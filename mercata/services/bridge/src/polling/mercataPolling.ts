@@ -2,21 +2,56 @@ import { config } from "../config";
 import {
   confirmDepositBatch,
   reviewDepositBatch,
+  confirmNativeDepositBatch,
+  reviewNativeDepositBatch,
+  finalizeNativeWithdrawalBatch,
+  queueManualNativeWithdrawalBatch,
   confirmWithdrawalBatch,
   finaliseWithdrawalBatch,
   handleRejectedWithdrawalBatch,
 } from "../services/bridgeService";
-import { NonEmptyArray, WithdrawalInfo, DepositInfo, ConfirmDepositArgs } from "../types";
+import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositInfo, NativeDepositInfo, ConfirmDepositArgs, ConfirmNativeDepositArgs } from "../types";
 import {
   getWithdrawalsByStatus,
+  getNativeWithdrawalsByStatus,
   getDepositsByStatus,
+  getNativeDepositsByStatus,
   getSafeTxHashFromEvents,
 } from "../services/cirrusService";
 import { monitorSafeTransactionStatusBatch } from "../services/safeService";
 import { logInfo, logError } from "../utils/logger";
 import { safeToBigInt } from "../utils/utils";
 import { verifyDepositsBatch } from "../services/verificationService";
+import { verifyNativeRedemptionsBatch } from "../services/nativeVerificationService";
 import { checkBalances } from "../utils/balanceCheck";
+
+const POLLING_BATCH_SIZE = 10;
+
+const chunk = <T>(items: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+};
+
+const startNonOverlappingPolling = (
+  operation: string,
+  pollingInterval: number,
+  poll: () => Promise<void>,
+): void => {
+  const run = async () => {
+    try {
+      await poll();
+    } catch (e: any) {
+      logError("MercataPolling", e as Error, { operation });
+    } finally {
+      setTimeout(run, pollingInterval);
+    }
+  };
+
+  void run();
+};
 
 export const startWithdrawalRequestPolling = (): void => {
   const pollingInterval = config.polling.withdrawalInterval || 5 * 60 * 1000;
@@ -29,7 +64,9 @@ export const startWithdrawalRequestPolling = (): void => {
       const initiatedWithdrawals: WithdrawalInfo[] = await getWithdrawalsByStatus("1");
       if (initiatedWithdrawals.length === 0) return;
 
-      await confirmWithdrawalBatch(initiatedWithdrawals as NonEmptyArray<WithdrawalInfo>);
+      for (const batch of chunk(initiatedWithdrawals, POLLING_BATCH_SIZE)) {
+        await confirmWithdrawalBatch(batch as NonEmptyArray<WithdrawalInfo>);
+      }
     } catch (e: any) {
       logError("MercataPolling", e as Error, {
         operation: "startWithdrawalRequestPolling",
@@ -37,8 +74,11 @@ export const startWithdrawalRequestPolling = (): void => {
     }
   };
 
-  void poll();
-  setInterval(poll, pollingInterval);
+  startNonOverlappingPolling(
+    "startWithdrawalRequestPolling",
+    pollingInterval,
+    poll,
+  );
 };
 
 export const startDepositInitiatedPolling = (): void => {
@@ -78,15 +118,15 @@ export const startDepositInitiatedPolling = (): void => {
       );
 
       if (verifiedDeposits.length > 0) {
-        await confirmDepositBatch(
-          verifiedDeposits as NonEmptyArray<ConfirmDepositArgs>
-        );
+        for (const batch of chunk(verifiedDeposits, POLLING_BATCH_SIZE)) {
+          await confirmDepositBatch(batch as NonEmptyArray<ConfirmDepositArgs>);
+        }
       }
 
       if (failedDeposits.length > 0) {
-        await reviewDepositBatch(
-          failedDeposits as NonEmptyArray<ConfirmDepositArgs>
-        );
+        for (const batch of chunk(failedDeposits, POLLING_BATCH_SIZE)) {
+          await reviewDepositBatch(batch as NonEmptyArray<ConfirmDepositArgs>);
+        }
       }
     } catch (e: any) {
       logError("MercataPolling", e as Error, {
@@ -95,8 +135,87 @@ export const startDepositInitiatedPolling = (): void => {
     }
   };
 
-  void poll();
-  setInterval(poll, pollingInterval);
+  startNonOverlappingPolling(
+    "startDepositInitiatedPolling",
+    pollingInterval,
+    poll,
+  );
+};
+
+export const startNativeDepositInitiatedPolling = (): void => {
+  const pollingInterval =
+    Number((config as any)?.polling?.withdrawalInterval) || 5 * 60 * 1000;
+
+  const poll = async () => {
+    try {
+      const [initiatedDeposits, pendingReviewDeposits] = await Promise.all([
+        getNativeDepositsByStatus("1"),
+        getNativeDepositsByStatus("2"),
+      ]);
+      const depositsById = new Map<string, NativeDepositInfo>();
+      for (const deposit of [...initiatedDeposits, ...pendingReviewDeposits]) {
+        depositsById.set(deposit.depositId, deposit);
+      }
+      const deposits = [...depositsById.values()];
+      if (!Array.isArray(deposits) || deposits.length === 0) return;
+
+      const verificationResults = await verifyNativeRedemptionsBatch(deposits);
+
+      const results: ConfirmNativeDepositArgs[] = deposits.map((deposit) => ({
+        externalChainId: deposit.externalChainId,
+        externalBridge: deposit.externalBridge,
+        externalRedemptionId: deposit.externalRedemptionId,
+        depositId: deposit.depositId,
+        stratoRecipient: deposit.stratoRecipient,
+        verified: verificationResults.get(deposit.depositId) === true,
+      }));
+
+      const { verifiedDeposits, failedDeposits } = results.reduce(
+        (acc, result) => {
+          if (result.verified) {
+            acc.verifiedDeposits.push(result);
+          } else {
+            acc.failedDeposits.push(result);
+          }
+          return acc;
+        },
+        {
+          verifiedDeposits: [] as ConfirmNativeDepositArgs[],
+          failedDeposits: [] as ConfirmNativeDepositArgs[],
+        },
+      );
+
+      if (verifiedDeposits.length > 0) {
+        for (const batch of chunk(verifiedDeposits, POLLING_BATCH_SIZE)) {
+          await confirmNativeDepositBatch(
+            batch as NonEmptyArray<ConfirmNativeDepositArgs>,
+          );
+        }
+      }
+
+      if (failedDeposits.length > 0) {
+        const initiatedFailedDeposits = failedDeposits.filter((deposit) => {
+          const sourceDeposit = depositsById.get(deposit.depositId);
+          return String(sourceDeposit?.bridgeStatus) === "1";
+        });
+        for (const batch of chunk(initiatedFailedDeposits, POLLING_BATCH_SIZE)) {
+          await reviewNativeDepositBatch(
+            batch as NonEmptyArray<ConfirmNativeDepositArgs>,
+          );
+        }
+      }
+    } catch (e: any) {
+      logError("MercataPolling", e as Error, {
+        operation: "startNativeDepositInitiatedPolling",
+      });
+    }
+  };
+
+  startNonOverlappingPolling(
+    "startNativeDepositInitiatedPolling",
+    pollingInterval,
+    poll,
+  );
 };
 
 export const startWithdrawalTxPolling = (): void => {
@@ -138,9 +257,13 @@ export const startWithdrawalTxPolling = (): void => {
       }
 
       if (toFinalize.length)
-        await finaliseWithdrawalBatch(toFinalize as NonEmptyArray<Number>);
+        for (const batch of chunk(toFinalize, POLLING_BATCH_SIZE)) {
+          await finaliseWithdrawalBatch(batch as NonEmptyArray<Number>);
+        }
       if (toReject.length)
-        await handleRejectedWithdrawalBatch(toReject as NonEmptyArray<Number>);
+        for (const batch of chunk(toReject, POLLING_BATCH_SIZE)) {
+          await handleRejectedWithdrawalBatch(batch as NonEmptyArray<Number>);
+        }
     } catch (e: any) {
       logError("MercataPolling", e as Error, {
         operation: "startWithdrawalTxPolling",
@@ -150,16 +273,112 @@ export const startWithdrawalTxPolling = (): void => {
     }
   };
 
-  void poll();
-  setInterval(poll, pollingInterval);
+  startNonOverlappingPolling("startWithdrawalTxPolling", pollingInterval, poll);
+};
+
+export const startNativeWithdrawalRequestPolling = (): void => {
+  const pollingInterval = config.polling.withdrawalInterval || 5 * 60 * 1000;
+
+  const poll = async () => {
+    try {
+      const initiatedWithdrawals: NativeWithdrawalInfo[] =
+        await getNativeWithdrawalsByStatus("1");
+      if (initiatedWithdrawals.length === 0) return;
+
+      const instantWithdrawals = initiatedWithdrawals.filter(
+        (withdrawal) => withdrawal.useInstantPath,
+      );
+      const approvalWithdrawals = initiatedWithdrawals.filter(
+        (withdrawal) => !withdrawal.useInstantPath,
+      );
+
+      if (instantWithdrawals.length > 0) {
+        for (const batch of chunk(instantWithdrawals, POLLING_BATCH_SIZE)) {
+          await finalizeNativeWithdrawalBatch(
+            batch as NonEmptyArray<NativeWithdrawalInfo>,
+          );
+        }
+      }
+
+      if (approvalWithdrawals.length > 0) {
+        for (const batch of chunk(approvalWithdrawals, POLLING_BATCH_SIZE)) {
+          await queueManualNativeWithdrawalBatch(
+            batch as NonEmptyArray<NativeWithdrawalInfo>,
+          );
+        }
+      }
+    } catch (e: any) {
+      logError("MercataPolling", e as Error, {
+        operation: "startNativeWithdrawalRequestPolling",
+      });
+    }
+  };
+
+  startNonOverlappingPolling(
+    "startNativeWithdrawalRequestPolling",
+    pollingInterval,
+    poll,
+  );
+};
+
+export const startNativeWithdrawalTxPolling = (): void => {
+  const pollingInterval = config.polling.bridgeOutInterval ?? 5 * 60 * 1000;
+
+  const poll = async () => {
+    try {
+      const pending: NativeWithdrawalInfo[] = await getNativeWithdrawalsByStatus("2");
+      if (!Array.isArray(pending) || pending.length === 0) return;
+
+      const pendingInstantExecution: NativeWithdrawalInfo[] = [];
+      const pendingManualExecution: NativeWithdrawalInfo[] = [];
+
+      for (const w of pending) {
+        if (w.useInstantPath) {
+          pendingInstantExecution.push(w);
+        } else {
+          pendingManualExecution.push(w);
+        }
+      }
+
+      if (pendingInstantExecution.length > 0) {
+        for (const batch of chunk(pendingInstantExecution, POLLING_BATCH_SIZE)) {
+          await finalizeNativeWithdrawalBatch(
+            batch as NonEmptyArray<NativeWithdrawalInfo>,
+          );
+        }
+      }
+      if (pendingManualExecution.length > 0) {
+        for (const batch of chunk(pendingManualExecution, POLLING_BATCH_SIZE)) {
+          await queueManualNativeWithdrawalBatch(
+            batch as NonEmptyArray<NativeWithdrawalInfo>,
+          );
+        }
+      }
+    } catch (e: any) {
+      logError("MercataPolling", e as Error, {
+        operation: "startNativeWithdrawalTxPolling",
+        error: e.message,
+        errorStack: e.stack,
+      });
+    }
+  };
+
+  startNonOverlappingPolling(
+    "startNativeWithdrawalTxPolling",
+    pollingInterval,
+    poll,
+  );
 };
 
 export const initializeMercataPolling = async () => {
   logInfo("MercataPolling", "Initializing Mercata polling...");
 
   startDepositInitiatedPolling();
+  startNativeDepositInitiatedPolling();
   startWithdrawalRequestPolling();
+  startNativeWithdrawalRequestPolling();
   startWithdrawalTxPolling();
+  startNativeWithdrawalTxPolling();
 
   logInfo("MercataPolling", "Mercata polling initialized");
 };

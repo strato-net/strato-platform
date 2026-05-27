@@ -22,12 +22,15 @@ export type BridgeMappingRow = {
 };
 
 export type BridgeAssetInfo = {
+  routeType: "standard" | "native";
   externalChainId: string;
+  externalBridge?: string;
   externalToken: string;
   externalName: string;
   externalSymbol: string;
   externalDecimals: string;
   maxPerWithdrawal: string;
+  instantWithdrawalThreshold?: string;
   stratoToken: string;
   enabled: boolean;
 };
@@ -38,6 +41,12 @@ export type BridgeableAssetRoute = {
   externalChainId: string;
   AssetInfo: BridgeAssetInfo;
   isDefaultRoute: boolean;
+};
+
+export type NativeBridgeAssetRow = {
+  key?: string;
+  key2?: string | number;
+  value?: unknown;
 };
 
 // ============================================================================
@@ -149,17 +158,42 @@ async function fetchTokenSymbols(accessToken: string, addresses: Set<string>): P
 
 async function fetchExternalMeta(accessToken: string, tokens: Set<string>): Promise<Map<string, { externalName: string; externalSymbol: string }>> {
   if (!tokens.size) return new Map();
-  const { data } = await cirrus.get(accessToken, `/${constants.MercataBridge}-assets`, {
-    params: {
-      address: `eq.${constants.mercataBridge}`,
-      key: `in.(${[...tokens].join(",")})`,
-      select: "key,value->>externalName,value->>externalSymbol,value->>externalChainId",
-    }
-  });
+  const [standardResponse, nativeResponse] = await Promise.all([
+    cirrus.get(accessToken, `/${constants.MercataBridge}-assets`, {
+      params: {
+        address: `eq.${constants.mercataBridge}`,
+        key: `in.(${[...tokens].join(",")})`,
+        select: "key,value->>externalName,value->>externalSymbol,value->>externalChainId",
+      }
+    }),
+    constants.stratoNativeBridge
+      ? cirrus.get(accessToken, `/${constants.StratoNativeBridge}-assets`, {
+          params: {
+            address: `eq.${constants.stratoNativeBridge}`,
+            select: "key,key2,value",
+          }
+        })
+      : Promise.resolve({ data: [] }),
+  ]);
   const map = new Map<string, { externalName: string; externalSymbol: string }>();
-  for (const a of data || []) {
+  for (const a of standardResponse.data || []) {
     const key = getBridgePairKey(normalizeBridgeAddress(a.key), toBridgeChainId(a.externalChainId));
     if (!map.has(key)) map.set(key, { externalName: a.externalName || "-", externalSymbol: a.externalSymbol || "-" });
+  }
+  for (const row of nativeResponse.data || []) {
+    const raw = row?.value;
+    if (!raw || typeof raw !== "object") continue;
+    const representationToken = typeof raw.representationToken === "string" ? normalizeBridgeAddress(raw.representationToken) : "";
+    const externalChainId = toBridgeChainId(row.key2);
+    if (!representationToken || !externalChainId || !tokens.has(stripHex(representationToken))) continue;
+
+    const key = getBridgePairKey(representationToken, externalChainId);
+    if (!map.has(key)) {
+      map.set(key, {
+        externalName: typeof raw.externalName === "string" ? raw.externalName : "-",
+        externalSymbol: typeof raw.externalSymbol === "string" ? raw.externalSymbol : "-",
+      });
+    }
   }
   return map;
 }
@@ -272,6 +306,7 @@ const toBridgeAssetInfo = (value: unknown, externalToken: string, externalChainI
   const raw = value as Record<string, unknown>;
   if (typeof raw.stratoToken !== "string" || raw.stratoToken.length === 0) return null;
   return {
+    routeType: "standard",
     externalChainId,
     externalToken,
     externalName: typeof raw.externalName === "string" ? raw.externalName : "",
@@ -323,6 +358,49 @@ export function parseBridgeRouteMappings(mappings: BridgeMappingRow[]): Bridgeab
         AssetInfo: { ...asset, stratoToken, enabled: true },
       });
     }
+  }
+
+  return routes;
+}
+
+export function parseNativeBridgeAssets(rows: NativeBridgeAssetRow[]): BridgeableAssetRoute[] {
+  const routes: BridgeableAssetRoute[] = [];
+
+  for (const row of rows) {
+    const stratoToken = typeof row.key === "string" ? normalizeBridgeAddress(row.key) : "";
+    const externalChainId = toBridgeChainId(row.key2);
+    if (!stratoToken || !externalChainId || !row.value || typeof row.value !== "object") continue;
+
+    const raw = row.value as Record<string, unknown>;
+    const representationToken = typeof raw.representationToken === "string"
+      ? normalizeBridgeAddress(raw.representationToken)
+      : "";
+    if (!representationToken) continue;
+
+    const asset: BridgeAssetInfo = {
+      routeType: "native",
+      externalChainId,
+      externalBridge: typeof raw.externalBridge === "string" ? normalizeBridgeAddress(raw.externalBridge) : "",
+      externalToken: representationToken,
+      externalName: typeof raw.externalName === "string" ? raw.externalName : "",
+      externalSymbol: typeof raw.externalSymbol === "string" ? raw.externalSymbol : "",
+      externalDecimals: "18",
+      maxPerWithdrawal: raw.maxPerWithdrawal != null ? String(raw.maxPerWithdrawal) : "0",
+      instantWithdrawalThreshold:
+        raw.instantWithdrawalThreshold != null
+          ? String(raw.instantWithdrawalThreshold)
+          : "0",
+      stratoToken,
+      enabled: isMappingTrue(raw.enabled),
+    };
+
+    routes.push({
+      id: `${representationToken}-${externalChainId}-${stratoToken}-native`,
+      externalToken: representationToken,
+      externalChainId,
+      AssetInfo: asset,
+      isDefaultRoute: true,
+    });
   }
 
   return routes;

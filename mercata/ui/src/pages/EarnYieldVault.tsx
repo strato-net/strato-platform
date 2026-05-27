@@ -46,6 +46,7 @@ import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 const VAULT_META: Record<string, {
   title: string;
   subtitle: string;
+  badge: string;
   iconBg: string;
   iconColor: string;
   cardBorder: string;
@@ -54,6 +55,7 @@ const VAULT_META: Record<string, {
   "eth-carry": {
     title: "ETH Carry Vault",
     subtitle: "ERC-4626 carry vault for ETH deposits",
+    badge: "Carry Vault",
     iconBg: "bg-indigo-500/15 dark:bg-indigo-400/15",
     iconColor: "text-indigo-600 dark:text-indigo-400",
     cardBorder: "border-indigo-500/25 dark:border-indigo-400/25 bg-gradient-to-br from-[#f5f3ff] to-[#ede9fe] dark:from-[#1a1533] dark:to-[#1c173a]",
@@ -62,10 +64,20 @@ const VAULT_META: Record<string, {
   "wbtc-carry": {
     title: "wBTC Carry Vault",
     subtitle: "ERC-4626 carry vault for wBTC deposits",
+    badge: "Carry Vault",
     iconBg: "bg-orange-500/15 dark:bg-orange-400/15",
     iconColor: "text-orange-600 dark:text-orange-400",
     cardBorder: "border-orange-500/25 dark:border-orange-400/25 bg-gradient-to-br from-[#fff7ed] to-[#ffedd5] dark:from-[#241a0a] dark:to-[#2b1d0c]",
     strategyDescription: "The vault targets growth in BTC per share. Deposited wBTC is used as collateral to borrow USDST, which is deployed into yield-bearing stablecoins (syrupUSDC, sUSDS). The net carry is periodically converted back into BTC, increasing each share's claim on BTC over time. The vault maintains an idle buffer for withdrawals; large redemptions may queue when capital is deployed.",
+  },
+  "usdc-yield": {
+    title: "USDC Yield Vault",
+    subtitle: "ERC-4626 yield vault for USDC deposits",
+    badge: "Yield Vault",
+    iconBg: "bg-emerald-500/15 dark:bg-emerald-400/15",
+    iconColor: "text-emerald-600 dark:text-emerald-400",
+    cardBorder: "border-emerald-500/25 dark:border-emerald-400/25 bg-gradient-to-br from-[#ecfdf5] to-[#d1fae5] dark:from-[#0a2018] dark:to-[#0c2a1f]",
+    strategyDescription: "The vault targets growth in USDC per share by routing deposits across approved yield strategies. USDC may be converted into other tokens when needed to access yield, but the vault manages returns back to USDC-denominated value. Yield is harvested, rebalanced, and compounded over time. The vault maintains an idle buffer for withdrawals; large redemptions may queue when capital is deployed.",
   },
 };
 
@@ -538,7 +550,7 @@ const EarnYieldVault = () => {
                 <section className="space-y-5">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                      Carry Vault
+                      {meta.badge}
                     </Badge>
                     <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
                       {assetSymbol}
@@ -661,7 +673,6 @@ const EarnYieldVault = () => {
                           <p className="text-lg font-semibold break-all">{formatAddress(effectiveInfo?.vaultAddress || "")}</p>
                           <CopyButton address={effectiveInfo?.vaultAddress || ""} />
                         </div>
-                        <p className="text-xs text-muted-foreground">Configured carryETH vault on this network</p>
                       </CardContent>
                     </Card>
                     <Card className="border border-border/70">
@@ -679,7 +690,7 @@ const EarnYieldVault = () => {
                         <p className="text-lg font-semibold">
                           {formatTokenAmount(effectiveInfo?.deployedAssets || "0", decimals)} {assetSymbol}
                         </p>
-                        <p className="text-xs text-muted-foreground">Capital deployed to the carry strategy</p>
+                        <p className="text-xs text-muted-foreground">Capital deployed to the strategy</p>
                       </CardContent>
                     </Card>
                     <Card className="border border-border/70">

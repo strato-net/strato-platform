@@ -7,6 +7,7 @@ import bodyParser from "body-parser";
 import { logInfo, logError } from "./utils/logger";
 import { validateBridgeConfig } from "./utils/configValidator";
 import { startMultiChainDepositPolling } from "./polling/alchemyPolling";
+import { startNativeRedemptionPolling } from "./polling/nativeRedemptionPolling";
 import { initializeMercataPolling } from "./polling/mercataPolling";
 import { initOpenIdConfig} from "./auth";
 import { healthMonitor } from "./utils/healthMonitor";
@@ -61,6 +62,7 @@ app.listen(port, async () => {
 
     // Start polling services
     startMultiChainDepositPolling();
+    startNativeRedemptionPolling();
     await initializeMercataPolling();
 
     logInfo(

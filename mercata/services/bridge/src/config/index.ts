@@ -11,6 +11,10 @@ export const ERC20_ABI = [
 export const DEPOSIT_EVENT_SIGNATURE =
   "0x55426533b384af6fcfee0e834a6407e3ffc370a0b1b53400c4e6ec92d7f1f750";
 
+// RedemptionRequested(address indexed representationToken, uint256 amount, address indexed sender, address indexed stratoRecipient, uint96 redemptionId)
+export const NATIVE_REDEMPTION_EVENT_SIGNATURE =
+  "0x8c3e37d44910f9975cca29b1cbb70b943d7107cf2091576b3291d4316c74129a";
+
 // Transfer(address,address,uint256)
 export const TRANSFER_EVENT_SIGNATURE =
   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
@@ -28,6 +32,9 @@ const config = {
   },
   bridge: {
     address: process.env.BRIDGE_ADDRESS,
+  },
+  nativeBridge: {
+    address: process.env.STRATO_NATIVE_BRIDGE_ADDRESS,
   },
   oracle: {
     address: process.env.PRICE_ORACLE_ADDRESS,
@@ -99,6 +106,54 @@ export const getChainRpcUrl = (chainId: number | bigint): string => {
   }
 
   return rpcUrl;
+};
+
+export const getNativeRepresentationBridgeAddress = (
+  chainId: number | bigint,
+): string | undefined => {
+  const chainIdStr = chainId.toString();
+  return process.env[`CHAIN_${chainIdStr}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`];
+};
+
+export const getNativeBridgePrivateKey = (
+  chainId: number | bigint,
+): string | undefined => {
+  const chainIdStr = chainId.toString();
+  return process.env[`CHAIN_${chainIdStr}_NATIVE_BRIDGE_PRIVATE_KEY`];
+};
+
+export interface NativeBridgePrivateKeyConfig {
+  envVar: string;
+  privateKey: string;
+}
+
+export const getNativeBridgePrivateKeys = (
+  chainId: number | bigint,
+): NativeBridgePrivateKeyConfig[] => {
+  const chainIdStr = chainId.toString();
+  const baseEnv = `CHAIN_${chainIdStr}_NATIVE_BRIDGE_PRIVATE_KEY`;
+  const keys: NativeBridgePrivateKeyConfig[] = [];
+  const seen = new Set<string>();
+
+  const addKey = (envVar: string) => {
+    const privateKey = process.env[envVar]?.trim();
+    if (!privateKey || seen.has(privateKey)) {
+      return;
+    }
+    seen.add(privateKey);
+    keys.push({ envVar, privateKey });
+  };
+
+  addKey(baseEnv);
+  for (let index = 1; ; index += 1) {
+    const envVar = `${baseEnv}_${index}`;
+    if (!process.env[envVar]) {
+      break;
+    }
+    addKey(envVar);
+  }
+
+  return keys;
 };
 
 // Validate required environment variables

@@ -115,6 +115,16 @@ export const defaultVaultFactoryFor: Record<string, string> = {
   "33056204878082667": "55c77951e9cadc73af24ec18881d01fedff1f1f1" // Upquark mainnet
 };
 
+export const defaultStratoNativeBridgeFor: Record<string, string> = {
+  "114784819836269": "49f69252b00235030a4dcd4c7ef17a64ef346258", // Helium testnet
+  "33056204878082667": "", // Upquark mainnet
+};
+
+export const defaultStratoNativeCustodyVaultFor: Record<string, string> = {
+  "114784819836269": "8cfe7b576f69260673e9a1a9517137f12a49ed93", // Helium testnet
+  "33056204878082667": "", // Upquark mainnet
+};
+
 export const defaultMetalForgeFor: Record<string, string> = {
   "114784819836269": "c5ed981b816a626981a5747d125e0e7296b2c7c6", // Helium testnet
   "33056204878082667": "1cc5bad32dc8667878fa7c53cc5cfd6e76fdb113", // Upquark mainnet
@@ -145,6 +155,11 @@ export const defaultWbtcCarryVaultFor: Record<string, string> = {
   "33056204878082667": "0b5831edcab6f06256a790340426236c31bb463f", // Upquark mainnet
 };
 
+export const defaultUsdcYieldVaultFor: Record<string, string> = {
+  "114784819836269": "9c9bcc6e040910c6705d15864067720923bacc82", // Helium testnet
+  "33056204878082667": "afcfc4d847d59fbc402856fd6934aff6796812b1",// Upquark mainnet
+};
+
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
@@ -158,6 +173,9 @@ export let vault: string = '';
 export let saveUsdstVault: string = '';
 export let ethCarryVault: string = '';
 export let wbtcCarryVault: string = '';
+export let stratoNativeBridge: string = '';
+export let stratoNativeCustodyVault: string = '';
+export let usdcYieldVault: string = '';
 
 function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
@@ -194,6 +212,17 @@ function setVaultFactoryConfig(networkId: string) {
   } else {
     vaultFactory = defaultVaultFactoryFor[networkId];
   }
+}
+
+function setStratoNativeBridgeConfig(networkId: string) {
+  stratoNativeBridge =
+    process.env.STRATO_NATIVE_BRIDGE ||
+    defaultStratoNativeBridgeFor[networkId] ||
+    "";
+  stratoNativeCustodyVault =
+    process.env.STRATO_NATIVE_CUSTODY_VAULT ||
+    defaultStratoNativeCustodyVaultFor[networkId] ||
+    "";
 }
 
 function setMetalForgeConfig(networkId: string) {
@@ -233,6 +262,10 @@ export function setCarryVaultConfig(networkId: string) {
   wbtcCarryVault = process.env.WBTC_CARRY_VAULT || defaultWbtcCarryVaultFor[networkId] || "";
 }
 
+export function setUsdcYieldVaultConfig(networkId: string) {
+  usdcYieldVault = process.env.USDC_YIELD_VAULT || defaultUsdcYieldVaultFor[networkId] || "";
+}
+
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
   const { eth } = await import("../utils/mercataApiHelper");
@@ -247,11 +280,13 @@ export async function initNetworkConfig() {
   setRewardsConfig(networkId);
   setReferralConfig(networkId);
   setVaultFactoryConfig(networkId);
+  setStratoNativeBridgeConfig(networkId);
   setMetalForgeConfig(networkId);
   setCreditCardTopUpConfig(networkId);
   setSaveUsdstVaultConfig(networkId);
   setVaultConfig(networkId);
   setCarryVaultConfig(networkId);
+  setUsdcYieldVaultConfig(networkId);
 }
 
 /**

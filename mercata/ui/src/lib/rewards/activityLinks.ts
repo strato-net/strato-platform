@@ -33,6 +33,16 @@ export const getActivityLink = (activityName: string): string | null => {
     return '/dashboard/earn-yield-vault?vault=eth-carry';
   }
 
+  // wBTC Carry Vault
+  if (lowerName.includes('wbtc carry vault')) {
+    return '/dashboard/earn-yield-vault?vault=wbtc-carry';
+  }
+
+  // USDC Yield Vault
+  if (lowerName.includes('usdc yield vault')) {
+    return '/dashboard/earn-yield-vault?vault=usdc-yield';
+  }
+
   // Vault activities - goes to the Vault page
   if (lowerName.includes('vault')) {
     return '/dashboard/vault';
