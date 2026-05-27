@@ -179,7 +179,7 @@ else
     echo "OAuth client '${OAUTH_CLIENT_ID}' already exists."
 fi
 
-echo "Local auth admin user is created with strato-local-user-add."
+echo "Local auth admin user is created with strato-user-add."
 
 echo ""
 echo "=== STRATO Local Auth Ready ==="

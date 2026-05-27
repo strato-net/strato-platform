@@ -29,10 +29,10 @@ Local auth supports a single admin user:
 
 - **Username:** `admin`
 
-Create it after the node is running:
+Create it and initialize its wallet key after the node is running:
 
 ```bash
-strato-local-user-add /path/to/mynode
+strato-user-add /path/to/mynode
 ```
 
 Override the username with `LOCAL_AUTH_ADMIN_USERNAME` if needed.
@@ -66,7 +66,7 @@ http://localhost:4444/.well-known/openid-configuration
    ```
 
 3. Or use the authorization code flow:
-   - Create the admin user with `strato-local-user-add`
+   - Create the admin user and wallet key with `strato-user-add`
    - Open: http://localhost:3000/login
    - Sign in as `admin`
    - You'll be redirected back with an authorization code
