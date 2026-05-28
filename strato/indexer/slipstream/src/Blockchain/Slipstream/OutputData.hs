@@ -1307,7 +1307,7 @@ genericBaseTableIndexesSQL = T.unlines
   , ""
   , "CREATE INDEX IF NOT EXISTS storage_status_address_idx"
   , "  ON storage (((data->>'status')), address)"
-  , "  WHERE data ? 'status';"
+  , "  WHERE jsonb_exists(data, 'status');"
   , ""
   , "CREATE INDEX IF NOT EXISTS event_name_sender_timestamp_idx"
   , "  ON event (event_name, transaction_sender, block_timestamp DESC);"
