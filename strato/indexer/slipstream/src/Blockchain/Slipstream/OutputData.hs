@@ -1270,6 +1270,7 @@ initialSlipstreamQueries =
       ["address", "block_hash", "event_index", "collection_name", "key"]
       Nothing -- (Just $ Foreign "event_event_array" ["address", "block_hash", "event_index"] globalEventTableName ["address", "block_hash", "event_index"])
       []
+  , RawSQL genericBaseTableIndexesSQL
   , RawSQL jsonbMergeDeepSQL
   , RawSQL jsonbObjToArraySQL
   , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "event") (indexTableName "" "storage") False "address" SqlText
@@ -1278,6 +1279,44 @@ initialSlipstreamQueries =
   , CreateFkeyFunction $ ForeignKeyInfo "mapping" (indexTableName "" "storage") (indexTableName "" "mapping") True "address" SqlText
   , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "contract") (indexTableName "" "storage") True "address" SqlText
   , CreateFkeyFunction $ ForeignKeyInfo "contract" (indexTableName "" "storage") (indexTableName "" "contract") True "address" SqlText
+  ]
+
+genericBaseTableIndexesSQL :: Text
+genericBaseTableIndexesSQL = T.unlines
+  [ "CREATE INDEX IF NOT EXISTS history_mapping_lookup_idx"
+  , "  ON \"history@mapping\" (address, collection_name, ((key->>'key')), valid_from, valid_to);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS mapping_collection_key_address_idx"
+  , "  ON mapping (collection_name, ((key->>'key')), address);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS mapping_address_collection_key_idx"
+  , "  ON mapping (address, collection_name, ((key->>'key')));"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS mapping_balances_key_value_address_idx"
+  , "  ON mapping (((key->>'key')), value DESC, address)"
+  , "  WHERE collection_name = '_balances'"
+  , "    AND value IS NOT NULL"
+  , "    AND (value)::text <> ALL (ARRAY['\"\"', '0', 'false'])"
+  , "    AND jsonb_typeof(value) IS NOT NULL;"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS mapping_collection_address_idx"
+  , "  ON mapping (collection_name, address)"
+  , "  WHERE value IS NOT NULL"
+  , "    AND (value)::text <> ALL (ARRAY['\"\"', '0', 'false'])"
+  , "    AND jsonb_typeof(value) IS NOT NULL;"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS storage_status_address_idx"
+  , "  ON storage (((data->>'status')), address)"
+  , "  WHERE data ? 'status';"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_name_sender_timestamp_idx"
+  , "  ON event (event_name, transaction_sender, block_timestamp DESC);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_address_name_timestamp_idx"
+  , "  ON event (address, event_name, block_timestamp DESC);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_name_timestamp_idx"
+  , "  ON event (event_name, block_timestamp DESC);"
   ]
 
 jsonbMergeDeepSQL :: Text
