@@ -344,6 +344,7 @@ withCurrentBlockHash bh f = do
 withCurrentBlockHashNoCommit ::
   ( MonadUnliftIO m,
     Mod.Modifiable MemDBs m,
+    Mod.Modifiable BlockHashRoot m,
     Mod.Modifiable CurrentBlockHash m
   ) =>
   Keccak256 ->
@@ -351,7 +352,10 @@ withCurrentBlockHashNoCommit ::
   m a
 withCurrentBlockHashNoCommit bh f = do
   memDBs' <- Mod.get (Mod.Proxy @MemDBs)
-  let restore = Mod.put (Mod.Proxy @MemDBs) memDBs'
+  blockHashRoot' <- Mod.get (Mod.Proxy @BlockHashRoot)
+  let restore = do
+        Mod.put (Mod.Proxy @BlockHashRoot) blockHashRoot'
+        Mod.put (Mod.Proxy @MemDBs) memDBs'
   Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash bh)
   a <- f `onException` restore
   restore
