@@ -510,7 +510,6 @@ export const repay = async (
 };
 
 // --- Collateral-specific caches ---
-const STATIC_CACHE_TTL = 3_600_000; // 1hr — token metadata (name, symbol, decimals, images)
 const COLLATERAL_CACHE_TTL = 30_000; // 30s — asset list, public response
 
 // Collateral asset addresses from assetConfigs — changes only on admin action (30s)
