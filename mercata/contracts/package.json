@@ -6,6 +6,7 @@
     "scripts": {
         "configure:native-route": "node deploy/configure-native-route.js",
         "deploy": "node deploy/deploy.js",
+        "deployProxy": "node deploy/deployProxy.js",
         "happy:eth-deposit": "node deploy/happy-eth-deposit.js",
         "happy:eth-withdrawal": "node deploy/happy-eth-withdrawal.js",
         "happy:native-redemption": "node deploy/happy-native-redemption.js",
