@@ -16,7 +16,7 @@ import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { useEarnContext } from "@/context/EarnContext";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
 import { useYieldVaultContext } from "@/hooks/useYieldVaultContext";
-import { buildNativeRewardsApyInfo, EarnApyInfo, findBestEarnApyInfo, findPoolEarnApyInfo } from "@/utils/earnUtils";
+import { buildActivityRewardsApyInfo, buildNativeRewardsApyInfo, EarnApyInfo, findBestEarnApyInfo, findPoolEarnApyInfo } from "@/utils/earnUtils";
 
 interface ActivitiesTableProps {
   activities: Activity[];
@@ -136,7 +136,7 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
     }
 
     if (lowerName.includes("direct mint") || lowerName.includes("bridge")) {
-      return findBestEarnApyInfo(tokenApys, usdstAddress);
+      return buildActivityRewardsApyInfo(activity.emissionRate, activity.totalStakeUsd);
     }
 
     return (

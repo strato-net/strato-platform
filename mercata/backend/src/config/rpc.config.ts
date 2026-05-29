@@ -22,7 +22,7 @@ const rpcUpstreams: RpcMapping = {
   [baseChainId]: process.env.RPC_URL_BASE || fallbackRpcUpstreams[baseChainId],
   [baseSepoliaChainId]: process.env.RPC_URL_BASE_SEPOLIA || fallbackRpcUpstreams[baseSepoliaChainId],
   [lineaChainId]: process.env.RPC_URL_LINEA || fallbackRpcUpstreams[lineaChainId],
-  [lineaSepoliaChainId]: process.env.RPC_URL_LINEA_SEPOLIA || fallbackRpcUpstreams[lineaChainId],
+  [lineaSepoliaChainId]: process.env.RPC_URL_LINEA_SEPOLIA || fallbackRpcUpstreams[lineaSepoliaChainId],
 };
 
 export function getRpcUpstream(chainId: string): { upstream: string | undefined; fallback: string | undefined } {

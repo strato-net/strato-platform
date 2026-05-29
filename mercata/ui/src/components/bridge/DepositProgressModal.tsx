@@ -19,6 +19,7 @@ interface DepositProgressModalProps {
   chainId?: number;
   isEasySavings?: boolean;
   isNative?: boolean;
+  isRedemption?: boolean;
   error?: string;
   onClose?: () => void;
 }
@@ -30,6 +31,7 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
   chainId,
   isEasySavings = false,
   isNative = true,
+  isRedemption = false,
   error,
   onClose,
 }) => {
@@ -58,7 +60,13 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
       steps.push(
         { key: "confirm_tx", label: "Confirm Transaction", description: "Confirm transaction in your wallet" },
         { key: "waiting_tx", label: "Waiting for Transaction", description: "Transaction is being processed on-chain" },
-        { key: "complete", label: "Processing Deposit", description: "All set! STRATO is processing your deposit (1-2 min). You can close this modal anytime." }
+        {
+          key: "complete",
+          label: isRedemption ? "Processing Redemption" : "Processing Deposit",
+          description: isRedemption
+            ? "All set! STRATO is processing your redemption (1-2 min). You can close this modal anytime."
+            : "All set! STRATO is processing your deposit (1-2 min). You can close this modal anytime."
+        }
       );
       return steps;
     }
@@ -146,10 +154,10 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
           </div>
           <span className="text-lg font-semibold text-foreground">
             {currentStep === "error" 
-              ? "Deposit Failed" 
+              ? (isRedemption ? "Redemption Failed" : "Deposit Failed")
               : currentStep === "complete" 
-              ? "Deposit Complete" 
-              : "Processing Deposit"}
+              ? (isRedemption ? "Redemption Complete" : "Deposit Complete")
+              : (isRedemption ? "Processing Redemption" : "Processing Deposit")}
           </span>
         </div>
       }

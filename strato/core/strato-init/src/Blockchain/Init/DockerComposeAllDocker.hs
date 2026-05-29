@@ -109,12 +109,14 @@ generateDockerComposeAllDocker = do
   let apex = def
         { image = "${APEX_IMAGE:-" ++ repoUrl ++ "apex:" ++ stratoVersion ++ "-" ++ hashApex ++ "}"
         , build = Just "."
-        , depends_on = Just $ DependsOnList ["postgres", "prometheus", "strato"]
+        , depends_on = Just $ DependsOnList ["postgres", "prometheus", "redis", "strato"]
         , environment = Just $ Map.fromList
             [ ("ADMIN_EMAIL", "${ADMIN_EMAIL:-}")
             , ("postgres_host", "postgres")
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
+            , ("redis_host", "redis")
+            , ("redis_port", "6379")
             , ("PROMETHEUS_HOST", "${PROMETHEUS_HOST:-prometheus:9090}")
             , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY:-}")
             , ("STRATO_HOSTNAME", "${STRATO_HOSTNAME:-strato}")

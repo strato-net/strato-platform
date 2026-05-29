@@ -155,7 +155,37 @@ executables:
       - saltine
       - strato-model
       - text
-      
+
+  change-vault-password:
+    source-dirs: app
+    main: ChangeVaultPassword.hs
+    other-modules: [Options]
+    dependencies:
+      - blockapps-vault-wrapper-api
+      - blockapps-vault-wrapper-server
+      - bytestring
+      - hflags
+      - opaleye
+      - postgresql-simple
+      - saltine
+
+  migrate-key:
+    source-dirs: app
+    main: MigrateKey.hs
+    other-modules: [Options]
+    dependencies:
+      - aeson
+      - base64-bytestring
+      - blockapps-vault-wrapper-api
+      - blockapps-vault-wrapper-server
+      - bytestring
+      - hflags
+      - opaleye
+      - postgresql-simple
+      - saltine
+      - strato-model
+      - text
+
 
 tests:
   vault-wrapper-spec:

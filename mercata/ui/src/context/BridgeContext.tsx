@@ -266,8 +266,11 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     ): Promise<BridgeResponse> => {
       setLoading(true);
       try {
+        const endpoint = params.routeType === "native"
+          ? "/bridge/requestNativeWithdrawal"
+          : "/bridge/requestWithdrawal";
         const { data } = await api.post<TransactionResponse>(
-          `/bridge/requestWithdrawal`,
+          endpoint,
           params,
           options as any
         );

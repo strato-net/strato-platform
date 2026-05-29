@@ -16,6 +16,10 @@ defineFlag "vaultPasswordFile" ("" :: String) "Path to file containing vault enc
 defineFlag "username" ("admin" :: String) "Username for key import"
 defineFlag "oauthProvider" ("admin" :: String) "OAuth provider for key import"
 
+defineFlag "pgPoolSize" (100 :: Int) "Maximum number of connections in the Postgres pool"
+defineFlag "pgPoolIdleTimeout" (30 :: Int) "Idle connection timeout in seconds before pool closes connections"
+defineFlag "pgPoolStripes" (0 :: Int) "Number of pool stripes (0 = use number of CPU capabilities)"
+
 defineFlag "pw" ("" :: String) "Password for vault-proxy"
 defineFlag "key" ("" :: String) "the old blockstanbulPrivateKey to migrate"
 defineFlag "pwOld" ("" :: String) "Password for old vault-wrapper" -- Used for mercata migration
