@@ -32,6 +32,9 @@ import {
   NoVoteAttestationError,
 } from "../services/bscProof.service";
 import {
+  NoRedemptionLogError,
+} from "../services/nativeRedemptionProof.service";
+import {
   listConfiguredChains,
   loadTrustlessConfig,
   trustlessClaim,
@@ -393,10 +396,23 @@ class BridgeController {
         res.status(400).json({ error: "chainId path param required" });
         return;
       }
-      const cfg = await loadTrustlessConfig(accessToken, chainId);
+      // ?routeType=standard|native (default: standard). Used by
+      // chain-specific UI panels that already know the route.
+      const routeTypeRaw = req.query.routeType;
+      const routeType =
+        routeTypeRaw === "native"
+          ? "native"
+          : routeTypeRaw === undefined || routeTypeRaw === "standard"
+          ? "standard"
+          : undefined;
+      if (routeType === undefined) {
+        res.status(400).json({ error: `routeType must be 'standard' or 'native' (got ${routeTypeRaw})` });
+        return;
+      }
+      const cfg = await loadTrustlessConfig(accessToken, chainId, routeType);
       res.json({ success: true, data: cfg });
     } catch (error: any) {
-      if (typeof error?.message === "string" && error.message.includes("trustless path disabled")) {
+      if (typeof error?.message === "string" && /trustless path disabled/.test(error.message)) {
         res.status(503).json({ error: error.message, code: "TRUSTLESS_DISABLED" });
         return;
       }
@@ -450,11 +466,20 @@ class BridgeController {
         res.status(400).json({ error: "chainId path param required" });
         return;
       }
-      const cfg = await loadTrustlessConfig(accessToken, chainId);
+      // getFinalizedHead's result is route-independent (source-chain
+      // finality is the same for both bridge routes). Standard route
+      // is the most likely to be configured; native is the fallback.
+      let cfg;
+      try {
+        cfg = await loadTrustlessConfig(accessToken, chainId, "standard");
+      } catch {
+        cfg = await loadTrustlessConfig(accessToken, chainId, "native");
+      }
       const head = await getFinalizedHead({
         chainId,
         name: chainId,
         flavor: cfg.flavor,
+        routeType: cfg.routeType,
         bridgeIn: cfg.bridgeIn,
         lightClient: cfg.lightClient,
         depositRoutedSig: cfg.depositRoutedSig,
@@ -510,19 +535,48 @@ class BridgeController {
         res.status(400).json({ error: "wallets query param required" });
         return;
       }
-      const cfg = await loadTrustlessConfig(accessToken, chainId);
-      const deposits = await getPendingDeposits(
-        accessToken,
-        {
-          chainId,
-          name: chainId,
-          flavor: cfg.flavor,
-          bridgeIn: cfg.bridgeIn,
-          lightClient: cfg.lightClient,
-          depositRoutedSig: cfg.depositRoutedSig,
-          l1LightClient: cfg.l1LightClient,
-        },
-        wallets,
+      // Scan both routes in parallel if both are configured for this
+      // chain. Either side failing (chain not registered for that
+      // route) is silent — the user just doesn't see those rows.
+      const tryLoad = async (route: "standard" | "native") => {
+        try {
+          return await loadTrustlessConfig(accessToken, chainId, route);
+        } catch {
+          return undefined;
+        }
+      };
+      const [standardCfg, nativeCfg] = await Promise.all([
+        tryLoad("standard"),
+        tryLoad("native"),
+      ]);
+      if (!standardCfg && !nativeCfg) {
+        res.status(503).json({ error: `trustless path disabled for chain ${chainId}`, code: "TRUSTLESS_DISABLED" });
+        return;
+      }
+      const scan = async (cfg: typeof standardCfg) => {
+        if (!cfg) return [];
+        return getPendingDeposits(
+          accessToken,
+          {
+            chainId,
+            name: chainId,
+            flavor: cfg.flavor,
+            routeType: cfg.routeType,
+            bridgeIn: cfg.bridgeIn,
+            lightClient: cfg.lightClient,
+            depositRoutedSig: cfg.depositRoutedSig,
+            l1LightClient: cfg.l1LightClient,
+          },
+          wallets,
+        );
+      };
+      const [standardRows, nativeRows] = await Promise.all([
+        scan(standardCfg),
+        scan(nativeCfg),
+      ]);
+      // Merge + sort by block number desc (newest first).
+      const deposits = [...standardRows, ...nativeRows].sort(
+        (a, b) => Number(BigInt(b.blockNumber) - BigInt(a.blockNumber)),
       );
       res.json({ success: true, data: deposits });
     } catch (error: any) {
@@ -553,14 +607,18 @@ class BridgeController {
   ): Promise<void> {
     try {
       const { accessToken, body, address: userAddress } = req;
-      const { externalChainId, externalTxHash, assignment } = (body || {}) as TrustlessClaimParams;
+      const { externalChainId, externalTxHash, routeType, assignment } = (body || {}) as TrustlessClaimParams;
       if (!externalChainId || !externalTxHash) {
         res.status(400).json({ error: "externalChainId and externalTxHash are required" });
         return;
       }
+      if (routeType !== undefined && routeType !== "standard" && routeType !== "native") {
+        res.status(400).json({ error: `routeType must be 'standard' or 'native' (got ${routeType})` });
+        return;
+      }
       const result = await trustlessClaim(
         accessToken,
-        { externalChainId, externalTxHash, assignment },
+        { externalChainId, externalTxHash, routeType, assignment },
         userAddress as string,
       );
       res.json({ success: true, data: result });
@@ -604,7 +662,14 @@ class BridgeController {
         res.status(404).json({ error: error.message, code: "NO_DEPOSIT_LOG" });
         return;
       }
-      if (typeof error?.message === "string" && error.message.includes("trustless path disabled")) {
+      if (error instanceof NoRedemptionLogError) {
+        // 404: the tx hash exists but has no RedemptionRequested log
+        // matching our configured rep-bridge — i.e. the user supplied
+        // a non-redemption tx, or pointed at the wrong chain.
+        res.status(404).json({ error: error.message, code: "NO_REDEMPTION_LOG" });
+        return;
+      }
+      if (typeof error?.message === "string" && /trustless path disabled/.test(error.message)) {
         res.status(503).json({ error: error.message, code: "TRUSTLESS_DISABLED" });
         return;
       }

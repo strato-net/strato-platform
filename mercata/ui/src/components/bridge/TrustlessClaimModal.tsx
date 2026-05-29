@@ -376,6 +376,7 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
       const r = await claimTrustlessDeposit({
         externalChainId: selectedChainId,
         externalTxHash: deposit.txHash,
+        routeType: deposit.routeType,
         walletAuth,
         walletTxProgress,
         onProgress: (s) => setStep(s),
@@ -778,23 +779,31 @@ const PickerView: React.FC<PickerViewProps> = ({
       <div>
         <p className="text-xs font-medium text-muted-foreground mb-2">Source chain</p>
         <div className="flex flex-wrap gap-2">
-          {chains.map((c) => {
-            const active = c.chainId === selectedChainId;
-            return (
-              <button
-                key={c.chainId}
-                type="button"
-                onClick={() => setSelectedChainId(c.chainId)}
-                className={`px-3 py-1.5 rounded-lg border text-sm transition-colors ${
-                  active
-                    ? "border-blue-500 bg-blue-500/10 text-foreground"
-                    : "border-border bg-muted/20 text-muted-foreground hover:bg-muted/30"
-                }`}
-              >
-                {c.name}
-              </button>
-            );
-          })}
+          {
+            // Dedupe by chainId — a chain registered for both standard
+            // and native routes returns two rows from /configuredChains
+            // (one per route), but the picker is keyed by chain. The
+            // pending-deposit list shows both routes together per chain.
+            Array.from(
+              new Map(chains.map((c) => [c.chainId, c])).values(),
+            ).map((c) => {
+              const active = c.chainId === selectedChainId;
+              return (
+                <button
+                  key={c.chainId}
+                  type="button"
+                  onClick={() => setSelectedChainId(c.chainId)}
+                  className={`px-3 py-1.5 rounded-lg border text-sm transition-colors ${
+                    active
+                      ? "border-blue-500 bg-blue-500/10 text-foreground"
+                      : "border-border bg-muted/20 text-muted-foreground hover:bg-muted/30"
+                  }`}
+                >
+                  {c.name}
+                </button>
+              );
+            })
+          }
         </div>
         {finalizedHead && (
           <p className="mt-2 text-[11px] text-muted-foreground">
@@ -847,7 +856,7 @@ const PickerView: React.FC<PickerViewProps> = ({
               const ready = isReadyToClaim(d);
               return (
                 <button
-                  key={`${d.txHash}-${d.logIndex}`}
+                  key={`${d.routeType}-${d.txHash}-${d.logIndex}`}
                   type="button"
                   onClick={() => onClickDeposit(d)}
                   className={`w-full text-left p-3 rounded-lg border transition-colors ${
@@ -858,8 +867,15 @@ const PickerView: React.FC<PickerViewProps> = ({
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-foreground truncate">
-                        {formatAmount(d)}
+                      <div className="flex items-center gap-2">
+                        <div className="text-sm font-medium text-foreground truncate">
+                          {formatAmount(d)}
+                        </div>
+                        {d.routeType === "native" && (
+                          <span className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-600 uppercase tracking-wide">
+                            Native
+                          </span>
+                        )}
                       </div>
                       <div className="text-[11px] font-mono text-muted-foreground truncate">
                         {formatTxHash(d.txHash)} · block {d.blockNumber}

@@ -201,4 +201,105 @@ library STRATOEventDecoder {
         // The vault's submitProof flow doesn't consult them; cold-path
         // sequencing is admin-driven, not on-chain-queued.
     }
+
+    // ============ NativeWithdrawalRequested ============
+
+    /// @dev Sibling decoder for the STRATO-native bridge-out flow. The
+    ///      `NativeWithdrawalRequested` event is emitted by
+    ///      `StratoNativeBridge` (separate contract from MercataBridge,
+    ///      governs STRATO-native tokens like USDST / GOLDST) and has a
+    ///      different argument shape than `Withdrawal` --- there's no
+    ///      `nonce` field (the STRATO-side `withdrawalId` plays that
+    ///      role), and the routing fields differ (a `representationToken`
+    ///      replaces `externalToken`, and an `externalBridge` field
+    ///      identifies the rep bridge directly).
+    ///
+    ///      Event signature on STRATO:
+    ///        NativeWithdrawalRequested(
+    ///          uint256 indexed withdrawalId,
+    ///          uint256 externalChainId,
+    ///          address externalBridge,
+    ///          address externalRecipient,
+    ///          address representationToken,
+    ///          address stratoSender,
+    ///          address stratoToken,
+    ///          uint256 stratoTokenAmount,
+    ///          bool    useInstantPath
+    ///        )
+    ///
+    ///      STRATO emits typed args as a single positional list -- the
+    ///      `indexed` keyword is consumed for SolidVM's event-routing
+    ///      semantics but doesn't split the args list across topics
+    ///      the way EVM does. So all nine args land in `args[0..8]`.
+    uint256 private constant NATIVE_WITHDRAWAL_ARG_COUNT = 9;
+    uint256 private constant N_ARG_WITHDRAWAL_ID = 0;
+    uint256 private constant N_ARG_EXTERNAL_CHAIN_ID = 1;
+    uint256 private constant N_ARG_EXTERNAL_BRIDGE = 2;
+    uint256 private constant N_ARG_EXTERNAL_RECIPIENT = 3;
+    uint256 private constant N_ARG_REPRESENTATION_TOKEN = 4;
+    uint256 private constant N_ARG_STRATO_SENDER = 5;
+    uint256 private constant N_ARG_STRATO_TOKEN = 6;
+    uint256 private constant N_ARG_STRATO_TOKEN_AMOUNT = 7;
+    uint256 private constant N_ARG_USE_INSTANT_PATH = 8;
+
+    struct DecodedNativeWithdrawal {
+        address contractAddress;     // must equal configured StratoNativeBridge addr
+        bytes32 eventNameHash;       // keccak256("NativeWithdrawalRequested")
+        uint256 withdrawalId;        // STRATO-side identifier; doubles as mintId's sourceWithdrawalId
+        uint256 externalChainId;     // must equal block.chainid on the destination
+        address externalBridge;      // must equal address(this) on the rep bridge
+        address externalRecipient;   // mint recipient
+        address representationToken; // must match stratoToRepresentation[stratoToken]
+        address stratoSender;        // for indexing / refund-paths if ever needed
+        address stratoToken;         // resolves the rep-token route
+        uint256 stratoTokenAmount;   // mint amount (representation tokens use the same decimals as the strato token)
+        /// @dev Carried for completeness so off-chain consumers can
+        ///      inspect the original flow choice. The trustless mint
+        ///      path doesn't honour this -- LC anchoring cadence is
+        ///      the only timing knob.
+        bool    useInstantPath;
+    }
+
+    /**
+     * @notice Decode a NativeWithdrawalRequested log out of a STRATO receipt.
+     *         Identical receipt/log envelope as {decodeWithdrawalLog};
+     *         only the inner args list differs.
+     */
+    function decodeNativeWithdrawalLog(bytes memory receiptRLP, uint256 logIndex)
+        internal
+        pure
+        returns (DecodedNativeWithdrawal memory n)
+    {
+        RLPReader.RLPItem memory receiptItem = receiptRLP.toRLPItem();
+        if (!receiptItem.isList()) revert MalformedReceipt();
+        RLPReader.RLPItem[] memory receiptFields = receiptItem.toList();
+        if (receiptFields.length != RECEIPT_FIELD_COUNT) revert MalformedReceipt();
+
+        RLPReader.RLPItem memory logsItem = receiptFields[RECEIPT_LOGS_INDEX];
+        if (!logsItem.isList()) revert MalformedReceipt();
+        RLPReader.RLPItem[] memory logs = logsItem.toList();
+        if (logIndex >= logs.length) revert LogIndexOutOfRange();
+
+        if (!logs[logIndex].isList()) revert MalformedLog();
+        RLPReader.RLPItem[] memory logFields = logs[logIndex].toList();
+        if (logFields.length != LOG_FIELD_COUNT) revert MalformedLog();
+
+        n.contractAddress = logFields[0].toAddress();
+        n.eventNameHash = keccak256(logFields[1].toBytes());
+
+        if (!logFields[2].isList()) revert MalformedLog();
+        RLPReader.RLPItem[] memory args = logFields[2].toList();
+        if (args.length != NATIVE_WITHDRAWAL_ARG_COUNT) revert UnexpectedArgCount();
+
+        n.withdrawalId        = args[N_ARG_WITHDRAWAL_ID].toUint();
+        n.externalChainId     = args[N_ARG_EXTERNAL_CHAIN_ID].toUint();
+        n.externalBridge      = args[N_ARG_EXTERNAL_BRIDGE].toAddress();
+        n.externalRecipient   = args[N_ARG_EXTERNAL_RECIPIENT].toAddress();
+        n.representationToken = args[N_ARG_REPRESENTATION_TOKEN].toAddress();
+        n.stratoSender        = args[N_ARG_STRATO_SENDER].toAddress();
+        n.stratoToken         = args[N_ARG_STRATO_TOKEN].toAddress();
+        n.stratoTokenAmount   = args[N_ARG_STRATO_TOKEN_AMOUNT].toUint();
+        // RLPReader has no toBool; treat any non-zero uint as true.
+        n.useInstantPath      = args[N_ARG_USE_INSTANT_PATH].toUint() != 0;
+    }
 }

@@ -12,6 +12,9 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import "./StratoNativeRepresentationToken.sol";
+import "./STRATOLightClient.sol";
+import {MerklePatricia} from "./lib/MerklePatricia.sol";
+import {STRATOEventDecoder} from "./lib/STRATOEventDecoder.sol";
 
 /// @title StratoNativeRepresentationBridge
 /// @notice Controls minting of external representation tokens and user-initiated redemption requests.
@@ -65,6 +68,35 @@ contract StratoNativeRepresentationBridge is
     bool public mintsPaused;
     bool public redemptionsPaused;
 
+    // ─────────────────────────────────────────────────────────────
+    // Trustless mint path (v2). State appended at the end so existing
+    // proxy storage slots stay stable on upgrade.
+    // ─────────────────────────────────────────────────────────────
+
+    /// @notice STRATOLightClient deployment on this chain that anchors
+    ///         STRATO receipts roots. The trustless mint path looks
+    ///         this up via `getReceiptsRoot(blockNumber)` and refuses
+    ///         to mint until a STRATO block is anchored.
+    /// @dev    Zero address ⇒ trustless mint is disabled (only the
+    ///         existing attestation path works).
+    STRATOLightClient public stratoLightClient;
+
+    /// @notice The StratoNativeBridge address on STRATO. The decoder's
+    ///         `contractAddress` must equal this — any other emitter
+    ///         is rejected even if it produced a perfectly-shaped log.
+    address public stratoNativeBridge;
+
+    /// @notice STRATO's chain id, used as the `sourceChainId` component
+    ///         of the dedup key (`mintId`) so the trustless and
+    ///         attestation paths share replay protection.
+    uint256 public stratoSourceChainId;
+
+    /// @notice keccak256("NativeWithdrawalRequested"). Held in storage
+    ///         (vs constant) so a future event-name revision doesn't
+    ///         force a contract redeploy — admins can rotate via
+    ///         {setNativeWithdrawalEventName}.
+    bytes32 public nativeWithdrawalEventNameHash;
+
     event RepresentationMinted(
         uint256 sourceChainId,
         address indexed sourceBridge,
@@ -111,6 +143,24 @@ contract StratoNativeRepresentationBridge is
     event AttestationThresholdUpdated(uint8 threshold);
     event MaxAttestationValidityUpdated(uint256 previousValiditySeconds, uint256 newValiditySeconds);
 
+    /// @notice Emitted when a representation is minted via the trustless
+    ///         proof path (vs the attestation path). Indexers can split
+    ///         metrics by mint origin.
+    event RepresentationMintedTrustlessly(
+        uint256 stratoBlockNumber,
+        uint256 stratoTxIndex,
+        uint256 stratoLogIndex,
+        address indexed stratoToken,
+        address representationToken,
+        address recipient,
+        uint256 amount,
+        bytes32 mintId
+    );
+    event StratoLightClientUpdated(address indexed previousLightClient, address indexed newLightClient);
+    event StratoNativeBridgeUpdated(address indexed previousBridge, address indexed newBridge);
+    event StratoSourceChainIdUpdated(uint256 previousChainId, uint256 newChainId);
+    event NativeWithdrawalEventNameHashUpdated(bytes32 previousHash, bytes32 newHash);
+
     error InvalidAddress();
     error ZeroAmount();
     error InvalidAttestation();
@@ -127,6 +177,16 @@ contract StratoNativeRepresentationBridge is
     error MintsPaused();
     error RedemptionsPaused();
     error RouteHasSupply();
+
+    // Trustless mint-path errors:
+    error TrustlessMintDisabled();        // stratoLightClient unset
+    error StratoBlockNotAnchored();       // LC.getReceiptsRoot returned bytes32(0)
+    error ProofVerificationFailed();      // MPT inclusion failed
+    error WrongSourceBridge();             // log emitter != configured stratoNativeBridge
+    error WrongDestinationChain();         // decoded externalChainId != block.chainid
+    error WrongDestinationBridge();        // decoded externalBridge != address(this)
+    error UnexpectedEventName();            // log eventName != configured nativeWithdrawalEventNameHash
+    error RepresentationMismatch();         // decoded representationToken != stratoToRepresentation[stratoToken]
 
     modifier whenMintsNotPaused() {
         if (mintsPaused) revert MintsPaused();
@@ -410,6 +470,205 @@ contract StratoNativeRepresentationBridge is
         uint256 previousValiditySeconds = maxAttestationValiditySeconds;
         maxAttestationValiditySeconds = validitySeconds;
         emit MaxAttestationValidityUpdated(previousValiditySeconds, validitySeconds);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Trustless mint path (v2)
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * @notice Convenience initializer that sets all four trustless-
+     *         mint config fields atomically. Equivalent to calling the
+     *         four per-field setters in sequence, but bundled so a
+     *         post-upgrade hook can wire the proxy in one tx without a
+     *         half-configured window.
+     *
+     *         Subsequent reconfiguration uses the per-field setters
+     *         (each guarded by MAPPING_ADMIN_ROLE) — this initializer
+     *         can be re-called by DEFAULT_ADMIN_ROLE if the admin wants
+     *         to swap multiple fields together; it's not single-shot.
+     */
+    function initializeTrustlessMint(
+        address lightClient_,
+        address stratoNativeBridge_,
+        uint256 stratoSourceChainId_,
+        bytes32 nativeWithdrawalEventNameHash_
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (lightClient_ == address(0)) revert InvalidAddress();
+        if (stratoNativeBridge_ == address(0)) revert InvalidAddress();
+        if (stratoSourceChainId_ == 0) revert WrongDestinationChain();
+        if (nativeWithdrawalEventNameHash_ == bytes32(0)) revert UnexpectedEventName();
+
+        address previousLC = address(stratoLightClient);
+        address previousBridge = stratoNativeBridge;
+        uint256 previousChainId = stratoSourceChainId;
+        bytes32 previousHash = nativeWithdrawalEventNameHash;
+
+        stratoLightClient = STRATOLightClient(lightClient_);
+        stratoNativeBridge = stratoNativeBridge_;
+        stratoSourceChainId = stratoSourceChainId_;
+        nativeWithdrawalEventNameHash = nativeWithdrawalEventNameHash_;
+
+        emit StratoLightClientUpdated(previousLC, lightClient_);
+        emit StratoNativeBridgeUpdated(previousBridge, stratoNativeBridge_);
+        emit StratoSourceChainIdUpdated(previousChainId, stratoSourceChainId_);
+        emit NativeWithdrawalEventNameHashUpdated(previousHash, nativeWithdrawalEventNameHash_);
+    }
+
+    function setStratoLightClient(address newLightClient) external onlyRole(MAPPING_ADMIN_ROLE) {
+        if (newLightClient == address(0)) revert InvalidAddress();
+        address previous = address(stratoLightClient);
+        stratoLightClient = STRATOLightClient(newLightClient);
+        emit StratoLightClientUpdated(previous, newLightClient);
+    }
+
+    function setStratoNativeBridge(address newBridge) external onlyRole(MAPPING_ADMIN_ROLE) {
+        if (newBridge == address(0)) revert InvalidAddress();
+        address previous = stratoNativeBridge;
+        stratoNativeBridge = newBridge;
+        emit StratoNativeBridgeUpdated(previous, newBridge);
+    }
+
+    function setStratoSourceChainId(uint256 newChainId) external onlyRole(MAPPING_ADMIN_ROLE) {
+        if (newChainId == 0) revert WrongDestinationChain();
+        uint256 previous = stratoSourceChainId;
+        stratoSourceChainId = newChainId;
+        emit StratoSourceChainIdUpdated(previous, newChainId);
+    }
+
+    function setNativeWithdrawalEventName(bytes32 newHash) external onlyRole(MAPPING_ADMIN_ROLE) {
+        if (newHash == bytes32(0)) revert UnexpectedEventName();
+        bytes32 previous = nativeWithdrawalEventNameHash;
+        nativeWithdrawalEventNameHash = newHash;
+        emit NativeWithdrawalEventNameHashUpdated(previous, newHash);
+    }
+
+    /**
+     * @notice Trustless mint: prove a `NativeWithdrawalRequested` log
+     *         was emitted by the configured {stratoNativeBridge} on a
+     *         STRATO block whose receipts root has been anchored by
+     *         {stratoLightClient}. On success the corresponding
+     *         representation tokens are minted to the recipient encoded
+     *         in the event.
+     *
+     *         This is the trust-minimized analog of
+     *         {mintRepresentationWithAttestation}. Both paths share the
+     *         {processedMints} dedup so a withdrawal can't be minted
+     *         twice via different paths.
+     *
+     *         The caller need not be the recipient. The proof itself
+     *         determines the recipient — anyone willing to spend the
+     *         gas can complete a stuck mint.
+     *
+     * @param  stratoBlockNumber STRATO block in which the event lives.
+     *                           Must already be anchored on {stratoLightClient}.
+     * @param  txIndex           Position of the originating tx within the STRATO block.
+     * @param  logIndex          Position of the NativeWithdrawalRequested log
+     *                           within that tx's receipt's logs[].
+     * @param  mptProof          Receipts-trie inclusion proof root → leaf.
+     * @param  receiptRLP        The trie leaf — RLP-encoded receipt at txIndex.
+     */
+    function mintRepresentationWithProof(
+        uint256 stratoBlockNumber,
+        uint256 txIndex,
+        uint256 logIndex,
+        bytes[] calldata mptProof,
+        bytes calldata receiptRLP
+    ) external whenNotPaused whenMintsNotPaused nonReentrant {
+        if (address(stratoLightClient) == address(0)) revert TrustlessMintDisabled();
+
+        // 1. STRATO block must be anchored on the light client.
+        bytes32 receiptsRoot = stratoLightClient.getReceiptsRoot(stratoBlockNumber);
+        if (receiptsRoot == bytes32(0)) revert StratoBlockNotAnchored();
+
+        // 2. MPT-verify the receipt against the anchored root.
+        bytes memory trieKey = _rlpEncodeStratoTxIndex(txIndex);
+        if (!MerklePatricia.verifyInclusion(receiptsRoot, trieKey, receiptRLP, mptProof)) {
+            revert ProofVerificationFailed();
+        }
+
+        // 3. Decode the log into typed form.
+        STRATOEventDecoder.DecodedNativeWithdrawal memory d =
+            STRATOEventDecoder.decodeNativeWithdrawalLog(receiptRLP, logIndex);
+
+        // 4. Source-side validation: the log must come from the
+        //    canonical StratoNativeBridge and carry the right event.
+        if (d.contractAddress != stratoNativeBridge) revert WrongSourceBridge();
+        if (d.eventNameHash != nativeWithdrawalEventNameHash) revert UnexpectedEventName();
+
+        // 5. Destination-side validation: STRATO can mint for many
+        //    chains; only honor logs whose destination matches us.
+        if (d.externalChainId != block.chainid) revert WrongDestinationChain();
+        if (d.externalBridge != address(this)) revert WrongDestinationBridge();
+
+        // 6. Token-mapping validation. Must match the registered
+        //    (stratoToken → representationToken) route and the route
+        //    must be active.
+        address mappedRepresentationToken = stratoToRepresentation[d.stratoToken];
+        if (mappedRepresentationToken == address(0)) revert TokenNotMapped();
+        if (mappedRepresentationToken != d.representationToken) revert RepresentationMismatch();
+        if (!routeActive[d.stratoToken]) revert RouteDisabled();
+        if (d.stratoTokenAmount == 0) revert ZeroAmount();
+
+        // 7. Dedup against the same key the attestation path uses —
+        //    one withdrawalId on STRATO maps to at most one mint here,
+        //    regardless of which submission path got there first.
+        bytes32 mintId = keccak256(
+            abi.encode(stratoSourceChainId, stratoNativeBridge, d.withdrawalId)
+        );
+        if (processedMints[mintId]) revert DuplicateMint();
+        processedMints[mintId] = true;
+
+        // 8. Mint to the recipient encoded in the event.
+        StratoNativeRepresentationToken(d.representationToken).mint(
+            d.externalRecipient,
+            d.stratoTokenAmount
+        );
+
+        emit RepresentationMintedTrustlessly(
+            stratoBlockNumber,
+            txIndex,
+            logIndex,
+            d.stratoToken,
+            d.representationToken,
+            d.externalRecipient,
+            d.stratoTokenAmount,
+            mintId
+        );
+        // Also emit the canonical {RepresentationMinted} so indexers
+        // that only watch the v1 event still see the trustless mint.
+        emit RepresentationMinted(
+            stratoSourceChainId,
+            stratoNativeBridge,
+            d.withdrawalId,
+            d.stratoToken,
+            d.representationToken,
+            d.externalRecipient,
+            d.stratoTokenAmount,
+            mintId
+        );
+    }
+
+    /// @dev Minimal RLP encoder for the trie key. STRATO's receipts
+    ///      trie keys txs by `rlp(txIndex)` — same shape as Ethereum.
+    ///      Mirrors {BridgeVault._rlpEncodeTxIndex}.
+    function _rlpEncodeStratoTxIndex(uint256 txIndex) private pure returns (bytes memory) {
+        if (txIndex == 0) return hex"80";
+        if (txIndex < 0x80) return abi.encodePacked(uint8(txIndex));
+        uint256 v = txIndex;
+        uint256 len;
+        while (v != 0) {
+            v >>= 8;
+            ++len;
+        }
+        bytes memory out = new bytes(1 + len);
+        out[0] = bytes1(uint8(0x80 + len));
+        v = txIndex;
+        for (uint256 i = len; i > 0; --i) {
+            out[i] = bytes1(uint8(v & 0xff));
+            v >>= 8;
+        }
+        return out;
     }
 
     function setMintPaused(bool paused_) external {

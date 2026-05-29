@@ -53,13 +53,38 @@ import {
   buildBscAnchorBundle,
   buildBscClaimInputs,
 } from "./bscProof.service";
+import {
+  buildNativeRedemptionClaimInputs,
+  REDEMPTION_REQUESTED_SIG,
+} from "./nativeRedemptionProof.service";
 
-const { MercataBridge, mercataBridge } = constants;
+const { MercataBridge, mercataBridge, StratoNativeBridge, stratoNativeBridge } = constants;
 const EthBridgeInName    = "BlockApps-EthBridgeIn";
 const EthLightClientName = "BlockApps-EthLightClient";
 const BaseLightClientName = "BlockApps-BaseLightClient";
 const LineaLightClientName = "BlockApps-LineaLightClient";
 const BscLightClientName = "BlockApps-BscLightClient";
+const StratoNativeBridgeInName = "BlockApps-StratoNativeBridgeIn";
+
+/**
+ * Which side of the bridge a trustless claim targets:
+ *   - "standard" → external chain → MercataBridge (mint wrapped on STRATO).
+ *                  Verifies `DepositRouted` from the source-chain
+ *                  DepositRouter; routes through `EthBridgeIn` →
+ *                  `MercataBridge.creditTrustlessDeposit`.
+ *   - "native"   → external chain → StratoNativeBridge (unlock locked
+ *                  STRATO-native tokens after the user burned a rep
+ *                  token on the source chain). Verifies
+ *                  `RedemptionRequested` from `StratoNativeRepresentationBridge`;
+ *                  routes through `StratoNativeBridgeIn` →
+ *                  `StratoNativeBridge.creditNativeRedemptionWithProof`.
+ *
+ * The two routes are completely disjoint on-chain (different verifier
+ * deployments, different sink contracts), but share the anchor side
+ * (same per-chain light client and its sync-committee / dispute-game /
+ * etc. catchup flow).
+ */
+export type BridgeRouteType = "standard" | "native";
 
 /**
  * Tag identifying which on-chain anchor flow a given source chain
@@ -97,9 +122,17 @@ export interface TrustlessClaimParams {
   externalChainId: string;
   externalTxHash: string;
   /**
+   * Which bridge flow the claim is for. Defaults to "standard" when
+   * omitted — preserves existing callers' behavior.
+   */
+  routeType?: BridgeRouteType;
+  /**
    * Optional ClaimAssignment for the LP fast-finality path. When present,
    * the claim is credited to `assignment.newRecipient` instead of the
    * stratoRecipient encoded in the source-chain log.
+   *
+   * Standard route only — native redemptions don't support assignment
+   * yet (v1 design choice; can be added with the same EIP-712 primitives).
    */
   assignment?: {
     depositKey: string;
@@ -124,22 +157,40 @@ export interface TrustlessClaimResponse {
   committeeAdvanceCount: number;
   blockNumber: string;
   flavor: LightClientFlavor;
+  /** Which bridge flow handled the claim. Echoed back so the UI can
+   *  render the right "minted to <addr>" / "unlocked to <addr>" copy. */
+  routeType: BridgeRouteType;
 }
 
 /** Per-source-chain config returned by {@link loadTrustlessConfig}. */
 export interface TrustlessConfig {
   flavor: LightClientFlavor;
-  /** EthBridgeIn deployment on STRATO that's registered for this source chain. */
+  /** Which route this config was resolved for. */
+  routeType: BridgeRouteType;
+  /**
+   * Standard route → {EthBridgeIn} deployment registered for the chain.
+   * Native route   → {StratoNativeBridgeIn} deployment registered for the chain.
+   */
   bridgeIn: string;
-  /** Light client {EthBridgeIn.lightClient} points at — Eth flavor → an
-   *  EthLightClient; Base flavor → a BaseLightClient. */
+  /** Light client the bridge-in points at. Same set per chain across
+   *  routes (an `EthLightClient` for Eth, `BaseLightClient` for Base,
+   *  etc.). */
   lightClient: string;
+  /**
+   * Source-chain event topic[0] the bridge-in expects. Field name
+   * inherited from the standard flow's vocabulary; the value differs
+   * by route:
+   *   - standard → DepositRouted sig (from EthBridgeIn.depositRoutedSig)
+   *   - native   → RedemptionRequested sig (from
+   *                StratoNativeBridgeIn.redemptionRequestedSig)
+   * Kept under the historical name to avoid a wide rename across
+   * controllers/routes/UI that read `cfg.depositRoutedSig`.
+   */
   depositRoutedSig: string;
   /**
-   * Base flavor only: the L1 EthLightClient address the BaseLightClient
-   * wraps (== `BaseLightClient.l1LightClient`). Required because the
-   * Cannon flow needs both an L1 anchor (on this contract) AND a
-   * Base-side anchor (on `lightClient`).
+   * Base / Linea flavors: the L1 EthLightClient address the
+   * Base/LineaLightClient wraps. Required because the L2-anchor flow
+   * needs both an L1 anchor (on this contract) AND a wrapper-side anchor.
    */
   l1LightClient?: string;
 }
@@ -151,54 +202,108 @@ export interface TrustlessConfig {
 /**
  * Resolve the per-chain trustless config from on-chain state. Throws
  * if the chain isn't supported or no bridge-in is registered for it.
+ *
+ * Dispatch on `routeType`:
+ *   - "standard" (default): look up MercataBridge.bridgeIns[srcChainId],
+ *      then hydrate from the registered EthBridgeIn.
+ *   - "native": look up StratoNativeBridge.nativeBridgeIns[srcChainId],
+ *      then hydrate from the registered StratoNativeBridgeIn (different
+ *      cirrus row, different event-sig field name, same light-client
+ *      lookup downstream).
  */
 export const loadTrustlessConfig = async (
   accessToken: string,
   srcChainId: string,
+  routeType: BridgeRouteType = "standard",
 ): Promise<TrustlessConfig> => {
   const flavor = FLAVOR_BY_CHAIN_ID[srcChainId];
   if (!flavor) {
     throw new Error(`MB: chainId ${srcChainId} not supported by trustless path`);
   }
 
-  // 1. MercataBridge.bridgeIns[srcChainId] — the per-chain mapping.
-  const { data: mbRows } = await cirrus.get(accessToken, `/${MercataBridge}-bridgeIns`, {
-    params: {
-      address: `eq.${mercataBridge}`,
-      key: `eq.${srcChainId}`,
-      select: "value",
-    },
-  });
-  const bridgeInRaw = mbRows?.[0]?.value;
-  if (!bridgeInRaw || /^0+$/.test(String(bridgeInRaw).replace(/^0x/, ""))) {
-    throw new Error(`MB: trustless path disabled for chain ${srcChainId}`);
-  }
-  const bridgeIn = ensureHexPrefix(bridgeInRaw);
+  let bridgeIn: string;
+  let lightClient: string;
+  let depositRoutedSig: string;
 
-  // 2. EthBridgeIn.lightClient + .depositRoutedSig — same shape regardless
-  //    of flavor (the bridge-in template is the same; only the light
-  //    client it points at differs).
-  const { data: bridgeInRows } = await cirrus.get(accessToken, `/${EthBridgeInName}`, {
-    params: {
-      address: `eq.${bridgeIn.replace(/^0x/, "")}`,
-      select: "lightClient,depositRoutedSig",
-    },
-  });
-  const row = bridgeInRows?.[0];
-  if (!row) throw new Error(`EthBridgeIn ${bridgeIn} not found in cirrus`);
-  const lightClient = ensureHexPrefix(row.lightClient);
-  const depositRoutedSig = ensureHexPrefix(row.depositRoutedSig);
-  if (!lightClient || /^0+$/.test(lightClient.replace(/^0x/, ""))) {
-    throw new Error("EthBridgeIn: lightClient unset");
-  }
-  if (!depositRoutedSig || /^0+$/.test(depositRoutedSig.replace(/^0x/, ""))) {
-    throw new Error("EthBridgeIn: depositRoutedSig unset");
+  if (routeType === "native") {
+    // 1n. StratoNativeBridge.nativeBridgeIns[srcChainId] mapping.
+    const { data: snbRows } = await cirrus.get(
+      accessToken,
+      `/${StratoNativeBridge}-nativeBridgeIns`,
+      {
+        params: {
+          address: `eq.${stratoNativeBridge}`,
+          key: `eq.${srcChainId}`,
+          select: "value",
+        },
+      },
+    );
+    const bridgeInRaw = snbRows?.[0]?.value;
+    if (!bridgeInRaw || /^0+$/.test(String(bridgeInRaw).replace(/^0x/, ""))) {
+      throw new Error(`SNB: native trustless path disabled for chain ${srcChainId}`);
+    }
+    bridgeIn = ensureHexPrefix(bridgeInRaw);
+
+    // 2n. StratoNativeBridgeIn.lightClient + .redemptionRequestedSig.
+    //     Different table than EthBridgeIn, but structurally equivalent.
+    const { data: bridgeInRows } = await cirrus.get(
+      accessToken,
+      `/${StratoNativeBridgeInName}`,
+      {
+        params: {
+          address: `eq.${bridgeIn.replace(/^0x/, "")}`,
+          select: "lightClient,redemptionRequestedSig",
+        },
+      },
+    );
+    const row = bridgeInRows?.[0];
+    if (!row) throw new Error(`StratoNativeBridgeIn ${bridgeIn} not found in cirrus`);
+    lightClient = ensureHexPrefix(row.lightClient);
+    depositRoutedSig = ensureHexPrefix(row.redemptionRequestedSig);
+    if (!lightClient || /^0+$/.test(lightClient.replace(/^0x/, ""))) {
+      throw new Error("StratoNativeBridgeIn: lightClient unset");
+    }
+    if (!depositRoutedSig || /^0+$/.test(depositRoutedSig.replace(/^0x/, ""))) {
+      throw new Error("StratoNativeBridgeIn: redemptionRequestedSig unset");
+    }
+  } else {
+    // 1s. MercataBridge.bridgeIns[srcChainId] — the per-chain mapping.
+    const { data: mbRows } = await cirrus.get(accessToken, `/${MercataBridge}-bridgeIns`, {
+      params: {
+        address: `eq.${mercataBridge}`,
+        key: `eq.${srcChainId}`,
+        select: "value",
+      },
+    });
+    const bridgeInRaw = mbRows?.[0]?.value;
+    if (!bridgeInRaw || /^0+$/.test(String(bridgeInRaw).replace(/^0x/, ""))) {
+      throw new Error(`MB: trustless path disabled for chain ${srcChainId}`);
+    }
+    bridgeIn = ensureHexPrefix(bridgeInRaw);
+
+    // 2s. EthBridgeIn.lightClient + .depositRoutedSig.
+    const { data: bridgeInRows } = await cirrus.get(accessToken, `/${EthBridgeInName}`, {
+      params: {
+        address: `eq.${bridgeIn.replace(/^0x/, "")}`,
+        select: "lightClient,depositRoutedSig",
+      },
+    });
+    const row = bridgeInRows?.[0];
+    if (!row) throw new Error(`EthBridgeIn ${bridgeIn} not found in cirrus`);
+    lightClient = ensureHexPrefix(row.lightClient);
+    depositRoutedSig = ensureHexPrefix(row.depositRoutedSig);
+    if (!lightClient || /^0+$/.test(lightClient.replace(/^0x/, ""))) {
+      throw new Error("EthBridgeIn: lightClient unset");
+    }
+    if (!depositRoutedSig || /^0+$/.test(depositRoutedSig.replace(/^0x/, ""))) {
+      throw new Error("EthBridgeIn: depositRoutedSig unset");
+    }
   }
 
   if (flavor === "eth" || flavor === "bsc") {
     // Eth flavor has no wrapper; BSC has its own self-contained light
     // client (no L1 piggyback) — neither needs an l1LightClient lookup.
-    return { flavor, bridgeIn, lightClient, depositRoutedSig };
+    return { flavor, routeType, bridgeIn, lightClient, depositRoutedSig };
   }
 
   // 3. Base / Linea flavors: also fetch the wrapped EthLightClient
@@ -218,7 +323,7 @@ export const loadTrustlessConfig = async (
     throw new Error(`${wrapperName}: l1LightClient unset`);
   }
 
-  return { flavor, bridgeIn, lightClient, depositRoutedSig, l1LightClient };
+  return { flavor, routeType, bridgeIn, lightClient, depositRoutedSig, l1LightClient };
 };
 
 /** One row of {@link listConfiguredChains}. */
@@ -226,17 +331,25 @@ export interface ConfiguredChain {
   chainId: string;
   name: string;
   flavor: LightClientFlavor;
+  /** Which bridge route this row is for. The same chainId can appear
+   *  twice (once "standard", once "native") if both registrations exist
+   *  on STRATO. */
+  routeType: BridgeRouteType;
   bridgeIn: string;
   lightClient: string;
+  /** Topic[0] the bridge-in expects. For native rows this is the
+   *  RedemptionRequested sig (kept under the historical field name —
+   *  see {TrustlessConfig.depositRoutedSig} for the why). */
   depositRoutedSig: string;
-  /** Base flavor only — the wrapped L1 EthLightClient. */
+  /** Base / Linea flavors only — the wrapped L1 EthLightClient. */
   l1LightClient?: string;
 }
 
 /**
- * Enumerate every source chain that has a non-zero `bridgeIns[chainId]`
- * entry on MercataBridge AND a flavor we know how to bridge from.
- * Drives the chain-button picker on the trustless claim modal.
+ * Enumerate every (chainId, routeType) pair that has a non-zero
+ * bridge-in registration on STRATO AND a chain-id flavor we recognize.
+ * Returns one row per route: a chain with both standard and native
+ * registrations shows up twice.
  *
  * Each row is hydrated with the same fields {@link loadTrustlessConfig}
  * returns, so the modal can stash the full bundle and skip the per-row
@@ -245,48 +358,61 @@ export interface ConfiguredChain {
 export const listConfiguredChains = async (
   accessToken: string,
 ): Promise<ConfiguredChain[]> => {
-  // 1. All bridgeIns rows on MercataBridge — postgrest returns the
-  //    full mapping when we omit the `key` filter.
-  const { data: rows } = await cirrus.get(
-    accessToken,
-    `/${MercataBridge}-bridgeIns`,
-    { params: { address: `eq.${mercataBridge}`, select: "key,value" } },
-  );
-  if (!Array.isArray(rows)) return [];
+  // 1. Pull both per-chain mappings in parallel.
+  const [mbResp, snbResp] = await Promise.all([
+    cirrus.get(
+      accessToken,
+      `/${MercataBridge}-bridgeIns`,
+      { params: { address: `eq.${mercataBridge}`, select: "key,value" } },
+    ),
+    cirrus.get(
+      accessToken,
+      `/${StratoNativeBridge}-nativeBridgeIns`,
+      { params: { address: `eq.${stratoNativeBridge}`, select: "key,value" } },
+    ).catch(() => ({ data: [] })), // SNB may not be deployed yet on older STRATOs
+  ]);
 
-  // 2. Filter to (a) chains we have a flavor for and (b) non-zero
-  //    bridgeIn entries (deletion stamps the value back to 0x0…).
-  const candidates = rows
-    .map((r: any) => ({
-      chainId: String(r.key),
-      bridgeIn: ensureHexPrefix(String(r.value)),
-    }))
-    .filter(
-      ({ chainId, bridgeIn }) =>
-        FLAVOR_BY_CHAIN_ID[chainId] &&
-        !/^0+$/.test(bridgeIn.replace(/^0x/, "")),
-    );
+  // 2. Build (chainId, routeType) candidate list. Filter to chains we
+  //    know how to bridge from and entries with a non-zero bridge-in
+  //    address (deletion stamps the value back to 0x0…).
+  type Candidate = { chainId: string; routeType: BridgeRouteType };
+  const candidates: Candidate[] = [];
+
+  const ingest = (rows: any, routeType: BridgeRouteType) => {
+    if (!Array.isArray(rows)) return;
+    for (const r of rows) {
+      const chainId = String(r.key);
+      const bridgeIn = ensureHexPrefix(String(r.value));
+      if (!FLAVOR_BY_CHAIN_ID[chainId]) continue;
+      if (/^0+$/.test(bridgeIn.replace(/^0x/, ""))) continue;
+      candidates.push({ chainId, routeType });
+    }
+  };
+  ingest(mbResp.data, "standard");
+  ingest(snbResp.data, "native");
+
   if (candidates.length === 0) return [];
 
-  // 3. Hydrate. We could parallel-await loadTrustlessConfig per chain
-  //    but that re-queries bridgeIns; doing the lightClient lookup
-  //    inline saves a round-trip per row.
+  // 3. Hydrate each candidate via loadTrustlessConfig — it does the
+  //    per-route cirrus dance for us.
   const results = await Promise.all(
-    candidates.map(async ({ chainId, bridgeIn }): Promise<ConfiguredChain | undefined> => {
+    candidates.map(async ({ chainId, routeType }): Promise<ConfiguredChain | undefined> => {
       try {
-        const cfg = await loadTrustlessConfig(accessToken, chainId);
+        const cfg = await loadTrustlessConfig(accessToken, chainId, routeType);
         return {
           chainId,
           name: CHAIN_NAMES[chainId] ?? `Chain ${chainId}`,
           flavor: cfg.flavor,
+          routeType: cfg.routeType,
           bridgeIn: cfg.bridgeIn,
           lightClient: cfg.lightClient,
           depositRoutedSig: cfg.depositRoutedSig,
           l1LightClient: cfg.l1LightClient,
         };
       } catch {
-        // A registered bridgeIn whose template-row is missing in cirrus
-        // is a misconfiguration — skip rather than 500 the whole list.
+        // A registered bridge-in whose template-row is missing in
+        // cirrus is a misconfiguration — skip rather than 500 the
+        // whole list.
         return undefined;
       }
     }),
@@ -710,6 +836,18 @@ const buildClaimArgs = (
       },
 });
 
+/**
+ * StratoNativeBridgeIn.claim() takes no ClaimAssignment in v1 — see
+ * the contract header. Same MPT-proof shape, smaller arg list.
+ */
+const buildNativeClaimArgs = (claim: ClaimInputs) => ({
+  blockNumber:       claim.blockNumber,
+  txIndex:           claim.txIndex,
+  logIndex:          claim.logIndex,
+  receiptValueBytes: strip0x(claim.receiptValueBytes),
+  mptProof:          strip0xArr(claim.mptProof),
+});
+
 // ─────────────────────────────────────────────────────────────────────
 // Sync-committee catchup
 // ─────────────────────────────────────────────────────────────────────
@@ -768,28 +906,69 @@ async function buildAdvanceCommitteeTxsIfNeeded(
   }));
 }
 
+/**
+ * Pick the right ClaimInputs builder based on (route, flavor).
+ *
+ *   - Native route → always {buildNativeRedemptionClaimInputs} (looks
+ *     for RedemptionRequested regardless of flavor; receipts-trie
+ *     semantics are EVM-uniform).
+ *   - Standard route → flavor-specific (because Base uses OP-stack
+ *     deposit-receipt type 0x7E with extra fields; the others are
+ *     standard EVM).
+ */
+async function buildClaimInputsForRoute(
+  cfg: TrustlessConfig,
+  externalChainId: string,
+  externalTxHash: string,
+): Promise<ClaimInputs> {
+  if (cfg.routeType === "native") {
+    // Cross-validate emitter: cfg.bridgeIn (StratoNativeBridgeIn) does
+    // NOT hold the rep-bridge addr — that's stored as
+    // `representationBridge` on the SNBI row. The check is a defense
+    // against stale rep-bridge config; if we skip it, the on-chain
+    // claim still rejects via `SNBI: log not from rep bridge`. For v1
+    // we let the chain do the final check (one less cirrus lookup).
+    return await buildNativeRedemptionClaimInputs(externalChainId, externalTxHash);
+  }
+  if (cfg.flavor === "base") {
+    return await buildBaseClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig);
+  }
+  if (cfg.flavor === "linea") {
+    return await buildLineaClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig);
+  }
+  if (cfg.flavor === "bsc") {
+    return await buildBscClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig);
+  }
+  return await buildClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig);
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Main entry
 // ─────────────────────────────────────────────────────────────────────
 
 export const trustlessClaim = async (
   accessToken: string,
-  { externalChainId, externalTxHash, assignment }: TrustlessClaimParams,
+  { externalChainId, externalTxHash, routeType, assignment }: TrustlessClaimParams,
   userAddress: string,
 ): Promise<TrustlessClaimResponse> => {
-  const cfg = await loadTrustlessConfig(accessToken, externalChainId);
+  const route: BridgeRouteType = routeType ?? "standard";
+  const cfg = await loadTrustlessConfig(accessToken, externalChainId, route);
+
+  if (route === "native" && assignment) {
+    // Native redemptions don't support EIP-712 assignment yet; fail
+    // loudly rather than silently dropping the LP intent.
+    throw new Error("trustlessClaim: assignment not supported for native route");
+  }
 
   // Build the claim inputs first (the loudest place to fail — bad
   // tx hash, missing log, etc.). ClaimInputs shape is identical
-  // across flavors so the downstream packing is uniform.
-  const claim: ClaimInputs =
-    cfg.flavor === "base"
-      ? await buildBaseClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig)
-      : cfg.flavor === "linea"
-        ? await buildLineaClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig)
-        : cfg.flavor === "bsc"
-          ? await buildBscClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig)
-          : await buildClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig);
+  // across flavors / routes so the downstream packing is uniform —
+  // only the event signature being matched differs by route.
+  const claim: ClaimInputs = await buildClaimInputsForRoute(
+    cfg,
+    externalChainId,
+    externalTxHash,
+  );
 
   const txInputs: Array<{ contractName: string; contractAddress: string; method: string; args: Record<string, any> }> = [];
   let l1AnchorSkipped = false;
@@ -983,13 +1162,23 @@ export const trustlessClaim = async (
     }
   }
 
-  // Always: the claim tx.
-  txInputs.push({
-    contractName: extractContractName(EthBridgeInName),
-    contractAddress: cfg.bridgeIn,
-    method: "claim",
-    args: buildClaimArgs(claim, assignment),
-  });
+  // Always: the claim tx. Different bridge-in template per route, and
+  // the native template's claim() signature has no assignment field.
+  if (route === "native") {
+    txInputs.push({
+      contractName: extractContractName(StratoNativeBridgeInName),
+      contractAddress: cfg.bridgeIn,
+      method: "claim",
+      args: buildNativeClaimArgs(claim),
+    });
+  } else {
+    txInputs.push({
+      contractName: extractContractName(EthBridgeInName),
+      contractAddress: cfg.bridgeIn,
+      method: "claim",
+      args: buildClaimArgs(claim, assignment),
+    });
+  }
 
   const tx = await buildFunctionTx(txInputs, userAddress, accessToken);
   const allResults = await postAndWaitForAllTxs(accessToken, () =>
@@ -1011,5 +1200,6 @@ export const trustlessClaim = async (
     committeeAdvanceCount,
     blockNumber: claim.blockNumber,
     flavor: cfg.flavor,
+    routeType: route,
   };
 };

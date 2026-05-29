@@ -21,16 +21,19 @@ import {
   getLogs,
   getTransactionReceipt,
 } from "./ethRpc.service";
-import { ConfiguredChain } from "./trustlessBridge.service";
+import { BridgeRouteType, ConfiguredChain } from "./trustlessBridge.service";
 import { MAX_PARENT_CHAIN_HEADERS } from "./bridgeProof.service";
 import { getLatestAnchoredL2BlockNumber } from "./baseProof.service";
 import { getLatestFinalizedLineaL2BlockNumber } from "./lineaProof.service";
 import { getLatestFinalizedBscBlockNumber } from "./bscProof.service";
+import { REDEMPTION_REQUESTED_SIG } from "./nativeRedemptionProof.service";
 import { keccak256 } from "../helpers/keccak.helper";
 
-const { mercataBridge } = constants;
+const { mercataBridge, stratoNativeBridge } = constants;
 const EthBridgeInName = "BlockApps-EthBridgeIn";
 const MercataBridgeName = "BlockApps-MercataBridge";
+const StratoNativeBridgeInName = "BlockApps-StratoNativeBridgeIn";
+const StratoNativeBridgeName = "BlockApps-StratoNativeBridge";
 
 // ─────────────────────────────────────────────────────────────────────
 // finalizedHead
@@ -136,11 +139,23 @@ export interface PendingDeposit {
   /** Unix timestamp (seconds) of the deposit block. */
   timestamp: string;
   logIndex: string;
+  /** Which route this row claims under. */
+  routeType: BridgeRouteType;
+  /** Standard route → ERC-20 deposited on the source chain.
+   *  Native route   → representation token burned on the source chain. */
   ethToken: string;
+  /** Standard route → original depositor.
+   *  Native route   → external sender (the burner). */
   ethSender: string;
   stratoRecipient: string;
+  /** Standard route → STRATO token the deposit mints.
+   *  Native route   → "" in v1 (UI can resolve from
+   *  `StratoNativeBridge.stratoTokenByRepresentation` if it cares to
+   *  surface the symbol; the on-chain credit resolves it itself). */
   targetStratoToken: string;
   amount: string;          // decimal wei
+  /** Standard route → uint96 depositId from DepositRouted.
+   *  Native route   → uint96 redemptionId from RedemptionRequested. */
   depositId: string;
   depositKey: string;      // keccak256(srcChainId, blockNumber, txIndex, logIndex) — used by claim()
 }
@@ -231,6 +246,25 @@ async function fetchProcessedSet(
   await Promise.all([
     fillSetFromTable(out, accessToken, `${EthBridgeInName}-processed`, bridgeIn),
     fillSetFromTable(out, accessToken, `${MercataBridgeName}-processedTrustlessDeposits`, mercataBridge),
+  ]);
+  return out;
+}
+
+/**
+ * Native-route counterpart of {fetchProcessedSet}. Both sides of the
+ * native flow set a `bool` flag for the same depositKey:
+ *   - StratoNativeBridgeIn.processed[depositKey]
+ *   - StratoNativeBridge.processedTrustlessRedemptions[depositKey]
+ * Same two-source defense in depth as the standard path.
+ */
+async function fetchProcessedNativeSet(
+  accessToken: string,
+  bridgeIn: string,
+): Promise<Set<string>> {
+  const out = new Set<string>();
+  await Promise.all([
+    fillSetFromTable(out, accessToken, `${StratoNativeBridgeInName}-processed`, bridgeIn),
+    fillSetFromTable(out, accessToken, `${StratoNativeBridgeName}-processedTrustlessRedemptions`, stratoNativeBridge),
   ]);
   return out;
 }
@@ -326,6 +360,42 @@ function decodeDepositLog(log: EthLog, perTxLogIndex: number): {
 }
 
 /**
+ * Decode a `RedemptionRequested` log from {StratoNativeRepresentationBridge}.
+ * Mirrors {decodeDepositLog} but for the native flow:
+ *   topics[1] = representationToken (indexed)
+ *   topics[2] = sender              (indexed)
+ *   topics[3] = stratoRecipient     (indexed)
+ *   data      = abi.encode(amount, redemptionId)   (2 × 32 bytes = 64 bytes)
+ *
+ * We surface `representationToken` in the `ethToken` slot and `redemptionId`
+ * in `depositId` so {getPendingDeposits} can use one decoded shape across
+ * both routes; the routeType field tags which is which.
+ */
+function decodeRedemptionLog(log: EthLog, perTxLogIndex: number): ReturnType<typeof decodeDepositLog> {
+  const representationToken = "0x" + log.topics[1].slice(-40);
+  const externalSender = "0x" + log.topics[2].slice(-40);
+  const stratoRecipient = "0x" + log.topics[3].slice(-40);
+  const data = log.data.replace(/^0x/, "");
+  if (data.length !== 128) {
+    throw new Error(`decodeRedemptionLog: data length ${data.length}, expected 128 hex chars`);
+  }
+  const amount = BigInt("0x" + data.slice(0, 64)).toString();
+  const redemptionId = BigInt("0x" + data.slice(64, 128)).toString();
+  return {
+    ethToken: representationToken,
+    ethSender: externalSender,
+    stratoRecipient,
+    amount,
+    targetStratoToken: "",   // resolvable via SNB.stratoTokenByRepresentation — left empty in v1
+    depositId: redemptionId,
+    logIndex: perTxLogIndex,
+    txIndex: parseInt(log.transactionIndex, 16),
+    blockNumber: BigInt(log.blockNumber),
+    txHash: log.transactionHash,
+  };
+}
+
+/**
  * Batch-resolve each log's block-wide logIndex into the per-transaction
  * logIndex that matches the contract's claim() convention.
  *
@@ -396,18 +466,58 @@ export async function getPendingDeposits(
     .filter((w) => /^0x[0-9a-f]{40}$/.test(w));
   if (cleanWallets.length === 0) return [];
 
-  // 1. Pull the depositRouter address from EthBridgeIn (cirrus row).
-  const { data: rows } = await cirrus.get(accessToken, `/${EthBridgeInName}`, {
-    params: {
-      address: `eq.${chain.bridgeIn.replace(/^0x/, "")}`,
-      select: "depositRouter",
-    },
-  });
-  const depositRouter = rows?.[0]?.depositRouter
-    ? ensureHexPrefix(rows[0].depositRouter)
-    : undefined;
-  if (!depositRouter) {
-    throw new Error(`getPendingDeposits: depositRouter not set on bridgeIn ${chain.bridgeIn}`);
+  // 1. Resolve the source contract whose logs we scan, and pin the
+  //    route-specific event sig + decoder + dedup-set lookup.
+  //
+  //    Standard route → DepositRouter (from EthBridgeIn.depositRouter)
+  //                     + DepositRouted topic + decodeDepositLog
+  //                     + (EthBridgeIn.processed, MercataBridge.processedTrustlessDeposits)
+  //
+  //    Native route   → StratoNativeRepresentationBridge
+  //                     (from StratoNativeBridgeIn.representationBridge)
+  //                     + RedemptionRequested topic + decodeRedemptionLog
+  //                     + (SNBI.processed, SNB.processedTrustlessRedemptions)
+  let sourceContract: string;
+  let topicSig: string;
+  let decode: (log: EthLog, perTxIdx: number) => ReturnType<typeof decodeDepositLog>;
+  let fetchProcessed: () => Promise<Set<string>>;
+
+  if (chain.routeType === "native") {
+    const { data: snbiRows } = await cirrus.get(accessToken, `/${StratoNativeBridgeInName}`, {
+      params: {
+        address: `eq.${chain.bridgeIn.replace(/^0x/, "")}`,
+        select: "representationBridge",
+      },
+    });
+    const repBridge = snbiRows?.[0]?.representationBridge
+      ? ensureHexPrefix(snbiRows[0].representationBridge)
+      : undefined;
+    if (!repBridge) {
+      throw new Error(
+        `getPendingDeposits: representationBridge not set on StratoNativeBridgeIn ${chain.bridgeIn}`,
+      );
+    }
+    sourceContract = repBridge;
+    topicSig = REDEMPTION_REQUESTED_SIG;
+    decode = decodeRedemptionLog;
+    fetchProcessed = () => fetchProcessedNativeSet(accessToken, chain.bridgeIn);
+  } else {
+    const { data: rows } = await cirrus.get(accessToken, `/${EthBridgeInName}`, {
+      params: {
+        address: `eq.${chain.bridgeIn.replace(/^0x/, "")}`,
+        select: "depositRouter",
+      },
+    });
+    const depositRouter = rows?.[0]?.depositRouter
+      ? ensureHexPrefix(rows[0].depositRouter)
+      : undefined;
+    if (!depositRouter) {
+      throw new Error(`getPendingDeposits: depositRouter not set on bridgeIn ${chain.bridgeIn}`);
+    }
+    sourceContract = depositRouter;
+    topicSig = chain.depositRoutedSig;
+    decode = decodeDepositLog;
+    fetchProcessed = () => fetchProcessedSet(accessToken, chain.bridgeIn);
   }
 
   // 2. Compute the eth_getLogs filter — chunked across the search
@@ -460,10 +570,10 @@ export async function getPendingDeposits(
     const to = Math.min(headBlock, from + chunkSize - 1);
     try {
       const chunk = await getLogs(chain.chainId, {
-        address: depositRouter,
+        address: sourceContract,
         fromBlock: "0x" + from.toString(16),
         toBlock: "0x" + to.toString(16),
-        topics: [chain.depositRoutedSig, null, null, recipientTopic],
+        topics: [topicSig, null, null, recipientTopic],
       });
       allLogs.push(...chunk);
       from = to + 1;
@@ -510,14 +620,14 @@ export async function getPendingDeposits(
         );
         return undefined;
       }
-      return decodeDepositLog(l, idx);
+      return decode(l, idx);
     })
     .filter((d): d is ReturnType<typeof decodeDepositLog> => d !== undefined);
 
   // 4. Drop already-processed via the on-chain `processed` mappings.
   //    Bulk-fetch the full set once and check membership locally — one
   //    cirrus round trip per request, regardless of how many deposits.
-  const processedSet = await fetchProcessedSet(accessToken, chain.bridgeIn);
+  const processedSet = await fetchProcessed();
   const filtered = decoded
     .map((d) => ({
       d,
@@ -531,6 +641,7 @@ export async function getPendingDeposits(
       blockNumber: d.blockNumber.toString(),
       timestamp: blockTimestamps.get("0x" + d.blockNumber.toString(16)) ?? "0",
       logIndex: d.logIndex.toString(),
+      routeType: chain.routeType,
       ethToken: d.ethToken,
       ethSender: d.ethSender,
       stratoRecipient: d.stratoRecipient,

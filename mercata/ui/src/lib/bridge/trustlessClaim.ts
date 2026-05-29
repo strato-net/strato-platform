@@ -32,7 +32,17 @@ export type TrustlessClaimStep =
   | "error";
 
 /** Tag returned by /bridge/trustlessConfig — drives UI labelling. */
-export type LightClientFlavor = "eth" | "base" | "linea";
+export type LightClientFlavor = "eth" | "base" | "linea" | "bsc";
+
+/**
+ * Which side of the bridge a claim targets:
+ *   - "standard" → external→STRATO mint of wrapped tokens via MercataBridge.
+ *   - "native"   → external→STRATO unlock of native tokens (USDST, GOLDST,
+ *                  etc.) that were previously bridged out via
+ *                  StratoNativeBridge. The user is redeeming a
+ *                  representation token they burned on the source chain.
+ */
+export type BridgeRouteType = "standard" | "native";
 
 export interface ClaimAssignmentInput {
   depositKey: `0x${string}`;
@@ -46,6 +56,10 @@ export interface ClaimAssignmentInput {
 export interface TrustlessClaimRequest {
   externalChainId: string | number;
   externalTxHash: string;
+  /** Which bridge route to claim under. Defaults to "standard". */
+  routeType?: BridgeRouteType;
+  /** EIP-712 assignment for the LP fast-finality path. Standard route
+   *  only — native redemptions don't support assignment in v1. */
   assignment?: ClaimAssignmentInput;
   walletAuth?: any;
   walletTxProgress?: (e: WalletTxProgressEvent) => void;
@@ -64,22 +78,28 @@ export interface TrustlessClaimResult {
   committeeAdvanceCount: number;
   blockNumber: string;
   flavor: LightClientFlavor;
+  /** Which route handled the claim — echoed back so the UI can render
+   *  flow-specific copy. */
+  routeType: BridgeRouteType;
 }
 
 export interface TrustlessConfig {
   flavor: LightClientFlavor;
+  routeType: BridgeRouteType;
   bridgeIn: `0x${string}`;
   lightClient: `0x${string}`;
   depositRoutedSig: `0x${string}`;
-  /** Base flavor only: the wrapped L1 EthLightClient. */
+  /** Base / Linea flavors only: the wrapped L1 EthLightClient. */
   l1LightClient?: `0x${string}`;
 }
 
-/** One row of {@link fetchConfiguredChains}. */
+/** One row of {@link fetchConfiguredChains}. A chain configured for
+ *  both standard and native shows up twice (once per route). */
 export interface ConfiguredChain {
   chainId: string;
   name: string;
   flavor: LightClientFlavor;
+  routeType: BridgeRouteType;
   bridgeIn: `0x${string}`;
   lightClient: `0x${string}`;
   depositRoutedSig: `0x${string}`;
@@ -93,17 +113,30 @@ export interface FinalizedHead {
   flavor: LightClientFlavor;
 }
 
-/** One row of /bridge/pendingDeposits/:chainId. */
+/** One row of /bridge/pendingDeposits/:chainId. The endpoint returns
+ *  both standard and native rows merged together when both routes are
+ *  configured for the chain. */
 export interface PendingDeposit {
   txHash: `0x${string}`;
   blockNumber: string;
   timestamp: string;
   logIndex: string;
+  /** Which bridge route this row claims under. */
+  routeType: BridgeRouteType;
+  /** Standard route: source-chain ERC-20 being deposited.
+   *  Native route:   source-chain representation token being burned. */
   ethToken: `0x${string}`;
+  /** Source-chain wallet that initiated the deposit/burn. */
   ethSender: `0x${string}`;
   stratoRecipient: `0x${string}`;
-  targetStratoToken: `0x${string}`;
+  /** STRATO token credited on success. Standard → minted; native →
+   *  unlocked from custody. Empty string for native rows in v1 (the UI
+   *  can resolve via StratoNativeBridge.stratoTokenByRepresentation if
+   *  it needs the symbol). */
+  targetStratoToken: `0x${string}` | "";
   amount: string;
+  /** Standard route → uint96 depositId.
+   *  Native route   → uint96 redemptionId. */
   depositId: string;
   depositKey: `0x${string}`;
 }
@@ -193,6 +226,7 @@ export async function fetchTrustlessConfig(
 export async function claimTrustlessDeposit({
   externalChainId,
   externalTxHash,
+  routeType,
   assignment,
   walletAuth,
   walletTxProgress,
@@ -233,6 +267,7 @@ export async function claimTrustlessDeposit({
       {
         externalChainId: String(externalChainId),
         externalTxHash,
+        routeType,
         assignment: assignment
           ? {
               ...assignment,

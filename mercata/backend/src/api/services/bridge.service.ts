@@ -1,5 +1,5 @@
 import { buildFunctionTx } from "../../utils/txBuilder";
-import { postAndWaitForAllTxs } from "../../utils/txHelper";
+import { postAndWaitForAllTxs, postAndWaitForTx } from "../../utils/txHelper";
 import { strato, cirrus, bridge, eth } from "../../utils/mercataApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName, ensureHexPrefix } from "../../utils/utils";
