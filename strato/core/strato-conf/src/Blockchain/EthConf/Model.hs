@@ -123,7 +123,8 @@ data SqlConf = SqlConf
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data StreamingConf = StreamingConf
-  { streamingHost :: String,
+  { streamingBackend :: String,
+    streamingHost :: String,
     streamingPort :: Int
   }
   deriving (Show, Eq, Generic, ToJSON)
@@ -131,7 +132,8 @@ data StreamingConf = StreamingConf
 -- Parse both old "kafkaHost/Port" and new "streamingHost/Port" field names
 instance FromJSON StreamingConf where
   parseJSON = withObject "StreamingConf" $ \v -> StreamingConf
-    <$> (v .:? "streamingHost" >>= maybe (v .:? "kafkaHost" .!= "localhost") pure)
+    <$> (v .:? "streamingBackend" .!= "jlog")
+    <*> (v .:? "streamingHost" >>= maybe (v .:? "kafkaHost" .!= "localhost") pure)
     <*> (v .:? "streamingPort" >>= maybe (v .:? "kafkaPort" .!= 9092) pure)
 
 -- Backward compatibility type alias
@@ -244,7 +246,8 @@ instance Default SqlConf where
 
 instance Default StreamingConf where
   def = StreamingConf
-    { streamingHost = "localhost"
+    { streamingBackend = "jlog"
+    , streamingHost = "localhost"
     , streamingPort = 9092
     }
 

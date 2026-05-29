@@ -10,10 +10,22 @@ parseBootnodeString "" = []
 parseBootnodeString s | not $ elem '[' s = [s]
 parseBootnodeString s = read s
 
+parseStreamingBackend :: String -> String
+parseStreamingBackend s
+  | s `elem` ["jlog", "kafka", "rabbitmq"] = s
+  | otherwise = error "streamingBackend must be one of: jlog, kafka, rabbitmq"
+
 defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
 defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname"
 defineFlag "p:password" ("" :: String) "Postgres password"
 defineFlag "K:kafkahost" ("localhost" :: String) "Streaming broker hostname"
+defineCustomFlag
+  "streamingBackend"
+  [|"jlog" :: String|]
+  "jlog|kafka|rabbitmq"
+  [|parseStreamingBackend|]
+  [|id|]
+  "Streaming backend to write to ethconf.yaml"
 defineFlag "z:lazyblocks" (False :: Bool) "Don't mine empty blocks"
 defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If set to false, the peer will not be able to initiate a connection to the network by itself (this option is useful if you want to set up a peer to itself be a bootnode in a private network)"
 defineCustomFlag
