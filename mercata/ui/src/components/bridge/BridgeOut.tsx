@@ -306,9 +306,10 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       const useExternalWalletSigning = isExternalEvmWalletConnected && !isAppAuthenticated;
       const res = await bridgeOutAPI(
         {
+          routeType: selectedToken.routeType,
           externalChainId: currentNetwork.chainId,
           externalRecipient,
-          externalToken,
+          ...(selectedToken.routeType === "native" ? {} : { externalToken }),
           stratoToken: selectedToken.stratoToken,
           stratoTokenAmount,
         },

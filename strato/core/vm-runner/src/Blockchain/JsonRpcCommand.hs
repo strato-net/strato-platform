@@ -124,21 +124,30 @@ ethCall id fromAddr toAddr callData = do
 
       $logInfoS "ethCall" . T.pack $ prettyCall ++ " on " ++ show toAddr
 
-      result <- SolidVM.call blockHeader toAddr fromAddr fromAddr 1000000 fromAddr
-        (hash callData) (labelToText funcName) argTexts Nothing
+      if not (isReadOnlyFunc func)
+        then do
+          $logInfoS "ethCall" . T.pack $ prettyCall ++ " => rejected non-read-only function"
+          return $ Error id "eth_call only supports read-only functions"
+        else do
+          result <- SolidVM.call blockHeader toAddr fromAddr fromAddr 1000000 fromAddr
+            (hash callData) (labelToText funcName) argTexts Nothing
 
-      case erException result of
-        Just ex -> do
-          $logInfoS "ethCall" . T.pack $ prettyCall ++ " => EXCEPTION: " ++ show ex
-          return $ Error id (show ex)
-        Nothing -> case erReturnVal result of
-          Nothing -> do
-            $logInfoS "ethCall" . T.pack $ prettyCall ++ " => (no return value)"
-            return $ Success id B.empty
-          Just retVal -> do
-            let encoded = encodeValueABI retTypes retVal
-            $logInfoS "ethCall" . T.pack $ prettyCall ++ " => " ++ show retVal
-            return $ Success id encoded
+          case erException result of
+            Just ex -> do
+              $logInfoS "ethCall" . T.pack $ prettyCall ++ " => EXCEPTION: " ++ show ex
+              return $ Error id (show ex)
+            Nothing -> case erReturnVal result of
+              Nothing -> do
+                $logInfoS "ethCall" . T.pack $ prettyCall ++ " => (no return value)"
+                return $ Success id B.empty
+              Just retVal -> do
+                let encoded = encodeValueABI retTypes retVal
+                $logInfoS "ethCall" . T.pack $ prettyCall ++ " => " ++ show retVal
+                return $ Success id encoded
+
+isReadOnlyFunc :: CC.Func -> Bool
+isReadOnlyFunc func =
+  CC._funcStateMutability func `elem` map Just [CC.Pure, CC.Constant, CC.View]
 
 initBestBlockContext :: VMBase m => m ()
 initBestBlockContext = do
@@ -261,7 +270,7 @@ matchStorageGetter contract selector = go (M.toList $ CC._storageDefs contract)
         syntheticFunc = CC.Func
           { CC._funcArgs = zipWith (\i t -> (Nothing, IndexedType i t Nothing)) [0..] argTypes
           , CC._funcVals = [(Nothing, IndexedType 0 retType Nothing)]
-          , CC._funcStateMutability = Nothing
+          , CC._funcStateMutability = Just CC.View
           , CC._funcContents = Nothing
           , CC._funcVisibility = Just Public
           , CC._funcVirtual = False

@@ -316,11 +316,14 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         // backend returned early before the txs landed; fetch it now from
         // the dedicated endpoint using the requestWithdrawalProof tx hash
         // (always the last entry in `hashes`).
+        const endpoint = params.routeType === "native"
+          ? "/bridge/requestNativeWithdrawal"
+          : "/bridge/requestWithdrawal";
         const { data: body } = await api.post<{
           success: boolean;
           data: WithdrawalTransactionResponse;
           hashes?: string[];
-        }>(`/bridge/requestWithdrawal`, params, axiosConfig);
+        }>(endpoint, params, axiosConfig);
 
         if (Array.isArray(body?.hashes) && body.hashes.length > 0) {
           const proofTxHash = body.hashes[body.hashes.length - 1];

@@ -377,13 +377,6 @@ router.get("/pendingDeposits/:chainId", walletAuth, BridgeController.getPendingD
  *       Builds the proof inputs, optionally skips anchorBlockHeader
  *       when the block is already on-chain, and submits the resulting
  *       STRATO tx batch via the standard wallet-signing pipeline.
- *     tags: [Bridge]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
  *             required: [externalChainId, externalTxHash]
  *             properties:
  *               externalChainId:
@@ -415,6 +408,45 @@ router.get("/pendingDeposits/:chainId", walletAuth, BridgeController.getPendingD
  *         description: Trustless path disabled
  */
 router.post("/trustlessClaim", walletAuth, BridgeController.trustlessClaim);
+
+/**
+ * @openapi
+ * /bridge/requestNativeWithdrawal:
+ *   post:
+ *     summary: Submit a native bridge withdrawal request
+ *     tags: [Bridge]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - externalChainId
+ *               - stratoToken
+ *               - stratoTokenAmount
+ *               - externalRecipient
+ *             properties:
+ *               externalChainId:
+ *                 type: string
+ *                 description: Destination chain identifier (numeric string)
+ *               stratoToken:
+ *                 type: string
+ *                 description: STRATO-native token contract address to bridge out
+ *               stratoTokenAmount:
+ *                 type: string
+ *                 description: Amount of the STRATO token to lock (decimal string)
+ *               externalRecipient:
+ *                 type: string
+ *                 description: Recipient address on the external chain
+ *               externalToken:
+ *                 type: string
+ *                 description: Optional representation token address metadata for client parity
+ *     responses:
+ *       200:
+ *         description: Native withdrawal transaction submitted
+ */
+router.post("/requestNativeWithdrawal", walletAuth, BridgeController.requestNativeWithdrawal);
 
 /**
  * @openapi

@@ -1,8 +1,9 @@
 /**
- * Deploy a new Proxy contract pointing at an existing implementation.
+ * Deploy a new Proxy contract.
  *
  * Usage:
  *   node deployProxy.js --impl <implAddr> --owner <initialOwnerAddr>
+ *   node deployProxy.js --empty --owner <initialOwnerAddr>
  *
  * Optional:
  *   --contract-file <file>  Source file to combine (default: BaseCodeCollection.sol)
@@ -18,8 +19,10 @@ const { rest, importer, util } = require('blockapps-rest');
 const fs = require('fs-extra');
 const path = require('path');
 
+const ZERO_ADDRESS = '0000000000000000000000000000000000000000';
+
 function printUsage() {
-  console.error('Usage: node deployProxy.js --impl <implAddr> --owner <initialOwnerAddr> [--contract-file <file>]');
+  console.error('Usage: node deployProxy.js (--impl <implAddr> | --empty) --owner <initialOwnerAddr> [--contract-file <file>]');
 }
 
 function parseArgs() {
@@ -28,6 +31,10 @@ function parseArgs() {
   for (let i = 0; i < args.length; i++) {
     if (args[i].startsWith('--')) {
       const key = args[i].slice(2);
+      if (key === 'empty') {
+        parsed[key] = true;
+        continue;
+      }
       const value = args[i + 1];
       if (!value || value.startsWith('--')) {
         throw new Error(`Missing value for argument: ${args[i]}`);
@@ -77,6 +84,10 @@ async function deployContractAsync(tokenObj, contractArgs, baseOptions) {
   const responseArray = Array.isArray(response) ? response : [response];
   const hashes = responseArray.map((r) => r && r.hash).filter(Boolean);
   if (hashes.length === 0) {
+    const voteIssueId = responseArray.find((r) => typeof r === 'string');
+    if (voteIssueId) {
+      return { voteRequired: true, voteIssueId, rawResponse: response };
+    }
     throw new Error('rest.createContract returned no tx hash: ' + JSON.stringify(response));
   }
 
@@ -96,9 +107,13 @@ async function deployContractAsync(tokenObj, contractArgs, baseOptions) {
   const created = final.txResult && final.txResult.contractsCreated;
   const address = Array.isArray(created) ? created[0] : created;
   if (!address) {
+    const voteHint = final.txResult && final.txResult.message;
+    if (voteHint) {
+      return { voteRequired: true, voteHint, receipt: final };
+    }
     throw new Error('Deployment succeeded but no contractsCreated entry: ' + JSON.stringify(final));
   }
-  return address;
+  return { proxyAddress: address, receipt: final };
 }
 
 async function main() {
@@ -114,10 +129,20 @@ async function main() {
     process.exit(1);
   }
 
-  const required = ['impl', 'owner'];
+  const required = ['owner'];
   const missing = required.filter((k) => !args[k]);
   if (missing.length > 0) {
     console.error(`Missing required arguments: ${missing.map((a) => '--' + a).join(', ')}\n`);
+    printUsage();
+    process.exit(1);
+  }
+  if (!args.impl && !args.empty) {
+    console.error('Missing required argument: provide either --impl <implAddr> or --empty\n');
+    printUsage();
+    process.exit(1);
+  }
+  if (args.impl && args.empty) {
+    console.error('Invalid arguments: use either --impl <implAddr> or --empty, not both\n');
     printUsage();
     process.exit(1);
   }
@@ -151,11 +176,13 @@ async function main() {
   const source = await combineSource(contractFilePath);
   console.log('Comments stripped from combined source(s)\n');
 
+  const logicContract = args.empty ? ZERO_ADDRESS : args.impl;
+
   const contractArgs = {
     name: 'Proxy',
     source,
     args: {
-      _logicContract: args['impl'],
+      _logicContract: logicContract,
       _initialOwner:  args['owner'],
     },
     txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
@@ -170,14 +197,30 @@ async function main() {
   };
 
   console.log('Deploying Proxy with:');
-  console.log(`  _logicContract: ${args['impl']}`);
+  console.log(`  _logicContract: ${logicContract}${args.empty ? ' (empty proxy)' : ''}`);
   console.log(`  _initialOwner:  ${args['owner']}\n`);
 
-  const proxyAddress = await deployContractAsync(tokenObj, contractArgs, deployOptions);
+  const result = await deployContractAsync(tokenObj, contractArgs, deployOptions);
+
+  if (result.voteRequired) {
+    console.log('\n====== Proxy Deployment Submitted ======');
+    console.log('Governance approval appears to be required before the proxy address is created.');
+    if (result.voteIssueId) {
+      console.log(`Vote Issue ID: ${result.voteIssueId}`);
+    }
+    if (result.voteHint) {
+      console.log(`Note: ${result.voteHint}`);
+    }
+    console.log(`Logic:         ${logicContract}${args.empty ? ' (empty proxy)' : ''}`);
+    console.log(`Owner:         ${args['owner']}`);
+    console.log('After the vote executes, record the created Proxy address before continuing.');
+    console.log('========================================');
+    return result;
+  }
 
   console.log('\n====== Proxy Deployed ======');
-  console.log(`Proxy Address: ${proxyAddress}`);
-  console.log(`Logic:         ${args['impl']}`);
+  console.log(`Proxy Address: ${result.proxyAddress}`);
+  console.log(`Logic:         ${logicContract}${args.empty ? ' (empty proxy)' : ''}`);
   console.log(`Owner:         ${args['owner']}`);
   console.log('============================');
 }

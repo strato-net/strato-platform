@@ -19,6 +19,7 @@ import Data.Cache
 import Data.IORef
 import Data.Pool
 import Data.String (fromString)
+import qualified GHC.Conc as Conc
 import Database.Persist.Sql (rawExecute)
 import Database.Persist.Postgresql (withPostgresqlConn)
 import Database.PostgreSQL.Simple
@@ -85,11 +86,15 @@ main = do
   void $ Strato23.runMigrations conn
   close conn
 
-  let poolConfig = defaultPoolConfig
-                    (connect dbConnectInfo)
-                    close
-                    3 -- timeout: 3 seconds
-                    20 -- max resources
+  stripes <- if flags_pgPoolStripes <= 0
+               then Conc.getNumCapabilities
+               else pure flags_pgPoolStripes
+  let poolConfig = setNumStripes (Just stripes)
+                 $ defaultPoolConfig
+                     (connect dbConnectInfo)
+                     close
+                     (realToFrac flags_pgPoolIdleTimeout)
+                     flags_pgPoolSize
   pool <- newPool poolConfig
   mgr <- newManager defaultManagerSettings
   password <- newIORef Nothing

@@ -13,19 +13,22 @@
 module Strato.Strato23.Monad where
 
 import BlockApps.Logging
+import Control.Concurrent (threadDelay)
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import qualified Crypto.Saltine.Core.SecretBox as SecretBox
+import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as LB
 import Data.Cache
 import Data.Foldable
+import Data.List (isInfixOf, isPrefixOf)
 import Data.Pool (Pool, withResource)
 import Data.Profunctor.Product.Default
 import Data.String
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Text.Encoding
-import Database.PostgreSQL.Simple (Connection, withTransaction)
+import Database.PostgreSQL.Simple (Connection, SqlError (..), withTransaction)
 import GHC.Stack
 import Network.HTTP.Client
 import Opaleye
@@ -212,6 +215,38 @@ formatTopLocation :: [(String, SrcLoc)] -> String
 formatTopLocation [] = "[-]"
 formatTopLocation ((_, x) : _) = "[" ++ srcLocModule x ++ ":" ++ show (srcLocStartLine x) ++ "]"
 
+-- | Decide whether a SqlError represents a transient connection-level failure
+-- that's safe to retry (e.g. Aurora failover, dropped connection from idle
+-- timeout, RDS Proxy backend switch). Returns False for application errors
+-- such as constraint violations, syntax errors, permission denials, etc.
+isTransientSqlError :: SqlError -> Bool
+isTransientSqlError SqlError {..} =
+  let st = BS.unpack sqlState
+      msg = BS.unpack sqlErrorMsg
+   in -- SQLSTATE class 08 = connection_exception (always transient)
+      "08" `isPrefixOf` st
+        -- 57P01 admin_shutdown (Aurora failover), 57P02 crash_shutdown,
+        -- 57P03 cannot_connect_now
+        || st `elem` ["57P01", "57P02", "57P03"]
+        -- Defensive substring matches for cases where SQLSTATE may be empty
+        || "server closed the connection unexpectedly" `isInfixOf` msg
+        || "terminating connection due to administrator command" `isInfixOf` msg
+        || "could not connect to server" `isInfixOf` msg
+
+-- | Retry an IO action on transient SQL errors with exponential backoff.
+-- Delays (microseconds): 50ms, 200ms, 1s. After the final attempt the error
+-- is re-raised unchanged. Non-transient errors are re-raised immediately
+-- without any retry.
+withSqlRetry :: IO a -> IO a
+withSqlRetry = go [50000, 200000, 1000000]
+  where
+    go [] action = action
+    go (delay : rest) action =
+      action `catch` \(e :: SqlError) ->
+        if isTransientSqlError e
+          then threadDelay delay >> go rest action
+          else throwIO e
+
 vaultQuery ::
   (HasCallStack, Default Unpackspec x x, Default FromFields x y) =>
   Query x ->
@@ -219,7 +254,7 @@ vaultQuery ::
 vaultQuery q = do
   traverse_ (logDebugCS callStack . Text.pack) (showSql q)
   pool <- asks dbPool
-  liftIO $ withResource pool (\conn -> runSelect conn q)
+  liftIO $ withSqlRetry $ withResource pool (\conn -> runSelect conn q)
 
 vaultQueryMaybe ::
   (HasCallStack, Default Unpackspec x x, Default FromFields x y) =>
@@ -254,7 +289,7 @@ vaultModify :: HasCallStack => (Connection -> IO x) -> VaultM x
 vaultModify modify = do
   logInfoCS callStack "Updating the database"
   pool <- asks dbPool
-  liftIO $ withResource pool modify
+  liftIO $ withSqlRetry $ withResource pool modify
 
 vaultModify1 :: HasCallStack => (Connection -> IO [x]) -> VaultM x
 vaultModify1 modify = do
@@ -269,7 +304,7 @@ vaultTransaction :: VaultM x -> VaultM x
 vaultTransaction vaultAction = do
     pool <- asks dbPool
     env  <- ask
-    liftIO $ withResource pool $ \conn -> withTransaction conn (runLoggingT (runReaderT vaultAction env))
+    liftIO $ withSqlRetry $ withResource pool $ \conn -> withTransaction conn (runLoggingT (runReaderT vaultAction env))
 
 vaultMaybe :: Text -> Maybe x -> VaultM x
 vaultMaybe msg = maybe (throwIO (CouldNotFind msg)) return
