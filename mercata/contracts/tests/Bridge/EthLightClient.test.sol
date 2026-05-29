@@ -36,10 +36,14 @@ contract Describe_EthLightClient {
     /// pubkey + 16 bytes zero pad), used for `nextAggregatePubkey:
     /// bytes32[2]` after the JSON-RPC ABI workaround.
     function _samplePubkey0Chunks() internal pure returns (bytes32[2]) {
-        bytes32[2] r;
-        r[0] = bytes32(hex"9203acd34ebb3ff76268f9fe68f066a48a3f518686ae0f2230b322e19435ccfc");
-        r[1] = bytes32(hex"4f208e5ba5a39cb2a409292c48a37c2200000000000000000000000000000000");
-        return r;
+        // Literal-init: SolidVM doesn't allocate slots for a bare
+        // `bytes32[2] r;` declaration, so per-index writes (r[0] = …)
+        // revert with "Cannot assign a value outside the allocated
+        // space". Returning a literal-init array sidesteps the issue.
+        return [
+            bytes32(hex"9203acd34ebb3ff76268f9fe68f066a48a3f518686ae0f2230b322e19435ccfc"),
+            bytes32(hex"4f208e5ba5a39cb2a409292c48a37c2200000000000000000000000000000000")
+        ];
     }
 
     /// 64 zero bytes in the chunked SyncAggregateInput.participationBits layout.

@@ -1060,26 +1060,28 @@ contract Describe_EthLightClientPeriodTransition {
 
     function _nextAggregate() internal pure returns (bytes32[2]) {
         // next_sync_committee.aggregate_pubkey from the LC update —
-        // 48-byte BLS pubkey + 16-byte SSZ right-pad, chunked.
-        bytes32[2] r;
-        r[0] = bytes32(hex"a55f3dcd5f40647e4f929646bc08f8ca7d3dfc96d25fd43719757ef63fd4014a");
-        r[1] = bytes32(hex"18b7423ff991dc94577cb847ad2094bf00000000000000000000000000000000");
-        return r;
+        // 48-byte BLS pubkey + 16-byte SSZ right-pad, chunked. Literal-
+        // init (vs. per-index writes) — SolidVM doesn't pre-allocate
+        // local fixed-size arrays.
+        return [
+            bytes32(hex"a55f3dcd5f40647e4f929646bc08f8ca7d3dfc96d25fd43719757ef63fd4014a"),
+            bytes32(hex"18b7423ff991dc94577cb847ad2094bf00000000000000000000000000000000")
+        ];
     }
 
     function _participationBits() internal pure returns (bytes32[2]) {
-        bytes32[2] r;
-        r[0] = bytes32(hex"fedfffffff7ffffffffffeffdffffbbf7fdfbffbf7ffffbfbfdfffdfffeffeef");
-        r[1] = bytes32(hex"fffeffffeffffffffe7ffefffebf9febffdfbbffefef77fffffbfefafeffffff");
-        return r;
+        return [
+            bytes32(hex"fedfffffff7ffffffffffeffdffffbbf7fdfbffbf7ffffbfbfdfffdfffeffeef"),
+            bytes32(hex"fffeffffeffffffffe7ffefffebf9febffdfbbffefef77fffffbfefafeffffff")
+        ];
     }
 
     function _signature() internal pure returns (bytes32[3]) {
-        bytes32[3] r;
-        r[0] = bytes32(hex"88f7dd72133aa251dfb11751a64a88a61ed82e2842674f0de4b298085375e328");
-        r[1] = bytes32(hex"dd1c3547fdc26472c46431f76260538f04478a7c2a61d698529c353093eec6a7");
-        r[2] = bytes32(hex"bdc73089314297c9f74516d2f3ba0af81fa15ff1d57be8f0f9a378063efd3fa4");
-        return r;
+        return [
+            bytes32(hex"88f7dd72133aa251dfb11751a64a88a61ed82e2842674f0de4b298085375e328"),
+            bytes32(hex"dd1c3547fdc26472c46431f76260538f04478a7c2a61d698529c353093eec6a7"),
+            bytes32(hex"bdc73089314297c9f74516d2f3ba0af81fa15ff1d57be8f0f9a378063efd3fa4")
+        ];
     }
 
     function _nextBranch() internal pure returns (bytes32[]) {
