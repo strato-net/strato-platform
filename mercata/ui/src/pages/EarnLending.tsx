@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE, mUsdstAddress, rewardsEnabled } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
-import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { useRewardsContext } from "@/context/RewardsContext";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { findBestEarnApyInfo } from "@/utils/earnUtils";
@@ -40,7 +40,7 @@ const EarnLending = () => {
     withdrawLiquidityAll,
   } = useLendingContext();
   const { toast } = useToast();
-  const { userRewards } = useRewardsUserInfo();
+  const { userRewards } = useRewardsContext();
   const { tokenApys } = useEarnContext();
 
   const [depositAmount, setDepositAmount] = useState("");

@@ -3,13 +3,13 @@ import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import SwapWidget from "@/components/swap/SwapWidget";
 import SwapHistory from "@/components/swap/SwapHistory";
-import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+import { useRewardsContext } from "@/context/RewardsContext";
 import { useUser } from "@/context/UserContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 
 const SwapAsset = () => {
   const { isLoggedIn } = useUser();
-  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+  const { userRewards, userRewardsLoading: rewardsLoading } = useRewardsContext();
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">

@@ -449,14 +449,14 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   // INITIALIZATION
   // ============================================================================
   useEffect(() => {
-    // Pool data is public - always fetch for all users
     fetchPools();
-    
-    // User-specific token data - only fetch when logged in
+  }, [fetchPools]);
+  
+  useEffect(() => {
     if (isLoggedIn) {
       fetchSwappableTokens();
     }
-  }, [fetchSwappableTokens, fetchPools, isLoggedIn]);
+  }, [fetchSwappableTokens, isLoggedIn]);
 
   // ============================================================================
   // PROVIDER

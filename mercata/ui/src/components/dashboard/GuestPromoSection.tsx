@@ -4,8 +4,7 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { requestWalletConnection } from "@/lib/auth";
 import { useEarnContext } from "@/context/EarnContext";
 import { useTokenContext } from "@/context/TokenContext";
-import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
-import { useRewards } from "@/hooks/useRewards";
+import { useRewardsContext } from "@/context/RewardsContext";
 import { findBestEarnApyInfo, buildEarnApyMap } from "@/utils/earnUtils";
 import { usdstAddress } from "@/lib/constants";
 
@@ -61,8 +60,7 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
   const navigate = useNavigate();
   const [rewardsButtonHovered, setRewardsButtonHovered] = useState(false);
   const { tokenApys, tokenApysLoaded } = useEarnContext();
-  const { userRewards } = useRewardsUserInfo();
-  const { state: rewardsState } = useRewards();
+  const { userRewards, state: rewardsState } = useRewardsContext();
   const { earningAssets, inactiveTokens, loadingEarningAssets } = useTokenContext();
   const tokensLoading = loadingEarningAssets || earningAssets.length === 0;
 

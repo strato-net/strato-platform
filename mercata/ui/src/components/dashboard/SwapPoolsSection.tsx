@@ -12,7 +12,7 @@ import { Pool, PoolCoin } from '@/interface';
 import { isMultiTokenPool } from '@/helpers/swapCalculations';
 import LiquidityDepositModal from './LiquidityDepositModal';
 import LiquidityWithdrawModal from './LiquidityWithdrawModal';
-import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+import { useRewardsContext } from "@/context/RewardsContext";
 import { useEarnContext } from "@/context/EarnContext";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
@@ -29,12 +29,8 @@ const SwapPoolsSection = () => {
   const { pools, poolsLoading, fetchPools, getPoolByAddress } = useSwapContext();
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { isLoggedIn } = useUser();
-  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+  const { userRewards, userRewardsLoading: rewardsLoading } = useRewardsContext();
   const { tokenApys } = useEarnContext();
-
-  useEffect(() => {
-    fetchPools();
-  }, [fetchPools]);
 
   useEffect(() => {
     // Only fetch user balance when logged in
