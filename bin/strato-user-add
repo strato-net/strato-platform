@@ -3,7 +3,7 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: strato-user-add NODE_DIR" >&2
+  echo "Usage: strato-user-add NODE_DIR [USERNAME] [--with-nodekey]" >&2
   exit 1
 }
 
@@ -21,6 +21,29 @@ prompt_hidden() {
 NODE_DIR="${1:-}"
 if [[ -z "$NODE_DIR" ]]; then
   usage
+fi
+shift || true
+
+USERNAME="${1:-${LOCAL_AUTH_ADMIN_USERNAME:-admin}}"
+if [[ "${1:-}" != "" && "${1:-}" != --* ]]; then
+  shift || true
+fi
+
+WITH_NODEKEY=false
+for arg in "$@"; do
+  case "$arg" in
+    --with-nodekey)
+      WITH_NODEKEY=true
+      ;;
+    *)
+      usage
+      ;;
+  esac
+done
+
+if [[ ! "$USERNAME" =~ ^[A-Za-z0-9._@-]+$ ]]; then
+  echo "Error: username may only contain letters, numbers, '.', '_', '@', and '-'" >&2
+  exit 1
 fi
 
 if [[ ! -d "$NODE_DIR" ]]; then
@@ -55,40 +78,144 @@ if [[ ! -f secrets/vault_password ]]; then
   exit 1
 fi
 
-USERNAME="${LOCAL_AUTH_ADMIN_USERNAME:-admin}"
-COMPOSE=(docker compose -p strato)
-
-if ! "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "local-auth"; then
-  echo "Error: local-auth service is not running. Start the node first." >&2
+if [[ ! -f secrets/oauth_credentials.yaml ]]; then
+  echo "Error: missing secrets/oauth_credentials.yaml" >&2
   exit 1
 fi
 
+COMPOSE=(docker compose -p strato)
+
+for _ in $(seq 1 90); do
+  if "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "local-auth"; then
+    break
+  fi
+  sleep 2
+done
+
+if ! "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "local-auth"; then
+  echo "Error: local-auth service did not start" >&2
+  exit 1
+fi
+
+for _ in $(seq 1 90); do
+  if "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "postgres"; then
+    break
+  fi
+  sleep 2
+done
+
+if ! "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "postgres"; then
+  echo "Error: postgres service did not start" >&2
+  exit 1
+fi
+
+for _ in $(seq 1 60); do
+  if "${COMPOSE[@]}" exec -T local-auth curl -fsS "http://localhost:4434/admin/identities" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
+
+if ! "${COMPOSE[@]}" exec -T local-auth curl -fsS "http://localhost:4434/admin/identities" >/dev/null 2>&1; then
+  echo "Error: local-auth admin API did not become ready" >&2
+  exit 1
+fi
+
+for _ in $(seq 1 60); do
+  if "${COMPOSE[@]}" exec -T postgres psql -U postgres -d oauth -Atc "select count(*) from message;" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
+
+if ! "${COMPOSE[@]}" exec -T postgres psql -U postgres -d oauth -Atc "select count(*) from message;" >/dev/null 2>&1; then
+  echo "Error: vault database did not become ready" >&2
+  exit 1
+fi
+
+oauth_config="$(python3 - <<'PY'
+import re
+from pathlib import Path
+
+text = Path("secrets/oauth_credentials.yaml").read_text()
+discovery_match = re.search(r'discoveryUrl:\s*"?([^"\n]+)"?', text)
+client_match = re.search(r'clientId:\s*"?([^"\n]+)"?', text)
+if not discovery_match:
+    raise SystemExit("could not find discoveryUrl in secrets/oauth_credentials.yaml")
+if not client_match:
+    raise SystemExit("could not find clientId in secrets/oauth_credentials.yaml")
+discovery_url = discovery_match.group(1).strip()
+suffix = "/.well-known/openid-configuration"
+if not discovery_url.endswith(suffix):
+    raise SystemExit("unexpected discoveryUrl format in secrets/oauth_credentials.yaml")
+print(discovery_url[:-len(suffix)])
+print(client_match.group(1).strip())
+PY
+)"
+oauth_provider="$(printf "%s" "$oauth_config" | sed -n '1p')"
+oauth_client_id="$(printf "%s" "$oauth_config" | sed -n '2p')"
+
+sql_escape() {
+  printf "%s" "$1" | sed "s/'/''/g"
+}
+
+vault_key_exists() {
+  local username="$1"
+  local provider="$2"
+  local username_sql provider_sql count
+  username_sql="$(sql_escape "$username")"
+  provider_sql="$(sql_escape "$provider")"
+  count="$("${COMPOSE[@]}" exec -T postgres psql -U postgres -d oauth -Atc \
+    "select count(*) from users where x_user_unique_name = '$username_sql' and x_identity_provider_id = '$provider_sql';" | tr -d '[:space:]')"
+  [[ "$count" != "0" ]]
+}
+
 identities="$("${COMPOSE[@]}" exec -T local-auth curl -fsS "http://localhost:4434/admin/identities")"
 if IDENTITY_JSON="$identities" python3 -c 'import json, os, sys; username = sys.argv[1]; identities = json.loads(os.environ["IDENTITY_JSON"]); sys.exit(0 if any(i.get("traits", {}).get("username") == username for i in identities) else 1)' "$USERNAME"; then
-  echo "Local auth admin user already exists: $USERNAME"
+  echo "Local auth user already exists: $USERNAME"
 else
-  echo "Creating local auth admin user: $USERNAME"
-  password="$(prompt_hidden "Create admin password: ")"
-  confirm="$(prompt_hidden "Confirm admin password: ")"
+  echo "Creating local auth user: $USERNAME"
+  password="$(prompt_hidden "Create password: ")"
+  confirm="$(prompt_hidden "Confirm password: ")"
 
   if [[ "$password" != "$confirm" ]]; then
-    echo "Error: admin passwords do not match" >&2
+    echo "Error: passwords do not match" >&2
     exit 1
   fi
 
   if [[ "${#password}" -lt 8 ]]; then
-    echo "Error: admin password must be at least 8 characters" >&2
+    echo "Error: password must be at least 8 characters" >&2
     exit 1
   fi
 
   python3 -c 'import json, sys; username = sys.argv[1]; password = sys.stdin.read().rstrip("\n"); print(json.dumps({"schema_id": "default", "traits": {"username": username}, "credentials": {"password": {"config": {"password": password}}}, "state": "active"}))' "$USERNAME" <<< "$password" \
     | "${COMPOSE[@]}" exec -T local-auth curl -fsS -X POST "http://localhost:4434/admin/identities" -H "Content-Type: application/json" -d @- >/dev/null
   unset password confirm
-  echo "Local auth admin user created: $USERNAME"
+  echo "Local auth user created: $USERNAME"
+fi
+
+user_key_exists=false
+node_key_exists=false
+if vault_key_exists "$USERNAME" "$oauth_provider"; then
+  user_key_exists=true
+fi
+if [[ "$WITH_NODEKEY" == true ]] && vault_key_exists "$oauth_client_id" "$oauth_provider"; then
+  node_key_exists=true
+fi
+
+if [[ "$user_key_exists" == true && ( "$WITH_NODEKEY" == false || "$node_key_exists" == true ) ]]; then
+  echo "Vault key already exists for: $USERNAME"
+  if [[ "$WITH_NODEKEY" == true ]]; then
+    echo "Node identity key already exists."
+  fi
+  exit 0
 fi
 
 echo ""
 echo "Wallet key setup for: $USERNAME"
+if [[ "$WITH_NODEKEY" == true ]]; then
+  echo "This recovery phrase also restores this node's admin/operator identity."
+fi
 echo "  1. Generate a new recovery phrase"
 echo "  2. Restore from an existing recovery phrase"
 printf "Choose [1/2]: " >&2
@@ -150,10 +277,9 @@ else
   mnemonic="$(prompt_hidden "Recovery phrase: ")"
 fi
 
-pg_password="$(tr -d '\n' < secrets/postgres_password)"
-
-private_key="$(
-  STRATO_BIP39_WORDLIST="$wordlist" STRATO_MNEMONIC="$mnemonic" python3 - <<'PY'
+derive_private_key() {
+  local derivation_index="$1"
+  STRATO_BIP39_WORDLIST="$wordlist" STRATO_MNEMONIC="$mnemonic" STRATO_DERIVATION_INDEX="$derivation_index" python3 - <<'PY'
 import hashlib
 import hmac
 import os
@@ -250,20 +376,38 @@ key = parse256(master[:32])
 chain = master[32:]
 if key == 0 or key >= N:
     raise SystemExit("Invalid BIP32 master key")
-for index in [44 + 0x80000000, 60 + 0x80000000, 0 + 0x80000000, 0, 0]:
+derivation_index = int(os.environ["STRATO_DERIVATION_INDEX"])
+for index in [44 + 0x80000000, 60 + 0x80000000, 0 + 0x80000000, 0, derivation_index]:
     key, chain = child(key, chain, index)
 sys.stdout.write(f"{key:064x}")
 PY
-)"
+}
 
-unset mnemonic
+pg_password="$(tr -d '\n' < secrets/postgres_password)"
 
-printf "%s" "$private_key" | strato-vault-import-key \
-  --pghost localhost \
-  --password "$pg_password" \
-  --database oauth \
-  --vaultPasswordFile secrets/vault_password \
-  --username "$USERNAME" \
-  --oauthProvider "$USERNAME"
+import_key() {
+  local private_key="$1"
+  local username="$2"
+  local provider="$3"
+  printf "%s" "$private_key" | strato-vault-import-key \
+    --pghost localhost \
+    --password "$pg_password" \
+    --database oauth \
+    --vaultPasswordFile secrets/vault_password \
+    --username "$username" \
+    --oauthProvider "$provider"
+}
 
-unset private_key pg_password
+if [[ "$user_key_exists" == false ]]; then
+  private_key="$(derive_private_key 0)"
+  import_key "$private_key" "$USERNAME" "$oauth_provider"
+fi
+
+if [[ "$WITH_NODEKEY" == true && "$node_key_exists" == false ]]; then
+  if [[ "${private_key:-}" == "" ]]; then
+    private_key="$(derive_private_key 0)"
+  fi
+  import_key "$private_key" "$oauth_client_id" "$oauth_provider"
+fi
+
+unset private_key mnemonic pg_password

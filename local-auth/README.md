@@ -23,19 +23,17 @@ docker compose up --build
 | Hydra Admin | 4445 | Client management API |
 | Login UI | 3000 | Web interface |
 
-## Admin User
+## Users
 
-Local auth supports a single admin user:
+Local auth creates the first admin/operator user during the first `strato-up` run. This address is also used as the node identity.
 
-- **Username:** `admin`
-
-Create it and initialize its wallet key after the node is running:
+Additional users can be created after the node is running:
 
 ```bash
-strato-user-add /path/to/mynode
+strato-user-add /path/to/mynode alice
 ```
 
-Override the username with `LOCAL_AUTH_ADMIN_USERNAME` if needed.
+The login UI accepts a username and password. The default first admin username is `admin`; override it with `LOCAL_AUTH_ADMIN_USERNAME` if needed.
 
 ## OAuth Configuration
 
@@ -66,9 +64,9 @@ http://localhost:4444/.well-known/openid-configuration
    ```
 
 3. Or use the authorization code flow:
-   - Create the admin user and wallet key with `strato-user-add`
+   - Create the first admin user with `strato-up`
    - Open: http://localhost:3000/login
-   - Sign in as `admin`
+   - Sign in with the local username and password
    - You'll be redirected back with an authorization code
 
 ## Integration with STRATO
@@ -78,7 +76,7 @@ When integrated with STRATO:
 1. nginx routes `/oauth/*` to this container's Hydra (4444)
 2. nginx routes `/auth/*` to this container's Login UI (3000)
 3. STRATO services use OAuth discovery URL pointing to local Hydra
-4. The fixed localAuth subject `admin` maps to the bootstrapped key in STRATO vault
+4. Each localAuth username maps to its matching key in STRATO vault
 
 ## Configuration Files
 

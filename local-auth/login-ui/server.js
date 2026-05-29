@@ -17,6 +17,12 @@ const KRATOS_ADMIN_URL = process.env.KRATOS_ADMIN_URL || 'http://localhost:4434'
 const HYDRA_ADMIN_URL = process.env.HYDRA_ADMIN_URL || 'http://localhost:4445';
 const ADMIN_USERNAME = process.env.LOCAL_AUTH_ADMIN_USERNAME || 'admin';
 
+const escapeHtml = value => String(value)
+  .replace(/&/g, '&amp;')
+  .replace(/"/g, '&quot;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;');
+
 const html = (title, content, pageId = '') => `
 <!DOCTYPE html>
 <html class="login-pf" lang="en">
@@ -109,7 +115,7 @@ app.get('/login', async (req, res) => {
             `${KRATOS_PUBLIC_URL}/sessions/whoami`,
             { headers: { Cookie: req.headers.cookie || '' } }
           );
-          subject = session.identity.id;
+          subject = session.identity.traits?.username || session.identity.id;
         } catch (_) {}
       }
       if (subject) {
@@ -126,10 +132,13 @@ app.get('/login', async (req, res) => {
           <div id="kc-form-wrapper">
             <form id="kc-form-login" method="POST" action="/auth/ui/login/oauth">
               <input type="hidden" name="login_challenge" value="${login_challenge}">
-              <input type="hidden" name="identifier" value="${ADMIN_USERNAME}">
+              <div class="form-group">
+                <label for="username" class="pf-c-form__label pf-c-form__label-text">Username</label>
+                <input id="username" class="pf-c-form-control" name="identifier" type="text" value="${ADMIN_USERNAME}" autofocus autocomplete="username" />
+              </div>
               <div class="form-group">
                 <label for="password" class="pf-c-form__label pf-c-form__label-text">Password</label>
-                <input id="password" class="pf-c-form-control" name="password" type="password" autofocus autocomplete="current-password" />
+                <input id="password" class="pf-c-form-control" name="password" type="password" autocomplete="current-password" />
               </div>
               <div id="kc-form-buttons" class="form-group">
                 <input class="pf-c-button pf-m-primary pf-m-block btn-lg" name="login" id="kc-login" type="submit" value="Sign In"/>
@@ -162,10 +171,13 @@ app.get('/login', async (req, res) => {
             <form id="kc-form-login" method="POST" action="${flowData.ui.action}">
               <input type="hidden" name="csrf_token" value="${csrfToken}">
               <input type="hidden" name="method" value="password">
-              <input type="hidden" name="identifier" value="${ADMIN_USERNAME}">
+              <div class="form-group">
+                <label for="username" class="pf-c-form__label pf-c-form__label-text">Username</label>
+                <input id="username" class="pf-c-form-control" name="identifier" type="text" value="${ADMIN_USERNAME}" autofocus autocomplete="username" />
+              </div>
               <div class="form-group">
                 <label for="password" class="pf-c-form__label pf-c-form__label-text">Password</label>
-                <input id="password" class="pf-c-form-control" name="password" type="password" autofocus autocomplete="current-password" />
+                <input id="password" class="pf-c-form-control" name="password" type="password" autocomplete="current-password" />
               </div>
               <div id="kc-form-buttons" class="form-group">
                 <input class="pf-c-button pf-m-primary pf-m-block btn-lg" name="login" id="kc-login" type="submit" value="Sign In"/>
@@ -187,7 +199,7 @@ app.get('/login', async (req, res) => {
 // Handle OAuth login form submission
 app.post('/login/oauth', async (req, res) => {
   const { login_challenge, password } = req.body;
-  const identifier = ADMIN_USERNAME;
+  const identifier = req.body.identifier || ADMIN_USERNAME;
 
   try {
     // Verify credentials with Kratos
@@ -211,7 +223,7 @@ app.post('/login/oauth', async (req, res) => {
     const { data: completion } = await axios.put(
       `${HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/login/accept`,
       {
-        subject: session.session.identity.id,
+        subject: session.session.identity.traits?.username || session.session.identity.id,
         remember: true,
         remember_for: 3600
       },
@@ -227,10 +239,13 @@ app.post('/login/oauth', async (req, res) => {
         <div id="kc-form-wrapper">
           <form id="kc-form-login" method="POST" action="/auth/ui/login/oauth">
             <input type="hidden" name="login_challenge" value="${login_challenge}">
-            <input type="hidden" name="identifier" value="${ADMIN_USERNAME}">
+            <div class="form-group">
+              <label for="username" class="pf-c-form__label pf-c-form__label-text">Username</label>
+              <input id="username" class="pf-c-form-control" name="identifier" type="text" value="${escapeHtml(identifier)}" autofocus autocomplete="username" />
+            </div>
             <div class="form-group">
               <label for="password" class="pf-c-form__label pf-c-form__label-text">Password</label>
-              <input id="password" class="pf-c-form-control" name="password" type="password" autofocus autocomplete="current-password" />
+              <input id="password" class="pf-c-form-control" name="password" type="password" autocomplete="current-password" />
             </div>
             <div id="kc-form-buttons" class="form-group">
               <input class="pf-c-button pf-m-primary pf-m-block btn-lg" name="login" id="kc-login" type="submit" value="Sign In"/>
@@ -265,9 +280,13 @@ app.get('/consent', async (req, res) => {
         remember: true,
         remember_for: 3600,
         session: {
+          access_token: {
+            preferred_username: consentRequest.subject
+          },
           id_token: {
             sub: consentRequest.subject,
-            name: consentRequest.context?.identity?.traits?.username || consentRequest.subject
+            name: consentRequest.context?.identity?.traits?.username || consentRequest.subject,
+            preferred_username: consentRequest.subject
           }
         }
       },

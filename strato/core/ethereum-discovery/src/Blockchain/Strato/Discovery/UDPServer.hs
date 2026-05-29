@@ -53,14 +53,9 @@ getKeyOrMakeKey = do
 
   case resultOrError of
     Left getErr -> do
-      $logInfoS "getKeyOrMakeKey" . T.pack $ "Could not get vault key, trying to create it: " ++ show getErr
-      (createdOrError :: Either SomeException PublicKey) <- try postKey
-      case createdOrError of
-        Right result -> return result
-        Left postErr -> do
-          $logErrorS "getKeyOrMakeKey" . T.pack $ "Vault is not ready yet: " ++ show postErr
-          liftIO $ threadDelay 2000000
-          getKeyOrMakeKey
+      $logInfoS "getKeyOrMakeKey" . T.pack $ "Node key is not available from Vault yet: " ++ show getErr
+      liftIO $ threadDelay 2000000
+      getKeyOrMakeKey
     Right result -> return result
 
 runEthUDPServer :: MonadDiscovery m => Int -> m ()

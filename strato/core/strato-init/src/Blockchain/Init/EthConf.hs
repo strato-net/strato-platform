@@ -117,7 +117,7 @@ genEthConf = do
 
   -- For local auth mode, skip vault during setup (vault-wrapper starts later)
   if Opts.flags_localAuth
-    then putStrLn $ "  ✓ Local auth mode (hostname: " ++ localHostname ++ "): node key will be created when vault-wrapper starts"
+    then putStrLn $ "  ✓ Local auth mode (hostname: " ++ localHostname ++ "): node key will be provisioned during first admin setup"
     else do
       (pub, _addr) <- getNodeKey
       putStrLn $ "  ✓ Node key: " ++ shortDescription pub
