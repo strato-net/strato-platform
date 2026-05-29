@@ -8,6 +8,10 @@ import { constants } from "../../../config/constants";
 let contractStateCache: { address: string; state: any; timestamp: number } | null = null;
 let pendingRequest: Promise<any> | null = null;
 const CACHE_TTL = 5000; // 5 seconds cache
+
+// Claimed rewards event cache — append-only, 30s TTL
+let _claimedRewardsCache: { data: Map<string, bigint>; expiresAt: number } | null = null;
+const CLAIMED_CACHE_TTL = 30_000;
 const normalizeUserAddress = (address: string): string => address.replace(/^0x/i, "").toLowerCase();
 
 /**
@@ -17,6 +21,7 @@ const normalizeUserAddress = (address: string): string => address.replace(/^0x/i
 export const clearContractStateCache = (): void => {
   contractStateCache = null;
   pendingRequest = null;
+  _claimedRewardsCache = null;
 };
 
 /**
@@ -276,8 +281,13 @@ export const fetchUnclaimedRewards = async (
  */
 export const fetchClaimedRewards = async (
   accessToken: string,
-  rewardsAddress: string
+  rewardsAddress: string,
+  forceRefresh: boolean = false
 ): Promise<Map<string, bigint>> => {
+  if (!forceRefresh && _claimedRewardsCache && Date.now() < _claimedRewardsCache.expiresAt) {
+    return _claimedRewardsCache.data;
+  }
+
   try {
     const { data: events = [] } = await cirrus.get(accessToken, "/event", {
       params: {
@@ -287,7 +297,7 @@ export const fetchClaimedRewards = async (
       },
     });
 
- return events.reduce((map: Map<string, bigint>, event: any) => {
+    const result = events.reduce((map: Map<string, bigint>, event: any) => {
       try {
         const attrs = typeof event.attributes === 'string' 
           ? JSON.parse(event.attributes) 
@@ -302,6 +312,9 @@ export const fetchClaimedRewards = async (
       }
       return map;
     }, new Map<string, bigint>());
+
+    _claimedRewardsCache = { data: result, expiresAt: Date.now() + CLAIMED_CACHE_TTL };
+    return result;
   } catch (error) {
     console.error("Failed to fetch claimed rewards:", error);
     return new Map<string, bigint>();
@@ -399,7 +412,7 @@ export const fetchAllUsersLeaderboard = async (
 ): Promise<Array<{ address: string; totalRewardsEarned: string }>> => {
   const state = await fetchContractState(accessToken, rewardsAddress, forceRefresh);
   const { userInfo = {}, unclaimedRewards = {}, activities = {}, activityStates = {} } = state || {};
-  const claimedRewardsMap = await fetchClaimedRewards(accessToken, rewardsAddress);
+  const claimedRewardsMap = await fetchClaimedRewards(accessToken, rewardsAddress, forceRefresh);
   const currentTime = Math.floor(Date.now() / 1000);
   const userSet = new Set<string>();
   const normalizedUnclaimedRewards = new Map<string, bigint>(
