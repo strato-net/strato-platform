@@ -598,24 +598,24 @@ export const getTokenStats = async (
       const totalSupply = BigInt(token._totalSupply || "0");
       // Calculate market cap: (price * totalSupply) / 10^36
       // Both price and totalSupply are in wei (18 decimals)
-      let marketCap = "0";
+      let marketCapWei = 0n;
+      let marketCap = "0.00";
       try {
         if (price !== 0n && totalSupply !== 0n) {
           // Market cap in USD = (price_wei * totalSupply_wei) / 10^36
           // We divide by 10^36 because both values have 18 decimals
-          const marketCapWei = price * totalSupply;
-          const marketCapUSD = marketCapWei / BigInt(10) ** BigInt(36);
+          marketCapWei = price * totalSupply;
+          const marketCapUSD = marketCapWei / (10n ** 36n);
           
           // Convert to decimal string with 2 decimal places
           const wholePart = marketCapUSD.toString();
-          const fractionalWei = marketCapWei % (BigInt(10) ** BigInt(36));
-          const fractionalPart = (fractionalWei * BigInt(100) / (BigInt(10) ** BigInt(36))).toString().padStart(2, '0');
+          const fractionalWei = marketCapWei % (10n ** 36n);
+          const fractionalPart = (fractionalWei * 100n / (10n ** 36n)).toString().padStart(2, '0');
           
           marketCap = `${wholePart}.${fractionalPart}`;
         }
       } catch (error) {
         console.error(`Error calculating market cap for ${token._symbol}:`, error);
-        marketCap = "0.00";
       }
       
       return {
@@ -623,27 +623,34 @@ export const getTokenStats = async (
         name: token._name,
         symbol: token._symbol,
         totalSupply: totalSupply.toString(),
-        marketCap: marketCap
+        marketCap,
+        marketCapWei // Keep BigInt for precise sorting and summation
       };
     });
 
-    // Sort tokens by market cap descending
+    // Sort tokens by market cap descending using BigInt
     const sortedTokens = tokensWithMarketCap.sort((a: any, b: any) => {
-      const marketCapA = parseFloat(a.marketCap);
-      const marketCapB = parseFloat(b.marketCap);
-      return marketCapB - marketCapA;
+      if (b.marketCapWei > a.marketCapWei) return 1;
+      if (b.marketCapWei < a.marketCapWei) return -1;
+      return 0;
     });
 
-    // Calculate total market cap
-    const totalMarketCap = sortedTokens.reduce((sum: number, token: any) => {
-      return sum + parseFloat(token.marketCap);
-    }, 0);
+    // Calculate total market cap using BigInt
+    const totalMarketCapWei = sortedTokens.reduce((sum: bigint, token: any) => {
+      return sum + token.marketCapWei;
+    }, 0n);
 
     // Format total market cap with 2 decimal places
-    const formattedTotalMarketCap = totalMarketCap.toFixed(2);
+    const totalMarketCapUSD = totalMarketCapWei / (10n ** 36n);
+    const totalFractionalWei = totalMarketCapWei % (10n ** 36n);
+    const totalFractionalPart = (totalFractionalWei * 100n / (10n ** 36n)).toString().padStart(2, '0');
+    const formattedTotalMarketCap = `${totalMarketCapUSD.toString()}.${totalFractionalPart}`;
+
+    // Remove marketCapWei before returning to API
+    const finalTokens = sortedTokens.map(({ marketCapWei: _, ...rest }: any) => rest);
 
     return {
-      tokens: sortedTokens,
+      tokens: finalTokens,
       totalMarketCap: formattedTotalMarketCap
     };
   } catch (error) {

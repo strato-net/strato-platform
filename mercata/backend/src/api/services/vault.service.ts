@@ -7,6 +7,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { FunctionInput } from "../../types/types";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
+import { safeBigIntOrDefault as safeBigInt } from "../../utils/bigIntUtils";
 import { StratoPaths, constants } from "../../config/constants";
 import * as config from "../../config/config";
 
@@ -17,55 +18,6 @@ const {
 } = constants;
 
 const WAD = BigInt(10) ** BigInt(18);
-
-/**
- * Safely convert a string to BigInt, returning 0n for invalid inputs.
- * Handles empty strings, scientific notation, and other formats.
- */
-const safeBigInt = (value: string | null | undefined): bigint => {
-  if (!value) return 0n;
-  const trimmed = value.trim();
-  if (trimmed === "") return 0n;
-  
-  // Pure integer string - direct conversion
-  if (/^-?\d+$/.test(trimmed)) {
-    return BigInt(trimmed);
-  }
-  
-  // Scientific notation (e.g., "5e+22", "1.5e10", "3E18")
-  const sciMatch = trimmed.match(/^(-?\d+\.?\d*)[eE]([+-]?\d+)$/);
-  if (sciMatch) {
-    const [, mantissa, exponent] = sciMatch;
-    const exp = parseInt(exponent, 10);
-    
-    // Split mantissa into integer and decimal parts
-    const [intPart, decPart = ""] = mantissa.replace("-", "").split(".");
-    const isNegative = mantissa.startsWith("-");
-    
-    // Combine and shift decimal point
-    const combined = intPart + decPart;
-    const shift = exp - decPart.length;
-    
-    let result: string;
-    if (shift >= 0) {
-      result = combined + "0".repeat(shift);
-    } else {
-      // Truncate decimals (floor toward zero)
-      const cutPoint = combined.length + shift;
-      result = cutPoint > 0 ? combined.slice(0, cutPoint) : "0";
-    }
-    
-    return BigInt(isNegative ? "-" + result : result);
-  }
-  
-  // Decimal number without exponent - truncate to integer
-  if (/^-?\d+\.\d+$/.test(trimmed)) {
-    const intPart = trimmed.split(".")[0];
-    return BigInt(intPart || "0");
-  }
-  
-  return 0n;
-};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPES
