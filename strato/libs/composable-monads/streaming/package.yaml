@@ -10,12 +10,13 @@ license:             Apache-2.0
 #
 # Available backends:
 #   kafka-monad        - Kafka via Milena (pure Haskell)
-#   streaming-kafka-hw - Redpanda via hw-kafka-client (librdkafka)
+#   streaming-kafka-hw - Kafka via hw-kafka-client (librdkafka)
 #   streaming-rabbitmq - RabbitMQ via amqp
 
 dependencies:
 - base >= 4.7 && < 5
-- streaming-jlog  # <- change this line to switch backends
+- kafka-monad
+- streaming-kafka-hw  # <- change this line to switch backends
 
 library:
   source-dirs: src

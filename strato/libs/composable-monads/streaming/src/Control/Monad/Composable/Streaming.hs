@@ -11,7 +11,7 @@
 --   streaming-jlog     -> import Control.Monad.Composable.Streaming.JLog (embedded, no server)
 
 module Control.Monad.Composable.Streaming (
-  module Control.Monad.Composable.Streaming.JLog
+  module Control.Monad.Composable.Streaming.Kafka
 ) where
 
-import Control.Monad.Composable.Streaming.JLog
+import Control.Monad.Composable.Streaming.Kafka

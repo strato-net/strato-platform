@@ -12,7 +12,7 @@ module Control.Monad.Composable.Streaming.DockerConfig (
 -- Re-export from the active backend's DockerConfig.
 -- This import must match the backend dependency in package.yaml:
 --   kafka-monad        -> Control.Monad.Composable.Kafka.DockerConfig
---   streaming-kafka-hw -> Control.Monad.Composable.Streaming.Kafka.DockerConfig
+--   streaming-kafka-hw -> Control.Monad.Composable.Kafka.DockerConfig
 --   streaming-rabbitmq -> Control.Monad.Composable.Streaming.RabbitMQ.DockerConfig
 --   streaming-jlog     -> Control.Monad.Composable.Streaming.JLog.DockerConfig (no container)
-import Control.Monad.Composable.Streaming.JLog.DockerConfig
+import Control.Monad.Composable.Kafka.DockerConfig

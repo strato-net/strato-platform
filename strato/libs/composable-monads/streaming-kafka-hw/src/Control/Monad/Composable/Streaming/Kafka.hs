@@ -228,8 +228,7 @@ mkConsumerSub topic = KC.topics [topic] <> KC.offsetReset KC.Earliest
 
 newConsumerAt :: StreamEnv -> Text -> TopicName -> Offset -> IO KC.KafkaConsumer
 newConsumerAt env grpId topicName (Offset ofs) = do
-  gid <- uniqueGroupId grpId
-  result <- KC.newConsumer (mkConsumerProps env gid) (mkConsumerSub topicName)
+  result <- KC.newConsumer (mkConsumerProps env grpId) (mkConsumerSub topicName)
   case result of
     Left err -> error $ "Failed to create Kafka consumer: " ++ show err
     Right kc -> do
@@ -253,12 +252,20 @@ runConsume :: (Binary a, HasStreaming m) =>
               ConsumerGroup -> TopicName -> ([a] -> m (Maybe b)) -> m b
 runConsume consumerGroup topicName f = do
   env <- getStreamEnv
-  kc <- liftIO $ newConsumerAt env consumerGroup topicName (Offset 0)
+  kc <- liftIO $ do
+    consumer <- newConsumerAt env consumerGroup topicName (Offset 0)
+    offset <- getCommittedOffset consumer topicName
+    let tp = KC.TopicPartition topicName (KC.PartitionId 0) (KC.PartitionOffset $ unOffset offset)
+    mErr <- KC.assign consumer [tp]
+    case mErr of
+      Nothing -> return consumer
+      Just err -> error $ "Kafka assign error: " ++ show err
   consumeLoop kc
   where
     consumeLoop kc = do
-      items <- pollItems kc
+      (items, newOffset) <- pollItems kc
       mReturnVal <- f items
+      liftIO $ commitOffset kc topicName newOffset
       case mReturnVal of
         Just returnVal -> do
           liftIO $ void $ KC.closeConsumer kc
@@ -267,13 +274,40 @@ runConsume consumerGroup topicName f = do
 
     pollItems kc = do
       msgs <- liftIO $ KC.pollMessageBatch kc (KC.Timeout 50000) (KC.BatchSize 500)
-      let payloads = mapMaybe extractPayload msgs
+      let records = mapMaybe extractPayload msgs
+          payloads = map snd records
       if null payloads
         then pollItems kc
-        else return $ map (decode . BL.fromStrict) payloads
+        else return (map (decode . BL.fromStrict) payloads, nextOffset records)
 
     extractPayload (Left _) = Nothing
-    extractPayload (Right cr) = KC.crValue cr
+    extractPayload (Right cr) = (\v -> (cr, v)) <$> KC.crValue cr
+
+    nextOffset records =
+      Offset . (+ 1) . maximum $ map (recordOffset . fst) records
+
+    recordOffset cr =
+      case KC.crOffset cr of
+        KC.Offset n -> n
+
+getCommittedOffset :: KC.KafkaConsumer -> TopicName -> IO Offset
+getCommittedOffset kc topicName = do
+  eOffsets <- KC.committed kc (KC.Timeout 5000) [(topicName, KC.PartitionId 0)]
+  case eOffsets of
+    Left err -> error $ "Kafka committed offset error: " ++ show err
+    Right [tp] ->
+      case KC.tpOffset tp of
+        KC.PartitionOffset n -> return $ Offset n
+        _ -> return $ Offset 0
+    _ -> return $ Offset 0
+
+commitOffset :: KC.KafkaConsumer -> TopicName -> Offset -> IO ()
+commitOffset kc topicName (Offset ofs) = do
+  let tp = KC.TopicPartition topicName (KC.PartitionId 0) (KC.PartitionOffset ofs)
+  mErr <- KC.commitPartitionsOffsets KC.OffsetCommit kc [tp]
+  case mErr of
+    Nothing -> return ()
+    Just err -> error $ "Kafka offset commit error: " ++ show err
 
 consumeFromLatest :: (Binary a, HasStreaming m) =>
                      TopicName -> m () -> ([a] -> m (Maybe b)) -> m b

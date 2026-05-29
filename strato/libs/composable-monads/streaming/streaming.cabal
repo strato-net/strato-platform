@@ -19,5 +19,6 @@ library
       src
   build-depends:
       base >=4.7 && <5
-    , streaming-jlog
+    , kafka-monad
+    , streaming-kafka-hw
   default-language: Haskell2010
