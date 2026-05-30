@@ -221,6 +221,46 @@ const inferStakeUsdInfo = (
   return empty;
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PRICING CONTEXT CACHE — 30 s TTL, shared across all rewards endpoints
+// ═══════════════════════════════════════════════════════════════════════════════
+
+type PricingCtx = {
+  priceMap: Map<string, string>;
+  mTokenAddress: string | null;
+  sTokenAddress: string | null;
+  vaultShareTokenAddress: string | null;
+  carryVaultUsdPriceMap: Map<string, string>;
+};
+
+let _pricingCtxCache: { ctx: PricingCtx; expiry: number } | null = null;
+const PRICING_CTX_TTL = 30_000;
+
+const buildPricingCtx = async (accessToken: string, forceRefresh: boolean = false): Promise<PricingCtx> => {
+  if (!forceRefresh && _pricingCtxCache && Date.now() < _pricingCtxCache.expiry) {
+    return _pricingCtxCache.ctx;
+  }
+
+  const [priceMap, mTokenAddress, vaultShareTokenAddress] = await Promise.all([
+    getCompletePriceMap(accessToken),
+    getMTokenAddress(accessToken),
+    getVaultShareTokenAddress(accessToken).catch(() => ""),
+  ]);
+  const carryVaultUsdPriceMap = getCarryVaultUsdPriceMap(priceMap);
+  const { sToken } = getSafetyModuleConfig();
+
+  const ctx: PricingCtx = {
+    priceMap,
+    mTokenAddress,
+    sTokenAddress: sToken.address || null,
+    vaultShareTokenAddress: vaultShareTokenAddress || null,
+    carryVaultUsdPriceMap,
+  };
+
+  _pricingCtxCache = { ctx, expiry: Date.now() + PRICING_CTX_TTL };
+  return ctx;
+};
+
 /**
  * Get rewards contract address or throw error
  */
@@ -292,21 +332,49 @@ export interface RewardsOverview {
   currentSeason: number;
 }
 
+let _rewardTokenSymbolCache: { symbol: string | null; tokenAddress: string; expiry: number } | null = null;
+const REWARD_TOKEN_SYMBOL_TTL = 30_000;
+
+const getRewardTokenSymbol = async (accessToken: string, rewardToken: string): Promise<string | null> => {
+  if (_rewardTokenSymbolCache && _rewardTokenSymbolCache.tokenAddress === rewardToken
+      && Date.now() < _rewardTokenSymbolCache.expiry) {
+    return _rewardTokenSymbolCache.symbol;
+  }
+  let symbol: string | null = null;
+  try {
+    if (rewardToken) {
+      const { data } = await cirrus.get(accessToken, `/${Token}`, {
+        params: { address: "eq." + rewardToken, select: "_symbol" },
+      });
+      symbol = data?.[0]?._symbol || null;
+    }
+  } catch (error) {
+    console.error(`Error fetching token symbol for ${rewardToken}:`, error);
+  }
+  _rewardTokenSymbolCache = { symbol, tokenAddress: rewardToken, expiry: Date.now() + REWARD_TOKEN_SYMBOL_TTL };
+  return symbol;
+};
+
 /**
  * Get global Rewards contract overview data
  * @param accessToken - Access token for authentication
  * @param forceRefresh - If true, bypasses cache and fetches fresh data from blockchain
  * @returns Rewards overview data
  */
+let _overviewCache: { data: RewardsOverview; expiry: number } | null = null;
+const OVERVIEW_CACHE_TTL = 30_000;
+
 export const fetchRewardsOverview = async (
   accessToken: string,
   forceRefresh: boolean = false
 ): Promise<RewardsOverview> => {
+  if (!forceRefresh && _overviewCache && Date.now() < _overviewCache.expiry) {
+    return _overviewCache.data;
+  }
+
   const rewardsAddress = getRewardsAddress();
 
   try {
-    // All these functions now use the same cached contract state, so they're fast
-    // fetchAllUsersLeaderboard also uses cached contract state + cached claimed rewards
     const [contractData, activitiesMap, activityStatesMap, allUsersLeaderboard] = await Promise.all([
       fetchRewardsContractData(accessToken, rewardsAddress, forceRefresh),
       fetchActivities(accessToken, rewardsAddress, forceRefresh),
@@ -314,46 +382,24 @@ export const fetchRewardsOverview = async (
       fetchAllUsersLeaderboard(accessToken, rewardsAddress, forceRefresh)
     ]);
 
-    // Count only actively-emitting activities (matches UI visibility filter)
     const activeActivityCount = Array.from(activitiesMap.values())
       .filter((a) => BigInt(a.emissionRate || "0") > 0n).length;
 
-    // Hardcoded season info for now
     const currentSeason = 2;
 
-
-    // Sum up total stake across all activities
     let totalStake = BigInt(0);
     activityStatesMap.forEach((state: any) => {
-      const stake = BigInt(state?.totalStake || "0");
-      totalStake += stake;
+      totalStake += BigInt(state?.totalStake || "0");
     });
 
-    // Sum up total distributed (all users' unclaimed + pending + claimed rewards)
     let totalDistributed = BigInt(0);
     allUsersLeaderboard.forEach((user) => {
       totalDistributed += BigInt(user.totalRewardsEarned);
     });
 
-    // Fetch token symbol
-    let rewardTokenSymbol: string | null = null;
-    try {
-      if (contractData.rewardToken) {
-        const { data } = await cirrus.get(accessToken, `/${Token}`, {
-          params: {
-            address: "eq." + contractData.rewardToken,
-            select: "_symbol",
-          }
-        });
-        const token = data?.[0];
-        rewardTokenSymbol = token?._symbol || null;
-      }
-    } catch (error) {
-      console.error(`Error fetching token symbol for ${contractData.rewardToken}:`, error);
-      // Continue without symbol, will be null
-    }
+    const rewardTokenSymbol = await getRewardTokenSymbol(accessToken, contractData.rewardToken);
 
-    return {
+    const result: RewardsOverview = {
       rewardToken: contractData.rewardToken,
       rewardTokenSymbol,
       totalRewardsEmission: contractData.totalRewardsEmission,
@@ -363,6 +409,9 @@ export const fetchRewardsOverview = async (
       totalDistributed: totalDistributed.toString(),
       currentSeason
     };
+
+    _overviewCache = { data: result, expiry: Date.now() + OVERVIEW_CACHE_TTL };
+    return result;
   } catch (error) {
     console.error("Failed to fetch Rewards overview:", error);
     throw error;
@@ -423,29 +472,14 @@ export const fetchUserActivities = async (
 
     const activityIds = activities.map((a: any) => a.activityId);
 
-    const [activityStatesMap, userInfoMap, unclaimedRewards, claimedRewardsMap, bonusResult] = await Promise.all([
+    const [activityStatesMap, userInfoMap, unclaimedRewards, claimedRewardsMap, bonusResult, pricingCtx] = await Promise.all([
       fetchActivityStates(accessToken, rewardsAddress, forceRefresh),
       fetchUserInfo(accessToken, rewardsAddress, normalizedUserAddress, activityIds, forceRefresh),
       fetchUnclaimedRewards(accessToken, rewardsAddress, normalizedUserAddress, forceRefresh),
       fetchClaimedRewards(accessToken, rewardsAddress),
-      fetchBonusRewards(accessToken, rewardsAddress, normalizedUserAddress)
+      fetchBonusRewards(accessToken, rewardsAddress, normalizedUserAddress),
+      buildPricingCtx(accessToken, forceRefresh),
     ]);
-
-    // Build shared pricing context once (used for LP/share-token TVL conversions)
-    const [priceMap, mTokenAddress, vaultShareTokenAddress] = await Promise.all([
-      getCompletePriceMap(accessToken),
-      getMTokenAddress(accessToken),
-      getVaultShareTokenAddress(accessToken).catch(() => ""),
-    ]);
-    const carryVaultUsdPriceMap = await getCarryVaultUsdPriceMap(accessToken, priceMap);
-    const { sToken } = getSafetyModuleConfig();
-    const pricingCtx = {
-      priceMap,
-      mTokenAddress,
-      sTokenAddress: sToken.address || null,
-      vaultShareTokenAddress: vaultShareTokenAddress || null,
-      carryVaultUsdPriceMap,
-    };
 
     // Combine all data
     const userActivities = await Promise.all(activities.map(async (activity: any) => {
@@ -536,21 +570,7 @@ export const fetchAllActivities = async (
       return [];
     }
 
-    // Build shared pricing context once (used for LP/share-token TVL conversions)
-    const [priceMap, mTokenAddress, vaultShareTokenAddress] = await Promise.all([
-      getCompletePriceMap(accessToken),
-      getMTokenAddress(accessToken),
-      getVaultShareTokenAddress(accessToken).catch(() => ""),
-    ]);
-    const carryVaultUsdPriceMap = await getCarryVaultUsdPriceMap(accessToken, priceMap);
-    const { sToken } = getSafetyModuleConfig();
-    const pricingCtx = {
-      priceMap,
-      mTokenAddress,
-      sTokenAddress: sToken.address || null,
-      vaultShareTokenAddress: vaultShareTokenAddress || null,
-      carryVaultUsdPriceMap,
-    };
+    const pricingCtx = await buildPricingCtx(accessToken, forceRefresh);
 
     // Combine activities with their states
     const enriched = await Promise.all(activities.map(async (activity: any) => {

@@ -25,6 +25,7 @@ import {
   pauseLendingPool,
   unpauseLendingPool,
   getLendingInterestAccrued,
+  clearLiquidationCache,
 } from "../services/lending.service";
 import {
   validateDepositLiquidityArgs,
@@ -292,6 +293,7 @@ class LendingController {
       validateLiquidationArgs({id, ...req.body});
 
       const result = await executeLiquidationService(accessToken, userAddress as string, id, req.body || {});
+      clearLiquidationCache();
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {

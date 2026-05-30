@@ -7,7 +7,7 @@ import { constants } from "../../../config/constants";
  */
 let contractStateCache: { address: string; state: any; timestamp: number } | null = null;
 let pendingRequest: Promise<any> | null = null;
-const CACHE_TTL = 5000; // 5 seconds cache
+const CACHE_TTL = 30_000; // 30 seconds cache
 const normalizeUserAddress = (address: string): string => address.replace(/^0x/i, "").toLowerCase();
 
 /**
@@ -272,12 +272,21 @@ export const fetchUnclaimedRewards = async (
 };
 
 /**
- * Fetch total claimed rewards per user from RewardsClaimed events
+ * Fetch total claimed rewards per user from RewardsClaimed events.
+ * Cached 30 s — claims are append-only so brief staleness is safe.
  */
+let _claimedRewardsCache: { data: Map<string, bigint>; address: string; expiry: number } | null = null;
+const CLAIMED_REWARDS_TTL = 30_000;
+
 export const fetchClaimedRewards = async (
   accessToken: string,
   rewardsAddress: string
 ): Promise<Map<string, bigint>> => {
+  if (_claimedRewardsCache && _claimedRewardsCache.address === rewardsAddress
+      && Date.now() < _claimedRewardsCache.expiry) {
+    return _claimedRewardsCache.data;
+  }
+
   try {
     const { data: events = [] } = await cirrus.get(accessToken, "/event", {
       params: {
@@ -287,7 +296,7 @@ export const fetchClaimedRewards = async (
       },
     });
 
- return events.reduce((map: Map<string, bigint>, event: any) => {
+    const result = events.reduce((map: Map<string, bigint>, event: any) => {
       try {
         const attrs = typeof event.attributes === 'string' 
           ? JSON.parse(event.attributes) 
@@ -302,6 +311,9 @@ export const fetchClaimedRewards = async (
       }
       return map;
     }, new Map<string, bigint>());
+
+    _claimedRewardsCache = { data: result, address: rewardsAddress, expiry: Date.now() + CLAIMED_REWARDS_TTL };
+    return result;
   } catch (error) {
     console.error("Failed to fetch claimed rewards:", error);
     return new Map<string, bigint>();
@@ -311,14 +323,25 @@ export const fetchClaimedRewards = async (
 /**
  * Fetch bonus rewards for a specific user from DirectPayoutApplied events,
  * broken down by activityId so the caller can resolve activity names.
+ * Cached 30 s per user — bonus payouts are append-only.
  */
+type BonusRewardsResult = { total: bigint; byActivity: Map<string, bigint> };
+const _bonusRewardsCache = new Map<string, { data: BonusRewardsResult; expiry: number }>();
+const BONUS_REWARDS_TTL = 30_000;
+
 export const fetchBonusRewards = async (
   accessToken: string,
   rewardsAddress: string,
   userAddress: string
-): Promise<{ total: bigint; byActivity: Map<string, bigint> }> => {
+): Promise<BonusRewardsResult> => {
+  const normalizedUserAddress = normalizeUserAddress(userAddress);
+  const cacheKey = `${rewardsAddress}:${normalizedUserAddress}`;
+  const cached = _bonusRewardsCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiry) {
+    return cached.data;
+  }
+
   try {
-    const normalizedUserAddress = normalizeUserAddress(userAddress);
     const { data: events = [] } = await cirrus.get(accessToken, "/event", {
       params: {
         address: `eq.${rewardsAddress}`,
@@ -342,7 +365,10 @@ export const fetchBonusRewards = async (
         byActivity.set(actId, (byActivity.get(actId) || 0n) + amount);
       } catch { /* skip */ }
     }
-    return { total, byActivity };
+
+    const result = { total, byActivity };
+    _bonusRewardsCache.set(cacheKey, { data: result, expiry: Date.now() + BONUS_REWARDS_TTL });
+    return result;
   } catch (error) {
     console.error("Failed to fetch bonus rewards:", error);
     return { total: 0n, byActivity: new Map() };
