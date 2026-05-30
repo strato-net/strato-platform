@@ -11,6 +11,8 @@ build-type:     Simple
 
 library
   exposed-modules:
+      Control.Monad.Composable.Streaming.Backend
+      Control.Monad.Composable.Streaming.Backend.DockerConfig
       Control.Monad.Composable.Streaming.Kafka
       Control.Monad.Composable.Streaming.Kafka.DockerConfig
   other-modules:
@@ -26,6 +28,7 @@ library
     , conduit
     , containers
     , hw-kafka-client
+    , kafka-monad
     , mtl
     , random
     , text

@@ -11,6 +11,8 @@ build-type:     Simple
 
 library
   exposed-modules:
+      Control.Monad.Composable.Streaming.Backend
+      Control.Monad.Composable.Streaming.Backend.DockerConfig
       Control.Monad.Composable.Streaming.RabbitMQ
       Control.Monad.Composable.Streaming.RabbitMQ.DockerConfig
   other-modules:
