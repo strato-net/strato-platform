@@ -41,7 +41,8 @@ library
   hs-source-dirs:
       src
   build-depends:
-      base
+      aeson
+    , base
     , blockapps-vault-wrapper-api
     , bytestring
     , cache

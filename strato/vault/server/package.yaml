@@ -25,6 +25,7 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
+    - aeson
     - blockapps-vault-wrapper-api
     - bytestring
     - cache
