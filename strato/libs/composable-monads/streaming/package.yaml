@@ -7,7 +7,7 @@ license:             Apache-2.0
 
 dependencies:
 - base >= 4.7 && < 5
-- streaming-kafka-hw
+- kafka-monad
 
 library:
   source-dirs: src
