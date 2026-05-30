@@ -301,6 +301,8 @@ export async function getInternalAddresses() {
   // Static: well-known system contract addresses from config
   const addresses: string[] = [
     mercataBridge,
+    stratoNativeBridge,
+    stratoNativeCustodyVault,
     burnAddress,
   ];
 
