@@ -49,8 +49,7 @@ runtimeConfig = def
       , redisDBNumber = flags_redisDBNumber
       }
   , streamingConfig = def
-      { streamingBackend = flags_streamingBackend
-      , streamingHost = bcHost brokerConfig
+      { streamingHost = bcHost brokerConfig
       , streamingPort = bcPort brokerConfig
       }
   , discoveryConfig = def { minAvailablePeers = flags_minPeers }
@@ -137,10 +136,9 @@ genEthConf = do
         , host = flags_pghost
         , password = pgPass
         }
-    , streamingConfig = (streamingConfig runtimeConfig) 
-        { streamingBackend = flags_streamingBackend
-        , streamingHost = if flags_kafkahost == "localhost" 
-                          then bcHost brokerConfig  -- Use backend default for JLog etc
+    , streamingConfig = (streamingConfig runtimeConfig)
+        { streamingHost = if flags_kafkahost == "localhost"
+                          then bcHost brokerConfig
                           else flags_kafkahost 
         }
     , levelDBConfig = def

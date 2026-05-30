@@ -3,20 +3,12 @@ version:             0.1.0.0
 license:             Apache-2.0
 
 # Umbrella package for message streaming.
-# To switch backends, change THREE things:
-#   1. The dependency below
-#   2. The import in Streaming.hs
-#   3. The import in DockerConfig.hs
-#
-# Available backends:
-#   kafka-monad        - Kafka via Milena (pure Haskell)
-#   streaming-kafka-hw - Kafka via hw-kafka-client (librdkafka)
-#   streaming-rabbitmq - RabbitMQ via amqp
+# Active backend: streaming-kafka-hw
 
 dependencies:
 - base >= 4.7 && < 5
 - kafka-monad
-- streaming-kafka-hw  # <- change this line to switch backends
+- streaming-kafka-hw
 
 library:
   source-dirs: src
