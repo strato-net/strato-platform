@@ -416,6 +416,19 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       };
     },
   },
+  "NativeDeposit": {
+    contract_name: "StratoNativeBridge",
+    event_name: "NativeDepositCompleted",
+    displayName: "Native Deposit",
+    filterConfig: { type: "single", attribute: "stratoRecipient" },
+    iconConfig: { icon: Download, color: "bg-green-500" },
+    getTokenAddress: (event: Event) => {
+      const token = event.attributes.stratoToken || event.attributes.strato_token;
+      return token ? [token] : [];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData =>
+      activityTypes.Deposit.handler(event, tokenSymbols, userAddress, tokenImages),
+  },
   "Withdraw": {
     contract_name: "MercataBridge",
     event_name: "WithdrawalRequested",
@@ -507,6 +520,35 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           },
         },
       };
+    },
+  },
+  "NativeWithdraw": {
+    contract_name: "StratoNativeBridge",
+    event_name: "NativeWithdrawalRequested",
+    displayName: "Native Withdrawal",
+    filterConfig: { type: "single", attribute: "stratoSender" },
+    iconConfig: { icon: Upload, color: "bg-red-500" },
+    getTokenAddress: (event: Event) => {
+      const token = event.attributes.stratoToken || event.attributes.strato_token;
+      const externalToken = event.attributes.representationToken || event.attributes.representation_token;
+      return [token, externalToken].filter(Boolean) as string[];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const attributes = event.attributes;
+      const normalizedEvent = {
+        ...event,
+        attributes: {
+          ...attributes,
+          token: attributes.stratoToken || attributes.strato_token,
+          user: attributes.stratoSender || attributes.strato_sender,
+          dest: attributes.externalRecipient || attributes.external_recipient,
+          destChainId: attributes.externalChainId || attributes.external_chain_id,
+          externalToken: attributes.representationToken || attributes.representation_token,
+          externalTokenAmount: attributes.stratoTokenAmount || attributes.strato_token_amount || "0",
+        },
+      } as Event;
+
+      return activityTypes.Withdraw.handler(normalizedEvent, tokenSymbols, userAddress, tokenImages);
     },
   },
   "CDPMint": {
@@ -1543,4 +1585,3 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     },
   },
 };
-

@@ -402,7 +402,6 @@ sudo ./strato-run.sh
 **Configuration:**
 
 - `nginx.conf` - Main config
-- `swagger/swagger.yaml` - API specification
 
 ---
 

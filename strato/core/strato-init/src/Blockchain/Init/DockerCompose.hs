@@ -62,6 +62,8 @@ generateDockerCompose = do
             , ("TOKEN_FACTORY", "${TOKEN_FACTORY:-}")
             , ("ADMIN_REGISTRY", "${ADMIN_REGISTRY:-}")
             , ("MERCATA_BRIDGE", "${MERCATA_BRIDGE:-}")
+            , ("STRATO_NATIVE_BRIDGE", "${STRATO_NATIVE_BRIDGE:-}")
+            , ("STRATO_NATIVE_CUSTODY_VAULT", "${STRATO_NATIVE_CUSTODY_VAULT:-}")
             , ("WAGMI_PROJECT_ID", "${WAGMI_PROJECT_ID:-}")
             , ("STRIPE_SECRET_KEY", "${STRIPE_SECRET_KEY:-}")
             , ("STRIPE_PUBLISHABLE_KEY", "${STRIPE_PUBLISHABLE_KEY:-}")
@@ -177,7 +179,7 @@ generateDockerCompose = do
             , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
-        , command = Just ["exec docker-entrypoint.sh postgres -c max_connections=300 -c shared_buffers=512MB >> /logs/postgres.log 2>&1"]
+        , command = Just ["exec docker-entrypoint.sh postgres -c max_connections=800 -c shared_buffers=512MB >> /logs/postgres.log 2>&1"]
         , restart = Just "unless-stopped"
         , healthcheck = Just Healthcheck
             { test = ["CMD-SHELL", "pg_isready -U postgres"]

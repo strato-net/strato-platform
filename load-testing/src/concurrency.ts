@@ -57,8 +57,17 @@ export async function runRateLimited<T>(
         submitted++;
         try {
           results[i] = await task(i);
-        } catch (err) {
-          // Store error info — caller should handle within task.
+        } catch (err: any) {
+          // Tasks are expected to record their own metrics — a throw that
+          // reaches here means the scenario forgot to handle a failure
+          // path and the iteration will be absent from the report. Warn
+          // loudly so the gap is visible during the run instead of
+          // silently disappearing into the metrics count.
+          console.warn(
+            `[runRateLimited] task #${i} threw uncaught: ${err?.message ?? err}. ` +
+              `This iteration will be missing from the metrics — scenarios should ` +
+              `catch their own errors and record a failed metric.`,
+          );
           results[i] = err as any;
         }
         resolve();
