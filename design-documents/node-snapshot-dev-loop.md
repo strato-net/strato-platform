@@ -132,7 +132,7 @@ The archive must not include:
 - `.ethereumH/ethconf.yaml`
 - macOS AppleDouble metadata files (`._*`)
 
-`ethconf.yaml` is intentionally excluded because it contains host-specific values and embeds the local Postgres password. Restore preserves the target node's generated config, then rewrites only the Postgres password fields to match the restored database.
+`ethconf.yaml` is intentionally excluded because it contains host-specific values and embeds the local Postgres password. Restore preserves the target node's generated config, then rewrites the local database password fields and local database hosts to match the restored stores.
 
 ## `SNAPSHOT.json`
 
@@ -310,8 +310,10 @@ Restore must update the target `.ethereumH/ethconf.yaml`:
 
 - `sqlConfig.password`
 - `cirrusConfig.password`
+- `sqlConfig.host` and `cirrusConfig.host` when they point at local Docker
+  database bindings
 
-Those fields must match `secrets/postgres_password`, because the restored Postgres data directory was initialized with that password.
+The password fields must match `secrets/postgres_password`, because the restored Postgres data directory was initialized with that password. Localhost database hosts should resolve to the same address family as the generated Docker port bindings.
 
 ### Payload replacement
 
@@ -408,6 +410,9 @@ For pure Mercata UI/backend work, the preferred loop remains dev mode against a 
 
 - **Snapshot was taken while writers were active:** smoke test fails or restored services enter crash recovery. Fix by requiring the cold shutdown gates.
 - **Postgres password mismatch:** backend, apex, or postgrest cannot connect. Fix by copying `secrets/postgres_password` from the snapshot and rewriting `ethconf.yaml` password fields.
+- **Localhost database host mismatch:** host processes try `::1` while Docker
+  exposes Postgres only on `127.0.0.1`. Fix by normalizing local SQL and Cirrus
+  hosts during restore.
 - **Network mismatch:** node may start with invalid state. Fix by refusing restore when snapshot network differs from requested network.
 - **Version mismatch:** schema or state format may be incompatible. Fix by enforcing same major STRATO version unless explicitly overridden for testing.
 - **Stale lock files:** LevelDB or pid lock errors on start. Fix by excluding `.strato.pid`, stopping all containers, and removing runtime-only locks during restore.

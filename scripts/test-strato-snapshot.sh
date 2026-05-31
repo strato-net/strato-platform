@@ -156,6 +156,11 @@ assert_file "$NODE/logs/keep.log"
 assert_contains "$NODE/.ethereumH/state/value" "state-from-snapshot"
 assert_contains "$NODE/.ethereumH/ethconf.yaml" "nodeUrl: http://local-dev-node:8081"
 assert_contains "$NODE/.ethereumH/ethconf.yaml" "password: snapshotpass"
+assert_contains "$NODE/.ethereumH/ethconf.yaml" "host: 127.0.0.1"
+if grep -q "host: localhost" "$NODE/.ethereumH/ethconf.yaml"; then
+  echo "restore should rewrite local database hosts to 127.0.0.1" >&2
+  exit 1
+fi
 assert_contains "$NODE/secrets/postgres_password" "snapshotpass"
 assert_no_appledouble "$NODE"
 

@@ -277,6 +277,33 @@ path.write_text("".join(out), encoding="utf-8")
 PY
 }
 
+rewrite_ethconf_localhost_db_hosts() {
+  local file="$1"
+  [[ -f "$file" ]] || die "ethconf.yaml not found: $file"
+  chmod u+w "$file" 2>/dev/null || true
+  python3 - "$file" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+sections = {"sqlConfig", "cirrusConfig"}
+current = None
+out = []
+
+for line in path.read_text(encoding="utf-8").splitlines(keepends=True):
+    top = re.match(r"^([A-Za-z0-9_]+):\s*$", line)
+    if top:
+        current = top.group(1)
+    if current in sections and re.match(r"^\s{2}host:\s*(['\"]?)localhost\1\s*$", line):
+        out.append("  host: 127.0.0.1\n")
+    else:
+        out.append(line)
+
+path.write_text("".join(out), encoding="utf-8")
+PY
+}
+
 node_network() {
   read_ethconf_value "$1/.ethereumH/ethconf.yaml" networkConfig network 2>/dev/null || true
 }
@@ -953,6 +980,7 @@ restore_payload() {
   local password
   password="$(<"$node_dir/secrets/postgres_password")"
   rewrite_ethconf_passwords "$node_dir/.ethereumH/ethconf.yaml" "$password"
+  rewrite_ethconf_localhost_db_hosts "$node_dir/.ethereumH/ethconf.yaml"
 
   rm -f "$node_dir/.strato.pid"
 }

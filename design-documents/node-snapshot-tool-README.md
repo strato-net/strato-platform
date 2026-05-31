@@ -172,7 +172,8 @@ Excluded payload:
 Restore preserves the target node's generated host config, copies the snapshot
 Postgres password, and rewrites `sqlConfig.password` and
 `cirrusConfig.password` in `.ethereumH/ethconf.yaml` to match the restored
-database.
+database. Restore also normalizes local `localhost` SQL and Cirrus hosts to
+`127.0.0.1` so host processes connect to the IPv4-only Docker port bindings.
 
 ## More Detail
 
