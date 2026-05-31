@@ -1,0 +1,426 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  echo "Usage: strato-user-add NODE_DIR [USERNAME] [--with-nodekey]" >&2
+  exit 1
+}
+
+prompt_hidden() {
+  local prompt="$1"
+  local value
+  printf "%s" "$prompt" >&2
+  stty -echo
+  IFS= read -r value
+  stty echo
+  printf "\n" >&2
+  printf "%s" "$value"
+}
+
+NODE_DIR="${1:-}"
+if [[ -z "$NODE_DIR" ]]; then
+  usage
+fi
+shift || true
+
+USERNAME="${1:-${LOCAL_AUTH_ADMIN_USERNAME:-admin}}"
+if [[ "${1:-}" != "" && "${1:-}" != --* ]]; then
+  shift || true
+fi
+
+WITH_NODEKEY=false
+for arg in "$@"; do
+  case "$arg" in
+    --with-nodekey)
+      WITH_NODEKEY=true
+      ;;
+    *)
+      usage
+      ;;
+  esac
+done
+
+if [[ ! "$USERNAME" =~ ^[A-Za-z0-9._@-]+$ ]]; then
+  echo "Error: username may only contain letters, numbers, '.', '_', '@', and '-'" >&2
+  exit 1
+fi
+
+if [[ ! -d "$NODE_DIR" ]]; then
+  echo "Error: node directory does not exist: $NODE_DIR" >&2
+  exit 1
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Error: docker is required" >&2
+  exit 1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "Error: python3 is required" >&2
+  exit 1
+fi
+
+if ! command -v strato-vault-import-key >/dev/null 2>&1; then
+  echo "Error: strato-vault-import-key is required. Run make first." >&2
+  exit 1
+fi
+
+cd "$NODE_DIR"
+
+if [[ ! -f secrets/postgres_password ]]; then
+  echo "Error: missing secrets/postgres_password" >&2
+  exit 1
+fi
+
+if [[ ! -f secrets/vault_password ]]; then
+  echo "Error: missing secrets/vault_password" >&2
+  exit 1
+fi
+
+if [[ ! -f secrets/oauth_credentials.yaml ]]; then
+  echo "Error: missing secrets/oauth_credentials.yaml" >&2
+  exit 1
+fi
+
+COMPOSE=(docker compose -p strato)
+
+for _ in $(seq 1 90); do
+  if "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "local-auth"; then
+    break
+  fi
+  sleep 2
+done
+
+if ! "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "local-auth"; then
+  echo "Error: local-auth service did not start" >&2
+  exit 1
+fi
+
+for _ in $(seq 1 90); do
+  if "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "postgres"; then
+    break
+  fi
+  sleep 2
+done
+
+if ! "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "postgres"; then
+  echo "Error: postgres service did not start" >&2
+  exit 1
+fi
+
+for _ in $(seq 1 60); do
+  if "${COMPOSE[@]}" exec -T local-auth curl -fsS "http://localhost:4434/admin/identities" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
+
+if ! "${COMPOSE[@]}" exec -T local-auth curl -fsS "http://localhost:4434/admin/identities" >/dev/null 2>&1; then
+  echo "Error: local-auth admin API did not become ready" >&2
+  exit 1
+fi
+
+for _ in $(seq 1 60); do
+  if "${COMPOSE[@]}" exec -T postgres psql -U postgres -d oauth -Atc "select count(*) from message;" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
+
+if ! "${COMPOSE[@]}" exec -T postgres psql -U postgres -d oauth -Atc "select count(*) from message;" >/dev/null 2>&1; then
+  echo "Error: vault database did not become ready" >&2
+  exit 1
+fi
+
+oauth_config="$(python3 - <<'PY'
+import re
+from pathlib import Path
+
+text = Path("secrets/oauth_credentials.yaml").read_text()
+discovery_match = re.search(r'discoveryUrl:\s*"?([^"\n]+)"?', text)
+client_match = re.search(r'clientId:\s*"?([^"\n]+)"?', text)
+if not discovery_match:
+    raise SystemExit("could not find discoveryUrl in secrets/oauth_credentials.yaml")
+if not client_match:
+    raise SystemExit("could not find clientId in secrets/oauth_credentials.yaml")
+discovery_url = discovery_match.group(1).strip()
+suffix = "/.well-known/openid-configuration"
+if not discovery_url.endswith(suffix):
+    raise SystemExit("unexpected discoveryUrl format in secrets/oauth_credentials.yaml")
+print(discovery_url[:-len(suffix)])
+print(client_match.group(1).strip())
+PY
+)"
+oauth_provider="$(printf "%s" "$oauth_config" | sed -n '1p')"
+oauth_client_id="$(printf "%s" "$oauth_config" | sed -n '2p')"
+
+sql_escape() {
+  printf "%s" "$1" | sed "s/'/''/g"
+}
+
+vault_key_exists() {
+  local username="$1"
+  local provider="$2"
+  local username_sql provider_sql count
+  username_sql="$(sql_escape "$username")"
+  provider_sql="$(sql_escape "$provider")"
+  count="$("${COMPOSE[@]}" exec -T postgres psql -U postgres -d oauth -Atc \
+    "select count(*) from users where x_user_unique_name = '$username_sql' and x_identity_provider_id = '$provider_sql';" | tr -d '[:space:]')"
+  [[ "$count" != "0" ]]
+}
+
+identities="$("${COMPOSE[@]}" exec -T local-auth curl -fsS "http://localhost:4434/admin/identities")"
+if IDENTITY_JSON="$identities" python3 -c 'import json, os, sys; username = sys.argv[1]; identities = json.loads(os.environ["IDENTITY_JSON"]); sys.exit(0 if any(i.get("traits", {}).get("username") == username for i in identities) else 1)' "$USERNAME"; then
+  echo "Local auth user already exists: $USERNAME"
+else
+  echo "Creating local auth user: $USERNAME"
+  password="$(prompt_hidden "Create password: ")"
+  confirm="$(prompt_hidden "Confirm password: ")"
+
+  if [[ "$password" != "$confirm" ]]; then
+    echo "Error: passwords do not match" >&2
+    exit 1
+  fi
+
+  if [[ "${#password}" -lt 8 ]]; then
+    echo "Error: password must be at least 8 characters" >&2
+    exit 1
+  fi
+
+  python3 -c 'import json, sys; username = sys.argv[1]; password = sys.stdin.read().rstrip("\n"); print(json.dumps({"schema_id": "default", "traits": {"username": username}, "credentials": {"password": {"config": {"password": password}}}, "state": "active"}))' "$USERNAME" <<< "$password" \
+    | "${COMPOSE[@]}" exec -T local-auth curl -fsS -X POST "http://localhost:4434/admin/identities" -H "Content-Type: application/json" -d @- >/dev/null
+  unset password confirm
+  echo "Local auth user created: $USERNAME"
+fi
+
+user_key_exists=false
+node_key_exists=false
+if vault_key_exists "$USERNAME" "$oauth_provider"; then
+  user_key_exists=true
+fi
+if [[ "$WITH_NODEKEY" == true ]] && vault_key_exists "$oauth_client_id" "$oauth_provider"; then
+  node_key_exists=true
+fi
+
+if [[ "$user_key_exists" == true && ( "$WITH_NODEKEY" == false || "$node_key_exists" == true ) ]]; then
+  echo "Vault key already exists for: $USERNAME"
+  if [[ "$WITH_NODEKEY" == true ]]; then
+    echo "Node identity key already exists."
+  fi
+  exit 0
+fi
+
+echo ""
+echo "Wallet key setup for: $USERNAME"
+if [[ "$WITH_NODEKEY" == true ]]; then
+  echo "This recovery phrase also restores this node's admin/operator identity."
+fi
+echo "  1. Generate a new recovery phrase"
+echo "  2. Restore from an existing recovery phrase"
+printf "Choose [1/2]: " >&2
+IFS= read -r choice
+
+case "$choice" in
+  1)
+    mnemonic_mode="generate"
+    ;;
+  2)
+    mnemonic_mode="restore"
+    ;;
+  *)
+    echo "Error: expected 1 or 2" >&2
+    exit 1
+    ;;
+esac
+
+wordlist="${STRATO_BIP39_WORDLIST:-$HOME/.local/share/strato/bip39-english.txt}"
+if [[ ! -f "$wordlist" ]]; then
+  repo_wordlist="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/strato/tools/airlock/data/english.txt"
+  if [[ -f "$repo_wordlist" ]]; then
+    wordlist="$repo_wordlist"
+  else
+    echo "Error: BIP39 word list not found. Run make or set STRATO_BIP39_WORDLIST." >&2
+    exit 1
+  fi
+fi
+
+if [[ "$mnemonic_mode" == "generate" ]]; then
+  mnemonic="$(STRATO_BIP39_WORDLIST="$wordlist" python3 - <<'PY'
+import hashlib
+import os
+
+wordlist_path = os.environ["STRATO_BIP39_WORDLIST"]
+with open(wordlist_path, "r", encoding="utf-8") as f:
+    words = [line.strip() for line in f if line.strip()]
+if len(words) != 2048:
+    raise SystemExit("BIP39 word list must contain 2048 words")
+entropy = os.urandom(16)
+checksum = hashlib.sha256(entropy).digest()[0] >> 4
+bits = bin(int.from_bytes(entropy, "big"))[2:].zfill(128) + bin(checksum)[2:].zfill(4)
+print(" ".join(words[int(bits[i:i+11], 2)] for i in range(0, 132, 11)))
+PY
+)"
+  echo ""
+  echo "Generated recovery phrase. Write it down now; it will not be saved."
+  echo ""
+  echo "  $mnemonic"
+  echo ""
+  confirm_phrase="$(prompt_hidden "Type YES after you have saved it: ")"
+  if [[ "$confirm_phrase" != "YES" ]]; then
+    echo "Error: recovery phrase was not confirmed" >&2
+    exit 1
+  fi
+  unset confirm_phrase
+else
+  echo "Enter your BIP39 recovery phrase. It will not be saved."
+  mnemonic="$(prompt_hidden "Recovery phrase: ")"
+fi
+
+derive_private_key() {
+  local derivation_index="$1"
+  STRATO_BIP39_WORDLIST="$wordlist" STRATO_MNEMONIC="$mnemonic" STRATO_DERIVATION_INDEX="$derivation_index" python3 - <<'PY'
+import hashlib
+import hmac
+import os
+import sys
+import unicodedata
+
+P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
+N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+G = (
+    55066263022277343669578718895168534326250603453777594175500187360389116729240,
+    32670510020758816978083085130507043184471273380659243275938904335757337482424,
+)
+
+def inv(x):
+    return pow(x, P - 2, P)
+
+def point_add(a, b):
+    if a is None:
+        return b
+    if b is None:
+        return a
+    x1, y1 = a
+    x2, y2 = b
+    if x1 == x2 and (y1 + y2) % P == 0:
+        return None
+    if a == b:
+        m = (3 * x1 * x1) * inv(2 * y1 % P) % P
+    else:
+        m = (y2 - y1) * inv((x2 - x1) % P) % P
+    x3 = (m * m - x1 - x2) % P
+    y3 = (m * (x1 - x3) - y1) % P
+    return x3, y3
+
+def point_mul(k, point=G):
+    result = None
+    addend = point
+    while k:
+        if k & 1:
+            result = point_add(result, addend)
+        addend = point_add(addend, addend)
+        k >>= 1
+    return result
+
+def ser32(i):
+    return i.to_bytes(4, "big")
+
+def ser256(i):
+    return i.to_bytes(32, "big")
+
+def parse256(b):
+    return int.from_bytes(b, "big")
+
+def compressed_pubkey(priv):
+    x, y = point_mul(priv)
+    return bytes([2 + (y & 1)]) + ser256(x)
+
+def child(parent_key, parent_chain_code, index):
+    if index >= 0x80000000:
+        data = b"\x00" + ser256(parent_key) + ser32(index)
+    else:
+        data = compressed_pubkey(parent_key) + ser32(index)
+    i = hmac.new(parent_chain_code, data, hashlib.sha512).digest()
+    il, ir = i[:32], i[32:]
+    child_key = (parse256(il) + parent_key) % N
+    if parse256(il) >= N or child_key == 0:
+        raise SystemExit("Invalid BIP32 child key")
+    return child_key, ir
+
+def validate_words(mnemonic):
+    with open(os.environ["STRATO_BIP39_WORDLIST"], "r", encoding="utf-8") as f:
+        wordlist = [line.strip() for line in f if line.strip()]
+    word_count = len(mnemonic.split())
+    if word_count not in {12, 15, 18, 21, 24}:
+        raise SystemExit("Invalid recovery phrase word count")
+    word_index = {word: i for i, word in enumerate(wordlist)}
+    phrase_words = mnemonic.split()
+    unknown = [word for word in phrase_words if word not in word_index]
+    if unknown:
+        raise SystemExit("Recovery phrase contains words not in BIP39 list: " + ", ".join(unknown[:3]))
+    bits = "".join(f"{word_index[word]:011b}" for word in phrase_words)
+    entropy_bits = word_count * 11 * 32 // 33
+    checksum_bits = entropy_bits // 32
+    entropy = int(bits[:entropy_bits], 2).to_bytes(entropy_bits // 8, "big")
+    expected = bin(hashlib.sha256(entropy).digest()[0])[2:].zfill(8)[:checksum_bits]
+    if bits[entropy_bits:] != expected:
+        raise SystemExit("Invalid recovery phrase checksum")
+
+mnemonic = " ".join(os.environ["STRATO_MNEMONIC"].split())
+validate_words(mnemonic)
+mnemonic = unicodedata.normalize("NFKD", mnemonic)
+seed = hashlib.pbkdf2_hmac("sha512", mnemonic.encode("utf-8"), b"mnemonic", 2048, dklen=64)
+master = hmac.new(b"Bitcoin seed", seed, hashlib.sha512).digest()
+key = parse256(master[:32])
+chain = master[32:]
+if key == 0 or key >= N:
+    raise SystemExit("Invalid BIP32 master key")
+derivation_index = int(os.environ["STRATO_DERIVATION_INDEX"])
+for index in [44 + 0x80000000, 60 + 0x80000000, 0 + 0x80000000, 0, derivation_index]:
+    key, chain = child(key, chain, index)
+sys.stdout.write(f"{key:064x}")
+PY
+}
+
+pg_password="$(tr -d '\n' < secrets/postgres_password)"
+
+import_key() {
+  local private_key="$1"
+  local username="$2"
+  local provider="$3"
+  printf "%s" "$private_key" | strato-vault-import-key \
+    --pghost localhost \
+    --password "$pg_password" \
+    --database oauth \
+    --vaultPasswordFile secrets/vault_password \
+    --username "$username" \
+    --oauthProvider "$provider"
+}
+
+extract_imported_address() {
+  sed -n 's/^Imported key for .*: //p' | tail -n 1
+}
+
+if [[ "$user_key_exists" == false ]]; then
+  private_key="$(derive_private_key 0)"
+  user_import_output="$(import_key "$private_key" "$USERNAME" "$oauth_provider")"
+  user_address="$(printf "%s\n" "$user_import_output" | extract_imported_address)"
+  if [[ "$WITH_NODEKEY" == true ]]; then
+    echo "Imported admin/operator key:"
+  else
+    echo "Imported user key:"
+  fi
+  echo "  Username: $USERNAME"
+  echo "  Address: $user_address"
+fi
+
+if [[ "$WITH_NODEKEY" == true && "$node_key_exists" == false ]]; then
+  if [[ "${private_key:-}" == "" ]]; then
+    private_key="$(derive_private_key 0)"
+  fi
+  import_key "$private_key" "$oauth_client_id" "$oauth_provider" >/dev/null
+  echo "Configured node services to use this operator address."
+fi
+
+unset private_key mnemonic pg_password user_import_output user_address

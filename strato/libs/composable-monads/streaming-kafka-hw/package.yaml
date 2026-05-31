@@ -10,6 +10,11 @@ dependencies:
 
 library:
   source-dirs: src
+  exposed-modules:
+  - Control.Monad.Composable.Streaming.Backend
+  - Control.Monad.Composable.Streaming.Backend.DockerConfig
+  - Control.Monad.Composable.Streaming.Kafka
+  - Control.Monad.Composable.Streaming.Kafka.DockerConfig
   dependencies:
   - aeson
   - binary
@@ -18,6 +23,7 @@ library:
   - conduit
   - containers
   - hw-kafka-client
+  - kafka-monad
   - mtl
   - random
   - text
