@@ -260,4 +260,35 @@ def waitLocalNodeIsSynced() {
   error ("STRATO node failed to sync after more than an hour. Check the strato logs in artifacts for more details.")
 }
 
+/**
+ * Wait for a host-process (strato-up/convoke) node to report isSynced=true via
+ * its local metadata endpoint. Unlike waitLocalNodeIsSynced(), this does not
+ * rely on the strato-getting-started 'strato-nginx-1' container, so it works
+ * with the build-and-strato-up deployment model.
+ * @param metadataUrl  Metadata endpoint. Default: http://127.0.0.1:3000/eth/v1.2/metadata
+ * @param maxAttempts  Poll attempts before failing. Default: 7000 (~hours at 2s).
+ */
+def waitHostNodeIsSynced(String metadataUrl = "http://127.0.0.1:3000/eth/v1.2/metadata", int maxAttempts = 7000) {
+  echo "Waiting for host node to be in-sync via ${metadataUrl} ..."
+  for (int i = 0; i < maxAttempts; i++) {
+    if (sh(returnStatus: true, script: "curl -fsS ${metadataUrl} | grep '\"isSynced\":true'") == 0) {
+      return true
+    }
+    sleep 2
+  }
+  error("STRATO host node failed to sync. Check mynode/logs in artifacts for details.")
+}
+
+/**
+ * Read the current best block number from a host-process node's metadata
+ * endpoint (nodeBestBlock). Returns 0 if unavailable.
+ */
+def hostNodeBestBlock(String metadataUrl = "http://127.0.0.1:3000/eth/v1.2/metadata") {
+  def out = sh(
+    returnStdout: true,
+    script: "curl -fsS ${metadataUrl} | jq -r '.nodeBestBlock // 0'"
+  ).trim()
+  return out.isInteger() ? out.toInteger() : 0
+}
+
 return this
