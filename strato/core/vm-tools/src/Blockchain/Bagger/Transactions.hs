@@ -47,7 +47,6 @@ data TransactionFailureCause
   | TFIntrinsicGasExceedsTxLimit Integer Integer OutputTx -- intrinsicGas, txGasLimit
   | TFBlockGasLimitExceeded Integer Integer OutputTx -- neededGas, actualGas
   | TFNonceMismatch Integer Integer OutputTx -- expectedNonce, actualNonce
-  | TFCodeCollectionNotFound Address String OutputTx
   | TFInvalidPragma [(String, String)] OutputTx
   | TFTXSizeLimitExceeded Integer Integer OutputTx -- txSizeLimit, actualSize
   | TFKnownFailedTX OutputTx
@@ -209,7 +208,6 @@ tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = BalanceTooLow Exec
 tfToBaggerTxRejection (TFIntrinsicGasExceedsTxLimit ig _ tx) = GasLimitTooLow Execution Queued ig tx
 tfToBaggerTxRejection TFBlockGasLimitExceeded {} = error "please dont do that (call tfToBaggerTxRejection on a TFBlockGasLimitExceeded)"
 tfToBaggerTxRejection (TFNonceMismatch expected _ tx) = NonceTooLow Execution Queued expected tx
-tfToBaggerTxRejection (TFCodeCollectionNotFound addr name tx) = CodeNotFound Validation Queued addr name tx
 tfToBaggerTxRejection (TFInvalidPragma erPragmas' tx) = InvalidPragma Validation Queued erPragmas' tx
 tfToBaggerTxRejection (TFTXSizeLimitExceeded limit actual tx) = TXSizeLimitExceeded Execution Queued actual limit tx
 tfToBaggerTxRejection (TFKnownFailedTX tx) = KnownFailedTX Execution Queued tx
@@ -220,7 +218,6 @@ instance Format TransactionFailureCause where
   format (TFIntrinsicGasExceedsTxLimit intG txGL _) = "Intrinsic gas exceeds TX gas limit: intrinsic gas " ++ show intG ++ " > tx gas limit " ++ show txGL
   format (TFBlockGasLimitExceeded txG blkG _) = "Block gas limit exceeded: needed " ++ show txG ++ " > available " ++ show blkG
   format (TFNonceMismatch expected actual _) = "Nonce mismatch: expecting " ++ show expected ++ ", actual " ++ show actual
-  format (TFCodeCollectionNotFound addr name _) = "Code collection not found at address " ++ format addr ++ " with name " ++ name
   format (TFInvalidPragma erPragmas' _) = "Invalid pragma: " ++ show erPragmas'
   format (TFTXSizeLimitExceeded limit actual _) = "TX size limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
   format (TFKnownFailedTX t) = "Known failed tx: " ++ format (otHash t)

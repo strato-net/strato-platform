@@ -67,7 +67,7 @@ import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 import Blockchain.TheDAOFork
 import Blockchain.Timing
-import Blockchain.VM.SolidException (SolidException(PaymentError, TooMuchGas))
+import Blockchain.VM.SolidException (SolidException(MissingCodeCollection, PaymentError, TooMuchGas))
 import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
@@ -506,8 +506,8 @@ runCodeForTransaction b availableGas tAddr t proposer =
             let selector = B.take 4 callData
                 argsBytes = B.drop 4 callData
             lift (resolveFunction b tAddr toAddr selector) >>= \case
-              Nothing -> throwE $ TFCodeCollectionNotFound toAddr
-                ("no matching function for selector 0x" ++ concatMap (printf "%02x") (B.unpack selector)) t
+              Nothing -> pure . solidvmErrorResults $ MissingCodeCollection (show toAddr)
+                ("no matching function for selector 0x" ++ concatMap (printf "%02x") (B.unpack selector))
               Just (fName, func) -> do
                 let argTexts = map valueToArgText $ decodeABIArgs argsBytes (funcArgTypes func)
                     fnStr = T.unpack (labelToText fName)
@@ -527,8 +527,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
                     Nothing
 
         TD.EthereumTX {TD.ethTo = Nothing} ->
-          throwE $ TFCodeCollectionNotFound (Address 0)
-            "EthereumTX contract creation (raw EVM bytecode) not supported" t
+          pure . solidvmErrorResults $ MissingCodeCollection (show $ Address 0) "EthereumTX contract creation (raw EVM bytecode) not supported"
 
         _ | isContractCreationTX ut -> do
           when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"

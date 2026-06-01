@@ -106,7 +106,6 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress= 
     Just f@TFInsufficientFunds {} -> recoverable f
     Just f@TFIntrinsicGasExceedsTxLimit {} -> recoverable f
     Just f@TFNonceMismatch {} -> error $ "mineTransactions' we messed up: " ++ format f
-    Just f@TFCodeCollectionNotFound {} -> recoverable f
     Just f@TFInvalidPragma {} -> recoverable f
     Just f@TFTXSizeLimitExceeded {} -> recoverable f
     Just f@TFKnownFailedTX {} -> recoverable f
