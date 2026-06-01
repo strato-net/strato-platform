@@ -92,11 +92,11 @@ pipeline {
 // Build-and-strato-up deploy for a single network: start the node with
 // strato-up (using the network's default public vault and file server), wait
 // for it to become available and sync, push CloudWatch metrics, then create
-// and publish a snapshot. Tears the node down before returning so the next
-// network starts clean.
+// and publish a snapshot. Cleanup is handled by the leading block below (on
+// the next network's run) and by the post{always} teardown.
 def deployAndSync(String network, String metricNamespacePrefix) {
   script {
-    // Clean any prior node state between networks.
+    // Clean any prior node state before this network's run.
     sh '''#!/bin/bash -le
       strato-down mynode || true
       pkill convoke || true
@@ -166,11 +166,5 @@ def deployAndSync(String network, String metricNamespacePrefix) {
           --strict-layers
       """
     }
-
-    // Tear down before the next network.
-    sh '''#!/bin/bash -le
-      strato-down mynode || true
-      pkill convoke || true
-    '''
   }
 }
