@@ -24,7 +24,7 @@ backup or canonical network checkpoint.
 - A clean checkout of the branch under test:
 
 ```bash
-export SNAPSHOT_BRANCH=codex/node-snapshot-prod-restore-latest-develop
+export SNAPSHOT_BRANCH=develop
 git fetch origin "$SNAPSHOT_BRANCH"
 git checkout -B "$SNAPSHOT_BRANCH" "origin/$SNAPSHOT_BRANCH"
 ```
