@@ -5,14 +5,27 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP_PATHS=()
 
+# Default public, read-only snapshot bucket. Override with STRATO_SNAPSHOT_BUCKET.
+DEFAULT_SNAPSHOT_BUCKET="strato-snapshots"
+# Compression extension used for snapshots published under the network prefix.
+SNAPSHOT_ARCHIVE_EXT="tar.zst"
+
 usage() {
   cat <<'EOF'
 Usage:
   strato-snapshot create <node-dir> --network <network> --output <file> [options]
-  strato-snapshot restore <node-dir> --source <file-or-s3-uri> --network <network> [options]
-  strato-snapshot inspect <file-or-s3-uri>
-  strato-snapshot smoke-test --source <file-or-s3-uri> --network <network> [options]
+  strato-snapshot restore <node-dir> (--source <file-or-s3-uri> | --snapshot[=<ts>]) --network <network> [options]
+  strato-snapshot inspect (<file-or-s3-uri> | --snapshot[=<ts>] --network <network>)
+  strato-snapshot smoke-test (--source <file-or-s3-uri> | --snapshot[=<ts>]) --network <network> [options]
   strato-snapshot publish <file> --destination <dir-or-s3-uri> [--alias latest]
+
+Snapshot selection (restore/inspect/smoke-test):
+  --source <file-or-s3-uri>  Explicit snapshot location (local path or s3:// URI).
+  --snapshot[=<timestamp>]   Resolve from the published S3 bucket for --network.
+                             Without a timestamp, downloads the 'latest' alias.
+                             Timestamp format: YYYYMMDD-HH:mm:ssZ (e.g. 20260601-13:05:00Z).
+  --bucket <name>            Override the snapshot bucket. Default: env
+                             STRATO_SNAPSHOT_BUCKET or '$DEFAULT_SNAPSHOT_BUCKET'.
 
 Create options:
   --metadata-url <url>       Metadata URL. Defaults from node ethconf apiPort.
@@ -113,13 +126,98 @@ absolute_path() {
   fi
 }
 
+snapshot_bucket() {
+  printf '%s\n' "${1:-${STRATO_SNAPSHOT_BUCKET:-$DEFAULT_SNAPSHOT_BUCKET}}"
+}
+
+# Normalize an operator-supplied timestamp (YYYYMMDD-HH:mm:ssZ) into the
+# filename-safe form used in S3 keys (YYYYMMDD-HHmmssZ). Already-normalized
+# input passes through unchanged.
+normalize_snapshot_timestamp() {
+  local ts="$1"
+  python3 - "$ts" <<'PY'
+import re
+import sys
+
+ts = sys.argv[1].strip()
+# Accept the documented colon form and the already-normalized form.
+m = re.fullmatch(r"(\d{8})-(\d{2}):?(\d{2}):?(\d{2})Z", ts)
+if not m:
+    sys.exit(1)
+print(f"{m.group(1)}-{m.group(2)}{m.group(3)}{m.group(4)}Z")
+PY
+}
+
+# Build the S3 URI for a published snapshot given network and optional timestamp.
+# No timestamp -> the 'latest' alias for the network.
+resolve_snapshot_source() {
+  local network="$1"
+  local timestamp="$2"
+  local bucket="$3"
+  [[ -n "$network" ]] || die "--network is required to resolve a published snapshot"
+  bucket="$(snapshot_bucket "$bucket")"
+
+  local key
+  if [[ -z "$timestamp" ]]; then
+    key="latest.${SNAPSHOT_ARCHIVE_EXT}"
+  else
+    local norm
+    norm="$(normalize_snapshot_timestamp "$timestamp")" \
+      || die "invalid snapshot timestamp '$timestamp'; expected YYYYMMDD-HH:mm:ssZ"
+    key="${network}-${norm}.${SNAPSHOT_ARCHIVE_EXT}"
+  fi
+  printf 's3://%s/%s/%s\n' "$bucket" "$network" "$key"
+}
+
+# Resolve the snapshot source for restore/inspect/smoke-test. An explicit
+# --source always wins; otherwise --snapshot[=ts] resolves against the bucket.
+resolve_selection_source() {
+  local source="$1"
+  local use_snapshot="$2"
+  local timestamp="$3"
+  local network="$4"
+  local bucket="$5"
+
+  if [[ -n "$source" ]]; then
+    if [[ "$use_snapshot" == "true" ]]; then
+      die "--source and --snapshot are mutually exclusive"
+    fi
+    printf '%s\n' "$source"
+    return 0
+  fi
+
+  [[ "$use_snapshot" == "true" ]] || die "one of --source or --snapshot is required"
+  resolve_snapshot_source "$network" "$timestamp" "$bucket"
+}
+
+# Verify a downloaded archive against its published .sha256 sidecar, if present.
+verify_s3_checksum() {
+  local s3_uri="$1"
+  local local_file="$2"
+  local checksum_uri="${s3_uri}.sha256"
+  local checksum_file
+  checksum_file="$(mktemp_dir)/expected.sha256"
+  if ! aws s3 cp "$checksum_uri" "$checksum_file" >/dev/null 2>&1; then
+    warn "no checksum sidecar at $checksum_uri; skipping integrity check"
+    return 0
+  fi
+  local expected actual
+  expected="$(awk '{print $1}' "$checksum_file")"
+  actual="$(sha256_file "$local_file")"
+  [[ -n "$expected" ]] || { warn "empty checksum at $checksum_uri; skipping"; return 0; }
+  [[ "$expected" == "$actual" ]] \
+    || die "checksum mismatch for $s3_uri (expected $expected, got $actual)"
+  info "Verified snapshot checksum: $actual"
+}
+
 fetch_source() {
   local source="$1"
   if [[ "$source" == s3://* ]]; then
     need_cmd aws
     local tmp
-    tmp="$(mktemp_dir)/snapshot.tar"
+    tmp="$(mktemp_dir)/snapshot.${source##*.}"
     aws s3 cp "$source" "$tmp" >/dev/null
+    verify_s3_checksum "$source" "$tmp"
     printf '%s\n' "$tmp"
   else
     [[ -f "$source" ]] || die "snapshot source not found: $source"
@@ -986,10 +1084,29 @@ restore_payload() {
 }
 
 cmd_inspect() {
-  [[ $# -eq 1 ]] || die "inspect requires exactly one source"
   need_cmd python3
-  local source archive manifest
-  source="$1"
+  local source use_snapshot timestamp network bucket archive manifest
+  source=""
+  use_snapshot="false"
+  timestamp=""
+  network=""
+  bucket=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --source) source="$2"; shift 2 ;;
+      --snapshot) use_snapshot="true"; shift ;;
+      --snapshot=*) use_snapshot="true"; timestamp="${1#*=}"; shift ;;
+      --network) network="$2"; shift 2 ;;
+      --bucket) bucket="$2"; shift 2 ;;
+      -*) die "unknown inspect option: $1" ;;
+      *)
+        [[ -z "$source" ]] || die "inspect accepts a single positional source"
+        source="$1"; shift ;;
+    esac
+  done
+
+  source="$(resolve_selection_source "$source" "$use_snapshot" "$timestamp" "$network" "$bucket")"
   archive="$(fetch_source "$source")"
   manifest="$(mktemp_dir)/SNAPSHOT.json"
   extract_manifest "$archive" "$manifest"
@@ -1016,10 +1133,13 @@ cmd_restore() {
   need_cmd python3
 
   [[ $# -ge 1 ]] || die "restore requires <node-dir>"
-  local node_dir source network force start include_prometheus allow_version_drift
+  local node_dir source use_snapshot timestamp bucket network force start include_prometheus allow_version_drift
   node_dir="$1"
   shift
   source=""
+  use_snapshot="false"
+  timestamp=""
+  bucket=""
   network=""
   force="false"
   start="false"
@@ -1029,6 +1149,9 @@ cmd_restore() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --source) source="$2"; shift 2 ;;
+      --snapshot) use_snapshot="true"; shift ;;
+      --snapshot=*) use_snapshot="true"; timestamp="${1#*=}"; shift ;;
+      --bucket) bucket="$2"; shift 2 ;;
       --network) network="$2"; shift 2 ;;
       --force) force="true"; shift ;;
       --start) start="true"; shift ;;
@@ -1038,8 +1161,8 @@ cmd_restore() {
     esac
   done
 
-  [[ -n "$source" ]] || die "--source is required"
   [[ -n "$network" ]] || die "--network is required"
+  source="$(resolve_selection_source "$source" "$use_snapshot" "$timestamp" "$network" "$bucket")"
 
   node_dir="$(absolute_path "$node_dir")"
   local archive extracted manifest generated_flag
@@ -1206,8 +1329,11 @@ if "isSynced" not in data:
 }
 
 cmd_smoke_test() {
-  local source network node_dir timeout
+  local source use_snapshot timestamp bucket network node_dir timeout
   source=""
+  use_snapshot="false"
+  timestamp=""
+  bucket=""
   network=""
   node_dir=""
   timeout="600"
@@ -1215,6 +1341,9 @@ cmd_smoke_test() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --source) source="$2"; shift 2 ;;
+      --snapshot) use_snapshot="true"; shift ;;
+      --snapshot=*) use_snapshot="true"; timestamp="${1#*=}"; shift ;;
+      --bucket) bucket="$2"; shift 2 ;;
       --network) network="$2"; shift 2 ;;
       --node-dir) node_dir="$2"; shift 2 ;;
       --timeout) timeout="$2"; shift 2 ;;
@@ -1222,8 +1351,8 @@ cmd_smoke_test() {
     esac
   done
 
-  [[ -n "$source" ]] || die "--source is required"
   [[ -n "$network" ]] || die "--network is required"
+  source="$(resolve_selection_source "$source" "$use_snapshot" "$timestamp" "$network" "$bucket")"
 
   if [[ -z "$node_dir" ]]; then
     node_dir="$(mktemp_dir)/snapshot-smoke-node"
@@ -1279,7 +1408,9 @@ cmd_publish() {
   alias_checksum_file=""
   if [[ -n "$alias_name" ]]; then
     alias_file="$alias_name$(archive_suffix "$base_name")"
-    alias_checksum_file="$(mktemp_dir)/$alias_name.sha256"
+    # Sidecar follows the <full-filename>.sha256 convention so `sha256sum -c`
+    # works in place and matches what restore/verify expects.
+    alias_checksum_file="$(mktemp_dir)/$alias_file.sha256"
     printf '%s  %s\n' "$digest" "$alias_file" > "$alias_checksum_file"
   fi
 
@@ -1289,7 +1420,7 @@ cmd_publish() {
     aws s3 cp "$checksum_file" "${destination%/}/$base_name.sha256"
     if [[ -n "$alias_name" ]]; then
       aws s3 cp "$artifact" "${destination%/}/$alias_file"
-      aws s3 cp "$alias_checksum_file" "${destination%/}/$alias_name.sha256"
+      aws s3 cp "$alias_checksum_file" "${destination%/}/$alias_file.sha256"
     fi
   else
     mkdir -p "$destination"
@@ -1297,7 +1428,7 @@ cmd_publish() {
     cp "$checksum_file" "$destination/$base_name.sha256"
     if [[ -n "$alias_name" ]]; then
       cp "$artifact" "$destination/$alias_file"
-      cp "$alias_checksum_file" "$destination/$alias_name.sha256"
+      cp "$alias_checksum_file" "$destination/$alias_file.sha256"
     fi
   fi
 }

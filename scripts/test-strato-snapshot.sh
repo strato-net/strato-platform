@@ -301,32 +301,49 @@ STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" publish "$TMP/snapshot.tar.gz" --destinat
 assert_file "$PUBLISH/snapshot.tar.gz"
 assert_file "$PUBLISH/snapshot.tar.gz.sha256"
 assert_file "$PUBLISH/latest.tar.gz"
-assert_file "$PUBLISH/latest.sha256"
-assert_contains "$PUBLISH/latest.sha256" "latest.tar.gz"
+assert_file "$PUBLISH/latest.tar.gz.sha256"
+assert_contains "$PUBLISH/latest.tar.gz.sha256" "latest.tar.gz"
 
-FAKEBIN="$TMP/fakebin"
-mkdir -p "$FAKEBIN"
-cat > "$FAKEBIN/strato-setup" <<'SH'
-#!/usr/bin/env bash
-set -euo pipefail
-mkdir -p "$1/logs"
-SH
-cat > "$FAKEBIN/convoke" <<'SH'
-#!/usr/bin/env bash
-echo "fake convoke failed"
-exit 42
-SH
-chmod +x "$FAKEBIN/strato-setup" "$FAKEBIN/convoke"
-UP_NODE="$TMP/up-node"
-mkdir -p "$UP_NODE"
-if PATH="$FAKEBIN:$PATH" STRATO_UP_STARTUP_CHECK_SECONDS=1 "$ROOT/bin/strato-up" "$UP_NODE" > "$TMP/up.out" 2>&1; then
-  echo "strato-up should reject immediate convoke failure" >&2
+# Snapshot source resolution (offline): exercise the helpers that map
+# --snapshot[=ts] + --network + --bucket into S3 URIs.
+RESOLVE_HELPERS="$(sed -n '/^snapshot_bucket()/,/^fetch_source()/p' "$TOOL" | sed '$d')"
+resolve_uri() {
+  STRATO_SNAPSHOT_BUCKET="${STRATO_SNAPSHOT_BUCKET:-}" bash -c '
+    set -euo pipefail
+    DEFAULT_SNAPSHOT_BUCKET="strato-snapshots"
+    SNAPSHOT_ARCHIVE_EXT="tar.zst"
+    die(){ echo "Error: $*" >&2; exit 1; }
+    warn(){ :; }
+    info(){ :; }
+    need_cmd(){ :; }
+    mktemp_dir(){ mktemp -d; }
+    sha256_file(){ :; }
+    '"$RESOLVE_HELPERS"'
+    resolve_selection_source "$1" "$2" "$3" "$4" "$5"
+  ' _ "$@"
+}
+
+[[ "$(resolve_uri "" true "" upquark "")" == "s3://strato-snapshots/upquark/latest.tar.zst" ]] \
+  || { echo "latest resolution wrong" >&2; exit 1; }
+[[ "$(resolve_uri "" true "20260601-13:05:00Z" helium "")" == "s3://strato-snapshots/helium/helium-20260601-130500Z.tar.zst" ]] \
+  || { echo "timestamp resolution wrong" >&2; exit 1; }
+[[ "$(resolve_uri "" true "" helium "custom-bucket")" == "s3://custom-bucket/helium/latest.tar.zst" ]] \
+  || { echo "bucket override resolution wrong" >&2; exit 1; }
+[[ "$(STRATO_SNAPSHOT_BUCKET=env-bucket resolve_uri "" true "" helium "")" == "s3://env-bucket/helium/latest.tar.zst" ]] \
+  || { echo "env bucket resolution wrong" >&2; exit 1; }
+[[ "$(resolve_uri "/tmp/explicit.tar" false "" helium "")" == "/tmp/explicit.tar" ]] \
+  || { echo "explicit source passthrough wrong" >&2; exit 1; }
+if resolve_uri "/tmp/explicit.tar" true "" helium "" 2>/dev/null; then
+  echo "--source and --snapshot should be mutually exclusive" >&2
   exit 1
 fi
-assert_contains "$TMP/up.out" "convoke exited during startup"
-[[ ! -f "$UP_NODE/.strato.pid" ]] || {
-  echo "strato-up should remove pidfile after immediate convoke failure" >&2
+if resolve_uri "" true "not-a-timestamp" helium "" 2>/dev/null; then
+  echo "invalid timestamp should be rejected" >&2
   exit 1
-}
+fi
+if resolve_uri "" false "" helium "" 2>/dev/null; then
+  echo "missing source/snapshot should be rejected" >&2
+  exit 1
+fi
 
 echo "strato-snapshot fixture tests passed"

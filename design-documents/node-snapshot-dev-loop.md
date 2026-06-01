@@ -2,7 +2,7 @@
 
 ## Overview
 
-Development should not require every engineer to sync a STRATO node from genesis. A snapshot is a cold, portable copy of a fully synced node's persisted state. Engineers restore that copy into a local node directory, start from the snapshot tip, and then use fast app patching (`make app` plus `strato-up --patch-app`) for normal iteration.
+Development should not require every engineer to sync a STRATO node from genesis. A snapshot is a cold, portable copy of a fully synced node's persisted state. Engineers restore that copy into a local node directory, start from the snapshot tip, and then use fast app patching (`make app` plus `strato-patch-app`) for normal iteration.
 
 This document defines the interface for snapshot production, artifact format, restore behavior, and safety gates.
 
@@ -57,7 +57,7 @@ Restore a snapshot into a local node directory.
 
 ```bash
 strato-snapshot restore <node-dir> \
-  --source s3://strato-dev-snapshots/helium/latest.tar.zst \
+  --source s3://strato-snapshots/helium/latest.tar.zst \
   --network helium \
   [--force]
 ```
@@ -98,7 +98,7 @@ Publish an already-created and smoke-tested artifact.
 
 ```bash
 strato-snapshot publish ./snapshots/helium-2026-04-24.tar.zst \
-  --destination s3://strato-dev-snapshots/helium/ \
+  --destination s3://strato-snapshots/helium/ \
   --alias latest
 ```
 
@@ -354,18 +354,20 @@ The smoke test should not publish if Postgres enters crash recovery failures, Re
 
 ## Storage Layout
 
-Recommended remote layout:
+Recommended remote layout. Each artifact has a sidecar checksum named
+`<artifact>.sha256` (the full filename plus `.sha256`, so
+`sha256sum -c <artifact>.sha256` works in place):
 
 ```text
-s3://strato-dev-snapshots/
+s3://strato-snapshots/
   helium/
     latest.tar.zst
-    latest.sha256
-    2026-04-24T143000Z-16.15-cda3022.tar.zst
-    2026-04-24T143000Z-16.15-cda3022.sha256
+    latest.tar.zst.sha256
+    helium-20260424-143000Z.tar.zst
+    helium-20260424-143000Z.tar.zst.sha256
   upquark/
     latest.tar.zst
-    latest.sha256
+    latest.tar.zst.sha256
 ```
 
 Versioned artifacts are immutable. `latest` is a movable alias updated only after smoke test success.
@@ -386,11 +388,17 @@ This keeps full sync measured in CI while making local development restore from 
 
 ## Developer Flow
 
-Typical local use:
+Typical local use (start directly from the latest published snapshot):
+
+```bash
+strato-up mynode --network=helium --snapshot
+```
+
+Or restore explicitly, then start:
 
 ```bash
 strato-snapshot restore mynode \
-  --source s3://strato-dev-snapshots/helium/latest.tar.zst \
+  --source s3://strato-snapshots/helium/latest.tar.zst \
   --network helium
 
 strato-up mynode
@@ -401,7 +409,7 @@ After that, app iteration should use the existing patch flow:
 ```bash
 make app
 strato-down mynode
-strato-up mynode --patch-app mercata-backend:<tag> mercata-ui:<tag>
+strato-patch-app mynode mercata-backend:<tag> mercata-ui:<tag>
 ```
 
 For pure Mercata UI/backend work, the preferred loop remains dev mode against a shared synced node via `NODE_URL`; snapshots are for work that actually requires a local STRATO node.

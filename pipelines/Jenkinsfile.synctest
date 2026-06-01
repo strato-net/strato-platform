@@ -6,137 +6,67 @@ pipeline {
   triggers {
     cron('H */2 * * *')
   }
+  environment {
+    PATH = "/home/ubuntu/.local/bin:${env.PATH}"
+    // Public, read-only snapshot bucket; writes use the block-apps-jenkins-s3 IAM user.
+    STRATO_SNAPSHOT_BUCKET = "strato-snapshots"
+    AWS_DEFAULT_REGION = "us-east-1"
+  }
   stages {
     stage('Prepare') {
       steps {
         script {
           lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
         }
+        sh '''#!/bin/bash -le
+          strato-down mynode || true
+          pkill convoke || true
+          docker rm -f $(docker ps -aq) || true
+          docker system prune -f || true
+          docker volume prune -fa || true
+          sudo rm -rf mynode || true
+        '''
       }
     }
-    
-    stage('Deploy Testnet') {
+
+    stage('Build') {
       steps {
-        sh 'sudo rm -rf strato-getting-started'
-        sh 'git clone https://github.com/blockapps/strato-getting-started'
-        dir("strato-getting-started") {
-          sh "sudo cp /datadrive/letsencrypt-ssl/server.pem ssl/certs/"
-          sh "sudo cp /datadrive/letsencrypt-ssl/server.key ssl/private/"
-          sh "sudo ./strato --compose"
-          sh "sudo ./strato --pull"
-          withCredentials([usernamePassword(credentialsId: 'testsync1-client', passwordVariable: 'TESTSYNC1_CLIENT_SECRET', usernameVariable: 'TESTSYNC1_CLIENT_ID')]) {
-            writeFile file: "strato-run.sh", text: """#!/bin/bash
-                NODE_HOST=\$(</host) \\
-                  network='helium' \\
-                  OAUTH_CLIENT_ID='$TESTSYNC1_CLIENT_ID' \\
-                  OAUTH_CLIENT_SECRET='$TESTSYNC1_CLIENT_SECRET' \\
-                  ssl='true' \\
-                  ./strato
-            """
-            sh "sudo ./strato --wipe"
-            withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
-              sh "sudo ./strato-run.sh"
-            }
-            script {
-              def timeStart = System.currentTimeMillis()
-              lib.waitLocalNodeIsSynced()
-              def syncTimeSec = (System.currentTimeMillis() - timeStart) / 1000 
-              def syncTimeMin = syncTimeSec / 60
-              def blocksTotal = Integer.parseInt(sh(
-                  script: "sudo docker exec strato-nginx-1 curl -s apex:3009/status | jq -r .lastBlock.number",
-                  returnStdout: true
-              ).trim())
-              def syncTimePerBlockSec = blocksTotal == 0 ? 0 : (syncTimeSec / blocksTotal)
-              
-              // Push sync time to AWS CloudWatch
-              sh """
-                aws cloudwatch put-metric-data \
-                  --namespace 'Testnet/Synctest/TimeMins' \
-                  --metric-name 'TestnetSyncTime' \
-                  --value ${syncTimeMin} \
-                  --unit 'Seconds' \
-                  --region 'us-east-1'
-              """
-              // Push sync time per block to AWS CloudWatch
-              sh """
-                aws cloudwatch put-metric-data \
-                  --namespace 'Testnet/Synctest/TimePerBlockSec' \
-                  --metric-name 'TestnetSyncTimePerBlock' \
-                  --value ${syncTimePerBlockSec} \
-                  --unit 'Seconds' \
-                  --region 'us-east-1'
-              """
-            }
-          }
-        }
+        sh 'rm -rf .docker-work'
+        sh "git checkout BUILD_METADATA"
+        sh 'make'
       }
     }
-    stage('Deploy Mainnet') {
+
+    // Deploy on helium (testnet), measure sync time, then snapshot + publish.
+    stage('Helium Sync + Snapshot') {
       steps {
-        sh 'sudo rm -rf strato-getting-started'
-        sh 'git clone https://github.com/blockapps/strato-getting-started'
-        dir("strato-getting-started") {
-          sh "sudo cp /datadrive/letsencrypt-ssl/server.pem ssl/certs/"
-          sh "sudo cp /datadrive/letsencrypt-ssl/server.key ssl/private/"
-          sh "sudo ./strato --compose"
-          sh "sudo ./strato --pull"
-          withCredentials([usernamePassword(credentialsId: 'testsync1-client', passwordVariable: 'TESTSYNC1_CLIENT_SECRET', usernameVariable: 'TESTSYNC1_CLIENT_ID')]) {
-            writeFile file: "strato-run.sh", text: """#!/bin/bash
-                NODE_HOST=\$(</host) \\
-                  network='upquark' \\
-                  OAUTH_CLIENT_ID='$TESTSYNC1_CLIENT_ID' \\
-                  OAUTH_CLIENT_SECRET='$TESTSYNC1_CLIENT_SECRET' \\
-                  ssl='true' \\
-                  ./strato
-            """
-            sh "sudo ./strato --wipe"
-            withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
-              sh "sudo ./strato-run.sh"
-            }
-            script {
-              def timeStart = System.currentTimeMillis()
-              lib.waitLocalNodeIsSynced()
-              def syncTimeSec = (System.currentTimeMillis() - timeStart) / 1000
-              def syncTimeMin = syncTimeSec / 60
-              def blocksTotal = Integer.parseInt(sh(
-                  script: "sudo docker exec strato-nginx-1 curl -s apex:3009/status | jq -r .lastBlock.number",
-                  returnStdout: true
-              ).trim())
-              def syncTimePerBlockSec = blocksTotal == 0 ? 0 : (syncTimeSec / blocksTotal)
-              
-              // Push sync time to AWS CloudWatch
-              sh """
-                aws cloudwatch put-metric-data \
-                  --namespace 'Mainnet/Synctest/TimeMins' \
-                  --metric-name 'MainnetSyncTime' \
-                  --value ${syncTimeMin} \
-                  --unit 'Seconds' \
-                  --region 'us-east-1'
-              """
-              // Push sync time per block to AWS CloudWatch
-              sh """
-                aws cloudwatch put-metric-data \
-                  --namespace 'Mainnet/Synctest/TimePerBlockSec' \
-                  --metric-name 'MainnetSyncTimePerBlock' \
-                  --value ${syncTimePerBlockSec} \
-                  --unit 'Seconds' \
-                  --region 'us-east-1'
-              """
-            }
-          }
-        }
+        deployAndSync('helium', 'Testnet')
+      }
+    }
+
+    // Deploy on upquark (mainnet), measure sync time, then snapshot + publish.
+    stage('Upquark Sync + Snapshot') {
+      steps {
+        deployAndSync('upquark', 'Mainnet')
       }
     }
   }
-  
+
   post {
+    always {
+      archiveArtifacts artifacts: 'mynode/logs/**', fingerprint: true, allowEmptyArchive: true
+      sh '''#!/bin/bash -le
+        strato-down mynode || true
+        pkill convoke || true
+      '''
+    }
     success {
       slackSend (
           color: 'good',
           message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
     }
-    
+
     failure {
       slackSend (
           color: 'danger',
@@ -148,5 +78,85 @@ pipeline {
           message: "Sync test build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
     }
+  }
+}
+
+// Build-and-strato-up deploy for a single network: start the node with
+// strato-up (using the network's default public vault and file server), wait
+// for host sync, push CloudWatch metrics, then create and publish a snapshot.
+// Tears the node down before returning so the next network starts clean.
+def deployAndSync(String network, String metricNamespacePrefix) {
+  script {
+    // Clean any prior node state between networks.
+    sh '''#!/bin/bash -le
+      strato-down mynode || true
+      pkill convoke || true
+      docker rm -f $(docker ps -aq) || true
+      docker system prune -f || true
+      docker volume prune -fa || true
+      sudo rm -rf mynode || true
+    '''
+
+    // Start the node from genesis using host processes (convoke), not the
+    // strato-getting-started docker wrapper. Uses the network's default public
+    // vault and file server, so no local vault/highway deployment is needed.
+    writeFile file: "run.sh", text: """#!/bin/bash
+      export PATH
+      strato-up mynode \\
+        --network=${network} \\
+        --sslDir='/datadrive/letsencrypt-ssl'
+    """
+    sh 'chmod +x run.sh'
+    withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
+      sh './run.sh'
+    }
+    sh 'docker ps'
+
+    // Measure sync time against the host metadata endpoint.
+    def timeStart = System.currentTimeMillis()
+    lib.waitHostNodeIsSynced()
+    def syncTimeSec = (System.currentTimeMillis() - timeStart) / 1000
+    def syncTimeMin = syncTimeSec / 60
+    def blocksTotal = lib.hostNodeBestBlock()
+    def syncTimePerBlockSec = blocksTotal == 0 ? 0 : (syncTimeSec / blocksTotal)
+
+    sh """
+      aws cloudwatch put-metric-data \
+        --namespace '${metricNamespacePrefix}/Synctest/TimeMins' \
+        --metric-name '${metricNamespacePrefix}SyncTime' \
+        --value ${syncTimeMin} \
+        --unit 'Seconds' \
+        --region 'us-east-1'
+    """
+    sh """
+      aws cloudwatch put-metric-data \
+        --namespace '${metricNamespacePrefix}/Synctest/TimePerBlockSec' \
+        --metric-name '${metricNamespacePrefix}SyncTimePerBlock' \
+        --value ${syncTimePerBlockSec} \
+        --unit 'Seconds' \
+        --region 'us-east-1'
+    """
+
+    // On successful sync, create and publish a snapshot for this network.
+    withCredentials([
+      usernamePassword(credentialsId: 'block-apps-jenkins-s3', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+    ]) {
+      sh """#!/bin/bash -le
+        set -x
+        export AWS_DEFAULT_REGION=us-east-1
+        ./scripts/create-and-publish-snapshot.sh \
+          --node-dir mynode \
+          --network ${network} \
+          --bucket ${STRATO_SNAPSHOT_BUCKET} \
+          --wait-timeout 600 \
+          --strict-layers
+      """
+    }
+
+    // Tear down before the next network.
+    sh '''#!/bin/bash -le
+      strato-down mynode || true
+      pkill convoke || true
+    '''
   }
 }

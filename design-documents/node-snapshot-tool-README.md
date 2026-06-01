@@ -33,12 +33,49 @@ bin/strato-snapshot restore "$NODE_DIR" \
 bin/strato-up "$NODE_DIR"
 ```
 
-You can restore directly from S3 when your AWS profile has access:
+You can restore directly from an explicit S3 URI when your AWS profile has access:
 
 ```bash
 bin/strato-snapshot restore "$NODE_DIR" \
-  --source s3://strato-dev-snapshots-406773134706-us-east-1/helium-local-60999.tar \
+  --source s3://strato-snapshots/helium/helium-20260601-130500Z.tar.zst \
   --network helium
+```
+
+### Restore from the published bucket (`--snapshot`)
+
+Instead of an explicit `--source`, use `--snapshot` to resolve the published
+artifact for a network from the snapshot bucket. Without a timestamp this
+downloads the `latest` alias; with a timestamp it selects that specific
+snapshot:
+
+```bash
+# Latest published helium snapshot:
+bin/strato-snapshot restore "$NODE_DIR" --snapshot --network helium
+
+# A specific snapshot by UTC timestamp (YYYYMMDD-HH:mm:ssZ):
+bin/strato-snapshot restore "$NODE_DIR" \
+  --snapshot=20260601-13:05:00Z \
+  --network helium
+```
+
+The bucket defaults to `strato-snapshots` and can be overridden with the
+`STRATO_SNAPSHOT_BUCKET` environment variable or `--bucket <name>`. The same
+`--snapshot[=<timestamp>]` / `--bucket` options work for `inspect` and
+`smoke-test`. Downloaded archives are verified against their published
+`.sha256` sidecar before use.
+
+### Start a node directly from a snapshot (`strato-up --snapshot`)
+
+`strato-up` accepts `--snapshot[=<timestamp>]`. It runs `strato-setup` to
+generate config, restores the published snapshot for the selected `--network`
+(default `upquark`), then starts the node:
+
+```bash
+# Latest upquark snapshot:
+bin/strato-up mynode --network=upquark --snapshot
+
+# Specific helium snapshot:
+bin/strato-up mynode --network=helium --snapshot=20260601-13:05:00Z
 ```
 
 Use `--force` only when replacing existing node state:
@@ -140,14 +177,33 @@ to be fully caught up by the end of the smoke test.
 Publish an already-created artifact to a local directory or S3 destination:
 
 ```bash
-bin/strato-snapshot publish /tmp/helium-20260429T150000Z.tar \
-  --destination s3://strato-dev-snapshots-406773134706-us-east-1/helium/ \
+bin/strato-snapshot publish /tmp/helium-20260601-130500Z.tar.zst \
+  --destination s3://strato-snapshots/helium/ \
   --alias latest
 ```
 
 `publish` uploads or copies the artifact, a `.sha256` checksum, and optional
 alias files. Run smoke tests before publishing; `publish` does not enforce that
 itself.
+
+## Nightly creation in CI
+
+`scripts/create-and-publish-snapshot.sh` wraps `create` + `publish` for use in
+Jenkins. It snapshots a running, synced node and publishes both a timestamped
+artifact and the `latest` alias under the network prefix:
+
+```bash
+scripts/create-and-publish-snapshot.sh \
+  --node-dir mynode \
+  --network upquark \
+  --bucket strato-snapshots \
+  --wait-timeout 600 \
+  --strict-layers
+```
+
+`pipelines/Jenkinsfile.synctest` builds STRATO, deploys with `strato-up` on
+each network (helium then upquark), measures sync time, and on a successful
+sync runs this script to refresh the published snapshots.
 
 ## Snapshot Contents
 
