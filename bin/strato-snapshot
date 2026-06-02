@@ -467,9 +467,22 @@ sys.exit(0 if data.get("isSynced") is True else 1)
 ' <<<"$json"
 }
 
+# Fetch a URL with curl. When STRATO_SNAPSHOT_CURL_CONTAINER is set, the request
+# is run from inside that container via `docker exec` instead of from the host.
+# This is needed when the node API (e.g. port 3000) is only reachable on the
+# container network and not published to the host.
+snapshot_curl() {
+  local url="$1"
+  if [[ -n "${STRATO_SNAPSHOT_CURL_CONTAINER:-}" ]]; then
+    docker exec "$STRATO_SNAPSHOT_CURL_CONTAINER" curl -fsS "$url" 2>/dev/null
+  else
+    curl -fsS "$url" 2>/dev/null
+  fi
+}
+
 http_json() {
   local url="$1"
-  curl -fsS "$url" 2>/dev/null
+  snapshot_curl "$url"
 }
 
 postgres_container() {
@@ -498,7 +511,7 @@ probe_api_indexer_tip() {
 
   if [[ -n "$last_block_url" ]]; then
     local body
-    body="$(curl -fsS "$last_block_url" 2>/dev/null || true)"
+    body="$(snapshot_curl "$last_block_url" || true)"
     if [[ -n "$body" ]]; then
       result="$(python3 -c '
 import json
@@ -528,7 +541,7 @@ probe_cirrus_tip() {
 
   if [[ -n "$cirrus_tip_url" ]]; then
     local body
-    body="$(curl -fsS "$cirrus_tip_url" 2>/dev/null || true)"
+    body="$(snapshot_curl "$cirrus_tip_url" || true)"
     if [[ -n "$body" ]]; then
       result="$(python3 -c '
 import json
@@ -1313,7 +1326,7 @@ wait_for_metadata() {
   local start now body
   start="$(date +%s)"
   while true; do
-    body="$(curl -fsS "$url" 2>/dev/null || true)"
+    body="$(snapshot_curl "$url" || true)"
     if [[ -n "$body" ]] && python3 -c '
 import json, sys
 data = json.load(sys.stdin)
