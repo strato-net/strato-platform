@@ -217,24 +217,46 @@ export const getBridgeTransactions = async (
   rawParams: Record<string, string | undefined> = {}
 ): Promise<BridgeTransactionResponse> => {
   const config = QUERY_CONFIGS[type];
+  const isDeposit = type === "deposit";
+  const offset = Math.max(Number(rawParams.offset || 0), 0);
+  const limit = rawParams.limit == null ? undefined : Math.max(Number(rawParams.limit), 0);
+  const sourceLimit = isDeposit && limit != null ? String(offset + limit) : undefined;
+  const sourcePageParams = isDeposit
+    ? {
+        order: rawParams.order || "block_timestamp.desc",
+        ...(sourceLimit ? { limit: sourceLimit } : {}),
+      }
+    : {};
+  const queryParams = buildQueryParams(stripPagingParams(rawParams), userAddress, [], type);
 
   const dataParams = {
     select: config.selectFields,
-    ...buildQueryParams(stripPagingParams(rawParams), userAddress, [], type)
+    ...queryParams,
+    ...sourcePageParams
   };
+  const nativeParams = nativeTransactionParams(rawParams, userAddress, type);
 
-  const [standardResponse, nativeResponse] = await Promise.all([
+  const [standardResponse, nativeResponse, nativeCountResponse] = await Promise.all([
     executeParallelQueries(
       accessToken,
       config,
       dataParams,
-      { ...dataParams, select: config.countField }
+      { ...queryParams, select: config.countField }
     ),
     constants.stratoNativeBridge
       ? cirrus.get(accessToken, `/${StratoNativeBridge}-${type === "withdrawal" ? "withdrawals" : "deposits"}`, {
           params: {
             select: "key,value,block_timestamp",
-            ...nativeTransactionParams(rawParams, userAddress, type),
+            ...nativeParams,
+            ...sourcePageParams,
+          }
+        })
+      : Promise.resolve({ data: [] }),
+    isDeposit && constants.stratoNativeBridge
+      ? cirrus.get(accessToken, `/${StratoNativeBridge}-deposits`, {
+          params: {
+            select: "count()",
+            ...nativeParams,
           }
         })
       : Promise.resolve({ data: [] }),
@@ -243,15 +265,19 @@ export const getBridgeTransactions = async (
   const nativeRows = Array.isArray(nativeResponse.data)
     ? normalizeNativeTransactions(nativeResponse.data, type)
     : [];
-  const allResults = [...standardResponse.results, ...nativeRows];
-  const totalCount = allResults.length;
+  const mergedResults = [...standardResponse.results, ...nativeRows];
+  const allResults = isDeposit ? applyPagination(mergedResults, rawParams) : mergedResults;
+  const nativeCount = Number(nativeCountResponse.data?.[0]?.count || 0);
+  const totalCount = isDeposit
+    ? Number(standardResponse.totalCount || 0) + nativeCount
+    : allResults.length;
 
   if (!allResults.length) {
     return { data: [], totalCount };
   }
 
   const enrichedData = await enrichTransactionData(accessToken, allResults, type);
-  return { data: applyPagination(enrichedData, rawParams), totalCount };
+  return { data: isDeposit ? enrichedData : applyPagination(enrichedData, rawParams), totalCount };
 };
 
 export const getBridgeableTokens = async (accessToken: string, chainId?: string): Promise<BridgeToken[]> => {

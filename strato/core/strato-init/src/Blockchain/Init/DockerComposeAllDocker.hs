@@ -9,7 +9,7 @@ import Blockchain.EthConf.Model (networkConfig, httpPort)
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.Options (flags_composeOnly, flags_repoUrl)
-import Blockchain.Strato.Version (stratoVersionTag)
+import Strato.Version (stratoVersionTag)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import Data.Default (def)

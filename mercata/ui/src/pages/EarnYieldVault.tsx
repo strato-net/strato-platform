@@ -134,8 +134,16 @@ const formatAddress = (value: string): string => {
 
 const previewAssetsForShares = (shares: bigint, totalAssets: bigint, totalShares: bigint): bigint => {
   if (shares <= 0n) return 0n;
-  if (totalAssets <= 0n || totalShares <= 0n) return totalShares <= 0n ? shares : 0n;
-  return (shares * (totalAssets + 1n)) / (totalShares + 1n);
+  if (totalShares <= 0n) return shares;
+  if (totalAssets <= 0n) return 0n;
+  return (shares * totalAssets) / totalShares;
+};
+
+const previewSharesForAssets = (assets: bigint, totalAssets: bigint, totalShares: bigint): bigint => {
+  if (assets <= 0n) return 0n;
+  if (totalShares <= 0n) return assets;
+  if (totalAssets <= 0n) return 0n;
+  return (assets * totalShares) / totalAssets;
 };
 
 type ActionMode = "deposit" | "redeem" | null;
@@ -289,21 +297,22 @@ const EarnYieldVault = () => {
   }, [actionMode, userInfo?.maxDeposit, userInfo?.userShares]);
 
   const totalAssetsBig = BigInt(effectiveInfo?.totalAssets || "0");
+  const totalClaimableAssetsBig = BigInt(effectiveInfo?.totalClaimableAssets || "0");
+  const activeAssetsBig =
+    totalAssetsBig > totalClaimableAssetsBig ? totalAssetsBig - totalClaimableAssetsBig : 0n;
   const totalSharesBig = BigInt(effectiveInfo?.totalShares || "0");
 
   const previewValueWei = useMemo(() => {
     if (amountWei <= 0n) return 0n;
 
     if (actionMode === "deposit") {
-      if (totalAssetsBig <= 0n || totalSharesBig <= 0n) return amountWei;
-      return (amountWei * (totalSharesBig + 1n)) / (totalAssetsBig + 1n);
+      return previewSharesForAssets(amountWei, activeAssetsBig, totalSharesBig);
     }
     if (actionMode === "redeem") {
-      if (totalAssetsBig <= 0n || totalSharesBig <= 0n) return 0n;
-      return (amountWei * (totalAssetsBig + 1n)) / (totalSharesBig + 1n);
+      return previewAssetsForShares(amountWei, activeAssetsBig, totalSharesBig);
     }
     return 0n;
-  }, [actionMode, amountWei, totalAssetsBig, totalSharesBig]);
+  }, [actionMode, amountWei, activeAssetsBig, totalSharesBig]);
 
   const instantWithdrawSharesWei = useMemo(() => {
     if (actionMode !== "redeem" || amountWei <= 0n) return 0n;
@@ -318,13 +327,13 @@ const EarnYieldVault = () => {
   }, [actionMode, amountWei, maxRedeemShares]);
 
   const instantWithdrawAssetsWei = useMemo(
-    () => previewAssetsForShares(instantWithdrawSharesWei, totalAssetsBig, totalSharesBig),
-    [instantWithdrawSharesWei, totalAssetsBig, totalSharesBig]
+    () => previewAssetsForShares(instantWithdrawSharesWei, activeAssetsBig, totalSharesBig),
+    [instantWithdrawSharesWei, activeAssetsBig, totalSharesBig]
   );
 
   const queuedWithdrawAssetsEstimateWei = useMemo(
-    () => previewAssetsForShares(queuedWithdrawSharesWei, totalAssetsBig, totalSharesBig),
-    [queuedWithdrawSharesWei, totalAssetsBig, totalSharesBig]
+    () => previewAssetsForShares(queuedWithdrawSharesWei, activeAssetsBig, totalSharesBig),
+    [queuedWithdrawSharesWei, activeAssetsBig, totalSharesBig]
   );
 
   const isActionAmountValid = amountWei > 0n && amountWei <= actionMaxWei;

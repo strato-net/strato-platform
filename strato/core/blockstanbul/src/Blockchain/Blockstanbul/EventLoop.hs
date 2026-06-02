@@ -454,6 +454,7 @@ sendMessages' wms = do
   putBlockstanbulContext ctx'
 
   recordValidator (_isValidator ctx') (_validatorBehavior ctx')
+  forM_ (_selfAddr ctx') $ recordNodeIdentity . T.pack . formatAddressWithoutColor
 
   return evs
 

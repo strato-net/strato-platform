@@ -26,7 +26,6 @@ The following endpoints require CSRF tokens for state-changing operations (POST,
 - `/strato-api/*` - Blockchain API
 - `/strato/v2.3/transaction` - Transaction submission
 - `/strato/v2.3/key` - Key management
-- `/strato/v2.3/users` - User management
 
 ## Frontend Implementation
 

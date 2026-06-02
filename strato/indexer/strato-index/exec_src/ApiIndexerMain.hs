@@ -4,9 +4,10 @@
 import Blockchain.EthConf
 import BlockApps.Init
 import BlockApps.Logging
-import Blockchain.Strato.Indexer.ApiIndexer
+import Blockchain.Strato.Indexer.ApiIndexer (indexerMainLoop)
 import Blockchain.Strato.Indexer.Bootstrap
 import Control.Monad.Composable.SQL
+import Control.Monad.Composable.Redis
 import HFlags
 import Instrumentation
 
@@ -14,12 +15,13 @@ import Wiring ()
 
 main :: IO ()
 main = do
-  blockappsInit "strato-api-indexer"
-  runInstrumentation "strato-api-indexer"
-  _ <- $initHFlags "Strato API Indexer"
+  blockappsInit "strato-indexer"
+  runInstrumentation "strato-indexer"
+  _ <- $initHFlags "Strato Indexer"
 
   runLoggingT $ do
     bootstrapIndexer
-    runStreamMConfigured "strato-api-indexer" $
+    runStreamMConfigured "strato-indexer" $
       runSQLM $
-        apiIndexerMainLoop
+        runRedisM lookupRedisBlockDBConfig $
+          indexerMainLoop

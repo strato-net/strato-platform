@@ -33,7 +33,7 @@ Protected endpoints (browser requests only):
 - `/apex-api/user`, `/apex-api/status` - User management
 - `/bloc/v2.2/*` - Blockchain transactions
 - `/strato-api/*` - Blockchain API
-- `/strato/v2.3/transaction`, `/strato/v2.3/key`, `/strato/v2.3/users` - Transaction/key/user management
+- `/strato/v2.3/transaction`, `/strato/v2.3/key` - Transaction/key/user management
 
 **CSRF Token Initialization**:
 - `/csrf-init` - Dedicated endpoint for initializing CSRF tokens. Use this in frontend applications to ensure a token is generated before making state-changing requests.

@@ -18,8 +18,8 @@ module Blockchain.CommunicationConduit
 where
 
 import           BlockApps.Logging
-import           Blockchain.Constants
 import           Blockchain.Context
+import           Strato.Version (stratoVersion)
 import           Blockchain.Data.Control               (P2PCNC (..))
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Wire                  as W
@@ -89,7 +89,7 @@ handleMsgClientConduit myId peer = do
     Right
       Hello
         { version = 4,
-          clientId = stratoVersionString,
+          clientId = "STRATO/v" ++ stratoVersion ++ "/linux/Haskell",
           capability =
             [ ETH . fromIntegral $ ethVersion,
               IST . fromIntegral $ blockstanbulVersion
@@ -164,7 +164,7 @@ handleMsgServerConduit myPubkey peer = do
       let helloMsg' =
             Hello
               { version = 4,
-                clientId = stratoVersionString,
+                clientId = "STRATO/v" ++ stratoVersion ++ "/linux/Haskell",
                 capability = [ETH (fromIntegral ethVersion)],
                 port = 0,
                 nodeId = myPubkey
