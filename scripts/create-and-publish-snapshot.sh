@@ -24,6 +24,9 @@ DEFAULT_BUCKET="strato-snapshots"
 # cirrus-tip URLs from this metadata URL.
 DEFAULT_CURL_CONTAINER="strato-nginx-1"
 DEFAULT_METADATA_URL="http://$(hostname):3000/eth/v1.2/metadata"
+# Apex /status (node/sequencer best block). Reachable as apex:3009 from inside
+# the curl container. Empty lets strato-snapshot use its own default.
+DEFAULT_STATUS_URL="http://apex:3009/status"
 
 usage() {
   cat <<EOF
@@ -39,6 +42,9 @@ Options:
                           container. Default: env STRATO_SNAPSHOT_METADATA_URL
                           or '$DEFAULT_METADATA_URL'. last-block and cirrus-tip
                           URLs are derived from it.
+  --status-url <url>      Apex /status URL for node/sequencer best block (used
+                          by --strict-layers). Default: env
+                          STRATO_SNAPSHOT_STATUS_URL or '$DEFAULT_STATUS_URL'.
   --curl-container <name> Container to run metadata/tip curls from (the node API
                           is not published to the host). Default: env
                           STRATO_SNAPSHOT_CURL_CONTAINER or '$DEFAULT_CURL_CONTAINER'.
@@ -64,6 +70,7 @@ NODE_DIR=""
 NETWORK=""
 BUCKET="${STRATO_SNAPSHOT_BUCKET:-$DEFAULT_BUCKET}"
 METADATA_URL="${STRATO_SNAPSHOT_METADATA_URL:-$DEFAULT_METADATA_URL}"
+STATUS_URL="${STRATO_SNAPSHOT_STATUS_URL:-$DEFAULT_STATUS_URL}"
 CURL_CONTAINER="${STRATO_SNAPSHOT_CURL_CONTAINER-$DEFAULT_CURL_CONTAINER}"
 OUTPUT_DIR=""
 WAIT_TIMEOUT="3600"
@@ -79,6 +86,7 @@ while [[ $# -gt 0 ]]; do
     --network) NETWORK="$2"; shift 2 ;;
     --bucket) BUCKET="$2"; shift 2 ;;
     --metadata-url) METADATA_URL="$2"; shift 2 ;;
+    --status-url) STATUS_URL="$2"; shift 2 ;;
     --curl-container) CURL_CONTAINER="$2"; shift 2 ;;
     --output-dir) OUTPUT_DIR="$2"; shift 2 ;;
     --wait-timeout) WAIT_TIMEOUT="$2"; shift 2 ;;
@@ -125,6 +133,7 @@ CREATE_ARGS=(
   --layer-lag "$LAYER_LAG"
 )
 [[ -n "$METADATA_URL" ]] && CREATE_ARGS+=(--metadata-url "$METADATA_URL")
+[[ -n "$STATUS_URL" ]] && CREATE_ARGS+=(--status-url "$STATUS_URL")
 [[ "$STRICT_LAYERS" == "true" ]] && CREATE_ARGS+=(--strict-layers)
 # The post-create smoke test restores into a temp dir and starts a fresh node
 # that waits on host loopback metadata without the deployment's SSL/host flags,

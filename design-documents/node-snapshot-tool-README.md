@@ -207,29 +207,43 @@ sync runs this script to refresh the published snapshots.
 
 ## Snapshot Contents
 
+The snapshot carries only public blockchain data, so a snapshot can be restored
+onto any new node started by any user with their own configuration.
+
 Included payload:
 
 - `.ethereumH/` state, excluding `ethconf.yaml`
-- `postgres/`
+- `postgres-dumps/eth.sql` and `postgres-dumps/cirrus.sql` — logical `pg_dump`s
+  of the public blockchain databases only
 - `redis/`
 - `kafka/`
-- `secrets/postgres_password`
 - `prometheus/` only when requested
 
 Excluded payload:
 
+- The raw `postgres/` data directory and the local-only `oauth` database
+  (node key and user wallet keys live there and are never captured)
+- `secrets/` entirely (including `secrets/postgres_password`, `vault_password`,
+  OAuth credentials/tokens, SSL secrets, local-auth secrets)
 - `logs/`
 - `.strato.pid`
 - `.ethereumH/ethconf.yaml`
-- OAuth credentials and tokens
-- SSL secrets
 - macOS AppleDouble metadata files (`._*`)
 
-Restore preserves the target node's generated host config, copies the snapshot
-Postgres password, and rewrites `sqlConfig.password` and
-`cirrusConfig.password` in `.ethereumH/ethconf.yaml` to match the restored
-database. Restore also normalizes local `localhost` SQL and Cirrus hosts to
-`127.0.0.1` so host processes connect to the IPv4-only Docker port bindings.
+The `eth`/`cirrus` databases are dumped with a throwaway `postgres:14.18`
+container against the cleanly-stopped data directory.
+
+Restore preserves the target node's generated host config and its own
+credentials: it loads the `eth`/`cirrus` dumps into the node's postgres cluster
+(initializing the cluster with the node's own `secrets/postgres_password` if it
+is a fresh node), and never imports the snapshot's postgres password. Restore
+also normalizes local `localhost` SQL and Cirrus hosts to `127.0.0.1` so host
+processes connect to the IPv4-only Docker port bindings.
+
+Because only the public `eth`/`cirrus` databases are captured and restored,
+**local-auth nodes are safe on both sides**: `create` never dumps the local-only
+`oauth` database (node key, admin/user wallet keys), and `restore` leaves the
+target node's own `oauth` database intact while replacing only `eth`/`cirrus`.
 
 ## More Detail
 

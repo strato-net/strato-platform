@@ -36,16 +36,15 @@ assert_no_appledouble() {
 make_fixture_snapshot() {
   local staging="$TMP/staging"
   mkdir -p "$staging/payload/ethereumH/state"
-  mkdir -p "$staging/payload/postgres/base"
+  mkdir -p "$staging/payload/postgres-dumps"
   mkdir -p "$staging/payload/redis"
   mkdir -p "$staging/payload/kafka/kafka-logs/__cluster_metadata-0"
-  mkdir -p "$staging/payload/secrets"
 
   echo "state-from-snapshot" > "$staging/payload/ethereumH/state/value"
-  echo "postgres-from-snapshot" > "$staging/payload/postgres/base/value"
+  echo "-- eth dump fixture" > "$staging/payload/postgres-dumps/eth.sql"
+  echo "-- cirrus dump fixture" > "$staging/payload/postgres-dumps/cirrus.sql"
   echo "redis-from-snapshot" > "$staging/payload/redis/appendonly.aof"
   echo "kafka-from-snapshot" > "$staging/payload/kafka/log"
-  echo "snapshotpass" > "$staging/payload/secrets/postgres_password"
 
   cat > "$staging/SNAPSHOT.json" <<'JSON'
 {
@@ -68,10 +67,10 @@ make_fixture_snapshot() {
   },
   "payload": [
     "ethereumH",
-    "postgres",
+    "postgres-dumps/eth.sql",
+    "postgres-dumps/cirrus.sql",
     "redis",
-    "kafka",
-    "secrets/postgres_password"
+    "kafka"
   ],
   "checksums": {
     "payloadSha256": "fixture"
@@ -141,7 +140,6 @@ STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapshot.t
 
 assert_file "$NODE/.ethereumH/ethconf.yaml"
 assert_file "$NODE/.ethereumH/state/value"
-assert_file "$NODE/postgres/base/value"
 assert_file "$NODE/redis/appendonly.aof"
 assert_file "$NODE/kafka/log"
 assert_file "$NODE/secrets/oauth_credentials.yaml"
@@ -155,13 +153,18 @@ assert_file "$NODE/logs/keep.log"
 
 assert_contains "$NODE/.ethereumH/state/value" "state-from-snapshot"
 assert_contains "$NODE/.ethereumH/ethconf.yaml" "nodeUrl: http://local-dev-node:8081"
-assert_contains "$NODE/.ethereumH/ethconf.yaml" "password: snapshotpass"
 assert_contains "$NODE/.ethereumH/ethconf.yaml" "host: 127.0.0.1"
 if grep -q "host: localhost" "$NODE/.ethereumH/ethconf.yaml"; then
   echo "restore should rewrite local database hosts to 127.0.0.1" >&2
   exit 1
 fi
-assert_contains "$NODE/secrets/postgres_password" "snapshotpass"
+# A2: the node keeps its own postgres password; restore must not import the
+# snapshot's credentials into ethconf or secrets.
+assert_contains "$NODE/secrets/postgres_password" "generatedpass"
+if grep -q "password: snapshotpass" "$NODE/.ethereumH/ethconf.yaml"; then
+  echo "restore must not import the snapshot postgres password (A2)" >&2
+  exit 1
+fi
 assert_no_appledouble "$NODE"
 
 if STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium >/tmp/strato-snapshot-restore.out 2>&1; then
@@ -217,6 +220,37 @@ if tar -tzf "$CREATED" | grep -E '(^|/)\._' > "$TMP/created-appledouble.out"; th
   cat "$TMP/created-appledouble.out" >&2
   exit 1
 fi
+
+# Real-STRATO metadata shape: /eth/v1.2/metadata exposes isSynced but NOT
+# nodeBestBlock/sequencedBestBlock/worldBestBlock. With --strict-layers, the
+# node/sequencer tips must be sourced from apex /status instead.
+cat > "$TMP/metadata-nostatusfields.json" <<'JSON'
+{
+  "isSynced": true,
+  "validators": [],
+  "networkName": "helium"
+}
+JSON
+cat > "$TMP/status.json" <<'JSON'
+{
+  "lastBlock": { "number": 100 },
+  "pbftData": { "sequence_number": 100 }
+}
+JSON
+CREATED_STATUS="$TMP/created-status.tar.gz"
+STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" create "$NODE" \
+  --network helium \
+  --output "$CREATED_STATUS" \
+  --metadata-url "file://$TMP/metadata-nostatusfields.json" \
+  --status-url "file://$TMP/status.json" \
+  --last-block-url "file://$TMP/last.json" \
+  --cirrus-tip-url "file://$TMP/cirrus.json" \
+  --strict-layers \
+  --skip-smoke-test
+
+STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" inspect "$CREATED_STATUS" > "$TMP/created-status-inspect.out"
+assert_contains "$TMP/created-status-inspect.out" "nodeBestBlock: 100"
+assert_contains "$TMP/created-status-inspect.out" "sequencedBestBlock: 100"
 
 DOCKER_FAKEBIN="$TMP/docker-fakebin"
 mkdir -p "$DOCKER_FAKEBIN"

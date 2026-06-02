@@ -4,6 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP_PATHS=()
+TMP_PG_CONTAINERS=()
 
 # Default public, read-only snapshot bucket. Override with STRATO_SNAPSHOT_BUCKET.
 DEFAULT_SNAPSHOT_BUCKET="strato-snapshots"
@@ -31,6 +32,8 @@ Create options:
   --metadata-url <url>       Metadata URL. Defaults from node ethconf apiPort.
   --last-block-url <url>     Optional API-indexer block tip URL.
   --cirrus-tip-url <url>     Optional Cirrus tip URL.
+  --status-url <url>         Apex /status URL for node/sequencer best block.
+                             Default: http://apex:3009/status.
   --strict-layers            Fail if API-indexer/Cirrus tips cannot be verified.
   --layer-lag <blocks>       Allowed tip lag for live layer checks. Default: 5.
   --wait-timeout <seconds>   Wait for sync/layer checks before snapshotting.
@@ -70,6 +73,9 @@ info() {
 
 cleanup() {
   set +u
+  for cid in "${TMP_PG_CONTAINERS[@]}"; do
+    [[ -n "$cid" ]] && docker stop "$cid" >/dev/null 2>&1
+  done
   for path in "${TMP_PATHS[@]}"; do
     [[ -n "$path" && -e "$path" ]] && rm -rf "$path"
   done
@@ -340,41 +346,6 @@ sys.exit(1)
 PY
 }
 
-rewrite_ethconf_passwords() {
-  local file="$1"
-  local password="$2"
-  [[ -f "$file" ]] || die "ethconf.yaml not found: $file"
-  chmod u+w "$file" 2>/dev/null || true
-  python3 - "$file" "$password" <<'PY'
-import re
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1])
-password = sys.argv[2]
-sections = {"sqlConfig", "cirrusConfig"}
-current = None
-seen = set()
-out = []
-
-for line in path.read_text(encoding="utf-8").splitlines(keepends=True):
-    top = re.match(r"^([A-Za-z0-9_]+):\s*$", line)
-    if top:
-        current = top.group(1)
-    if current in sections and re.match(r"^\s{2}password:\s*", line):
-        out.append(f"  password: {password}\n")
-        seen.add(current)
-    else:
-        out.append(line)
-
-missing = sections - seen
-if missing:
-    raise SystemExit(f"missing password field(s) in ethconf.yaml: {', '.join(sorted(missing))}")
-
-path.write_text("".join(out), encoding="utf-8")
-PY
-}
-
 rewrite_ethconf_localhost_db_hosts() {
   local file="$1"
   [[ -f "$file" ]] || die "ethconf.yaml not found: $file"
@@ -432,6 +403,49 @@ import sys
 u = urlparse(sys.argv[1])
 print(f"{u.scheme}://{u.netloc}/sync/cirrus-tip")
 PY
+}
+
+# The node/sequencer best-block heights are served by apex's /status endpoint
+# (lastBlock.number and pbftData.sequence_number), NOT the metadata endpoint.
+# When the curls run from inside a container (STRATO_SNAPSHOT_CURL_CONTAINER),
+# apex is reachable as apex:3009. Override with --status-url if needed.
+default_status_url() {
+  printf '%s\n' "http://apex:3009/status"
+}
+
+# Best block number the node has processed, from apex /status (lastBlock.number).
+status_node_block() {
+  local status_url="$1"
+  [[ -n "$status_url" ]] || return 1
+  local body
+  body="$(snapshot_curl "$status_url" || true)"
+  [[ -n "$body" ]] || return 1
+  python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+value = data.get("lastBlock", {}).get("number")
+if value is None:
+    raise SystemExit(1)
+print(int(value))
+' <<<"$body" 2>/dev/null
+}
+
+# Sequencer sequence number, from apex /status (pbftData.sequence_number).
+status_sequencer_block() {
+  local status_url="$1"
+  [[ -n "$status_url" ]] || return 1
+  local body
+  body="$(snapshot_curl "$status_url" || true)"
+  [[ -n "$body" ]] || return 1
+  python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+pbft = data.get("pbftData") or {}
+value = pbft.get("sequence_number")
+if value is None:
+    raise SystemExit(1)
+print(int(value))
+' <<<"$body" 2>/dev/null
 }
 
 json_field() {
@@ -574,12 +588,14 @@ write_live_checks_json() {
   local metadata_json="$2"
   local api_tip="$3"
   local cirrus_tip="$4"
+  local node_tip="${5:-}"
+  local seq_tip="${6:-}"
   python3 -c '
 import json
 import sys
 from pathlib import Path
 
-output, api_tip, cirrus_tip = sys.argv[1:4]
+output, api_tip, cirrus_tip, node_tip, seq_tip = sys.argv[1:6]
 metadata = json.load(sys.stdin)
 
 def maybe_int(value):
@@ -590,17 +606,19 @@ def maybe_int(value):
     except Exception:
         return None
 
+# Prefer the resolved tips (e.g. from apex /status) over metadata, which on this
+# codebase does not carry block heights.
 result = {
     "isSynced": bool(metadata.get("isSynced")),
-    "nodeBestBlock": maybe_int(metadata.get("nodeBestBlock")),
-    "sequencedBestBlock": maybe_int(metadata.get("sequencedBestBlock")),
+    "nodeBestBlock": maybe_int(node_tip) if maybe_int(node_tip) is not None else maybe_int(metadata.get("nodeBestBlock")),
+    "sequencedBestBlock": maybe_int(seq_tip) if maybe_int(seq_tip) is not None else maybe_int(metadata.get("sequencedBestBlock")),
     "worldBestBlock": maybe_int(metadata.get("worldBestBlock")),
     "apiIndexerTip": maybe_int(api_tip),
     "cirrusTip": maybe_int(cirrus_tip),
 }
 
 Path(output).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-' "$output" "$api_tip" "$cirrus_tip" <<<"$metadata_json"
+' "$output" "$api_tip" "$cirrus_tip" "$node_tip" "$seq_tip" <<<"$metadata_json"
 }
 
 live_checks_summary() {
@@ -666,6 +684,7 @@ run_live_checks_once() {
   local allowed_lag="$5"
   local node_dir="$6"
   local checks_json="$7"
+  local status_url="$8"
 
   local metadata_json
   metadata_json="$(http_json "$metadata_url" || true)"
@@ -676,10 +695,16 @@ run_live_checks_once() {
   seq_tip="$(json_field "$metadata_json" sequencedBestBlock 2>/dev/null || true)"
   world_tip="$(json_field "$metadata_json" worldBestBlock 2>/dev/null || true)"
 
+  # The metadata endpoint does not expose block heights; source the node and
+  # sequencer tips from apex /status instead (lastBlock.number,
+  # pbftData.sequence_number).
+  [[ -z "$node_tip" ]] && node_tip="$(status_node_block "$status_url" || true)"
+  [[ -z "$seq_tip" ]] && seq_tip="$(status_sequencer_block "$status_url" || true)"
+
   local api_tip cirrus_tip
   api_tip="$(probe_api_indexer_tip "$last_block_url" "$node_dir" || true)"
   cirrus_tip="$(probe_cirrus_tip "$cirrus_tip_url" "$node_dir" || true)"
-  write_live_checks_json "$checks_json" "$metadata_json" "${api_tip:-}" "${cirrus_tip:-}"
+  write_live_checks_json "$checks_json" "$metadata_json" "${api_tip:-}" "${cirrus_tip:-}" "${node_tip:-}" "${seq_tip:-}"
 
   json_is_synced "$metadata_json" || return 1
 
@@ -694,7 +719,7 @@ run_live_checks_once() {
     check_tip "API-indexer" "$api_tip" "$node_tip" "$allowed_lag" "$strict"
     check_tip "Cirrus" "$cirrus_tip" "$node_tip" "$allowed_lag" "$strict"
   elif [[ "$strict" == "true" ]]; then
-    die "metadata does not expose nodeBestBlock; cannot run strict layer checks"
+    die "could not determine node best block (metadata or apex /status); cannot run strict layer checks"
   fi
 }
 
@@ -708,11 +733,12 @@ wait_for_live_checks() {
   local interval="$7"
   local node_dir="$8"
   local checks_json="$9"
+  local status_url="${10}"
 
   local start now
   start="$(date +%s)"
   while true; do
-    if run_live_checks_once "$metadata_url" "$last_block_url" "$cirrus_tip_url" "$strict" "$allowed_lag" "$node_dir" "$checks_json"; then
+    if run_live_checks_once "$metadata_url" "$last_block_url" "$cirrus_tip_url" "$strict" "$allowed_lag" "$node_dir" "$checks_json" "$status_url"; then
       return 0
     fi
     now="$(date +%s)"
@@ -1008,7 +1034,7 @@ strato_version = "unknown"
 if ":" in strato_image:
     strato_version = strato_image.rsplit(":", 1)[1]
 
-payload = ["ethereumH", "postgres", "redis", "kafka", "secrets/postgres_password"]
+payload = ["ethereumH", "postgres-dumps/eth.sql", "postgres-dumps/cirrus.sql", "redis", "kafka"]
 if include_prometheus == "true":
     payload.append("prometheus")
 
@@ -1036,19 +1062,115 @@ Path(output).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", e
 PY
 }
 
+# Image used for the throwaway postgres container that dumps/loads the captured
+# databases. Must match the node's postgres major version to read the data dir.
+SNAPSHOT_POSTGRES_IMAGE="postgres:14.18"
+# Databases captured into the snapshot. These hold only public blockchain data
+# (chain state and indexed contract storage). The local-only `oauth` database
+# (node key, user keys) is intentionally NOT captured.
+SNAPSHOT_PG_DATABASES=("eth" "cirrus")
+
+postgres_data_dir_initialized() {
+  [[ -f "$1/PG_VERSION" ]]
+}
+
+# Start a throwaway postgres container on a data dir and wait until it is ready.
+# Prints the container id. Caller must stop it with pg_temp_stop.
+#
+# If the data dir is an initialized cluster, it is started as-is (trust auth for
+# local dump/load). If it is empty, the postgres entrypoint initializes it using
+# the given password and default database `eth` -- matching how the node's own
+# postgres container would initialize it on first start.
+pg_temp_start() {
+  local data_dir="$1"
+  local init_password="${2:-}"
+  need_cmd docker
+  local args=(-d --rm -v "$data_dir:/var/lib/postgresql/data")
+  if postgres_data_dir_initialized "$data_dir"; then
+    args+=(-e POSTGRES_HOST_AUTH_METHOD=trust)
+  else
+    [[ -n "$init_password" ]] || die "cannot initialize empty postgres data dir without a password"
+    args+=(-e "POSTGRES_PASSWORD=$init_password" -e "POSTGRES_DB=eth")
+  fi
+  local cid
+  cid="$(docker run "${args[@]}" "$SNAPSHOT_POSTGRES_IMAGE" -c max_connections=300 2>/dev/null)" \
+    || die "failed to start temporary postgres container"
+  TMP_PG_CONTAINERS+=("$cid")
+  local i
+  for i in $(seq 1 90); do
+    if docker exec "$cid" pg_isready -U postgres >/dev/null 2>&1; then
+      printf '%s\n' "$cid"
+      return 0
+    fi
+    sleep 1
+  done
+  die "temporary postgres container did not become ready"
+}
+
+pg_temp_stop() {
+  local cid="$1"
+  [[ -n "$cid" ]] || return 0
+  docker stop "$cid" >/dev/null 2>&1 || true
+}
+
+# Dump the captured databases from the node's (stopped) postgres data dir into
+# <dest_dir>/<db>.sql using a throwaway postgres container.
+dump_databases() {
+  local data_dir="$1"
+  local dest_dir="$2"
+  [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && { mkdir -p "$dest_dir"; for db in "${SNAPSHOT_PG_DATABASES[@]}"; do printf -- '-- offline fixture dump for %s\n' "$db" > "$dest_dir/$db.sql"; done; return 0; }
+  mkdir -p "$dest_dir"
+  local cid db
+  cid="$(pg_temp_start "$data_dir")"
+  for db in "${SNAPSHOT_PG_DATABASES[@]}"; do
+    info "Dumping database '$db'..."
+    docker exec "$cid" pg_dump -U postgres --no-owner --no-privileges "$db" > "$dest_dir/$db.sql" \
+      || { pg_temp_stop "$cid"; die "pg_dump failed for database '$db'"; }
+  done
+  pg_temp_stop "$cid"
+}
+
+# Load the captured database dumps into the target node's postgres data dir
+# using a throwaway postgres container. If the data dir is empty (fresh
+# strato-setup node), it is first initialized with the node's own postgres
+# password so the subsequent strato-up reuses the same cluster. We never import
+# a foreign password, so the restored node keeps its own credentials (A2).
+load_databases() {
+  local data_dir="$1"
+  local dumps_dir="$2"
+  local node_password="$3"
+  [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && return 0
+  local cid db
+  cid="$(pg_temp_start "$data_dir" "$node_password")"
+  for db in "${SNAPSHOT_PG_DATABASES[@]}"; do
+    [[ -f "$dumps_dir/$db.sql" ]] || { pg_temp_stop "$cid"; die "snapshot missing database dump: $db.sql"; }
+    info "Loading database '$db'..."
+    # Recreate the database empty, then load the dump.
+    docker exec "$cid" psql -U postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"$db\";" >/dev/null 2>&1 \
+      || { pg_temp_stop "$cid"; die "failed to drop database '$db' before restore"; }
+    docker exec "$cid" psql -U postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$db\";" >/dev/null 2>&1 \
+      || { pg_temp_stop "$cid"; die "failed to create database '$db'"; }
+    docker exec -i "$cid" psql -U postgres -v ON_ERROR_STOP=1 -d "$db" < "$dumps_dir/$db.sql" >/dev/null 2>&1 \
+      || { pg_temp_stop "$cid"; die "failed to load dump for database '$db'"; }
+  done
+  pg_temp_stop "$cid"
+}
+
 stage_payload() {
   local node_dir="$1"
   local staging="$2"
   local include_prometheus="$3"
 
-  mkdir -p "$staging/payload/secrets"
+  mkdir -p "$staging/payload"
   copy_ethereum_payload "$node_dir/.ethereumH" "$staging/payload/ethereumH"
-  copy_dir_contents_without_appledouble "$node_dir/postgres" "$staging/payload/postgres"
   copy_dir_contents_without_appledouble "$node_dir/redis" "$staging/payload/redis"
   copy_dir_contents_without_appledouble "$node_dir/kafka" "$staging/payload/kafka"
 
-  [[ -f "$node_dir/secrets/postgres_password" ]] || die "missing secrets/postgres_password"
-  cp "$node_dir/secrets/postgres_password" "$staging/payload/secrets/postgres_password"
+  # Capture only the public blockchain databases (eth, cirrus) as logical dumps,
+  # not the raw postgres data dir. This excludes the local-only `oauth` database
+  # (node key, user keys) and avoids shipping a node-specific postgres password.
+  [[ -d "$node_dir/postgres" ]] || die "postgres state directory not found"
+  dump_databases "$node_dir/postgres" "$staging/payload/postgres-dumps"
 
   if [[ "$include_prometheus" == "true" && -d "$node_dir/prometheus" ]]; then
     copy_dir_contents_without_appledouble "$node_dir/prometheus" "$staging/payload/prometheus"
@@ -1057,9 +1179,13 @@ stage_payload() {
   scrub_appledouble_files "$staging/payload"
 }
 
+# Clear the non-postgres state that we fully replace from the payload. The
+# postgres data dir is intentionally preserved: it carries the target node's own
+# freshly-generated credentials and local-only `oauth` database. We only reload
+# the public `eth`/`cirrus` databases into it from the dumps.
 remove_restored_state() {
   local node_dir="$1"
-  rm -rf "$node_dir/postgres" "$node_dir/redis" "$node_dir/kafka"
+  rm -rf "$node_dir/redis" "$node_dir/kafka"
   if [[ -d "$node_dir/.ethereumH" ]]; then
     find "$node_dir/.ethereumH" -mindepth 1 ! -name ethconf.yaml -exec rm -rf {} +
   fi
@@ -1071,26 +1197,33 @@ restore_payload() {
   local include_prometheus="$3"
 
   [[ -d "$extracted/payload" ]] || die "payload missing from archive"
-  [[ -f "$extracted/payload/secrets/postgres_password" ]] || die "payload missing secrets/postgres_password"
+  [[ -d "$extracted/payload/postgres-dumps" ]] || die "payload missing postgres-dumps/"
+  [[ -f "$node_dir/secrets/postgres_password" ]] \
+    || die "target node has no secrets/postgres_password; run strato-setup first"
 
   remove_restored_state "$node_dir"
-  mkdir -p "$node_dir/.ethereumH" "$node_dir/secrets"
+  mkdir -p "$node_dir/.ethereumH" "$node_dir/postgres"
   copy_dir_contents "$extracted/payload/ethereumH" "$node_dir/.ethereumH"
-  copy_dir_contents "$extracted/payload/postgres" "$node_dir/postgres"
   copy_dir_contents "$extracted/payload/redis" "$node_dir/redis"
   copy_dir_contents "$extracted/payload/kafka" "$node_dir/kafka"
-  chmod u+w "$node_dir/secrets/postgres_password" 2>/dev/null || true
-  rm -f "$node_dir/secrets/postgres_password"
-  cp "$extracted/payload/secrets/postgres_password" "$node_dir/secrets/postgres_password"
+
+  # Load only the public blockchain databases into the target node's postgres
+  # cluster (initializing it with the node's own password if empty). The node
+  # keeps its own postgres password and local-only `oauth` DB; no foreign
+  # credentials are imported (A2), and no node/user-specific data from the
+  # source rides along (B3).
+  local node_password
+  node_password="$(<"$node_dir/secrets/postgres_password")"
+  load_databases "$node_dir/postgres" "$extracted/payload/postgres-dumps" "$node_password"
 
   if [[ "$include_prometheus" == "true" && -d "$extracted/payload/prometheus" ]]; then
     rm -rf "$node_dir/prometheus"
     copy_dir_contents "$extracted/payload/prometheus" "$node_dir/prometheus"
   fi
 
-  local password
-  password="$(<"$node_dir/secrets/postgres_password")"
-  rewrite_ethconf_passwords "$node_dir/.ethereumH/ethconf.yaml" "$password"
+  # Normalize localhost SQL/Cirrus hosts to 127.0.0.1 so host processes connect
+  # to the IPv4-only Docker port bindings. The node's own postgres password in
+  # ethconf is left untouched (A2: the node keeps its own credentials).
   rewrite_ethconf_localhost_db_hosts "$node_dir/.ethereumH/ethconf.yaml"
 
   rm -f "$node_dir/.strato.pid"
@@ -1238,7 +1371,7 @@ cmd_create() {
   need_cmd curl
 
   [[ $# -ge 1 ]] || die "create requires <node-dir>"
-  local node_dir network output metadata_url last_block_url cirrus_tip_url strict_layers allowed_lag
+  local node_dir network output metadata_url last_block_url cirrus_tip_url status_url strict_layers allowed_lag
   local wait_timeout wait_interval include_prometheus skip_smoke smoke_node_dir smoke_timeout
   node_dir="$1"
   shift
@@ -1247,6 +1380,7 @@ cmd_create() {
   metadata_url=""
   last_block_url=""
   cirrus_tip_url=""
+  status_url=""
   strict_layers="false"
   allowed_lag="5"
   wait_timeout="0"
@@ -1263,6 +1397,7 @@ cmd_create() {
       --metadata-url) metadata_url="$2"; shift 2 ;;
       --last-block-url) last_block_url="$2"; shift 2 ;;
       --cirrus-tip-url) cirrus_tip_url="$2"; shift 2 ;;
+      --status-url) status_url="$2"; shift 2 ;;
       --strict-layers) strict_layers="true"; shift ;;
       --layer-lag) allowed_lag="$2"; shift 2 ;;
       --wait-timeout) wait_timeout="$2"; shift 2 ;;
@@ -1288,11 +1423,12 @@ cmd_create() {
   metadata_url="${metadata_url:-$(default_metadata_url "$node_dir")}"
   last_block_url="${last_block_url:-$(default_last_block_url "$metadata_url")}"
   cirrus_tip_url="${cirrus_tip_url:-$(default_cirrus_tip_url "$metadata_url")}"
+  status_url="${status_url:-$(default_status_url)}"
 
   local live_checks
   live_checks="$(mktemp_dir)/live-checks.json"
   info "Checking live sync state via $metadata_url"
-  if ! wait_for_live_checks "$metadata_url" "$last_block_url" "$cirrus_tip_url" "$strict_layers" "$allowed_lag" "$wait_timeout" "$wait_interval" "$node_dir" "$live_checks"; then
+  if ! wait_for_live_checks "$metadata_url" "$last_block_url" "$cirrus_tip_url" "$strict_layers" "$allowed_lag" "$wait_timeout" "$wait_interval" "$node_dir" "$live_checks" "$status_url"; then
     local summary
     summary="$(live_checks_summary "$live_checks" 2>/dev/null || true)"
     [[ -n "$summary" ]] && warn "Last live check: $summary"
