@@ -1,56 +1,34 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
-import { getRebaseFactors } from "./oracle.service";
 import { getVaultShareTokenAddress, getVaultHistoryConfig } from "./vault.service";
-import { getSaveUsdstInfo, getSaveUsdstUserInfo } from "./saveUsdst.service";
+import { getSaveUsdstInfo } from "./saveUsdst.service";
 import { getLoan } from "./lending.service";
 import { getVaults } from "./cdp.service";
-import { listVaultDefs, getYieldVaultInfo, getYieldVaultUserInfo } from "./yieldVault.service";
+import { listVaultDefs, getYieldVaultInfo } from "./yieldVault.service";
 import { Token, EarningAsset, BalanceSnapshot } from "@mercata/shared-types";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
+import {
+  getCachedEarningAssetCdps,
+  getCachedEarningAssetCollaterals,
+  getCachedEarningAssetPrices,
+  getCachedEarningAssetTokens,
+  getCachedRebaseFactors,
+  getCachedRebasingExternalSymbols,
+  getCachedSaveUsdstInfo,
+  getCachedSaveUsdstUserInfo,
+  getCachedVaultShareTokenAddress,
+  getCachedYieldVaultInfo,
+  getCachedYieldVaultUserInfo,
+} from "../../cache/earningAssets.cache";
 
-const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, YieldVault } = constants;
-
-// Queries MercataBridge config for the unanimous externalSymbol for each given strato token address.
-// Returns a map of stratoToken -> externalSymbol.
-// Used to display the equivalent quantity of an external rebasing token in the UI.
-// Omits tokens who map to multiple different externalSymbol values for different chains.
-const getRebasingExternalSymbols = async (
-  accessToken: string,
-  stratoTokenAddresses: string[]
-): Promise<Map<string, string>> => {
-  if (!stratoTokenAddresses.length || !mercataBridge) return new Map();
-  const { data } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, {
-    params: {
-      address: `eq.${mercataBridge}`,
-      "value->>stratoToken": `in.(${stratoTokenAddresses.join(",")})`,
-      select: "value->>stratoToken,value->>externalSymbol",
-    },
-  }).catch(() => ({ data: [] }));
-
-  const symbolsByToken = new Map<string, Set<string>>();
-  for (const row of data || []) {
-    const stratoToken = (row.stratoToken || "").toLowerCase().replace(/^0x/, "");
-    const sym: string = row.externalSymbol;
-    if (!stratoToken || !sym) continue;
-    if (!symbolsByToken.has(stratoToken)) symbolsByToken.set(stratoToken, new Set());
-    symbolsByToken.get(stratoToken)!.add(sym);
-  }
-
-  const result = new Map<string, string>();
-  for (const [stratoToken, symbols] of symbolsByToken) {
-    if (symbols.size === 1) result.set(stratoToken, [...symbols][0]);
-    // size > 1 → conflicting symbols across routes → omit
-  }
-  return result;
-};
+const { Token, DECIMALS, YieldVault } = constants;
 
 const buildSaveUsdstEarningAsset = (
-  info: Awaited<ReturnType<typeof getSaveUsdstInfo>>,
-  userInfo?: Awaited<ReturnType<typeof getSaveUsdstUserInfo>>
+  info: Awaited<ReturnType<typeof getCachedSaveUsdstInfo>>,
+  userInfo?: Awaited<ReturnType<typeof getCachedSaveUsdstUserInfo>>
 ): EarningAsset | null => {
   if (!info.deployed || !info.vaultAddress) return null;
 
@@ -83,8 +61,8 @@ const buildSaveUsdstEarningAsset = (
 };
 
 const buildYieldVaultEarningAsset = (
-  info: Awaited<ReturnType<typeof getYieldVaultInfo>>,
-  userInfo?: Awaited<ReturnType<typeof getYieldVaultUserInfo>> | null
+  info: Awaited<ReturnType<typeof getCachedYieldVaultInfo>>,
+  userInfo?: Awaited<ReturnType<typeof getCachedYieldVaultUserInfo>> | null
 ): EarningAsset | null => {
   if (!info.deployed || !info.vaultAddress) return null;
 
@@ -163,36 +141,14 @@ export const getEarningAssets = async (
   userAddress: string
 ): Promise<EarningAsset[]> => {
   const [tokens, collaterals, cdps, rawPrices, vaultShareToken, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap] = await Promise.all([
-    cirrus.get(accessToken, "/" + Token, {
-      params: {
-        "balances.key": `eq.${userAddress}`,
-        select: buildTokenSelectFields({
-          images: true,
-          attributes: true,
-          balance: true,
-        }).join(","),
-        status: "eq.2",
-      },
-    }),
-    cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
-      params: {
-        select: "user:key,asset:key2,amount:value::text",
-        key: `eq.${userAddress}`,
-        value: `gt.0`,
-      },
-    }),
-    cirrus.get(accessToken, `/${CDPEngine}-vaults`, {
-      params: {
-        select: "user:key,asset:key2,amount:value->>collateral::text",
-        key: `eq.${userAddress}`,
-        "value->>collateral": `gt.0`,
-      },
-    }),
-    getCompletePriceMap(accessToken),
-    getVaultShareTokenAddress(accessToken),
-    getSaveUsdstInfo(accessToken).catch(() => null),
-    getSaveUsdstUserInfo(accessToken, userAddress).catch(() => null),
-    getRebaseFactors(accessToken),
+    getCachedEarningAssetTokens(accessToken, userAddress),
+    getCachedEarningAssetCollaterals(accessToken, userAddress),
+    getCachedEarningAssetCdps(accessToken, userAddress),
+    getCachedEarningAssetPrices(accessToken),
+    getCachedVaultShareTokenAddress(accessToken),
+    getCachedSaveUsdstInfo(accessToken).catch(() => null),
+    getCachedSaveUsdstUserInfo(accessToken, userAddress).catch(() => null),
+    getCachedRebaseFactors(accessToken),
   ]);
 
   const collateralMap = new Map<string, bigint>();
@@ -207,7 +163,7 @@ export const getEarningAssets = async (
     .map((t: any) => t.address as string)
     .filter((addr: string) => rebaseFactorMap.has(addr));
 
-  const rebasingExternalSymbolMap = await getRebasingExternalSymbols(accessToken, rebasingAddresses)
+  const rebasingExternalSymbolMap = await getCachedRebasingExternalSymbols(accessToken, rebasingAddresses)
     .catch(() => new Map<string, string>());
 
   const earningAssets = (tokens.data || []).map((t: any) => {
@@ -260,10 +216,11 @@ export const getEarningAssets = async (
 
   const yieldVaultPairs = await Promise.all(
     listVaultDefs().map(async (def) => ({
-      info: await getYieldVaultInfo(accessToken, def.key).catch(() => null),
-      userInfo: await getYieldVaultUserInfo(accessToken, def.key, userAddress).catch(() => null),
+      info: await getCachedYieldVaultInfo(accessToken, def.key).catch(() => null),
+      userInfo: await getCachedYieldVaultUserInfo(accessToken, def.key, userAddress).catch(() => null),
     }))
   );
+
   for (const { info, userInfo } of yieldVaultPairs) {
     if (!info?.deployed) continue;
     const yvAsset = buildYieldVaultEarningAsset(info, userInfo ?? undefined);
