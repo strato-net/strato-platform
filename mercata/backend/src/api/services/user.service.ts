@@ -5,7 +5,20 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import JSONBig from "json-bigint";
+import { normalizeLegacyEscapes, sanitizeJsonLikeStringArgs } from "../helpers/jsonStringParsing.helper";
 const { AdminRegistry, adminRegistry } = constants;
+const JSONBigString = JSONBig({ storeAsString: true });
+
+export const parseAdminIssueArgs = (argsRaw: any): any => {
+  if (typeof argsRaw !== "string") return argsRaw;
+
+  const normalizedArgsRaw = normalizeLegacyEscapes(argsRaw);
+  try {
+    return JSONBigString.parse(normalizedArgsRaw);
+  } catch {
+    return JSONBigString.parse(sanitizeJsonLikeStringArgs(normalizedArgsRaw));
+  }
+};
 
 export const isUserAdmin = async (
   accessToken: string,
@@ -190,9 +203,7 @@ export const castVoteOnIssueById = async (
     let { target, func, args: argsRaw } = issue;
 
     // Parse args keeping large numbers as strings (JSONBig with storeAsString)
-    const JSONBigString = JSONBig({ storeAsString: true });
-    const args = typeof argsRaw === 'string' ? JSONBigString.parse(argsRaw) : argsRaw;
-    // console.log("args in castVoteOnIssueById", args);
+    const args = parseAdminIssueArgs(argsRaw);
 
     // If func is _addAdmin, call the addAdmin endpoint directly
     if (func === '_addAdmin') {
@@ -250,7 +261,6 @@ export const castVoteOnIssueById = async (
       // If args is already an object, use it directly
       Object.assign(argsObject, args);
     }
-
 
     // Build transaction directly to the target contract
     const tx = await buildFunctionTx({
@@ -328,7 +338,6 @@ export const getOpenIssues = async (
       issues: uniqueIssues 
     };
   } catch (error) {
-    console.log(error);
     return {};
   }
 };
@@ -363,7 +372,6 @@ export const getExecutedIssues = async (
       executedTotal 
     };
   } catch (error) {
-    console.log(error);
     return { executed: [], executedTotal: 0 };
   }
 };
