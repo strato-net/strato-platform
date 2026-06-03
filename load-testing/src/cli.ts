@@ -10,6 +10,7 @@ import { FunctionCallScenario } from "./scenarios/functionCall";
 import { MixedWorkloadScenario } from "./scenarios/mixedWorkload";
 import { TokenSaleScenario } from "./scenarios/tokenSale";
 import { ForgeBuyScenario } from "./scenarios/forgeBuy";
+import { PageLoadScenario } from "./scenarios/pageLoad";
 import { BaseScenario } from "./scenarios/base";
 import { LoadTestConfig, LoadTestReport, ScenarioResult } from "./types";
 
@@ -21,7 +22,7 @@ program
   .option("-c, --config <path>", "Path to config YAML file", "config.yaml")
   .option(
     "-s, --scenario <name>",
-    "Run a specific scenario: contractDeploy | functionCall | mixedWorkload | tokenSale | forgeBuy",
+    "Run a specific scenario: contractDeploy | functionCall | mixedWorkload | tokenSale | forgeBuy | pageLoad",
   )
   .option("--batch-size <n>", "Override batch size (low-level scenarios)", parseInt)
   .option("--batch-count <n>", "Override batch count (low-level scenarios)", parseInt)
@@ -111,6 +112,9 @@ async function main(): Promise<void> {
   }
   if (config.scenarios.forgeBuy.enabled) {
     scenarios.push(new ForgeBuyScenario(config, collector, opts.verbose));
+  }
+  if (config.scenarios.pageLoad.enabled) {
+    scenarios.push(new PageLoadScenario(config, collector, opts.verbose));
   }
 
   if (scenarios.length === 0) {

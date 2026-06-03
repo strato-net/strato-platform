@@ -32,7 +32,7 @@ import { AppScenario } from "./appScenario";
  * tx. No Sepolia, no bridge service, no asynchronous wait — the on-STRATO
  * tx hash is in the response body the moment the POST returns.
  *
- * Page-load warmup (when `includePageLoad: true`):
+ * Page-load warmup (when `includePageLoad: true`, default false):
  *   - GET /api/metal-forge/configs  (forge rate + metal addresses)
  *   - GET /api/tokens/balance       (calling user's USDST balance)
  *
@@ -160,43 +160,69 @@ export class ForgeBuyScenario extends AppScenario {
         const client = this.backendClients[i % this.backendClients.length];
 
         const submitTime = Date.now();
-        const res = await this.postWithRetry({
-          client,
-          path: "/api/metal-forge/buy",
-          body: buyBody,
-          legName: "buyMetal",
-          iterationIdx: i,
-          maxRetries: cfg.requestRetries ?? 3,
-          scenarioLabel: ForgeBuyScenario.LABEL,
-        });
-        const data = res.data ?? {};
-        const reported = data?.data?.status ?? data?.status;
-        const hash = data?.data?.hash ?? data?.hash ?? `buyMetal:${i}`;
-        const buyOk =
-          res.status >= 200 &&
-          res.status < 300 &&
-          (reported === undefined || reported === "success" || reported === "Success");
-        if (!buyOk) {
+        // Catch *any* exception thrown by the HTTP path (socket reset, axios
+        // timeout, JSON parse failure, etc.) and record it as a failed metric
+        // so the run report reflects total attempts, not just attempts that
+        // produced a parseable response. Without this, thrown iterations
+        // disappear from the metrics entirely and the report under-counts.
+        try {
+          const res = await this.postWithRetry({
+            client,
+            path: "/api/metal-forge/buy",
+            body: buyBody,
+            legName: "buyMetal",
+            iterationIdx: i,
+            maxRetries: cfg.requestRetries ?? 3,
+            scenarioLabel: ForgeBuyScenario.LABEL,
+          });
+          const data = res.data ?? {};
+          const reported = data?.data?.status ?? data?.status;
+          const hash = data?.data?.hash ?? data?.hash ?? `buyMetal:${i}`;
+          const buyOk =
+            res.status >= 200 &&
+            res.status < 300 &&
+            (reported === undefined || reported === "success" || reported === "Success");
+          if (!buyOk) {
+            console.warn(
+              `[forgeBuy] buyMetal #${i} FAILED: httpStatus=${res.status} ` +
+                `respErr=${res.error ?? "?"} ` +
+                `body=${typeof res.data === "string" ? res.data.slice(0, 400) : JSON.stringify(res.data).slice(0, 400)}`,
+            );
+          } else if (shouldLogProgress(i)) {
+            console.log(
+              `[forgeBuy] buyMetal #${i} ok ${res.durationMs}ms hash=${String(hash).substring(0, 18)}`,
+            );
+          }
+          this.recordRequestMetric({
+            txMetrics,
+            nodeName,
+            scenario: `${scenario}:buyMetal`,
+            userId: i,
+            submitTime,
+            res,
+            success: buyOk,
+            hashOverride: hash,
+          });
+        } catch (err: any) {
+          const message = err?.message ?? String(err);
           console.warn(
-            `[forgeBuy] buyMetal #${i} FAILED: httpStatus=${res.status} ` +
-              `respErr=${res.error ?? "?"} ` +
-              `body=${typeof res.data === "string" ? res.data.slice(0, 400) : JSON.stringify(res.data).slice(0, 400)}`,
+            `[forgeBuy] buyMetal #${i} THREW after ${Date.now() - submitTime}ms: ${message}`,
           );
-        } else if (shouldLogProgress(i)) {
-          console.log(
-            `[forgeBuy] buyMetal #${i} ok ${res.durationMs}ms hash=${String(hash).substring(0, 18)}`,
-          );
+          this.recordRequestMetric({
+            txMetrics,
+            nodeName,
+            scenario: `${scenario}:buyMetal`,
+            userId: i,
+            submitTime,
+            res: {
+              status: 0,
+              durationMs: Date.now() - submitTime,
+              error: message,
+            },
+            success: false,
+            hashOverride: `buyMetal:${i}`,
+          });
         }
-        this.recordRequestMetric({
-          txMetrics,
-          nodeName,
-          scenario: `${scenario}:buyMetal`,
-          userId: i,
-          submitTime,
-          res,
-          success: buyOk,
-          hashOverride: hash,
-        });
       },
     );
     const runEnd = Date.now();

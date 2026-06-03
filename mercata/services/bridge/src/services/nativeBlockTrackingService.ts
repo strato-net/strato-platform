@@ -56,10 +56,6 @@ class NativeBlockTrackingService {
     logInfo("NativeBlockTrackingService", `Updated local lastProcessedBlock for chain ${chainId}: ${blockNumber}`);
   }
 
-  async getEffectiveLastProcessedBlock(chainId: number, blockchainLastBlock: number): Promise<number> {
-    const localLastBlock = await this.getLastProcessedBlock(chainId);
-    return Math.max(localLastBlock, blockchainLastBlock);
-  }
 }
 
 export const nativeBlockTrackingService = new NativeBlockTrackingService();

@@ -117,12 +117,12 @@ export const defaultVaultFactoryFor: Record<string, string> = {
 
 export const defaultStratoNativeBridgeFor: Record<string, string> = {
   "114784819836269": "49f69252b00235030a4dcd4c7ef17a64ef346258", // Helium testnet
-  "33056204878082667": "", // Upquark mainnet
+  "33056204878082667": "4d9e9c39180a75091b9c35bbb9064d67c7fdde5a", // Upquark mainnet
 };
 
 export const defaultStratoNativeCustodyVaultFor: Record<string, string> = {
   "114784819836269": "8cfe7b576f69260673e9a1a9517137f12a49ed93", // Helium testnet
-  "33056204878082667": "", // Upquark mainnet
+  "33056204878082667": "db967ac5c497e6a2bd6f89036d2b63851760318f", // Upquark mainnet
 };
 
 export const defaultMetalForgeFor: Record<string, string> = {
@@ -319,6 +319,8 @@ export async function getInternalAddresses() {
   // Static: well-known system contract addresses from config
   const addresses: string[] = [
     mercataBridge,
+    stratoNativeBridge,
+    stratoNativeCustodyVault,
     burnAddress,
   ];
 

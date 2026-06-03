@@ -21,6 +21,7 @@ module Control.Monad.Composable.Streaming.Kafka (
   ConsumerGroup,
   ClientId,
   StreamAddress,
+  MonadUnliftIO,
   -- Running
   runStreamM,
   runStreamMUsingEnv,
@@ -31,10 +32,12 @@ module Control.Monad.Composable.Streaming.Kafka (
   produceItemsAsJSON,
   -- Consuming
   consume,
+  consumeBroadcast,
   runConsume,
   consumeFromLatest,
   -- Topics
   createTopicAndWait,
+  createBroadcastTopic,
   -- Conduit
   conduitBatchSource,
   -- Deprecated/internal (for migration)
@@ -154,11 +157,11 @@ runStreamMUsingEnv env f = do
 runKafkaMUsingEnv :: MonadIO m => StreamEnv -> StreamM m a -> m a
 runKafkaMUsingEnv = runStreamMUsingEnv
 
-runStreamM :: MonadIO m => ClientId -> StreamAddress -> StreamM m a -> m a
+runStreamM :: MonadUnliftIO m => ClientId -> StreamAddress -> StreamM m a -> m a
 runStreamM x y f = flip runStreamMUsingEnv f =<< createStreamEnv x y
 
 -- Deprecated alias
-runKafkaM :: MonadIO m => KafkaClientId -> KafkaAddress -> StreamM m a -> m a
+runKafkaM :: MonadUnliftIO m => KafkaClientId -> KafkaAddress -> StreamM m a -> m a
 runKafkaM = runStreamM
 
 ----------------------
@@ -225,8 +228,7 @@ mkConsumerSub topic = KC.topics [topic] <> KC.offsetReset KC.Earliest
 
 newConsumerAt :: StreamEnv -> Text -> TopicName -> Offset -> IO KC.KafkaConsumer
 newConsumerAt env grpId topicName (Offset ofs) = do
-  gid <- uniqueGroupId grpId
-  result <- KC.newConsumer (mkConsumerProps env gid) (mkConsumerSub topicName)
+  result <- KC.newConsumer (mkConsumerProps env grpId) (mkConsumerSub topicName)
   case result of
     Left err -> error $ "Failed to create Kafka consumer: " ++ show err
     Right kc -> do
@@ -241,16 +243,29 @@ consume :: (Binary a, HasStreaming m) =>
 consume consumerGroup topicName f =
   void $ runConsume consumerGroup topicName (\a -> Nothing <$ f a)
 
+-- | Pub-sub consume. For Kafka, same as consume since consumer groups provide pub-sub.
+consumeBroadcast :: (Binary a, HasStreaming m) =>
+                    ConsumerGroup -> TopicName -> ([a] -> m ()) -> m ()
+consumeBroadcast = consume
+
 runConsume :: (Binary a, HasStreaming m) =>
               ConsumerGroup -> TopicName -> ([a] -> m (Maybe b)) -> m b
 runConsume consumerGroup topicName f = do
   env <- getStreamEnv
-  kc <- liftIO $ newConsumerAt env consumerGroup topicName (Offset 0)
+  kc <- liftIO $ do
+    consumer <- newConsumerAt env consumerGroup topicName (Offset 0)
+    offset <- getCommittedOffset consumer topicName
+    let tp = KC.TopicPartition topicName (KC.PartitionId 0) (KC.PartitionOffset $ unOffset offset)
+    mErr <- KC.assign consumer [tp]
+    case mErr of
+      Nothing -> return consumer
+      Just err -> error $ "Kafka assign error: " ++ show err
   consumeLoop kc
   where
     consumeLoop kc = do
-      items <- pollItems kc
+      (items, newOffset) <- pollItems kc
       mReturnVal <- f items
+      liftIO $ commitOffset kc topicName newOffset
       case mReturnVal of
         Just returnVal -> do
           liftIO $ void $ KC.closeConsumer kc
@@ -259,13 +274,40 @@ runConsume consumerGroup topicName f = do
 
     pollItems kc = do
       msgs <- liftIO $ KC.pollMessageBatch kc (KC.Timeout 50000) (KC.BatchSize 500)
-      let payloads = mapMaybe extractPayload msgs
+      let records = mapMaybe extractPayload msgs
+          payloads = map snd records
       if null payloads
         then pollItems kc
-        else return $ map (decode . BL.fromStrict) payloads
+        else return (map (decode . BL.fromStrict) payloads, nextOffset records)
 
     extractPayload (Left _) = Nothing
-    extractPayload (Right cr) = KC.crValue cr
+    extractPayload (Right cr) = (\v -> (cr, v)) <$> KC.crValue cr
+
+    nextOffset records =
+      Offset . (+ 1) . maximum $ map (recordOffset . fst) records
+
+    recordOffset cr =
+      case KC.crOffset cr of
+        KC.Offset n -> n
+
+getCommittedOffset :: KC.KafkaConsumer -> TopicName -> IO Offset
+getCommittedOffset kc topicName = do
+  eOffsets <- KC.committed kc (KC.Timeout 5000) [(topicName, KC.PartitionId 0)]
+  case eOffsets of
+    Left err -> error $ "Kafka committed offset error: " ++ show err
+    Right [tp] ->
+      case KC.tpOffset tp of
+        KC.PartitionOffset n -> return $ Offset n
+        _ -> return $ Offset 0
+    _ -> return $ Offset 0
+
+commitOffset :: KC.KafkaConsumer -> TopicName -> Offset -> IO ()
+commitOffset kc topicName (Offset ofs) = do
+  let tp = KC.TopicPartition topicName (KC.PartitionId 0) (KC.PartitionOffset ofs)
+  mErr <- KC.commitPartitionsOffsets KC.OffsetCommit kc [tp]
+  case mErr of
+    Nothing -> return ()
+    Just err -> error $ "Kafka offset commit error: " ++ show err
 
 consumeFromLatest :: (Binary a, HasStreaming m) =>
                      TopicName -> m () -> ([a] -> m (Maybe b)) -> m b
@@ -363,6 +405,10 @@ createTopicAndWait topicName = do
         else do
           liftIO $ threadDelay 100000
           waitForReady (retries - 1)
+
+-- | Create a broadcast-only topic. For Kafka, same as createTopicAndWait since Kafka retains messages.
+createBroadcastTopic :: HasStreaming m => TopicName -> m ()
+createBroadcastTopic = createTopicAndWait
 
 checkTopicReady :: StreamEnv -> TopicName -> IO Bool
 checkTopicReady env topicName =

@@ -44,7 +44,7 @@ These interactive docs let you:
 
 This is the **STRATO Core API** reference. The API provides access to:
 
-- **User Management** - Account creation, address management (`/strato/v2.3/users`, `/strato/v2.3/key`)
+- **Key Management** - Address management (`/strato/v2.3/key`)
 - **Transactions** - Submit and track blockchain transactions (`/strato/v2.3/transaction`)
 - **Smart Contracts** - Deploy and interact with contracts (`/bloc/v2.2/contracts`)
 - **Blockchain Queries** - Account data, metadata (`/strato-api/eth/v1.2/*`)
