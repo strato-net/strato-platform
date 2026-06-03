@@ -652,6 +652,14 @@ print(", ".join(parts))
 PY
 }
 
+# Check whether a layer's indexed tip is caught up to the node tip.
+# Returns:
+#   0  ok (caught up, or nothing to verify)
+#   1  behind: tip is reachable but lagging more than allowed_lag (caller should
+#      keep waiting -- the indexer is still catching up)
+#   2  unverifiable: tip could not be read at all
+# Non-strict callers treat 1 and 2 as ok (best-effort). Strict callers treat 2
+# as fatal but 1 as "keep waiting".
 check_tip() {
   local label="$1"
   local tip="$2"
@@ -664,16 +672,15 @@ check_tip() {
   fi
 
   if [[ -z "$tip" ]]; then
-    if [[ "$strict" == "true" ]]; then
-      die "could not verify $label tip"
-    fi
-    warn "could not verify $label tip"
-    return 0
+    [[ "$strict" == "true" ]] || warn "could not verify $label tip"
+    return 2
   fi
 
   if (( tip + allowed_lag < reference )); then
-    die "$label tip ($tip) is behind node tip ($reference) by more than $allowed_lag block(s)"
+    info "$label tip ($tip) is behind node tip ($reference) by more than $allowed_lag block(s); waiting for it to catch up"
+    return 1
   fi
+  return 0
 }
 
 run_live_checks_once() {
@@ -716,8 +723,19 @@ run_live_checks_once() {
   fi
 
   if [[ -n "$node_tip" ]]; then
-    check_tip "API-indexer" "$api_tip" "$node_tip" "$allowed_lag" "$strict"
-    check_tip "Cirrus" "$cirrus_tip" "$node_tip" "$allowed_lag" "$strict"
+    local rc label
+    for label in "API-indexer:$api_tip" "Cirrus:$cirrus_tip"; do
+      rc=0
+      check_tip "${label%%:*}" "${label#*:}" "$node_tip" "$allowed_lag" "$strict" || rc=$?
+      if (( rc == 1 )); then
+        # Layer is reachable but still catching up: not ready, keep waiting.
+        return 1
+      fi
+      if (( rc == 2 )) && [[ "$strict" == "true" ]]; then
+        # Strict mode requires the layer tip to be verifiable.
+        die "could not verify ${label%%:*} tip"
+      fi
+    done
   elif [[ "$strict" == "true" ]]; then
     die "could not determine node best block (metadata or apex /status); cannot run strict layer checks"
   fi

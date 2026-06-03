@@ -315,6 +315,36 @@ assert_contains "$TMP/unsynced.err" "Last live check"
 assert_contains "$TMP/unsynced.err" "nodeBestBlock=99"
 assert_contains "$TMP/unsynced.err" "sequencerLag=1"
 
+# A synced node whose Cirrus indexer is still catching up must not fail
+# immediately under --strict-layers; it should keep waiting and (with
+# --wait-timeout 0) time out with the generic not-synced message rather than the
+# instant "is behind" die.
+cat > "$TMP/cirrus-behind.json" <<'JSON'
+[
+  {
+    "block_number": 50
+  }
+]
+JSON
+if STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" create "$NODE" \
+  --network helium \
+  --output "$TMP/cirrus-behind.tar.gz" \
+  --metadata-url "file://$TMP/metadata.json" \
+  --last-block-url "file://$TMP/last.json" \
+  --cirrus-tip-url "file://$TMP/cirrus-behind.json" \
+  --strict-layers \
+  --wait-timeout 0 \
+  --skip-smoke-test \
+  > "$TMP/cirrus-behind.out" 2> "$TMP/cirrus-behind.err"; then
+  echo "create should not snapshot while Cirrus is behind" >&2
+  exit 1
+fi
+assert_contains "$TMP/cirrus-behind.err" "not synced enough to snapshot"
+if grep -q "is behind node tip" "$TMP/cirrus-behind.err"; then
+  : # informational waiting message is fine
+fi
+assert_contains "$TMP/cirrus-behind.err" "catch up"
+
 if STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" create "$NODE" \
   --network helium \
   --output "$TMP/unreachable.tar.gz" \
