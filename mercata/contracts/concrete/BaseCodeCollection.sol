@@ -63,6 +63,10 @@ import "Vault/VaultFactory.sol";
 import "YieldVault/YieldVault.sol";
 
 //TODO
+
+//Direct Mint PSM
+import "./Pools/DirectMintPSM.sol";
+
 contract record Mercata is Authorizable {
     RateStrategy public rateStrategy;
     PriceOracle public priceOracle;
@@ -88,6 +92,7 @@ contract record Mercata is Authorizable {
     Token public cataToken;
     Escrow public escrow;
     MetalForge public metalForge;
+    DirectMintPSM public directMintPSM;
 
     constructor() public {
         // The owner of the implementation contract is ignored in favor of the proxy owner
@@ -220,6 +225,15 @@ contract record Mercata is Authorizable {
 
         mercataBridge.initialize(address(tokenFactory), address(lendingRegistry), address(metalForge));
         Ownable(mercataBridge).transferOwnership(address(adminRegistry));
+
+        DirectMintPSM directMintPSMImpl = new DirectMintPSM(address(this));
+        directMintPSM = DirectMintPSM(address(new Proxy(address(directMintPSMImpl), this)));
+        Token exampleUSDST = Token(address(new Proxy(address(new Token(implOwnerIgnored)), this)));
+        Token exampleStableToken = Token(address(new Proxy(address(new Token(implOwnerIgnored)), this)));
+        directMintPSM.initialize(address(exampleUSDST), [address(exampleStableToken)], 86400);
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(exampleUSDST), "mint", address(directMintPSM));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(exampleUSDST), "burn", address(directMintPSM));
+        Ownable(directMintPSM).transferOwnership(address(adminRegistry));
 
         adminRegistry.swapAdmin(this, msg.sender);
     }
