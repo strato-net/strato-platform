@@ -57,6 +57,11 @@ Options:
   --run-smoke-test        Run create's post-create restore smoke test. Off by
                           default in this orchestration (the source node is
                           already verified synced and the artifact is checksummed).
+  --no-publish            Create the archive only; do not publish to S3. Implies
+                          --keep-archive and prints the archive path so a caller
+                          can validate it before publishing separately.
+  --publish-only <file>   Skip create; publish an already-created archive
+                          (e.g. one that was validated after --no-publish).
   --keep-archive          Do not delete the local archive after publishing.
 EOF
 }
@@ -79,6 +84,8 @@ STRICT_LAYERS="false"
 INCLUDE_PROMETHEUS="false"
 RUN_SMOKE_TEST="false"
 KEEP_ARCHIVE="false"
+NO_PUBLISH="false"
+PUBLISH_ONLY=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -94,16 +101,32 @@ while [[ $# -gt 0 ]]; do
     --strict-layers) STRICT_LAYERS="true"; shift ;;
     --include-prometheus) INCLUDE_PROMETHEUS="true"; shift ;;
     --run-smoke-test) RUN_SMOKE_TEST="true"; shift ;;
+    --no-publish) NO_PUBLISH="true"; shift ;;
+    --publish-only) PUBLISH_ONLY="$2"; shift 2 ;;
     --keep-archive) KEEP_ARCHIVE="true"; shift ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown option: $1" ;;
   esac
 done
 
-[[ -n "$NODE_DIR" ]] || die "--node-dir is required"
 [[ -n "$NETWORK" ]] || die "--network is required"
+# --publish-only just uploads an existing archive; --node-dir is not needed then.
+[[ -n "$PUBLISH_ONLY" || -n "$NODE_DIR" ]] || die "--node-dir is required"
 [[ -x "$SNAPSHOT_TOOL" ]] || die "strato-snapshot not found at $SNAPSHOT_TOOL"
 command -v aws >/dev/null 2>&1 || die "aws CLI is required to publish snapshots"
+
+DESTINATION="s3://${BUCKET}/${NETWORK}/"
+
+# --publish-only: upload a previously-created (and validated) archive, then exit.
+if [[ -n "$PUBLISH_ONLY" ]]; then
+  [[ -f "$PUBLISH_ONLY" ]] || die "archive not found: $PUBLISH_ONLY"
+  echo "Publishing $(basename "$PUBLISH_ONLY") to $DESTINATION (alias: latest)"
+  "$SNAPSHOT_TOOL" publish "$PUBLISH_ONLY" --destination "$DESTINATION" --alias latest
+  echo "Published:"
+  echo "  ${DESTINATION}$(basename "$PUBLISH_ONLY")"
+  echo "  ${DESTINATION}latest.tar.zst"
+  exit 0
+fi
 
 CLEANUP_DIR=""
 cleanup() {
@@ -123,7 +146,6 @@ mkdir -p "$OUTPUT_DIR"
 TIMESTAMP="$(date -u +%Y%m%d-%H%M%SZ)"
 ARCHIVE_NAME="${NETWORK}-${TIMESTAMP}.tar.zst"
 ARCHIVE_PATH="$OUTPUT_DIR/$ARCHIVE_NAME"
-DESTINATION="s3://${BUCKET}/${NETWORK}/"
 
 CREATE_ARGS=(
   "$NODE_DIR"
@@ -149,6 +171,15 @@ export STRATO_SNAPSHOT_CURL_CONTAINER="$CURL_CONTAINER"
 
 echo "Creating $NETWORK snapshot from $NODE_DIR -> $ARCHIVE_PATH"
 "$SNAPSHOT_TOOL" create "${CREATE_ARGS[@]}"
+
+if [[ "$NO_PUBLISH" == "true" ]]; then
+  # Retain the archive so the caller can validate it before publishing
+  # (e.g. via --publish-only). Emit a machine-parseable line with the path.
+  CLEANUP_DIR=""
+  echo "Snapshot created but not published (--no-publish)."
+  echo "SNAPSHOT_ARCHIVE=$ARCHIVE_PATH"
+  exit 0
+fi
 
 echo "Publishing $ARCHIVE_NAME to $DESTINATION (alias: latest)"
 "$SNAPSHOT_TOOL" publish "$ARCHIVE_PATH" --destination "$DESTINATION" --alias latest

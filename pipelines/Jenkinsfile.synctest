@@ -151,7 +151,33 @@ def deployAndSync(String network, String metricNamespacePrefix) {
         --region 'us-east-1'
     """
 
-    // On successful sync, create and publish a snapshot for this network.
+    // On successful sync, create a snapshot for this network but DO NOT publish
+    // yet. We validate the archive by restoring a fresh node from it, and only
+    // publish if that succeeds -- so a bad snapshot never overwrites 'latest'.
+    def snapshotDir = "${env.WORKSPACE}/snapshot-out"
+    sh "rm -rf ${snapshotDir} && mkdir -p ${snapshotDir}"
+    def createOut = sh(returnStdout: true, script: """#!/bin/bash -le
+      set -x
+      ./scripts/create-and-publish-snapshot.sh \
+        --node-dir mynode \
+        --network ${network} \
+        --bucket ${STRATO_SNAPSHOT_BUCKET} \
+        --output-dir ${snapshotDir} \
+        --wait-timeout 600 \
+        --strict-layers \
+        --no-publish
+    """).trim()
+    def archivePath = createOut.readLines().find { it.startsWith('SNAPSHOT_ARCHIVE=') }?.substring('SNAPSHOT_ARCHIVE='.length())?.trim()
+    if (!archivePath) {
+      error("Could not determine created snapshot archive path from create output")
+    }
+
+    // Validate the archive by restoring a fresh node from the local file and
+    // confirming it resumes from the snapshot height (not genesis).
+    verifySnapshotRestore(network, archivePath, blocksTotal)
+
+    // Validation passed: publish the validated archive (uploads it and updates
+    // the 'latest' alias for the network).
     withCredentials([
       usernamePassword(credentialsId: 'block-apps-jenkins-s3', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
     ]) {
@@ -159,12 +185,64 @@ def deployAndSync(String network, String metricNamespacePrefix) {
         set -x
         export AWS_DEFAULT_REGION=us-east-1
         ./scripts/create-and-publish-snapshot.sh \
-          --node-dir mynode \
           --network ${network} \
           --bucket ${STRATO_SNAPSHOT_BUCKET} \
-          --wait-timeout 600 \
-          --strict-layers
+          --publish-only ${archivePath}
       """
     }
+
+    sh "rm -rf ${snapshotDir}"
+  }
+}
+
+// Restore a fresh node from a local snapshot archive and confirm it comes up and
+// resumes from at/near the snapshot block height. Runs BEFORE the archive is
+// published, so an unusable snapshot fails the build without touching 'latest'.
+def verifySnapshotRestore(String network, String archivePath, def snapshotBlock) {
+  script {
+    // Start from a clean node directory.
+    sh '''#!/bin/bash -le
+      strato-down mynode || true
+      pkill convoke || true
+      docker rm -f $(docker ps -aq) || true
+      docker system prune -f || true
+      docker volume prune -fa || true
+      sudo rm -rf mynode || true
+    '''
+
+    writeFile file: "run-restore.sh", text: """#!/bin/bash
+      export PATH
+      strato-up mynode \\
+        --network=${network} \\
+        --nodeHost=\$(</host) \\
+        --sslDir='/home/ubuntu/letsencrypt-ssl' \\
+        --snapshot-source='${archivePath}'
+    """
+    sh 'chmod +x run-restore.sh'
+    withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
+      sh './run-restore.sh'
+    }
+    sh 'docker ps'
+
+    // Node must come up and serve metadata.
+    lib.checkNodeAvailability(443)
+
+    // The restored node must start at/above the snapshot height, proving it
+    // resumed from snapshot state rather than syncing from genesis. Allow a
+    // small margin below the snapshot block for indexer settling.
+    def restoredBlock = Integer.parseInt(sh(
+        script: "docker exec strato-nginx-1 curl -s apex:3009/status | jq -r .lastBlock.number",
+        returnStdout: true
+    ).trim())
+    echo "Restored node block: ${restoredBlock}, snapshot block: ${snapshotBlock}"
+    if (restoredBlock < (snapshotBlock as int) - 100) {
+      error("Restored node block (${restoredBlock}) is far below the snapshot height (${snapshotBlock}); restore likely failed")
+    }
+
+    // Tear the verification node down before moving on.
+    sh '''#!/bin/bash -le
+      strato-down mynode || true
+      pkill convoke || true
+    '''
   }
 }
