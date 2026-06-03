@@ -80,9 +80,11 @@ export async function buildFunctionTx(
     throw new Error("At least one transaction input is required");
   }
 
-  if (userAddress && accessToken) {
-    await ensureFeeCoverage(inputArray.length, userAddress, accessToken);
-  }
+  // TEMP(load-test): pre-tx Cirrus balance/voucher check disabled to measure
+  // its impact on throughput. Re-enable before merging.
+  // if (userAddress && accessToken) {
+  //   await ensureFeeCoverage(inputArray.length, userAddress, accessToken);
+  // }
 
   const txs = inputArray.map((input) => ({
     type: "FUNCTION" as const,
