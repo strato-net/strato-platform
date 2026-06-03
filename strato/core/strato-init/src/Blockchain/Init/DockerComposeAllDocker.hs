@@ -199,8 +199,6 @@ generateDockerComposeAllDocker = do
             , ("SLIPSTREAM_DEBUG_LOG", "${SLIPSTREAM_DEBUG_LOG:-false}")
             , ("SLIPSTREAM_OPTIONAL", "${SLIPSTREAM_OPTIONAL:-}")
             , ("strictBlockstanbul", "${strictBlockstanbul:-}")
-            , ("strictGas", "${strictGas:-}")
-            , ("strictGasLimit", "${strictGasLimit:-}")
             , ("svmTrace", "${svmTrace:-}")
             , ("sqlDiff", "${sqlDiff:-}")
             , ("svmDev", "${svmDev:-}")

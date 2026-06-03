@@ -106,10 +106,7 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress= 
     Just f@TFInsufficientFunds {} -> recoverable f
     Just f@TFIntrinsicGasExceedsTxLimit {} -> recoverable f
     Just f@TFNonceMismatch {} -> error $ "mineTransactions' we messed up: " ++ format f
-    Just f@TFInvalidPragma {} -> recoverable f
     Just f@TFTXSizeLimitExceeded {} -> recoverable f
-    Just f@TFKnownFailedTX {} -> recoverable f
-    Just f@TFTransactionGasExceeded {} -> recoverable f
 
 
 -- todo batch insert results
@@ -174,20 +171,12 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
     (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (TD.nonce bt) ++ ")", hsh)
   BalanceTooLow s q needed actual OutputTx {otHash = hsh} ->
     (p' s q ++ "account balance (expected: " ++ show needed ++ ", actual: " ++ show actual ++ ")", hsh)
-  GasLimitTooLow s q _ OutputTx {otHash = hsh} ->
-    (p' s q ++ "tx gas limit", hsh)
+  GasLimitTooLow s q needed actual OutputTx {otHash = hsh} ->
+    (p' s q ++ "tx gas limit (expected: " ++ show needed ++ ", actual: " ++ show actual ++ ")", hsh)
   LessLucrative s q OutputTx {otHash = hashBetter} OutputTx {otHash = hashWorse} ->
     (p s q ++ formatKeccak256WithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
-  CodeNotFound s q a n OutputTx {otHash = h} ->
-    (p s q ++ " code not found at address " ++ format a ++ " with name " ++ n, h)
-  InvalidPragma s q erPragmas OutputTx {otHash = hsh} ->
-    (p s q ++ " invalid pragma " ++ show erPragmas, hsh)
   TXSizeLimitExceeded s q e l OutputTx {otHash = hsh} ->
     (p s q ++ "tx size limit exceeded. Limit: " ++ show l ++ " Actual: " ++ show e, hsh)
-  GasLimitExceeded s q e l OutputTx {otHash = hsh} ->
-    (p s q ++ "transaction gas limit exceeded. Limit: " ++ show l ++ " Actual: " ++ show e, hsh)
-  KnownFailedTX s q OutputTx {otHash = hsh} ->
-    (p s q ++ "known failed tx: " ++ format hsh, hsh)
   AdminFlushed s q scope OutputTx {otHash = hsh} ->
     (p s q ++ "administratively flushed from mempool with scope " ++ show scope, hsh)
   where
@@ -544,9 +533,10 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = runExceptT $ do
       txn = TD.nonce bt
       txFee = B.calculateIntrinsicTxFee state t
       txSize = toInteger $ BS.length $ BL.toStrict $ Bin.encode bt
-  when (intrinsicGas >= Conf.gasLimit (networkConfig ethConf))
+      gLimit = Conf.gasLimit (networkConfig ethConf)
+  when (intrinsicGas >= gLimit)
     . throwE
-    $ GasLimitExceeded Validation Incoming intrinsicGas (Conf.gasLimit (networkConfig ethConf)) t
+    $ GasLimitTooLow Validation Incoming intrinsicGas gLimit t
   (addressNonce, addressBalance) <- lift $ getAddressNonceAndBalance address
   when (addressNonce > txn)
     . throwE
@@ -557,9 +547,6 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = runExceptT $ do
   when (txSize >= toInteger (Conf.txSizeLimit (networkConfig ethConf)))
     . throwE
     $ TXSizeLimitExceeded Validation Incoming txSize (toInteger (Conf.txSizeLimit (networkConfig ethConf))) t
-  when (otHash t `S.member` knownFailedTxs) $ do
-    liftIO $ putStrLn $ "################################ otHash = " ++ format (otHash t)
-    throwE $ KnownFailedTX Validation Incoming t
   return ()
 
 addToSeen :: MonadBagger m => OutputTx -> m ()
