@@ -30,6 +30,15 @@ import {
   applyStablePoolFees,
   getUserPoolLiquidityFlowTotals,
 } from "../helpers/swapping.helper";
+import {
+  LIVE_POOL_SELECT_FIELDS,
+  applyLivePoolFields,
+  getCachedPoolFetch,
+  getPoolFetchCacheKey,
+  setCachedPoolFetch,
+  getCachedMultiTokenTokenMetadata,
+  setCachedMultiTokenTokenMetadata,
+} from "../cache/swappingCache";
 import { getOraclePrices } from "./oracle.service";
 import {
   SwapHistoryEntry,
@@ -66,6 +75,40 @@ const { Pool: PoolTable, PoolFactory, PoolSwap, StablePool: StablePoolTable, swa
 
 const normalizeAddress = (address: string): string => address.toLowerCase().replace(/^0x/, "");
 
+const formatElapsedMs = (ms: number): string => `${Math.round(ms * 100) / 100}ms`;
+
+const getUserBalanceEntries = (
+  address: string,
+  userAddress: string,
+  balanceMap: Map<string, string>
+) => balanceMap.has(address)
+  ? [{ user: userAddress, balance: balanceMap.get(address) || "0" }]
+  : [];
+
+const applyUserBalancesToPools = (
+  pools: RawGetPool[],
+  userAddress: string | undefined,
+  balanceMap: Map<string, string>
+): RawGetPool[] => {
+  if (!userAddress) return pools;
+
+  return pools.map(pool => ({
+    ...pool,
+    tokenA: {
+      ...pool.tokenA,
+      balances: getUserBalanceEntries(pool.tokenA.address, userAddress, balanceMap),
+    },
+    tokenB: {
+      ...pool.tokenB,
+      balances: getUserBalanceEntries(pool.tokenB.address, userAddress, balanceMap),
+    },
+    lpToken: {
+      ...pool.lpToken,
+      balances: getUserBalanceEntries(pool.lpToken.address, userAddress, balanceMap),
+    },
+  }));
+};
+
 // --- Pool Queries ---
 
 export const getPools = async (
@@ -73,56 +116,203 @@ export const getPools = async (
   userAddress: string | undefined,
   rawParams: Record<string, string | undefined> = {}
 ): Promise<PoolList> => {
-  const params = buildPoolParams(rawParams, userAddress);
+  const startedAt = performance.now();
+  let sectionStartedAt = startedAt;
+  const trackSection = (section: string, details = "") => {
+    const now = performance.now();
+    console.log(`[getPools] ${section}${details ? ` ${details}` : ""}: ${formatElapsedMs(now - sectionStartedAt)}`);
+    sectionStartedAt = now;
+  };
+  const trackTotal = () => {
+    console.log(`[getPools] total: ${formatElapsedMs(performance.now() - startedAt)}`);
+  };
+  const params = buildPoolParams(rawParams);
+  trackSection("build params");
 
-  const [{data: poolData}, { data: factoryData }] = await Promise.all([
-    cirrus.get(accessToken, `/${PoolTable}`, { params }),
-    cirrus.get(accessToken, `/${PoolFactory}`, {
-      params: { address: "eq." + config.poolFactory, select: "swapFeeRate,lpSharePercent" }
-    })
-  ]);
+  const poolFetchCacheKey = getPoolFetchCacheKey(params);
+  const cachedPoolFetch = getCachedPoolFetch(poolFetchCacheKey);
+  trackSection("check pool fetch cache", cachedPoolFetch ? "(hit)" : "(miss)");
+
+  let poolData: RawGetPool[];
+  let factoryData: unknown;
+  if (cachedPoolFetch) {
+    const cachedPoolAddresses = cachedPoolFetch.poolData.map(pool => pool.address).filter(Boolean);
+    const { data: livePoolData } = await cirrus.get(accessToken, `/${PoolTable}`, {
+      params: {
+        poolFactory: params.poolFactory,
+        address: `in.(${cachedPoolAddresses.join(",")})`,
+        select: LIVE_POOL_SELECT_FIELDS,
+      }
+    });
+    poolData = applyLivePoolFields(cachedPoolFetch.poolData as Partial<RawGetPool>[], livePoolData as RawGetPool[]);
+    factoryData = cachedPoolFetch.factoryData;
+    trackSection("fetch live cached pool fields", `(${cachedPoolAddresses.length} pools)`);
+  } else {
+    const [{data: fetchedPoolData}, { data: fetchedFactoryData }] = await Promise.all([
+      cirrus.get(accessToken, `/${PoolTable}`, { params }),
+      cirrus.get(accessToken, `/${PoolFactory}`, {
+        params: { address: "eq." + config.poolFactory, select: "swapFeeRate,lpSharePercent" }
+      })
+    ]);
+    poolData = fetchedPoolData as RawGetPool[];
+    factoryData = fetchedFactoryData;
+    setCachedPoolFetch(poolFetchCacheKey, poolData, factoryData);
+    trackSection("fetch pools and factory", `(${poolData.length} pools)`);
+  }
 
   // Filter out hidden pools and pools with deactivated tokens (status !== 2 = ACTIVE)
   const ACTIVE_TOKEN_STATUS = "2";
-  const validatedPools = (poolData as RawGetPool[]).filter(
+  const validatedPools = poolData.filter(
     pool => !config.hiddenSwapPools.has(pool.address)
       && pool.tokenA.status === ACTIVE_TOKEN_STATUS
       && pool.tokenB.status === ACTIVE_TOKEN_STATUS
   );
-  const validatedFactory = factoryData[0] as RawPoolFactory;
+  const validatedFactory = (factoryData as RawPoolFactory[])[0];
   const tokenAddresses = extractTokenAddresses(validatedPools);
+  trackSection("validate pools");
+
+  let userBalanceMap = new Map<string, string>();
+  if (userAddress) {
+    const userBalanceAddresses = [
+      ...new Set(validatedPools.flatMap(pool => [
+        pool.tokenA.address,
+        pool.tokenB.address,
+        pool.lpToken.address,
+      ]))
+    ];
+    if (userBalanceAddresses.length) {
+      const { data: liveUserBalances } = await cirrus.get(accessToken, `/${constants.Token}-_balances`, {
+        params: {
+          key: `eq.${userAddress}`,
+          address: `in.(${userBalanceAddresses.join(",")})`,
+          select: "address,user:key,balance:value::text",
+        }
+      });
+      userBalanceMap = new Map(
+        (liveUserBalances as { address: string; balance: string }[]).map(balance => [balance.address, balance.balance])
+      );
+    }
+  }
+  const poolsWithUserBalances = applyUserBalancesToPools(validatedPools, userAddress, userBalanceMap);
+  trackSection("fetch normal pool user balances", userAddress ? `(${userBalanceMap.size} balances)` : "(skipped)");
+
   const priceMap = await getOraclePrices(accessToken, {
     select: "asset:key,price:value::text",
     key: `in.(${tokenAddresses.join(',')})`
-  });
+  }, true);
+  trackSection("fetch oracle prices");
+
   const volumeMap = await getTradingVolume24hForPools(accessToken, validatedPools.map(pool => pool.address), priceMap);
+  trackSection("fetch 24h volume");
 
   let userLiquidityFlowTotals: Map<string, { totalDepositedUsd: bigint; totalWithdrawnUsd: bigint }> | undefined;
   if (userAddress) {
     userLiquidityFlowTotals = await getUserPoolLiquidityFlowTotals(
       accessToken,
-      validatedPools,
+      poolsWithUserBalances,
       userAddress,
       priceMap
     );
   }
+  trackSection("fetch user liquidity flows");
 
   const poolList: any[] = buildPoolList(
-    validatedPools,
+    poolsWithUserBalances,
     priceMap,
     volumeMap,
     validatedFactory,
     userAddress
   );
+  trackSection("build pool list");
 
   // Replace or add multi-token stable pools. These pools also appear in the BlockApps-Pool table
   // (from Pool(pool).setFeeParameters()) but with invalid tokenA/tokenB. Replace those entries
   // with properly built multi-token pool entries.
+  console.log("[getPools] ------- build multi-token pools -------");
   const multiTokenStablePools = await fetchMultiTokenStablePools(accessToken);
+  trackSection("fetch multi-token stable pools", `(${multiTokenStablePools.length} pools)`);
+
+  const multiTokenLPTokenAddresses = [
+    ...new Set(multiTokenStablePools.map(stablePool => stablePool.lpToken))
+  ];
+  const multiTokenTokenAddresses = [
+    ...new Set(multiTokenStablePools.flatMap(stablePool => [
+      ...stablePool.coins.map(coin => coin.tokenAddress),
+      stablePool.lpToken,
+    ]))
+  ];
+  let multiTokenMetadataMap = multiTokenTokenAddresses.length
+    ? getCachedMultiTokenTokenMetadata(multiTokenTokenAddresses, multiTokenLPTokenAddresses)
+    : new Map<string, RawToken>();
+  trackSection("check multi-token metadata cache", multiTokenMetadataMap ? "(hit)" : "(miss)");
+
+  if (multiTokenTokenAddresses.length && !multiTokenMetadataMap) {
+    multiTokenMetadataMap = await fetchTokenMetadata(accessToken, multiTokenTokenAddresses);
+    setCachedMultiTokenTokenMetadata(multiTokenTokenAddresses, multiTokenMetadataMap, multiTokenLPTokenAddresses);
+    trackSection("fetch multi-token metadata", `(${multiTokenTokenAddresses.length} tokens)`);
+  }
+  multiTokenMetadataMap = multiTokenMetadataMap || new Map<string, RawToken>();
+  if (multiTokenLPTokenAddresses.length) {
+    const { data: liveLPTokens } = await cirrus.get(accessToken, `/${constants.Token}`, {
+      params: {
+        address: `in.(${multiTokenLPTokenAddresses.join(",")})`,
+        select: "address,_totalSupply::text",
+      }
+    });
+    (liveLPTokens as { address: string; _totalSupply: string }[]).forEach((token) => {
+      const cachedToken = multiTokenMetadataMap.get(token.address);
+      if (cachedToken) {
+        multiTokenMetadataMap.set(token.address, {
+          ...cachedToken,
+          _totalSupply: token._totalSupply,
+        });
+      }
+    });
+  }
+  trackSection("fetch multi-token LP live metadata", `(${multiTokenLPTokenAddresses.length} tokens)`);
+
+  if (userAddress && multiTokenTokenAddresses.length) {
+    const { data: liveUserBalances } = await cirrus.get(accessToken, `/${constants.Token}-_balances`, {
+      params: {
+        key: `eq.${userAddress}`,
+        address: `in.(${multiTokenTokenAddresses.join(",")})`,
+        select: "address,user:key,balance:value::text",
+      }
+    });
+    (liveUserBalances as { address: string; user: string; balance: string }[]).forEach((balance) => {
+      const address = balance.address;
+      const cachedToken = multiTokenMetadataMap.get(address);
+      if (cachedToken) {
+        multiTokenMetadataMap.set(address, {
+          ...cachedToken,
+          balances: [{ user: balance.user, balance: balance.balance }],
+        });
+      }
+    });
+  }
+  trackSection("fetch multi-token user balances", userAddress ? `(${multiTokenTokenAddresses.length} tokens)` : "(skipped)");
+
+  const missingMultiTokenPriceAddresses = [
+    ...new Set(multiTokenStablePools
+      .flatMap(stablePool => stablePool.coins.map(coin => coin.tokenAddress))
+      .filter(address => !priceMap.has(address)))
+  ];
+  if (missingMultiTokenPriceAddresses.length > 0) {
+    const additionalPrices = await getOraclePrices(accessToken, {
+      select: "asset:key,price:value::text",
+      key: `in.(${missingMultiTokenPriceAddresses.join(',')})`
+    }, true);
+    additionalPrices.forEach((price, addr) => priceMap.set(addr, price));
+    missingMultiTokenPriceAddresses.forEach((addr) => {
+      if (!priceMap.has(addr)) priceMap.set(addr, "0");
+    });
+  }
+  trackSection("fetch multi-token missing prices", `(${missingMultiTokenPriceAddresses.length} tokens)`);
+
   await Promise.all(multiTokenStablePools.map(async (stablePool) => {
     try {
       const poolEntry = await buildMultiTokenPoolEntry(
-        accessToken, stablePool, priceMap, volumeMap, validatedFactory, userAddress
+        accessToken, stablePool, priceMap, volumeMap, validatedFactory, userAddress, multiTokenMetadataMap
       );
       const existingIdx = poolList.findIndex((p: any) => p.address === stablePool.address);
       if (existingIdx !== -1) {
@@ -134,14 +324,18 @@ export const getPools = async (
       console.error(`Failed to build multi-token pool ${stablePool.address}:`, err);
     }
   }));
+  console.log("[getPools] ------- end build multi-token pools -------");
+  trackSection("build multi-token pools");
 
   const patchedPoolList = await applyStablePoolFees(accessToken, poolList);
+  trackSection("apply stable pool fees");
 
   if (!userAddress) {
+    trackTotal();
     return patchedPoolList;
   }
 
-  return patchedPoolList.map((pool) => {
+  const poolsWithUserTotals = patchedPoolList.map((pool) => {
     const flow = userLiquidityFlowTotals?.get(pool.address.toLowerCase()) || {
       totalDepositedUsd: 0n,
       totalWithdrawnUsd: 0n,
@@ -169,6 +363,10 @@ export const getPools = async (
       userAllTimeEarningsUsd: userAllTimeEarningsUsd.toString(),
     };
   });
+  trackSection("build user totals");
+  trackTotal();
+
+  return poolsWithUserTotals;
 };
 
 // --- Token Queries ---
