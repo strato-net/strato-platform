@@ -220,8 +220,11 @@ fetch_source() {
   local source="$1"
   if [[ "$source" == s3://* ]]; then
     need_cmd aws
-    local tmp
-    tmp="$(mktemp_dir)/snapshot.${source##*.}"
+    local tmp suffix
+    # Preserve the full archive suffix (e.g. .tar.zst) so extract_archive can
+    # recognize it; ${source##*.} would yield only ".zst".
+    suffix="$(archive_suffix "$source")"
+    tmp="$(mktemp_dir)/snapshot${suffix}"
     aws s3 cp --only-show-errors "$source" "$tmp" >/dev/null
     verify_s3_checksum "$source" "$tmp"
     printf '%s\n' "$tmp"
@@ -1097,24 +1100,69 @@ postgres_data_dir_initialized() {
   [[ -f "$1/PG_VERSION" ]]
 }
 
+# Determine the uid:gid the node's postgres container runs as. The node's
+# postgres bind-mounts ./postgres and runs as the operator's uid:gid (set in the
+# generated docker-compose.yml), so the data dir is owned by that user. Our
+# throwaway container must match it, or the node's postgres will later fail with
+# "Permission denied" on the data dir. Reads the `user:` from the node's compose
+# postgres service, falling back to the current user.
+postgres_run_user() {
+  local node_dir="$1"
+  local compose="$node_dir/docker-compose.yml"
+  local u=""
+  if [[ -f "$compose" ]]; then
+    u="$(python3 - "$compose" <<'PY'
+import re, sys
+compose = sys.argv[1]
+current = None
+try:
+    lines = open(compose, encoding="utf-8").read().splitlines()
+except FileNotFoundError:
+    sys.exit(0)
+for line in lines:
+    svc = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", line)
+    if svc:
+        current = svc.group(1)
+        continue
+    if current == "postgres":
+        m = re.match(r"^\s+user:\s*['\"]?([0-9]+:[0-9]+)['\"]?\s*$", line)
+        if m:
+            print(m.group(1))
+            break
+PY
+)"
+  fi
+  if [[ -z "$u" ]]; then
+    u="$(id -u):$(id -g)"
+  fi
+  printf '%s\n' "$u"
+}
+
 # Start a throwaway postgres container on a data dir and wait until it is ready.
 # Prints the container id. Caller must stop it with pg_temp_stop.
 #
 # If the data dir is an initialized cluster, it is started as-is (trust auth for
 # local dump/load). If it is empty, the postgres entrypoint initializes it using
 # the given password and default database `eth` -- matching how the node's own
-# postgres container would initialize it on first start.
+# postgres container would initialize it on first start. The container runs as
+# run_user (uid:gid) so the data dir ends up owned the same way the node's own
+# postgres container expects.
 pg_temp_start() {
   local data_dir="$1"
   local init_password="${2:-}"
+  local run_user="${3:-}"
   need_cmd docker
   local args=(-d --rm -v "$data_dir:/var/lib/postgresql/data")
+  [[ -n "$run_user" ]] && args+=(--user "$run_user")
   if postgres_data_dir_initialized "$data_dir"; then
     args+=(-e POSTGRES_HOST_AUTH_METHOD=trust)
   else
     [[ -n "$init_password" ]] || die "cannot initialize empty postgres data dir without a password"
     args+=(-e "POSTGRES_PASSWORD=$init_password" -e "POSTGRES_DB=eth")
   fi
+  # When running as a non-default uid, the official image needs a writable HOME
+  # and PGDATA owned by that uid; the bind-mounted data dir is created by
+  # strato-setup as the operator, so ownership already matches.
   local cid
   cid="$(docker run "${args[@]}" "$SNAPSHOT_POSTGRES_IMAGE" -c max_connections=300 2>/dev/null)" \
     || die "failed to start temporary postgres container"
@@ -1143,8 +1191,9 @@ dump_databases() {
   local dest_dir="$2"
   [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && { mkdir -p "$dest_dir"; for db in "${SNAPSHOT_PG_DATABASES[@]}"; do printf -- '-- offline fixture dump for %s\n' "$db" > "$dest_dir/$db.sql"; done; return 0; }
   mkdir -p "$dest_dir"
-  local cid db
-  cid="$(pg_temp_start "$data_dir")"
+  local cid db run_user
+  run_user="$(postgres_run_user "$(dirname "$data_dir")")"
+  cid="$(pg_temp_start "$data_dir" "" "$run_user")"
   for db in "${SNAPSHOT_PG_DATABASES[@]}"; do
     info "Dumping database '$db'..."
     docker exec "$cid" pg_dump -U postgres --no-owner --no-privileges "$db" > "$dest_dir/$db.sql" \
@@ -1163,8 +1212,9 @@ load_databases() {
   local dumps_dir="$2"
   local node_password="$3"
   [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && return 0
-  local cid db
-  cid="$(pg_temp_start "$data_dir" "$node_password")"
+  local cid db run_user
+  run_user="$(postgres_run_user "$(dirname "$data_dir")")"
+  cid="$(pg_temp_start "$data_dir" "$node_password" "$run_user")"
   for db in "${SNAPSHOT_PG_DATABASES[@]}"; do
     [[ -f "$dumps_dir/$db.sql" ]] || { pg_temp_stop "$cid"; die "snapshot missing database dump: $db.sql"; }
     info "Loading database '$db'..."
