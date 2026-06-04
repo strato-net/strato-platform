@@ -213,8 +213,9 @@ onto any new node started by any user with their own configuration.
 Included payload:
 
 - `.ethereumH/` state, excluding `ethconf.yaml`
-- `postgres-dumps/eth.sql` and `postgres-dumps/cirrus.sql` — logical `pg_dump`s
-  of the public blockchain databases only
+- `postgres-dumps/eth.dump` and `postgres-dumps/cirrus.dump` — `pg_dump` custom
+  format (`-Fc`) of the public blockchain databases only; restored in parallel
+  with `pg_restore -j`
 - `redis/`
 - `kafka/`
 - `prometheus/` only when requested
@@ -231,7 +232,10 @@ Excluded payload:
 - macOS AppleDouble metadata files (`._*`)
 
 The `eth`/`cirrus` databases are dumped with a throwaway `postgres:14.18`
-container against the cleanly-stopped data directory.
+container against the cleanly-stopped data directory. On restore, the load-time
+container runs with relaxed durability (`fsync=off`, `synchronous_commit=off`)
+and `pg_restore -j` for a fast parallel restore; this is safe because the data
+is disposable until the restore completes.
 
 Restore preserves the target node's generated host config and its own
 credentials: it loads the `eth`/`cirrus` dumps into the node's postgres cluster

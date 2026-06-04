@@ -1060,7 +1060,7 @@ strato_version = "unknown"
 if ":" in strato_image:
     strato_version = strato_image.rsplit(":", 1)[1]
 
-payload = ["ethereumH", "postgres-dumps/eth.sql", "postgres-dumps/cirrus.sql", "redis", "kafka"]
+payload = ["ethereumH", "postgres-dumps/eth.dump", "postgres-dumps/cirrus.dump", "redis", "kafka"]
 if include_prometheus == "true":
     payload.append("prometheus")
 
@@ -1151,6 +1151,7 @@ pg_temp_start() {
   local data_dir="$1"
   local init_password="${2:-}"
   local run_user="${3:-}"
+  local mode="${4:-}"
   need_cmd docker
   local args=(-d --rm -v "$data_dir:/var/lib/postgresql/data")
   [[ -n "$run_user" ]] && args+=(--user "$run_user")
@@ -1160,11 +1161,18 @@ pg_temp_start() {
     [[ -n "$init_password" ]] || die "cannot initialize empty postgres data dir without a password"
     args+=(-e "POSTGRES_PASSWORD=$init_password" -e "POSTGRES_DB=eth")
   fi
+  # Server-side postgres args. In "fast" mode (bulk restore into a disposable
+  # cluster) relax durability and grow bulk-load buffers for a much faster load.
+  local pg_args=(-c max_connections=300)
+  if [[ "$mode" == "fast" ]]; then
+    pg_args+=(-c fsync=off -c synchronous_commit=off -c full_page_writes=off \
+      -c max_wal_size=4GB -c checkpoint_timeout=30min -c maintenance_work_mem=1GB)
+  fi
   # When running as a non-default uid, the official image needs a writable HOME
   # and PGDATA owned by that uid; the bind-mounted data dir is created by
   # strato-setup as the operator, so ownership already matches.
   local cid
-  cid="$(docker run "${args[@]}" "$SNAPSHOT_POSTGRES_IMAGE" -c max_connections=300 2>/dev/null)" \
+  cid="$(docker run "${args[@]}" "$SNAPSHOT_POSTGRES_IMAGE" "${pg_args[@]}" 2>/dev/null)" \
     || die "failed to start temporary postgres container"
   TMP_PG_CONTAINERS+=("$cid")
   local i
@@ -1184,19 +1192,31 @@ pg_temp_stop() {
   docker stop "$cid" >/dev/null 2>&1 || true
 }
 
+# Number of parallel jobs to use for pg_dump/pg_restore (bounded by CPUs).
+snapshot_pg_jobs() {
+  local n
+  n="$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 4)"
+  (( n < 1 )) && n=1
+  (( n > 8 )) && n=8
+  printf '%s\n' "$n"
+}
+
 # Dump the captured databases from the node's (stopped) postgres data dir into
-# <dest_dir>/<db>.sql using a throwaway postgres container.
+# <dest_dir>/<db>.dump (postgres custom format) using a throwaway postgres
+# container. Custom format enables parallel, index-rebuilding restore.
 dump_databases() {
   local data_dir="$1"
   local dest_dir="$2"
-  [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && { mkdir -p "$dest_dir"; for db in "${SNAPSHOT_PG_DATABASES[@]}"; do printf -- '-- offline fixture dump for %s\n' "$db" > "$dest_dir/$db.sql"; done; return 0; }
+  [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && { mkdir -p "$dest_dir"; for db in "${SNAPSHOT_PG_DATABASES[@]}"; do printf -- 'offline fixture dump for %s\n' "$db" > "$dest_dir/$db.dump"; done; return 0; }
   mkdir -p "$dest_dir"
-  local cid db run_user
+  local cid db run_user jobs
   run_user="$(postgres_run_user "$(dirname "$data_dir")")"
+  jobs="$(snapshot_pg_jobs)"
   cid="$(pg_temp_start "$data_dir" "" "$run_user")"
   for db in "${SNAPSHOT_PG_DATABASES[@]}"; do
     info "Dumping database '$db'..."
-    docker exec "$cid" pg_dump -U postgres --no-owner --no-privileges "$db" > "$dest_dir/$db.sql" \
+    # -Fc = custom (compressed) format; stream to a host file via stdout.
+    docker exec "$cid" pg_dump -U postgres --no-owner --no-privileges -Fc "$db" > "$dest_dir/$db.dump" \
       || { pg_temp_stop "$cid"; die "pg_dump failed for database '$db'"; }
   done
   pg_temp_stop "$cid"
@@ -1212,19 +1232,28 @@ load_databases() {
   local dumps_dir="$2"
   local node_password="$3"
   [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && return 0
-  local cid db run_user
+  local cid db run_user jobs
   run_user="$(postgres_run_user "$(dirname "$data_dir")")"
-  cid="$(pg_temp_start "$data_dir" "$node_password" "$run_user")"
+  jobs="$(snapshot_pg_jobs)"
+  # "fast" mode relaxes durability on the throwaway load container for a much
+  # faster bulk restore; safe because the data is disposable until restore
+  # completes (on failure we just retry the whole restore).
+  cid="$(pg_temp_start "$data_dir" "$node_password" "$run_user" fast)"
   for db in "${SNAPSHOT_PG_DATABASES[@]}"; do
-    [[ -f "$dumps_dir/$db.sql" ]] || { pg_temp_stop "$cid"; die "snapshot missing database dump: $db.sql"; }
+    [[ -f "$dumps_dir/$db.dump" ]] || { pg_temp_stop "$cid"; die "snapshot missing database dump: $db.dump"; }
     info "Loading database '$db'..."
-    # Recreate the database empty, then load the dump.
+    # Recreate the database empty, then restore in parallel (data + indexes).
     docker exec "$cid" psql -U postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"$db\";" >/dev/null 2>&1 \
       || { pg_temp_stop "$cid"; die "failed to drop database '$db' before restore"; }
     docker exec "$cid" psql -U postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$db\";" >/dev/null 2>&1 \
       || { pg_temp_stop "$cid"; die "failed to create database '$db'"; }
-    docker exec -i "$cid" psql -U postgres -v ON_ERROR_STOP=1 -d "$db" < "$dumps_dir/$db.sql" >/dev/null 2>&1 \
-      || { pg_temp_stop "$cid"; die "failed to load dump for database '$db'"; }
+    # pg_restore -j needs a seekable file, so copy the dump into the container.
+    docker cp "$dumps_dir/$db.dump" "$cid:/tmp/$db.dump" \
+      || { pg_temp_stop "$cid"; die "failed to copy dump into container for '$db'"; }
+    docker exec "$cid" pg_restore -U postgres --no-owner --no-privileges \
+      -j "$jobs" -d "$db" "/tmp/$db.dump" >/dev/null 2>&1 \
+      || { pg_temp_stop "$cid"; die "failed to restore dump for database '$db'"; }
+    docker exec "$cid" rm -f "/tmp/$db.dump" >/dev/null 2>&1 || true
   done
   pg_temp_stop "$cid"
 }

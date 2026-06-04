@@ -41,8 +41,8 @@ make_fixture_snapshot() {
   mkdir -p "$staging/payload/kafka/kafka-logs/__cluster_metadata-0"
 
   echo "state-from-snapshot" > "$staging/payload/ethereumH/state/value"
-  echo "-- eth dump fixture" > "$staging/payload/postgres-dumps/eth.sql"
-  echo "-- cirrus dump fixture" > "$staging/payload/postgres-dumps/cirrus.sql"
+  echo "eth dump fixture" > "$staging/payload/postgres-dumps/eth.dump"
+  echo "cirrus dump fixture" > "$staging/payload/postgres-dumps/cirrus.dump"
   echo "redis-from-snapshot" > "$staging/payload/redis/appendonly.aof"
   echo "kafka-from-snapshot" > "$staging/payload/kafka/log"
 
@@ -67,8 +67,8 @@ make_fixture_snapshot() {
   },
   "payload": [
     "ethereumH",
-    "postgres-dumps/eth.sql",
-    "postgres-dumps/cirrus.sql",
+    "postgres-dumps/eth.dump",
+    "postgres-dumps/cirrus.dump",
     "redis",
     "kafka"
   ],
