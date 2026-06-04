@@ -82,20 +82,28 @@ export abstract class AppScenario extends BaseScenario {
       }
     }
 
-    // Warm up: M parallel grants (one per UNIQUE user). Different users hit
-    // different Keycloak rate-limit buckets so this fans out cleanly.
-    await Promise.all(
-      [...oauthByUser.entries()].map(async ([key, oauth]) => {
-        try {
-          await oauth.init();
-          await oauth.getToken();
-        } catch (err: any) {
-          console.warn(
-            `[${scenarioLabel}] OAuth warmup failed for ${key}: ${err.message}`,
-          );
-        }
-      }),
-    );
+    // Warm up: one grant per UNIQUE user, throttled to ~20 grants/sec.
+    //
+    // Firing all grants in parallel overruns Keycloak's global / per-IP /
+    // per-client throughput limit (distinct from its per-user limit): the
+    // proxy in front of Keycloak returns an HTML error page for the overflow,
+    // and simple-oauth2/@hapi/wreck throws "The content-type is not JSON
+    // compatible". Spacing the grants ~50ms apart keeps the aggregate rate
+    // under that ceiling. Grants are independent, so a small fixed delay
+    // between sequential launches is enough — no need for a global gate here.
+    const GRANT_SPACING_MS = 50; // ~20 grants/sec
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    for (const [key, oauth] of oauthByUser.entries()) {
+      try {
+        await oauth.init();
+        await oauth.getToken();
+      } catch (err: any) {
+        console.warn(
+          `[${scenarioLabel}] OAuth warmup failed for ${key}: ${err.message}`,
+        );
+      }
+      await sleep(GRANT_SPACING_MS);
+    }
 
     // Build N BackendClients, round-robin across the M shared OAuthClients.
     const pool: BackendClient[] = [];
