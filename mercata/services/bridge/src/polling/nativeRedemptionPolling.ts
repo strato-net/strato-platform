@@ -40,7 +40,7 @@ const parseNativeDepositLog = (chainId: number, log: any): NativeDepositArgs | n
   };
 };
 
-const pollChainNativeRedemptions = async (chainId: number, fallbackLastBlock: number) => {
+const pollChainNativeRedemptions = async (chainId: number) => {
   const nativeRepresentationBridge = getNativeRepresentationBridgeAddress(chainId);
   if (!nativeRepresentationBridge) {
     return;
@@ -50,19 +50,15 @@ const pollChainNativeRedemptions = async (chainId: number, fallbackLastBlock: nu
   }
 
   const currentBlock = await getCurrentBlockNumber(chainId);
-  const effectiveLastProcessedBlock =
-    await nativeBlockTrackingService.getEffectiveLastProcessedBlock(
-      chainId,
-      fallbackLastBlock,
-    );
+  const lastProcessedBlock = await nativeBlockTrackingService.getLastProcessedBlock(chainId);
 
-  if (effectiveLastProcessedBlock >= currentBlock) {
+  if (lastProcessedBlock >= currentBlock) {
     return;
   }
 
   const logs = await getChainLogs(
     chainId,
-    effectiveLastProcessedBlock + 1,
+    lastProcessedBlock + 1,
     currentBlock,
     nativeRepresentationBridge,
     NATIVE_REDEMPTION_EVENT_SIGNATURE,
@@ -73,7 +69,9 @@ const pollChainNativeRedemptions = async (chainId: number, fallbackLastBlock: nu
     .filter((deposit): deposit is NativeDepositArgs => deposit !== null);
 
   if (deposits.length > 0) {
-    await recordNativeDepositBatch([deposits[0], ...deposits.slice(1)]);
+    for (const deposit of deposits) {
+      await recordNativeDepositBatch([deposit]);
+    }
     logInfo(
       "NativeRedemptionPolling",
       `Recorded ${deposits.length} native redemption deposits for chain ${chainId}`,
@@ -94,10 +92,7 @@ export const startNativeRedemptionPolling = () => {
             return;
           }
 
-          await pollChainNativeRedemptions(
-            Number(chainInfo.externalChainId),
-            Number(chainInfo.lastProcessedBlock || 0),
-          );
+          await pollChainNativeRedemptions(Number(chainInfo.externalChainId));
         }),
       );
     } catch (error) {

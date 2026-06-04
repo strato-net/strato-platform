@@ -10,7 +10,7 @@ import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
-import Blockchain.Strato.Version (stratoVersionTag)
+import Strato.Version (stratoVersionTag)
 import Data.Default (def)
 import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml
@@ -83,7 +83,7 @@ generateDockerCompose = do
   let mercataUi = def
         { image = "mercata-ui:" ++ stratoVersionTag ++ "-" ++ hashMercataUi
         , depends_on = Just $ DependsOnList ["mercata-backend"]
-        , volumes = Just ["./logs:/logs"]
+        , volumes = Just ["./logs:/logs", "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
         , environment = Just $ Map.fromList
             [ ("LUCKY_ORANGE_SITE_ID", "${LUCKY_ORANGE_SITE_ID:-}")
             , ("GOOGLE_ANALYTICS_ID", "${GOOGLE_ANALYTICS_ID:-}")
@@ -179,7 +179,7 @@ generateDockerCompose = do
             , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
-        , command = Just ["exec docker-entrypoint.sh postgres -c max_connections=500 -c shared_buffers=512MB >> /logs/postgres.log 2>&1"]
+        , command = Just ["exec docker-entrypoint.sh postgres -c max_connections=800 -c shared_buffers=512MB >> /logs/postgres.log 2>&1"]
         , restart = Just "unless-stopped"
         , healthcheck = Just Healthcheck
             { test = ["CMD-SHELL", "pg_isready -U postgres"]
@@ -270,7 +270,7 @@ generateDockerCompose = do
             }
         , volumes = Just (bcVolumes bc)
         , logging = noLogging
-        , ports = Just ["127.0.0.1:9092:9092"]
+        , ports = Just ["127.0.0.1:" ++ show (bcPort bc) ++ ":" ++ show (bcPort bc)]
         }
 
   let prometheus = def
@@ -315,6 +315,9 @@ generateDockerCompose = do
         , logging = noLogging
         }
 
+  -- Only include streaming service if a broker image is configured (not embedded like JLog)
+  let streamingService = if null (bcImage bc) then [] else [("streaming", streaming)]
+  
   let baseServices =
             [ ("mercata-backend", mercataBackend)
             , ("mercata-ui", mercataUi)
@@ -325,9 +328,8 @@ generateDockerCompose = do
             , ("postgres", postgres)
             , ("nginx", nginx)
             , ("docs", docs)
-            , ("streaming", streaming)
             , ("prometheus", prometheus)
-            ]
+            ] ++ streamingService
 
   let allServices = if flags_localAuth
         then ("local-auth", localAuth) : baseServices

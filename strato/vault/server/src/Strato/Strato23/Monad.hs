@@ -87,6 +87,7 @@ data VaultWrapperError
   | AlreadyExists Text
   | RuntimeError SomeException
   | UserDoesNotExist Text
+  | JsonError Int LB.ByteString
   deriving (Show, Exception)
 
 --------------------------------------------------------------------------------
@@ -120,6 +121,7 @@ handleVaultError = \case
     $logErrorS "handleVaultError/RuntimeError" . Text.pack $
       show e ++ "\n  callstack missing for runtime errors"
     throwIO e
+  e@(JsonError _ _) -> throwIO e
   e -> do
     $logErrorLS "handleVaultError" e
     throwIO e
@@ -201,6 +203,13 @@ enterVaultWrapper env x = Handler $ do
                       "Something wrong has happened inside of STRATO.",
                       "Please contact your network administrator to have this problem fixed."
                     ]
+            }
+        JsonError status body ->
+          ServerError
+            { errHTTPCode = status,
+              errReasonPhrase = "",
+              errBody = body,
+              errHeaders = [("Content-Type", "application/json")]
             }
 
 withSecretKey :: (SecretBox.Key -> VaultM a) -> VaultM a

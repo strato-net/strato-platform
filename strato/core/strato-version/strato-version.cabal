@@ -1,0 +1,26 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           strato-version
+version:        0.1.0.0
+synopsis:       STRATO version information
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Strato.Version
+  other-modules:
+      Strato.Version.TH
+      Paths_strato_version
+  hs-source-dirs:
+      src
+  ghc-options: -Wall
+  build-depends:
+      base
+    , process
+    , template-haskell
+  default-language: Haskell2010

@@ -82,6 +82,15 @@ newKeyStore key = liftIO $ do
   -- Secp256k1 for ethereum account creation
   (salt, acctNonce) <- newSaltAndNonce
   acctSk <- liftIO newPrivateKey
+  keyStoreFromPrivateKeyWithSaltAndNonce key salt acctNonce acctSk
+
+keyStoreFromPrivateKey :: MonadIO m => SecretBox.Key -> PrivateKey -> m KeyStore
+keyStoreFromPrivateKey key acctSk = liftIO $ do
+  (salt, acctNonce) <- newSaltAndNonce
+  keyStoreFromPrivateKeyWithSaltAndNonce key salt acctNonce acctSk
+
+keyStoreFromPrivateKeyWithSaltAndNonce :: MonadIO m => SecretBox.Key -> ByteString -> SecretBox.Nonce -> PrivateKey -> m KeyStore
+keyStoreFromPrivateKeyWithSaltAndNonce key salt acctNonce acctSk = liftIO $ do
   let encAcctSk = encrypt key acctNonce $ exportPrivateKey acctSk
       acctAddr = fromPrivateKey acctSk
   return

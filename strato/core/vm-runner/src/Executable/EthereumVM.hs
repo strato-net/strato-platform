@@ -31,6 +31,7 @@ import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Bootstrap
 import Blockchain.Database.MerklePatricia.NodeData
 import Blockchain.EthConf
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Event
 import Blockchain.JsonRpcCommand
 import Blockchain.Model.SyncState
@@ -50,7 +51,6 @@ import Blockchain.SyncDB
 import Blockchain.Timing
 import Blockchain.VMContext
 import Blockchain.VMMetrics
-import Blockchain.VMOptions
 import Blockchain.Wiring
 import Conduit hiding (Flush)
 import Control.Monad
@@ -202,7 +202,7 @@ sendOutEvent (OutStateDiff diff) = void $ produceIndexEvents [StateDiffEntry dif
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)
 sendOutEvent (OutASM asm) =
-  when (not flags_sqlDiff) $
+  when (not $ Conf.sqlDiff $ Conf.vmConfig ethConf) $
     timeit "produceAddressStateUpdates" (Just vmBlockInsertionMined) $
       void $ produceIndexEvents [AddressStateUpdates asm]
 sendOutEvent (OutJSONRPC r) = produceResponse r

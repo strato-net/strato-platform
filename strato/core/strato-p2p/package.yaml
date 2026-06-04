@@ -41,6 +41,7 @@ library:
     - base16-bytestring
     - blockapps-data
     - blockapps-datadefs
+    - strato-version
     - blockDB
     - blockstanbul
     - bytestring

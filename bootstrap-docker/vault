@@ -220,7 +220,18 @@ fi
 # END OF COMPOSE FILE PRE-PROCESSING
 
 ${docker_compose} -f docker-compose-vault-temp.yml up -d --remove-orphans
-until curl --silent --output /dev/null --fail --insecure --location "${http_protocol}://localhost:${main_port}/_ping" ; do sleep 0.5; done
+# Wait until the vault is reachable. /_ping returns 200 when the password is
+# already set (e.g. via vaultPasswordFile) and 503 when it is awaiting password
+# initialization — either response means the container is up and ready for
+# setPassword to proceed. Any other condition (connection refused, timeout,
+# transient 5xx from a fronting proxy) keeps the loop waiting.
+until status=$(curl --silent --output /dev/null --insecure --location \
+                    --write-out '%{http_code}' --max-time 2 \
+                    "${http_protocol}://localhost:${main_port}/_ping") \
+       && { [ "$status" = "200" ] || [ "$status" = "503" ]; }
+do
+  sleep 0.5
+done
 
 setPassword
 

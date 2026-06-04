@@ -5,6 +5,7 @@ module Blockchain.Init.EthConf (genEthConf) where
 
 import Blockchain.EthConf
 import Blockchain.Init.Options hiding (flags_localAuth)
+import Control.Monad.Composable.Streaming.DockerConfig (brokerConfig, bcHost, bcPort)
 import qualified Blockchain.Init.Options as Opts
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Options (flags_network, flags_txSizeLimit, flags_gasLimit, computeNetworkID)
@@ -47,7 +48,10 @@ runtimeConfig = def
       , redisPort = flags_redisPort
       , redisDBNumber = flags_redisDBNumber
       }
-  , kafkaConfig = def { kafkaHost = "kafka" }
+  , streamingConfig = def
+      { streamingHost = bcHost brokerConfig
+      , streamingPort = bcPort brokerConfig
+      }
   , discoveryConfig = def { minAvailablePeers = flags_minPeers }
   , p2pConfig = def
       { maxConnections = flags_maxConn
@@ -64,6 +68,7 @@ runtimeConfig = def
       , nativeTokenAddress = getNativeTokenForNetwork flags_network
       }
   , debugConfig = def { svmTrace = flags_svmTrace }
+  , vmConfig = def { sqlDiff = flags_sqlDiff, diffPublish = flags_diffPublish }
   }
 
 getNodeKey :: IO (VC.PublicKey, Address)
@@ -115,7 +120,7 @@ genEthConf = do
 
   -- For local auth mode, skip vault during setup (vault-wrapper starts later)
   if Opts.flags_localAuth
-    then putStrLn $ "  ✓ Local auth mode (hostname: " ++ localHostname ++ "): node key will be created when vault-wrapper starts"
+    then putStrLn $ "  ✓ Local auth mode (hostname: " ++ localHostname ++ "): node key will be provisioned during first admin setup"
     else do
       (pub, _addr) <- getNodeKey
       putStrLn $ "  ✓ Node key: " ++ shortDescription pub
@@ -131,7 +136,11 @@ genEthConf = do
         , host = flags_pghost
         , password = pgPass
         }
-    , kafkaConfig = (kafkaConfig runtimeConfig) { kafkaHost = flags_kafkahost }
+    , streamingConfig = (streamingConfig runtimeConfig)
+        { streamingHost = if flags_kafkahost == "localhost"
+                          then bcHost brokerConfig
+                          else flags_kafkahost 
+        }
     , levelDBConfig = def
         { cacheSize = flags_ldbCacheSize
         , blockSize = flags_ldbBlockSize
@@ -150,10 +159,12 @@ genEthConf = do
         , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
         , notificationServerUrl = flags_notificationServerUrl
         , repoUrl = flags_repoUrl
+        , cookieRealm = localHostname
         }
     , networkConfig = def
         { network = flags_network
         , networkID = computeNetworkID
+        , chainId = computeChainId flags_network
         , httpPort = flags_httpPort
         , txSizeLimit = flags_txSizeLimit
         , gasLimit = flags_gasLimit

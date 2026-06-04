@@ -7,6 +7,11 @@ dependencies:
 
 library:
   source-dirs: src
+  exposed-modules:
+  - Control.Monad.Composable.Streaming.Backend
+  - Control.Monad.Composable.Streaming.Backend.DockerConfig
+  - Control.Monad.Composable.Kafka
+  - Control.Monad.Composable.Kafka.DockerConfig
   dependencies:
   - aeson
   - base16-bytestring

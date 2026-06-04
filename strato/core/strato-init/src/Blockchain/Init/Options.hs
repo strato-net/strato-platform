@@ -13,7 +13,7 @@ parseBootnodeString s = read s
 defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
 defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname"
 defineFlag "p:password" ("" :: String) "Postgres password"
-defineFlag "K:kafkahost" ("localhost" :: String) "Kafka hostname"
+defineFlag "K:kafkahost" ("localhost" :: String) "Streaming broker hostname"
 defineFlag "z:lazyblocks" (False :: Bool) "Don't mine empty blocks"
 defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If set to false, the peer will not be able to initiate a connection to the network by itself (this option is useful if you want to set up a peer to itself be a bootnode in a private network)"
 defineCustomFlag
@@ -76,4 +76,8 @@ defineFlag "mempoolLivenessCutoff" (60 :: Integer) "Max age of a transaction in 
 -- Consensus timing flags
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag "blockstanbul_round_period_s" (120 :: Int) "Maximum seconds that one validator will remain the proposer"
+
+-- VM config flags
+defineFlag "sqlDiff" (True :: Bool) "Update account state and storage in SQL DB (set false for faster sync)"
+defineFlag "diffPublish" (True :: Bool) "Publish state changes to streaming for indexer"
 $(return [])

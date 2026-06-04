@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Docker configuration for Apache Kafka
-module Control.Monad.Composable.Streaming.DockerConfig.Kafka (
+module Control.Monad.Composable.Kafka.DockerConfig (
   BrokerConfig(..),
   brokerConfig,
   brokerVolumeDirs
@@ -12,17 +12,20 @@ import qualified Data.Map as Map
 
 data BrokerConfig = BrokerConfig
   { bcImage :: String
+  , bcHost :: String  -- Hostname or path for embedded backends
   , bcEnvironment :: Maybe (Map String String)
   , bcEntrypoint :: Maybe [String]
   , bcCommand :: Maybe [String]
   , bcHealthcheckTest :: [String]
   , bcVolumes :: [String]
+  , bcPort :: Int
   , bcNeedsUserGid :: Bool
   }
 
 brokerConfig :: BrokerConfig
 brokerConfig = BrokerConfig
   { bcImage = "apache/kafka:3.9.2"
+  , bcHost = "localhost"  -- Default host for processes connecting to exposed port
   , bcEnvironment = Just $ Map.fromList
       [ ("KAFKA_NODE_ID", "1")
       , ("KAFKA_PROCESS_ROLES", "broker,controller")
@@ -47,6 +50,7 @@ brokerConfig = BrokerConfig
   , bcCommand = Just ["exec /__cacert_entrypoint.sh /etc/kafka/docker/run >> /logs/kafka.log 2>&1"]
   , bcHealthcheckTest = ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
   , bcVolumes = ["./logs:/logs", "./kafka:/kafka"]
+  , bcPort = 9092
   , bcNeedsUserGid = False
   }
 

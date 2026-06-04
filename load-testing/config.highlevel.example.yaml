@@ -110,7 +110,7 @@ scenarios:
     # externalChainId: "11155111"           # default Ethereum Sepolia ("1" Ethereum mainnet | "8453" Base | ...)
     # payTokenAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"  # default — helium USDST (intermediate token AUTO_FORGE consumes)
     # metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6"   # default (helium MetalForge — used only for forge-side balance reads)
-    # includePageLoad: true                 # default (4 Fund-page GETs once per user during warmup)
+    # includePageLoad: false                # default (4 Fund-page GETs once per user during warmup)
     # --- transient-error retry (per-iteration backend POST) ---
     # Retries on HTTP 429 + any 5xx (e.g. backend 503 when the bridge service
     # is overloaded). Backoff between attempts is exponential with ±0..500 ms
@@ -186,7 +186,7 @@ scenarios:
     # payAmount: "1000000000000000"         # default — 0.001 USDST per iteration (18-dec wei)
     # minMetalOut: "0"                      # default — slippage guard (set from oracle in production)
     # metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6"   # default — helium MetalForge
-    # includePageLoad: true                 # default — 2 GETs per user during warmup
+    # includePageLoad: false                # default — 2 GETs per user during warmup
     # requestRetries: 3                     # default
     # logBalances: "summary"                # default — "summary" | "none". summary: per-user
     #                                       # STRATO snapshot before + after the run (auth-filtered
