@@ -14,6 +14,13 @@ import { calculateLPTokenPrice } from "../helpers/swapping.helper";
 
 const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, YieldVault } = constants;
 
+// --- net-balance-history caches ---
+const HISTORY_RESPONSE_TTL = 30_000; // 30s — full response per user+duration
+const ACTIVE_REQ_TTL = 5_000;        // 5s — carry vault activeRequestId per user+vault
+
+const _historyCache = new Map<string, { data: BalanceSnapshot[]; expiresAt: number }>();
+const _activeReqCache = new Map<string, { value: string; expiresAt: number }>();
+
 // Queries MercataBridge config for the unanimous externalSymbol for each given strato token address.
 // Returns a map of stratoToken -> externalSymbol.
 // Used to display the equivalent quantity of an external rebasing token in the UI.
@@ -686,16 +693,32 @@ export const getNetBalanceHistory = async (
   userAddress: string,
   historyParams: HistoryParams,
 ): Promise<BalanceSnapshot[]> => {
+  const startedAt = performance.now();
 
-  // Pre-fetch vault config and carry vault active request IDs in parallel
+  // Full response cache keyed by user + duration window
+  const cacheKey = `${userAddress}:${historyParams.interval}:${historyParams.numTicks}:${Math.floor(historyParams.endTimestamp / historyParams.interval)}`;
+  const cached = _historyCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt) {
+    console.log(`[net-balance-history] total response time: ${(performance.now() - startedAt).toFixed(2)}ms (cached)`);
+    return cached.data;
+  }
+
+  // Pre-fetch vault config (1hr cached) and carry vault active request IDs (5s cached) in parallel
   const carryVaultAddrs = listVaultDefs().filter(v => v.address).map(v => v.address);
   const [vaultConfig, ...activeReqIds] = await Promise.all([
     getVaultHistoryConfig(accessToken),
-    ...carryVaultAddrs.map(addr =>
-      cirrus.get(accessToken, `/${YieldVault}-activeRequestId`, {
+    ...carryVaultAddrs.map(addr => {
+      const reqKey = `${userAddress}:${addr}`;
+      const reqCached = _activeReqCache.get(reqKey);
+      if (reqCached && Date.now() < reqCached.expiresAt) return Promise.resolve(reqCached.value);
+      return cirrus.get(accessToken, `/${YieldVault}-activeRequestId`, {
         params: { address: `eq.${addr}`, key: `eq.${userAddress}`, select: 'value::text' },
-      }).then(r => r.data?.[0]?.value || "0").catch(() => "0")
-    ),
+      }).then(r => {
+        const val = r.data?.[0]?.value || "0";
+        _activeReqCache.set(reqKey, { value: val, expiresAt: Date.now() + ACTIVE_REQ_TTL });
+        return val;
+      }).catch(() => "0");
+    }),
   ]);
 
   const requestFilters: string[] = [];
@@ -751,7 +774,10 @@ export const getNetBalanceHistory = async (
     updatePortfolioInfoMapping,
     processBalanceSnapshot
   );
-  return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.netBalance}));
+  const result = balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.netBalance}));
+  _historyCache.set(cacheKey, { data: result, expiresAt: Date.now() + HISTORY_RESPONSE_TTL });
+  console.log(`[net-balance-history] total response time: ${(performance.now() - startedAt).toFixed(2)}ms`);
+  return result;
 };
 
 export const getBorrowingHistory = async (
