@@ -602,19 +602,28 @@ export const getVaultShareTokenAddress = async (
  * Get vault config for history tracking.
  * Returns shareToken, botExecutor, and supportedAssets needed for portfolio history.
  */
+// 1hr cache — config only changes on admin operations
+let _vaultHistoryConfigCache: { data: { shareToken: string; botExecutor: string; supportedAssets: string[] }; expiresAt: number } | null = null;
+const VAULT_HISTORY_CONFIG_TTL = 3_600_000;
+
 export const getVaultHistoryConfig = async (
   accessToken: string
 ): Promise<{ shareToken: string; botExecutor: string; supportedAssets: string[] } | null> => {
+  if (_vaultHistoryConfigCache && Date.now() < _vaultHistoryConfigCache.expiresAt) {
+    return _vaultHistoryConfigCache.data;
+  }
   const vaultAddress = getVaultAddress();
   if (!vaultAddress) return null;
   const vaultData = await getCachedVaultData(accessToken, vaultAddress);
   if (!vaultData) return null;
-  return {
+  const result = {
     shareToken: vaultData.shareToken || "",
     botExecutor: vaultData.botExecutor || "",
     supportedAssets: (vaultData.supportedAssets || [])
       .filter((addr: string) => addr && addr !== "0000000000000000000000000000000000000000"),
   };
+  _vaultHistoryConfigCache = { data: result, expiresAt: Date.now() + VAULT_HISTORY_CONFIG_TTL };
+  return result;
 };
 
 /**
