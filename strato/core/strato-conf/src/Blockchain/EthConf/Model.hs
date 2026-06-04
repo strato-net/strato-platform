@@ -204,6 +204,7 @@ instance FromJSON UrlConfig where
     <*> v .:  "fileServerUrl"
     <*> v .:  "notificationServerUrl"
     <*> v .:  "repoUrl"
+    <*> v .:? "cookieRealm" .!= "localhost"
 
 data NetworkConf = NetworkConf
   { network :: String
