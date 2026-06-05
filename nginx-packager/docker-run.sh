@@ -35,12 +35,43 @@ NODE_URL=$(yq '.urlConfig.nodeUrl' /config/ethconf.yaml)
 STRATO_HOSTNAME=$(echo "$NODE_URL" | sed 's|https\?://\([^:/]*\).*|\1|')
 STRATO_PORT_API=$(yq '.apiConfig.apiPort' /config/ethconf.yaml)
 HTTP_PORT=$(yq '.networkConfig.httpPort' /config/ethconf.yaml)
-VAULT_URL=$(yq '.urlConfig.vaultUrl' /config/ethconf.yaml)
+VAULT_URL=$(yq '.urlConfig.vaultUrl' /config/ethconf.yaml | xargs)
 INTERNAL_VAULT_URL=${INTERNAL_VAULT_URL:-http://${STRATO_HOSTNAME}:8093}
 
 if [[ -z "${VAULT_URL}" || "${VAULT_URL}" == "null" ]]; then
   echo "urlConfig.vaultUrl is required in /config/ethconf.yaml"
   exit 7
+fi
+
+# Split VAULT_URL into protocol/hostname/port so the /key location can use a
+# variable in proxy_pass. Using a variable forces nginx to honor the upstream
+# DNS TTL via the `resolver` directive instead of caching the IP for the
+# worker's lifetime (vault.blockapps.net is an AWS ELB with rotating IPs).
+VAULT_PROTOCOL=$(echo "$VAULT_URL" | sed -E -n 's|^(https?)://.*|\1|p')
+VAULT_HOSTNAME=$(echo "$VAULT_URL" | sed -E 's|^https?://||; s|[:/].*$||')
+VAULT_PORT=$(echo "$VAULT_URL" | sed -E -n 's|^https?://[^:/]*:([0-9]+).*|\1|p')
+
+if [[ -z "${VAULT_PROTOCOL}" ]]; then
+  echo "urlConfig.vaultUrl must start with http:// or https:// (got: ${VAULT_URL})"
+  exit 7
+fi
+if [[ -z "${VAULT_HOSTNAME}" ]]; then
+  echo "Could not parse hostname from urlConfig.vaultUrl (got: ${VAULT_URL})"
+  exit 7
+fi
+# Validate the parsed hostname is a plausible DNS name / IP rather than just
+# non-empty, so malformed URLs (e.g. embedded userinfo) fail loudly instead of
+# silently misrouting the upstream.
+if [[ ! "${VAULT_HOSTNAME}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  echo "Parsed an invalid vault hostname '${VAULT_HOSTNAME}' from urlConfig.vaultUrl (got: ${VAULT_URL})"
+  exit 7
+fi
+# When a port is present, carry the leading colon in the value (":8093") so the
+# template can write "$vault_hostname__VAULT_PORT__" without a literal colon.
+# When the URL omits the port, leave it empty and let nginx use the protocol
+# default (443 for https, 80 for http) — avoids a dangling colon in proxy_pass.
+if [[ -n "${VAULT_PORT}" ]]; then
+  VAULT_PORT=":${VAULT_PORT}"
 fi
 
 # If container is running for the first time - generate config:
@@ -121,7 +152,9 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i "s/__STRATO_PORT_API__/$STRATO_PORT_API/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_API2__/$STRATO_PORT_API2/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_LOGS__/$STRATO_PORT_LOGS/g" /tmp/nginx.conf
-  sed -i "s|__VAULT_URL__|$VAULT_URL|g" /tmp/nginx.conf
+  sed -i "s|__VAULT_PROTOCOL__|$VAULT_PROTOCOL|g" /tmp/nginx.conf
+  sed -i "s|__VAULT_HOSTNAME__|$VAULT_HOSTNAME|g" /tmp/nginx.conf
+  sed -i "s|__VAULT_PORT__|$VAULT_PORT|g" /tmp/nginx.conf
   sed -i "s|__INTERNAL_VAULT_URL__|$INTERNAL_VAULT_URL|g" /tmp/nginx.conf
   sed -i "s|__HTTP_PORT__|$HTTP_PORT|g" /tmp/nginx.conf
   sed -i "s|__RPC_PORT__|$RPC_PORT|g" /tmp/nginx.conf
