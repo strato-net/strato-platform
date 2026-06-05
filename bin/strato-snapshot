@@ -1671,8 +1671,10 @@ cmd_publish() {
     aws s3 cp --only-show-errors "$checksum_file" "${destination%/}/$base_name.sha256"
     if [[ -n "$alias_name" ]]; then
       # Server-side copy of the just-uploaded artifact to the alias key, so the
-      # large archive is not re-uploaded from the host.
-      aws s3 cp --only-show-errors "${destination%/}/$base_name" "${destination%/}/$alias_file"
+      # large archive is not re-uploaded from the host. --copy-props none avoids
+      # the GetObjectTagging/PutObjectTagging calls (the publishing IAM user is
+      # only granted Get/Put/Delete/List, not the tagging actions).
+      aws s3 cp --only-show-errors --copy-props none "${destination%/}/$base_name" "${destination%/}/$alias_file"
       aws s3 cp --only-show-errors "$alias_checksum_file" "${destination%/}/$alias_file.sha256"
     fi
   else
