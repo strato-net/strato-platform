@@ -28,7 +28,7 @@ defineFlag "R:redisHost" ("localhost" :: String) "Redis BlockDB hostname"
 defineFlag "redisPort" (6379 :: Int) "Redis BlockDB port"
 defineFlag "redisDBNumber" (0 :: Integer) "Redis database number"
 
-defineFlag "minPeers" (0 :: Int) "Threshold for discovery to stop querying for more peers"
+defineFlag "minPeers" (10 :: Int) "Threshold for discovery to stop querying for more peers"
 
 defineFlag "apiIPAddress" "" "The address containers use to reach strato-api on the host (auto-detected if empty)"
 
