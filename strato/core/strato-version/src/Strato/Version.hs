@@ -6,19 +6,20 @@ module Strato.Version
   , stratoVersionTag
   ) where
 
-#ifdef VERSION
-stratoVersionTag :: String
-stratoVersionTag = VERSION
-{-# NOINLINE stratoVersionTag #-}
-
-#else
+#ifndef VERSION
 import Strato.Version.TH (getVersionValue)
+#endif
+
+#define STRINGIFY(x) #x
+#define STR(x) STRINGIFY(x)
 
 stratoVersionTag :: String
+#ifdef VERSION
+stratoVersionTag = STR(VERSION)
+#else
 stratoVersionTag = $(getVersionValue "VERSION")
-{-# NOINLINE stratoVersionTag #-}
-
 #endif
+{-# NOINLINE stratoVersionTag #-}
 
 stratoVersion :: String
 stratoVersion = stratoVersionTag
