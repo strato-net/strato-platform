@@ -20,7 +20,6 @@ import { useCDP } from "@/context/CDPContext";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
 import { BalanceSnapshot } from "@mercata/shared-types";
 import { useUserLeaderboardRank } from "@/hooks/useUserLeaderboardRank";
-import { useRewards } from "@/hooks/useRewards";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import { roundByMagnitude, formatRoundedWithCommas } from "@/services/rewardsService";
 import { formatBalance, safeBigInt } from "@/utils/numberUtils";
@@ -94,7 +93,6 @@ const Dashboard = () => {
   });
 
   const { activities: rewardsActivities, loading: rewardsActivitiesLoading } = useRewardsActivities();
-  const { state: rewardsState } = useRewards();
   const { rank: userRank, totalEarned, loading: rankLoading } = useUserLeaderboardRank();
   const { userRewards: rewardsUserInfo } = useRewardsUserInfo();
   const communityBonusFormatted = useMemo(() => {
@@ -296,9 +294,7 @@ const Dashboard = () => {
         <DashboardHeader title="Portfolio" />
 
         <main className="p-4 md:p-6 pb-24 md:pb-6">
-          {!isLoggedIn && <GuestPromoSection variant={1} />}
-          {isLoggedIn && !isLoadingNetBalance && totalBalance === 0 && <GuestPromoSection variant={2} />}
-          {isLoggedIn && (isLoadingNetBalance || totalBalance > 0) && <GuestPromoSection variant={3} />}
+          <GuestPromoSection variant={!isLoggedIn ? 1 : (!isLoadingNetBalance && totalBalance === 0) ? 2 : 3} userRewards={rewardsUserInfo} />
           {showFullDashboard && <LiquidationAlertBanner />}
           {showFullDashboard && (
             <div className={`grid grid-cols-1 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3 md:gap-6 mb-4 md:mb-8`}>
