@@ -10,12 +10,9 @@ module Strato.Version
 import Strato.Version.TH (getVersionValue)
 #endif
 
-#define STRINGIFY(x) #x
-#define STR(x) STRINGIFY(x)
-
 stratoVersionTag :: String
 #ifdef VERSION
-stratoVersionTag = STR(VERSION)
+stratoVersionTag = VERSION
 #else
 stratoVersionTag = $(getVersionValue "VERSION")
 #endif
