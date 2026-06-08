@@ -16,6 +16,12 @@ export interface BackendUserPoolConfig {
   openIdDiscoveryUrl?: string;
   clientId?: string;
   clientSecret?: string;
+  /** Per-request HTTP timeout (ms) for every BackendClient in the pool.
+   *  Defaults to BackendClient's own default (60000) when omitted. Scenarios
+   *  with long server-side processing under load (e.g. forgeBuy waiting on
+   *  chain confirmation) should raise this so slow-but-successful requests
+   *  aren't counted as client-side timeouts. */
+  requestTimeoutMs?: number;
 }
 
 /**
@@ -111,13 +117,14 @@ export abstract class AppScenario extends BaseScenario {
     for (let i = 0; i < cfg.concurrentUsers; i++) {
       const u = users[i % users.length];
       const oauth = oauthByUser.get(oauthKey(u.username))!;
-      pool.push(new BackendClient(backendUrl, oauth));
+      pool.push(new BackendClient(backendUrl, oauth, cfg.requestTimeoutMs));
       usernamePool.push(u.username);
     }
 
     console.log(
       `[${scenarioLabel}] OAuth: ${oauthByUser.size} unique account(s) shared across ` +
-        `${pool.length} BackendClient(s)`,
+        `${pool.length} BackendClient(s)` +
+        (cfg.requestTimeoutMs ? `; requestTimeout=${cfg.requestTimeoutMs}ms` : ""),
     );
 
     this.backendClients = pool;
