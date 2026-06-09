@@ -18,6 +18,7 @@ library:
     - aeson
     - base64
     - bytestring
+    - containers
     - directory
     - filelock
     - filepath
