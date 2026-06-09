@@ -135,6 +135,7 @@ processedCollectionRow collection ttype AggregateAction {..} ks v =
       collection_name = collection,
       collection_type = ttype,
       blockHash = actionBlockHash,
+      transactionHash = zeroHash,
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,
       collectionDataKeys = ks,

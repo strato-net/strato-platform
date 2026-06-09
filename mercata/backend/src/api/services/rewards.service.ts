@@ -2,14 +2,13 @@ import * as config from "../../config/config";
 import { constants } from "../../config/constants";
 import { cirrus } from "../../utils/mercataApiHelper";
 import stakeSemanticsConfig from "./rewardsStakeSemantics.json";
-import { getCompletePriceMap } from "../helpers/oracle.helper";
+import { getCompletePriceMap, getCarryVaultUsdPriceMap } from "../helpers/oracle.helper";
 import { getSafetyModuleConfig } from "./safety.service";
 import { getVaultShareTokenAddress } from "./vault.service";
 import {
   calculatePersonalEmissionRate,
   parseActivityType,
   fetchRewardsContractData,
-  fetchActivityIds,
   fetchActivities,
   fetchActivityStates,
   fetchUserInfo,
@@ -43,6 +42,7 @@ type StakeSemanticsConfig = {
 };
 
 const normalizeAddr = (a: string): string => a.toLowerCase();
+const normalizeUserAddress = (a: string): string => a.replace(/^0x/i, "").toLowerCase();
 
 const STAKE_SEMANTICS: StakeSemanticsConfig = stakeSemanticsConfig as StakeSemanticsConfig;
 
@@ -119,6 +119,7 @@ const inferStakeUsdInfo = (
     mTokenAddress: string | null;
     sTokenAddress: string | null;
     vaultShareTokenAddress: string | null;
+    carryVaultUsdPriceMap: Map<string, string>;
   },
   baseActivity: { name: string; sourceContract: string; totalStake: string; stakeDenomination: StakeDenomination; stakeAssetAddress: string | null },
   userStakeWei?: string
@@ -146,6 +147,22 @@ const inferStakeUsdInfo = (
         stakeUnitPriceUsd: price,
         totalStakeUsd: mulDiv1e18(baseActivity.totalStake, price),
         userStakeUsd: userStakeWei ? mulDiv1e18(userStakeWei, price) : undefined,
+      };
+    }
+  }
+
+  // 1b) Carry yield vault (ERC-4626 eth-carry / wbtc-carry).
+  // Stake is in vault share units. USD-per-share is precomputed in `carryVaultUsdPriceMap`
+  // by composing the vault's underlying-per-share NAV with the asset's USD oracle price.
+  // Must run before the generic "vault" name-match below, which would otherwise route
+  // the carry vault to the main protocol vault's SLP pricing.
+  if (baseActivity.sourceContract) {
+    const carryUsdPrice = ctx.carryVaultUsdPriceMap.get(baseActivity.sourceContract.toLowerCase());
+    if (carryUsdPrice && carryUsdPrice !== "0") {
+      return {
+        stakeUnitPriceUsd: carryUsdPrice,
+        totalStakeUsd: mulDiv1e18(baseActivity.totalStake, carryUsdPrice),
+        userStakeUsd: userStakeWei ? mulDiv1e18(userStakeWei, carryUsdPrice) : undefined,
       };
     }
   }
@@ -290,12 +307,16 @@ export const fetchRewardsOverview = async (
   try {
     // All these functions now use the same cached contract state, so they're fast
     // fetchAllUsersLeaderboard also uses cached contract state + cached claimed rewards
-    const [contractData, activityIds, activityStatesMap, allUsersLeaderboard] = await Promise.all([
+    const [contractData, activitiesMap, activityStatesMap, allUsersLeaderboard] = await Promise.all([
       fetchRewardsContractData(accessToken, rewardsAddress, forceRefresh),
-      fetchActivityIds(accessToken, rewardsAddress, forceRefresh),
+      fetchActivities(accessToken, rewardsAddress, forceRefresh),
       fetchActivityStates(accessToken, rewardsAddress, forceRefresh),
       fetchAllUsersLeaderboard(accessToken, rewardsAddress, forceRefresh)
     ]);
+
+    // Count only actively-emitting activities (matches UI visibility filter)
+    const activeActivityCount = Array.from(activitiesMap.values())
+      .filter((a) => BigInt(a.emissionRate || "0") > 0n).length;
 
     // Hardcoded season info for now
     const currentSeason = 2;
@@ -337,7 +358,7 @@ export const fetchRewardsOverview = async (
       rewardTokenSymbol,
       totalRewardsEmission: contractData.totalRewardsEmission,
       lastBlockHandled: contractData.highestBlockSeen,
-      activityCount: activityIds.length,
+      activityCount: activeActivityCount,
       totalStake: totalStake.toString(),
       totalDistributed: totalDistributed.toString(),
       currentSeason
@@ -377,6 +398,7 @@ export const fetchUserActivities = async (
   forceRefresh: boolean = false
 ): Promise<UserActivitiesResponse> => {
   const rewardsAddress = getRewardsAddress();
+  const normalizedUserAddress = normalizeUserAddress(userAddress);
 
   try {
     // Fetch all activities
@@ -385,11 +407,11 @@ export const fetchUserActivities = async (
 
     if (activities.length === 0) {
       const [unclaimedRewards, claimedRewardsMap, bonusResult] = await Promise.all([
-        fetchUnclaimedRewards(accessToken, rewardsAddress, userAddress, forceRefresh),
+        fetchUnclaimedRewards(accessToken, rewardsAddress, normalizedUserAddress, forceRefresh),
         fetchClaimedRewards(accessToken, rewardsAddress),
-        fetchBonusRewards(accessToken, rewardsAddress, userAddress)
+        fetchBonusRewards(accessToken, rewardsAddress, normalizedUserAddress)
       ]);
-      const claimedRewards = claimedRewardsMap.get(userAddress.toLowerCase()) || 0n;
+      const claimedRewards = claimedRewardsMap.get(normalizedUserAddress) || 0n;
       return {
         unclaimedRewards,
         claimedRewards: claimedRewards.toString(),
@@ -403,10 +425,10 @@ export const fetchUserActivities = async (
 
     const [activityStatesMap, userInfoMap, unclaimedRewards, claimedRewardsMap, bonusResult] = await Promise.all([
       fetchActivityStates(accessToken, rewardsAddress, forceRefresh),
-      fetchUserInfo(accessToken, rewardsAddress, userAddress, activityIds, forceRefresh),
-      fetchUnclaimedRewards(accessToken, rewardsAddress, userAddress, forceRefresh),
+      fetchUserInfo(accessToken, rewardsAddress, normalizedUserAddress, activityIds, forceRefresh),
+      fetchUnclaimedRewards(accessToken, rewardsAddress, normalizedUserAddress, forceRefresh),
       fetchClaimedRewards(accessToken, rewardsAddress),
-      fetchBonusRewards(accessToken, rewardsAddress, userAddress)
+      fetchBonusRewards(accessToken, rewardsAddress, normalizedUserAddress)
     ]);
 
     // Build shared pricing context once (used for LP/share-token TVL conversions)
@@ -415,12 +437,14 @@ export const fetchUserActivities = async (
       getMTokenAddress(accessToken),
       getVaultShareTokenAddress(accessToken).catch(() => ""),
     ]);
+    const carryVaultUsdPriceMap = await getCarryVaultUsdPriceMap(accessToken, priceMap);
     const { sToken } = getSafetyModuleConfig();
     const pricingCtx = {
       priceMap,
       mTokenAddress,
       sTokenAddress: sToken.address || null,
       vaultShareTokenAddress: vaultShareTokenAddress || null,
+      carryVaultUsdPriceMap,
     };
 
     // Combine all data
@@ -466,7 +490,7 @@ export const fetchUserActivities = async (
       };
     }));
 
-    const claimedRewards = claimedRewardsMap.get(userAddress.toLowerCase()) || 0n;
+    const claimedRewards = claimedRewardsMap.get(normalizedUserAddress) || 0n;
 
     const bonusSources: BonusSource[] = [];
     for (const [actId, amount] of bonusResult.byActivity) {
@@ -518,12 +542,14 @@ export const fetchAllActivities = async (
       getMTokenAddress(accessToken),
       getVaultShareTokenAddress(accessToken).catch(() => ""),
     ]);
+    const carryVaultUsdPriceMap = await getCarryVaultUsdPriceMap(accessToken, priceMap);
     const { sToken } = getSafetyModuleConfig();
     const pricingCtx = {
       priceMap,
       mTokenAddress,
       sTokenAddress: sToken.address || null,
       vaultShareTokenAddress: vaultShareTokenAddress || null,
+      carryVaultUsdPriceMap,
     };
 
     // Combine activities with their states

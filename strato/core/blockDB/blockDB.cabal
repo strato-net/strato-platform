@@ -23,8 +23,7 @@ library
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -fconstraint-solver-iterations=8
   build-depends:
-      QuickCheck
-    , aeson
+      aeson
     , base >=4.7 && <5
     , binary
     , blockapps-data
@@ -37,7 +36,6 @@ library
     , esqueleto
     , ethereum-rlp
     , format
-    , generic-arbitrary
     , hedis
     , labeled-error
     , lens

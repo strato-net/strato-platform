@@ -20,7 +20,7 @@ executables:
       - blockapps-init
       - ethereum-discovery
       - hflags
-      - kafka-monad
+      - streaming
       - lifted-async
       - ordered-containers
       - process-monitor
@@ -41,6 +41,7 @@ library:
     - base16-bytestring
     - blockapps-data
     - blockapps-datadefs
+    - strato-version
     - blockDB
     - blockstanbul
     - bytestring
@@ -60,7 +61,7 @@ library:
     - hflags
     - http-client
     - iproute
-    - kafka-monad
+    - streaming
     - lens
     - lifted-async
     - lifted-base
@@ -76,7 +77,6 @@ library:
     - servant-client
     - servant-server
     - split
-    - sql-monad
     - stm-conduit
     - strato-conf
     - strato-model

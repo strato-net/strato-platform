@@ -19,7 +19,6 @@ dependencies:
   - bytestring
   - containers
   - Decimal
-  - monad-alter
   - ordered-containers
   - parsec
   - QuickCheck
@@ -27,7 +26,6 @@ dependencies:
   - solid-vm-model
   - strato-model
   - text
-  - transformers
   - unordered-containers
   - vector
 

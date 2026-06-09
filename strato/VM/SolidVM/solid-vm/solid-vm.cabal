@@ -13,13 +13,13 @@ library
   exposed-modules:
       Blockchain.SolidVM
       Blockchain.SolidVM.Builtins
+      Blockchain.SolidVM.Environment
       Blockchain.SolidVM.ForkGate
+      Blockchain.SolidVM.GasInfo
       Blockchain.SolidVM.SetGet
       Blockchain.SolidVM.Simple
       Blockchain.SolidVM.SM
   other-modules:
-      Blockchain.SolidVM.Environment
-      Blockchain.SolidVM.GasInfo
       Blockchain.SolidVM.TraceTools
       Paths_solid_vm
   hs-source-dirs:
@@ -46,10 +46,7 @@ library
     , ethereum-rlp
     , evm-solidity
     , exceptions
-    , extra
     , format
-    , galois-field
-    , labeled-error
     , lens
     , merkle-patricia-db
     , monad-alter
@@ -82,7 +79,6 @@ executable exprs-needed
       base
     , containers
     , parsec
-    , solid-vm-compiler
     , solid-vm-model
     , solid-vm-parser
     , solid-vm-static-analysis

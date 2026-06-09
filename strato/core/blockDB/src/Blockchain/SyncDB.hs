@@ -207,7 +207,9 @@ updateWorldBestBlockInfo sha num = withRetryCount 0
           case maybeExistingWBBI of
             Nothing -> do
               liftLog $ $logWarnS "updateWorldBestBlockInfo" "No WorldBestBlock in Redis, will force"
-              void $ forceBestBlockInfo' worldBestBlockKey (BestBlock sha num)
+              forceBestBlockInfo' worldBestBlockKey (BestBlock sha num) >>= \case
+                Right _ -> pure ()
+                Left err -> error $ "Failed to force world best block in Redis: " ++ show err
               checkAndUpdateSyncStatus
               releaseAndFinalize lockID True
             Just (BestBlock _ oldNumber) -> do
@@ -216,7 +218,9 @@ updateWorldBestBlockInfo sha num = withRetryCount 0
               if willUpdate
                 then do
                   liftLog $ $logDebugS "updateWorldBestBlockInfo" . T.pack $ "Updating best block: " ++ show num
-                  void $ forceBestBlockInfo' worldBestBlockKey (BestBlock sha num)
+                  forceBestBlockInfo' worldBestBlockKey (BestBlock sha num) >>= \case
+                    Right _ -> pure ()
+                    Left err -> error $ "Failed to update world best block in Redis: " ++ show err
                   checkAndUpdateSyncStatus
                 else liftLog $ $logDebugS "updateWorldBestBlockInfo" "Not updating"
               releaseAndFinalize lockID willUpdate

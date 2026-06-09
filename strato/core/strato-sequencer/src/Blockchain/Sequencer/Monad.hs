@@ -59,7 +59,7 @@ import Control.Lens
 import Control.Monad (unless, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Control.Monad.Composable.Vault (HasVault, VaultM, runVaultM)
 import Control.Monad.Reader
 import Control.Monad.State
@@ -110,14 +110,14 @@ data SequencerConfig = SequencerConfig
     cablePackage :: CablePackage,
     maxEventsPerIter :: Int,
     maxUsPerIter :: Int,
-    kafkaClientId :: KafkaClientId,
+    kafkaClientId :: ClientId,
     redisConn :: RBDB.RedisConnection
   }
 
-type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (KafkaM (ResourceT (VaultM (LoggingT IO)))))
+type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (StreamM (ResourceT (VaultM (LoggingT IO)))))
 
 -- Test version without VaultM - relies on external HasVault instance for the base monad
-type SequencerMTest = StateT SequencerContext (ReaderT SequencerConfig (KafkaM (ResourceT (LoggingT IO))))
+type SequencerMTest = StateT SequencerContext (ReaderT SequencerConfig (StreamM (ResourceT (LoggingT IO))))
 
 instance {-# OVERLAPPING #-} Monad m => Mod.Accessible DependentBlockDB (ReaderT SequencerConfig m) where
   access _ = asks dependentBlockDB
@@ -182,7 +182,7 @@ instance (MonadIO m, MonadLogger m, Mod.Modifiable BestSequencedBlock m) => Mod.
 runSequencerM :: String -> SequencerConfig -> BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM vaultUrl' c bc m = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  a <- runVaultM vaultUrl' . runResourceT . runKafkaMConfigured (kafkaClientId c) $ do
+  a <- runVaultM vaultUrl' . runResourceT . runStreamMConfigured (kafkaClientId c) $ do
     let dbCS = depBlockDBCacheSize c
         dbPath = depBlockDBPath c
         stxSize = seenTransactionDBSize c
@@ -200,7 +200,7 @@ runSequencerM vaultUrl' c bc m = do
 runSequencerMTest :: SequencerConfig -> BlockstanbulContext -> SequencerMTest a -> (LoggingT IO) a
 runSequencerMTest c bc m = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  a <- runResourceT . runKafkaMConfigured (kafkaClientId c) $ do
+  a <- runResourceT . runStreamMConfigured (kafkaClientId c) $ do
     let dbCS = depBlockDBCacheSize c
         dbPath = depBlockDBPath c
         stxSize = seenTransactionDBSize c
@@ -278,13 +278,13 @@ fuseChannels :: (MonadIO m, MonadReader SequencerConfig m) =>
                 m (ConduitM () SeqLoopEvent SequencerM ())
 fuseChannels = do
   timers <- asks blockstanbulTimeouts
-  let k = kafkaConfig ethConf
-      kafkaAddress = (fromString $ kafkaHost k, fromIntegral $ kafkaPort k)
+  let k = streamingConfig ethConf
+      streamingAddress = (fromString $ streamingHost k, fromIntegral $ streamingPort k)
 
   let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . format))
   (debugLog . transPipe lift)
     <$> mergeSources
-      [ conduitBatchSource "sequencer" kafkaAddress unseqEventsTopicName .| mapC UnseqEvents,
+      [ conduitBatchSource "sequencer" streamingAddress unseqEventsTopicName .| mapC UnseqEvents,
         sourceTMChan timers .| mapC TimerFire
       ]
       4096 -- 🙏

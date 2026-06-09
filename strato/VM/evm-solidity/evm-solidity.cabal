@@ -71,7 +71,6 @@ library
     , hashable
     , lens
     , memory
-    , monad-alter
     , mtl
     , openapi3
     , ordered-containers
@@ -82,7 +81,6 @@ library
     , solid-vm-model
     , strato-model
     , text
-    , transformers
     , unordered-containers
     , vector
   default-language: Haskell2010

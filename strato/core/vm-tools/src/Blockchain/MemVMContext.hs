@@ -1,8 +1,12 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -51,6 +55,7 @@ import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext
   ( ContextState (..),
+    VMBase,
     CurrentBlockHash (..),
     GasCap (..),
     MemDBs (..),
@@ -66,8 +71,8 @@ import Blockchain.VMContext
     vmGasCap,
   )
 import Control.DeepSeq
-import Control.Lens
-import Control.Monad (join)
+import Control.Lens hiding (Context)
+import Control.Monad.Catch
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Class
@@ -77,7 +82,6 @@ import Data.Default
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
-import Data.Traversable (for)
 import Debugger
 import GHC.Generics
 import UnliftIO
@@ -115,7 +119,9 @@ instance NFData MemContextDBs where
       `seq` _worldBestBlock
       `seq` ()
 
-data MemContext = MemContext
+data VMType = InMemory | Sandboxed
+
+data MemContext (t :: VMType) = MemContext
   { _dbs :: MemContextDBs,
     _state :: ContextState
   }
@@ -123,226 +129,277 @@ data MemContext = MemContext
 
 makeLenses ''MemContext
 
-instance Default MemContext where
+instance Default (MemContext t) where
   def = MemContext def def
 
-type MemContextM m = ReaderT (IORef MemContext) m
+type MemContextM (t :: VMType) m = ReaderT (IORef (MemContext t)) m
 
-getMemContext :: MonadIO m => MemContextM m MemContext
+getMemContext :: MonadIO m => MemContextM t m (MemContext t)
 getMemContext = ask >>= readIORef
 
-get :: MonadIO m => MemContextM m ContextState
+get :: MonadIO m => MemContextM t m ContextState
 get = _state <$> getMemContext
 {-# INLINE get #-}
 
-gets :: MonadIO m => (ContextState -> a) -> MemContextM m a
+gets :: MonadIO m => (ContextState -> a) -> MemContextM t m a
 gets f = f <$> get
 {-# INLINE gets #-}
 
-put :: MonadIO m => ContextState -> MemContextM m ()
+put :: MonadIO m => ContextState -> MemContextM t m ()
 put c = ask >>= \i -> atomicModifyIORef i $ (,()) . (state .~ c)
 {-# INLINE put #-}
 
-modify :: MonadIO m => (ContextState -> ContextState) -> MemContextM m ()
+modify :: MonadIO m => (ContextState -> ContextState) -> MemContextM t m ()
 modify f = ask >>= \i -> atomicModifyIORef i $ (,()) . (state %~ f)
 {-# INLINE modify #-}
 
-modify' :: MonadIO m => (ContextState -> ContextState) -> MemContextM m ()
+modify' :: MonadIO m => (ContextState -> ContextState) -> MemContextM t m ()
 modify' f = ask >>= \i -> atomicModifyIORef' i $ (,()) . (state %~ f)
 {-# INLINE modify' #-}
 
-dbsGet :: MonadIO m => MemContextM m MemContextDBs
+dbsGet :: MonadIO m => MemContextM t m MemContextDBs
 dbsGet = _dbs <$> getMemContext
 {-# INLINE dbsGet #-}
 
-dbsGets :: MonadIO m => (MemContextDBs -> a) -> MemContextM m a
+dbsGets :: MonadIO m => (MemContextDBs -> a) -> MemContextM t m a
 dbsGets f = f <$> dbsGet
 {-# INLINE dbsGets #-}
 
-dbsPut :: MonadIO m => MemContextDBs -> MemContextM m ()
+dbsPut :: MonadIO m => MemContextDBs -> MemContextM t m ()
 dbsPut c = ask >>= \i -> atomicModifyIORef i $ (,()) . (dbs .~ c)
 {-# INLINE dbsPut #-}
 
-dbsModify :: MonadIO m => (MemContextDBs -> MemContextDBs) -> MemContextM m ()
+dbsModify :: MonadIO m => (MemContextDBs -> MemContextDBs) -> MemContextM t m ()
 dbsModify f = ask >>= \i -> atomicModifyIORef i $ (,()) . (dbs %~ f)
 {-# INLINE dbsModify #-}
 
-dbsModify' :: MonadIO m => (MemContextDBs -> MemContextDBs) -> MemContextM m ()
+dbsModify' :: MonadIO m => (MemContextDBs -> MemContextDBs) -> MemContextM t m ()
 dbsModify' f = ask >>= \i -> atomicModifyIORef' i $ (,()) . (dbs %~ f)
 {-# INLINE dbsModify' #-}
 
-contextGet :: MonadIO m => MemContextM m ContextState
+contextGet :: MonadIO m => MemContextM t m ContextState
 contextGet = get
 {-# INLINE contextGet #-}
 
-contextGets :: MonadIO m => (ContextState -> a) -> MemContextM m a
+contextGets :: MonadIO m => (ContextState -> a) -> MemContextM t m a
 contextGets = gets
 {-# INLINE contextGets #-}
 
-contextPut :: MonadIO m => ContextState -> MemContextM m ()
+contextPut :: MonadIO m => ContextState -> MemContextM t m ()
 contextPut = put
 {-# INLINE contextPut #-}
 
-contextModify :: MonadIO m => (ContextState -> ContextState) -> MemContextM m ()
+contextModify :: MonadIO m => (ContextState -> ContextState) -> MemContextM t m ()
 contextModify = modify
 {-# INLINE contextModify #-}
 
-contextModify' :: MonadIO m => (ContextState -> ContextState) -> MemContextM m ()
+contextModify' :: MonadIO m => (ContextState -> ContextState) -> MemContextM t m ()
 contextModify' = modify'
 {-# INLINE contextModify' #-}
 
-instance Show MemContext where
+instance Show (MemContext t) where
   show = const "<context>"
 
-instance MonadIO m => Mod.Modifiable ContextState (MemContextM m) where
+instance MonadIO m => Mod.Modifiable ContextState (MemContextM t m) where
   get _ = get
   put _ = put
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible MemContext (MemContextM m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (MemContext t) (MemContextM t m) where
   access _ = ask >>= readIORef
 
-instance MonadIO m => Mod.Modifiable (Maybe DebugSettings) (MemContextM m) where
+instance MonadIO m => Mod.Modifiable (Maybe DebugSettings) (MemContextM t m) where
   get _ = gets $ view debugSettings
   put _ ds = modify $ debugSettings .~ ds
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ContextState (MemContextM m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ContextState (MemContextM t m) where
   access _ = get
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible MemDBs (MemContextM m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible MemDBs (MemContextM t m) where
   access _ = gets $ view memDBs
 
-instance MonadIO m => Mod.Modifiable MemDBs (MemContextM m) where
+instance MonadIO m => Mod.Modifiable MemDBs (MemContextM t m) where
   get _ = gets $ view memDBs
   put _ md = modify $ memDBs .~ md
 
 vmBlockHashRootKey :: B.ByteString
 vmBlockHashRootKey = "block_hash_root"
 
-instance MonadIO m => Mod.Modifiable BlockHashRoot (MemContextM m) where
+instance MonadIO m => Mod.Modifiable BlockHashRoot (MemContextM 'InMemory m) where
   get _ = dbsGets $ view blockHashRoot
   put _ bhr = dbsModify' $ blockHashRoot .~ bhr
 
-instance MonadIO m => Mod.Modifiable CurrentBlockHash (MemContextM m) where
+instance VMBase m => Mod.Modifiable BlockHashRoot (MemContextM 'Sandboxed m) where
+  get p = dbsGets (view blockHashRoot) >>= \case
+    BlockHashRoot bh | bh == MP.emptyTriePtr -> lift $ Mod.get p
+    bh -> pure bh
+  put _ bhr = dbsModify' $ blockHashRoot .~ bhr
+
+instance MonadIO m => Mod.Modifiable CurrentBlockHash (MemContextM 'InMemory m) where
   get _ = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock
   put _ bh = modify $ memDBs . currentBlock ?~ bh
 
-instance MonadIO m => HasMemAddressStateDB (MemContextM m) where
+instance VMBase m => Mod.Modifiable CurrentBlockHash (MemContextM 'Sandboxed m) where
+  get p = gets (view $ memDBs . currentBlock) >>= \case
+    Just a -> pure a
+    Nothing -> lift $ Mod.get p
+  put _ bh = modify $ memDBs . currentBlock ?~ bh
+
+instance MonadIO m => HasMemAddressStateDB (MemContextM t m) where
   getAddressStateTxDBMap = gets $ view $ memDBs . stateTxMap
   putAddressStateTxDBMap theMap = modify $ memDBs . stateTxMap .~ theMap
   getAddressStateBlockDBMap = gets $ view $ memDBs . stateBlockMap
   putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
 
-instance MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (MemContextM m) where
+instance MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (MemContextM 'InMemory m) where
   lookup _ sr = dbsGets $ view (stateDB . at sr)
   insert _ sr nd = dbsModify' $ stateDB . at sr ?~ nd
   delete _ sr = dbsModify' $ stateDB . at sr .~ Nothing
 
-instance (MonadIO m, MonadLogger m) => (Address `A.Alters` AddressState) (MemContextM m) where
+instance VMBase m => (MP.StateRoot `A.Alters` MP.NodeData) (MemContextM 'Sandboxed m) where
+  lookup p sr = dbsGets (view $ stateDB . at sr) >>= \case
+    Just a -> pure $ Just a
+    Nothing -> lift $ A.lookup p sr
+  insert _ sr nd = dbsModify' $ stateDB . at sr ?~ nd
+  delete _ sr = dbsModify' $ stateDB . at sr .~ Nothing
+
+instance VMBase (MemContextM t m) => (Address `A.Alters` AddressState) (MemContextM t m) where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => A.Selectable Address AddressState (MemContextM m) where
+instance {-# OVERLAPPING #-} VMBase (MemContextM t m) => A.Selectable Address AddressState (MemContextM t m) where
   select _ = getAddressStateMaybe
 
-instance (MonadIO m, MonadLogger m) => (Maybe Word256 `A.Alters` MP.StateRoot) (MemContextM m) where
-  lookup _ chainId = do
-    mBH <- gets $ view $ memDBs . currentBlock
-    fmap join . for mBH $ \(CurrentBlockHash bh) -> do
-      mSR <- gets $ view $ memDBs . stateRoots . at (bh, chainId)
-      case mSR of
-        Just sr -> pure $ Just sr
-        Nothing -> getChainStateRoot chainId bh
-  insert _ chainId sr = do
-    mBH <- gets $ view $ memDBs . currentBlock
-    case mBH of
-      Nothing -> pure ()
-      Just (CurrentBlockHash bh) -> do
-        modify $ memDBs . stateRoots %~ M.insert (bh, chainId) sr
-        putChainStateRoot chainId bh sr
-  delete _ chainId = do
-    mBH <- gets $ view $ memDBs . currentBlock
-    case mBH of
-      Nothing -> pure ()
-      Just (CurrentBlockHash bh) -> do
-        modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
-        deleteChainStateRoot chainId bh
+instance (MonadIO m, VMBase (MemContextM t m)) => (Maybe Word256 `A.Alters` MP.StateRoot) (MemContextM t m) where
+  lookup _ chainId = Mod.get (Mod.Proxy @CurrentBlockHash) >>= \(CurrentBlockHash bh) -> do
+    mSR <- gets $ view $ memDBs . stateRoots . at (bh, chainId)
+    case mSR of
+      Just sr -> pure $ Just sr
+      Nothing -> getChainStateRoot chainId bh
+  insert _ chainId sr = Mod.get (Mod.Proxy @CurrentBlockHash) >>= \(CurrentBlockHash bh) -> do
+    modify $ memDBs . stateRoots %~ M.insert (bh, chainId) sr
+    putChainStateRoot chainId bh sr
+  delete _ chainId = Mod.get (Mod.Proxy @CurrentBlockHash) >>= \(CurrentBlockHash bh) -> do
+    modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
+    deleteChainStateRoot chainId bh
 
-instance MonadIO m => (Keccak256 `A.Alters` DBCode) (MemContextM m) where
+instance MonadIO m => (Keccak256 `A.Alters` DBCode) (MemContextM 'InMemory m) where
   lookup _ k = dbsGets $ view (codeDB . at k)
   insert _ k c = dbsModify' $ codeDB . at k ?~ c
   delete _ k = dbsModify' $ codeDB . at k .~ Nothing
 
-instance MonadIO m => (N.NibbleString `A.Alters` N.NibbleString) (MemContextM m) where
+instance VMBase m => (Keccak256 `A.Alters` DBCode) (MemContextM 'Sandboxed m) where
+  lookup p k = dbsGets (view $ codeDB . at k) >>= \case
+    Just a -> pure $ Just a
+    Nothing -> lift $ A.lookup p k
+  insert _ k c = dbsModify' $ codeDB . at k ?~ c
+  delete _ k = dbsModify' $ codeDB . at k .~ Nothing
+
+instance MonadIO m => (N.NibbleString `A.Alters` N.NibbleString) (MemContextM 'InMemory m) where
   lookup _ n1 = dbsGets $ view (hashDB . at n1)
   insert _ n1 n2 = dbsModify' $ hashDB . at n1 ?~ n2
   delete _ n1 = dbsModify' $ hashDB . at n1 .~ Nothing
 
-instance MonadIO m => HasMemRawStorageDB (MemContextM m) where
+instance VMBase m => (N.NibbleString `A.Alters` N.NibbleString) (MemContextM 'Sandboxed m) where
+  lookup p n1 = dbsGets (view $ hashDB . at n1) >>= \case
+    Just a -> pure $ Just a
+    Nothing -> lift $ A.lookup p n1
+  insert _ n1 n2 = dbsModify' $ hashDB . at n1 ?~ n2
+  delete _ n1 = dbsModify' $ hashDB . at n1 .~ Nothing
+
+instance MonadIO m => HasMemRawStorageDB (MemContextM t m) where
   getMemRawStorageTxDB = gets $ view $ memDBs . storageTxMap
   putMemRawStorageTxMap theMap = modify $ memDBs . storageTxMap .~ theMap
   getMemRawStorageBlockDB = gets $ view $ memDBs . storageBlockMap
   putMemRawStorageBlockMap theMap = modify $ memDBs . storageBlockMap .~ theMap
 
-instance (MonadIO m, MonadLogger m) => (RawStorageKey `A.Alters` RawStorageValue) (MemContextM m) where
+instance VMBase (MemContextM t m) => (RawStorageKey `A.Alters` RawStorageValue) (MemContextM t m) where
   lookup _ = genericLookupRawStorageDB
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB
   lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
-instance MonadIO m => (Keccak256 `A.Alters` BlockSummary) (MemContextM m) where
+instance MonadIO m => (Keccak256 `A.Alters` BlockSummary) (MemContextM 'InMemory m) where
   lookup _ k = dbsGets $ view (blockSummaryDB . at k)
   insert _ k bs = dbsModify' $ blockSummaryDB . at k ?~ bs
   delete _ k = dbsModify' $ blockSummaryDB . at k .~ Nothing
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (Maybe WorldBestBlock) (MemContextM m) where
+instance VMBase m => (Keccak256 `A.Alters` BlockSummary) (MemContextM 'Sandboxed m) where
+  lookup p k = dbsGets (view $ blockSummaryDB . at k) >>= \case
+    Just a -> pure $ Just a
+    Nothing -> lift $ A.lookup p k
+  insert _ k bs = dbsModify' $ blockSummaryDB . at k ?~ bs
+  delete _ k = dbsModify' $ blockSummaryDB . at k .~ Nothing
+
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (Maybe WorldBestBlock) (MemContextM 'InMemory m) where
   access _ = dbsGets $ view worldBestBlock
 
-instance MonadIO m => Mod.Modifiable GasCap (MemContextM m) where
+instance VMBase m => Mod.Accessible (Maybe WorldBestBlock) (MemContextM 'Sandboxed m) where
+  access _ = dbsGets $ view worldBestBlock
+
+instance MonadIO m => Mod.Modifiable GasCap (MemContextM t m) where
   get _ = GasCap . _vmGasCap <$> get
   put _ (GasCap g) = contextModify $ vmGasCap .~ g
 
 runMemContextM ::
-  (MonadIO m, MonadLogger m) =>
+  (MonadUnliftIO m, MonadLogger m, MonadCatch m, A.Selectable FilePath (Either String String) m) =>
   Maybe DebugSettings ->
-  MemContextM m a ->
-  m (a, MemContext)
-runMemContextM = runMemContextMWith def
+  MemContextM 'InMemory m a ->
+  m (a, MemContext 'InMemory)
+runMemContextM d f = do
+  let initialize = do
+        MP.initializeBlank
+        setStateDBStateRoot Nothing MP.emptyTriePtr
+  runMemContextMWith def d (initialize >> f)
 
 runMemContextMWith ::
-  (MonadIO m, MonadLogger m) =>
+  MonadUnliftIO m =>
   MemContextDBs ->
   Maybe DebugSettings ->
-  MemContextM m a ->
-  m (a, MemContext)
+  MemContextM t m a ->
+  m (a, MemContext t)
 runMemContextMWith cdbs dSettings f = do
   cache <- liftIO $ TRC.new 64
   let cstate =
         def
           & txRunResultsCache .~ cache
           & debugSettings .~ dSettings
-      ctx = MemContext cdbs cstate
+  runMemContextMWith' cdbs cstate f
+
+runMemContextMWith' ::
+  MonadUnliftIO m =>
+  MemContextDBs ->
+  ContextState ->
+  MemContextM t m a ->
+  m (a, MemContext t)
+runMemContextMWith' cdbs cstate f = do
+  let ctx = MemContext cdbs cstate
   ctxRef <- newIORef ctx
-  a <- flip runReaderT ctxRef $ do
-    MP.initializeBlank
-    setStateDBStateRoot Nothing MP.emptyTriePtr
-    f
+  a <- runReaderT f ctxRef
   ctx' <- readIORef ctxRef
   return (a, ctx')
 
 evalMemContextM ::
-  (MonadIO m, MonadLogger m) =>
+  (MonadUnliftIO m, MonadLogger m, MonadCatch m, A.Selectable FilePath (Either String String) m) =>
   Maybe DebugSettings ->
-  MemContextM m a ->
+  MemContextM 'InMemory m a ->
   m a
 evalMemContextM d f = fst <$> runMemContextM d f
 
 execMemContextM ::
-  (MonadIO m, MonadLogger m) =>
+  (MonadUnliftIO m, MonadLogger m, MonadCatch m, A.Selectable FilePath (Either String String) m) =>
   Maybe DebugSettings ->
-  MemContextM m a ->
-  m MemContext
+  MemContextM 'InMemory m a ->
+  m (MemContext 'InMemory)
 execMemContextM d f = snd <$> runMemContextM d f
 
-compactMemContextM :: MonadIO m => MemContextM m ()
+compactMemContextM :: MonadIO m => MemContextM t m ()
 compactMemContextM = ask >>= flip atomicModifyIORef' (\a -> (force a, ()))
+
+evalSandboxedContextM ::
+  VMBase m =>
+  MemContextM 'Sandboxed m a ->
+  m a
+evalSandboxedContextM f = do
+  cstate <- Mod.access (Mod.Proxy @ContextState)
+  fst <$> runMemContextMWith' def cstate f

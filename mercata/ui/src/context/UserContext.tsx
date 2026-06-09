@@ -1,16 +1,25 @@
 "use client";
 
 // context/UserContext.tsx
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { useAccount, useWalletClient } from "wagmi";
-import { api, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
-import { isAuthenticated, logout } from "@/lib/auth";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useAccount, useDisconnect, useWalletClient } from "wagmi";
+import { api, setAppAuthenticated, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
+import { isAuthenticated, logout as authLogout, redirectToSignedOutLanding, WALLET_CONNECT_REQUEST_EVENT } from "@/lib/auth";
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
+import { readAttribution, clearAttribution } from "@/lib/attribution";
+import { ensureStratoChainInWallet } from "@/lib/stratoChain";
 
 interface UserContextType {
   userAddress: string | null;
+  stratoAddress: string | null;
+  externalWalletAddress: string | null;
+  isExternalWalletConnected: boolean;
+  externalEvmWalletAddress: string | null;
+  isExternalEvmWalletConnected: boolean;
   setUserAddress: (address: string | null) => void;
   isLoggedIn: boolean;
+  isAppAuthenticated: boolean;
   isAdmin: boolean;
   userName: string;
   logout: () => void;
@@ -37,8 +46,13 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+const isStratoConnector = (connector?: { id?: string; name?: string } | null) =>
+  connector?.id === "stratoWallet" || connector?.name === "STRATO Wallet";
+
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const account = useAccount();
+  const { openConnectModal } = useConnectModal();
+  const { disconnect } = useDisconnect();
   const { data: walletClient } = useWalletClient();
   const [stratoAddress, setStratoAddress] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
@@ -53,11 +67,13 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [contractSearchResultsLoading, setContractSearchResultsLoading] = useState<boolean>(false)
   const [contractDetailsResults, setContractDetailsResults] = useState<object>({});
   const [contractDetailsResultsLoading, setContractDetailsResultsLoading] = useState<boolean>(false);
+  const sessionExpiryLogoutStartedRef = useRef(false);
 
   const checkAuthenticationStatus = async (initialCheck = false) => {
     try {
       if (initialCheck) setLoading(true); // Only show loader on first load
-      const authenticated = await isAuthenticated();
+      const storedUser = localStorage.getItem("user");
+      const { authenticated, userData: probedUserData } = await isAuthenticated();
 
       if (authenticated !== isLoggedIn) {
         setIsLoggedIn(authenticated);
@@ -65,20 +81,43 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
       // If authenticated and we don't have user data, try to get it
       if (authenticated) {
-        const storedUser = localStorage.getItem("user");
+        sessionExpiryLogoutStartedRef.current = false;
         if (!storedUser || !stratoAddress) {
           try {
-            const response = await api.get('/user/me');
-            const newUserAddress = response.data.userAddress;
-            const serverIsAdmin = response.data.isAdmin;
-            const userName = response.data.userName
+            // Reuse the body from isAuthenticated()'s probe so we don't issue a
+            // second /user/me — that would mask the transient isNewUser flag
+            // the backend only returns once, on the call that creates the key.
+            const data = probedUserData ?? (await api.get('/user/me', { walletAuth: false } as any)).data;
+            const newUserAddress = data.userAddress;
+            const serverIsAdmin = data.isAdmin;
+            const userName = data.userName
             setUserName(userName)
             if (newUserAddress !== stratoAddress) {
-              localStorage.setItem("user", JSON.stringify(response.data));
+              localStorage.setItem("user", JSON.stringify(data));
               setStratoAddress(newUserAddress);
             }
             if (serverIsAdmin !== isAdmin) {
               setIsAdmin(serverIsAdmin);
+            }
+
+            // GA4 attribution: tag all subsequent events with user_id, and fire
+            // signup_completed exactly once for brand-new users.
+            const gtag = (window as any).gtag;
+            if (gtag && newUserAddress) {
+              gtag('set', { user_id: newUserAddress });
+              if (data.isNewUser) {
+                const attribution = readAttribution() ?? {};
+                gtag('event', 'signup_completed', {
+                  utm_source: (attribution as any).utm_source ?? '(direct)',
+                  utm_medium: (attribution as any).utm_medium ?? '(none)',
+                  utm_campaign: (attribution as any).utm_campaign ?? '(none)',
+                  utm_content: (attribution as any).utm_content ?? '(none)',
+                  via: (attribution as any).via ?? '(none)',
+                  landing_url: (attribution as any).landing_url ?? null,
+                  referrer: (attribution as any).referrer ?? null,
+                });
+                clearAttribution();
+              }
             }
           } catch (error) {
             // If we can't fetch user details but auth check passed, 
@@ -95,10 +134,29 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           }
         }
       } else {
-        if (stratoAddress) {
+        const hadStratoSession = !!storedUser || !!stratoAddress || isLoggedIn;
+        if (hadStratoSession) {
+          sessionExpiryLogoutStartedRef.current = true;
           localStorage.removeItem("user");
           setStratoAddress(null);
+          setIsLoggedIn(false);
           setIsAdmin(false);
+          setUserName(null);
+          setConnectedWalletAddress(null);
+          setWalletSigner(null);
+          setAppAuthenticated(false);
+          try {
+            disconnect();
+          } catch {
+            // Continue session-expiry logout even if wallet disconnect fails.
+          }
+          redirectToSignedOutLanding();
+          return;
+        } else if (stratoAddress) {
+          setStratoAddress(null);
+          setIsLoggedIn(false);
+          setIsAdmin(false);
+          setUserName(null);
         }
       }
     } catch (error) {
@@ -110,7 +168,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const castVoteOnIssue = async (target: string, func: string, args: any[]) => {
     try {
-      await api.post('/user/admin/vote', { target, func, args });
+      await api.post('/user/admin/vote', { target, func, args }, { walletAuth: false } as any);
       await getOpenIssues();
       // Show the recently executed issue
       await getExecutedIssues(1, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
@@ -122,7 +180,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const castVoteOnIssueById = async (issueId: string) => {
     try {
-      await api.post('/user/admin/vote/by-id', { issueId });
+      await api.post('/user/admin/vote/by-id', { issueId }, { walletAuth: false } as any);
       await getOpenIssues();
       // Show the recently executed issue
       await getExecutedIssues(1, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
@@ -190,28 +248,51 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const addAdmin = async (userAddress: string) => {
-    await api.post('/user/admin', { userAddress });
+    await api.post('/user/admin', { userAddress }, { walletAuth: false } as any);
     await getOpenIssues();
   };
 
   const removeAdmin = async (userAddress: string) => {
-    await api.delete('/user/admin', { data: { userAddress } });
+    await api.delete('/user/admin', { data: { userAddress }, walletAuth: false } as any);
     await getOpenIssues();
   };
 
   const dismissIssue = async (issueId: string) => {
-    await api.post('/user/admin/dismiss', { issueId });
+    await api.post('/user/admin/dismiss', { issueId }, { walletAuth: false } as any);
     await getOpenIssues();
   };
 
-  const userAddress = account.isConnected && account.address ? account.address : stratoAddress;
-  const effectiveLoggedIn = isLoggedIn || (account.isConnected && !!account.address);
+  const externalWalletAddress = account.isConnected && account.address ? account.address : null;
+  const isExternalWalletConnected = !!externalWalletAddress;
+  const externalEvmWalletAddress = !isStratoConnector(account.connector) ? externalWalletAddress : null;
+  const isExternalEvmWalletConnected = !!externalEvmWalletAddress;
+  const shouldUseExternalWallet = !sessionExpiryLogoutStartedRef.current && !loading && !isLoggedIn && isExternalWalletConnected;
+  const userAddress = isLoggedIn ? stratoAddress : shouldUseExternalWallet ? externalWalletAddress : null;
+  const effectiveLoggedIn = isLoggedIn || shouldUseExternalWallet;
+
+  useEffect(() => {
+    setConnectedWalletAddress(externalWalletAddress);
+  }, [externalWalletAddress]);
+
+  useEffect(() => {
+    setAppAuthenticated(isLoggedIn);
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    const openWalletConnect = () => {
+      if (!account.isConnected) openConnectModal?.();
+    };
+
+    window.addEventListener(WALLET_CONNECT_REQUEST_EVENT, openWalletConnect);
+    return () => window.removeEventListener(WALLET_CONNECT_REQUEST_EVENT, openWalletConnect);
+  }, [account.isConnected, openConnectModal]);
 
   useEffect(() => {
     const connected = account.isConnected && account.address;
-    setConnectedWalletAddress(connected ? account.address : null);
     if (connected && walletClient) {
       setWalletSigner(async (unsignedTx: any) => {
+        await ensureStratoChainInWallet(walletClient);
+
         const d = unsignedTx.data;
         return walletClient.signTypedData({
           domain: {
@@ -250,6 +331,25 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     checkAuthenticationStatus();
   };
 
+  const handleLogout = useCallback(() => {
+    try {
+      disconnect();
+    } catch {
+      // Continue STRATO logout even if wallet disconnect fails.
+    }
+    setConnectedWalletAddress(null);
+    setWalletSigner(null);
+    setAppAuthenticated(false);
+    setStratoAddress(null);
+    setIsLoggedIn(false);
+    setIsAdmin(false);
+    setUserName(null);
+    localStorage.removeItem("user");
+    const gtag = (window as any).gtag;
+    if (gtag) gtag('set', { user_id: null });
+    authLogout();
+  }, [disconnect]);
+
   useEffect(() => {
     checkAuthenticationStatus(true);
 
@@ -264,11 +364,17 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const contextValue = useMemo(() => ({
     userAddress,
+    stratoAddress,
+    externalWalletAddress,
+    isExternalWalletConnected,
+    externalEvmWalletAddress,
+    isExternalEvmWalletConnected,
     setUserAddress,
     userName,
     isLoggedIn: effectiveLoggedIn,
+    isAppAuthenticated: isLoggedIn,
     isAdmin,
-    logout,
+    logout: handleLogout,
     refreshAuth,
     loading,
     openIssuesLoading,
@@ -288,7 +394,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     getContractDetails,
     contractDetailsResults,
     contractDetailsResultsLoading,
-  }), [userAddress, effectiveLoggedIn, isAdmin, loading, userName,
+  }), [userAddress, stratoAddress, externalWalletAddress, isExternalWalletConnected, externalEvmWalletAddress, isExternalEvmWalletConnected, effectiveLoggedIn, isLoggedIn, isAdmin, loading, userName,
+    handleLogout,
     openIssues, openIssuesLoading, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues,
     castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin,
     contractSearch, contractSearchResults, contractSearchResultsLoading,

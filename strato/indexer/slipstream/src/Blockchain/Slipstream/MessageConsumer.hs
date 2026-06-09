@@ -14,33 +14,33 @@ where
 
 import BlockApps.Logging
 import Blockchain.Data.TransactionResult
-import Blockchain.EthConf
-import Blockchain.Slipstream.Data.Action (AggregateEvent)
+-- import Blockchain.EthConf  -- UNUSED: was for solidvmevents
+-- import Blockchain.Slipstream.Data.Action (AggregateEvent)  -- UNUSED: was for solidvmevents
 import Blockchain.Slipstream.Metrics
 import Blockchain.Slipstream.Processor
 import Blockchain.Slipstream.OutputData
 import Blockchain.Slipstream.SQL
 import Conduit
 import Control.Monad
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Control.Monad.Composable.SQL
-import Data.String
+-- import Data.String  -- UNUSED: was for solidvmevents
 import Blockchain.Slipstream.PostgresqlTypedShim
 import Prelude hiding (lookup)
 
 getAndProcessMessages ::
   ( MonadLogger m,
-    HasKafka m,
+    HasStreaming m,
     HasSQL m
   ) =>
   PGConnection ->
   m ()
 getAndProcessMessages conn = do
-  createTopicAndWait solidVmEventsTopicName
+  -- createTopicAndWait solidVmEventsTopicName  -- UNUSED: no consumer
 
-  consume "getAndProcessMessages'" "slipstream" "vmevents" $ \() messages -> do
+  consume "slipstream" "vmevents" $ \messages -> do
     recordKafkaMessages messages
-    emittedEvents <- runConduit $
+    _emittedEvents <- runConduit $
       processTheMessages messages `fuseUpstream`
         dedupC `fuseUpstream`
         awaitForever (\case
@@ -49,13 +49,14 @@ getAndProcessMessages conn = do
             InsertDelegatecall dc -> insertDelegatecallPostgres conn dc
             _ -> dbQueryCatchError conn $ slipstreamQueryPostgres cmd
         )
-    _ <- produceSolidVmEvents emittedEvents
+    -- _ <- produceSolidVmEvents _emittedEvents  -- UNUSED: no consumer for solidvmevents
     return ()
 
 ------ solidvmevents indexer code here ------
-solidVmEventsTopicName :: TopicName
-solidVmEventsTopicName = fromString "solidvmevents"
-
-produceSolidVmEvents :: MonadIO m =>
-                        [AggregateEvent] -> m [ProduceResponse]
-produceSolidVmEvents = runKafkaMConfigured "slipstream" . produceItemsAsJSON solidVmEventsTopicName
+-- UNUSED: no consumer for solidvmevents topic
+-- solidVmEventsTopicName :: TopicName
+-- solidVmEventsTopicName = fromString "solidvmevents"
+--
+-- produceSolidVmEvents :: MonadIO m =>
+--                         [AggregateEvent] -> m [ProduceResponse]
+-- produceSolidVmEvents = runStreamMConfigured "slipstream" . produceItemsAsJSON solidVmEventsTopicName

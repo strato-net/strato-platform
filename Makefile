@@ -50,7 +50,7 @@ $(info )
 
 # Compute content hash for a directory (truncated to 12 chars)
 # Usage: $(call dir_hash,directory_path)
-dir_hash = $(shell git ls-files $(1) 2>/dev/null | sort | xargs sha256sum 2>/dev/null | sha256sum | cut -c1-12)
+dir_hash = $(shell git ls-files $(1) 2>/dev/null | LC_ALL=C sort | xargs sha256sum 2>/dev/null | sha256sum | cut -c1-12)
 
 # Image content hashes - used for docker tags
 HASH_STRATO := $(call dir_hash,strato)
@@ -185,12 +185,12 @@ all_develop: build_develop docker-compose
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
 
-.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force app
+.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key change-vault-password install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force app
 
 app: mercata-backend mercata-ui
 	@echo ""
 	@echo "Both app images built. To patch a running node:"
-	@echo "  strato-up <node-dir> --patch-app $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)"
+	@echo "  strato-patch-app <node-dir> $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)"
 
 # Force rebuild targets (unconditional)
 apex-force:
@@ -267,6 +267,10 @@ build_common: generate-version-file
 	@install -m 755 bin/strato-up $(HOME)/.local/bin/
 	@install -m 755 bin/strato-down $(HOME)/.local/bin/
 	@install -m 755 bin/strato-ps $(HOME)/.local/bin/
+	@install -m 755 bin/strato-patch-app $(HOME)/.local/bin/
+	@install -m 755 bin/strato-user-add $(HOME)/.local/bin/
+	@mkdir -p $(HOME)/.local/share/strato
+	@install -m 644 strato/tools/airlock/data/english.txt $(HOME)/.local/share/strato/bip39-english.txt
 
 build_common_docker: generate-version-file
 	@echo building haskell libraries and creating directories in docker
@@ -362,6 +366,28 @@ vault-wrapper: build_common_docker
 	docker build --target vault-wrapper --tag ${REPO_URL}vault-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}vault-wrapper:${VERSION} ${REPO_AWS_ECR_URL}vault-wrapper:${VERSION}
 
+# Builds the migrate-key admin tool on the host and installs it to ~/.local/bin.
+# See strato/vault/vault-runner/README.md ("Migrating a single key between Vaults")
+# for the full operator workflow (docker cp into the vault-wrapper container, etc).
+migrate-key:
+	@echo Now building migrate-key...
+	cd strato && stack ${NIX_FLAG} build blockapps-vault-wrapper-server:exe:migrate-key
+	cd strato && stack ${NIX_FLAG} --local-bin-path ${HOME}/.local/bin install blockapps-vault-wrapper-server:exe:migrate-key
+	@echo
+	@echo "Installed: ${HOME}/.local/bin/migrate-key"
+	@echo "Next steps: see strato/vault/vault-runner/README.md - 'Migrating a single key between Vaults'"
+
+# Builds the change-vault-password admin tool on the host and installs it to ~/.local/bin.
+# See strato/vault/vault-runner/README.md ("Changing the existing Vault password")
+# for the full operator workflow (docker cp into the vault-wrapper container, etc).
+change-vault-password:
+	@echo Now building change-vault-password...
+	cd strato && stack ${NIX_FLAG} build blockapps-vault-wrapper-server:exe:change-vault-password
+	cd strato && stack ${NIX_FLAG} --local-bin-path ${HOME}/.local/bin install blockapps-vault-wrapper-server:exe:change-vault-password
+	@echo
+	@echo "Installed: ${HOME}/.local/bin/change-vault-password"
+	@echo "Next steps: see strato/vault/vault-runner/README.md - 'Changing the existing Vault password'"
+
 vault-nginx:
 	@echo Now building vault-nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}vault-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
@@ -439,6 +465,8 @@ uninstall:
 	@rm -f $(HOME)/.local/bin/strato-up
 	@rm -f $(HOME)/.local/bin/strato-down
 	@rm -f $(HOME)/.local/bin/strato-ps
+	@rm -f $(HOME)/.local/bin/strato-patch-app
+	@rm -f $(HOME)/.local/bin/strato-user-add
 	@rm -f $(HOME)/.local/bin/strato-setup
 	@rm -f $(HOME)/.local/bin/convoke
 	@echo "Done"

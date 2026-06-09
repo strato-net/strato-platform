@@ -10,7 +10,7 @@
 
 import BlockApps.Init
 import BlockApps.Logging
-import Blockchain.EthConf (cirrusConnStr, ethConf, runKafkaMConfigured)
+import Blockchain.EthConf (cirrusConnStr, ethConf, runStreamMConfigured)
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Slipstream.Data.CirrusTables
 import Blockchain.Slipstream.MessageConsumer
@@ -19,7 +19,7 @@ import Blockchain.Slipstream.OutputData
 import Blockchain.Slipstream.PostgresqlTypedShim
 import Control.Concurrent
 import Control.Monad
-import Control.Monad.Composable.Kafka (createTopicAndWait)
+import Control.Monad.Composable.Streaming (createTopicAndWait)
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (runReaderT)
@@ -41,7 +41,7 @@ main = do
 
   runLoggingT
     . runResourceT
-    . runKafkaMConfigured "slipstream"
+    . runStreamMConfigured "slipstream"
     $ do
       $logInfoS "main" "Welcome to Slipstream!!!!"
       void . liftIO . forkIO . run 10777 $ metricsApp

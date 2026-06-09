@@ -513,6 +513,7 @@ data ProcessedCollectionRow = ProcessedCollectionRow
     collection_name :: Text,
     collection_type ::Text,
     blockHash :: Keccak256,
+    transactionHash :: Keccak256,
     blockTimestamp :: UTCTime,
     blockNumber :: Integer,
     collectionDataKeys :: [V.Value],
@@ -571,6 +572,7 @@ baseEventColumns :: TableColumns
 baseEventColumns =
   [ ("address", SqlText)
   , ("block_hash", SqlText)
+  , ("transaction_hash", SqlText)
   , ("block_timestamp", SqlText)
   , ("block_number", SqlText)
   , ("transaction_sender", SqlText)
@@ -774,6 +776,7 @@ eventBaseColumnsQuery =
   [
     ("address", SqlText),
     ("block_hash", SqlText),
+    ("transaction_hash", SqlText),
     ("block_timestamp", SqlText),
     ("block_number", SqlText),
     ("transaction_sender", SqlText),
@@ -908,6 +911,7 @@ insertEventArrayTableQuery ms =
                 baseVals =
                   [ ValueAddress . address,
                     ValueString . T.pack . keccak256ToHex . blockHash,
+                    ValueString . T.pack . keccak256ToHex . transactionHash,
                     ValueString . tshow . blockTimestamp,
                     ValueInt False Nothing . blockNumber,
                     const $ ValueString "",
@@ -990,6 +994,7 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
       collection_name = arrayName,
       collection_type = "Event Array",
       blockHash = eventBlockHash ae,
+      transactionHash = Action.evTxHash ev,
       blockTimestamp = eventBlockTimestamp ae,
       blockNumber = eventBlockNumber ae,
       collectionDataKeys = [index],
@@ -1032,6 +1037,7 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
   let eventName = T.pack $ Action.evName ev
       address = Action.evContractAddress ev
       blockHash = T.pack . keccak256ToHex $ eventBlockHash agEv
+      txHash = T.pack . keccak256ToHex $ Action.evTxHash ev
       blockTimestamp = tshow $ eventBlockTimestamp agEv
       blockNumber = eventBlockNumber agEv
       transactionSender = Action.evTxSender ev
@@ -1049,6 +1055,7 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
       values = Just <$>
         [ SimpleValue $ ValueAddress address
         , SimpleValue $ ValueString blockHash
+        , SimpleValue $ ValueString txHash
         , SimpleValue $ ValueString blockTimestamp
         , SimpleValue $ ValueInt False Nothing blockNumber
         , SimpleValue $ ValueAddress transactionSender
@@ -1085,21 +1092,21 @@ solidityTypeToSQLType _ _ _ SVMType.Variadic = Just SqlJsonb
 ------------------
 
 solidityValueToText :: SolidityValue -> Text
-solidityValueToText (SolidityValueAsString x) = escapeQuotes $ V.unEscapeStringValue x
+solidityValueToText (SolidityValueAsString x) = escapeQuestionMarks . escapeQuotes $ V.unEscapeStringValue x
 solidityValueToText (SolidityBool x) = tshow x
 solidityValueToText (SolidityNum x) = tshow x
-solidityValueToText (SolidityBytes x) = escapeQuotes $ tshow x
+solidityValueToText (SolidityBytes x) = escapeQuestionMarks . escapeQuotes $ tshow x
 solidityValueToText (SolidityArray x) = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
 solidityValueToText x@(SolidityObject _) = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
 
 valueToSQLText' :: Bool -> Value -> Maybe Text
 valueToSQLText' _ (SimpleValue (ValueBool x)) = Just $ if x then "true" else "false"
 valueToSQLText' _ (SimpleValue (ValueInt _ _ v)) = Just $ tshow v
-valueToSQLText' _ (SimpleValue (ValueString s)) = Just s
+valueToSQLText' _ (SimpleValue (ValueString s)) = Just $ escapeQuestionMarks s
 valueToSQLText' _ (SimpleValue (ValueAddress (Address 0))) = Just ""
 valueToSQLText' _ (SimpleValue (ValueAddress (Address addr))) =
   Just . T.pack $ printf "%040x" (fromIntegral addr :: Integer)
-valueToSQLText' _ (SimpleValue (ValueBytes _ bytes)) = Just $
+valueToSQLText' _ (SimpleValue (ValueBytes _ bytes)) = Just . escapeQuestionMarks $
   case decodeUtf8' bytes of
     Left _ -> decodeUtf8 $ Base16.encode bytes
     Right x -> x
@@ -1234,6 +1241,7 @@ initialSlipstreamQueries =
       [ ("id", SqlSerial)
       , ("address", SqlText)
       , ("block_hash", SqlText)
+      , ("transaction_hash", SqlText)
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
       , ("transaction_sender", SqlText)
@@ -1248,6 +1256,7 @@ initialSlipstreamQueries =
       eventArrayTableName
       [ ("address", SqlText)
       , ("block_hash", SqlText)
+      , ("transaction_hash", SqlText)
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
       , ("transaction_sender", SqlText)
@@ -1261,6 +1270,7 @@ initialSlipstreamQueries =
       ["address", "block_hash", "event_index", "collection_name", "key"]
       Nothing -- (Just $ Foreign "event_event_array" ["address", "block_hash", "event_index"] globalEventTableName ["address", "block_hash", "event_index"])
       []
+  , RawSQL genericBaseTableIndexesSQL
   , RawSQL jsonbMergeDeepSQL
   , RawSQL jsonbObjToArraySQL
   , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "event") (indexTableName "" "storage") False "address" SqlText
@@ -1269,6 +1279,44 @@ initialSlipstreamQueries =
   , CreateFkeyFunction $ ForeignKeyInfo "mapping" (indexTableName "" "storage") (indexTableName "" "mapping") True "address" SqlText
   , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "contract") (indexTableName "" "storage") True "address" SqlText
   , CreateFkeyFunction $ ForeignKeyInfo "contract" (indexTableName "" "storage") (indexTableName "" "contract") True "address" SqlText
+  ]
+
+genericBaseTableIndexesSQL :: Text
+genericBaseTableIndexesSQL = T.unlines
+  [ "CREATE INDEX IF NOT EXISTS history_mapping_lookup_idx"
+  , "  ON \"history@mapping\" (address, collection_name, ((key->>'key')), valid_from, valid_to);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS mapping_collection_key_address_idx"
+  , "  ON mapping (collection_name, ((key->>'key')), address);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS mapping_address_collection_key_idx"
+  , "  ON mapping (address, collection_name, ((key->>'key')));"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS mapping_balances_key_value_address_idx"
+  , "  ON mapping (((key->>'key')), value DESC, address)"
+  , "  WHERE collection_name = '_balances'"
+  , "    AND value IS NOT NULL"
+  , "    AND (value)::text <> ALL (ARRAY['\"\"', '0', 'false'])"
+  , "    AND jsonb_typeof(value) IS NOT NULL;"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS mapping_collection_address_idx"
+  , "  ON mapping (collection_name, address)"
+  , "  WHERE value IS NOT NULL"
+  , "    AND (value)::text <> ALL (ARRAY['\"\"', '0', 'false'])"
+  , "    AND jsonb_typeof(value) IS NOT NULL;"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS storage_status_address_idx"
+  , "  ON storage (((data->>'status')), address)"
+  , "  WHERE jsonb_exists(data, 'status');"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_name_sender_timestamp_idx"
+  , "  ON event (event_name, transaction_sender, block_timestamp DESC);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_address_name_timestamp_idx"
+  , "  ON event (address, event_name, block_timestamp DESC);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_name_timestamp_idx"
+  , "  ON event (event_name, block_timestamp DESC);"
   ]
 
 jsonbMergeDeepSQL :: Text

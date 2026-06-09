@@ -7,12 +7,17 @@
     "test:deploy": "ts-node src/cli.ts --scenario contractDeploy",
     "test:calls": "ts-node src/cli.ts --scenario functionCall",
     "test:mixed": "ts-node src/cli.ts --scenario mixedWorkload",
+    "test:token-sale": "ts-node src/cli.ts --scenario tokenSale",
+    "test:forge-buy": "ts-node src/cli.ts --scenario forgeBuy",
+    "test:page-load": "ts-node src/cli.ts --scenario pageLoad",
     "test:all": "ts-node src/cli.ts",
-    "test:quick": "ts-node src/cli.ts --batch-size 5 --batch-count 2"
+    "test:quick": "ts-node src/cli.ts --batch-size 5 --batch-count 2",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "axios": "^1.7.0",
     "commander": "^12.1.0",
+    "ethers": "^6.13.0",
     "js-yaml": "^4.1.0",
     "simple-oauth2": "^5.1.0"
   },

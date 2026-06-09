@@ -15,6 +15,8 @@ import {
   findRewardActivity, findPoolRewardActivity,
 } from "../helpers/earnRewards.helper";
 import { computeEquityFromMaps, computeVaultPerformanceMetrics, safeBigInt } from "../helpers/vaultPerformance.helper";
+import { listVaultDefs, getYieldVaultInfo } from "./yieldVault.service";
+import { getCarryVaultUsdPriceMap } from "../helpers/oracle.helper";
 import { ApySource, TokenApyEntry } from "@mercata/shared-types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -45,6 +47,9 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   const ctx = parsePhase1(phase1, vaultAddr, rewAddr, saveUsdstVault);
   const phase1b = await fetchPhase1b(accessToken, ctx, saveUsdstVault);
 
+  const carryVaultUsdPriceMap = await getCarryVaultUsdPriceMap(accessToken, ctx.prices).catch(
+    () => new Map<string, string>(),
+  );
   const rewardActivities = buildRewardActivitiesFromMappings(
     ctx.rewardActivityCfgById, ctx.rewardActivityStateById, {
       priceMap: ctx.prices,
@@ -52,6 +57,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       sTokenAddress: constants.sToken ?? null,
       vaultShareTokenAddress: ctx.shareTokenAddress || null,
       saveUsdstVaultAddress: saveUsdstVault || null,
+      carryVaultUsdPriceMap,
     },
   );
 
@@ -84,6 +90,8 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     if (isPositiveApy(vaultWeightedApy)) add(ctx.shareTokenAddress, { source: "vault_weighted", apy: vaultWeightedApy });
     if (isPositiveApy(vaultRewardApy)) add(ctx.shareTokenAddress, { source: "rewards", apy: vaultRewardApy, meta: "vault" });
   }
+
+  await addCarryVaultApys(accessToken, add, rewardActivities);
 
   const safetyAPY = computeSafetyAPY(ctx.smRow, ctx.stRow, ctx.smEvents);
   if (safetyAPY) add(constants.USDST, { source: "safety", apy: safetyAPY });
@@ -329,6 +337,107 @@ function addSaveUsdstApys(add: AddFn, ctx: Phase1Ctx, phase1b: Phase1bData, rewa
 
   if (nativeApy) add(addr, { source: "lending", apy: nativeApy, meta: "save_usdst" });
   if (rewardsApy) add(addr, { source: "rewards", apy: rewardsApy, meta: "save_usdst" });
+}
+
+/**
+ * Carry-style ERC4626 yield vaults (eth-carry, wbtc-carry).
+ *
+ * Mirrors the saveUSDST APY pattern but uses `source: "vault"` for the native
+ * strategy yield (so `buildTokenCompositeInfo` combines it with the rewards
+ * portion the same way the main protocol vault does).
+ *
+ * Native APY comes from getYieldVaultInfo (same calculation the
+ * /earn/yield-vault/:key/info endpoint returns), so the Earn page's vault card
+ * and the Rewards page's "Best Available APY" cell stay in sync.
+ *
+ * Keyed by the vault address (which is also the share-token address for an
+ * ERC4626 vault), matching how ActivitiesTable resolves carry-vault entries.
+ */
+async function addCarryVaultApys(
+  accessToken: string,
+  add: AddFn,
+  rewardActivities: any[],
+) {
+  const defs = listVaultDefs().filter((def) => !!def?.address);
+  if (!defs.length) return;
+
+  const infos = await Promise.all(
+    defs.map((def) => getYieldVaultInfo(accessToken, def.key).catch(() => null)),
+  );
+
+  for (let i = 0; i < defs.length; i++) {
+    const def = defs[i];
+    const info = infos[i];
+    const addr = normalizeAddress(def.address);
+    if (!addr) continue;
+
+    if (info?.deployed && isPositiveApy(info.apy)) {
+      add(addr, { source: "vault", apy: info.apy });
+    }
+
+    // Vault-level Base APY = weighted average of per-strategy `baseApyPct`,
+    // weighted by *productive* on-chain equity (deployedAssetsUSD − offChainUsdWad).
+    //
+    // Why productive equity (not deployedAssets):
+    //   Per-strategy `baseApyPct` is computed on productive equity, not on
+    //   deployed equity (the "subtract off-chain from equity" rule). Weighting
+    //   by deployedAssets here would mix incompatible denominators across
+    //   strategies and produce a number that matches neither "rate on productive
+    //   capital" nor "rate on deposited capital". Weighting by productive equity
+    //   makes the rollup mathematically equal to Σ netYieldUSD / Σ productiveUSD,
+    //   which matches the per-strategy display semantics.
+    //
+    // Emitted as `vault_weighted` so the headline tooltip on
+    // Dashboard / Earn / Rewards / EarnYieldVault renders Native + Base + Rewards
+    // consistently with the main protocol vault.
+    if (info?.deployed && info.strategyHoldings?.length) {
+      let assetPriceWad = 0n;
+      try { assetPriceWad = BigInt(info.assetPriceWad || "0"); } catch { assetPriceWad = 0n; }
+      const assetDecimals = Number.isFinite(info.decimals) ? info.decimals : 18;
+      const assetUnit = 10n ** BigInt(assetDecimals);
+
+      let totalProductive = 0n; // USD-WAD
+      let weightedSumBps = 0n;  // bps × USD-WAD
+      for (const h of info.strategyHoldings) {
+        if (h.baseApyPct === null || h.baseApyPct === undefined) continue;
+        if (!Number.isFinite(h.baseApyPct)) continue;
+        if (assetPriceWad <= 0n || assetUnit === 0n) continue;
+
+        let deployed = 0n;
+        let offChain = 0n;
+        try {
+          deployed = BigInt(h.deployedAssets || "0");
+          offChain = BigInt(h.offChainUsdWad || "0");
+        } catch { continue; }
+        if (deployed <= 0n) continue;
+
+        const deployedUsdWad = (deployed * assetPriceWad) / assetUnit;
+        const productiveUsdWad =
+          deployedUsdWad > offChain ? deployedUsdWad - offChain : 0n;
+        if (productiveUsdWad <= 0n) continue;
+
+        const apyBps = BigInt(Math.round(h.baseApyPct * 100));
+        totalProductive += productiveUsdWad;
+        weightedSumBps += apyBps * productiveUsdWad;
+      }
+      if (totalProductive > 0n) {
+        const avgBps = Number(weightedSumBps / totalProductive);
+        const vaultBaseApy = avgBps / 100;
+        if (Number.isFinite(vaultBaseApy) && vaultBaseApy > 0) {
+          add(addr, { source: "vault_weighted", apy: vaultBaseApy.toFixed(2) });
+        }
+      }
+    }
+
+    const rewardsActivity = findRewardActivity(rewardActivities, {
+      sourceContract: addr,
+      stakeAssetAddress: addr,
+    });
+    const rewardsApy = computeRewardsApy(rewardsActivity?.emissionRate, rewardsActivity?.totalStakeUsd);
+    if (rewardsApy) {
+      add(addr, { source: "rewards", apy: rewardsApy, meta: "vault" });
+    }
+  }
 }
 
 function addBaseYieldApys(add: AddFn, exchangeRateHistory: any, anchorsMs: number[]): Map<string, number> {

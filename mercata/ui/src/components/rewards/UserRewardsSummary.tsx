@@ -9,15 +9,16 @@ import {
   calculateRealTimePendingRewards,
   roundByMagnitude,
   formatRoundedWithCommas,
-  formatEmissionRatePerDay,
 } from "@/services/rewardsService";
-import { formatBalance } from "@/utils/numberUtils";
-import { Loader2, Coins, Star, Gift, Info, Zap, Clock } from "lucide-react";
+import { formatBalance, truncateAddress } from "@/utils/numberUtils";
+import { Loader2, Coins, Star, Gift, Info, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
+import CopyButton from "@/components/ui/copy";
+import { isTxPending } from "@/utils/transactionStatus";
 
 interface UserRewardsSummaryProps {
   userRewards: UserRewardsData | null;
@@ -82,7 +83,7 @@ export const UserRewardsSummary = ({
   rewardsStateLoading,
 }: UserRewardsSummaryProps) => {
   const { toast } = useToast();
-  const { userAddress } = useUser();
+  const { userAddress, isAppAuthenticated } = useUser();
   const [isClaimingAll, setIsClaimingAll] = useState(false);
 
   const handleClaimAll = async () => {
@@ -106,11 +107,11 @@ export const UserRewardsSummary = ({
 
     try {
       setIsClaimingAll(true);
-      const result = await claimAllRewards(userAddress);
+      const result = await claimAllRewards(userAddress, { walletAuth: !isAppAuthenticated });
 
       if (result.success) {
         toast({
-          title: "Claim Successful",
+          title: isTxPending(result.status) ? "Claim Submitted" : "Claim Successful",
           description: result.txHash
             ? `Transaction hash: ${result.txHash.slice(0, 10)}...`
             : "Rewards claimed successfully",
@@ -203,20 +204,11 @@ export const UserRewardsSummary = ({
   )) + " points";
 
   // Overview stats (global)
-  const totalRewardsEmissionStr = rewardsState?.totalRewardsEmission ? String(rewardsState.totalRewardsEmission) : null;
-  const totalRewardsEmissionBig = totalRewardsEmissionStr ? safeBigInt(totalRewardsEmissionStr) : null;
-  const hasValidEmission = totalRewardsEmissionBig !== null && totalRewardsEmissionBig > 0n;
-  const emissionPerDay = hasValidEmission && totalRewardsEmissionStr
-    ? formatEmissionRatePerDay(totalRewardsEmissionStr)
-    : "?";
   const totalDistributedFormatted = rewardsState?.totalDistributed
     ? formatRoundedWithCommas(roundByMagnitude(String(parseFloat(rewardsState.totalDistributed) / 1e18)))
     : "0";
-  const lastBlock = rewardsState?.lastBlockHandled && rewardsState.lastBlockHandled !== "0"
-    ? `Block ${rewardsState.lastBlockHandled}`
-    : "?";
   const activityCountLabel = rewardsState?.activityCount !== undefined && rewardsState?.activityCount !== null && rewardsState.activityCount >= 0
-    ? `${rewardsState.activityCount} ${rewardsState.activityCount === 1 ? "activity" : "activities"}`
+    ? String(rewardsState.activityCount)
     : "?";
 
   return (
@@ -289,8 +281,8 @@ export const UserRewardsSummary = ({
 
       <Card>
         <CardHeader className="px-4 md:px-6 pb-2 md:pb-3">
-          <CardTitle className="text-sm md:text-base">Rewards Overview</CardTitle>
-          <CardDescription className="text-xs">Global rewards statistics</CardDescription>
+          <CardTitle className="text-sm md:text-base">Global Rewards Overview</CardTitle>
+          <CardDescription className="text-xs">Rewards statistics over all users</CardDescription>
         </CardHeader>
         <CardContent className="px-4 md:px-6">
           {rewardsStateLoading ? (
@@ -302,24 +294,28 @@ export const UserRewardsSummary = ({
           ) : (
             <div className="space-y-2 text-xs md:text-sm">
               <div className="flex items-center gap-2">
-                <Zap className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                <span className="text-muted-foreground">Emission:</span>
-                <span className="font-semibold truncate">
-                  {emissionPerDay}{emissionPerDay !== "?" ? " pts/day" : ""}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
                 <Star className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                 <span className="text-muted-foreground">Total Earned:</span>
                 <span className="font-semibold truncate">{totalDistributedFormatted}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Clock className="h-3.5 w-3.5 text-purple-500 shrink-0" />
-                <span className="text-muted-foreground">Last Update:</span>
-                <span className="font-semibold truncate">{lastBlock}</span>
+                <Activity className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                <span className="text-muted-foreground">Activities:</span>
+                <span className="font-semibold truncate">{activityCountLabel}</span>
               </div>
-              <div className="text-xs text-muted-foreground pl-5.5">
-                {activityCountLabel}
+              <div className="flex items-center gap-2">
+                <Coins className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                <span className="text-muted-foreground">Reward Token:</span>
+                {rewardsState?.rewardToken ? (
+                  <span className="flex items-center gap-1 min-w-0">
+                    <span className="font-semibold font-mono truncate">
+                      {truncateAddress(rewardsState.rewardToken)}
+                    </span>
+                    <CopyButton address={rewardsState.rewardToken} />
+                  </span>
+                ) : (
+                  <span className="font-semibold">?</span>
+                )}
               </div>
             </div>
           )}

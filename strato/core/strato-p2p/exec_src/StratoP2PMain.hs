@@ -31,7 +31,7 @@ import           Data.IORef
 import           Data.Set.Ordered (empty)
 import           Instrumentation
 import           Blockchain.Sequencer.Kafka (seqP2pEventsTopicName, unseqEventsTopicName)
-import           Control.Monad.Composable.Kafka (createTopicAndWait)
+import           Control.Monad.Composable.Streaming (createTopicAndWait)
 
 main :: IO ()
 main = runLoggingT initP2P
@@ -46,19 +46,18 @@ initP2P = labelTheThread "initP2P" $ do
   -- a freshly created table will already have all peers in the inactive state.
   _ <- liftIO $ (try resetPeers :: IO (Either SomeException ()))
   _ <- liftIO $ $initHFlags "Strato P2P"
-  liftIO $ runKafkaMConfigured "strato-p2p" $ do
+  liftIO $ runStreamMConfigured "strato-p2p" $ do
     createTopicAndWait seqP2pEventsTopicName
     createTopicAndWait unseqEventsTopicName
   setParticipationMode flags_participationMode
   wireMessagesRef <- liftIO $ newIORef empty
   cfg <- initConfig wireMessagesRef
   let vaultUrl' = vaultUrl . urlConfig $ ethConf
-      sSource = seqEventNotificationSource . contextKafkaState
       runner f = runLoggingT $ runVaultM vaultUrl' $ do
         c' <- initContext
         ctx <- liftIO $ newIORef c'
         let cfg' = cfg { configContext = ctx }
-        runContextM cfg' . f $ sSource c'
+        runContextM cfg' . f $ seqEventNotificationSource
   liftIO $
     race_
       (run 10248 $ prometheus def p2pApp)

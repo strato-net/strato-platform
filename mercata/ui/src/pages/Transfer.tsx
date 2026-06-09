@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Token } from "@/interface";
-import { useWriteContract, useChains, useSwitchChain } from "wagmi";
-import { getStratoChainId } from "@/lib/stratoChain";
+import { useWalletClient, useWriteContract } from "wagmi";
+import { ensureStratoChainInWallet, getStratoChainId } from "@/lib/stratoChain";
 
 import { useUser } from "@/context/UserContext";
 import { useTokenContext, BulkTransferItem, BulkTransferResponse } from "@/context/TokenContext";
@@ -49,10 +49,8 @@ const Transfer = () => {
   const { userAddress, userName, isLoggedIn } = useUser();
   const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance, getTransferableTokens, transferToken, bulkTransferToken } = useTokenContext();
   const { writeContractAsync } = useWriteContract();
-  const chains = useChains();
+  const { data: walletClient } = useWalletClient();
   const stratoChainId = getStratoChainId();
-  const stratoChain = stratoChainId ? chains.find((c) => c.id === stratoChainId) : undefined;
-  const { switchChainAsync } = useSwitchChain();
   const { toast } = useToast();
   const isVaultUser = !!userName;
   const guestMode = !isLoggedIn;
@@ -149,7 +147,7 @@ const Transfer = () => {
           value: weiValue,
         });
       } else {
-        if (stratoChain) await switchChainAsync({ chainId: stratoChain.id });
+        await ensureStratoChainInWallet(walletClient);
         const nonceRes = await fetch("/rpc", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -157,13 +155,15 @@ const Transfer = () => {
         }).then((r) => r.json());
         const nonce = Number(nonceRes.result);
         await writeContractAsync({
-          chainId: stratoChain?.id,
+          chainId: stratoChainId || undefined,
           address: ensureHexPrefix(fromAsset.address),
           abi: erc20TransferAbi,
           functionName: "transfer",
           args: [ensureHexPrefix(recipient), BigInt(weiValue)],
           nonce: Number(nonce),
           gas: 1000000n,
+          type: "legacy",
+          gasPrice: 0n,
         });
       }
 
@@ -176,17 +176,15 @@ const Transfer = () => {
       });
       setFromAmount("");
       setRecipient("");
-      const updatedTokens = await fetchUserTokens();
-      const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);
-      if (updatedToken) {
-        setFromAsset(updatedToken);
-      } else {
-        setFromAsset(null)
-      }
-      await fetchUsdstBalance();
+      setSwapLoading(false);
+
+      fetchUserTokens().then((updatedTokens) => {
+        const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);
+        setFromAsset(updatedToken || null);
+      }).catch(() => {});
+      fetchUsdstBalance();
     } catch (error) {
       console.error("Transfer error:", error);
-    } finally {
       setSwapLoading(false);
     }
   };
@@ -370,7 +368,7 @@ const Transfer = () => {
                         This address has no transaction history on the STRATO network.
                         If you are trying to withdraw to an external chain (e.g. Ethereum),
                         please use the{" "}
-                        <Link to="/dashboard/withdrawals?tab=bridge-out" className="font-medium underline">
+                        <Link to="/dashboard/withdrawals" className="font-medium underline">
                           Withdraw page
                         </Link>{" "}
                         instead.

@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { formatBalance as formatBalanceUtil, formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP } from "@/utils/numberUtils";
 import { usdstAddress } from "@/lib/constants";
-import { redirectToLogin } from "@/lib/auth";
+import { requestWalletConnection } from "@/lib/auth";
 
 
 interface OpenJuniorNoteWidgetProps {
@@ -440,9 +440,9 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
         {guestMode ? (
           <Button
             className="w-full"
-            onClick={() => redirectToLogin()}
+            onClick={() => requestWalletConnection()}
           >
-            Sign In to Cover Bad Debt
+            Connect Wallet to Cover Bad Debt
           </Button>
         ) : (
           <Button 

@@ -2,70 +2,20 @@
 
 set -e
 
-# Parse --patch-app flag (handled here since strato-setup doesn't know about it)
-# Usage: strato-up <node-dir> --patch-app <mercata-backend-image:tag> <mercata-ui-image:tag>
-PATCH_APP=false
-SETUP_ARGS=()
-BACKEND_IMAGE=""
-UI_IMAGE=""
-
-i=1
-while [[ $i -le $# ]]; do
-    arg="${!i}"
+# --patch-app was removed - inform the user. To be removed soon.
+for arg in "$@"; do
     if [[ "$arg" == "--patch-app" ]]; then
-        PATCH_APP=true
-        # Consume exactly 2 arguments
-        i=$((i + 1))
-        if [[ $i -gt $# ]]; then
-            echo "Error: --patch-app requires exactly 2 arguments: <mercata-backend-image:tag> <mercata-ui-image:tag>"
-            exit 1
-        fi
-        BACKEND_IMAGE="${!i}"
-        i=$((i + 1))
-        if [[ $i -gt $# ]]; then
-            echo "Error: --patch-app requires exactly 2 arguments: <mercata-backend-image:tag> <mercata-ui-image:tag>"
-            exit 1
-        fi
-        UI_IMAGE="${!i}"
-    else
-        SETUP_ARGS+=("$arg")
+        echo "Error: the --patch-app flag has been removed from strato-up."
+        echo "Use 'strato-patch-app' instead (see README for details)."
+        exit 1
     fi
-    i=$((i + 1))
 done
 
-if [[ "$PATCH_APP" == "true" ]]; then
-    # --patch-app: validate arguments and node directory, defer compose update until after pid check
-    NODE_DIR="${SETUP_ARGS[0]}"
-
-    if [[ -z "$NODE_DIR" ]]; then
-        echo "Error: node directory required"
-        echo "Usage: strato-up <node-directory> --patch-app <mercata-backend-image:tag> <mercata-ui-image:tag>"
-        exit 1
-    fi
-    if [[ ! -d "$NODE_DIR" ]]; then
-        echo "Error: node directory '$NODE_DIR' does not exist"
-        exit 1
-    fi
-    if [[ ! -f "$NODE_DIR/docker-compose.yml" ]]; then
-        echo "Error: docker-compose.yml not found in '$NODE_DIR'"
-        exit 1
-    fi
-
-    if [[ "$BACKEND_IMAGE" != *"mercata-backend:"* ]]; then
-        echo "Error: first --patch-app argument must be a mercata-backend image (got '$BACKEND_IMAGE')"
-        exit 1
-    fi
-    if [[ "$UI_IMAGE" != *"mercata-ui:"* ]]; then
-        echo "Error: second --patch-app argument must be a mercata-ui image (got '$UI_IMAGE')"
-        exit 1
-    fi
-else
-    # Normal flow: setup node (creates if needed, warns if exists with flags)
-    strato-setup "${SETUP_ARGS[@]}"
-    NODE_DIR="${SETUP_ARGS[0]}"
-fi
+strato-setup "$@"
+NODE_DIR="$1"
 
 cd "$NODE_DIR"
+NODE_DIR_ABS="$(pwd)"
 
 # Check if node is already running
 if [[ -f .strato.pid ]]; then
@@ -79,20 +29,20 @@ if [[ -f .strato.pid ]]; then
     rm -f .strato.pid
 fi
 
-# Apply --patch-app image replacements after confirming node is stopped
-if [[ "$PATCH_APP" == "true" ]]; then
-    echo "Updating mercata-backend image to: $BACKEND_IMAGE"
-    sed "s|image:.*mercata-backend:.*|image: ${BACKEND_IMAGE}|" docker-compose.yml > docker-compose.yml.tmp \
-        && mv docker-compose.yml.tmp docker-compose.yml
-
-    echo "Updating mercata-ui image to: $UI_IMAGE"
-    sed "s|image:.*mercata-ui:.*|image: ${UI_IMAGE}|" docker-compose.yml > docker-compose.yml.tmp \
-        && mv docker-compose.yml.tmp docker-compose.yml
-fi
-
 echo "Starting convoke..."
 # stdout goes to log, stderr goes to both log and terminal
 nohup convoke > logs/convoke.log 2> >(tee -a logs/convoke.log >&2) &
-echo "CONVOKE_PID=$!" > .strato.pid
+CONVOKE_PID=$!
+echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
+
+if grep -q "local-auth:" docker-compose.yml; then
+    echo "Ensuring local auth admin and node identity setup..."
+    if ! strato-user-add "$NODE_DIR_ABS" "${LOCAL_AUTH_ADMIN_USERNAME:-admin}" --with-nodekey; then
+        echo "Error: local auth admin setup failed; stopping STRATO." >&2
+        kill "$CONVOKE_PID" 2>/dev/null || true
+        rm -f .strato.pid
+        exit 1
+    fi
+fi
 
 echo "STRATO started in: $(pwd)"
