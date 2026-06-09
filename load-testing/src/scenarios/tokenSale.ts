@@ -370,10 +370,16 @@ export class TokenSaleScenario extends AppScenario {
             res.status < 300 &&
             (reported === undefined || reported === "success" || reported === "Success");
           if (!bridgeOk) {
+            const bodyStr =
+              res.data === undefined
+                ? "<no response body>"
+                : typeof res.data === "string"
+                  ? res.data.slice(0, 400)
+                  : (JSON.stringify(res.data) ?? String(res.data)).slice(0, 400);
             console.warn(
               `[tokenSale] bridgeRequest #${i} FAILED: httpStatus=${res.status} ` +
                 `respErr=${res.error ?? "?"} ` +
-                `body=${typeof res.data === "string" ? res.data.slice(0, 400) : JSON.stringify(res.data).slice(0, 400)}`,
+                `body=${bodyStr}`,
             );
           } else if (shouldLogProgress(i)) {
             console.log(
