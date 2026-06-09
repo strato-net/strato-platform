@@ -26,11 +26,11 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class (blockHash, blockHeader, blockHeaderBlockNumber)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
+import Control.Monad.Composable.Vault
 import Control.Monad.Extra (whenM)
 import Control.Monad.State.Strict
 import Control.Monad.Trans.Except
@@ -454,6 +454,7 @@ sendMessages' wms = do
   putBlockstanbulContext ctx'
 
   recordValidator (_isValidator ctx') (_validatorBehavior ctx')
+  forM_ (_selfAddr ctx') $ recordNodeIdentity . T.pack . formatAddressWithoutColor
 
   return evs
 

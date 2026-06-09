@@ -4,13 +4,12 @@ import UsdstBalanceBox from "@/components/layouts/UsdstBalanceBox";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Transport, WagmiProvider } from "wagmi";
-import { mainnet, polygon, sepolia, base, baseSepolia } from "wagmi/chains";
+import { mainnet, polygon, sepolia, base, baseSepolia, linea, lineaSepolia } from "wagmi/chains";
 import {
   connectorsForWallets,
   RainbowKitProvider,
 } from "@rainbow-me/rainbowkit";
 import { createConfig, http } from "wagmi";
-import { defineChain } from "viem";
 import "@rainbow-me/rainbowkit/styles.css";
 import { UserProvider } from "@/context/UserContext";
 import { UserTokensProvider } from "@/context/UserTokensContext";
@@ -29,6 +28,7 @@ import StratoStats from "./pages/StratoStats";
 import Rewards from "./pages/Rewards";
 import ReferFriend from "./pages/ReferFriend";
 import Claim from "./pages/Claim";
+import CommunityRewardsOnePager from "./pages/CommunityRewardsOnePager";
 import ReferralsManagement from "./pages/ReferralsManagement";
 import PriceTracking from "./pages/PriceTracking";
 import Vault from "./pages/Vault";
@@ -54,6 +54,8 @@ import {
   metaMaskWallet,
   walletConnectWallet,
 } from "@rainbow-me/rainbowkit/wallets";
+import { stratoWallet } from "@/lib/stratoWallet";
+import { initStratoChain, getStratoChain } from "@/lib/stratoChain";
 import AdminRoute from "./components/AdminRoute";
 import { TokenProvider } from "./context/TokenContext";
 import { BridgeProvider } from "@/context/BridgeContext";
@@ -71,10 +73,14 @@ import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
-import { initializeCsrfToken, csrfOnRequest } from "./lib/csrf";
+import { csrfOnRequest, initializeCsrfToken } from "./lib/csrf";
+import { captureAttribution } from "./lib/attribution";
+import { getNodeHealth, shouldShowNodeHealth, type NodeHealth } from "./lib/nodeHealth";
 
 
 const queryClient = new QueryClient();
+const proxiedChainIds = new Set([mainnet.id, sepolia.id, base.id, baseSepolia.id, linea.id, lineaSepolia.id]);
+const baseChains = [mainnet, polygon, sepolia, base, baseSepolia, linea, lineaSepolia] as const;
 
 const App = () => {
   const [projectId, setProjectId] = useState("PROJECT_ID_UNSET");
@@ -84,10 +90,16 @@ const App = () => {
   const [wagmiConfig, setWagmiConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [configError, setConfigError] = useState(false);
+  const [nodeHealth, setNodeHealth] = useState<NodeHealth | null>(null);
 
   // Initialize CSRF token on app startup
   useEffect(() => {
     initializeCsrfToken();
+  }, []);
+
+  // Capture inbound UTM params before any auth redirect (Keycloak strips query params).
+  useEffect(() => {
+    captureAttribution();
   }, []);
 
   useEffect(() => {
@@ -96,7 +108,7 @@ const App = () => {
 
     const fetchConfig = async () => {
       try {
-        const configData = await getConfig();
+        const [configData] = await Promise.all([getConfig(), initStratoChain()]);
         if (!cancelled) {
           setProjectId(configData.projectId ?? "PROJECT_ID_UNSET");
           if (configData.networkId) setNetworkId(String(configData.networkId));
@@ -125,28 +137,46 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const refreshNodeHealth = async () => {
+      const health = await getNodeHealth();
+      if (!cancelled) {
+        setNodeHealth(shouldShowNodeHealth(health) ? health : null);
+      }
+    };
+
+    refreshNodeHealth();
+    const interval = setInterval(refreshNodeHealth, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!loading) {
-      const appName = "Mercata";
-      const stratoChainId = networkId ? Number(networkId) : null;
-      const stratoChain =
-        stratoChainId != null && !Number.isNaN(stratoChainId) && Number.isSafeInteger(stratoChainId)
-          ? defineChain({
-              id: stratoChainId,
-              name: "STRATO",
-              nativeCurrency: { decimals: 18, name: "ETH", symbol: "ETH" },
-              rpcUrls: { default: { http: [typeof window !== "undefined" ? `${window.location.origin}/api/rpc/${networkId}` : ""] } },
-            })
-          : null;
-      const baseChains = [mainnet, polygon, sepolia, base, baseSepolia] as const;
+      const appName = "STRATO";
+      const stratoChain = getStratoChain();
       const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(
-        chains.map((chain) => [chain.id, http(`/api/rpc/${chain.id}`, { onFetchRequest: csrfOnRequest })])
+        chains.map((chain) => [
+          chain.id,
+          chain === stratoChain
+            ? http(`/rpc`)
+            : proxiedChainIds.has(chain.id)
+              ? http(`/api/rpc/${chain.id}`, { fetchOptions: { credentials: "include" }, onFetchRequest: csrfOnRequest })
+              : http(),
+        ])
       );
 
       const connectors = connectorsForWallets(
         [
+          ...(stratoChain
+            ? [{ groupName: "STRATO", wallets: [stratoWallet] }]
+            : []),
           {
-            groupName: "Recommended",
+            groupName: "External",
             wallets: [metaMaskWallet, coinbaseWallet, walletConnectWallet],
           },
         ],
@@ -157,12 +187,11 @@ const App = () => {
         connectors,
         chains: chains as unknown as readonly [typeof mainnet, ...(typeof baseChains)],
         transports,
-        ssr: true,
       });
 
       setWagmiConfig(config);
     }
-  }, [projectId, loading, networkId]);
+  }, [projectId, loading]);
 
   const networkIdStr = networkId ?? undefined;
   const creditCardTopUpAddressStr = creditCardTopUpAddress ?? undefined;
@@ -172,7 +201,11 @@ const App = () => {
   }
 
   if (configError) {
-    return <SyncingPage />;
+    return <SyncingPage nodeHealth={nodeHealth} />;
+  }
+
+  if (nodeHealth) {
+    return <SyncingPage nodeHealth={nodeHealth} />;
   }
 
   if (!wagmiConfig) {
@@ -206,6 +239,14 @@ const App = () => {
                                               <Routes>
                                                 <Route path="/" element={<Index />} />
                                                 <Route path="/claim" element={<Claim />} />
+                                                <Route
+                                                  path="/communityrewards"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <CommunityRewardsOnePager />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
                                                 <Route
                                                   path="/dashboard"
                                                   element={

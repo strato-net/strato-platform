@@ -5,6 +5,7 @@ module Blockchain.Init.EthConf (genEthConf) where
 
 import Blockchain.EthConf
 import Blockchain.Init.Options hiding (flags_localAuth)
+import Control.Monad.Composable.Streaming.DockerConfig (brokerConfig, bcHost, bcPort)
 import qualified Blockchain.Init.Options as Opts
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Options (flags_network, flags_txSizeLimit, flags_gasLimit, computeNetworkID)
@@ -16,6 +17,7 @@ import Strato.Auth.Client (AuthEnv, newAuthEnv, runWithAuth)
 import qualified Strato.Strato23.API.Types as VC
 import Strato.Strato23.Client
 import System.Info (os)
+import System.Process (readProcess)
 import Text.ShortDescription
 
 -- | Address strato-api binds its socket to
@@ -23,13 +25,6 @@ getApiListenAddress :: String
 getApiListenAddress
   | os == "linux" = "172.17.0.1"
   | otherwise = "127.0.0.1"
-
--- | Address Docker containers use to reach strato-api on the host
-getApiHost :: String
-getApiHost
-  | flags_apiIPAddress /= "" = flags_apiIPAddress
-  | os == "linux" = "172.17.0.1"
-  | otherwise = "host.docker.internal"
 
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
@@ -53,7 +48,10 @@ runtimeConfig = def
       , redisPort = flags_redisPort
       , redisDBNumber = flags_redisDBNumber
       }
-  , kafkaConfig = def { kafkaHost = "kafka" }
+  , streamingConfig = def
+      { streamingHost = bcHost brokerConfig
+      , streamingPort = bcPort brokerConfig
+      }
   , discoveryConfig = def { minAvailablePeers = flags_minPeers }
   , p2pConfig = def
       { maxConnections = flags_maxConn
@@ -64,13 +62,13 @@ runtimeConfig = def
       }
   , apiConfig = def
       { apiListenAddress = getApiListenAddress
-      , apiHost = getApiHost
       }
   , contractsConfig = ContractsConf
       { railgunProxy = getRailgunProxyForNetwork flags_network
       , nativeTokenAddress = getNativeTokenForNetwork flags_network
       }
   , debugConfig = def { svmTrace = flags_svmTrace }
+  , vmConfig = def { sqlDiff = flags_sqlDiff, diffPublish = flags_diffPublish }
   }
 
 getNodeKey :: IO (VC.PublicKey, Address)
@@ -113,9 +111,16 @@ genEthConf :: IO EthConf
 genEthConf = do
   pgPass <- filter (/= '\n') <$> readFile "secrets/postgres_password"
 
+  localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
+
+  let ssl = not $ null flags_sslDir
+      !nodeBaseUrl = (if ssl then "https://" else "http://")
+        ++ localHostname
+        ++ if ssl then "" else ":" ++ show flags_httpPort
+
   -- For local auth mode, skip vault during setup (vault-wrapper starts later)
   if Opts.flags_localAuth
-    then putStrLn "  ✓ Local auth mode: node key will be created when vault-wrapper starts"
+    then putStrLn $ "  ✓ Local auth mode (hostname: " ++ localHostname ++ "): node key will be provisioned during first admin setup"
     else do
       (pub, _addr) <- getNodeKey
       putStrLn $ "  ✓ Node key: " ++ shortDescription pub
@@ -131,7 +136,11 @@ genEthConf = do
         , host = flags_pghost
         , password = pgPass
         }
-    , kafkaConfig = (kafkaConfig runtimeConfig) { kafkaHost = flags_kafkahost }
+    , streamingConfig = (streamingConfig runtimeConfig)
+        { streamingHost = if flags_kafkahost == "localhost"
+                          then bcHost brokerConfig
+                          else flags_kafkahost 
+        }
     , levelDBConfig = def
         { cacheSize = flags_ldbCacheSize
         , blockSize = flags_ldbBlockSize
@@ -142,19 +151,20 @@ genEthConf = do
         , mempoolLivenessCutoff = flags_mempoolLivenessCutoff
         }
     , urlConfig = def
-        { vaultUrl = if Opts.flags_localAuth
-            then "http://localhost:" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"
+        { nodeUrl = nodeBaseUrl
+        , vaultUrl = if Opts.flags_localAuth
+            then nodeBaseUrl ++ "/vault/strato/v2.3"
             else flags_vaultUrl
-        , vaultUrlDocker = if Opts.flags_localAuth
-            then "http://nginx:" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"
-            else flags_vaultUrl
+        , vaultTimeoutSec = flags_vaultTimeoutSec
         , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
         , notificationServerUrl = flags_notificationServerUrl
         , repoUrl = flags_repoUrl
+        , cookieRealm = localHostname
         }
     , networkConfig = def
         { network = flags_network
         , networkID = computeNetworkID
+        , chainId = computeChainId flags_network
         , httpPort = flags_httpPort
         , txSizeLimit = flags_txSizeLimit
         , gasLimit = flags_gasLimit

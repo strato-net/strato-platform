@@ -1,4 +1,5 @@
 import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, DepositActionRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction } from "@mercata/shared-types";
+import type { WalletTxProgressHandler } from "@/lib/axios";
 
 export interface BalanceResponse {
   balance: string;
@@ -7,6 +8,15 @@ export interface BalanceResponse {
 export interface BridgeResponse {
   success: boolean;
   data?: TransactionResponse;
+}
+
+export interface WithdrawalRequestOptions {
+  walletAuth?: boolean;
+  walletTxProgress?: WalletTxProgressHandler;
+}
+
+export interface DepositActionRequestOptions {
+  walletAuth?: boolean;
 }
 
 export type NetworkSummary = {
@@ -27,8 +37,8 @@ export type BridgeContextType = {
   // Navigation state for bridge transactions
   targetTransactionTab: BridgeTransactionTab | null;
   setTargetTransactionTab: (tab: BridgeTransactionTab | null) => void;
-  requestWithdrawal: (params: WithdrawalRequestParams) => Promise<BridgeResponse>;
-  requestDepositAction: (params: DepositActionRequestParams) => Promise<TransactionResponse>;
+  requestWithdrawal: (params: WithdrawalRequestParams, options?: WithdrawalRequestOptions) => Promise<BridgeResponse>;
+  requestDepositAction: (params: DepositActionRequestParams, options?: DepositActionRequestOptions) => Promise<TransactionResponse>;
   useBalance: (tokenAddress: string | null) => {
     data: { 
       balance: string; 

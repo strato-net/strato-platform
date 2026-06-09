@@ -34,6 +34,7 @@ library:
   - strato-model
   - text
   - unix
+  - vault-monad
 
 
 #temporarily removing this test while I decide if it is still needed

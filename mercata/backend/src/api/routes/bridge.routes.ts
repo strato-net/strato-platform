@@ -3,6 +3,7 @@ import authHandler from "../middleware/authHandler";
 import BridgeController from "../controllers/bridge.controller";
 
 const router = Router();
+const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 /**
  * @openapi
@@ -58,7 +59,46 @@ const router = Router();
  *                     message:
  *                       type: string
  */
-router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeController.requestWithdrawal);
+router.post("/requestWithdrawal", walletAuth, BridgeController.requestWithdrawal);
+
+/**
+ * @openapi
+ * /bridge/requestNativeWithdrawal:
+ *   post:
+ *     summary: Submit a native bridge withdrawal request
+ *     tags: [Bridge]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - externalChainId
+ *               - stratoToken
+ *               - stratoTokenAmount
+ *               - externalRecipient
+ *             properties:
+ *               externalChainId:
+ *                 type: string
+ *                 description: Destination chain identifier (numeric string)
+ *               stratoToken:
+ *                 type: string
+ *                 description: STRATO-native token contract address to bridge out
+ *               stratoTokenAmount:
+ *                 type: string
+ *                 description: Amount of the STRATO token to lock (decimal string)
+ *               externalRecipient:
+ *                 type: string
+ *                 description: Recipient address on the external chain
+ *               externalToken:
+ *                 type: string
+ *                 description: Optional representation token address metadata for client parity
+ *     responses:
+ *       200:
+ *         description: Native withdrawal transaction submitted
+ */
+router.post("/requestNativeWithdrawal", walletAuth, BridgeController.requestNativeWithdrawal);
 
 /**
  * @openapi
@@ -107,7 +147,7 @@ router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeControll
  *                     hash:
  *                       type: string
  */
-router.post("/requestDepositAction", authHandler.authorizeRequest(), BridgeController.requestDepositAction);
+router.post("/requestDepositAction", walletAuth, BridgeController.requestDepositAction);
 
 /**
  * @openapi

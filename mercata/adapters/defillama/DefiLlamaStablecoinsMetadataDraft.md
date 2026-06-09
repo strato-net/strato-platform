@@ -13,7 +13,7 @@ It is intentionally separate from the draft stablecoin adapter logic because the
 ## STRATO Chain
 
 - chain key: `strato`
-- public source endpoint: `https://YOUR_PUBLIC_STRATO_API_HOST/api/v1/metrics/stablecoins`
+- public source endpoint: `https://app.strato.nexus/api/metrics/stablecoins`
 
 ## Included Stablecoins
 
@@ -61,12 +61,12 @@ Stablecoin supply on STRATO counts the circulating supply of canonical USD-pegge
 
 ## Current Prod Snapshot
 
-Current production output from `prod-stablecoins-output.json`:
+Live snapshot from `https://app.strato.nexus/api/metrics/stablecoins` (2026-04-17):
 
-- total stablecoin supply: approximately `$814.9M`
-- `USDST`: approximately `$801.0M`
-- `USDC`: approximately `$9.28M`
-- `USDT`: approximately `$4.60M`
+- total stablecoin supply: approximately `$987.8K`
+- `USDST`: approximately `$911.0K`
+- `USDC`: approximately `$52.4K`
+- `USDT`: approximately `$24.5K`
 
 ## Candidate Review Notes
 

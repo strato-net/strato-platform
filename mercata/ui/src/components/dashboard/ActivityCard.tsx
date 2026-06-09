@@ -30,6 +30,7 @@ export interface ActivityField {
   imageFallback?: string; // Fallback text (e.g., symbol) when no image
   rawAmount?: string; // Raw amount value for tooltip (for amount fields)
   explorerUrl?: string; // Explorer URL for transaction hashes
+  className?: string;
 }
 
 
@@ -277,7 +278,7 @@ export const ActivityCard = ({ data }: { data: ActivityCardData }) => {
     );
 
     return (
-      <div className="inline-flex items-center gap-2">
+      <div className={`inline-flex items-center gap-2 ${field.className || ""}`}>
         {field.image && (
           <AssetImageDisplay
             image={field.image}

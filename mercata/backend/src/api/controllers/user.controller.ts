@@ -13,10 +13,10 @@ class UserController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { address: userAddress, accessToken, userName } = req;
+      const { address: userAddress, accessToken, userName, isNewUser } = req;
       const isAdmin = await isUserAdmin(accessToken, userAddress);
-      
-      res.status(RestStatus.OK).json({ userAddress, isAdmin, userName });
+
+      res.status(RestStatus.OK).json({ userAddress, isAdmin, userName, isNewUser: !!isNewUser });
       next();
     } catch (e) {
       next(e);

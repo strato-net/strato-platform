@@ -76,6 +76,63 @@ export function loadConfig(configPath: string): LoadTestConfig {
         enabled: false,
         ...raw.scenarios?.multiNode,
       },
+      tokenSale: {
+        enabled: false,
+        totalTxCount: 1000,
+        timeWindowMs: 30000,
+        concurrentUsers: 50,
+        networkLabel: "helium",
+        chainId: 114784819836269,
+        externalChainId: "11155111", // Ethereum Sepolia (testnet) — set to "1" for mainnet
+        // `bridge` and `metalTokenAddress` MUST be supplied in user config —
+        // there is no sensible default for the funded EOA / DepositRouter /
+        // GOLDST. `bridge` is typed as required, but the YAML loader merges
+        // user config over this `undefined` placeholder; if the user omits
+        // `bridge:` the scenario throws at run() validation with a clear
+        // message.
+        bridge: undefined as any,
+        metalTokenAddress: "",
+        payTokenAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010", // helium USDST
+        metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6", // helium MetalForge
+        includePageLoad: false,
+        logBalances: "summary",
+        requestRetries: 3,
+        autoForgeWaitTimeoutSec: 300,
+        autoForgeWaitPollIntervalSec: 5,
+        ...raw.scenarios?.tokenSale,
+      },
+      forgeBuy: {
+        enabled: false,
+        totalTxCount: 1000,
+        timeWindowMs: 30000,
+        concurrentUsers: 50,
+        networkLabel: "helium",
+        chainId: 114784819836269,
+        // `metalTokenAddress` MUST be supplied in user config — no sensible
+        // default for GOLDST.
+        metalTokenAddress: "",
+        payTokenAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010", // helium USDST
+        payAmount: "1000000000000000", // 0.001 USDST per iteration
+        minMetalOut: "0",
+        metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6", // helium MetalForge
+        includePageLoad: false,
+        logBalances: "summary",
+        requestRetries: 3,
+        ...raw.scenarios?.forgeBuy,
+      },
+      pageLoad: {
+        enabled: false,
+        concurrentUsers: 50,
+        networkLabel: "helium",
+        // Defaults mirror the forge Buy page's on-mount GETs so this scenario
+        // exercises the same page-load path the forgeBuy UI hits, in
+        // isolation runs. Override via YAML to test other UI pages.
+        steps: [
+          { name: "metalForgeConfigs", path: "/api/metal-forge/configs" },
+          { name: "tokensBalance", path: "/api/tokens/balance" },
+        ],
+        ...raw.scenarios?.pageLoad,
+      },
     },
     report: { ...DEFAULTS.report!, ...raw.report },
   };
@@ -83,16 +140,31 @@ export function loadConfig(configPath: string): LoadTestConfig {
   return config;
 }
 
+export interface CliOverrides {
+  batchSize?: number;
+  batchCount?: number;
+  scenario?: string;
+  nodes?: string[];
+  reportDir?: string;
+  submitMode?: SubmitMode;
+  concurrentUsers?: number;
+  totalTx?: number;
+  timeWindow?: number;
+  backendUrl?: string;
+}
+
+const KNOWN_SCENARIOS = new Set([
+  "contractDeploy",
+  "functionCall",
+  "mixedWorkload",
+  "tokenSale",
+  "forgeBuy",
+  "pageLoad",
+]);
+
 export function applyCliOverrides(
   config: LoadTestConfig,
-  overrides: {
-    batchSize?: number;
-    batchCount?: number;
-    scenario?: string;
-    nodes?: string[];
-    reportDir?: string;
-    submitMode?: SubmitMode;
-  },
+  overrides: CliOverrides,
 ): LoadTestConfig {
   if (overrides.batchSize !== undefined) {
     config.scenarios.contractDeploy.batchSize = overrides.batchSize;
@@ -102,19 +174,20 @@ export function applyCliOverrides(
   if (overrides.batchCount !== undefined) {
     config.scenarios.contractDeploy.batchCount = overrides.batchCount;
     config.scenarios.functionCall.batchCount = overrides.batchCount;
-    // For mixed workload, adjust totalTxCount
     config.scenarios.mixedWorkload.totalTxCount =
       overrides.batchCount * config.scenarios.mixedWorkload.batchSize;
   }
   if (overrides.scenario) {
-    // Disable all, then enable just the requested one
-    config.scenarios.contractDeploy.enabled = false;
-    config.scenarios.functionCall.enabled = false;
-    config.scenarios.mixedWorkload.enabled = false;
-    if (overrides.scenario === "contractDeploy") config.scenarios.contractDeploy.enabled = true;
-    else if (overrides.scenario === "functionCall") config.scenarios.functionCall.enabled = true;
-    else if (overrides.scenario === "mixedWorkload") config.scenarios.mixedWorkload.enabled = true;
-    else throw new Error(`Unknown scenario: ${overrides.scenario}`);
+    if (!KNOWN_SCENARIOS.has(overrides.scenario)) {
+      throw new Error(
+        `Unknown scenario: ${overrides.scenario}. Known: ${Array.from(KNOWN_SCENARIOS).join(", ")}`,
+      );
+    }
+    // Disable all, then enable only the requested one
+    for (const key of KNOWN_SCENARIOS) {
+      (config.scenarios as any)[key].enabled = false;
+    }
+    (config.scenarios as any)[overrides.scenario].enabled = true;
   }
   if (overrides.nodes && overrides.nodes.length > 0) {
     config.nodes = config.nodes.filter((n) => overrides.nodes!.includes(n.name));
@@ -129,6 +202,24 @@ export function applyCliOverrides(
     config.scenarios.contractDeploy.submitMode = overrides.submitMode;
     config.scenarios.functionCall.submitMode = overrides.submitMode;
     config.scenarios.mixedWorkload.submitMode = overrides.submitMode;
+  }
+  if (overrides.concurrentUsers !== undefined) {
+    config.scenarios.tokenSale.concurrentUsers = overrides.concurrentUsers;
+    config.scenarios.forgeBuy.concurrentUsers = overrides.concurrentUsers;
+    config.scenarios.pageLoad.concurrentUsers = overrides.concurrentUsers;
+  }
+  if (overrides.totalTx !== undefined) {
+    config.scenarios.tokenSale.totalTxCount = overrides.totalTx;
+    config.scenarios.forgeBuy.totalTxCount = overrides.totalTx;
+  }
+  if (overrides.timeWindow !== undefined) {
+    config.scenarios.tokenSale.timeWindowMs = overrides.timeWindow;
+    config.scenarios.forgeBuy.timeWindowMs = overrides.timeWindow;
+  }
+  if (overrides.backendUrl) {
+    config.scenarios.tokenSale.backendUrl = overrides.backendUrl;
+    config.scenarios.forgeBuy.backendUrl = overrides.backendUrl;
+    config.scenarios.pageLoad.backendUrl = overrides.backendUrl;
   }
   return config;
 }

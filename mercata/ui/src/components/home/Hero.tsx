@@ -11,7 +11,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
-import { redirectToLogin } from '@/lib/auth';
+import { requestWalletConnection } from '@/lib/auth';
 import heroBackground from '../../assets/home/hero-background.png';
 import darkThemeBackground from '../../assets/home/darktheme-hero-bg.png';
 
@@ -25,7 +25,7 @@ const Hero = () => {
     if (isLoggedIn) {
       navigate('/dashboard');
     } else {
-      redirectToLogin();
+      requestWalletConnection();
     }
   };
 

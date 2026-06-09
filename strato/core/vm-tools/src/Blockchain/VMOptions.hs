@@ -8,8 +8,6 @@ module Blockchain.VMOptions
     flags_sqlDiff,
     flags_diffPublish,
     flags_queryBlocks,
-    flags_strictGas,
-    flags_strictGasLimit,
   )
 where
 import HFlags
@@ -29,5 +27,3 @@ defineFlag "diffPublish" False "publishes all state changes to kafka"
 defineFlag "queryBlocks" (10000 :: Int) "Number of blocks to query from SQL to process in one batch"
 defineFlag "svmDev" (False :: Bool) "Whether to crash on SolidVM exceptions"
 defineFlag "svmTrace" (False :: Bool) "Whether to have verbose logging in SolidVM"
-defineFlag "strictGas" (True :: Bool) "Whether to restrict transactions to approximately 2 second gas timeout"
-defineFlag "strictGasLimit" (400000 :: Integer) "The maximum amount of gas that can be used for a transaction in strict mode"

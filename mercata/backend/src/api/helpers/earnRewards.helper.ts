@@ -59,6 +59,7 @@ export function buildRewardActivitiesFromMappings(
     sTokenAddress: string | null;
     vaultShareTokenAddress: string | null;
     saveUsdstVaultAddress: string | null;
+    carryVaultUsdPriceMap?: Map<string, string>;
   },
 ): any[] {
   const saveUsdstSource = normalizeAddress(pricingCtx.saveUsdstVaultAddress);
@@ -83,7 +84,7 @@ export function buildRewardActivitiesFromMappings(
 
 function computeRewardStakeUsd(
   sourceContractRaw: string, name: string, totalStake: string,
-  ctx: { priceMap: Map<string, string>; mTokenAddress: string | null; sTokenAddress: string | null; vaultShareTokenAddress: string | null },
+  ctx: { priceMap: Map<string, string>; mTokenAddress: string | null; sTokenAddress: string | null; vaultShareTokenAddress: string | null; carryVaultUsdPriceMap?: Map<string, string> },
   saveUsdstSource: string,
 ): { stakeAssetAddress: string | null; totalStakeUsd: string | null } {
   const sourceContract = normalizeAddress(sourceContractRaw);
@@ -96,6 +97,17 @@ function computeRewardStakeUsd(
 
   const directStakePrice = stakeAssetAddress ? getPriceForAddress(ctx.priceMap, stakeAssetAddress) : null;
   if (directStakePrice) return { stakeAssetAddress, totalStakeUsd: toUsdValue(totalStake, directStakePrice) };
+
+  // Carry yield vaults (eth-carry, wbtc-carry): stake is in share units and the
+  // USD-per-share is precomputed against the asset's oracle price. Must precede
+  // the generic `lower.includes("vault")` branch, which would otherwise route
+  // the carry vault through the main protocol vault's share-token price.
+  if (ctx.carryVaultUsdPriceMap) {
+    const carryUsdPrice = ctx.carryVaultUsdPriceMap.get(sourceContract);
+    if (carryUsdPrice && carryUsdPrice !== "0") {
+      return { stakeAssetAddress: sourceContract, totalStakeUsd: toUsdValue(totalStake, carryUsdPrice) };
+    }
+  }
 
   const lower = name.toLowerCase();
   if (lower.includes("safety")) {

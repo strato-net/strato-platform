@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserRewardsData, claimAllRewards, claimRewards, safeBigInt } from "@/services/rewardsService";
+import { UserRewardsData, claimRewards, safeBigInt } from "@/services/rewardsService";
 import {
   calculateRealTimePendingRewards,
   formatEmissionRatePerDay,
@@ -16,6 +16,7 @@ import { useState } from "react";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
 import { useUser } from "@/context/UserContext";
 import { useOracleContext } from "@/context/OracleContext";
+import { isTxPending } from "@/utils/transactionStatus";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 import { Link } from "react-router-dom";
@@ -83,58 +84,9 @@ export const UserRewardsSection = ({
 }: UserRewardsSectionProps) => {
   const { toast } = useToast();
   const { saveUsdstInfo } = useSaveUsdstContext();
-  const { userAddress } = useUser();
+  const { userAddress, isAppAuthenticated } = useUser();
   const { getPrice } = useOracleContext();
   const [claimingActivityIds, setClaimingActivityIds] = useState<number[]>([]);
-  const [isClaimingAll, setIsClaimingAll] = useState(false);
-
-  const handleClaimAll = async () => {
-    if (!userAddress) {
-      toast({
-        title: "User Not Logged In",
-        description: "Please log in to claim rewards",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!userRewards) {
-      toast({
-        title: "No Rewards",
-        description: "You don't have any rewards to claim",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setIsClaimingAll(true);
-      setClaimingActivityIds([]);
-      
-      const result = await claimAllRewards(userAddress);
-      
-      if (result.success) {
-        toast({
-          title: "Claim Successful",
-          description: result.txHash 
-            ? `Transaction hash: ${result.txHash.slice(0, 10)}...`
-            : "Rewards claimed successfully",
-        });
-        onClaimSuccess?.();
-      } else {
-        throw new Error("Claim failed");
-      }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to claim rewards";
-      toast({
-        title: "Claim Failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsClaimingAll(false);
-    }
-  };
 
   const handleClaimActivity = async (activityIds: number[]) => {
     if (!userAddress) {
@@ -158,11 +110,11 @@ export const UserRewardsSection = ({
     try {
       setClaimingActivityIds(activityIds);
       
-      const result = await claimRewards(userAddress, activityIds);
+      const result = await claimRewards(userAddress, activityIds, { walletAuth: !isAppAuthenticated });
       
       if (result.success) {
         toast({
-          title: "Claim Successful",
+          title: isTxPending(result.status) ? "Claim Submitted" : "Claim Successful",
           description: result.txHash 
             ? `Transaction hash: ${result.txHash.slice(0, 10)}...`
             : "Rewards claimed successfully",
@@ -225,28 +177,10 @@ export const UserRewardsSection = ({
       safeBigInt(a.activity?.emissionRate || "0") > 0n
   );
 
-  const hasBonusRewards = userRewards.bonusRewards && safeBigInt(userRewards.bonusRewards) > 0n;
-  const bonusFormatted = hasBonusRewards
-    ? formatRoundedWithCommas(roundByMagnitude(
-        formatBalance(userRewards.bonusRewards!, "points", 18, 18, 18)
-          .replace(/\s*points?\s*$/i, '').trim()
-      )) + " points"
-    : null;
-
-  // Calculate what user would receive if they claim:
-  // - claimAllRewards: settles all activities, then claims total unclaimedRewards[user]
-  // - claimRewards(activityId): settles that activity, then claims total unclaimedRewards[user]
-  // So both claim the total, but after settling different activities
-  
-  // Calculate new pending rewards that haven't been settled yet for each activity
-  const baseUnclaimed = safeBigInt(unclaimedRewardsStr);
-  let totalNewPending = 0n;
-  
   // Pre-calculate pending for each activity using real-time calculation
   const activityPendingMap = new Map<number, bigint>();
-  const currentTime = Math.floor(Date.now() / 1000); // Current Unix timestamp in seconds
+  const currentTime = Math.floor(Date.now() / 1000);
   activitiesWithStake.forEach(({ activity, userInfo }) => {
-    // Check for existence, not truthiness (0 is valid for userIndex)
     if (
       userInfo?.stake &&
       activity?.accRewardPerStake !== undefined &&
@@ -264,109 +198,12 @@ export const UserRewardsSection = ({
         activity.lastUpdateTime,
         currentTime
       );
-      const pendingBig = safeBigInt(pending);
-      activityPendingMap.set(activity.activityId, pendingBig);
-      totalNewPending += pendingBig;
+      activityPendingMap.set(activity.activityId, safeBigInt(pending));
     }
   });
-  
-  // Total claimable = base unclaimed + new pending from all activities
-  const totalClaimable = baseUnclaimed + totalNewPending;
-  const hasClaimable = totalClaimable > 0n;
-  const totalClaimableDecimal = totalClaimable >= 0n
-    ? formatBalance(totalClaimable.toString(), "points", 18, 18, 18)
-    : null;
-  // Extract just the numeric part (remove "points" suffix and any spaces)
-  const numericPart = totalClaimableDecimal
-    ? totalClaimableDecimal.replace(/\s*points?\s*$/i, '').trim()
-    : null;
-  const totalClaimableFormatted = numericPart !== null
-    ? formatRoundedWithCommas(roundByMagnitude(numericPart)) + " points" 
-    : "?";
 
   return (
     <div className="space-y-6">
-      {/* Total Claimable, Total Earned, and optionally Community Bonus Cards */}
-      <div className={`grid grid-cols-1 ${hasBonusRewards ? "md:grid-cols-3" : "md:grid-cols-2"} gap-6`}>
-      {/* Total Claimable Card */}
-      <Card>
-        <CardHeader className="px-4 md:px-6 pb-2 md:pb-4">
-          <CardTitle className="text-base md:text-lg">
-            Total Claimable Rewards{hasBonusRewards ? " (incl. Bonus)" : ""}
-          </CardTitle>
-          <CardDescription className="text-xs md:text-sm">Rewards ready to claim now</CardDescription>
-        </CardHeader>
-        <CardContent className="px-4 md:px-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div>
-              <div className="flex items-center space-x-2 mb-1 md:mb-2">
-                <Coins className="h-4 w-4 md:h-5 md:w-5 text-yellow-500" />
-                <p className="text-2xl md:text-3xl font-bold">{totalClaimableFormatted}</p>
-              </div>
-              <p className="text-xs md:text-sm text-muted-foreground">
-                Amount you will receive if you click "Claim All"
-              </p>
-            </div>
-            <Button
-              onClick={handleClaimAll}
-              disabled={!hasClaimable || isClaimingAll || !userAddress}
-              size="lg"
-              className="w-full md:w-auto"
-            >
-              {isClaimingAll ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Claiming...
-                </>
-              ) : !userAddress ? (
-                "Log In to Claim"
-              ) : (
-                "Claim All"
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-        {/* Total Earned Card */}
-        <Card>
-          <CardHeader className="px-4 md:px-6 pb-2 md:pb-4">
-            <CardTitle className="text-base md:text-lg">Total Claimed</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 md:px-6">
-            <div className="flex items-center space-x-2 mb-1 md:mb-2">
-              <Star className="h-4 w-4 md:h-5 md:w-5 text-amber-500" />
-              <p className="text-2xl md:text-3xl font-bold">
-                {formatRoundedWithCommas(roundByMagnitude(
-                  formatBalance(userRewards?.claimedRewards || "0", "points", 18, 18, 18)
-                    .replace(/\s*points?\s*$/i, '').trim()
-                ))} points
-              </p>
-            </div>
-            <p className="text-xs md:text-sm text-muted-foreground">
-              Reward Points
-            </p>
-          </CardContent>
-        </Card>
-
-        {hasBonusRewards && (
-          <Card>
-            <CardHeader className="px-4 md:px-6 pb-2 md:pb-4">
-              <div className="flex items-center gap-1.5">
-                <CardTitle className="text-base md:text-lg">Community Bonus</CardTitle>
-                <InfoTooltip content="Included in claimable total" />
-              </div>
-            </CardHeader>
-            <CardContent className="px-4 md:px-6">
-              <div className="flex items-center space-x-2 mb-1 md:mb-2">
-                <Gift className="h-4 w-4 md:h-5 md:w-5 text-emerald-500" />
-                <p className="text-2xl md:text-3xl font-bold">{bonusFormatted}</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
       {/* Activities with Stake */}
       {activitiesWithStake.length === 0 ? (
         <Card>
@@ -378,7 +215,7 @@ export const UserRewardsSection = ({
         </Card>
       ) : (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Your Activity Positions</h3>
+          <h3 className="text-lg font-semibold">Your Active Positions</h3>
           {activitiesWithStake.map(({ activity, userInfo, personalEmissionRate }) => {
             // Format stake values with magnitude-aware rounding
             const userStakeStr = userInfo?.stake || null;
@@ -510,4 +347,3 @@ export const UserRewardsSection = ({
     </div>
   );
 };
-

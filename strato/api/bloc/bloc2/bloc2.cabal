@@ -29,7 +29,6 @@ library
   ghc-options: -Wall -Werror -fsimpl-tick-factor=15000
   build-depends:
       base
-    , base16-bytestring
     , bimap
     , bloc2api
     , blockDB
@@ -46,8 +45,6 @@ library
     , containers
     , core-api2
     , deepseq
-    , esqueleto
-    , ethereum-rlp
     , evm-solidity
     , extra
     , format
@@ -56,7 +53,6 @@ library
     , labeled-error
     , lens
     , monad-alter
-    , monad-logger
     , mtl
     , openapi3
     , ordered-containers
@@ -69,11 +65,9 @@ library
     , solid-vm-model
     , solid-vm-parser
     , source-tools
-    , sql-monad
     , strato-auth
     , strato-conf
     , strato-model
-    , strato-redis-blockdb
     , text
     , time
     , transformers

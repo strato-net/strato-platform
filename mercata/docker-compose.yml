@@ -40,6 +40,17 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
+  rwa-io-adapter:
+    build: ./adapters/rwa-io
+    image: mercata-rwa-io-adapter:latest
+    environment:
+      - RWA_IO_API_KEY=${RWA_IO_API_KEY}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
   nginx:
     environment:
       - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -e
 
 minLogLevel=LevelInfo
 if [ "${VAULTWRAPPER_DEBUG:-false}" == true ]; then
@@ -12,7 +12,7 @@ vault-wrapper:
 --phsot=\$postgres_host="${postgres_host}"
 --pgport=\$postgres_port="${postgres_port}"
 --pguser=\$postgres_user="${postgres_user}"
---password=\$postgres_password="${postgres_password}"
+--password=\$postgres_password="***"
 --database=\$postgres_vault_wrapper_db="${postgres_vault_wrapper_db}"
 --minLogLevel="${minLogLevel}"
 --keyStoreCacheTimeout="${keyStoreCacheTimeout}"

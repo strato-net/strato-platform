@@ -37,7 +37,6 @@ library
     , generic-arbitrary
     , generic-random
     , labeled-error
-    , openapi3
     , persistent
     , solid-vm-model
     , strato-model

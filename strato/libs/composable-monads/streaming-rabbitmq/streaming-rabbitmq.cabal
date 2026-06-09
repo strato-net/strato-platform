@@ -1,0 +1,35 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           streaming-rabbitmq
+version:        0.1.0.0
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Control.Monad.Composable.Streaming.Backend
+      Control.Monad.Composable.Streaming.Backend.DockerConfig
+      Control.Monad.Composable.Streaming.RabbitMQ
+      Control.Monad.Composable.Streaming.RabbitMQ.DockerConfig
+  other-modules:
+      Paths_streaming_rabbitmq
+  hs-source-dirs:
+      src
+  build-depends:
+      aeson
+    , amqp
+    , base >=4.7 && <5
+    , binary
+    , bytestring
+    , composable-monads-base
+    , conduit
+    , containers
+    , mtl
+    , stm
+    , text
+    , transformers
+  default-language: Haskell2010
