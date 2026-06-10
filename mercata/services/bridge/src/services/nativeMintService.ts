@@ -370,3 +370,33 @@ export const getNativeMintProposalExecution = async (
 
   return { status: "pending" };
 };
+
+export const getPendingNativeMintProposalHashes = async (
+  chainId: number | string,
+): Promise<Set<string>> => {
+  const { apiKit } = await initializeSafeForChain(toSafeNumberChainId(String(chainId)));
+  const safeAddress = config.safe.address || "";
+  const pending = new Set<string>();
+  if (!safeAddress) return pending;
+
+  const limit = 100;
+  let offset = 0;
+  while (true) {
+    const response = await retry(
+      () => apiKit.getPendingTransactions(safeAddress, {
+        ordering: "nonce",
+        limit,
+        offset,
+      }),
+      { logPrefix: "NativeMintService" },
+    );
+    const results = (response as any)?.results || [];
+    for (const tx of results) {
+      if (tx?.safeTxHash) pending.add(ensureHexPrefix(tx.safeTxHash).toLowerCase());
+    }
+    if (!response.next || results.length === 0) break;
+    offset += limit;
+  }
+
+  return pending;
+};
