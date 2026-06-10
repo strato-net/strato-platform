@@ -19,6 +19,7 @@ pipeline {
           lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
         }
         sh '''#!/bin/bash -le
+          rm -rf /tmp/tmp.*
           strato-down mynode || true
           pkill convoke || true
           docker rm -f $(docker ps -aq) || true
