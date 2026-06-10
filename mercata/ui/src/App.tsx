@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Loader2 } from "lucide-react";
 import UsdstBalanceBox from "@/components/layouts/UsdstBalanceBox";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -204,7 +205,11 @@ const App = () => {
   const creditCardTopUpAddressStr = creditCardTopUpAddress ?? undefined;
 
   if (loading) {
-    return <div>Loading configuration...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   if (configError) {
@@ -216,7 +221,11 @@ const App = () => {
   }
 
   if (!wagmiConfig) {
-    return <div>Loading configuration...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
