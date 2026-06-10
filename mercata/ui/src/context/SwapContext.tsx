@@ -51,6 +51,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   // EFFECTS
   // ============================================================================
   
+  
   // Clear refs when pool changes
   useEffect(() => {
     if (!pool?.address) {
