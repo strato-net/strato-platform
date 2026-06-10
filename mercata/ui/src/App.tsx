@@ -71,16 +71,23 @@ import { SaveUsdstProvider } from "@/context/SaveUsdstContext";
 import { YieldVaultProvider } from "@/context/YieldVaultContext";
 import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { csrfOnRequest, initializeCsrfToken } from "./lib/csrf";
 import { captureAttribution } from "./lib/attribution";
 import { getNodeHealth, shouldShowNodeHealth, type NodeHealth } from "./lib/nodeHealth";
+import { useUser } from "@/context/UserContext";
 
 
 const queryClient = new QueryClient();
 const proxiedChainIds = new Set([mainnet.id, sepolia.id, base.id, baseSepolia.id, linea.id, lineaSepolia.id]);
 const baseChains = [mainnet, polygon, sepolia, base, baseSepolia, linea, lineaSepolia] as const;
+
+const AuthGate = ({ children }: { children: ReactNode }) => {
+  const { loading } = useUser();
+  if (loading) return null;
+  return <>{children}</>;
+};
 
 const App = () => {
   const [projectId, setProjectId] = useState("PROJECT_ID_UNSET");
@@ -219,6 +226,7 @@ const App = () => {
           <WagmiProvider config={wagmiConfig}>
             <RainbowKitProvider>
               <UserProvider>
+                <AuthGate>
                 <UserTokensProvider>
                   <SwapProvider>
                     <OracleProvider>
@@ -485,6 +493,7 @@ const App = () => {
                     </OracleProvider>
                   </SwapProvider>
                 </UserTokensProvider>
+                </AuthGate>
               </UserProvider>
             </RainbowKitProvider>
           </WagmiProvider>
