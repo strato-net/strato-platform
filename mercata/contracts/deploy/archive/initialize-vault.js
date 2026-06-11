@@ -7,8 +7,8 @@
  * See deploy-yield-vault.md for the full deployment runbook.
  */
 require('dotenv').config();
-const config = require('./config');
-const auth = require('./auth');
+const config = require('../config');
+const auth = require('../auth');
 const { rest } = require('blockapps-rest');
 
 function parseArgs() {

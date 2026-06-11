@@ -10,8 +10,8 @@
  *     --guardian <addr>
  */
 require('dotenv').config();
-const config = require('./config');
-const auth = require('./auth');
+const config = require('../config');
+const auth = require('../auth');
 const { rest, util } = require('blockapps-rest');
 
 function parseArgs() {
