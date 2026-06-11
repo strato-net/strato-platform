@@ -181,12 +181,30 @@ data ContractsConf = ContractsConf
 data UrlConfig = UrlConfig
   { nodeUrl :: String  -- Canonical external URL: http(s)://hostname[:port]
   , vaultUrl :: String
+  -- | HTTP response timeout (seconds) for vault-wrapper signature / key
+  -- requests. Default 12s; bump for high-concurrency scenarios where the
+  -- vault HSM/HSM-proxy round-trip can spike under load. Set via
+  -- --vaultTimeoutSec at strato-init time.
+  , vaultTimeoutSec :: Int
   , fileServerUrl :: String
   , notificationServerUrl :: String
   , repoUrl :: String  -- Docker registry URL prefix for images
   , cookieRealm :: String  -- Domain for auth cookies (hostname, or parent domain for subdomain sharing)
   }
-  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+  deriving (Show, Eq, Generic, ToJSON)
+
+-- Manual FromJSON so existing YAML configs without 'vaultTimeoutSec' continue
+-- to parse (defaulting to 12s). Once all deployed configs include the field
+-- this can be reverted to the derived instance.
+instance FromJSON UrlConfig where
+  parseJSON = withObject "UrlConfig" $ \v -> UrlConfig
+    <$> v .:  "nodeUrl"
+    <*> v .:  "vaultUrl"
+    <*> v .:? "vaultTimeoutSec" .!= 12
+    <*> v .:  "fileServerUrl"
+    <*> v .:  "notificationServerUrl"
+    <*> v .:  "repoUrl"
+    <*> v .:? "cookieRealm" .!= "localhost"
 
 data NetworkConf = NetworkConf
   { network :: String
@@ -315,6 +333,7 @@ instance Default UrlConfig where
   def = UrlConfig
     { nodeUrl = "http://localhost:8081"
     , vaultUrl = "https://vault.blockapps.net:8093"
+    , vaultTimeoutSec = 12
     , fileServerUrl = ""
     , notificationServerUrl = ""
     , repoUrl = ""
