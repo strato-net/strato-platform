@@ -26,6 +26,17 @@ getApiListenAddress
   | os == "linux" = "172.17.0.1"
   | otherwise = "127.0.0.1"
 
+-- | In local mode the generated docker-compose.yml publishes Postgres/Redis only
+-- on IPv4 (127.0.0.1:PORT). macOS resolves "localhost" to IPv6 (::1) first, so
+-- local STRATO processes fail to connect ("connection to server at \"localhost\"
+-- (::1) ... Connection refused"). Pin the default "localhost" to the IPv4 loopback
+-- the ports are actually bound to. On Linux "localhost" already resolves to
+-- 127.0.0.1, so this is a no-op there. Explicit non-localhost hosts (e.g. the
+-- "postgres" docker service name used in allDocker mode) are left untouched.
+preferIPv4Loopback :: String -> String
+preferIPv4Loopback "localhost" = "127.0.0.1"
+preferIPv4Loopback h = h
+
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
 getRailgunProxyForNetwork :: String -> Maybe Address
@@ -44,7 +55,7 @@ runtimeConfig = def
   { sqlConfig = def { host = "postgres" }
   , cirrusConfig = def { host = "postgres", database = "cirrus" }
   , redisBlockDBConfig = def
-      { redisHost = flags_redisHost
+      { redisHost = preferIPv4Loopback flags_redisHost
       , redisPort = flags_redisPort
       , redisDBNumber = flags_redisDBNumber
       }
@@ -128,12 +139,12 @@ genEthConf = do
   return runtimeConfig
     { sqlConfig = (sqlConfig runtimeConfig)
         { user = flags_pguser
-        , host = flags_pghost
+        , host = preferIPv4Loopback flags_pghost
         , password = pgPass
         }
     , cirrusConfig = (cirrusConfig runtimeConfig)
         { user = flags_pguser
-        , host = flags_pghost
+        , host = preferIPv4Loopback flags_pghost
         , password = pgPass
         }
     , streamingConfig = (streamingConfig runtimeConfig)
@@ -155,6 +166,7 @@ genEthConf = do
         , vaultUrl = if Opts.flags_localAuth
             then nodeBaseUrl ++ "/vault/strato/v2.3"
             else flags_vaultUrl
+        , vaultTimeoutSec = flags_vaultTimeoutSec
         , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
         , notificationServerUrl = flags_notificationServerUrl
         , repoUrl = flags_repoUrl

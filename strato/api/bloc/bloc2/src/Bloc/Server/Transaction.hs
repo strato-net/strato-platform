@@ -31,7 +31,7 @@ import Bloc.Server.TransactionResult
 import Bloc.Server.Utils
 import BlockApps.Logging
 import Data.ByteString (ByteString)
-import Strato.Auth.Client (newAuthEnv, runWithUserToken)
+import Strato.Auth.Client (newAuthEnvWith, runWithUserToken)
 import qualified Strato.Strato23.API.Types as VaultT
 import Strato.Strato23.Client (postSignature, getKey)
 import BlockApps.Solidity.ArgValue
@@ -1110,7 +1110,8 @@ vaultGetPub ::
   (MonadIO m, MonadLogger m) =>
   Text -> m PublicKey
 vaultGetPub token = do
-  env <- liftIO $ newAuthEnv (EthConf.vaultUrl . EthConf.urlConfig $ ethConf)
+  let urlCfg = EthConf.urlConfig ethConf
+  env <- liftIO $ newAuthEnvWith (EthConf.vaultTimeoutSec urlCfg) (EthConf.vaultUrl urlCfg)
   result <- liftIO $ runWithUserToken env token (getKey Nothing Nothing)
   either (blocError . VaultWrapperError) return (fmap VaultT.unPubKey result)
 
@@ -1118,7 +1119,8 @@ vaultSign ::
   (MonadIO m, MonadLogger m) =>
   Text -> ByteString -> m Signature
 vaultSign token msgHash = do
-  env <- liftIO $ newAuthEnv (EthConf.vaultUrl . EthConf.urlConfig $ ethConf)
+  let urlCfg = EthConf.urlConfig ethConf
+  env <- liftIO $ newAuthEnvWith (EthConf.vaultTimeoutSec urlCfg) (EthConf.vaultUrl urlCfg)
   result <- liftIO $ runWithUserToken env token (postSignature Nothing (VaultT.MsgHash msgHash))
   either (blocError . VaultWrapperError) return result
 
