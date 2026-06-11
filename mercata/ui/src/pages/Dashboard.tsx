@@ -16,13 +16,11 @@ import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipati
 import PortfolioValueChart from "@/components/dashboard/PortfolioValueChart";
 import { useLendingContext } from "@/context/LendingContext";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
-import { BalanceSnapshot } from "@mercata/shared-types";
 import { useUserLeaderboardRank } from "@/hooks/useUserLeaderboardRank";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import { roundByMagnitude, formatRoundedWithCommas } from "@/services/rewardsService";
 import { formatBalance, safeBigInt } from "@/utils/numberUtils";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import LiquidationAlertBanner from "@/components/ui/LiquidationAlertBanner";
 import GuestPromoSection from "@/components/dashboard/GuestPromoSection";
 import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
@@ -32,19 +30,6 @@ const TIME_RANGES = ["1d", "7d", "1m", "3m", "6m", "1y", "all"] as const;
 type TimeRange = typeof TIME_RANGES[number];
 
 type TabType = 'netBalance' | 'rewards' | 'borrowed';
-
-const getEstimatedApyPercent = (emissionRate?: string, totalStakeUsd?: string | null): number => {
-  try {
-    if (!emissionRate || !totalStakeUsd) return 0;
-    const tvlUsd = Number(BigInt(totalStakeUsd)) / 1e18;
-    if (!Number.isFinite(tvlUsd) || tvlUsd <= 0) return 0;
-    const annualCata = (Number(BigInt(emissionRate)) / 1e18) * 86400 * 365;
-    if (!Number.isFinite(annualCata) || annualCata <= 0) return 0;
-    return (annualCata * 0.25 / tvlUsd) * 100;
-  } catch {
-    return 0;
-  }
-};
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -87,7 +72,7 @@ const Dashboard = () => {
   });
 
   const { rank: userRank, totalEarned, loading: rankLoading } = useUserLeaderboardRank();
-  const { userRewards: rewardsUserInfo, loading: rewardsUserLoading } = useRewardsUserInfo();
+  const { userRewards: rewardsUserInfo } = useRewardsUserInfo();
   const communityBonusFormatted = useMemo(() => {
     const bonus = rewardsUserInfo?.bonusRewards;
     if (!bonus || safeBigInt(bonus) <= 0n) return null;
@@ -96,14 +81,6 @@ const Dashboard = () => {
       .trim();
     return formatRoundedWithCommas(roundByMagnitude(numeric));
   }, [rewardsUserInfo?.bonusRewards]);
-  const highestIncentiveApy = useMemo(() => {
-    const activities = rewardsUserInfo?.activities;
-    if (!activities?.length) return 0;
-    return activities.reduce((maxApy, { activity }) => {
-      const apy = getEstimatedApyPercent(activity.emissionRate, activity.totalStakeUsd ?? null);
-      return apy > maxApy ? apy : maxApy;
-    }, 0);
-  }, [rewardsUserInfo?.activities]);
 
   // Extract CATA token from inactive tokens by address
   const cataToken = useMemo(() =>
@@ -354,36 +331,6 @@ const Dashboard = () => {
               />
             </div>
           )}
-
-          {/* Rewards Section */}
-          {/* <div className="mb-4 md:mb-8">
-            <div className="bg-card shadow-sm rounded-xl p-4 md:p-6 border border-border">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 md:p-3 bg-blue-500 rounded-lg shrink-0">
-                    <Coins className="text-white" size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-base md:text-lg font-semibold">Rewards</h3>
-                    <div className="text-xs md:text-sm text-muted-foreground">
-                      {rewardsUserLoading ? (
-                        <Skeleton className="h-4 w-36 mt-1" />
-                      ) : (
-                        <>Earn up to {highestIncentiveApy.toFixed(2)}% APY</>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <Button
-                  onClick={() => navigate("/dashboard/rewards?tab=activities")}
-                  className="w-full md:w-auto flex items-center justify-center gap-2"
-                >
-                  <Coins className="h-4 w-4" />
-                  Earn Rewards
-                </Button>
-              </div>
-            </div>
-          </div> */}
 
           {/* Portfolio Value Chart - hidden on mobile and for guests */}
           {showFullDashboard && (
