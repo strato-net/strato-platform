@@ -5,6 +5,11 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 
+const ADDRESS_RE = /^[0-9a-fA-F]{40}$/;
+const CREATE_ISSUE_POLL_INTERVAL_MS = parseInt(process.env.CREATE_ISSUE_POLL_INTERVAL_MS || '10000', 10);
+const CREATE_ISSUE_LOOKUP_TIMEOUT_MS = parseInt(process.env.CREATE_ISSUE_LOOKUP_TIMEOUT_MS || '3600000', 10);
+const CREATE_ISSUE_TIMEOUT_MS = parseInt(process.env.CREATE_ISSUE_TIMEOUT_MS || '3600000', 10);
+
 const getTokenFromNameAndPassword = async () => {
     const GLOBAL_ADMIN_NAME = getEnvVar('GLOBAL_ADMIN_NAME');
     const GLOBAL_ADMIN_PASSWORD = getEnvVar('GLOBAL_ADMIN_PASSWORD');
@@ -177,6 +182,105 @@ function getEnvVar(name) {
   return value;
 }
 
+const firstValue = (value) => Array.isArray(value) ? value[0] : value;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function getReceiptValue(receipt) {
+  return receipt?.txResult?.response?.v || firstValue(receipt?.data?.contents) || null;
+}
+
+function getCreatedAddress(receipt) {
+  const created = firstValue(receipt?.txResult?.contractsCreated);
+  if (typeof created === 'string' && created.length > 0) return created;
+
+  const value = getReceiptValue(receipt);
+  return typeof value === 'string' && ADDRESS_RE.test(value) ? value : null;
+}
+
+function getIssueId(receipt) {
+  const value = getReceiptValue(receipt);
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+async function searchCirrusWithToken(tokenObj, tableName, params) {
+  const response = await axios.get(`${config.nodes[0].url}/cirrus/search/${tableName}`, {
+    headers: { Authorization: `Bearer ${tokenObj.token}` },
+    params,
+  });
+  return response.data;
+}
+
+function getEventTxHash(event = {}) {
+  return event.transaction_hash || event.transactionHash || event.txHash || event.hash;
+}
+
+function getEventTimestamp(event = {}) {
+  return event.block_timestamp || event.blockTimestamp || event.timestamp;
+}
+
+async function waitForCirrusRow(tokenObj, tableName, params, predicate, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const rows = await searchCirrusWithToken(tokenObj, tableName, params);
+    const match = Array.isArray(rows) ? rows.find(predicate) : null;
+    if (match) return match;
+    await sleep(CREATE_ISSUE_POLL_INTERVAL_MS);
+  }
+  return null;
+}
+
+async function getIssueCreatedTimestamp(tokenObj, issueId, creationTxHash, fallbackTimestamp) {
+  const row = creationTxHash && await waitForCirrusRow(
+    tokenObj,
+    'BlockApps-AdminRegistry-IssueCreated',
+    { issueId: `eq.${issueId}`, order: 'block_timestamp.desc', limit: '10' },
+    (event) => getEventTxHash(event) === creationTxHash && getEventTimestamp(event),
+    CREATE_ISSUE_LOOKUP_TIMEOUT_MS
+  );
+
+  const timestamp = getEventTimestamp(row);
+  if (timestamp) return timestamp;
+
+  console.log(`IssueCreated timestamp was not found for tx ${creationTxHash}; falling back to local submit time ${fallbackTimestamp}`);
+  return fallbackTimestamp;
+}
+
+async function pollForCreateIssueExecution(tokenObj, issueId, creationReceipt, fallbackTimestamp, addressLabel = 'contract address') {
+  const tableName = 'BlockApps-AdminRegistry-IssueExecuted';
+  const creationTxHash = creationReceipt && creationReceipt.hash;
+  const createdAfter = await getIssueCreatedTimestamp(tokenObj, issueId, creationTxHash, fallbackTimestamp);
+
+  console.log(`Create-contract governance issue created: ${issueId}`);
+  console.log(`Waiting for IssueExecuted event in ${tableName} after ${createdAfter}...`);
+
+  const executed = await waitForCirrusRow(
+    tokenObj,
+    tableName,
+    { issueId: `eq.${issueId}`, block_timestamp: `gte.${createdAfter}`, order: 'block_timestamp.desc', limit: '10' },
+    () => true,
+    CREATE_ISSUE_TIMEOUT_MS
+  );
+
+  if (!executed) {
+    throw new Error(`Timed out waiting for create-contract issue to execute: ${issueId}`);
+  }
+
+  const txHash = getEventTxHash(executed);
+  if (!txHash) {
+    throw new Error('IssueExecuted found but no transaction hash was available: ' + JSON.stringify(executed));
+  }
+
+  const finalResults = await rest.getBlocResults(tokenObj, [txHash], { config, isAsync: true });
+  const final = Array.isArray(finalResults) ? finalResults[0] : finalResults;
+  const address = getCreatedAddress(final);
+  if (address) return address;
+
+  throw new Error(
+    `Create-contract issue executed but no ${addressLabel} was found in receipt: ` +
+      JSON.stringify(final)
+  );
+}
+
 /**
  * Performs a Cirrus search query using username/password authentication.
  * 
@@ -213,4 +317,14 @@ const cirrusSearch = async (tableName, params = {}) => {
   }
 };
 
-module.exports = { callListAndWait, createContractArgs, getEnvVar, saveCreateTXDataAsFile, saveCallListTXDataAsFile, cirrusSearch };
+module.exports = {
+  callListAndWait,
+  createContractArgs,
+  getEnvVar,
+  saveCreateTXDataAsFile,
+  saveCallListTXDataAsFile,
+  cirrusSearch,
+  getCreatedAddress,
+  getIssueId,
+  pollForCreateIssueExecution,
+};
