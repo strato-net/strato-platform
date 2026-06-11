@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatBalance } from "@/utils/numberUtils";
@@ -28,13 +28,19 @@ export default function MyPoolParticipationSection({
   const shouldShowLoading = loading && !hasData;
 
   const { liquidityInfo, loadingLiquidity } = useLendingContext();
-  const { pools, poolsLoading } = useSwapContext();
+  const { pools, poolsLoading, fetchPools } = useSwapContext();
   const { vaultState } = useVaultContext();
   const { tokenApys } = useEarnContext();
 
   const [expandedTokens, setExpandedTokens] = useState<Record<string, boolean>>(
     {}
   );
+
+  useEffect(() => {
+    if (hasData && pools.length === 0) {
+      fetchPools();
+    }
+  }, [fetchPools, hasData, pools.length]);
 
   const lpTokenPoolMap = useMemo(() => {
     const map = new Map<string, any>();
