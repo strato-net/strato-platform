@@ -9,23 +9,18 @@ import BorrowingSection from "../components/dashboard/BorrowingSection";
 import { Wallet, Coins, Shield, Loader2, Trophy, Send, Book, ArrowRightLeft, Gem, Mail, Gift } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
-import { useRewardsActivities } from "@/hooks/useRewardsActivities";
-import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useNetBalance } from "@/hooks/useNetBalance";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
 import PortfolioValueChart from "@/components/dashboard/PortfolioValueChart";
 import { useLendingContext } from "@/context/LendingContext";
-import { useCDP } from "@/context/CDPContext";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
-import { BalanceSnapshot } from "@mercata/shared-types";
 import { useUserLeaderboardRank } from "@/hooks/useUserLeaderboardRank";
-import { useRewards } from "@/hooks/useRewards";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import { roundByMagnitude, formatRoundedWithCommas } from "@/services/rewardsService";
 import { formatBalance, safeBigInt } from "@/utils/numberUtils";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import LiquidationAlertBanner from "@/components/ui/LiquidationAlertBanner";
 import GuestPromoSection from "@/components/dashboard/GuestPromoSection";
 import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
@@ -36,30 +31,14 @@ type TimeRange = typeof TIME_RANGES[number];
 
 type TabType = 'netBalance' | 'rewards' | 'borrowed';
 
-const getEstimatedApyPercent = (emissionRate?: string, totalStakeUsd?: string | null): number => {
-  try {
-    if (!emissionRate || !totalStakeUsd) return 0;
-    const tvlUsd = Number(BigInt(totalStakeUsd)) / 1e18;
-    if (!Number.isFinite(tvlUsd) || tvlUsd <= 0) return 0;
-    const annualCata = (Number(BigInt(emissionRate)) / 1e18) * 86400 * 365;
-    if (!Number.isFinite(annualCata) || annualCata <= 0) return 0;
-    return (annualCata * 0.25 / tvlUsd) * 100;
-  } catch {
-    return 0;
-  }
-};
-
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const { toast } = useToast();
   const { userAddress, isLoggedIn } = useUser();
   const {
     earningAssets,
-    getEarningAssets,
     inactiveTokens,
-    getInactiveTokens,
     getBalanceHistory,
     getCataBalanceHistory,
     getBorrowingHistory,
@@ -81,8 +60,7 @@ const Dashboard = () => {
     }
     return 'netBalance';
   });
-  const { loans, refreshLoans } = useLendingContext();
-  const { totalCDPDebt, refreshVaults } = useCDP();
+  const { loans } = useLendingContext();
   const { contactEnabled } = useNetwork();
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(() => {
@@ -93,8 +71,6 @@ const Dashboard = () => {
     return '1d';
   });
 
-  const { activities: rewardsActivities, loading: rewardsActivitiesLoading } = useRewardsActivities();
-  const { state: rewardsState } = useRewards();
   const { rank: userRank, totalEarned, loading: rankLoading } = useUserLeaderboardRank();
   const { userRewards: rewardsUserInfo } = useRewardsUserInfo();
   const communityBonusFormatted = useMemo(() => {
@@ -105,13 +81,6 @@ const Dashboard = () => {
       .trim();
     return formatRoundedWithCommas(roundByMagnitude(numeric));
   }, [rewardsUserInfo?.bonusRewards]);
-  const highestIncentiveApy = useMemo(() => {
-    if (!rewardsActivities.length) return 0;
-    return rewardsActivities.reduce((maxApy, activity) => {
-      const apy = getEstimatedApyPercent(activity.emissionRate, activity.totalStakeUsd ?? null);
-      return apy > maxApy ? apy : maxApy;
-    }, 0);
-  }, [rewardsActivities]);
 
   // Extract CATA token from inactive tokens by address
   const cataToken = useMemo(() =>
@@ -174,22 +143,8 @@ const Dashboard = () => {
     if (claimReturnUrl && isLoggedIn) {
       localStorage.removeItem("claimReturnUrl");
       navigate(claimReturnUrl, { replace: true });
-      return;
     }
-
-    const hasExistingEarningAssets = earningAssets.length > 0;
-    const hasExistingInactiveTokens = inactiveTokens.length > 0;
-
-    // Always fetch earning assets (uses public endpoint for guests)
-    getEarningAssets(!hasExistingEarningAssets);
-
-    // Only fetch inactive tokens for logged-in users (no public endpoint available)
-    if (isLoggedIn) {
-      getInactiveTokens(!hasExistingInactiveTokens);
-      refreshLoans();
-      refreshVaults();
-    }
-  }, [location.pathname, userAddress, getEarningAssets, getInactiveTokens, refreshLoans, refreshVaults, isLoggedIn, navigate]);
+  }, [isLoggedIn, navigate]);
 
   useEffect(() => {
     localStorage.setItem('dashboard-activeTab', activeTab);
@@ -223,8 +178,8 @@ const Dashboard = () => {
   }), [getBalanceHistory, getCataBalanceHistory, getBorrowingHistory, setNetBalanceHistoryCache, setRewardsHistoryCache, setBorrowedHistoryCache]);
 
   useEffect(() => {
-    // Only fetch history data for logged-in users
-    if (!isLoggedIn) {
+    const isDesktop = window.matchMedia('(min-width: 768px)').matches;
+    if (!isLoggedIn || !isDesktop) {
       setLoadingBalanceHistory(false);
       return;
     }
@@ -296,9 +251,7 @@ const Dashboard = () => {
         <DashboardHeader title="Portfolio" />
 
         <main className="p-4 md:p-6 pb-24 md:pb-6">
-          {!isLoggedIn && <GuestPromoSection variant={1} />}
-          {isLoggedIn && !isLoadingNetBalance && totalBalance === 0 && <GuestPromoSection variant={2} />}
-          {isLoggedIn && (isLoadingNetBalance || totalBalance > 0) && <GuestPromoSection variant={3} />}
+          <GuestPromoSection variant={!isLoggedIn ? 1 : (!isLoadingNetBalance && totalBalance === 0) ? 2 : 3} userRewards={rewardsUserInfo} />
           {showFullDashboard && <LiquidationAlertBanner />}
           {showFullDashboard && (
             <div className={`grid grid-cols-1 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3 md:gap-6 mb-4 md:mb-8`}>
@@ -378,36 +331,6 @@ const Dashboard = () => {
               />
             </div>
           )}
-
-          {/* Rewards Section */}
-          {/* <div className="mb-4 md:mb-8">
-            <div className="bg-card shadow-sm rounded-xl p-4 md:p-6 border border-border">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 md:p-3 bg-blue-500 rounded-lg shrink-0">
-                    <Coins className="text-white" size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-base md:text-lg font-semibold">Rewards</h3>
-                    <div className="text-xs md:text-sm text-muted-foreground">
-                      {rewardsActivitiesLoading ? (
-                        <Skeleton className="h-4 w-36 mt-1" />
-                      ) : (
-                        <>Earn up to {highestIncentiveApy.toFixed(2)}% APY</>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <Button
-                  onClick={() => navigate("/dashboard/rewards?tab=activities")}
-                  className="w-full md:w-auto flex items-center justify-center gap-2"
-                >
-                  <Coins className="h-4 w-4" />
-                  Earn Rewards
-                </Button>
-              </div>
-            </div>
-          </div> */}
 
           {/* Portfolio Value Chart - hidden on mobile and for guests */}
           {showFullDashboard && (
