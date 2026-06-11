@@ -7,19 +7,16 @@ const auth = require('./auth');
 const { rest, importer, util } = require('blockapps-rest');
 const fs = require('fs-extra');
 const path = require('path');
+const axios = require('axios');
 
 // The owner of the implementation address is ignored in favor of the proxy owner
 const DEFAULT_CONSTRUCTOR_ARGS = {"initialOwner": "deadbeef"};
+const CREATE_ISSUE_POLL_INTERVAL_MS = parseInt(process.env.CREATE_ISSUE_POLL_INTERVAL_MS || '10000', 10);
+const CREATE_ISSUE_LOOKUP_TIMEOUT_MS = parseInt(process.env.CREATE_ISSUE_LOOKUP_TIMEOUT_MS || '3600000', 10);
+const CREATE_ISSUE_TIMEOUT_MS = parseInt(process.env.CREATE_ISSUE_TIMEOUT_MS || '3600000', 10);
 
-// BATCH_TARGETS is currently filled with StablePool proxies to upgrade for Issue #6348
 const BATCH_TARGETS = [
-    "ff2befcd850183170627dcbc377c3fd573789172",
-    "bab35f9fe024e2735edae7a9c0aba4db260a649c",
-    "3d1dc151402858521bf9beaa8c72a68c9b4fc2fe",
-    "5214055d631645de83b7299604ea6ade31d87c47",
-    "9c75280f9e2368005d2b7342f19c59f9176b5962",
-    "5888fbe6d6774c1d5788a7b631fc2a2fe88c44c6",
-    "41be20683ef9d57884e0a92f203e6c3161cf0aa1"
+    "----proxy-address----",
 ];
 
 /**
@@ -81,6 +78,108 @@ function parseArgs() {
   }
   
   return parsed;
+}
+
+const ADDRESS_RE = /^[0-9a-fA-F]{40}$/;
+const firstValue = (value) => Array.isArray(value) ? value[0] : value;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function getReceiptValue(receipt) {
+  return receipt?.txResult?.response?.v || firstValue(receipt?.data?.contents) || null;
+}
+
+function getCreatedAddress(receipt) {
+  const created = firstValue(receipt?.txResult?.contractsCreated);
+  if (typeof created === 'string' && created.length > 0) return created;
+
+  const value = getReceiptValue(receipt);
+  return typeof value === 'string' && ADDRESS_RE.test(value) ? value : null;
+}
+
+function getIssueId(receipt) {
+  const value = getReceiptValue(receipt);
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+async function searchCirrus(tokenObj, tableName, params) {
+  const nodeUrl = config.nodes[0].url;
+  const url = `${nodeUrl}/cirrus/search/${tableName}`;
+  const response = await axios.get(url, {
+    headers: { Authorization: `Bearer ${tokenObj.token}` },
+    params,
+  });
+  return response.data;
+}
+
+function getEventTxHash(event = {}) {
+  return event.transaction_hash || event.transactionHash || event.txHash || event.hash;
+}
+
+function getEventTimestamp(event = {}) {
+  return event.block_timestamp || event.blockTimestamp || event.timestamp;
+}
+
+async function waitForCirrusRow(tokenObj, tableName, params, predicate, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const rows = await searchCirrus(tokenObj, tableName, params);
+    const match = Array.isArray(rows) ? rows.find(predicate) : null;
+    if (match) return match;
+    await sleep(CREATE_ISSUE_POLL_INTERVAL_MS);
+  }
+  return null;
+}
+
+async function getIssueCreatedTimestamp(tokenObj, issueId, creationTxHash, fallbackTimestamp) {
+  const row = creationTxHash && await waitForCirrusRow(
+    tokenObj,
+    'BlockApps-AdminRegistry-IssueCreated',
+    { issueId: `eq.${issueId}`, order: 'block_timestamp.desc', limit: '10' },
+    (event) => getEventTxHash(event) === creationTxHash && getEventTimestamp(event),
+    CREATE_ISSUE_LOOKUP_TIMEOUT_MS
+  );
+
+  const timestamp = getEventTimestamp(row);
+  if (timestamp) return timestamp;
+
+  console.log(`IssueCreated timestamp was not found for tx ${creationTxHash}; falling back to local submit time ${fallbackTimestamp}`);
+  return fallbackTimestamp;
+}
+
+async function pollForCreateIssueExecution(tokenObj, issueId, creationReceipt, fallbackTimestamp) {
+  const tableName = 'BlockApps-AdminRegistry-IssueExecuted';
+  const creationTxHash = creationReceipt && creationReceipt.hash;
+  const createdAfter = await getIssueCreatedTimestamp(tokenObj, issueId, creationTxHash, fallbackTimestamp);
+
+  console.log(`Create-contract governance issue created: ${issueId}`);
+  console.log(`Waiting for IssueExecuted event in ${tableName} after ${createdAfter}...`);
+
+  const executed = await waitForCirrusRow(
+    tokenObj,
+    tableName,
+    { issueId: `eq.${issueId}`, block_timestamp: `gte.${createdAfter}`, order: 'block_timestamp.desc', limit: '10' },
+    () => true,
+    CREATE_ISSUE_TIMEOUT_MS
+  );
+
+  if (!executed) {
+    throw new Error(`Timed out waiting for create-contract issue to execute: ${issueId}`);
+  }
+
+  const txHash = getEventTxHash(executed);
+  if (!txHash) {
+    throw new Error('IssueExecuted found but no transaction hash was available: ' + JSON.stringify(executed));
+  }
+
+  const finalResults = await rest.getBlocResults(tokenObj, [txHash], { config, isAsync: true });
+  const final = Array.isArray(finalResults) ? finalResults[0] : finalResults;
+  const address = getCreatedAddress(final);
+  if (address) return address;
+
+  throw new Error(
+    'Create-contract issue executed but no implementation address was found in receipt: ' +
+      JSON.stringify(final)
+  );
 }
 
 /** Get the logic contract address from a proxy (read-only)
@@ -156,6 +255,7 @@ async function verifyProxyAndImplementation(tokenObj, proxyAddress, contractName
  */
 async function deployImplementationAsync(tokenObj, contractArgs, baseOptions) {
   const asyncOptions = { ...baseOptions, isAsync: true };
+  const submittedAt = new Date().toISOString();
   const response = await rest.createContract(tokenObj, contractArgs, asyncOptions);
   const responseArray = Array.isArray(response) ? response : [response];
   const hashes = responseArray.map((r) => r && r.hash).filter(Boolean);
@@ -181,9 +281,13 @@ async function deployImplementationAsync(tokenObj, contractArgs, baseOptions) {
     );
   }
 
-  const created = final.txResult && final.txResult.contractsCreated;
-  const address = Array.isArray(created) ? created[0] : created;
+  const address = getCreatedAddress(final);
   if (!address) {
+    const issueId = getIssueId(final);
+    if (issueId) {
+      return pollForCreateIssueExecution(tokenObj, issueId, final, submittedAt);
+    }
+
     throw new Error(
       'Deployment succeeded but no contractsCreated entry in receipt: ' +
         JSON.stringify(final)
