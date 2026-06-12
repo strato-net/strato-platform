@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useToast } from '@/hooks/use-toast';
 import { ModeToggle } from '../mode-toggle';
 import { useEffect } from 'react';
-import { PENDING_STRATO_WALLET_CONNECT_KEY } from '@/lib/auth';
+import { PENDING_STRATO_WALLET_CONNECT_KEY, requestWalletConnection } from '@/lib/auth';
 
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import STRATOICON from '@/assets/icon.png';
@@ -167,9 +167,7 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
           </Popover>
         ) : (
           <Button
-            onClick={() => {
-              if (stratoConnector) connect({ connector: stratoConnector });
-            }}
+            onClick={requestWalletConnection}
             size="sm"
             className="h-8 md:h-9 px-3 md:px-4 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 gap-1.5"
           >
