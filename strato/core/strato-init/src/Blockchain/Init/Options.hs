@@ -28,7 +28,7 @@ defineFlag "R:redisHost" ("localhost" :: String) "Redis BlockDB hostname"
 defineFlag "redisPort" (6379 :: Int) "Redis BlockDB port"
 defineFlag "redisDBNumber" (0 :: Integer) "Redis database number"
 
-defineFlag "minPeers" (0 :: Int) "Threshold for discovery to stop querying for more peers"
+defineFlag "minPeers" (10 :: Int) "Threshold for discovery to stop querying for more peers"
 
 defineFlag "apiIPAddress" "" "The address containers use to reach strato-api on the host (auto-detected if empty)"
 
@@ -38,6 +38,8 @@ defineFlag "nodeHost" ("localhost" :: String) "The external hostname for the nod
 defineFlag "svmTrace" (False :: Bool) "Enable verbose logging in SolidVM"
 
 defineFlag "vaultUrl" "https://vault.blockapps.net:8093/strato/v2.3" "URL of the shared vault service"
+
+defineFlag "vaultTimeoutSec" (12 :: Int) "HTTP response timeout (seconds) for vault-wrapper signature / key requests"
 
 defineFlag "fileServerUrl" "" "URL of the file server for marketplace (derived from network if not provided)"
 
