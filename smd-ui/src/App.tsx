@@ -1,0 +1,48 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { WagmiProvider } from "wagmi";
+import { RainbowKitProvider } from "@rainbow-me/rainbowkit";
+import "@rainbow-me/rainbowkit/styles.css";
+
+import { ThemeProvider } from "@/components/theme-provider";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
+import { UserProvider } from "@/context/UserContext";
+import { buildWagmiConfig } from "@/lib/wagmi";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import AccountsPage from "@/pages/AccountsPage";
+import ContractsPage from "@/pages/ContractsPage";
+import NotFound from "@/pages/NotFound";
+
+const queryClient = new QueryClient();
+const wagmiConfig = buildWagmiConfig();
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
+        <WagmiProvider config={wagmiConfig}>
+          <RainbowKitProvider>
+            <UserProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter basename="/smd">
+                  <Routes>
+                    <Route element={<DashboardLayout />}>
+                      <Route path="/" element={<Navigate to="/accounts" replace />} />
+                      <Route path="/accounts" element={<AccountsPage />} />
+                      <Route path="/contracts" element={<ContractsPage />} />
+                    </Route>
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </BrowserRouter>
+              </TooltipProvider>
+            </UserProvider>
+          </RainbowKitProvider>
+        </WagmiProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+}
