@@ -14,6 +14,10 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import DashboardPage from "@/pages/DashboardPage";
 import AccountsPage from "@/pages/AccountsPage";
 import ContractsPage from "@/pages/ContractsPage";
+import ExplorerPage from "@/pages/ExplorerPage";
+import BlockDetailPage from "@/pages/BlockDetailPage";
+import TransactionDetailPage from "@/pages/TransactionDetailPage";
+import SearchPage from "@/pages/SearchPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +40,10 @@ export default function App() {
                       <Route path="/dashboard" element={<DashboardPage />} />
                       <Route path="/accounts" element={<AccountsPage />} />
                       <Route path="/contracts" element={<ContractsPage />} />
+                      <Route path="/explorer" element={<ExplorerPage />} />
+                      <Route path="/explorer/blocks/:number" element={<BlockDetailPage />} />
+                      <Route path="/explorer/transactions/:hash" element={<TransactionDetailPage />} />
+                      <Route path="/explorer/search" element={<SearchPage />} />
                     </Route>
                     <Route path="*" element={<NotFound />} />
                   </Routes>

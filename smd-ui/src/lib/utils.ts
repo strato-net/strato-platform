@@ -20,6 +20,13 @@ export function secondsToHuman(total?: number): string {
   return parts.join(" ");
 }
 
+/** Format a block/tx timestamp (ISO string or epoch) for display. */
+export function formatTimestamp(ts?: string | number): string {
+  if (ts == null || ts === "") return "—";
+  const d = typeof ts === "number" ? new Date(ts) : new Date(/^\d+$/.test(String(ts)) ? Number(ts) : String(ts));
+  return isNaN(d.getTime()) ? String(ts) : d.toLocaleString();
+}
+
 /** Shorten a hex address/hash for display, e.g. 0x1234…abcd */
 export function shortenHex(value: string, lead = 6, trail = 4): string {
   if (!value) return "";

@@ -6,7 +6,7 @@ const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, enabled: true },
   { to: "/accounts", label: "Accounts", icon: Users, enabled: true },
   { to: "/contracts", label: "Contracts", icon: FileCode2, enabled: true },
-  { to: "/explorer", label: "Explorer", icon: Boxes, enabled: false },
+  { to: "/explorer", label: "Explorer", icon: Boxes, enabled: true },
 ];
 
 export function SidebarNav() {
