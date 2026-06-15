@@ -122,10 +122,8 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
         // If STRATO wallet is connected via wagmi, disconnect it first so modal can open
         if (isConnected && connector && isStratoConnector(connector)) {
           disconnect();
-          setTimeout(() => openConnectModal?.(), 50);
-        } else {
-          openConnectModal?.();
         }
+        openConnectModal?.();
       }}
     >
       {connectLabel}
