@@ -69,6 +69,7 @@ import { NetworkProvider } from "@/context/NetworkContext";
 import { VaultProvider } from "@/context/VaultContext";
 import { SaveUsdstProvider } from "@/context/SaveUsdstContext";
 import { YieldVaultProvider } from "@/context/YieldVaultContext";
+import { RewardsProvider } from "@/context/RewardsContext";
 import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
@@ -232,6 +233,7 @@ const App = () => {
                                     <VaultProvider>
                                       <SaveUsdstProvider>
                                         <YieldVaultProvider>
+                                          <RewardsProvider>
                                           <TooltipProvider>
                                             <Toaster />
                                             <BrowserRouter>
@@ -472,6 +474,7 @@ const App = () => {
                                               </Routes>
                                             </BrowserRouter>
                                           </TooltipProvider>
+                                          </RewardsProvider>
                                         </YieldVaultProvider>
                                       </SaveUsdstProvider>
                                     </VaultProvider>

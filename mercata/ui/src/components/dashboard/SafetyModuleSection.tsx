@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SAFETY_STAKE_FEE, SAFETY_REDEEM_FEE, usdstAddress, safetyModuleAddress } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
-import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { useRewardsContext } from "@/context/RewardsContext";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { EarnApyInfo } from "@/utils/earnUtils";
@@ -35,7 +35,7 @@ const SafetyModuleSection = () => {
   const [redeemAmount, setRedeemAmount] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
-  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+  const { userRewards, userRewardsLoading: rewardsLoading } = useRewardsContext();
   const { tokenApys, tokenApysLoaded } = useEarnContext();
 
   const safetyBestApyInfo = useMemo(

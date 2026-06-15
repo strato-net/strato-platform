@@ -31,7 +31,7 @@ import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { safeParseUnits } from "@/utils/numberUtils";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
-import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { useRewardsContext } from "@/context/RewardsContext";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import {
   calculateEstimatedRewardsPerDay,
@@ -165,9 +165,9 @@ const EarnYieldVault = () => {
   } = useRewardsActivities();
   const {
     userRewards,
-    loading: rewardsUserLoading,
-    refetch: refetchUserRewards,
-  } = useRewardsUserInfo();
+    userRewardsLoading: rewardsUserLoading,
+    refetchUserRewards,
+  } = useRewardsContext();
 
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [actionAmount, setActionAmount] = useState("");

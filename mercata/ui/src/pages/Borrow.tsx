@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useSearchParams } from 'react-router-dom';
 import { useUser } from "@/context/UserContext";
 import { useCDP } from '@/context/CDPContext';
-import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+import { useRewardsContext } from "@/context/RewardsContext";
 import { useUserTokens } from '@/context/UserTokensContext';
 import { useTokenContext } from '@/context/TokenContext';
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
@@ -19,7 +19,7 @@ import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 const Borrow = () => {
   const { isLoggedIn } = useUser();
   const { refreshVaults } = useCDP();
-  const { refetch: refetchRewards } = useRewardsUserInfo();
+  const { refetchUserRewards: refetchRewards } = useRewardsContext();
   const { fetchTokens } = useUserTokens();
   const { fetchUsdstBalance, refreshNetBalance } = useTokenContext();
   const [searchParams] = useSearchParams();

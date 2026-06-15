@@ -27,7 +27,7 @@ import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { safeParseUnits } from "@/utils/numberUtils";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
-import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { useRewardsContext } from "@/context/RewardsContext";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import {
   calculateEstimatedRewardsPerDay,
@@ -128,7 +128,7 @@ const EarnSave = () => {
   const { usdstBalance, fetchUsdstBalance } = useTokenContext();
   const { toast } = useToast();
   const { activities: rewardsActivities, loading: rewardsActivitiesLoading } = useRewardsActivities();
-  const { userRewards, loading: rewardsUserLoading } = useRewardsUserInfo();
+  const { userRewards, userRewardsLoading: rewardsUserLoading } = useRewardsContext();
   const {
     saveUsdstInfo: saveInfo,
     saveUsdstUserInfo: userInfo,
