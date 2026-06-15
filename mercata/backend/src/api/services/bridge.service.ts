@@ -294,18 +294,33 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
   };
   if (chainId) nativeParams["key2"] = `eq.${chainId}`;
 
-  const [standardResponse, nativeResponse] = await Promise.all([
+  const [standardResponse, nativeResponse, nativeBridgeResponse] = await Promise.all([
     cirrus.get(accessToken, "/mapping", { params: standardParams }),
     constants.stratoNativeBridge
       ? cirrus.get(accessToken, `/${StratoNativeBridge}-assets`, { params: nativeParams })
+      : Promise.resolve({ data: [] }),
+    constants.stratoNativeBridge
+      ? cirrus.get(accessToken, `/${StratoNativeBridge}`, {
+          params: {
+            address: `eq.${constants.stratoNativeBridge}`,
+            select: "depositsPaused,withdrawalsPaused",
+            limit: "1",
+          }
+        })
       : Promise.resolve({ data: [] }),
   ]);
 
   const standardRoutes = Array.isArray(standardResponse.data)
     ? parseBridgeRouteMappings(standardResponse.data as BridgeMappingRow[])
     : [];
+  const nativeBridgeState = Array.isArray(nativeBridgeResponse.data)
+    ? nativeBridgeResponse.data[0]
+    : undefined;
   const nativeRoutes = Array.isArray(nativeResponse.data)
-    ? parseNativeBridgeAssets(nativeResponse.data as NativeBridgeAssetRow[])
+    ? parseNativeBridgeAssets(nativeResponse.data as NativeBridgeAssetRow[], {
+        depositsPaused: nativeBridgeState?.depositsPaused === true,
+        withdrawalsPaused: nativeBridgeState?.withdrawalsPaused === true,
+      })
     : [];
   const routes = [...standardRoutes, ...nativeRoutes];
   if (!routes.length) return [];

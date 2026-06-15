@@ -33,6 +33,8 @@ export type BridgeAssetInfo = {
   instantWithdrawalThreshold?: string;
   stratoToken: string;
   enabled: boolean;
+  depositsPaused?: boolean;
+  withdrawalsPaused?: boolean;
 };
 
 export type BridgeableAssetRoute = {
@@ -363,7 +365,10 @@ export function parseBridgeRouteMappings(mappings: BridgeMappingRow[]): Bridgeab
   return routes;
 }
 
-export function parseNativeBridgeAssets(rows: NativeBridgeAssetRow[]): BridgeableAssetRoute[] {
+export function parseNativeBridgeAssets(
+  rows: NativeBridgeAssetRow[],
+  pauseState: { depositsPaused?: boolean; withdrawalsPaused?: boolean } = {}
+): BridgeableAssetRoute[] {
   const routes: BridgeableAssetRoute[] = [];
 
   for (const row of rows) {
@@ -392,6 +397,8 @@ export function parseNativeBridgeAssets(rows: NativeBridgeAssetRow[]): Bridgeabl
           : "0",
       stratoToken,
       enabled: isMappingTrue(raw.enabled),
+      depositsPaused: pauseState.depositsPaused,
+      withdrawalsPaused: pauseState.withdrawalsPaused,
     };
 
     routes.push({
