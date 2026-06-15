@@ -11,6 +11,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { UserProvider } from "@/context/UserContext";
 import { buildWagmiConfig } from "@/lib/wagmi";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import DashboardPage from "@/pages/DashboardPage";
 import AccountsPage from "@/pages/AccountsPage";
 import ContractsPage from "@/pages/ContractsPage";
 import NotFound from "@/pages/NotFound";
@@ -31,7 +32,8 @@ export default function App() {
                 <BrowserRouter basename="/smd">
                   <Routes>
                     <Route element={<DashboardLayout />}>
-                      <Route path="/" element={<Navigate to="/accounts" replace />} />
+                      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                      <Route path="/dashboard" element={<DashboardPage />} />
                       <Route path="/accounts" element={<AccountsPage />} />
                       <Route path="/contracts" element={<ContractsPage />} />
                     </Route>

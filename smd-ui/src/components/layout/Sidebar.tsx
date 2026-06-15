@@ -3,9 +3,9 @@ import { Users, FileCode2, LayoutDashboard, Boxes } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, enabled: true },
   { to: "/accounts", label: "Accounts", icon: Users, enabled: true },
   { to: "/contracts", label: "Contracts", icon: FileCode2, enabled: true },
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, enabled: false },
   { to: "/explorer", label: "Explorer", icon: Boxes, enabled: false },
 ];
 
