@@ -162,6 +162,12 @@ function stratoConnector(walletDetails: Record<string, unknown> = {}) {
       const user = await fetchStratoUser();
       const addr = normalizeAddress(user?.userAddress);
       if (!addr) {
+        // During an auto-reconnect (page load) a missing session just means the
+        // user is a guest — fail the reconnect quietly instead of forcing login.
+        // Only an explicit "Connect → STRATO Wallet" choice should start the OIDC flow.
+        if (isReconnecting) {
+          throw new Error("STRATO session not available");
+        }
         sessionStorage.setItem(PENDING_STRATO_WALLET_CONNECT_KEY, "1");
         redirectToLogin();
         throw new Error("Authentication required");

@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { compileContract, deployContract } from "@/services/contracts";
-import { useUser } from "@/context/UserContext";
+import { compileContract } from "@/services/contracts";
+import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 
 const STARTER = `contract SimpleStorage {
   uint storedData;
@@ -24,7 +24,7 @@ const STARTER = `contract SimpleStorage {
 
 export function EditorTab() {
   const { resolvedTheme } = useTheme();
-  const { isAppAuthenticated } = useUser();
+  const { submit: submitTx, canSubmit } = useSubmitTransaction();
   const [name, setName] = useState("SimpleStorage");
   const [source, setSource] = useState(STARTER);
   const [args, setArgs] = useState("{}");
@@ -57,7 +57,7 @@ export function EditorTab() {
     }
     setDeploying(true);
     try {
-      const result = await deployContract(name, source, parsedArgs);
+      const result = await submitTx("CONTRACT", { contract: name, src: source, args: parsedArgs, metadata: {} });
       const address = result?.data?.contents?.address;
       setOutput(JSON.stringify(result, null, 2));
       toast.success("Contract deployed", { description: address });
@@ -108,13 +108,13 @@ export function EditorTab() {
               <Button variant="outline" onClick={doCompile} disabled={compiling} className="flex-1">
                 {compiling ? "Compiling…" : "Compile"}
               </Button>
-              <Button onClick={doDeploy} disabled={deploying || !isAppAuthenticated} className="flex-1">
+              <Button onClick={doDeploy} disabled={deploying || !canSubmit} className="flex-1">
                 {deploying ? "Deploying…" : "Deploy"}
               </Button>
             </div>
-            {!isAppAuthenticated ? (
+            {!canSubmit ? (
               <p className="text-xs text-muted-foreground">
-                Sign in with a STRATO wallet to deploy.
+                Connect a wallet (STRATO or external) to deploy.
               </p>
             ) : null}
           </CardContent>

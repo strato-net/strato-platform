@@ -1,7 +1,6 @@
 import axios from "axios";
 import { toast } from "sonner";
 import { getCsrfToken } from "./csrf";
-import { redirectToLogin } from "./auth";
 
 // Single axios instance for SMD read/write REST calls. Callers pass full paths
 // built from env.ts base URLs (BLOC_URL, STRATO_URL, CIRRUS_URL, APEX_URL).
@@ -37,9 +36,11 @@ api.interceptors.response.use(
     if (error.code === "ERR_CANCELED" || error.name === "CanceledError") {
       return Promise.reject(error);
     }
+    // 401 just means "not authenticated" — the SMD supports guest browsing, so do
+    // NOT force a Keycloak login here. UserContext owns the auth lifecycle (it
+    // detects session expiry on its periodic probe and drops to the guest landing).
+    // Reject silently so guest data calls fail into empty states without a toast.
     if (error.response?.status === 401) {
-      toast.error("Session expired", { description: "Reauthenticating…" });
-      setTimeout(() => redirectToLogin(), 1500);
       return Promise.reject(error);
     }
     toast.error("Request failed", { description: extractErrorMessage(error) });

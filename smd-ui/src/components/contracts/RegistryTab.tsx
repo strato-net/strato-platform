@@ -21,7 +21,7 @@ export function RegistryTab() {
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
 
-  const { isAppAuthenticated } = useUser();
+  const { userAddress } = useUser();
   const { data: contracts, isLoading } = useContracts(search);
   const { data: addresses } = useContractAddresses(selectedName);
   const { data: xabi } = useContractXabi(selectedName, selectedAddress);
@@ -127,9 +127,9 @@ export function RegistryTab() {
 
               <section>
                 <h3 className="mb-2 text-sm font-semibold">Methods</h3>
-                {!isAppAuthenticated ? (
+                {!userAddress ? (
                   <p className="mb-2 text-xs text-muted-foreground">
-                    Sign in with a STRATO wallet to invoke write methods.
+                    Connect a wallet (STRATO or external) to invoke write methods.
                   </p>
                 ) : null}
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

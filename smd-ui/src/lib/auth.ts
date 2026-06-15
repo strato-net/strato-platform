@@ -52,9 +52,9 @@ export const isAuthenticated = async (): Promise<{ authenticated: boolean; user?
   return user ? { authenticated: true, user } : { authenticated: false };
 };
 
-/** Logout via the nginx OIDC logout endpoint. */
+/** Logout via the nginx OIDC logout endpoint, returning to the SMD in guest mode. */
 export const logout = (): void => {
-  window.location.href = "/auth/logout";
+  window.location.href = "/auth/logout?returnTo=/smd/";
 };
 
 /** Redirect to OIDC login, preserving the current path for return after auth. */

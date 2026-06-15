@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { callContractMethod } from "@/services/contracts";
+import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 
 interface MethodCallerProps {
   contractName: string;
@@ -16,11 +16,19 @@ export function MethodCaller({ contractName, contractAddress, method, args }: Me
   const argNames = Object.keys(args || {});
   const [values, setValues] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
+  const { submit: submitTx, canSubmit } = useSubmitTransaction();
 
   const submit = async () => {
     setPending(true);
     try {
-      const result = await callContractMethod(contractName, contractAddress, method, values);
+      const result = await submitTx("FUNCTION", {
+        contractName,
+        contractAddress,
+        value: 0,
+        method,
+        args: values,
+        metadata: {},
+      });
       toast.success(`Called ${method}`, {
         description: result?.data?.contents?.toString?.() ?? "Success",
       });
@@ -48,7 +56,7 @@ export function MethodCaller({ contractName, contractAddress, method, args }: Me
           </div>
         ))}
       </div>
-      <Button size="sm" className="mt-3" onClick={submit} disabled={pending}>
+      <Button size="sm" className="mt-3" onClick={submit} disabled={pending || !canSubmit}>
         {pending ? "Calling…" : "Call"}
       </Button>
     </div>
