@@ -4,9 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { BarSeriesCard, TxTypePieCard } from "@/components/dashboard/DashboardCharts";
+import { PeersCard } from "@/components/dashboard/PeersCard";
+import { RecentTransactionsCard } from "@/components/dashboard/RecentTransactionsCard";
+import { CopyButton } from "@/components/CopyButton";
 import { useSocketRoom } from "@/hooks/useSocketRoom";
 import { ROOMS } from "@/lib/socket";
-import { useNodeStatus, extractValidators } from "@/services/dashboard";
+import { useNodeStatus, useNodeMetadata } from "@/services/dashboard";
 import { secondsToHuman, shortenHex } from "@/lib/utils";
 
 interface HealthPayload {
@@ -46,7 +49,9 @@ export default function DashboardPage() {
   const txTypes = useSocketRoom<{ val: number; type: string }[]>(ROOMS.TRANSACTIONS_TYPE, []);
 
   const { data: status } = useNodeStatus();
-  const validators = extractValidators(status?.pbftData);
+  const { data: metadata } = useNodeMetadata();
+  const validators = metadata?.validators ?? [];
+  const nodeAddress = status?.nodeAddress || metadata?.nodeAddress;
 
   const healthy = health.health !== false;
   const sys = system.systemInfo;
@@ -73,9 +78,10 @@ export default function DashboardPage() {
             </CardDescription>
           </div>
           <div className="text-right text-xs text-muted-foreground">
-            <div className="flex items-center justify-end gap-1">
+            <div className="flex items-center justify-end gap-1.5">
               <Server className="h-3.5 w-3.5" />
-              {status?.nodeAddress ? shortenHex(status.nodeAddress, 8, 6) : "—"}
+              <span className="font-mono">{nodeAddress ? shortenHex(nodeAddress, 8, 6) : "—"}</span>
+              {nodeAddress ? <CopyButton value={nodeAddress} /> : null}
             </div>
           </div>
         </CardHeader>
@@ -102,6 +108,12 @@ export default function DashboardPage() {
         <StatCard label="Users" value={Number(usersCount).toLocaleString()} icon={Users} to="/accounts" />
         <StatCard label="Contracts" value={Number(contractsCount).toLocaleString()} icon={FileText} to="/contracts" />
         <StatCard label="Shards" value={Number(shardCount).toLocaleString()} icon={Boxes} />
+      </div>
+
+      {/* Peers + Recent transactions */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <PeersCard />
+        <RecentTransactionsCard />
       </div>
 
       {/* Charts */}

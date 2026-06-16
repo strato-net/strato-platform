@@ -24,7 +24,11 @@ const chainParam = () => {
   return id ? { chainid: id } : {};
 };
 
-/** GET /bloc/v2.2/contracts — list of contract names. */
+/**
+ * GET /bloc/v2.2/contracts — bloc returns an OBJECT keyed by contract name
+ * ({ Name: { instances: [...] } }); older shapes may return an array of names.
+ * Returns a sorted list of names either way.
+ */
 export function useContracts(name: string, limit = 50, offset = 0) {
   return useQuery({
     queryKey: ["contracts", name, limit, offset],
@@ -32,7 +36,9 @@ export function useContracts(name: string, limit = 50, offset = 0) {
       const { data } = await api.get(`${env.BLOC_URL}/contracts`, {
         params: { limit, offset, ...(name ? { name } : {}), ...chainParam() },
       });
-      return Array.isArray(data) ? data : [];
+      if (Array.isArray(data)) return data;
+      if (data && typeof data === "object") return Object.keys(data).sort();
+      return [];
     },
   });
 }

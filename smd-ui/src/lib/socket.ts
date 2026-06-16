@@ -26,6 +26,7 @@ export const ROOMS = {
   GET_NODE_UPTIME: "GET_NODE_UPTIME",
   GET_SYSTEM_INFO: "GET_SYSTEM_INFO",
   GET_NETWORK_HEALTH: "GET_NETWORK_HEALTH",
+  GET_PEERS: "GET_PEERS",
 } as const;
 
 export type Room = (typeof ROOMS)[keyof typeof ROOMS];

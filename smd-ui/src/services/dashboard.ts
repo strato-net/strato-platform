@@ -27,17 +27,20 @@ export function useNodeStatus() {
   });
 }
 
-/** Best-effort extraction of validator addresses from pbftData (shape varies by node). */
-export function extractValidators(pbftData: any): string[] {
-  if (!pbftData) return [];
-  const candidates =
-    pbftData.validators ||
-    pbftData.validatorList ||
-    pbftData.view?.validators ||
-    pbftData.commiters ||
-    pbftData.committers;
-  if (Array.isArray(candidates)) {
-    return candidates.map((v: any) => (typeof v === "string" ? v : v?.address || v?.commonName || String(v)));
-  }
-  return [];
+export interface NodeMetadata {
+  nodeAddress?: string;
+  validators?: string[];
+  isSynced?: boolean;
+}
+
+/** GET /strato-api/eth/v1.2/metadata — node address, validator set, sync status. */
+export function useNodeMetadata() {
+  return useQuery({
+    queryKey: ["node-metadata"],
+    queryFn: async (): Promise<NodeMetadata> => {
+      const { data } = await api.get(`${env.STRATO_URL}/metadata`);
+      return data || {};
+    },
+    refetchInterval: 15000,
+  });
 }

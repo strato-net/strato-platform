@@ -1,8 +1,14 @@
+import { lazy, Suspense } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import { RegistryTab } from "@/components/contracts/RegistryTab";
 import { QueryTab } from "@/components/contracts/QueryTab";
-import { EditorTab } from "@/components/contracts/EditorTab";
+
+// Lazy-load the editor so the (large) bundled monaco only downloads when opened.
+const EditorTab = lazy(() =>
+  import("@/components/contracts/EditorTab").then((m) => ({ default: m.EditorTab }))
+);
 
 export default function ContractsPage() {
   return (
@@ -24,7 +30,9 @@ export default function ContractsPage() {
           <QueryTab />
         </TabsContent>
         <TabsContent value="editor" className="mt-4">
-          <EditorTab />
+          <Suspense fallback={<Skeleton className="h-[28rem] w-full" />}>
+            <EditorTab />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>

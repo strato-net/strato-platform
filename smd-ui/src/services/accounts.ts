@@ -33,18 +33,33 @@ export function useAccountDetail(address: string | null | undefined) {
   });
 }
 
-/** CIRRUS Certificate directory — the network's known accounts. */
-export function useCertificates(limit = 100) {
+export interface UserRecord {
+  username: string;
+  address: string;
+}
+
+function extractUsername(row: any): string {
+  const storage = row?.storage;
+  const data = Array.isArray(storage) ? storage[0]?.data : storage?.data;
+  return data?.username ?? row?.["storage.data.username"] ?? "";
+}
+
+/**
+ * Registered users on the network, from the `User` contract's CIRRUS state:
+ *   /cirrus/search/contract?contract_name=eq.User&storage.data->>username=neq.&select=*,storage(*)
+ * username comes from storage.data.username; address is the User contract address.
+ */
+export function useUsers() {
   return useQuery({
-    queryKey: ["certificates", limit],
-    queryFn: async (): Promise<CertificateRecord[]> => {
-      const { data } = await api.get(`${env.CIRRUS_URL}/Certificate`, {
-        params: {
-          select: "commonName,organization,organizationalUnit,userAddress,isValid",
-          limit,
-        },
-      });
-      return Array.isArray(data) ? data : [];
+    queryKey: ["users"],
+    queryFn: async (): Promise<UserRecord[]> => {
+      const { data } = await api.get(
+        `${env.CIRRUS_URL}/contract?contract_name=eq.User&storage.data->>username=neq.&select=*,storage(*)`
+      );
+      if (!Array.isArray(data)) return [];
+      return data
+        .map((row) => ({ username: extractUsername(row), address: row?.address ?? "" }))
+        .filter((u) => u.username);
     },
   });
 }

@@ -10,11 +10,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SendTokensDialog } from "@/components/accounts/SendTokensDialog";
+import { CopyButton } from "@/components/CopyButton";
 import { useUser } from "@/context/UserContext";
-import { useAccountDetail, useCertificates } from "@/services/accounts";
+import { useAccountDetail, useUsers } from "@/services/accounts";
 import { requestWalletConnection } from "@/lib/auth";
 import { shortenHex } from "@/lib/utils";
 
@@ -32,7 +32,7 @@ function formatBalance(balance?: string): string {
 export default function AccountsPage() {
   const { userAddress } = useUser();
   const { data: account, isLoading: accountLoading } = useAccountDetail(userAddress);
-  const { data: certificates, isLoading: certsLoading } = useCertificates();
+  const { data: users, isLoading: usersLoading } = useUsers();
 
   return (
     <div className="space-y-6">
@@ -59,7 +59,10 @@ export default function AccountsPage() {
             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
                 <dt className="text-xs uppercase text-muted-foreground">Address</dt>
-                <dd className="break-all font-mono text-sm">{userAddress}</dd>
+                <dd className="flex items-center gap-1.5 break-all font-mono text-sm">
+                  {userAddress}
+                  <CopyButton value={userAddress} />
+                </dd>
               </div>
               <div>
                 <dt className="text-xs uppercase text-muted-foreground">Balance</dt>
@@ -80,11 +83,11 @@ export default function AccountsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Network accounts</CardTitle>
-          <CardDescription>Registered identities on this STRATO network.</CardDescription>
+          <CardTitle>Users</CardTitle>
+          <CardDescription>Registered users on this STRATO network.</CardDescription>
         </CardHeader>
         <CardContent>
-          {certsLoading ? (
+          {usersLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-8 w-full" />
               <Skeleton className="h-8 w-full" />
@@ -94,31 +97,26 @@ export default function AccountsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Common name</TableHead>
-                  <TableHead>Organization</TableHead>
+                  <TableHead>Username</TableHead>
                   <TableHead>Address</TableHead>
-                  <TableHead className="text-right">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(certificates ?? []).map((c) => (
-                  <TableRow key={c.userAddress}>
-                    <TableCell className="font-medium">{c.commonName}</TableCell>
-                    <TableCell className="text-muted-foreground">{c.organization || "—"}</TableCell>
-                    <TableCell className="font-mono text-xs">{shortenHex(c.userAddress)}</TableCell>
-                    <TableCell className="text-right">
-                      {c.isValid === false ? (
-                        <Badge variant="destructive">Invalid</Badge>
-                      ) : (
-                        <Badge variant="secondary">Valid</Badge>
-                      )}
+                {(users ?? []).map((u) => (
+                  <TableRow key={u.address || u.username}>
+                    <TableCell className="font-medium">{u.username}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      <span className="inline-flex items-center gap-1.5">
+                        {u.address ? shortenHex(u.address) : "—"}
+                        {u.address ? <CopyButton value={u.address} /> : null}
+                      </span>
                     </TableCell>
                   </TableRow>
                 ))}
-                {(certificates ?? []).length === 0 ? (
+                {(users ?? []).length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
-                      No accounts found.
+                    <TableCell colSpan={2} className="text-center text-muted-foreground">
+                      No users found.
                     </TableCell>
                   </TableRow>
                 ) : null}
