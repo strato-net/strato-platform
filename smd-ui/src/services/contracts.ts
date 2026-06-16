@@ -75,6 +75,44 @@ export async function compileContract(contractName: string, source: string, soli
   return data;
 }
 
+export interface ConstructorArg {
+  name: string;
+  type: string;
+  index?: number;
+}
+
+export interface XabiContract {
+  /** constructor args, keyed by name */
+  constr?: { args?: Record<string, { type: string; index?: number }> };
+  [key: string]: unknown;
+}
+
+export interface XabiResult {
+  /** map of contract name -> contract xabi (incl. constructor args) */
+  src?: Record<string, XabiContract>;
+  [key: string]: unknown;
+}
+
+/**
+ * POST /bloc/v2.2/contracts/xabi — tokenize/parse source into its xabi.
+ * Returns `{ src: { ContractName: { constr: { args } }, ... } }`; used by the
+ * editor to list the contracts in the source and their constructor arguments.
+ */
+export async function tokenizeSource(source: string): Promise<XabiResult> {
+  const { data } = await api.post(`${env.BLOC_URL}/contracts/xabi`, { src: source });
+  return data;
+}
+
+/** Extract a contract's constructor args (ordered by `index` when present). */
+export function constructorArgs(xabi: XabiResult | null, contractName: string): ConstructorArg[] {
+  const contract = xabi?.src?.[contractName];
+  const args = contract?.constr?.args;
+  if (!args) return [];
+  return Object.entries(args)
+    .map(([name, def]) => ({ name, type: def.type, index: def.index }))
+    .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+}
+
 /** GET /cirrus/search/:table?<query> — CIRRUS state query. */
 export async function queryCirrus(table: string, queryString: string) {
   const qs = queryString.startsWith("?") ? queryString.slice(1) : queryString;
