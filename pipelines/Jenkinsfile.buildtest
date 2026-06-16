@@ -53,7 +53,6 @@ pipeline {
                 BA_PASSWORD='$BUILDTEST_BA_PASSWORD' \\
             strato-up mynode \\
               --network=helium \\
-              --nodeHost='buildtest.testnet.strato.nexus' \\
               --sslDir='/home/ec2-user/cloudflare-ssl/'
           """
           sh "chmod +x run.sh"

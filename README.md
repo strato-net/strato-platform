@@ -76,9 +76,10 @@ strato-login
 Start the node:
 
 ```
-<OPTIONAL_ENV_VARS> strato-up mynode --network=helium --nodeHost=example.com --sslDir='/path/to/ssl'
+<OPTIONAL_ENV_VARS> strato-up mynode --network=helium --sslDir='/path/to/ssl'
 ```
 
+- The node's external hostname is taken from the machine's `hostname`. It must be a name that browsers and the node's own containers can reach (e.g. a public DNS name). On cloud hosts whose default `hostname` is an internal-only name (such as AWS EC2's `ip-x-x-x-x.ec2.internal`), set it first with `sudo hostnamectl set-hostname example.com` before running `strato-up`.
 - `/path/to/ssl` should contain `server.pem` and `server.key` directly (no subdirectories), with read permissions for all users (`chmod 444 server.*`).
 - Do not include OAUTH variables in env vars. You can include app-related variables if needed (e.g., RPC URLs, etc.).
 - Use `--network=helium` for testnet or `--network=upquark` for mainnet (default).
