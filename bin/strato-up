@@ -79,8 +79,12 @@ if [[ -f .strato.pid ]]; then
 fi
 
 echo "Starting convoke..."
-# stdout goes to log, stderr goes to both log and terminal
-nohup convoke > logs/convoke.log 2> >(tee -a logs/convoke.log >&2) &
+# stdout and stderr both go to the log; stderr also goes to the terminal.
+# Both streams go through "tee -a" (append mode) so the two writers share the
+# file's end position and can't overwrite each other's bytes. Truncate first,
+# since the append redirects no longer reset the log on restart.
+: > logs/convoke.log
+nohup convoke > >(tee -a logs/convoke.log >/dev/null) 2> >(tee -a logs/convoke.log >&2) &
 CONVOKE_PID=$!
 echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
 
