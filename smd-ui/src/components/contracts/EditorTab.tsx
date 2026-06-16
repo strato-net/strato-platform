@@ -57,7 +57,7 @@ const STARTER = `contract SimpleStorage {
 
 export function EditorTab() {
   const { resolvedTheme } = useTheme();
-  const { submit: submitTx, canSubmit } = useSubmitTransaction();
+  const { submit: submitTx, canSubmit, canDeploy } = useSubmitTransaction();
   const { userAddress } = useUser();
 
   const [files, setFiles] = useState<SourceFile[]>([{ name: "Main.sol", content: STARTER }]);
@@ -423,7 +423,13 @@ export function EditorTab() {
 
             {!canSubmit ? (
               <p className="text-xs text-muted-foreground">
-                Connect a wallet (STRATO or external) to create a contract.
+                Connect a wallet to create a contract.
+              </p>
+            ) : !canDeploy ? (
+              <p className="text-xs text-muted-foreground">
+                Deploying a contract requires the STRATO wallet. External wallets can call
+                functions and send tokens, but not deploy — connect with the STRATO wallet to
+                create contracts.
               </p>
             ) : null}
           </div>
@@ -432,7 +438,7 @@ export function EditorTab() {
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={doCreate} disabled={deploying || !canSubmit || !selectedContract}>
+            <Button onClick={doCreate} disabled={deploying || !canDeploy || !selectedContract}>
               {deploying ? "Creating…" : "Create Contract"}
             </Button>
           </DialogFooter>

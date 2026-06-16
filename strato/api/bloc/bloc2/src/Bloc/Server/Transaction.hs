@@ -1062,8 +1062,10 @@ preparePostUnsignedRawTx time tx contractName' args =
       (Address 0)
       (fromIntegral $ TX.nonce tx)
       (fromIntegral $ TX.gasLimit tx)
-      (Just $ TX.to tx)
-      (Just $ TX.funcName tx)
+      -- `to` and `funcName` only exist on MessageTX; a ContractCreationTX (deploy)
+      -- has neither, so guard the selectors to avoid "No match in record selector".
+      (case tx of TX.MessageTX {} -> Just (TX.to tx); _ -> Nothing)
+      (case tx of TX.MessageTX {} -> Just (TX.funcName tx); _ -> Nothing)
       (Just contractName')
       args
       (TX.network tx)

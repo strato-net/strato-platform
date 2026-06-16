@@ -15,7 +15,7 @@ export default function ContractsPage() {
     <div>
       <PageHeader
         title="Contracts"
-        description="Browse the registry, query state with CIRRUS, and compile & deploy contracts."
+        description="Browse the registry, query state with Cirrus, and compile & deploy contracts."
       />
       <Tabs defaultValue="registry">
         <TabsList>

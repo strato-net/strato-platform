@@ -47,7 +47,7 @@ function extractUsername(row: any): string {
 }
 
 /**
- * Registered users on the network, from the `User` contract's CIRRUS state:
+ * Registered users on the network, from the `User` contract's Cirrus state:
  *   /cirrus/search/contract?contract_name=eq.User&storage.data->>username=neq.&select=*,storage(*)
  * username comes from storage.data.username; address is the User contract address.
  */

@@ -35,7 +35,7 @@ export function QueryTab() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">CIRRUS query</CardTitle>
+        <CardTitle className="text-base">Cirrus query</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_2fr_auto] sm:items-end">

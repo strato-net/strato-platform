@@ -116,15 +116,6 @@ export interface AccountMatch {
   userAddress: string;
 }
 
-/** Search the CIRRUS Certificate directory by name / org / address (ilike). */
-export async function searchAccounts(term: string): Promise<AccountMatch[]> {
-  const q = encodeURIComponent(`*${term}*`);
-  const { data } = await api.get(
-    `${env.CIRRUS_URL}/Certificate?or=(commonName.ilike.${q},organization.ilike.${q},userAddress.ilike.${q})`
-  );
-  return Array.isArray(data) ? data : [];
-}
-
 export interface AccountEntry {
   address: string;
   balance?: string | number;

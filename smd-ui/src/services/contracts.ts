@@ -43,6 +43,99 @@ export function useContracts(name: string, limit = 50, offset = 0) {
   });
 }
 
+export interface ContractGroup {
+  name: string;
+  addresses: string[];
+}
+
+/**
+ * GET /bloc/v2.2/contracts?name=<search> — map of contract name -> instances.
+ * The `name` param matches a substring of BOTH contract names and instance
+ * addresses, so searching "1008" returns contracts whose instance addresses
+ * contain "1008". Response shape: { Name: [{ address, createdAt }, ...] }.
+ */
+export function useContractGroups(search: string, limit = 10, offset = 0) {
+  return useQuery({
+    queryKey: ["contract-groups", search, limit, offset],
+    queryFn: async (): Promise<ContractGroup[]> => {
+      const { data } = await api.get(`${env.BLOC_URL}/contracts`, {
+        params: { limit, offset, ...(search ? { name: search } : {}), ...chainParam() },
+      });
+      if (!data || typeof data !== "object") return [];
+      return Object.entries(data as Record<string, any>).map(([name, insts]) => {
+        const list = Array.isArray(insts) ? insts : insts?.instances ?? [];
+        return {
+          name,
+          addresses: (list as any[])
+            .map((i) => (typeof i === "string" ? i : i?.address))
+            .filter(Boolean),
+        };
+      });
+    },
+  });
+}
+
+/** GET /bloc/v2.2/contracts/:name/:address/state — symbol -> value (state vars + function signatures). */
+export function useContractState(name: string | null, address: string | null) {
+  return useQuery({
+    queryKey: ["contract-state", name, address],
+    enabled: !!name && !!address,
+    queryFn: async (): Promise<Record<string, unknown>> => {
+      const { data } = await api.get(`${env.BLOC_URL}/contracts/${name}/${address}/state`, {
+        params: chainParam(),
+      });
+      return data && typeof data === "object" ? data : {};
+    },
+  });
+}
+
+export interface FuncArg {
+  name: string;
+  type: string;
+}
+export interface ContractFunction {
+  name: string;
+  args: FuncArg[];
+  payable: boolean;
+  signature: string;
+}
+
+function argType(def: any): string {
+  return def?.type?.tag ?? def?.type ?? "";
+}
+
+/** GET /bloc/v2.2/contracts/:name/:address — full contract info (function arg names/types live here). */
+export function useContractInfo(name: string | null, address: string | null) {
+  return useQuery({
+    queryKey: ["contract-info", name, address],
+    enabled: !!name && !!address,
+    queryFn: async (): Promise<any> => {
+      const { data } = await api.get(`${env.BLOC_URL}/contracts/${name}/${address}`, {
+        params: chainParam(),
+      });
+      return data;
+    },
+  });
+}
+
+/** A state value that is a function signature, e.g. `function (uint256,string) returns ()`. */
+export function isFunctionValue(v: unknown): v is string {
+  return typeof v === "string" && v.startsWith("function");
+}
+
+/** Extract a function's argument list (name + type tag) from the contract info. */
+export function functionArgs(info: any, fnName: string): FuncArg[] {
+  const args = info?._functions?.[fnName]?._funcArgs;
+  if (!Array.isArray(args)) return [];
+  // _funcArgs is an array of [name, { type: { tag } }] tuples.
+  return args.map((entry: any) => ({ name: entry?.[0] ?? "", type: argType(entry?.[1]) }));
+}
+
+/** Whether a function is payable (accepts value), from its state mutability. */
+export function isPayable(info: any, fnName: string): boolean {
+  return info?._functions?.[fnName]?._funcStateMutability === "payable";
+}
+
 /** GET /bloc/v2.2/contracts/:name — deployed addresses for a contract name. */
 export function useContractAddresses(name: string | null) {
   return useQuery({
@@ -113,7 +206,7 @@ export function constructorArgs(xabi: XabiResult | null, contractName: string): 
     .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
 }
 
-/** GET /cirrus/search/:table?<query> — CIRRUS state query. */
+/** GET /cirrus/search/:table?<query> — Cirrus state query. */
 export async function queryCirrus(table: string, queryString: string) {
   const qs = queryString.startsWith("?") ? queryString.slice(1) : queryString;
   const { data } = await api.get(`${env.CIRRUS_URL}/${table}${qs ? `?${qs}` : ""}`);

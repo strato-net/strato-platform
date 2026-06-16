@@ -20,8 +20,15 @@ export function useSubmitTransaction() {
       if (isAppAuthenticated) {
         return submitStratoTx(type, payload);
       }
+      // External-wallet (EIP-712) signing only supports MessageTX-style txs on the
+      // node — function calls and transfers. Contract creation must go through the
+      // STRATO wallet (server-side vault signing).
+      if (type === "CONTRACT") {
+        throw new Error(
+          "Deploying a contract requires the STRATO wallet. Connect with the STRATO wallet to deploy; external wallets can call functions and send tokens."
+        );
+      }
       if (walletClient && address) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await ensureStratoChainInWallet(walletClient as any).catch(() => {});
         return signAndSubmitViaWallet(walletClient, address, type, payload);
       }
@@ -31,5 +38,7 @@ export function useSubmitTransaction() {
   );
 
   const canSubmit = isAppAuthenticated || (!!walletClient && !!address);
-  return { submit, canSubmit };
+  // Contract deploys are only possible with the STRATO wallet (vault signing).
+  const canDeploy = isAppAuthenticated;
+  return { submit, canSubmit, canDeploy };
 }
