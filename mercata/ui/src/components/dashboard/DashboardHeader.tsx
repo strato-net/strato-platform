@@ -109,9 +109,7 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
           <Popover>
             <PopoverTrigger asChild>
               <button className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-[#1e2a4a] flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity">
-                <span className="text-white text-xs md:text-sm font-semibold">
-                  {userName.slice(0, 2).toUpperCase()}
-                </span>
+                <span className="text-white text-xs md:text-sm font-semibold">ST</span>
               </button>
             </PopoverTrigger>
 
@@ -119,12 +117,10 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
               <div className="space-y-3 md:space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-[#1e2a4a] flex items-center justify-center shrink-0">
-                    <span className="text-white text-sm font-semibold">
-                      {userName?.slice(0, 2).toUpperCase() || "NA"}
-                    </span>
+                    <span className="text-white text-sm font-semibold">ST</span>
                   </div>
                   <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{userName || "N/A"}</p>
+                    <p className="font-medium text-sm truncate">STRATO Wallet</p>
                     <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-muted-foreground font-mono">
                       <span className="truncate">{truncateAddress(userAddress, 8, 4)}</span>
                       <button onClick={() => copyAddress(userAddress, 'User')} className="hover:text-foreground shrink-0">
