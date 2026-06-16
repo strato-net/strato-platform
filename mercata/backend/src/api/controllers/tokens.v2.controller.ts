@@ -144,7 +144,7 @@ class TokensV2Controller {
 
       const { poolAddress } = params;
 
-      const historyParams = getHistoryParams(`${query?.duration || '1d'}`, query.end ? `${query.end}` : undefined, 80);
+      const historyParams = getHistoryParams(`${query?.duration || '1d'}`, query.end ? `${query.end}` : undefined);
 
       const result = await getPoolPriceHistory(accessToken, userAddress, poolAddress, historyParams);
       res.status(RestStatus.OK).json(result);
