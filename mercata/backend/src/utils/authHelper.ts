@@ -174,7 +174,7 @@ export async function fetchOpenIdConfig(openIdDiscoveryUrl: string | undefined):
     
     const discoveryResponse = await axios.get(openIdDiscoveryUrl);
     const { token_endpoint, jwks_uri } = discoveryResponse.data;
-    
+
     if (!token_endpoint) {
       throw new Error("Token endpoint not found in OpenID discovery document");
     }
@@ -182,7 +182,24 @@ export async function fetchOpenIdConfig(openIdDiscoveryUrl: string | undefined):
       throw new Error("JWKS URI not found in OpenID discovery document");
     }
 
-    const jwksResponse = await axios.get(jwks_uri);
+    // The discovery document reports endpoints (jwks_uri, token_endpoint) using
+    // the OAuth issuer's external URL. When we fetched discovery from an internal
+    // origin (--localAuth, e.g. http://local-auth:4444), those external URLs
+    // route back through the public HTTPS endpoint and fail certificate
+    // verification (e.g. an untrusted Cloudflare Origin cert). Resolve the
+    // endpoints against the same origin we used for discovery so subsequent hops
+    // (JWKS fetch, client-credentials token requests) also stay internal. For an
+    // external provider, discovery and these endpoints share the issuer origin,
+    // so this rewrite is a no-op.
+    const discoveryOrigin = new URL(openIdDiscoveryUrl).origin;
+    const toDiscoveryOrigin = (endpoint: string): string => {
+      const url = new URL(endpoint);
+      return `${discoveryOrigin}${url.pathname}${url.search}`;
+    };
+    const resolvedTokenEndpoint = toDiscoveryOrigin(token_endpoint);
+    const resolvedJwksUri = toDiscoveryOrigin(jwks_uri);
+
+    const jwksResponse = await axios.get(resolvedJwksUri);
     const jwks = jwksResponse.data as JSONWebKeySet;
 
     if (!jwks || !Array.isArray(jwks.keys)) {
@@ -190,7 +207,7 @@ export async function fetchOpenIdConfig(openIdDiscoveryUrl: string | undefined):
     }
 
     console.debug("Successfully fetched OpenID configuration and JWKS");
-    return { tokenEndpoint: token_endpoint, jwks };
+    return { tokenEndpoint: resolvedTokenEndpoint, jwks };
   } catch (error) {
     console.error("Failed to fetch OpenID discovery data:", error);
     throw new Error("Failed to fetch OpenID discovery data");

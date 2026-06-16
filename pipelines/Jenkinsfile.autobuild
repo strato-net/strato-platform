@@ -94,7 +94,6 @@ pipeline {
           export PATH
           strato-up mynode \\
             --network=helium \\
-            --nodeHost=\$(</host) \\
             --vaultUrl=https://\$(</host):8093/strato/v2.3 \\
             --fileServerUrl=https://\$(</host):44300/highway \\
             --sslDir='/home/ubuntu/letsencrypt-ssl' \\
