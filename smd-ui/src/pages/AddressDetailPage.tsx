@@ -16,6 +16,7 @@ import {
 import { CopyButton } from "@/components/CopyButton";
 import { DetailRow } from "@/components/explorer/DetailRow";
 import { AddrLink } from "@/components/explorer/AddrLink";
+import { ContractStatePanel } from "@/components/contracts/ContractStatePanel";
 import { useAccountDetail } from "@/services/accounts";
 import { useStorageByAddress, useTransactionsByAddress } from "@/services/explorer";
 import { shortenHex } from "@/lib/utils";
@@ -25,7 +26,7 @@ function formatBalance(balance?: string): string {
   try {
     return `${Number(formatEther(BigInt(balance))).toLocaleString(undefined, {
       maximumFractionDigits: 6,
-    })} STRT`;
+    })} STRATO`;
   } catch {
     return balance;
   }
@@ -83,6 +84,11 @@ export default function AddressDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Contract state + callable functions (only when this address is a contract) */}
+      {account?.contractName && address ? (
+        <ContractStatePanel name={account.contractName} address={address} />
+      ) : null}
 
       <Card>
         <CardHeader>

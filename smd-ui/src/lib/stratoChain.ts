@@ -129,7 +129,7 @@ export function initStratoChain(): Chain | null {
   _chain = defineChain({
     id: _chainId,
     name: chainLabel,
-    nativeCurrency: { decimals: 18, name: "STRATO", symbol: "STRT" },
+    nativeCurrency: { decimals: 18, name: "STRATO", symbol: "STRATO" },
     rpcUrls: { default: { http: [runtime.rpcUrl() || rpcUrl] } },
     ...(explorerUrl
       ? { blockExplorers: { default: { name: "Stratoscan", url: explorerUrl } } }

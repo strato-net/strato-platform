@@ -67,7 +67,7 @@ export default function AccountsPage() {
               <div>
                 <dt className="text-xs uppercase text-muted-foreground">Balance</dt>
                 <dd className="text-sm font-medium">
-                  {accountLoading ? <Skeleton className="h-5 w-24" /> : `${formatBalance(account?.balance)} STRT`}
+                  {accountLoading ? <Skeleton className="h-5 w-24" /> : `${formatBalance(account?.balance)} STRATO`}
                 </dd>
               </div>
               <div>

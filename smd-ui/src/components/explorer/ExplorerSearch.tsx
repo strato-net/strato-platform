@@ -27,7 +27,7 @@ export function ExplorerSearch({ className }: { className?: string }) {
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
           className="w-64 pl-8"
-          placeholder="Block #, tx hash, or account"
+          placeholder="Search for anything"
           value={term}
           onChange={(e) => setTerm(e.target.value)}
         />

@@ -126,9 +126,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   }, [disconnect]);
 
   useEffect(() => {
+    // One-time auth check on load. We intentionally do NOT poll /apex-api/user —
+    // guests/external wallets have no STRATO session, so polling just 401s on a
+    // loop. Session state is refreshed explicitly via refreshAuth() (e.g. after login).
     checkAuthenticationStatus(true);
-    const interval = setInterval(() => checkAuthenticationStatus(false), 30000);
-    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

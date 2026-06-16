@@ -1,4 +1,4 @@
-import { Activity, Box, Boxes, FileText, Network, Server, Users } from "lucide-react";
+import { Activity, Box, FileText, Network, Server, Users } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +39,6 @@ export default function DashboardPage() {
   const lastBlock = useSocketRoom<number>(ROOMS.LAST_BLOCK_NUMBER, 0);
   const usersCount = useSocketRoom<number>(ROOMS.USERS_COUNT, 0);
   const contractsCount = useSocketRoom<number>(ROOMS.CONTRACTS_COUNT, 0);
-  const shardCount = useSocketRoom<number>(ROOMS.GET_SHARD_COUNT, 0);
   const uptime = useSocketRoom<number>(ROOMS.GET_NODE_UPTIME, 0);
   const health = useSocketRoom<HealthPayload>(ROOMS.GET_HEALTH, {});
   const system = useSocketRoom<SystemPayload>(ROOMS.GET_SYSTEM_INFO, {});
@@ -103,11 +102,10 @@ export default function DashboardPage() {
       </Card>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Last block" value={Number(lastBlock).toLocaleString()} icon={Box} />
         <StatCard label="Users" value={Number(usersCount).toLocaleString()} icon={Users} to="/accounts" />
         <StatCard label="Contracts" value={Number(contractsCount).toLocaleString()} icon={FileText} to="/contracts" />
-        <StatCard label="Shards" value={Number(shardCount).toLocaleString()} icon={Boxes} />
       </div>
 
       {/* Peers + Recent transactions */}

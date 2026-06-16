@@ -327,10 +327,6 @@ export function EditorTab() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <Field label="Shard">
-              <span className="text-sm text-muted-foreground">Main Chain</span>
-            </Field>
-
             <Field label="Name">
               <Input
                 placeholder="username"
