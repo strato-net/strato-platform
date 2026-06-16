@@ -23,7 +23,7 @@ import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
 import           Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import           Blockchain.Threads
-import           Control.Monad.Composable.Vault (runVaultM)
+import           Control.Monad.Composable.Vault (runVaultMWith, newVaultAuthEnv)
 import           Executable.StratoP2P
 import           BlockApps.Init
 import           BlockApps.Logging as BL
@@ -52,8 +52,10 @@ initP2P = labelTheThread "initP2P" $ do
   setParticipationMode flags_participationMode
   wireMessagesRef <- liftIO $ newIORef empty
   cfg <- initConfig wireMessagesRef
-  let vaultUrl' = vaultUrl . urlConfig $ ethConf
-      runner f = runLoggingT $ runVaultM vaultUrl' $ do
+  let peerVaultRole = peerVault (vaultConfig ethConf)
+  vaultEnv <- newVaultAuthEnv (vrTimeoutSec peerVaultRole) (vrVaultUrl peerVaultRole)
+                              (vrCredentialsPath peerVaultRole) (vrTokenCachePath peerVaultRole)
+  let runner f = runLoggingT $ runVaultMWith vaultEnv $ do
         c' <- initContext
         ctx <- liftIO $ newIORef c'
         let cfg' = cfg { configContext = ctx }

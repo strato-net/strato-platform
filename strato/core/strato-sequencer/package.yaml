@@ -71,6 +71,7 @@ executables:
       - strato-model
       - strato-redis-blockdb
       - strato-sequencer
+      - vault-monad
       - wai-middleware-prometheus
       - warp
     other-modules: []

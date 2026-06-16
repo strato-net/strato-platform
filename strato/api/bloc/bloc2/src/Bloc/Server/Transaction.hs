@@ -1110,8 +1110,8 @@ vaultGetPub ::
   (MonadIO m, MonadLogger m) =>
   Text -> m PublicKey
 vaultGetPub token = do
-  let urlCfg = EthConf.urlConfig ethConf
-  env <- liftIO $ newAuthEnvWith (EthConf.vaultTimeoutSec urlCfg) (EthConf.vaultUrl urlCfg)
+  let r = EthConf.apiVault (EthConf.vaultConfig ethConf)
+  env <- liftIO $ newAuthEnvWith (EthConf.vrTimeoutSec r) (EthConf.vrVaultUrl r)
   result <- liftIO $ runWithUserToken env token (getKey Nothing Nothing)
   either (blocError . VaultWrapperError) return (fmap VaultT.unPubKey result)
 
@@ -1119,8 +1119,8 @@ vaultSign ::
   (MonadIO m, MonadLogger m) =>
   Text -> ByteString -> m Signature
 vaultSign token msgHash = do
-  let urlCfg = EthConf.urlConfig ethConf
-  env <- liftIO $ newAuthEnvWith (EthConf.vaultTimeoutSec urlCfg) (EthConf.vaultUrl urlCfg)
+  let r = EthConf.apiVault (EthConf.vaultConfig ethConf)
+  env <- liftIO $ newAuthEnvWith (EthConf.vrTimeoutSec r) (EthConf.vrVaultUrl r)
   result <- liftIO $ runWithUserToken env token (postSignature Nothing (VaultT.MsgHash msgHash))
   either (blocError . VaultWrapperError) return result
 

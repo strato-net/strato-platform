@@ -1,7 +1,13 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Blockchain.Init.EthConf (genEthConf) where
+module Blockchain.Init.EthConf
+  ( genEthConf
+  , sequencerCredentialsPath
+  , peerCredentialsPath
+  , sequencerTokenCachePath
+  , peerTokenCachePath
+  ) where
 
 import Blockchain.EthConf
 import Blockchain.Init.Options hiding (flags_localAuth)
@@ -13,12 +19,31 @@ import Control.Concurrent
 import Data.Default
 import Network.HTTP.Types.Status
 import Servant.Client
-import Strato.Auth.Client (AuthEnv, newAuthEnv, runWithAuth)
+import Strato.Auth.Client (AuthEnv, newAuthEnvWithCreds, runWithAuth)
+import Strato.Auth.ClientCredentials (loadClientCredentials)
 import qualified Strato.Strato23.API.Types as VC
 import Strato.Strato23.Client
 import System.Info (os)
 import System.Process (readProcess)
 import Text.ShortDescription
+
+-- | Credential files backing the two local-vault node identities. Written by
+-- "Blockchain.Init.Generator" at setup time and read back here (to provision
+-- node keys) and by the running components via ethconf.yaml's vaultConfig.
+sequencerCredentialsPath :: FilePath
+sequencerCredentialsPath = "secrets/oauth_credentials.sequencer.yaml"
+
+peerCredentialsPath :: FilePath
+peerCredentialsPath = "secrets/oauth_credentials.peer.yaml"
+
+-- | Per-identity token caches. Distinct paths are required so the sequencer and
+-- the p2p/discover pair, which run in the same container, don't clobber each
+-- other's cached OAuth token.
+sequencerTokenCachePath :: FilePath
+sequencerTokenCachePath = "secrets/oauth_token.sequencer"
+
+peerTokenCachePath :: FilePath
+peerTokenCachePath = "secrets/oauth_token.peer"
 
 -- | Address strato-api binds its socket to
 getApiListenAddress :: String
@@ -82,9 +107,14 @@ runtimeConfig = def
   , vmConfig = def { sqlDiff = flags_sqlDiff, diffPublish = flags_diffPublish }
   }
 
-getNodeKey :: IO (VC.PublicKey, Address)
-getNodeKey = do
-  env <- newAuthEnv flags_vaultUrl
+-- | Provision (or fetch) the node key for a single vault identity. @url@ is the
+-- vault, @credsPath@ the OAuth identity, @tokenPath@ its token cache. With
+-- distinct identities this is called once per local role so each role's key
+-- exists before the components start (p2p's 'getPub' does not create a key).
+getNodeKeyFor :: String -> FilePath -> FilePath -> IO (VC.PublicKey, Address)
+getNodeKeyFor url credsPath tokenPath = do
+  creds <- loadClientCredentials credsPath
+  env <- newAuthEnvWithCreds flags_vaultTimeoutSec url creds tokenPath
   ak <- waitOnVault env $ runWithAuth env (getKey Nothing Nothing)
   return (VC.unPubKey ak, VC.unAddress ak)
 
@@ -129,12 +159,27 @@ genEthConf = do
         ++ localHostname
         ++ if ssl then "" else ":" ++ show flags_httpPort
 
+      -- The vault each role talks to. In local-auth (dev) everything points at
+      -- the bundled vault. Otherwise strato-api uses the public vault while the
+      -- sequencer and p2p/discover use the local vault (falling back to the
+      -- public one when --localVaultUrl is empty, i.e. single-vault mode).
+      localAuthVaultUrl = nodeBaseUrl ++ "/vault/strato/v2.3"
+      publicVaultUrl
+        | Opts.flags_localAuth = localAuthVaultUrl
+        | otherwise            = flags_vaultUrl
+      localVaultUrl
+        | Opts.flags_localAuth     = localAuthVaultUrl
+        | null flags_localVaultUrl = flags_vaultUrl
+        | otherwise                = flags_localVaultUrl
+
   -- For local auth mode, skip vault during setup (vault-wrapper starts later)
   if Opts.flags_localAuth
-    then putStrLn $ "  ✓ Local auth mode (hostname: " ++ localHostname ++ "): node key will be provisioned during first admin setup"
+    then putStrLn $ "  ✓ Local auth mode (hostname: " ++ localHostname ++ "): node keys will be provisioned during first admin setup"
     else do
-      (pub, _addr) <- getNodeKey
-      putStrLn $ "  ✓ Node key: " ++ shortDescription pub
+      (seqPub, _) <- getNodeKeyFor localVaultUrl sequencerCredentialsPath sequencerTokenCachePath
+      putStrLn $ "  ✓ Sequencer node key: " ++ shortDescription seqPub
+      (peerPub, _) <- getNodeKeyFor localVaultUrl peerCredentialsPath peerTokenCachePath
+      putStrLn $ "  ✓ Peer node key: " ++ shortDescription peerPub
 
   return runtimeConfig
     { sqlConfig = (sqlConfig runtimeConfig)
@@ -163,14 +208,35 @@ genEthConf = do
         }
     , urlConfig = def
         { nodeUrl = nodeBaseUrl
-        , vaultUrl = if Opts.flags_localAuth
-            then nodeBaseUrl ++ "/vault/strato/v2.3"
-            else flags_vaultUrl
+        , vaultUrl = publicVaultUrl
         , vaultTimeoutSec = flags_vaultTimeoutSec
         , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
         , notificationServerUrl = flags_notificationServerUrl
         , repoUrl = flags_repoUrl
         , cookieRealm = localHostname
+        }
+    -- Per-role vault routing. strato-api → public vault (user tokens, no node
+    -- identity). strato-sequencer and strato-p2p/ethereum-discover → local
+    -- vault, each with its own credentials file and token cache.
+    , vaultConfig = VaultConfig
+        { apiVault = VaultRole
+            { vrVaultUrl = publicVaultUrl
+            , vrTimeoutSec = flags_vaultTimeoutSec
+            , vrCredentialsPath = Nothing
+            , vrTokenCachePath = Nothing
+            }
+        , sequencerVault = VaultRole
+            { vrVaultUrl = localVaultUrl
+            , vrTimeoutSec = flags_vaultTimeoutSec
+            , vrCredentialsPath = Just sequencerCredentialsPath
+            , vrTokenCachePath = Just sequencerTokenCachePath
+            }
+        , peerVault = VaultRole
+            { vrVaultUrl = localVaultUrl
+            , vrTimeoutSec = flags_vaultTimeoutSec
+            , vrCredentialsPath = Just peerCredentialsPath
+            , vrTokenCachePath = Just peerTokenCachePath
+            }
         }
     , networkConfig = def
         { network = flags_network

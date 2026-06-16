@@ -6,6 +6,7 @@ module Strato.Auth.Token
   ( getToken
   , refreshToken
   , tokenFilePath
+  , defaultTokenCachePath
   ) where
 
 import Control.Exception (catch, SomeException)
@@ -31,38 +32,48 @@ isLocalhost uri = case URI.uriAuthority uri of
                 in h `elem` ["localhost", "127.0.0.1", "::1"] || not (T.any (== '.') h)
   _ -> False
 
+-- | Default token cache location. Used when a caller does not supply an
+-- explicit path (single-vault / back-compat). When two identities run in the
+-- same container they MUST use distinct paths to avoid clobbering each other's
+-- cached token — see 'Strato.Auth.Client.newAuthEnvWithCreds'.
+defaultTokenCachePath :: FilePath
+defaultTokenCachePath = "secrets/oauth_token"
+
+-- | Back-compat alias for 'defaultTokenCachePath'.
 tokenFilePath :: FilePath
-tokenFilePath = "secrets/oauth_token"
+tokenFilePath = defaultTokenCachePath
 
-lockFilePath :: FilePath
-lockFilePath = "secrets/oauth_token.lock"
+-- | The advisory lock guarding a token cache file. Derived from the cache path
+-- so each identity locks independently.
+lockPathFor :: FilePath -> FilePath
+lockPathFor tokenPath = tokenPath ++ ".lock"
 
--- | Get cached token, or fetch a new one if not cached
-getToken :: T.Text -> IO T.Text
-getToken discUrl = do
-  cached <- readCachedToken
+-- | Get cached token, or fetch a new one if not cached. The token is cached at
+-- 'tokenPath'; credentials (discovery URL, client id/secret) come from 'creds'.
+getToken :: ClientCredentialsConfig -> FilePath -> IO T.Text
+getToken creds tokenPath = do
+  cached <- readCachedToken tokenPath
   case cached of
     Just token -> pure token
-    Nothing -> refreshToken discUrl
+    Nothing -> refreshToken creds tokenPath
 
 -- | Force refresh the token (call this on 401)
 --
 -- Retries up to 4 times with exponential backoff on network failures
 -- (e.g. connection timeout, DNS failure, TLS errors).
-refreshToken :: T.Text -> IO T.Text
-refreshToken discUrl =
-  withFileLock lockFilePath Exclusive $ \_ ->
+refreshToken :: ClientCredentialsConfig -> FilePath -> IO T.Text
+refreshToken ClientCredentialsConfig{..} tokenPath =
+  withFileLock (lockPathFor tokenPath) Exclusive $ \_ ->
     withRetry "OAuth token fetch" 4 $ do
-      let ClientCredentialsConfig{..} = clientCredentialsConfig
-      tokenEndpoint <- getTokenEndpoint discUrl
+      tokenEndpoint <- getTokenEndpoint discoveryUrl
       TokenResponse{..} <- fetchToken tokenEndpoint clientId clientSecret
-      writeCachedToken trAccessToken trExpiresIn
+      writeCachedToken tokenPath trAccessToken trExpiresIn
       pure trAccessToken
 
-readCachedToken :: IO (Maybe T.Text)
-readCachedToken =
+readCachedToken :: FilePath -> IO (Maybe T.Text)
+readCachedToken tokenPath =
   (do
-    content <- LBS.readFile tokenFilePath
+    content <- LBS.readFile tokenPath
     case decode content of
       Nothing -> pure Nothing  -- invalid JSON or old plain-text format
       Just (CachedToken token expiresAt) -> do
@@ -72,15 +83,15 @@ readCachedToken =
           else pure (Just token)
   ) `catch` (\(_ :: SomeException) -> pure Nothing)
 
-writeCachedToken :: T.Text -> Integer -> IO ()
-writeCachedToken token expiresIn = do
+writeCachedToken :: FilePath -> T.Text -> Integer -> IO ()
+writeCachedToken tokenPath token expiresIn = do
   now <- round <$> getPOSIXTime
   let tokenData = object
         [ "access_token" .= token
         , "expires_at" .= (now + expiresIn)
         ]
-  createDirectoryIfMissing True (takeDirectory tokenFilePath)
-  LBS.writeFile tokenFilePath (encode tokenData)
+  createDirectoryIfMissing True (takeDirectory tokenPath)
+  LBS.writeFile tokenPath (encode tokenData)
 
 -- | Fetch token endpoint from OpenID discovery document
 getTokenEndpoint :: T.Text -> IO T.Text
