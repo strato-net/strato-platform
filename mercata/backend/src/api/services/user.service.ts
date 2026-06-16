@@ -200,7 +200,7 @@ export const castVoteOnIssueById = async (
     }
 
     const issue = issueResponse.data[0];
-    let { target, func, args: argsRaw } = issue;
+    const { target, func, args: argsRaw } = issue;
 
     // Parse args keeping large numbers as strings (JSONBig with storeAsString)
     const args = parseAdminIssueArgs(argsRaw);
@@ -223,58 +223,7 @@ export const castVoteOnIssueById = async (
       return await removeAdmin(accessToken, userAddress, adminAddress);
     }
 
-    // Get contract name from Cirrus
-    const contractResponse = await cirrus.get(accessToken, "contract", {
-      params: {
-        address: `eq.${target}`
-      },
-    });
-
-    
-
-    if (contractResponse.status !== 200 || !contractResponse.data || !Array.isArray(contractResponse.data) || contractResponse.data.length === 0) {
-      throw new Error('Failed to fetch contract details for target address');
-    }
-    const contractName = contractResponse.data[0].contract_name;
-  
-
-    // Get contract details to retrieve function parameter names
-    const contractDetails = await getContractDetails(accessToken, target);
-    const allFunctions = (contractDetails as any)?._functions || {};
-    const functionInfo = allFunctions[func];
-    
-    if (!functionInfo || !functionInfo._funcArgs) {
-      throw new Error(`Function ${func} not found in contract ${contractName}`);
-    }
-
-    // Convert array args to object with parameter names
-    const funcArgs = functionInfo._funcArgs as Array<[string, any]>;
-    const argsObject: Record<string, any> = {};
-    
-    if (Array.isArray(args)) {
-      funcArgs.forEach(([paramName], index) => {
-        if (index < args.length) {
-          argsObject[paramName] = args[index];
-        }
-      });
-    } else {
-      // If args is already an object, use it directly
-      Object.assign(argsObject, args);
-    }
-
-    // Build transaction directly to the target contract
-    const tx = await buildFunctionTx({
-      contractName,
-      contractAddress: target,
-      method: func,
-      args: argsObject,
-    }, userAddress, accessToken);
-
-    const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, tx)
-    );
-
-    return { status, hash };
+    return await castVoteOnIssue(accessToken, userAddress, target, func, args);
   } catch (error) {
     throw error;
   }
