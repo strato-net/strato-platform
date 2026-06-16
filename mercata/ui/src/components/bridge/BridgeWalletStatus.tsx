@@ -31,8 +31,10 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
   const { connectModalOpen, openConnectModal } = useConnectModal();
   const { toast } = useToast();
   const externalModalActiveRef = React.useRef(false);
+  const [pendingExternalModal, setPendingExternalModal] = React.useState(false);
+  const isConnectedToStrato = isConnected && connector ? isStratoConnector(connector) : false;
   const hasConnectedWallet =
-    isConnected && (!externalOnly || (connector ? !isStratoConnector(connector) : false));
+    isConnected && (!externalOnly || !isConnectedToStrato);
 
   const hideStratoWalletOption = React.useCallback(() => {
     const stratoOption = document.querySelector<HTMLElement>(
@@ -101,6 +103,13 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
     };
   }, [connectModalOpen, externalOnly, hideStratoWalletOption, restoreStratoWalletOption]);
 
+  React.useEffect(() => {
+    if (!pendingExternalModal || isConnected || !openConnectModal) return;
+    externalModalActiveRef.current = true;
+    openConnectModal();
+    setPendingExternalModal(false);
+  }, [isConnected, openConnectModal, pendingExternalModal]);
+
   const copyToClipboard = async () => {
     if (address) {
       await navigator.clipboard.writeText(address);
@@ -118,6 +127,11 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
       disabled={guestMode}
       className={CONNECT_BUTTON_CLASS}
       onClick={() => {
+        if (isConnectedToStrato) {
+          setPendingExternalModal(true);
+          disconnect();
+          return;
+        }
         externalModalActiveRef.current = true;
         openConnectModal?.();
       }}
