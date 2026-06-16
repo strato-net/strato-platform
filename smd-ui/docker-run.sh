@@ -6,15 +6,27 @@ set -e
 cd "$(dirname "$0")"
 
 # Read chainId and network from ethconf.yaml (single source of truth), matching
-# the mercata UI. These drive the STRATO chain in the wallet connector.
-CHAIN_ID=$(grep "^  chainId:" /config/ethconf.yaml 2>/dev/null | awk '{print $2}')
-NETWORK_NAME=$(grep "^  network:" /config/ethconf.yaml 2>/dev/null | awk '{print $2}' | tr -d '"')
+# the mercata UI. These drive the STRATO chain in the wallet connector. Fail fast
+# (like the mercata UI) so a missing/unmounted config surfaces as a crash-loop
+# rather than silently dropping the STRATO wallet from the connector list.
+CHAIN_ID=$(grep "^  chainId:" /config/ethconf.yaml | awk '{print $2}')
+NETWORK_NAME=$(grep "^  network:" /config/ethconf.yaml | awk '{print $2}' | tr -d '"')
+
+if [ -z "$CHAIN_ID" ]; then
+  echo "ERROR: Could not read chainId from /config/ethconf.yaml" >&2
+  exit 1
+fi
+
+if [ -z "$NETWORK_NAME" ]; then
+  echo "ERROR: Could not read network name from /config/ethconf.yaml" >&2
+  exit 1
+fi
 
 # Generate runtime configuration consumed by /smd/config.js (window.ENV).
 cat > dist/config.js << EOF
 window.ENV = {
-  CHAIN_ID: ${CHAIN_ID:-null},
-  NETWORK_NAME: "${NETWORK_NAME:-}",
+  CHAIN_ID: ${CHAIN_ID},
+  NETWORK_NAME: "${NETWORK_NAME}",
   RPC_URL: "${RPC_URL:-/rpc}",
   EXPLORER_URL: "${EXPLORER_URL:-}",
   WAGMI_PROJECT_ID: "${WAGMI_PROJECT_ID:-}"
