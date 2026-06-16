@@ -8,6 +8,8 @@ export interface AccountDetail {
   nonce: number;
   latestBlockNum?: number;
   code?: string;
+  contractName?: string | null;
+  codeHash?: string;
 }
 
 export interface CertificateRecord {
@@ -62,4 +64,19 @@ export function useUsers() {
         .filter((u) => u.username);
     },
   });
+}
+
+/**
+ * Search registered users by username (ilike) — same `User` contract logic as the
+ * Accounts tab, filtered to usernames matching `*term*`.
+ */
+export async function searchUsers(term: string): Promise<UserRecord[]> {
+  const pattern = encodeURIComponent(`*${term}*`);
+  const { data } = await api.get(
+    `${env.CIRRUS_URL}/contract?contract_name=eq.User&storage.data->>username=ilike.${pattern}&select=*,storage(*)`
+  );
+  if (!Array.isArray(data)) return [];
+  return data
+    .map((row) => ({ username: extractUsername(row), address: row?.address ?? "" }))
+    .filter((u) => u.username);
 }

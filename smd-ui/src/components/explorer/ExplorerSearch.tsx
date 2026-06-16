@@ -13,8 +13,10 @@ export function ExplorerSearch({ className }: { className?: string }) {
     const t = term.trim();
     if (!t) return;
     const kind = classifyQuery(t);
+    // A bare block number jumps straight to the block; everything else (tx/block
+    // hash, address, free text) goes to the search page, which resolves a hash
+    // against both the transaction and block endpoints plus general search.
     if (kind === "block") navigate(`/explorer/blocks/${t}`);
-    else if (kind === "hash") navigate(`/explorer/transactions/${t.startsWith("0x") ? t : `0x${t}`}`);
     else navigate(`/explorer/search?q=${encodeURIComponent(t)}`);
     setTerm("");
   };

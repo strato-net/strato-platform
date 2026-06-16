@@ -190,7 +190,8 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable TxsFilterParams [RawT
                       fmap (\search ->
                           let isWhiteSpace c = c `elem` [' ', '\n', '\t']
                               searches = filter (not . T.null) $ T.dropAround isWhiteSpace <$> T.split (==',') search
-                              queries = (\v -> (E.unsafeSqlCastAs "TEXT" (rawTx E.^. RawTransactionFromAddress) `E.like` E.val (T.unpack $ "%" <> v <> "%"))
+                              queries = (\v -> (E.unsafeSqlCastAs "TEXT" (rawTx E.^. RawTransactionTxHash) `E.like` E.val (T.unpack $ "%" <> v <> "%"))
+                                         E.||. (E.unsafeSqlCastAs "TEXT" (rawTx E.^. RawTransactionFromAddress) `E.like` E.val (T.unpack $ "%" <> v <> "%"))
                                          E.||. (E.unsafeSqlCastAs "TEXT" (rawTx E.^. RawTransactionToAddress) `E.like` E.val (T.unpack $ "%" <> v <> "%"))
                                          E.||. (E.unsafeSqlCastAs "TEXT" (rawTx E.^. RawTransactionArgs) `E.like` E.val (T.unpack $ "%" <> v <> "%"))
                                          E.||. (rawTx E.^. RawTransactionFuncName `E.like` E.val (Just $ "%" <> v <> "%"))

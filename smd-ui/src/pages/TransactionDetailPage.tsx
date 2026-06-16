@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTransactionByHash } from "@/services/explorer";
 import { DetailRow } from "@/components/explorer/DetailRow";
+import { AddrLink } from "@/components/explorer/AddrLink";
 import { formatTimestamp } from "@/lib/utils";
 
 function fmtValue(v?: string | number): string {
@@ -50,8 +51,8 @@ export default function TransactionDetailPage() {
             <dl className="divide-y divide-border">
               <DetailRow label="Hash" value={tx.hash || hash || "—"} mono />
               <DetailRow label="Type" value={tx.transactionType || "—"} />
-              <DetailRow label="From" value={tx.from || "—"} mono />
-              <DetailRow label="To" value={tx.to || "—"} mono />
+              <DetailRow label="From" value={<AddrLink address={tx.from} />} mono />
+              <DetailRow label="To" value={<AddrLink address={tx.to} />} mono />
               <DetailRow label="Value" value={fmtValue(tx.value)} />
               <DetailRow label="Nonce" value={String(tx.nonce ?? "—")} />
               <DetailRow label="Gas limit" value={String(tx.gasLimit ?? "—")} />

@@ -17,6 +17,7 @@ import ContractsPage from "@/pages/ContractsPage";
 import ExplorerPage from "@/pages/ExplorerPage";
 import BlockDetailPage from "@/pages/BlockDetailPage";
 import TransactionDetailPage from "@/pages/TransactionDetailPage";
+import AddressDetailPage from "@/pages/AddressDetailPage";
 import SearchPage from "@/pages/SearchPage";
 import NotFound from "@/pages/NotFound";
 
@@ -43,6 +44,7 @@ export default function App() {
                       <Route path="/explorer" element={<ExplorerPage />} />
                       <Route path="/explorer/blocks/:number" element={<BlockDetailPage />} />
                       <Route path="/explorer/transactions/:hash" element={<TransactionDetailPage />} />
+                      <Route path="/explorer/accounts/:address" element={<AddressDetailPage />} />
                       <Route path="/explorer/search" element={<SearchPage />} />
                     </Route>
                     <Route path="*" element={<NotFound />} />

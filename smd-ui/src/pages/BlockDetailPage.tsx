@@ -51,7 +51,7 @@ export default function BlockDetailPage() {
           ) : (
             <dl className="divide-y divide-border">
               <DetailRow label="Number" value={String(bd?.number ?? "—")} />
-              <DetailRow label="Hash" value={block.hash || bd?.hash || "—"} mono />
+              <DetailRow label="Hash" value={block.blockHash || block.hash || bd?.hash || "—"} mono />
               <DetailRow label="Parent hash" value={bd?.parentHash || "—"} mono />
               <DetailRow label="Timestamp" value={formatTimestamp(bd?.timestamp)} />
               <DetailRow label="Difficulty" value={String(bd?.difficulty ?? "—")} />
