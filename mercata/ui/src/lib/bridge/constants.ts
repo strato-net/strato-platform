@@ -179,6 +179,20 @@ export const DEPOSIT_ROUTER_ABI = [
   }
 ] as const;
 
+export const STRATO_NATIVE_REPRESENTATION_BRIDGE_ABI = [
+  {
+    inputs: [
+      { name: 'representationToken', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'stratoRecipient', type: 'address' }
+    ],
+    name: 'requestRedemption',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  }
+] as const;
+
 // Chain Management
 export const SUPPORTED_CHAINS = {
   MAINNET: 1,

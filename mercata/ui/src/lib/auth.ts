@@ -2,6 +2,7 @@ import { api } from './axios';
 import { clearDismissedForUser, LAST_USER_ADDRESS_KEY } from '@/hooks/useLiquidationDismiss';
 
 export const WALLET_CONNECT_REQUEST_EVENT = 'mercata:wallet-connect-request';
+export const PENDING_STRATO_WALLET_CONNECT_KEY = 'mercata:pending-strato-wallet-connect';
 
 // Check authentication status via server API call (works with HttpOnly cookies).
 // Uses fetch directly to bypass the Axios 401 interceptor — this is a probe,

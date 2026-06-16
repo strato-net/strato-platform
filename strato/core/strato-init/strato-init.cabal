@@ -21,6 +21,7 @@ library
       Blockchain.Init.DockerComposeAllDocker
       Blockchain.Init.EthConf
       Blockchain.Init.Generator
+      Blockchain.Init.LocalAuth
       Blockchain.Init.BuildMetadata
       Blockchain.Init.BuildMetadata.TH
       Blockchain.Init.Monad
@@ -60,6 +61,7 @@ library
     , strato-conf
     , strato-genesis
     , strato-model
+    , strato-version
     , streaming
     , template-haskell
     , transformers

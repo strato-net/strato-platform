@@ -9,6 +9,7 @@
     "test:mixed": "ts-node src/cli.ts --scenario mixedWorkload",
     "test:token-sale": "ts-node src/cli.ts --scenario tokenSale",
     "test:forge-buy": "ts-node src/cli.ts --scenario forgeBuy",
+    "test:page-load": "ts-node src/cli.ts --scenario pageLoad",
     "test:all": "ts-node src/cli.ts",
     "test:quick": "ts-node src/cli.ts --batch-size 5 --batch-count 2",
     "typecheck": "tsc --noEmit"

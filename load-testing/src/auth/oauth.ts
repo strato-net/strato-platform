@@ -24,11 +24,49 @@ interface CachedToken {
  * per unique (clientId, username), shared across all BackendClients that map
  * to that user."
  */
+/**
+ * Process-wide rate limiter for Keycloak token-endpoint requests.
+ *
+ * Keycloak (and the nginx layer in front of it) starts returning HTTP
+ * 400/429/503 once the aggregate grant rate climbs past a few tens of
+ * requests per second. With concurrentUsers > 20 we can easily exceed that
+ * on warmup alone, so we serialize all grant dispatches across every
+ * OAuthClient instance and enforce a minimum spacing between consecutive
+ * outbound requests. 20 req/s → 50 ms minimum gap.
+ *
+ * This is a simple FIFO promise chain: every gated call appends a task
+ * that (a) sleeps until at least `lastDispatchAt + minIntervalMs`, (b)
+ * updates `lastDispatchAt`, then (c) runs the caller's work. The chain
+ * itself is awaited so backpressure naturally builds up under high
+ * concurrency instead of spiking the server.
+ */
+const KEYCLOAK_RATE_LIMIT_PER_SEC = 20;
+const KEYCLOAK_MIN_INTERVAL_MS = Math.ceil(1000 / KEYCLOAK_RATE_LIMIT_PER_SEC);
+let keycloakDispatchChain: Promise<void> = Promise.resolve();
+let keycloakLastDispatchAt = 0;
+function gateKeycloakRequest<T>(work: () => Promise<T>): Promise<T> {
+  const slot = keycloakDispatchChain.then(async () => {
+    const now = Date.now();
+    const wait = Math.max(0, keycloakLastDispatchAt + KEYCLOAK_MIN_INTERVAL_MS - now);
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    keycloakLastDispatchAt = Date.now();
+  });
+  // Chain swallows errors from `work` so one failure doesn't break the gate
+  // for subsequent callers; the original promise we hand back to the caller
+  // still surfaces the error.
+  keycloakDispatchChain = slot.catch(() => undefined);
+  return slot.then(work);
+}
+
 export class OAuthClient {
   private oauth2: simpleOauth2.ResourceOwnerPassword | null = null;
   private cachedToken: CachedToken | null = null;
   private inflightFetch: Promise<string> | null = null;
   private config: AuthConfig;
+  /** Cached token endpoint resolved from the OIDC discovery doc. Used by
+   *  the diagnostic raw-POST path so we can surface the upstream Keycloak
+   *  response (status, headers, body) when simple-oauth2 / wreck throws. */
+  private tokenEndpoint: string | null = null;
 
   /** Convenience identity tags so callers can dedupe / diagnose. */
   public readonly username: string;
@@ -45,6 +83,7 @@ export class OAuthClient {
     if (this.oauth2) return;
     const { data: openIdConfig } = await axios.get(this.config.openIdDiscoveryUrl);
     const tokenEndpoint: string = openIdConfig.token_endpoint;
+    this.tokenEndpoint = tokenEndpoint;
 
     const credentials = {
       client: {
@@ -58,6 +97,54 @@ export class OAuthClient {
     };
 
     this.oauth2 = new simpleOauth2.ResourceOwnerPassword(credentials);
+  }
+
+  /**
+   * Diagnostic-only raw token grant. Re-issues the Resource-Owner-Password
+   * grant via plain axios (NOT simple-oauth2) so we can surface the actual
+   * HTTP status Keycloak (or any proxy in front of it) returned, even in
+   * cases where simple-oauth2 / @hapi/wreck throws non-status-bearing errors
+   * like "The content-type is not JSON compatible".
+   *
+   * Never throws — best-effort logging only. The original error from
+   * fetchAndCache is what propagates to the caller.
+   */
+  private async logRawTokenResponse(context: string): Promise<void> {
+    if (!this.tokenEndpoint) {
+      console.warn(
+        `[oauth-debug] ${context} (${this.clientId}::${this.username}): ` +
+          `no resolved tokenEndpoint yet`,
+      );
+      return;
+    }
+    try {
+      const body = new URLSearchParams({
+        grant_type: "password",
+        client_id: this.config.clientId,
+        client_secret: this.config.clientSecret,
+        username: this.config.username,
+        password: this.config.password,
+        scope: "openid email profile",
+      });
+      const resp = await gateKeycloakRequest(() =>
+        axios.post(this.tokenEndpoint!, body.toString(), {
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          validateStatus: () => true,
+          transformResponse: (x) => x,
+          timeout: 15000,
+        }),
+      );
+      console.warn(
+        `[oauth-debug] ${context} (${this.clientId}::${this.username}): ` +
+          `http status=${resp.status}`,
+      );
+    } catch (probeErr: any) {
+      const probeStatus = probeErr?.response?.status;
+      console.warn(
+        `[oauth-debug] ${context} (${this.clientId}::${this.username}): ` +
+          `probe failed${probeStatus ? ` http status=${probeStatus}` : ""}`,
+      );
+    }
   }
 
   async getToken(): Promise<string> {
@@ -84,11 +171,13 @@ export class OAuthClient {
     let lastErr: any = null;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const result = await this.oauth2!.getToken({
-          username: this.config.username,
-          password: this.config.password,
-          scope: "openid email profile",
-        });
+        const result = await gateKeycloakRequest(() =>
+          this.oauth2!.getToken({
+            username: this.config.username,
+            password: this.config.password,
+            scope: "openid email profile",
+          }),
+        );
         const token = result.token as any;
         this.cachedToken = {
           accessToken: token.access_token,
@@ -97,10 +186,23 @@ export class OAuthClient {
         return this.cachedToken.accessToken;
       } catch (err: any) {
         lastErr = err;
+        // simple-oauth2 wraps Keycloak responses via @hapi/wreck. On HTTP
+        // errors it attaches `err.output.statusCode`; on body-parse errors
+        // (e.g. "content-type is not JSON compatible") there's no status, so
+        // we fall back to a raw axios probe to surface the real one.
+        const status = err?.output?.statusCode ?? err?.response?.status;
+        if (status != null) {
+          console.warn(
+            `[oauth-debug] grant attempt ${attempt} for ` +
+              `${this.clientId}::${this.username}: http status=${status}`,
+          );
+        } else {
+          await this.logRawTokenResponse(`grant attempt ${attempt}`);
+        }
+
         // Keycloak per-user rate limit returns HTTP 400 ("invalid_grant" with
         // "user is temporarily disabled") or 429. Back off ~1.5 s + jitter and
         // retry once. Any other error fails fast.
-        const status = err?.output?.statusCode ?? err?.response?.status;
         const isRateLimited = status === 429 || status === 400;
         if (attempt === 0 && isRateLimited) {
           const backoff = 1500 + Math.floor(Math.random() * 500);

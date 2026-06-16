@@ -22,6 +22,7 @@ import           Blockchain.Strato.Discovery.P2PUtil
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Host
+import           Control.Concurrent                       (threadDelay)
 import           Control.Monad                           (forM_, when, unless)
 import           Control.Monad.Catch
 import qualified Control.Monad.Change.Alter              as A
@@ -45,13 +46,16 @@ import           System.Random
 import qualified Text.Colors                             as CL
 import           Text.Format
 
-getKeyOrMakeKey :: (MonadCatch m, HasVault m) =>
+getKeyOrMakeKey :: (MonadCatch m, HasVault m, MonadIO m, MonadLogger m) =>
                    m PublicKey
 getKeyOrMakeKey = do
   (resultOrError :: Either SomeException PublicKey) <- try getPub
 
   case resultOrError of
-    Left _ -> postKey
+    Left getErr -> do
+      $logInfoS "getKeyOrMakeKey" . T.pack $ "Node key is not available from Vault yet: " ++ show getErr
+      liftIO $ threadDelay 2000000
+      getKeyOrMakeKey
     Right result -> return result
 
 runEthUDPServer :: MonadDiscovery m => Int -> m ()

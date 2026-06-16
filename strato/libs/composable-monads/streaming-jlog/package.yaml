@@ -1,0 +1,31 @@
+name:                streaming-jlog
+version:             0.1.0.0
+license:             Apache-2.0
+
+# JLog (Journaled Log) streaming backend - embedded, no server required
+# Uses embedded jlog-c package (no system library needed)
+
+dependencies:
+- base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+  exposed-modules:
+  - Control.Monad.Composable.Streaming.Backend
+  - Control.Monad.Composable.Streaming.Backend.DockerConfig
+  - Control.Monad.Composable.Streaming.JLog
+  - Control.Monad.Composable.Streaming.JLog.DockerConfig
+  dependencies:
+  - aeson
+  - binary
+  - bytestring
+  - composable-monads-base
+  - conduit
+  - containers
+  - directory
+  - filepath
+  - jlog-c
+  - mtl
+  - stm
+  - text
+  - transformers
