@@ -91,7 +91,7 @@ class TokensV2Controller {
 
       const { tokenAddress } = params;
 
-      const historyParams = getHistoryParams(`${query?.duration || '1d'}`, query.end ? `${query.end}` : undefined);
+      const historyParams = getHistoryParams(`${query?.duration || '7d'}`, query.end ? `${query.end}` : undefined, 80);
 
       const result = await getBalanceHistory(accessToken, userAddress, tokenAddress, historyParams);
       res.status(RestStatus.OK).json(result);
@@ -108,7 +108,7 @@ class TokensV2Controller {
     try {
       const { accessToken, query, address: userAddress } = req;
 
-      const historyParams = getHistoryParams(`${query?.duration || '1d'}`, query.end ? `${query.end}` : undefined);
+      const historyParams = getHistoryParams(`${query?.duration || '7d'}`, query.end ? `${query.end}` : undefined, 80);
 
       const result = await getNetBalanceHistory(accessToken, userAddress, historyParams);
       res.status(RestStatus.OK).json(result);
@@ -125,7 +125,7 @@ class TokensV2Controller {
     try {
       const { accessToken, query, address: userAddress } = req;
 
-      const historyParams = getHistoryParams(`${query?.duration || '1d'}`, query.end ? `${query.end}` : undefined);
+      const historyParams = getHistoryParams(`${query?.duration || '7d'}`, query.end ? `${query.end}` : undefined, 80);
 
       const result = await getBorrowingHistory(accessToken, userAddress, historyParams);
       res.status(RestStatus.OK).json(result);
@@ -144,7 +144,7 @@ class TokensV2Controller {
 
       const { poolAddress } = params;
 
-      const historyParams = getHistoryParams(`${query?.duration || '1d'}`, query.end ? `${query.end}` : undefined);
+      const historyParams = getHistoryParams(`${query?.duration || '1d'}`, query.end ? `${query.end}` : undefined, 80);
 
       const result = await getPoolPriceHistory(accessToken, userAddress, poolAddress, historyParams);
       res.status(RestStatus.OK).json(result);
