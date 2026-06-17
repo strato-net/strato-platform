@@ -11,7 +11,9 @@ import System.Directory
 import System.Environment (getArgs, setEnv)
 import System.Posix.Types (ProcessID)
 import System.Posix.User (getEffectiveUserID, getEffectiveGroupID)
-import System.Posix.Signals (signalProcess, sigTERM)
+import System.Posix.Signals (signalProcess, sigTERM, sigKILL, Signal)
+import System.Posix.Process (getProcessStatus, ProcessStatus)
+import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async
 import Control.Exception
 import Control.Monad
@@ -69,34 +71,77 @@ launchCommand (cmd, args) = do
 
 
 
--- Kill all PIDs in pid file, except optionally one survivor
-killRemainingExcept :: ProcessID -> IO ()
-killRemainingExcept survivor = do
-  exists <- doesFileExist pidFile
-  unless exists $ return ()
-  contents <- readFile pidFile
-  let maybePids = mapM readMaybe (lines contents) :: Maybe [ProcessID]
-  case maybePids of
-    Nothing -> hPutStrLn stderr "Warning: invalid PIDs in pid file"
-    Just pids -> forM_ (filter (/= survivor) pids) $ \pid -> do
-      result <- try $ signalProcess sigTERM pid :: IO (Either SomeException ())
-      case result of
-        Left e  -> hPutStrLn stderr $ "Failed to kill PID " ++ show pid ++ ": " ++ displayException e
-        Right _ -> hPutStrLn stderr $ "Killed PID " ++ show pid
+-- Send a signal to the process group led by the given PID.
+-- Children are launched with create_group=True, so each recorded PID is a
+-- process group leader and negating it targets the whole group. This reaches
+-- worker threads/children (e.g. strato-api running with -N4) that would
+-- otherwise be orphaned and keep holding resources like listening sockets.
+signalGroup :: Signal -> ProcessID -> IO ()
+signalGroup sig pid = do
+  result <- try $ signalProcess sig (negate pid) :: IO (Either SomeException ())
+  case result of
+    Left e  -> hPutStrLn stderr $ "Failed to signal group " ++ show pid ++ ": " ++ displayException e
+    Right _ -> return ()
 
--- Kill all PIDs unconditionally
+-- True if the process has been reaped (no longer exists).
+processGone :: ProcessID -> IO Bool
+processGone pid = do
+  result <- try (getProcessStatus False False pid)
+             :: IO (Either SomeException (Maybe ProcessStatus))
+  case result of
+    Left _        -> return True   -- ESRCH/ECHILD: nothing left to reap
+    Right Nothing -> return False  -- still alive
+    Right (Just _) -> return True  -- reaped
+
+-- Kill all recorded process groups: SIGTERM, wait, then SIGKILL stragglers.
+-- The crashed process is included here on purpose. Its leader PID may already
+-- be dead, but children/workers in its group (the orphaned listener) are not,
+-- so we must still terminate the whole group.
 killAllProcesses :: IO ()
-killAllProcesses = killRemainingExcept (-1)
+killAllProcesses = do
+  exists <- doesFileExist pidFile
+  if not exists
+    then return ()
+    else do
+      contents <- readFile pidFile
+      let maybePids = mapM readMaybe (lines contents) :: Maybe [ProcessID]
+      case maybePids of
+        Nothing -> hPutStrLn stderr "Warning: invalid PIDs in pid file"
+        Just pids -> do
+          forM_ pids $ \pid -> do
+            signalGroup sigTERM pid
+            hPutStrLn stderr $ "Sent SIGTERM to group " ++ show pid
+          -- Give processes a chance to exit cleanly before escalating.
+          threadDelay (5 * 1000 * 1000)  -- 5 seconds
+          forM_ pids $ \pid -> do
+            gone <- processGone pid
+            unless gone $ do
+              signalGroup sigKILL pid
+              hPutStrLn stderr $ "Sent SIGKILL to group " ++ show pid
 
 -- Get the last n elements from a list
 tailN :: Int -> [a] -> [a]
 tailN n xs = drop (length xs - n) xs
 
+-- Print the last n lines of a file without reading it all into memory.
+-- Process logs can grow to many GB; the previous implementation read the
+-- entire file as a String (~16 bytes/char), which could OOM the host when a
+-- child exited. We seek near the end and only examine the trailing bytes.
 tailFile :: Int -> FilePath -> IO ()
-tailFile n path = do
-    contents <- readFile path
-    let linesToPrint = tailN n (lines contents)
-    hPutStrLn stderr $ unlines linesToPrint
+tailFile n path = handle onErr $
+  withFile path ReadMode $ \h -> do
+    size <- hFileSize h
+    let maxBytes = 65536 :: Integer  -- enough to hold the last n log lines
+        start = max 0 (size - maxBytes)
+    when (start > 0) $ hSeek h AbsoluteSeek start
+    contents <- hGetContents h
+    -- If we started mid-file the first line is likely partial; drop it.
+    let ls = lines contents
+        ls' = if start > 0 then drop 1 ls else ls
+    hPutStrLn stderr $ unlines (tailN n ls')
+  where
+    onErr e =
+      hPutStrLn stderr $ "Warning: could not tail " ++ path ++ ": " ++ show (e :: SomeException)
 
 -- Start docker compose containers
 dockerComposeUp :: IO ()
@@ -155,7 +200,7 @@ main = do
   case result of
     Just (_, (exitCode, pid, cmd)) -> do
       hPutStrLn stderr $ "ERROR: Process " ++ cmd ++ " (PID " ++ show pid ++ ") exited with: " ++ show exitCode
-      killRemainingExcept pid
+      killAllProcesses
       hPutStrLn stderr "Tail of logs for crashed process:"
       tailFile 20 (logsDir </> cmd)
     Nothing -> do
