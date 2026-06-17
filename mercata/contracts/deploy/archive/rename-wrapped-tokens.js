@@ -10,8 +10,8 @@
  *   node deploy/rename-wrapped-tokens.js --apply
  */
 require("dotenv").config();
-const config = require("./config");
-const auth = require("./auth");
+const config = require("../config");
+const auth = require("../auth");
 const { rest } = require("blockapps-rest");
 
 // -----------------------------
