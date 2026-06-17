@@ -4,7 +4,7 @@ import { Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { WalletSelect } from "@/components/contracts/WalletSelect";
 import {
   Dialog,
   DialogContent,
@@ -39,8 +39,9 @@ export function MethodCaller({
   const { submit: submitTx, canSubmit } = useSubmitTransaction();
 
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [useWallet, setUseWallet] = useState(false);
+  // "" = call directly from the connected account; otherwise route the call through
+  // this User wallet (the node wraps it as wallet.callContract).
+  const [walletUsername, setWalletUsername] = useState("");
   const [showSource, setShowSource] = useState(false);
   const [value, setValue] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
@@ -63,14 +64,18 @@ export function MethodCaller({
     setResult(null);
     setError("");
     try {
-      const res = await submitTx("FUNCTION", {
-        contractName,
-        contractAddress,
-        value: payable && value ? Number(value) : 0,
-        method,
-        args: parsed,
-        metadata: {},
-      });
+      const res = await submitTx(
+        "FUNCTION",
+        {
+          contractName,
+          contractAddress,
+          value: payable && value ? Number(value) : 0,
+          method,
+          args: parsed,
+          metadata: {},
+        },
+        walletUsername ? { username: walletUsername } : undefined
+      );
       setResult(res);
       toast.success(`Called ${method}`);
     } catch (err: any) {
@@ -104,18 +109,14 @@ export function MethodCaller({
               <span className="break-all font-mono text-xs">{contractAddress}</span>
             </Field>
 
-            <Field label="Name">
-              <Input placeholder="username" value={name} onChange={(e) => setName(e.target.value)} />
-            </Field>
-
             <Field label="Caller Address">
               <span className="break-all font-mono text-xs text-muted-foreground">
                 {userAddress || "Connect a wallet"}
               </span>
             </Field>
 
-            <Field label="Use Wallet">
-              <Switch checked={useWallet} onCheckedChange={setUseWallet} />
+            <Field label="Wallet">
+              <WalletSelect value={walletUsername} onChange={setWalletUsername} />
             </Field>
 
             {signature ? (

@@ -18,7 +18,7 @@ export default function ContractsPage() {
         description="Browse the registry, query state with Cirrus, and compile & deploy contracts."
       />
       <Tabs defaultValue="registry">
-        <TabsList>
+        <TabsList className="gap-2">
           <TabsTrigger value="registry">Registry</TabsTrigger>
           <TabsTrigger value="query">Query</TabsTrigger>
           <TabsTrigger value="editor">Editor</TabsTrigger>

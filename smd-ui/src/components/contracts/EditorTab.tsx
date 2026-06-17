@@ -7,7 +7,7 @@ import { Plus, FolderInput, Download, X, FilePlus2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { WalletSelect } from "@/components/contracts/WalletSelect";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
@@ -76,8 +76,9 @@ export function EditorTab() {
 
   // Create Contract dialog
   const [createOpen, setCreateOpen] = useState(false);
-  const [useWallet, setUseWallet] = useState(false);
-  const [name, setName] = useState("");
+  // "" = deploy directly from the connected account; otherwise route through this
+  // User wallet (createContract). External wallets can only deploy via a wallet.
+  const [walletUsername, setWalletUsername] = useState("");
   const [selectedContract, setSelectedContract] = useState<string>("");
   const [argValues, setArgValues] = useState<Record<string, string>>({});
   const [deploying, setDeploying] = useState(false);
@@ -177,18 +178,17 @@ export function EditorTab() {
     setCreateOpen(true);
   };
 
-  // STRATO wallets deploy directly; external wallets must route through their User
-  // wallet contract, which needs a username ("Name") and "Use Wallet" enabled.
-  const externalDeployReady = useWallet && !!name.trim();
-  const canCreate = isAppAuthenticated || (canSubmit && externalDeployReady);
+  // STRATO wallets can deploy directly; external wallets must route through one of
+  // their User wallet contracts (select it from the Wallet dropdown).
+  const canCreate = isAppAuthenticated || (canSubmit && !!walletUsername);
 
   const doCreate = async () => {
     if (!selectedContract) {
       toast.error("Select a contract to create");
       return;
     }
-    if (!isAppAuthenticated && !externalDeployReady) {
-      toast.error('Enter a username and enable "Use Wallet" to deploy with an external wallet');
+    if (!isAppAuthenticated && !walletUsername) {
+      toast.error("Select one of your User wallets to deploy with an external wallet");
       return;
     }
     const args: Record<string, unknown> = {};
@@ -215,7 +215,7 @@ export function EditorTab() {
           args,
           metadata,
         },
-        useWallet ? { username: name.trim() } : undefined
+        walletUsername ? { username: walletUsername } : undefined
       );
       const address: string | undefined = result?.data?.contents?.address;
       setDeployedAddress(address ?? "");
@@ -340,14 +340,6 @@ export function EditorTab() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <Field label="Name">
-              <Input
-                placeholder="username"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </Field>
-
             <Field label="Address">
               <Input
                 value={userAddress ?? ""}
@@ -357,8 +349,8 @@ export function EditorTab() {
               />
             </Field>
 
-            <Field label="Use Wallet">
-              <Switch checked={useWallet} onCheckedChange={setUseWallet} />
+            <Field label="Wallet">
+              <WalletSelect value={walletUsername} onChange={setWalletUsername} />
             </Field>
 
             <Field label="Contracts">
@@ -374,10 +366,6 @@ export function EditorTab() {
                   ))}
                 </SelectContent>
               </Select>
-            </Field>
-
-            <Field label="VM">
-              <span className="text-sm text-muted-foreground">SolidVM</span>
             </Field>
 
             <div>
@@ -434,11 +422,11 @@ export function EditorTab() {
               <p className="text-xs text-muted-foreground">
                 Connect a wallet to create a contract.
               </p>
-            ) : !isAppAuthenticated && !externalDeployReady ? (
+            ) : !isAppAuthenticated && !walletUsername ? (
               <p className="text-xs text-muted-foreground">
-                To deploy with an external wallet, enter your username above and enable "Use
-                Wallet". The deploy is routed through your on-chain User wallet contract so
-                MetaMask (or another external wallet) can sign it.
+                To deploy with an external wallet, select one of your User wallets above. The
+                deploy is routed through that on-chain wallet so MetaMask (or another external
+                wallet) can sign it.
               </p>
             ) : null}
           </div>

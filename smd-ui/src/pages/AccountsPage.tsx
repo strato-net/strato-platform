@@ -12,6 +12,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { SendTokensDialog } from "@/components/accounts/SendTokensDialog";
+import { CreateUserDialog } from "@/components/accounts/CreateUserDialog";
+import { MyWalletsCard } from "@/components/accounts/MyWalletsCard";
 import { CopyButton } from "@/components/CopyButton";
 import { useUser } from "@/context/UserContext";
 import { useAccountDetail, useUsers } from "@/services/accounts";
@@ -39,7 +41,14 @@ export default function AccountsPage() {
       <PageHeader
         title="Accounts"
         description="View balances and send tokens across STRATO accounts."
-        actions={userAddress ? <SendTokensDialog /> : null}
+        actions={
+          userAddress ? (
+            <div className="flex items-center gap-2">
+              <CreateUserDialog />
+              <SendTokensDialog />
+            </div>
+          ) : null
+        }
       />
 
       <Card>
@@ -80,6 +89,8 @@ export default function AccountsPage() {
           )}
         </CardContent>
       </Card>
+
+      {userAddress ? <MyWalletsCard ownerAddress={userAddress} /> : null}
 
       <Card>
         <CardHeader>

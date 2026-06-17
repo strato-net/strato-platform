@@ -62,22 +62,24 @@ export function ContractStatePanel({ name, address }: { name: string; address: s
                 {funcs.map(([k, v]) => {
                   const sig = typeof v === "string" ? v.replace(/^function\s*/, "") : "";
                   return (
-                    <tr key={k} className="border-t border-border align-middle">
-                      <td className="px-3 py-2 align-middle">
-                        <div className="overflow-x-auto">
-                          <MethodCaller
-                            contractName={name}
-                            contractAddress={address}
-                            method={k}
-                            args={functionArgs(info, k)}
-                            payable={isPayable(info, k)}
-                            signature={sig}
-                          />
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="overflow-x-auto whitespace-pre font-mono text-xs text-muted-foreground">
-                          {String(v)}
+                    <tr key={k} className="border-t border-border">
+                      {/* Single full-width cell: the button sizes to its name (no wrap/cut-off)
+                          and the signature takes the rest, scrolling instead of overlapping. */}
+                      <td colSpan={2} className="px-3 py-2">
+                        <div className="flex items-center gap-3">
+                          <div className="shrink-0">
+                            <MethodCaller
+                              contractName={name}
+                              contractAddress={address}
+                              method={k}
+                              args={functionArgs(info, k)}
+                              payable={isPayable(info, k)}
+                              signature={sig}
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1 overflow-x-auto whitespace-pre font-mono text-xs text-muted-foreground">
+                            {String(v)}
+                          </div>
                         </div>
                       </td>
                     </tr>

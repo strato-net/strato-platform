@@ -233,11 +233,17 @@ type StratoTxType = "CONTRACT" | "FUNCTION" | "TRANSFER";
  * Used for the logged-in STRATO wallet. resolve=true returns the resolved result;
  * Pending results are polled to completion.
  */
-export async function submitStratoTx(type: StratoTxType, payload: Record<string, unknown>) {
+export async function submitStratoTx(
+  type: StratoTxType,
+  payload: Record<string, unknown>,
+  username?: string
+) {
   const { data } = await api.post(
     `${env.STRATO_URL_V23}/transaction`,
     { txs: [{ payload, type }] },
-    { params: { resolve: true, ...chainParam() } }
+    // `username` routes the tx through the user's User wallet contract (server-side
+    // vault signing); the node wraps CONTRACT/FUNCTION as createContract/callContract.
+    { params: { resolve: true, ...chainParam(), ...(username ? { username } : {}) } }
   );
   const result = Array.isArray(data) ? data[0] : data;
   if (result?.status === "Pending" && result?.hash) {

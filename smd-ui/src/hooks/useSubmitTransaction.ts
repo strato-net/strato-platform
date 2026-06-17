@@ -21,10 +21,10 @@ export function useSubmitTransaction() {
       payload: Record<string, unknown>,
       options?: { username?: string }
     ) => {
-      if (isAppAuthenticated) {
-        return submitStratoTx(type, payload);
-      }
       const username = options?.username?.trim() || undefined;
+      if (isAppAuthenticated) {
+        return submitStratoTx(type, payload, username);
+      }
       // External-wallet (EIP-712) signing only supports MessageTX-style txs on the
       // node. A raw contract creation can't be signed by an external wallet, but a
       // deploy routed through the user's on-chain User wallet contract becomes a
