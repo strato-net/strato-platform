@@ -351,24 +351,43 @@ s3_download() {
   return 1
 }
 
-# Verify a downloaded archive against its published .sha256 sidecar, if present.
-verify_s3_checksum() {
+# Fetch the published .sha256 sidecar for an s3:// object and print the expected
+# hex digest. Prints nothing (and returns non-zero) if no sidecar is available.
+fetch_expected_checksum() {
   local s3_uri="$1"
-  local local_file="$2"
-  local checksum_uri="${s3_uri}.sha256"
   local checksum_file
   checksum_file="$(mktemp_dir)/expected.sha256"
-  if ! s3_download "$checksum_uri" "$checksum_file"; then
-    warn "no checksum sidecar at $checksum_uri; skipping integrity check"
+  s3_download "${s3_uri}.sha256" "$checksum_file" >/dev/null 2>&1 || return 1
+  awk '{print $1}' "$checksum_file"
+}
+
+# Verify a downloaded archive against an expected sha256 (from the published
+# sidecar). A missing/empty expected checksum is a soft skip; a mismatch is fatal.
+verify_checksum() {
+  local s3_uri="$1"
+  local local_file="$2"
+  local expected="$3"
+  if [[ -z "$expected" ]]; then
+    warn "no checksum sidecar at ${s3_uri}.sha256; skipping integrity check"
     return 0
   fi
-  local expected actual
-  expected="$(awk '{print $1}' "$checksum_file")"
+  local actual
   actual="$(sha256_file "$local_file")"
-  [[ -n "$expected" ]] || { warn "empty checksum at $checksum_uri; skipping"; return 0; }
   [[ "$expected" == "$actual" ]] \
     || die "checksum mismatch for $s3_uri (expected $expected, got $actual)"
   info "Verified snapshot checksum: $actual"
+}
+
+# Persistent directory for downloaded snapshot archives, so an already-downloaded
+# archive whose checksum still matches S3 can be reused instead of re-downloaded.
+# NOT purged between runs (unlike WORKDIR). Override with STRATO_SNAPSHOT_DOWNLOAD_DIR.
+snapshot_download_dir() {
+  local dir="${STRATO_SNAPSHOT_DOWNLOAD_DIR:-$SCRIPT_DIR/../.snapshot-downloads}"
+  if ! mkdir -p "$dir" 2>/dev/null; then
+    dir="${TMPDIR:-/tmp}/strato-snapshot-downloads"
+    mkdir -p "$dir" 2>/dev/null || { printf '\n'; return 1; }
+  fi
+  (cd "$dir" && pwd)
 }
 
 fetch_source() {
@@ -376,18 +395,51 @@ fetch_source() {
   if [[ "$source" == s3://* ]]; then
     command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || command -v aws >/dev/null 2>&1 \
       || die "need one of curl, wget, or aws to download $source"
-    local tmp suffix
-    # Preserve the full archive suffix (e.g. .tar.zst) so extract_archive can
-    # recognize it; ${source##*.} would yield only ".zst".
-    suffix="$(archive_suffix "$source")"
-    tmp="$(mktemp_dir)/snapshot${suffix}"
+
+    local dl_dir local_file expected
+    # Stable local path keyed by the S3 object key (e.g. helium-latest.tar.zst),
+    # so repeated restores of the same key reuse one file.
+    dl_dir="$(snapshot_download_dir || true)"
+    if [[ -n "$dl_dir" ]]; then
+      local key
+      key="${source#s3://}"; key="${key#*/}"        # strip s3://bucket/
+      local_file="$dl_dir/${key//\//-}"             # flatten network/ prefix
+    else
+      # No writable persistent dir: fall back to the per-run work area.
+      local suffix; suffix="$(archive_suffix "$source")"
+      local_file="$(mktemp_dir)/snapshot${suffix}"
+    fi
+
+    # Learn the expected checksum once; used both for reuse and verification.
+    expected="$(fetch_expected_checksum "$source" || true)"
+
+    # Decide whether the existing local copy can be reused, comparing its SHA-256
+    # against the published .sha256 on S3.
+    if [[ -f "$local_file" ]]; then
+      if [[ -z "$expected" ]]; then
+        info "Local snapshot found but S3 has no .sha256 to compare; re-downloading: $local_file"
+      else
+        info "Found local snapshot; comparing SHA-256 against S3 (${expected})..."
+        local local_sum
+        local_sum="$(sha256_file "$local_file")"
+        if [[ "$local_sum" == "$expected" ]]; then
+          info "SHA-256 matches; reusing already-downloaded snapshot (no download needed): $local_file"
+          printf '%s\n' "$local_file"
+          return 0
+        fi
+        info "SHA-256 differs (local ${local_sum} != S3 ${expected}); downloading a fresh snapshot"
+      fi
+    else
+      info "No local snapshot cached yet; downloading"
+    fi
+
     info "Downloading snapshot: $(s3_to_https_url "$source")"
     # Show a progress bar for the (large) archive download. The bar goes to
     # stderr so it does not pollute the path printed on stdout.
-    s3_download "$source" "$tmp" true \
+    s3_download "$source" "$local_file" true \
       || die "failed to download snapshot from $(s3_to_https_url "$source")"
-    verify_s3_checksum "$source" "$tmp"
-    printf '%s\n' "$tmp"
+    verify_checksum "$source" "$local_file" "$expected"
+    printf '%s\n' "$local_file"
   else
     [[ -f "$source" ]] || die "snapshot source not found: $source"
     absolute_path "$source"
@@ -460,6 +512,23 @@ copy_dir_contents() {
   [[ -d "$src" ]] || return 0
   mkdir -p "$dest"
   (cd "$src" && tar -cf - .) | (cd "$dest" && tar -xpf -)
+}
+
+# Move the contents of src into dest. On the same filesystem this is an instant
+# rename (no byte copy); across filesystems mv falls back to copy+delete, so it
+# is never slower than copy_dir_contents. The src is consumed; only use this for
+# throwaway sources (e.g. the extracted snapshot work area).
+move_dir_contents() {
+  local src="$1"
+  local dest="$2"
+  [[ -d "$src" ]] || return 0
+  mkdir -p "$dest"
+  # Enumerate top-level entries (including dotfiles, excluding . and ..) with
+  # find -- robust regardless of glob/dotglob shell settings -- and move each.
+  local entry
+  while IFS= read -r -d '' entry; do
+    mv -f "$entry" "$dest/"
+  done < <(find "$src" -mindepth 1 -maxdepth 1 -print0)
 }
 
 copy_dir_contents_without_appledouble() {
@@ -1463,12 +1532,14 @@ restore_payload() {
   [[ -f "$node_dir/secrets/postgres_password" ]] \
     || die "target node has no secrets/postgres_password; run strato-setup first"
 
-  info "Copying restored state (.ethereumH, redis, kafka) into node..."
+  info "Moving restored state (.ethereumH, redis, kafka) into node..."
   remove_restored_state "$node_dir"
   mkdir -p "$node_dir/.ethereumH" "$node_dir/postgres"
-  copy_dir_contents "$extracted/payload/ethereumH" "$node_dir/.ethereumH"
-  copy_dir_contents "$extracted/payload/redis" "$node_dir/redis"
-  copy_dir_contents "$extracted/payload/kafka" "$node_dir/kafka"
+  # Move (not copy) from the throwaway extraction dir: an instant rename on the
+  # same filesystem, and never slower than a copy across filesystems.
+  move_dir_contents "$extracted/payload/ethereumH" "$node_dir/.ethereumH"
+  move_dir_contents "$extracted/payload/redis" "$node_dir/redis"
+  move_dir_contents "$extracted/payload/kafka" "$node_dir/kafka"
 
   # Load only the public blockchain databases into the target node's postgres
   # cluster (initializing it with the node's own password if empty). The node
@@ -1481,7 +1552,7 @@ restore_payload() {
 
   if [[ "$include_prometheus" == "true" && -d "$extracted/payload/prometheus" ]]; then
     rm -rf "$node_dir/prometheus"
-    copy_dir_contents "$extracted/payload/prometheus" "$node_dir/prometheus"
+    move_dir_contents "$extracted/payload/prometheus" "$node_dir/prometheus"
   fi
 
   # Normalize localhost SQL/Cirrus hosts to 127.0.0.1 so host processes connect
