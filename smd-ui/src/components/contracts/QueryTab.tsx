@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { queryCirrus } from "@/services/contracts";
 
 export function QueryTab() {
@@ -56,12 +55,12 @@ export function QueryTab() {
           results.length === 0 ? (
             <p className="text-sm text-muted-foreground">No rows.</p>
           ) : (
-            <ScrollArea className="max-h-[28rem] w-full rounded-md border border-border">
-              <table className="w-full text-left text-xs">
-                <thead className="sticky top-0 bg-muted">
+            <div className="max-h-[28rem] w-full overflow-auto rounded-md border border-border">
+              <table className="w-max min-w-full text-left text-xs">
+                <thead className="sticky top-0 z-10 bg-muted">
                   <tr>
                     {columns.map((c) => (
-                      <th key={c} className="px-3 py-2 font-medium">{c}</th>
+                      <th key={c} className="whitespace-nowrap px-3 py-2 font-medium">{c}</th>
                     ))}
                   </tr>
                 </thead>
@@ -69,7 +68,7 @@ export function QueryTab() {
                   {results.map((row, i) => (
                     <tr key={i} className="border-t border-border">
                       {columns.map((c) => (
-                        <td key={c} className="max-w-xs truncate px-3 py-1.5 font-mono">
+                        <td key={c} className="whitespace-nowrap px-3 py-1.5 font-mono">
                           {typeof row[c] === "object" ? JSON.stringify(row[c]) : String(row[c])}
                         </td>
                       ))}
@@ -77,7 +76,7 @@ export function QueryTab() {
                   ))}
                 </tbody>
               </table>
-            </ScrollArea>
+            </div>
           )
         ) : null}
       </CardContent>

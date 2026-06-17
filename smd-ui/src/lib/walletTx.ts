@@ -39,12 +39,15 @@ function parseSignature(sig: string): { r: string; s: string; v: string } {
 async function fetchUnsignedTxs(
   type: StratoTxType,
   payload: Record<string, unknown>,
-  userAddress: string
+  userAddress: string,
+  username?: string
 ): Promise<UnsignedTx[]> {
   const { data } = await api.post(
     `${env.BLOC_URL}/transaction/unsigned`,
     { txs: [{ payload, type }], address: userAddress.replace(/^0x/, "") },
-    { params: chainParam() }
+    // `username` makes the node wrap CONTRACT/FUNCTION txs as a call to the user's
+    // User wallet contract, producing a MessageTX an external wallet can sign.
+    { params: { ...chainParam(), ...(username ? { username } : {}) } }
   );
   // Tolerate a few shapes: a raw array, or a wrapper with _unsignedTxs / txs.
   if (Array.isArray(data)) return data;
@@ -113,9 +116,10 @@ export async function signAndSubmitViaWallet(
   walletClient: WalletClient,
   userAddress: string,
   type: StratoTxType,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  options?: { username?: string }
 ): Promise<any> {
-  const unsigned = await fetchUnsignedTxs(type, payload, userAddress);
+  const unsigned = await fetchUnsignedTxs(type, payload, userAddress, options?.username);
   if (unsigned.length === 0) throw new Error("Node returned no unsigned transaction to sign");
 
   const hashes: string[] = [];

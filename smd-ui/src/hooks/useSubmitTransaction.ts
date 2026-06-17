@@ -16,29 +16,36 @@ export function useSubmitTransaction() {
   const { data: walletClient } = useWalletClient();
 
   const submit = useCallback(
-    async (type: StratoTxType, payload: Record<string, unknown>) => {
+    async (
+      type: StratoTxType,
+      payload: Record<string, unknown>,
+      options?: { username?: string }
+    ) => {
       if (isAppAuthenticated) {
         return submitStratoTx(type, payload);
       }
+      const username = options?.username?.trim() || undefined;
       // External-wallet (EIP-712) signing only supports MessageTX-style txs on the
-      // node — function calls and transfers. Contract creation must go through the
-      // STRATO wallet (server-side vault signing).
-      if (type === "CONTRACT") {
+      // node. A raw contract creation can't be signed by an external wallet, but a
+      // deploy routed through the user's on-chain User wallet contract becomes a
+      // `createContract` function call (a MessageTX) — so it requires a username.
+      if (type === "CONTRACT" && !username) {
         throw new Error(
-          "Deploying a contract requires the STRATO wallet. Connect with the STRATO wallet to deploy; external wallets can call functions and send tokens."
+          'Deploying with an external wallet requires a username and "Use Wallet" enabled, ' +
+            "so the deploy is routed through your STRATO User wallet contract."
         );
       }
       if (walletClient && address) {
         await ensureStratoChainInWallet(walletClient as any).catch(() => {});
-        return signAndSubmitViaWallet(walletClient, address, type, payload);
+        return signAndSubmitViaWallet(walletClient, address, type, payload, { username });
       }
       throw new Error("Connect a wallet to sign this transaction");
     },
     [isAppAuthenticated, walletClient, address]
   );
 
+  // STRATO wallets deploy directly (vault signing). External wallets can also deploy,
+  // but only by routing through their User wallet contract (username + Use Wallet).
   const canSubmit = isAppAuthenticated || (!!walletClient && !!address);
-  // Contract deploys are only possible with the STRATO wallet (vault signing).
-  const canDeploy = isAppAuthenticated;
-  return { submit, canSubmit, canDeploy };
+  return { submit, canSubmit, isAppAuthenticated };
 }

@@ -57,8 +57,8 @@ const STARTER = `contract SimpleStorage {
 
 export function EditorTab() {
   const { resolvedTheme } = useTheme();
-  const { submit: submitTx, canSubmit, canDeploy } = useSubmitTransaction();
-  const { userAddress } = useUser();
+  const { submit: submitTx, canSubmit } = useSubmitTransaction();
+  const { userAddress, isAppAuthenticated } = useUser();
 
   const [files, setFiles] = useState<SourceFile[]>([{ name: "Main.sol", content: STARTER }]);
   const [active, setActive] = useState(0);
@@ -177,9 +177,18 @@ export function EditorTab() {
     setCreateOpen(true);
   };
 
+  // STRATO wallets deploy directly; external wallets must route through their User
+  // wallet contract, which needs a username ("Name") and "Use Wallet" enabled.
+  const externalDeployReady = useWallet && !!name.trim();
+  const canCreate = isAppAuthenticated || (canSubmit && externalDeployReady);
+
   const doCreate = async () => {
     if (!selectedContract) {
       toast.error("Select a contract to create");
+      return;
+    }
+    if (!isAppAuthenticated && !externalDeployReady) {
+      toast.error('Enter a username and enable "Use Wallet" to deploy with an external wallet');
       return;
     }
     const args: Record<string, unknown> = {};
@@ -198,12 +207,16 @@ export function EditorTab() {
     setDeploying(true);
     setDeployedAddress("");
     try {
-      const result = await submitTx("CONTRACT", {
-        contract: selectedContract,
-        src: compiledSource,
-        args,
-        metadata,
-      });
+      const result = await submitTx(
+        "CONTRACT",
+        {
+          contract: selectedContract,
+          src: compiledSource,
+          args,
+          metadata,
+        },
+        useWallet ? { username: name.trim() } : undefined
+      );
       const address: string | undefined = result?.data?.contents?.address;
       setDeployedAddress(address ?? "");
       setOutput(JSON.stringify(result, null, 2));
@@ -421,11 +434,11 @@ export function EditorTab() {
               <p className="text-xs text-muted-foreground">
                 Connect a wallet to create a contract.
               </p>
-            ) : !canDeploy ? (
+            ) : !isAppAuthenticated && !externalDeployReady ? (
               <p className="text-xs text-muted-foreground">
-                Deploying a contract requires the STRATO wallet. External wallets can call
-                functions and send tokens, but not deploy — connect with the STRATO wallet to
-                create contracts.
+                To deploy with an external wallet, enter your username above and enable "Use
+                Wallet". The deploy is routed through your on-chain User wallet contract so
+                MetaMask (or another external wallet) can sign it.
               </p>
             ) : null}
           </div>
@@ -434,7 +447,7 @@ export function EditorTab() {
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={doCreate} disabled={deploying || !canDeploy || !selectedContract}>
+            <Button onClick={doCreate} disabled={deploying || !canCreate || !selectedContract}>
               {deploying ? "Creating…" : "Create Contract"}
             </Button>
           </DialogFooter>

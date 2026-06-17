@@ -268,15 +268,62 @@ postBlocTransactionUnsigned ::
     HasCodeDB m,
     HasBlocEnv m
   ) =>
+  -- | Optional username — when supplied, CONTRACT/FUNCTION txs are wrapped as a
+  -- call to the user's on-chain User wallet contract (createContract/callContract)
+  -- so that they become MessageTXs an external wallet can sign via EIP-712.
+  Maybe String ->
   -- | SolidVM transactions
   PostBlocTransactionRequest ->
   -- | tx hash & raw tx data
   m [BlocTransactionUnsignedResult]
-postBlocTransactionUnsigned (PostBlocTransactionRequest _ [] _ _) = return []
-postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams msrcs) = withCodeCollectionCache $ do
+postBlocTransactionUnsigned _ (PostBlocTransactionRequest _ [] _ _) = return []
+postBlocTransactionUnsigned mUsername (PostBlocTransactionRequest mAddr txList txParams msrcs) = withCodeCollectionCache $ do
   addr <- case mAddr of
     Nothing -> throwIO $ UserError "Address is required for unsigned transactions"
     Just addr' -> return addr'
+  let useWallet = maybe False (not . null) mUsername
+  userContractAddr <- case (useWallet, mUsername) of
+    (True, Just u) -> do
+      let userRegistry = Address 0x720
+      ch <- A.selectWithDefault (A.Proxy @AddressState) userRegistry >>= \s ->
+        pure . keccak256ToByteString $ case addressStateCodeHash s of
+          ExternallyOwned h -> h
+          SolidVMCode _ h   -> h
+      pure $ getNewAddressWithSalt_unsafe userRegistry u ch [SMV.SString "User", SMV.SString u]
+    _ -> pure addr
+  -- Shared machinery: turn method calls into unsigned MessageTXs (mirrors the
+  -- FUNCTION case below; reused for the wallet-wrapped CONTRACT/FUNCTION paths).
+  let processMethodCalls mcs = do
+        txsWithParams <- genNonces (Don't CacheNonce) addr methodcallTxParams mcs
+        forStateT Map.empty txsWithParams $
+          \MethodCall{..} -> do
+            mCached <- use $ at methodcallContractAddress
+            (contract, mCodeCollection) <- case mCached of
+              Just x -> pure (x, Nothing)
+              Nothing -> do
+                mContractCC <- lift $ getContractWithCodeCollectionByAddress methodcallContractAddress methodcallMethodName
+                case mContractCC of
+                  Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (format methodcallContractAddress)
+                  Just (c, cc) -> do
+                    _ <- at methodcallContractAddress <?= c
+                    pure (c, Just cc)
+            case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
+              Just _ -> pure ()
+              Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+            let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
+                xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
+                typeDefs = contractToTypeDefsWithCC mCodeCollection contract
+            argsAsSource <- lift $ constructArgValuesAndSource (Just typeDefs) (Just methodcallArgs) xabiArgs
+            lift . prepareUnsignedRawTx methodcallMethodName argsAsSource $
+              TransactionHeader
+                (Just methodcallContractAddress)
+                addr
+                (Just methodcallMethodName)
+                Nothing
+                argsAsSource
+                "mercata"
+                (fromMaybe emptyTxParams _methodcallTxParams)
+                Nothing
   fmap join . forM txList $ \tx -> case transactionType tx of
     TRANSFER -> do
       tx' <- fromTransfer tx
@@ -297,6 +344,36 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
             prepareUnsignedRawTx "" [] header
         )
         txsWithParams
+    CONTRACT | useWallet -> do
+      p <- fromContract tx
+      let srcMap' p' = join $ liftA2 Map.lookup (contractpayloadContract p') msrcs
+          src'' p' = if contractpayloadSrc p' == mempty then Nothing else Just $ contractpayloadSrc p'
+          getSrc' p' = fromMaybe mempty $ src'' p' <|> srcMap' p'
+          contractSrc = getSrc' p
+          cn = fromMaybe "unnamed_contract" (contractpayloadContract p)
+          srcLength = Text.length $ sourceBlob contractSrc
+          metadata = Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]
+      (_, theContract@Contract {..}) <-
+        getContractDetailsForContract contractSrc (contractpayloadContract p) >>= \case
+          Nothing -> throwIO $ UserError "You need to supply at least one contract in the source"
+          Just x' -> pure x'
+      let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
+          xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) _constructor
+      ctorArgsAsSource <- constructArgValuesAndSource (Just $ contractToTypeDefs theContract) (contractpayloadArgs p) xabiArgs
+      let methodArgs =
+            M.fromList
+              [ ("contractName", ArgString cn),
+                ("contractSrc", ArgString $ sourceBlob contractSrc),
+                ("args", ArgArray . V.fromList $ ArgString <$> ctorArgsAsSource)
+              ]
+          mc =
+            MethodCall
+              userContractAddr
+              "createContract"
+              methodArgs
+              (mergeTxParams (contractpayloadTxParams p) txParams)
+              (Just metadata)
+      processMethodCalls [mc]
     CONTRACT -> do
       ps <- fromContract tx
       let srcMap :: ContractPayload -> Maybe SourceMap
@@ -344,39 +421,38 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
                 (Just $ Code $ serializeSourceMap src)
     FUNCTION -> do
       p <- fromFunction tx
-      let mapMethodCalls = (\(FunctionPayload a m r x md) -> MethodCall a m r (mergeTxParams x txParams) md) p
-      txsWithParams <- genNonces (Don't CacheNonce) addr methodcallTxParams [mapMethodCalls]
-      forStateT Map.empty txsWithParams $
-        \MethodCall{..} -> do
-          mCached <- use $ at methodcallContractAddress
-          (contract, mCodeCollection) <- case mCached of
-            Just x -> pure (x, Nothing)
-            Nothing -> do
-              mContractCC <- lift $ getContractWithCodeCollectionByAddress methodcallContractAddress methodcallMethodName
-              case mContractCC of
-                Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (format methodcallContractAddress)
-                Just (c, cc) -> do
-                  _ <- at methodcallContractAddress <?= c
-                  pure (c, Just cc)
-          case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
-            Just _ -> pure ()
-            Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
-
-          let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
-              xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
-              typeDefs = contractToTypeDefsWithCC mCodeCollection contract
-          argsAsSource <- lift $ constructArgValuesAndSource (Just typeDefs) (Just methodcallArgs) xabiArgs
-          lift . prepareUnsignedRawTx methodcallMethodName argsAsSource $
-            TransactionHeader
-              (Just methodcallContractAddress)
-              addr
-              (Just methodcallMethodName)
-              Nothing
-              argsAsSource
-              "mercata"
-              (fromMaybe emptyTxParams _methodcallTxParams)
-              Nothing
---              (Just $ Code $ sel <> argsBin)
+      mc <-
+        if useWallet && userContractAddr /= functionpayloadContractAddress p
+          then do
+            -- Wrap as User.callContract(contractToCall, functionName, args) so an
+            -- external wallet signs a call to its own User contract.
+            args' <- getContractWithCodeCollectionByAddress (functionpayloadContractAddress p) (functionpayloadMethod p) >>= \case
+              Nothing -> pure $ M.elems (functionpayloadArgs p)
+              Just (theContract@Contract {..}, cc) -> do
+                let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
+                    xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) $ Map.lookup (Text.unpack $ functionpayloadMethod p) _functions
+                map ArgString <$> constructArgValuesAndSource (Just $ contractToTypeDefsWithCC (Just cc) theContract) (Just $ functionpayloadArgs p) xabiArgs
+            pure $
+              MethodCall
+                userContractAddr
+                "callContract"
+                ( M.fromList
+                    [ ("contractToCall", ArgString . Text.pack . show $ functionpayloadContractAddress p),
+                      ("functionName", ArgString $ functionpayloadMethod p),
+                      ("args", ArgArray $ V.fromList args')
+                    ]
+                )
+                (mergeTxParams (functionpayloadTxParams p) txParams)
+                (functionpayloadMetadata p)
+          else
+            pure $
+              MethodCall
+                (functionpayloadContractAddress p)
+                (functionpayloadMethod p)
+                (functionpayloadArgs p)
+                (mergeTxParams (functionpayloadTxParams p) txParams)
+                (functionpayloadMetadata p)
+      processMethodCalls [mc]
   where fromTransfer = \case
           BlocTransfer t -> return t
           _ -> throwIO $ UserError "Could not decode transfer arguments from body"

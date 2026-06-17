@@ -87,7 +87,7 @@ export function MethodCaller({
   return (
     <>
       <Button variant="secondary" size="sm" onClick={() => setOpen(true)} className="gap-1.5">
-        <Wand2 className="h-3.5 w-3.5" />
+        <Wand2 className="h-3.5 w-3.5 shrink-0" />
         <span className="font-mono">{method}</span>
       </Button>
 
