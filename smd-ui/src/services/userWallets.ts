@@ -21,20 +21,21 @@ function extractUsername(row: any): string {
 }
 
 /**
- * User wallets that `ownerAddress` controls. A User contract stores its authorized
- * accounts in the `userAddresses` record-collection, exposed by cirrus via the
- * `mapping` table (columns: address = the User contract, value = an authorized
- * account). We join back to `storage` for the wallet's username:
- *   /cirrus/search/mapping?collection_name=eq.userAddresses&value=eq."<addr>"&select=address,storage(data->>username)
+ * User wallets that `ownerAddress` controls. A User contract tracks its authorized
+ * accounts in the `userAddressMap` mapping (address => uint), which enforces a 1:1
+ * relation, exposed by cirrus via the `mapping` table (columns: address = the User
+ * contract, key = the authorized account). We join back to `storage` for the
+ * wallet's username:
+ *   /cirrus/search/mapping?collection_name=eq.userAddressMap&key->>key=eq.<addr>&select=address,storage(data->>username)
  */
 export function useMyUserWallets(ownerAddress?: string | null) {
   return useQuery({
     queryKey: ["my-user-wallets", ownerAddress],
     enabled: !!ownerAddress,
     queryFn: async (): Promise<UserWallet[]> => {
-      const value = encodeURIComponent(`"${strip0x(ownerAddress!)}"`);
+      const key = strip0x(ownerAddress!);
       const { data } = await api.get(
-        `${env.CIRRUS_URL}/mapping?collection_name=eq.userAddresses&value=eq.${value}&select=address,storage(data->>username)`
+        `${env.CIRRUS_URL}/mapping?collection_name=eq.userAddressMap&key-%3E%3Ekey=eq.${key}&select=address,storage(data-%3E%3Eusername)`
       );
       if (!Array.isArray(data)) return [];
       return data
