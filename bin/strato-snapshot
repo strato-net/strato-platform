@@ -514,6 +514,23 @@ copy_dir_contents() {
   (cd "$src" && tar -cf - .) | (cd "$dest" && tar -xpf -)
 }
 
+# Move the contents of src into dest. On the same filesystem this is an instant
+# rename (no byte copy); across filesystems mv falls back to copy+delete, so it
+# is never slower than copy_dir_contents. The src is consumed; only use this for
+# throwaway sources (e.g. the extracted snapshot work area).
+move_dir_contents() {
+  local src="$1"
+  local dest="$2"
+  [[ -d "$src" ]] || return 0
+  mkdir -p "$dest"
+  # Enumerate top-level entries (including dotfiles, excluding . and ..) with
+  # find -- robust regardless of glob/dotglob shell settings -- and move each.
+  local entry
+  while IFS= read -r -d '' entry; do
+    mv -f "$entry" "$dest/"
+  done < <(find "$src" -mindepth 1 -maxdepth 1 -print0)
+}
+
 copy_dir_contents_without_appledouble() {
   local src="$1"
   local dest="$2"
@@ -1515,12 +1532,14 @@ restore_payload() {
   [[ -f "$node_dir/secrets/postgres_password" ]] \
     || die "target node has no secrets/postgres_password; run strato-setup first"
 
-  info "Copying restored state (.ethereumH, redis, kafka) into node..."
+  info "Moving restored state (.ethereumH, redis, kafka) into node..."
   remove_restored_state "$node_dir"
   mkdir -p "$node_dir/.ethereumH" "$node_dir/postgres"
-  copy_dir_contents "$extracted/payload/ethereumH" "$node_dir/.ethereumH"
-  copy_dir_contents "$extracted/payload/redis" "$node_dir/redis"
-  copy_dir_contents "$extracted/payload/kafka" "$node_dir/kafka"
+  # Move (not copy) from the throwaway extraction dir: an instant rename on the
+  # same filesystem, and never slower than a copy across filesystems.
+  move_dir_contents "$extracted/payload/ethereumH" "$node_dir/.ethereumH"
+  move_dir_contents "$extracted/payload/redis" "$node_dir/redis"
+  move_dir_contents "$extracted/payload/kafka" "$node_dir/kafka"
 
   # Load only the public blockchain databases into the target node's postgres
   # cluster (initializing it with the node's own password if empty). The node
@@ -1533,7 +1552,7 @@ restore_payload() {
 
   if [[ "$include_prometheus" == "true" && -d "$extracted/payload/prometheus" ]]; then
     rm -rf "$node_dir/prometheus"
-    copy_dir_contents "$extracted/payload/prometheus" "$node_dir/prometheus"
+    move_dir_contents "$extracted/payload/prometheus" "$node_dir/prometheus"
   fi
 
   # Normalize localhost SQL/Cirrus hosts to 127.0.0.1 so host processes connect
