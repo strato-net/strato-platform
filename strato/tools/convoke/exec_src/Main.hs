@@ -123,11 +123,25 @@ killAllProcesses = do
 tailN :: Int -> [a] -> [a]
 tailN n xs = drop (length xs - n) xs
 
+-- Print the last n lines of a file without reading it all into memory.
+-- Process logs can grow to many GB; the previous implementation read the
+-- entire file as a String (~16 bytes/char), which could OOM the host when a
+-- child exited. We seek near the end and only examine the trailing bytes.
 tailFile :: Int -> FilePath -> IO ()
-tailFile n path = do
-    contents <- readFile path
-    let linesToPrint = tailN n (lines contents)
-    hPutStrLn stderr $ unlines linesToPrint
+tailFile n path = handle onErr $
+  withFile path ReadMode $ \h -> do
+    size <- hFileSize h
+    let maxBytes = 65536 :: Integer  -- enough to hold the last n log lines
+        start = max 0 (size - maxBytes)
+    when (start > 0) $ hSeek h AbsoluteSeek start
+    contents <- hGetContents h
+    -- If we started mid-file the first line is likely partial; drop it.
+    let ls = lines contents
+        ls' = if start > 0 then drop 1 ls else ls
+    hPutStrLn stderr $ unlines (tailN n ls')
+  where
+    onErr e =
+      hPutStrLn stderr $ "Warning: could not tail " ++ path ++ ": " ++ show (e :: SomeException)
 
 -- Start docker compose containers
 dockerComposeUp :: IO ()
