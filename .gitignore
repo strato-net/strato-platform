@@ -66,6 +66,8 @@ docker-compose.oracle.yml
 /mynode/
 /snapshot-test-node/
 /snapshot-smoke-node/
+/.snapshot-work/
+/.snapshot-downloads/
 .aider*
 
 # Documentation working files (summaries, verification reports, commit messages)

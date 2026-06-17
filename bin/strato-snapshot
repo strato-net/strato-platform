@@ -3,13 +3,38 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TMP_PATHS=()
 TMP_PG_CONTAINERS=()
 
 # Default public, read-only snapshot bucket. Override with STRATO_SNAPSHOT_BUCKET.
 DEFAULT_SNAPSHOT_BUCKET="strato-snapshots"
+# Region of the public snapshot bucket (used to build the HTTPS read URL).
+DEFAULT_SNAPSHOT_REGION="us-east-1"
 # Compression extension used for snapshots published under the network prefix.
 SNAPSHOT_ARCHIVE_EXT="tar.zst"
+
+# Reusable working area for downloads/extraction. Using one deterministic base
+# (purged at start of every run) prevents the unbounded accumulation of
+# /tmp/tmp.* dirs that a per-run mktemp would leave behind, especially since
+# helpers run in command-substitution subshells whose temp paths the parent's
+# EXIT trap cannot track. Default: <repo>/.snapshot-work; falls back to
+# ${TMPDIR}/strato-snapshot if that is not writable. Override with
+# STRATO_SNAPSHOT_WORKDIR.
+init_workdir() {
+  if [[ -n "${STRATO_SNAPSHOT_WORKDIR:-}" ]]; then
+    WORKDIR="$STRATO_SNAPSHOT_WORKDIR"
+  else
+    WORKDIR="$SCRIPT_DIR/../.snapshot-work"
+  fi
+  # Purge any leftovers from prior (possibly crashed) runs, then recreate.
+  rm -rf "$WORKDIR" 2>/dev/null || true
+  if ! mkdir -p "$WORKDIR" 2>/dev/null; then
+    WORKDIR="${TMPDIR:-/tmp}/strato-snapshot"
+    rm -rf "$WORKDIR" 2>/dev/null || true
+    mkdir -p "$WORKDIR" || die "could not create work directory: $WORKDIR"
+  fi
+  WORKDIR="$(cd "$WORKDIR" && pwd)"
+}
+init_workdir
 
 usage() {
   cat <<'EOF'
@@ -76,19 +101,19 @@ cleanup() {
   for cid in "${TMP_PG_CONTAINERS[@]}"; do
     [[ -n "$cid" ]] && docker stop "$cid" >/dev/null 2>&1
   done
-  for path in "${TMP_PATHS[@]}"; do
-    [[ -n "$path" && -e "$path" ]] && rm -rf "$path"
-  done
+  # Remove this run's working area. (A crashed run that skips this is still
+  # cleaned by the next run's init_workdir purge.)
+  [[ -n "${WORKDIR:-}" && -d "$WORKDIR" ]] && rm -rf "$WORKDIR"
   set -u
   return 0
 }
 trap cleanup EXIT
 
+# Create a unique subdirectory inside the run's WORKDIR. Works correctly even
+# when called from a command-substitution subshell, because all dirs live under
+# the single WORKDIR that is purged at start and removed at exit.
 mktemp_dir() {
-  local dir
-  dir="$(mktemp -d)"
-  TMP_PATHS+=("$dir")
-  printf '%s\n' "$dir"
+  mktemp -d -p "$WORKDIR"
 }
 
 need_cmd() {
@@ -134,6 +159,22 @@ absolute_path() {
 
 snapshot_bucket() {
   printf '%s\n' "${1:-${STRATO_SNAPSHOT_BUCKET:-$DEFAULT_SNAPSHOT_BUCKET}}"
+}
+
+snapshot_region() {
+  printf '%s\n' "${STRATO_SNAPSHOT_REGION:-${AWS_DEFAULT_REGION:-$DEFAULT_SNAPSHOT_REGION}}"
+}
+
+# Convert an s3://bucket/key URI into the public virtual-hosted HTTPS URL so the
+# object can be fetched with plain curl/wget (no aws CLI / credentials needed).
+s3_to_https_url() {
+  local s3_uri="$1"
+  local rest bucket key region
+  rest="${s3_uri#s3://}"
+  bucket="${rest%%/*}"
+  key="${rest#*/}"
+  region="$(snapshot_region)"
+  printf 'https://%s.s3.%s.amazonaws.com/%s\n' "$bucket" "$region" "$key"
 }
 
 # Normalize an operator-supplied timestamp (YYYYMMDD-HH:mm:ssZ) into the
@@ -196,51 +237,209 @@ resolve_selection_source() {
   resolve_snapshot_source "$network" "$timestamp" "$bucket"
 }
 
+# Fixed width (number of fill characters) of the rendered progress bar, between
+# the [ and ] brackets.
+SNAPSHOT_PROGRESS_WIDTH=100
+
+# Cross-platform file size in bytes (0 if missing).
+file_size_bytes() {
+  local f="$1"
+  [[ -f "$f" ]] || { printf '0\n'; return; }
+  # GNU stat (-c) then BSD/macOS stat (-f); fall back to wc -c.
+  stat -c %s "$f" 2>/dev/null || stat -f %z "$f" 2>/dev/null || wc -c < "$f" 2>/dev/null || printf '0\n'
+}
+
+# Content-Length of an HTTP(S) URL (empty if unknown). Uses a HEAD request.
+http_content_length() {
+  local url="$1"
+  command -v curl >/dev/null 2>&1 || { printf '\n'; return; }
+  curl -fsSLI "$url" 2>/dev/null \
+    | awk 'tolower($1) == "content-length:" { gsub(/\r/,"",$2); v=$2 } END { if (v) print v }'
+}
+
+# Draw a fixed-width [####....] progress bar to stderr given current/total bytes.
+draw_progress_bar() {
+  local current="$1"
+  local total="$2"
+  local width="$SNAPSHOT_PROGRESS_WIDTH"
+  local pct filled i bar=""
+  if [[ -z "$total" || "$total" -le 0 ]]; then
+    return 0
+  fi
+  (( current > total )) && current="$total"
+  pct=$(( current * 100 / total ))
+  filled=$(( current * width / total ))
+  for ((i = 0; i < width; i++)); do
+    if (( i < filled )); then bar+="#"; else bar+="."; fi
+  done
+  # \r returns to line start; printf to stderr so stdout stays clean.
+  printf '\r[%s] %3d%%' "$bar" "$pct" >&2
+}
+
+# Run a download command in the background and render a fixed-width bracketed
+# progress bar by polling the destination file size against the known total.
+# Args: <dest> <total_bytes> <cmd...>. Returns the download command's status.
+download_with_bar() {
+  local dest="$1"; shift
+  local total="$1"; shift
+  "$@" &
+  local dl_pid=$!
+  local cur
+  while kill -0 "$dl_pid" 2>/dev/null; do
+    cur="$(file_size_bytes "$dest")"
+    draw_progress_bar "$cur" "$total"
+    sleep 1
+  done
+  wait "$dl_pid"
+  local rc=$?
+  if (( rc == 0 )); then
+    draw_progress_bar "$total" "$total"
+    printf '\n' >&2
+  else
+    printf '\n' >&2
+  fi
+  return $rc
+}
+
 # Download an s3:// object to a local path. The snapshot bucket is public-read,
-# so try a signed request first (works when AWS credentials are configured, e.g.
-# the publishing CI user) and fall back to an anonymous (--no-sign-request)
-# request for machines without credentials. Returns non-zero if both fail.
+# so we fetch it over plain HTTPS with curl or wget -- no aws CLI or credentials
+# required. Falls back to the aws CLI only if neither curl nor wget is present.
+# Returns non-zero if the download fails.
+#
+# Pass show_progress=true (3rd arg) to display a fixed-width bracketed progress
+# bar (used for the large archive; left off for tiny sidecar files).
 s3_download() {
   local s3_uri="$1"
   local dest="$2"
-  aws s3 cp --only-show-errors "$s3_uri" "$dest" >/dev/null 2>&1 && return 0
-  aws s3 cp --only-show-errors --no-sign-request "$s3_uri" "$dest" >/dev/null 2>&1 && return 0
+  local show_progress="${3:-false}"
+  local url total
+  url="$(s3_to_https_url "$s3_uri")"
+
+  if command -v curl >/dev/null 2>&1; then
+    if [[ "$show_progress" == "true" ]]; then
+      total="$(http_content_length "$url")"
+      if [[ -n "$total" ]]; then
+        download_with_bar "$dest" "$total" curl -fsSL -o "$dest" "$url" && return 0
+      else
+        # Unknown size: fall back to curl's own bar.
+        curl -fSL --progress-bar -o "$dest" "$url" && return 0
+      fi
+    else
+      curl -fsSL -o "$dest" "$url" && return 0
+    fi
+    return 1
+  fi
+  if command -v wget >/dev/null 2>&1; then
+    if [[ "$show_progress" == "true" ]]; then
+      total="$(http_content_length "$url")"
+      if [[ -n "$total" ]]; then
+        download_with_bar "$dest" "$total" wget -q -O "$dest" "$url" && return 0
+      else
+        wget -q --show-progress -O "$dest" "$url" && return 0
+      fi
+    else
+      wget -q -O "$dest" "$url" && return 0
+    fi
+    return 1
+  fi
+  # Last resort: aws CLI (anonymous, then signed). aws shows its own progress
+  # unless quieted; keep it quiet to avoid the verbose per-chunk output.
+  if command -v aws >/dev/null 2>&1; then
+    aws s3 cp --only-show-errors --no-sign-request "$s3_uri" "$dest" >/dev/null 2>&1 && return 0
+    aws s3 cp --only-show-errors "$s3_uri" "$dest" >/dev/null 2>&1 && return 0
+  fi
   return 1
 }
 
-# Verify a downloaded archive against its published .sha256 sidecar, if present.
-verify_s3_checksum() {
+# Fetch the published .sha256 sidecar for an s3:// object and print the expected
+# hex digest. Prints nothing (and returns non-zero) if no sidecar is available.
+fetch_expected_checksum() {
   local s3_uri="$1"
-  local local_file="$2"
-  local checksum_uri="${s3_uri}.sha256"
   local checksum_file
   checksum_file="$(mktemp_dir)/expected.sha256"
-  if ! s3_download "$checksum_uri" "$checksum_file"; then
-    warn "no checksum sidecar at $checksum_uri; skipping integrity check"
+  s3_download "${s3_uri}.sha256" "$checksum_file" >/dev/null 2>&1 || return 1
+  awk '{print $1}' "$checksum_file"
+}
+
+# Verify a downloaded archive against an expected sha256 (from the published
+# sidecar). A missing/empty expected checksum is a soft skip; a mismatch is fatal.
+verify_checksum() {
+  local s3_uri="$1"
+  local local_file="$2"
+  local expected="$3"
+  if [[ -z "$expected" ]]; then
+    warn "no checksum sidecar at ${s3_uri}.sha256; skipping integrity check"
     return 0
   fi
-  local expected actual
-  expected="$(awk '{print $1}' "$checksum_file")"
+  local actual
   actual="$(sha256_file "$local_file")"
-  [[ -n "$expected" ]] || { warn "empty checksum at $checksum_uri; skipping"; return 0; }
   [[ "$expected" == "$actual" ]] \
     || die "checksum mismatch for $s3_uri (expected $expected, got $actual)"
   info "Verified snapshot checksum: $actual"
 }
 
+# Persistent directory for downloaded snapshot archives, so an already-downloaded
+# archive whose checksum still matches S3 can be reused instead of re-downloaded.
+# NOT purged between runs (unlike WORKDIR). Override with STRATO_SNAPSHOT_DOWNLOAD_DIR.
+snapshot_download_dir() {
+  local dir="${STRATO_SNAPSHOT_DOWNLOAD_DIR:-$SCRIPT_DIR/../.snapshot-downloads}"
+  if ! mkdir -p "$dir" 2>/dev/null; then
+    dir="${TMPDIR:-/tmp}/strato-snapshot-downloads"
+    mkdir -p "$dir" 2>/dev/null || { printf '\n'; return 1; }
+  fi
+  (cd "$dir" && pwd)
+}
+
 fetch_source() {
   local source="$1"
   if [[ "$source" == s3://* ]]; then
-    need_cmd aws
-    local tmp suffix
-    # Preserve the full archive suffix (e.g. .tar.zst) so extract_archive can
-    # recognize it; ${source##*.} would yield only ".zst".
-    suffix="$(archive_suffix "$source")"
-    tmp="$(mktemp_dir)/snapshot${suffix}"
-    s3_download "$source" "$tmp" \
-      || die "failed to download snapshot from $source (no AWS credentials and anonymous read failed)"
-    verify_s3_checksum "$source" "$tmp"
-    printf '%s\n' "$tmp"
+    command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || command -v aws >/dev/null 2>&1 \
+      || die "need one of curl, wget, or aws to download $source"
+
+    local dl_dir local_file expected
+    # Stable local path keyed by the S3 object key (e.g. helium-latest.tar.zst),
+    # so repeated restores of the same key reuse one file.
+    dl_dir="$(snapshot_download_dir || true)"
+    if [[ -n "$dl_dir" ]]; then
+      local key
+      key="${source#s3://}"; key="${key#*/}"        # strip s3://bucket/
+      local_file="$dl_dir/${key//\//-}"             # flatten network/ prefix
+    else
+      # No writable persistent dir: fall back to the per-run work area.
+      local suffix; suffix="$(archive_suffix "$source")"
+      local_file="$(mktemp_dir)/snapshot${suffix}"
+    fi
+
+    # Learn the expected checksum once; used both for reuse and verification.
+    expected="$(fetch_expected_checksum "$source" || true)"
+
+    # Decide whether the existing local copy can be reused, comparing its SHA-256
+    # against the published .sha256 on S3.
+    if [[ -f "$local_file" ]]; then
+      if [[ -z "$expected" ]]; then
+        info "Local snapshot found but S3 has no .sha256 to compare; re-downloading: $local_file"
+      else
+        info "Found local snapshot; comparing SHA-256 against S3 (${expected})..."
+        local local_sum
+        local_sum="$(sha256_file "$local_file")"
+        if [[ "$local_sum" == "$expected" ]]; then
+          info "SHA-256 matches; reusing already-downloaded snapshot (no download needed): $local_file"
+          printf '%s\n' "$local_file"
+          return 0
+        fi
+        info "SHA-256 differs (local ${local_sum} != S3 ${expected}); downloading a fresh snapshot"
+      fi
+    else
+      info "No local snapshot cached yet; downloading"
+    fi
+
+    info "Downloading snapshot: $(s3_to_https_url "$source")"
+    # Show a progress bar for the (large) archive download. The bar goes to
+    # stderr so it does not pollute the path printed on stdout.
+    s3_download "$source" "$local_file" true \
+      || die "failed to download snapshot from $(s3_to_https_url "$source")"
+    verify_checksum "$source" "$local_file" "$expected"
+    printf '%s\n' "$local_file"
   else
     [[ -f "$source" ]] || die "snapshot source not found: $source"
     absolute_path "$source"
@@ -1316,6 +1515,7 @@ restore_payload() {
   [[ -f "$node_dir/secrets/postgres_password" ]] \
     || die "target node has no secrets/postgres_password; run strato-setup first"
 
+  info "Copying restored state (.ethereumH, redis, kafka) into node..."
   remove_restored_state "$node_dir"
   mkdir -p "$node_dir/.ethereumH" "$node_dir/postgres"
   copy_dir_contents "$extracted/payload/ethereumH" "$node_dir/.ethereumH"
@@ -1430,6 +1630,7 @@ cmd_restore() {
   archive="$(fetch_source "$source")"
   extracted="$(mktemp_dir)"
   manifest="$extracted/SNAPSHOT.json"
+  info "Extracting snapshot archive (this can take a while for large snapshots)..."
   extract_archive "$archive" "$extracted"
   [[ -f "$manifest" ]] || die "SNAPSHOT.json missing from archive"
 

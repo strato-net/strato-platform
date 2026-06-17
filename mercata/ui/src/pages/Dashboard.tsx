@@ -26,7 +26,7 @@ import GuestPromoSection from "@/components/dashboard/GuestPromoSection";
 import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
 import { useNetwork } from "@/context/NetworkContext";
 
-const TIME_RANGES = ["1d", "7d", "1m", "3m", "6m", "1y", "all"] as const;
+const TIME_RANGES = ["7d", "1m", "3m", "6m", "1y", "all"] as const;
 type TimeRange = typeof TIME_RANGES[number];
 
 type TabType = 'netBalance' | 'rewards' | 'borrowed';
@@ -68,7 +68,7 @@ const Dashboard = () => {
     if (stored && TIME_RANGES.includes(stored as TimeRange)) {
       return stored as TimeRange;
     }
-    return '1d';
+    return '7d';
   });
 
   const { rank: userRank, totalEarned, loading: rankLoading } = useUserLeaderboardRank();

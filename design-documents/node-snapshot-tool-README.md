@@ -12,9 +12,20 @@ as production backups or canonical recovery checkpoints.
 - Docker running.
 - Repository built or installed so `strato-setup`, `strato-up`, `strato-down`,
   and `convoke` are available.
-- `python3`, `curl`, `tar`, and `lsof`.
-- `aws` CLI only when reading from or publishing to S3.
+- `python3`, `curl` (or `wget`), `tar`, and `lsof`.
+- `aws` CLI only when **publishing** to S3. Restoring/inspecting from the public
+  bucket uses plain HTTPS via `curl`/`wget` and needs no AWS CLI or credentials.
 - Enough disk for the archive and restored node data.
+
+Extraction uses a single working directory, `<repo>/.snapshot-work` (override
+with `STRATO_SNAPSHOT_WORKDIR`; falls back to `$TMPDIR/strato-snapshot`). It is
+purged at the start of every run and removed on exit, so repeated restores do
+not accumulate temp files.
+
+Downloaded archives are kept in a persistent directory, `<repo>/.snapshot-downloads`
+(override with `STRATO_SNAPSHOT_DOWNLOAD_DIR`). Before downloading, the tool
+compares the local copy's SHA-256 against the snapshot's published `.sha256` on
+S3; if they match, the existing file is reused instead of re-downloaded.
 
 ## Restore a Snapshot
 
