@@ -228,6 +228,11 @@ generateDockerCompose = do
             ]
             ++ if flags_localAuth
                then [ ("OAUTH_DISCOVERY_URL", "http://local-auth:4444/.well-known/openid-configuration")
+                      -- Bearer-token verification must fetch JWKS from the bundled
+                      -- Hydra service directly. The discovery doc advertises an
+                      -- external (issuer) jwks_uri that would route back through the
+                      -- public HTTPS endpoint and fail, so pin the internal JWKS URL.
+                    , ("OAUTH_JWKS_URI", "http://local-auth:4444/.well-known/jwks.json")
                     ]
                else []
         , ports = Just [portNum ++ ":" ++ portNum, "443:443"]

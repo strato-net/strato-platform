@@ -5,8 +5,24 @@ local node_host_with_protocol = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_
 local unique_name = ''
 local user_access_token = ''
 
+-- Bearer-token verification needs the OAuth provider's JWKS. By default we point
+-- lua-resty-openidc at the discovery URL and let it follow the document's
+-- jwks_uri. In --localAuth mode the discovery document (served by the bundled
+-- Hydra) advertises an external issuer jwks_uri that would route back through the
+-- public HTTPS endpoint (e.g. Cloudflare) and fail. When an explicit internal
+-- JWKS URI is provided, pass it directly as discovery = { jwks_uri = ... } so the
+-- key fetch stays internal. For external providers this placeholder is empty and
+-- we keep the standard discovery-URL behavior unchanged.
+local oauth_jwks_uri = "<OAUTH_JWKS_URI_PLACEHOLDER>"
+local verify_discovery
+if oauth_jwks_uri ~= "" then
+  verify_discovery = { jwks_uri = oauth_jwks_uri }
+else
+  verify_discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>"
+end
+
 local verify_opts = {
-  discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
+  discovery = verify_discovery,
   ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
   accept_none_alg = false,
   accept_unsupported_alg = false

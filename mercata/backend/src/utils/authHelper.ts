@@ -173,7 +173,7 @@ export async function fetchOpenIdConfig(openIdDiscoveryUrl: string | undefined):
     }
     
     const discoveryResponse = await axios.get(openIdDiscoveryUrl);
-    const { token_endpoint, jwks_uri } = discoveryResponse.data;
+    const { issuer, token_endpoint, jwks_uri } = discoveryResponse.data;
 
     if (!token_endpoint) {
       throw new Error("Token endpoint not found in OpenID discovery document");
@@ -184,20 +184,36 @@ export async function fetchOpenIdConfig(openIdDiscoveryUrl: string | undefined):
 
     // The discovery document reports endpoints (jwks_uri, token_endpoint) using
     // the OAuth issuer's external URL. When we fetched discovery from an internal
-    // origin (--localAuth, e.g. http://local-auth:4444), those external URLs
-    // route back through the public HTTPS endpoint and fail certificate
-    // verification (e.g. an untrusted Cloudflare Origin cert). Resolve the
-    // endpoints against the same origin we used for discovery so subsequent hops
-    // (JWKS fetch, client-credentials token requests) also stay internal. For an
-    // external provider, discovery and these endpoints share the issuer origin,
-    // so this rewrite is a no-op.
-    const discoveryOrigin = new URL(openIdDiscoveryUrl).origin;
-    const toDiscoveryOrigin = (endpoint: string): string => {
+    // base (--localAuth, e.g. http://local-auth:4444), those external URLs route
+    // back through the public HTTPS endpoint and fail certificate verification
+    // (e.g. an untrusted Cloudflare Origin cert). Re-base the endpoints onto the
+    // same base we used for discovery so subsequent hops (JWKS fetch,
+    // client-credentials token requests) also stay internal.
+    //
+    // The internal base can differ from the issuer by more than the origin: the
+    // public URL is fronted by nginx under an "/auth" path prefix (the issuer),
+    // whereas Hydra serves the same routes at the root of local-auth:4444. So we
+    // strip the issuer's path prefix from each endpoint and re-append it to the
+    // internal base derived from the discovery URL. For an external provider, the
+    // internal base equals the issuer base, so this reconstructs the original
+    // URL unchanged.
+    const discoveryUrl = new URL(openIdDiscoveryUrl);
+    // Internal base = discovery URL minus the well-known discovery suffix.
+    const internalBase =
+      discoveryUrl.origin +
+      discoveryUrl.pathname.replace(/\/\.well-known\/openid-configuration$/, "");
+    const issuerPath = issuer ? new URL(issuer).pathname.replace(/\/$/, "") : "";
+    const reBaseInternal = (endpoint: string): string => {
       const url = new URL(endpoint);
-      return `${discoveryOrigin}${url.pathname}${url.search}`;
+      // Path relative to the issuer prefix (e.g. "/.well-known/jwks.json").
+      const relativePath =
+        issuerPath && url.pathname.startsWith(issuerPath)
+          ? url.pathname.slice(issuerPath.length)
+          : url.pathname;
+      return `${internalBase}${relativePath}${url.search}`;
     };
-    const resolvedTokenEndpoint = toDiscoveryOrigin(token_endpoint);
-    const resolvedJwksUri = toDiscoveryOrigin(jwks_uri);
+    const resolvedTokenEndpoint = reBaseInternal(token_endpoint);
+    const resolvedJwksUri = reBaseInternal(jwks_uri);
 
     const jwksResponse = await axios.get(resolvedJwksUri);
     const jwks = jwksResponse.data as JSONWebKeySet;
