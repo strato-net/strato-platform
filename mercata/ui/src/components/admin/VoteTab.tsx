@@ -17,17 +17,21 @@ import CreateAdminIssueModal from './CreateAdminIssueModal';
 import CastVoteModal from './CastVoteModal';
 import AddAdminModal from './AddAdminModal';
 import RemoveAdminModal from './RemoveAdminModal';
+import AddGuardianModal from './AddGuardianModal';
+import RemoveGuardianModal from './RemoveGuardianModal';
 import { parseJsonBigInt } from '@/utils/numberUtils';
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE, ADMIN_VOTE_OPEN_ISSUES_PER_PAGE } from '@/lib/constants';
 
 const normalizeAddress = (addr?: string | null): string => (addr || '').toLowerCase().replace(/^0x/, '');
 
 const VoteTab = () => {
-  const { userAddress, openIssuesLoading, openIssues, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues, castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin } = useUser();
+  const { userAddress, openIssuesLoading, openIssues, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues, castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin, addGuardian, removeGuardian } = useUser();
   const [createOpen, setCreateOpen] = useState(false);
   const [voteModalOpen, setVoteModalOpen] = useState(false);
   const [addAdminOpen, setAddAdminOpen] = useState(false);
   const [removeAdminOpen, setRemoveAdminOpen] = useState(false);
+  const [addGuardianOpen, setAddGuardianOpen] = useState(false);
+  const [removeGuardianOpen, setRemoveGuardianOpen] = useState(false);
   const [executedPage, setExecutedPage] = useState(1);
   const [openIssuesPage, setOpenIssuesPage] = useState(1);
   const [selectedIssue, setSelectedIssue] = useState<{
@@ -81,6 +85,14 @@ const VoteTab = () => {
     await removeAdmin(userAddress);
   };
 
+  const handleAddGuardian = async (userAddress: string) => {
+    await addGuardian(userAddress);
+  };
+
+  const handleRemoveGuardian = async (userAddress: string) => {
+    await removeGuardian(userAddress);
+  };
+
   if (openIssuesLoading) {
     return (
       <Card>
@@ -101,6 +113,7 @@ const VoteTab = () => {
   }
 
   const admins: any[] = (openIssues && openIssues['admins']) || [];
+  const guardians: any[] = (openIssues && openIssues['guardians']) || [];
   const allIssues: any[] = (openIssues && openIssues['issues']) || [];
   const votes: any[] = (openIssues && openIssues['votes']) || [];
   const thresholds: any[] = (openIssues && openIssues['thresholds']) || [];
@@ -173,6 +186,71 @@ const VoteTab = () => {
                     )}
                   </div>
                   {normalizeAddress(admin.address) === normalizeAddress(userAddress) && (
+                    <span className="text-[10px] md:text-xs bg-strato-blue text-white px-1.5 md:px-2 py-0.5 md:py-1 rounded shrink-0">You</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* List of Guardians */}
+      <Card className="dark:bg-card overflow-hidden">
+        <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-3 px-4 md:px-6">
+          <div className="space-y-0.5 md:space-y-1">
+            <CardTitle className="text-base md:text-xl dark:text-foreground">Guardians</CardTitle>
+            <CardDescription className="text-xs md:text-sm dark:text-muted-foreground">Addresses authorized to pause allowlisted protocol functions</CardDescription>
+          </div>
+
+          <div className="flex flex-row gap-2 shrink-0">
+            <Button
+              size="sm"
+              onClick={() => setAddGuardianOpen(true)}
+              className="bg-strato-blue hover:bg-strato-blue/90 text-xs md:text-sm"
+            >
+              Add Guardian
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setRemoveGuardianOpen(true)}
+              disabled={guardians.length === 0}
+              className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed text-xs md:text-sm"
+            >
+              Remove Guardian
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="px-4 md:px-6">
+          <div className="mb-3 md:mb-4">
+            <span className="text-xs md:text-sm text-muted-foreground">
+              {guardians.length} guardian{guardians.length !== 1 ? 's' : ''} registered
+            </span>
+          </div>
+
+          {guardians.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground text-sm">No guardians found</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
+              {guardians.map((guardian: { address: string }, index: number) => (
+                <div
+                  key={`${guardian.address}-${index}`}
+                  className="flex items-center justify-between p-2 md:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors border-border"
+                >
+                  <div className="flex items-center gap-1.5 md:space-x-2 min-w-0">
+                    <span className="font-mono text-xs md:text-sm dark:text-foreground truncate">
+                      {guardian && guardian.address !== 'Unknown'
+                        ? `${guardian.address.slice(0, 6)}...${guardian.address.slice(-4)}`
+                        : guardian.address
+                      }
+                    </span>
+                    {guardian?.address && guardian.address !== 'Unknown' && (
+                      <CopyButton address={guardian.address} />
+                    )}
+                  </div>
+                  {guardian.address === userAddress && (
                     <span className="text-[10px] md:text-xs bg-strato-blue text-white px-1.5 md:px-2 py-0.5 md:py-1 rounded shrink-0">You</span>
                   )}
                 </div>
@@ -538,6 +616,19 @@ const VoteTab = () => {
         onOpenChange={setRemoveAdminOpen}
         onRemoveAdmin={handleRemoveAdmin}
         admins={admins}
+      />
+      <AddGuardianModal
+        open={addGuardianOpen}
+        onOpenChange={setAddGuardianOpen}
+        onAddGuardian={handleAddGuardian}
+        guardians={guardians}
+        admins={admins}
+      />
+      <RemoveGuardianModal
+        open={removeGuardianOpen}
+        onOpenChange={setRemoveGuardianOpen}
+        onRemoveGuardian={handleRemoveGuardian}
+        guardians={guardians}
       />
     </div>
   );

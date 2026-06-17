@@ -112,6 +112,58 @@ export const removeAdmin = async (
   }
 };
 
+// Add a new guardian to the registry
+export const addGuardian = async (
+  accessToken: string,
+  userAddress: string,
+  guardianAddress: string
+): Promise<{ status: string; hash: string }> => {
+  try {
+    const tx = await buildFunctionTx({
+      contractName: extractContractName(AdminRegistry),
+      contractAddress: adminRegistry,
+      method: "addGuardian",
+      args: {
+        _guardian: guardianAddress,
+      },
+    }, userAddress, accessToken);
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    return { status, hash };
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Remove a guardian from the registry
+export const removeGuardian = async (
+  accessToken: string,
+  userAddress: string,
+  guardianAddress: string
+): Promise<{ status: string; hash: string }> => {
+  try {
+    const tx = await buildFunctionTx({
+      contractName: extractContractName(AdminRegistry),
+      contractAddress: adminRegistry,
+      method: "removeGuardian",
+      args: {
+        _guardian: guardianAddress,
+      },
+    }, userAddress, accessToken);
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    return { status, hash };
+  } catch (error) {
+    throw error;
+  }
+};
+
 // Cast a vote on an issue in the registry
 export const castVoteOnIssue = async (
   accessToken: string,
@@ -212,6 +264,24 @@ export const castVoteOnIssueById = async (
       return await removeAdmin(accessToken, userAddress, adminAddress);
     }
 
+    // If func is _addGuardian, call the addGuardian endpoint directly
+    if (func === '_addGuardian') {
+      const guardianAddress = Array.isArray(args) ? args[0] : args._guardian;
+      if (!guardianAddress) {
+        throw new Error('Guardian address not found in args');
+      }
+      return await addGuardian(accessToken, userAddress, guardianAddress);
+    }
+
+    // If func is _removeGuardian, call the removeGuardian endpoint directly
+    if (func === '_removeGuardian') {
+      const guardianAddress = Array.isArray(args) ? args[0] : args._guardian;
+      if (!guardianAddress) {
+        throw new Error('Guardian address not found in args');
+      }
+      return await removeGuardian(accessToken, userAddress, guardianAddress);
+    }
+
     // Get contract name from Cirrus
     const contractResponse = await cirrus.get(accessToken, "contract", {
       params: {
@@ -277,7 +347,7 @@ export const getOpenIssues = async (
     const response = await cirrus.get(accessToken, "/" + AdminRegistry, {
       params: {
         address: `eq.${adminRegistry}`,
-        select: `*,admins:${AdminRegistry}-admins(address:value),votes:${AdminRegistry}-votes(block_timestamp,issueId:key,index:key2,voter:value),thresholds:${AdminRegistry}-votingThresholds(target:key,func:key2,threshold:value)`,
+        select: `*,admins:${AdminRegistry}-admins(address:value),guardians:${AdminRegistry}-guardians(address:value),votes:${AdminRegistry}-votes(block_timestamp,issueId:key,index:key2,voter:value),thresholds:${AdminRegistry}-votingThresholds(target:key,func:key2,threshold:value)`,
         ['votes.value']: 'neq.""',
         ['votes.value->>length']: 'is.null',
       },
@@ -291,8 +361,9 @@ export const getOpenIssues = async (
       return {};
     }
 
-    const { admins: adminsRaw, votes, defaultVotingThresholdBps, thresholds } = response.data[0];
+    const { admins: adminsRaw, guardians: guardiansRaw, votes, defaultVotingThresholdBps, thresholds } = response.data[0];
     const admins = adminsRaw.filter((admin: any) => admin.address && admin.address !== 'Unknown'); // remove blank admins
+    const guardians = (guardiansRaw || []).filter((guardian: any) => guardian.address && guardian.address !== 'Unknown'); // remove blank guardians
 
     const issueIds = new Set(votes.map((v: any) => v.issueId));
 
@@ -322,6 +393,7 @@ export const getOpenIssues = async (
 
     return { 
       admins, 
+      guardians,
       votes, 
       globalThreshold: defaultVotingThresholdBps, 
       thresholds, 
