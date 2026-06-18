@@ -1,12 +1,7 @@
 import { api } from "@/lib/axios";
 import { safeParseUnits } from "@/utils/numberUtils";
-import type { AxiosRequestConfig } from "axios";
 
 const DECIMALS = 18;
-
-type PsmRequestOptions = AxiosRequestConfig & {
-  walletAuth?: boolean;
-};
 
 export interface EligibleToken {
   address: string;
@@ -50,30 +45,30 @@ export interface PsmInfo {
 }
 
 export const psmService = {
-  async getInfo(options?: PsmRequestOptions): Promise<PsmInfo> {
-    const response = await api.get("/psm/info", options);
+  async getInfo(): Promise<PsmInfo> {
+    const response = await api.get("/psm/info");
     return response.data;
   },
 
-  async mint(amount: string, againstToken: string, options?: PsmRequestOptions) {
+  async mint(amount: string, againstToken: string) {
     const amountWei = safeParseUnits(amount, DECIMALS).toString();
-    const response = await api.post("/psm/mint", { amount: amountWei, againstToken }, options);
+    const response = await api.post("/psm/mint", { amount: amountWei, againstToken });
     return response.data;
   },
 
-  async requestBurn(amount: string, redeemToken: string, options?: PsmRequestOptions) {
+  async requestBurn(amount: string, redeemToken: string) {
     const amountWei = safeParseUnits(amount, DECIMALS).toString();
-    const response = await api.post("/psm/request-burn", { amount: amountWei, redeemToken }, options);
+    const response = await api.post("/psm/request-burn", { amount: amountWei, redeemToken });
     return response.data;
   },
 
-  async completeBurn(id: string, options?: PsmRequestOptions) {
-    const response = await api.post("/psm/complete-burn", { id }, options);
+  async completeBurn(id: string) {
+    const response = await api.post("/psm/complete-burn", { id });
     return response.data;
   },
 
-  async cancelBurn(id: string, options?: PsmRequestOptions) {
-    const response = await api.post("/psm/cancel-burn", { id }, options);
+  async cancelBurn(id: string) {
+    const response = await api.post("/psm/cancel-burn", { id });
     return response.data;
   },
 };
