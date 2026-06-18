@@ -29,6 +29,8 @@ export interface Transaction {
   gasPrice?: number | string;
   nonce?: number | string;
   transactionType?: string;
+  funcName?: string;
+  functionName?: string;
   timestamp?: string;
   blockNumber?: number | string;
 }

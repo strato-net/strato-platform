@@ -7,9 +7,11 @@ import { BarSeriesCard, TxTypePieCard } from "@/components/dashboard/DashboardCh
 import { PeersCard } from "@/components/dashboard/PeersCard";
 import { RecentTransactionsCard } from "@/components/dashboard/RecentTransactionsCard";
 import { CopyButton } from "@/components/CopyButton";
+import { useMemo } from "react";
 import { useSocketRoom } from "@/hooks/useSocketRoom";
 import { ROOMS } from "@/lib/socket";
 import { useNodeStatus, useNodeMetadata } from "@/services/dashboard";
+import { useTransactions } from "@/services/explorer";
 import { secondsToHuman, shortenHex } from "@/lib/utils";
 
 interface HealthPayload {
@@ -45,7 +47,39 @@ export default function DashboardPage() {
   const network = useSocketRoom<NetworkPayload>(ROOMS.GET_NETWORK_HEALTH, {});
   const txCount = useSocketRoom<{ x: number; y: number }[]>(ROOMS.TRANSACTIONS_COUNT, []);
   const blockProp = useSocketRoom<{ x: number; y: number }[]>(ROOMS.BLOCKS_PROPAGATION, []);
-  const txTypes = useSocketRoom<{ val: number; type: string }[]>(ROOMS.TRANSACTIONS_TYPE, []);
+
+  // The series x values are relative indices; map them to real block numbers so the
+  // bar tooltips show the actual block (newest bar = lastBlock).
+  const txCountSeries = useMemo(() => attachBlockNumbers(txCount, lastBlock), [txCount, lastBlock]);
+  const blockPropSeries = useMemo(
+    () => attachBlockNumbers(blockProp, lastBlock),
+    [blockProp, lastBlock]
+  );
+
+  // Transaction breakdown by function name (funcName), from recent transactions.
+  const { data: recentTxs } = useTransactions(50);
+  const txFnData = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of recentTxs ?? []) {
+      const name = (t.funcName || t.functionName)?.trim() || t.transactionType || "Unknown";
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [recentTxs]);
+
+  // Transaction breakdown by sender (from address), from recent transactions.
+  const txSenderData = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of recentTxs ?? []) {
+      const name = t.from ? shortenHex(t.from) : "Unknown";
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [recentTxs]);
 
   const { data: status } = useNodeStatus();
   const { data: metadata } = useNodeMetadata();
@@ -64,7 +98,7 @@ export default function DashboardPage() {
 
       {/* Node health banner */}
       <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+        <CardHeader className="flex flex-col gap-2 space-y-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div>
             <CardTitle className="flex items-center gap-2">
               Node status
@@ -76,8 +110,8 @@ export default function DashboardPage() {
               Uptime {secondsToHuman(uptime)} · {status?.version ? `v${status.version}` : "version —"}
             </CardDescription>
           </div>
-          <div className="text-right text-xs text-muted-foreground">
-            <div className="flex items-center justify-end gap-1.5">
+          <div className="text-left text-xs text-muted-foreground sm:text-right">
+            <div className="flex items-center justify-start gap-1.5 sm:justify-end">
               <Server className="h-3.5 w-3.5" />
               <span className="font-mono">{nodeAddress ? shortenHex(nodeAddress, 8, 6) : "—"}</span>
               {nodeAddress ? <CopyButton value={nodeAddress} /> : null}
@@ -115,10 +149,13 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <BarSeriesCard title="Transactions per Last 15 Blocks" data={txCount} />
-        <TxTypePieCard data={txTypes} />
-        <BarSeriesCard title="Block Interval (Last 15 Blocks)" data={blockProp} unit="s" />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <BarSeriesCard title="Transactions per Last 15 Blocks" data={txCountSeries} seriesLabel="tx" />
+        <TxTypePieCard title="Transactions by Function" data={txFnData} />
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <TxTypePieCard title="Transactions by Sender" data={txSenderData} />
+        <BarSeriesCard title="Block Interval (Last 15 Blocks)" data={blockPropSeries} unit="s" seriesLabel="s" />
       </div>
 
       {/* Validators */}
@@ -143,6 +180,22 @@ export default function DashboardPage() {
       </Card>
     </div>
   );
+}
+
+/**
+ * Map a relative-index series ({x,y}) onto real block numbers. The last point is the
+ * newest block (= lastBlock); earlier points count backwards. Falls back to the index
+ * until lastBlock is known.
+ */
+function attachBlockNumbers(
+  data: { x: number; y: number }[],
+  lastBlock: number
+): { x: number; y: number; block: number }[] {
+  const len = data.length;
+  return data.map((d, i) => ({
+    ...d,
+    block: lastBlock ? lastBlock - (len - 1 - i) : d.x,
+  }));
 }
 
 function Metric({

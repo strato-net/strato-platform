@@ -10,8 +10,16 @@ import { shortenHex } from "@/lib/utils";
 interface RecentTx {
   hash?: string;
   transactionType?: string;
+  // apex-ws emits the raw transaction row, where the function is `func_name`.
+  func_name?: string;
   from_address?: string;
   to_address?: string;
+}
+
+/** The called function name (matching the "Transactions by Function" pie), falling
+ * back to the transaction type for non-function txs (transfers/deploys). */
+function txLabel(t: RecentTx): string {
+  return t.func_name?.trim() || t.transactionType || "—";
 }
 
 export function RecentTransactionsCard() {
@@ -40,7 +48,7 @@ export function RecentTransactionsCard() {
                   ) : (
                     <span className="font-mono text-xs">—</span>
                   )}
-                  <Badge variant="outline" className="shrink-0">{t.transactionType || "—"}</Badge>
+                  <Badge variant="outline" className="shrink-0 font-mono">{txLabel(t)}</Badge>
                 </li>
               ))}
             </ul>

@@ -1,9 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import { formatEther } from "viem";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -15,16 +13,8 @@ import {
 } from "@/components/ui/table";
 import { useBlocks, useTransactions } from "@/services/explorer";
 import { ExplorerSearch } from "@/components/explorer/ExplorerSearch";
+import { AddrLink } from "@/components/explorer/AddrLink";
 import { shortenHex, formatTimestamp } from "@/lib/utils";
-
-function fmtValue(v?: string | number): string {
-  if (v == null) return "0";
-  try {
-    return `${Number(formatEther(BigInt(v))).toLocaleString(undefined, { maximumFractionDigits: 6 })}`;
-  } catch {
-    return String(v);
-  }
-}
 
 function BlocksTable() {
   const navigate = useNavigate();
@@ -37,8 +27,8 @@ function BlocksTable() {
       <TableHeader>
         <TableRow>
           <TableHead>Block</TableHead>
+          <TableHead>Hash</TableHead>
           <TableHead>Txns</TableHead>
-          <TableHead>Difficulty</TableHead>
           <TableHead>Timestamp</TableHead>
           <TableHead>Parent hash</TableHead>
         </TableRow>
@@ -54,8 +44,8 @@ function BlocksTable() {
               onClick={() => num != null && navigate(`/explorer/blocks/${num}`)}
             >
               <TableCell className="font-medium">{num ?? "—"}</TableCell>
+              <TableCell className="font-mono text-xs">{shortenHex(b.blockHash || "")}</TableCell>
               <TableCell>{txns}</TableCell>
-              <TableCell>{String(b.blockData?.difficulty ?? "—")}</TableCell>
               <TableCell className="text-muted-foreground">{formatTimestamp(b.blockData?.timestamp)}</TableCell>
               <TableCell className="font-mono text-xs">{shortenHex(b.blockData?.parentHash || "")}</TableCell>
             </TableRow>
@@ -82,10 +72,9 @@ function TransactionsTable() {
       <TableHeader>
         <TableRow>
           <TableHead>Hash</TableHead>
-          <TableHead>Type</TableHead>
           <TableHead>From</TableHead>
           <TableHead>To</TableHead>
-          <TableHead className="text-right">Value</TableHead>
+          <TableHead>Function</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -96,17 +85,20 @@ function TransactionsTable() {
             onClick={() => t.hash && navigate(`/explorer/transactions/${t.hash}`)}
           >
             <TableCell className="font-mono text-xs">{shortenHex(t.hash || "")}</TableCell>
-            <TableCell>
-              <Badge variant="outline">{t.transactionType || "—"}</Badge>
+            <TableCell className="font-mono text-xs" onClick={(e) => e.stopPropagation()}>
+              {t.from ? <AddrLink address={t.from} /> : "—"}
             </TableCell>
-            <TableCell className="font-mono text-xs">{shortenHex(t.from || "")}</TableCell>
-            <TableCell className="font-mono text-xs">{t.to ? shortenHex(t.to) : "—"}</TableCell>
-            <TableCell className="text-right">{fmtValue(t.value)}</TableCell>
+            <TableCell className="font-mono text-xs" onClick={(e) => e.stopPropagation()}>
+              {t.to ? <AddrLink address={t.to} /> : "—"}
+            </TableCell>
+            <TableCell className="font-mono text-xs">
+              {(t.funcName || t.functionName)?.trim() || t.transactionType || "—"}
+            </TableCell>
           </TableRow>
         ))}
         {(txns ?? []).length === 0 ? (
           <TableRow>
-            <TableCell colSpan={5} className="text-center text-muted-foreground">No transactions.</TableCell>
+            <TableCell colSpan={4} className="text-center text-muted-foreground">No transactions.</TableCell>
           </TableRow>
         ) : null}
       </TableBody>
