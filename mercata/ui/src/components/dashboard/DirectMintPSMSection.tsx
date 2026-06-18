@@ -67,8 +67,18 @@ const getMintCapacity = (token: EligibleToken): bigint | null => {
 
 const minBigInt = (a: bigint, b: bigint): bigint => (a < b ? a : b);
 
+const redactAddress = (value: string | null): string | null => {
+  if (!value) return null;
+  return value.length > 12 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
+};
+
 const DirectMintPSMSection = () => {
-  const { isLoggedIn } = useUser();
+  const {
+    isLoggedIn,
+    isAppAuthenticated,
+    isExternalEvmWalletConnected,
+    externalWalletAddress,
+  } = useUser();
   const { fetchUsdstBalance } = useTokenContext();
   const { fetchTokens } = useUserTokens();
   const { toast } = useToast();
@@ -151,6 +161,17 @@ const DirectMintPSMSection = () => {
     (t) => t.address === redeemToken
   );
 
+  const tracePsmAction = useCallback((action: string, details: Record<string, unknown>) => {
+    console.info(`[PSM trace] ${action}: UI state`, {
+      isLoggedIn,
+      isAppAuthenticated,
+      isExternalEvmWalletConnected,
+      hasExternalWalletAddress: Boolean(externalWalletAddress),
+      externalWalletAddress: redactAddress(externalWalletAddress),
+      ...details,
+    });
+  }, [externalWalletAddress, isAppAuthenticated, isExternalEvmWalletConnected, isLoggedIn]);
+
   const isMintValid = () => {
     if (!mintAmount || !selectedMintToken || psmInfo?.mintPaused) return false;
     try {
@@ -189,6 +210,11 @@ const DirectMintPSMSection = () => {
 
   const handleMint = async () => {
     if (!mintToken || !mintAmount) return;
+    tracePsmAction("mint", {
+      mintToken,
+      mintAmount,
+      selectedMintTokenSymbol: selectedMintToken?.symbol,
+    });
     try {
       setIsProcessing(true);
       await psmService.mint(mintAmount, mintToken);
@@ -212,6 +238,11 @@ const DirectMintPSMSection = () => {
 
   const handleRequestBurn = async () => {
     if (!redeemToken || !redeemAmount) return;
+    tracePsmAction("requestBurn", {
+      redeemToken,
+      redeemAmount,
+      selectedRedeemTokenSymbol: selectedRedeemToken?.symbol,
+    });
     try {
       setIsProcessing(true);
       await psmService.requestBurn(redeemAmount, redeemToken);
@@ -234,6 +265,11 @@ const DirectMintPSMSection = () => {
   };
 
   const handleCompleteBurn = async (request: BurnRequest) => {
+    tracePsmAction("completeBurn", {
+      id: request.id,
+      redeemToken: request.redeemToken,
+      redeemTokenSymbol: request.redeemTokenSymbol,
+    });
     try {
       setIsProcessing(true);
       setCompleteDialogRequest(null);
@@ -252,6 +288,7 @@ const DirectMintPSMSection = () => {
   };
 
   const handleCancelBurn = async (id: string) => {
+    tracePsmAction("cancelBurn", { id });
     try {
       setIsProcessing(true);
       setCancelDialogRequest(null);
