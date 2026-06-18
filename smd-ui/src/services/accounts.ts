@@ -80,3 +80,14 @@ export async function searchUsers(term: string): Promise<UserRecord[]> {
     .map((row) => ({ username: extractUsername(row), address: row?.address ?? "" }))
     .filter((u) => u.username);
 }
+
+/** Live username search (for recipient autocomplete); runs once `term` is >= 2 chars. */
+export function useUserSearch(term: string) {
+  const trimmed = term.trim();
+  return useQuery({
+    queryKey: ["user-search", trimmed],
+    enabled: trimmed.length >= 2,
+    queryFn: () => searchUsers(trimmed),
+    staleTime: 10_000,
+  });
+}
