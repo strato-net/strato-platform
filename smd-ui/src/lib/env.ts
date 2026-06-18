@@ -1,6 +1,6 @@
 // Endpoint configuration for the STRATO Management Dashboard.
-// Base URLs mirror the legacy SMD (smd-ui/legacy/src/env.js) and resolve through the
-// platform nginx (nginx-packager) which OIDC-protects /smd/ and proxies these paths.
+// Base URLs resolve through the platform nginx (nginx-packager) which OIDC-protects
+// /smd/ and proxies these paths.
 
 declare global {
   interface Window {
