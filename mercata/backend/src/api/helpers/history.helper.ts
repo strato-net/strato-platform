@@ -139,8 +139,8 @@ export const getHistory = async (
     })
   ]);
 
-  const storageHistory = storageRes.data as StorageHistoryElement[];
-  const mappingHistory = mappingRes.data as MappingHistoryElement[];
+  const storageHistory = Array.from(new Set(storageRes.data as StorageHistoryElement[]));
+  const mappingHistory = Array.from(new Set(mappingRes.data as MappingHistoryElement[]));
   const snapshots: any[] = (new Array(numTicks + 1)).fill({}).map((_, i) => { return {
     timestamp: endTimestamp - (interval * (numTicks - i)),
     data: initialSnapshotData
