@@ -73,6 +73,7 @@ import           SolidVM.Model.SolidString
 import           SolidVM.Model.Storable
 import qualified SolidVM.Model.Type              as SVMType
 import           Text.Printf
+import           Text.ShortDescription
 import qualified Data.Text.Encoding as TE
 
 newtype First b a = First {unFirst :: (a, b)}
@@ -1013,7 +1014,7 @@ pipeInsertGlobalEventTable aggregatedEvents = do
 insertGlobalEventTable :: OutputM m => AggregateEvent -> m SlipstreamQuery
 insertGlobalEventTable agEv = do
   let query = insertGlobalEventTableQuery agEv
-  $logInfoS "insertGlobalEventTable/query" . T.pack $ show query
+  $logInfoS "insertGlobalEventTable/query" . T.pack $ shortDescription agEv
   return query
 
 -- | Generates an INSERT SQL statement for the global 'events' table.
