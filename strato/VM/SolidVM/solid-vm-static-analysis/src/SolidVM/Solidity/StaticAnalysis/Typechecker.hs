@@ -39,6 +39,7 @@ import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.StaticAnalysis.Types
 import Text.Read (readMaybe)
 import Blockchain.VM.SolidException
+import Control.Exception (throw)
 
 emptyAnnotation :: SourceAnnotation Text
 emptyAnnotation = (SourceAnnotation (initialPosition "") (initialPosition "") "")
@@ -421,9 +422,9 @@ apply' funcArgTypes funcValTypes overloads args argNames funcArgNames functionAr
               newOrder =
                 map
                   ( \case
-                      Nothing -> error "Argument name does not exist"
+                      Nothing -> throw $ InvalidArguments "Argument name does not exist" "<unnamed>"
                       Just x -> case M.lookup x zipped of
-                        Nothing -> error "Argument name does not exist" x
+                        Nothing -> throw $ InvalidArguments "Argument name does not exist" (show x)
                         Just y -> y
                   )
                   funcArgNames
@@ -453,7 +454,7 @@ apply' funcArgTypes funcValTypes overloads args argNames funcArgNames functionAr
         then t
         else loop (count - 1) t
     loop 0 b = b
-    loop _ _ = error "trying to access an index outside of range"
+    loop _ _ = throw $ IndexOutOfBounds "trying to access an index outside of range" "array access in typechecker"
 
 apply :: Type' -> Type' -> Maybe [SolidString] -> SSS Type'
 apply (Bottom es) (Bottom ess) _ = pure $ Bottom (es <> ess)
@@ -679,7 +680,7 @@ string' (a : _) = a
 
 theLastPartOf :: SolidString -> Text
 theLastPartOf = unsafeHead . reverse . T.splitOn "." . labelToText
-  where unsafeHead [] = error "Data.Text.splitOn returned an empty list. This should not be possible"
+  where unsafeHead [] = throw $ InternalError "Data.Text.splitOn returned an empty list" "this should be unreachable"
         unsafeHead (x:_) = x
 
 typecheckStatic :: Type -> Type -> Either Text Type
@@ -1410,7 +1411,7 @@ statementsHelper' x stmts = do
   modify $ NE.cons (Nothing, M.empty)
   anns <- reduceType' x <$> traverse statementHelper stmts
   modify $ \case
-    _ :| [] -> error "statementsHelper': Stack underflow"
+    _ :| [] -> throw $ InternalError "statementsHelper': Stack underflow" "typechecker"
     (r, _) :| ((s, l) : rest) -> case (r, s) of
       (Nothing, Nothing) -> (Nothing, l) :| rest
       (Nothing, Just (Sum ss)) -> (Just (Sum (NE.cons (Unit x) ss)), l) :| rest
@@ -1733,7 +1734,7 @@ getVarTypeByName' :: SolidString -> SourceAnnotation Text -> SSS Type'
 getVarTypeByName' name ctx = do
   mVar <- foldr (lookupVar . snd) Nothing <$> get
   case mVar of
-    Just BlankEntry -> error "getVarTypeByName' BlankEntry: I don't think this can happen"
+    Just BlankEntry -> throw $ InternalError "getVarTypeByName' encountered a BlankEntry" "this should be unreachable"
     Just VarDefEntry {..} -> pure . Mutable $ case vardefType of
       Just t -> Static t ctx
       Nothing -> Top (S.singleton name) ctx
@@ -1847,7 +1848,7 @@ statementHelper (TryCatchStatement tryStatmenets catchMap x) = do
           $ M.keys catchMap
       zipped =
         zipWith
-          (curry (\case (y, Just z) -> zip y z; _ -> error "errorParams and catchMap don't match"))
+          (curry (\case (y, Just z) -> zip y z; _ -> throw $ InvalidArguments "errorParams and catchMap don't match" "typechecker"))
           errorParams
           (map (fst . snd) (M.toList catchMap))
 
@@ -1889,7 +1890,7 @@ statementHelper (ForStatement mInit mCond mPost body x) = do
   bs <- statementsHelper' x body
   -- Pop the for loop scope
   modify $ \case
-    _ :| [] -> error "ForStatement: Stack underflow"
+    _ :| [] -> throw $ InternalError "ForStatement: Stack underflow" "typechecker"
     _ :| (s : rest) -> s :| rest
   pure $ reduceType' x [is, cs, ps, bs]
 statementHelper (Block x) = pure $ topType' x

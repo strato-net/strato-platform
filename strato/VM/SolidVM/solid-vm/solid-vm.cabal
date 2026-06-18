@@ -14,11 +14,12 @@ library
       Blockchain.SolidVM
       Blockchain.SolidVM.Builtins
       Blockchain.SolidVM.Environment
+      Blockchain.SolidVM.ForkGate
       Blockchain.SolidVM.GasInfo
+      Blockchain.SolidVM.SetGet
       Blockchain.SolidVM.Simple
       Blockchain.SolidVM.SM
   other-modules:
-      Blockchain.SolidVM.SetGet
       Blockchain.SolidVM.TraceTools
       Paths_solid_vm
   hs-source-dirs:
@@ -82,6 +83,21 @@ executable exprs-needed
     , solid-vm-parser
     , solid-vm-static-analysis
     , text
+  default-language: Haskell2010
+
+test-suite audit-fix-spec
+  type: exitcode-stdio-1.0
+  main-is: AuditFixMain.hs
+  other-modules:
+      BuiltinsAuditFixSpec
+      SetGetAuditFixSpec
+  hs-source-dirs:
+      audit-tests/
+  build-depends:
+      base
+    , hspec
+    , solid-vm
+    , solid-vm-model
   default-language: Haskell2010
 
 test-suite solid-vm-spec

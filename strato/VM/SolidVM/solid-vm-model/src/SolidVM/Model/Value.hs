@@ -14,6 +14,7 @@ module SolidVM.Model.Value
     defaultValue,
     createDefaultValue,
     valEquals,
+    valEqualsGated,
     valueTypeName,
     getConst,
   )
@@ -40,6 +41,7 @@ import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe, listToMaybe)
+import Text.Read (readMaybe)
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Data.Vector (Vector)
@@ -129,6 +131,11 @@ toNull (SBytes bs) | B.null bs = SNULL
 toNull (SArray vs) | V.null vs = SNULL
 toNull v = v
 
+-- NOTE: audit finding 41 calls for total Eq/Ord instances over 'Value'.
+-- Making them total changes the outcome of comparisons between
+-- incompatible constructors — a contract path that historically crashed
+-- (via 'todo') now proceeds, which can create on-chain state that the
+-- reference chain never had. Apply the totalisation behind a fork block.
 instance Eq Value where
   x == y = case (toNull x, toNull y) of
     (SNULL, SNULL) -> True
@@ -205,7 +212,10 @@ coerceFromInt ct cc (SEnumVal tipe _ _) n' =
     let n = fromIntegral n'
     -- Look up enum in contract first, then fall back to file-level enums
     enumDef <- fmap fst $ M.lookup tipe (CC._enums ct) <|> M.lookup tipe (cc ^. CC.flEnums)
-    when (n >= length enumDef) $ fail "enum val out of range"
+    -- Reject negative inputs as well as out-of-range; without the lower-bound
+    -- check, casting a negative Integer lands in a negative Int and crashes
+    -- the VM with an index-out-of-bounds from (!!).
+    when (n < 0 || n >= length enumDef) $ fail "enum val out of range"
     return $ SEnumVal tipe (enumDef !! n) $ fromIntegral n'
 coerceFromInt _ _ SNULL n = SInteger n
 coerceFromInt _ _ SReference{} n = SInteger n
@@ -219,16 +229,50 @@ coerceType ct cc xt = \case
   SString s -> case xt of
     SVMType.String {} -> SString s
     SVMType.Bytes {} -> SString s
-    SVMType.Decimal {} -> SDecimal (read s :: Decimal)
+    SVMType.Decimal {} ->
+      case readMaybe s :: Maybe Decimal of
+        Just d -> SDecimal d
+        Nothing -> typeError "string literal not a valid decimal" $ show (xt, s)
     _ -> typeError "string literal must be string or bytes" $ show (xt, s)
   v -> v
 
 valEquals :: CC.Contract -> CodeCollection -> Value -> Value -> Bool
-valEquals ct cc lhs rhs = case (lhs, rhs) of
-  (SInteger _, SInteger _) -> lhs == rhs
-  (SInteger i, _) -> coerceFromInt ct cc rhs i == rhs
-  (_, SInteger i) -> lhs == coerceFromInt ct cc lhs i
-  _ -> lhs == rhs
+valEquals = valEqualsGated False
+
+-- | Audit finding 41: gated variant of 'valEquals'. Pass 'True' post-fork
+-- to use a total equality check that returns 'False' for mismatched
+-- constructor pairs instead of throwing 'todo'. Pre-fork callers still
+-- get the (unsafe) existing behaviour.
+valEqualsGated :: Bool -> CC.Contract -> CodeCollection -> Value -> Value -> Bool
+valEqualsGated strict ct cc lhs rhs = case (lhs, rhs) of
+  (SInteger _, SInteger _) -> eq lhs rhs
+  (SInteger i, _) -> eq (coerceFromInt ct cc rhs i) rhs
+  (_, SInteger i) -> eq lhs (coerceFromInt ct cc lhs i)
+  _ -> eq lhs rhs
+  where
+    eq a b
+      | strict = totalValueEq a b
+      | otherwise = a == b
+
+-- | Total Eq over 'Value': mismatched constructor pairs compare as
+-- not-equal instead of raising. Exposed as a separate function so the
+-- 'Eq' instance itself stays unchanged (callers that want the
+-- pre-audit crashing behaviour still get it). Only the pairs that the
+-- existing 'Eq' instance treats as equal are considered equal here.
+totalValueEq :: Value -> Value -> Bool
+totalValueEq x y = case (toNull x, toNull y) of
+  (SNULL, SNULL) -> True
+  (SInteger i1, SInteger i2) -> i1 == i2
+  (SString s1, SString s2) -> s1 == s2
+  (SDecimal v1, SDecimal v2) -> v1 == v2
+  (SBool b1, SBool b2) -> b1 == b2
+  (SAddress a1 b1, SAddress a2 b2) -> a1 == a2 && b1 == b2
+  (SContract c1 a1, SContract c2 a2) -> c1 == c2 && a1 == a2
+  (SEnumVal t1 _ n1, SEnumVal t2 _ n2) -> t1 == t2 && n1 == n2
+  (SBytes b1, SBytes b2) -> b1 == b2
+  (SString b1, SBytes b2) -> encodeUtf8 (T.pack b1) == b2
+  (SBytes b1, SString b2) -> b1 == encodeUtf8 (T.pack b2)
+  _ -> False
 
 createVar' :: MonadIO m => Value -> m Variable
 createVar' val = liftIO $ Variable <$> newIORef val

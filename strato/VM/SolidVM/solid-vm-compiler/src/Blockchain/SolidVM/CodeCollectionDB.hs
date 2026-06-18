@@ -231,13 +231,19 @@ codeCollectionFromSource isRunningTests typeCheck initCode = do
         [(t, src)] | T.null t -> encodeUtf8 src -- for backwards compatibility
         _ -> BL.toStrict $ Aeson.encode initList
       hsh = hash canonicalInitCode
-  codeCache <- liftIO $ readIORef unsafeCodeCacheLRUIORef
-  case LRU.lookup hsh codeCache of
-    (newCache, (Just cc)) -> do
+  -- Atomic lookup: if present, bump LRU ordering and return. Not racy —
+  -- see audit finding 29. Separate reads/writes allowed two concurrent
+  -- transactions to each compile and each write back, corrupting LRU
+  -- eviction bookkeeping.
+  mCached <- liftIO . atomicModifyIORef' unsafeCodeCacheLRUIORef $ \cache ->
+    case LRU.lookup hsh cache of
+      (cache', Just cc) -> (cache', Just cc)
+      (_, Nothing)      -> (cache, Nothing)
+  case mCached of
+    Just cc -> do
       recordCacheEvent CacheHit
-      liftIO $ writeIORef unsafeCodeCacheLRUIORef newCache
       return (hsh, cc)
-    (_, Nothing) -> do
+    Nothing -> do
       recordCacheEvent StorageWrite
       hsh' <- addCode canonicalInitCode
       ecc <- compileSource isRunningTests typeCheck initMap
@@ -247,7 +253,8 @@ codeCollectionFromSource isRunningTests typeCheck initCode = do
             Left (IEx p) -> typeError "codeCollectionFromSource" $ show p
             Left (SVMEx (s, _)) -> throw s
             Left (TCEx xs) -> typeError "Typechecker" $ T.unpack (typeErrorToAnnotation xs)
-      liftIO $ modifyIORef' unsafeCodeCacheLRUIORef (LRU.insert hsh cc)
+      liftIO . atomicModifyIORef' unsafeCodeCacheLRUIORef $ \cache ->
+        (LRU.insert hsh cc cache, ())
       return $ assert (hsh == hsh') (hsh, cc)
 
 codeCollectionFromHash ::
@@ -261,16 +268,19 @@ codeCollectionFromHash ::
   Keccak256 ->
   m CodeCollection
 codeCollectionFromHash isRunningTests typeCheck hsh = do
-  codeCache <- liftIO $ readIORef unsafeCodeCacheLRUIORef
-  case LRU.lookup hsh codeCache of
-    (newCache, (Just cc)) -> do
+  mCached <- liftIO . atomicModifyIORef' unsafeCodeCacheLRUIORef $ \cache ->
+    case LRU.lookup hsh cache of
+      (cache', Just cc) -> (cache', Just cc)
+      (_, Nothing)      -> (cache, Nothing)
+  case mCached of
+    Just cc -> do
       recordCacheEvent CacheHit
-      liftIO $ writeIORef unsafeCodeCacheLRUIORef newCache
       return cc
-    (_, Nothing) -> do
+    Nothing -> do
       recordCacheEvent CacheMiss
       cc <- codeCollectionFromHashNoCache isRunningTests True typeCheck hsh
-      liftIO $ modifyIORef' unsafeCodeCacheLRUIORef (LRU.insert hsh cc)
+      liftIO . atomicModifyIORef' unsafeCodeCacheLRUIORef $ \cache ->
+        (LRU.insert hsh cc cache, ())
       return cc
 
 codeCollectionFromHashNoCache ::

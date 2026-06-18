@@ -4,6 +4,19 @@ license: Apache-2.0
 dependencies:
   - base
 
+tests:
+  audit-fix-spec:
+    main: AuditFixMain.hs
+    source-dirs: tests/
+    other-modules:
+      - OptimizerAuditFixSpec
+    dependencies:
+      - hspec
+      - solid-vm-model
+      - solid-vm-static-analysis
+      - source-tools
+      - data-default
+
 library:
   source-dirs: src/
   exposed-modules:

@@ -47,17 +47,20 @@ library:
   - openapi3
 
 
-# tests:
-#   blockapps-solidity-test:
-#     main: Main.hs
-#     source-dirs: test/
-#     dependencies:
-#      - aeson-qq
-#      - evm-solidity
-#      - generic-random
-#      - hspec
-#      - labeled-error
-#      - quickcheck-instances
-#      - raw-strings-qq
-#      - servant
-#      - openapi3
+# NOTE: the legacy test/Main.hs (using hspec-discover over
+# test/BlockApps/...) is left in place but not wired up — those specs
+# were commented out years ago and reviving them is out of scope for
+# the audit follow-up. The active test suite below has its own entry
+# point and only loads the audit-fix regression specs.
+tests:
+  audit-fix-spec:
+    main: AuditFixMain.hs
+    source-dirs: test/
+    other-modules:
+      - BlockApps.Solidity.ABI.CodecAuditFixSpec
+    dependencies:
+      - bytestring
+      - evm-solidity
+      - hspec
+      - solid-vm-model
+      - vector

@@ -25,6 +25,7 @@ module SolidVM.Solidity.Parse.Lexer
     symbol,
     solidityLanguage,
     whiteSpace,
+    boundedNoneOf,
   )
 where
 
@@ -73,6 +74,17 @@ stringLiteral :: SolidityParser String
 stringLiteral = solidityStringLiteral
 
 whiteSpace = P.whiteSpace solidityLexer
+
+-- | Consume up to @maxLen@ characters that are not in @forbidden@, then fail
+-- with a descriptive error if the limit is reached before the expected
+-- delimiter appears. Prevents unbounded allocation in parsers that used
+-- 'many (noneOf ";")' (audit findings 30/31).
+boundedNoneOf :: Int -> String -> SolidityParser String
+boundedNoneOf maxLen forbidden = go maxLen
+  where
+    go :: Int -> SolidityParser String
+    go 0 = unexpected "input too long while scanning for delimiter"
+    go n = (noneOf forbidden >>= \c -> (c :) <$> go (n - 1)) <|> pure ""
 
 solidityLexer = P.makeTokenParser solidityLanguage
 
@@ -239,10 +251,9 @@ hexChar = do
   _ <- char 'x'
   d1 <- hexDigit
   d2 <- hexDigit
-  let d = case readHex [d1, d2] of
-        ((d', _) : _) -> d'
-        _ -> error "hexChar"
-  return $ w2c d
+  case readHex [d1, d2] of
+    ((d', _) : _) -> pure $ w2c d'
+    _ -> fail "malformed \\x hex escape"
 
 unicodeChar :: SolidityParser Char
 unicodeChar = do
@@ -251,11 +262,9 @@ unicodeChar = do
   d2 <- digit
   d3 <- digit
   d4 <- digit
-  -- let ((d, _):_) = readHex [d1,d2,d3,d4]
-  let d = case readHex [d1, d2, d3, d4] of
-        ((d', _) : _) -> d'
-        _ -> error "unicodeChar"
-  return $ toEnum d
+  case readHex [d1, d2, d3, d4] of
+    ((d', _) : _) -> pure $ toEnum d'
+    _ -> fail "malformed \\u unicode escape"
 
 charEsc :: SolidityParser Char
 charEsc = choice (map parseEsc escMap)

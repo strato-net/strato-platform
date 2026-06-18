@@ -339,7 +339,8 @@ objectE = do
   return $ ObjectLiteral a $ Map.fromList exps
   where
     assoc = do
-      k <- many1 (noneOf ":")
+      -- Audit finding 31: bounded so a missing ':' doesn't DoS the parser.
+      k <- boundedNoneOf 1024 ":"
       void colon
       v <- literal
       return (stringToLabel $ init . maybe "" snd . uncons $ show k, v) -- get rid of the surrounding quotes
@@ -465,12 +466,17 @@ parseCreateArgs = do
   str3 <- uncurry StringLiteral <$> withPosition parseCreateConstructArgs -- Constructor Args
   return [str1, str2, str3]
 
+-- | Audit finding 31: hard cap on embedded contract source inside
+-- @create(...)@ when no explicit @srcLength@ hint is available.
+maxEmbeddedContractSrcChars :: Int
+maxEmbeddedContractSrcChars = 512 * 1024
+
 parseCreateContractSrc :: SolidityParser String
 parseCreateContractSrc = do
   srcLength <- getContractSrcLength
   void $ string "\""
   case srcLength of
-    0 -> manyTill anyChar (try (void $ string "\",\"("))
+    0 -> boundedManyTillString maxEmbeddedContractSrcChars "\",\"("
     _ -> count srcLength anyChar
 
 parseCreateConstructArgs :: SolidityParser String
@@ -478,11 +484,23 @@ parseCreateConstructArgs = do
   srcLength <- getContractSrcLength
   case srcLength of
     0 -> do
-      content <- manyTill anyChar (try $ (void $ string "\")") <* eof)
+      content <- boundedManyTillString maxEmbeddedContractSrcChars "\")" <* eof
       return ('(' : content)
     _ -> do
       void $ string "\",\""
-      manyTill anyChar (try $ (void $ string "\")") <* eof)
+      boundedManyTillString maxEmbeddedContractSrcChars "\")" <* eof
+
+-- | Like @manyTill anyChar (try (string s))@ but capped at @maxLen@
+-- characters. Fails explicitly once the cap is reached rather than
+-- allocating an unbounded char list.
+boundedManyTillString :: Int -> String -> SolidityParser String
+boundedManyTillString maxLen s = go maxLen
+  where
+    go :: Int -> SolidityParser String
+    go 0 = unexpected $ "input exceeded maximum length " ++ show maxLen ++ " while scanning for " ++ show s
+    go n =
+      (try (string s) >> pure "")
+        <|> (anyChar >>= \c -> (c :) <$> go (n - 1))
 
 parseExternalCallArgs :: SolidityParser (SolidString, [SVMType.Type])
 parseExternalCallArgs = do

@@ -66,6 +66,7 @@ test-suite solid-vm-spec
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      AuditFixSpec
       ParserSpec
       PragmaSpec
       Spec

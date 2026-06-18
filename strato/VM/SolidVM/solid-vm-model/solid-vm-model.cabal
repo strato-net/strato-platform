@@ -13,6 +13,7 @@ library
   exposed-modules:
       BlockApps.Ethereum2
       Blockchain.SolidVM.Exception
+      Blockchain.VM.ForkGate
       Blockchain.VM.SolidException
       SolidVM.Model.CodeCollection
       SolidVM.Model.CodeCollection.ConstantDecl
@@ -73,6 +74,7 @@ test-suite storage-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      AuditFixSpec
       BasicValueStringTest
       StorageTest
   hs-source-dirs:
@@ -84,6 +86,8 @@ test-suite storage-test
   build-depends:
       base
     , bytestring
+    , containers
+    , data-default
     , ethereum-rlp
     , format
     , hspec

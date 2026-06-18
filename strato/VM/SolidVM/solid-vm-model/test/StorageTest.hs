@@ -39,10 +39,19 @@ spec = do
             ]
       forM_ examples $ \bv -> rlpDecode (rlpEncode bv) `shouldBe` bv
 
+    -- Audit finding 9: invalid shapes used to raise a bare 'error' (an
+    -- 'ErrorCall') from rlpDecode, which would crash the VM thread
+    -- before runSM's handler could surface it. They now throw a typed
+    -- 'StorableException', which @runSM@'s 'SomeException' branch turns
+    -- into an 'InternalError' instead of a node crash.
     it "should fail on invalids" $ do
       let examples =
             [ RLPArray [],
               RLPArray [RLPScalar 6, rlpEncode (300 :: Integer)],
               RLPArray [RLPScalar 0, rlpEncode (8 :: Integer), rlpEncode (7 :: Integer)]
             ]
-      forM_ examples $ \rlp -> evaluate (rlpDecode rlp :: BasicValue) `shouldThrow` anyErrorCall
+      forM_ examples $ \rlp ->
+        evaluate (rlpDecode rlp :: BasicValue)
+          `shouldThrow` (\e -> case (e :: StorableException) of
+                                 StorableMalformedData {} -> True
+                                 _                        -> False)

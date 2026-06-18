@@ -108,10 +108,17 @@ mergeUnresolvedFileUnits (UFU i p u) (UFU j q v) = do
            then Right $ UFU (i <> j) (p <> q) (newFileUnits)
            else Left . T.pack $ "Duplicate values: " ++ show duplicates
 
-instance Semigroup (UnresolvedFileUnitsF a) where
-  (<>) = mergeUnresolvedFileUnitsIgnoreDuplicates
+-- | Audit finding 40: use the *checked* merge so duplicate
+-- contract/function names are flagged rather than silently swallowed by
+-- a left-biased union. Applied unconditionally — re-compiling a
+-- well-formed contract should never hit a duplicate, and the checked
+-- merge already tolerates overloadable function definitions.
+instance Show a => Semigroup (UnresolvedFileUnitsF a) where
+  a <> b = case mergeUnresolvedFileUnits a b of
+    Right r -> r
+    Left e -> error $ "ImportResolver: refusing to silently overwrite duplicate definitions: " ++ T.unpack e
 
-instance Monoid (UnresolvedFileUnitsF a) where
+instance Show a => Monoid (UnresolvedFileUnitsF a) where
   mempty = def
   mappend = (<>)
 
@@ -176,8 +183,12 @@ resolveFile getCCFromHash getNamedSUnits expr (seen, resolved) =
     then pure (seen, resolved)
     else case expr of
       AddressLiteral x addr -> do
+        -- Audit finding 52: missing import target is now a hard
+        -- compilation error, mirroring how 'StringLiteral' imports
+        -- already behave when the source file can't be found. Applied
+        -- unconditionally.
         lift (A.select (A.Proxy @AddressState) addr) >>= \case
-          Nothing -> pure (seen, resolved)
+          Nothing -> throwE (x, T.pack $ "Import target address not found on-chain: " ++ show addr)
           Just AddressState {..} ->
             case addressStateCodeHash of
               SolidVMCode _ ch -> do
@@ -242,10 +253,19 @@ doResolve ::
   Text ->
   FileImportF a ->
   EndoM (ExceptT (a, Text) m) (S.Set Text, ImportMapF a)
+-- | Audit finding 47: thread the updated 'seen' set across sibling
+-- imports so a file discovered by one branch is visible to later
+-- branches. Applied unconditionally.
 doResolve f g fileName imp (seen, resolved) = case imp of
-  Simple path x -> resolvePath fileName path >>= \p -> resolveFile f g p (seen, resolved) >>= \(_, r') -> (seen,) <$> updateResolved x fileName (tShowExpr p) "" r'
-  Qualified path alias x -> resolvePath fileName path >>= \p -> resolveFile f g p (seen, resolved) >>= \(_, r') -> (seen,) <$> updateResolved x fileName (tShowExpr p) alias r'
-  Braced items path _ -> resolvePath fileName path >>= \p -> resolveFile f g p (seen, resolved) >>= \(_, r') -> (seen,) <$> foldrM (updateSingleItem fileName $ tShowExpr p) r' items
+  Simple path x -> resolvePath fileName path >>= \p ->
+    resolveFile f g p (seen, resolved) >>= \(seen', r') ->
+      (seen',) <$> updateResolved x fileName (tShowExpr p) "" r'
+  Qualified path alias x -> resolvePath fileName path >>= \p ->
+    resolveFile f g p (seen, resolved) >>= \(seen', r') ->
+      (seen',) <$> updateResolved x fileName (tShowExpr p) alias r'
+  Braced items path _ -> resolvePath fileName path >>= \p ->
+    resolveFile f g p (seen, resolved) >>= \(seen', r') ->
+      (seen',) <$> foldrM (updateSingleItem fileName $ tShowExpr p) r' items
 
 resolvePath :: Monad m => Text -> EndoM (ExceptT (a, Text) m) (ExpressionF a)
 resolvePath fileName (StringLiteral a path') =

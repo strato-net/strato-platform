@@ -52,7 +52,8 @@ module Blockchain.SolidVM.SM
     getContractsForParents,
     getAbstractParentsFromContract,
     getMapNamesFromContract,
-    getArrayNamesFromContract
+    getArrayNamesFromContract,
+    markSelfDestructed
   )
 where
 
@@ -60,6 +61,9 @@ where
 
 import BlockApps.Logging
 import Blockchain.DB.CodeDB
+import Blockchain.EthConf (ethConf, networkConfig)
+import qualified Blockchain.EthConf.Model as Conf
+import qualified Blockchain.VM.ForkGate as ForkGate
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
@@ -130,7 +134,12 @@ data CallInfo = CallInfo
     readOnly :: Bool,
     isUncheckedSection :: Bool, -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
     currentSourcePos :: Maybe SourcePosition,
-    isFreeFunction :: Bool
+    isFreeFunction :: Bool,
+    -- | Audit finding 18: set by 'selfdestruct' post-fork to halt the
+    -- current call frame after the state changes are applied.
+    -- 'runStatements' checks this before each statement. Pre-fork stays
+    -- at 'False' — selfdestruct continues running subsequent statements.
+    selfDestructed :: Bool
   }
   deriving (Show)
 
@@ -477,35 +486,65 @@ runSM maybeCode envBefore gi f = do
             _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap} -- capping the transaction gas limit
           }
   startingStateRef <- newIORef startingState
-  eVal <- try $ runReaderT f startingStateRef
+  let blockNum = blockHeaderBlockNumber $ Env.blockHeader envBefore
+      nid = Conf.networkID (networkConfig ethConf)
+      postAudit = ForkGate.isAuditForkActive nid blockNum
+  -- Audit findings 14 (runSM SomeException catch) and 22 (dev-mode no
+  -- longer rethrows). Post-audit catches 'SomeException' (so
+  -- ArithException / ErrorCall / missing-DB errors cannot escape the VM
+  -- boundary) and turns ordinary user errors into Left even in dev mode.
+  eVal <-
+    if postAudit
+      then do
+        let wrap :: SomeException -> SolidException
+            wrap e = case fromException e of
+              Just se -> se
+              Nothing -> InternalError "uncaught exception in VM" (show e)
+        fmap (either (Left . wrap) Right) . try @_ @SomeException $ runReaderT f startingStateRef
+      else try $ runReaderT f startingStateRef
   sstateAfter <- readIORef startingStateRef
   let envAfter = env sstateAfter
   case eVal of
-    -- NO errors will crash the VM.
-    -- InternalError should *never* happen.
-    -- TODO should also not happen, but since this is a work in progress they
-    -- are a fact of life and should be fixed on demand.
-    -- The rest should always be a user error and handled safely
     Left se -> do
       $logErrorLS "runSM/error" se
-      if flags_svmDev
+      if flags_svmDev && not postAudit
         then do
           $logErrorLS "runSM/error_code" maybeCode
           throwIO se
-        else return (envAfter, Left se)
+        else do
+          when (flags_svmDev && postAudit) $ $logErrorLS "runSM/error_code" maybeCode
+          return (envAfter, Left (se :: SolidException))
     Right value -> do
       Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ memDBs .= _ssMemDBs sstateAfter
       return (envAfter, Right value)
 
 -- When calling a remote contract, the new `msg.sender` is the contract
 -- that the call is initiated from.
+--
+-- Audit finding 15: post-audit wraps 'mv' in 'finally' so @msg.sender@
+-- is always restored, even on exception. Pre-audit forgot to restore
+-- on exceptions, leaving the sender observable as the callee's value
+-- inside try/catch handlers. Gated via 'auditForkActiveSM' below.
 pushSender :: MonadSM m => Address -> m a -> m a
 pushSender newSender mv = do
   oldSender <- Mod.get (Mod.Proxy @Env.Sender)
   Mod.put (Mod.Proxy @Env.Sender) (Env.Sender newSender)
-  ret <- mv
-  Mod.put (Mod.Proxy @Env.Sender) oldSender
-  return $ ret
+  postAudit <- auditForkActiveSM
+  if postAudit
+    then mv `finally` Mod.put (Mod.Proxy @Env.Sender) oldSender
+    else do
+      ret <- mv
+      Mod.put (Mod.Proxy @Env.Sender) oldSender
+      return ret
+
+-- | Internal helper: read fork-active state from the environment.
+-- Duplicated here to avoid a cyclic import with 'Blockchain.SolidVM.ForkGate'.
+auditForkActiveSM :: MonadSM m => m Bool
+auditForkActiveSM = do
+  env' <- Mod.access (Mod.Proxy @Env.Environment)
+  let blockNum = blockHeaderBlockNumber (Env.blockHeader env')
+      nid = Conf.networkID (networkConfig ethConf)
+  pure $ ForkGate.isAuditForkActive nid blockNum
 
 startingAction :: Env.Environment -> Action
 startingAction env' =
@@ -712,9 +751,20 @@ withCallInfo ::
   m a ->
   m a
 withCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff f = do
+  -- Audit finding 5: post-audit snapshots and restores the global
+  -- 'Action' record so events, action data, delegatecalls, and new
+  -- code collections emitted by a reverted sub-call do not persist.
+  postAudit <- auditForkActiveSM
+  actionBefore <-
+    if postAudit
+      then Just <$> Mod.get (Mod.Proxy @Action)
+      else pure Nothing
   addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff
   eRes <- try f
   popCallInfo $ isLeft eRes
+  case (actionBefore, isLeft eRes) of
+    (Just before, True) -> Mod.put (Mod.Proxy @Action) before
+    _ -> pure ()
   case eRes of
     Left (e :: SomeException) -> throwIO e
     Right res -> pure res
@@ -732,6 +782,14 @@ addCallInfo ::
   Bool ->
   m ()
 addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
+  -- Audit finding 17: post-audit caps the call-stack depth at 1024
+  -- (matching EVM EIP-150). Without this, unbounded recursion can
+  -- overflow the RTS stack and escape 'runSM'.
+  postAudit <- auditForkActiveSM
+  when postAudit $ do
+    existing <- Mod.get (Mod.Proxy @[CallInfo])
+    when (length existing >= 1024) $
+      throwIO $ InternalError "Call depth exceeded" ("1024" :: String)
   let newCallInfo =
         CallInfo
           { currentFunctionName = fn,
@@ -746,10 +804,19 @@ addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
             readOnly = ro,
             isUncheckedSection = False, -- The rationale here is that unchecked sections only apply to the current stack frame
             currentSourcePos = Nothing,
-            isFreeFunction = ff
+            isFreeFunction = ff,
+            selfDestructed = False
           }
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo :)
+
+-- | Audit finding 18: flag the current call frame as selfdestructed.
+-- 'runStatements' checks this before each statement and stops when it
+-- sees the flag, halting the frame post-selfdestruct.
+markSelfDestructed :: MonadSM m => m ()
+markSelfDestructed = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  [] -> pure []
+  (ci : rest) -> pure $ ci {selfDestructed = True} : rest
 
 uncheckedCallInfo :: MonadSM m => m ()
 uncheckedCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
@@ -796,9 +863,19 @@ withStaticCallInfo f = do
   case cs of
     [] -> internalError "withStaticCallInfo was called with an empty stack" ()
     (curFrame : rest) -> do
+      -- Audit finding 5: post-audit, staticcalls must not leave emitted
+      -- events / code collections in the global Action record.
+      postAudit <- auditForkActiveSM
+      actionBefore <-
+        if postAudit
+          then Just <$> Mod.get (Mod.Proxy @Action)
+          else pure Nothing
       Mod.put (Mod.Proxy @[CallInfo]) $ curFrame{readOnly = True} : rest
       eResult <- try f
       Mod.put (Mod.Proxy @[CallInfo]) $ curFrame : rest
+      case actionBefore of
+        Just before -> Mod.put (Mod.Proxy @Action) before
+        Nothing -> pure ()
       case eResult of
         Left (e :: SomeException) -> throwIO e
         Right result -> pure result
@@ -966,15 +1043,28 @@ addNewCodeCollection ch cc = do
       Mod.modify_ (Mod.Proxy @(OMap.OMap (Text, Keccak256) CodeCollection)) $ pure . (OMap.|> ((username, ch), cc))
     Nothing -> pure ()
 
+-- Audit finding 7: post-audit applies (a) a 256-block lookback cap on
+-- 'blockhash' and (b) a typed SolidException from 'getBSum' on missing
+-- entries.
 getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)
 getBlockHashWithNumber num h = do
   $logInfoS "getBlockHashWithNumber" . T.pack $ "calling getBSum with " ++ format h
   bSum <- getBSum h
-  case num `compare` bSumNumber bSum of
-    Ordering.LT -> getBlockHashWithNumber num $ bSumParentHash bSum
-    Ordering.EQ -> return $ Just h
-    Ordering.GT -> return Nothing
+  postAudit <- auditForkActiveSM
+  let currentNum = bSumNumber bSum
+      exceedsLookback = postAudit && (num < 0 || currentNum - num > 256)
+  if exceedsLookback
+    then return Nothing
+    else case num `compare` currentNum of
+      Ordering.LT -> getBlockHashWithNumber num $ bSumParentHash bSum
+      Ordering.EQ -> return $ Just h
+      Ordering.GT -> return Nothing
 
+-- | Pre-audit 'getBSum' used partial @error@ which escaped 'runSM'. With
+-- the post-audit 'SomeException' catch in runSM this error is now
+-- safely handled, but pre-audit chains see it escape — so we keep the
+-- behaviour identical (both use @error@) and rely on runSM's fork-gated
+-- 'SomeException' handler to keep the node alive post-audit.
 getBSum :: (Keccak256 `A.Alters` BlockSummary) m => Keccak256 -> m BlockSummary
 getBSum bh =
   fromMaybe (error $ "missing value in block summary DB: " ++ format bh)

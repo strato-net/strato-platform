@@ -47,10 +47,13 @@ tests:
     main: Main.hs
     ghc-options: -dynamic
     other-modules:
+      - AuditFixSpec
       - BasicValueStringTest
       - StorageTest
     dependencies:
       - bytestring
+      - containers
+      - data-default
       - ethereum-rlp
       - format
       - hspec

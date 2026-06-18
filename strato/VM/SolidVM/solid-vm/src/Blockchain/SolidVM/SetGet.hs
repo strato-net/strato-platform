@@ -44,6 +44,7 @@ import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM
 import Blockchain.EthConf (ethConf, networkConfig)
 import qualified Blockchain.EthConf.Model as Conf
+import qualified Blockchain.VM.ForkGate as ForkGate
 import Blockchain.Strato.Model.Address
 import Control.Monad
 import Control.Monad.IO.Class
@@ -54,6 +55,7 @@ import Data.Bool (bool)
 import Data.Decimal
 import Data.List
 import qualified Data.Map as M
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8', encodeUtf8)
 import qualified Data.Vector as V
@@ -73,7 +75,11 @@ fromBasic = \case
     Right t -> SString $ T.unpack t
     Left _ -> SString $ BC.unpack s
   MS.BBytes bs -> SBytes bs
-  MS.BDecimal v -> SDecimal $ read $ BC.unpack v
+  -- Corrupt/malformed BDecimal bytes used to crash the node via partial
+  -- 'read'; now fall back to 0 so the VM boundary stays intact. A malformed
+  -- decimal at this layer indicates storage corruption, not a contract-level
+  -- error, so there is no suitable SolidException to raise.
+  MS.BDecimal v -> SDecimal . fromMaybe 0 . readMaybe $ BC.unpack v
   MS.BBool b -> SBool b
   MS.BAddress a -> SAddress a False
   MS.BContract n a -> SContract n a
@@ -92,8 +98,19 @@ toBasic currentBlockNum = \case
   SUserDefined _ _ x -> toBasic currentBlockNum x
   SBytes bs -> Just $ MS.BBytes bs
   SNULL ->
+    -- Audit finding 39: replace the inverted @not (networkID == helium
+    -- && block < 33918)@ guard with an explicit per-network decision.
+    -- Runtime behaviour is unchanged (Helium still gates on block
+    -- 33918; every other network still has the feature enabled), but
+    -- adding a new network now forces an explicit choice in
+    -- 'ForkGate.Network' rather than silently inheriting post-fork
+    -- semantics from a hardcoded comparison.
     let heliumToBasicForkBlock = 33918 :: Integer
-        snullToBasicEnabled = not (Conf.networkID (networkConfig ethConf) == 114784819836269 && currentBlockNum < heliumToBasicForkBlock)
+        nid = Conf.networkID (networkConfig ethConf)
+        snullToBasicEnabled = case ForkGate.networkOf nid of
+          ForkGate.Helium -> currentBlockNum >= heliumToBasicForkBlock
+          ForkGate.Upquark -> True
+          ForkGate.Other -> True
      in if snullToBasicEnabled then Just MS.BDefault else Nothing
   _ -> Nothing
 

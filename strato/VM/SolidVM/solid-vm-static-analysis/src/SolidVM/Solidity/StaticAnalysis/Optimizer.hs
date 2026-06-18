@@ -333,6 +333,10 @@ optimizeExpression (Binary x "%" a b) t = do
   a' <- optimizeExpression a t
   b' <- optimizeExpression b t
   case (a', b') of
+    -- Do not fold when the divisor is zero — let the runtime raise a
+    -- divide-by-zero error. Folding would crash the compiler via the
+    -- unguarded Haskell `mod`.
+    (NumberLiteral _ _ _, NumberLiteral _ 0 _) -> pure $ Binary x "%" a' b'
     (NumberLiteral y valA w, NumberLiteral z valB _) -> pure $ NumberLiteral (y <> z) (valA `mod` valB) w
     _ -> pure $ Binary x "%" a' b'
 optimizeExpression (Binary     z "+=" lhs rhs) t = optimizeSetter t z "+" lhs rhs
