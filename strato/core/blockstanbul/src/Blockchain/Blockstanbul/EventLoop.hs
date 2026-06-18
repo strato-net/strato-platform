@@ -44,6 +44,7 @@ import Prometheus
 import System.Exit
 import Text.Format
 import Text.Printf
+import Text.ShortDescription
 import Prelude hiding (round, sequence)
 
 yieldL :: Monad m => b -> ConduitM a (Either b c) m ()
@@ -143,7 +144,7 @@ nextRound nt = do
       yieldR $ ResetTimer r
   use view >>= recordView
   vals <- use validators
-  $logInfoS "nextRound/validators" . T.pack $ show vals
+  $logInfoS "nextRound/validators" . T.pack $ shortDescription (S.toList vals)
   thisR <- use $ view . round
   when (S.null vals) . liftIO $
     die "All participants voted out, consensus is stuck."

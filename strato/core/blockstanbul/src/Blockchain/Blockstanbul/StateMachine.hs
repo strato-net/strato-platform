@@ -26,6 +26,7 @@ import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Text.Format
+import Text.ShortDescription
 import Prelude hiding (round, sequence)
 
 class Monad m => HasBlockstanbulContext m where
@@ -89,7 +90,7 @@ debugShowCtx = do
       debugLog loc lns f = join . uses lns $ $logDebugS loc . T.pack . f
   infoLog "showctx/view" view format
   infoLog "showctx/proposer" proposer ((++ "\n") . format)
-  infoLog "showctx/validators" validators (show . map format . S.toList)
+  infoLog "showctx/validators" validators (shortDescription . S.toList)
   infoLog "showctx/mBlockNumber" proposal (show . fmap (number . blockBlockData))
   infoLog "showctx/mLockedBlockNo" blockLock (show . fmap (number . blockBlockData))
   infoLog "showctx/mLockedSender" lockSender (show . fmap format)
