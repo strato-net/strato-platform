@@ -46,13 +46,20 @@ if [[ -z "${VAULT_URL}" || "${VAULT_URL}" == "null" ]]; then
   exit 7
 fi
 
-# Split VAULT_URL into protocol/hostname/port so the /key location can use a
+# Split VAULT_URL into protocol/hostname/port/path so the /key location can use a
 # variable in proxy_pass. Using a variable forces nginx to honor the upstream
 # DNS TTL via the `resolver` directive instead of caching the IP for the
 # worker's lifetime (vault.blockapps.net is an AWS ELB with rotating IPs).
 VAULT_PROTOCOL=$(echo "$VAULT_URL" | sed -E -n 's|^(https?)://.*|\1|p')
 VAULT_HOSTNAME=$(echo "$VAULT_URL" | sed -E 's|^https?://||; s|[:/].*$||')
 VAULT_PORT=$(echo "$VAULT_URL" | sed -E -n 's|^https?://[^:/]*:([0-9]+).*|\1|p')
+# Preserve any path component from vaultUrl (e.g. "/vault/strato/v2.3" in
+# --localAuth mode, where the vault wrapper is reached back through nginx's
+# /vault/ location rather than at the external vault host). Without this the
+# /key location would drop the path and proxy to the node's own hostname,
+# looping back into nginx and timing out with a 504. A trailing slash is
+# stripped so it can be combined with "/key" without a doubled slash.
+VAULT_PATH=$(echo "$VAULT_URL" | sed -E 's|^https?://[^/]*||; s|/$||')
 
 if [[ -z "${VAULT_PROTOCOL}" ]]; then
   echo "urlConfig.vaultUrl must start with http:// or https:// (got: ${VAULT_URL})"
@@ -158,6 +165,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i "s|__VAULT_PROTOCOL__|$VAULT_PROTOCOL|g" /tmp/nginx.conf
   sed -i "s|__VAULT_HOSTNAME__|$VAULT_HOSTNAME|g" /tmp/nginx.conf
   sed -i "s|__VAULT_PORT__|$VAULT_PORT|g" /tmp/nginx.conf
+  sed -i "s|__VAULT_PATH__|$VAULT_PATH|g" /tmp/nginx.conf
   sed -i "s|__INTERNAL_VAULT_URL__|$INTERNAL_VAULT_URL|g" /tmp/nginx.conf
   sed -i "s|__HTTP_PORT__|$HTTP_PORT|g" /tmp/nginx.conf
   sed -i "s|__RPC_PORT__|$RPC_PORT|g" /tmp/nginx.conf
