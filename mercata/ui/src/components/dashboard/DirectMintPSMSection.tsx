@@ -124,6 +124,14 @@ const DirectMintPSMSection = () => {
     }
   }, [isLoggedIn, psmRequestOptions]);
 
+  const refreshAfterPsmAction = useCallback(async () => {
+    const refreshes: Promise<unknown>[] = [refreshData()];
+    if (!isExternalEvmWalletConnected || !isAppAuthenticated) {
+      refreshes.push(fetchUsdstBalance(), fetchTokens());
+    }
+    await Promise.all(refreshes);
+  }, [fetchTokens, fetchUsdstBalance, isAppAuthenticated, isExternalEvmWalletConnected, refreshData]);
+
   useEffect(() => {
     refreshData();
   }, [refreshData]);
@@ -208,7 +216,7 @@ const DirectMintPSMSection = () => {
         variant: "success",
       });
       setMintAmount("");
-      await Promise.all([refreshData(), fetchUsdstBalance(), fetchTokens()]);
+      await refreshAfterPsmAction();
     } catch {
       // Errors handled by axios interceptor
     } finally {
@@ -231,7 +239,7 @@ const DirectMintPSMSection = () => {
         variant: "success",
       });
       setRedeemAmount("");
-      await Promise.all([refreshData(), fetchUsdstBalance(), fetchTokens()]);
+      await refreshAfterPsmAction();
     } catch {
       // Errors handled by axios interceptor
     } finally {
@@ -249,7 +257,7 @@ const DirectMintPSMSection = () => {
         description: `Redeemed ${formatUnits(request.amount, 18)} ${psmInfo?.mintableTokenSymbol} for ${formatUnits(request.payoutAmount || request.amount, 18)} ${request.redeemTokenSymbol}`,
         variant: "success",
       });
-      await Promise.all([refreshData(), fetchUsdstBalance(), fetchTokens()]);
+      await refreshAfterPsmAction();
     } catch {
       // Errors handled by axios interceptor
     } finally {
@@ -267,7 +275,7 @@ const DirectMintPSMSection = () => {
         description: "Your redeem request has been cancelled.",
         variant: "success",
       });
-      await Promise.all([refreshData(), fetchUsdstBalance(), fetchTokens()]);
+      await refreshAfterPsmAction();
     } catch {
       // Errors handled by axios interceptor
     } finally {
