@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { formatUnits } from "ethers";
 import { ArrowDownUp, Clock, Flame, BarChart3 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
@@ -68,10 +68,16 @@ const getMintCapacity = (token: EligibleToken): bigint | null => {
 const minBigInt = (a: bigint, b: bigint): bigint => (a < b ? a : b);
 
 const DirectMintPSMSection = () => {
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn, isAppAuthenticated, isExternalEvmWalletConnected } = useUser();
   const { fetchUsdstBalance } = useTokenContext();
   const { fetchTokens } = useUserTokens();
   const { toast } = useToast();
+  const psmRequestOptions = useMemo(
+    () => isExternalEvmWalletConnected && !isAppAuthenticated
+      ? { walletAuth: true }
+      : undefined,
+    [isExternalEvmWalletConnected, isAppAuthenticated]
+  );
 
   const [psmInfo, setPsmInfo] = useState<PsmInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -97,7 +103,7 @@ const DirectMintPSMSection = () => {
     if (!isLoggedIn) return;
     try {
       setLoading(true);
-      const info = await psmService.getInfo();
+      const info = await psmService.getInfo(psmRequestOptions);
       const mintTokens = info.eligibleTokens.filter((t) => t.mintEnabled);
       const redeemTokens = info.eligibleTokens.filter((t) => t.burnEnabled);
       setPsmInfo(info);
@@ -116,7 +122,7 @@ const DirectMintPSMSection = () => {
     } finally {
       setLoading(false);
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, psmRequestOptions]);
 
   useEffect(() => {
     refreshData();
@@ -191,7 +197,7 @@ const DirectMintPSMSection = () => {
     if (!mintToken || !mintAmount) return;
     try {
       setIsProcessing(true);
-      await psmService.mint(mintAmount, mintToken);
+      await psmService.mint(mintAmount, mintToken, psmRequestOptions);
       const amountWei = safeParseUnits(mintAmount, 18);
       const netMintAmount = selectedMintToken
         ? formatUnits(applyBpsFee(amountWei, selectedMintToken.mintFeeBps), 18)
@@ -214,7 +220,7 @@ const DirectMintPSMSection = () => {
     if (!redeemToken || !redeemAmount) return;
     try {
       setIsProcessing(true);
-      await psmService.requestBurn(redeemAmount, redeemToken);
+      await psmService.requestBurn(redeemAmount, redeemToken, psmRequestOptions);
       const amountWei = safeParseUnits(redeemAmount, 18);
       const payoutAmount = selectedRedeemToken
         ? formatUnits(applyBpsFee(amountWei, selectedRedeemToken.burnFeeBps), 18)
@@ -237,7 +243,7 @@ const DirectMintPSMSection = () => {
     try {
       setIsProcessing(true);
       setCompleteDialogRequest(null);
-      await psmService.completeBurn(request.id);
+      await psmService.completeBurn(request.id, psmRequestOptions);
       toast({
         title: "Redemption Complete",
         description: `Redeemed ${formatUnits(request.amount, 18)} ${psmInfo?.mintableTokenSymbol} for ${formatUnits(request.payoutAmount || request.amount, 18)} ${request.redeemTokenSymbol}`,
@@ -255,7 +261,7 @@ const DirectMintPSMSection = () => {
     try {
       setIsProcessing(true);
       setCancelDialogRequest(null);
-      await psmService.cancelBurn(id);
+      await psmService.cancelBurn(id, psmRequestOptions);
       toast({
         title: "Request Cancelled",
         description: "Your redeem request has been cancelled.",
