@@ -51,9 +51,9 @@ function applyEnvProfile(profile) {
 const ENV_PROFILE = applyEnvProfile(getArgValue(process.argv.slice(2), "--env"));
 
 const { rest } = require("blockapps-rest");
-const auth = require("./auth");
-const config = require("./config");
-const { callListAndWait } = require("./util");
+const auth = require("../auth");
+const config = require("../config");
+const { callListAndWait } = require("../util");
 
 const DEFAULT_BRIDGE_ADDRESS = "0000000000000000000000000000000000001008";
 const DEFAULT_USDST_ADDRESS = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010";

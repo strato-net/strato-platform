@@ -1,32 +1,35 @@
 /**
- * State-changing smoke runner for the existing non-native ETH bridge-out flow:
- * STRATO mapped token -> MercataBridge -> Sepolia ETH Safe proposal or execution.
+ * State-changing happy-path runner for native bridge-out:
+ * STRATO native token -> bridge service -> Sepolia representation token.
  *
  * This script:
- * 1. Checks the STRATO withdrawer mapped-token balance and Sepolia recipient ETH balance
- * 2. Approves MercataBridge to pull the mapped STRATO token
- * 3. Calls MercataBridge.requestWithdrawal(...) for Sepolia ETH
- * 4. Waits until the bridge service records a manual Safe tx hash or completes the withdrawal
+ * 1. Checks STRATO withdrawer and Sepolia recipient balances
+ * 2. Approves the STRATO native custody vault
+ * 3. Calls requestWithdrawal() on STRATO
+ * 4. Waits for the bridge service to mint on Sepolia and finalize on STRATO
+ * 5. Verifies the Sepolia recipient representation balance increases
  */
 const path = require("path");
 require("dotenv").config({
   path:
-    process.env.HAPPY_ETH_WITHDRAWAL_ENV_FILE ||
-    path.resolve(__dirname, "../.env.happy-eth-withdrawal"),
+    process.env.HAPPY_NATIVE_WITHDRAWAL_ENV_FILE ||
+    path.resolve(__dirname, "../.env.happy-native-withdrawal"),
 });
 
 const axios = require("axios");
 const { ethers } = require("ethers");
-const config = require("./config");
-const auth = require("./auth");
+const config = require("../config");
+const auth = require("../auth");
 const { rest, util } = require("blockapps-rest");
 
 const DEFAULT_EXTERNAL_CHAIN_ID = "11155111";
-const ETH_EXTERNAL_TOKEN = "0x0000000000000000000000000000000000000000";
-const DEFAULT_STRATO_ETH_TOKEN = "0x93fb7295859b2d70199e0a4883b7c320cf874e6c";
-const PENDING_REVIEW_STATUS = "2";
 const COMPLETED_STATUS = "3";
 const ABORTED_STATUS = "4";
+
+const REPRESENTATION_TOKEN_ABI = [
+  "function balanceOf(address owner) view returns (uint256)",
+  "function symbol() view returns (string)",
+];
 
 function getRequiredEnv(name) {
   const value = process.env[name];
@@ -72,10 +75,21 @@ function buildConfig() {
   return {
     externalChainId,
     rpcUrl: getRequiredEnv(`CHAIN_${externalChainId}_RPC_URL`),
-    bridgeAddress: normalizeAddress(getRequiredEnv("BRIDGE_ADDRESS"), "MercataBridge"),
+    representationTokenAddress: normalizeAddress(
+      getRequiredEnv(`CHAIN_${externalChainId}_REPRESENTATION_TOKEN_ADDRESS`),
+      "representation token"
+    ),
+    stratoBridgeAddress: normalizeAddress(
+      getRequiredEnv("STRATO_NATIVE_BRIDGE_ADDRESS"),
+      "STRATO native bridge"
+    ),
+    stratoVaultAddress: normalizeAddress(
+      getRequiredEnv("STRATO_NATIVE_CUSTODY_VAULT_ADDRESS"),
+      "STRATO native custody vault"
+    ),
     stratoTokenAddress: normalizeAddress(
-      process.env.STRATO_ETH_TOKEN_ADDRESS || DEFAULT_STRATO_ETH_TOKEN,
-      "STRATO ETH token"
+      getRequiredEnv("STRATO_TOKEN_ADDRESS"),
+      "STRATO token"
     ),
     externalRecipientAddress: normalizeAddress(
       getRequiredEnv("EXTERNAL_RECIPIENT_ADDRESS"),
@@ -88,9 +102,8 @@ function buildConfig() {
     stratoUsername: getRequiredEnv("STRATO_WITHDRAWER_NAME"),
     stratoPassword: getRequiredEnv("STRATO_WITHDRAWER_PASSWORD"),
     withdrawalAmount: BigInt(getRequiredEnv("WITHDRAWAL_AMOUNT_WEI")),
-    requireManual: process.env.REQUIRE_MANUAL_WITHDRAWAL !== "false",
     pollIntervalMs: Number(process.env.HAPPY_PATH_POLL_INTERVAL_MS || "10000"),
-    timeoutMs: Number(process.env.HAPPY_PATH_TIMEOUT_MS || "600000"),
+    timeoutMs: Number(process.env.HAPPY_PATH_TIMEOUT_MS || "900000"),
     nodeUrl: getRequiredEnv("NODE_URL").replace(/\/$/, ""),
     oauthUrl: getRequiredEnv("OAUTH_URL"),
     oauthClientId: getRequiredEnv("OAUTH_CLIENT_ID"),
@@ -149,7 +162,7 @@ async function cirrusSearch(cfg, tableName, params = {}) {
 
 async function getStratoTokenBalance(cfg, holderAddress) {
   const rows = await cirrusSearch(cfg, "BlockApps-Token-_balances", {
-    address: `eq.${toCirrusAddress(cfg.stratoTokenAddress, "STRATO ETH token")}`,
+    address: `eq.${toCirrusAddress(cfg.stratoTokenAddress, "STRATO token")}`,
     key: `eq.${toCirrusAddress(holderAddress, "STRATO balance holder")}`,
     select: "balance:value::text",
     limit: 1,
@@ -161,19 +174,18 @@ async function getStratoTokenBalance(cfg, holderAddress) {
   return BigInt(rows[0].balance || "0");
 }
 
-async function getHotWithdrawalThreshold(cfg) {
-  const rows = await cirrusSearch(cfg, "BlockApps-MercataBridge-hotWithdrawalThresholds", {
-    address: `eq.${toCirrusAddress(cfg.bridgeAddress, "MercataBridge")}`,
-    key: `eq.${cfg.externalChainId}`,
-    key2: `eq.${toCirrusAddress(ETH_EXTERNAL_TOKEN, "ETH external token")}`,
-    select: "threshold:value::text",
+async function getVaultLockedBalance(cfg) {
+  const rows = await cirrusSearch(cfg, "BlockApps-StratoNativeCustodyVault-lockedBalance", {
+    address: `eq.${toCirrusAddress(cfg.stratoVaultAddress, "STRATO native custody vault")}`,
+    key: `eq.${toCirrusAddress(cfg.stratoTokenAddress, "STRATO token")}`,
+    select: "lockedBalance:value::text",
     limit: 1,
   });
 
   if (!Array.isArray(rows) || rows.length === 0) {
     return 0n;
   }
-  return BigInt(rows[0].threshold || "0");
+  return BigInt(rows[0].lockedBalance || "0");
 }
 
 async function callContract(tokenObj, address, name, method, args) {
@@ -218,9 +230,9 @@ async function callContract(tokenObj, address, name, method, args) {
   return final;
 }
 
-async function findEthWithdrawal(cfg) {
-  const rows = await cirrusSearch(cfg, "BlockApps-MercataBridge-withdrawals", {
-    address: `eq.${toCirrusAddress(cfg.bridgeAddress, "MercataBridge")}`,
+async function findNativeWithdrawal(cfg) {
+  const rows = await cirrusSearch(cfg, "BlockApps-StratoNativeBridge-withdrawals", {
+    address: `eq.${toCirrusAddress(cfg.stratoBridgeAddress, "STRATO native bridge")}`,
     select: "key,value,block_timestamp",
     order: "block_timestamp.desc",
     limit: 100,
@@ -238,8 +250,11 @@ async function findEthWithdrawal(cfg) {
     cfg.stratoWithdrawerAddress,
     "STRATO withdrawer"
   );
-  const expectedStratoToken = toCirrusAddress(cfg.stratoTokenAddress, "STRATO token");
-  const expectedExternalToken = toCirrusAddress(ETH_EXTERNAL_TOKEN, "ETH external token");
+  const expectedToken = toCirrusAddress(cfg.stratoTokenAddress, "STRATO token");
+  const expectedRepresentationToken = toCirrusAddress(
+    cfg.representationTokenAddress,
+    "representation token"
+  );
 
   return (
     rows.find((row) => {
@@ -249,8 +264,8 @@ async function findEthWithdrawal(cfg) {
         String(value.externalChainId) === cfg.externalChainId &&
         stripHexPrefixLower(value.externalRecipient) === expectedRecipient &&
         stripHexPrefixLower(value.stratoSender) === expectedSender &&
-        stripHexPrefixLower(value.stratoToken) === expectedStratoToken &&
-        stripHexPrefixLower(value.externalToken) === expectedExternalToken &&
+        stripHexPrefixLower(value.stratoToken) === expectedToken &&
+        stripHexPrefixLower(value.representationToken) === expectedRepresentationToken &&
         String(value.stratoTokenAmount || "") === cfg.withdrawalAmount.toString()
       );
     }) || null
@@ -263,21 +278,18 @@ async function main() {
     throw new Error("WITHDRAWAL_AMOUNT_WEI must be greater than zero");
   }
 
-  console.log("Non-native ETH withdrawal smoke plan:");
+  console.log("Native withdrawal happy-path plan:");
   console.log(
     JSON.stringify(
       {
         externalChainId: cfg.externalChainId,
-        bridge: cfg.bridgeAddress,
-        externalToken: ETH_EXTERNAL_TOKEN,
-        externalName: "Ether",
-        externalSymbol: "ETH",
-        externalDecimals: "18",
+        stratoBridge: cfg.stratoBridgeAddress,
+        stratoVault: cfg.stratoVaultAddress,
         stratoToken: cfg.stratoTokenAddress,
         stratoWithdrawer: cfg.stratoWithdrawerAddress,
         externalRecipient: cfg.externalRecipientAddress,
+        representationToken: cfg.representationTokenAddress,
         withdrawalAmountWei: cfg.withdrawalAmount.toString(),
-        requireManualWithdrawal: cfg.requireManual,
         timeoutMs: cfg.timeoutMs,
         pollIntervalMs: cfg.pollIntervalMs,
       },
@@ -294,58 +306,63 @@ async function main() {
     );
   }
 
+  const representationToken = new ethers.Contract(
+    cfg.representationTokenAddress,
+    REPRESENTATION_TOKEN_ABI,
+    provider
+  );
   const tokenObj = {
     token: await auth.getUserToken(cfg.stratoUsername, cfg.stratoPassword),
   };
 
-  const [stratoBalanceBefore, externalBalanceBefore, hotWithdrawalThreshold] = await Promise.all([
+  const [
+    tokenSymbol,
+    stratoBalanceBefore,
+    vaultLockedBefore,
+    externalBalanceBefore,
+  ] = await Promise.all([
+    representationToken.symbol(),
     getStratoTokenBalance(cfg, cfg.stratoWithdrawerAddress),
-    provider.getBalance(cfg.externalRecipientAddress),
-    getHotWithdrawalThreshold(cfg),
+    getVaultLockedBalance(cfg),
+    representationToken.balanceOf(cfg.externalRecipientAddress),
   ]);
 
   logSection("Preflight");
   console.log(`STRATO withdrawer: ${cfg.stratoWithdrawerAddress}`);
-  console.log(`STRATO mapped ETH balance before: ${stratoBalanceBefore.toString()}`);
+  console.log(`STRATO balance before: ${stratoBalanceBefore.toString()}`);
+  console.log(`STRATO vault locked before: ${vaultLockedBefore.toString()}`);
   console.log(`Sepolia recipient: ${cfg.externalRecipientAddress}`);
-  console.log(`Sepolia ETH balance before: ${externalBalanceBefore.toString()}`);
-  console.log(`ETH hot withdrawal threshold: ${hotWithdrawalThreshold.toString()}`);
-  console.log(`Require manual withdrawal: ${String(cfg.requireManual)}`);
+  console.log(`Representation token: ${tokenSymbol} (${cfg.representationTokenAddress})`);
+  console.log(`Sepolia recipient balance before: ${externalBalanceBefore.toString()}`);
 
   if (stratoBalanceBefore < cfg.withdrawalAmount) {
     throw new Error(
       `STRATO withdrawer balance too low: need ${cfg.withdrawalAmount}, have ${stratoBalanceBefore}`
     );
   }
-  if (cfg.requireManual && cfg.withdrawalAmount <= hotWithdrawalThreshold) {
-    throw new Error(
-      `Withdrawal amount is in the hot-wallet lane: amount=${cfg.withdrawalAmount}, threshold=${hotWithdrawalThreshold}. Use an amount greater than the threshold or set REQUIRE_MANUAL_WITHDRAWAL=false.`
-    );
-  }
 
-  logSection("Approve MercataBridge");
+  logSection("Approve Custody Vault");
   const approveResult = await callContract(
     tokenObj,
     cfg.stratoTokenAddress,
     "Token",
     "approve",
     {
-      spender: cfg.bridgeAddress,
+      spender: cfg.stratoVaultAddress,
       value: cfg.withdrawalAmount.toString(),
     }
   );
   console.log(`Approve tx: ${approveResult.hash || "(submitted)"}`);
 
-  logSection("Request ETH Withdrawal");
+  logSection("Request Withdrawal");
   const withdrawalResult = await callContract(
     tokenObj,
-    cfg.bridgeAddress,
-    "MercataBridge",
+    cfg.stratoBridgeAddress,
+    "StratoNativeBridge",
     "requestWithdrawal",
     {
       externalChainId: cfg.externalChainId,
       externalRecipient: cfg.externalRecipientAddress,
-      externalToken: ETH_EXTERNAL_TOKEN,
       stratoToken: cfg.stratoTokenAddress,
       stratoTokenAmount: cfg.withdrawalAmount.toString(),
     }
@@ -355,56 +372,44 @@ async function main() {
   logSection("Wait For Bridge Service");
   const deadline = Date.now() + cfg.timeoutMs;
   let lastStatus = null;
-  let lastCustodyTxHash = null;
+  let lastExternalTxHash = null;
 
   while (Date.now() < deadline) {
-    const [withdrawalRow, externalBalanceNow] = await Promise.all([
-      findEthWithdrawal(cfg),
-      provider.getBalance(cfg.externalRecipientAddress),
+    const [withdrawalRow, externalBalanceNow, vaultLockedNow] = await Promise.all([
+      findNativeWithdrawal(cfg),
+      representationToken.balanceOf(cfg.externalRecipientAddress),
+      getVaultLockedBalance(cfg),
     ]);
 
     if (withdrawalRow) {
       const status = String(withdrawalRow.value.bridgeStatus);
-      const custodyTxHash = String(withdrawalRow.value.custodyTxHash || "");
-      const useHotWallet = String(withdrawalRow.value.useHotWallet) === "true";
+      const externalTxHash = String(withdrawalRow.value.externalTxHash || "");
 
-      if (status !== lastStatus || custodyTxHash !== lastCustodyTxHash) {
+      if (status !== lastStatus || externalTxHash !== lastExternalTxHash) {
         console.log(
-          `Observed STRATO withdrawal ${withdrawalRow.key}: status=${status}, custodyTxHash=${custodyTxHash || "(none)"}, useHotWallet=${String(withdrawalRow.value.useHotWallet)}`
+          `Observed STRATO withdrawal ${withdrawalRow.key}: status=${status}, externalTxHash=${externalTxHash || "(none)"}`
         );
         lastStatus = status;
-        lastCustodyTxHash = custodyTxHash;
-      }
-
-      if (cfg.requireManual && useHotWallet) {
-        throw new Error(
-          `Withdrawal ${withdrawalRow.key} entered hot-wallet lane. Increase WITHDRAWAL_AMOUNT_WEI above the ETH hot threshold or set REQUIRE_MANUAL_WITHDRAWAL=false.`
-        );
+        lastExternalTxHash = externalTxHash;
       }
 
       if (status === ABORTED_STATUS) {
-        throw new Error(`ETH withdrawal was aborted: ${withdrawalRow.key}`);
+        throw new Error(`STRATO native withdrawal was aborted: ${withdrawalRow.key}`);
       }
 
       if (status === COMPLETED_STATUS) {
         const externalDelta = externalBalanceNow - externalBalanceBefore;
         if (externalDelta !== cfg.withdrawalAmount) {
           throw new Error(
-            `Sepolia ETH balance delta mismatch after completion: expected ${cfg.withdrawalAmount}, got ${externalDelta}`
+            `Sepolia recipient balance delta mismatch after completion: expected ${cfg.withdrawalAmount}, got ${externalDelta}`
           );
         }
 
-        console.log(`Sepolia ETH balance after: ${externalBalanceNow.toString()}`);
-        console.log(`Received ETH on Sepolia: ${externalDelta.toString()}`);
+        console.log(`Sepolia recipient balance after: ${externalBalanceNow.toString()}`);
+        console.log(`STRATO vault locked after: ${vaultLockedNow.toString()}`);
+        console.log(`Minted amount observed on Sepolia: ${externalDelta.toString()}`);
         logSection("Result");
-        console.log("Non-native ETH withdrawal completed successfully.");
-        return;
-      }
-
-      if (status === PENDING_REVIEW_STATUS && custodyTxHash) {
-        console.log(`Safe transaction hash: ${custodyTxHash}`);
-        logSection("Result");
-        console.log("Non-native ETH withdrawal reached manual Safe proposal/pending-review state.");
+        console.log("Happy-path native withdrawal completed successfully.");
         return;
       }
     }
@@ -413,7 +418,7 @@ async function main() {
   }
 
   throw new Error(
-    `Timed out waiting for ETH withdrawal service processing after ${cfg.timeoutMs} ms`
+    `Timed out waiting for STRATO withdrawal completion after ${cfg.timeoutMs} ms`
   );
 }
 
