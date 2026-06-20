@@ -983,13 +983,6 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
                   isTypeArray (SVMType.Array _ _) = True
                   isTypeArray _ = False
 
-          multilineLog "event/emit/versioning" $
-            boringBox
-              [ "Emitting event:",
-                "Event: " ++ C.yellow eventName,
-                "Contract: " ++ C.yellow (labelToString $ CC._contractName curCnct)
-              ]
-
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
           tHash <- Env.txHash <$> getEnv
           txSender <- Env.origin <$> getEnv
