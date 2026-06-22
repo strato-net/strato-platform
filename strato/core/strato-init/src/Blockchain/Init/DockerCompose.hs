@@ -40,6 +40,7 @@ generateDockerCompose = do
 
   let mercataBackend = def
         { image = "mercata-backend:" ++ stratoVersionTag ++ "-" ++ hashMercataBackend
+        , user = Just userGid
         , depends_on = Just $ DependsOnList ["postgrest"]
         , init = Just True
         , extra_hosts = hostGateway
@@ -244,6 +245,7 @@ generateDockerCompose = do
 
   let docs = def
         { image = "swaggerapi/swagger-ui:v5.29.2"
+        , user = Just userGid
         , environment = Just $ Map.fromList [("API_URL", "/docs/swagger.yaml")]
         , volumes = Just ["./logs:/logs"]
         , entrypoint = Just ["/bin/sh", "-c"]
