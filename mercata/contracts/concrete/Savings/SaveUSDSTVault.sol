@@ -7,15 +7,23 @@ import "../../abstract/ERC20/utils/Pausable.sol";
 /// @title SaveUSDSTVault
 /// @notice A standalone USDST savings vault with ERC-4626-style accounting.
 /// @dev The vault itself is the ERC-20 share token. Yield is added explicitly
-///      through reward notifications rather than lending-pool utilization.
+///      through reward notifications or funded rate accrual rather than lending-pool utilization.
 contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
+    uint256 public constant MAX_PER_SECOND_SAVINGS_RATE = 1000000021979553151239153027;
+
     address public assetToken;
     bool public vaultInitialized;
     uint8 private _underlyingDecimals;
     uint256 private _managedAssets;
+    uint256 public perSecondSavingsRate;
+    uint256 public lastAccrual;
+    address public rewardDistributor;
 
     event VaultInitialized(address indexed assetToken, string name, string symbol);
     event RewardNotified(address indexed sender, uint256 amount);
+    event Accrued(address indexed distributor, uint256 targetAmount, uint256 creditedAmount);
+    event PerSecondSavingsRateUpdated(uint256 oldRate, uint256 newRate);
+    event RewardDistributorUpdated(address indexed oldDistributor, address indexed newDistributor);
     event Deposit(address indexed caller, address indexed owner, uint256 assets, uint256 shares);
     event Withdraw(address indexed caller, address indexed receiver, address indexed owner, uint256 assets, uint256 shares);
 
@@ -33,6 +41,8 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
 
         assetToken = _assetToken;
         _underlyingDecimals = _tryGetAssetDecimals(_assetToken);
+        perSecondSavingsRate = 1e27;
+        lastAccrual = block.timestamp;
         vaultInitialized = true;
 
         emit VaultInitialized(_assetToken, name_, symbol_);
@@ -105,6 +115,7 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
     function deposit(uint256 assets, address receiver) external whenNotPaused returns (uint256 shares) {
         _requireInitialized();
         require(receiver != address(0), "SaveUSDST: receiver=0");
+        _accrue();
         shares = previewDeposit(assets);
         _deposit(_msgSender(), receiver, assets, shares);
     }
@@ -112,6 +123,7 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
     function mint(uint256 shares, address receiver) external whenNotPaused returns (uint256 assets) {
         _requireInitialized();
         require(receiver != address(0), "SaveUSDST: receiver=0");
+        _accrue();
         assets = previewMint(shares);
         _deposit(_msgSender(), receiver, assets, shares);
     }
@@ -119,6 +131,7 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
     function withdraw(uint256 assets, address receiver, address ownerAddress) external whenNotPaused returns (uint256 shares) {
         _requireInitialized();
         require(receiver != address(0), "SaveUSDST: receiver=0");
+        _accrue();
         require(assets <= maxWithdraw(ownerAddress), "SaveUSDST: withdraw exceeds max");
 
         shares = previewWithdraw(assets);
@@ -128,6 +141,7 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
     function redeem(uint256 shares, address receiver, address ownerAddress) external whenNotPaused returns (uint256 assets) {
         _requireInitialized();
         require(receiver != address(0), "SaveUSDST: receiver=0");
+        _accrue();
         require(shares <= maxRedeem(ownerAddress), "SaveUSDST: redeem exceeds max");
 
         assets = previewRedeem(shares);
@@ -138,6 +152,20 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
         _requireInitialized();
         if (totalSupply() == 0) return 1e18;
         return (_pricingAssets() * 1e18) / totalSupply();
+    }
+
+    function pendingAccrual() public view returns (uint256 targetAmount, uint256 fundedAmount) {
+        _requireInitialized();
+        return _pendingAccrual();
+    }
+
+    function projectedExchangeRate() external view returns (uint256) {
+        _requireInitialized();
+        uint256 supply = totalSupply();
+        if (supply == 0) return 1e18;
+
+        (, uint256 fundedAmount) = _pendingAccrual();
+        return ((_pricingAssets() + fundedAmount) * 1e18) / supply;
     }
 
     /// @notice Credit prefunded USDST rewards that have already arrived in the vault.
@@ -152,6 +180,34 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
         credited = expectedAmount;
         _managedAssets += credited;
         emit RewardNotified(_msgSender(), credited);
+    }
+
+    function accrue() external returns (uint256 credited) {
+        _requireInitialized();
+        credited = _accrue();
+    }
+
+    function setPerSecondSavingsRate(uint256 newRate) external onlyOwner returns (uint256 credited) {
+        _requireInitialized();
+        require(newRate >= 1e27, "SaveUSDST: rate too low");
+        require(newRate <= MAX_PER_SECOND_SAVINGS_RATE, "SaveUSDST: rate too high");
+        credited = _accrue();
+
+        uint256 oldRate = perSecondSavingsRate;
+        perSecondSavingsRate = newRate;
+        lastAccrual = block.timestamp;
+
+        emit PerSecondSavingsRateUpdated(oldRate, newRate);
+    }
+
+    function setRewardDistributor(address newRewardDistributor) external onlyOwner returns (uint256 credited) {
+        _requireInitialized();
+        credited = _accrue();
+
+        address oldRewardDistributor = rewardDistributor;
+        rewardDistributor = newRewardDistributor;
+
+        emit RewardDistributorUpdated(oldRewardDistributor, newRewardDistributor);
     }
 
     function pause() external onlyOwner {
@@ -237,6 +293,96 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
         }
 
         emit Withdraw(caller, receiver, ownerAddress, delta, shares);
+    }
+
+    function _accrue() internal returns (uint256 credited) {
+        uint256 nowTs = block.timestamp;
+        if (nowTs <= lastAccrual) {
+            return 0;
+        }
+
+        uint256 elapsed = nowTs - lastAccrual;
+        if (totalSupply() == 0 || perSecondSavingsRate <= 1e27 || rewardDistributor == address(0)) {
+            lastAccrual = nowTs;
+            return 0;
+        }
+
+        uint256 growthFactor = _rpow(perSecondSavingsRate, elapsed, 1e27);
+        uint256 targetAmount = (_managedAssets * (growthFactor - 1e27)) / 1e27;
+        lastAccrual = nowTs;
+
+        if (targetAmount == 0) {
+            return 0;
+        }
+
+        uint256 available = IERC20(assetToken).balanceOf(rewardDistributor);
+        uint256 allowance = IERC20(assetToken).allowance(rewardDistributor, address(this));
+        if (available > allowance) {
+            available = allowance;
+        }
+
+        if (available > targetAmount) {
+            available = targetAmount;
+        }
+
+        if (available == 0) {
+            emit Accrued(rewardDistributor, targetAmount, 0);
+            return 0;
+        }
+
+        uint256 beforeBalance = IERC20(assetToken).balanceOf(address(this));
+        require(IERC20(assetToken).transferFrom(rewardDistributor, address(this), available), "SaveUSDST: accrual transfer failed");
+        credited = IERC20(assetToken).balanceOf(address(this)) - beforeBalance;
+        require(credited > 0, "SaveUSDST: no accrual delta");
+
+        _managedAssets += credited;
+        emit RewardNotified(rewardDistributor, credited);
+        emit Accrued(rewardDistributor, targetAmount, credited);
+        return credited;
+    }
+
+    function _pendingAccrual() internal view returns (uint256 targetAmount, uint256 fundedAmount) {
+        if (block.timestamp <= lastAccrual) {
+            return (0, 0);
+        }
+
+        uint256 elapsed = block.timestamp - lastAccrual;
+        if (totalSupply() == 0 || perSecondSavingsRate <= 1e27 || rewardDistributor == address(0)) {
+            return (0, 0);
+        }
+
+        uint256 growthFactor = _rpow(perSecondSavingsRate, elapsed, 1e27);
+        targetAmount = (_managedAssets * (growthFactor - 1e27)) / 1e27;
+        if (targetAmount == 0) {
+            return (0, 0);
+        }
+
+        fundedAmount = IERC20(assetToken).balanceOf(rewardDistributor);
+        uint256 allowance = IERC20(assetToken).allowance(rewardDistributor, address(this));
+        if (fundedAmount > allowance) {
+            fundedAmount = allowance;
+        }
+
+        if (fundedAmount > targetAmount) {
+            fundedAmount = targetAmount;
+        }
+
+        return (targetAmount, fundedAmount);
+    }
+
+    function _rpow(uint256 x, uint256 n, uint256 base) internal pure returns (uint256 z) {
+        if (x == 0) return n == 0 ? base : 0;
+        z = (n % 2 == 0) ? base : x;
+        uint256 half = base / 2;
+        for (n /= 2; n > 0; n /= 2) {
+            uint256 xx = x * x;
+            x = (xx + half) / base;
+            if (n % 2 == 1) {
+                uint256 zx = z * x;
+                z = (zx + half) / base;
+            }
+        }
+        return z;
     }
 
     function _convertToShares(uint256 assets, bool roundUp) internal view returns (uint256) {
