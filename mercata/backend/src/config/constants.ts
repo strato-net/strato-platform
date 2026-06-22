@@ -30,6 +30,8 @@ export const constants = (() => {
   const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
   const MercataBridge = `${CONTRACT_PREFIX}MercataBridge`;
   const StratoNativeBridge = `${CONTRACT_PREFIX}StratoNativeBridge`;
+  const StratoStaking = `${CONTRACT_PREFIX}StratoStaking`;
+  const ValidatorRegistry = `${CONTRACT_PREFIX}ValidatorRegistry`;
   const CreditCardTopUp = `${CONTRACT_PREFIX}CreditCardTopUp`;
   const CDPEngine = `${CONTRACT_PREFIX}CDPEngine`;
   const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
@@ -143,6 +145,8 @@ export const constants = (() => {
     AdminRegistry,
     MercataBridge,
     StratoNativeBridge,
+    StratoStaking,
+    ValidatorRegistry,
     CreditCardTopUp,
     CDPEngine,
     CDPVault,
@@ -166,6 +170,9 @@ export const constants = (() => {
     mercataBridge,
     get stratoNativeBridge() { return config.stratoNativeBridge; },
     get stratoNativeCustodyVault() { return config.stratoNativeCustodyVault; },
+    get stratoToken() { return config.stratoToken; },
+    get stratoStaking() { return config.stratoStaking; },
+    get validatorRegistry() { return config.validatorRegistry; },
     get creditCardTopUp() { return config.creditCardTopUp; },  // Use getter to get current value after init
     Event,
     tokenSelectFields,

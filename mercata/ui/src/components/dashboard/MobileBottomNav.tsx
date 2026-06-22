@@ -17,7 +17,8 @@ import {
   Vault,
 
   ArrowDownToLine,
-  X
+  X,
+  ShieldCheck
 } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
 import { useUser } from '@/context/UserContext';
@@ -54,6 +55,7 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
     label: 'EARN',
     items: [
       { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
+      { icon: ShieldCheck, label: 'Stake STRATO', path: '/dashboard/earn-staking' },
       { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
     ],
   },

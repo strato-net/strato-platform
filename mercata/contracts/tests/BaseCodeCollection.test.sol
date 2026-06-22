@@ -40,6 +40,21 @@ contract Describe_Mercata is Authorizable {
         require(m.saveUSDSTVault().asset() == address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), "SaveUSDSTVault asset mismatch");
     }
 
+    function it_deploys_staking_contracts() {
+        address expectedStratoToken = address(0x8ee9a3391e38176feebf5d43cb2c1d6c4f728b04);
+        if (block.chainid == 33056204878082667) {
+            expectedStratoToken = address(0x2ca3e170e6714282da77815f7864b17f612f5f83);
+        }
+
+        require(address(m.stratoStaking()) != address(0), "StratoStaking address is 0");
+        require(address(m.validatorRegistry()) != address(0), "ValidatorRegistry address is 0");
+        require(address(m.stratoStaking().stratoToken()) == expectedStratoToken, "StratoStaking token mismatch");
+        require(address(m.stratoStaking().validatorRegistry()) == address(m.validatorRegistry()), "Staking registry mismatch");
+        require(address(m.validatorRegistry().staking()) == address(m.stratoStaking()), "Registry staking mismatch");
+        require(Ownable(address(m.stratoStaking())).owner() == address(m.adminRegistry()), "StratoStaking owner mismatch");
+        require(Ownable(address(m.validatorRegistry())).owner() == address(m.adminRegistry()), "ValidatorRegistry owner mismatch");
+    }
+
     function it_can_create_tokens() {
         address t = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
         require(t != address(0), "Failed to create Token");

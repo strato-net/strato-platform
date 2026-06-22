@@ -125,6 +125,11 @@ export const defaultStratoNativeCustodyVaultFor: Record<string, string> = {
   "33056204878082667": "db967ac5c497e6a2bd6f89036d2b63851760318f", // Upquark mainnet
 };
 
+export const defaultStratoTokenFor: Record<string, string> = {
+  "114784819836269": "8ee9a3391e38176feebf5d43cb2c1d6c4f728b04", // Helium testnet
+  "33056204878082667": "2ca3e170e6714282da77815f7864b17f612f5f83", // Upquark mainnet
+};
+
 export const defaultMetalForgeFor: Record<string, string> = {
   "114784819836269": "c5ed981b816a626981a5747d125e0e7296b2c7c6", // Helium testnet
   "33056204878082667": "1cc5bad32dc8667878fa7c53cc5cfd6e76fdb113", // Upquark mainnet
@@ -175,6 +180,9 @@ export let ethCarryVault: string = '';
 export let wbtcCarryVault: string = '';
 export let stratoNativeBridge: string = '';
 export let stratoNativeCustodyVault: string = '';
+export let stratoToken: string = '';
+export let stratoStaking: string = '';
+export let validatorRegistry: string = '';
 export let usdcYieldVault: string = '';
 
 function setBridgeConfig(networkId: string) {
@@ -223,6 +231,19 @@ function setStratoNativeBridgeConfig(networkId: string) {
     process.env.STRATO_NATIVE_CUSTODY_VAULT ||
     defaultStratoNativeCustodyVaultFor[networkId] ||
     "";
+}
+
+function setStratoTokenConfig(networkId: string) {
+  stratoToken =
+    process.env.STRATO_TOKEN ||
+    process.env.STRATO_TOKEN_ADDRESS ||
+    defaultStratoTokenFor[networkId] ||
+    "";
+}
+
+function setStratoStakingConfig() {
+  stratoStaking = process.env.STRATO_STAKING || "";
+  validatorRegistry = process.env.VALIDATOR_REGISTRY || "";
 }
 
 function setMetalForgeConfig(networkId: string) {
@@ -281,6 +302,8 @@ export async function initNetworkConfig() {
   setReferralConfig(networkId);
   setVaultFactoryConfig(networkId);
   setStratoNativeBridgeConfig(networkId);
+  setStratoTokenConfig(networkId);
+  setStratoStakingConfig();
   setMetalForgeConfig(networkId);
   setCreditCardTopUpConfig(networkId);
   setSaveUsdstVaultConfig(networkId);

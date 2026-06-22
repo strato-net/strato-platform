@@ -38,6 +38,10 @@ import "Lending/SafetyModule.sol";
 //Savings
 import "Savings/SaveUSDSTVault.sol";
 
+//Staking
+import "Staking/StratoStaking.sol";
+import "Staking/ValidatorRegistry.sol";
+
 //Bridging
 import "./Bridge/MercataBridge.sol";
 import "./Bridge/StratoNativeBridge.sol";
@@ -88,6 +92,24 @@ contract record Mercata is Authorizable {
     Token public cataToken;
     Escrow public escrow;
     MetalForge public metalForge;
+    StratoStaking public stratoStaking;
+    ValidatorRegistry public validatorRegistry;
+
+    uint256 constant HELIUM_NETWORK_ID = 114784819836269;
+    uint256 constant UPQUARK_NETWORK_ID = 33056204878082667;
+    address constant STRATO_STAKING_TOKEN_HELIUM = address(0x8ee9a3391e38176feebf5d43cb2c1d6c4f728b04);
+    address constant STRATO_STAKING_TOKEN_UPQUARK = address(0x2ca3e170e6714282da77815f7864b17f612f5f83);
+    uint256 constant STRATO_STAKING_UNBONDING_SECONDS = 604800;
+    uint256 constant STRATO_STAKING_BASE_REWARD_BPS = 5000;
+    uint256 constant STRATO_STAKING_MAX_COMMISSION_BPS = 2000;
+    uint256 constant STRATO_STAKING_MAX_BATCH_SIZE = 16;
+
+    function _stratoStakingTokenForNetwork() internal view returns (address) {
+        if (block.chainid == UPQUARK_NETWORK_ID) {
+            return STRATO_STAKING_TOKEN_UPQUARK;
+        }
+        return STRATO_STAKING_TOKEN_HELIUM;
+    }
 
     constructor() public {
         // The owner of the implementation contract is ignored in favor of the proxy owner
@@ -217,6 +239,19 @@ contract record Mercata is Authorizable {
             address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010)
         );
         Ownable(metalForge).transferOwnership(address(0x000000000000000000000000000000000000100c));
+
+        // Create STRATO staking and validator registry
+        address stratoStakingImpl = address(new StratoStaking(implOwnerIgnored));
+        stratoStaking = StratoStaking(address(new Proxy(stratoStakingImpl, this)));
+
+        address validatorRegistryImpl = address(new ValidatorRegistry(implOwnerIgnored));
+        validatorRegistry = ValidatorRegistry(address(new Proxy(validatorRegistryImpl, this)));
+
+        stratoStaking.initialize(_stratoStakingTokenForNetwork(), STRATO_STAKING_UNBONDING_SECONDS, STRATO_STAKING_BASE_REWARD_BPS, STRATO_STAKING_MAX_COMMISSION_BPS, STRATO_STAKING_MAX_BATCH_SIZE);
+        validatorRegistry.initialize(address(stratoStaking));
+        stratoStaking.setValidatorRegistry(address(validatorRegistry));
+        Ownable(stratoStaking).transferOwnership(address(adminRegistry));
+        Ownable(validatorRegistry).transferOwnership(address(adminRegistry));
 
         mercataBridge.initialize(address(tokenFactory), address(lendingRegistry), address(metalForge));
         Ownable(mercataBridge).transferOwnership(address(adminRegistry));

@@ -69,6 +69,8 @@ async function main() {
     console.log(`Rewards: ${deployedContract.managers.rewards}`);
     console.log(`Escrow: ${deployedContract.managers.escrow}`);
     console.log(`Metal Forge: ${deployedContract.managers.metalForge}`);
+    console.log(`STRATO Staking: ${deployedContract.managers.stratoStaking}`);
+    console.log(`Validator Registry: ${deployedContract.managers.validatorRegistry}`);
     console.log('===================================\n');
     
     // Return the deployed contract address for scripting
@@ -101,6 +103,8 @@ async function main() {
       REWARDS: deployedContract.managers.rewards,
       ESCROW: deployedContract.managers.escrow,
       METAL_FORGE: deployedContract.managers.metalForge,
+      STRATO_STAKING: deployedContract.managers.stratoStaking,
+      VALIDATOR_REGISTRY: deployedContract.managers.validatorRegistry,
       MERCATA_CORE: deployedContract.address,
     };
     Object.entries(envLines).forEach(([k, v]) => {

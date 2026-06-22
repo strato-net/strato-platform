@@ -16,7 +16,8 @@ import {
   LucideIcon,
   HandCoins,
   Vault,
-  ArrowDownToLine
+  ArrowDownToLine,
+  ShieldCheck
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
@@ -54,6 +55,7 @@ const NAV_CATEGORIES: NavCategory[] = [
     label: 'EARN',
     items: [
       { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
+      { icon: ShieldCheck, label: 'Stake STRATO', path: '/dashboard/earn-staking' },
       { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
     ],
   },
