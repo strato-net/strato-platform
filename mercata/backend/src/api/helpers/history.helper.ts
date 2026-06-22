@@ -1,5 +1,22 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 
+function dedup<T>(arr: T[]): T[] {
+  const seen = new Set<string>();
+  return arr.filter((item) => {
+    const key = JSON.stringify(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+const sortByBroadFirst = (a: { valid_from: string; valid_to: string }, b: { valid_from: string; valid_to: string }) => {
+  const aTo = a.valid_to === 'infinity' ? Number.MAX_SAFE_INTEGER : Date.parse(a.valid_to + 'Z');
+  const bTo = b.valid_to === 'infinity' ? Number.MAX_SAFE_INTEGER : Date.parse(b.valid_to + 'Z');
+  if (aTo !== bTo) return bTo - aTo;
+  return Date.parse(a.valid_from + 'Z') - Date.parse(b.valid_from + 'Z');
+};
+
 export interface StorageHistoryElement {
   address: string;
   data: any;
@@ -139,8 +156,10 @@ export const getHistory = async (
     })
   ]);
 
-  const storageHistory = Array.from(new Set(storageRes.data as StorageHistoryElement[]));
-  const mappingHistory = Array.from(new Set(mappingRes.data as MappingHistoryElement[]));
+  const storageHistory = dedup(storageRes.data as StorageHistoryElement[]);
+  const mappingHistory = dedup(mappingRes.data as MappingHistoryElement[]);
+  storageHistory.sort(sortByBroadFirst);
+  mappingHistory.sort(sortByBroadFirst);
   const snapshots: any[] = (new Array(numTicks + 1)).fill({}).map((_, i) => { return {
     timestamp: endTimestamp - (interval * (numTicks - i)),
     data: initialSnapshotData
