@@ -286,7 +286,7 @@ blockstanbulSend' msg = do
           (P2pBlock <$> committedBlocks)
             ++ p2ps
 
-    case committedBlocks of
+    case reverse committedBlocks of
       [] -> pure ()
       (b:_) -> do
         let bh = BDB.blockHeader b

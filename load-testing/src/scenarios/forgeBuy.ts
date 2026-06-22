@@ -74,8 +74,15 @@ export class ForgeBuyScenario extends AppScenario {
       );
     }
 
+    // Per-request HTTP timeout scaled to the run size: 1.5s per buy. Under
+    // concurrency the backend serializes buys (chain confirmation + tx queue),
+    // so the slowest request's wall-clock grows with totalTxCount. A fixed 60s
+    // timeout counted slow-but-successful buys as client-side failures; scaling
+    // it keeps those requests alive long enough to record their true outcome.
+    const requestTimeoutMs = Math.ceil(1.5 * cfg.totalTxCount) * 1000;
+
     await this.initClientPool(
-      cfg,
+      { ...cfg, requestTimeoutMs },
       { backendUrl: node.url, auth: node.auth },
       ForgeBuyScenario.LABEL,
     );
@@ -183,10 +190,16 @@ export class ForgeBuyScenario extends AppScenario {
             res.status < 300 &&
             (reported === undefined || reported === "success" || reported === "Success");
           if (!buyOk) {
+            const bodyStr =
+              res.data === undefined
+                ? "<no response body>"
+                : typeof res.data === "string"
+                  ? res.data.slice(0, 400)
+                  : (JSON.stringify(res.data) ?? String(res.data)).slice(0, 400);
             console.warn(
               `[forgeBuy] buyMetal #${i} FAILED: httpStatus=${res.status} ` +
                 `respErr=${res.error ?? "?"} ` +
-                `body=${typeof res.data === "string" ? res.data.slice(0, 400) : JSON.stringify(res.data).slice(0, 400)}`,
+                `body=${bodyStr}`,
             );
           } else if (shouldLogProgress(i)) {
             console.log(

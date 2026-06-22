@@ -1193,7 +1193,7 @@ initialSlipstreamQueries =
       , ("valid_from", SqlTimestamp)
       , ("valid_to", SqlTimestamp)
       ]
-      []
+      ["address", "block_hash"]
       Nothing
       [("storage_history_idx", ["address","valid_to"])]
 {-  , CreateTable
@@ -1233,7 +1233,7 @@ initialSlipstreamQueries =
       , ("valid_from", SqlTimestamp)
       , ("valid_to", SqlTimestamp)
       ]
-      []
+      ["address", "block_hash", "path"]
       Nothing
       [("mapping_history_idx", ["address","path","valid_to"])]
   , CreateTable

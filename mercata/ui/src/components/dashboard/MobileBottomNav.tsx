@@ -9,12 +9,10 @@ import {
   Send,
   Gift,
   Activity,
-  CreditCard,
   Download,
   BarChart3,
   Droplets,
   Shield,
-  UserPlus,
   HandCoins,
   Vault,
 
@@ -60,17 +58,10 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
     ],
   },
   {
-    label: 'SPEND',
-    items: [
-      { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
-    ],
-  },
-  {
     label: 'PRO',
     items: [
       { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
       { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
-      { icon: UserPlus, label: 'Referrals', path: '/dashboard/referrals' },
       { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
       { icon: BarChart3, label: 'Analytics', path: '/dashboard/stats' },
       { icon: Shield, label: 'Admin', path: '/dashboard/admin', adminOnly: true },

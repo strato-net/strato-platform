@@ -4,6 +4,7 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
+const { getCreatedAddress, getIssueId, pollForCreateIssueExecution } = require('./util');
 const { rest, importer, util } = require('blockapps-rest');
 const fs = require('fs-extra');
 const path = require('path');
@@ -11,15 +12,8 @@ const path = require('path');
 // The owner of the implementation address is ignored in favor of the proxy owner
 const DEFAULT_CONSTRUCTOR_ARGS = {"initialOwner": "deadbeef"};
 
-// BATCH_TARGETS is currently filled with StablePool proxies to upgrade for Issue #6348
 const BATCH_TARGETS = [
-    "ff2befcd850183170627dcbc377c3fd573789172",
-    "bab35f9fe024e2735edae7a9c0aba4db260a649c",
-    "3d1dc151402858521bf9beaa8c72a68c9b4fc2fe",
-    "5214055d631645de83b7299604ea6ade31d87c47",
-    "9c75280f9e2368005d2b7342f19c59f9176b5962",
-    "5888fbe6d6774c1d5788a7b631fc2a2fe88c44c6",
-    "41be20683ef9d57884e0a92f203e6c3161cf0aa1"
+    "----proxy-address----",
 ];
 
 /**
@@ -156,6 +150,7 @@ async function verifyProxyAndImplementation(tokenObj, proxyAddress, contractName
  */
 async function deployImplementationAsync(tokenObj, contractArgs, baseOptions) {
   const asyncOptions = { ...baseOptions, isAsync: true };
+  const submittedAt = new Date().toISOString();
   const response = await rest.createContract(tokenObj, contractArgs, asyncOptions);
   const responseArray = Array.isArray(response) ? response : [response];
   const hashes = responseArray.map((r) => r && r.hash).filter(Boolean);
@@ -181,9 +176,13 @@ async function deployImplementationAsync(tokenObj, contractArgs, baseOptions) {
     );
   }
 
-  const created = final.txResult && final.txResult.contractsCreated;
-  const address = Array.isArray(created) ? created[0] : created;
+  const address = getCreatedAddress(final);
   if (!address) {
+    const issueId = getIssueId(final);
+    if (issueId) {
+      return pollForCreateIssueExecution(tokenObj, issueId, final, submittedAt, 'implementation address');
+    }
+
     throw new Error(
       'Deployment succeeded but no contractsCreated entry in receipt: ' +
         JSON.stringify(final)
