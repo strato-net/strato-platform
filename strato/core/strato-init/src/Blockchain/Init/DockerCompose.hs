@@ -98,6 +98,7 @@ generateDockerCompose = do
 
   let smd = def
         { image = "smd:" ++ stratoVersionTag ++ "-" ++ hashSmd
+        , user = Just userGid
         , depends_on = Just $ DependsOnList ["apex", "postgrest", "prometheus"]
         , extra_hosts = hostGateway
         , volumes = Just ["./logs:/logs"]
@@ -149,6 +150,7 @@ generateDockerCompose = do
 
   let postgrest = def
         { image = "postgrest:" ++ stratoVersionTag ++ "-" ++ hashPostgrest
+        , user = Just userGid
         , depends_on = Just $ DependsOnList ["postgres"]
         , environment = Just $ Map.fromList
             [ ("PG_ENV_POSTGRES_DB", "cirrus")
