@@ -92,7 +92,7 @@ createCommandsFile = do
         , "vm-runner +RTS -T -I2 -N1 -RTS"
         , "strato-indexer"
         , "slipstream +RTS -T -RTS"
-        , "strato-api +RTS -T -N4 -RTS"
+        , "strato-api +RTS -T -N -maxN4 -RTS"
         , "strato-network-monitor"
         ]
 

@@ -18,10 +18,10 @@
  *   SYRUP_USDC, SUSDS, SAVE_USDST_VAULT
  */
 require('dotenv').config();
-const config = require('./config');
-const auth = require('./auth');
+const config = require('../config');
+const auth = require('../auth');
 const { rest } = require('blockapps-rest');
-const { cirrusSearch } = require('./util');
+const { cirrusSearch } = require('../util');
 
 // ── Addresses (mainnet defaults, overridable via env) ──────────────────────
 

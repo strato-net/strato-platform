@@ -26,10 +26,8 @@ import NotFound from "./pages/NotFound";
 import SyncingPage from "./pages/SyncingPage";
 import StratoStats from "./pages/StratoStats";
 import Rewards from "./pages/Rewards";
-import ReferFriend from "./pages/ReferFriend";
 import Claim from "./pages/Claim";
 import CommunityRewardsOnePager from "./pages/CommunityRewardsOnePager";
-import ReferralsManagement from "./pages/ReferralsManagement";
 import PriceTracking from "./pages/PriceTracking";
 import Vault from "./pages/Vault";
 import Earn from "./pages/Earn";
@@ -39,7 +37,6 @@ import EarnLending from "./pages/EarnLending";
 import EarnPools from "./pages/EarnPools";
 import EarnYieldVault from "./pages/EarnYieldVault";
 import OnrampPage from "./pages/OnrampPage";
-import CreditCardPage from "./pages/CreditCard";
 
 // Import dashboard components
 
@@ -352,14 +349,6 @@ const App = () => {
                                                   }
                                                 />
                                                 <Route
-                                                  path="/dashboard/credit-card"
-                                                  element={
-                                                    <GuestAccessibleRoute>
-                                                      <CreditCardPage />
-                                                    </GuestAccessibleRoute>
-                                                  }
-                                                />
-                                                <Route
                                                   path="/dashboard/activity"
                                                   element={
                                                     <GuestAccessibleRoute>
@@ -427,24 +416,6 @@ const App = () => {
                                                   element={
                                                     <GuestAccessibleRoute>
                                                       <Rewards />
-                                                    </GuestAccessibleRoute>
-                                                  }
-                                                />
-      
-                                                <Route
-                                                  path="/dashboard/refer"
-                                                  element={
-                                                    <ProtectedRoute>
-                                                      <ReferFriend />
-                                                    </ProtectedRoute>
-                                                  }
-                                                />
-      
-                                                <Route
-                                                  path="/dashboard/referrals"
-                                                  element={
-                                                    <GuestAccessibleRoute>
-                                                      <ReferralsManagement />
                                                     </GuestAccessibleRoute>
                                                   }
                                                 />
