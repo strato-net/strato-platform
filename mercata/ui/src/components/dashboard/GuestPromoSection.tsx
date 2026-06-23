@@ -119,9 +119,7 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
     return best > 0 ? best.toFixed(1) : null;
   }, [tokenApys]);
 
-  if (variant === 3) {
-    if (!rewardsEnabled) return null;
-
+  if (variant === 3 && rewardsEnabled) {
     return (
       <div className="mb-8">
         <div
