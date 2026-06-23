@@ -110,6 +110,7 @@ generateDockerCompose = do
 
   let apex = def
         { image = "apex:" ++ stratoVersionTag ++ "-" ++ hashApex
+        , user = Just userGid
         , depends_on = Just $ DependsOnList ["postgres", "prometheus", "redis"]
         , extra_hosts = hostGateway
         , environment = Just $ Map.fromList
