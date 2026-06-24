@@ -3,6 +3,7 @@ import { formatEther, formatUnits, parseUnits, type Address } from "viem";
 import QRCode from "qrcode";
 import {
   ArrowDownLeft,
+  ArrowLeftRight,
   ArrowUpRight,
   ArrowUpDown,
   Check,
@@ -16,7 +17,6 @@ import {
   Pencil,
   Plus,
   QrCode as QrCodeIcon,
-  Send as SendIcon,
   Settings as SettingsIcon,
   ShieldAlert,
   Sun,
@@ -34,6 +34,7 @@ import {
   quoteOut,
   findPool,
 } from "@/src/core/swap-quote";
+import type { BridgeRoute, BridgeConfig, BridgeHistoryItem } from "@/src/core/bridge";
 import {
   Avatar,
   Button,
@@ -222,7 +223,7 @@ export function Home({ navigate }: { navigate: (to: string) => void }) {
         />
         <ActionButton
           label="Send"
-          icon={<SendIcon className="h-5 w-5" />}
+          icon={<ArrowLeftRight className="h-5 w-5" />}
           onClick={() => navigate("send")}
         />
         <ActionButton
@@ -288,28 +289,53 @@ function TokenIcon({
   symbol,
   icon,
   fallback,
+  badge,
 }: {
   symbol: string;
   icon?: string;
   fallback?: React.ReactNode;
+  /** Small network logo (MetaMask-style) overlaid on the bottom-right corner. */
+  badge?: string;
 }) {
   const [failed, setFailed] = useState(false);
-  if (symbol === "USDST") return <Logo className="h-8 w-8 shrink-0" />;
-  if (icon && !failed) {
-    return (
+  const base =
+    symbol === "USDST" ? (
+      <Logo className="h-8 w-8 shrink-0" />
+    ) : icon && !failed ? (
       <img
         src={icon}
         alt=""
         onError={() => setFailed(true)}
         className="h-8 w-8 shrink-0 rounded-full bg-slate-100 dark:bg-slate-900 object-cover"
       />
+    ) : fallback ? (
+      <>{fallback}</>
+    ) : (
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+        {symbol.slice(0, 4)}
+      </span>
     );
-  }
-  if (fallback) return <>{fallback}</>;
+  if (!badge) return base;
   return (
-    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-      {symbol.slice(0, 4)}
+    <span className="relative inline-flex h-8 w-8 shrink-0">
+      {base}
+      <ChainBadge src={badge} />
     </span>
+  );
+}
+
+// Network logo badge pinned to the bottom-right of a token icon. Hides itself if
+// the image fails to load so a broken icon never shows.
+function ChainBadge({ src }: { src: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    <img
+      src={src}
+      alt=""
+      onError={() => setFailed(true)}
+      className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border border-white bg-white object-cover dark:border-slate-900"
+    />
   );
 }
 
@@ -337,13 +363,15 @@ function TokensTab({
   const others = (tokens.data ?? []).filter((t) => t.symbol !== symbol);
   const active = others.filter((t) => t.status === 2);
   const legacy = others.filter((t) => t.status === 3);
-  const nativeName = (tokens.data ?? []).find((t) => t.symbol === symbol)?.name ?? symbol;
+  const nativeToken = (tokens.data ?? []).find((t) => t.symbol === symbol);
+  const nativeName = nativeToken?.name ?? symbol;
+  const badge = network?.chainBadge;
 
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-3 overflow-hidden rounded-lg px-1 py-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <TokenIcon symbol={symbol} />
+          <TokenIcon symbol={symbol} icon={nativeToken?.icon} badge={badge} />
           <div className="min-w-0">
             <div className="truncate text-sm font-medium">{symbol}</div>
             <div className="truncate text-xs text-slate-400">{nativeName}</div>
@@ -355,7 +383,7 @@ function TokensTab({
       </div>
 
       {active.map((t) => (
-        <TokenRow key={t.address} token={t} />
+        <TokenRow key={t.address} token={t} badge={badge} />
       ))}
 
       {legacy.length > 0 && (
@@ -369,14 +397,23 @@ function TokensTab({
             />
             Legacy tokens ({legacy.length})
           </button>
-          {showLegacy && legacy.map((t) => <TokenRow key={t.address} token={t} muted />)}
+          {showLegacy &&
+            legacy.map((t) => <TokenRow key={t.address} token={t} badge={badge} muted />)}
         </div>
       )}
     </div>
   );
 }
 
-function TokenRow({ token, muted }: { token: TokenBalance; muted?: boolean }) {
+function TokenRow({
+  token,
+  badge,
+  muted,
+}: {
+  token: TokenBalance;
+  badge?: string;
+  muted?: boolean;
+}) {
   return (
     <div
       className={`flex items-center justify-between gap-3 overflow-hidden rounded-lg px-1 py-2 ${
@@ -384,7 +421,7 @@ function TokenRow({ token, muted }: { token: TokenBalance; muted?: boolean }) {
       }`}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <TokenIcon symbol={token.symbol} icon={token.icon} />
+        <TokenIcon symbol={token.symbol} icon={token.icon} badge={badge} />
         <div className="min-w-0">
           <div className="truncate text-sm font-medium">{token.symbol}</div>
           <div className="truncate text-xs text-slate-400">{token.name}</div>
@@ -550,26 +587,62 @@ function ActivityTab({
 // --------------------------------------------------------------------- Send
 export function Send({ navigate }: { navigate: (to: string) => void }) {
   const selected = useAsync<Address | null>(() => callBackground("accounts.selected"));
+  const network = useAsync<StratoNetwork>(() => callBackground("networks.selected"));
+  const allNetworks = useAsync<StratoNetwork[]>(() => callBackground("networks.list"));
   const tokens = useAsync<TokenBalance[]>(
     async () => (selected.data ? callBackground("tokens.list", selected.data) : []),
-    [selected.data]
+    [selected.data, network.data?.chainId]
   );
+  const bridge = useAsync<BridgeConfig>(() => callBackground("bridge.config"));
+
   const [tokenAddr, setTokenAddr] = useState<string | null>(null);
+  const [destId, setDestId] = useState<string | null>(null); // null = same chain (transfer)
   const [to, setTo] = useState("");
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Only active tokens (status 2) are sendable from the dropdown.
+  const sourceIsStrato = network.data ? isStratoNetwork(network.data) : true;
   const list = (tokens.data ?? []).filter((t) => t.status === 2);
-  // Default to USDST (native) if held, else the first token.
+
+  // Default token: USDST (native) if held, else the first.
   useEffect(() => {
     if (tokenAddr || list.length === 0) return;
     setTokenAddr((list.find((t) => t.symbol === "USDST") ?? list[0]).address);
   }, [list, tokenAddr]);
 
   const token = list.find((t) => t.address === tokenAddr);
+  const tokenKey = token ? token.address.replace(/^0x/, "").toLowerCase() : "";
+  const routes = bridge.data?.routes ?? [];
+
+  // Destination options: same chain (transfer) + any configured bridge routes.
+  const destOptions = useMemo(() => {
+    const opts: { id: string; label: string; route?: BridgeRoute }[] = [];
+    if (network.data) opts.push({ id: network.data.id, label: `${network.data.name} (transfer)` });
+    if (!token) return opts;
+    if (sourceIsStrato) {
+      for (const r of routes) {
+        if (r.stratoToken !== tokenKey) continue;
+        const net = (allNetworks.data ?? []).find(
+          (n) => !isStratoNetwork(n) && n.chainId === r.externalChainId
+        );
+        if (net) opts.push({ id: net.id, label: `Bridge to ${net.name}`, route: r });
+      }
+    } else if (network.data) {
+      const r = routes.find(
+        (x) => x.externalChainId === network.data!.chainId && x.externalToken === tokenKey
+      );
+      const strato = (allNetworks.data ?? []).find(isStratoNetwork);
+      if (r && strato) opts.push({ id: strato.id, label: "Bridge to STRATO", route: r });
+    }
+    return opts;
+  }, [network.data, allNetworks.data, routes, token, tokenKey, sourceIsStrato]);
+
+  const dest = destOptions.find((o) => o.id === destId) ?? destOptions[0];
+  const isBridge = !!dest?.route;
+  const canBridge = destOptions.some((o) => !!o.route);
+
   const balanceRaw = token ? BigInt(token.raw) : 0n;
   const amountRaw = token ? safeParseUnits(amount, token.decimals) : 0n;
   const insufficient = amountRaw > balanceRaw;
@@ -580,16 +653,28 @@ export function Send({ navigate }: { navigate: (to: string) => void }) {
     setAmount(formatUnits(raw, token.decimals));
   };
 
-  const send = async () => {
+  const submit = async () => {
     if (!token) return;
     setError(null);
     setStatus(null);
     setBusy(true);
     try {
-      await callBackground("tx.sendToken", selected.data, token.address, to.trim(), amountRaw.toString());
-      setStatus(`Sent ${amount} ${token.symbol} to ${shortAddr(to.trim())}`);
+      if (isBridge && dest?.route) {
+        if (sourceIsStrato) {
+          await callBackground("bridge.withdraw", selected.data, bridge.data, dest.route, amountRaw.toString(), to.trim());
+        } else {
+          const router = bridge.data!.chains.find(
+            (c) => c.chainId === network.data!.chainId
+          )?.depositRouter;
+          if (!router) throw new Error("No deposit router for this chain");
+          await callBackground("bridge.deposit", selected.data, dest.route, router, amountRaw.toString(), to.trim());
+        }
+        setStatus(`Bridging ${amount} ${token.symbol} → ${dest.label.replace("Bridge to ", "")}. It may take a few minutes to arrive.`);
+      } else {
+        await callBackground("tx.sendToken", selected.data, token.address, to.trim(), amountRaw.toString());
+        setStatus(`Sent ${amount} ${token.symbol} to ${shortAddr(to.trim())}`);
+      }
       setAmount("");
-      setTo("");
       tokens.refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -600,18 +685,23 @@ export function Send({ navigate }: { navigate: (to: string) => void }) {
 
   return (
     <div>
-      <ScreenHeader title="Send" onClose={() => navigate("")} />
+      <ScreenHeader title={isBridge ? "Bridge" : "Send"} onClose={() => navigate("")} />
       <div className="space-y-3 p-4">
-        <p className="text-xs text-slate-500 dark:text-slate-400">From {shortAddr(selected.data)}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          From {shortAddr(selected.data)} on {network.data?.name ?? "—"}
+        </p>
 
         <Field label="Token">
           <div className="flex items-center gap-2 rounded-lg border border-slate-300 px-2 py-1.5">
-            {token && <TokenIcon symbol={token.symbol} icon={token.icon} />}
+            {token && (
+              <TokenIcon symbol={token.symbol} icon={token.icon} badge={network.data?.chainBadge} />
+            )}
             <select
               value={tokenAddr ?? ""}
               onChange={(e) => {
                 setTokenAddr(e.target.value);
                 setAmount("");
+                setDestId(null);
               }}
               className="flex-1 bg-transparent text-sm font-medium outline-none"
             >
@@ -624,9 +714,37 @@ export function Send({ navigate }: { navigate: (to: string) => void }) {
           </div>
         </Field>
 
-        <Field label="To address">
-          <Input value={to} onChange={(e) => setTo(e.target.value)} placeholder="0x…" />
+        <Field label={isBridge ? `Recipient on ${dest?.label.replace("Bridge to ", "")}` : "To address"}>
+          <div className="flex gap-1.5">
+            <Input value={to} onChange={(e) => setTo(e.target.value)} placeholder="0x…" />
+            {canBridge && (
+              <button
+                onClick={() => selected.data && setTo(selected.data)}
+                className="shrink-0 rounded-lg bg-slate-100 dark:bg-slate-800 px-2 text-xs hover:bg-slate-200 dark:hover:bg-slate-700"
+              >
+                Me
+              </button>
+            )}
+          </div>
         </Field>
+
+        {/* Destination network: same chain = transfer; other = bridge. Only shown
+            when the selected token actually has a bridge route. */}
+        {canBridge && (
+          <Field label="Destination network">
+            <select
+              value={dest?.id ?? ""}
+              onChange={(e) => setDestId(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            >
+              {destOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
 
         <div>
           <Field label={`Amount${token ? ` (${token.symbol})` : ""}`}>
@@ -646,6 +764,12 @@ export function Send({ navigate }: { navigate: (to: string) => void }) {
           </div>
         </div>
 
+        {isBridge && (
+          <p className="rounded-md bg-blue-50 dark:bg-blue-950 p-2 text-xs text-[#001B70] dark:text-blue-300">
+            Cross-chain bridge. Funds are released on the destination chain by a relayer after
+            confirmation.
+          </p>
+        )}
         <ErrorText>{error}</ErrorText>
         {insufficient && amountRaw > 0n && (
           <p className="text-xs text-red-600 dark:text-red-400">Insufficient balance.</p>
@@ -653,9 +777,88 @@ export function Send({ navigate }: { navigate: (to: string) => void }) {
         {status && (
           <p className="break-all text-xs text-green-700 dark:text-green-400">{status}</p>
         )}
-        <Button disabled={busy || !token || amountRaw <= 0n || insufficient || !to.trim()} onClick={send}>
-          {busy ? "Sending…" : "Send"}
+        <Button
+          disabled={busy || !token || amountRaw <= 0n || insufficient || !to.trim()}
+          onClick={submit}
+        >
+          {busy ? (isBridge ? "Bridging…" : "Sending…") : isBridge ? "Bridge" : "Send"}
         </Button>
+
+        <button
+          onClick={() => navigate("bridges")}
+          className="w-full pt-1 text-center text-xs text-[#001B70] dark:text-blue-300 hover:underline"
+        >
+          View bridge transfers
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------- Bridge history
+const BRIDGE_CHAIN_NAMES: Record<string, string> = {
+  "1": "Ethereum",
+  "8453": "Base",
+  "59144": "Linea",
+};
+function bridgeChainName(id: string): string {
+  return BRIDGE_CHAIN_NAMES[id] ?? `Chain ${id}`;
+}
+
+export function BridgeHistory({ navigate }: { navigate: (to: string) => void }) {
+  const selected = useAsync<Address | null>(() => callBackground("accounts.selected"));
+  const items = useAsync<BridgeHistoryItem[]>(
+    async () => (selected.data ? callBackground("bridge.history", selected.data) : []),
+    [selected.data]
+  );
+  const list = items.data ?? [];
+
+  return (
+    <div>
+      <ScreenHeader title="Bridge transfers" onClose={() => navigate("")} />
+      <div className="space-y-1 p-3">
+        {items.loading && (
+          <div className="py-10 text-center text-sm text-slate-400">Loading…</div>
+        )}
+        {!items.loading && list.length === 0 && (
+          <div className="py-10 text-center text-sm text-slate-400">No bridge transfers yet.</div>
+        )}
+        {list.map((b, i) => {
+          const out = b.direction === "out";
+          const chain = bridgeChainName(b.externalChainId);
+          const statusColor =
+            b.status === "completed"
+              ? "text-green-600 dark:text-green-400"
+              : b.status === "failed"
+                ? "text-red-600 dark:text-red-400"
+                : "text-amber-600";
+          return (
+            <div
+              key={b.timestamp + i}
+              className="flex items-center justify-between gap-3 overflow-hidden rounded-lg px-1 py-2"
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-950 text-[#001B70] dark:text-blue-300">
+                  {out ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownLeft className="h-4 w-4" />}
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">
+                    {out ? `Bridge to ${chain}` : `Bridge from ${chain}`}
+                  </div>
+                  <div className={`text-xs capitalize ${statusColor}`}>{b.status}</div>
+                </div>
+              </div>
+              <div className="shrink-0 whitespace-nowrap text-right text-sm">
+                <div className="font-medium">
+                  {b.amount} {b.symbol}
+                </div>
+                <div className="text-xs text-slate-400">
+                  {new Date(b.timestamp).toLocaleDateString()}
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

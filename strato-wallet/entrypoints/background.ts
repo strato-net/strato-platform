@@ -33,6 +33,14 @@ import { getTxs } from "@/src/core/history";
 import { fetchActivity } from "@/src/core/activity";
 import { fetchTokens, fetchDefi } from "@/src/core/portfolio";
 import { fetchPools, executeSwap, type SwapRequest } from "@/src/core/swap";
+import {
+  fetchBridgeConfig,
+  fetchBridgeHistory,
+  executeWithdrawal,
+  executeDeposit,
+  type BridgeRoute,
+  type BridgeConfig,
+} from "@/src/core/bridge";
 import { rpcCall } from "@/src/core/rpc";
 import { sendEvmTransaction, encodeErc20Transfer } from "@/src/core/tx-evm";
 import { sendBlocTransaction, sendBlocCalls, type BlocTxParams } from "@/src/core/tx-strato";
@@ -278,6 +286,41 @@ async function dispatchControl(method: string, args: unknown[]): Promise<unknown
     }
     case "swap.execute":
       return executeSwap(await getSelectedNetwork(), args[0] as Address, args[1] as SwapRequest);
+
+    // bridge (registry lives on STRATO regardless of the selected network)
+    case "bridge.config": {
+      const strato = (await getNetworks()).find(isStratoNetwork);
+      return strato
+        ? fetchBridgeConfig(strato)
+        : { bridgeAddr: "", nativeBridgeAddr: "", custodyVault: "", routes: [], chains: [] };
+    }
+    case "bridge.history": {
+      const strato = (await getNetworks()).find(isStratoNetwork);
+      return strato ? fetchBridgeHistory(strato, args[0] as string) : [];
+    }
+    case "bridge.withdraw": {
+      const strato = (await getNetworks()).find(isStratoNetwork);
+      if (!strato) throw new Error("No STRATO network configured");
+      return executeWithdrawal(
+        strato,
+        args[1] as BridgeConfig,
+        args[0] as Address,
+        args[2] as BridgeRoute,
+        args[3] as string,
+        args[4] as string
+      );
+    }
+    case "bridge.deposit": {
+      // Source is the currently-selected EVM network.
+      return executeDeposit(
+        await getSelectedNetwork(),
+        args[0] as Address,
+        args[1] as BridgeRoute,
+        args[2] as string,
+        args[3] as string,
+        args[4] as string
+      );
+    }
 
     // permissions
     case "permissions.list":

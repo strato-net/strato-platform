@@ -15,6 +15,13 @@ function fmt(n: number): string {
 }
 
 function tokenIcon(chainId: string, address: string): string {
+  // MetaMask only hosts the native-coin icon at the zero address for mainnet
+  // (chainId 1). On L2s whose native coin is also ETH (Base, Linea) that URL
+  // 404s, so resolve the native icon from mainnet — same coin, same logo. A
+  // chain badge (added in the UI) distinguishes which network it's on.
+  if (/^0x0+$/.test(address)) {
+    return `https://static.cx.metamask.io/api/v1/tokenIcons/1/${address.toLowerCase()}.png`;
+  }
   return `https://static.cx.metamask.io/api/v1/tokenIcons/${chainId}/${address.toLowerCase()}.png`;
 }
 

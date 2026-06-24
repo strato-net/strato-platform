@@ -42,6 +42,11 @@ export interface StratoNetwork {
   oauthIssuer?: string;
   /** Keycloak client id registered for this extension (public client + PKCE). */
   oauthClientId?: string;
+  /**
+   * Small network logo shown as a badge on token icons (MetaMask-style) to
+   * distinguish which chain a token lives on. Only set for EVM networks.
+   */
+  chainBadge?: string;
 }
 
 // /rpc, /api/*, /bloc/*, and /strato/v2.3/* are all nginx routes on the SAME node
@@ -95,6 +100,7 @@ export const ETHEREUM_NETWORK: StratoNetwork = {
   chainId: "1",
   explorerUrl: "https://etherscan.io",
   nativeSymbol: "ETH",
+  chainBadge: "https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg",
 };
 export const BASE_NETWORK: StratoNetwork = {
   id: "base",
@@ -104,6 +110,7 @@ export const BASE_NETWORK: StratoNetwork = {
   chainId: "8453",
   explorerUrl: "https://basescan.org",
   nativeSymbol: "ETH",
+  chainBadge: "https://icons.llamao.fi/icons/chains/rsz_base.jpg",
 };
 export const LINEA_NETWORK: StratoNetwork = {
   id: "linea",
@@ -113,6 +120,7 @@ export const LINEA_NETWORK: StratoNetwork = {
   chainId: "59144",
   explorerUrl: "https://lineascan.build",
   nativeSymbol: "ETH",
+  chainBadge: "https://icons.llamao.fi/icons/chains/rsz_linea.jpg",
 };
 
 /** Networks shipped with the extension. */
