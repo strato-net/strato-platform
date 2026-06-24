@@ -22,6 +22,7 @@ import {
   Gem,
   Clock,
   CheckCircle,
+  ShieldCheck,
   LucideIcon
 } from "lucide-react";
 import { usdstAddress } from "@/lib/constants";
@@ -80,6 +81,43 @@ const normalizeAddress = (addr?: string | null): string => (addr || "").toLowerC
 const isUserAddress = (addr: string, userAddress?: string | null): boolean => {
   return !!(userAddress && addr && normalizeAddress(addr) === normalizeAddress(userAddress));
 };
+
+const getEventAttribute = (event: Event, ...names: string[]): string => {
+  for (const name of names) {
+    const value = event.attributes[name];
+    if (value !== undefined && value !== null && value !== "") return String(value);
+  }
+  return "";
+};
+
+const formatUnixSeconds = (value: string): string => {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds <= 0) return "";
+
+  return new Date(seconds * 1000).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
+const stratoAmountField = (label: string, amount: string): ActivityField => ({
+  label,
+  value: formatValue(amount),
+  type: "amount",
+  badge: "STRATO",
+  rawAmount: getFullAmount(amount),
+});
+
+const addressField = (label: string, value: string, userAddress?: string | null): ActivityField => ({
+  label,
+  value,
+  type: "address",
+  isUserAddress: isUserAddress(value, userAddress),
+});
 
 /**
  * Helper to add image to a field if the address has an image
@@ -832,6 +870,234 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
             fieldLabels: ["Claimed By"],
             renderer: "addresses-with-bullet",
           },
+        },
+      };
+    },
+  },
+  "StratoStaked": {
+    contract_name: "StratoStaking",
+    event_name: "Staked",
+    displayName: "STRATO Staked",
+    filterConfig: { type: "single", attribute: "user" },
+    iconConfig: { icon: ShieldCheck, color: "bg-cyan-500" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+      const user = getEventAttribute(event, "user", "User");
+      const operator = getEventAttribute(event, "operator", "Operator");
+      const amount = getEventAttribute(event, "amount", "Amount") || "0";
+
+      return {
+        title: "STRATO Staked",
+        fields: [
+          stratoAmountField("Amount", amount),
+          addressField("User", user, userAddress),
+          addressField("Validator", operator, userAddress),
+        ],
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: { fieldLabels: ["Amount"], renderer: "amount-with-token" },
+          line2: { fieldLabels: ["User", "Validator"], renderer: "addresses-with-bullet" },
+        },
+      };
+    },
+  },
+  "StratoStakeMoved": {
+    contract_name: "StratoStaking",
+    event_name: "StakeMoved",
+    displayName: "STRATO Stake Moved",
+    filterConfig: { type: "single", attribute: "user" },
+    iconConfig: { icon: ArrowLeftRight, color: "bg-cyan-600" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+      const user = getEventAttribute(event, "user", "User");
+      const fromOperator = getEventAttribute(event, "fromOperator", "FromOperator");
+      const toOperator = getEventAttribute(event, "toOperator", "ToOperator");
+      const amount = getEventAttribute(event, "amount", "Amount") || "0";
+
+      return {
+        title: "STRATO Stake Moved",
+        fields: [
+          stratoAmountField("Amount", amount),
+          addressField("User", user, userAddress),
+          addressField("From Validator", fromOperator, userAddress),
+          addressField("To Validator", toOperator, userAddress),
+        ],
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: { fieldLabels: ["Amount"], renderer: "amount-with-token" },
+          line2: { fieldLabels: ["User", "From Validator", "To Validator"] },
+        },
+      };
+    },
+  },
+  "StratoUnbondingStarted": {
+    contract_name: "StratoStaking",
+    event_name: "UnbondingStarted",
+    displayName: "STRATO Unstake Queued",
+    filterConfig: { type: "single", attribute: "user" },
+    iconConfig: { icon: Clock, color: "bg-cyan-400" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+      const user = getEventAttribute(event, "user", "User");
+      const operator = getEventAttribute(event, "operator", "Operator");
+      const requestId = getEventAttribute(event, "requestId", "RequestId");
+      const amount = getEventAttribute(event, "amount", "Amount") || "0";
+      const releaseTime = formatUnixSeconds(getEventAttribute(event, "releaseTime", "ReleaseTime"));
+
+      const fields: ActivityField[] = [
+        stratoAmountField("Amount", amount),
+        addressField("User", user, userAddress),
+        addressField("Validator", operator, userAddress),
+      ];
+      if (requestId) fields.push({ label: "Request", value: `#${requestId}`, type: "text" });
+      if (releaseTime) fields.push({ label: "Releases", value: releaseTime, type: "text" });
+
+      return {
+        title: "STRATO Unstake Queued",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: { fieldLabels: ["Amount"], renderer: "amount-with-token" },
+          line2: { fieldLabels: releaseTime ? ["User", "Validator", "Releases"] : ["User", "Validator"] },
+        },
+      };
+    },
+  },
+  "StratoUnbondedWithdrawn": {
+    contract_name: "StratoStaking",
+    event_name: "UnbondedWithdrawn",
+    displayName: "STRATO Withdrawn",
+    filterConfig: { type: "single", attribute: "user" },
+    iconConfig: { icon: Upload, color: "bg-cyan-700" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+      const user = getEventAttribute(event, "user", "User");
+      const amount = getEventAttribute(event, "amount", "Amount") || "0";
+
+      return {
+        title: "STRATO Withdrawn",
+        fields: [
+          stratoAmountField("Amount", amount),
+          addressField("User", user, userAddress),
+        ],
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: { fieldLabels: ["Amount"], renderer: "amount-with-token" },
+          line2: { fieldLabels: ["User"], renderer: "addresses-with-bullet" },
+        },
+      };
+    },
+  },
+  "StratoDelegatorRewardsClaimed": {
+    contract_name: "StratoStaking",
+    event_name: "DelegatorRewardsClaimed",
+    displayName: "STRATO Rewards Claimed",
+    filterConfig: { type: "single", attribute: "user" },
+    iconConfig: { icon: Gift, color: "bg-gradient-to-br from-cyan-400 to-teal-500" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+      const user = getEventAttribute(event, "user", "User");
+      const amount = getEventAttribute(event, "amount", "Amount") || "0";
+
+      return {
+        title: "STRATO Rewards Claimed",
+        fields: [
+          stratoAmountField("Amount", amount),
+          addressField("User", user, userAddress),
+        ],
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: { fieldLabels: ["Amount"], renderer: "amount-with-token" },
+          line2: { fieldLabels: ["User"], renderer: "addresses-with-bullet" },
+        },
+      };
+    },
+  },
+  "StratoSelfBonded": {
+    contract_name: "StratoStaking",
+    event_name: "SelfBonded",
+    displayName: "STRATO Self-Bonded",
+    filterConfig: { type: "single", attribute: "operator" },
+    iconConfig: { icon: Coins, color: "bg-sky-600" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+      const operator = getEventAttribute(event, "operator", "Operator");
+      const amount = getEventAttribute(event, "amount", "Amount") || "0";
+
+      return {
+        title: "STRATO Self-Bonded",
+        fields: [
+          stratoAmountField("Amount", amount),
+          addressField("Operator", operator, userAddress),
+        ],
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: { fieldLabels: ["Amount"], renderer: "amount-with-token" },
+          line2: { fieldLabels: ["Operator"], renderer: "addresses-with-bullet" },
+        },
+      };
+    },
+  },
+  "StratoSelfBondUnbondingStarted": {
+    contract_name: "StratoStaking",
+    event_name: "SelfBondUnbondingStarted",
+    displayName: "STRATO Self-Bond Unstaking",
+    filterConfig: { type: "single", attribute: "operator" },
+    iconConfig: { icon: Clock, color: "bg-sky-500" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+      const operator = getEventAttribute(event, "operator", "Operator");
+      const requestId = getEventAttribute(event, "requestId", "RequestId");
+      const amount = getEventAttribute(event, "amount", "Amount") || "0";
+      const releaseTime = formatUnixSeconds(getEventAttribute(event, "releaseTime", "ReleaseTime"));
+
+      const fields: ActivityField[] = [
+        stratoAmountField("Amount", amount),
+        addressField("Operator", operator, userAddress),
+      ];
+      if (requestId) fields.push({ label: "Request", value: `#${requestId}`, type: "text" });
+      if (releaseTime) fields.push({ label: "Releases", value: releaseTime, type: "text" });
+
+      return {
+        title: "STRATO Self-Bond Unstaking",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: { fieldLabels: ["Amount"], renderer: "amount-with-token" },
+          line2: { fieldLabels: releaseTime ? ["Operator", "Releases"] : ["Operator"] },
+        },
+      };
+    },
+  },
+  "StratoOperatorRewardsClaimed": {
+    contract_name: "StratoStaking",
+    event_name: "OperatorRewardsClaimed",
+    displayName: "STRATO Operator Rewards Claimed",
+    filterConfig: { type: "single", attribute: "operator" },
+    iconConfig: { icon: Gift, color: "bg-gradient-to-br from-sky-400 to-cyan-500" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+      const operator = getEventAttribute(event, "operator", "Operator");
+      const amount = getEventAttribute(event, "amount", "Amount") || "0";
+
+      return {
+        title: "STRATO Operator Rewards Claimed",
+        fields: [
+          stratoAmountField("Amount", amount),
+          addressField("Operator", operator, userAddress),
+        ],
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: { fieldLabels: ["Amount"], renderer: "amount-with-token" },
+          line2: { fieldLabels: ["Operator"], renderer: "addresses-with-bullet" },
         },
       };
     },

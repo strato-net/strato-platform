@@ -69,6 +69,13 @@ export interface StratoStakingInfo {
   estimatedApy: string;
   userTotalStake: string;
   claimableRewards: string;
+  isOperator: boolean;
+  operatorAddress: string;
+  operatorClaimableRewards: string;
+  operatorPendingBaseRewards: string;
+  operatorPendingCommission: string;
+  operatorPendingSelfBondRewards: string;
+  currentOperatorCommissionBps: string;
   validators: StratoOperatorInfo[];
   unbondingRequests: StratoUnbondingRequestInfo[];
 }
@@ -161,6 +168,13 @@ const emptyInfo = (): StratoStakingInfo => ({
   estimatedApy: "-",
   userTotalStake: "0",
   claimableRewards: "0",
+  isOperator: false,
+  operatorAddress: "",
+  operatorClaimableRewards: "0",
+  operatorPendingBaseRewards: "0",
+  operatorPendingCommission: "0",
+  operatorPendingSelfBondRewards: "0",
+  currentOperatorCommissionBps: "0",
   validators: [],
   unbondingRequests: [],
 });
@@ -422,15 +436,16 @@ const getUnbondingRequests = async (
   }
 };
 
-const projectedStakeIndex = (state: Record<string, any>): bigint => {
-  const stored = parseBigIntLike(state.globalStakeRewardPerTokenStored);
+const projectedRewardIndexes = (state: Record<string, any>): { baseIndex: bigint; stakeIndex: bigint } => {
+  let baseIndex = parseBigIntLike(state.baseRewardPerOperatorStored);
+  let stakeIndex = parseBigIntLike(state.globalStakeRewardPerTokenStored);
   const periodStart = Number(state.periodStart || 0);
   const periodFinish = Number(state.periodFinish || 0);
   const lastUpdateTime = Number(state.lastUpdateTime || 0);
   const now = Math.floor(Date.now() / 1000);
   const current = Math.min(now, periodFinish);
 
-  if (!current || now < periodStart || current <= lastUpdateTime) return stored;
+  if (!current || now < periodStart || current <= lastUpdateTime) return { baseIndex, stakeIndex };
 
   let reserve = parseBigIntLike(state.scheduledRewardRemaining);
   const activeOperatorCount = parseBigIntLike(state.activeOperatorCount);
@@ -442,17 +457,60 @@ const projectedStakeIndex = (state: Record<string, any>): bigint => {
     if (baseAccrued > reserve) baseAccrued = reserve;
 
     const perOperator = baseAccrued / activeOperatorCount;
-    reserve -= perOperator * activeOperatorCount;
+    const allocatedBase = perOperator * activeOperatorCount;
+    if (allocatedBase > 0n) {
+      baseIndex += perOperator;
+      reserve -= allocatedBase;
+    }
   }
 
   if (parseBigIntLike(state.stakeRewardRate) <= 0n || totalRewardableStake <= 0n || reserve <= 0n) {
-    return stored;
+    return { baseIndex, stakeIndex };
   }
 
   let stakeAccrued = parseBigIntLike(state.stakeRewardRate) * delta;
   if (stakeAccrued > reserve) stakeAccrued = reserve;
 
-  return stored + ((stakeAccrued * WAD) / totalRewardableStake);
+  const rewardPerStake = (stakeAccrued * WAD) / totalRewardableStake;
+  const allocatedStake = (rewardPerStake * totalRewardableStake) / WAD;
+
+  if (allocatedStake > 0n) {
+    stakeIndex += rewardPerStake;
+  }
+
+  return { baseIndex, stakeIndex };
+};
+
+const projectedOperatorRewards = (
+  operator: Record<string, any>,
+  currentIndexes: { baseIndex: bigint; stakeIndex: bigint }
+): { base: bigint; selfBond: bigint; commission: bigint } => {
+  let base = parseBigIntLike(operator.pendingBaseRewards);
+  let selfBondReward = parseBigIntLike(operator.pendingSelfBondRewards);
+  let commission = parseBigIntLike(operator.pendingCommission);
+
+  if (!parseBoolLike(operator.active)) {
+    return { base, selfBond: selfBondReward, commission };
+  }
+
+  const basePaid = parseBigIntLike(operator.baseRewardPerOperatorPaid);
+  if (currentIndexes.baseIndex > basePaid) {
+    base += currentIndexes.baseIndex - basePaid;
+  }
+
+  const stakePaid = parseBigIntLike(operator.stakeRewardPerTokenPaid);
+  if (currentIndexes.stakeIndex > stakePaid) {
+    const stakeDelta = currentIndexes.stakeIndex - stakePaid;
+    const selfBond = parseBigIntLike(operator.selfBond);
+    const delegatedStake = parseBigIntLike(operator.delegatedStake);
+
+    selfBondReward += (selfBond * stakeDelta) / WAD;
+
+    const userGross = (delegatedStake * stakeDelta) / WAD;
+    commission += (userGross * parseBigIntLike(operator.commissionBps)) / BPS_DIVISOR;
+  }
+
+  return { base, selfBond: selfBondReward, commission };
 };
 
 const projectedDelegatorIndex = (
@@ -498,7 +556,7 @@ export const getStratoStakingInfo = async (
   if (!state) return emptyInfo();
 
   const tokenAddress = normalizeAddress(state.stratoToken) || stratoTokenAddress();
-  const currentStakeIndex = projectedStakeIndex(state);
+  const currentIndexes = projectedRewardIndexes(state);
 
   const [
     tokenInfo,
@@ -525,6 +583,13 @@ export const getStratoStakingInfo = async (
   let userWeightedApyBps = 0n;
   let activeApyBpsTotal = 0n;
   let activeApyCount = 0n;
+  let isOperator = false;
+  let connectedOperatorAddress = "";
+  let operatorPendingBaseRewards = 0n;
+  let operatorPendingCommission = 0n;
+  let operatorPendingSelfBondRewards = 0n;
+  let currentOperatorCommissionBps = 0n;
+  const normalizedUserAddress = normalizeAddress(userAddress);
 
   const validators = operatorRows.map((row) => {
     const operatorAddress = normalizeAddress(row.key);
@@ -537,12 +602,22 @@ export const getStratoStakingInfo = async (
     const userStake = userDelegatedStake.get(operatorAddress) || 0n;
     const pendingStored = userPendingRewards.get(operatorAddress) || 0n;
     const paid = userRewardPaid.get(operatorAddress) || 0n;
-    const projectedIndex = projectedDelegatorIndex(value, currentStakeIndex);
+    const projectedIndex = projectedDelegatorIndex(value, currentIndexes.stakeIndex);
     const projectedReward = userStake > 0n && projectedIndex > paid
       ? (userStake * (projectedIndex - paid)) / WAD
       : 0n;
     const pendingRewards = pendingStored + projectedReward;
     const apyBps = validatorApyBps(state, commissionBps);
+    const operatorRewards = projectedOperatorRewards(value, currentIndexes);
+
+    if (operatorAddress && operatorAddress === normalizedUserAddress) {
+      isOperator = true;
+      connectedOperatorAddress = operatorAddress;
+      operatorPendingBaseRewards = operatorRewards.base;
+      operatorPendingCommission = operatorRewards.commission;
+      operatorPendingSelfBondRewards = operatorRewards.selfBond;
+      currentOperatorCommissionBps = commissionBps;
+    }
 
     if (parseBoolLike(value.active)) {
       activeApyBpsTotal += apyBps;
@@ -607,6 +682,13 @@ export const getStratoStakingInfo = async (
     estimatedApy,
     userTotalStake: userTotalStake.toString(),
     claimableRewards: claimableRewards.toString(),
+    isOperator,
+    operatorAddress: connectedOperatorAddress,
+    operatorClaimableRewards: (operatorPendingBaseRewards + operatorPendingCommission + operatorPendingSelfBondRewards).toString(),
+    operatorPendingBaseRewards: operatorPendingBaseRewards.toString(),
+    operatorPendingCommission: operatorPendingCommission.toString(),
+    operatorPendingSelfBondRewards: operatorPendingSelfBondRewards.toString(),
+    currentOperatorCommissionBps: currentOperatorCommissionBps.toString(),
     validators,
     unbondingRequests,
   };
@@ -790,6 +872,20 @@ export const claimStratoRewards = async (
       claimOperators: claimOperatorsBatch,
     },
   })));
+};
+
+export const claimStratoOperatorRewards = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ status: string; hash: string }> => {
+  const staking = requireStakingAddress();
+
+  return await buildAndPost(accessToken, userAddress, {
+    contractName: extractContractName(StratoStaking),
+    contractAddress: staking,
+    method: "claimOperatorRewards",
+    args: {},
+  });
 };
 
 export const withdrawStratoUnbonded = async (

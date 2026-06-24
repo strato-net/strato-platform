@@ -40,30 +40,13 @@ export const activityFeedApi = {
       timeRange?: 'all' | 'today' | 'week' | 'month';
     } = {}
   ): Promise<EventResponse> => {
-    const params = new URLSearchParams();
-
-    // Format: "contract1:event1,contract2:event2"
-    const activityTypesStr = activityTypePairs
-      .map(p => `${p.contract_name}:${p.event_name}`)
-      .join(',');
-    params.append('activity_types', activityTypesStr);
-
-    // Send filter configs as JSON in query param
-    const filterConfigs = activityTypePairs.map(p => ({
-      contract_name: p.contract_name,
-      event_name: p.event_name,
-      filterConfig: p.filterConfig,
-    }));
-    params.append('filter_configs', JSON.stringify(filterConfigs));
-
-    if (options.limit) params.append('limit', options.limit.toString());
-    if (options.offset) params.append('offset', options.offset.toString());
-    if (options.myActivity) params.append('my_activity', 'true');
-    if (options.timeRange && options.timeRange !== 'all') {
-      params.append('time_range', options.timeRange);
-    }
-
-    const response = await api.get(`/events/activities?${params.toString()}`);
+    const response = await api.post('/events/activities', {
+      activityTypePairs,
+      limit: options.limit,
+      offset: options.offset,
+      myActivity: options.myActivity,
+      timeRange: options.timeRange,
+    });
     return response.data as EventResponse;
   },
 
@@ -89,5 +72,3 @@ export const activityFeedApi = {
     return { contractNames, eventNames };
   }
 };
-
- 

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
   addStratoOperator,
+  claimStratoOperatorRewards,
   claimStratoRewards,
   depositStratoRewards,
   getStratoStakingInfo,
@@ -108,6 +109,15 @@ class StakingController {
       }
 
       const result = await claimStratoRewards(req.accessToken, req.address as string, operators, claimAll);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async claimOperatorRewards(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await claimStratoOperatorRewards(req.accessToken, req.address as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

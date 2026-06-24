@@ -12,6 +12,7 @@ router.post("/stake", walletAuth, StakingController.stake);
 router.post("/move", walletAuth, StakingController.moveStake);
 router.post("/unstake", walletAuth, StakingController.unstake);
 router.post("/claim", walletAuth, StakingController.claim);
+router.post("/operator/claim", walletAuth, StakingController.claimOperatorRewards);
 router.post("/withdraw-unbonded", walletAuth, StakingController.withdrawUnbonded);
 
 router.post("/commission", walletAuth, StakingController.setCommission);

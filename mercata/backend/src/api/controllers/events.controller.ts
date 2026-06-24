@@ -38,49 +38,55 @@ class EventsController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, address, query } = req;
+      const { accessToken, address, body, query } = req;
 
-      // Parse activity type pairs from query
-      // Format: activity_types=contract1:event1,contract2:event2
-      const activityTypesParam = query.activity_types as string;
-      if (!activityTypesParam) {
+      let activityTypePairs: ActivityTypePair[] = [];
+      if (Array.isArray(body?.activityTypePairs)) {
+        activityTypePairs = body.activityTypePairs.map((pair: ActivityTypePair) => ({
+          contract_name: pair.contract_name,
+          event_name: pair.event_name,
+          filterConfig: pair.filterConfig,
+        }));
+      } else if (query.activity_types) {
+        const activityTypesParam = query.activity_types as string;
+        let filterConfigsMap: Map<string, ActivityTypePair["filterConfig"]> = new Map();
+        if (query.filter_configs) {
+          try {
+            const filterConfigs = JSON.parse(query.filter_configs as string) as Array<{
+              contract_name: string;
+              event_name: string;
+              filterConfig: ActivityTypePair["filterConfig"];
+            }>;
+            filterConfigs.forEach(config => {
+              const key = `${config.contract_name}:${config.event_name}`;
+              filterConfigsMap.set(key, config.filterConfig);
+            });
+          } catch (error) {
+            // If parsing fails, continue without filter configs (will use defaults)
+            console.warn("Failed to parse filter_configs:", error);
+          }
+        }
+
+        activityTypePairs = activityTypesParam.split(',').map((pair) => {
+          const [contract_name, event_name] = pair.split(':');
+          const key = `${contract_name}:${event_name}`;
+          return {
+            contract_name,
+            event_name,
+            filterConfig: filterConfigsMap.get(key)
+          };
+        });
+      }
+
+      if (!activityTypePairs.length) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "activity_types parameter required" });
         return;
       }
 
-      // Parse filter configs from query (JSON string)
-      let filterConfigsMap: Map<string, ActivityTypePair["filterConfig"]> = new Map();
-      if (query.filter_configs) {
-        try {
-          const filterConfigs = JSON.parse(query.filter_configs as string) as Array<{
-            contract_name: string;
-            event_name: string;
-            filterConfig: ActivityTypePair["filterConfig"];
-          }>;
-          filterConfigs.forEach(config => {
-            const key = `${config.contract_name}:${config.event_name}`;
-            filterConfigsMap.set(key, config.filterConfig);
-          });
-        } catch (error) {
-          // If parsing fails, continue without filter configs (will use defaults)
-          console.warn("Failed to parse filter_configs:", error);
-        }
-      }
-
-      const activityTypePairs: ActivityTypePair[] = activityTypesParam.split(',').map((pair) => {
-        const [contract_name, event_name] = pair.split(':');
-        const key = `${contract_name}:${event_name}`;
-        return {
-          contract_name,
-          event_name,
-          filterConfig: filterConfigsMap.get(key)
-        };
-      });
-
-      const limit = parseInt(query.limit as string || "10");
-      const offset = parseInt(query.offset as string || "0");
-      const userAddress = query.my_activity === 'true' ? address : undefined;
-      const timeRange = query.time_range as string | undefined;
+      const limit = parseInt(String(body?.limit ?? query.limit ?? "10"));
+      const offset = parseInt(String(body?.offset ?? query.offset ?? "0"));
+      const userAddress = (body?.myActivity === true || query.my_activity === 'true') ? address : undefined;
+      const timeRange = (body?.timeRange || query.time_range) as string | undefined;
 
       const activities = await getActivitiesByTypes(
         accessToken,
@@ -98,4 +104,4 @@ class EventsController {
   }
 }
 
-export default EventsController; 
+export default EventsController;
