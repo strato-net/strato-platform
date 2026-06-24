@@ -24,7 +24,13 @@ import {
 } from "lucide-react";
 import { callBackground } from "@/src/messaging/control";
 import type { AccountMeta, HdWalletInfo } from "@/src/core/keyring";
-import { type StratoNetwork, nativeSymbol, explorerTxUrl, isStratoNetwork } from "@/src/core/networks";
+import {
+  type StratoNetwork,
+  nativeSymbol,
+  explorerTxUrl,
+  isStratoNetwork,
+  isTestnet,
+} from "@/src/core/networks";
 import type { OriginPermission } from "@/src/core/permissions";
 import type { ActivityItem } from "@/src/core/activity";
 import type { TokenBalance, DefiPosition } from "@/src/core/portfolio";
@@ -144,11 +150,25 @@ function CopyButton({ value, className }: { value: string; className?: string })
 // --------------------------------------------------------------------- Home
 type HomeTab = "tokens" | "defi" | "activity";
 
+// Networks to show in a selector: hide testnets unless the toggle is on, but
+// always keep the currently-selected network visible (e.g. a dApp switched the
+// wallet to a testnet while the toggle is off).
+function visibleNetworks(
+  all: StratoNetwork[] | undefined,
+  showTestnets: boolean | undefined,
+  selectedId: string | undefined
+): StratoNetwork[] {
+  return (all ?? []).filter(
+    (n) => showTestnets || !isTestnet(n) || n.id === selectedId
+  );
+}
+
 export function Home({ navigate }: { navigate: (to: string) => void }) {
   const accounts = useAsync<AccountMeta[]>(() => callBackground("accounts.list"));
   const selected = useAsync<Address | null>(() => callBackground("accounts.selected"));
   const networks = useAsync<StratoNetwork[]>(() => callBackground("networks.list"));
   const network = useAsync<StratoNetwork>(() => callBackground("networks.selected"));
+  const showTestnets = useAsync<boolean>(() => callBackground("settings.showTestnets"));
   const [tab, setTab] = useState<HomeTab>("tokens");
   const [copied, copy] = useCopy();
   const [theme, toggleTheme] = useTheme();
@@ -262,7 +282,7 @@ export function Home({ navigate }: { navigate: (to: string) => void }) {
             }}
             className="appearance-none rounded-full border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 py-1.5 pl-3 pr-8 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-900"
           >
-            {(networks.data ?? []).map((n) => (
+            {visibleNetworks(networks.data, showTestnets.data, network.data?.id).map((n) => (
               <option key={n.id} value={n.id}>
                 {n.name}
               </option>
@@ -1655,7 +1675,13 @@ export function ImportAccount({ navigate }: { navigate: (to: string) => void }) 
 export function Settings({ navigate }: { navigate: (to: string) => void }) {
   const networks = useAsync<StratoNetwork[]>(() => callBackground("networks.list"));
   const selected = useAsync<StratoNetwork>(() => callBackground("networks.selected"));
+  const showTestnets = useAsync<boolean>(() => callBackground("settings.showTestnets"));
   const [form, setForm] = useState<Partial<StratoNetwork>>({});
+
+  const toggleTestnets = async () => {
+    await callBackground("settings.setShowTestnets", !showTestnets.data);
+    showTestnets.refresh();
+  };
 
   const save = async () => {
     const base = selected.data!;
@@ -1678,13 +1704,36 @@ export function Settings({ navigate }: { navigate: (to: string) => void }) {
               selected.refresh();
             }}
           >
-            {(networks.data ?? []).map((n) => (
+            {visibleNetworks(networks.data, showTestnets.data, selected.data?.id).map((n) => (
               <option key={n.id} value={n.id}>
                 {n.name}
               </option>
             ))}
           </select>
         </Field>
+
+        <label className="flex items-center justify-between rounded-lg border border-slate-300 dark:border-slate-800 px-3 py-2">
+          <span className="text-sm">
+            Show test networks
+            <span className="block text-xs text-slate-400">
+              STRATO Helium &amp; Sepolia testnets
+            </span>
+          </span>
+          <button
+            role="switch"
+            aria-checked={!!showTestnets.data}
+            onClick={toggleTestnets}
+            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+              showTestnets.data ? "bg-[#001B70]" : "bg-slate-300 dark:bg-slate-700"
+            }`}
+          >
+            <span
+              className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                showTestnets.data ? "translate-x-5" : "translate-x-0"
+              }`}
+            />
+          </button>
+        </label>
 
         {selected.data && (
           <Card className="space-y-2">

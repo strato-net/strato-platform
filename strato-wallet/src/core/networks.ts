@@ -47,6 +47,12 @@ export interface StratoNetwork {
    * distinguish which chain a token lives on. Only set for EVM networks.
    */
   chainBadge?: string;
+  /**
+   * Test network. Hidden from the UI selectors unless "Show test networks" is
+   * enabled in Settings, but always known to the background so dApps running on a
+   * testnet can still discover/connect and switch the wallet to it.
+   */
+  testnet?: boolean;
 }
 
 // /rpc, /api/*, /bloc/*, and /strato/v2.3/* are all nginx routes on the SAME node
@@ -123,12 +129,70 @@ export const LINEA_NETWORK: StratoNetwork = {
   chainBadge: "https://icons.llamao.fi/icons/chains/rsz_linea.jpg",
 };
 
+// ---- Test networks. Hidden by default (Settings → Show test networks), but
+// always present in getNetworks() so dApps on a testnet can connect/switch. ----
+
+// STRATO Helium testnet (BlockApps public testnet). Verified chainId
+// 195049586845898 (0xb165855668ca) at app.testnet.strato.nexus/rpc.
+export const HELIUM_NETWORK: StratoNetwork = {
+  id: "strato-helium",
+  name: "STRATO Helium",
+  kind: "strato",
+  testnet: true,
+  rpcUrl: "https://app.testnet.strato.nexus/rpc",
+  chainId: "195049586845898",
+  blocUrl: "https://app.testnet.strato.nexus/bloc/v2.2",
+  stratoApiUrl: "https://app.testnet.strato.nexus/strato-api/eth/v1.2",
+  vaultUrl: "https://app.testnet.strato.nexus/strato/v2.3",
+  explorerUrl: "https://stratoscan.testnet.strato.nexus",
+  nativeSymbol: "USDST",
+  oauthIssuer: "https://keycloak.blockapps.net/auth/realms/mercata",
+  oauthClientId: "strato-wallet-extension-test",
+};
+export const ETHEREUM_SEPOLIA_NETWORK: StratoNetwork = {
+  id: "ethereum-sepolia",
+  name: "Ethereum Sepolia",
+  kind: "evm",
+  testnet: true,
+  rpcUrl: "https://ethereum-sepolia-rpc.publicnode.com",
+  chainId: "11155111",
+  explorerUrl: "https://sepolia.etherscan.io",
+  nativeSymbol: "ETH",
+  chainBadge: "https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg",
+};
+export const BASE_SEPOLIA_NETWORK: StratoNetwork = {
+  id: "base-sepolia",
+  name: "Base Sepolia",
+  kind: "evm",
+  testnet: true,
+  rpcUrl: "https://sepolia.base.org",
+  chainId: "84532",
+  explorerUrl: "https://sepolia.basescan.org",
+  nativeSymbol: "ETH",
+  chainBadge: "https://icons.llamao.fi/icons/chains/rsz_base.jpg",
+};
+export const LINEA_SEPOLIA_NETWORK: StratoNetwork = {
+  id: "linea-sepolia",
+  name: "Linea Sepolia",
+  kind: "evm",
+  testnet: true,
+  rpcUrl: "https://rpc.sepolia.linea.build",
+  chainId: "59141",
+  explorerUrl: "https://sepolia.lineascan.build",
+  nativeSymbol: "ETH",
+  chainBadge: "https://icons.llamao.fi/icons/chains/rsz_linea.jpg",
+};
+
 /** Networks shipped with the extension. */
 export const BUILTIN_NETWORKS: StratoNetwork[] = [
   DEFAULT_NETWORK,
   ETHEREUM_NETWORK,
   BASE_NETWORK,
   LINEA_NETWORK,
+  HELIUM_NETWORK,
+  ETHEREUM_SEPOLIA_NETWORK,
+  BASE_SEPOLIA_NETWORK,
+  LINEA_SEPOLIA_NETWORK,
 ];
 
 /** True for STRATO networks (Cirrus/BLOC/swap); false for generic EVM. */
@@ -182,6 +246,26 @@ const networksStore = storage.defineItem<StratoNetwork[]>("local:networks", {
 const selectedStore = storage.defineItem<string>("local:selectedNetwork", {
   fallback: DEFAULT_NETWORK.id,
 });
+
+// Whether test networks are shown in the UI selectors. Off by default; testnets
+// are always known to the background regardless of this flag (so dApps on a
+// testnet can still connect and switch the wallet to it).
+const showTestnetsStore = storage.defineItem<boolean>("local:showTestnets", {
+  fallback: false,
+});
+
+export async function getShowTestnets(): Promise<boolean> {
+  return showTestnetsStore.getValue();
+}
+
+export async function setShowTestnets(show: boolean): Promise<void> {
+  await showTestnetsStore.setValue(show);
+}
+
+/** True if this network is a test network. */
+export function isTestnet(n: StratoNetwork): boolean {
+  return n.testnet === true;
+}
 
 export async function getNetworks(): Promise<StratoNetwork[]> {
   const stored = await networksStore.getValue();

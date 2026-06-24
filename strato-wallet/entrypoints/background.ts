@@ -24,6 +24,8 @@ import {
   userInfoUrl,
   nativeSymbol,
   isStratoNetwork,
+  getShowTestnets,
+  setShowTestnets,
   type StratoNetwork,
 } from "@/src/core/networks";
 import { fetchEvmTokens, fetchEvmActivity } from "@/src/core/evm-portfolio";
@@ -133,6 +135,15 @@ async function broadcastEvent(event: string, data: unknown): Promise<void> {
   await sendEventToOrigins(origins, event, data);
 }
 
+// The STRATO network a bridge operation targets: the selected one if it's a
+// STRATO chain (so STRATO Helium bridges against Helium), else the first STRATO
+// network (mainnet) — used when bridging while a non-STRATO chain is selected.
+async function stratoForBridge(): Promise<StratoNetwork | undefined> {
+  const selected = await getSelectedNetwork();
+  if (isStratoNetwork(selected)) return selected;
+  return (await getNetworks()).find(isStratoNetwork);
+}
+
 // Control handler registry used by the popup UI.
 async function dispatchControl(method: string, args: unknown[]): Promise<unknown> {
   switch (method) {
@@ -208,6 +219,10 @@ async function dispatchControl(method: string, args: unknown[]): Promise<unknown
       return setSelectedNetwork(args[0] as string);
     case "networks.upsert":
       return upsertNetwork(args[0] as StratoNetwork);
+    case "settings.showTestnets":
+      return getShowTestnets();
+    case "settings.setShowTestnets":
+      return setShowTestnets(args[0] as boolean);
 
     // balances / sending from the popup
     case "balance": {
@@ -297,17 +312,17 @@ async function dispatchControl(method: string, args: unknown[]): Promise<unknown
 
     // bridge (registry lives on STRATO regardless of the selected network)
     case "bridge.config": {
-      const strato = (await getNetworks()).find(isStratoNetwork);
+      const strato = await stratoForBridge();
       return strato
         ? fetchBridgeConfig(strato)
         : { bridgeAddr: "", nativeBridgeAddr: "", custodyVault: "", routes: [], chains: [] };
     }
     case "bridge.history": {
-      const strato = (await getNetworks()).find(isStratoNetwork);
+      const strato = await stratoForBridge();
       return strato ? fetchBridgeHistory(strato, args[0] as string) : [];
     }
     case "bridge.withdraw": {
-      const strato = (await getNetworks()).find(isStratoNetwork);
+      const strato = await stratoForBridge();
       if (!strato) throw new Error("No STRATO network configured");
       return executeWithdrawal(
         strato,
