@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import "@/lib/monaco";
 import { useTheme } from "next-themes";
@@ -31,6 +31,7 @@ import {
   type XabiResult,
 } from "@/services/contracts";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
+import { usePersistentState } from "@/hooks/usePersistentState";
 import { useUser } from "@/context/UserContext";
 
 interface SourceFile {
@@ -60,8 +61,16 @@ export function EditorTab() {
   const { submit: submitTx, canSubmit } = useSubmitTransaction();
   const { userAddress, isAppAuthenticated } = useUser();
 
-  const [files, setFiles] = useState<SourceFile[]>([{ name: "Main.sol", content: STARTER }]);
-  const [active, setActive] = useState(0);
+  // Persisted so edits and added files survive tab switches and page reloads.
+  const [files, setFiles] = usePersistentState<SourceFile[]>("smd:editor:files", [
+    { name: "Main.sol", content: STARTER },
+  ]);
+  const [active, setActive] = usePersistentState<number>("smd:editor:active", 0);
+
+  // Keep the active index valid if a persisted value points past the file list.
+  useEffect(() => {
+    if (active > files.length - 1) setActive(Math.max(0, files.length - 1));
+  }, [files.length, active, setActive]);
   const [output, setOutput] = useState<string>("");
   const [compiling, setCompiling] = useState(false);
 
