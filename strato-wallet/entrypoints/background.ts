@@ -55,6 +55,14 @@ export default defineBackground(() => {
   // Allow the Bearer-token vault signature POST past nginx's CSRF guard.
   installCsrfBypassRule();
 
+  // If the user closes the approval popup without deciding, reject the pending
+  // requests so the dApp gets a clean rejection instead of spinning forever.
+  browser.windows?.onRemoved?.addListener((windowId) => {
+    approvals.onWindowClosed(windowId).catch(() => {
+      /* nothing actionable if cleanup fails */
+    });
+  });
+
   // Keep-alive: the popup/approval UI holds this port open so the service worker
   // (and its in-memory keyring + pending approvals) survives while a wallet
   // window is open. Accepting the connection is all that's needed.

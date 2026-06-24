@@ -8,6 +8,7 @@
 // the popup can render the queue.
 
 import { storage } from "wxt/storage";
+import { RpcErrors } from "@/src/messaging/protocol";
 
 export type ApprovalType =
   | "connect"
@@ -39,6 +40,8 @@ const queueStore = storage.defineItem<PendingApproval[]>("local:approvalQueue", 
 class ApprovalController {
   private resolvers = new Map<string, Resolver>();
   private seq = 0;
+  /** The id of the currently-open approval popup window (if any). */
+  private windowId: number | null = null;
 
   async getQueue(): Promise<PendingApproval[]> {
     return queueStore.getValue();
@@ -58,15 +61,46 @@ class ApprovalController {
       data,
       createdAt: Date.now(),
     };
-    const queue = await queueStore.getValue();
+    // Drop zombie entries: any queued approval with no live resolver belongs to a
+    // previous service-worker lifetime (its dApp promise is already dead). Pruning
+    // them here means a fresh request always surfaces as the active approval,
+    // instead of the stale one wedging the popup (e.g. reconnect after a
+    // disconnect spinning until a page refresh).
+    const queue = (await queueStore.getValue()).filter((a) => this.resolvers.has(a.id));
     await queueStore.setValue([...queue, approval]);
 
     const promise = new Promise<T>((resolve, reject) => {
       this.resolvers.set(id, { resolve: resolve as (v: unknown) => void, reject });
     });
 
-    await openApprovalPopup();
+    await this.ensurePopup();
     return promise;
+  }
+
+  /** Open the approval popup, reusing/focusing an existing one rather than stacking. */
+  private async ensurePopup(): Promise<void> {
+    if (this.windowId != null) {
+      try {
+        await browser.windows.update(this.windowId, { focused: true });
+        return;
+      } catch {
+        this.windowId = null; // window was closed since we last opened it
+      }
+    }
+    this.windowId = await openApprovalPopup();
+  }
+
+  /**
+   * Called when a browser window closes. If it's our approval popup and the user
+   * dismissed it without deciding, reject the outstanding requests so the dApp
+   * gets a clean "user rejected" instead of hanging forever.
+   */
+  async onWindowClosed(windowId: number): Promise<void> {
+    if (windowId !== this.windowId) return;
+    this.windowId = null;
+    for (const [, r] of this.resolvers) r.reject(RpcErrors.userRejected);
+    this.resolvers.clear();
+    await queueStore.setValue([]);
   }
 
   async resolve(id: string, value: unknown): Promise<void> {
@@ -93,16 +127,17 @@ class ApprovalController {
   }
 }
 
-async function openApprovalPopup(): Promise<void> {
+async function openApprovalPopup(): Promise<number | null> {
   const url = browser.runtime.getURL("/popup.html#/approve");
   try {
-    await browser.windows.create({
+    const win = await browser.windows.create({
       url,
       type: "popup",
       width: 380,
       height: 620,
       focused: true,
     });
+    return win?.id ?? null;
   } catch {
     // Fallback: best-effort open of the default action popup.
     try {
@@ -110,6 +145,7 @@ async function openApprovalPopup(): Promise<void> {
     } catch {
       /* ignore */
     }
+    return null;
   }
 }
 
