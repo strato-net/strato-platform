@@ -247,12 +247,9 @@ spec = do
 
 CREATE OR REPLACE FUNCTION "insert_or_update_Vehicle2_history_table"() RETURNS TRIGGER AS $$
 BEGIN
-    RAISE NOTICE 'Trigger fired for % on table Vehicle2: %', TG_OP, NEW.address;
     IF TG_OP = 'INSERT' THEN
-        RAISE NOTICE 'Inserting into history table history@Vehicle2 for address: %', NEW.address;
         INSERT INTO "history@Vehicle2" VALUES (NEW.*);
     ELSIF TG_OP = 'UPDATE' THEN
-        RAISE NOTICE 'Updating history table history@Vehicle2 for address: %', NEW.address;
         INSERT INTO "history@Vehicle2" VALUES (NEW.*);
     END IF;
     RETURN NEW;

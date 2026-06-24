@@ -21,9 +21,10 @@ import GHC.Generics
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Instances.Text ()
 import Text.Format
+import Text.ShortDescription
 
 newtype Validator = Validator Address
-  deriving (Generic, Eq, Data, Show, Ord, Read, FromJSON, ToJSON, RLPSerializable, NFData, Format, Binary, Arbitrary)
+  deriving (Generic, Eq, Data, Show, Ord, Read, FromJSON, ToJSON, RLPSerializable, NFData, Format, ShortDescription, Binary, Arbitrary)
 
 instance ToSchema Validator where
   declareNamedSchema _ =
