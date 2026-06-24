@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAccount } from "wagmi";
 import { formatUnits } from "ethers";
 import { ArrowLeft, CheckCircle2, Clock, Loader2, RefreshCw, Search } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -176,7 +177,8 @@ const validatorKey = (validator: StakingValidator): string => validator.operator
 
 const EarnStaking = () => {
   const navigate = useNavigate();
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn, isAppAuthenticated } = useUser();
+  const { isConnected } = useAccount();
   const { toast } = useToast();
   const [info, setInfo] = useState<StakingInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -196,6 +198,8 @@ const EarnStaking = () => {
 
   const decimals = Number(info?.tokenDecimals || 18);
   const symbol = info?.tokenSymbol || "STRATO";
+  const useExternalWalletSigning = isConnected && !isAppAuthenticated;
+  const stakingTxConfig = useExternalWalletSigning ? ({ walletAuth: true } as any) : undefined;
 
   const refreshInfo = useCallback(async () => {
     setLoading(true);
@@ -380,7 +384,7 @@ const EarnStaking = () => {
       async () => {
         await api.post("/staking/stake", {
           delegations: [{ operator: actionValidatorOperator, amount: totalStakeAmount.toString() }],
-        });
+        }, stakingTxConfig);
         closeActionModal();
         setStakeAmount("");
       },
@@ -394,7 +398,7 @@ const EarnStaking = () => {
 
     await runAction(
       async () => {
-        await api.post("/staking/unstake", { operator: actionValidatorOperator, amount: unstakeAmountParsed.toString() });
+        await api.post("/staking/unstake", { operator: actionValidatorOperator, amount: unstakeAmountParsed.toString() }, stakingTxConfig);
         closeActionModal();
         setUnstakeAmount("");
       },
@@ -412,7 +416,7 @@ const EarnStaking = () => {
           fromOperator: actionValidatorOperator,
           toOperator: moveTargetOperator,
           amount: moveAmountParsed.toString(),
-        });
+        }, stakingTxConfig);
         closeActionModal();
         setMoveAmount("");
       },
@@ -424,7 +428,7 @@ const EarnStaking = () => {
   const handleClaim = async (operator?: string) => {
     await runAction(
       async () => {
-        await api.post("/staking/claim", operator ? { operators: [operator] } : { claimAll: true });
+        await api.post("/staking/claim", operator ? { operators: [operator] } : { claimAll: true }, stakingTxConfig);
       },
       "Claim submitted",
       "claim"
@@ -435,7 +439,7 @@ const EarnStaking = () => {
     if (!claimReady || !actionValidatorOperator) return;
     await runAction(
       async () => {
-        await api.post("/staking/claim", { operators: [actionValidatorOperator] });
+        await api.post("/staking/claim", { operators: [actionValidatorOperator] }, stakingTxConfig);
         closeActionModal();
       },
       "Claim submitted",
@@ -446,7 +450,7 @@ const EarnStaking = () => {
   const handleWithdrawReady = async () => {
     await runAction(
       async () => {
-        await api.post("/staking/withdraw-unbonded", { withdrawAll: true });
+        await api.post("/staking/withdraw-unbonded", { withdrawAll: true }, stakingTxConfig);
       },
       "Withdrawal submitted",
       "withdraw"
@@ -458,7 +462,7 @@ const EarnStaking = () => {
 
     await runAction(
       async () => {
-        await api.post("/staking/operator/claim");
+        await api.post("/staking/operator/claim", undefined, stakingTxConfig);
       },
       "Operator claim submitted",
       "operator-claim"
@@ -470,7 +474,7 @@ const EarnStaking = () => {
 
     await runAction(
       async () => {
-        await api.post("/staking/commission", { commissionBps: operatorCommissionBps.toString() });
+        await api.post("/staking/commission", { commissionBps: operatorCommissionBps.toString() }, stakingTxConfig);
         setOperatorCommissionPercent("");
       },
       "Commission update submitted",
@@ -483,7 +487,7 @@ const EarnStaking = () => {
 
     await runAction(
       async () => {
-        await api.post("/staking/self-bond", { amount: selfBondAmountParsed.toString() });
+        await api.post("/staking/self-bond", { amount: selfBondAmountParsed.toString() }, stakingTxConfig);
         setSelfBondAmount("");
       },
       "Self-bond submitted",
@@ -496,7 +500,7 @@ const EarnStaking = () => {
 
     await runAction(
       async () => {
-        await api.post("/staking/self-unbond", { amount: selfUnbondAmountParsed.toString() });
+        await api.post("/staking/self-unbond", { amount: selfUnbondAmountParsed.toString() }, stakingTxConfig);
         setSelfUnbondAmount("");
       },
       "Self-unbond submitted",
@@ -548,39 +552,39 @@ const EarnStaking = () => {
           <Card>
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">Delegation APY</p>
-              <p className="mt-1 text-2xl font-semibold">{info.estimatedApy === "-" ? "-" : `${info.estimatedApy}%`}</p>
+              <p className="mt-1 font-semibold">{info.estimatedApy === "-" ? "-" : `${info.estimatedApy}%`}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">Wallet</p>
-              <p className="mt-1 text-2xl font-semibold">{formatToken(info.walletBalance, decimals)} {symbol}</p>
+              <p className="mt-1 font-semibold">{formatToken(info.walletBalance, decimals)} {symbol}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">Network Stake</p>
-              <p className="mt-1 text-2xl font-semibold">{formatToken(info.totalRewardableStake, decimals)} {symbol}</p>
+              <p className="mt-1 font-semibold">{formatToken(info.totalRewardableStake, decimals)} {symbol}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Your Delegation</p>
-              <p className="mt-1 text-2xl font-semibold">{formatToken(info.userTotalStake, decimals)} {symbol}</p>
+              <p className="text-xs text-muted-foreground">Your Stake</p>
+              <p className="mt-1 font-semibold">{formatToken(info.userTotalStake, decimals)} {symbol}</p>
             </CardContent>
           </Card>
           {info.isOperator && (
             <Card>
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground">Self-Bond</p>
-                <p className="mt-1 text-2xl font-semibold">{formatToken(operatorValidator?.selfBond, decimals)} {symbol}</p>
+                <p className="mt-1 font-semibold">{formatToken(operatorValidator?.selfBond, decimals)} {symbol}</p>
               </CardContent>
             </Card>
           )}
           <Card>
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">Claimable</p>
-              <p className="mt-1 text-2xl font-semibold">{formatToken(info.claimableRewards, decimals)} {symbol}</p>
+              <p className="mt-1 font-semibold">{formatToken(info.claimableRewards, decimals)} {symbol}</p>
             </CardContent>
           </Card>
         </div>
@@ -618,7 +622,7 @@ const EarnStaking = () => {
               <div className={`mt-4 grid gap-3 ${operatorActive ? "lg:grid-cols-3" : operatorSelfBond > 0n ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
                 <div className="rounded-md bg-muted/30 p-3">
                   <p className="text-xs text-muted-foreground">Operator Rewards</p>
-                  <p className="mt-1 text-xl font-semibold">{formatToken(info.operatorClaimableRewards, decimals)} {symbol}</p>
+                  <p className="mt-1 font-semibold">{formatToken(info.operatorClaimableRewards, decimals)} {symbol}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Base {formatToken(info.operatorPendingBaseRewards, decimals)} · Commission {formatToken(info.operatorPendingCommission, decimals)} · Self-bond {formatToken(info.operatorPendingSelfBondRewards, decimals)}
                   </p>
