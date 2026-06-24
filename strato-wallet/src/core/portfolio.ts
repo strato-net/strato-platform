@@ -12,6 +12,8 @@ export interface TokenBalance {
   raw: string; // base-unit balance
   amount: string; // formatted
   icon?: string; // image URL
+  /** Token lifecycle status: 2 = active, 3 = legacy/retired, other = hidden. */
+  status: number;
 }
 
 export interface DefiPosition {
@@ -56,7 +58,7 @@ export async function fetchTokens(
   const addr = address.toLowerCase().replace(/^0x/, "");
   const url =
     `${base(network)}/BlockApps-Token?balances.key=eq.${addr}` +
-    `&select=address,_name,_symbol,customDecimals,images:BlockApps-Token-images(value),` +
+    `&select=address,_name,_symbol,customDecimals,status,images:BlockApps-Token-images(value),` +
     `balances:BlockApps-Token-_balances!inner(balance:value::text)&limit=200`;
   const rows = await cget(url);
   const tokens = rows
@@ -71,6 +73,7 @@ export async function fetchTokens(
         raw,
         amount: fmt(raw, decimals),
         icon: firstImage(r.images),
+        status: Number(r.status),
       };
     })
     .filter((t) => t.raw !== "0");

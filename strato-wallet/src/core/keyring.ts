@@ -466,7 +466,7 @@ async function signViaBearer(
 
 /** Legacy cookie-session vault signing (same-origin contexts only). */
 async function signViaVaultCookie(vaultUrl: string, hash: Hex): Promise<Signature> {
-  const res = await fetch(`${vaultUrl.replace(/\/$/, "")}/strato/v2.3/signature`, {
+  const res = await fetch(`${vaultUrl.replace(/\/$/, "")}/signature`, {
     method: "POST",
     credentials: "include",
     headers: { "content-type": "application/json" },

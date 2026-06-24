@@ -72,7 +72,7 @@ export const DEFAULT_NETWORK: StratoNetwork = {
   chainId: "123354377739506",
   blocUrl: "https://dnorwood.stratomercata.com/bloc/v2.2",
   stratoApiUrl: "https://dnorwood.stratomercata.com/strato-api/eth/v1.2",
-  vaultUrl: "https://dnorwood.stratomercata.com",
+  vaultUrl: "https://vault.blockapps.net:8093/strato/v2.3",
   explorerUrl: STRATO_EXPLORER,
   nativeSymbol: "USDST",
   oauthIssuer: "https://keycloak.blockapps.net/auth/realms/mercata",

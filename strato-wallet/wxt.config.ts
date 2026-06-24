@@ -6,6 +6,15 @@ import { defineConfig } from "wxt";
 export default defineConfig({
   modules: ["@wxt-dev/module-react"],
   srcDir: ".",
+  // The toolbar icon opens the side panel (set via sidePanel.setPanelBehavior in
+  // the background). That only takes effect when the action has NO default_popup,
+  // so strip the one WXT auto-adds for the popup entrypoint. popup.html is still
+  // built and used for the standalone approval window.
+  hooks: {
+    "build:manifestGenerated"(_wxt, manifest) {
+      if (manifest.action) delete manifest.action.default_popup;
+    },
+  },
   manifest: {
     name: "STRATO Wallet",
     description:

@@ -326,9 +326,15 @@ function TokensTab({
     async () => (address && network ? callBackground("tokens.list", address) : []),
     [address, network?.chainId]
   );
+  const [showLegacy, setShowLegacy] = useState(false);
+
   // The native (USDST) balance comes from the headline rpc call; list other
-  // tokens from Cirrus below it (deduped against the native symbol).
+  // tokens from Cirrus below it (deduped against the native symbol). Active
+  // tokens (status 2) show in the main list; legacy (status 3) collapse below;
+  // anything else is hidden.
   const others = (tokens.data ?? []).filter((t) => t.symbol !== symbol);
+  const active = others.filter((t) => t.status === 2);
+  const legacy = others.filter((t) => t.status === 3);
   const nativeName = (tokens.data ?? []).find((t) => t.symbol === symbol)?.name ?? symbol;
 
   return (
@@ -346,23 +352,45 @@ function TokensTab({
         </div>
       </div>
 
-      {others.map((t) => (
-        <div
-          key={t.address}
-          className="flex items-center justify-between gap-3 overflow-hidden rounded-lg px-1 py-2"
-        >
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <TokenIcon symbol={t.symbol} icon={t.icon} />
-            <div className="min-w-0">
-              <div className="truncate text-sm font-medium">{t.symbol}</div>
-              <div className="truncate text-xs text-slate-400">{t.name}</div>
-            </div>
-          </div>
-          <div className="shrink-0 whitespace-nowrap text-right text-sm font-medium">
-            {t.amount} {t.symbol}
-          </div>
-        </div>
+      {active.map((t) => (
+        <TokenRow key={t.address} token={t} />
       ))}
+
+      {legacy.length > 0 && (
+        <div className="pt-1">
+          <button
+            onClick={() => setShowLegacy((v) => !v)}
+            className="flex w-full items-center gap-1 px-1 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          >
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${showLegacy ? "" : "-rotate-90"}`}
+            />
+            Legacy tokens ({legacy.length})
+          </button>
+          {showLegacy && legacy.map((t) => <TokenRow key={t.address} token={t} muted />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TokenRow({ token, muted }: { token: TokenBalance; muted?: boolean }) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-3 overflow-hidden rounded-lg px-1 py-2 ${
+        muted ? "opacity-70" : ""
+      }`}
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <TokenIcon symbol={token.symbol} icon={token.icon} />
+        <div className="min-w-0">
+          <div className="truncate text-sm font-medium">{token.symbol}</div>
+          <div className="truncate text-xs text-slate-400">{token.name}</div>
+        </div>
+      </div>
+      <div className="shrink-0 whitespace-nowrap text-right text-sm font-medium">
+        {token.amount} {token.symbol}
+      </div>
     </div>
   );
 }
@@ -531,7 +559,8 @@ export function Send({ navigate }: { navigate: (to: string) => void }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const list = tokens.data ?? [];
+  // Only active tokens (status 2) are sendable from the dropdown.
+  const list = (tokens.data ?? []).filter((t) => t.status === 2);
   // Default to USDST (native) if held, else the first token.
   useEffect(() => {
     if (tokenAddr || list.length === 0) return;
@@ -1518,6 +1547,8 @@ export function Settings({ navigate }: { navigate: (to: string) => void }) {
           onClick={async () => {
             await callBackground("wallet.lock");
             navigate("");
+            // Re-run App so it re-checks lock state and shows the Unlock screen.
+            window.location.reload();
           }}
         >
           Lock wallet

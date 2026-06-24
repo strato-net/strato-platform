@@ -36,6 +36,11 @@ import { sendBlocTransaction, sendBlocCalls, type BlocTxParams } from "@/src/cor
 import { listPermissions, revokePermission } from "@/src/core/permissions";
 
 export default defineBackground(() => {
+  // Clicking the toolbar icon opens the side panel (needs no action popup).
+  chrome.sidePanel
+    ?.setPanelBehavior?.({ openPanelOnActionClick: true })
+    .catch((e) => console.error("setPanelBehavior failed", e));
+
   // Allow the Bearer-token vault signature POST past nginx's CSRF guard.
   installCsrfBypassRule();
 
