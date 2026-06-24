@@ -67,6 +67,8 @@ import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
 import qualified Blockchain.Database.MerklePatricia as MP
+import Blockchain.EthConf (ethConf)
+import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.SolidVM.Exception
@@ -82,6 +84,7 @@ import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
 import Blockchain.VMOptions
 import Control.Applicative ((<|>))
+import Control.Arrow ((&&&))
 import Control.Lens hiding (Context)
 import Control.Monad
 import Control.Monad.Catch (MonadCatch)
@@ -948,8 +951,10 @@ blockappsAddresses = S.fromList
 getUsername :: MonadSM m => m (Maybe Text)
 getUsername = do
   let go []     = do
-        origin <- Env.origin <$> getEnv
-        if origin `S.member` blockappsAddresses
+        (origin, currentBlockNum) <- (Env.origin &&& (blockHeaderBlockNumber . Env.blockHeader)) <$> getEnv
+        let netID = Conf.networkID (Conf.networkConfig ethConf)
+            isPreUsernameFork = currentBlockNum < 100000 && (netID `elem` [33056204878082667, 114784819836269])
+        if isPreUsernameFork && origin `S.member` blockappsAddresses
           then pure $ Just "BlockApps"
           else pure Nothing
       go (x:xs) = do
