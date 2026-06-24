@@ -983,13 +983,6 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
                   isTypeArray (SVMType.Array _ _) = True
                   isTypeArray _ = False
 
-          multilineLog "event/emit/versioning" $
-            boringBox
-              [ "Emitting event:",
-                "Event: " ++ C.yellow eventName,
-                "Contract: " ++ C.yellow (labelToString $ CC._contractName curCnct)
-              ]
-
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
           tHash <- Env.txHash <$> getEnv
           txSender <- Env.origin <$> getEnv
@@ -2456,7 +2449,7 @@ callBuiltin "create" args@(cName : src : argVals) = do
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   isRunningTests <- Env.runningTests <$> getEnv
-  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
+  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 $ T.pack contractSrc
   addNewCodeCollection hsh cc
   newAddress <- getNewAddress creator
   execResults <- create' creator newAddress hsh cc contractName' argVals
@@ -2480,7 +2473,7 @@ callBuiltin "create2" args@(salt : n : src : argVals) = do
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   isRunningTests <- Env.runningTests <$> getEnv
-  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
+  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 $ T.pack contractSrc
   addNewCodeCollection hsh cc
   newAddress <- getNewAddressWithSalt creator salt hsh $ n:argVals
   execResults <- create' creator newAddress hsh cc contractName' argVals

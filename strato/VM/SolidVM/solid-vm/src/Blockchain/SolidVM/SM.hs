@@ -467,7 +467,7 @@ runSM ::
 runSM maybeCode envBefore gi f = do
   csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
   GasCap gasCap <- Mod.get (Mod.Proxy @GasCap)
-  $logInfoS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
+  $logDebugS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
   let !startingState =
         SState
           { env = envBefore,
@@ -486,7 +486,10 @@ runSM maybeCode envBefore gi f = do
     -- TODO should also not happen, but since this is a work in progress they
     -- are a fact of life and should be fixed on demand.
     -- The rest should always be a user error and handled safely
-    Left se -> do
+    Left (e :: SomeException) -> do
+      let se = case fromException e of
+            Just solidEx -> solidEx
+            Nothing -> InternalError "Uncaught internal exception" (show e)
       $logErrorLS "runSM/error" se
       if flags_svmDev
         then do

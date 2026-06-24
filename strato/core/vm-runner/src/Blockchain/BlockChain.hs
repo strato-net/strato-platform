@@ -414,14 +414,14 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
         }
 
   lift $ attachFeeResult <$> do -- can't throwE after this point because fee payment already succeeded
-    $logInfoS "runCodeForTransaction" "decide() function successful, running TX"
+    $logDebugS "runCodeForTransaction" "decide() function successful, running TX"
 
     incrementNonce tAddr
 
     if otHash t `S.member` knownFailedTxs
       then pure . solidvmErrorResults $ RevertError "Known failed tx" (format $ txHash t)
       else do
-        $logInfoS "addTx" . T.pack $ "gas is always off, so I'm giving the account enough balance for this TX"
+        $logDebugS "addTx" . T.pack $ "gas is always off, so I'm giving the account enough balance for this TX"
         faucetSuccess <- addToBalance tAddr 10000000 -- txCost
         unless faucetSuccess $ error "failed to give balance to a gasOff account"
 
@@ -757,7 +757,7 @@ replaceBestIfBetter b@OutputBlock {obBlockData = bd, obReceiptTransactions = txs
         case cbbi of
           Unspecified -> $logInfoS "replaceBestIfBetter" "ContextBestBlockInfo is Unspecified"
           ContextBestBlockInfo h _ t ->
-            $logInfoS "ContextBestBlockInfo" . T.pack $
+            $logDebugS "ContextBestBlockInfo" . T.pack $
               concat
                 [ format h,
                   " ",

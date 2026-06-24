@@ -30,6 +30,10 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
 COPY ui/docker-run.sh ./
 
+# docker-run.sh regenerates this at startup; make it writable so the container
+# can run as a non-root user.
+RUN touch dist/config.js && chmod 666 dist/config.js
+
 EXPOSE 8080
 
 # Add health check
