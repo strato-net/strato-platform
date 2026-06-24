@@ -40,6 +40,7 @@ generateDockerCompose = do
 
   let mercataBackend = def
         { image = "mercata-backend:" ++ stratoVersionTag ++ "-" ++ hashMercataBackend
+        , user = Just userGid
         , depends_on = Just $ DependsOnList ["postgrest"]
         , init = Just True
         , extra_hosts = hostGateway
@@ -82,6 +83,7 @@ generateDockerCompose = do
 
   let mercataUi = def
         { image = "mercata-ui:" ++ stratoVersionTag ++ "-" ++ hashMercataUi
+        , user = Just userGid
         , depends_on = Just $ DependsOnList ["mercata-backend"]
         , volumes = Just ["./logs:/logs", "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
         , environment = Just $ Map.fromList
@@ -96,6 +98,7 @@ generateDockerCompose = do
 
   let smd = def
         { image = "smd:" ++ stratoVersionTag ++ "-" ++ hashSmd
+        , user = Just userGid
         , depends_on = Just $ DependsOnList ["apex", "postgrest", "prometheus"]
         , extra_hosts = hostGateway
         , volumes = Just ["./logs:/logs", "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
@@ -107,6 +110,7 @@ generateDockerCompose = do
 
   let apex = def
         { image = "apex:" ++ stratoVersionTag ++ "-" ++ hashApex
+        , user = Just userGid
         , depends_on = Just $ DependsOnList ["postgres", "prometheus", "redis"]
         , extra_hosts = hostGateway
         , environment = Just $ Map.fromList
@@ -147,6 +151,7 @@ generateDockerCompose = do
 
   let postgrest = def
         { image = "postgrest:" ++ stratoVersionTag ++ "-" ++ hashPostgrest
+        , user = Just userGid
         , depends_on = Just $ DependsOnList ["postgres"]
         , environment = Just $ Map.fromList
             [ ("PG_ENV_POSTGRES_DB", "cirrus")
@@ -244,6 +249,7 @@ generateDockerCompose = do
 
   let docs = def
         { image = "swaggerapi/swagger-ui:v5.29.2"
+        , user = Just userGid
         , environment = Just $ Map.fromList [("API_URL", "/docs/swagger.yaml")]
         , volumes = Just ["./logs:/logs"]
         , entrypoint = Just ["/bin/sh", "-c"]

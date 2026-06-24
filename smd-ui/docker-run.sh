@@ -23,6 +23,8 @@ if [ -z "$NETWORK_NAME" ]; then
 fi
 
 # Generate runtime configuration consumed by /smd/config.js (window.ENV).
+# Overwrite the file in place (it's made writable in the Dockerfile) so this works
+# when running as a non-root user without write access to the dist/ directory.
 cat > dist/config.js << EOF
 window.ENV = {
   CHAIN_ID: ${CHAIN_ID},
