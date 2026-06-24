@@ -33,11 +33,7 @@ data TransactionFailureType
   | IntrinsicGasExceedsLimit
   | TrumpedByMoreLucrative
   | ExecutionFailure String
-  | MissingCode
-  | InvalidPragmaType
   | TXSizeLimitError
-  | GasLimitError
-  | KnownFailedTXError
   | AdminFlushedError
   deriving (Eq, Read, Show, Generic, NFData)
 

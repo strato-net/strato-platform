@@ -9,7 +9,7 @@ import Blockchain.EthConf.Model (networkConfig, httpPort)
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.Options (flags_composeOnly, flags_repoUrl)
-import Blockchain.Strato.Version (stratoVersionTag)
+import Strato.Version (stratoVersionTag)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import Data.Default (def)
@@ -199,8 +199,6 @@ generateDockerComposeAllDocker = do
             , ("SLIPSTREAM_DEBUG_LOG", "${SLIPSTREAM_DEBUG_LOG:-false}")
             , ("SLIPSTREAM_OPTIONAL", "${SLIPSTREAM_OPTIONAL:-}")
             , ("strictBlockstanbul", "${strictBlockstanbul:-}")
-            , ("strictGas", "${strictGas:-}")
-            , ("strictGasLimit", "${strictGasLimit:-}")
             , ("svmTrace", "${svmTrace:-}")
             , ("sqlDiff", "${sqlDiff:-}")
             , ("svmDev", "${svmDev:-}")

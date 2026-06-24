@@ -11,7 +11,7 @@ where
 import Binary
 import EthLog (eventRowToLog, matchesTopics)
 import TransactionReceipt (TransactionReceipt, mkTransactionReceipt)
-import Blockchain.Constants (stratoVersionString)
+import Strato.Version (stratoVersion)
 import Blockchain.CommunicationConduit (ethVersion)
 import Blockchain.EthConf (runStreamMConfigured, ethConf)
 import qualified Blockchain.EthConf.Model as EthConf
@@ -166,7 +166,7 @@ rpc_modules = flip (toMethod "rpc_modules") () $ do
 
 web3_clientVersion :: Method Server
 web3_clientVersion = flip (toMethod "web3_clientVersion") () $ do
-  liftIO $ return stratoVersionString
+  liftIO $ return $ "STRATO/v" ++ stratoVersion ++ "/linux/Haskell"
 
 net_version :: Method Server
 net_version = flip (toMethod "net_version") () $ do

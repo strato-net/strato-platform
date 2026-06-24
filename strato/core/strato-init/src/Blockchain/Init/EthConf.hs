@@ -5,6 +5,7 @@ module Blockchain.Init.EthConf (genEthConf) where
 
 import Blockchain.EthConf
 import Blockchain.Init.Options hiding (flags_localAuth)
+import Control.Monad.Composable.Streaming.DockerConfig (brokerConfig, bcHost, bcPort)
 import qualified Blockchain.Init.Options as Opts
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Options (flags_network, flags_txSizeLimit, flags_gasLimit, computeNetworkID)
@@ -25,6 +26,17 @@ getApiListenAddress
   | os == "linux" = "172.17.0.1"
   | otherwise = "127.0.0.1"
 
+-- | In local mode the generated docker-compose.yml publishes Postgres/Redis only
+-- on IPv4 (127.0.0.1:PORT). macOS resolves "localhost" to IPv6 (::1) first, so
+-- local STRATO processes fail to connect ("connection to server at \"localhost\"
+-- (::1) ... Connection refused"). Pin the default "localhost" to the IPv4 loopback
+-- the ports are actually bound to. On Linux "localhost" already resolves to
+-- 127.0.0.1, so this is a no-op there. Explicit non-localhost hosts (e.g. the
+-- "postgres" docker service name used in allDocker mode) are left untouched.
+preferIPv4Loopback :: String -> String
+preferIPv4Loopback "localhost" = "127.0.0.1"
+preferIPv4Loopback h = h
+
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
 getRailgunProxyForNetwork :: String -> Maybe Address
@@ -43,11 +55,14 @@ runtimeConfig = def
   { sqlConfig = def { host = "postgres" }
   , cirrusConfig = def { host = "postgres", database = "cirrus" }
   , redisBlockDBConfig = def
-      { redisHost = flags_redisHost
+      { redisHost = preferIPv4Loopback flags_redisHost
       , redisPort = flags_redisPort
       , redisDBNumber = flags_redisDBNumber
       }
-  , kafkaConfig = def { kafkaHost = "kafka" }
+  , streamingConfig = def
+      { streamingHost = bcHost brokerConfig
+      , streamingPort = bcPort brokerConfig
+      }
   , discoveryConfig = def { minAvailablePeers = flags_minPeers }
   , p2pConfig = def
       { maxConnections = flags_maxConn
@@ -64,6 +79,7 @@ runtimeConfig = def
       , nativeTokenAddress = getNativeTokenForNetwork flags_network
       }
   , debugConfig = def { svmTrace = flags_svmTrace }
+  , vmConfig = def { sqlDiff = flags_sqlDiff, diffPublish = flags_diffPublish }
   }
 
 getNodeKey :: IO (VC.PublicKey, Address)
@@ -115,7 +131,7 @@ genEthConf = do
 
   -- For local auth mode, skip vault during setup (vault-wrapper starts later)
   if Opts.flags_localAuth
-    then putStrLn $ "  ✓ Local auth mode (hostname: " ++ localHostname ++ "): node key will be created when vault-wrapper starts"
+    then putStrLn $ "  ✓ Local auth mode (hostname: " ++ localHostname ++ "): node key will be provisioned during first admin setup"
     else do
       (pub, _addr) <- getNodeKey
       putStrLn $ "  ✓ Node key: " ++ shortDescription pub
@@ -123,15 +139,19 @@ genEthConf = do
   return runtimeConfig
     { sqlConfig = (sqlConfig runtimeConfig)
         { user = flags_pguser
-        , host = flags_pghost
+        , host = preferIPv4Loopback flags_pghost
         , password = pgPass
         }
     , cirrusConfig = (cirrusConfig runtimeConfig)
         { user = flags_pguser
-        , host = flags_pghost
+        , host = preferIPv4Loopback flags_pghost
         , password = pgPass
         }
-    , kafkaConfig = (kafkaConfig runtimeConfig) { kafkaHost = flags_kafkahost }
+    , streamingConfig = (streamingConfig runtimeConfig)
+        { streamingHost = if flags_kafkahost == "localhost"
+                          then bcHost brokerConfig
+                          else flags_kafkahost 
+        }
     , levelDBConfig = def
         { cacheSize = flags_ldbCacheSize
         , blockSize = flags_ldbBlockSize
@@ -146,13 +166,16 @@ genEthConf = do
         , vaultUrl = if Opts.flags_localAuth
             then nodeBaseUrl ++ "/vault/strato/v2.3"
             else flags_vaultUrl
+        , vaultTimeoutSec = flags_vaultTimeoutSec
         , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
         , notificationServerUrl = flags_notificationServerUrl
         , repoUrl = flags_repoUrl
+        , cookieRealm = localHostname
         }
     , networkConfig = def
         { network = flags_network
         , networkID = computeNetworkID
+        , chainId = computeChainId flags_network
         , httpPort = flags_httpPort
         , txSizeLimit = flags_txSizeLimit
         , gasLimit = flags_gasLimit

@@ -74,6 +74,7 @@ import           SolidVM.Model.Storable
 import qualified SolidVM.Model.Type              as SVMType
 import qualified SolidVM.Model.Value             as SVMValue
 import           Text.Printf
+import           Text.ShortDescription
 import qualified Data.Text.Encoding as TE
 
 newtype First b a = First {unFirst :: (a, b)}
@@ -182,21 +183,18 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
             -- Create or replace the function for handling insert and update triggers
             "CREATE OR REPLACE FUNCTION ", triggerFunctionName, "() RETURNS TRIGGER AS $$\n",
             "BEGIN\n",
-            "    RAISE NOTICE 'Trigger fired for % on table ", tableNameToText normalTableName, ": %', TG_OP, NEW.address;\n",
             "  UPDATE ",
             tableNameToDoubleQuoteText tableName <> " h\n",
             "  SET valid_to = CAST(NEW.block_timestamp AS timestamp)\n",
             "  WHERE h.address = NEW.address\n",
             "    AND h.valid_to = 'infinity'::timestamp;\n",
             "    IF TG_OP = 'INSERT' THEN\n",
-            "        RAISE NOTICE 'Inserting into history table ", tableNameToText tableName, " for address: %', NEW.address;\n",
             "        INSERT INTO ",
             tableNameToDoubleQuoteText tableName,
             "  SELECT NEW.*,\n",
             "         CAST(NEW.block_timestamp AS timestamp),\n",
             "         'infinity'::timestamp;\n",
             "    ELSIF TG_OP = 'UPDATE' THEN\n",
-            "        RAISE NOTICE 'Updating history table ", tableNameToText tableName, " for address: %', NEW.address;\n",
             "        INSERT INTO ",
             tableNameToDoubleQuoteText tableName,
             "  SELECT NEW.*,\n",
@@ -226,7 +224,6 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
             -- Create or replace the function for handling insert and update triggers
             "CREATE OR REPLACE FUNCTION ", triggerFunctionName, "() RETURNS TRIGGER AS $$\n",
             "BEGIN\n",
-            "    RAISE NOTICE 'Trigger fired for % on table ", tableNameToText normalTableName, ": %.%', TG_OP, NEW.address, NEW.path;\n",
             "  UPDATE ",
             tableNameToDoubleQuoteText tableName <> " h\n",
             "  SET valid_to = CAST(NEW.block_timestamp AS timestamp)\n",
@@ -234,14 +231,12 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
             "    AND h.path = NEW.path\n",
             "    AND h.valid_to = 'infinity'::timestamp;\n",
             "    IF TG_OP = 'INSERT' THEN\n",
-            "        RAISE NOTICE 'Inserting into history table ", tableNameToText tableName, " for address: %.%', NEW.address, NEW.path;\n",
             "        INSERT INTO ",
             tableNameToDoubleQuoteText tableName,
             "  SELECT NEW.*,\n",
             "         CAST(NEW.block_timestamp AS timestamp),\n",
             "         'infinity'::timestamp;\n",
             "    ELSIF TG_OP = 'UPDATE' THEN\n",
-            "        RAISE NOTICE 'Updating history table ", tableNameToText tableName, " for address: %.%', NEW.address, NEW.path;\n",
             "        INSERT INTO ",
             tableNameToDoubleQuoteText tableName,
             "  SELECT NEW.*,\n",
@@ -1022,7 +1017,7 @@ pipeInsertGlobalEventTable aggregatedEvents = do
 insertGlobalEventTable :: OutputM m => AggregateEvent -> m SlipstreamQuery
 insertGlobalEventTable agEv = do
   let query = insertGlobalEventTableQuery agEv
-  $logInfoS "insertGlobalEventTable/query" . T.pack $ show query
+  $logInfoS "insertGlobalEventTable/query" . T.pack $ shortDescription agEv
   return query
 
 -- | Generates an INSERT SQL statement for the global 'events' table.
@@ -1196,7 +1191,7 @@ initialSlipstreamQueries =
       , ("valid_from", SqlTimestamp)
       , ("valid_to", SqlTimestamp)
       ]
-      []
+      ["address", "block_hash"]
       Nothing
       [("storage_history_idx", ["address","valid_to"])]
 {-  , CreateTable
@@ -1236,7 +1231,7 @@ initialSlipstreamQueries =
       , ("valid_from", SqlTimestamp)
       , ("valid_to", SqlTimestamp)
       ]
-      []
+      ["address", "block_hash", "path"]
       Nothing
       [("mapping_history_idx", ["address","path","valid_to"])]
   , CreateTable
@@ -1273,6 +1268,7 @@ initialSlipstreamQueries =
       ["address", "block_hash", "event_index", "collection_name", "key"]
       Nothing -- (Just $ Foreign "event_event_array" ["address", "block_hash", "event_index"] globalEventTableName ["address", "block_hash", "event_index"])
       []
+  , RawSQL genericBaseTableIndexesSQL
   , RawSQL jsonbMergeDeepSQL
   , RawSQL jsonbObjToArraySQL
   , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "event") (indexTableName "" "storage") False "address" SqlText
@@ -1281,6 +1277,44 @@ initialSlipstreamQueries =
   , CreateFkeyFunction $ ForeignKeyInfo "mapping" (indexTableName "" "storage") (indexTableName "" "mapping") True "address" SqlText
   , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "contract") (indexTableName "" "storage") True "address" SqlText
   , CreateFkeyFunction $ ForeignKeyInfo "contract" (indexTableName "" "storage") (indexTableName "" "contract") True "address" SqlText
+  ]
+
+genericBaseTableIndexesSQL :: Text
+genericBaseTableIndexesSQL = T.unlines
+  [ "CREATE INDEX IF NOT EXISTS history_mapping_lookup_idx"
+  , "  ON \"history@mapping\" (address, collection_name, ((key->>'key')), valid_from, valid_to);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS mapping_collection_key_address_idx"
+  , "  ON mapping (collection_name, ((key->>'key')), address);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS mapping_address_collection_key_idx"
+  , "  ON mapping (address, collection_name, ((key->>'key')));"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS mapping_balances_key_value_address_idx"
+  , "  ON mapping (((key->>'key')), value DESC, address)"
+  , "  WHERE collection_name = '_balances'"
+  , "    AND value IS NOT NULL"
+  , "    AND (value)::text <> ALL (ARRAY['\"\"', '0', 'false'])"
+  , "    AND jsonb_typeof(value) IS NOT NULL;"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS mapping_collection_address_idx"
+  , "  ON mapping (collection_name, address)"
+  , "  WHERE value IS NOT NULL"
+  , "    AND (value)::text <> ALL (ARRAY['\"\"', '0', 'false'])"
+  , "    AND jsonb_typeof(value) IS NOT NULL;"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS storage_status_address_idx"
+  , "  ON storage (((data->>'status')), address)"
+  , "  WHERE jsonb_exists(data, 'status');"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_name_sender_timestamp_idx"
+  , "  ON event (event_name, transaction_sender, block_timestamp DESC);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_address_name_timestamp_idx"
+  , "  ON event (address, event_name, block_timestamp DESC);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_name_timestamp_idx"
+  , "  ON event (event_name, block_timestamp DESC);"
   ]
 
 jsonbMergeDeepSQL :: Text

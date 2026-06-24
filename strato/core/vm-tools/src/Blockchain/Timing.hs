@@ -22,7 +22,7 @@ timeIt f = do
 timeit :: (MonadIO m, MonadLogger m) => String -> Maybe Gauge -> m a -> m a
 timeit message timer f = do
   (diff, ret) <- timeIt f
-  $logInfoS "timeit" . T.pack $ "#### " ++ message ++ " time = " ++ printf "%.4f" (realToFrac diff :: Double) ++ "s"
+  $logDebugS "timeit" . T.pack $ "#### " ++ message ++ " time = " ++ printf "%.4f" (realToFrac diff :: Double) ++ "s"
   liftIO $ forM_ timer (flip setGauge (realToFrac diff))
   return ret
 
@@ -37,6 +37,6 @@ loopTimer =
 loopTimeit :: (MonadIO m, MonadLogger m) => String -> m a -> m a
 loopTimeit message f = do
   (diff, ret) <- timeIt f
-  $logInfoS "timeit" . T.pack $ "#### " ++ message ++ " time = " ++ printf "%.4f" (realToFrac diff :: Double) ++ "s"
+  $logDebugS "timeit" . T.pack $ "#### " ++ message ++ " time = " ++ printf "%.4f" (realToFrac diff :: Double) ++ "s"
   liftIO . withLabel loopTimer (T.pack message) $ \timer -> observe timer . realToFrac $ diff
   return ret

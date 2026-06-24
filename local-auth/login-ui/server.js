@@ -15,6 +15,13 @@ const KRATOS_PUBLIC_URL = process.env.KRATOS_PUBLIC_URL || 'http://kratos:4433';
 const KRATOS_BROWSER_URL = process.env.KRATOS_BROWSER_URL || 'http://localhost:8081/auth/kratos';
 const KRATOS_ADMIN_URL = process.env.KRATOS_ADMIN_URL || 'http://localhost:4434';
 const HYDRA_ADMIN_URL = process.env.HYDRA_ADMIN_URL || 'http://localhost:4445';
+const ADMIN_USERNAME = process.env.LOCAL_AUTH_ADMIN_USERNAME || 'admin';
+
+const escapeHtml = value => String(value)
+  .replace(/&/g, '&amp;')
+  .replace(/"/g, '&quot;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;');
 
 const html = (title, content, pageId = '') => `
 <!DOCTYPE html>
@@ -108,7 +115,7 @@ app.get('/login', async (req, res) => {
             `${KRATOS_PUBLIC_URL}/sessions/whoami`,
             { headers: { Cookie: req.headers.cookie || '' } }
           );
-          subject = session.identity.id;
+          subject = session.identity.traits?.username || session.identity.id;
         } catch (_) {}
       }
       if (subject) {
@@ -126,8 +133,8 @@ app.get('/login', async (req, res) => {
             <form id="kc-form-login" method="POST" action="/auth/ui/login/oauth">
               <input type="hidden" name="login_challenge" value="${login_challenge}">
               <div class="form-group">
-                <label for="username" class="pf-c-form__label pf-c-form__label-text">Username or email</label>
-                <input id="username" class="pf-c-form-control" name="email" type="text" autofocus autocomplete="username" />
+                <label for="username" class="pf-c-form__label pf-c-form__label-text">Username</label>
+                <input id="username" class="pf-c-form-control" name="identifier" type="text" value="${ADMIN_USERNAME}" autofocus autocomplete="username" />
               </div>
               <div class="form-group">
                 <label for="password" class="pf-c-form__label pf-c-form__label-text">Password</label>
@@ -137,16 +144,6 @@ app.get('/login', async (req, res) => {
                 <input class="pf-c-button pf-m-primary pf-m-block btn-lg" name="login" id="kc-login" type="submit" value="Sign In"/>
               </div>
             </form>
-          </div>
-        </div>
-        <div id="kc-info" class="login-pf-signup">
-          <div id="kc-info-wrapper" class="">
-            <div id="kc-registration-container">
-              <span id="mercata-register-or-text">OR</span>
-              <div id="kc-registration">
-                <span><a href="/auth/ui/registration?login_challenge=${login_challenge}">Register</a></span>
-              </div>
-            </div>
           </div>
         </div>
       `, 'login-login'));
@@ -175,8 +172,8 @@ app.get('/login', async (req, res) => {
               <input type="hidden" name="csrf_token" value="${csrfToken}">
               <input type="hidden" name="method" value="password">
               <div class="form-group">
-                <label for="username" class="pf-c-form__label pf-c-form__label-text">Username or email</label>
-                <input id="username" class="pf-c-form-control" name="identifier" type="text" autofocus autocomplete="username" />
+                <label for="username" class="pf-c-form__label pf-c-form__label-text">Username</label>
+                <input id="username" class="pf-c-form-control" name="identifier" type="text" value="${ADMIN_USERNAME}" autofocus autocomplete="username" />
               </div>
               <div class="form-group">
                 <label for="password" class="pf-c-form__label pf-c-form__label-text">Password</label>
@@ -186,16 +183,6 @@ app.get('/login', async (req, res) => {
                 <input class="pf-c-button pf-m-primary pf-m-block btn-lg" name="login" id="kc-login" type="submit" value="Sign In"/>
               </div>
             </form>
-          </div>
-        </div>
-        <div id="kc-info" class="login-pf-signup">
-          <div id="kc-info-wrapper" class="">
-            <div id="kc-registration-container">
-              <span id="mercata-register-or-text">OR</span>
-              <div id="kc-registration">
-                <span><a href="/auth/ui/registration">Register</a></span>
-              </div>
-            </div>
           </div>
         </div>
       `, 'login-login'));
@@ -211,7 +198,8 @@ app.get('/login', async (req, res) => {
 
 // Handle OAuth login form submission
 app.post('/login/oauth', async (req, res) => {
-  const { login_challenge, email, password } = req.body;
+  const { login_challenge, password } = req.body;
+  const identifier = req.body.identifier || ADMIN_USERNAME;
 
   try {
     // Verify credentials with Kratos
@@ -224,7 +212,7 @@ app.post('/login/oauth', async (req, res) => {
     const { data: session } = await axios.post(
       `${KRATOS_PUBLIC_URL}/self-service/login`,
       {
-        identifier: email,
+        identifier,
         password: password,
         method: 'password'
       },
@@ -235,7 +223,7 @@ app.post('/login/oauth', async (req, res) => {
     const { data: completion } = await axios.put(
       `${HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/login/accept`,
       {
-        subject: session.session.identity.id,
+        subject: session.session.identity.traits?.username || session.session.identity.id,
         remember: true,
         remember_for: 3600
       },
@@ -246,14 +234,14 @@ app.post('/login/oauth', async (req, res) => {
   } catch (error) {
     console.error('OAuth login error:', error.response?.data || error.message);
     res.send(html('Login to STRATO', `
-      <div class="alert alert-error">Invalid email or password</div>
+      <div class="alert alert-error">Invalid password</div>
       <div id="kc-form">
         <div id="kc-form-wrapper">
           <form id="kc-form-login" method="POST" action="/auth/ui/login/oauth">
             <input type="hidden" name="login_challenge" value="${login_challenge}">
             <div class="form-group">
-              <label for="username" class="pf-c-form__label pf-c-form__label-text">Username or email</label>
-              <input id="username" class="pf-c-form-control" name="email" value="${email}" type="text" autofocus autocomplete="username" />
+              <label for="username" class="pf-c-form__label pf-c-form__label-text">Username</label>
+              <input id="username" class="pf-c-form-control" name="identifier" type="text" value="${escapeHtml(identifier)}" autofocus autocomplete="username" />
             </div>
             <div class="form-group">
               <label for="password" class="pf-c-form__label pf-c-form__label-text">Password</label>
@@ -263,16 +251,6 @@ app.post('/login/oauth', async (req, res) => {
               <input class="pf-c-button pf-m-primary pf-m-block btn-lg" name="login" id="kc-login" type="submit" value="Sign In"/>
             </div>
           </form>
-        </div>
-      </div>
-      <div id="kc-info" class="login-pf-signup">
-        <div id="kc-info-wrapper" class="">
-          <div id="kc-registration-container">
-            <span id="mercata-register-or-text">OR</span>
-            <div id="kc-registration">
-              <span><a href="/auth/ui/registration">Register</a></span>
-            </div>
-          </div>
         </div>
       </div>
     `, 'login-login'));
@@ -302,10 +280,13 @@ app.get('/consent', async (req, res) => {
         remember: true,
         remember_for: 3600,
         session: {
+          access_token: {
+            preferred_username: consentRequest.subject
+          },
           id_token: {
             sub: consentRequest.subject,
-            email: consentRequest.context?.identity?.traits?.email || consentRequest.subject,
-            name: consentRequest.context?.identity?.traits?.name || consentRequest.subject
+            name: consentRequest.context?.identity?.traits?.username || consentRequest.subject,
+            preferred_username: consentRequest.subject
           }
         }
       },
@@ -319,65 +300,17 @@ app.get('/consent', async (req, res) => {
 });
 
 // Registration page
-app.get('/registration', async (req, res) => {
-  const { flow, login_challenge } = req.query;
-
-  if (flow) {
-    try {
-      const { data: flowData } = await axios.get(
-        `${KRATOS_PUBLIC_URL}/self-service/registration/flows`,
-        { params: { id: flow }, headers: { Cookie: req.headers.cookie || '' } }
-      );
-
-      const csrfToken = flowData.ui.nodes.find(n => n.attributes.name === 'csrf_token')?.attributes.value || '';
-      const messages = flowData.ui.messages?.map(m => m.text).join('<br>') || '';
-      const fieldMessages = flowData.ui.nodes
-        .flatMap(n => (n.messages || []).map(m => m.text))
-        .join('<br>');
-
-      return res.send(html('Register', `
-        ${messages ? `<div class="alert alert-error">${messages}</div>` : ''}
-        ${fieldMessages ? `<div class="alert alert-error">${fieldMessages}</div>` : ''}
-        <div id="kc-form">
-          <div id="kc-form-wrapper">
-            <form id="kc-register-form" method="POST" action="${flowData.ui.action}">
-              <input type="hidden" name="csrf_token" value="${csrfToken}">
-              <input type="hidden" name="method" value="password">
-              <div class="form-group">
-                <label for="username" class="pf-c-form__label pf-c-form__label-text">Username</label>
-                <input id="username" class="pf-c-form-control" name="traits.username" type="text" autofocus autocomplete="username" />
-              </div>
-              <div class="form-group">
-                <label for="email" class="pf-c-form__label pf-c-form__label-text">Email</label>
-                <input id="email" class="pf-c-form-control" name="traits.email" type="email" autocomplete="email" />
-              </div>
-              <div class="form-group">
-                <label for="password" class="pf-c-form__label pf-c-form__label-text">Password</label>
-                <input id="password" class="pf-c-form-control" name="password" type="password" autocomplete="new-password" />
-              </div>
-              <div id="kc-form-buttons" class="form-group">
-                <input class="pf-c-button pf-m-primary pf-m-block btn-lg" type="submit" value="Register"/>
-              </div>
-            </form>
-          </div>
+app.get('/registration', (_req, res) => {
+  res.status(404).send(html('Registration Disabled', `
+    <div class="alert alert-error">Local auth registration is disabled.</div>
+    <div id="kc-form">
+      <div id="kc-form-wrapper">
+        <div id="kc-form-buttons" class="form-group">
+          <a href="/auth/ui/login" style="display:block"><input class="pf-c-button pf-m-primary pf-m-block btn-lg" type="button" value="Back to Login" onclick="window.location='/auth/ui/login'"/></a>
         </div>
-        <div id="kc-info" class="login-pf-signup">
-          <div id="kc-info-wrapper" class="">
-            <span><a href="/auth/ui/login${login_challenge ? '?login_challenge=' + login_challenge : ''}">Back to Login</a></span>
-          </div>
-        </div>
-      `, 'login-register'));
-    } catch (error) {
-      console.error('Registration flow error:', error.response?.data || error.message);
-      return res.status(500).send(html('Error', `<div class="alert alert-error">Registration flow error. <a href="${KRATOS_BROWSER_URL}/self-service/registration/browser">Try again</a></div>`));
-    }
-  }
-
-  const baseUrl = KRATOS_BROWSER_URL.replace(/\/auth\/kratos$/, '');
-  const returnTo = login_challenge
-    ? `&return_to=${encodeURIComponent(baseUrl + '/auth/ui/login?login_challenge=' + login_challenge)}`
-    : '';
-  res.redirect(`${KRATOS_BROWSER_URL}/self-service/registration/browser?${returnTo}`);
+      </div>
+    </div>
+  `));
 });
 
 // Logout
@@ -433,16 +366,6 @@ app.get('/', (req, res) => {
       <div id="kc-form-wrapper">
         <div id="kc-form-buttons" class="form-group">
           <a href="/auth/ui/login" style="display:block"><input class="pf-c-button pf-m-primary pf-m-block btn-lg" type="button" value="Sign In" onclick="window.location='/auth/ui/login'"/></a>
-        </div>
-      </div>
-    </div>
-    <div id="kc-info" class="login-pf-signup">
-      <div id="kc-info-wrapper" class="">
-        <div id="kc-registration-container">
-          <span id="mercata-register-or-text">OR</span>
-          <div id="kc-registration">
-            <span><a href="/auth/ui/registration">Register</a></span>
-          </div>
         </div>
       </div>
     </div>
