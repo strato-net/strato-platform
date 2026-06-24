@@ -22,8 +22,11 @@ import {
   upsertNetwork,
   signatureUrl,
   userInfoUrl,
+  nativeSymbol,
+  isStratoNetwork,
   type StratoNetwork,
 } from "@/src/core/networks";
+import { fetchEvmTokens, fetchEvmActivity } from "@/src/core/evm-portfolio";
 import { loginWithStrato, fetchAddress } from "@/src/core/oauth";
 import { installCsrfBypassRule } from "@/src/core/csrf-bypass";
 import { getTxs } from "@/src/core/history";
@@ -31,7 +34,7 @@ import { fetchActivity } from "@/src/core/activity";
 import { fetchTokens, fetchDefi } from "@/src/core/portfolio";
 import { fetchPools, executeSwap, type SwapRequest } from "@/src/core/swap";
 import { rpcCall } from "@/src/core/rpc";
-import { sendEvmTransaction } from "@/src/core/tx-evm";
+import { sendEvmTransaction, encodeErc20Transfer } from "@/src/core/tx-evm";
 import { sendBlocTransaction, sendBlocCalls, type BlocTxParams } from "@/src/core/tx-strato";
 import { listPermissions, revokePermission } from "@/src/core/permissions";
 
@@ -211,22 +214,35 @@ async function dispatchControl(method: string, args: unknown[]): Promise<unknown
       return sendBlocTransaction(network, args[0] as Address, args[1] as BlocTxParams);
     }
     case "tx.sendToken": {
-      // Transfer any BlockApps-Token (incl. native USDST) via Token.transfer.
       const network = await getSelectedNetwork();
       const [from, tokenAddress, to, value] = args as [Address, string, string, string];
-      return sendBlocCalls(
-        network,
+      if (isStratoNetwork(network)) {
+        // STRATO: any BlockApps-Token (incl. native USDST) via Token.transfer.
+        return sendBlocCalls(
+          network,
+          from,
+          [
+            {
+              contractName: "Token",
+              contractAddress: String(tokenAddress).replace(/^0x/, ""),
+              method: "transfer",
+              args: { to: String(to).replace(/^0x/, ""), value },
+            },
+          ],
+          { gasLimit: 32_100_000_000, gasPrice: 1 }
+        );
+      }
+      // EVM: native coin → value transfer; ERC-20 → encoded transfer() calldata.
+      const isNative = /^0x0+$/i.test(String(tokenAddress));
+      if (isNative) {
+        return sendEvmTransaction(network, { from, to, value: String(value) });
+      }
+      return sendEvmTransaction(network, {
         from,
-        [
-          {
-            contractName: "Token",
-            contractAddress: String(tokenAddress).replace(/^0x/, ""),
-            method: "transfer",
-            args: { to: String(to).replace(/^0x/, ""), value },
-          },
-        ],
-        { gasLimit: 32_100_000_000, gasPrice: 1 }
-      );
+        to: tokenAddress,
+        data: encodeErc20Transfer(to, value),
+        value: "0",
+      });
     }
 
     // approvals
@@ -241,15 +257,25 @@ async function dispatchControl(method: string, args: unknown[]): Promise<unknown
     case "history.list":
       return getTxs(args[0] as Address, args[1] as string);
     case "activity.list": {
-      const network = await getSelectedNetwork();
-      return fetchActivity(network, args[0] as string, (args[1] as number) ?? 25);
+      const n = await getSelectedNetwork();
+      return isStratoNetwork(n)
+        ? fetchActivity(n, args[0] as string, (args[1] as number) ?? 25)
+        : fetchEvmActivity(n.chainId, args[0] as string, nativeSymbol(n));
     }
-    case "tokens.list":
-      return fetchTokens(await getSelectedNetwork(), args[0] as string);
-    case "defi.list":
-      return fetchDefi(await getSelectedNetwork(), args[0] as string);
-    case "swap.pools":
-      return fetchPools(await getSelectedNetwork());
+    case "tokens.list": {
+      const n = await getSelectedNetwork();
+      return isStratoNetwork(n)
+        ? fetchTokens(n, args[0] as string)
+        : fetchEvmTokens(n.chainId, args[0] as string);
+    }
+    case "defi.list": {
+      const n = await getSelectedNetwork();
+      return isStratoNetwork(n) ? fetchDefi(n, args[0] as string) : [];
+    }
+    case "swap.pools": {
+      const n = await getSelectedNetwork();
+      return isStratoNetwork(n) ? fetchPools(n) : [];
+    }
     case "swap.execute":
       return executeSwap(await getSelectedNetwork(), args[0] as Address, args[1] as SwapRequest);
 

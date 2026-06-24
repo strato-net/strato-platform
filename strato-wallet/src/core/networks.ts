@@ -12,6 +12,11 @@ export interface StratoNetwork {
   /** Stable id used as the storage key for the selection. */
   id: string;
   name: string;
+  /**
+   * "strato" (Cirrus/BLOC/vault, swap-capable) or "evm" (generic EVM L1/L2 —
+   * balances/activity via the MetaMask accounts API, no swap). Defaults to strato.
+   */
+  kind?: "strato" | "evm";
   /** EVM JSON-RPC endpoint, e.g. https://node.example/rpc */
   rpcUrl: string;
   /**
@@ -68,6 +73,7 @@ export const STRATO_EXPLORER = "https://stratoscan.strato.nexus";
 export const DEFAULT_NETWORK: StratoNetwork = {
   id: "strato",
   name: "STRATO",
+  kind: "strato",
   rpcUrl: "https://dnorwood.stratomercata.com/rpc",
   chainId: "123354377739506",
   blocUrl: "https://dnorwood.stratomercata.com/bloc/v2.2",
@@ -78,6 +84,49 @@ export const DEFAULT_NETWORK: StratoNetwork = {
   oauthIssuer: "https://keycloak.blockapps.net/auth/realms/mercata",
   oauthClientId: "strato-wallet-extension-test",
 };
+
+// Generic EVM networks (mainly for bridging to/from STRATO). Balances + activity
+// come from the MetaMask accounts API; swap is STRATO-only.
+export const ETHEREUM_NETWORK: StratoNetwork = {
+  id: "ethereum",
+  name: "Ethereum",
+  kind: "evm",
+  rpcUrl: "https://ethereum-rpc.publicnode.com",
+  chainId: "1",
+  explorerUrl: "https://etherscan.io",
+  nativeSymbol: "ETH",
+};
+export const BASE_NETWORK: StratoNetwork = {
+  id: "base",
+  name: "Base",
+  kind: "evm",
+  rpcUrl: "https://mainnet.base.org",
+  chainId: "8453",
+  explorerUrl: "https://basescan.org",
+  nativeSymbol: "ETH",
+};
+export const LINEA_NETWORK: StratoNetwork = {
+  id: "linea",
+  name: "Linea",
+  kind: "evm",
+  rpcUrl: "https://rpc.linea.build",
+  chainId: "59144",
+  explorerUrl: "https://lineascan.build",
+  nativeSymbol: "ETH",
+};
+
+/** Networks shipped with the extension. */
+export const BUILTIN_NETWORKS: StratoNetwork[] = [
+  DEFAULT_NETWORK,
+  ETHEREUM_NETWORK,
+  BASE_NETWORK,
+  LINEA_NETWORK,
+];
+
+/** True for STRATO networks (Cirrus/BLOC/swap); false for generic EVM. */
+export function isStratoNetwork(n: StratoNetwork): boolean {
+  return n.kind !== "evm";
+}
 
 /** Effective native token symbol for a network. */
 export function nativeSymbol(n: StratoNetwork): string {
@@ -119,7 +168,7 @@ export function deriveStratoUrls(rpcUrl: string): Partial<StratoNetwork> {
 }
 
 const networksStore = storage.defineItem<StratoNetwork[]>("local:networks", {
-  fallback: [DEFAULT_NETWORK],
+  fallback: BUILTIN_NETWORKS,
 });
 
 const selectedStore = storage.defineItem<string>("local:selectedNetwork", {
@@ -127,8 +176,29 @@ const selectedStore = storage.defineItem<string>("local:selectedNetwork", {
 });
 
 export async function getNetworks(): Promise<StratoNetwork[]> {
-  const list = await networksStore.getValue();
-  return list.length ? list : [DEFAULT_NETWORK];
+  const stored = await networksStore.getValue();
+  // Ensure built-in networks are present (adds newly-shipped ones to existing
+  // installs without disturbing user-added/edited networks).
+  const byId = new Map(stored.map((n) => [n.id, n]));
+  let changed = false;
+  for (const b of BUILTIN_NETWORKS) {
+    const existing = byId.get(b.id);
+    if (!existing) {
+      byId.set(b.id, b);
+      changed = true;
+    } else if (b.kind === "evm") {
+      // Keep built-in EVM networks in sync with shipped defaults (e.g. a fixed
+      // RPC URL); users customize the STRATO network, not these.
+      const synced = { ...existing, ...b };
+      if (JSON.stringify(synced) !== JSON.stringify(existing)) {
+        byId.set(b.id, synced);
+        changed = true;
+      }
+    }
+  }
+  const merged = [...byId.values()];
+  if (changed) await networksStore.setValue(merged);
+  return merged.length ? merged : [DEFAULT_NETWORK];
 }
 
 export async function getSelectedNetwork(): Promise<StratoNetwork> {

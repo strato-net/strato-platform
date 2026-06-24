@@ -66,6 +66,12 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
-  useEffect(run, [run]);
+  // When deps change (e.g. switching networks), clear stale data first so a failed
+  // or slow refetch never shows the previous context's value. Manual refresh()
+  // calls run() directly and keeps the current data (no flicker).
+  useEffect(() => {
+    setData(undefined);
+    run();
+  }, [run]);
   return { data, error, loading, refresh: run };
 }

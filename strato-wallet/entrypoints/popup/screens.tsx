@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { callBackground } from "@/src/messaging/control";
 import type { AccountMeta, HdWalletInfo } from "@/src/core/keyring";
-import { type StratoNetwork, nativeSymbol, explorerTxUrl } from "@/src/core/networks";
+import { type StratoNetwork, nativeSymbol, explorerTxUrl, isStratoNetwork } from "@/src/core/networks";
 import type { OriginPermission } from "@/src/core/permissions";
 import type { ActivityItem } from "@/src/core/activity";
 import type { TokenBalance, DefiPosition } from "@/src/core/portfolio";
@@ -153,13 +153,14 @@ export function Home({ navigate }: { navigate: (to: string) => void }) {
   const [theme, toggleTheme] = useTheme();
 
   const symbol = network.data ? nativeSymbol(network.data) : FALLBACK_SYMBOL;
+  const swapEnabled = network.data ? isStratoNetwork(network.data) : true;
   const addr = selected.data ?? null;
   const current = (accounts.data ?? []).find(
     (a) => a.address.toLowerCase() === (addr ?? "").toLowerCase()
   );
   const balance = useAsync<string>(
     async () => (addr ? callBackground<string>("balance", addr) : "0x0"),
-    [addr]
+    [addr, network.data?.chainId]
   );
 
   return (
@@ -217,6 +218,7 @@ export function Home({ navigate }: { navigate: (to: string) => void }) {
           label="Swap"
           icon={<ArrowUpDown className="h-5 w-5" />}
           onClick={() => navigate("swap")}
+          disabled={!swapEnabled}
         />
         <ActionButton
           label="Send"
