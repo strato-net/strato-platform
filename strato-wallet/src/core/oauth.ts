@@ -20,6 +20,30 @@ interface Discovery {
   token_endpoint: string;
 }
 
+/**
+ * fetch with a hard timeout. Without this a stalled OAuth call (token exchange,
+ * or the node's get-or-create user lookup for a brand-new identity) hangs the
+ * whole login forever with no error — the UI just sits at "Opening login…".
+ */
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit = {},
+  ms = 20_000
+): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(input, { ...init, signal: ctrl.signal });
+  } catch (e) {
+    if ((e as Error)?.name === "AbortError") {
+      throw new Error(`Request timed out after ${Math.round(ms / 1000)}s: ${input}`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function b64url(bytes: ArrayBuffer | Uint8Array): string {
   const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   let s = "";
@@ -39,7 +63,7 @@ async function pkceChallenge(verifier: string): Promise<string> {
 
 async function discover(issuer: string): Promise<Discovery> {
   const url = `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
-  const res = await fetch(url);
+  const res = await fetchWithTimeout(url, {}, 15_000);
   if (!res.ok) throw new Error(`OIDC discovery failed (${res.status}) at ${url}`);
   const d = await res.json();
   if (!d.authorization_endpoint || !d.token_endpoint) {
@@ -51,7 +75,13 @@ async function discover(issuer: string): Promise<Discovery> {
 /** Run the interactive login and return tokens. Must run in the background SW. */
 export async function loginWithStrato(
   issuer: string,
-  clientId: string
+  clientId: string,
+  /**
+   * OIDC `prompt`. Defaults to "login" so an existing IdP (Keycloak) SSO session
+   * doesn't silently return the same identity — this lets the user authenticate as
+   * a different account when adding/switching OAuth wallets.
+   */
+  prompt: string = "login"
 ): Promise<OAuthTokens> {
   if (!issuer || !clientId) {
     throw new Error("Network is missing oauthIssuer / oauthClientId (set in Settings)");
@@ -72,6 +102,7 @@ export async function loginWithStrato(
       code_challenge: challenge,
       code_challenge_method: "S256",
       state,
+      prompt,
     }).toString();
 
   const redirect = await browser.identity.launchWebAuthFlow({
@@ -96,7 +127,7 @@ export async function loginWithStrato(
     client_id: clientId,
     code_verifier: verifier,
   });
-  const res = await fetch(token_endpoint, {
+  const res = await fetchWithTimeout(token_endpoint, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body,
@@ -120,7 +151,7 @@ export async function refreshTokens(t: OAuthTokens): Promise<OAuthTokens> {
     refresh_token: t.refreshToken,
     client_id: t.clientId,
   });
-  const res = await fetch(t.tokenEndpoint, {
+  const res = await fetchWithTimeout(t.tokenEndpoint, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body,
@@ -144,15 +175,35 @@ export async function fetchAddress(
   userInfoUrl: string,
   accessToken: string
 ): Promise<{ address: string; username?: string }> {
-  const res = await fetch(userInfoUrl, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) throw new Error(`User lookup failed (${res.status}) at ${userInfoUrl}`);
-  const d = await res.json();
-  const address: string | undefined = d.userAddress || d.address;
-  if (!address) throw new Error("Node did not return an address for this account");
-  return {
-    address: address.startsWith("0x") ? address : `0x${address}`,
-    username: d.userName || d.username,
-  };
+  // A brand-new identity triggers get-or-create of a vault key on the node, which
+  // can lag: the lookup may briefly 404/425 or return without an address. Poll a
+  // few times before giving up so first-time logins don't fail spuriously.
+  const deadline = Date.now() + 30_000;
+  let lastErr = "";
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetchWithTimeout(
+      userInfoUrl,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+      15_000
+    );
+    if (res.ok) {
+      const d = await res.json();
+      const address: string | undefined = d.userAddress || d.address;
+      if (address) {
+        return {
+          address: address.startsWith("0x") ? address : `0x${address}`,
+          username: d.userName || d.username,
+        };
+      }
+      lastErr = "Node did not return an address for this account";
+    } else if (res.status === 404 || res.status === 425 || res.status >= 500) {
+      // Not provisioned yet / transient — retry.
+      lastErr = `User lookup failed (${res.status}) at ${userInfoUrl}`;
+    } else {
+      // Auth/permanent error — don't retry.
+      throw new Error(`User lookup failed (${res.status}) at ${userInfoUrl}`);
+    }
+    if (Date.now() >= deadline) throw new Error(lastErr);
+    await new Promise((r) => setTimeout(r, 2_000));
+  }
 }

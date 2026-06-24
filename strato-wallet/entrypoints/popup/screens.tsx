@@ -13,6 +13,7 @@ import {
   Copy,
   DollarSign,
   KeyRound,
+  LogOut,
   Moon,
   Pencil,
   Plus,
@@ -20,6 +21,7 @@ import {
   Settings as SettingsIcon,
   ShieldAlert,
   Sun,
+  Trash2,
   X,
 } from "lucide-react";
 import { callBackground } from "@/src/messaging/control";
@@ -1327,13 +1329,16 @@ function AccountRow({
   onSelect,
   onExport,
   onRename,
+  onRemove,
 }: {
   account: AccountMeta;
   active: boolean;
   onSelect: () => void;
   onExport?: () => void;
   onRename?: (label: string) => void;
+  onRemove?: () => void;
 }) {
+  const isRemote = account.kind === "remote";
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(account.label);
 
@@ -1411,6 +1416,16 @@ function AccountRow({
                 <KeyRound className="h-4 w-4" />
               </button>
             )}
+            {onRemove && (
+              <button
+                title={isRemote ? "Log out of this account" : "Remove account"}
+                aria-label={isRemote ? "Log out of this account" : "Remove account"}
+                onClick={onRemove}
+                className="flex h-7 w-7 items-center justify-center rounded-full text-slate-500 dark:text-slate-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"
+              >
+                {isRemote ? <LogOut className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+              </button>
+            )}
           </div>
         </>
       )}
@@ -1423,6 +1438,7 @@ export function AccountsList({ navigate }: { navigate: (to: string) => void }) {
   const selected = useAsync<Address | null>(() => callBackground("accounts.selected"));
   const wallets = useAsync<HdWalletInfo[]>(() => callBackground("wallets.list"));
   const [reveal, setReveal] = useState<RevealTarget | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<AccountMeta | null>(null);
   const [busy, setBusy] = useState(false);
 
   const list = accounts.data ?? [];
@@ -1439,6 +1455,17 @@ export function AccountsList({ navigate }: { navigate: (to: string) => void }) {
   const rename = async (a: AccountMeta, label: string) => {
     await callBackground("accounts.rename", a.address, label);
     accounts.refresh();
+  };
+  const remove = async (a: AccountMeta) => {
+    setBusy(true);
+    try {
+      await callBackground("accounts.remove", a.address);
+      setConfirmRemove(null);
+      accounts.refresh();
+      selected.refresh();
+    } finally {
+      setBusy(false);
+    }
   };
 
   const imported = list.filter((a) => a.kind === "imported");
@@ -1515,6 +1542,7 @@ export function AccountsList({ navigate }: { navigate: (to: string) => void }) {
                 onExport={() =>
                   setReveal({ kind: "privatekey", address: a.address, label: a.label })
                 }
+                onRemove={() => setConfirmRemove(a)}
               />
             ))}
           </div>
@@ -1531,6 +1559,7 @@ export function AccountsList({ navigate }: { navigate: (to: string) => void }) {
                 active={isActive(a)}
                 onSelect={() => select(a)}
                 onRename={(label) => rename(a, label)}
+                onRemove={() => setConfirmRemove(a)}
               />
             ))}
           </div>
@@ -1560,6 +1589,65 @@ export function AccountsList({ navigate }: { navigate: (to: string) => void }) {
         </div>
       </div>
       {reveal && <RevealSecret target={reveal} onClose={() => setReveal(null)} />}
+      {confirmRemove && (
+        <RemoveAccountModal
+          account={confirmRemove}
+          busy={busy}
+          onConfirm={() => remove(confirmRemove)}
+          onClose={() => setConfirmRemove(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ------------------------------------------------ Remove / log out confirmation
+function RemoveAccountModal({
+  account,
+  busy,
+  onConfirm,
+  onClose,
+}: {
+  account: AccountMeta;
+  busy: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const isRemote = account.kind === "remote";
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5">
+      <div className="w-full rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-xl">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-semibold">
+            {isRemote ? "Log out of account" : "Remove account"}
+          </span>
+          <button onClick={onClose} aria-label="Close" className="text-slate-500 dark:text-slate-400 hover:text-slate-700">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+          {isRemote ? (
+            <>
+              Log out of <span className="font-medium">{account.label}</span>? You can log back in
+              anytime with STRATO. Your funds stay safe in the vault.
+            </>
+          ) : (
+            <>
+              Remove <span className="font-medium">{account.label}</span> from this wallet? Make sure
+              you have its private key backed up — it can't be recovered here otherwise.
+            </>
+          )}
+        </p>
+        <p className="mt-2 break-all font-mono text-xs text-slate-400">{account.address}</p>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Button variant="secondary" disabled={busy} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="danger" disabled={busy} onClick={onConfirm}>
+            {busy ? "…" : isRemote ? "Log out" : "Remove"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

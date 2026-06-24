@@ -254,6 +254,41 @@ class Keyring {
     return metaStore.getValue();
   }
 
+  /**
+   * Remove a non-HD account (imported private key or remote/OAuth account),
+   * deleting its secret/tokens. HD-derived accounts can't be removed (they belong
+   * to a recovery phrase and are re-derivable). Returns the (possibly new)
+   * selected address so callers can notify connected dApps.
+   */
+  async removeAccount(address: Address): Promise<Address | null> {
+    const vault = await this.getVault();
+    const key = address.toLowerCase();
+    const all = await metaStore.getValue();
+    const meta = all.find((a) => a.address.toLowerCase() === key);
+    if (!meta) throw new Error("Unknown account");
+    if (meta.kind === "hd") {
+      throw new Error("HD accounts can't be removed; remove the recovery phrase instead");
+    }
+
+    if (meta.kind === "remote") {
+      if (vault.oauthTokens) delete vault.oauthTokens[key];
+    } else {
+      delete vault.privateKeys[key];
+    }
+
+    const remaining = all.filter((a) => a.address.toLowerCase() !== key);
+    await metaStore.setValue(remaining);
+
+    // If we removed the active account, fall back to the first remaining one.
+    let selected = await selectedStore.getValue();
+    if (selected && selected.toLowerCase() === key) {
+      selected = remaining[0]?.address ?? null;
+      await selectedStore.setValue(selected);
+    }
+    await this.persist();
+    return selected;
+  }
+
   /** Rename an account (label only; no secrets involved). */
   async renameAccount(address: Address, label: string): Promise<AccountMeta> {
     const trimmed = label.trim();

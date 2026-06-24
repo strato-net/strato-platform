@@ -173,6 +173,12 @@ async function dispatchControl(method: string, args: unknown[]): Promise<unknown
       return keyring.getSelectedAddress();
     case "accounts.rename":
       return keyring.renameAccount(args[0] as Address, args[1] as string);
+    case "accounts.remove": {
+      const newSelected = await keyring.removeAccount(args[0] as Address);
+      // Connected dApps follow the new active account (or see a disconnect).
+      await broadcastEvent("accountsChanged", newSelected ? [newSelected] : []);
+      return newSelected;
+    }
     case "accounts.select": {
       await keyring.setSelectedAddress(args[0] as Address);
       // Connected dApps follow the active account.
