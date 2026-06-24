@@ -106,7 +106,7 @@ contract Describe_StratoStaking {
 
     function _startRewards(uint256 amount, uint256 duration, uint256 baseRewardBps) internal {
         funder.do(address(staking), "depositRewards(uint256)", amount);
-        staking.startRewardSchedule(block.timestamp, duration, baseRewardBps, "Test Period", "Test rewards");
+        staking.startRewardSchedule(amount, block.timestamp, duration, baseRewardBps, "Test Period", "Test rewards");
     }
 
     function it_registry_stores_and_updates_operator_profile() public {
@@ -228,7 +228,7 @@ contract Describe_StratoStaking {
         funder.do(address(staking), "depositRewards(uint256)", 10000e18);
 
         uint256 startTime = block.timestamp + 10;
-        staking.startRewardSchedule(startTime, 100, 0, "Season 1", "Launch staking rewards");
+        staking.startRewardSchedule(10000e18, startTime, 100, 0, "Season 1", "Launch staking rewards");
 
         require(staking.periodStart() == startTime, "Period start");
         require(staking.periodFinish() == startTime + 100, "Period finish");
@@ -251,6 +251,32 @@ contract Describe_StratoStaking {
         uint256 userAfter = IERC20(address(strato)).balanceOf(address(user1));
 
         require(userAfter - userBefore == 475e18, "User receives post-start rewards");
+    }
+
+    function it_streams_only_explicit_reward_schedule_amount() public {
+        _stake(user1, address(operatorA), 1000e18);
+
+        funder.do(address(staking), "depositRewards(uint256)", 10000e18);
+        staking.startRewardSchedule(4000e18, block.timestamp, 100, 0, "Limited Period", "Partial reserve schedule");
+
+        fastForward(10);
+
+        uint256 userBefore = IERC20(address(strato)).balanceOf(address(user1));
+        user1.do(address(staking), "claimRewards", _claimOperators(address(operatorA)));
+        uint256 userAfter = IERC20(address(strato)).balanceOf(address(user1));
+
+        require(userAfter - userBefore == 380e18, "Only scheduled reward amount streams");
+
+        bool excessRecoveryRejected = false;
+        try staking.recoverRewardReserve(address(this), 6001e18) {
+        } catch {
+            excessRecoveryRejected = true;
+        }
+        require(excessRecoveryRejected, "Scheduled reserve remains protected");
+
+        staking.recoverRewardReserve(address(this), 6000e18);
+        require(staking.rewardReserve() == 3600e18, "Only idle reserve recovered");
+        require(staking.scheduledRewardRemaining() == 3600e18, "Scheduled remainder still tracked");
     }
 
     function it_unstakes_into_queue_and_withdraws_after_unbonding() public {
@@ -423,7 +449,8 @@ contract Describe_StratoStaking {
 
     function it_keeps_principal_separate_from_recoverable_reward_reserve() public {
         _stake(user1, address(operatorA), 1000e18);
-        _startRewards(1000e18, 100, 5000);
+        funder.do(address(staking), "depositRewards(uint256)", 1500e18);
+        staking.startRewardSchedule(1000e18, block.timestamp, 100, 5000, "Test Period", "Test rewards");
 
         staking.recoverRewardReserve(address(this), 500e18);
 
@@ -431,10 +458,10 @@ contract Describe_StratoStaking {
         require(IERC20(address(strato)).balanceOf(address(staking)) >= staking.principalBalance(), "Principal remains collateralized");
 
         bool rejected = false;
-        try staking.recoverRewardReserve(address(this), 501e18) {
+        try staking.recoverRewardReserve(address(this), 1) {
         } catch {
             rejected = true;
         }
-        require(rejected, "Cannot recover more than reward reserve");
+        require(rejected, "Cannot recover scheduled reward reserve");
     }
 }

@@ -34,7 +34,7 @@ import VaultDepositModal from "@/components/vault/VaultDepositModal";
 import type { Pool } from "@/interface";
 import { formatUnits } from "ethers";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
-import { CircleArrowDown, PiggyBank, TrendingUp } from "lucide-react";
+import { CircleArrowDown, PiggyBank, ShieldCheck, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import stratoVaultLogo from "@/assets/strato-vault-logo.png";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
@@ -243,6 +243,7 @@ const Earn = () => {
     | { kind: "saveUsdst"; apySortValue: number }
     | { kind: "vault"; apySortValue: number }
     | { kind: "lending"; apySortValue: number }
+    | { kind: "staking"; apySortValue: number }
     | { kind: "pool"; apySortValue: number; pool: Pool }
     | { kind: "yieldVault"; apySortValue: number; vaultIndex: number };
 
@@ -472,6 +473,7 @@ const Earn = () => {
     if (opportunity.kind === "saveUsdst") return safeBigInt(saveUsdstTvl);
     if (opportunity.kind === "vault") return safeBigInt(vaultState.totalEquity);
     if (opportunity.kind === "lending") return safeBigInt(liquidityInfo?.totalUSDSTSupplied?.toString());
+    if (opportunity.kind === "staking") return 0n;
     if (opportunity.kind === "yieldVault") {
       const vData = yieldVaults[YIELD_VAULTS[opportunity.vaultIndex].key];
       return safeBigInt(vData?.tvlUsd);
@@ -483,8 +485,9 @@ const Earn = () => {
     if (opportunity.kind === "saveUsdst") return 0;
     if (opportunity.kind === "vault") return 1;
     if (opportunity.kind === "yieldVault") return 2;
-    if (opportunity.kind === "lending") return 3;
-    return 4;
+    if (opportunity.kind === "staking") return 3;
+    if (opportunity.kind === "lending") return 4;
+    return 5;
   };
 
   const compareOpportunities = (a: OpportunityRow, b: OpportunityRow): number => {
@@ -535,6 +538,10 @@ const Earn = () => {
 
     if (opportunity.kind === "lending") {
       return `$${formatUsd(liquidityInfo?.withdrawable?.userBalance || "0")}`;
+    }
+
+    if (opportunity.kind === "staking") {
+      return "--";
     }
 
     if (opportunity.kind === "yieldVault") {
@@ -618,6 +625,9 @@ const Earn = () => {
     }
 
     if (activeFilter === "all" || activeFilter === "pools") {
+      if (activeFilter === "all") {
+        rows.push({ kind: "staking", apySortValue: Number.NEGATIVE_INFINITY });
+      }
       rows.push({ kind: "lending", apySortValue: parseApy(lendingDisplayApyRaw) });
       for (const pool of sortedPools) {
         rows.push({ kind: "pool", apySortValue: parseApy(getPoolDisplayApy(pool)), pool });
@@ -709,6 +719,20 @@ const Earn = () => {
       };
     }
 
+    if (opportunity.kind === "staking") {
+      return {
+        title: "Stake STRATO",
+        subtitle: "Delegate STRATO to approved validators",
+        apyRaw: undefined,
+        tvl: "0",
+        badge: "Staking",
+        rateLabel: "Estimated APY",
+        actionLabel: "Stake",
+        onCardClick: () => navigate("/dashboard/earn-staking"),
+        onActionClick: () => navigate("/dashboard/earn-staking"),
+      };
+    }
+
     const pool = opportunity.pool;
     return {
       title: pool.poolName,
@@ -730,6 +754,7 @@ const Earn = () => {
       return yieldVaultApyInfos[YIELD_VAULTS[opportunity.vaultIndex].key] ?? null;
     }
     if (opportunity.kind === "lending") return lendingEarnApyInfo;
+    if (opportunity.kind === "staking") return null;
     return getPoolEarnApyInfo(opportunity.pool);
   };
 
@@ -747,6 +772,10 @@ const Earn = () => {
 
     if (key === "lending") {
       return { kind: "lending", apySortValue: parseApy(lendingDisplayApyRaw) };
+    }
+
+    if (key === "staking" || key === "strato-staking") {
+      return { kind: "staking", apySortValue: Number.NEGATIVE_INFINITY };
     }
 
     const yieldVaultIdx = YIELD_VAULTS.findIndex((v) => v.key === key);
@@ -929,6 +958,10 @@ const Earn = () => {
                           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-500/15 dark:bg-blue-400/15">
                             <CircleArrowDown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                           </div>
+                        ) : configuredFeaturedOpportunity.kind === "staking" ? (
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 dark:bg-cyan-400/15">
+                            <ShieldCheck className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                          </div>
                         ) : (
                           <TokenPairIcon pool={configuredFeaturedOpportunity.pool} size="lg" />
                         )}
@@ -955,16 +988,18 @@ const Earn = () => {
                           TVL
                         </p>
                         <p className="text-sm font-medium text-foreground/80 md:text-sm">
-                          {configuredFeaturedOpportunity.kind === "yieldVault"
-                            ? (() => {
-                              const vd =
-                                yieldVaults[
-                                YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].key
-                                ];
-                              const s = formatYieldVaultTvlUsd(vd);
-                              return s === "--" ? "--" : `$${s}`;
-                            })()
-                            : `$${formatUsd(featuredOpportunityMeta.tvl)}`}
+                          {configuredFeaturedOpportunity.kind === "staking"
+                            ? "--"
+                            : configuredFeaturedOpportunity.kind === "yieldVault"
+                              ? (() => {
+                                const vd =
+                                  yieldVaults[
+                                  YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].key
+                                  ];
+                                const s = formatYieldVaultTvlUsd(vd);
+                                return s === "--" ? "--" : `$${s}`;
+                              })()
+                              : `$${formatUsd(featuredOpportunityMeta.tvl)}`}
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -1030,6 +1065,10 @@ const Earn = () => {
                       ) : topOpportunity.kind === "lending" ? (
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-500/15 dark:bg-blue-400/15">
                           <CircleArrowDown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                      ) : topOpportunity.kind === "staking" ? (
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 dark:bg-cyan-400/15">
+                          <ShieldCheck className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
                         </div>
                       ) : (
                         <TokenPairIcon pool={topOpportunity.pool} size="lg" />
@@ -1372,6 +1411,63 @@ const Earn = () => {
                                     ) : (
                                       "Coming Soon"
                                     )}
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        if (opportunity.kind === "staking") {
+                          return (
+                            <tr
+                              key="staking"
+                              className="border-b border-border/40 cursor-pointer hover:bg-muted/20"
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => navigate("/dashboard/earn-staking")}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  navigate("/dashboard/earn-staking");
+                                }
+                              }}
+                            >
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="w-8 h-8 rounded-full bg-cyan-500/15 dark:bg-cyan-400/15 flex items-center justify-center shrink-0">
+                                    <ShieldCheck className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                                  </div>
+                                  <p className="font-medium truncate">Stake STRATO</p>
+                                  <Badge variant="secondary" className="text-[10px]">Staking</Badge>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <p className="text-sm font-semibold">--</p>
+                              </td>
+                              <td className="px-4 py-3">
+                                <p className="text-sm font-semibold">--</p>
+                                <p className="text-xs text-muted-foreground">TVL</p>
+                              </td>
+                              <td className="px-4 py-3">
+                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>
+                                <p className="text-xs text-muted-foreground">Your Position</p>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-muted-foreground">
+                                Protocol staking
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    className="h-9 min-w-[108px] justify-center"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate("/dashboard/earn-staking");
+                                    }}
+                                  >
+                                    <ShieldCheck className="h-4 w-4 mr-1 shrink-0" />
+                                    Stake
                                   </Button>
                                 </div>
                               </td>

@@ -10,6 +10,7 @@ const { Token, StratoStaking, ValidatorRegistry } = constants;
 const WAD = 10n ** 18n;
 const BPS_DIVISOR = 10000n;
 const YEAR_SECONDS = 365n * 24n * 60n * 60n;
+const MAX_UINT256 = (1n << 256n) - 1n;
 
 export interface StratoOperatorInfo {
   address: string;
@@ -53,6 +54,8 @@ export interface StratoStakingInfo {
   totalRewardableStake: string;
   activeValidatorCount: string;
   rewardReserve: string;
+  rewardPeriodAmount: string;
+  scheduledRewardRemaining: string;
   baseRewardBps: string;
   maxCommissionBps: string;
   maxBatchSize: string;
@@ -143,6 +146,8 @@ const emptyInfo = (): StratoStakingInfo => ({
   totalRewardableStake: "0",
   activeValidatorCount: "0",
   rewardReserve: "0",
+  rewardPeriodAmount: "0",
+  scheduledRewardRemaining: "0",
   baseRewardBps: "0",
   maxCommissionBps: "0",
   maxBatchSize: "0",
@@ -205,6 +210,8 @@ const getContractState = async (accessToken: string): Promise<Record<string, any
           "totalRewardableStake::text",
           "activeOperatorCount::text",
           "rewardReserve::text",
+          "rewardPeriodAmount::text",
+          "scheduledRewardRemaining::text",
           "baseRewardRate::text",
           "stakeRewardRate::text",
           "periodStart::text",
@@ -271,6 +278,33 @@ const getTokenBalance = async (
     return data?.[0]?.value || "0";
   } catch {
     return "0";
+  }
+};
+
+const getTokenAllowance = async (
+  accessToken: string,
+  tokenAddress: string,
+  ownerAddress: string,
+  spenderAddress: string
+): Promise<bigint> => {
+  const token = normalizeAddress(tokenAddress);
+  const owner = normalizeAddress(ownerAddress);
+  const spender = normalizeAddress(spenderAddress);
+  if (!token || !owner || !spender) return 0n;
+
+  try {
+    const { data } = await cirrus.get(accessToken, `/${Token}-_allowances`, {
+      params: {
+        address: `eq.${token}`,
+        key: `eq.${owner}`,
+        key2: `eq.${spender}`,
+        select: "value::text",
+      },
+    });
+
+    return parseBigIntLike(data?.[0]?.value);
+  } catch {
+    return 0n;
   }
 };
 
@@ -398,7 +432,7 @@ const projectedStakeIndex = (state: Record<string, any>): bigint => {
 
   if (!current || now < periodStart || current <= lastUpdateTime) return stored;
 
-  let reserve = parseBigIntLike(state.rewardReserve);
+  let reserve = parseBigIntLike(state.scheduledRewardRemaining);
   const activeOperatorCount = parseBigIntLike(state.activeOperatorCount);
   const totalRewardableStake = parseBigIntLike(state.totalRewardableStake);
   const delta = BigInt(current - lastUpdateTime);
@@ -558,6 +592,8 @@ export const getStratoStakingInfo = async (
     totalRewardableStake: String(state.totalRewardableStake || "0"),
     activeValidatorCount: String(state.activeOperatorCount || "0"),
     rewardReserve: String(state.rewardReserve || "0"),
+    rewardPeriodAmount: String(state.rewardPeriodAmount || "0"),
+    scheduledRewardRemaining: String(state.scheduledRewardRemaining || "0"),
     baseRewardBps: String(state.baseRewardBps || "0"),
     maxCommissionBps: String(state.maxCommissionBps || "0"),
     maxBatchSize: String(state.maxBatchSize || "0"),
@@ -641,6 +677,7 @@ export const stakeStrato = async (
   assertWithinMaxBatchSize(normalized.length, maxBatchSize, "Delegations");
 
   const totalAmount = normalized.reduce((sum, delegation) => sum + parseBigIntLike(delegation.amount), 0n);
+  const allowance = await getTokenAllowance(accessToken, token, userAddress, staking);
 
   const stakeTx: FunctionInput = normalized.length === 1
     ? {
@@ -662,18 +699,21 @@ export const stakeStrato = async (
         },
       };
 
-  return await buildAndPost(accessToken, userAddress, [
-    {
+  const txs: FunctionInput[] = [];
+  if (allowance < totalAmount) {
+    txs.push({
       contractName: extractContractName(Token),
       contractAddress: token,
       method: "approve",
       args: {
         spender: staking,
-        value: totalAmount.toString(),
+        value: MAX_UINT256.toString(),
       },
-    },
-    stakeTx,
-  ]);
+    });
+  }
+  txs.push(stakeTx);
+
+  return await buildAndPost(accessToken, userAddress, txs);
 };
 
 export const moveStratoStake = async (
@@ -938,6 +978,7 @@ export const removeStratoOperator = async (
 export const startStratoRewardSchedule = async (
   accessToken: string,
   userAddress: string,
+  rewardAmount: string,
   startTime: string,
   duration: string,
   baseRewardBps: string,
@@ -945,6 +986,7 @@ export const startStratoRewardSchedule = async (
   description: string
 ): Promise<{ status: string; hash: string }> =>
   castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "startRewardSchedule", [
+    rewardAmount,
     startTime,
     duration,
     baseRewardBps,

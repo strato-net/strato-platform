@@ -18,7 +18,7 @@ struct ValidatorProfile {
 
 // Permissioned validator profile registry. Staking owns balances/rewards; this contract
 // owns who is active and what metadata users see for each operator.
-contract record ValidatorRegistry is Ownable {
+contract  ValidatorRegistry is Ownable {
     event Initialized(address indexed staking);
     event StakingUpdated(address indexed oldStaking, address indexed newStaking);
     event OperatorAdded(address indexed operator, uint256 commissionBps);
@@ -29,9 +29,9 @@ contract record ValidatorRegistry is Ownable {
     IStratoStakingOperatorSync public staking;
 
     // Operators remain in the list after removal so historical records stay addressable.
-    address[] public record operatorList;
-    mapping(address => ValidatorProfile) public record operators;
-    mapping(string => address) public record protocolValidatorOperators;
+    address[] public  operatorList;
+    mapping(address => ValidatorProfile) public  operators;
+    mapping(string => address) public  protocolValidatorOperators;
 
     constructor(address initialOwner) Ownable(initialOwner) { }
 

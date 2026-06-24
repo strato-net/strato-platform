@@ -25,7 +25,7 @@ struct StakingUnbondRequest {
     bool claimed;
 }
 
-contract record StratoStaking is Ownable {
+contract  StratoStaking is Ownable {
     event Initialized(address indexed stratoToken, uint256 unbondingSeconds, uint256 baseRewardBps, uint256 maxCommissionBps);
     event ValidatorRegistrySet(address indexed validatorRegistry);
     event OperatorSynced(address indexed operator, bool active, uint256 commissionBps);
@@ -61,7 +61,11 @@ contract record StratoStaking is Ownable {
     uint256 public totalRewardableStake;
     uint256 public activeOperatorCount;
 
+    // Reward reserve is the STRATO inventory available for rewards. The schedule fields
+    // below are the Phase 1 funding adapter, not the future protocol reward engine.
     uint256 public rewardReserve;
+    uint256 public rewardPeriodAmount;
+    uint256 public scheduledRewardRemaining;
     uint256 public baseRewardRate;
     uint256 public stakeRewardRate;
     uint256 public periodStart;
@@ -74,15 +78,15 @@ contract record StratoStaking is Ownable {
     uint256 public baseRewardPerOperatorStored;
     uint256 public globalStakeRewardPerTokenStored;
 
-    address[] public record operatorList;
-    mapping(address => StakingOperator) public record operators;
+    address[] public  operatorList;
+    mapping(address => StakingOperator) public  operators;
 
     // User stake is keyed by operator so user-directed delegation is already represented.
-    mapping(address => mapping(address => uint256)) public record delegatedStake;
-    mapping(address => mapping(address => uint256)) public record userRewardPerStakePaid;
-    mapping(address => mapping(address => uint256)) public record pendingDelegatorRewards;
-    mapping(address => mapping(uint256 => StakingUnbondRequest)) public record unbondingQueue;
-    mapping(address => uint256) public record unbondingRequestCount;
+    mapping(address => mapping(address => uint256)) public  delegatedStake;
+    mapping(address => mapping(address => uint256)) public  userRewardPerStakePaid;
+    mapping(address => mapping(address => uint256)) public  pendingDelegatorRewards;
+    mapping(address => mapping(uint256 => StakingUnbondRequest)) public  unbondingQueue;
+    mapping(address => uint256) public  unbondingRequestCount;
 
     constructor(address initialOwner) Ownable(initialOwner) { }
 
@@ -152,17 +156,36 @@ contract record StratoStaking is Ownable {
         return balance - principal;
     }
 
-    // Pull streamed rewards into the global indexes. Base rewards go equally to active
-    // operators; stake rewards accrue pro rata over active rewardable stake.
+    function scheduledRewardReserve() public view returns (uint256) {
+        if (periodFinish == 0 || block.timestamp >= periodFinish) return 0;
+        return scheduledRewardRemaining;
+    }
+
+    function recoverableRewardReserve() public view returns (uint256) {
+        uint256 scheduled = scheduledRewardReserve();
+        if (rewardReserve <= scheduled) return 0;
+        return rewardReserve - scheduled;
+    }
+
+    // Phase 1 adapter: pull streamed scheduled rewards into global indexes. Later
+    // protocol rewards should credit validator-specific rewards into the same
+    // operator/delegator accounting path, without relying on this global schedule.
     function _updateGlobalRewards() internal {
         uint256 current = lastTimeRewardApplicable();
-        if (current <= lastUpdateTime) return;
+        if (current <= lastUpdateTime) {
+            if (periodFinish > 0 && block.timestamp >= periodFinish) {
+                baseRewardRate = 0;
+                stakeRewardRate = 0;
+                scheduledRewardRemaining = 0;
+            }
+            return;
+        }
 
         uint256 delta = current - lastUpdateTime;
 
-        if (baseRewardRate > 0 && activeOperatorCount > 0 && rewardReserve > 0) {
+        if (baseRewardRate > 0 && activeOperatorCount > 0 && scheduledRewardRemaining > 0) {
             uint256 baseAccrued = baseRewardRate * delta;
-            if (baseAccrued > rewardReserve) baseAccrued = rewardReserve;
+            if (baseAccrued > scheduledRewardRemaining) baseAccrued = scheduledRewardRemaining;
 
             uint256 perOperator = baseAccrued / activeOperatorCount;
             uint256 allocatedBase = perOperator * activeOperatorCount;
@@ -170,12 +193,13 @@ contract record StratoStaking is Ownable {
             if (allocatedBase > 0) {
                 baseRewardPerOperatorStored += perOperator;
                 rewardReserve -= allocatedBase;
+                scheduledRewardRemaining -= allocatedBase;
             }
         }
 
-        if (stakeRewardRate > 0 && totalRewardableStake > 0 && rewardReserve > 0) {
+        if (stakeRewardRate > 0 && totalRewardableStake > 0 && scheduledRewardRemaining > 0) {
             uint256 stakeAccrued = stakeRewardRate * delta;
-            if (stakeAccrued > rewardReserve) stakeAccrued = rewardReserve;
+            if (stakeAccrued > scheduledRewardRemaining) stakeAccrued = scheduledRewardRemaining;
 
             uint256 rewardPerStake = (stakeAccrued * PRECISION) / totalRewardableStake;
             uint256 allocatedStake = (rewardPerStake * totalRewardableStake) / PRECISION;
@@ -183,10 +207,34 @@ contract record StratoStaking is Ownable {
             if (allocatedStake > 0) {
                 globalStakeRewardPerTokenStored += rewardPerStake;
                 rewardReserve -= allocatedStake;
+                scheduledRewardRemaining -= allocatedStake;
             }
         }
 
         lastUpdateTime = current;
+        if (current == periodFinish && block.timestamp >= periodFinish) {
+            baseRewardRate = 0;
+            stakeRewardRate = 0;
+            scheduledRewardRemaining = 0;
+        }
+    }
+
+    // Generic validator reward accounting: self-bond rewards accrue to the operator,
+    // delegator rewards are net of operator commission and credited through an index.
+    function _creditOperatorRewardShares(address operator, uint256 selfBondReward, uint256 delegatorGrossReward) internal {
+        StakingOperator storage v = operators[operator];
+
+        if (selfBondReward > 0) {
+            v.pendingSelfBondRewards += selfBondReward;
+        }
+
+        if (delegatorGrossReward > 0 && v.delegatedStake > 0) {
+            uint256 commission = (delegatorGrossReward * v.commissionBps) / BPS_DIVISOR;
+            uint256 userNet = delegatorGrossReward - commission;
+
+            v.pendingCommission += commission;
+            v.delegatorRewardPerStakeStored += (userNet * PRECISION) / v.delegatedStake;
+        }
     }
 
     // Materialize one operator's pending base, self-bond, commission, and delegator indexes.
@@ -211,18 +259,9 @@ contract record StratoStaking is Ownable {
 
         uint256 stakeDelta = globalStakeRewardPerTokenStored - v.stakeRewardPerTokenPaid;
         if (stakeDelta > 0) {
-            if (v.selfBond > 0) {
-                v.pendingSelfBondRewards += (v.selfBond * stakeDelta) / PRECISION;
-            }
-
-            if (v.delegatedStake > 0) {
-                uint256 userGross = (v.delegatedStake * stakeDelta) / PRECISION;
-                uint256 commission = (userGross * v.commissionBps) / BPS_DIVISOR;
-                uint256 userNet = userGross - commission;
-
-                v.pendingCommission += commission;
-                v.delegatorRewardPerStakeStored += (userNet * PRECISION) / v.delegatedStake;
-            }
+            uint256 selfBondReward = (v.selfBond * stakeDelta) / PRECISION;
+            uint256 delegatorGrossReward = (v.delegatedStake * stakeDelta) / PRECISION;
+            _creditOperatorRewardShares(operator, selfBondReward, delegatorGrossReward);
 
             v.stakeRewardPerTokenPaid = globalStakeRewardPerTokenStored;
         }
@@ -270,9 +309,9 @@ contract record StratoStaking is Ownable {
     function _refreshRewardRates() internal {
         uint256 rateStartTime = _rateStartTime();
 
-        if (periodFinish > rateStartTime && rewardReserve > 0) {
+        if (periodFinish > rateStartTime && scheduledRewardRemaining > 0) {
             uint256 remaining = periodFinish - rateStartTime;
-            uint256 totalRate = rewardReserve / remaining;
+            uint256 totalRate = scheduledRewardRemaining / remaining;
             baseRewardRate = (totalRate * baseRewardBps) / BPS_DIVISOR;
             stakeRewardRate = totalRate - baseRewardRate;
             lastUpdateTime = rateStartTime;
@@ -281,34 +320,40 @@ contract record StratoStaking is Ownable {
 
         baseRewardRate = 0;
         stakeRewardRate = 0;
+        scheduledRewardRemaining = 0;
     }
 
+    // Phase 1 adapter: stream an explicit amount from the funded reserve over time.
     function _startRewardSchedule(
+        uint256 rewardAmount,
         uint256 startTime,
         uint256 duration,
         uint256 _baseRewardBps,
         string name,
         string description
     ) internal {
+        require(rewardAmount > 0, "SS: amount=0");
         require(startTime >= block.timestamp, "SS: start in past");
         require(duration > 0, "SS: duration=0");
         require(_baseRewardBps <= BPS_DIVISOR, "SS: bad base");
-        require(rewardReserve > 0, "SS: no reserve");
+        require(rewardAmount <= rewardReserve, "SS: insufficient reserve");
 
         baseRewardBps = _baseRewardBps;
+        rewardPeriodAmount = rewardAmount;
+        scheduledRewardRemaining = rewardAmount;
         periodStart = startTime;
         periodFinish = startTime + duration;
         rewardPeriodName = name;
         rewardPeriodDescription = description;
 
-        uint256 totalRate = rewardReserve / duration;
+        uint256 totalRate = rewardAmount / duration;
         require(totalRate > 0, "SS: reward rate=0");
 
         baseRewardRate = (totalRate * baseRewardBps) / BPS_DIVISOR;
         stakeRewardRate = totalRate - baseRewardRate;
         lastUpdateTime = startTime;
 
-        emit RewardsFunded(msg.sender, rewardReserve, startTime, duration, baseRewardRate, stakeRewardRate, name, description);
+        emit RewardsFunded(msg.sender, rewardAmount, startTime, duration, baseRewardRate, stakeRewardRate, name, description);
     }
 
     // The registry is the canonical source for operator lifecycle; it syncs accounting here.
@@ -406,21 +451,6 @@ contract record StratoStaking is Ownable {
         emit CommissionUpdated(operator, oldCommissionBps, newCommissionBps);
     }
 
-    function fundRewards(
-        uint256 amount,
-        uint256 startTime,
-        uint256 duration,
-        uint256 _baseRewardBps,
-        string name,
-        string description
-    ) external onlyOwner onlyInitialized {
-        require(amount > 0, "SS: amount=0");
-
-        _updateGlobalRewards();
-        _depositRewards(amount);
-        _startRewardSchedule(startTime, duration, _baseRewardBps, name, description);
-    }
-
     function depositRewards(uint256 amount) public onlyInitialized {
         require(amount > 0, "SS: amount=0");
         _updateGlobalRewards();
@@ -428,6 +458,7 @@ contract record StratoStaking is Ownable {
     }
 
     function startRewardSchedule(
+        uint256 rewardAmount,
         uint256 startTime,
         uint256 duration,
         uint256 _baseRewardBps,
@@ -435,7 +466,7 @@ contract record StratoStaking is Ownable {
         string description
     ) external onlyOwner onlyInitialized {
         _updateGlobalRewards();
-        _startRewardSchedule(startTime, duration, _baseRewardBps, name, description);
+        _startRewardSchedule(rewardAmount, startTime, duration, _baseRewardBps, name, description);
     }
 
     // Delegators choose an operator for reward accounting. Phase 1 stake does not affect consensus.
@@ -614,7 +645,7 @@ contract record StratoStaking is Ownable {
         require(to != address(0), "SS: to=0");
 
         _updateGlobalRewards();
-        require(amount <= rewardReserve, "SS: reserve protected");
+        require(amount <= recoverableRewardReserve(), "SS: reserve protected");
         require(rewardBalance() >= amount, "SS: reserve unavailable");
 
         rewardReserve -= amount;

@@ -245,8 +245,8 @@ class StakingController {
 
   static async startRewardSchedule(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { startTime, duration, baseRewardBps, name, description } = req.body || {};
-      if (!isPositiveAmount(startTime) || !isPositiveAmount(duration) || baseRewardBps === undefined) {
+      const { rewardAmount, startTime, duration, baseRewardBps, name, description } = req.body || {};
+      if (!isPositiveAmount(rewardAmount) || !isPositiveAmount(startTime) || !isPositiveAmount(duration) || baseRewardBps === undefined) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid reward schedule" });
         return;
       }
@@ -254,6 +254,7 @@ class StakingController {
       const result = await startStratoRewardSchedule(
         req.accessToken,
         req.address as string,
+        String(rewardAmount),
         String(startTime),
         String(duration),
         String(baseRewardBps),

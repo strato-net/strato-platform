@@ -130,6 +130,16 @@ export const defaultStratoTokenFor: Record<string, string> = {
   "33056204878082667": "2ca3e170e6714282da77815f7864b17f612f5f83", // Upquark mainnet
 };
 
+export const defaultStratoStakingFor: Record<string, string> = {
+  "114784819836269": "d6726e06c3c71a3bad80b5eb6925707a31729b81", // Helium testnet
+  "33056204878082667": "", // Upquark mainnet
+};
+
+export const defaultValidatorRegistryFor: Record<string, string> = {
+  "114784819836269": "bfbb75bb6bd0bafa2f5c5b735fe518ade76808dd", // Helium testnet
+  "33056204878082667": "", // Upquark mainnet
+};
+
 export const defaultMetalForgeFor: Record<string, string> = {
   "114784819836269": "c5ed981b816a626981a5747d125e0e7296b2c7c6", // Helium testnet
   "33056204878082667": "1cc5bad32dc8667878fa7c53cc5cfd6e76fdb113", // Upquark mainnet
@@ -241,9 +251,9 @@ function setStratoTokenConfig(networkId: string) {
     "";
 }
 
-function setStratoStakingConfig() {
-  stratoStaking = process.env.STRATO_STAKING || "";
-  validatorRegistry = process.env.VALIDATOR_REGISTRY || "";
+function setStratoStakingConfig(networkId: string) {
+  stratoStaking = process.env.STRATO_STAKING || defaultStratoStakingFor[networkId] || "";
+  validatorRegistry = process.env.VALIDATOR_REGISTRY || defaultValidatorRegistryFor[networkId] || "";
 }
 
 function setMetalForgeConfig(networkId: string) {
@@ -303,7 +313,7 @@ export async function initNetworkConfig() {
   setVaultFactoryConfig(networkId);
   setStratoNativeBridgeConfig(networkId);
   setStratoTokenConfig(networkId);
-  setStratoStakingConfig();
+  setStratoStakingConfig(networkId);
   setMetalForgeConfig(networkId);
   setCreditCardTopUpConfig(networkId);
   setSaveUsdstVaultConfig(networkId);
