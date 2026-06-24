@@ -467,7 +467,7 @@ runSM ::
 runSM maybeCode envBefore gi f = do
   csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
   GasCap gasCap <- Mod.get (Mod.Proxy @GasCap)
-  $logInfoS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
+  $logDebugS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
   let !startingState =
         SState
           { env = envBefore,
