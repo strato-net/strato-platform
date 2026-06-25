@@ -64,6 +64,10 @@ docker-compose.oracle.yml
 
 /app
 /mynode/
+/snapshot-test-node/
+/snapshot-smoke-node/
+/.snapshot-work/
+/.snapshot-downloads/
 .aider*
 
 # Documentation working files (summaries, verification reports, commit messages)
@@ -131,3 +135,5 @@ __pycache__/
 /docs/developer/
 /docs/end-user/
 .docker-built/
+
+mercata/contracts/.env.happy-eth-withdrawal

@@ -79,7 +79,7 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
       case bbi of
         ContextBestBlockInfo h _ _ -> pure h
         Unspecified -> pure Keccak256.zeroHash
-    resps <- withCurrentBlockHash bbHash $ traverse runJsonRpcCommand' rpcCommands
+    resps <- withCurrentBlockHashNoCommit bbHash $ traverse runJsonRpcCommand' rpcCommands
     recordSeqEventCount bLen tLen
     pure resps
   yieldMany $! OutJSONRPC <$> rpcResps

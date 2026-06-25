@@ -31,7 +31,7 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 4, String diskRoot = '/', Bool
             find . -name '.stack-work' -exec rm -r {} +
           fi
           if [ -d "\$f/mynode" ]; then
-            rm -rf "\$f/mynode"
+            sudo rm -rf "\$f/mynode"
           fi
         ); 
       done

@@ -70,12 +70,12 @@ import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 import Blockchain.TheDAOFork
 import Blockchain.Timing
-import Blockchain.VM.SolidException (SolidException(PaymentError, TooMuchGas))
+import Blockchain.VM.SolidException (SolidException(MissingCodeCollection, RevertError))
 import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
-import Blockchain.EthConf (ethConf, networkConfig, contractsConfig, nativeTokenAddress)
+import Blockchain.EthConf (ethConf, networkConfig, contractsConfig, nativeTokenAddress, vmConfig)
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Verifier
 import Conduit
@@ -88,7 +88,6 @@ import Control.Monad.Composable.Base ()
 import Control.Monad.Trans.Except
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Binary as Bin
-import Data.Bool (bool)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.DList as DL
@@ -105,7 +104,6 @@ import Data.Time.Clock
 import Prometheus as P
 import SolidVM.Model.CodeCollection hiding (Event, Block, events, _events)
 import SolidVM.Model.SolidString (labelToText)
-import SolidVM.Model.Value (Value(..))
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
@@ -199,7 +197,7 @@ addBlocks unfiltered = do
           when didReplaceBest' $ do
             $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
             nbb <- readIORef replacedBest
-            when flags_sqlDiff $
+            when (Conf.sqlDiff $ vmConfig ethConf) $
               timeit "calculateAndEmitStateDiffs" timerToUse $
                 calculateAndEmitStateDiffs srLog oldHeader
             yield . OutIndexEvent $ NewBestBlock nbb
@@ -406,28 +404,11 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
   printTransactionMessage tx result time'
   trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
   case result of
-    Right execResult ->
-      let invalidPragmas = invalidPragmasUsed $ erPragmas execResult
-       in if not $ null invalidPragmas
-            then do
-              putAddressStateTxDBMap M.empty
-              putMemRawStorageTxMap M.empty
-              return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmas tx) (DL.toList ran) unran remGas -- use invalidPragmasUsed here
-            else do
-              case erException execResult of
-                Just (Left (TooMuchGas limit actual)) -> do
-                  putAddressStateTxDBMap M.empty
-                  putMemRawStorageTxMap M.empty
-                  return $ Bagger.TxMiningResult (Just $ TFTransactionGasExceeded limit actual tx) (DL.toList ran) unran remGas
-                Just (Left (PaymentError limit (_, actual))) -> do
-                  putAddressStateTxDBMap M.empty
-                  putMemRawStorageTxMap M.empty
-                  return $ Bagger.TxMiningResult (Just $ TFInsufficientFunds limit actual tx) (DL.toList ran) unran remGas
-                _ -> do
-                  let nextRemGas = remGas - (TD.gasLimit bt - calculateReturned bt execResult)
-                  flushMemAddressStateTxToBlockDB
-                  flushMemStorageTxDBToBlockDB
-                  mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs mSelfAddress
+    Right execResult -> do
+      let nextRemGas = remGas - (TD.gasLimit bt - calculateReturned bt execResult)
+      flushMemAddressStateTxToBlockDB
+      flushMemStorageTxDBToBlockDB
+      mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs mSelfAddress
     Left failure -> do
       return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
 
@@ -452,9 +433,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
     . throwE
     $ TFTXSizeLimitExceeded txSize (toInteger (Conf.txSizeLimit (networkConfig ethConf))) t
 
-  let isKnownToBeSlow = otHash t `S.member` knownExpensiveTxs
-      adjustedTxGasLimit = bool (TD.gasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
-      availableGas = fromInteger adjustedTxGasLimit
+  let availableGas = 400_000
 
   feeResult <- payFees b availableGas tAddr t proposer
   let combineA f x y = liftA2 f x y <|> x <|> y
@@ -468,41 +447,36 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
         , erEvents = erEvents feeResult ++ erEvents er
         }
 
-  if (erException feeResult == Nothing) || (erReturnVal feeResult == Just (SBool True))
-    then do
-      $logInfoS "runCodeForTransaction" "decide() function successful, running TX"
+  lift $ attachFeeResult <$> do -- can't throwE after this point because fee payment already succeeded
+    $logDebugS "runCodeForTransaction" "decide() function successful, running TX"
 
-      lift $ incrementNonce tAddr
+    incrementNonce tAddr
 
-      when (otHash t `S.member` knownFailedTxs) $ do
-        throwE $ TFKnownFailedTX t
+    if otHash t `S.member` knownFailedTxs
+      then pure . solidvmErrorResults $ RevertError "Known failed tx" (format $ txHash t)
+      else do
+        $logDebugS "addTx" . T.pack $ "gas is always off, so I'm giving the account enough balance for this TX"
+        faucetSuccess <- addToBalance tAddr 10000000 -- txCost
+        unless faucetSuccess $ error "failed to give balance to a gasOff account"
 
-      $logInfoS "addTx" . T.pack $ "gas is always off, so I'm giving the account enough balance for this TX"
-      faucetSuccess <- lift $ addToBalance tAddr 10000000 -- txCost
-      unless faucetSuccess $ error "failed to give balance to a gasOff account"
+        when flags_debug $ $logDebugS "addTx" "running code"
+        let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
+        P.incCounter txTypeCounter
 
-      when flags_debug $ $logDebugS "addTx" "running code"
-      let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
-      lift $ P.incCounter txTypeCounter
-      when flags_strictGas $ $logInfoS "addTx" . T.pack $ "Strict Gas Mode is on. Adjusted transaction gas limit is " ++ show adjustedTxGasLimit
+        execResults <- runCodeForTransaction b availableGas tAddr t proposer
+        P.incCounter vmTxsProcessed
 
-      execResults <- runCodeForTransaction b availableGas tAddr t proposer
-      lift $ P.incCounter vmTxsProcessed
-
-      case erException execResults of
-        Just e -> do
-          when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
-          lift $ P.incCounter vmTxsUnsuccessful
-        Nothing -> do
-          when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (format <$> S.toList (erSuicideList execResults))
-          forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
-            lift $ purgeStorageMap address'
-            lift $ A.delete (Proxy @AddressState) address'
-          lift $ P.incCounter vmTxsSuccessful
-      return $ attachFeeResult execResults
-    else case erException feeResult of
-      Just (Left PaymentError{}) -> pure feeResult
-      _ -> pure $ feeResult{ erException = Just . Left $ PaymentError 10_000_000_000_000_000 (show tAddr, 0) } -- TODO: Make Fee contract throw a PaymentError and remove this case
+        case erException execResults of
+          Just e -> do
+            when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
+            P.incCounter vmTxsUnsuccessful
+          Nothing -> do
+            when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (format <$> S.toList (erSuicideList execResults))
+            forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
+              purgeStorageMap address'
+              A.delete (Proxy @AddressState) address'
+            P.incCounter vmTxsSuccessful
+        pure execResults
 
 runCodeForTransaction ::
   (VMBase m) =>
@@ -511,7 +485,7 @@ runCodeForTransaction ::
   Address ->
   OutputTx ->
   Address ->
-  ExceptT TransactionFailureCause m ExecResults
+  m ExecResults
 runCodeForTransaction b availableGas tAddr t proposer =
   let ut = otBaseTx t
    in case ut of
@@ -522,83 +496,78 @@ runCodeForTransaction b availableGas tAddr t proposer =
                 amountArg = T.pack $ show val
             $logInfoS "runCodeForTransaction" $ T.pack $
               "EthereumTX native transfer: " ++ show val ++ " to " ++ format toAddr ++ " -> nativeToken.transfer"
-            lift $
-              SolidVM.call
-                b
-                nativeAddr
-                tAddr
-                proposer
-                (fromIntegral availableGas)
-                tAddr
-                (txHash ut)
-                "transfer"
-                [recipientArg, amountArg]
-                Nothing
+            SolidVM.call
+              b
+              nativeAddr
+              tAddr
+              proposer
+              (fromIntegral availableGas)
+              tAddr
+              (txHash ut)
+              "transfer"
+              [recipientArg, amountArg]
+              Nothing
           | otherwise -> do
             when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $
               "runCodeForTransaction: EthereumTX caller: " ++ format tAddr ++ ", address: " ++ format toAddr
             let selector = B.take 4 callData
                 argsBytes = B.drop 4 callData
-            lift (resolveFunction b tAddr toAddr selector) >>= \case
-              Nothing -> throwE $ TFCodeCollectionNotFound toAddr
-                ("no matching function for selector 0x" ++ concatMap (printf "%02x") (B.unpack selector)) t
+            resolveFunction b tAddr toAddr selector >>= \case
+              Nothing -> pure . solidvmErrorResults $ MissingCodeCollection (show toAddr)
+                ("no matching function for selector 0x" ++ concatMap (printf "%02x") (B.unpack selector))
               Just (fName, func) -> do
                 let argTexts = map valueToArgText $ decodeABIArgs argsBytes (funcArgTypes func)
                     fnStr = T.unpack (labelToText fName)
                 $logInfoS "runCodeForTransaction" $ T.pack $
                   "EthereumTX resolved: " ++ fnStr ++ "(" ++ intercalate ", " (map T.unpack argTexts) ++ ") on " ++ format toAddr
-                lift $
-                  SolidVM.call
-                    b
-                    toAddr
-                    tAddr
-                    proposer
-                    (fromIntegral availableGas)
-                    tAddr
-                    (txHash ut)
-                    (labelToText fName)
-                    argTexts
-                    Nothing
+                SolidVM.call
+                  b
+                  toAddr
+                  tAddr
+                  proposer
+                  (fromIntegral availableGas)
+                  tAddr
+                  (txHash ut)
+                  (labelToText fName)
+                  argTexts
+                  Nothing
 
         TD.EthereumTX {TD.ethTo = Nothing} ->
-          throwE $ TFCodeCollectionNotFound (Address 0)
-            "EthereumTX contract creation (raw EVM bytecode) not supported" t
+          pure . solidvmErrorResults $ MissingCodeCollection (show $ Address 0) "EthereumTX contract creation (raw EVM bytecode) not supported"
 
         _ | isContractCreationTX ut -> do
           when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
 
           --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
-          nonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
+          nonce <- addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
           let newAddress = getNewAddress_unsafe (tAddr) (nonce - 1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
 
-          lift $
-            SolidVM.create
-              b
-              tAddr
-              tAddr
-              proposer
-              availableGas
-              newAddress
-              (TD.code ut)
-              (txHash ut)
-              (fromJust $ txContractName ut)
-              (txArgs ut)
+          SolidVM.create
+            b
+            tAddr
+            tAddr
+            proposer
+            availableGas
+            newAddress
+            (TD.code ut)
+            (txHash ut)
+            (fromJust $ txContractName ut)
+            (txArgs ut)
 
         _ -> do
           when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (TD.to ut)
 
-          lift $
-            SolidVM.call
-                  b -- blockData
-                  (TD.to ut) -- codeAddress
-                  tAddr -- sender
-                  proposer -- proposer
-                  (fromIntegral availableGas) -- availableGas
-                  tAddr -- origin
-                  (txHash ut) -- txHash
-                  (TD.funcName ut)
-                  (TD.args ut)
-                  Nothing
+          SolidVM.call
+                b -- blockData
+                (TD.to ut) -- codeAddress
+                tAddr -- sender
+                proposer -- proposer
+                (fromIntegral availableGas) -- availableGas
+                tAddr -- origin
+                (txHash ut) -- txHash
+                (TD.funcName ut)
+                (TD.args ut)
+                Nothing
 
 payFees ::
   VMBase m =>
@@ -612,7 +581,7 @@ payFees b availableGas tAddr t proposer = do
   -- BEGIN: Custom Validation Check
   -- Call validation contract at 0xDEC1DE. Require it returns True.
 
-  lift $
+  feeResult <- lift $
     SolidVM.call
       b  -- blockData
       (Address 0xDEC1DE)  --codeAddress
@@ -624,6 +593,10 @@ payFees b availableGas tAddr t proposer = do
       "decide"
       []
       (Just DelegateCall)
+  
+  case erException feeResult of
+    Nothing -> pure feeResult 
+    Just _ -> throwE $ TFInsufficientFunds 10_000_000_000_000_000 0 t
 
 ----------------
 {-
@@ -733,7 +706,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
           transactionResultDeletedStorage = "",
           transactionResultStatus = Just txrStatus
         }
-  yield . OutVMEvents . (txr:) $ if not flags_diffPublish
+  yield . OutVMEvents . (txr:) $ if not (Conf.diffPublish $ vmConfig ethConf)
     then []
     else case erAction <$> result of
       Right (Just act) -> extractCodeCollectionAddedMessages act
@@ -818,7 +791,7 @@ replaceBestIfBetter b@OutputBlock {obBlockData = bd, obReceiptTransactions = txs
         case cbbi of
           Unspecified -> $logInfoS "replaceBestIfBetter" "ContextBestBlockInfo is Unspecified"
           ContextBestBlockInfo h _ t ->
-            $logInfoS "ContextBestBlockInfo" . T.pack $
+            $logDebugS "ContextBestBlockInfo" . T.pack $
               concat
                 [ format h,
                   " ",

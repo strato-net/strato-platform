@@ -77,7 +77,14 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 fi
 
 echo 'Waiting for Vault-Wrapper to be available...'
-until curl --silent --output /dev/null --fail --location "http://${VAULT_WRAPPER_HOST}/strato/v2.3/_ping"
+# /_ping returns 200 when the vault password is set and 503 when it is
+# awaiting password initialization. Either response means the upstream is
+# reachable and nginx can start proxying; any other condition (connection
+# refused, timeout, transient 5xx) keeps the loop waiting.
+until status=$(curl --silent --output /dev/null --location \
+                    --write-out '%{http_code}' --max-time 2 \
+                    "http://${VAULT_WRAPPER_HOST}/strato/v2.3/_ping") \
+       && { [ "$status" = "200" ] || [ "$status" = "503" ]; }
 do
   sleep 0.5
 done

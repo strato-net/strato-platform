@@ -68,7 +68,8 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
 
   const currentTokens = useMemo(() => {
     return bridgeableTokens.filter((token) =>
-      isSaving ? !token.isDefaultRoute : token.isDefaultRoute
+      (token.routeType !== "native" || !token.withdrawalsPaused) &&
+      (isSaving ? !token.isDefaultRoute : token.isDefaultRoute)
     );
   }, [bridgeableTokens, isSaving]);
 
@@ -281,9 +282,10 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       const useExternalWalletSigning = isExternalEvmWalletConnected && !isAppAuthenticated;
       const res = await bridgeOutAPI(
         {
+          routeType: selectedToken.routeType,
           externalChainId: currentNetwork.chainId,
           externalRecipient,
-          externalToken,
+          ...(selectedToken.routeType === "native" ? {} : { externalToken }),
           stratoToken: selectedToken.stratoToken,
           stratoTokenAmount,
         },

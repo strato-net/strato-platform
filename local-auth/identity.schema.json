@@ -7,24 +7,6 @@
     "traits": {
       "type": "object",
       "properties": {
-        "email": {
-          "type": "string",
-          "format": "email",
-          "title": "Email",
-          "ory.sh/kratos": {
-            "credentials": {
-              "password": {
-                "identifier": true
-              }
-            },
-            "recovery": {
-              "via": "email"
-            },
-            "verification": {
-              "via": "email"
-            }
-          }
-        },
         "username": {
           "type": "string",
           "title": "Username",
@@ -39,7 +21,7 @@
           }
         }
       },
-      "required": ["email"],
+      "required": ["username"],
       "additionalProperties": false
     }
   }

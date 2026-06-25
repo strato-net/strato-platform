@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -8,7 +9,9 @@
 
 module Blockchain.Strato.Indexer.ApiIndexer
   ( apiIndexerMainLoop,
+    indexerMainLoop,
     indexAPI,
+    indexP2P,
     kafkaClientIds,
   )
 where
@@ -20,6 +23,7 @@ import Blockchain.Data.DataDefs (ReceiptRef (..))
 import Blockchain.Data.ReceiptRef (putReceiptRefs)
 import Blockchain.DB.MemAddressStateDB (AddressStateModification(..))
 import Blockchain.DB.SQLDB
+import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Indexer.IContext
 import Blockchain.Strato.Indexer.Kafka
@@ -32,10 +36,28 @@ import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
 import Control.Arrow ((&&&))
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
+import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
+import Text.Format
 
+-- | Combined indexer: processes events for both SQL (API) and Redis (P2P)
+indexerMainLoop :: ( MonadLogger m,
+                     HasStreaming m,
+                     HasSQLDB m,
+                     (Keccak256 `A.Alters` API OutputTx) m,
+                     (Keccak256 `A.Alters` API OutputBlock) m,
+                     (Keccak256 `A.Alters` P2P OutputBlock) m,
+                     Mod.Modifiable (P2P BestBlock) m
+                   ) =>
+                   m ()
+indexerMainLoop =
+  consume "strato-indexer" targetTopicName $ \idxEvents -> do
+    indexAPI idxEvents
+    indexP2P idxEvents
+
+-- | Legacy entry point for API-only indexing
 apiIndexerMainLoop :: ( MonadLogger m,
                         HasStreaming m,
                         HasSQLDB m,
@@ -115,7 +137,21 @@ indexAPI idxEvents = do
 kafkaClientIds :: (ClientId, ConsumerGroup)
 kafkaClientIds = ("strato-api-indexer", "strato-api-indexer")
 
-{-
-indexerMetadata :: Metadata
-indexerMetadata = Metadata $ KString S8.empty
--}
+-- | P2P indexing: writes blocks to Redis for P2P sync
+indexP2P ::
+  ( MonadLogger m,
+    (Keccak256 `A.Alters` P2P OutputBlock) m,
+    Mod.Modifiable (P2P BestBlock) m
+  ) =>
+  [IndexEvent] ->
+  m ()
+indexP2P idxEvents = do
+  forM_ idxEvents $ \case
+    RanBlock b -> do
+      $logInfoS "p2pIndexer" . T.pack $ "Inserting Redis block with sha: " ++ format (blockHash b)
+      A.insert (A.Proxy @(P2P OutputBlock)) (blockHash b) $ P2P b
+    NewBestBlock (sha, num) -> do
+      $logInfoS "p2pIndexer" . T.pack $
+        "Updating RedisBestBlock as (" ++ format sha ++ ", " ++ show num ++ ")"
+      Mod.put (Mod.Proxy @(P2P BestBlock)) . P2P $ BestBlock sha num
+    _ -> return ()

@@ -28,73 +28,76 @@ export interface HistorySnapshot {
   data: any;
 }
 
-export const getHistoryParams = (duration?: string, end?: string): HistoryParams => {
+// Rescale params to at most maxTicks points while preserving the time window
+const capTicks = (params: HistoryParams, maxTicks?: number): HistoryParams => {
+  if (!maxTicks || maxTicks >= params.numTicks) return params;
+  return {
+    endTimestamp: params.endTimestamp,
+    interval: (params.interval * params.numTicks) / maxTicks,
+    numTicks: maxTicks
+  };
+};
+
+export const getHistoryParams = (duration?: string, end?: string, maxTicks?: number): HistoryParams => {
   const endTimestamp = end ? Date.parse(end) : Date.now();
   switch (duration) {
     case '1h': {
-      return {
+      return capTicks({
         endTimestamp,
         interval: 1000 * 10, // 10 seconds
         numTicks: 360 // 1 hour = 360 * 10 seconds
-      }
-    }
-    case '5d': {
-      return {
-        endTimestamp,
-        interval: 1000 * 60 * 30, // 30 minutes
-        numTicks: 5 * 48
-      }
+      }, maxTicks);
     }
     case '7d': {
-      return {
+      return capTicks({
         endTimestamp,
         interval: 1000 * 60 * 30, // 30 minutes
         numTicks: 7 * 48
-      }
+      }, maxTicks);
     }
     case '1m': {
-      return {
+      return capTicks({
         endTimestamp,
         interval: 1000 * 60 * 60 * 2, // 2 hours
         numTicks: 372 // 1 month
-      }
+      }, maxTicks);
     }
     case '3m': {
-      return {
+      return capTicks({
         endTimestamp,
         interval: 1000 * 60 * 60 * 6, // 6 hours
         numTicks: 368 // 3 months
-      }
+      }, maxTicks);
     }
     case '6m': {
-      return {
+      return capTicks({
         endTimestamp,
         interval: 1000 * 60 * 60 * 12, // 12 hours
         numTicks: 366 // 6 months
-      }
+      }, maxTicks);
     }
     case '1y': {
-      return {
+      return capTicks({
         endTimestamp,
         interval: 1000 * 60 * 60 * 24, // 1 day
         numTicks: 366 // 12 months
-      }
+      }, maxTicks);
     }
     case 'all': {
       const genesisTimestamp = Date.parse('2025-10-30T00:00:00Z');
       const dt = endTimestamp - genesisTimestamp;
-      return {
+      return capTicks({
         endTimestamp,
         interval: Number(dt/360),
         numTicks: 360
-      }
+      }, maxTicks);
     }
     default: {
-      return {
+      return capTicks({
         endTimestamp,
         interval: 1000 * 5 * 60, // 5 minutes
         numTicks: 12 * 24 // 5 minutes * 288 = 24 hours
-      }
+      }, maxTicks);
     }
   }
 }
@@ -136,8 +139,8 @@ export const getHistory = async (
     })
   ]);
 
-  const storageHistory = storageRes.data as StorageHistoryElement[];
-  const mappingHistory = mappingRes.data as MappingHistoryElement[];
+  const storageHistory = Array.from(new Set(storageRes.data as StorageHistoryElement[]));
+  const mappingHistory = Array.from(new Set(mappingRes.data as MappingHistoryElement[]));
   const snapshots: any[] = (new Array(numTicks + 1)).fill({}).map((_, i) => { return {
     timestamp: endTimestamp - (interval * (numTicks - i)),
     data: initialSnapshotData

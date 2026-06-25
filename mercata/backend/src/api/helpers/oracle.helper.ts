@@ -10,6 +10,9 @@ import { OraclePriceMap } from "@mercata/shared-types";
 
 const { Token, DECIMALS, Pool, LendingPool, SaveUSDSTVault, lendingRegistry, YieldVault } = constants;
 
+const getActiveAssets = (totalAssets: bigint, totalClaimableAssets: bigint): bigint =>
+  totalAssets > totalClaimableAssets ? totalAssets - totalClaimableAssets : 0n;
+
 const addMTokenPrice = async (
   accessToken: string,
   priceMap: OraclePriceMap
@@ -153,7 +156,7 @@ const addYieldVaultTokenPrices = async (
     const { data: rows } = await cirrus.get(accessToken, `/${YieldVault}`, {
       params: {
         address: `eq.${vaultAddress}`,
-        select: "address,_asset,deployedAssets::text,_totalSupply::text",
+        select: "address,_asset,deployedAssets::text,_totalSupply::text,totalClaimableAssets::text",
       },
     });
     const v = rows?.[0];
@@ -170,8 +173,9 @@ const addYieldVaultTokenPrices = async (
     const idle = BigInt(balRows?.[0]?.value || "0");
     const deployed = BigInt(v.deployedAssets || "0");
     const totalAssets = idle + deployed;
+    const activeAssets = getActiveAssets(totalAssets, BigInt(v.totalClaimableAssets || "0"));
     const totalShares = BigInt(v._totalSupply || "0");
-    const pricePerShare = totalShares === 0n ? DECIMALS : (totalAssets * DECIMALS) / totalShares;
+    const pricePerShare = totalShares === 0n ? DECIMALS : (activeAssets * DECIMALS) / totalShares;
     priceMap.set(v.address, pricePerShare.toString());
   }
 };
@@ -199,7 +203,7 @@ export const getCarryVaultUsdPriceMap = async (
     const { data: rows } = await cirrus.get(accessToken, `/${YieldVault}`, {
       params: {
         address: `eq.${vaultAddress}`,
-        select: "address,_asset,deployedAssets::text,_totalSupply::text",
+        select: "address,_asset,deployedAssets::text,_totalSupply::text,totalClaimableAssets::text",
       },
     });
     const v = rows?.[0];
@@ -216,10 +220,11 @@ export const getCarryVaultUsdPriceMap = async (
     const idle = BigInt(balRows?.[0]?.value || "0");
     const deployed = BigInt(v.deployedAssets || "0");
     const totalAssets = idle + deployed;
+    const activeAssets = getActiveAssets(totalAssets, BigInt(v.totalClaimableAssets || "0"));
     const totalShares = BigInt(v._totalSupply || "0");
     if (totalShares === 0n) continue;
 
-    const pricePerShareUnderlying = (totalAssets * DECIMALS) / totalShares;
+    const pricePerShareUnderlying = (activeAssets * DECIMALS) / totalShares;
 
     const assetKey = String(v._asset).toLowerCase();
     const assetUsdPriceStr = priceMap.get(assetKey) || priceMap.get(v._asset) || "0";

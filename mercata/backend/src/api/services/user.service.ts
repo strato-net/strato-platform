@@ -5,7 +5,20 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import JSONBig from "json-bigint";
+import { normalizeLegacyEscapes, sanitizeJsonLikeStringArgs } from "../helpers/jsonStringParsing.helper";
 const { AdminRegistry, adminRegistry } = constants;
+const JSONBigString = JSONBig({ storeAsString: true });
+
+export const parseAdminIssueArgs = (argsRaw: any): any => {
+  if (typeof argsRaw !== "string") return argsRaw;
+
+  const normalizedArgsRaw = normalizeLegacyEscapes(argsRaw);
+  try {
+    return JSONBigString.parse(normalizedArgsRaw);
+  } catch {
+    return JSONBigString.parse(sanitizeJsonLikeStringArgs(normalizedArgsRaw));
+  }
+};
 
 export const isUserAdmin = async (
   accessToken: string,
@@ -34,6 +47,42 @@ export const isUserAdmin = async (
     return false;
   }
 }; 
+
+const getVariadicTail = (args: any[], startIndex: number): any[] => {
+  const tail = args.slice(startIndex);
+  return tail.length === 1 && Array.isArray(tail[0]) ? tail[0] : tail;
+};
+
+const getCreateContractArgs = (args: any[]): any[] =>
+  getVariadicTail(args, 2).map((arg) => typeof arg === "string" ? JSON.stringify(arg) : arg);
+
+const castVoteOnCreateContractIssue = async (
+  accessToken: string,
+  userAddress: string,
+  target: string,
+  args: any[],
+): Promise<{ status: string; hash: string }> => {
+  if (args.length < 3) {
+    throw new Error('Invalid createContract issue args');
+  }
+
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(AdminRegistry),
+    contractAddress: target,
+    method: "createContract",
+    args: {
+      contractName: args[0],
+      contractSrc: args[1],
+      args: getCreateContractArgs(args),
+    },
+  }, userAddress, accessToken);
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  return { status, hash };
+};
 
 export const getAdmin = async (
   accessToken: string
@@ -187,12 +236,10 @@ export const castVoteOnIssueById = async (
     }
 
     const issue = issueResponse.data[0];
-    let { target, func, args: argsRaw } = issue;
+    const { target, func, args: argsRaw } = issue;
 
     // Parse args keeping large numbers as strings (JSONBig with storeAsString)
-    const JSONBigString = JSONBig({ storeAsString: true });
-    const args = typeof argsRaw === 'string' ? JSONBigString.parse(argsRaw) : argsRaw;
-    // console.log("args in castVoteOnIssueById", args);
+    const args = parseAdminIssueArgs(argsRaw);
 
     // If func is _addAdmin, call the addAdmin endpoint directly
     if (func === '_addAdmin') {
@@ -212,59 +259,11 @@ export const castVoteOnIssueById = async (
       return await removeAdmin(accessToken, userAddress, adminAddress);
     }
 
-    // Get contract name from Cirrus
-    const contractResponse = await cirrus.get(accessToken, "contract", {
-      params: {
-        address: `eq.${target}`
-      },
-    });
-
-    
-
-    if (contractResponse.status !== 200 || !contractResponse.data || !Array.isArray(contractResponse.data) || contractResponse.data.length === 0) {
-      throw new Error('Failed to fetch contract details for target address');
-    }
-    const contractName = contractResponse.data[0].contract_name;
-  
-
-    // Get contract details to retrieve function parameter names
-    const contractDetails = await getContractDetails(accessToken, target);
-    const allFunctions = (contractDetails as any)?._functions || {};
-    const functionInfo = allFunctions[func];
-    
-    if (!functionInfo || !functionInfo._funcArgs) {
-      throw new Error(`Function ${func} not found in contract ${contractName}`);
+    if (func === 'createContract' && Array.isArray(args)) {
+      return await castVoteOnCreateContractIssue(accessToken, userAddress, target, args);
     }
 
-    // Convert array args to object with parameter names
-    const funcArgs = functionInfo._funcArgs as Array<[string, any]>;
-    const argsObject: Record<string, any> = {};
-    
-    if (Array.isArray(args)) {
-      funcArgs.forEach(([paramName], index) => {
-        if (index < args.length) {
-          argsObject[paramName] = args[index];
-        }
-      });
-    } else {
-      // If args is already an object, use it directly
-      Object.assign(argsObject, args);
-    }
-
-
-    // Build transaction directly to the target contract
-    const tx = await buildFunctionTx({
-      contractName,
-      contractAddress: target,
-      method: func,
-      args: argsObject,
-    }, userAddress, accessToken);
-
-    const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, tx)
-    );
-
-    return { status, hash };
+    return await castVoteOnIssue(accessToken, userAddress, target, func, args);
   } catch (error) {
     throw error;
   }
@@ -328,7 +327,6 @@ export const getOpenIssues = async (
       issues: uniqueIssues 
     };
   } catch (error) {
-    console.log(error);
     return {};
   }
 };
@@ -363,7 +361,6 @@ export const getExecutedIssues = async (
       executedTotal 
     };
   } catch (error) {
-    console.log(error);
     return { executed: [], executedTotal: 0 };
   }
 };

@@ -16,7 +16,6 @@ build-type:     Simple
 
 library
   exposed-modules:
-      BlockApps.Tools.Checkpoints
       BlockApps.Tools.Code
       BlockApps.Tools.DumpKafkaSequencer
       BlockApps.Tools.DumpKafkaUnSequencer

@@ -19,6 +19,7 @@ import {
   DEPOSIT_ROUTER_ABI,
   ERC20_ABI,
   PERMIT2_ADDRESS,
+  STRATO_NATIVE_REPRESENTATION_BRIDGE_ABI,
 } from "@/lib/bridge/constants";
 import {
   getTokenConfig,
@@ -287,7 +288,7 @@ interface BridgeInProps {
 
 const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: externalFundingMode, onFundingModeChange, onMetalPurchase }) => {
   // Hooks & Context
-  const { isConnected } = useAccount();
+  const { isConnected, connector } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
   const { switchChain } = useSwitchChain();
@@ -340,6 +341,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const [progressTxHash, setProgressTxHash] = useState<string>();
   const [progressError, setProgressError] = useState<string>();
   const [progressIsNative, setProgressIsNative] = useState(true);
+  const [progressIsRedemption, setProgressIsRedemption] = useState(false);
   const [metalProgressOpen, setMetalProgressOpen] = useState(false);
   const [metalSteps, setMetalSteps] = useState<MetalBuyStep[]>([]);
   const [metalProgressError, setMetalProgressError] = useState<string>();
@@ -364,17 +366,36 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     return availableNetworks.find((n) => n.chainName === selectedNetwork) || null;
   }, [availableNetworks, selectedNetwork]);
 
+  const depositableBridgeTokens = useMemo(
+    () => bridgeableTokens.filter((token) => token.routeType !== "native"),
+    [bridgeableTokens]
+  );
+
+  const nativeBridgeTokens = useMemo(
+    () => bridgeableTokens.filter((token) => token.routeType === "native" && !token.depositsPaused),
+    [bridgeableTokens]
+  );
+
   const { sourceTokenRoutes, matchingActions } = useMemo(() => {
     if (!selectedToken) return { sourceTokenRoutes: prevCardsRef.current.routes, matchingActions: prevCardsRef.current.actions };
-    const routes = bridgeableTokens.filter((token) =>
-      token.externalToken?.toLowerCase() === selectedToken.externalToken?.toLowerCase()
-    );
+    const routes = selectedToken.routeType === "native"
+      ? nativeBridgeTokens.filter((token) => token.id === selectedToken.id)
+      : depositableBridgeTokens.filter((token) =>
+          token.routeType !== "native" &&
+          token.externalToken?.toLowerCase() === selectedToken.externalToken?.toLowerCase()
+        );
     if (routes.length > 0) prevRouteCountRef.current = routes.length;
-    const mintStratoTokens = new Set(routes.filter(r => r.isDefaultRoute).map(r => normAddr(r.stratoToken)));
-    const actions = depositActions.filter(a => a.payToken && mintStratoTokens.has(normAddr(a.payToken)));
+    const mintStratoTokens = new Set(
+      routes
+        .filter(r => r.routeType !== "native" && r.isDefaultRoute)
+        .map(r => normAddr(r.stratoToken))
+    );
+    const actions = selectedToken.routeType === "native"
+      ? []
+      : depositActions.filter(a => a.payToken && mintStratoTokens.has(normAddr(a.payToken)));
     if (routes.length > 0) prevCardsRef.current = { routes, actions };
     return { sourceTokenRoutes: routes.length > 0 ? routes : prevCardsRef.current.routes, matchingActions: routes.length > 0 ? actions : prevCardsRef.current.actions };
-  }, [bridgeableTokens, selectedToken, depositActions]);
+  }, [depositableBridgeTokens, nativeBridgeTokens, selectedToken, depositActions]);
 
   const getApyInfo = useMemo(() => {
     const m = buildEarnApyMap(tokenApys);
@@ -435,13 +456,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
 
   const uniqueExternalTokens = useMemo(() => {
     const seen = new Set<string>();
-    return bridgeableTokens.filter((token) => {
+    return depositableBridgeTokens.filter((token) => {
       const key = (token.externalToken || "").toLowerCase();
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
-  }, [bridgeableTokens]);
+  }, [depositableBridgeTokens]);
 
   const expectedChainId = currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : null;
   const externalSender = externalEvmWalletAddress;
@@ -449,7 +470,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const stratoRecipient = userAddress;
   const hasExternalWallet = isConnected && isExternalEvmWalletConnected && !!externalSenderHex;
   const isCorrectNetwork = hasExternalWallet && !!chainId && !!expectedChainId && chainId === expectedChainId;
-  const isNativeToken = BigInt(selectedToken?.externalToken || "0") === 0n;
+  const isNativeRedemption = selectedToken?.routeType === "native";
+  const isNativeToken = !isNativeRedemption && BigInt(selectedToken?.externalToken || "0") === 0n;
   const useExternalWalletSigning = hasExternalWallet && !isAppAuthenticated;
   const visibleMatchingActions = useMemo(
     () => useExternalWalletSigning ? [] : matchingActions,
@@ -522,13 +544,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     if (!selectedNetwork && availableNetworks.length) {
       setSelectedNetwork(availableNetworks[0].chainName);
     }
-    if (!selectedToken && bridgeableTokens.length) {
-      setSelectedToken(bridgeableTokens[0]);
+    if (!selectedToken && (depositableBridgeTokens.length || nativeBridgeTokens.length)) {
+      setSelectedToken(depositableBridgeTokens[0] || nativeBridgeTokens[0]);
     } else if (
       selectedToken &&
-      !bridgeableTokens.some((t) => t.id === selectedToken.id)
+      ![...depositableBridgeTokens, ...nativeBridgeTokens].some((t) => t.id === selectedToken.id)
     ) {
-      setSelectedToken(bridgeableTokens[0] || null);
+      setSelectedToken(depositableBridgeTokens[0] || nativeBridgeTokens[0] || null);
     }
 
     const currentExternal = (selectedToken?.externalToken || "").toLowerCase();
@@ -541,7 +563,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     prevExternalTokenRef.current = currentExternal;
   }, [
     availableNetworks,
-    bridgeableTokens,
+    depositableBridgeTokens,
+    nativeBridgeTokens,
     selectedNetwork,
     selectedToken,
     setSelectedNetwork,
@@ -555,6 +578,11 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   }, [useExternalWalletSigning, selectedAction]);
 
   useEffect(() => {
+    if (selectedToken?.routeType === "native") {
+      setMinDepositInfo({ amount: "0", amountWei: 0n, loading: false });
+      setIsTokenPermitted(true);
+      return;
+    }
     if (selectedToken && currentNetwork) {
       fetchMinDepositAmount(selectedToken.externalToken, parseInt(selectedToken.externalDecimals || "18"));
     }
@@ -571,6 +599,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         return;
       }
       if (chainId !== expectedChainId) {
+        if (!connector || typeof connector.getChainId !== "function") {
+          setNetworkError(`Please switch to ${selectedNetwork}`);
+          return;
+        }
         try {
           await switchChain({ chainId: expectedChainId });
           setNetworkError("");
@@ -582,7 +614,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       }
     };
     handleNetworkSwitch();
-  }, [chainId, fundingMode, hasExternalWallet, selectedNetwork, expectedChainId, switchChain]);
+  }, [chainId, connector, fundingMode, hasExternalWallet, selectedNetwork, expectedChainId, switchChain]);
 
   // Handlers
   const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
@@ -810,16 +842,97 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     setIsLoading(true);
     setProgressError(undefined);
     
-    const isNative = BigInt(selectedToken.externalToken || "0") === 0n;
+    const isNative = selectedToken.routeType !== "native" && BigInt(selectedToken.externalToken || "0") === 0n;
     setProgressIsNative(isNative);
+    setProgressIsRedemption(selectedToken.routeType === "native");
     
     setProgressModalOpen(true);
 
     try {
       const activeChainId = currentNetwork.chainId;
+      const activeChainIdNumber = Number(activeChainId);
       const depositRouter = currentNetwork.depositRouter;
       const targetStratoToken = ensureHexPrefix(selectedToken.stratoToken);
-      
+      const depositAmount = safeParseUnits(
+        amount,
+        parseInt(selectedToken.externalDecimals || "18"),
+      );
+
+      if (selectedToken.routeType === "native") {
+        if (!selectedToken.externalBridge) {
+          throw new Error("Native representation bridge is not configured for this route.");
+        }
+
+        setProgressIsNative(false);
+        setCurrentStep("approve");
+        const representationToken = ensureHexPrefix(selectedToken.externalToken);
+        const representationBridge = ensureHexPrefix(selectedToken.externalBridge);
+
+        const approveTx = await writeContractAsync({
+          address: representationToken as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [representationBridge as `0x${string}`, depositAmount],
+          chainId: activeChainIdNumber,
+          account: externalSenderHex,
+        });
+
+        const approveSuccess = await waitForTransaction(approveTx, activeChainId);
+        if (!approveSuccess) {
+          throw new Error(`Approval reverted on ${selectedNetwork} network. Please try again.`);
+        }
+
+        setCurrentStep("confirm_tx");
+        const txHash = await writeContractAsync({
+          address: representationBridge as `0x${string}`,
+          abi: STRATO_NATIVE_REPRESENTATION_BRIDGE_ABI,
+          functionName: "requestRedemption",
+          args: [
+            representationToken as `0x${string}`,
+            depositAmount,
+            ensureHexPrefix(stratoRecipient) as `0x${string}`,
+          ],
+          chainId: activeChainIdNumber,
+          account: externalSenderHex,
+        });
+
+        setProgressTxHash(txHash);
+        setCurrentStep("waiting_tx");
+        const success = await waitForTransaction(txHash, activeChainId);
+        if (!success) {
+          throw new Error(`Transaction reverted on ${selectedNetwork} network. No funds were redeemed to STRATO. Please try again.`);
+        }
+
+        const existing = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
+        existing.push({
+          externalChainId: parseInt(activeChainId),
+          externalTxHash: txHash,
+          type: 'bridge',
+          DepositInfo: {
+            externalSender,
+            stratoRecipient,
+            stratoToken: selectedToken.stratoToken,
+            stratoTokenAmount: depositAmount.toString(),
+            bridgeStatus: "1",
+          },
+          block_timestamp: new Date().toISOString(),
+          stratoTokenSymbol: selectedToken.stratoTokenSymbol,
+          externalName: selectedToken.externalName,
+          externalSymbol: selectedToken.externalSymbol,
+        });
+        localStorage.setItem('pendingDeposits', JSON.stringify(existing));
+        triggerDepositRefresh();
+
+        setCurrentStep("complete");
+        setAmount("");
+
+        await Promise.all([
+          refetchToken(),
+          fetchUsdstBalance(),
+        ]);
+        return;
+      }
+
       // Set initial step based on token type
       if (!isNative) {
         // ERC20 tokens need approval
@@ -828,11 +941,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         // Native tokens (ETH) go straight to confirm
         setCurrentStep("confirm_tx");
       }
-      const depositAmount = safeParseUnits(
-        amount,
-        parseInt(selectedToken.externalDecimals || "18"),
-      );
-
       const validation = await validateRouterContract({
         depositRouterAddress: depositRouter,
         amount,
@@ -916,7 +1024,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         setCurrentStep("confirm_tx");
       }
       const chain = await resolveViemChain(activeChainId);
-
       let txHash: `0x${string}`;
       if (isNative) {
         txHash = await writeContractAsync({
@@ -1174,19 +1281,30 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             <CrossfadePanel active={fundingMode === "bridge"}>
               <div className="rounded-md border-2 border-border p-3 space-y-2">
                 <div className="flex items-center gap-2">
-                  <Select value={(selectedToken?.externalToken || "").toLowerCase()}
+                  <Select value={
+                    selectedToken?.routeType === "native"
+                      ? `native:${selectedToken.id}`
+                      : (selectedToken?.externalToken || "").toLowerCase()
+                  }
                     onValueChange={(val) => {
-                      const match = bridgeableTokens.find((t) => (t.externalToken || "").toLowerCase() === val && t.isDefaultRoute)
-                        || bridgeableTokens.find((t) => (t.externalToken || "").toLowerCase() === val) || null;
+                      const match = val.startsWith("native:")
+                        ? nativeBridgeTokens.find((t) => `native:${t.id}` === val) || null
+                        : depositableBridgeTokens.find((t) => (t.externalToken || "").toLowerCase() === val && t.isDefaultRoute)
+                          || depositableBridgeTokens.find((t) => (t.externalToken || "").toLowerCase() === val) || null;
                       setSelectedToken(match);
                     }}
-                    disabled={!uniqueExternalTokens.length || guestMode || isLoading}>
+                    disabled={(!uniqueExternalTokens.length && !nativeBridgeTokens.length) || guestMode || isLoading}>
                     <SelectTrigger className="h-10 min-w-[120px] w-auto shrink-0 gap-1 rounded-md border-border text-sm font-semibold text-foreground px-2">
                       <SelectValue placeholder="Token" />
                     </SelectTrigger>
                     <SelectContent>
                       {uniqueExternalTokens.filter((t) => t.externalSymbol || t.externalName).map((t) => (
                         <SelectItem key={t.externalToken} value={(t.externalToken || "").toLowerCase()}>
+                          {fundTokenLabel(t)}
+                        </SelectItem>
+                      ))}
+                      {nativeBridgeTokens.filter((t) => t.externalSymbol || t.externalName).map((t) => (
+                        <SelectItem key={t.id} value={`native:${t.id}`}>
                           {fundTokenLabel(t)}
                         </SelectItem>
                       ))}
@@ -1250,9 +1368,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                 {sourceTokenRoutes.length > 0 ? [
                   ...sourceTokenRoutes.map((rt) => {
                     let est = amount || "0";
-                    const routePrice = rt.rebaseFactor
-                      ? fmtSpotDollarWei(rt.rebaseFactor)
-                      : "$1.00";
                     if (rt.rebaseFactor && amount) {
                       try {
                         const factor = BigInt(rt.rebaseFactor);
@@ -1266,7 +1381,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                         estimated={est}
                         onClick={() => { setSelectedToken(rt); setSelectedAction(null); }}
                         disabled={guestMode || isLoading}
-                        effectivePrice={routePrice}
                         apyBadge={<ApyLine addr={rt.stratoToken} />}
                       />
                     );
@@ -1333,7 +1447,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             disabled={fundingMode === "metals" ? (isLoading || !selectedPayToken || !selectedMetal || !amount || guestMode) : isButtonDisabled}
             className="w-full h-11 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 text-base font-semibold"
           >
-            {isLoading ? "Processing..." : fundingMode === "metals" ? `Buy ${selectedMetal?.symbol || "Metal"}` : "Deposit"}
+            {isLoading
+              ? "Processing..."
+              : fundingMode === "metals"
+                ? `Buy ${selectedMetal?.symbol || "Metal"}`
+                : selectedToken?.routeType === "native"
+                  ? "Redeem to STRATO"
+                  : "Deposit"}
           </Button>
           <div className={`overflow-hidden transition-all duration-300 ease-in-out text-right ${
             fundingMode === "bridge" ? "max-h-[30px] opacity-100" : "max-h-0 opacity-0"
@@ -1379,12 +1499,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           chainId={currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : undefined}
           isEasySavings={(selectedAction?.action || 0) > 0}
           isNative={progressIsNative}
+          isRedemption={progressIsRedemption}
           error={progressError}
           onClose={() => {
             setProgressModalOpen(false);
             setCurrentStep("confirm_tx");
             setProgressTxHash(undefined);
             setProgressError(undefined);
+            setProgressIsRedemption(false);
           }}
         />
         <MetalBuyProgressModal

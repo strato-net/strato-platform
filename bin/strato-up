@@ -2,19 +2,69 @@
 
 set -e
 
-# --patch-app was removed - inform the user. To be removed soon.
+# Parse snapshot restore options (strato-up only; not passed to strato-setup):
+#   --snapshot[=<timestamp>]   Restore from the published S3 snapshot for the
+#                              selected --network (latest, or a timestamp).
+#   --snapshot-source=<src>    Restore from an explicit local file or s3:// URI
+#                              (e.g. to validate a freshly created archive before
+#                              it is published). Takes precedence over --snapshot.
+# Restore happens after strato-setup and before convoke is started.
+FROM_SNAPSHOT="false"
+SNAPSHOT_TIMESTAMP=""
+SNAPSHOT_SOURCE=""
+NETWORK="upquark"
+SETUP_ARGS=()
 for arg in "$@"; do
-    if [[ "$arg" == "--patch-app" ]]; then
-        echo "Error: the --patch-app flag has been removed from strato-up."
-        echo "Use 'strato-patch-app' instead (see README for details)."
-        exit 1
-    fi
+    case "$arg" in
+        # --patch-app was removed - inform the user. To be removed soon.
+        --patch-app)
+            echo "Error: the --patch-app flag has been removed from strato-up."
+            echo "Use 'strato-patch-app' instead (see README for details)."
+            exit 1
+            ;;
+        --snapshot)
+            FROM_SNAPSHOT="true"
+            ;;
+        --snapshot=*)
+            FROM_SNAPSHOT="true"
+            SNAPSHOT_TIMESTAMP="${arg#*=}"
+            ;;
+        --snapshot-source=*)
+            FROM_SNAPSHOT="true"
+            SNAPSHOT_SOURCE="${arg#*=}"
+            ;;
+        --network=*)
+            NETWORK="${arg#*=}"
+            SETUP_ARGS+=("$arg")
+            ;;
+        *)
+            SETUP_ARGS+=("$arg")
+            ;;
+    esac
 done
 
-strato-setup "$@"
+strato-setup "${SETUP_ARGS[@]}"
 NODE_DIR="$1"
 
+if [[ "$FROM_SNAPSHOT" == "true" ]]; then
+    if [[ -n "$SNAPSHOT_SOURCE" ]]; then
+        SNAPSHOT_ARG=(--source "$SNAPSHOT_SOURCE")
+        echo "Restoring node from $NETWORK snapshot source ($SNAPSHOT_SOURCE)..."
+    elif [[ -n "$SNAPSHOT_TIMESTAMP" ]]; then
+        SNAPSHOT_ARG=("--snapshot=$SNAPSHOT_TIMESTAMP")
+        echo "Restoring node from $NETWORK snapshot ($SNAPSHOT_TIMESTAMP)..."
+    else
+        SNAPSHOT_ARG=(--snapshot)
+        echo "Restoring node from latest $NETWORK snapshot..."
+    fi
+    if ! strato-snapshot restore "$NODE_DIR" "${SNAPSHOT_ARG[@]}" --network "$NETWORK" --force; then
+        echo "Error: snapshot restore failed; not starting STRATO." >&2
+        exit 1
+    fi
+fi
+
 cd "$NODE_DIR"
+NODE_DIR_ABS="$(pwd)"
 
 # Check if node is already running
 if [[ -f .strato.pid ]]; then
@@ -29,8 +79,23 @@ if [[ -f .strato.pid ]]; then
 fi
 
 echo "Starting convoke..."
-# stdout goes to log, stderr goes to both log and terminal
-nohup convoke > logs/convoke.log 2> >(tee -a logs/convoke.log >&2) &
-echo "CONVOKE_PID=$!" > .strato.pid
+# stdout and stderr both go to the log; stderr also goes to the terminal.
+# Both streams go through "tee -a" (append mode) so the two writers share the
+# file's end position and can't overwrite each other's bytes. Truncate first,
+# since the append redirects no longer reset the log on restart.
+: > logs/convoke.log
+nohup convoke > >(tee -a logs/convoke.log >/dev/null) 2> >(tee -a logs/convoke.log >&2) &
+CONVOKE_PID=$!
+echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
+
+if grep -q "local-auth:" docker-compose.yml; then
+    echo "Ensuring local auth admin and node identity setup..."
+    if ! strato-user-add "$NODE_DIR_ABS" "${LOCAL_AUTH_ADMIN_USERNAME:-admin}" --with-nodekey; then
+        echo "Error: local auth admin setup failed; stopping STRATO." >&2
+        kill "$CONVOKE_PID" 2>/dev/null || true
+        rm -f .strato.pid
+        exit 1
+    fi
+fi
 
 echo "STRATO started in: $(pwd)"

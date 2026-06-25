@@ -27,6 +27,7 @@ packages:
 - core/miner-ethash
 - core/seqevents
 - core/strato-conf
+- core/strato-version
 - core/strato-genesis
 - core/strato-init
 - core/strato-model
@@ -55,6 +56,8 @@ packages:
 - libs/composable-monads/streaming-kafka-hw
 - libs/composable-monads/streaming-rabbitmq
 - libs/composable-monads/streaming-redpanda
+- libs/jlog-c
+- libs/composable-monads/streaming-jlog
 - libs/composable-monads/streaming
 - libs/composable-monads/redis-monad
 - libs/composable-monads/sql-monad

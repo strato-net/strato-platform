@@ -1,0 +1,32 @@
+cabal-version: 2.2
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           jlog-c
+version:        0.1.0.0
+license:        BSD-3-Clause
+license-file:   cbits/LICENSE
+build-type:     Simple
+
+library
+  exposed-modules:
+      JLog.FFI
+  other-modules:
+      Paths_jlog_c
+  autogen-modules:
+      Paths_jlog_c
+  hs-source-dirs:
+      src
+  cc-options: -DHAVE_STDINT_H -DHAVE_SYS_TYPES_H -DHAVE_UNISTD_H -D_GNU_SOURCE -Wno-format-truncation
+  include-dirs:
+      cbits
+  c-sources:
+      cbits/jlog.c
+      cbits/jlog_hash.c
+      cbits/jlog_io.c
+      cbits/jlog_compress.c
+  build-depends:
+      base >=4.7 && <5
+  default-language: Haskell2010

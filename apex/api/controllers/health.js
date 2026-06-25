@@ -119,8 +119,33 @@ module.exports = {
   healthStatus: async function (req, res, next) {
     try {
       let health = null, uptime = null, healthStatus = null, healthIssues = [], healthData = null;
-      const [healthInfo, stallInfo, systemInfo, syncInfo] =
-        await utils.getLatestHealth();
+      const [
+        [healthInfo, stallInfo, systemInfo, syncInfo],
+        lastBlock,
+        bestBlockNumber,
+        pbftData,
+        nodeAddress,
+      ] = await Promise.all([
+        utils.getLatestHealth(),
+        BlockDataRef.findOne({
+          where: {
+            pow_verified: true,
+            is_confirmed: true,
+          },
+          order: [["number", "DESC"]],
+          attributes: ["number", "hash", "parent_hash", "nonce"],
+          raw: true,
+        }),
+        // Source `lastBlock.number` from the same place as `strato-barometer syncstats`
+        // (used by `bin/strato-ps`): the BestBlock entry in Redis. Falls back to
+        // BlockDataRef.number if Redis is unavailable.
+        redisBlockDB.getBestBlockNumber().catch((err) => {
+          winston.warn(`Falling back to BlockDataRef for lastBlock.number: ${err.message}`);
+          return null;
+        }),
+        getPbftData(),
+        getNodeAddress(),
+      ]);
 
       if (healthInfo && stallInfo && systemInfo && syncInfo) {
         ({ health, uptime, healthStatus, healthIssues, healthData } = utils.consolidateHealthData(
@@ -139,6 +164,14 @@ module.exports = {
         apiVersion: API_VERSION,
         version: process.env.STRATO_VERSION,
         timestamp: new Date().toISOString(),
+        nodeAddress,
+        lastBlock: {
+          number: bestBlockNumber !== null ? bestBlockNumber : lastBlock.number,
+          hash: lastBlock.hash,
+          parentHash: lastBlock.parent_hash,
+          nonce: lastBlock.nonce,
+        },
+        pbftData: findView(pbftData),
         health: health,
         healthStatus: healthStatus,
         healthIssues: healthIssues,
@@ -153,21 +186,44 @@ module.exports = {
   },
 };
 
-// Fetches the node's blockchain (coinbase) address from strato-api.
-// Returns null if the call fails so /status remains usable.
+// Fetches the node's own blockchain address from Prometheus.
+// The address is carried in the `address` label of the `pbft_node_identity`
+// metric, which the blockstanbul consensus layer emits once it has resolved
+// the node identity (from Vault). Returns null if unavailable so /status
+// remains usable.
 async function getNodeAddress() {
   try {
-    return await rp({
+    if (!process.env["PROMETHEUS_HOST"]) {
+      throw Error(
+        "PROMETHEUS_HOST env var is not set - unable to get prometheus data"
+      );
+    }
+    const resp = await rp({
       method: "GET",
-      uri: `${process.env.stratoRoot}/coinbase`,
-      json: true,
-      timeout: config.healthCheck.requestTimeout - 100,
+      url: `http://${process.env["PROMETHEUS_HOST"]}/prometheus/api/v1/query?query=pbft_node_identity`,
       followRedirects: false,
+      timeout: config.healthCheck.requestTimeout - 100,
+      json: true,
     });
+    return findNodeAddress(resp);
   } catch (err) {
-    winston.warn(`Unable to fetch node coinbase address: ${err.message}`);
+    winston.warn(`Unable to fetch node address: ${err.message}`);
     return null;
   }
+}
+
+// Extracts the node address from a Prometheus `pbft_node_identity` query
+// response. The address lives in the `address` label; returns it with a 0x
+// prefix, or null if not present.
+function findNodeAddress(obj) {
+  if (!(obj && obj.data && obj.data.result && obj.data.result.length)) {
+    return null;
+  }
+  const elem = obj.data.result.find((e) => e && e.metric && e.metric.address);
+  if (!elem) {
+    return null;
+  }
+  return `0x${elem.metric.address}`;
 }
 
 function getPbftData() {
