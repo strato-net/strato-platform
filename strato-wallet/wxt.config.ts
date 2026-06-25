@@ -23,7 +23,15 @@ export default defineConfig({
     // registered as a Keycloak OAuth client. Public key only; the matching private
     // key lives in .secrets/ (gitignored) for Web Store packaging.
     key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoXgq85nDLn+rO/Y+PvlhEQVz6QBs9yuWhZVTDaI+FYt2E3AVE3AFOAO91+9b7z5ZxGocNXVPBCH+Ow2vWdzAR/p06E9O1JOjdRVQIDhHHRyHSLoKqvmCbecgjFxNA28Axh8aFxkBVswXKxqq1Uh/x88mVKfW3ErCGK9vPisqujE5UReBGrW08sMHpmcnTCFH6bUWW0bpAzm0yGxGzKrF5ptjfHhu7kBqzMKP2wPIpy3GGcl3Lj+a5Oic8LrH4xDyQHNd0Fr1JV3UqXwkhZ8sNAsDMJf2HmXtW8UqKoPNcB2b96dPzKj+qS3JZJLPx0rqEswXK7RgzNq0URK0tB8uqQIDAQAB",
-    permissions: ["storage", "tabs", "identity", "declarativeNetRequest", "sidePanel"],
+    permissions: [
+      "storage",
+      "tabs",
+      "identity",
+      "declarativeNetRequest",
+      "sidePanel",
+      "alarms",
+      "notifications",
+    ],
     host_permissions: ["<all_urls>"],
     action: {
       default_title: "STRATO Wallet",

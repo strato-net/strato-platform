@@ -47,6 +47,18 @@ import { rpcCall } from "@/src/core/rpc";
 import { sendEvmTransaction, encodeErc20Transfer } from "@/src/core/tx-evm";
 import { sendBlocTransaction, sendBlocCalls, type BlocTxParams } from "@/src/core/tx-strato";
 import { listPermissions, revokePermission } from "@/src/core/permissions";
+import { runWatchers } from "@/src/core/watchers";
+import {
+  listNotifications,
+  unreadCount,
+  markRead,
+  markAllRead,
+  clearNotifications,
+  getNotifSettings,
+  setNotifSettings,
+  refreshBadge,
+  type NotifSettings,
+} from "@/src/core/notifications";
 
 export default defineBackground(() => {
   // Clicking the toolbar icon opens the side panel (needs no action popup).
@@ -56,6 +68,29 @@ export default defineBackground(() => {
 
   // Allow the Bearer-token vault signature POST past nginx's CSRF guard.
   installCsrfBypassRule();
+
+  // Event notifications: a periodic alarm wakes the (ephemeral) worker to poll
+  // on-chain state and fire notifications on transitions. MV3 alarms persist and
+  // run while the browser is open even with the UI closed. Only create it if it
+  // doesn't already exist — re-creating on every cold start would reset its
+  // schedule (and frequent SW restarts could then starve it). Polling is driven
+  // solely by the alarm, never on cold start, to avoid redundant Cirrus reads.
+  const WATCH_ALARM = "strato-watch";
+  (async () => {
+    if (!(await browser.alarms?.get?.(WATCH_ALARM))) {
+      await browser.alarms?.create?.(WATCH_ALARM, { delayInMinutes: 0.5, periodInMinutes: 2 });
+    }
+  })().catch(() => {});
+  browser.alarms?.onAlarm.addListener((alarm) => {
+    if (alarm.name === WATCH_ALARM) runWatchers().catch((e) => console.error("watch", e));
+  });
+  // Sync the unread badge on startup (cheap, local).
+  refreshBadge().catch(() => {});
+
+  // Clicking an OS notification opens the wallet to the relevant view.
+  browser.notifications?.onClicked?.addListener((id) => {
+    openNotification(id).catch((e) => console.error("notif click", e));
+  });
 
   // If the user closes the approval popup without deciding, reject the pending
   // requests so the dApp gets a clean rejection instead of spinning forever.
@@ -133,6 +168,34 @@ async function sendEventToOrigins(
 async function broadcastEvent(event: string, data: unknown): Promise<void> {
   const origins = new Set((await listPermissions()).map((p) => p.origin));
   await sendEventToOrigins(origins, event, data);
+}
+
+// Open the wallet UI (a popup window) at the route a notification points to, mark
+// it read, and dismiss the OS toast.
+async function openNotification(id: string): Promise<void> {
+  const notif = (await listNotifications()).find((n) => n.id === id);
+  await markRead(id);
+  browser.notifications?.clear?.(id).catch?.(() => {});
+  // Switch to the account the notification is about so the opened view is in
+  // that account's context.
+  if (notif?.address) {
+    try {
+      const current = await keyring.getSelectedAddress();
+      if (current?.toLowerCase() !== notif.address.toLowerCase()) {
+        await keyring.setSelectedAddress(notif.address as Address);
+        await broadcastEvent("accountsChanged", [notif.address]);
+      }
+    } catch (e) {
+      console.error("notif account switch", e);
+    }
+  }
+  const route = notif?.route ?? "notifications";
+  const url = browser.runtime.getURL(`/popup.html#/${route}`);
+  try {
+    await browser.windows.create({ url, type: "popup", width: 380, height: 620, focused: true });
+  } catch {
+    /* best effort */
+  }
 }
 
 // The STRATO network a bridge operation targets: the selected one if it's a
@@ -350,6 +413,25 @@ async function dispatchControl(method: string, args: unknown[]): Promise<unknown
         args[4] as string
       );
     }
+
+    // notifications
+    case "notifications.list":
+      return listNotifications();
+    case "notifications.unreadCount":
+      return unreadCount();
+    case "notifications.markRead":
+      return markRead(args[0] as string);
+    case "notifications.markAllRead":
+      return markAllRead();
+    case "notifications.clear":
+      return clearNotifications();
+    case "notifications.settings":
+      return getNotifSettings();
+    case "notifications.setSettings":
+      return setNotifSettings(args[0] as Partial<NotifSettings>);
+    case "notifications.checkNow":
+      await runWatchers();
+      return true;
 
     // permissions
     case "permissions.list":

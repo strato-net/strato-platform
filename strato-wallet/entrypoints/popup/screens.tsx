@@ -6,6 +6,7 @@ import {
   ArrowLeftRight,
   ArrowUpRight,
   ArrowUpDown,
+  Bell,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -171,6 +172,7 @@ export function Home({ navigate }: { navigate: (to: string) => void }) {
   const networks = useAsync<StratoNetwork[]>(() => callBackground("networks.list"));
   const network = useAsync<StratoNetwork>(() => callBackground("networks.selected"));
   const showTestnets = useAsync<boolean>(() => callBackground("settings.showTestnets"));
+  const unread = useAsync<number>(() => callBackground("notifications.unreadCount"));
   const [tab, setTab] = useState<HomeTab>("tokens");
   const [copied, copy] = useCopy();
   const [theme, toggleTheme] = useTheme();
@@ -199,6 +201,16 @@ export function Home({ navigate }: { navigate: (to: string) => void }) {
           <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400" />
         </button>
         <div className="flex items-center gap-1">
+          <div className="relative">
+            <IconButton title="Notifications" onClick={() => navigate("notifications")}>
+              <Bell className="h-5 w-5" />
+            </IconButton>
+            {(unread.data ?? 0) > 0 && (
+              <span className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+                {unread.data! > 9 ? "9+" : unread.data}
+              </span>
+            )}
+          </div>
           <IconButton
             title={theme === "dark" ? "Light mode" : "Dark mode"}
             onClick={toggleTheme}
@@ -881,6 +893,97 @@ export function BridgeHistory({ navigate }: { navigate: (to: string) => void }) 
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------- Notifications
+interface WalletNotification {
+  id: string;
+  type: "bridge" | "incoming" | "loan";
+  title: string;
+  body: string;
+  createdAt: number;
+  read: boolean;
+  route?: string;
+}
+
+function notifIcon(type: WalletNotification["type"]) {
+  if (type === "bridge") return <ArrowLeftRight className="h-4 w-4" />;
+  if (type === "incoming") return <ArrowDownLeft className="h-4 w-4" />;
+  return <ShieldAlert className="h-4 w-4" />;
+}
+
+export function Notifications({ navigate }: { navigate: (to: string) => void }) {
+  const items = useAsync<WalletNotification[]>(() => callBackground("notifications.list"));
+  const list = items.data ?? [];
+
+  // Opening the center clears the unread badge; the loaded list keeps its
+  // read flags so just-read items still render highlighted this once.
+  useEffect(() => {
+    callBackground("notifications.markAllRead").catch(() => {});
+  }, []);
+
+  const clearAll = async () => {
+    await callBackground("notifications.clear");
+    items.refresh();
+  };
+
+  return (
+    <div>
+      <ScreenHeader title="Notifications" onClose={() => navigate("")} />
+      <div className="p-3">
+        {list.length > 0 && (
+          <div className="mb-1 flex justify-end">
+            <button
+              onClick={clearAll}
+              className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Clear all
+            </button>
+          </div>
+        )}
+        <div className="space-y-1">
+          {items.loading && (
+            <div className="py-10 text-center text-sm text-slate-400">Loading…</div>
+          )}
+          {!items.loading && list.length === 0 && (
+            <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <Bell className="h-10 w-10 text-slate-300" />
+              <p className="text-sm text-slate-500 dark:text-slate-400">No notifications yet.</p>
+            </div>
+          )}
+          {list.map((n) => (
+            <button
+              key={n.id}
+              onClick={() => navigate(n.route ?? "")}
+              className={`flex w-full items-start gap-3 rounded-lg px-2 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-900 ${
+                n.read ? "" : "bg-blue-50/60 dark:bg-blue-950/40"
+              }`}
+            >
+              <span
+                className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                  n.type === "loan"
+                    ? "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400"
+                    : "bg-blue-50 text-[#001B70] dark:bg-blue-950 dark:text-blue-300"
+                }`}
+              >
+                {notifIcon(n.type)}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-sm font-medium">{n.title}</span>
+                  {!n.read && <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{n.body}</p>
+                <p className="mt-0.5 text-[11px] text-slate-400">
+                  {new Date(n.createdAt).toLocaleString()}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -1760,15 +1863,46 @@ export function ImportAccount({ navigate }: { navigate: (to: string) => void }) 
 }
 
 // ----------------------------------------------------------------- Settings
+interface NotifSettings {
+  os: boolean;
+  bridge: boolean;
+  incoming: boolean;
+  loan: boolean;
+}
+
+function ToggleSwitch({ on, onClick }: { on: boolean; onClick: () => void }) {
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      onClick={onClick}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+        on ? "bg-[#001B70]" : "bg-slate-300 dark:bg-slate-700"
+      }`}
+    >
+      <span
+        className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+          on ? "translate-x-5" : "translate-x-0"
+        }`}
+      />
+    </button>
+  );
+}
+
 export function Settings({ navigate }: { navigate: (to: string) => void }) {
   const networks = useAsync<StratoNetwork[]>(() => callBackground("networks.list"));
   const selected = useAsync<StratoNetwork>(() => callBackground("networks.selected"));
   const showTestnets = useAsync<boolean>(() => callBackground("settings.showTestnets"));
+  const notif = useAsync<NotifSettings>(() => callBackground("notifications.settings"));
   const [form, setForm] = useState<Partial<StratoNetwork>>({});
 
   const toggleTestnets = async () => {
     await callBackground("settings.setShowTestnets", !showTestnets.data);
     showTestnets.refresh();
+  };
+  const toggleNotif = async (key: keyof NotifSettings) => {
+    await callBackground("notifications.setSettings", { [key]: !notif.data?.[key] });
+    notif.refresh();
   };
 
   const save = async () => {
@@ -1807,21 +1941,34 @@ export function Settings({ navigate }: { navigate: (to: string) => void }) {
               STRATO Helium &amp; Sepolia testnets
             </span>
           </span>
-          <button
-            role="switch"
-            aria-checked={!!showTestnets.data}
-            onClick={toggleTestnets}
-            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-              showTestnets.data ? "bg-[#001B70]" : "bg-slate-300 dark:bg-slate-700"
-            }`}
-          >
-            <span
-              className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-                showTestnets.data ? "translate-x-5" : "translate-x-0"
-              }`}
-            />
-          </button>
+          <ToggleSwitch on={!!showTestnets.data} onClick={toggleTestnets} />
         </label>
+
+        <Card className="space-y-2">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Notifications</p>
+          <label className="flex items-center justify-between py-1">
+            <span className="text-sm">
+              Desktop notifications
+              <span className="block text-xs text-slate-400">Show OS pop-ups for alerts below</span>
+            </span>
+            <ToggleSwitch on={!!notif.data?.os} onClick={() => toggleNotif("os")} />
+          </label>
+          <label className="flex items-center justify-between py-1">
+            <span className="text-sm">Bridge finalization</span>
+            <ToggleSwitch on={notif.data?.bridge !== false} onClick={() => toggleNotif("bridge")} />
+          </label>
+          <label className="flex items-center justify-between py-1">
+            <span className="text-sm">Incoming transfers</span>
+            <ToggleSwitch
+              on={notif.data?.incoming !== false}
+              onClick={() => toggleNotif("incoming")}
+            />
+          </label>
+          <label className="flex items-center justify-between py-1">
+            <span className="text-sm">Liquidation risk (loans &amp; CDPs)</span>
+            <ToggleSwitch on={notif.data?.loan !== false} onClick={() => toggleNotif("loan")} />
+          </label>
+        </Card>
 
         {selected.data && (
           <Card className="space-y-2">

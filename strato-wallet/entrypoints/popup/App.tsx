@@ -11,6 +11,7 @@ import {
   SwapScreen,
   Receive,
   BridgeHistory,
+  Notifications,
   Setup,
   Unlock,
   ImportAccount,
@@ -72,6 +73,8 @@ export function App() {
       return <Receive navigate={navigate} />;
     case "bridges":
       return <BridgeHistory navigate={navigate} />;
+    case "notifications":
+      return <Notifications navigate={navigate} />;
     case "accounts":
       return <AccountsList navigate={navigate} />;
     case "import":
