@@ -73,6 +73,7 @@ import           SolidVM.Model.SolidString
 import           SolidVM.Model.Storable
 import qualified SolidVM.Model.Type              as SVMType
 import           Text.Printf
+import           Text.ShortDescription
 import qualified Data.Text.Encoding as TE
 
 newtype First b a = First {unFirst :: (a, b)}
@@ -181,21 +182,18 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
             -- Create or replace the function for handling insert and update triggers
             "CREATE OR REPLACE FUNCTION ", triggerFunctionName, "() RETURNS TRIGGER AS $$\n",
             "BEGIN\n",
-            "    RAISE NOTICE 'Trigger fired for % on table ", tableNameToText normalTableName, ": %', TG_OP, NEW.address;\n",
             "  UPDATE ",
             tableNameToDoubleQuoteText tableName <> " h\n",
             "  SET valid_to = CAST(NEW.block_timestamp AS timestamp)\n",
             "  WHERE h.address = NEW.address\n",
             "    AND h.valid_to = 'infinity'::timestamp;\n",
             "    IF TG_OP = 'INSERT' THEN\n",
-            "        RAISE NOTICE 'Inserting into history table ", tableNameToText tableName, " for address: %', NEW.address;\n",
             "        INSERT INTO ",
             tableNameToDoubleQuoteText tableName,
             "  SELECT NEW.*,\n",
             "         CAST(NEW.block_timestamp AS timestamp),\n",
             "         'infinity'::timestamp;\n",
             "    ELSIF TG_OP = 'UPDATE' THEN\n",
-            "        RAISE NOTICE 'Updating history table ", tableNameToText tableName, " for address: %', NEW.address;\n",
             "        INSERT INTO ",
             tableNameToDoubleQuoteText tableName,
             "  SELECT NEW.*,\n",
@@ -225,7 +223,6 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
             -- Create or replace the function for handling insert and update triggers
             "CREATE OR REPLACE FUNCTION ", triggerFunctionName, "() RETURNS TRIGGER AS $$\n",
             "BEGIN\n",
-            "    RAISE NOTICE 'Trigger fired for % on table ", tableNameToText normalTableName, ": %.%', TG_OP, NEW.address, NEW.path;\n",
             "  UPDATE ",
             tableNameToDoubleQuoteText tableName <> " h\n",
             "  SET valid_to = CAST(NEW.block_timestamp AS timestamp)\n",
@@ -233,14 +230,12 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
             "    AND h.path = NEW.path\n",
             "    AND h.valid_to = 'infinity'::timestamp;\n",
             "    IF TG_OP = 'INSERT' THEN\n",
-            "        RAISE NOTICE 'Inserting into history table ", tableNameToText tableName, " for address: %.%', NEW.address, NEW.path;\n",
             "        INSERT INTO ",
             tableNameToDoubleQuoteText tableName,
             "  SELECT NEW.*,\n",
             "         CAST(NEW.block_timestamp AS timestamp),\n",
             "         'infinity'::timestamp;\n",
             "    ELSIF TG_OP = 'UPDATE' THEN\n",
-            "        RAISE NOTICE 'Updating history table ", tableNameToText tableName, " for address: %.%', NEW.address, NEW.path;\n",
             "        INSERT INTO ",
             tableNameToDoubleQuoteText tableName,
             "  SELECT NEW.*,\n",
@@ -1019,7 +1014,7 @@ pipeInsertGlobalEventTable aggregatedEvents = do
 insertGlobalEventTable :: OutputM m => AggregateEvent -> m SlipstreamQuery
 insertGlobalEventTable agEv = do
   let query = insertGlobalEventTableQuery agEv
-  $logInfoS "insertGlobalEventTable/query" . T.pack $ show query
+  $logInfoS "insertGlobalEventTable/query" . T.pack $ shortDescription agEv
   return query
 
 -- | Generates an INSERT SQL statement for the global 'events' table.

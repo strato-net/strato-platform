@@ -28,6 +28,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
 import GHC.Generics
+import Text.ShortDescription
 
 data AggregateAction = AggregateAction
   { actionBlockHash :: Keccak256,
@@ -48,6 +49,15 @@ data AggregateEvent = AggregateEvent
     eventEvent :: Event
   }
   deriving (Show, Generic, NFData, ToJSON, FromJSON)
+
+instance ShortDescription AggregateEvent where
+  shortDescription agEv =
+    let ev = eventEvent agEv
+     in "event " ++ evName ev
+          ++ " @" ++ formatAddressWithoutColor (evContractAddress ev)
+          ++ " block " ++ show (eventBlockNumber agEv)
+          ++ " idx " ++ show (eventIndex agEv)
+          ++ " tx " ++ keccak256ToHex (evTxHash ev)
 
 -- Binary encoding is set to JSON for now, since kafka monad lib encodes binary, and marketplace needs this as JSON
 -- We probably should just offer a way to enocde json in kafka lib, but this will do for now
