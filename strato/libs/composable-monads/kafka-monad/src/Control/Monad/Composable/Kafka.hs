@@ -19,6 +19,7 @@ module Control.Monad.Composable.Kafka (
   ConsumerGroup,
   ClientId,
   StreamAddress,
+  MonadUnliftIO,
   -- Running
   runStreamM,
   runStreamMUsingEnv,
@@ -29,10 +30,12 @@ module Control.Monad.Composable.Kafka (
   produceItemsAsJSON,
   -- Consuming
   consume,
+  consumeBroadcast,
   runConsume,
   consumeFromLatest,
   -- Topics
   createTopicAndWait,
+  createBroadcastTopic,
   -- Conduit
   conduitBatchSource,
   -- Deprecated/internal (for migration)
@@ -132,7 +135,7 @@ runStreamMUsingEnv :: StreamEnv -> StreamM m a -> m a
 runStreamMUsingEnv env f =
   runReaderT f $ streamStateIORef env
 
-runStreamM :: MonadIO m => ClientId -> StreamAddress -> StreamM m a -> m a
+runStreamM :: MonadUnliftIO m => ClientId -> StreamAddress -> StreamM m a -> m a
 runStreamM x y f = flip runStreamMUsingEnv f =<< createStreamEnv x y
 
 -- Deprecated aliases (accept old types for backward compatibility)
@@ -214,6 +217,12 @@ produceItemsAsJSON topicName events = do
 consume :: (Binary a, HasStreaming m) =>
            ConsumerGroup -> TopicName -> ([a] -> m ()) -> m ()
 consume consumerGroup topicName f = void $ runConsume consumerGroup topicName (\a -> Nothing <$ f a)
+
+-- | Pub-sub consume: in Kafka, consumer groups already provide this behavior,
+-- so this is just an alias for 'consume'.
+consumeBroadcast :: (Binary a, HasStreaming m) =>
+                    ConsumerGroup -> TopicName -> ([a] -> m ()) -> m ()
+consumeBroadcast = consume
 
 runConsume :: (Binary a, HasStreaming m) =>
               ConsumerGroup -> TopicName -> ([a] -> m (Maybe b)) -> m b
@@ -307,3 +316,7 @@ createTopicAndWait name = do
         else do
           liftIO $ threadDelay 100000  -- 100ms
           waitForLeader (retries - 1)
+
+-- | Create a broadcast-only topic. For Kafka, same as createTopicAndWait since Kafka retains messages.
+createBroadcastTopic :: HasStreaming m => TopicName -> m ()
+createBroadcastTopic = createTopicAndWait

@@ -1,0 +1,1940 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TMP_PG_CONTAINERS=()
+
+# Default public, read-only snapshot bucket. Override with STRATO_SNAPSHOT_BUCKET.
+DEFAULT_SNAPSHOT_BUCKET="strato-snapshots"
+# Region of the public snapshot bucket (used to build the HTTPS read URL).
+DEFAULT_SNAPSHOT_REGION="us-east-1"
+# Compression extension used for snapshots published under the network prefix.
+SNAPSHOT_ARCHIVE_EXT="tar.zst"
+
+# Reusable working area for downloads/extraction. Using one deterministic base
+# (purged at start of every run) prevents the unbounded accumulation of
+# /tmp/tmp.* dirs that a per-run mktemp would leave behind, especially since
+# helpers run in command-substitution subshells whose temp paths the parent's
+# EXIT trap cannot track. Default: <repo>/.snapshot-work; falls back to
+# ${TMPDIR}/strato-snapshot if that is not writable. Override with
+# STRATO_SNAPSHOT_WORKDIR.
+init_workdir() {
+  if [[ -n "${STRATO_SNAPSHOT_WORKDIR:-}" ]]; then
+    WORKDIR="$STRATO_SNAPSHOT_WORKDIR"
+  else
+    WORKDIR="$SCRIPT_DIR/../.snapshot-work"
+  fi
+  # Purge any leftovers from prior (possibly crashed) runs, then recreate.
+  rm -rf "$WORKDIR" 2>/dev/null || true
+  if ! mkdir -p "$WORKDIR" 2>/dev/null; then
+    WORKDIR="${TMPDIR:-/tmp}/strato-snapshot"
+    rm -rf "$WORKDIR" 2>/dev/null || true
+    mkdir -p "$WORKDIR" || die "could not create work directory: $WORKDIR"
+  fi
+  WORKDIR="$(cd "$WORKDIR" && pwd)"
+}
+init_workdir
+
+usage() {
+  cat <<'EOF'
+Usage:
+  strato-snapshot create <node-dir> --network <network> --output <file> [options]
+  strato-snapshot restore <node-dir> (--source <file-or-s3-uri> | --snapshot[=<ts>]) --network <network> [options]
+  strato-snapshot inspect (<file-or-s3-uri> | --snapshot[=<ts>] --network <network>)
+  strato-snapshot smoke-test (--source <file-or-s3-uri> | --snapshot[=<ts>]) --network <network> [options]
+  strato-snapshot publish <file> --destination <dir-or-s3-uri> [--alias latest]
+
+Snapshot selection (restore/inspect/smoke-test):
+  --source <file-or-s3-uri>  Explicit snapshot location (local path or s3:// URI).
+  --snapshot[=<timestamp>]   Resolve from the published S3 bucket for --network.
+                             Without a timestamp, downloads the 'latest' alias.
+                             Timestamp format: YYYYMMDD-HH:mm:ssZ (e.g. 20260601-13:05:00Z).
+  --bucket <name>            Override the snapshot bucket. Default: env
+                             STRATO_SNAPSHOT_BUCKET or '$DEFAULT_SNAPSHOT_BUCKET'.
+
+Create options:
+  --metadata-url <url>       Metadata URL. Defaults from node ethconf apiPort.
+  --last-block-url <url>     Optional API-indexer block tip URL.
+  --cirrus-tip-url <url>     Optional Cirrus tip URL.
+  --status-url <url>         Apex /status URL for node/sequencer best block.
+                             Default: http://apex:3009/status.
+  --strict-layers            Fail if API-indexer/Cirrus tips cannot be verified.
+  --layer-lag <blocks>       Allowed tip lag for live layer checks. Default: 5.
+  --wait-timeout <seconds>   Wait for sync/layer checks before snapshotting.
+  --wait-interval <seconds>  Poll interval for --wait-timeout. Default: 30.
+  --include-prometheus       Include prometheus/ in the payload.
+  --skip-smoke-test          Do not restore/start-test the created artifact.
+  --smoke-node-dir <dir>     Directory to use for create smoke test.
+  --smoke-timeout <seconds>  Smoke-test metadata timeout. Default: 600.
+
+Restore options:
+  --force                    Replace existing state.
+  --start                    Start the node after restore.
+  --include-prometheus       Restore prometheus/ if present.
+  --allow-version-drift      Do not enforce major STRATO version compatibility.
+
+Smoke-test options:
+  --node-dir <dir>           Directory to restore into. Defaults to a temp dir.
+  --timeout <seconds>        Metadata wait timeout. Default: 600.
+
+Environment:
+  STRATO_SNAPSHOT_OFFLINE_TEST=1  Allows fixture tests to bypass Docker-only checks.
+EOF
+}
+
+die() {
+  echo "Error: $*" >&2
+  exit 1
+}
+
+warn() {
+  echo "Warning: $*" >&2
+}
+
+info() {
+  echo "$*" >&2
+}
+
+cleanup() {
+  set +u
+  for cid in "${TMP_PG_CONTAINERS[@]}"; do
+    [[ -n "$cid" ]] && docker stop "$cid" >/dev/null 2>&1
+  done
+  # Remove this run's working area. (A crashed run that skips this is still
+  # cleaned by the next run's init_workdir purge.)
+  [[ -n "${WORKDIR:-}" && -d "$WORKDIR" ]] && rm -rf "$WORKDIR"
+  set -u
+  return 0
+}
+trap cleanup EXIT
+
+# Create a unique subdirectory inside the run's WORKDIR. Works correctly even
+# when called from a command-substitution subshell, because all dirs live under
+# the single WORKDIR that is purged at start and removed at exit.
+mktemp_dir() {
+  mktemp -d -p "$WORKDIR"
+}
+
+need_cmd() {
+  command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
+}
+
+sha256_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  else
+    shasum -a 256 "$1" | awk '{print $1}'
+  fi
+}
+
+sha256_stream() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | awk '{print $1}'
+  else
+    shasum -a 256 | awk '{print $1}'
+  fi
+}
+
+archive_suffix() {
+  local file="$1"
+  case "$file" in
+    *.tar.zst) printf '.tar.zst\n' ;;
+    *.tzst) printf '.tzst\n' ;;
+    *.tar.gz) printf '.tar.gz\n' ;;
+    *.tgz) printf '.tgz\n' ;;
+    *.tar) printf '.tar\n' ;;
+    *) die "unsupported archive extension: $file" ;;
+  esac
+}
+
+absolute_path() {
+  local path="$1"
+  if [[ "$path" = /* ]]; then
+    printf '%s\n' "$path"
+  else
+    printf '%s/%s\n' "$PWD" "$path"
+  fi
+}
+
+snapshot_bucket() {
+  printf '%s\n' "${1:-${STRATO_SNAPSHOT_BUCKET:-$DEFAULT_SNAPSHOT_BUCKET}}"
+}
+
+snapshot_region() {
+  printf '%s\n' "${STRATO_SNAPSHOT_REGION:-${AWS_DEFAULT_REGION:-$DEFAULT_SNAPSHOT_REGION}}"
+}
+
+# Convert an s3://bucket/key URI into the public virtual-hosted HTTPS URL so the
+# object can be fetched with plain curl/wget (no aws CLI / credentials needed).
+s3_to_https_url() {
+  local s3_uri="$1"
+  local rest bucket key region
+  rest="${s3_uri#s3://}"
+  bucket="${rest%%/*}"
+  key="${rest#*/}"
+  region="$(snapshot_region)"
+  printf 'https://%s.s3.%s.amazonaws.com/%s\n' "$bucket" "$region" "$key"
+}
+
+# Normalize an operator-supplied timestamp (YYYYMMDD-HH:mm:ssZ) into the
+# filename-safe form used in S3 keys (YYYYMMDD-HHmmssZ). Already-normalized
+# input passes through unchanged.
+normalize_snapshot_timestamp() {
+  local ts="$1"
+  python3 - "$ts" <<'PY'
+import re
+import sys
+
+ts = sys.argv[1].strip()
+# Accept the documented colon form and the already-normalized form.
+m = re.fullmatch(r"(\d{8})-(\d{2}):?(\d{2}):?(\d{2})Z", ts)
+if not m:
+    sys.exit(1)
+print(f"{m.group(1)}-{m.group(2)}{m.group(3)}{m.group(4)}Z")
+PY
+}
+
+# Build the S3 URI for a published snapshot given network and optional timestamp.
+# No timestamp -> the 'latest' alias for the network.
+resolve_snapshot_source() {
+  local network="$1"
+  local timestamp="$2"
+  local bucket="$3"
+  [[ -n "$network" ]] || die "--network is required to resolve a published snapshot"
+  bucket="$(snapshot_bucket "$bucket")"
+
+  local key
+  if [[ -z "$timestamp" ]]; then
+    key="latest.${SNAPSHOT_ARCHIVE_EXT}"
+  else
+    local norm
+    norm="$(normalize_snapshot_timestamp "$timestamp")" \
+      || die "invalid snapshot timestamp '$timestamp'; expected YYYYMMDD-HH:mm:ssZ"
+    key="${network}-${norm}.${SNAPSHOT_ARCHIVE_EXT}"
+  fi
+  printf 's3://%s/%s/%s\n' "$bucket" "$network" "$key"
+}
+
+# Resolve the snapshot source for restore/inspect/smoke-test. An explicit
+# --source always wins; otherwise --snapshot[=ts] resolves against the bucket.
+resolve_selection_source() {
+  local source="$1"
+  local use_snapshot="$2"
+  local timestamp="$3"
+  local network="$4"
+  local bucket="$5"
+
+  if [[ -n "$source" ]]; then
+    if [[ "$use_snapshot" == "true" ]]; then
+      die "--source and --snapshot are mutually exclusive"
+    fi
+    printf '%s\n' "$source"
+    return 0
+  fi
+
+  [[ "$use_snapshot" == "true" ]] || die "one of --source or --snapshot is required"
+  resolve_snapshot_source "$network" "$timestamp" "$bucket"
+}
+
+# Fixed width (number of fill characters) of the rendered progress bar, between
+# the [ and ] brackets.
+SNAPSHOT_PROGRESS_WIDTH=100
+
+# Cross-platform file size in bytes (0 if missing).
+file_size_bytes() {
+  local f="$1"
+  [[ -f "$f" ]] || { printf '0\n'; return; }
+  # GNU stat (-c) then BSD/macOS stat (-f); fall back to wc -c.
+  stat -c %s "$f" 2>/dev/null || stat -f %z "$f" 2>/dev/null || wc -c < "$f" 2>/dev/null || printf '0\n'
+}
+
+# Content-Length of an HTTP(S) URL (empty if unknown). Uses a HEAD request.
+http_content_length() {
+  local url="$1"
+  command -v curl >/dev/null 2>&1 || { printf '\n'; return; }
+  curl -fsSLI "$url" 2>/dev/null \
+    | awk 'tolower($1) == "content-length:" { gsub(/\r/,"",$2); v=$2 } END { if (v) print v }'
+}
+
+# Draw a fixed-width [####....] progress bar to stderr given current/total bytes.
+draw_progress_bar() {
+  local current="$1"
+  local total="$2"
+  local width="$SNAPSHOT_PROGRESS_WIDTH"
+  local pct filled i bar=""
+  if [[ -z "$total" || "$total" -le 0 ]]; then
+    return 0
+  fi
+  (( current > total )) && current="$total"
+  pct=$(( current * 100 / total ))
+  filled=$(( current * width / total ))
+  for ((i = 0; i < width; i++)); do
+    if (( i < filled )); then bar+="#"; else bar+="."; fi
+  done
+  # \r returns to line start; printf to stderr so stdout stays clean.
+  printf '\r[%s] %3d%%' "$bar" "$pct" >&2
+}
+
+# Run a download command in the background and render a fixed-width bracketed
+# progress bar by polling the destination file size against the known total.
+# Args: <dest> <total_bytes> <cmd...>. Returns the download command's status.
+download_with_bar() {
+  local dest="$1"; shift
+  local total="$1"; shift
+  "$@" &
+  local dl_pid=$!
+  local cur
+  while kill -0 "$dl_pid" 2>/dev/null; do
+    cur="$(file_size_bytes "$dest")"
+    draw_progress_bar "$cur" "$total"
+    sleep 1
+  done
+  wait "$dl_pid"
+  local rc=$?
+  if (( rc == 0 )); then
+    draw_progress_bar "$total" "$total"
+    printf '\n' >&2
+  else
+    printf '\n' >&2
+  fi
+  return $rc
+}
+
+# Download an s3:// object to a local path. The snapshot bucket is public-read,
+# so we fetch it over plain HTTPS with curl or wget -- no aws CLI or credentials
+# required. Falls back to the aws CLI only if neither curl nor wget is present.
+# Returns non-zero if the download fails.
+#
+# Pass show_progress=true (3rd arg) to display a fixed-width bracketed progress
+# bar (used for the large archive; left off for tiny sidecar files).
+s3_download() {
+  local s3_uri="$1"
+  local dest="$2"
+  local show_progress="${3:-false}"
+  local url total
+  url="$(s3_to_https_url "$s3_uri")"
+
+  if command -v curl >/dev/null 2>&1; then
+    if [[ "$show_progress" == "true" ]]; then
+      total="$(http_content_length "$url")"
+      if [[ -n "$total" ]]; then
+        download_with_bar "$dest" "$total" curl -fsSL -o "$dest" "$url" && return 0
+      else
+        # Unknown size: fall back to curl's own bar.
+        curl -fSL --progress-bar -o "$dest" "$url" && return 0
+      fi
+    else
+      curl -fsSL -o "$dest" "$url" && return 0
+    fi
+    return 1
+  fi
+  if command -v wget >/dev/null 2>&1; then
+    if [[ "$show_progress" == "true" ]]; then
+      total="$(http_content_length "$url")"
+      if [[ -n "$total" ]]; then
+        download_with_bar "$dest" "$total" wget -q -O "$dest" "$url" && return 0
+      else
+        wget -q --show-progress -O "$dest" "$url" && return 0
+      fi
+    else
+      wget -q -O "$dest" "$url" && return 0
+    fi
+    return 1
+  fi
+  # Last resort: aws CLI (anonymous, then signed). aws shows its own progress
+  # unless quieted; keep it quiet to avoid the verbose per-chunk output.
+  if command -v aws >/dev/null 2>&1; then
+    aws s3 cp --only-show-errors --no-sign-request "$s3_uri" "$dest" >/dev/null 2>&1 && return 0
+    aws s3 cp --only-show-errors "$s3_uri" "$dest" >/dev/null 2>&1 && return 0
+  fi
+  return 1
+}
+
+# Fetch the published .sha256 sidecar for an s3:// object and print the expected
+# hex digest. Prints nothing (and returns non-zero) if no sidecar is available.
+fetch_expected_checksum() {
+  local s3_uri="$1"
+  local checksum_file
+  checksum_file="$(mktemp_dir)/expected.sha256"
+  s3_download "${s3_uri}.sha256" "$checksum_file" >/dev/null 2>&1 || return 1
+  awk '{print $1}' "$checksum_file"
+}
+
+# Verify a downloaded archive against an expected sha256 (from the published
+# sidecar). A missing/empty expected checksum is a soft skip; a mismatch is fatal.
+verify_checksum() {
+  local s3_uri="$1"
+  local local_file="$2"
+  local expected="$3"
+  if [[ -z "$expected" ]]; then
+    warn "no checksum sidecar at ${s3_uri}.sha256; skipping integrity check"
+    return 0
+  fi
+  local actual
+  actual="$(sha256_file "$local_file")"
+  [[ "$expected" == "$actual" ]] \
+    || die "checksum mismatch for $s3_uri (expected $expected, got $actual)"
+  info "Verified snapshot checksum: $actual"
+}
+
+# Persistent directory for downloaded snapshot archives, so an already-downloaded
+# archive whose checksum still matches S3 can be reused instead of re-downloaded.
+# NOT purged between runs (unlike WORKDIR). Override with STRATO_SNAPSHOT_DOWNLOAD_DIR.
+snapshot_download_dir() {
+  local dir="${STRATO_SNAPSHOT_DOWNLOAD_DIR:-$SCRIPT_DIR/../.snapshot-downloads}"
+  if ! mkdir -p "$dir" 2>/dev/null; then
+    dir="${TMPDIR:-/tmp}/strato-snapshot-downloads"
+    mkdir -p "$dir" 2>/dev/null || { printf '\n'; return 1; }
+  fi
+  (cd "$dir" && pwd)
+}
+
+fetch_source() {
+  local source="$1"
+  if [[ "$source" == s3://* ]]; then
+    command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || command -v aws >/dev/null 2>&1 \
+      || die "need one of curl, wget, or aws to download $source"
+
+    local dl_dir local_file expected
+    # Stable local path keyed by the S3 object key (e.g. helium-latest.tar.zst),
+    # so repeated restores of the same key reuse one file.
+    dl_dir="$(snapshot_download_dir || true)"
+    if [[ -n "$dl_dir" ]]; then
+      local key
+      key="${source#s3://}"; key="${key#*/}"        # strip s3://bucket/
+      local_file="$dl_dir/${key//\//-}"             # flatten network/ prefix
+    else
+      # No writable persistent dir: fall back to the per-run work area.
+      local suffix; suffix="$(archive_suffix "$source")"
+      local_file="$(mktemp_dir)/snapshot${suffix}"
+    fi
+
+    # Learn the expected checksum once; used both for reuse and verification.
+    expected="$(fetch_expected_checksum "$source" || true)"
+
+    # Decide whether the existing local copy can be reused, comparing its SHA-256
+    # against the published .sha256 on S3.
+    if [[ -f "$local_file" ]]; then
+      if [[ -z "$expected" ]]; then
+        info "Local snapshot found but S3 has no .sha256 to compare; re-downloading: $local_file"
+      else
+        info "Found local snapshot; comparing SHA-256 against S3 (${expected})..."
+        local local_sum
+        local_sum="$(sha256_file "$local_file")"
+        if [[ "$local_sum" == "$expected" ]]; then
+          info "SHA-256 matches; reusing already-downloaded snapshot (no download needed): $local_file"
+          printf '%s\n' "$local_file"
+          return 0
+        fi
+        info "SHA-256 differs (local ${local_sum} != S3 ${expected}); downloading a fresh snapshot"
+      fi
+    else
+      info "No local snapshot cached yet; downloading"
+    fi
+
+    info "Downloading snapshot: $(s3_to_https_url "$source")"
+    # Show a progress bar for the (large) archive download. The bar goes to
+    # stderr so it does not pollute the path printed on stdout.
+    s3_download "$source" "$local_file" true \
+      || die "failed to download snapshot from $(s3_to_https_url "$source")"
+    verify_checksum "$source" "$local_file" "$expected"
+    printf '%s\n' "$local_file"
+  else
+    [[ -f "$source" ]] || die "snapshot source not found: $source"
+    absolute_path "$source"
+  fi
+}
+
+tar_without_appledouble() {
+  COPYFILE_DISABLE=1 tar --exclude='._*' --exclude='./._*' --exclude='*/._*' "$@"
+}
+
+scrub_appledouble_files() {
+  local path="$1"
+  [[ -e "$path" ]] || return 0
+  find "$path" -name '._*' -exec rm -rf {} +
+}
+
+make_archive() {
+  local staging="$1"
+  local output="$2"
+  mkdir -p "$(dirname "$output")"
+
+  case "$output" in
+    *.tar.zst|*.tzst)
+      if command -v zstd >/dev/null 2>&1; then
+        (cd "$staging" && tar_without_appledouble -cf - .) | zstd -T0 -q -o "$output"
+      else
+        (cd "$staging" && tar_without_appledouble --zstd -cpf "$output" .)
+      fi
+      ;;
+    *.tar.gz|*.tgz)
+      (cd "$staging" && tar_without_appledouble -czpf "$output" .)
+      ;;
+    *.tar)
+      (cd "$staging" && tar_without_appledouble -cpf "$output" .)
+      ;;
+    *)
+      die "unsupported output extension; use .tar.zst, .tar.gz, or .tar"
+      ;;
+  esac
+}
+
+extract_archive() {
+  local archive="$1"
+  local dest="$2"
+  mkdir -p "$dest"
+
+  case "$archive" in
+    *.tar.zst|*.tzst)
+      if command -v zstd >/dev/null 2>&1; then
+        zstd -dc "$archive" | tar -xpf - -C "$dest"
+      else
+        tar --zstd -xpf "$archive" -C "$dest"
+      fi
+      ;;
+    *.tar.gz|*.tgz)
+      tar -xzpf "$archive" -C "$dest"
+      ;;
+    *.tar)
+      tar -xpf "$archive" -C "$dest"
+      ;;
+    *)
+      die "unsupported archive extension: $archive"
+      ;;
+  esac
+}
+
+copy_dir_contents() {
+  local src="$1"
+  local dest="$2"
+  [[ -d "$src" ]] || return 0
+  mkdir -p "$dest"
+  (cd "$src" && tar -cf - .) | (cd "$dest" && tar -xpf -)
+}
+
+# Move the contents of src into dest. On the same filesystem this is an instant
+# rename (no byte copy); across filesystems mv falls back to copy+delete, so it
+# is never slower than copy_dir_contents. The src is consumed; only use this for
+# throwaway sources (e.g. the extracted snapshot work area).
+move_dir_contents() {
+  local src="$1"
+  local dest="$2"
+  [[ -d "$src" ]] || return 0
+  mkdir -p "$dest"
+  # Enumerate top-level entries (including dotfiles, excluding . and ..) with
+  # find -- robust regardless of glob/dotglob shell settings -- and move each.
+  local entry
+  while IFS= read -r -d '' entry; do
+    mv -f "$entry" "$dest/"
+  done < <(find "$src" -mindepth 1 -maxdepth 1 -print0)
+}
+
+copy_dir_contents_without_appledouble() {
+  local src="$1"
+  local dest="$2"
+  [[ -d "$src" ]] || return 0
+  mkdir -p "$dest"
+  (cd "$src" && tar_without_appledouble -cf - .) | (cd "$dest" && tar -xpf -)
+}
+
+copy_ethereum_payload() {
+  local src="$1"
+  local dest="$2"
+  [[ -d "$src" ]] || die "missing .ethereumH state directory"
+  mkdir -p "$dest"
+  (cd "$src" && tar_without_appledouble --exclude='./ethconf.yaml' -cf - .) | (cd "$dest" && tar_without_appledouble -xpf -)
+}
+
+read_ethconf_value() {
+  local file="$1"
+  local section="$2"
+  local key="$3"
+  [[ -f "$file" ]] || return 1
+  python3 - "$file" "$section" "$key" <<'PY'
+import re
+import sys
+
+path, section, key = sys.argv[1:4]
+target_section = section + ":"
+target_key = key + ":"
+inside = False
+
+with open(path, "r", encoding="utf-8") as f:
+    for line in f:
+        if re.match(r"^[A-Za-z0-9_]+:\s*$", line):
+            inside = line.strip() == target_section
+            continue
+        if inside:
+            m = re.match(r"^\s{2}" + re.escape(target_key) + r"\s*(.*)$", line)
+            if m:
+                value = m.group(1).strip()
+                if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+                    value = value[1:-1]
+                print(value)
+                sys.exit(0)
+sys.exit(1)
+PY
+}
+
+rewrite_ethconf_localhost_db_hosts() {
+  local file="$1"
+  [[ -f "$file" ]] || die "ethconf.yaml not found: $file"
+  chmod u+w "$file" 2>/dev/null || true
+  python3 - "$file" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+sections = {"sqlConfig", "cirrusConfig"}
+current = None
+out = []
+
+for line in path.read_text(encoding="utf-8").splitlines(keepends=True):
+    top = re.match(r"^([A-Za-z0-9_]+):\s*$", line)
+    if top:
+        current = top.group(1)
+    if current in sections and re.match(r"^\s{2}host:\s*(['\"]?)localhost\1\s*$", line):
+        out.append("  host: 127.0.0.1\n")
+    else:
+        out.append(line)
+
+path.write_text("".join(out), encoding="utf-8")
+PY
+}
+
+node_network() {
+  read_ethconf_value "$1/.ethereumH/ethconf.yaml" networkConfig network 2>/dev/null || true
+}
+
+node_http_port() {
+  read_ethconf_value "$1/.ethereumH/ethconf.yaml" networkConfig httpPort 2>/dev/null || true
+}
+
+default_metadata_url() {
+  local node_dir="$1"
+  local port
+  port="$(read_ethconf_value "$node_dir/.ethereumH/ethconf.yaml" apiConfig apiPort 2>/dev/null || true)"
+  port="${port:-3000}"
+  printf '%s\n' "http://127.0.0.1:${port}/eth/v1.2/metadata"
+}
+
+default_last_block_url() {
+  local metadata_url="$1"
+  printf '%s\n' "${metadata_url%/metadata}/block/last/1"
+}
+
+default_cirrus_tip_url() {
+  local metadata_url="$1"
+  python3 - "$metadata_url" <<'PY'
+from urllib.parse import urlparse
+import sys
+
+u = urlparse(sys.argv[1])
+print(f"{u.scheme}://{u.netloc}/sync/cirrus-tip")
+PY
+}
+
+# The node/sequencer best-block heights are served by apex's /status endpoint
+# (lastBlock.number and pbftData.sequence_number), NOT the metadata endpoint.
+# When the curls run from inside a container (STRATO_SNAPSHOT_CURL_CONTAINER),
+# apex is reachable as apex:3009. Override with --status-url if needed.
+default_status_url() {
+  printf '%s\n' "http://apex:3009/status"
+}
+
+# Best block number the node has processed, from apex /status (lastBlock.number).
+status_node_block() {
+  local status_url="$1"
+  [[ -n "$status_url" ]] || return 1
+  local body
+  body="$(snapshot_curl "$status_url" || true)"
+  [[ -n "$body" ]] || return 1
+  python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+value = data.get("lastBlock", {}).get("number")
+if value is None:
+    raise SystemExit(1)
+print(int(value))
+' <<<"$body" 2>/dev/null
+}
+
+# Sequencer sequence number, from apex /status (pbftData.sequence_number).
+status_sequencer_block() {
+  local status_url="$1"
+  [[ -n "$status_url" ]] || return 1
+  local body
+  body="$(snapshot_curl "$status_url" || true)"
+  [[ -n "$body" ]] || return 1
+  python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+pbft = data.get("pbftData") or {}
+value = pbft.get("sequence_number")
+if value is None:
+    raise SystemExit(1)
+print(int(value))
+' <<<"$body" 2>/dev/null
+}
+
+json_field() {
+  local json="$1"
+  local field="$2"
+  python3 -c '
+import json
+import sys
+
+field = sys.argv[1]
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+value = data.get(field)
+if value is None:
+    sys.exit(1)
+print(value)
+' "$field" <<<"$json"
+}
+
+json_is_synced() {
+  local json="$1"
+  python3 -c '
+import json
+import sys
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+sys.exit(0 if data.get("isSynced") is True else 1)
+' <<<"$json"
+}
+
+# Fetch a URL with curl. When STRATO_SNAPSHOT_CURL_CONTAINER is set, the request
+# is run from inside that container via `docker exec` instead of from the host.
+# This is needed when the node API (e.g. port 3000) is only reachable on the
+# container network and not published to the host.
+snapshot_curl() {
+  local url="$1"
+  if [[ -n "${STRATO_SNAPSHOT_CURL_CONTAINER:-}" ]]; then
+    docker exec "$STRATO_SNAPSHOT_CURL_CONTAINER" curl -fsS "$url" 2>/dev/null
+  else
+    curl -fsS "$url" 2>/dev/null
+  fi
+}
+
+http_json() {
+  local url="$1"
+  snapshot_curl "$url"
+}
+
+postgres_container() {
+  local node_dir="$1"
+  if [[ -f "$node_dir/docker-compose.yml" ]]; then
+    docker compose -p strato -f "$node_dir/docker-compose.yml" ps -q postgres 2>/dev/null | head -1
+  else
+    (cd "$node_dir" && docker compose -p strato ps -q postgres 2>/dev/null | head -1)
+  fi
+}
+
+psql_scalar() {
+  local node_dir="$1"
+  local db="$2"
+  local sql="$3"
+  local container
+  container="$(postgres_container "$node_dir")"
+  [[ -n "$container" ]] || return 1
+  docker exec "$container" psql -U postgres -d "$db" -tAc "$sql" 2>/dev/null | tr -d '[:space:]'
+}
+
+probe_api_indexer_tip() {
+  local last_block_url="$1"
+  local node_dir="$2"
+  local result=""
+
+  if [[ -n "$last_block_url" ]]; then
+    local body
+    body="$(snapshot_curl "$last_block_url" || true)"
+    if [[ -n "$body" ]]; then
+      result="$(python3 -c '
+import json
+import sys
+
+data = json.load(sys.stdin)
+value = data[0].get("blockData", {}).get("number")
+if value is None:
+    raise SystemExit(1)
+print(int(value))
+' <<<"$body" 2>/dev/null || true)"
+    fi
+  fi
+
+  if [[ -z "$result" ]] && command -v docker >/dev/null 2>&1; then
+    result="$(psql_scalar "$node_dir" eth "select coalesce(max(number), 0) from block_data_ref where is_confirmed = true;" || true)"
+  fi
+
+  [[ -n "$result" ]] || return 1
+  printf '%s\n' "$result"
+}
+
+probe_cirrus_tip() {
+  local cirrus_tip_url="$1"
+  local node_dir="$2"
+  local result=""
+
+  if [[ -n "$cirrus_tip_url" ]]; then
+    local body
+    body="$(snapshot_curl "$cirrus_tip_url" || true)"
+    if [[ -n "$body" ]]; then
+      result="$(python3 -c '
+import json
+import sys
+
+data = json.load(sys.stdin)
+if isinstance(data, list):
+    data = data[0] if data else {}
+value = data.get("block_number") or data.get("blockNumber") or data.get("block")
+if value is None:
+    raise SystemExit(1)
+print(int(value))
+' <<<"$body" 2>/dev/null || true)"
+    fi
+  fi
+
+  if [[ -z "$result" ]] && command -v docker >/dev/null 2>&1; then
+    # This is a best-effort fallback. It proves Cirrus has indexed at least up
+    # to the newest contract update, but a quiet chain can have no contract row
+    # at the exact VM tip. CI should prefer --cirrus-tip-url when available.
+    result="$(psql_scalar "$node_dir" cirrus "select coalesce(max(block_number::numeric), 0)::bigint from storage where block_number ~ '^[0-9]+$';" || true)"
+  fi
+
+  [[ -n "$result" ]] || return 1
+  printf '%s\n' "$result"
+}
+
+write_live_checks_json() {
+  local output="$1"
+  local metadata_json="$2"
+  local api_tip="$3"
+  local cirrus_tip="$4"
+  local node_tip="${5:-}"
+  local seq_tip="${6:-}"
+  python3 -c '
+import json
+import sys
+from pathlib import Path
+
+output, api_tip, cirrus_tip, node_tip, seq_tip = sys.argv[1:6]
+metadata = json.load(sys.stdin)
+
+def maybe_int(value):
+    if value in ("", "null", None):
+        return None
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+# Prefer the resolved tips (e.g. from apex /status) over metadata, which on this
+# codebase does not carry block heights.
+result = {
+    "isSynced": bool(metadata.get("isSynced")),
+    "nodeBestBlock": maybe_int(node_tip) if maybe_int(node_tip) is not None else maybe_int(metadata.get("nodeBestBlock")),
+    "sequencedBestBlock": maybe_int(seq_tip) if maybe_int(seq_tip) is not None else maybe_int(metadata.get("sequencedBestBlock")),
+    "worldBestBlock": maybe_int(metadata.get("worldBestBlock")),
+    "apiIndexerTip": maybe_int(api_tip),
+    "cirrusTip": maybe_int(cirrus_tip),
+}
+
+Path(output).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+' "$output" "$api_tip" "$cirrus_tip" "$node_tip" "$seq_tip" <<<"$metadata_json"
+}
+
+live_checks_summary() {
+  local checks_json="$1"
+  [[ -f "$checks_json" ]] || return 1
+  python3 - "$checks_json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+fields = [
+    "isSynced",
+    "nodeBestBlock",
+    "sequencedBestBlock",
+    "worldBestBlock",
+    "apiIndexerTip",
+    "cirrusTip",
+]
+
+parts = [f"{field}={data.get(field, 'unknown')}" for field in fields]
+node = data.get("nodeBestBlock")
+seq = data.get("sequencedBestBlock")
+world = data.get("worldBestBlock")
+if isinstance(node, int) and isinstance(world, int):
+    parts.append(f"nodeLag={world - node}")
+if isinstance(seq, int) and isinstance(world, int):
+    parts.append(f"sequencerLag={world - seq}")
+print(", ".join(parts))
+PY
+}
+
+# Check whether a layer's indexed tip is caught up to the node tip.
+# Returns:
+#   0  ok (caught up, or nothing to verify)
+#   1  behind: tip is reachable but lagging more than allowed_lag (caller should
+#      keep waiting -- the indexer is still catching up)
+#   2  unverifiable: tip could not be read at all
+# Non-strict callers treat 1 and 2 as ok (best-effort). Strict callers treat 2
+# as fatal but 1 as "keep waiting".
+check_tip() {
+  local label="$1"
+  local tip="$2"
+  local reference="$3"
+  local allowed_lag="$4"
+  local strict="$5"
+
+  if [[ -z "$reference" || "$reference" == "null" ]]; then
+    return 0
+  fi
+
+  if [[ -z "$tip" ]]; then
+    [[ "$strict" == "true" ]] || warn "could not verify $label tip"
+    return 2
+  fi
+
+  if (( tip + allowed_lag < reference )); then
+    info "$label tip ($tip) is behind node tip ($reference) by more than $allowed_lag block(s); waiting for it to catch up"
+    return 1
+  fi
+  return 0
+}
+
+run_live_checks_once() {
+  local metadata_url="$1"
+  local last_block_url="$2"
+  local cirrus_tip_url="$3"
+  local strict="$4"
+  local allowed_lag="$5"
+  local node_dir="$6"
+  local checks_json="$7"
+  local status_url="$8"
+
+  local metadata_json
+  metadata_json="$(http_json "$metadata_url" || true)"
+  [[ -n "$metadata_json" ]] || return 1
+
+  local node_tip seq_tip world_tip
+  node_tip="$(json_field "$metadata_json" nodeBestBlock 2>/dev/null || true)"
+  seq_tip="$(json_field "$metadata_json" sequencedBestBlock 2>/dev/null || true)"
+  world_tip="$(json_field "$metadata_json" worldBestBlock 2>/dev/null || true)"
+
+  # The metadata endpoint does not expose block heights; source the node and
+  # sequencer tips from apex /status instead (lastBlock.number,
+  # pbftData.sequence_number).
+  [[ -z "$node_tip" ]] && node_tip="$(status_node_block "$status_url" || true)"
+  [[ -z "$seq_tip" ]] && seq_tip="$(status_sequencer_block "$status_url" || true)"
+
+  local api_tip cirrus_tip
+  api_tip="$(probe_api_indexer_tip "$last_block_url" "$node_dir" || true)"
+  cirrus_tip="$(probe_cirrus_tip "$cirrus_tip_url" "$node_dir" || true)"
+  write_live_checks_json "$checks_json" "$metadata_json" "${api_tip:-}" "${cirrus_tip:-}" "${node_tip:-}" "${seq_tip:-}"
+
+  json_is_synced "$metadata_json" || return 1
+
+  if [[ -n "$world_tip" && -n "$node_tip" ]] && (( node_tip + allowed_lag < world_tip )); then
+    return 1
+  fi
+  if [[ -n "$world_tip" && -n "$seq_tip" ]] && (( seq_tip + allowed_lag < world_tip )); then
+    return 1
+  fi
+
+  if [[ -n "$node_tip" ]]; then
+    local rc label
+    for label in "API-indexer:$api_tip" "Cirrus:$cirrus_tip"; do
+      rc=0
+      check_tip "${label%%:*}" "${label#*:}" "$node_tip" "$allowed_lag" "$strict" || rc=$?
+      if (( rc == 1 )); then
+        # Layer is reachable but still catching up: not ready, keep waiting.
+        return 1
+      fi
+      if (( rc == 2 )) && [[ "$strict" == "true" ]]; then
+        # Strict mode requires the layer tip to be verifiable.
+        die "could not verify ${label%%:*} tip"
+      fi
+    done
+  elif [[ "$strict" == "true" ]]; then
+    die "could not determine node best block (metadata or apex /status); cannot run strict layer checks"
+  fi
+}
+
+wait_for_live_checks() {
+  local metadata_url="$1"
+  local last_block_url="$2"
+  local cirrus_tip_url="$3"
+  local strict="$4"
+  local allowed_lag="$5"
+  local timeout="$6"
+  local interval="$7"
+  local node_dir="$8"
+  local checks_json="$9"
+  local status_url="${10}"
+
+  local start now
+  start="$(date +%s)"
+  while true; do
+    if run_live_checks_once "$metadata_url" "$last_block_url" "$cirrus_tip_url" "$strict" "$allowed_lag" "$node_dir" "$checks_json" "$status_url"; then
+      return 0
+    fi
+    now="$(date +%s)"
+    if (( timeout <= 0 || now - start >= timeout )); then
+      return 1
+    fi
+    local summary
+    summary="$(live_checks_summary "$checks_json" 2>/dev/null || true)"
+    if [[ -n "$summary" ]]; then
+      info "Waiting for node/layers to sync... $summary"
+    else
+      info "Waiting for node/layers to sync..."
+    fi
+    local remaining sleep_for
+    remaining=$(( timeout - (now - start) ))
+    sleep_for="$interval"
+    if (( timeout > 0 && remaining < sleep_for )); then
+      sleep_for="$remaining"
+    fi
+    (( sleep_for > 0 )) || return 1
+    sleep "$sleep_for"
+  done
+}
+
+state_user_pids() {
+  local node_dir="$1"
+  local rel
+  for rel in postgres redis kafka .ethereumH; do
+    [[ -d "$node_dir/$rel" ]] || continue
+    { lsof +D "$node_dir/$rel" 2>/dev/null || true; } | awk 'NR > 1 {print $2}'
+  done | sort -u
+}
+
+is_docker_desktop_state_pid() {
+  local pid="$1"
+  local args
+  args="$(ps -p "$pid" -o comm= -o args= 2>/dev/null || true)"
+  case "$args" in
+    *com.apple.Virtualization.VirtualMachine*|*com.docker*|*Docker.app*|*virtiofs*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+state_user_pids_excluding_docker_desktop() {
+  local node_dir="$1"
+  local pid
+  state_user_pids "$node_dir" | while IFS= read -r pid; do
+    [[ -n "$pid" ]] || continue
+    is_docker_desktop_state_pid "$pid" && continue
+    printf '%s\n' "$pid"
+  done
+}
+
+state_pid_descriptions() {
+  local pids="$1"
+  local pid
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] || continue
+    ps -p "$pid" -o pid= -o comm= -o args= 2>/dev/null || true
+  done <<<"$pids"
+}
+
+wait_for_local_state_users() {
+  local node_dir="$1"
+  [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && return 0
+  command -v lsof >/dev/null 2>&1 || return 0
+
+  local attempt pids all_pids warned_docker_handles
+  warned_docker_handles="false"
+  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    pids="$(state_user_pids_excluding_docker_desktop "$node_dir" || true)"
+    if [[ -z "$pids" ]]; then
+      all_pids="$(state_user_pids "$node_dir" || true)"
+      if [[ -n "$all_pids" && "$warned_docker_handles" == "false" ]]; then
+        warn "Docker Desktop still has state files mounted; ignoring those handles after compose shutdown"
+      fi
+      return 0
+    fi
+    [[ "$attempt" == "1" ]] && info "Waiting for local state writers to exit: $pids"
+    sleep 1
+  done
+
+  die "local state writer processes are still running after stop: $(state_pid_descriptions "$pids")"
+}
+
+stop_writers() {
+  local node_dir="$1"
+  if [[ -x "$SCRIPT_DIR/strato-down" ]]; then
+    "$SCRIPT_DIR/strato-down" "$node_dir" || true
+  elif command -v strato-down >/dev/null 2>&1; then
+    strato-down "$node_dir" || true
+  fi
+
+  if [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]]; then
+    return 0
+  fi
+
+  need_cmd docker
+  # Safety-net teardown in case strato-down left anything. strato-down has
+  # usually already removed the compose project, so a benign "No resource found
+  # to remove" warning is expected here and is filtered out; real errors are
+  # still surfaced.
+  local down_out
+  down_out="$(cd "$node_dir" && docker compose -p strato down --remove-orphans 2>&1)" || true
+  down_out="$(grep -v 'No resource found to remove for project' <<<"$down_out" || true)"
+  [[ -n "$down_out" ]] && printf '%s\n' "$down_out" >&2
+  wait_for_local_state_users "$node_dir"
+}
+
+assert_no_running_containers() {
+  local node_dir="$1"
+  [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && return 0
+  local containers
+  containers="$(cd "$node_dir" && docker compose -p strato ps -q 2>/dev/null || true)"
+  [[ -z "$containers" ]] || die "strato compose containers are still running"
+}
+
+assert_no_open_files() {
+  local node_dir="$1"
+  [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && return 0
+  need_cmd lsof
+  local rel pids
+  for rel in postgres redis kafka .ethereumH; do
+    [[ -d "$node_dir/$rel" ]] || continue
+    pids="$({ lsof +D "$node_dir/$rel" 2>/dev/null || true; } | awk 'NR > 1 {print $2}' | sort -u | while IFS= read -r pid; do
+      [[ -n "$pid" ]] || continue
+      is_docker_desktop_state_pid "$pid" && continue
+      printf '%s\n' "$pid"
+    done)"
+    [[ -z "$pids" ]] || die "state files are still open under $node_dir/$rel: $(state_pid_descriptions "$pids")"
+  done
+}
+
+assert_clean_postgres() {
+  local node_dir="$1"
+  [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && return 0
+  [[ -d "$node_dir/postgres" ]] || die "postgres state directory not found"
+
+  local output=""
+  if command -v pg_controldata >/dev/null 2>&1; then
+    output="$(pg_controldata "$node_dir/postgres" 2>/dev/null || true)"
+  fi
+  if [[ -z "$output" ]]; then
+    need_cmd docker
+    output="$(docker run --rm -v "$node_dir/postgres:/var/lib/postgresql/data:ro" postgres:14.18 pg_controldata /var/lib/postgresql/data 2>/dev/null || true)"
+  fi
+
+  grep -q "Database cluster state:.*shut down" <<<"$output" || die "Postgres was not cleanly shut down"
+}
+
+state_exists() {
+  local node_dir="$1"
+  [[ -d "$node_dir/postgres" && -n "$(find "$node_dir/postgres" -mindepth 1 -maxdepth 1 2>/dev/null | head -1)" ]] && return 0
+  [[ -d "$node_dir/redis" && -n "$(find "$node_dir/redis" -mindepth 1 -maxdepth 1 2>/dev/null | head -1)" ]] && return 0
+  [[ -d "$node_dir/kafka" && -n "$(find "$node_dir/kafka" -mindepth 1 -maxdepth 1 2>/dev/null | head -1)" ]] && return 0
+  if [[ -d "$node_dir/.ethereumH" ]]; then
+    find "$node_dir/.ethereumH" -mindepth 1 ! -name ethconf.yaml 2>/dev/null | grep -q . && return 0
+  fi
+  return 1
+}
+
+node_is_running() {
+  local node_dir="$1"
+  if [[ -f "$node_dir/.strato.pid" ]]; then
+    # shellcheck disable=SC1090
+    source "$node_dir/.strato.pid" 2>/dev/null || true
+    if [[ -n "${CONVOKE_PID:-}" ]] && kill -0 "$CONVOKE_PID" 2>/dev/null; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+ensure_node_config() {
+  local node_dir="$1"
+  local network="$2"
+  local generated_flag="$3"
+
+  if [[ -f "$node_dir/.ethereumH/ethconf.yaml" && -f "$node_dir/docker-compose.yml" ]]; then
+    printf 'false' > "$generated_flag"
+    return 0
+  fi
+
+  if [[ -e "$node_dir" ]] && state_exists "$node_dir"; then
+    die "target has state but no complete generated config: $node_dir"
+  fi
+
+  if command -v strato-setup >/dev/null 2>&1; then
+    strato-setup "$node_dir" "--network=$network"
+  else
+    die "target node is not configured and strato-setup is not available"
+  fi
+
+  [[ -f "$node_dir/.ethereumH/ethconf.yaml" && -f "$node_dir/docker-compose.yml" ]] || die "strato-setup did not generate expected node files"
+  printf 'true' > "$generated_flag"
+}
+
+extract_manifest() {
+  local archive="$1"
+  local dest="$2"
+  local extract_dir
+  extract_dir="$(mktemp_dir)"
+  extract_archive "$archive" "$extract_dir"
+  [[ -f "$extract_dir/SNAPSHOT.json" ]] || die "SNAPSHOT.json missing from archive"
+  cp "$extract_dir/SNAPSHOT.json" "$dest"
+}
+
+manifest_field() {
+  local manifest="$1"
+  local path="$2"
+  python3 - "$manifest" "$path" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+value = data
+for part in sys.argv[2].split("."):
+    if not part:
+        continue
+    if not isinstance(value, dict) or part not in value:
+        sys.exit(1)
+    value = value[part]
+
+if value is None:
+    sys.exit(1)
+print(value)
+PY
+}
+
+major_version() {
+  local version="$1"
+  sed -E 's/^([0-9]+).*/\1/' <<<"$version"
+}
+
+compose_images_json() {
+  local compose="$1"
+  python3 - "$compose" <<'PY'
+import json
+import re
+import sys
+
+compose = sys.argv[1]
+images = {}
+current = None
+
+try:
+    lines = open(compose, "r", encoding="utf-8").read().splitlines()
+except FileNotFoundError:
+    print("{}")
+    sys.exit(0)
+
+for line in lines:
+    service = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", line)
+    if service:
+        current = service.group(1)
+        continue
+    if current:
+        image = re.match(r"^\s+image:\s*(.+?)\s*$", line)
+        if image:
+            images[current] = image.group(1).strip('"').strip("'")
+
+print(json.dumps(images, sort_keys=True))
+PY
+}
+
+write_snapshot_manifest() {
+  local output="$1"
+  local network="$2"
+  local node_dir="$3"
+  local live_checks="$4"
+  local payload_checksum="$5"
+  local include_prometheus="$6"
+
+  local images_json
+  images_json="$(compose_images_json "$node_dir/docker-compose.yml")"
+
+  python3 - "$output" "$network" "$payload_checksum" "$include_prometheus" "$images_json" "$live_checks" <<'PY'
+import getpass
+import json
+import os
+import socket
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+output, network, checksum, include_prometheus, images_json, live_checks_path = sys.argv[1:7]
+images = json.loads(images_json)
+live_checks = json.loads(Path(live_checks_path).read_text(encoding="utf-8"))
+
+strato_image = images.get("strato", "")
+strato_version = "unknown"
+if ":" in strato_image:
+    strato_version = strato_image.rsplit(":", 1)[1]
+
+payload = ["ethereumH", "postgres-dumps/eth.dump", "postgres-dumps/cirrus.dump", "redis", "kafka"]
+if include_prometheus == "true":
+    payload.append("prometheus")
+
+manifest = {
+    "schemaVersion": 1,
+    "network": network,
+    "createdAt": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+    "createdBy": f"{getpass.getuser()}@{socket.gethostname()}",
+    "stratoVersion": strato_version,
+    "composeProject": "strato",
+    "block": live_checks,
+    "images": images,
+    "payload": payload,
+    "checksums": {
+        "payloadSha256": checksum,
+    },
+    "compatibility": {
+        "requiresSameNetwork": True,
+        "requiresSameMajorVersion": True,
+        "allowPatchVersionDrift": True,
+    },
+}
+
+Path(output).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+}
+
+# Image used for the throwaway postgres container that dumps/loads the captured
+# databases. Must match the node's postgres major version to read the data dir.
+SNAPSHOT_POSTGRES_IMAGE="postgres:14.18"
+# Databases captured into the snapshot. These hold only public blockchain data
+# (chain state and indexed contract storage). The local-only `oauth` database
+# (node key, user keys) is intentionally NOT captured.
+SNAPSHOT_PG_DATABASES=("eth" "cirrus")
+
+postgres_data_dir_initialized() {
+  [[ -f "$1/PG_VERSION" ]]
+}
+
+# Determine the uid:gid the node's postgres container runs as. The node's
+# postgres bind-mounts ./postgres and runs as the operator's uid:gid (set in the
+# generated docker-compose.yml), so the data dir is owned by that user. Our
+# throwaway container must match it, or the node's postgres will later fail with
+# "Permission denied" on the data dir. Reads the `user:` from the node's compose
+# postgres service, falling back to the current user.
+postgres_run_user() {
+  local node_dir="$1"
+  local compose="$node_dir/docker-compose.yml"
+  local u=""
+  if [[ -f "$compose" ]]; then
+    u="$(python3 - "$compose" <<'PY'
+import re, sys
+compose = sys.argv[1]
+current = None
+try:
+    lines = open(compose, encoding="utf-8").read().splitlines()
+except FileNotFoundError:
+    sys.exit(0)
+for line in lines:
+    svc = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", line)
+    if svc:
+        current = svc.group(1)
+        continue
+    if current == "postgres":
+        m = re.match(r"^\s+user:\s*['\"]?([0-9]+:[0-9]+)['\"]?\s*$", line)
+        if m:
+            print(m.group(1))
+            break
+PY
+)"
+  fi
+  if [[ -z "$u" ]]; then
+    u="$(id -u):$(id -g)"
+  fi
+  printf '%s\n' "$u"
+}
+
+# Start a throwaway postgres container on a data dir and wait until it is ready.
+# Prints the container id. Caller must stop it with pg_temp_stop.
+#
+# If the data dir is an initialized cluster, it is started as-is (trust auth for
+# local dump/load). If it is empty, the postgres entrypoint initializes it using
+# the given password and default database `eth` -- matching how the node's own
+# postgres container would initialize it on first start. The container runs as
+# run_user (uid:gid) so the data dir ends up owned the same way the node's own
+# postgres container expects.
+pg_temp_start() {
+  local data_dir="$1"
+  local init_password="${2:-}"
+  local run_user="${3:-}"
+  local mode="${4:-}"
+  need_cmd docker
+  local args=(-d --rm -v "$data_dir:/var/lib/postgresql/data")
+  [[ -n "$run_user" ]] && args+=(--user "$run_user")
+  if postgres_data_dir_initialized "$data_dir"; then
+    args+=(-e POSTGRES_HOST_AUTH_METHOD=trust)
+  else
+    [[ -n "$init_password" ]] || die "cannot initialize empty postgres data dir without a password"
+    args+=(-e "POSTGRES_PASSWORD=$init_password" -e "POSTGRES_DB=eth")
+  fi
+  # Server-side postgres args. In "fast" mode (bulk restore into a disposable
+  # cluster) relax durability and grow bulk-load buffers for a much faster load.
+  local pg_args=(-c max_connections=300)
+  if [[ "$mode" == "fast" ]]; then
+    pg_args+=(-c fsync=off -c synchronous_commit=off -c full_page_writes=off \
+      -c max_wal_size=4GB -c checkpoint_timeout=30min -c maintenance_work_mem=1GB)
+  fi
+  # When running as a non-default uid, the official image needs a writable HOME
+  # and PGDATA owned by that uid; the bind-mounted data dir is created by
+  # strato-setup as the operator, so ownership already matches.
+  local cid
+  cid="$(docker run "${args[@]}" "$SNAPSHOT_POSTGRES_IMAGE" "${pg_args[@]}" 2>/dev/null)" \
+    || die "failed to start temporary postgres container"
+  TMP_PG_CONTAINERS+=("$cid")
+  local i
+  for i in $(seq 1 90); do
+    if docker exec "$cid" pg_isready -U postgres >/dev/null 2>&1; then
+      printf '%s\n' "$cid"
+      return 0
+    fi
+    sleep 1
+  done
+  die "temporary postgres container did not become ready"
+}
+
+pg_temp_stop() {
+  local cid="$1"
+  [[ -n "$cid" ]] || return 0
+  docker stop "$cid" >/dev/null 2>&1 || true
+}
+
+# Number of parallel jobs to use for pg_dump/pg_restore (bounded by CPUs).
+snapshot_pg_jobs() {
+  local n
+  n="$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 4)"
+  (( n < 1 )) && n=1
+  (( n > 8 )) && n=8
+  printf '%s\n' "$n"
+}
+
+# Dump the captured databases from the node's (stopped) postgres data dir into
+# <dest_dir>/<db>.dump (postgres custom format) using a throwaway postgres
+# container. Custom format enables parallel, index-rebuilding restore.
+dump_databases() {
+  local data_dir="$1"
+  local dest_dir="$2"
+  [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && { mkdir -p "$dest_dir"; for db in "${SNAPSHOT_PG_DATABASES[@]}"; do printf -- 'offline fixture dump for %s\n' "$db" > "$dest_dir/$db.dump"; done; return 0; }
+  mkdir -p "$dest_dir"
+  local cid db run_user jobs
+  run_user="$(postgres_run_user "$(dirname "$data_dir")")"
+  jobs="$(snapshot_pg_jobs)"
+  cid="$(pg_temp_start "$data_dir" "" "$run_user")"
+  for db in "${SNAPSHOT_PG_DATABASES[@]}"; do
+    info "Dumping database '$db'..."
+    # -Fc = custom (compressed) format; stream to a host file via stdout.
+    docker exec "$cid" pg_dump -U postgres --no-owner --no-privileges -Fc "$db" > "$dest_dir/$db.dump" \
+      || { pg_temp_stop "$cid"; die "pg_dump failed for database '$db'"; }
+  done
+  pg_temp_stop "$cid"
+}
+
+# Load the captured database dumps into the target node's postgres data dir
+# using a throwaway postgres container. If the data dir is empty (fresh
+# strato-setup node), it is first initialized with the node's own postgres
+# password so the subsequent strato-up reuses the same cluster. We never import
+# a foreign password, so the restored node keeps its own credentials (A2).
+load_databases() {
+  local data_dir="$1"
+  local dumps_dir="$2"
+  local node_password="$3"
+  [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && return 0
+  local cid db run_user jobs
+  run_user="$(postgres_run_user "$(dirname "$data_dir")")"
+  jobs="$(snapshot_pg_jobs)"
+  # "fast" mode relaxes durability on the throwaway load container for a much
+  # faster bulk restore; safe because the data is disposable until restore
+  # completes (on failure we just retry the whole restore).
+  cid="$(pg_temp_start "$data_dir" "$node_password" "$run_user" fast)"
+  for db in "${SNAPSHOT_PG_DATABASES[@]}"; do
+    [[ -f "$dumps_dir/$db.dump" ]] || { pg_temp_stop "$cid"; die "snapshot missing database dump: $db.dump"; }
+    info "Loading database '$db'..."
+    # Recreate the database empty, then restore in parallel (data + indexes).
+    docker exec "$cid" psql -U postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"$db\";" >/dev/null 2>&1 \
+      || { pg_temp_stop "$cid"; die "failed to drop database '$db' before restore"; }
+    docker exec "$cid" psql -U postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$db\";" >/dev/null 2>&1 \
+      || { pg_temp_stop "$cid"; die "failed to create database '$db'"; }
+    # pg_restore -j needs a seekable file, so copy the dump into the container.
+    docker cp "$dumps_dir/$db.dump" "$cid:/tmp/$db.dump" \
+      || { pg_temp_stop "$cid"; die "failed to copy dump into container for '$db'"; }
+    docker exec "$cid" pg_restore -U postgres --no-owner --no-privileges \
+      -j "$jobs" -d "$db" "/tmp/$db.dump" >/dev/null 2>&1 \
+      || { pg_temp_stop "$cid"; die "failed to restore dump for database '$db'"; }
+    docker exec "$cid" rm -f "/tmp/$db.dump" >/dev/null 2>&1 || true
+  done
+  pg_temp_stop "$cid"
+}
+
+stage_payload() {
+  local node_dir="$1"
+  local staging="$2"
+  local include_prometheus="$3"
+
+  mkdir -p "$staging/payload"
+  copy_ethereum_payload "$node_dir/.ethereumH" "$staging/payload/ethereumH"
+  copy_dir_contents_without_appledouble "$node_dir/redis" "$staging/payload/redis"
+  copy_dir_contents_without_appledouble "$node_dir/kafka" "$staging/payload/kafka"
+
+  # Capture only the public blockchain databases (eth, cirrus) as logical dumps,
+  # not the raw postgres data dir. This excludes the local-only `oauth` database
+  # (node key, user keys) and avoids shipping a node-specific postgres password.
+  [[ -d "$node_dir/postgres" ]] || die "postgres state directory not found"
+  dump_databases "$node_dir/postgres" "$staging/payload/postgres-dumps"
+
+  if [[ "$include_prometheus" == "true" && -d "$node_dir/prometheus" ]]; then
+    copy_dir_contents_without_appledouble "$node_dir/prometheus" "$staging/payload/prometheus"
+  fi
+
+  scrub_appledouble_files "$staging/payload"
+}
+
+# Clear the non-postgres state that we fully replace from the payload. The
+# postgres data dir is intentionally preserved: it carries the target node's own
+# freshly-generated credentials and local-only `oauth` database. We only reload
+# the public `eth`/`cirrus` databases into it from the dumps.
+remove_restored_state() {
+  local node_dir="$1"
+  rm -rf "$node_dir/redis" "$node_dir/kafka"
+  if [[ -d "$node_dir/.ethereumH" ]]; then
+    find "$node_dir/.ethereumH" -mindepth 1 ! -name ethconf.yaml -exec rm -rf {} +
+  fi
+}
+
+restore_payload() {
+  local extracted="$1"
+  local node_dir="$2"
+  local include_prometheus="$3"
+
+  [[ -d "$extracted/payload" ]] || die "payload missing from archive"
+  [[ -d "$extracted/payload/postgres-dumps" ]] || die "payload missing postgres-dumps/"
+  [[ -f "$node_dir/secrets/postgres_password" ]] \
+    || die "target node has no secrets/postgres_password; run strato-setup first"
+
+  info "Moving restored state (.ethereumH, redis, kafka) into node..."
+  remove_restored_state "$node_dir"
+  mkdir -p "$node_dir/.ethereumH" "$node_dir/postgres"
+  # Move (not copy) from the throwaway extraction dir: an instant rename on the
+  # same filesystem, and never slower than a copy across filesystems.
+  move_dir_contents "$extracted/payload/ethereumH" "$node_dir/.ethereumH"
+  move_dir_contents "$extracted/payload/redis" "$node_dir/redis"
+  move_dir_contents "$extracted/payload/kafka" "$node_dir/kafka"
+
+  # Load only the public blockchain databases into the target node's postgres
+  # cluster (initializing it with the node's own password if empty). The node
+  # keeps its own postgres password and local-only `oauth` DB; no foreign
+  # credentials are imported (A2), and no node/user-specific data from the
+  # source rides along (B3).
+  local node_password
+  node_password="$(<"$node_dir/secrets/postgres_password")"
+  load_databases "$node_dir/postgres" "$extracted/payload/postgres-dumps" "$node_password"
+
+  if [[ "$include_prometheus" == "true" && -d "$extracted/payload/prometheus" ]]; then
+    rm -rf "$node_dir/prometheus"
+    move_dir_contents "$extracted/payload/prometheus" "$node_dir/prometheus"
+  fi
+
+  # Normalize localhost SQL/Cirrus hosts to 127.0.0.1 so host processes connect
+  # to the IPv4-only Docker port bindings. The node's own postgres password in
+  # ethconf is left untouched (A2: the node keeps its own credentials).
+  rewrite_ethconf_localhost_db_hosts "$node_dir/.ethereumH/ethconf.yaml"
+
+  rm -f "$node_dir/.strato.pid"
+}
+
+cmd_inspect() {
+  need_cmd python3
+  local source use_snapshot timestamp network bucket archive manifest
+  source=""
+  use_snapshot="false"
+  timestamp=""
+  network=""
+  bucket=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --source) source="$2"; shift 2 ;;
+      --snapshot) use_snapshot="true"; shift ;;
+      --snapshot=*) use_snapshot="true"; timestamp="${1#*=}"; shift ;;
+      --network) network="$2"; shift 2 ;;
+      --bucket) bucket="$2"; shift 2 ;;
+      -*) die "unknown inspect option: $1" ;;
+      *)
+        [[ -z "$source" ]] || die "inspect accepts a single positional source"
+        source="$1"; shift ;;
+    esac
+  done
+
+  source="$(resolve_selection_source "$source" "$use_snapshot" "$timestamp" "$network" "$bucket")"
+  archive="$(fetch_source "$source")"
+  manifest="$(mktemp_dir)/SNAPSHOT.json"
+  extract_manifest "$archive" "$manifest"
+  python3 - "$manifest" <<'PY'
+import json
+import sys
+
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+block = data.get("block", {})
+print(f"network: {data.get('network', 'unknown')}")
+print(f"createdAt: {data.get('createdAt', 'unknown')}")
+print(f"stratoVersion: {data.get('stratoVersion', 'unknown')}")
+print(f"isSynced: {block.get('isSynced', 'unknown')}")
+print(f"nodeBestBlock: {block.get('nodeBestBlock', 'unknown')}")
+print(f"sequencedBestBlock: {block.get('sequencedBestBlock', 'unknown')}")
+print(f"worldBestBlock: {block.get('worldBestBlock', 'unknown')}")
+print(f"apiIndexerTip: {block.get('apiIndexerTip', 'unknown')}")
+print(f"cirrusTip: {block.get('cirrusTip', 'unknown')}")
+print("payload: " + ", ".join(data.get("payload", [])))
+PY
+}
+
+cmd_restore() {
+  need_cmd python3
+
+  [[ $# -ge 1 ]] || die "restore requires <node-dir>"
+  local node_dir source use_snapshot timestamp bucket network force start include_prometheus allow_version_drift
+  node_dir="$1"
+  shift
+  source=""
+  use_snapshot="false"
+  timestamp=""
+  bucket=""
+  network=""
+  force="false"
+  start="false"
+  include_prometheus="false"
+  allow_version_drift="false"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --source) source="$2"; shift 2 ;;
+      --snapshot) use_snapshot="true"; shift ;;
+      --snapshot=*) use_snapshot="true"; timestamp="${1#*=}"; shift ;;
+      --bucket) bucket="$2"; shift 2 ;;
+      --network) network="$2"; shift 2 ;;
+      --force) force="true"; shift ;;
+      --start) start="true"; shift ;;
+      --include-prometheus) include_prometheus="true"; shift ;;
+      --allow-version-drift) allow_version_drift="true"; shift ;;
+      *) die "unknown restore option: $1" ;;
+    esac
+  done
+
+  [[ -n "$network" ]] || die "--network is required"
+  source="$(resolve_selection_source "$source" "$use_snapshot" "$timestamp" "$network" "$bucket")"
+
+  node_dir="$(absolute_path "$node_dir")"
+  local archive extracted manifest generated_flag
+  archive="$(fetch_source "$source")"
+  extracted="$(mktemp_dir)"
+  manifest="$extracted/SNAPSHOT.json"
+  info "Extracting snapshot archive (this can take a while for large snapshots)..."
+  extract_archive "$archive" "$extracted"
+  [[ -f "$manifest" ]] || die "SNAPSHOT.json missing from archive"
+
+  local snapshot_network
+  snapshot_network="$(manifest_field "$manifest" network)"
+  [[ "$snapshot_network" == "$network" ]] || die "snapshot network '$snapshot_network' does not match requested network '$network'"
+
+  generated_flag="$(mktemp_dir)/generated"
+  ensure_node_config "$node_dir" "$network" "$generated_flag"
+
+  local target_network
+  target_network="$(node_network "$node_dir")"
+  [[ -z "$target_network" || "$target_network" == "$network" ]] || die "target node network '$target_network' does not match requested network '$network'"
+
+  if node_is_running "$node_dir"; then
+    die "target node is running; stop it before restore"
+  fi
+
+  if [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" != "1" ]] && command -v docker >/dev/null 2>&1; then
+    local containers
+    containers="$(cd "$node_dir" && docker compose -p strato ps -q 2>/dev/null || true)"
+    [[ -z "$containers" ]] || die "strato compose containers are running; stop them before restore"
+  fi
+
+  if [[ "$(cat "$generated_flag")" != "true" && "$force" != "true" ]] && state_exists "$node_dir"; then
+    die "target contains existing state; pass --force to replace it"
+  fi
+
+  if [[ "$allow_version_drift" != "true" && -f "$node_dir/docker-compose.yml" ]]; then
+    local snapshot_version target_images target_strato target_version
+    snapshot_version="$(manifest_field "$manifest" stratoVersion 2>/dev/null || true)"
+    target_images="$(compose_images_json "$node_dir/docker-compose.yml")"
+    target_strato="$(python3 -c '
+import json, sys
+images = json.load(sys.stdin)
+print(images.get("strato", ""))
+' <<<"$target_images")"
+    target_version="${target_strato##*:}"
+    if [[ -n "$snapshot_version" && "$snapshot_version" != "unknown" && -n "$target_version" && "$target_version" != "$target_strato" ]]; then
+      [[ "$(major_version "$snapshot_version")" == "$(major_version "$target_version")" ]] || die "snapshot version '$snapshot_version' is incompatible with target '$target_version'"
+    fi
+  fi
+
+  restore_payload "$extracted" "$node_dir" "$include_prometheus"
+  info "Snapshot restored into: $node_dir"
+
+  if [[ "$start" == "true" ]]; then
+    "$SCRIPT_DIR/strato-up" "$node_dir"
+  fi
+}
+
+cmd_create() {
+  need_cmd python3
+  need_cmd curl
+
+  [[ $# -ge 1 ]] || die "create requires <node-dir>"
+  local node_dir network output metadata_url last_block_url cirrus_tip_url status_url strict_layers allowed_lag
+  local wait_timeout wait_interval include_prometheus skip_smoke smoke_node_dir smoke_timeout
+  node_dir="$1"
+  shift
+  network=""
+  output=""
+  metadata_url=""
+  last_block_url=""
+  cirrus_tip_url=""
+  status_url=""
+  strict_layers="false"
+  allowed_lag="5"
+  wait_timeout="0"
+  wait_interval="30"
+  include_prometheus="false"
+  skip_smoke="false"
+  smoke_node_dir=""
+  smoke_timeout="600"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --network) network="$2"; shift 2 ;;
+      --output) output="$2"; shift 2 ;;
+      --metadata-url) metadata_url="$2"; shift 2 ;;
+      --last-block-url) last_block_url="$2"; shift 2 ;;
+      --cirrus-tip-url) cirrus_tip_url="$2"; shift 2 ;;
+      --status-url) status_url="$2"; shift 2 ;;
+      --strict-layers) strict_layers="true"; shift ;;
+      --layer-lag) allowed_lag="$2"; shift 2 ;;
+      --wait-timeout) wait_timeout="$2"; shift 2 ;;
+      --wait-interval) wait_interval="$2"; shift 2 ;;
+      --include-prometheus) include_prometheus="true"; shift ;;
+      --skip-smoke-test) skip_smoke="true"; shift ;;
+      --smoke-node-dir) smoke_node_dir="$2"; shift 2 ;;
+      --smoke-timeout) smoke_timeout="$2"; shift 2 ;;
+      *) die "unknown create option: $1" ;;
+    esac
+  done
+
+  [[ -n "$network" ]] || die "--network is required"
+  [[ -n "$output" ]] || die "--output is required"
+  [[ -d "$node_dir" ]] || die "node directory not found: $node_dir"
+  node_dir="$(absolute_path "$node_dir")"
+  output="$(absolute_path "$output")"
+
+  local configured_network
+  configured_network="$(node_network "$node_dir")"
+  [[ -z "$configured_network" || "$configured_network" == "$network" ]] || die "node network '$configured_network' does not match requested network '$network'"
+
+  metadata_url="${metadata_url:-$(default_metadata_url "$node_dir")}"
+  last_block_url="${last_block_url:-$(default_last_block_url "$metadata_url")}"
+  cirrus_tip_url="${cirrus_tip_url:-$(default_cirrus_tip_url "$metadata_url")}"
+  status_url="${status_url:-$(default_status_url)}"
+
+  local live_checks
+  live_checks="$(mktemp_dir)/live-checks.json"
+  info "Checking live sync state via $metadata_url"
+  if ! wait_for_live_checks "$metadata_url" "$last_block_url" "$cirrus_tip_url" "$strict_layers" "$allowed_lag" "$wait_timeout" "$wait_interval" "$node_dir" "$live_checks" "$status_url"; then
+    local summary
+    summary="$(live_checks_summary "$live_checks" 2>/dev/null || true)"
+    [[ -n "$summary" ]] && warn "Last live check: $summary"
+    die "node/layers are not synced enough to snapshot"
+  fi
+
+  info "Stopping writers before snapshot..."
+  stop_writers "$node_dir"
+  assert_no_running_containers "$node_dir"
+  assert_no_open_files "$node_dir"
+  assert_clean_postgres "$node_dir"
+
+  local staging payload_checksum
+  staging="$(mktemp_dir)"
+  stage_payload "$node_dir" "$staging" "$include_prometheus"
+  payload_checksum="$(cd "$staging" && tar -cf - payload | sha256_stream)"
+  write_snapshot_manifest "$staging/SNAPSHOT.json" "$network" "$node_dir" "$live_checks" "$payload_checksum" "$include_prometheus"
+  make_archive "$staging" "$output"
+  info "Snapshot created: $output"
+
+  if [[ "$skip_smoke" != "true" ]]; then
+    local smoke_args=(--source "$output" --network "$network" --timeout "$smoke_timeout")
+    [[ -n "$smoke_node_dir" ]] && smoke_args+=(--node-dir "$smoke_node_dir")
+    cmd_smoke_test "${smoke_args[@]}"
+  fi
+}
+
+wait_for_metadata() {
+  local url="$1"
+  local timeout="$2"
+  local start now body
+  start="$(date +%s)"
+  while true; do
+    body="$(snapshot_curl "$url" || true)"
+    if [[ -n "$body" ]] && python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+if "isSynced" not in data:
+    raise SystemExit(1)
+' <<<"$body" 2>/dev/null; then
+      return 0
+    fi
+    now="$(date +%s)"
+    (( now - start < timeout )) || return 1
+    sleep 5
+  done
+}
+
+cmd_smoke_test() {
+  local source use_snapshot timestamp bucket network node_dir timeout
+  source=""
+  use_snapshot="false"
+  timestamp=""
+  bucket=""
+  network=""
+  node_dir=""
+  timeout="600"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --source) source="$2"; shift 2 ;;
+      --snapshot) use_snapshot="true"; shift ;;
+      --snapshot=*) use_snapshot="true"; timestamp="${1#*=}"; shift ;;
+      --bucket) bucket="$2"; shift 2 ;;
+      --network) network="$2"; shift 2 ;;
+      --node-dir) node_dir="$2"; shift 2 ;;
+      --timeout) timeout="$2"; shift 2 ;;
+      *) die "unknown smoke-test option: $1" ;;
+    esac
+  done
+
+  [[ -n "$network" ]] || die "--network is required"
+  source="$(resolve_selection_source "$source" "$use_snapshot" "$timestamp" "$network" "$bucket")"
+
+  if [[ -z "$node_dir" ]]; then
+    node_dir="$(mktemp_dir)/snapshot-smoke-node"
+  else
+    node_dir="$(absolute_path "$node_dir")"
+  fi
+
+  cmd_restore "$node_dir" --source "$source" --network "$network" --force
+  if ! "$SCRIPT_DIR/strato-up" "$node_dir"; then
+    [[ -x "$SCRIPT_DIR/strato-down" ]] && "$SCRIPT_DIR/strato-down" "$node_dir" || true
+    die "smoke test failed to start restored node"
+  fi
+
+  local metadata_url
+  metadata_url="$(default_metadata_url "$node_dir")"
+  if ! wait_for_metadata "$metadata_url" "$timeout"; then
+    [[ -x "$SCRIPT_DIR/strato-down" ]] && "$SCRIPT_DIR/strato-down" "$node_dir" || true
+    die "smoke test timed out waiting for metadata"
+  fi
+
+  if [[ -x "$SCRIPT_DIR/strato-down" ]]; then
+    "$SCRIPT_DIR/strato-down" "$node_dir" || true
+  fi
+  info "Smoke test passed for $source"
+}
+
+cmd_publish() {
+  [[ $# -ge 1 ]] || die "publish requires <file>"
+  local artifact destination alias_name checksum_file base_name digest
+  artifact="$1"
+  shift
+  destination=""
+  alias_name=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --destination) destination="$2"; shift 2 ;;
+      --alias) alias_name="$2"; shift 2 ;;
+      *) die "unknown publish option: $1" ;;
+    esac
+  done
+
+  [[ -f "$artifact" ]] || die "artifact not found: $artifact"
+  [[ -n "$destination" ]] || die "--destination is required"
+
+  checksum_file="$(mktemp_dir)/$(basename "$artifact").sha256"
+  digest="$(sha256_file "$artifact")"
+  base_name="$(basename "$artifact")"
+  printf '%s  %s\n' "$digest" "$base_name" > "$checksum_file"
+
+  local alias_file alias_checksum_file
+  alias_file=""
+  alias_checksum_file=""
+  if [[ -n "$alias_name" ]]; then
+    alias_file="$alias_name$(archive_suffix "$base_name")"
+    # Sidecar follows the <full-filename>.sha256 convention so `sha256sum -c`
+    # works in place and matches what restore/verify expects.
+    alias_checksum_file="$(mktemp_dir)/$alias_file.sha256"
+    printf '%s  %s\n' "$digest" "$alias_file" > "$alias_checksum_file"
+  fi
+
+  if [[ "$destination" == s3://* ]]; then
+    need_cmd aws
+    aws s3 cp --only-show-errors "$artifact" "${destination%/}/$base_name"
+    aws s3 cp --only-show-errors "$checksum_file" "${destination%/}/$base_name.sha256"
+    if [[ -n "$alias_name" ]]; then
+      # Server-side copy of the just-uploaded artifact to the alias key, so the
+      # large archive is not re-uploaded from the host. --copy-props none avoids
+      # the GetObjectTagging/PutObjectTagging calls (the publishing IAM user is
+      # only granted Get/Put/Delete/List, not the tagging actions).
+      aws s3 cp --only-show-errors --copy-props none "${destination%/}/$base_name" "${destination%/}/$alias_file"
+      aws s3 cp --only-show-errors "$alias_checksum_file" "${destination%/}/$alias_file.sha256"
+    fi
+  else
+    mkdir -p "$destination"
+    cp "$artifact" "$destination/$base_name"
+    cp "$checksum_file" "$destination/$base_name.sha256"
+    if [[ -n "$alias_name" ]]; then
+      cp "$artifact" "$destination/$alias_file"
+      cp "$alias_checksum_file" "$destination/$alias_file.sha256"
+    fi
+  fi
+}
+
+main() {
+  [[ $# -gt 0 ]] || { usage; exit 1; }
+  local cmd="$1"
+  shift
+
+  case "$cmd" in
+    create) cmd_create "$@" ;;
+    restore) cmd_restore "$@" ;;
+    inspect) cmd_inspect "$@" ;;
+    smoke-test) cmd_smoke_test "$@" ;;
+    publish) cmd_publish "$@" ;;
+    --help|-h|help) usage ;;
+    *) die "unknown command: $cmd" ;;
+  esac
+}
+
+main "$@"

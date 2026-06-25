@@ -142,7 +142,7 @@ instance Format Address where
   format = CL.yellow . formatAddressWithoutColor
 
 instance ShortDescription Address where
-  shortDescription x = CL.yellow . shorten 12 . padZeros 40 $ showHex x ""
+  shortDescription x = shorten 8 . padZeros 40 $ showHex x ""
 
 instance Binary Address where
   put (Address x) = sequence_ $ fmap put $ word160ToBytes $ fromIntegral x

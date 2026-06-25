@@ -51,6 +51,20 @@ recordValidator iv vb = liftIO $ do
   withLabel validatorView "is_validator" (`setGauge` (f iv))
   withLabel validatorView "validator_behavior" (`setGauge` (f vb))
 
+{-# NOINLINE nodeIdentity #-}
+nodeIdentity :: Vector Text Gauge
+nodeIdentity =
+  unsafeRegister
+    . vector "address"
+    . gauge
+    $ Info "pbft_node_identity" "This node's own blockchain address, carried in the 'address' label (value is always 1.0)"
+
+-- | Record this node's own address as a Prometheus gauge. The address is the
+-- 40-char hex string (no 0x prefix) carried in the 'address' label; the gauge
+-- value is always 1.0. Apex reads the label to surface the node address.
+recordNodeIdentity :: MonadIO m => Text -> m ()
+recordNodeIdentity addr = liftIO $ withLabel nodeIdentity addr (`setGauge` 1.0)
+
 {-# NOINLINE authResults #-}
 authResults :: Vector Text Counter
 authResults =

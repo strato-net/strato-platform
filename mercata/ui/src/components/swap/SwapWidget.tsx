@@ -523,7 +523,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
   // ========================================================================
   // CONTEXT & HOOKS
   // ========================================================================
-  const { swappableTokens, pairableTokens, pairablesLoading, fetchPairableTokens, swap, swapMultiToken, getPoolByTokenPair, getPoolByAddress, fromAsset, toAsset, pool, setPool, poolLoading, loading: swapLoading, setFromAsset, setToAsset, refreshSwapHistory, pools } = useSwapContext();
+  const { swappableTokens, pairableTokens, pairablesLoading, refetchSwappableTokens, fetchPairableTokens, swap, swapMultiToken, getPoolByTokenPair, getPoolByAddress, fromAsset, toAsset, pool, setPool, poolLoading, loading: swapLoading, setFromAsset, setToAsset, refreshSwapHistory, pools, fetchPools } = useSwapContext();
 
   // ========================================================================
   // DERIVED STATE
@@ -638,6 +638,18 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
     setToAmount("");
     setEditingField(null);
   }, [pool?.address]);
+
+  useEffect(() => {
+    if (!guestMode && swappableTokens.length === 0) {
+      refetchSwappableTokens();
+    }
+  }, [guestMode, refetchSwappableTokens, swappableTokens.length]);
+
+  useEffect(() => {
+    if (pools.length === 0) {
+      fetchPools();
+    }
+  }, [fetchPools, pools.length]);
 
   // Initial setup and user-dependent effects
   useEffect(() => {
