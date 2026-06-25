@@ -341,6 +341,7 @@ export async function getInternalAddresses() {
 
   // Network-specific addresses (set by initNetworkConfig)
   addresses.push(rewards || '', escrow, vaultFactory);
+  addresses.push(stratoStaking, validatorRegistry);
 
   // Lending Registry --> lendingPool, collateralVault, liquidityPool
   const { data: [lending] } = await cirrus.get(accessToken, "/BlockApps-LendingRegistry", {
