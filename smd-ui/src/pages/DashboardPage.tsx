@@ -12,6 +12,7 @@ import { useSocketRoom } from "@/hooks/useSocketRoom";
 import { ROOMS } from "@/lib/socket";
 import { useNodeStatus, useNodeMetadata } from "@/services/dashboard";
 import { useTransactions } from "@/services/explorer";
+import { useUser } from "@/context/UserContext";
 import { secondsToHuman, shortenHex } from "@/lib/utils";
 
 interface HealthPayload {
@@ -81,7 +82,9 @@ export default function DashboardPage() {
       .sort((a, b) => b.value - a.value);
   }, [recentTxs]);
 
-  const { data: status } = useNodeStatus();
+  // /apex-api/status requires an authenticated session; skip the poll for guests.
+  const { isLoggedIn } = useUser();
+  const { data: status } = useNodeStatus(isLoggedIn);
   const { data: metadata } = useNodeMetadata();
   const validators = metadata?.validators ?? [];
   const nodeAddress = status?.nodeAddress || metadata?.nodeAddress;
@@ -96,7 +99,9 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader title="Dashboard" description="Live node and network statistics." />
 
-      {/* Node health banner */}
+      {/* Node status banner — depends on /apex-api/status, which requires auth, so
+          it's hidden from unauthenticated (guest) users. */}
+      {isLoggedIn ? (
       <Card>
         <CardHeader className="flex flex-col gap-2 space-y-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div>
@@ -134,6 +139,7 @@ export default function DashboardPage() {
           ) : null}
         </CardContent>
       </Card>
+      ) : null}
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
