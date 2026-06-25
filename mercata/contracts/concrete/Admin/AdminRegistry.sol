@@ -139,7 +139,11 @@ contract record AdminRegistry is Ownable {
     }
 
     function _getIssueId(address _target, string _func, variadic _args) internal returns (string) {
-        return keccak256(_target, _func, _args);
+        string issueId = keccak256(_target, _func, _args);
+        if (currentIssues[issueId]) {
+            return issueId;
+        }
+        return keccak256(abi.encode(_target, _func, _args));
     }
 
     function _executeIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal returns (variadic) {
