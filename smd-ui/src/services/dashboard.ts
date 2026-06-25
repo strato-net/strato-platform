@@ -32,6 +32,22 @@ export function useNodeStatus(enabled = true) {
   });
 }
 
+/**
+ * GET /health — public node health (no auth). Returns a subset of the same shape as
+ * /apex-api/status: health/healthStatus/healthIssues, version, uptime, nodeAddress,
+ * lastBlock. Used to show node health to unauthenticated (guest) users.
+ */
+export function useNodeHealth() {
+  return useQuery({
+    queryKey: ["node-health"],
+    queryFn: async (): Promise<NodeStatus> => {
+      const { data } = await api.get(env.HEALTH_URL);
+      return data || {};
+    },
+    refetchInterval: 15000,
+  });
+}
+
 export interface NodeMetadata {
   nodeAddress?: string;
   validators?: string[];

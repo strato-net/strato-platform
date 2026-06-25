@@ -10,7 +10,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { useMemo } from "react";
 import { useSocketRoom } from "@/hooks/useSocketRoom";
 import { ROOMS } from "@/lib/socket";
-import { useNodeStatus, useNodeMetadata } from "@/services/dashboard";
+import { useNodeStatus, useNodeHealth, useNodeMetadata } from "@/services/dashboard";
 import { useTransactions } from "@/services/explorer";
 import { useUser } from "@/context/UserContext";
 import { secondsToHuman, shortenHex } from "@/lib/utils";
@@ -82,14 +82,25 @@ export default function DashboardPage() {
       .sort((a, b) => b.value - a.value);
   }, [recentTxs]);
 
-  // /apex-api/status requires an authenticated session; skip the poll for guests.
+  // /apex-api/status requires an authenticated session; skip the poll for guests and
+  // fall back to the public /health endpoint for the health/version/uptime fields.
   const { isLoggedIn } = useUser();
   const { data: status } = useNodeStatus(isLoggedIn);
+  const { data: nodeHealth } = useNodeHealth();
   const { data: metadata } = useNodeMetadata();
   const validators = metadata?.validators ?? [];
-  const nodeAddress = status?.nodeAddress || metadata?.nodeAddress;
+  const nodeAddress = status?.nodeAddress || nodeHealth?.nodeAddress || metadata?.nodeAddress;
+  const version = status?.version || nodeHealth?.version;
 
-  const healthy = health.health !== false;
+  // Prefer the live socket values; fall back to /health (so guests still see health).
+  const healthy = (health.health ?? nodeHealth?.health) !== false;
+  const healthStatusText =
+    health.healthStatus || nodeHealth?.healthStatus || (healthy ? "Healthy" : "Unhealthy");
+  const uptimeSecs = uptime || nodeHealth?.uptime || 0;
+  const issues =
+    (health.healthIssues && health.healthIssues.length
+      ? health.healthIssues
+      : nodeHealth?.healthIssues) ?? [];
   const sys = system.systemInfo;
   const cpu = sys?.cpu?.currentLoad?.value;
   const mem = sys?.memory?.use?.value;
@@ -99,20 +110,17 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader title="Dashboard" description="Live node and network statistics." />
 
-      {/* Node status banner — depends on /apex-api/status, which requires auth, so
-          it's hidden from unauthenticated (guest) users. */}
-      {isLoggedIn ? (
+      {/* Node status banner. Health/version/uptime come from /health (public) so guests
+          see it too; detailed system metrics require an authenticated session. */}
       <Card>
         <CardHeader className="flex flex-col gap-2 space-y-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div>
             <CardTitle className="flex items-center gap-2">
               Node status
-              <Badge variant={healthy ? "secondary" : "destructive"}>
-                {health.healthStatus || (healthy ? "Healthy" : "Unhealthy")}
-              </Badge>
+              <Badge variant={healthy ? "secondary" : "destructive"}>{healthStatusText}</Badge>
             </CardTitle>
             <CardDescription className="mt-1">
-              Uptime {secondsToHuman(uptime)} · {status?.version ? `v${status.version}` : "version —"}
+              Uptime {secondsToHuman(uptimeSecs)} · {version ? `v${version}` : "version —"}
             </CardDescription>
           </div>
           <div className="text-left text-xs text-muted-foreground sm:text-right">
@@ -123,23 +131,28 @@ export default function DashboardPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <Metric icon={Activity} label="CPU" value={pct(cpu)} />
-            <Metric icon={Activity} label="Memory" value={pct(mem)} />
-            <Metric icon={Activity} label="Disk" value={pct(disk)} />
-            <Metric
-              icon={Network}
-              label="Network"
-              value={network.statusMessage || (network.status ? "Healthy" : "—")}
-            />
-          </div>
-          {!healthy && health.healthIssues && health.healthIssues.length > 0 ? (
-            <p className="mt-3 text-sm text-destructive">{health.healthIssues.join(". ")}</p>
-          ) : null}
-        </CardContent>
+        {isLoggedIn || (!healthy && issues.length > 0) ? (
+          <CardContent>
+            {isLoggedIn ? (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <Metric icon={Activity} label="CPU" value={pct(cpu)} />
+                <Metric icon={Activity} label="Memory" value={pct(mem)} />
+                <Metric icon={Activity} label="Disk" value={pct(disk)} />
+                <Metric
+                  icon={Network}
+                  label="Network"
+                  value={network.statusMessage || (network.status ? "Healthy" : "—")}
+                />
+              </div>
+            ) : null}
+            {!healthy && issues.length > 0 ? (
+              <p className={isLoggedIn ? "mt-3 text-sm text-destructive" : "text-sm text-destructive"}>
+                {issues.join(". ")}
+              </p>
+            ) : null}
+          </CardContent>
+        ) : null}
       </Card>
-      ) : null}
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
