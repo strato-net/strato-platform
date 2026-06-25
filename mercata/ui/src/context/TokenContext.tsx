@@ -12,6 +12,7 @@ import { Token, CreateTokenPayload } from '@/interface';
 import { Token as TokenType, EarningAsset, BalanceSnapshot } from '@mercata/shared-types';
 import { cataAddress, usdstAddress } from '@/lib/constants';
 import { useUser } from '@/context/UserContext';
+import { isTxSubmitted } from '@/utils/transactionStatus';
 
 export interface BulkTransferItem {
   to: string;
@@ -30,6 +31,8 @@ export interface BulkTransferResponse {
   results: BulkTransferResult[];
   successCount: number;
   failureCount: number;
+  status?: string;
+  hash?: string;
 }
 
 type TokenContextType = {
@@ -84,7 +87,7 @@ type TokenContextType = {
 const TokenContext = createContext<TokenContextType | undefined>(undefined);
 
 export const TokenProvider = ({ children }: { children: ReactNode }) => {
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn, userAddress } = useUser();
   const [tokens, setTokens] = useState<Token[]>([]);
   const [activeTokens, setActiveTokens] = useState<Token[]>([]);
   const [inactiveTokens, setInactiveTokens] = useState<TokenType[]>([]);
@@ -407,6 +410,20 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     try {
       const response = await api.post<BulkTransferResponse>('/tokens/bulk-transfer', payload);
       fetchNetBalance();
+      if (
+        response.data.results.length === 1 &&
+        isTxSubmitted(response.data.status) &&
+        !isTxSubmitted(response.data.results[0].status)
+      ) {
+        return {
+          ...response.data,
+          results: [{
+            ...response.data.results[0],
+            status: response.data.status,
+            hash: response.data.hash || response.data.results[0].hash,
+          }],
+        };
+      }
       return response.data;
     } catch (err) {
       throw err;
@@ -473,7 +490,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         earningAssetsAbortControllerRef.current.abort();
       }
     };
-  }, [getEarningAssets, isLoggedIn]);
+  }, [getEarningAssets, isLoggedIn, userAddress]);
 
   // Net balance - fetch on mount + poll every 60s for logged-in users
   useEffect(() => {
@@ -491,7 +508,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         netBalanceAbortControllerRef.current.abort();
       }
     };
-  }, [fetchNetBalance, isLoggedIn]);
+  }, [fetchNetBalance, isLoggedIn, userAddress]);
 
 
   return (

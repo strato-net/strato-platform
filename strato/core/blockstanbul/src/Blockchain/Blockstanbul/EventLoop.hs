@@ -26,11 +26,11 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class (blockHash, blockHeader, blockHeaderBlockNumber)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
+import Control.Monad.Composable.Vault
 import Control.Monad.Extra (whenM)
 import Control.Monad.State.Strict
 import Control.Monad.Trans.Except
@@ -44,6 +44,7 @@ import Prometheus
 import System.Exit
 import Text.Format
 import Text.Printf
+import Text.ShortDescription
 import Prelude hiding (round, sequence)
 
 yieldL :: Monad m => b -> ConduitM a (Either b c) m ()
@@ -143,7 +144,7 @@ nextRound nt = do
       yieldR $ ResetTimer r
   use view >>= recordView
   vals <- use validators
-  $logInfoS "nextRound/validators" . T.pack $ show vals
+  $logDebugS "nextRound/validators" . T.pack $ shortDescription (S.toList vals)
   thisR <- use $ view . round
   when (S.null vals) . liftIO $
     die "All participants voted out, consensus is stuck."
@@ -189,7 +190,9 @@ commitBlock blk = do
   lift . applyValidatorChanges $ blockBlockData blk
   yieldR $ ToCommit blk
   let hsh = blockHash blk
-  $logInfoS "blockstanbul" . T.pack $ "Successful block commit of " ++ format hsh
+      blockNo = blockHeaderBlockNumber $ blockHeader blk
+  $logInfoS "blockstanbul" . T.pack $
+    printf "Committed block #%d (%s)" blockNo (shortDescription hsh)
   lastParent .= Just hsh
   clearLock
   myBlock .= Nothing
@@ -264,7 +267,7 @@ eventLoop ctx = execStateC ctx $
               yieldR $ FailedHistoric blk
             Right _ -> do
               acceptHistoric
-              $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
+              $logDebugS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
               commitBlock blk
         UnannouncedBlock blk' -> do
           -- this is for sending out a new block,
@@ -454,6 +457,7 @@ sendMessages' wms = do
   putBlockstanbulContext ctx'
 
   recordValidator (_isValidator ctx') (_validatorBehavior ctx')
+  forM_ (_selfAddr ctx') $ recordNodeIdentity . T.pack . formatAddressWithoutColor
 
   return evs
 

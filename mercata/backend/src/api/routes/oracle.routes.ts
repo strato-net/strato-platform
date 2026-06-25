@@ -3,6 +3,7 @@ import authHandler from "../middleware/authHandler";
 import OracleController from "../controllers/oracle.controller";
 
 const router = Router();
+const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 /**
  * @openapi
@@ -62,7 +63,7 @@ router.get("/price", authHandler.authorizeRequest(true), OracleController.getPri
  *                 hash:
  *                   type: string
  */
-router.post("/price", authHandler.authorizeRequest(), OracleController.setPrice);
+router.post("/price", walletAuth, OracleController.setPrice);
 
 /**
  * @openapi

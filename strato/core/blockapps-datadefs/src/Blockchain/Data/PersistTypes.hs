@@ -7,6 +7,7 @@ module Blockchain.Data.PersistTypes where
 
 import BlockApps.Solidity.Xabi
 import Blockchain.Data.PubKey
+import SolidVM.Model.Value (Value(..))
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.StateRoot
 import Blockchain.Strato.Model.Validator
@@ -28,6 +29,7 @@ import Text.Read (readMaybe)
 
 -- derivePersistField "Point"
 derivePersistFieldJSON "Xabi"
+derivePersistFieldJSON "Value"
 
 integerCap :: Word32
 integerCap = 1000

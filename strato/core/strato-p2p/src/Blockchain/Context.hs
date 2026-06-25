@@ -54,7 +54,7 @@ import           Control.Exception                       hiding (bracket, catch)
 import           Control.Lens                            hiding (Context)
 import qualified Control.Monad.Change.Alter              as A
 import qualified Control.Monad.Change.Modify             as Mod
-import           Control.Monad.Composable.Kafka
+import           Control.Monad.Composable.Vault
 import           Control.Monad.Reader
 import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString                         as B
@@ -94,12 +94,10 @@ import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.Secp256k1
 
 import qualified Blockchain.Strato.RedisBlockDB          as RBDB
 import           Blockchain.SyncDB
 import           Control.Monad                           (void)
-import           Control.Monad.Composable.Vault          (VaultM)
 import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                    as SQL
 import qualified Database.Redis                          as Redis
@@ -148,8 +146,7 @@ withPeerAddress :: (Maybe Address -> Maybe Address) -> PeerAddress -> PeerAddres
 withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
-  { contextKafkaState     :: KafkaEnv
-  , blockHeaders          :: ([BlockHeader], UTCTime) -- keep track when last updated global headers cache
+  { blockHeaders          :: ([BlockHeader], UTCTime) -- keep track when last updated global headers cache
   , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp       :: ActionTimestamp
   , _blockstanbulPeerAddr :: PeerAddress
@@ -233,7 +230,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (ReaderT Config 
       Just (BestBlock s n) -> BestBlock s n
   put _ (BestBlock s n) =
     RBDB.withRedisBlockDB (putBestBlockInfo s n) >>= \case
-      Left _ -> $logInfoS "ContextM.put BestBlock" $ T.pack "Failed to update BestBlock"
+      Left err -> error $ "Failed to update best block in Redis: " ++ show err
       Right _ -> return ()
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT Config m) where
@@ -245,7 +242,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (Reader
       Just bestSequencedBlock -> return bestSequencedBlock
   put _ bestSequencedBlock =
     RBDB.withRedisBlockDB (putBestSequencedBlockInfo bestSequencedBlock) >>= \case
-      Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
+      Left err -> error $ "Failed to update best sequenced block in Redis: " ++ show err
       Right _ -> return ()
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Integer (Canonical BlockHeader) (ReaderT Config m) where
@@ -393,8 +390,8 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Point PPeer (Reader
     where
       actions = SQL.selectList [PPeerPubkey SQL.==. Just pk] []
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Outputs (ReaderT Config m) [IngestEvent] where
-  output = void . runKafkaMConfigured "strato-p2p" . SK.writeUnseqEvents
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Mod.Outputs (ReaderT Config m) [IngestEvent] where
+  output = void . runStreamMConfigured "strato-p2p" . SK.writeUnseqEvents
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT Config m) where
   select p = liftIO . A.select p
@@ -495,13 +492,9 @@ initConfig wireMessagesRef = do
     }
 
 initContext :: MonadIO m => m Context
-initContext = do
-  let k = kafkaConfig ethConf
-      address = (fromString $ kafkaHost k, fromIntegral $ kafkaPort k)
-  kafkaEnv <- createKafkaEnv "strato-p2p" address
+initContext =
   return $
     Context { actionTimestamp = emptyActionTimestamp
-            , contextKafkaState = kafkaEnv
             , blockHeaders = ([], jamshidBirth)
             , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
             , _blockstanbulPeerAddr = PeerAddress Nothing

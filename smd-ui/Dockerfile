@@ -20,6 +20,9 @@ ENV STRATO_VERSION=${STRATO_VERSION}
 ENV NODE_ENV=production
 COPY docker-run.sh /usr/src/app/
 COPY --from=builder /usr/src/app/build build/
+# docker-run.sh regenerates this at startup; make it writable so the container
+# can run as a non-root user.
+RUN chmod 666 build/scripts/config.js
 EXPOSE 3002
 HEALTHCHECK --interval=5s --timeout=2s --start-period=180s \
   CMD lsof -i :3002 || \

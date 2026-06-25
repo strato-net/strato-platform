@@ -20,6 +20,8 @@ RUN npm run build
 
 FROM base
 
+RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_amd64 && chmod +x /usr/local/bin/yq
+
 WORKDIR /app
 
 COPY backend/package*.json ./

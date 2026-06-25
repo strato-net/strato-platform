@@ -40,6 +40,8 @@ import "Savings/SaveUSDSTVault.sol";
 
 //Bridging
 import "./Bridge/MercataBridge.sol";
+import "./Bridge/StratoNativeBridge.sol";
+import "./Bridge/StratoNativeCustodyVault.sol";
 
 //CDP
 import "CDP/CDPRegistry.sol";
@@ -70,6 +72,8 @@ contract record Mercata is Authorizable {
     PoolConfigurator public poolConfigurator;
     LendingRegistry public lendingRegistry;
     MercataBridge public mercataBridge;
+    StratoNativeBridge public stratoNativeBridge;
+    StratoNativeCustodyVault public stratoNativeCustodyVault;
     PoolFactory public poolFactory;
     TokenFactory public tokenFactory;
     FeeCollector public feeCollector;

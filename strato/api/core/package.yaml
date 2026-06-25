@@ -13,7 +13,6 @@ library:
   dependencies:
     - aeson
     - aeson-casing
-    - base64-bytestring
     - binary
     - blockapps-data
     - blockapps-datadefs
@@ -27,22 +26,15 @@ library:
     - directory
     - esqueleto
     - ethereum-discovery
-    - extra
     - filepath
     - format
-    - hflags
     - http-types
-    - labeled-error
     - lens
     - monad-alter
     - mtl
     - process
-    - QuickCheck
     - seqevents
     - servant-client
-    - servant-multipart
-    - servant-multipart-client
-    #  - servant-swagger-tags
     - solid-vm-model
     - source-tools
     - sql-monad
@@ -53,8 +45,4 @@ library:
     - transformers
     - unliftio
     - unordered-containers
-    - blockapps-vault-wrapper-api
-    - blockapps-vault-wrapper-client
-    - vault-monad
     - strato-redis-blockdb
-    - evm-solidity

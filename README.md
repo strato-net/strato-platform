@@ -32,6 +32,7 @@ Choose one of the following options to install dependencies:
         libleveldb-dev \
         liblzma-dev \
         libpq-dev \
+	librdkafka-dev \
         libsecp256k1-dev \
         libsodium-dev \
         pkg-config \
@@ -111,10 +112,47 @@ This builds both app images and prints the command to deploy them (similar to `m
 
 #### Patch the App on a Node
 
-Stop and restart the node with the new images:
+Update the `mercata-backend` and `mercata-ui` image tags in the node's `docker-compose.yml`:
+
 ```
-strato-down
-strato-up mynode --patch-app mercata-backend:<tag> mercata-ui:<tag>
+strato-patch-app mynode mercata-backend:<tag> mercata-ui:<tag>
 ```
 
 Use the exact image tags printed by `make app`.
+
+How the new images take effect depends on whether the node is currently running:
+
+- **Node is not running:** `strato-patch-app` only rewrites the image tags in `docker-compose.yml`. The new images will be picked up automatically on the next `strato-up`.
+- **Node is running:** the script will print a follow-up command. To apply the new images on the live node, either:
+  - Re-run docker compose up for just the app services, **reusing the same ENV VARS from your original run script** (e.g. `run.sh`), so the recreated containers get the same environment they were originally launched with:
+    ```
+    <ENV VARS> docker compose -p strato up -d --no-deps mercata-backend mercata-ui
+    ```
+  - Or restart the full node without wiping its data:
+    ```
+    strato-down && ./run.sh
+    ```
+
+### 6. Restore a Synced Node Snapshot
+
+For local development that requires a STRATO node, restore a pre-synced snapshot instead of syncing from genesis. The simplest path is to start a node directly from the latest published snapshot for the network:
+
+```
+strato-up mynode --network=helium --snapshot
+```
+
+`--snapshot` downloads the latest snapshot for the network; append a timestamp (`--snapshot=YYYYMMDD-HH:mm:ssZ`) to pick a specific one. To restore without starting, or to restore from an explicit location:
+
+```
+# Latest published snapshot for the network:
+strato-snapshot restore mynode --snapshot --network helium
+
+# An explicit local file or S3 URI:
+strato-snapshot restore mynode \
+  --source s3://strato-snapshots/helium/latest.tar.zst \
+  --network helium
+
+strato-up mynode
+```
+
+Snapshot artifacts are cold copies of `.ethereumH`, Postgres, Redis, and Kafka state. See `design-documents/node-snapshot-tool-README.md` for the full CLI and `design-documents/node-snapshot-dev-loop.md` for the create/restore contract and safety checks.

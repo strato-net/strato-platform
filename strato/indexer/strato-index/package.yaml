@@ -21,7 +21,7 @@ library:
   - common-log
   - containers
   - format
-  - kafka-monad
+  - streaming
   - monad-alter
   - persistent-postgresql
   - seqevents
@@ -33,7 +33,7 @@ library:
   - unliftio
 
 executables:
-  strato-api-indexer:
+  strato-indexer:
     main: ApiIndexerMain.hs
     source-dirs: exec_src
     dependencies:
@@ -42,7 +42,6 @@ executables:
       - blockDB
       - common-log
       - containers
-      - evm-solidity
       - hflags
       - monad-alter
       - process-monitor
@@ -51,27 +50,7 @@ executables:
       - strato-conf
       - strato-index
       - strato-model
-      - strato-statediff
+      - streaming
     other-modules:
       - Wiring
 
-  strato-p2p-indexer:
-    main: P2PIndexerMain.hs
-    source-dirs: exec_src
-    dependencies:
-      - blockapps-data
-      - blockapps-init
-      - blockDB
-      - common-log
-      - containers
-      - evm-solidity
-      - hflags
-      - kafka-monad
-      - monad-alter
-      - process-monitor
-      - redis-monad
-      - strato-conf
-      - strato-index
-      - strato-model
-    other-modules:
-      - Wiring

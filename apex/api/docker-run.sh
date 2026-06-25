@@ -5,9 +5,8 @@ set -x
 # TODO: Set POSTGRES vars defaults here, remove default from docker-compose.yml, rename postgres vars using uppercase
 # These must be exported so Node.js can access them via process.env
 export PROMETHEUS_HOST=${PROMETHEUS_HOST:-'prometheus:9090'}
-export STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
-export STRATO_PORT_API=${STRATO_PORT_API:-3000}
-export STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
+export redis_host=${redis_host:-redis}
+export redis_port=${redis_port:-6379}
 
 source set-aux-env-vars.sh
 
@@ -16,21 +15,29 @@ if [ -f /run/secrets/postgres_password ]; then
   postgres_password=$(cat /run/secrets/postgres_password)
 fi
 
-# Set postgres configurations
-sed -i -e 's|__apex_postgres_user__|'"${postgres_user}"'|g' config/config.json
-sed -i -e 's|__apex_postgres_password__|'"${postgres_password}"'|g' config/config.json
-sed -i -e 's|__apex_postgres_host__|'"${postgres_host}"'|g' config/config.json
-sed -i -e 's|__apex_postgres_port__|'"${postgres_port}"'|g' config/config.json
+# Set postgres configurations. Write via temp files and overwrite (rather than
+# `sed -i`, which creates its temp in the dir) so this works when running as a
+# non-root user with only the files themselves made writable.
+sed -e 's|__apex_postgres_user__|'"${postgres_user}"'|g' \
+    -e 's|__apex_postgres_password__|'"${postgres_password}"'|g' \
+    -e 's|__apex_postgres_host__|'"${postgres_host}"'|g' \
+    -e 's|__apex_postgres_port__|'"${postgres_port}"'|g' \
+    config/config.json > /tmp/apex-config.json
+cat /tmp/apex-config.json > config/config.json
 
-sed -i -e 's|__bloc_postgres_user__|'"${postgres_user}"'|g' models/strato/bloc22/config.json
-sed -i -e 's|__bloc_postgres_password__|'"${postgres_password}"'|g' models/strato/bloc22/config.json
-sed -i -e 's|__bloc_postgres_host__|'"${postgres_host}"'|g' models/strato/bloc22/config.json
-sed -i -e 's|__bloc_postgres_port__|'"${postgres_port}"'|g' models/strato/bloc22/config.json
+sed -e 's|__bloc_postgres_user__|'"${postgres_user}"'|g' \
+    -e 's|__bloc_postgres_password__|'"${postgres_password}"'|g' \
+    -e 's|__bloc_postgres_host__|'"${postgres_host}"'|g' \
+    -e 's|__bloc_postgres_port__|'"${postgres_port}"'|g' \
+    models/strato/bloc22/config.json > /tmp/bloc22-config.json
+cat /tmp/bloc22-config.json > models/strato/bloc22/config.json
 
-sed -i -e 's|__strato_postgres_user__|'"${postgres_user}"'|g' models/strato/eth/config.js
-sed -i -e 's|__strato_postgres_password__|'"${postgres_password}"'|g' models/strato/eth/config.js
-sed -i -e 's|__strato_postgres_host__|'"${postgres_host}"'|g' models/strato/eth/config.js
-sed -i -e 's|__strato_postgres_port__|'"${postgres_port}"'|g' models/strato/eth/config.js
+sed -e 's|__strato_postgres_user__|'"${postgres_user}"'|g' \
+    -e 's|__strato_postgres_password__|'"${postgres_password}"'|g' \
+    -e 's|__strato_postgres_host__|'"${postgres_host}"'|g' \
+    -e 's|__strato_postgres_port__|'"${postgres_port}"'|g' \
+    models/strato/eth/config.js > /tmp/eth-config.js
+cat /tmp/eth-config.js > models/strato/eth/config.js
 
 echo 'Waiting for postgres to be available...'
 until pg_isready -h ${postgres_host} -p ${postgres_port}

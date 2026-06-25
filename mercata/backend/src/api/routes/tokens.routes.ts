@@ -3,6 +3,7 @@ import authHandler from "../middleware/authHandler";
 import TokensController from "../controllers/tokens.controller";
 
 const router = Router();
+const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 /**
  * @openapi
@@ -215,7 +216,7 @@ router.get("/:address", authHandler.authorizeRequest(true), TokensController.get
  *               additionalProperties: true
  */
 router.get("/", authHandler.authorizeRequest(true), TokensController.getAll);
-router.post("/", authHandler.authorizeRequest(), TokensController.create);
+router.post("/", walletAuth, TokensController.create);
 
 /**
  * @openapi
@@ -252,7 +253,7 @@ router.post("/", authHandler.authorizeRequest(), TokensController.create);
  *               type: object
  *               additionalProperties: true
  */
-router.post("/transfer", authHandler.authorizeRequest(), TokensController.transfer);
+router.post("/transfer", walletAuth, TokensController.transfer);
 
 /**
  * @openapi
@@ -316,7 +317,7 @@ router.post("/transfer", authHandler.authorizeRequest(), TokensController.transf
  *                 failureCount:
  *                   type: integer
  */
-router.post("/bulk-transfer", authHandler.authorizeRequest(), TokensController.bulkTransfer);
+router.post("/bulk-transfer", walletAuth, TokensController.bulkTransfer);
 
 /**
  * @openapi
@@ -353,7 +354,7 @@ router.post("/bulk-transfer", authHandler.authorizeRequest(), TokensController.b
  *               type: object
  *               additionalProperties: true
  */
-router.post("/approve", authHandler.authorizeRequest(), TokensController.approve);
+router.post("/approve", walletAuth, TokensController.approve);
 
 /**
  * @openapi
@@ -394,7 +395,7 @@ router.post("/approve", authHandler.authorizeRequest(), TokensController.approve
  *               type: object
  *               additionalProperties: true
  */
-router.post("/transferFrom", authHandler.authorizeRequest(), TokensController.transferFrom);
+router.post("/transferFrom", walletAuth, TokensController.transferFrom);
 
 /**
  * @openapi
@@ -427,6 +428,6 @@ router.post("/transferFrom", authHandler.authorizeRequest(), TokensController.tr
  *               type: object
  *               additionalProperties: true
  */
-router.post("/setStatus", authHandler.authorizeRequest(), TokensController.setStatus);
+router.post("/setStatus", walletAuth, TokensController.setStatus);
 
 export default router;

@@ -1,7 +1,25 @@
 import { useEffect, useState } from "react";
+import type { NodeHealth } from "@/lib/nodeHealth";
 
-const SyncingPage = () => {
+interface SyncingPageProps {
+  nodeHealth?: NodeHealth | null;
+}
+
+const SyncingPage = ({ nodeHealth }: SyncingPageProps) => {
   const [dots, setDots] = useState("");
+  const status = nodeHealth?.healthStatus || "SYNCING";
+  const issues = nodeHealth?.healthIssues?.filter(Boolean) || [];
+  const isStalled = nodeHealth?.nodeSync?.isSyncStalled === true || status === "SYNC STALLED";
+  const title = isStalled
+    ? "Node Sync Stalled"
+    : status === "UNHEALTHY"
+      ? "Node Unhealthy"
+      : "Node Syncing";
+  const description = isStalled
+    ? "The blockchain node has stopped catching up with the network."
+    : status === "UNHEALTHY"
+      ? "The blockchain node is currently reporting an unhealthy state."
+      : "The blockchain node is currently synchronizing data from the network.";
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -20,13 +38,26 @@ const SyncingPage = () => {
           </div>
         </div>
         <h1 className="text-3xl font-bold tracking-tight mb-4">
-          Node Syncing{dots}
+          {title}{dots}
         </h1>
         <p className="text-lg text-muted-foreground mb-6">
-          The blockchain node is currently synchronizing data from the network.
-          This process may take some time depending on the amount of data to
-          sync.
+          {description}
         </p>
+        {issues.length > 0 && (
+          <div className="mb-6 rounded-md border border-border bg-muted/40 p-4 text-left text-sm text-muted-foreground">
+            <div className="mb-2 font-medium text-foreground">Current status</div>
+            <ul className="list-disc space-y-1 pl-5">
+              {issues.map((issue) => (
+                <li key={issue}>{issue}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {nodeHealth?.nodeSync && (
+          <p className="text-xs text-muted-foreground mb-3">
+            Sync check: {nodeHealth.nodeSync.latestCheckTimestamp || nodeHealth.timestamp || "pending"}
+          </p>
+        )}
         <p className="text-sm text-muted-foreground">
           This page will automatically refresh when the node is ready.
         </p>

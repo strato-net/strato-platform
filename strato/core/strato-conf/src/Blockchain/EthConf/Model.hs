@@ -10,6 +10,7 @@ module Blockchain.EthConf.Model where
 
 import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
+import Control.Applicative ((<|>))
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
@@ -46,7 +47,7 @@ data EthConf = EthConf
   { sqlConfig :: SqlConf,
     cirrusConfig :: SqlConf,
     redisBlockDBConfig :: RedisBlockDBConf,
-    kafkaConfig :: KafkaConf,
+    streamingConfig :: StreamingConf,
     levelDBConfig :: LevelDBConf,
     quarryConfig :: QuarryConf,
     discoveryConfig :: DiscoveryConf,
@@ -55,16 +56,22 @@ data EthConf = EthConf
     contractsConfig :: ContractsConf,
     urlConfig :: UrlConfig,
     networkConfig :: NetworkConf,
-    debugConfig :: DebugConfig
+    debugConfig :: DebugConfig,
+    vmConfig :: VmConf
   }
   deriving (Show, Eq, Generic)
+
+-- Backward compatibility alias
+kafkaConfig :: EthConf -> StreamingConf
+kafkaConfig = streamingConfig
+{-# DEPRECATED kafkaConfig "Use streamingConfig instead" #-}
 
 instance FromJSON EthConf where
   parseJSON = withObject "EthConf" $ \v -> EthConf
     <$> v .: "sqlConfig"
     <*> v .: "cirrusConfig"
     <*> v .: "redisBlockDBConfig"
-    <*> v .: "kafkaConfig"
+    <*> (v .:? "streamingConfig" .!= def <|> v .: "kafkaConfig")
     <*> v .:? "levelDBConfig" .!= def
     <*> v .:? "quarryConfig" .!= def
     <*> v .: "discoveryConfig"
@@ -74,6 +81,7 @@ instance FromJSON EthConf where
     <*> v .:? "urlConfig" .!= def
     <*> v .:? "networkConfig" .!= def
     <*> v .:? "debugConfig" .!= def
+    <*> v .:? "vmConfig" .!= def
 
 instance ToJSON EthConf where
   toJSON = Aeson.genericToJSON Aeson.defaultOptions { Aeson.omitNothingFields = True }
@@ -82,14 +90,12 @@ instance ToJSON EthConf where
 data ApiConfig = ApiConfig
   { apiPort :: Int
   , apiListenAddress :: String
-  , apiHost :: String
   } deriving (Show, Eq, Generic, ToJSON)
 
 instance FromJSON ApiConfig where
   parseJSON = withObject "ApiConfig" $ \v -> ApiConfig
     <$> v .:? "apiPort" .!= 3000
     <*> v .:? "apiListenAddress" .!= "127.0.0.1"
-    <*> v .:? "apiHost" .!= "localhost"
 
 data DiscoveryConf = DiscoveryConf
   { discoveryPort :: Int,
@@ -116,11 +122,30 @@ data SqlConf = SqlConf
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
-data KafkaConf = KafkaConf
-  { kafkaHost :: String,
-    kafkaPort :: Int
+data StreamingConf = StreamingConf
+  { streamingHost :: String,
+    streamingPort :: Int
   }
-  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+  deriving (Show, Eq, Generic, ToJSON)
+
+-- Parse both old "kafkaHost/Port" and new "streamingHost/Port" field names
+instance FromJSON StreamingConf where
+  parseJSON = withObject "StreamingConf" $ \v -> StreamingConf
+    <$> (v .:? "streamingHost" >>= maybe (v .:? "kafkaHost" .!= "localhost") pure)
+    <*> (v .:? "streamingPort" >>= maybe (v .:? "kafkaPort" .!= 9092) pure)
+
+-- Backward compatibility type alias
+type KafkaConf = StreamingConf
+{-# DEPRECATED KafkaConf "Use StreamingConf instead" #-}
+
+-- Backward compatibility field accessors
+kafkaHost :: StreamingConf -> String
+kafkaHost = streamingHost
+{-# DEPRECATED kafkaHost "Use streamingHost instead" #-}
+
+kafkaPort :: StreamingConf -> Int
+kafkaPort = streamingPort
+{-# DEPRECATED kafkaPort "Use streamingPort instead" #-}
 
 data RedisBlockDBConf = RedisBlockDBConf
   { redisHost :: String,
@@ -154,17 +179,37 @@ data ContractsConf = ContractsConf
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data UrlConfig = UrlConfig
-  { vaultUrl :: String
-  , vaultUrlDocker :: String
+  { nodeUrl :: String  -- Canonical external URL: http(s)://hostname[:port]
+  , vaultUrl :: String
+  -- | HTTP response timeout (seconds) for vault-wrapper signature / key
+  -- requests. Default 12s; bump for high-concurrency scenarios where the
+  -- vault HSM/HSM-proxy round-trip can spike under load. Set via
+  -- --vaultTimeoutSec at strato-init time.
+  , vaultTimeoutSec :: Int
   , fileServerUrl :: String
   , notificationServerUrl :: String
   , repoUrl :: String  -- Docker registry URL prefix for images
+  , cookieRealm :: String  -- Domain for auth cookies (hostname, or parent domain for subdomain sharing)
   }
-  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+  deriving (Show, Eq, Generic, ToJSON)
+
+-- Manual FromJSON so existing YAML configs without 'vaultTimeoutSec' continue
+-- to parse (defaulting to 12s). Once all deployed configs include the field
+-- this can be reverted to the derived instance.
+instance FromJSON UrlConfig where
+  parseJSON = withObject "UrlConfig" $ \v -> UrlConfig
+    <$> v .:  "nodeUrl"
+    <*> v .:  "vaultUrl"
+    <*> v .:? "vaultTimeoutSec" .!= 12
+    <*> v .:  "fileServerUrl"
+    <*> v .:  "notificationServerUrl"
+    <*> v .:  "repoUrl"
+    <*> v .:? "cookieRealm" .!= "localhost"
 
 data NetworkConf = NetworkConf
   { network :: String
   , networkID :: Integer
+  , chainId :: Integer
   , httpPort :: Int
   , txSizeLimit :: Int
   , gasLimit :: Integer
@@ -174,24 +219,32 @@ data NetworkConf = NetworkConf
   deriving (Show, Eq, Generic, ToJSON)
 
 instance FromJSON NetworkConf where
-  parseJSON = withObject "NetworkConf" $ \v -> NetworkConf
-    <$> v .:? "network" .!= "upquark"
-    <*> v .:? "networkID" .!= (-1)
-    <*> v .:? "httpPort" .!= 8081
-    <*> v .:? "txSizeLimit" .!= 2097152
-    <*> v .:? "gasLimit" .!= 1000000
-    <*> v .:? "blockPeriodMs" .!= 1000
-    <*> v .:? "roundPeriodS" .!= 120
+  parseJSON = withObject "NetworkConf" $ \v -> do
+    net <- v .:? "network" .!= "upquark"
+    NetworkConf net
+      <$> v .:? "networkID" .!= (-1)
+      <*> v .:? "chainId" .!= computeChainId net
+      <*> v .:? "httpPort" .!= 8081
+      <*> v .:? "txSizeLimit" .!= 2097152
+      <*> v .:? "gasLimit" .!= 1000000
+      <*> v .:? "blockPeriodMs" .!= 1000
+      <*> v .:? "roundPeriodS" .!= 120
 
 -- EIP-155 chain ID: keccak256(networkName), first 6 bytes (48 bits).
 -- Fits in JS Number.MAX_SAFE_INTEGER with room for v = chainId * 2 + 35.
-chainId :: NetworkConf -> Integer
-chainId nc =
-  let digest = keccak256ToByteString $ hash $ C8.pack $ network nc
+computeChainId :: String -> Integer
+computeChainId networkName =
+  let digest = keccak256ToByteString $ hash $ C8.pack networkName
   in foldl (\acc b -> acc * 256 + fromIntegral b) 0 (B.unpack $ B.take 6 digest)
 
 data DebugConfig = DebugConfig
   { svmTrace :: Bool
+  }
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+
+data VmConf = VmConf
+  { sqlDiff :: Bool
+  , diffPublish :: Bool
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
@@ -207,10 +260,10 @@ instance Default SqlConf where
     , poolsize = 10
     }
 
-instance Default KafkaConf where
-  def = KafkaConf
-    { kafkaHost = "localhost"
-    , kafkaPort = 9092
+instance Default StreamingConf where
+  def = StreamingConf
+    { streamingHost = "localhost"
+    , streamingPort = 9092
     }
 
 instance Default RedisBlockDBConf where
@@ -257,12 +310,17 @@ instance Default ApiConfig where
   def = ApiConfig
     { apiPort = 3000
     , apiListenAddress = "127.0.0.1"
-    , apiHost = "localhost"
     }
 
 instance Default DebugConfig where
   def = DebugConfig
     { svmTrace = False
+    }
+
+instance Default VmConf where
+  def = VmConf
+    { sqlDiff = True
+    , diffPublish = True
     }
 
 instance Default ContractsConf where
@@ -273,17 +331,20 @@ instance Default ContractsConf where
 
 instance Default UrlConfig where
   def = UrlConfig
-    { vaultUrl = "https://vault.blockapps.net:8093"
-    , vaultUrlDocker = "https://vault.blockapps.net:8093"
+    { nodeUrl = "http://localhost:8081"
+    , vaultUrl = "https://vault.blockapps.net:8093"
+    , vaultTimeoutSec = 12
     , fileServerUrl = ""
     , notificationServerUrl = ""
     , repoUrl = ""
+    , cookieRealm = "localhost"
     }
 
 instance Default NetworkConf where
   def = NetworkConf
     { network = "upquark"
     , networkID = -1  -- will be computed from network name
+    , chainId = computeChainId "upquark"
     , httpPort = 8081
     , txSizeLimit = 2097152  -- 2 MiB
     , gasLimit = 1000000
@@ -296,7 +357,7 @@ instance Default EthConf where
     { sqlConfig = def
     , cirrusConfig = def { database = "cirrus" }
     , redisBlockDBConfig = def
-    , kafkaConfig = def
+    , streamingConfig = def
     , levelDBConfig = def
     , quarryConfig = def
     , discoveryConfig = def
@@ -306,4 +367,5 @@ instance Default EthConf where
     , urlConfig = def
     , networkConfig = def
     , debugConfig = def
+    , vmConfig = def
     }

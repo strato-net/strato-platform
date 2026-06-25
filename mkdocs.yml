@@ -82,7 +82,9 @@ nav:
   - Home: index.md
   - Quick Start: quick-start.md
   - Core Concepts: concepts.md
-  
+  - Tokenomics: tokenomics.md
+  - Litepaper: litepaper.md
+
   # === GETTING STARTED ===
   - Getting Started:
       - First-Time User: scenarios/first-time-user.md

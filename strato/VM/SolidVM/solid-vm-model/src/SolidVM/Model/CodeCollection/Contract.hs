@@ -70,7 +70,7 @@ data ContractF a = Contract
     _functions :: Map SolidString (FuncF a),
     _constructor :: Maybe (FuncF a),
     _modifiers :: Map SolidString (ModifierF a),
-    _usings :: Map SolidString [UsingF a],
+    _usings :: [UsingF a],
     _contractType :: ContractType,
     _importedFrom :: Maybe Address,
     _contractContext :: a
@@ -142,7 +142,7 @@ instance Default a => Default (ContractF a) where
         _functions = empty,
         _constructor = Nothing,
         _modifiers = empty,
-        _usings = empty,
+        _usings = [],
         _contractType = ContractType,
         _importedFrom = Nothing,
         _contractContext = def
@@ -172,7 +172,7 @@ instance Arbitrary Contract where
               _functions = empty,
               _constructor = Nothing,
               _modifiers = empty,
-              _usings = empty,
+              _usings = [],
               _contractType = ContractType,
               _importedFrom = Nothing,
               _contractContext = a

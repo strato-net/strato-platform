@@ -1,44 +1,38 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef } from "react";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs as AntdTabs } from "antd";
 import BridgeOut from "@/components/bridge/BridgeOut";
 import WithdrawTransactionDetails from "@/components/dashboard/WithdrawTransactionDetails";
-import { useSearchParams, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { Loader2, ArrowRight } from "lucide-react";
 import { formatBalance } from "@/utils/numberUtils";
 import { useUser } from "@/context/UserContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
+import { requestWalletConnection } from "@/lib/auth";
 
 const WithdrawalsPage = () => {
-  const { isLoggedIn } = useUser();
-  const [activeTab, setActiveTab] = useState<"from-savings" | "bridge-out">(
-    "from-savings"
-  );
-  const [searchParams] = useSearchParams();
+  const { isLoggedIn, loading, isAppAuthenticated, externalWalletAddress } = useUser();
   const { loadNetworksAndTokens, withdrawalSummary, loadingWithdrawalSummary, fetchWithdrawalSummary, setTargetTransactionTab } =
     useBridgeContext();
 
   const withdrawalSummaryIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const canLoadWithdrawData = !loading && (isAppAuthenticated || !!externalWalletAddress);
 
   useEffect(() => {
-    const tabParam = searchParams.get("tab");
-    if (tabParam && ['from-savings', 'bridge-out'].includes(tabParam)) {
-      setActiveTab(tabParam as "from-savings" | "bridge-out");
-    }
-  }, [searchParams]);
+    if (!canLoadWithdrawData) return;
 
-  useEffect(() => {
     loadNetworksAndTokens().catch((error) => {
       console.error('Failed to load networks and tokens:', error);
     });
-  }, [loadNetworksAndTokens]);
+  }, [canLoadWithdrawData, loadNetworksAndTokens]);
 
   // Withdrawal summary polling (15s interval)
   useEffect(() => {
+    if (!canLoadWithdrawData) return;
+
     const hasExistingData = !!withdrawalSummary;
     fetchWithdrawalSummary(!hasExistingData);
 
@@ -52,29 +46,10 @@ const WithdrawalsPage = () => {
         withdrawalSummaryIntervalRef.current = null;
       }
     };
-  }, [fetchWithdrawalSummary]);
+  }, [canLoadWithdrawData, fetchWithdrawalSummary]);
 
   return (
     <div className="h-screen bg-background overflow-hidden pb-16 md:pb-0">
-      <style>{`
-        .custom-tabs .ant-tabs-tab {
-          justify-content: center !important;
-        }
-        .custom-tabs .ant-tabs-tab-btn {
-          justify-content: center !important;
-          text-align: center !important;
-          width: 100% !important;
-          color: hsl(var(--muted-foreground)) !important;
-        }
-        .custom-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
-          color: hsl(var(--primary)) !important;
-          text-shadow: none !important;
-        }
-        .custom-tabs .ant-tabs-ink-bar {
-          background: hsl(var(--primary)) !important;
-        }
-      `}</style>
-
       <DashboardSidebar />
 
       <div
@@ -98,6 +73,7 @@ const WithdrawalsPage = () => {
                       onClick={(e) => {
                         if (!isLoggedIn) {
                           e.preventDefault();
+                          requestWalletConnection();
                           return;
                         }
                         setTargetTransactionTab('WithdrawalInitiated');
@@ -105,7 +81,7 @@ const WithdrawalsPage = () => {
                       className={`flex items-center gap-1 text-xs md:text-sm font-semibold transition-colors whitespace-nowrap ${
                         isLoggedIn 
                           ? "text-blue-600 hover:text-blue-800 cursor-pointer" 
-                          : "text-muted-foreground cursor-not-allowed opacity-50 pointer-events-none"
+                          : "text-muted-foreground hover:text-foreground cursor-pointer"
                       }`}
                     >
                       <ArrowRight size={14} className="md:w-4 md:h-4" />
@@ -114,33 +90,8 @@ const WithdrawalsPage = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col min-h-0">
-                  <div className="w-full flex-1 flex flex-col min-h-0">
-                    <AntdTabs
-                      activeKey={activeTab}
-                      items={[
-                        {
-                          key: "from-savings",
-                          label: "From Savings",
-                        },
-                        {
-                          key: "bridge-out",
-                          label: "Bridge Out",
-                        },
-                      ]}
-                      onChange={(value) =>
-                        setActiveTab(value as "from-savings" | "bridge-out")
-                      }
-                      className="custom-tabs"
-                      style={
-                        {
-                          "--ant-primary-color": "hsl(var(--primary))",
-                          "--ant-primary-color-hover": "hsl(var(--primary))",
-                        } as React.CSSProperties
-                      }
-                    />
-                    <div className="mt-4 flex-1 min-h-0 overflow-auto p-1 -m-1">
-                      <BridgeOut isSaving={activeTab === "from-savings"} guestMode={!isLoggedIn} />
-                    </div>
+                  <div className="w-full flex-1 min-h-0 overflow-auto p-1 -m-1">
+                    <BridgeOut guestMode={!isLoggedIn} />
                   </div>
                 </CardContent>
               </Card>

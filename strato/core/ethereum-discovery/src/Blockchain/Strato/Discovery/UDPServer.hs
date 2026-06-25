@@ -8,8 +8,6 @@
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TypeApplications    #-}
 
-{-# OPTIONS -fno-warn-deprecations #-}
-{-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.Discovery.UDPServer
   ( runEthUDPServer,
     connectMe,
@@ -24,11 +22,12 @@ import           Blockchain.Strato.Discovery.P2PUtil
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Host
-import           Blockchain.Strato.Model.Secp256k1
+import           Control.Concurrent                       (threadDelay)
 import           Control.Monad                           (forM_, when, unless)
 import           Control.Monad.Catch
 import qualified Control.Monad.Change.Alter              as A
 import qualified Control.Monad.Change.Modify             as Mod
+import           Control.Monad.Composable.Vault
 import           Control.Monad.IO.Class
 import qualified Crypto.Types.PubKey.ECC                 as ECC
 import qualified Data.ByteString                         as B
@@ -41,20 +40,33 @@ import qualified Data.Text                               as T
 import           Data.Time.Clock.POSIX
 import           Network.Socket
 import           Numeric.Natural
+import           Strato.Strato23.API.Types
 import           System.Entropy
 import           System.Random
 import qualified Text.Colors                             as CL
 import           Text.Format
 
+getKeyOrMakeKey :: (MonadCatch m, HasVault m, MonadIO m, MonadLogger m) =>
+                   m PublicKey
+getKeyOrMakeKey = do
+  (resultOrError :: Either SomeException PublicKey) <- try getPub
+
+  case resultOrError of
+    Left getErr -> do
+      $logInfoS "getKeyOrMakeKey" . T.pack $ "Node key is not available from Vault yet: " ++ show getErr
+      liftIO $ threadDelay 2000000
+      getKeyOrMakeKey
+    Right result -> return result
+
 runEthUDPServer :: MonadDiscovery m => Int -> m ()
 runEthUDPServer minPeers = do
-  pub <- getPub
-  $logInfoS "ethereumDiscovery" . T.pack $ "My NodeID: " ++ format pub
-  $logInfoS "ethereumDiscovery" . T.pack $ "My Node Address: " ++ format (fromPublicKey pub)
+  key <- getKeyOrMakeKey
+  $logInfoS "ethereumDiscovery" . T.pack $ "My NodeID: " ++ format key
+  $logInfoS "ethereumDiscovery" . T.pack $ "My Node Address: " ++ format (fromPublicKey key)
   udpHandshakeServer minPeers
 
 connectMe ::
-  (MonadIO m, MonadFail m, MonadLogger m, MonadCatch m) =>
+  (MonadIO m, MonadFail m, MonadCatch m) =>
   UDPPort ->
   m Socket
 connectMe (UDPPort port') = do

@@ -14,6 +14,8 @@ import {
   BridgeResponse,
   NetworkSummary,
   BridgeContextType,
+  WithdrawalRequestOptions,
+  DepositActionRequestOptions,
 } from "@/lib/bridge/types";
 import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, DepositActionRequestParams, WithdrawalSummaryResponse, DepositAction } from "@mercata/shared-types";
 
@@ -113,7 +115,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       // Error toast is already handled by axios interceptor for non-guest-safe URLs
       console.error("Failed to load networks and tokens:", error);
       setAvailableNetworks([]);
-      setNetworksLoaded(true); // Set to true to prevent retry loops
+      setNetworksLoaded(false);
     } finally {
       setLoading(false);
     }
@@ -258,10 +260,20 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const requestWithdrawal = useCallback(
-    async (params: WithdrawalRequestParams): Promise<BridgeResponse> => {
+    async (
+      params: WithdrawalRequestParams,
+      options?: WithdrawalRequestOptions
+    ): Promise<BridgeResponse> => {
       setLoading(true);
       try {
-        const { data } = await api.post<TransactionResponse>(`/bridge/requestWithdrawal`, params);
+        const endpoint = params.routeType === "native"
+          ? "/bridge/requestNativeWithdrawal"
+          : "/bridge/requestWithdrawal";
+        const { data } = await api.post<TransactionResponse>(
+          endpoint,
+          params,
+          options as any
+        );
         return { success: true, data };
       } finally {
         setLoading(false);
@@ -271,10 +283,10 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const requestDepositAction = useCallback(
-    async (params: DepositActionRequestParams): Promise<TransactionResponse> => {
+    async (params: DepositActionRequestParams, options?: DepositActionRequestOptions): Promise<TransactionResponse> => {
       setLoading(true);
       try {
-        const { data } = await api.post<TransactionResponse>(`/bridge/requestDepositAction`, params);
+        const { data } = await api.post<TransactionResponse>(`/bridge/requestDepositAction`, params, options as any);
         return data;
       } finally {
         setLoading(false);

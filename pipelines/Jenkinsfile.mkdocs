@@ -162,6 +162,9 @@ pipeline {
                   # Build the docs
                   mkdocs build --clean
 
+                  # Add CNAME file so it gets included in gh-pages root
+                  echo "docs.strato.nexus" > site/CNAME
+
                   # Clone gh-pages branch to preserve staging/
                   git clone --branch gh-pages --single-branch "${REMOTE_URL}" gh-pages-temp 2>/dev/null || {
                     echo "gh-pages branch does not exist yet, creating fresh deployment"

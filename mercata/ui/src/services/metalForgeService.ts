@@ -1,4 +1,5 @@
 import { api } from "@/lib/axios";
+import type { WalletTxProgressHandler } from "@/lib/axios";
 
 export interface MetalConfig {
   address: string;
@@ -30,6 +31,15 @@ export interface BuyResult {
   hash: string;
 }
 
+interface BuyOptions {
+  walletTxProgress?: WalletTxProgressHandler;
+}
+
+const walletTxConfig = (options?: BuyOptions) =>
+  options?.walletTxProgress
+    ? ({ walletTxProgress: options.walletTxProgress } as any)
+    : undefined;
+
 export const metalForgeService = {
   async getConfigs(): Promise<Config> {
     const response = await api.get("/metal-forge/configs");
@@ -40,14 +50,15 @@ export const metalForgeService = {
     metalToken: string,
     payToken: string,
     payAmount: string,
-    minMetalOut: string
+    minMetalOut: string,
+    options?: BuyOptions
   ): Promise<BuyResult> {
     const response = await api.post("/metal-forge/buy", {
       metalToken,
       payToken,
       payAmount,
       minMetalOut,
-    });
+    }, walletTxConfig(options));
     return response.data;
   },
 };

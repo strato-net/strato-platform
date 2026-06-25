@@ -270,11 +270,10 @@ async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics) {
     });
   });
 
-  const { isVaultPasswordSet = false  } = await getStratoMetadata();
-  if (isVaultPasswordSet === false) {
-    winston.error('Vault password not set!');
+  if (!process.env.vaultUrl) {
+    winston.error('Vault URL not configured!');
     isNodeHealthy = false;
-    failedChecks.push("STRATO Vault password is not set");
+    failedChecks.push("STRATO Vault is not configured");
   }
 
 
@@ -511,28 +510,34 @@ async function checkSystemInfo() {
 
     // FILESYSTEM
     const fsData = [];
+    // si.fsSize() returns one row per mount point, so the same underlying device
+    // appears multiple times when Docker bind-mounts (e.g. /etc/hosts, /logs,
+    // /config/ethconf.yaml, /run/secrets/*) all back onto the host's root device.
+    // Dedupe by device name so we don't emit duplicate "Low Disk Space" alerts.
+    const seenFs = new Set();
     metadataFs.forEach(function (fs) {
-      if (fs.fs !== "overlay") {
-        const prevFsInfo = prevSysInfo.filesystem?.find(f => f.name === fs.fs);
-        const prevFsAlert = prevFsInfo?.use?.isHealthy === false;
-        const diskSpaceAlert = fs.use >= config.healthCheck.diskspaceUsedAlertLevel ||
-                               (prevFsAlert && fs.use >= config.healthCheck.diskspaceUsedCloseLevel);
-        
-        fsData.push({
-          name: fs.fs,
-          size: fs.size,
-          used: fs.used,
-          use: {
-            value: +fs.use.toFixed(2),
-            isHealthy: !diskSpaceAlert,
-          },
-        });
-        if (diskSpaceAlert) {
-          isHealthy = false;
-          additional_info.push(
-            `Low Disk Space on ${fs.fs} (used ${fs.use.toFixed(2)}%)`
-          );
-        }
+      if (fs.fs === "overlay" || seenFs.has(fs.fs)) return;
+      seenFs.add(fs.fs);
+
+      const prevFsInfo = prevSysInfo.filesystem?.find(f => f.name === fs.fs);
+      const prevFsAlert = prevFsInfo?.use?.isHealthy === false;
+      const diskSpaceAlert = fs.use >= config.healthCheck.diskspaceUsedAlertLevel ||
+                             (prevFsAlert && fs.use >= config.healthCheck.diskspaceUsedCloseLevel);
+
+      fsData.push({
+        name: fs.fs,
+        size: fs.size,
+        used: fs.used,
+        use: {
+          value: +fs.use.toFixed(2),
+          isHealthy: !diskSpaceAlert,
+        },
+      });
+      if (diskSpaceAlert) {
+        isHealthy = false;
+        additional_info.push(
+          `Low Disk Space on ${fs.fs} (used ${fs.use.toFixed(2)}%)`
+        );
       }
     });
     fsData.sort((a, b) => b.use.value - a.use.value);

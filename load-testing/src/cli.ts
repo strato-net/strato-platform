@@ -8,6 +8,9 @@ import { writeHtmlReport } from "./report/htmlReport";
 import { ContractDeployScenario } from "./scenarios/contractDeploy";
 import { FunctionCallScenario } from "./scenarios/functionCall";
 import { MixedWorkloadScenario } from "./scenarios/mixedWorkload";
+import { TokenSaleScenario } from "./scenarios/tokenSale";
+import { ForgeBuyScenario } from "./scenarios/forgeBuy";
+import { PageLoadScenario } from "./scenarios/pageLoad";
 import { BaseScenario } from "./scenarios/base";
 import { LoadTestConfig, LoadTestReport, ScenarioResult } from "./types";
 
@@ -17,12 +20,19 @@ program
   .name("strato-load-test")
   .description("STRATO blockchain load testing framework")
   .option("-c, --config <path>", "Path to config YAML file", "config.yaml")
-  .option("-s, --scenario <name>", "Run a specific scenario (contractDeploy, functionCall, mixedWorkload)")
-  .option("--batch-size <n>", "Override batch size", parseInt)
-  .option("--batch-count <n>", "Override batch count", parseInt)
+  .option(
+    "-s, --scenario <name>",
+    "Run a specific scenario: contractDeploy | functionCall | mixedWorkload | tokenSale | forgeBuy | pageLoad",
+  )
+  .option("--batch-size <n>", "Override batch size (low-level scenarios)", parseInt)
+  .option("--batch-count <n>", "Override batch count (low-level scenarios)", parseInt)
+  .option("--concurrent-users <n>", "Override concurrent users (tokenSale, forgeBuy)", parseInt)
+  .option("--total-tx <n>", "Override totalTxCount (tokenSale, forgeBuy)", parseInt)
+  .option("--time-window <ms>", "Override timeWindowMs (tokenSale, forgeBuy)", parseInt)
+  .option("--backend-url <url>", "Override backend URL (tokenSale, forgeBuy)")
   .option("--nodes <names>", "Comma-separated node names to target", (v) => v.split(","))
   .option("--report-dir <path>", "Output directory for reports")
-  .option("--submit-mode <mode>", "Submit mode: sequential (default) or pipeline (submit all batches before confirming)")
+  .option("--submit-mode <mode>", "Submit mode: sequential (default) or pipeline")
   .option("-v, --verbose", "Enable verbose logging", false);
 
 async function runScenarioOnNodes(
@@ -54,6 +64,10 @@ async function main(): Promise<void> {
       nodes: opts.nodes,
       reportDir: opts.reportDir,
       submitMode: opts.submitMode,
+      concurrentUsers: opts.concurrentUsers,
+      totalTx: opts.totalTx,
+      timeWindow: opts.timeWindow,
+      backendUrl: opts.backendUrl,
     });
   } catch (err: any) {
     console.error(`Configuration error: ${err.message}`);
@@ -93,6 +107,15 @@ async function main(): Promise<void> {
   if (config.scenarios.mixedWorkload.enabled) {
     scenarios.push(new MixedWorkloadScenario(config, collector, opts.verbose));
   }
+  if (config.scenarios.tokenSale.enabled) {
+    scenarios.push(new TokenSaleScenario(config, collector, opts.verbose));
+  }
+  if (config.scenarios.forgeBuy.enabled) {
+    scenarios.push(new ForgeBuyScenario(config, collector, opts.verbose));
+  }
+  if (config.scenarios.pageLoad.enabled) {
+    scenarios.push(new PageLoadScenario(config, collector, opts.verbose));
+  }
 
   if (scenarios.length === 0) {
     console.log("No scenarios enabled. Enable at least one scenario in config or use --scenario.");
@@ -112,21 +135,36 @@ async function main(): Promise<void> {
     console.log();
   }
 
-  // Compute stats
+  // Compute stats. Enumerate (scenario, node) pairs from the recorded TxMetrics
+  // themselves — scenarios may emit per-leg sub-scopes (e.g.
+  // "tokenSale:bridgeRequest", "tokenSale:sepoliaDeposit") which are NOT the
+  // same string as the parent ScenarioResult.scenario. Filtering by the
+  // parent name alone would yield 0 hits and a blank summary table.
+  const allTxMetrics = collector.getAllTxMetrics();
   const scenarioNodePairs = new Set<string>();
+  for (const m of allTxMetrics) {
+    scenarioNodePairs.add(`${m.scenario}::${m.nodeName}`);
+  }
+  // Keep parent-scope names too, even if they had no direct metrics, so they
+  // appear (with zeros) in the summary for empty scenarios.
   for (const r of allResults) {
     scenarioNodePairs.add(`${r.scenario}::${r.nodeName}`);
   }
 
-  const scenarioStats = Array.from(scenarioNodePairs).map((key) => {
-    const [scenario, nodeName] = key.split("::");
-    return computeScenarioStats(
-      collector.getAllTxMetrics(),
-      collector.getAllBatchMetrics(),
-      scenario,
-      nodeName,
-    );
-  });
+  const scenarioStats = Array.from(scenarioNodePairs)
+    .map((key) => {
+      const [scenario, nodeName] = key.split("::");
+      return computeScenarioStats(
+        collector.getAllTxMetrics(),
+        collector.getAllBatchMetrics(),
+        scenario,
+        nodeName,
+      );
+    })
+    // Drop empty rows — when a scenario only emits per-leg sub-scopes (e.g.
+    // tokenSale -> tokenSale:bridgeRequest), the parent name itself has 0
+    // metrics and would otherwise show as a misleading "0/0 succeeded" row.
+    .filter((s) => s.totalTxCount > 0);
 
   const timeline = computeTimeline(collector.getAllTxMetrics());
 

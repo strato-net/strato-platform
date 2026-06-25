@@ -3,6 +3,7 @@ import authHandler from "../middleware/authHandler";
 import CreditCardController from "../controllers/creditCard.controller";
 
 const router = Router();
+const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 /**
  * @openapi
@@ -133,7 +134,7 @@ router.get("/balance", authHandler.authorizeRequest(), CreditCardController.getB
  *       401:
  *         description: Unauthorized
  */
-router.put("/config", authHandler.authorizeRequest(), CreditCardController.upsertConfig);
+router.put("/config", walletAuth, CreditCardController.upsertConfig);
 
 /**
  * @openapi
@@ -163,7 +164,7 @@ router.put("/config", authHandler.authorizeRequest(), CreditCardController.upser
  *       401:
  *         description: Unauthorized
  */
-router.post("/add-card", authHandler.authorizeRequest(), CreditCardController.addCard);
+router.post("/add-card", walletAuth, CreditCardController.addCard);
 
 /**
  * @openapi
@@ -194,7 +195,7 @@ router.post("/add-card", authHandler.authorizeRequest(), CreditCardController.ad
  *       401:
  *         description: Unauthorized
  */
-router.post("/update-card", authHandler.authorizeRequest(), CreditCardController.updateCard);
+router.post("/update-card", walletAuth, CreditCardController.updateCard);
 
 /**
  * @openapi
@@ -217,7 +218,7 @@ router.post("/update-card", authHandler.authorizeRequest(), CreditCardController
  *       401:
  *         description: Unauthorized
  */
-router.post("/remove-card", authHandler.authorizeRequest(), CreditCardController.removeCard);
+router.post("/remove-card", walletAuth, CreditCardController.removeCard);
 
 /**
  * @openapi
@@ -240,7 +241,7 @@ router.post("/remove-card", authHandler.authorizeRequest(), CreditCardController
  *       401:
  *         description: Unauthorized
  */
-router.post("/approve", authHandler.authorizeRequest(), CreditCardController.approve);
+router.post("/approve", walletAuth, CreditCardController.approve);
 
 /**
  * @openapi
@@ -259,7 +260,7 @@ router.post("/approve", authHandler.authorizeRequest(), CreditCardController.app
  *       401:
  *         description: Unauthorized
  */
-router.delete("/config/:id", authHandler.authorizeRequest(), CreditCardController.deleteConfig);
+router.delete("/config/:id", walletAuth, CreditCardController.deleteConfig);
 
 /**
  * list of enabled card configs for the top-up watcher service.
@@ -284,6 +285,6 @@ router.get("/watcher-balance", authHandler.authorizeRequest(), CreditCardControl
 /**
  * User-triggered manual top-up for a specific card (uses operator service token under the hood).
  */
-router.post("/manual-top-up", authHandler.authorizeRequest(), CreditCardController.manualTopUp);
+router.post("/manual-top-up", walletAuth, CreditCardController.manualTopUp);
 
 export default router;

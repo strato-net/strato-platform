@@ -19,7 +19,7 @@ import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import type { BridgeToken } from "@mercata/shared-types";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
-import { Loader2, CreditCard, DollarSign, Plus, Settings, ChevronDown, ChevronUp, Clock } from "lucide-react";
+import { Loader2, CreditCard, DollarSign, Plus, Settings, ChevronDown, ChevronUp, Clock, Info } from "lucide-react";
 import { safeParseUnits } from "@/utils/numberUtils";
 import {
   CARD_PROVIDERS,
@@ -95,16 +95,23 @@ function getTokenLogoUrl(symbol: string): string | null {
 }
 
 export default function CreditCardPage() {
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn, loading: userLoading, isAppAuthenticated, externalWalletAddress } = useUser();
   const { toast } = useToast();
   const { isTestnet } = useNetwork();
   const { loadNetworksAndTokens } = useBridgeContext();
 
   const [configs, setConfigs] = useState<OnChainCardConfig[]>([]);
   const [loadingCards, setLoadingCards] = useState(true);
+  const canLoadCardData = !userLoading && (isAppAuthenticated || !!externalWalletAddress);
 
   const loadCards = useCallback(async () => {
-    if (!isLoggedIn) return;
+    if (!canLoadCardData) {
+      if (!userLoading) {
+        setConfigs([]);
+        setLoadingCards(false);
+      }
+      return;
+    }
     setLoadingCards(true);
     try {
       const { data } = await api.get<OnChainCardConfig[]>("/credit-card");
@@ -115,7 +122,7 @@ export default function CreditCardPage() {
     } finally {
       setLoadingCards(false);
     }
-  }, [isLoggedIn]);
+  }, [canLoadCardData, userLoading]);
 
   useEffect(() => {
     loadCards();
@@ -164,8 +171,10 @@ export default function CreditCardPage() {
   const loading = loadingCards;
 
   useEffect(() => {
+    if (!canLoadCardData) return;
+
     loadNetworksAndTokens().catch(console.error);
-  }, [loadNetworksAndTokens]);
+  }, [canLoadCardData, loadNetworksAndTokens]);
 
   useEffect(() => {
     if (configs.length === 0) {
@@ -216,7 +225,7 @@ export default function CreditCardPage() {
   }, [configs]);
 
   useEffect(() => {
-    if (!isLoggedIn || cardDisplays.length === 0) return;
+    if (!canLoadCardData || cardDisplays.length === 0) return;
 
     let cancelled = false;
 
@@ -252,11 +261,11 @@ export default function CreditCardPage() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [cardDisplays.length, configs, isLoggedIn]);
+  }, [canLoadCardData, cardDisplays.length, configs]);
 
   // Fetch pending top-ups for each card
   useEffect(() => {
-    if (!isLoggedIn || cardDisplays.length === 0) return;
+    if (!canLoadCardData || cardDisplays.length === 0) return;
     let cancelled = false;
     const fetchPending = async () => {
       await Promise.allSettled(
@@ -277,7 +286,7 @@ export default function CreditCardPage() {
     void fetchPending();
     const id = window.setInterval(fetchPending, 60_000);
     return () => { cancelled = true; window.clearInterval(id); };
-  }, [cardDisplays.length, configs, isLoggedIn]);
+  }, [canLoadCardData, cardDisplays.length, configs]);
 
   const openModal = (config: OnChainCardConfig | null) => {
     setEditingConfig(config);
@@ -495,6 +504,20 @@ export default function CreditCardPage() {
           {!isLoggedIn && (
             <GuestSignInBanner message="Sign in to link your card wallet and set up automatic top-ups" />
           )}
+
+          <div className="mb-6 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30 p-4">
+            <div className="flex gap-3">
+              <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h2 className="text-sm font-semibold text-foreground">How it works</h2>
+                <p className="text-sm text-muted-foreground">
+                  Connect your crypto debit card wallet to STRATO and keep it funded automatically.
+                  Link a card from a supported provider, choose your network and token, and optionally
+                  set a balance threshold to trigger automatic top-ups so your card is always ready to use.
+                </p>
+              </div>
+            </div>
+          </div>
 
           {loading ? (
             <div className="flex items-center gap-2 text-muted-foreground py-12">

@@ -30,6 +30,9 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 4, String diskRoot = '/', Bool
             sudo stack --allow-different-user purge
             find . -name '.stack-work' -exec rm -r {} +
           fi
+          if [ -d "\$f/mynode" ]; then
+            sudo rm -rf "\$f/mynode"
+          fi
         ); 
       done
     """

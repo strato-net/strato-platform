@@ -1,0 +1,28 @@
+name:                streaming-rabbitmq
+version:             0.1.0.0
+license:             Apache-2.0
+
+# RabbitMQ streaming backend using amqp library
+
+dependencies:
+- base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+  exposed-modules:
+  - Control.Monad.Composable.Streaming.Backend
+  - Control.Monad.Composable.Streaming.Backend.DockerConfig
+  - Control.Monad.Composable.Streaming.RabbitMQ
+  - Control.Monad.Composable.Streaming.RabbitMQ.DockerConfig
+  dependencies:
+  - aeson
+  - amqp
+  - binary
+  - bytestring
+  - composable-monads-base
+  - conduit
+  - containers
+  - mtl
+  - stm
+  - text
+  - transformers

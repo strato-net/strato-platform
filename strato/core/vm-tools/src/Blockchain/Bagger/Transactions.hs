@@ -47,11 +47,7 @@ data TransactionFailureCause
   | TFIntrinsicGasExceedsTxLimit Integer Integer OutputTx -- intrinsicGas, txGasLimit
   | TFBlockGasLimitExceeded Integer Integer OutputTx -- neededGas, actualGas
   | TFNonceMismatch Integer Integer OutputTx -- expectedNonce, actualNonce
-  | TFCodeCollectionNotFound Address String OutputTx
-  | TFInvalidPragma [(String, String)] OutputTx
   | TFTXSizeLimitExceeded Integer Integer OutputTx -- txSizeLimit, actualSize
-  | TFKnownFailedTX OutputTx
-  | TFTransactionGasExceeded Integer Integer OutputTx
   deriving (Eq, Read, Show, Generic)
 
 instance NFData TransactionFailureCause
@@ -75,26 +71,18 @@ data BaggerTxQueue = Incoming | Pending | Queued deriving (Eq, Read, Show)
 data TxRejection
   = NonceTooLow BaggerStage BaggerTxQueue Integer OutputTx -- integers: needed nonce
   | BalanceTooLow BaggerStage BaggerTxQueue Integer Integer OutputTx -- integers: needed balance, actual balance
-  | GasLimitTooLow BaggerStage BaggerTxQueue Integer OutputTx -- queue should probably only be Validation, integer is intrinsic gas
+  | GasLimitTooLow BaggerStage BaggerTxQueue Integer Integer OutputTx -- queue should probably only be Validation, integer is intrinsic gas
   | LessLucrative BaggerStage BaggerTxQueue OutputTx OutputTx -- newTx, oldTx
-  | CodeNotFound BaggerStage BaggerTxQueue Address String OutputTx
-  | InvalidPragma BaggerStage BaggerTxQueue [(String, String)] OutputTx
   | TXSizeLimitExceeded BaggerStage BaggerTxQueue Integer Integer OutputTx
-  | GasLimitExceeded BaggerStage BaggerTxQueue Integer Integer OutputTx
-  | KnownFailedTX BaggerStage BaggerTxQueue OutputTx
   | AdminFlushed BaggerStage BaggerTxQueue FlushScope OutputTx
   deriving (Eq, Read, Show)
 
 rejectedTx :: TxRejection -> OutputTx
 rejectedTx (NonceTooLow _ _ _ t) = t
 rejectedTx (BalanceTooLow _ _ _ _ t) = t
-rejectedTx (GasLimitTooLow _ _ _ t) = t
+rejectedTx (GasLimitTooLow _ _ _ _ t) = t
 rejectedTx (LessLucrative _ _ _ t) = t
-rejectedTx (CodeNotFound _ _ _ _ t) = t
-rejectedTx (InvalidPragma _ _ _ t) = t
 rejectedTx (TXSizeLimitExceeded _ _ _ _ t) = t
-rejectedTx (GasLimitExceeded _ _ _ _ t) = t
-rejectedTx (KnownFailedTX _ _ t) = t
 rejectedTx (AdminFlushed _ _ _ t) = t
 
 data BaggerStage = Insertion | Validation | Promotion | Demotion | Execution deriving (Read, Eq, Show)
@@ -120,10 +108,12 @@ instance Format TxRejection where
       ++ format hash
       ++ "\n"
       ++ format o
-  format (GasLimitTooLow stage queue actual o@OutputTx {otHash = hash}) =
+  format (GasLimitTooLow stage queue actual limit o@OutputTx {otHash = hash}) =
     "GasLimitTooLow at stage " ++ show stage ++ " in queue " ++ show queue
       ++ "\n\tactual gas limit "
       ++ show actual
+      ++ "\n\ttransaction gas limit "
+      ++ show limit
       ++ "\n\ttx hash "
       ++ format hash
       ++ "\n"
@@ -134,42 +124,12 @@ instance Format TxRejection where
       ++ format superior
       ++ "\n----inferior transaction:----\n"
       ++ format inferior
-  format (CodeNotFound stage queue address name o) =
-    "CodeNotFound at stage " ++ show stage ++ " in queue " ++ show queue
-      ++ "\n\ttarget address "
-      ++ format address
-      ++ "\n\tcontract name "
-      ++ name
-      ++ "\n"
-      ++ format o
-  format (InvalidPragma stage queue erPragmas' o@OutputTx {otHash = hash}) =
-    "InvalidPragma at stage " ++ show stage ++ " in queue " ++ show queue ++ " prag " ++ show erPragmas'
-      ++ "\n\ttx hash "
-      ++ format hash
-      ++ "\n"
-      ++ format o
   format (TXSizeLimitExceeded stage queue actual limit o@OutputTx {otHash = hash}) =
     "TXSizeLimitExceeded at stage " ++ show stage ++ " in queue " ++ show queue
       ++ "\n\tactual txSize "
       ++ show actual
       ++ "\n\ttxSize limit "
       ++ show limit
-      ++ "\n\ttx hash "
-      ++ format hash
-      ++ "\n"
-      ++ format o
-  format (GasLimitExceeded stage queue actual limit o@OutputTx {otHash = hash}) =
-    "GasLimitExceeded at stage " ++ show stage ++ " in queue " ++ show queue
-      ++ "\n\tactual gas "
-      ++ show actual
-      ++ "\n\tgas limit "
-      ++ show limit
-      ++ "\n\ttx hash "
-      ++ format hash
-      ++ "\n"
-      ++ format o
-  format (KnownFailedTX stage queue o@OutputTx {otHash = hash}) =
-    "KnownFailedTX at stage " ++ show stage ++ " in queue " ++ show queue
       ++ "\n\ttx hash "
       ++ format hash
       ++ "\n"
@@ -187,44 +147,28 @@ txRejectionToAPIFailureCause (NonceTooLow stage queue needed tx) =
   Failure (show stage) (Just $ show queue) IncorrectNonce (Just needed) (Just . TD.nonce $ otBaseTx tx) Nothing
 txRejectionToAPIFailureCause (BalanceTooLow stage queue needed actual _) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.InsufficientFunds (Just needed) (Just actual) Nothing
-txRejectionToAPIFailureCause (GasLimitTooLow stage queue needed tx) =
-  Failure (show stage) (Just $ show queue) IntrinsicGasExceedsLimit (Just needed) (Just . TD.gasLimit $ otBaseTx tx) Nothing
+txRejectionToAPIFailureCause (GasLimitTooLow stage queue needed limit _) =
+  Failure (show stage) (Just $ show queue) IntrinsicGasExceedsLimit (Just needed) (Just limit) Nothing
 txRejectionToAPIFailureCause (LessLucrative stage queue newTx _) =
   Failure (show stage) (Just $ show queue) TrumpedByMoreLucrative Nothing Nothing (Just $ "trumped by " ++ formatKeccak256WithoutColor (otHash newTx))
-txRejectionToAPIFailureCause (CodeNotFound stage queue address name _) =
-  Failure (show stage) (Just $ show queue) MissingCode Nothing Nothing (Just $ "code not found at address " ++ format address ++ " with name " ++ name)
-txRejectionToAPIFailureCause (InvalidPragma stage queue erPragmas' tx) =
-  Failure (show stage) (Just $ show queue) InvalidPragmaType Nothing Nothing (Just $ "invalid pragma " ++ show erPragmas' ++ " in tx " ++ format (otBaseTx tx))
 txRejectionToAPIFailureCause (TXSizeLimitExceeded stage queue actual limit _) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.TXSizeLimitError (Just limit) (Just actual) (Just $ "The TX size is " ++ show actual ++ " but the limit is " ++ show limit)
-txRejectionToAPIFailureCause (GasLimitExceeded stage queue actual limit _) =
-  Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.GasLimitError (Just limit) (Just actual) (Just $ "The transaction takes " ++ show actual ++ " gas but the limit is " ++ show limit)
-txRejectionToAPIFailureCause (KnownFailedTX stage queue t) =
-  Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.KnownFailedTXError Nothing Nothing (Just $ "The transaction " ++ show (otHash t) ++ " is known to fail")
 txRejectionToAPIFailureCause (AdminFlushed stage queue scope t) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.AdminFlushedError Nothing Nothing (Just $ "The transaction " ++ show (otHash t) ++ " was administratively flushed from mempool with scope " ++ show scope)
 
 tfToBaggerTxRejection :: TransactionFailureCause -> TxRejection
 tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = BalanceTooLow Execution Queued cost balance tx
-tfToBaggerTxRejection (TFIntrinsicGasExceedsTxLimit ig _ tx) = GasLimitTooLow Execution Queued ig tx
+tfToBaggerTxRejection (TFIntrinsicGasExceedsTxLimit ig txGL tx) = GasLimitTooLow Execution Queued ig txGL tx
 tfToBaggerTxRejection TFBlockGasLimitExceeded {} = error "please dont do that (call tfToBaggerTxRejection on a TFBlockGasLimitExceeded)"
 tfToBaggerTxRejection (TFNonceMismatch expected _ tx) = NonceTooLow Execution Queued expected tx
-tfToBaggerTxRejection (TFCodeCollectionNotFound addr name tx) = CodeNotFound Validation Queued addr name tx
-tfToBaggerTxRejection (TFInvalidPragma erPragmas' tx) = InvalidPragma Validation Queued erPragmas' tx
 tfToBaggerTxRejection (TFTXSizeLimitExceeded limit actual tx) = TXSizeLimitExceeded Execution Queued actual limit tx
-tfToBaggerTxRejection (TFKnownFailedTX tx) = KnownFailedTX Execution Queued tx
-tfToBaggerTxRejection (TFTransactionGasExceeded limit actual tx) = GasLimitExceeded Execution Queued actual limit tx
 
 instance Format TransactionFailureCause where
   format (TFInsufficientFunds cost bal _) = "Insufficient funds: cost " ++ show cost ++ " > balance " ++ show bal
   format (TFIntrinsicGasExceedsTxLimit intG txGL _) = "Intrinsic gas exceeds TX gas limit: intrinsic gas " ++ show intG ++ " > tx gas limit " ++ show txGL
   format (TFBlockGasLimitExceeded txG blkG _) = "Block gas limit exceeded: needed " ++ show txG ++ " > available " ++ show blkG
   format (TFNonceMismatch expected actual _) = "Nonce mismatch: expecting " ++ show expected ++ ", actual " ++ show actual
-  format (TFCodeCollectionNotFound addr name _) = "Code collection not found at address " ++ format addr ++ " with name " ++ name
-  format (TFInvalidPragma erPragmas' _) = "Invalid pragma: " ++ show erPragmas'
   format (TFTXSizeLimitExceeded limit actual _) = "TX size limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
-  format (TFKnownFailedTX t) = "Known failed tx: " ++ format (otHash t)
-  format (TFTransactionGasExceeded limit actual _) = "Transaction gas limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
 
 getDeltasFromResults :: [TxRunResult] -> ValidatorDelta
 getDeltasFromResults = foldr go mempty

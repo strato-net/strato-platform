@@ -36,7 +36,6 @@ library:
   - nibblestring
   - solid-vm-model
   - strato-model
-  - text
   - transformers
   - unliftio-core
   - monad-logger

@@ -1,19 +1,27 @@
 import { api } from './axios';
 import { clearDismissedForUser, LAST_USER_ADDRESS_KEY } from '@/hooks/useLiquidationDismiss';
 
-// Check authentication status via server API call (works with HttpOnly cookies)
-export const isAuthenticated = async (): Promise<boolean> => {
+export const WALLET_CONNECT_REQUEST_EVENT = 'mercata:wallet-connect-request';
+export const PENDING_STRATO_WALLET_CONNECT_KEY = 'mercata:pending-strato-wallet-connect';
+
+// Check authentication status via server API call (works with HttpOnly cookies).
+// Uses fetch directly to bypass the Axios 401 interceptor — this is a probe,
+// not a user action, so a 401 here means "not logged in," not "session expired."
+// Also returns the parsed user data when available so callers can avoid a
+// duplicate /user/me request (which would otherwise mask transient flags like
+// `isNewUser` that only appear on the first call after key creation).
+export const isAuthenticated = async (): Promise<{ authenticated: boolean; userData?: any }> => {
   try {
-    // Make a request to check auth status - the cookie will be sent automatically
-    await api.get('/user/me');
-    return true;
-  } catch (error) {
-    // If we get a 401, the user is not authenticated
-    if (error.response?.status === 401) {
-      return false;
+    const res = await fetch('/api/user/me', { credentials: 'include' });
+    if (!res.ok) return { authenticated: false };
+    try {
+      const userData = await res.json();
+      return { authenticated: true, userData };
+    } catch {
+      return { authenticated: true };
     }
-    // For other errors, assume authentication issue
-    return false;
+  } catch {
+    return { authenticated: false };
   }
 };
 
@@ -43,4 +51,14 @@ export const redirectToLogin = (returnTo?: string): void => {
   }
 
   window.location.href = `/login?${params.toString()}`;
+};
+
+// Passive session expiry should leave the app signed out without starting a
+// new OIDC login flow, since SSO can silently recreate the STRATO session.
+export const redirectToSignedOutLanding = (): void => {
+  window.location.replace('/dashboard');
+};
+
+export const requestWalletConnection = (): void => {
+  window.dispatchEvent(new CustomEvent(WALLET_CONNECT_REQUEST_EVENT));
 };

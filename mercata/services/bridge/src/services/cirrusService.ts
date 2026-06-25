@@ -3,15 +3,23 @@ import { config } from "../config";
 import {
   ChainInfo,
   WithdrawalInfo,
+  NativeWithdrawalInfo,
   NonEmptyArray,
   DepositInfo,
+  NativeDepositInfo,
   AssetInfo,
   BridgeInfo,
 } from "../types";
 
-const { bridge, oracle } = config;
-const { address: bridgeAddress } = bridge;
+const { bridge, nativeBridge, oracle } = config;
+const toCirrusAddress = (address?: string) =>
+  address ? address.toLowerCase().replace(/^0x/, "") : undefined;
+
+const bridgeAddress = toCirrusAddress(bridge.address);
+const nativeBridgeAddress = toCirrusAddress(nativeBridge.address);
+const oracleAddress = toCirrusAddress(oracle.address);
 const MERCATA_URL = "BlockApps-MercataBridge";
+const NATIVE_BRIDGE_URL = "BlockApps-StratoNativeBridge";
 const ORACLE_URL = "BlockApps-PriceOracle";
 
 // Get all enabled chains from the bridge contract
@@ -73,6 +81,28 @@ export const getAssetInfo = async (
   );
 };
 
+export const getEnabledNativeChainIds = async (): Promise<number[]> => {
+  if (!nativeBridgeAddress) return [];
+
+  const data = await cirrus.get(`/${NATIVE_BRIDGE_URL}-assets`, {
+    params: {
+      "value->>enabled": "eq.true",
+      address: `eq.${nativeBridgeAddress}`,
+      select: "key2",
+    },
+  });
+
+  if (!Array.isArray(data) || !data.length) return [];
+
+  return Array.from(
+    new Set(
+      data
+        .map((item) => Number(item.key2))
+        .filter((chainId) => Number.isSafeInteger(chainId) && chainId > 0),
+    ),
+  );
+};
+
 // Get withdrawals by status (reusable function)
 export const getWithdrawalsByStatus = async (
   status: string
@@ -85,6 +115,30 @@ export const getWithdrawalsByStatus = async (
         address: `eq.${bridgeAddress}`,
         order: "value->>requestedAt.asc",
         "bridge.withdrawalsPaused": "eq.false",
+      },
+    }
+  );
+
+  if (!Array.isArray(data) || data.length === 0) return [];
+
+  return data.map((item) => ({
+    ...item.value,
+    withdrawalId: item.key,
+  }));
+};
+
+export const getNativeWithdrawalsByStatus = async (
+  status: string
+): Promise<NativeWithdrawalInfo[]> => {
+  if (!nativeBridgeAddress) return [];
+
+  const data = await cirrus.get(
+    `/${NATIVE_BRIDGE_URL}-withdrawals?select=*`,
+    {
+      params: {
+        "value->>bridgeStatus": `eq.${status}`,
+        address: `eq.${nativeBridgeAddress}`,
+        order: "value->>requestedAt.asc",
       },
     }
   );
@@ -151,6 +205,30 @@ export const getDepositsByStatus = async (
   );
 };
 
+export const getNativeDepositsByStatus = async (
+  status: string
+): Promise<NativeDepositInfo[]> => {
+  if (!nativeBridgeAddress) return [];
+
+  const data = await cirrus.get(
+    `/${NATIVE_BRIDGE_URL}-deposits?select=*`,
+    {
+      params: {
+        "value->>bridgeStatus": `eq.${status}`,
+        address: `eq.${nativeBridgeAddress}`,
+        order: "value->>timestamp.asc",
+      },
+    }
+  );
+
+  if (!Array.isArray(data) || data.length === 0) return [];
+
+  return data.map(({ value, key: depositId }) => ({
+    ...value,
+    depositId,
+  }));
+};
+
 export const getBridgeInfo = async (): Promise<BridgeInfo | null> => {
   const data = await cirrus.get(`/${MERCATA_URL}`, {
     params: {
@@ -182,12 +260,12 @@ export const getRebaseFactors = async (
   stratoTokenAddresses: string[]
 ): Promise<Map<string, bigint>> => {
   const normalized = stratoTokenAddresses.map(a => a.toLowerCase().replace(/^0x/, ""));
-  if (!normalized.length || !oracle.address) return new Map();
+  if (!normalized.length || !oracleAddress) return new Map();
 
   const data = await cirrus.get(`/${ORACLE_URL}-rebaseFactors`, {
     params: {
       key: `in.(${normalized.join(",")})`,
-      address: `eq.${oracle.address}`,
+      address: `eq.${oracleAddress}`,
       select: "key,value::text",
     },
   }).catch(() => []);

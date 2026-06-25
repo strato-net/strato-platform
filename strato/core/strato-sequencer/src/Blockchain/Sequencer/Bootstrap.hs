@@ -8,15 +8,14 @@ import Blockchain.Constants
 import Blockchain.Data.Block
 import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Model.WrappedBlock
-import Blockchain.EthConf (runKafkaMConfigured)
+import Blockchain.EthConf (runStreamMConfigured)
 import Blockchain.Sequencer.Constants
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka (writeSeqVmTasks, writeSeqP2pEvents, assertSequencerTopicsCreation)
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
-import Control.Monad.Composable.Kafka
-import qualified Data.ByteString.Char8 as C8
+import qualified Data.Text as T
 
 -- | Bootstrap genesis block into LevelDB and Kafka.
 --
@@ -43,7 +42,7 @@ initLevelDB hash' = do
 
 initKafka :: OutputBlock -> IO ()
 initKafka shortCircuit = do
-        runKafkaMConfigured (KString $ C8.pack defaultKafkaClientId') $ do
+        runStreamMConfigured (T.pack defaultKafkaClientId') $ do
           _ <- assertSequencerTopicsCreation
           _ <- writeSeqVmTasks [VmBlock shortCircuit]
           _ <- writeSeqP2pEvents [P2pBlock shortCircuit]

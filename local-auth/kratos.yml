@@ -4,7 +4,7 @@ dsn: postgres://postgres@postgres:5432/kratos?sslmode=disable
 
 serve:
   public:
-    base_url: http://localhost:8081/auth/kratos/
+    base_url: __NODE_URL__/auth/kratos/
     cors:
       enabled: true
       allowed_origins:
@@ -15,20 +15,23 @@ serve:
     base_url: http://localhost:4434/
 
 cookies:
-  domain: localhost
+  domain: __COOKIE_REALM__
   path: /
   same_site: Lax
 
 selfservice:
-  default_browser_return_url: http://localhost:8081/auth/ui/
+  default_browser_return_url: __NODE_URL__/auth/ui/
+  allowed_return_urls:
+    - __NODE_URL__/
   
   flows:
     login:
-      ui_url: http://localhost:8081/auth/ui/login
+      ui_url: __NODE_URL__/auth/ui/login
       lifespan: 10m
     
     registration:
-      ui_url: http://localhost:8081/auth/ui/registration
+      enabled: false
+      ui_url: __NODE_URL__/auth/ui/registration
       lifespan: 10m
       after:
         password:
@@ -36,22 +39,22 @@ selfservice:
             - hook: session
     
     settings:
-      ui_url: http://localhost:8081/auth/ui/settings
+      ui_url: __NODE_URL__/auth/ui/settings
       privileged_session_max_age: 15m
     
     recovery:
       enabled: true
-      ui_url: http://localhost:8081/auth/ui/recovery
+      ui_url: __NODE_URL__/auth/ui/recovery
       use: code
     
     verification:
       enabled: true
-      ui_url: http://localhost:8081/auth/ui/verification
+      ui_url: __NODE_URL__/auth/ui/verification
       use: code
     
     logout:
       after:
-        default_browser_return_url: http://localhost:8081/auth/ui/login
+        default_browser_return_url: __NODE_URL__/auth/ui/login
 
   methods:
     password:

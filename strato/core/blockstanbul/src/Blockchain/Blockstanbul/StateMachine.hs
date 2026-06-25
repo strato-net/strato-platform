@@ -19,12 +19,14 @@ import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Lens hiding (view)
 import Control.Monad
+import Control.Monad.Composable.Vault
 import Control.Monad.State.Class
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Text.Format
+import Text.ShortDescription
 import Prelude hiding (round, sequence)
 
 class Monad m => HasBlockstanbulContext m where
@@ -84,15 +86,14 @@ makeLenses ''BlockstanbulContext
 debugShowCtx :: StateMachineM m => m ()
 debugShowCtx = do
   let debugLog :: (StateMachineM m2) => T.Text -> LensLike' (Const (m2 ())) BlockstanbulContext a -> (a -> String) -> m2 ()
-      infoLog loc lns f = join . uses lns $ $logInfoS loc . T.pack . f
       debugLog loc lns f = join . uses lns $ $logDebugS loc . T.pack . f
-  infoLog "showctx/view" view format
-  infoLog "showctx/proposer" proposer ((++ "\n") . format)
-  infoLog "showctx/validators" validators (show . map format . S.toList)
-  infoLog "showctx/mBlockNumber" proposal (show . fmap (number . blockBlockData))
-  infoLog "showctx/mLockedBlockNo" blockLock (show . fmap (number . blockBlockData))
-  infoLog "showctx/mLockedSender" lockSender (show . fmap format)
-  infoLog "showctx/isValidator" isValidator show
+  debugLog "showctx/view" view format
+  debugLog "showctx/proposer" proposer ((++ "\n") . format)
+  debugLog "showctx/validators" validators (shortDescription . S.toList)
+  debugLog "showctx/mBlockNumber" proposal (show . fmap (number . blockBlockData))
+  debugLog "showctx/mLockedBlockNo" blockLock (show . fmap (number . blockBlockData))
+  debugLog "showctx/mLockedSender" lockSender (show . fmap format)
+  debugLog "showctx/isValidator" isValidator show
   debugLog "showctx/prepared" prepared show
   debugLog "showctx/committed" committed show
   debugLog "showctx/hasPrepared" hasPrepared show
