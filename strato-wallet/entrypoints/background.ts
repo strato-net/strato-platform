@@ -34,6 +34,7 @@ import { installCsrfBypassRule } from "@/src/core/csrf-bypass";
 import { getTxs } from "@/src/core/history";
 import { fetchActivity } from "@/src/core/activity";
 import { fetchTokens, fetchDefi } from "@/src/core/portfolio";
+import { fetchTokenDetail, fetchPriceHistory } from "@/src/core/token-detail";
 import { fetchPools, executeSwap, type SwapRequest } from "@/src/core/swap";
 import {
   fetchBridgeConfig,
@@ -371,6 +372,22 @@ async function dispatchControl(method: string, args: unknown[]): Promise<unknown
     case "defi.list": {
       const n = await getSelectedNetwork();
       return isStratoNetwork(n) ? fetchDefi(n, args[0] as string) : [];
+    }
+    // token details (STRATO tokens + DeFi position tokens)
+    case "token.detail": {
+      const n = await getSelectedNetwork();
+      if (!isStratoNetwork(n)) return null;
+      return fetchTokenDetail(n, args[0] as string, args[1] as string);
+    }
+    case "token.priceHistory": {
+      const n = await getSelectedNetwork();
+      if (!isStratoNetwork(n)) return [];
+      return fetchPriceHistory(n, args[0] as string, args[1] as number, args[2] as number);
+    }
+    case "token.activity": {
+      const n = await getSelectedNetwork();
+      if (!isStratoNetwork(n)) return [];
+      return fetchActivity(n, args[1] as string, 50, args[0] as string);
     }
     case "swap.pools": {
       const n = await getSelectedNetwork();

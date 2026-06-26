@@ -45,12 +45,17 @@ function fmtAmount(v: bigint): string {
 export async function fetchActivity(
   network: StratoNetwork,
   address: string,
-  limit = 25
+  limit = 25,
+  /** Optional token contract to restrict activity to (for the token details page). */
+  tokenAddress?: string
 ): Promise<ActivityItem[]> {
   const addr = address.toLowerCase().replace(/^0x/, "");
+  const tokenFilter = tokenAddress
+    ? `&address=eq.${tokenAddress.toLowerCase().replace(/^0x/, "")}`
+    : "";
   const url =
     `${cirrusBase(network)}/BlockApps-Token-Transfer` +
-    `?or=(from.eq.${addr},to.eq.${addr})` +
+    `?or=(from.eq.${addr},to.eq.${addr})${tokenFilter}` +
     `&select=*,BlockApps-Token(_name,_symbol)` +
     `&order=block_timestamp.desc&limit=${limit}`;
 

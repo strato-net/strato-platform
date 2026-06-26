@@ -309,9 +309,15 @@ export function Home({ navigate }: { navigate: (to: string) => void }) {
       {/* tab content */}
       <div className="px-4 pb-4 pt-3">
         {tab === "tokens" && (
-          <TokensTab balance={balance.data} symbol={symbol} address={addr} network={network.data} />
+          <TokensTab
+            balance={balance.data}
+            symbol={symbol}
+            address={addr}
+            network={network.data}
+            navigate={navigate}
+          />
         )}
-        {tab === "defi" && <DeFiTab address={addr} network={network.data} />}
+        {tab === "defi" && <DeFiTab address={addr} network={network.data} navigate={navigate} />}
         {tab === "activity" && <ActivityTab address={addr} network={network.data} />}
       </div>
     </div>
@@ -378,17 +384,23 @@ function TokensTab({
   symbol,
   address,
   network,
+  navigate,
 }: {
   balance?: string;
   symbol: string;
   address: Address | null;
   network?: StratoNetwork;
+  navigate: (to: string) => void;
 }) {
   const tokens = useAsync<TokenBalance[]>(
     async () => (address && network ? callBackground("tokens.list", address) : []),
     [address, network?.chainId]
   );
   const [showLegacy, setShowLegacy] = useState(false);
+  // Token details are STRATO-only (Cirrus-backed).
+  const canDetail = !!network && isStratoNetwork(network);
+  const openToken = (addr?: string) =>
+    canDetail && addr ? () => navigate(`token/${addr}`) : undefined;
 
   // The native (USDST) balance comes from the headline rpc call; list other
   // tokens from Cirrus below it (deduped against the native symbol). Active
@@ -401,9 +413,15 @@ function TokensTab({
   const nativeName = nativeToken?.name ?? symbol;
   const badge = network?.chainBadge;
 
+  const nativeClick = openToken(nativeToken?.address);
   return (
     <div className="space-y-1">
-      <div className="flex items-center justify-between gap-3 overflow-hidden rounded-lg px-1 py-2">
+      <div
+        onClick={nativeClick}
+        className={`flex items-center justify-between gap-3 overflow-hidden rounded-lg px-1 py-2 ${
+          nativeClick ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900" : ""
+        }`}
+      >
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <TokenIcon symbol={symbol} icon={nativeToken?.icon} badge={badge} />
           <div className="min-w-0">
@@ -417,7 +435,7 @@ function TokensTab({
       </div>
 
       {active.map((t) => (
-        <TokenRow key={t.address} token={t} badge={badge} />
+        <TokenRow key={t.address} token={t} badge={badge} onClick={openToken(t.address)} />
       ))}
 
       {legacy.length > 0 && (
@@ -432,7 +450,9 @@ function TokensTab({
             Legacy tokens ({legacy.length})
           </button>
           {showLegacy &&
-            legacy.map((t) => <TokenRow key={t.address} token={t} badge={badge} muted />)}
+            legacy.map((t) => (
+              <TokenRow key={t.address} token={t} badge={badge} muted onClick={openToken(t.address)} />
+            ))}
         </div>
       )}
     </div>
@@ -443,16 +463,19 @@ function TokenRow({
   token,
   badge,
   muted,
+  onClick,
 }: {
   token: TokenBalance;
   badge?: string;
   muted?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <div
+      onClick={onClick}
       className={`flex items-center justify-between gap-3 overflow-hidden rounded-lg px-1 py-2 ${
         muted ? "opacity-70" : ""
-      }`}
+      } ${onClick ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900" : ""}`}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <TokenIcon symbol={token.symbol} icon={token.icon} badge={badge} />
@@ -472,9 +495,11 @@ function TokenRow({
 function DeFiTab({
   address,
   network,
+  navigate,
 }: {
   address: Address | null;
   network?: StratoNetwork;
+  navigate: (to: string) => void;
 }) {
   const positions = useAsync<DefiPosition[]>(
     async () => (address && network ? callBackground("defi.list", address) : []),
@@ -505,7 +530,10 @@ function DeFiTab({
       {list.map((p, i) => (
         <div
           key={p.symbol + i}
-          className="flex items-center justify-between gap-3 overflow-hidden rounded-lg px-1 py-2"
+          onClick={p.address ? () => navigate(`token/${p.address}`) : undefined}
+          className={`flex items-center justify-between gap-3 overflow-hidden rounded-lg px-1 py-2 ${
+            p.address ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900" : ""
+          }`}
         >
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <TokenIcon
@@ -985,6 +1013,288 @@ export function Notifications({ navigate }: { navigate: (to: string) => void }) 
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------- Token details
+interface TokenDetail {
+  address: string;
+  symbol: string;
+  name: string;
+  icon?: string;
+  decimals: number;
+  description?: string;
+  status: number;
+  priceUsd?: number;
+  balanceAmount: string;
+  balanceUsd?: number;
+  marketCapUsd?: number;
+  circulatingSupply?: number;
+}
+interface PricePoint {
+  t: number;
+  price: number;
+}
+
+const RANGES: { id: string; label: string; secs: number }[] = [
+  { id: "1D", label: "1D", secs: 86400 },
+  { id: "1W", label: "1W", secs: 7 * 86400 },
+  { id: "1M", label: "1M", secs: 30 * 86400 },
+  { id: "3M", label: "3M", secs: 90 * 86400 },
+  { id: "1Y", label: "1Y", secs: 365 * 86400 },
+  { id: "All", label: "All", secs: 0 },
+];
+
+function fmtUsd(n: number | undefined, opts?: { compact?: boolean }): string {
+  if (n == null || !isFinite(n)) return "—";
+  return n.toLocaleString(undefined, {
+    style: "currency",
+    currency: "USD",
+    notation: opts?.compact ? "compact" : "standard",
+    maximumFractionDigits: opts?.compact ? 2 : n < 1 ? 6 : 2,
+  });
+}
+function fmtCount(n: number | undefined): string {
+  if (n == null || !isFinite(n)) return "—";
+  return n.toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 2 });
+}
+
+function PriceChart({ points }: { points: PricePoint[] }) {
+  if (points.length < 2) {
+    return (
+      <div className="flex h-40 items-center justify-center text-xs text-slate-400">
+        Not enough price history
+      </div>
+    );
+  }
+  const prices = points.map((p) => p.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const range = max - min || 1;
+  const W = 320;
+  const H = 130;
+  const pad = 6;
+  const x = (i: number) => (i / (points.length - 1)) * W;
+  const y = (pr: number) => pad + (1 - (pr - min) / range) * (H - 2 * pad);
+  const line = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p.price).toFixed(1)}`).join(" ");
+  const area = `${line} L${W.toFixed(1)},${H} L0,${H} Z`;
+  const up = prices[prices.length - 1] >= prices[0];
+  const stroke = up ? "#16a34a" : "#dc2626";
+
+  return (
+    <div className="relative">
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-40 w-full">
+        <defs>
+          <linearGradient id="pcfill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={stroke} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={stroke} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={area} fill="url(#pcfill)" />
+        <path d={line} fill="none" stroke={stroke} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+      </svg>
+      <span className="pointer-events-none absolute right-1 top-0 text-[11px] text-slate-400">
+        {fmtUsd(max)}
+      </span>
+      <span className="pointer-events-none absolute bottom-0 right-1 text-[11px] text-slate-400">
+        {fmtUsd(min)}
+      </span>
+    </div>
+  );
+}
+
+export function TokenDetails({ address, navigate }: { address: string; navigate: (to: string) => void }) {
+  const selected = useAsync<Address | null>(() => callBackground("accounts.selected"));
+  const detail = useAsync<TokenDetail | null>(
+    async () => (selected.data ? callBackground("token.detail", address, selected.data) : null),
+    [address, selected.data]
+  );
+  const [range, setRange] = useState("1D");
+  const history = useAsync<PricePoint[]>(
+    async () => {
+      const r = RANGES.find((x) => x.id === range)!;
+      const since = r.secs ? Math.floor(Date.now() / 1000) - r.secs : 0;
+      return callBackground("token.priceHistory", address, since, 40);
+    },
+    [address, range]
+  );
+  const activity = useAsync<ActivityItem[]>(
+    async () => (selected.data ? callBackground("token.activity", address, selected.data) : []),
+    [address, selected.data]
+  );
+
+  const d = detail.data;
+  const pts = history.data ?? [];
+  const change =
+    pts.length >= 2 && pts[0].price > 0 ? (pts[pts.length - 1].price - pts[0].price) / pts[0].price : null;
+  const asOf = pts.length ? new Date(pts[pts.length - 1].t * 1000) : null;
+
+  return (
+    <div>
+      <ScreenHeader title={d?.symbol ?? "Token"} onClose={() => navigate("")} />
+      <div className="space-y-4 p-4">
+        {detail.loading && <div className="py-10 text-center text-sm text-slate-400">Loading…</div>}
+
+        {d && (
+          <>
+            {/* price header */}
+            {d.priceUsd != null && (
+              <div>
+                <div className="text-xs text-slate-400">{d.symbol}</div>
+                <div className="text-3xl font-bold tracking-tight">{fmtUsd(d.priceUsd)}</div>
+                <div className="mt-0.5 flex items-center gap-2 text-sm">
+                  {change != null && (
+                    <span className={change >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                      {change >= 0 ? "+" : ""}
+                      {(change * 100).toFixed(2)}%
+                    </span>
+                  )}
+                  {asOf && <span className="text-slate-400">{asOf.toLocaleString()}</span>}
+                </div>
+              </div>
+            )}
+
+            {/* chart + range tabs (only when priced) */}
+            {d.priceUsd != null && (
+              <div>
+                {history.loading ? (
+                  <div className="h-40 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-900" />
+                ) : (
+                  <PriceChart points={pts} />
+                )}
+                <div className="mt-2 flex justify-between">
+                  {RANGES.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => setRange(r.id)}
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                        range === r.id
+                          ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                          : "text-slate-400 hover:text-slate-600"
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* actions */}
+            <div className="flex gap-2">
+              <ActionButton label="Buy" icon={<DollarSign className="h-5 w-5" />} disabled />
+              <ActionButton label="Swap" icon={<ArrowUpDown className="h-5 w-5" />} onClick={() => navigate("swap")} />
+              <ActionButton label="Send" icon={<ArrowLeftRight className="h-5 w-5" />} onClick={() => navigate("send")} />
+              <ActionButton label="Receive" icon={<ArrowDownLeft className="h-5 w-5" />} onClick={() => navigate("receive")} />
+            </div>
+
+            {/* your balance */}
+            <div>
+              <p className="mb-1 text-sm font-semibold">Your balance</p>
+              <div className="flex items-center justify-between gap-3 rounded-lg px-1 py-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <TokenIcon symbol={d.symbol} icon={d.icon} />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">{d.name}</div>
+                    <div className="truncate text-xs text-slate-400">{d.symbol}</div>
+                  </div>
+                </div>
+                <div className="shrink-0 text-right text-sm">
+                  {d.balanceUsd != null && <div className="font-medium">{fmtUsd(d.balanceUsd)}</div>}
+                  <div className="text-xs text-slate-400">
+                    {d.balanceAmount} {d.symbol}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* token details */}
+            <div>
+              <p className="mb-1 text-sm font-semibold">Token details</p>
+              <div className="space-y-1.5 text-sm">
+                <DetailRow label="Network" value="STRATO" />
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-slate-400">Contract</span>
+                  <span className="inline-flex items-center gap-1 font-mono text-xs">
+                    {shortAddr(d.address)}
+                    <CopyButton value={d.address} className="text-slate-400 hover:text-slate-600" />
+                  </span>
+                </div>
+                <DetailRow label="Decimals" value={String(d.decimals)} />
+              </div>
+              {d.description && (
+                <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                  {d.description}
+                </p>
+              )}
+            </div>
+
+            {/* market details */}
+            {(d.marketCapUsd != null || d.circulatingSupply != null) && (
+              <div>
+                <p className="mb-1 text-sm font-semibold">Market details</p>
+                <div className="space-y-1.5 text-sm">
+                  {d.marketCapUsd != null && (
+                    <DetailRow label="Market cap" value={fmtUsd(d.marketCapUsd, { compact: true })} />
+                  )}
+                  {d.circulatingSupply != null && (
+                    <DetailRow label="Circulating supply" value={`${fmtCount(d.circulatingSupply)} ${d.symbol}`} />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* your activity */}
+            <div>
+              <p className="mb-1 text-sm font-semibold">Your activity</p>
+              {(activity.data ?? []).length === 0 ? (
+                <p className="py-3 text-center text-xs text-slate-400">No activity yet.</p>
+              ) : (
+                <div className="space-y-1">
+                  {(activity.data ?? []).map((a, i) => {
+                    const incoming = a.direction === "in";
+                    return (
+                      <div key={a.hash + i} className="flex items-center justify-between gap-3 px-1 py-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900 text-slate-500">
+                            {incoming ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium">
+                              {incoming ? "Received" : a.direction === "self" ? "Self transfer" : "Sent"}
+                            </div>
+                            <div className="text-xs text-slate-400">
+                              {new Date(a.timestamp).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right text-sm font-medium">
+                          {incoming ? "+" : "-"}
+                          {a.amount} {a.symbol}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {!detail.loading && !d && (
+          <p className="py-10 text-center text-sm text-slate-400">Token details unavailable.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-slate-400">{label}</span>
+      <span className="font-medium">{value}</span>
     </div>
   );
 }

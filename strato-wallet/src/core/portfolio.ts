@@ -23,6 +23,7 @@ export interface DefiPosition {
   symbol: string; // LP / share token symbol
   amount: string; // formatted balance
   icon?: string; // image URL
+  address?: string; // 0x LP / vault token address (for the token details page)
 }
 
 function firstImage(rel: unknown): string | undefined {
@@ -95,14 +96,14 @@ export async function fetchDefi(
     `${b}/BlockApps-Pool?lpToken.balances.key=eq.${addr}&lpToken.balances.value=gt.0` +
     `&select=address,isStable,tokenA:tokenA_fkey(_symbol,images:BlockApps-Token-images(value)),` +
     `tokenB:tokenB_fkey(_symbol),` +
-    `lpToken:lpToken_fkey!inner(_symbol,images:BlockApps-Token-images(value),` +
+    `lpToken:lpToken_fkey!inner(address,_symbol,images:BlockApps-Token-images(value),` +
     `balances:BlockApps-Token-_balances!inner(balance:value::text))&limit=100`;
   const saveUrl =
     `${b}/BlockApps-SaveUSDSTVault-_balances?key=eq.${addr}&value=gt.0` +
-    `&select=value::text,vault:BlockApps-SaveUSDSTVault(_symbol,_name)&limit=50`;
+    `&select=value::text,vault:BlockApps-SaveUSDSTVault(address,_symbol,_name)&limit=50`;
   const yieldUrl =
     `${b}/BlockApps-YieldVault-_balances?key=eq.${addr}&value=gt.0` +
-    `&select=value::text,vault:BlockApps-YieldVault(_symbol,_name)&limit=50`;
+    `&select=value::text,vault:BlockApps-YieldVault(address,_symbol,_name)&limit=50`;
 
   // Tolerate networks where a given table doesn't exist.
   const [pools, save, yieldV] = await Promise.all([
@@ -123,6 +124,7 @@ export async function fetchDefi(
       symbol: p.lpToken?._symbol ?? "LP",
       amount: fmt(p.lpToken?.balances?.[0]?.balance, 18),
       icon: firstImage(p.lpToken?.images) ?? firstImage(p.tokenA?.images),
+      address: p.lpToken?.address ? `0x${String(p.lpToken.address).replace(/^0x/, "")}` : undefined,
     });
   }
   for (const v of save) {
@@ -132,6 +134,7 @@ export async function fetchDefi(
       sub: "Vault",
       symbol: v.vault?._symbol || "saveUSDST",
       amount: fmt(v.value, 18),
+      address: v.vault?.address ? `0x${String(v.vault.address).replace(/^0x/, "")}` : undefined,
     });
   }
   for (const v of yieldV) {
@@ -141,6 +144,7 @@ export async function fetchDefi(
       sub: "Vault",
       symbol: v.vault?._symbol || "vault",
       amount: fmt(v.value, 18),
+      address: v.vault?.address ? `0x${String(v.vault.address).replace(/^0x/, "")}` : undefined,
     });
   }
   return positions;

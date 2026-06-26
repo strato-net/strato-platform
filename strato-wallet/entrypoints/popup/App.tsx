@@ -12,6 +12,7 @@ import {
   Receive,
   BridgeHistory,
   Notifications,
+  TokenDetails,
   Setup,
   Unlock,
   ImportAccount,
@@ -62,6 +63,11 @@ export function App() {
         }}
       />
     );
+  }
+
+  // Token details: route is "token/<address>".
+  if (route.startsWith("token/")) {
+    return <TokenDetails address={route.slice("token/".length)} navigate={navigate} />;
   }
 
   switch (route) {
