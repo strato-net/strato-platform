@@ -1,12 +1,11 @@
 // Event watchers, run on a chrome.alarms schedule by the background worker. Each
-// poll fetches current on-chain state for EVERY account in the wallet (HD,
-// imported, and OAuth/remote), diffs it against persisted "seen" state, and fires
-// notifications only on transitions. On the very first run we seed the seen-state
-// WITHOUT notifying, so a fresh install doesn't dump a backlog of historical
-// bridges/transfers as alerts.
+// poll fetches current state for EVERY account in the wallet (HD, imported, and
+// OAuth/remote), diffs it against persisted state, and fires notifications on
+// transitions. On the very first run we seed the seen-state WITHOUT notifying, so
+// a fresh install doesn't dump a backlog of historical bridges/transfers.
 //
-// All reads are unauthenticated (Cirrus + eth_call), so watchers work even while
-// the wallet is locked — we only need account addresses, which live in storage.
+// All reads are unauthenticated Cirrus queries, so watchers work even while the
+// wallet is locked — we only need account addresses, which live in storage.
 
 import { storage } from "wxt/storage";
 import { keyring, type AccountMeta } from "./keyring";
@@ -20,8 +19,13 @@ import {
 import { fetchBridgeHistory } from "./bridge";
 import { fetchActivity } from "./activity";
 import { fetchEvmActivity } from "./evm-portfolio";
-import { fetchLoanHealth, HEALTH_SCALE } from "./lending";
-import { fetchCdpPositions } from "./cdp";
+import {
+  fetchRiskData,
+  fetchCdpPositions,
+  fetchLoanHealth,
+  HEALTH_SCALE,
+  type RiskData,
+} from "./risk";
 import { pushNotification } from "./notifications";
 
 type LoanBucket = "safe" | "warning" | "danger";
@@ -39,18 +43,16 @@ interface WatcherState {
   incomingSeen: string[];
   /** Last NOTIFIED liquidation-risk bucket, per position key (loan / CDP). */
   loanBucket: Record<string, LoanBucket>;
-  /** Last OBSERVED bucket, per position key — used to debounce transient reads. */
-  observedBucket?: Record<string, LoanBucket>;
 }
 
 // Bump when the watched scope changes so the next run re-seeds without notifying.
 const SEED_VERSION = 2;
 
 const stateStore = storage.defineItem<WatcherState>("local:watcherState", {
-  fallback: { bridgeTerminal: [], incomingSeen: [], loanBucket: {}, observedBucket: {} },
+  fallback: { bridgeTerminal: [], incomingSeen: [], loanBucket: {} },
 });
 
-// Warn when (normalized) health factor drops below 1.2x the liquidation
+// Warn when the (normalized) health factor drops below 1.2x the liquidation
 // threshold; danger once at/below it (liquidatable).
 const WARN_AT = (HEALTH_SCALE * 12n) / 10n;
 const RANK: Record<LoanBucket, number> = { safe: 0, warning: 1, danger: 2 };
@@ -68,21 +70,22 @@ function bucketFor(hf: bigint): LoanBucket {
 }
 
 /**
- * Decide whether a liquidation-risk reading should fire, with a debounce: only
- * alert when the risk WORSENS past what the user was last told AND the same (or
- * worse) level was already seen on the previous poll. This filters out transient
- * bad reads — e.g. a momentarily stale CDP price oracle that makes a healthy
- * position (CR 3.04) briefly look risky for a single poll.
+ * Fire a liquidation-risk alert only when risk WORSENS past what the user was last
+ * told (healthy→warning, healthy/warning→danger) — never when improving up out of
+ * danger into warning. The position's bucket is always recorded as the new
+ * baseline, so it won't re-fire until it recovers and re-enters a riskier range.
  */
-function evalRisk(
+function decideRisk(
   current: LoanBucket,
   notified: LoanBucket,
-  observed: LoanBucket
-): { fire: LoanBucket | null; nextNotified: LoanBucket } {
-  const sustained = current !== "safe" && RANK[current] > RANK[notified] && RANK[observed] >= RANK[current];
-  if (sustained) return { fire: current, nextNotified: current };
-  // Re-arm downward (so a later rise alerts again); otherwise keep the baseline.
-  return { fire: null, nextNotified: RANK[current] < RANK[notified] ? current : notified };
+  acct: AccountMeta,
+  net: StratoNetwork,
+  key: string,
+  kind: "loan" | "cdp",
+  symbol?: string
+): LoanBucket {
+  if (RANK[current] > RANK[notified]) fireRiskNotif(acct, net, current, key, kind, symbol);
+  return current;
 }
 
 /** Fire a loan/CDP liquidation-risk notification (shared "loan" type + toggle). */
@@ -134,16 +137,21 @@ export async function runWatchers(): Promise<void> {
     for (const n of [strato, selected]) {
       if (n && !incomingNets.some((x) => x.id === n.id)) incomingNets.push(n);
     }
-    // Loans live on STRATO chains; check the home + active STRATO chains so a loan
-    // on whichever chain you're using is caught.
+    // Loans/CDPs live on STRATO chains; check the home + active STRATO chains.
     const stratoNets = incomingNets.filter(isStratoNetwork);
 
-    // Snapshot the pre-run seen-sets; watchers decide notify-vs-seed against these
-    // and RETURN newly-seen keys, which we merge once at the end (no shared-state
-    // races between the concurrent tasks).
+    // Network-wide risk reference data (prices + configs), fetched once per net and
+    // shared across all accounts. Nets without data (e.g. auth-gated Cirrus) skip.
+    const riskByNet = new Map<string, RiskData>();
+    await Promise.all(
+      stratoNets.map(async (net) => {
+        const d = await fetchRiskData(net);
+        if (d) riskByNet.set(net.id, d);
+      })
+    );
+
     const bridgeSeen = new Set(state.bridgeTerminal);
     const incomingSeen = new Set(state.incomingSeen);
-    const observed = state.observedBucket ?? {};
 
     const bridgeTasks = accounts.map((a) =>
       watchBridge(a, strato, bridgeSeen, firstRun, chainName)
@@ -152,14 +160,19 @@ export async function runWatchers(): Promise<void> {
       incomingNets.map((n) => watchIncoming(a, n, incomingSeen, firstRun))
     );
     const loanTasks = accounts.flatMap((a) =>
-      stratoNets.map((net) => {
+      stratoNets.flatMap((net) => {
+        const data = riskByNet.get(net.id);
+        if (!data) return [];
         const key = `${net.id}:${a.address.toLowerCase()}`;
-        return watchLoan(a, net, state.loanBucket[key] ?? "safe", observed[key] ?? "safe");
+        return [watchLoan(a, net, data, state.loanBucket[key] ?? "safe")];
       })
     );
     // CDPs (per engine + collateral asset) — the more common borrowing route.
     const cdpTasks = accounts.flatMap((a) =>
-      stratoNets.map((net) => watchCdp(a, net, state.loanBucket, observed))
+      stratoNets.flatMap((net) => {
+        const data = riskByNet.get(net.id);
+        return data ? [watchCdp(a, net, data, state.loanBucket)] : [];
+      })
     );
 
     const [bridgeRes, incomingRes, loanRes, cdpRes] = await Promise.all([
@@ -171,16 +184,12 @@ export async function runWatchers(): Promise<void> {
 
     for (const r of bridgeRes) if (r.status === "fulfilled") for (const k of r.value) bridgeSeen.add(k);
     for (const r of incomingRes) if (r.status === "fulfilled") for (const k of r.value) incomingSeen.add(k);
-    const applyRisk = (u: { key: string; notified: LoanBucket; observed: LoanBucket }) => {
-      state.loanBucket[u.key] = u.notified;
-      observed[u.key] = u.observed;
-    };
-    for (const r of loanRes) if (r.status === "fulfilled") applyRisk(r.value);
-    for (const r of cdpRes) if (r.status === "fulfilled") for (const u of r.value) applyRisk(u);
+    for (const r of loanRes) if (r.status === "fulfilled") state.loanBucket[r.value.key] = r.value.notified;
+    for (const r of cdpRes)
+      if (r.status === "fulfilled") for (const u of r.value) state.loanBucket[u.key] = u.notified;
 
     state.bridgeTerminal = [...bridgeSeen].slice(-500);
     state.incomingSeen = [...incomingSeen].slice(-500);
-    state.observedBucket = observed;
     state.version = SEED_VERSION;
     await stateStore.setValue(state);
   } finally {
@@ -250,34 +259,31 @@ async function watchIncoming(
   return found;
 }
 
-type RiskUpdate = { key: string; notified: LoanBucket; observed: LoanBucket };
+type RiskUpdate = { key: string; notified: LoanBucket };
 
 async function watchLoan(
   acct: AccountMeta,
   net: StratoNetwork,
-  notified: LoanBucket,
-  observed: LoanBucket
+  data: RiskData,
+  notified: LoanBucket
 ): Promise<RiskUpdate> {
   const key = `${net.id}:${acct.address.toLowerCase()}`;
-  const health = await fetchLoanHealth(net, acct.address);
-  const current: LoanBucket = !health || !health.hasDebt ? "safe" : bucketFor(health.healthFactor);
-  const { fire, nextNotified } = evalRisk(current, notified, observed);
-  if (fire) fireRiskNotif(acct, net, fire, key, "loan");
-  return { key, notified: nextNotified, observed: current };
+  const hlth = await fetchLoanHealth(net, acct.address, data);
+  const current: LoanBucket = !hlth || !hlth.hasDebt ? "safe" : bucketFor(hlth.healthFactor);
+  return { key, notified: decideRisk(current, notified, acct, net, key, "loan") };
 }
 
 async function watchCdp(
   acct: AccountMeta,
   net: StratoNetwork,
-  notifiedMap: Record<string, LoanBucket>,
-  observedMap: Record<string, LoanBucket>
+  data: RiskData,
+  notifiedMap: Record<string, LoanBucket>
 ): Promise<RiskUpdate[]> {
-  const positions = await fetchCdpPositions(net, acct.address);
+  const positions = await fetchCdpPositions(net, acct.address, data);
   return positions.map((p) => {
     const key = `cdp:${net.id}:${p.engine.toLowerCase()}:${p.asset}:${acct.address.toLowerCase()}`;
     const current = bucketFor(p.healthFactor);
-    const { fire, nextNotified } = evalRisk(current, notifiedMap[key] ?? "safe", observedMap[key] ?? "safe");
-    if (fire) fireRiskNotif(acct, net, fire, key, "cdp", p.symbol);
-    return { key, notified: nextNotified, observed: current };
+    const notified = decideRisk(current, notifiedMap[key] ?? "safe", acct, net, key, "cdp", p.symbol);
+    return { key, notified };
   });
 }
