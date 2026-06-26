@@ -7,8 +7,8 @@
  *     [--min-idle-bps <bps>] [--strategy <addr>]
  */
 require('dotenv').config();
-const config = require('./config');
-const auth = require('./auth');
+const config = require('../config');
+const auth = require('../auth');
 const { rest } = require('blockapps-rest');
 
 function parseArgs() {

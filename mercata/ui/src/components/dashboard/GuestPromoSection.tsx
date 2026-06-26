@@ -8,7 +8,7 @@ import { useRewards } from "@/hooks/useRewards";
 import { formatEmissionRatePerDay } from "@/services/rewardsService";
 import { findBestEarnApyInfo, buildEarnApyMap } from "@/utils/earnUtils";
 import type { UserRewardsData } from "@/services/rewardsService";
-import { usdstAddress } from "@/lib/constants";
+import { rewardsEnabled, usdstAddress } from "@/lib/constants";
 
 /** GOLDST / SILVST — images from TokenContext (earningAssets ∪ inactiveTokens) */
 const METAL_PROMO_TOKEN_ADDRESSES = [
@@ -130,6 +130,8 @@ const GuestPromoSection = ({ variant, userRewards }: GuestPromoSectionProps) => 
   }, [tokenApys]);
 
   if (variant === 3) {
+    if (!rewardsEnabled) return null;
+
     return (
       <div className="mb-8">
         <div
@@ -197,7 +199,7 @@ const GuestPromoSection = ({ variant, userRewards }: GuestPromoSectionProps) => 
     <div className="space-y-4 mb-8">
       {/* Hero Banner */}
       <div
-        className="rounded-2xl overflow-hidden"
+        className={`rounded-2xl overflow-hidden ${rewardsEnabled ? "" : "hidden"}`}
         style={{
           background:
             "linear-gradient(135deg, #0A0F29 0%, #001B70 55%, #102a80 100%)",

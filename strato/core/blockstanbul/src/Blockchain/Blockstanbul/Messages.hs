@@ -201,7 +201,7 @@ shortFormat (WireMessage (MsgAuth s _) (Preprepare v blk)) =
 shortFormat wm = format wm
 
 inShortLog :: MonadLogger m => Text -> InEvent -> m ()
-inShortLog loc iev = $logInfoS loc . pack $
+inShortLog loc iev = $logDebugS loc . pack $
   case iev of
     IMsg a m -> shortFormat $ WireMessage a m
     Timeout rn -> CL.blue "TIMEOUT " ++ show rn
@@ -215,7 +215,7 @@ inShortLog loc iev = $logInfoS loc . pack $
 outShortLog :: MonadLogger m => Text -> EOutEvent -> m ()
 outShortLog loc eoev = do
   let prefix = either (const $ CL.red "GOSSIP ") (const "") eoev
-  $logInfoS loc . pack $
+  $logDebugS loc . pack $
     case fromE eoev of
       OMsg a m -> shortFormat $ WireMessage a m
       ToCommit blk -> prefix ++ CL.blue "TO_COMMIT " ++ blkNum blk

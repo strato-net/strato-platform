@@ -15,11 +15,12 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
+const { getCreatedAddress, getIssueId, pollForCreateIssueExecution } = require('./util');
 const { rest, importer, util } = require('blockapps-rest');
 const fs = require('fs-extra');
 const path = require('path');
 
-const ZERO_ADDRESS = '0000000000000000000000000000000000000000';
+const EMPTY_PROXY_IMPL = '0xdeadbeef';
 
 function printUsage() {
   console.error('Usage: node deployProxy.js (--impl <implAddr> | --empty) --owner <initialOwnerAddr> [--contract-file <file>]');
@@ -80,13 +81,15 @@ async function combineSource(contractFilePath) {
  */
 async function deployContractAsync(tokenObj, contractArgs, baseOptions) {
   const asyncOptions = { ...baseOptions, isAsync: true };
+  const submittedAt = new Date().toISOString();
   const response = await rest.createContract(tokenObj, contractArgs, asyncOptions);
   const responseArray = Array.isArray(response) ? response : [response];
   const hashes = responseArray.map((r) => r && r.hash).filter(Boolean);
   if (hashes.length === 0) {
     const voteIssueId = responseArray.find((r) => typeof r === 'string');
     if (voteIssueId) {
-      return { voteRequired: true, voteIssueId, rawResponse: response };
+      const proxyAddress = await pollForCreateIssueExecution(tokenObj, voteIssueId, null, submittedAt, 'Proxy address');
+      return { proxyAddress, rawResponse: response };
     }
     throw new Error('rest.createContract returned no tx hash: ' + JSON.stringify(response));
   }
@@ -104,12 +107,12 @@ async function deployContractAsync(tokenObj, contractArgs, baseOptions) {
     throw new Error('Proxy deployment failed: ' + JSON.stringify(final || finalResults));
   }
 
-  const created = final.txResult && final.txResult.contractsCreated;
-  const address = Array.isArray(created) ? created[0] : created;
+  const address = getCreatedAddress(final);
   if (!address) {
-    const voteHint = final.txResult && final.txResult.message;
-    if (voteHint) {
-      return { voteRequired: true, voteHint, receipt: final };
+    const issueId = getIssueId(final);
+    if (issueId) {
+      const proxyAddress = await pollForCreateIssueExecution(tokenObj, issueId, final, submittedAt, 'Proxy address');
+      return { proxyAddress, receipt: final };
     }
     throw new Error('Deployment succeeded but no contractsCreated entry: ' + JSON.stringify(final));
   }
@@ -176,7 +179,7 @@ async function main() {
   const source = await combineSource(contractFilePath);
   console.log('Comments stripped from combined source(s)\n');
 
-  const logicContract = args.empty ? ZERO_ADDRESS : args.impl;
+  const logicContract = args.empty ? EMPTY_PROXY_IMPL : args.impl;
 
   const contractArgs = {
     name: 'Proxy',
