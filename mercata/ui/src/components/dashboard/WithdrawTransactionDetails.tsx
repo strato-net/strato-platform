@@ -10,6 +10,7 @@ import { formatWeiToDecimalHP } from '@/utils/numberUtils';
 import { ensureHexPrefix } from '@/utils/numberUtils';
 import { usdstAddress } from '@/lib/constants';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { getStratoChain } from '@/lib/stratoChain';
 
 const normalizeStratoAccount = (account?: string) => (account || '').replace(/^0x/i, '');
 
@@ -87,10 +88,8 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
         const rawAddr = record?.WithdrawalInfo?.stratoSender || '';
         const displayAddr = normalizeStratoAccount(rawAddr);
         const linkAddr = ensureHexPrefix(rawAddr) || '';
-        const chainIdStr = record?.WithdrawalInfo?.externalChainId ? String(record.WithdrawalInfo.externalChainId) : '1';
-        const txUrl = getExplorerUrl(chainIdStr, '0x');
-        const base = txUrl.split('/tx/')[0];
-        const addressUrl = linkAddr ? `${base}/address/${linkAddr}` : '';
+        const stratoExplorerUrl = getStratoChain()?.blockExplorers?.default?.url || '';
+        const addressUrl = linkAddr && stratoExplorerUrl ? `${stratoExplorerUrl}/address/${linkAddr}` : '';
 
         return displayAddr ? (
           <div className="group relative flex items-center gap-2">
