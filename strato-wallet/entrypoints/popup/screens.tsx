@@ -241,7 +241,12 @@ export function Home({ navigate }: { navigate: (to: string) => void }) {
           <span className="text-xl font-semibold text-slate-400">{symbol}</span>
         </div>
         <div className="mt-0.5 text-xs text-slate-400">
-          {current?.kind === "remote" ? "STRATO account" : "Self-custody"} ·{" "}
+          {current?.kind === "remote"
+            ? "STRATO account"
+            : current?.kind === "mpc"
+              ? "MPC (2-of-2)"
+              : "Self-custody"}{" "}
+          ·{" "}
           {network.data?.name ?? "STRATO"}
         </div>
       </div>
@@ -1883,6 +1888,7 @@ export function AccountsList({ navigate }: { navigate: (to: string) => void }) {
 
   const imported = list.filter((a) => a.kind === "imported");
   const remote = list.filter((a) => a.kind === "remote");
+  const mpc = list.filter((a) => a.kind === "mpc");
 
   return (
     <div>
@@ -1978,6 +1984,23 @@ export function AccountsList({ navigate }: { navigate: (to: string) => void }) {
           </div>
         )}
 
+        {/* MPC (2-of-2 with Vault) accounts */}
+        {mpc.length > 0 && (
+          <div className="space-y-1">
+            <span className="px-1 text-xs font-semibold text-slate-500 dark:text-slate-400">MPC accounts</span>
+            {mpc.map((a) => (
+              <AccountRow
+                key={a.address}
+                account={a}
+                active={isActive(a)}
+                onSelect={() => select(a)}
+                onRename={(label) => rename(a, label)}
+                onRemove={() => setConfirmRemove(a)}
+              />
+            ))}
+          </div>
+        )}
+
         <div className="space-y-2 pt-1">
           <Button variant="secondary" onClick={() => navigate("import")}>
             <span className="inline-flex items-center justify-center gap-1">
@@ -2027,6 +2050,7 @@ function RemoveAccountModal({
   onClose: () => void;
 }) {
   const isRemote = account.kind === "remote";
+  const isMpc = account.kind === "mpc";
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5">
       <div className="w-full rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-xl">
@@ -2043,6 +2067,13 @@ function RemoveAccountModal({
             <>
               Log out of <span className="font-medium">{account.label}</span>? You can log back in
               anytime with STRATO. Your funds stay safe in the vault.
+            </>
+          ) : isMpc ? (
+            <>
+              Remove <span className="font-medium">{account.label}</span>? This deletes this
+              device's MPC shard. Because it's a 2-of-2 key, the account{" "}
+              <span className="font-medium">cannot be recovered or sign again</span> without this
+              shard — only remove it if the account is empty or you've moved the funds.
             </>
           ) : (
             <>
@@ -2164,6 +2195,19 @@ export function ImportAccount({ navigate }: { navigate: (to: string) => void }) 
             >
               {busy ? "Opening login…" : "Login with STRATO"}
             </Button>
+            <div className="text-center text-xs text-slate-400">or</div>
+            <Button
+              variant="secondary"
+              disabled={busy || !oauthReady}
+              onClick={() => run(() => callBackground("mpc.create"))}
+            >
+              {busy ? "Opening login…" : "Create MPC account (2-of-2)"}
+            </Button>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Generates a new key split between this device and the Vault — both shards are
+              required to sign, so neither alone can. The device shard isn't derived from your
+              seed phrase, so back up this wallet to avoid losing access.
+            </p>
           </div>
         )}
         <ErrorText>{error}</ErrorText>

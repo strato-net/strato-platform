@@ -24,8 +24,9 @@ import { generateMnemonic, validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { encryptJson, decryptJson, type EncryptedBlob } from "./vault-crypto";
 import { refreshTokens, type OAuthTokens } from "./oauth";
+import { reconstructKey, getMpcShard } from "./mpc";
 
-export type AccountKind = "hd" | "imported" | "remote";
+export type AccountKind = "hd" | "imported" | "remote" | "mpc";
 
 export interface AccountMeta {
   address: Address;
@@ -50,6 +51,8 @@ export interface HdWalletInfo {
 interface StoredToken extends OAuthTokens {
   /** node vault signature endpoint to POST signing hashes to */
   signatureUrl: string;
+  /** node vault MPC shard endpoint (kind === "mpc" accounts only). */
+  mpcKeyUrl?: string;
 }
 
 /** A single HD wallet (recovery phrase) — only in memory while unlocked. */
@@ -66,8 +69,10 @@ interface VaultData {
   hdWallets: HdWallet[];
   /** address -> private key, for derived hd accounts + imported raw keys. */
   privateKeys: Record<string, Hex>;
-  /** address -> OAuth tokens, for remote accounts. */
+  /** address -> OAuth tokens, for remote + mpc accounts. */
   oauthTokens?: Record<string, StoredToken>;
+  /** address -> the wallet's MPC shard (shard A), for kind === "mpc" accounts. */
+  mpcShards?: Record<string, Hex>;
   /** legacy single-wallet fields (pre multi-HD); migrated on load. */
   mnemonic?: string;
   nextHdIndex?: number;
@@ -102,6 +107,9 @@ const sessionStore = storage.defineItem<{ vault: VaultData; password: string } |
 class Keyring {
   private password: string | null = null;
   private vault: VaultData | null = null;
+  // Vault MPC shards (shard B) cached in memory only for the unlock session — never
+  // persisted to storage, so the at-rest 2-of-2 split holds (disk has shard A only).
+  private mpcShardCache = new Map<string, Hex>();
 
   async isInitialized(): Promise<boolean> {
     return (await blobStore.getValue()) !== null;
@@ -114,6 +122,7 @@ class Keyring {
   async lock(): Promise<void> {
     this.password = null;
     this.vault = null;
+    this.mpcShardCache.clear();
     await sessionStore.setValue(null);
   }
 
@@ -272,6 +281,12 @@ class Keyring {
 
     if (meta.kind === "remote") {
       if (vault.oauthTokens) delete vault.oauthTokens[key];
+    } else if (meta.kind === "mpc") {
+      // Removing an MPC account deletes the wallet's shard; with shard B alone the
+      // account can no longer sign (2-of-2), so this is effectively permanent.
+      if (vault.oauthTokens) delete vault.oauthTokens[key];
+      if (vault.mpcShards) delete vault.mpcShards[key];
+      this.mpcShardCache.delete(key);
     } else {
       delete vault.privateKeys[key];
     }
@@ -389,6 +404,50 @@ class Keyring {
     return meta;
   }
 
+  /**
+   * Record a 2-of-2 MPC account: the wallet's shard (shard A) is stored encrypted
+   * in the vault; the OAuth tokens authenticate fetching the Vault shard (shard B)
+   * at signing time. The full key is never stored — only assembled in memory to
+   * sign. (Vault already holds shard B by the time this is called.)
+   */
+  async addMpcAccount(
+    address: Address,
+    shardA: Hex,
+    tokens: OAuthTokens,
+    mpcKeyUrl: string,
+    signatureUrl: string,
+    username?: string,
+    label?: string
+  ): Promise<AccountMeta> {
+    const vault = await this.getVault();
+    const key = address.toLowerCase();
+    vault.mpcShards = vault.mpcShards ?? {};
+    vault.mpcShards[key] = shardA;
+    vault.oauthTokens = vault.oauthTokens ?? {};
+    vault.oauthTokens[key] = { ...tokens, signatureUrl, mpcKeyUrl };
+    const meta: AccountMeta = {
+      address,
+      kind: "mpc",
+      username,
+      vaultUrl: mpcKeyUrl,
+      label: label ?? username ?? "MPC account",
+    };
+    await this.appendMeta(meta);
+    await this.persist();
+    return meta;
+  }
+
+  /** Fetch (and memoize for the session) the Vault shard for an MPC account. */
+  private async getMpcShardForSession(address: Address, token: StoredToken): Promise<Hex> {
+    const key = address.toLowerCase();
+    const cached = this.mpcShardCache.get(key);
+    if (cached) return cached;
+    const url = token.mpcKeyUrl ?? token.signatureUrl.replace(/\/signature$/, "/mpckey");
+    const shardB = await getMpcShard(url, token.accessToken);
+    this.mpcShardCache.set(key, shardB);
+    return shardB;
+  }
+
   private async appendMeta(meta: AccountMeta): Promise<void> {
     const all = await metaStore.getValue();
     if (all.some((a) => a.address.toLowerCase() === meta.address.toLowerCase())) {
@@ -432,6 +491,18 @@ class Keyring {
       // Legacy cookie-based remote account (no stored OAuth tokens).
       if (meta.vaultUrl) return signViaVaultCookie(meta.vaultUrl, hash);
       throw new Error("Remote account has no signer; log in again");
+    }
+
+    if (meta.kind === "mpc") {
+      // 2-of-2: fetch the Vault shard, reconstruct the key in memory, sign, drop it.
+      const token = await this.getFreshToken(address);
+      if (!token) throw new Error("MPC account session expired; log in again");
+      const shardA = (await this.getVault()).mpcShards?.[address.toLowerCase()];
+      if (!shardA) throw new Error("Missing local MPC shard for this account");
+      const shardB = await this.getMpcShardForSession(address, token);
+      const priv = reconstructKey(shardA, shardB);
+      const sig = await sign({ hash, privateKey: priv });
+      return { r: sig.r, s: sig.s, recovery: Number(sig.yParity ?? 0) };
     }
 
     const vault = await this.getVault();

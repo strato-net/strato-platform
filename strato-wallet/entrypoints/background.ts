@@ -4,6 +4,7 @@
 
 import { defineBackground } from "wxt/sandbox";
 import { type Address } from "viem";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
   KEEPALIVE_PORT,
   INPAGE_TARGET,
@@ -21,6 +22,7 @@ import {
   setSelectedNetwork,
   upsertNetwork,
   signatureUrl,
+  mpcKeyUrl,
   userInfoUrl,
   nativeSymbol,
   isStratoNetwork,
@@ -30,6 +32,7 @@ import {
 } from "@/src/core/networks";
 import { fetchEvmTokens, fetchEvmActivity } from "@/src/core/evm-portfolio";
 import { loginWithStrato, fetchAddress } from "@/src/core/oauth";
+import { splitKey, postMpcShard } from "@/src/core/mpc";
 import { installCsrfBypassRule } from "@/src/core/csrf-bypass";
 import { getTxs } from "@/src/core/history";
 import { fetchActivity } from "@/src/core/activity";
@@ -278,6 +281,24 @@ async function dispatchControl(method: string, args: unknown[]): Promise<unknown
         signatureUrl(network),
         username
       );
+    }
+    case "mpc.create": {
+      // Create a 2-of-2 MPC account: OAuth login -> generate key locally -> split
+      // -> send Vault its shard -> store the wallet's shard. The full key only
+      // exists transiently here at creation; signing reconstructs it client-side.
+      const network = args[0]
+        ? (await getNetworks()).find((n) => n.id === args[0]) ?? (await getSelectedNetwork())
+        : await getSelectedNetwork();
+      if (!isStratoNetwork(network)) throw new Error("MPC accounts are STRATO-only");
+      if (!network.oauthIssuer || !network.oauthClientId) {
+        throw new Error("This network has no OAuth issuer/client configured. Set them in Settings.");
+      }
+      const tokens = await loginWithStrato(network.oauthIssuer, network.oauthClientId);
+      const priv = generatePrivateKey();
+      const address = privateKeyToAccount(priv).address;
+      const { shardA, shardB } = splitKey(priv);
+      await postMpcShard(mpcKeyUrl(network), tokens.accessToken, shardB, address);
+      return keyring.addMpcAccount(address, shardA, tokens, mpcKeyUrl(network), signatureUrl(network));
     }
 
     // networks

@@ -63,6 +63,11 @@ export function signatureUrl(n: StratoNetwork): string {
   return `${new URL(n.rpcUrl).origin}/strato/v2.3/signature`;
 }
 
+/** Vault MPC shard endpoint (2-of-2 shard store/fetch). */
+export function mpcKeyUrl(n: StratoNetwork): string {
+  return `${new URL(n.rpcUrl).origin}/strato/v2.3/mpckey`;
+}
+
 /** Node user-identity endpoint (maps an OAuth token -> blockchain address). */
 export function userInfoUrl(n: StratoNetwork): string {
   return `${new URL(n.rpcUrl).origin}/api/user/me`;
