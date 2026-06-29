@@ -15,13 +15,34 @@ export interface NodeStatus {
   uptime?: number;
 }
 
-/** Poll /apex-api/status for node identity, health, last block, and validators. */
-export function useNodeStatus() {
+/**
+ * Poll /apex-api/status for node identity, health, last block, and validators.
+ * This endpoint requires an authenticated session, so pass `enabled=false` for
+ * guests to avoid 401s (and hide the dependent widgets).
+ */
+export function useNodeStatus(enabled = true) {
   return useQuery({
     queryKey: ["node-status"],
+    enabled,
     queryFn: async (): Promise<NodeStatus> => {
       const { data } = await api.get(`${env.APEX_URL}/status`);
       return data;
+    },
+    refetchInterval: 15000,
+  });
+}
+
+/**
+ * GET /health — public node health (no auth). Returns a subset of the same shape as
+ * /apex-api/status: health/healthStatus/healthIssues, version, uptime, nodeAddress,
+ * lastBlock. Used to show node health to unauthenticated (guest) users.
+ */
+export function useNodeHealth() {
+  return useQuery({
+    queryKey: ["node-health"],
+    queryFn: async (): Promise<NodeStatus> => {
+      const { data } = await api.get(env.HEALTH_URL);
+      return data || {};
     },
     refetchInterval: 15000,
   });
