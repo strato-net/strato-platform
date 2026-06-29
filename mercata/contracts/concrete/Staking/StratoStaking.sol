@@ -33,6 +33,7 @@ contract  StratoStaking is Ownable {
     event ParamsUpdated(uint256 unbondingSeconds, uint256 baseRewardBps, uint256 maxCommissionBps, uint256 maxBatchSize);
     event RewardsDeposited(address indexed funder, uint256 amount);
     event RewardsFunded(address indexed funder, uint256 amount, uint256 startTime, uint256 duration, uint256 baseRewardRate, uint256 stakeRewardRate, string name, string description);
+    event RewardScheduleStopped(address indexed stopper, uint256 remainingReward, uint256 stoppedAt);
     event Staked(address indexed user, address indexed operator, uint256 amount);
     event StakeMoved(address indexed user, address indexed fromOperator, address indexed toOperator, uint256 amount);
     event UnbondingStarted(address indexed user, address indexed operator, uint256 indexed requestId, uint256 amount, uint256 releaseTime);
@@ -42,6 +43,7 @@ contract  StratoStaking is Ownable {
     event DelegatorRewardsClaimed(address indexed user, uint256 amount);
     event OperatorRewardsClaimed(address indexed operator, uint256 amount);
     event RewardReserveRecovered(address indexed to, uint256 amount);
+    event UntrackedStratoRecovered(address indexed to, uint256 amount);
     event StrayTokenRecovered(address indexed token, address indexed to, uint256 amount);
 
     uint256 public constant PRECISION = 1e18;
@@ -161,10 +163,21 @@ contract  StratoStaking is Ownable {
         return scheduledRewardRemaining;
     }
 
+    function hasActiveRewardSchedule() public view returns (bool) {
+        return periodFinish > 0 && block.timestamp < periodFinish && scheduledRewardRemaining > 0;
+    }
+
     function recoverableRewardReserve() public view returns (uint256) {
         uint256 scheduled = scheduledRewardReserve();
         if (rewardReserve <= scheduled) return 0;
         return rewardReserve - scheduled;
+    }
+
+    function recoverableUntrackedStrato() public view returns (uint256) {
+        uint256 balance = IERC20(address(stratoToken)).balanceOf(address(this));
+        uint256 tracked = principalBalance() + rewardReserve;
+        if (balance <= tracked) return 0;
+        return balance - tracked;
     }
 
     // Phase 1 adapter: pull streamed scheduled rewards into global indexes. Later
@@ -336,6 +349,7 @@ contract  StratoStaking is Ownable {
         require(startTime >= block.timestamp, "SS: start in past");
         require(duration > 0, "SS: duration=0");
         require(_baseRewardBps <= BPS_DIVISOR, "SS: bad base");
+        require(!hasActiveRewardSchedule(), "SS: active schedule");
         require(rewardAmount <= rewardReserve, "SS: insufficient reserve");
 
         baseRewardBps = _baseRewardBps;
@@ -405,6 +419,13 @@ contract  StratoStaking is Ownable {
         emit OperatorSynced(operator, false, v.commissionBps);
     }
 
+    function _requireActiveCommissionsWithinCap(uint256 commissionCapBps) internal view {
+        for (uint256 i = 0; i < operatorList.length; i++) {
+            StakingOperator storage v = operators[operatorList[i]];
+            require(!v.active || v.commissionBps <= commissionCapBps, "SS: active commission too high");
+        }
+    }
+
     function setParams(
         uint256 _unbondingSeconds,
         uint256 _baseRewardBps,
@@ -414,6 +435,9 @@ contract  StratoStaking is Ownable {
         require(_baseRewardBps <= BPS_DIVISOR, "SS: bad base");
         require(_maxCommissionBps <= BPS_DIVISOR, "SS: bad commission");
         require(_maxBatchSize > 0, "SS: bad batch");
+        if (_maxCommissionBps < maxCommissionBps) {
+            _requireActiveCommissionsWithinCap(_maxCommissionBps);
+        }
 
         _updateGlobalRewards();
 
@@ -467,6 +491,20 @@ contract  StratoStaking is Ownable {
     ) external onlyOwner onlyInitialized {
         _updateGlobalRewards();
         _startRewardSchedule(rewardAmount, startTime, duration, _baseRewardBps, name, description);
+    }
+
+    function stopRewardSchedule() external onlyOwner onlyInitialized {
+        _updateGlobalRewards();
+
+        uint256 remainingReward = scheduledRewardRemaining;
+        baseRewardRate = 0;
+        stakeRewardRate = 0;
+        scheduledRewardRemaining = 0;
+        periodStart = block.timestamp;
+        periodFinish = block.timestamp;
+        lastUpdateTime = block.timestamp;
+
+        emit RewardScheduleStopped(msg.sender, remainingReward, block.timestamp);
     }
 
     // Delegators choose an operator for reward accounting. Phase 1 stake does not affect consensus.
@@ -653,6 +691,14 @@ contract  StratoStaking is Ownable {
         require(IERC20(address(stratoToken)).transfer(to, amount), "SS: reserve transfer failed");
 
         emit RewardReserveRecovered(to, amount);
+    }
+
+    function recoverUntrackedStrato(address to, uint256 amount) external onlyOwner onlyInitialized {
+        require(to != address(0), "SS: to=0");
+        require(amount <= recoverableUntrackedStrato(), "SS: untracked unavailable");
+
+        require(IERC20(address(stratoToken)).transfer(to, amount), "SS: untracked transfer failed");
+        emit UntrackedStratoRecovered(to, amount);
     }
 
     function recoverStrayToken(address token, address to, uint256 amount) external onlyOwner {

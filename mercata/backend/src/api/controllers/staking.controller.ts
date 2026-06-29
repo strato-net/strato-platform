@@ -14,6 +14,7 @@ import {
   setStratoOperatorCommission,
   stakeStrato,
   startStratoRewardSchedule,
+  stopStratoRewardSchedule,
   unbondSelfStrato,
   unstakeStrato,
   withdrawStratoUnbonded,
@@ -33,6 +34,16 @@ const isNonNegativeAmount = (value: unknown): boolean => {
   } catch {
     return false;
   }
+};
+
+const parseOptionalBoolean = (value: unknown): boolean | null => {
+  if (value === undefined) return false;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    if (value === "true") return true;
+    if (value === "false") return false;
+  }
+  return null;
 };
 
 class StakingController {
@@ -102,7 +113,11 @@ class StakingController {
   static async claim(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const operators = Array.isArray(req.body?.operators) ? req.body.operators : [];
-      const claimAll = Boolean(req.body?.claimAll);
+      const claimAll = parseOptionalBoolean(req.body?.claimAll);
+      if (claimAll === null) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid claimAll" });
+        return;
+      }
       if (!claimAll && !operators.length) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid claim request" });
         return;
@@ -127,7 +142,13 @@ class StakingController {
   static async withdrawUnbonded(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const requestIds = Array.isArray(req.body?.requestIds) ? req.body.requestIds : [];
-      const result = await withdrawStratoUnbonded(req.accessToken, req.address as string, requestIds, Boolean(req.body?.withdrawAll));
+      const withdrawAll = parseOptionalBoolean(req.body?.withdrawAll);
+      if (withdrawAll === null) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid withdrawAll" });
+        return;
+      }
+
+      const result = await withdrawStratoUnbonded(req.accessToken, req.address as string, requestIds, withdrawAll);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -271,6 +292,15 @@ class StakingController {
         String(name || ""),
         String(description || "")
       );
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async stopRewardSchedule(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await stopStratoRewardSchedule(req.accessToken, req.address as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

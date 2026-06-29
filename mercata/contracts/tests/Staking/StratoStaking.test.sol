@@ -279,6 +279,33 @@ contract Describe_StratoStaking {
         require(staking.scheduledRewardRemaining() == 3600e18, "Scheduled remainder still tracked");
     }
 
+    function it_requires_active_reward_schedule_to_be_stopped_before_replacement() public {
+        _stake(user1, address(operatorA), 1000e18);
+
+        funder.do(address(staking), "depositRewards(uint256)", 10000e18);
+        staking.startRewardSchedule(4000e18, block.timestamp, 100, 0, "Season 1", "First schedule");
+
+        bool replacementRejected = false;
+        try staking.startRewardSchedule(1000e18, block.timestamp, 100, 0, "Season 2", "Replacement schedule") {
+        } catch {
+            replacementRejected = true;
+        }
+        require(replacementRejected, "Active schedule should block replacement");
+
+        fastForward(10);
+        staking.stopRewardSchedule();
+
+        require(!staking.hasActiveRewardSchedule(), "Schedule stopped");
+        require(staking.scheduledRewardRemaining() == 0, "Scheduled remainder released");
+        require(staking.baseRewardRate() == 0, "Base rate stopped");
+        require(staking.stakeRewardRate() == 0, "Stake rate stopped");
+        require(staking.recoverableRewardReserve() == 9600e18, "Undistributed rewards recoverable");
+
+        staking.startRewardSchedule(1000e18, block.timestamp, 100, 0, "Season 2", "Replacement schedule");
+        require(staking.hasActiveRewardSchedule(), "Replacement schedule active");
+        require(staking.rewardPeriodAmount() == 1000e18, "Replacement amount");
+    }
+
     function it_unstakes_into_queue_and_withdraws_after_unbonding() public {
         _stake(user1, address(operatorA), 1000e18);
 
@@ -447,6 +474,22 @@ contract Describe_StratoStaking {
         require(unauthorized, "Unrelated user should not update commission");
     }
 
+    function it_rejects_lowering_commission_cap_below_active_operator_commission() public {
+        operatorA.do(address(staking), "setCommissionBps(uint256)", 900);
+
+        bool rejected = false;
+        try staking.setParams(100, 5000, 800, 16) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "Cannot lower cap below active commission");
+
+        staking.setOperatorCommissionBps(address(operatorA), 800);
+        staking.setParams(100, 5000, 800, 16);
+
+        require(staking.maxCommissionBps() == 800, "Cap lowered after commission update");
+    }
+
     function it_keeps_principal_separate_from_recoverable_reward_reserve() public {
         _stake(user1, address(operatorA), 1000e18);
         funder.do(address(staking), "depositRewards(uint256)", 1500e18);
@@ -463,5 +506,31 @@ contract Describe_StratoStaking {
             rejected = true;
         }
         require(rejected, "Cannot recover scheduled reward reserve");
+    }
+
+    function it_recovers_only_untracked_strato_transfers() public {
+        _stake(user1, address(operatorA), 1000e18);
+        funder.do(address(staking), "depositRewards(uint256)", 500e18);
+
+        strato.mint(address(this), 250e18);
+        require(IERC20(address(strato)).transfer(address(staking), 250e18), "Direct STRATO transfer");
+
+        require(staking.recoverableUntrackedStrato() == 250e18, "Untracked STRATO detected");
+
+        bool reserveRecoveryRejected = false;
+        try staking.recoverRewardReserve(address(this), 750e18) {
+        } catch {
+            reserveRecoveryRejected = true;
+        }
+        require(reserveRecoveryRejected, "Untracked STRATO is not reward reserve");
+
+        uint256 beforeBalance = IERC20(address(strato)).balanceOf(address(this));
+        staking.recoverUntrackedStrato(address(this), 250e18);
+        uint256 afterBalance = IERC20(address(strato)).balanceOf(address(this));
+
+        require(afterBalance - beforeBalance == 250e18, "Recovered untracked STRATO");
+        require(staking.recoverableUntrackedStrato() == 0, "No untracked STRATO remains");
+        require(staking.rewardReserve() == 500e18, "Reward reserve unchanged");
+        require(IERC20(address(strato)).balanceOf(address(staking)) >= staking.principalBalance() + staking.rewardReserve(), "Tracked balances protected");
     }
 }

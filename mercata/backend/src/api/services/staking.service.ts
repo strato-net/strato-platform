@@ -436,49 +436,80 @@ const getUnbondingRequests = async (
   }
 };
 
-const projectedRewardIndexes = (state: Record<string, any>): { baseIndex: bigint; stakeIndex: bigint } => {
+const projectedRewardIndexes = (state: Record<string, any>): {
+  baseIndex: bigint;
+  stakeIndex: bigint;
+  rewardReserve: bigint;
+  scheduledRewardRemaining: bigint;
+  baseRewardRate: bigint;
+  stakeRewardRate: bigint;
+} => {
   let baseIndex = parseBigIntLike(state.baseRewardPerOperatorStored);
   let stakeIndex = parseBigIntLike(state.globalStakeRewardPerTokenStored);
+  let rewardReserve = parseBigIntLike(state.rewardReserve);
+  let scheduledRewardRemaining = parseBigIntLike(state.scheduledRewardRemaining);
+  let baseRewardRate = parseBigIntLike(state.baseRewardRate);
+  let stakeRewardRate = parseBigIntLike(state.stakeRewardRate);
   const periodStart = Number(state.periodStart || 0);
   const periodFinish = Number(state.periodFinish || 0);
   const lastUpdateTime = Number(state.lastUpdateTime || 0);
   const now = Math.floor(Date.now() / 1000);
   const current = Math.min(now, periodFinish);
 
-  if (!current || now < periodStart || current <= lastUpdateTime) return { baseIndex, stakeIndex };
+  const finishScheduleIfEnded = () => {
+    if (periodFinish > 0 && now >= periodFinish) {
+      baseRewardRate = 0n;
+      stakeRewardRate = 0n;
+      scheduledRewardRemaining = 0n;
+    }
+  };
 
-  let reserve = parseBigIntLike(state.scheduledRewardRemaining);
+  if (!current || now < periodStart || current <= lastUpdateTime) {
+    finishScheduleIfEnded();
+    return { baseIndex, stakeIndex, rewardReserve, scheduledRewardRemaining, baseRewardRate, stakeRewardRate };
+  }
+
   const activeOperatorCount = parseBigIntLike(state.activeOperatorCount);
   const totalRewardableStake = parseBigIntLike(state.totalRewardableStake);
   const delta = BigInt(current - lastUpdateTime);
 
-  if (parseBigIntLike(state.baseRewardRate) > 0n && activeOperatorCount > 0n && reserve > 0n) {
-    let baseAccrued = parseBigIntLike(state.baseRewardRate) * delta;
-    if (baseAccrued > reserve) baseAccrued = reserve;
+  if (baseRewardRate > 0n && activeOperatorCount > 0n && scheduledRewardRemaining > 0n) {
+    let baseAccrued = baseRewardRate * delta;
+    if (baseAccrued > scheduledRewardRemaining) baseAccrued = scheduledRewardRemaining;
 
     const perOperator = baseAccrued / activeOperatorCount;
     const allocatedBase = perOperator * activeOperatorCount;
     if (allocatedBase > 0n) {
       baseIndex += perOperator;
-      reserve -= allocatedBase;
+      rewardReserve = rewardReserve > allocatedBase ? rewardReserve - allocatedBase : 0n;
+      scheduledRewardRemaining -= allocatedBase;
     }
   }
 
-  if (parseBigIntLike(state.stakeRewardRate) <= 0n || totalRewardableStake <= 0n || reserve <= 0n) {
-    return { baseIndex, stakeIndex };
+  if (stakeRewardRate > 0n && totalRewardableStake > 0n && scheduledRewardRemaining > 0n) {
+    let stakeAccrued = stakeRewardRate * delta;
+    if (stakeAccrued > scheduledRewardRemaining) stakeAccrued = scheduledRewardRemaining;
+
+    const rewardPerStake = (stakeAccrued * WAD) / totalRewardableStake;
+    const allocatedStake = (rewardPerStake * totalRewardableStake) / WAD;
+
+    if (allocatedStake > 0n) {
+      stakeIndex += rewardPerStake;
+      rewardReserve = rewardReserve > allocatedStake ? rewardReserve - allocatedStake : 0n;
+      scheduledRewardRemaining -= allocatedStake;
+    }
   }
 
-  let stakeAccrued = parseBigIntLike(state.stakeRewardRate) * delta;
-  if (stakeAccrued > reserve) stakeAccrued = reserve;
-
-  const rewardPerStake = (stakeAccrued * WAD) / totalRewardableStake;
-  const allocatedStake = (rewardPerStake * totalRewardableStake) / WAD;
-
-  if (allocatedStake > 0n) {
-    stakeIndex += rewardPerStake;
+  if (current === periodFinish && now >= periodFinish) {
+    baseRewardRate = 0n;
+    stakeRewardRate = 0n;
+    scheduledRewardRemaining = 0n;
+  } else if (scheduledRewardRemaining === 0n) {
+    baseRewardRate = 0n;
+    stakeRewardRate = 0n;
   }
 
-  return { baseIndex, stakeIndex };
+  return { baseIndex, stakeIndex, rewardReserve, scheduledRewardRemaining, baseRewardRate, stakeRewardRate };
 };
 
 const projectedOperatorRewards = (
@@ -534,7 +565,8 @@ const projectedDelegatorIndex = (
 
 const validatorApyBps = (
   state: Record<string, any>,
-  commissionBps: bigint
+  commissionBps: bigint,
+  stakeRewardRate: bigint
 ): bigint => {
   const totalRewardableStake = parseBigIntLike(state.totalRewardableStake);
   if (totalRewardableStake <= 0n) return 0n;
@@ -543,7 +575,7 @@ const validatorApyBps = (
   const periodFinish = Number(state.periodFinish || 0);
   if (!periodFinish || now >= periodFinish) return 0n;
 
-  const grossBps = (parseBigIntLike(state.stakeRewardRate) * YEAR_SECONDS * BPS_DIVISOR) / totalRewardableStake;
+  const grossBps = (stakeRewardRate * YEAR_SECONDS * BPS_DIVISOR) / totalRewardableStake;
   const netCommissionBps = commissionBps >= BPS_DIVISOR ? BPS_DIVISOR : commissionBps;
   return (grossBps * (BPS_DIVISOR - netCommissionBps)) / BPS_DIVISOR;
 };
@@ -607,7 +639,7 @@ export const getStratoStakingInfo = async (
       ? (userStake * (projectedIndex - paid)) / WAD
       : 0n;
     const pendingRewards = pendingStored + projectedReward;
-    const apyBps = validatorApyBps(state, commissionBps);
+    const apyBps = validatorApyBps(state, commissionBps, currentIndexes.stakeRewardRate);
     const operatorRewards = projectedOperatorRewards(value, currentIndexes);
 
     if (operatorAddress && operatorAddress === normalizedUserAddress) {
@@ -666,9 +698,9 @@ export const getStratoStakingInfo = async (
     totalUnbonding: String(state.totalUnbonding || "0"),
     totalRewardableStake: String(state.totalRewardableStake || "0"),
     activeValidatorCount: String(state.activeOperatorCount || "0"),
-    rewardReserve: String(state.rewardReserve || "0"),
+    rewardReserve: currentIndexes.rewardReserve.toString(),
     rewardPeriodAmount: String(state.rewardPeriodAmount || "0"),
-    scheduledRewardRemaining: String(state.scheduledRewardRemaining || "0"),
+    scheduledRewardRemaining: currentIndexes.scheduledRewardRemaining.toString(),
     baseRewardBps: String(state.baseRewardBps || "0"),
     maxCommissionBps: String(state.maxCommissionBps || "0"),
     maxBatchSize: String(state.maxBatchSize || "0"),
@@ -677,8 +709,8 @@ export const getStratoStakingInfo = async (
     periodFinish: String(state.periodFinish || "0"),
     rewardPeriodName: String(state.rewardPeriodName || ""),
     rewardPeriodDescription: String(state.rewardPeriodDescription || ""),
-    baseRewardRate: String(state.baseRewardRate || "0"),
-    stakeRewardRate: String(state.stakeRewardRate || "0"),
+    baseRewardRate: currentIndexes.baseRewardRate.toString(),
+    stakeRewardRate: currentIndexes.stakeRewardRate.toString(),
     estimatedApy,
     userTotalStake: userTotalStake.toString(),
     claimableRewards: claimableRewards.toString(),
@@ -1089,6 +1121,12 @@ export const startStratoRewardSchedule = async (
     name,
     description,
   ]);
+
+export const stopStratoRewardSchedule = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ status: string; hash: string }> =>
+  castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "stopRewardSchedule", []);
 
 export const setStratoStakingParams = async (
   accessToken: string,

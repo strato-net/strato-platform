@@ -24,6 +24,7 @@ router.post("/admin/operators", walletAuth, StakingController.addOperator);
 router.delete("/admin/operators", walletAuth, StakingController.removeOperator);
 router.patch("/admin/operators/commission", walletAuth, StakingController.setOperatorCommission);
 router.post("/admin/reward-schedule", walletAuth, StakingController.startRewardSchedule);
+router.post("/admin/reward-schedule/stop", walletAuth, StakingController.stopRewardSchedule);
 router.patch("/admin/params", walletAuth, StakingController.setParams);
 
 export default router;

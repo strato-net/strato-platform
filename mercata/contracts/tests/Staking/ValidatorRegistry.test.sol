@@ -58,12 +58,8 @@ contract Describe_ValidatorRegistry {
         (exists, active, name, description, metadataURI, protocolValidatorId) = registry.operators(operator);
     }
 
-    function it_initializes_once_and_allows_owner_to_update_staking() public {
+    function it_initializes_once_with_fixed_staking_target() public {
         require(address(registry.staking()) == address(staking), "Initial staking target");
-
-        MockOperatorSync newStaking = new MockOperatorSync();
-        registry.setStaking(address(newStaking));
-        require(address(registry.staking()) == address(newStaking), "Updated staking target");
 
         bool reinitialized = false;
         try registry.initialize(address(staking)) {
@@ -72,12 +68,13 @@ contract Describe_ValidatorRegistry {
         }
         require(reinitialized, "Registry should initialize once");
 
-        bool unauthorized = false;
-        try user.do(address(registry), "setStaking", address(staking)) {
+        ValidatorRegistry zeroRegistry = new ValidatorRegistry(address(this));
+        bool zeroRejected = false;
+        try zeroRegistry.initialize(address(0)) {
         } catch {
-            unauthorized = true;
+            zeroRejected = true;
         }
-        require(unauthorized, "Only owner should update staking target");
+        require(zeroRejected, "Zero staking target rejected");
     }
 
     function it_adds_operator_profile_and_syncs_staking() public {

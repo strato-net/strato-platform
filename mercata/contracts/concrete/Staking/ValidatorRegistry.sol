@@ -20,7 +20,6 @@ struct ValidatorProfile {
 // owns who is active and what metadata users see for each operator.
 contract  ValidatorRegistry is Ownable {
     event Initialized(address indexed staking);
-    event StakingUpdated(address indexed oldStaking, address indexed newStaking);
     event OperatorAdded(address indexed operator, uint256 commissionBps);
     event OperatorRemoved(address indexed operator);
     event OperatorReactivated(address indexed operator, uint256 commissionBps);
@@ -44,23 +43,13 @@ contract  ValidatorRegistry is Ownable {
 
     function initialize(address _staking) external onlyOwner {
         require(address(staking) == address(0), "VR: initialized");
-        _setStaking(_staking);
+        require(_staking != address(0), "VR: staking=0");
+        staking = IStratoStakingOperatorSync(_staking);
         emit Initialized(_staking);
     }
 
     function operatorCount() external view returns (uint256) {
         return operatorList.length;
-    }
-
-    function _setStaking(address _staking) internal {
-        require(_staking != address(0), "VR: staking=0");
-        address oldStaking = address(staking);
-        staking = IStratoStakingOperatorSync(_staking);
-        emit StakingUpdated(oldStaking, _staking);
-    }
-
-    function setStaking(address _staking) external onlyOwner {
-        _setStaking(_staking);
     }
 
     function _sameString(string left, string right) internal pure returns (bool) {
