@@ -381,9 +381,11 @@ conduitBatchSource clientId streamAddress topicName = do
   forever $ do
     result <- liftIO $ readBatchConduit topicPath subscriber
     case result of
-      Nothing -> do
-        yield []
-        liftIO $ threadDelay 100000
+      -- No new data: wait and re-check, but do NOT emit an empty batch.
+      -- Yielding [] here pushes a no-op downstream on every poll, which (e.g.)
+      -- makes the sequencer log a full loop iteration ~10x/sec while idle.
+      -- Consumers should only ever see real data.
+      Nothing -> liftIO $ threadDelay 100000
       Just (msgs, lastId) -> do
         liftIO $ checkpointConduit topicPath subscriber lastId
         let items = map (decode . LBS.fromStrict) msgs

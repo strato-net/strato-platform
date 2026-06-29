@@ -13,4 +13,7 @@ COPY package*.json  /usr/src/app/
 ENV NODE_ENV=production
 RUN npm ci --only=production
 COPY . /usr/src/app
+# docker-run.sh regenerates these at startup; make them writable so the
+# container can run as a non-root user.
+RUN chmod 666 config/config.json models/strato/bloc22/config.json models/strato/eth/config.js
 CMD [ "/usr/src/app/docker-run.sh" ]

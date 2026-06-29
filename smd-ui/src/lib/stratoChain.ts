@@ -1,0 +1,147 @@
+import { defineChain, type Chain } from "viem";
+import { runtime } from "./env";
+
+export const rpcUrl =
+  typeof window !== "undefined" ? `${window.location.origin}/rpc` : "/rpc";
+
+let _chainId: number | null = null;
+let _chain: Chain | null = null;
+
+type WalletLike = {
+  chain?: { id?: number };
+  switchChain?: (args: { id: number }) => Promise<unknown>;
+  addChain?: (args: { chain: Chain }) => Promise<unknown>;
+  request?: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
+
+type AddEthereumChainParameter = {
+  chainId: `0x${string}`;
+  chainName: string;
+  nativeCurrency: Chain["nativeCurrency"];
+  rpcUrls: string[];
+  blockExplorerUrls?: string[];
+};
+
+function toChainIdHex(chainId: number): `0x${string}` {
+  return `0x${chainId.toString(16)}`;
+}
+
+function hasErrorCode(error: unknown, code: number, seen = new Set<unknown>()): boolean {
+  if (!error || typeof error !== "object") return false;
+  if (seen.has(error)) return false;
+  seen.add(error);
+
+  const err = error as {
+    code?: unknown;
+    cause?: unknown;
+    data?: unknown;
+    error?: unknown;
+    originalError?: unknown;
+  };
+  if (err.code === code) return true;
+  return (
+    hasErrorCode(err.cause, code, seen) ||
+    hasErrorCode(err.data, code, seen) ||
+    hasErrorCode(err.error, code, seen) ||
+    hasErrorCode(err.originalError, code, seen)
+  );
+}
+
+function isUnknownChainError(error: unknown): boolean {
+  return hasErrorCode(error, 4902);
+}
+
+function getInitializedStratoChain(): Chain {
+  if (!_chain) throw new Error("STRATO chain not initialized");
+  return _chain;
+}
+
+function getAddEthereumChainParameter(chain: Chain): AddEthereumChainParameter {
+  const blockExplorerUrl = chain.blockExplorers?.default?.url;
+  return {
+    chainId: toChainIdHex(chain.id),
+    chainName: chain.name,
+    nativeCurrency: chain.nativeCurrency,
+    rpcUrls: [...chain.rpcUrls.default.http],
+    ...(blockExplorerUrl ? { blockExplorerUrls: [blockExplorerUrl] } : {}),
+  };
+}
+
+async function switchWalletChain(walletClient: WalletLike, chain: Chain) {
+  if (walletClient.switchChain) {
+    await walletClient.switchChain({ id: chain.id });
+    return;
+  }
+  if (walletClient.request) {
+    await walletClient.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: toChainIdHex(chain.id) }],
+    });
+    return;
+  }
+  throw new Error("Connected wallet does not support network switching");
+}
+
+async function addWalletChain(walletClient: WalletLike, chain: Chain) {
+  if (walletClient.addChain) {
+    await walletClient.addChain({ chain });
+    return;
+  }
+  if (walletClient.request) {
+    await walletClient.request({
+      method: "wallet_addEthereumChain",
+      params: [getAddEthereumChainParameter(chain)],
+    });
+    return;
+  }
+  throw new Error("Connected wallet does not support adding networks");
+}
+
+export async function ensureStratoChainInWallet(walletClient: WalletLike | null | undefined) {
+  if (!walletClient) throw new Error("No wallet client available");
+  const chain = getInitializedStratoChain();
+  if (walletClient.chain?.id === chain.id) return;
+
+  try {
+    await switchWalletChain(walletClient, chain);
+  } catch (error) {
+    if (!isUnknownChainError(error)) throw error;
+    await addWalletChain(walletClient, chain);
+    await switchWalletChain(walletClient, chain);
+  }
+}
+
+/**
+ * Initialize the STRATO chain from runtime config (window.ENV, injected by
+ * /smd/config.js at container startup). Returns null when CHAIN_ID is not set,
+ * in which case only external wallets are offered.
+ */
+export function initStratoChain(): Chain | null {
+  if (_chain) return _chain;
+  const chainId = runtime.chainId();
+  if (!chainId) return null;
+  _chainId = chainId;
+
+  const networkName = runtime.networkName();
+  const chainLabel = networkName ? `STRATO ${networkName}` : "STRATO";
+  const explorerUrl = runtime.explorerUrl();
+
+  _chain = defineChain({
+    id: _chainId,
+    name: chainLabel,
+    nativeCurrency: { decimals: 18, name: "STRATO", symbol: "STRATO" },
+    rpcUrls: { default: { http: [runtime.rpcUrl() || rpcUrl] } },
+    ...(explorerUrl
+      ? { blockExplorers: { default: { name: "Stratoscan", url: explorerUrl } } }
+      : {}),
+  });
+  return _chain;
+}
+
+export function getStratoChain(): Chain | null {
+  return _chain;
+}
+
+export function getStratoChainId(): number | null {
+  return _chainId;
+}

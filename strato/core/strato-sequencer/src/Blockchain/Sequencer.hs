@@ -54,6 +54,7 @@ import Data.Time.Clock
 import Prometheus as P
 import Text.Format
 import Text.Printf
+import Text.ShortDescription
 
 type SeqOutEvent = Either [P2pEvent] [VmTask]
 
@@ -360,7 +361,7 @@ expandBlock sb = do
   readiness <- enqueueIfParentNotEmitted sb
   case readiness of
     NotReadyToEmit -> do
-      $logWarnS "expandBlock" . T.pack $ prettyBlock sb ++ " is not yet ready to emit."
+      $logInfoS "expandBlock" . T.pack $ shortDescription sb ++ " is not yet ready to emit."
       P.incCounter seqBlocksEnqueued
       return []
     ReadyToEmit -> do
@@ -368,10 +369,10 @@ expandBlock sb = do
       dryChain <- buildEmissionChain sb
       if dryChain /= []
         then do
-          $logInfoS "expandBlock" . T.pack $ prettyBlock sb ++ " is ready to emit! Emitting it and chain of dependents."
+          $logDebugS "expandBlock" . T.pack $ shortDescription sb ++ " is ready to emit! Emitting it and chain of dependents."
           return dryChain
         else do
-          $logInfoS "expandBlock" . T.pack $ prettyBlock sb ++ " is ready to emit, but its emission chain is empty. It was likely already emitted."
+          $logDebugS "expandBlock" . T.pack $ shortDescription sb ++ " is ready to emit, but its emission chain is empty. It was likely already emitted."
           return []
 
 runConsensus ::
@@ -417,12 +418,6 @@ prettyIBlock IngestBlock {ibOrigin = o, ibBlockData = bd, ibReceiptTransactions 
   where
     blockNonce = show . number $ bd
     bHash = format . BDB.blockHeaderHash $ bd
-
-prettyBlock :: SequencedBlock -> String
-prettyBlock SequencedBlock {sbOrigin = o, sbBlockData = bd, sbReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
-  where
-    blockNonce = show . number $ bd
-    bHash = format . blockHeaderHash $ bd
 
 prettyTx :: IngestTx -> String
 prettyTx IngestTx {itOrigin = o, itTransaction = t} = prefix t ++ " via " ++ shortOrigin o

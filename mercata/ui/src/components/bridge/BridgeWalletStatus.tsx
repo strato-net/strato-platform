@@ -4,6 +4,7 @@ import { ConnectButton, useConnectModal } from '@rainbow-me/rainbowkit';
 import { Copy } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
+import { suppressStratoReconnect, allowStratoReconnect, markExternalWalletActive, clearExternalWalletActive } from '@/lib/stratoWallet';
 
 interface BridgeWalletStatusProps {
   guestMode?: boolean;
@@ -31,8 +32,25 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
   const { connectModalOpen, openConnectModal } = useConnectModal();
   const { toast } = useToast();
   const externalModalActiveRef = React.useRef(false);
+  const [pendingExternalModal, setPendingExternalModal] = React.useState(false);
+
+  const isConnectedToStrato = isConnected && connector ? isStratoConnector(connector) : false;
   const hasConnectedWallet =
-    isConnected && (!externalOnly || (connector ? !isStratoConnector(connector) : false));
+    isConnected && (!externalOnly || !isConnectedToStrato);
+
+  React.useEffect(() => {
+    if (!pendingExternalModal || isConnected || !openConnectModal) return;
+    externalModalActiveRef.current = true;
+    markExternalWalletActive();
+    openConnectModal();
+    setPendingExternalModal(false);
+    allowStratoReconnect();
+  }, [pendingExternalModal, isConnected, openConnectModal]);
+
+  React.useEffect(() => {
+    if (!pendingExternalModal) return;
+    return () => { allowStratoReconnect(); };
+  }, [pendingExternalModal]);
 
   const hideStratoWalletOption = React.useCallback(() => {
     const stratoOption = document.querySelector<HTMLElement>(
@@ -84,6 +102,9 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
 
   React.useEffect(() => {
     if (!connectModalOpen) {
+      if (externalModalActiveRef.current && !isConnected) {
+        clearExternalWalletActive();
+      }
       externalModalActiveRef.current = false;
       restoreStratoWalletOption();
       return;
@@ -112,15 +133,23 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
     }
   };
 
+  const handleExternalConnect = () => {
+    if (isConnectedToStrato) {
+      suppressStratoReconnect();
+      setPendingExternalModal(true);
+      disconnect();
+    } else {
+      externalModalActiveRef.current = true;
+      openConnectModal?.();
+    }
+  };
+
   const connectControl = externalOnly ? (
     <button
       type="button"
       disabled={guestMode}
       className={CONNECT_BUTTON_CLASS}
-      onClick={() => {
-        externalModalActiveRef.current = true;
-        openConnectModal?.();
-      }}
+      onClick={handleExternalConnect}
     >
       {connectLabel}
     </button>
@@ -133,7 +162,7 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
       {hasConnectedWallet ? (
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full">
           <div
-            onClick={() => disconnect()}
+            onClick={() => { clearExternalWalletActive(); disconnect(); }}
             className="relative group cursor-pointer flex-1"
           >
             <div className="px-3 sm:px-4 py-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-xl font-semibold group-hover:opacity-0 transition-opacity w-full text-center h-[38px] sm:h-[42px] flex items-center justify-center text-sm sm:text-base">

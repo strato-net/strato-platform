@@ -20,7 +20,7 @@ const { rest, importer, util } = require('blockapps-rest');
 const fs = require('fs-extra');
 const path = require('path');
 
-const ZERO_ADDRESS = '0000000000000000000000000000000000000000';
+const EMPTY_PROXY_IMPL = '0xdeadbeef';
 
 function printUsage() {
   console.error('Usage: node deployProxy.js (--impl <implAddr> | --empty) --owner <initialOwnerAddr> [--contract-file <file>]');
@@ -179,7 +179,7 @@ async function main() {
   const source = await combineSource(contractFilePath);
   console.log('Comments stripped from combined source(s)\n');
 
-  const logicContract = args.empty ? ZERO_ADDRESS : args.impl;
+  const logicContract = args.empty ? EMPTY_PROXY_IMPL : args.impl;
 
   const contractArgs = {
     name: 'Proxy',

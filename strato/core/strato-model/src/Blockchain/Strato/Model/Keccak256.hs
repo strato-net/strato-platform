@@ -60,6 +60,8 @@ import Servant.Docs
 import Test.QuickCheck
 import qualified Text.Colors as CL
 import Text.Format
+import Text.ShortDescription
+import Text.Tools (shorten)
 import Web.FormUrlEncoded hiding (fieldLabelModifier)
 import Web.PathPieces
 
@@ -168,6 +170,9 @@ zeroHash = unsafeCreateKeccak256FromWord256 0
 
 instance Format Keccak256 where
   format = CL.yellow . formatKeccak256WithoutColor
+
+instance ShortDescription Keccak256 where
+  shortDescription = shorten 8 . keccak256ToHex
 
 -- I think we want this first definition, but the API already uses the second one!
 -- Someday we should fix this, but it will probably change our external (API) behavior.
