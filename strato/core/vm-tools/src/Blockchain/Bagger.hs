@@ -428,7 +428,7 @@ addToQueued stage t@OutputTx {otSigner = signer} =
 promoteExecutables :: MonadBagger m => m ()
 promoteExecutables = do
   preState <- getBaggerState
-  $logInfoS "Bagger.promoteExecutables" "pulling from mempool"
+  $logDebugS "Bagger.promoteExecutables" "pulling from mempool"
   let txShas = B.bestBlockTxHashes (B.miningCache preState)
       queued' = M.keysSet (B.queued preState)
   forM_ queued' $ \address -> do
@@ -461,7 +461,7 @@ promoteExecutables = do
 promoteTx :: MonadBagger m => OutputTx -> m ()
 promoteTx tx@OutputTx {otSigner = signer} = do
   state <- getBaggerState
-  $logInfoS "Bagger.promoteTx" "pulling from mempool"
+  $logDebugS "Bagger.promoteTx" "pulling from mempool"
   let txShas = B.bestBlockTxHashes (B.miningCache state)
       !(evicted, kept, state') = B.addToPending tx state
   putBaggerState state'
@@ -474,7 +474,7 @@ promoteTx tx@OutputTx {otSigner = signer} = do
 demoteUnexecutables :: MonadBagger m => m ()
 demoteUnexecutables = do
   preState <- getBaggerState
-  $logInfoS "Bagger.demoteUnexecutables" "pulling from mempool"
+  $logDebugS "Bagger.demoteUnexecutables" "pulling from mempool"
   let txShas = B.bestBlockTxHashes (B.miningCache preState)
       pending' = M.keysSet (B.pending preState)
   forM_ pending' $ \address -> do
@@ -572,7 +572,7 @@ nextGasLimit g = g + q - (if d == 0 then 1 else 0) where (q, d) = g `quotRem` 10
 
 buildFromMiningCache :: MonadBagger m => m OutputBlock
 buildFromMiningCache = do
-  $logInfoS "Bagger.buildFromMiningCache" "pulling from mempool"
+  $logDebugS "Bagger.buildFromMiningCache" "pulling from mempool"
   state <- getBaggerState
   let cache = B.miningCache state
   let uncles = []

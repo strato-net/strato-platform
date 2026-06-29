@@ -149,8 +149,8 @@ export const UserRewardsSummary = ({
   const unclaimedRewardsStr = userRewards.unclaimedRewards || "0";
   const activitiesWithStake = userRewards.activities.filter(
     (a) =>
-      safeBigInt(a.userInfo?.stake || "0") > 0n &&
-      safeBigInt(a.activity?.emissionRate || "0") > 0n
+      safeBigInt(a.userInfo?.stake || "0") > 0n 
+    // && safeBigInt(a.activity?.emissionRate || "0") > 0n
   );
 
   const hasBonusRewards = !!userRewards.bonusRewards && safeBigInt(userRewards.bonusRewards) > 0n;

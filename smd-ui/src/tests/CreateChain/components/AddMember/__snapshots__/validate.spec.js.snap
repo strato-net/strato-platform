@@ -1,7 +1,0 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
-
-exports[`AddMember: validate when form has no values 1`] = `Object {}`;
-
-exports[`AddMember: validate when form has values (with address) 1`] = `Object {}`;
-
-exports[`AddMember: validate when form has values (with user) 1`] = `Object {}`;

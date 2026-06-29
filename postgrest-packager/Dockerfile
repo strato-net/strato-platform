@@ -25,6 +25,10 @@ RUN apt-get update && \
 
 COPY doit.sh postgrest.conf.tpl /
 
+# doit.sh regenerates this at startup; make it writable so the container
+# can run as a non-root user.
+RUN touch /postgrest.conf && chmod 666 /postgrest.conf
+
 COPY licenses /licenses
 
 HEALTHCHECK --interval=5s --timeout=2s --start-period=60s \

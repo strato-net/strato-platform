@@ -38,6 +38,7 @@ import           Data.Maybe                        (fromJust)
 import qualified GHC.Generics                      as GHCG
 import qualified Text.Colors                       as CL
 import           Text.Format
+import           Text.ShortDescription
 import           Text.Tools
 
 data IngestTx = IngestTx
@@ -193,6 +194,10 @@ instance Witnessable SequencedBlock where
 
 instance Eq SequencedBlock where
   a == b = sbHash a == sbHash b
+
+instance ShortDescription SequencedBlock where
+  shortDescription sb =
+    "Block #" ++ show (number (sbBlockData sb)) ++ "/" ++ shortDescription (sbHash sb)
 
 instance Ord OutputTx where
   compare OutputTx {otHash = hA} OutputTx {otHash = hB} = compare hA hB
