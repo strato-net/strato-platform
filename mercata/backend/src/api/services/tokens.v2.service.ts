@@ -12,7 +12,7 @@ import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
 
-const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, YieldVault } = constants;
+const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, YieldVault, priceOracle } = constants;
 
 // Queries MercataBridge config for the unanimous externalSymbol for each given strato token address.
 // Returns a map of stratoToken -> externalSymbol.
@@ -717,7 +717,7 @@ export const getNetBalanceHistory = async (
 
   const mappingFilters = [
     `path.like.*${userAddress}*`,
-    'path.like.prices[*',
+    `and(address.eq.${priceOracle},path.like.prices[*)`,
     'path.like.collateralConfigs[*',
     'path.like.collateralGlobalStates[*',
     'and(address.eq.937efa7e3a77e20bbdbd7c0d32b6514f368c1010,path.eq._balances[0000000000000000000000000000000000001004])',
