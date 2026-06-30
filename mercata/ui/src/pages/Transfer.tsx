@@ -169,7 +169,7 @@ const Transfer = () => {
 
       toast({
         title: "Success",
-        description: `Transferred ${fromAmount} ${
+        description: `Sent ${fromAmount} ${
           fromAsset?.token?._symbol ||
           fromAsset?.token?._name
           } to ${recipient}`,
@@ -393,7 +393,7 @@ const Transfer = () => {
                           checked={nonceOverride}
                           onCheckedChange={(v) => setNonceOverride(v === true)}
                         />
-                        <span>I understand — proceed with this transfer</span>
+                        <span>I understand — proceed with this send</span>
                       </label>
                     </div>
                   </div>
