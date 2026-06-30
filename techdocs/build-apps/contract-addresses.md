@@ -371,9 +371,9 @@ Before using any contract:
 
 The **mercata backend** shows how to manage contract addresses:
 
-- **Config** - `mercata/backend/src/config/config.ts` - Environment variables
-- **Constants** - `mercata/backend/src/config/constants.ts` - Contract definitions
-- **Helpers** - `mercata/backend/src/api/helpers/` - Registry queries
+- **Config** - `app/backend/src/config/config.ts` - Environment variables
+- **Constants** - `app/backend/src/config/constants.ts` - Contract definitions
+- **Helpers** - `app/backend/src/api/helpers/` - Registry queries
 
 ---
 

@@ -36,7 +36,7 @@ generateDockerComposeAllDocker = do
 
   let mercataBackend = def
         { image = "${MERCATABACKEND_IMAGE:-" ++ repoUrl ++ "mercata-backend:" ++ stratoVersion ++ "-" ++ hashMercataBackend ++ "}"
-        , build = Just "./mercata/backend"
+        , build = Just "./app/backend"
         , depends_on = Just $ DependsOnList ["strato", "postgrest"]
         , init = Just True
         , environment = Just $ Map.fromList
@@ -78,7 +78,7 @@ generateDockerComposeAllDocker = do
 
   let mercataUi = def
         { image = "${MERCATAUI_IMAGE:-" ++ repoUrl ++ "mercata-ui:" ++ stratoVersion ++ "-" ++ hashMercataUi ++ "}"
-        , build = Just "./mercata/ui"
+        , build = Just "./app/ui"
         , depends_on = Just $ DependsOnList ["mercata-backend"]
         , environment = Just $ Map.fromList
             [ ("LUCKY_ORANGE_SITE_ID", "${LUCKY_ORANGE_SITE_ID:-}")

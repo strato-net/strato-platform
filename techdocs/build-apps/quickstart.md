@@ -600,9 +600,9 @@ try {
 
 ### Study the Reference Implementation
 
-The **mercata app** (`strato-platform/mercata/`) is the complete reference:
+The **mercata app** (`strato-platform/app/`) is the complete reference:
 
-- **Backend** - `mercata/backend/src/` - Shows all STRATO API patterns
-- **Transaction Builder** - `mercata/backend/src/utils/txBuilder.ts`
-- **Transaction Helper** - `mercata/backend/src/utils/txHelper.ts`
-- **API Clients** - `mercata/backend/src/utils/mercataApiHelper.ts`
+- **Backend** - `app/backend/src/` - Shows all STRATO API patterns
+- **Transaction Builder** - `app/backend/src/utils/txBuilder.ts`
+- **Transaction Helper** - `app/backend/src/utils/txHelper.ts`
+- **API Clients** - `app/backend/src/utils/mercataApiHelper.ts`

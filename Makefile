@@ -57,12 +57,12 @@ HASH_STRATO := $(call dir_hash,strato)
 HASH_POSTGREST := $(call dir_hash,postgrest-packager)
 HASH_NGINX := $(call dir_hash,nginx-packager)
 HASH_APEX := $(call dir_hash,apex)
-HASH_MERCATA_BACKEND := $(call dir_hash,mercata/backend)
-HASH_MERCATA_UI := $(call dir_hash,mercata/ui)
+HASH_MERCATA_BACKEND := $(call dir_hash,app/backend)
+HASH_MERCATA_UI := $(call dir_hash,app/ui)
 HASH_PROMETHEUS := $(call dir_hash,prometheus-packager)
 HASH_SMD := $(call dir_hash,smd-ui)
-HASH_BRIDGE := $(call dir_hash,mercata/services/bridge)
-HASH_BRIDGE_NGINX := $(call dir_hash,mercata/services/bridge/nginx)
+HASH_BRIDGE := $(call dir_hash,app/services/bridge)
+HASH_BRIDGE_NGINX := $(call dir_hash,app/services/bridge/nginx)
 HASH_LOCAL_AUTH := $(call dir_hash,local-auth)
 
 # Check if image exists in Docker — rebuild if missing (hash in tag handles source changes)
@@ -126,7 +126,7 @@ apex:
 mercata-backend:
 	@if $(call image_missing,$(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND)); then \
 		echo "Building mercata-backend ($(VERSION)-$(HASH_MERCATA_BACKEND))..."; \
-		docker build -t $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) -f ./mercata/backend/Dockerfile ./mercata && \
+		docker build -t $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) -f ./app/backend/Dockerfile ./app && \
 		docker tag $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) $(REPO_AWS_ECR_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND); \
 	else \
 		echo "mercata-backend up to date"; \
@@ -135,7 +135,7 @@ mercata-backend:
 mercata-ui:
 	@if $(call image_missing,$(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)); then \
 		echo "Building mercata-ui ($(VERSION)-$(HASH_MERCATA_UI))..."; \
-		docker build -t $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI) -f ./mercata/ui/Dockerfile ./mercata && \
+		docker build -t $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI) -f ./app/ui/Dockerfile ./app && \
 		docker tag $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI) $(REPO_AWS_ECR_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI); \
 	else \
 		echo "mercata-ui up to date"; \
@@ -160,7 +160,7 @@ smd:
 bridge:
 	@if $(call image_missing,$(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE)); then \
 		echo "Building bridge ($(VERSION)-$(HASH_BRIDGE))..."; \
-		docker build -t $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) ./mercata/services/bridge && \
+		docker build -t $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) ./app/services/bridge && \
 		docker tag $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) $(REPO_AWS_ECR_URL)bridge:$(VERSION)-$(HASH_BRIDGE); \
 	else \
 		echo "bridge up to date"; \
@@ -169,7 +169,7 @@ bridge:
 bridge-nginx:
 	@if $(call image_missing,$(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX)); then \
 		echo "Building bridge-nginx ($(VERSION)-$(HASH_BRIDGE_NGINX))..."; \
-		docker build --add-host=openresty.org:3.125.51.27 -t $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) ./mercata/services/bridge/nginx && \
+		docker build --add-host=openresty.org:3.125.51.27 -t $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) ./app/services/bridge/nginx && \
 		docker tag $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) $(REPO_AWS_ECR_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX); \
 	else \
 		echo "bridge-nginx up to date"; \
@@ -215,22 +215,22 @@ smd-force:
 
 mercata-backend-force:
 	@echo Now building mercata-backend...
-	docker build -t ${REPO_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND} -f ./mercata/backend/Dockerfile ./mercata
+	docker build -t ${REPO_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND} -f ./app/backend/Dockerfile ./app
 	docker tag ${REPO_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND} ${REPO_AWS_ECR_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND}
 
 mercata-ui-force:
 	@echo Now building mercata-ui...
-	docker build -t ${REPO_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI} -f ./mercata/ui/Dockerfile ./mercata
+	docker build -t ${REPO_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI} -f ./app/ui/Dockerfile ./app
 	docker tag ${REPO_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI} ${REPO_AWS_ECR_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI}
 
 bridge-force:
 	@echo Now building bridge...
-	docker build -t ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ./mercata/services/bridge
+	docker build -t ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ./app/services/bridge
 	docker tag ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ${REPO_AWS_ECR_URL}bridge:${VERSION}-${HASH_BRIDGE}
 
 bridge-nginx-force:
 	@echo Now building bridge-nginx...
-	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ./mercata/services/bridge/nginx
+	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ./app/services/bridge/nginx
 	docker tag ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ${REPO_AWS_ECR_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX}
 
 local-auth:
@@ -245,7 +245,7 @@ oracle:
 	@echo Now building oracle... 
 	# TODO: Dockerize
 	@echo TODO: NO DOCKERFILE TO BUILD YET...
-	#docker build -t ${REPO_URL}oracle:${VERSION} ./mercata/services/oracle
+	#docker build -t ${REPO_URL}oracle:${VERSION} ./app/services/oracle
 	#docker tag ${REPO_URL}oracle:${VERSION} ${REPO_AWS_ECR_URL}oracle:${VERSION}
 	# TODO: #dcpush - replace with proper docker compose push flow
 	#echo "${REPO_URL}oracle:${VERSION}" > oracle_image_tag

@@ -54,7 +54,7 @@ scenarios:
   # Token Sale TPS — canonical UI bridge-in flow (1000 sales / 30s)
   # ---------------------------------------------------------------------------
   # Replays the "Fund > Bridge-In (Sepolia USDC → STRATO USDST → AUTO_FORGE
-  # GOLDST)" composition performed by mercata/ui/src/components/bridge/BridgeIn.tsx.
+  # GOLDST)" composition performed by app/ui/src/components/bridge/BridgeIn.tsx.
   # Each "sale" is the composition of:
   #   1. Sign Permit2 typed-data (EIP-712) for USDC on Sepolia.
   #   2. Broadcast DepositRouter.deposit(USDC, ..., signature) on Sepolia.

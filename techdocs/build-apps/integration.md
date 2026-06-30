@@ -835,10 +835,10 @@ main().catch(console.error);
 
 The **mercata backend** is the complete reference:
 
-- **Transaction Builder** - `mercata/backend/src/utils/txBuilder.ts`
-- **Transaction Helper** - `mercata/backend/src/utils/txHelper.ts`
-- **API Clients** - `mercata/backend/src/utils/mercataApiHelper.ts`
-- **Services** - `mercata/backend/src/api/services/`
+- **Transaction Builder** - `app/backend/src/utils/txBuilder.ts`
+- **Transaction Helper** - `app/backend/src/utils/txHelper.ts`
+- **API Clients** - `app/backend/src/utils/mercataApiHelper.ts`
+- **Services** - `app/backend/src/api/services/`
   - `tokens.service.ts` - Token operations
   - `bridge.service.ts` - Bridge operations
   - `swapping.service.ts` - Swap operations

@@ -107,14 +107,14 @@ cd <strato-platform>
 git checkout <approved-branch>
 git pull
 git rev-parse --short HEAD
-grep -R "parseNativeBridgeAssets\|isMappingTrue(raw.enabled)" -n mercata/backend/src
+grep -R "parseNativeBridgeAssets\|isMappingTrue(raw.enabled)" -n app/backend/src
 ```
 
 The application code can be built earlier, but do not activate the app containers for native mainnet routes until the STRATO and Ethereum contract addresses are finalized and runtime env is set. Mainnet native routes require production `STRATO_NATIVE_BRIDGE`, `STRATO_NATIVE_CUSTODY_VAULT`, and bridge-service Ethereum env values.
 
 ## 3. STRATO Mainnet Contracts
 
-Run from `mercata/contracts`.
+Run from `app/contracts`.
 
 The STRATO deployer may be a funded operational account, but it must not be the final authority. The upgrade commands below set `initialOwner` to `<ADMIN_REGISTRY_WITHOUT_0X>`, so owner-only native bridge and custody vault administration belongs to STRATO governance/admin after deployment.
 
@@ -187,7 +187,7 @@ args:
 
 ## 4. Ethereum Mainnet Contracts
 
-Run from `mercata/ethereum`.
+Run from `app/ethereum`.
 
 The Ethereum deployer may be any approved funded EOA. It should only submit deployment transactions. The initializer params below assign `DEFAULT_ADMIN_ROLE` to `<ETHEREUM_ADMIN_SAFE>`, not to the deployer. Do not continue to production activation if the deployer retains unexpected admin roles after deployment.
 
@@ -363,7 +363,7 @@ If `ATTESTATION_THRESHOLD` is greater than `1`, add one `setAttestationSigner(<s
 
 Complete this section if the STRATO-side token was originally deployed as CATA and must appear as STRATO before mainnet bridge/auction activation.
 
-Run from `mercata/contracts`.
+Run from `app/contracts`.
 
 Step 1: upgrade the CATA token proxy to the implementation that supports the rename function:
 
@@ -396,7 +396,7 @@ Token.symbol() == STRATO
 
 ## 7. Configure STRATO Native Route
 
-Run from `mercata/contracts` after Ethereum mainnet token and bridge proxies exist:
+Run from `app/contracts` after Ethereum mainnet token and bridge proxies exist:
 
 ```bash
 npm run configure:native-route -- \
@@ -436,7 +436,7 @@ CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY_1=<second-native-mint-signer-key>
 CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY_2=<third-native-mint-signer-key>
 ```
 
-Mercata backend mainnet addresses should be added to `mercata/backend/src/config/config.ts` before building the backend image. Update the Upquark entries after the production proxies are final:
+Mercata backend mainnet addresses should be added to `app/backend/src/config/config.ts` before building the backend image. Update the Upquark entries after the production proxies are final:
 
 ```ts
 export const defaultStratoNativeBridgeFor: Record<string, string> = {

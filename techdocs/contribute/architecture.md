@@ -9,13 +9,13 @@ Understanding the STRATO platform monorepo structure and how components work tog
 The STRATO platform is a **monorepo** containing:
 
 1. **Layer 1: Blockchain** (`strato/`) - Core blockchain (Haskell)
-2. **Layer 2: DeFi Application** (`mercata/`) - Application layer (Solidity, TypeScript, React)
+2. **Layer 2: DeFi Application** (`app/`) - Application layer (Solidity, TypeScript, React)
 3. **Supporting Infrastructure** - Deployment, proxies, documentation
 
 ```
 strato-platform/
 ├── strato/              # Blockchain core (Haskell)
-├── mercata/             # DeFi application (TypeScript, Solidity, React)
+├── app/             # DeFi application (TypeScript, Solidity, React)
 ├── bootstrap-docker/    # Production deployment scripts
 ├── nginx-packager/      # Reverse proxy & Swagger docs
 ├── docs/                # Additional documentation
@@ -130,7 +130,7 @@ User → JSON-RPC API → strato-core → vm-runner → State
 
 ---
 
-## Layer 2: DeFi Application (`mercata/`)
+## Layer 2: DeFi Application (`app/`)
 
 ### Purpose
 
@@ -138,13 +138,13 @@ Full-stack DeFi application built on top of STRATO blockchain.
 
 ### Key Components
 
-#### Smart Contracts (`mercata/contracts/`)
+#### Smart Contracts (`app/contracts/`)
 
 **What:** Solidity smart contracts for DeFi protocols
 
 **Language:** Solidity 0.8.22
 
-**Location:** `mercata/contracts/concrete/`
+**Location:** `app/contracts/concrete/`
 
 **Core Protocols:**
 
@@ -181,7 +181,7 @@ Full-stack DeFi application built on top of STRATO blockchain.
 **Build:**
 
 ```bash
-cd mercata/contracts
+cd app/contracts
 npm install
 npm run compile
 npm test
@@ -194,13 +194,13 @@ npm test                    # All tests
 npm run test:coverage       # With coverage
 ```
 
-#### Backend API (`mercata/backend/`)
+#### Backend API (`app/backend/`)
 
 **What:** Node.js REST API for DeFi operations
 
 **Language:** TypeScript (Node.js + Express)
 
-**Location:** `mercata/backend/src/`
+**Location:** `app/backend/src/`
 
 **Responsibilities:**
 
@@ -233,7 +233,7 @@ npm run test:coverage       # With coverage
 **Run:**
 
 ```bash
-cd mercata/backend
+cd app/backend
 npm install
 npm run dev              # Development mode
 npm run build            # Production build
@@ -248,13 +248,13 @@ npm run test:integration # Integration tests
 npm run test:e2e         # E2E tests
 ```
 
-#### Frontend UI (`mercata/ui/`)
+#### Frontend UI (`app/ui/`)
 
 **What:** React web application for DeFi interactions
 
 **Language:** TypeScript (React + Vite)
 
-**Location:** `mercata/ui/src/`
+**Location:** `app/ui/src/`
 
 **Responsibilities:**
 
@@ -289,7 +289,7 @@ npm run test:e2e         # E2E tests
 **Run:**
 
 ```bash
-cd mercata/ui
+cd app/ui
 npm install
 npm run dev              # Development server (port 3001)
 npm run build            # Production build
@@ -303,7 +303,7 @@ npm test                 # Component tests
 npm run test:e2e         # E2E tests (Playwright)
 ```
 
-#### Background Services (`mercata/services/`)
+#### Background Services (`app/services/`)
 
 **What:** Long-running services for async operations
 
@@ -330,7 +330,7 @@ npm run test:e2e         # E2E tests (Playwright)
 **Run:**
 
 ```bash
-cd mercata/services/bridge
+cd app/services/bridge
 npm install
 npm run dev
 ```
@@ -444,12 +444,12 @@ stack exec strato-core   # Run compiled binary
 **Usage:**
 
 ```bash
-cd mercata/backend
+cd app/backend
 npm install              # Install dependencies
 npm run build            # Compile TypeScript
 npm test                 # Run tests
 
-cd mercata/ui
+cd app/ui
 npm install
 npm run dev              # Start dev server
 ```
@@ -523,10 +523,10 @@ npm run dev              # Start dev server
 Detailed component-specific guides are coming soon. For now, see:
 
 1. **Blockchain Core** - Haskell codebase (`strato/core/`, `strato/api/`)
-2. **Smart Contracts** - Solidity contracts (`mercata/contracts/`)
-3. **Backend API** - Node.js/TypeScript (`mercata/backend/`)
-4. **Frontend UI** - React/TypeScript (`mercata/ui/`)
-5. **Services** - Background services (`mercata/services/`)
+2. **Smart Contracts** - Solidity contracts (`app/contracts/`)
+3. **Backend API** - Node.js/TypeScript (`app/backend/`)
+4. **Frontend UI** - React/TypeScript (`app/ui/`)
+5. **Services** - Background services (`app/services/`)
 
 ### General Workflow
 

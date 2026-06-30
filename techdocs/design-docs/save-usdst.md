@@ -417,7 +417,7 @@ That is the cleanest way to create durable hold demand for `USDST` without mixin
 
 ### Existing contract
 
-`SaveUSDSTVault.sol` in `mercata/contracts/concrete/Savings/` already implements the core vault. It is the share token itself (ERC-20), with ERC-4626-shaped deposit / mint / withdraw / redeem and managed-asset accounting.
+`SaveUSDSTVault.sol` in `app/contracts/concrete/Savings/` already implements the core vault. It is the share token itself (ERC-20), with ERC-4626-shaped deposit / mint / withdraw / redeem and managed-asset accounting.
 
 ### Contract interactions at launch
 

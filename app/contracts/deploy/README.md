@@ -221,9 +221,9 @@ npm run configure:native-route -- \
 Run a read-only smoke check against the deployed native STRATO bridge route.
 
 This script intentionally uses a separate env file from the deployment scripts:
-- default: `mercata/contracts/.env.smoke-native-bridge`
+- default: `app/contracts/.env.smoke-native-bridge`
 - optional override: `SMOKE_NATIVE_BRIDGE_ENV_FILE=/absolute/path/to/file`
-- template: `mercata/contracts/.env.smoke-native-bridge.example`
+- template: `app/contracts/.env.smoke-native-bridge.example`
 
 **Usage**:
 ```bash
@@ -232,7 +232,7 @@ npm run smoke:native-bridge -- --external-chain-id 11155111
 
 Example env file:
 ```bash
-# mercata/contracts/.env.smoke-native-bridge
+# app/contracts/.env.smoke-native-bridge
 CHAIN_11155111_RPC_URL=<sepolia-rpc-url>
 CHAIN_11155111_NATIVE_REPRESENTATION_BRIDGE_ADDRESS=<sepolia-native-bridge-proxy>
 CHAIN_11155111_REPRESENTATION_TOKEN_ADDRESS=<sepolia-representation-token-proxy>
@@ -284,9 +284,9 @@ Run the first state-changing happy-path for the native bridge:
 - verify the STRATO recipient balance increases by the redeemed amount
 
 This script intentionally uses a separate env file:
-- default: `mercata/contracts/.env.happy-native-redemption`
+- default: `app/contracts/.env.happy-native-redemption`
 - optional override: `HAPPY_NATIVE_REDEMPTION_ENV_FILE=/absolute/path/to/file`
-- template: `mercata/contracts/.env.happy-native-redemption.example`
+- template: `app/contracts/.env.happy-native-redemption.example`
 
 **Usage**:
 ```bash

@@ -67,10 +67,10 @@ nodes:
 npm run test:token-sale -- --config config.highlevel.yaml
 ```
 
-Replays the "Fund > Bridge-In (Sepolia USDC → STRATO USDST → AUTO_FORGE → GOLDST)" composition performed by `mercata/ui/src/components/bridge/BridgeIn.tsx`. Each "sale" is the pair of operations the UI triggers once the user confirms the deposit:
+Replays the "Fund > Bridge-In (Sepolia USDC → STRATO USDST → AUTO_FORGE → GOLDST)" composition performed by `app/ui/src/components/bridge/BridgeIn.tsx`. Each "sale" is the pair of operations the UI triggers once the user confirms the deposit:
 
 1. **Sepolia leg** — sign a Permit2 `PermitTransferFrom` typed-data (EIP-712), then broadcast `DepositRouter.deposit(USDC, amount, stratoAddress, USDST, nonce, deadline, signature)` on Sepolia. One funded EOA signs every iteration with sequential nonces.
-2. **Bridge-request leg** — `POST /api/bridge/requestDepositAction { externalChainId, externalTxHash, action: 2, targetToken: GOLDST }`. The bridge service (`mercata/services/bridge`) polls Sepolia, sees the `DepositRouted` event, mints USDST to the recipient and auto-forges USDST → GOLDST server-side.
+2. **Bridge-request leg** — `POST /api/bridge/requestDepositAction { externalChainId, externalTxHash, action: 2, targetToken: GOLDST }`. The bridge service (`app/services/bridge`) polls Sepolia, sees the `DepositRouted` event, mints USDST to the recipient and auto-forges USDST → GOLDST server-side.
 
 Optional per-user warm-up replays the GETs the Fund page fires on mount:
 
@@ -187,8 +187,8 @@ Rough sizing: each deposit consumes ~150k gas at ~30 gwei ≈ 0.0000045 ETH. For
 
 The bridge service expects `DepositRouter.sol` deployed on Sepolia.
 
-1. Deploy `mercata/ethereum/contracts/bridge/DepositRouter.sol` to Sepolia via the hardhat project in `mercata/ethereum/`.
-2. Register the deployed address + supported token mappings (USDC ↔ USDST) in the on-chain `MercataBridge` contract on STRATO (see `mercata/services/bridge/README.md`).
+1. Deploy `app/ethereum/contracts/bridge/DepositRouter.sol` to Sepolia via the hardhat project in `app/ethereum/`.
+2. Register the deployed address + supported token mappings (USDC ↔ USDST) in the on-chain `MercataBridge` contract on STRATO (see `app/services/bridge/README.md`).
 3. Configure the bridge service's `CHAIN_11155111_RPC_URL` env var and ensure it is running.
 4. Paste the Sepolia DepositRouter address into `config.highlevel.yaml` under `scenarios.tokenSale.bridge.depositRouterAddress`.
 
