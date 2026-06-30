@@ -105,7 +105,7 @@ generateDockerComposeAllDocker = do
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh /usr/src/app/docker-run.sh >> /logs/smd.log 2>&1"]
-        , volumes = Just ["./logs:/logs"]
+        , volumes = Just ["./logs:/logs", "./nodedata/.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }

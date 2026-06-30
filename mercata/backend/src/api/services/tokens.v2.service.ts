@@ -14,7 +14,7 @@ import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, Stor
 import { getHistoryDirect, fetchActiveRequestIds, fetchVaultHistoryConfig } from "../helpers/historyDb.helper";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
 
-const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS } = constants;
+const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, priceOracle } = constants;
 
 // Queries MercataBridge config for the unanimous externalSymbol for each given strato token address.
 // Returns a map of stratoToken -> externalSymbol.
@@ -728,6 +728,7 @@ export const getNetBalanceHistory = async (
       botExecutor: vaultConfig?.botExecutor,
       carryVaultAddrs,
       requestFilters,
+      priceOracle,
     },
     mappingCollectionNames,
     initialData,

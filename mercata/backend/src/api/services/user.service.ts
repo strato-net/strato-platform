@@ -48,6 +48,42 @@ export const isUserAdmin = async (
   }
 }; 
 
+const getVariadicTail = (args: any[], startIndex: number): any[] => {
+  const tail = args.slice(startIndex);
+  return tail.length === 1 && Array.isArray(tail[0]) ? tail[0] : tail;
+};
+
+const getCreateContractArgs = (args: any[]): any[] =>
+  getVariadicTail(args, 2).map((arg) => typeof arg === "string" ? JSON.stringify(arg) : arg);
+
+const castVoteOnCreateContractIssue = async (
+  accessToken: string,
+  userAddress: string,
+  target: string,
+  args: any[],
+): Promise<{ status: string; hash: string }> => {
+  if (args.length < 3) {
+    throw new Error('Invalid createContract issue args');
+  }
+
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(AdminRegistry),
+    contractAddress: target,
+    method: "createContract",
+    args: {
+      contractName: args[0],
+      contractSrc: args[1],
+      args: getCreateContractArgs(args),
+    },
+  }, userAddress, accessToken);
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  return { status, hash };
+};
+
 export const getAdmin = async (
   accessToken: string
 ): Promise<string[]> => {
@@ -221,6 +257,10 @@ export const castVoteOnIssueById = async (
         throw new Error('Admin address not found in args');
       }
       return await removeAdmin(accessToken, userAddress, adminAddress);
+    }
+
+    if (func === 'createContract' && Array.isArray(args)) {
+      return await castVoteOnCreateContractIssue(accessToken, userAddress, target, args);
     }
 
     return await castVoteOnIssue(accessToken, userAddress, target, func, args);

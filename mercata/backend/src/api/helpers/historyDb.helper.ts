@@ -94,6 +94,7 @@ export interface NetBalanceMappingFilterParams {
   botExecutor?: string;
   carryVaultAddrs: string[];
   requestFilters: { address: string; path: string }[];
+  priceOracle: string;
 }
 
 /**
@@ -155,7 +156,11 @@ export async function fetchMappingHistory(
 ): Promise<MappingHistoryElement[]> {
   // Collections whose rows are needed in full (no path filter required).
   // In PostgREST these required individual `path LIKE 'collName[%'` ORs.
-  const globalCollections = ['prices', 'collateralConfigs', 'collateralGlobalStates'];
+  // `prices` is handled separately: it must be restricted to the system price
+  // oracle address, otherwise stale prices published by other contracts pollute
+  // the portfolio history (see fix "restrict portfolio history price query to
+  // system oracle").
+  const globalCollections = ['collateralConfigs', 'collateralGlobalStates'];
 
   // Build the _balances path array: user-specific paths + bot executor + carry vault idle assets
   const balancePaths: string[] = [
@@ -182,7 +187,7 @@ export async function fetchMappingHistory(
   // $1 = endTime, $2 = startTime, $3 = collectionNames,
   // $4 = userAddress path pattern, $5 = globalCollections,
   // $6 = balancePaths, $7 = carryVaultAddrs, $8 = claimablePath,
-  // $9 = requestAddrs, $10 = requestPaths
+  // $9 = requestAddrs, $10 = requestPaths, $11 = priceOracle
   const sql = `
     SELECT address, collection_name, key, path, value, valid_from, valid_to
     FROM "history@mapping"
@@ -192,8 +197,10 @@ export async function fetchMappingHistory(
       AND (
         -- User-specific rows: balances, collaterals, loans, vaults
         path LIKE $4
-        -- Global reference data: all rows for prices, collateralConfigs, collateralGlobalStates
+        -- Global reference data: all rows for collateralConfigs, collateralGlobalStates
         OR collection_name = ANY($5)
+        -- Prices: only from the system price oracle (avoid stale prices from other contracts)
+        OR (collection_name = 'prices' AND address = $11)
         -- Specific _balances lookups (liquidity pool, bot executor, carry vault idle assets)
         OR path = ANY($6)
         -- Carry vault claimable assets for this user
@@ -215,6 +222,7 @@ export async function fetchMappingHistory(
     claimablePath,
     requestAddrs.length > 0 ? requestAddrs : [''],
     requestPaths.length > 0 ? requestPaths : [''],
+    filters.priceOracle,
   ]);
 }
 
