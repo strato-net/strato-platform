@@ -196,6 +196,7 @@ export async function fetchUserMappingHistory(
       AND valid_to >= $2
       AND collection_name = ANY($3)
       AND (
+        path LIKE $4
         OR path = ANY($5)
         OR (address = ANY($6) AND path = $7)
         OR (address = ANY($8) AND path = ANY($9))
