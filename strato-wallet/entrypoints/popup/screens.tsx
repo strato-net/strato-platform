@@ -2351,6 +2351,13 @@ export function Settings({ navigate }: { navigate: (to: string) => void }) {
                 onChange={(e) => setForm((f) => ({ ...f, stratoApiUrl: e.target.value }))}
               />
             </Field>
+            <Field label="Vault URL (signing / MPC)">
+              <Input
+                defaultValue={selected.data.vaultUrl ?? ""}
+                placeholder="https://vault.example:8093/strato/v2.3"
+                onChange={(e) => setForm((f) => ({ ...f, vaultUrl: e.target.value.trim() }))}
+              />
+            </Field>
             <Field label="Block explorer URL">
               <Input
                 defaultValue={selected.data.explorerUrl ?? ""}

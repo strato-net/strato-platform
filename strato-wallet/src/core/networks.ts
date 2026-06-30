@@ -58,14 +58,27 @@ export interface StratoNetwork {
 // /rpc, /api/*, /bloc/*, and /strato/v2.3/* are all nginx routes on the SAME node
 // origin, so derive these from the RPC URL's origin (not the raw vault server).
 
-/** Vault signature endpoint (BLOC v2.3 signer, fronted by the node's nginx). */
+/**
+ * Base URL of the Vault's v2.3 API. The Vault is a standalone service (often a
+ * different host/port than the node, e.g. https://vault.blockapps.net:8093/strato/v2.3),
+ * so prefer the network's explicit `vaultUrl`. Falls back to the node origin only
+ * when no vaultUrl is configured (its nginx may also proxy /strato/v2.3). A bare
+ * origin is normalized to end at the /strato/v2.3 base.
+ */
+export function vaultBase(n: StratoNetwork): string {
+  const raw = n.vaultUrl?.trim();
+  const base = raw ? raw.replace(/\/+$/, "") : `${new URL(n.rpcUrl).origin}/strato/v2.3`;
+  return /\/strato\/v2\.3$/.test(base) ? base : `${base}/strato/v2.3`;
+}
+
+/** Vault signature endpoint (BLOC v2.3 signer). */
 export function signatureUrl(n: StratoNetwork): string {
-  return `${new URL(n.rpcUrl).origin}/strato/v2.3/signature`;
+  return `${vaultBase(n)}/signature`;
 }
 
 /** Vault MPC shard endpoint (2-of-2 shard store/fetch). */
 export function mpcKeyUrl(n: StratoNetwork): string {
-  return `${new URL(n.rpcUrl).origin}/strato/v2.3/mpckey`;
+  return `${vaultBase(n)}/mpckey`;
 }
 
 /** Node user-identity endpoint (maps an OAuth token -> blockchain address). */

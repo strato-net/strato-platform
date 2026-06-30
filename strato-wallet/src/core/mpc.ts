@@ -43,6 +43,28 @@ export function reconstructKey(shardAHex: string, shardBHex: string): Hex {
 // Shard hex is sent/received without the 0x prefix (the Vault hex-decodes it).
 const strip0x = (h: string) => h.replace(/^0x/, "");
 
+// A node whose nginx doesn't route /strato/v2.3/mpckey to the Vault falls through
+// to the SPA catch-all, which returns 200 + HTML. Parse strictly so we never treat
+// that (or any non-Vault response) as success.
+const ROUTE_HINT =
+  "the /strato/v2.3/mpckey route may not be deployed on this node yet";
+
+async function readVaultJson(res: Response, what: string): Promise<any> {
+  if (!res.ok) {
+    throw new Error(`${what} failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
+  }
+  const ct = res.headers.get("content-type") ?? "";
+  const text = await res.text();
+  if (!ct.includes("application/json")) {
+    throw new Error(`${what} failed: Vault returned a non-JSON response (${ROUTE_HINT})`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`${what} failed: Vault returned an unparseable response (${ROUTE_HINT})`);
+  }
+}
+
 /** Store the Vault shard (shard B) for the authenticated user. */
 export async function postMpcShard(
   mpcKeyUrl: string,
@@ -54,22 +76,24 @@ export async function postMpcShard(
     method: "POST",
     headers: {
       "content-type": "application/json",
+      accept: "application/json",
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify({ shard: strip0x(shardBHex), address: strip0x(addressHex).toLowerCase() }),
   });
-  if (!res.ok) {
-    throw new Error(`MPC key store failed (${res.status}): ${await res.text()}`);
+  const body = await readVaultJson(res, "MPC key store");
+  // The Vault echoes the stored address; anything else means it wasn't stored.
+  if (!body || typeof body !== "object" || !body.address) {
+    throw new Error(`MPC key store failed: unexpected response (${ROUTE_HINT})`);
   }
 }
 
 /** Fetch the Vault shard (shard B); returns 0x-prefixed hex. */
 export async function getMpcShard(mpcKeyUrl: string, accessToken: string): Promise<Hex> {
   const res = await fetch(mpcKeyUrl, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: { accept: "application/json", Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) throw new Error(`MPC shard fetch failed (${res.status}): ${await res.text()}`);
-  const j = await res.json();
+  const j = await readVaultJson(res, "MPC shard fetch");
   if (!j?.shard) throw new Error("Vault returned no MPC shard");
   return `0x${strip0x(String(j.shard))}`;
 }
