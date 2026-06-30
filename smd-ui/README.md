@@ -1,92 +1,55 @@
-# SMD-ui
+# STRATO Management Dashboard (SMD)
 
-STRATO Management Dashboard - the UI for STRATO built on React.js.
+Modern rewrite of the SMD on the same stack as the Mercata app: **Vite + React 18 +
+TypeScript + Tailwind + shadcn/ui**, with **wagmi / viem / RainbowKit** wallet
+connectivity and **TanStack Query** for data.
 
-# Run in production
-In production we run SMD in Docker as part of STRATO node (see Dockerfile, docker-run.sh, strato-platform/docker-compose.tpl.yml and github.com/blockapps/strato-getting-started)
+Served under `/smd/` on port `3002` behind the platform `nginx-packager`.
 
-# Run for local development
+> The previous React 15 / Redux-saga / Blueprint app is parked in `legacy/` as a
+> reference during the port and will be removed once feature parity is reached.
 
-To run react dev server locally with all features enabled go through the following steps:
+## Develop
 
-Requirements:
+```bash
+npm install
+# Proxy API calls to a running STRATO node (defaults to http://localhost:8080):
+STRATO_NODE_URL=https://your-node npm run dev
+```
 
-- Node v14.21.3 (updating to 21 made the problems to run jest tests - this needs some work, including replacing of yields with awaits)
+Vite serves the app at `http://localhost:3002/smd/`. The dev proxy forwards
+`/bloc`, `/strato-api`, `/strato`, `/cirrus`, `/apex-api`, `/rpc`, `/vault`,
+`/api`, `/auth`, and `/login` to `STRATO_NODE_URL`.
 
-To run the React dev server locally with all features enabled, add the `SMD_DEV_MODE=true` and `SMD_DEV_MODE_HOST_IP=<MY_IP>` environment variables to your STRATO start script:
+## Build
 
-1. Determine correct SMD_DEV_MODE_HOST_IP value depending on your OS:
-  - Linux: `172.17.0.1` (default)
-  - MacOS: `docker.for.mac.localhost`
-  - Windows: `host.docker.internal`
+```bash
+npm run build      # outputs dist/ (base = /smd/)
+```
 
-  Note depending on your Docker setup and version, a different value for your IP might be required.
+## Wallet connectivity
 
-2. Run STRATO node normally on your localhost (say, localhost:8080):
-    ```
-    NODE_HOST=localhost:8080 \
-    HTTP_PORT=8080 \
-    OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
-    OAUTH_JWT_USERNAME_PROPERTY=email \
-    OAUTH_CLIENT_ID=dev \
-    OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \
-    PASSWORD=123 \
-    SMD_DEV_MODE=true \
-    SMD_DEV_MODE_HOST_IP=<YOUR_IP> \
-    ./strato --single
-    ```
+The **Connect Wallet** button lets users connect with:
 
-3. Run SMD react dev server locally:
-    ```
-    cd strato-platform/smd-ui
-    npm i
-    REACT_APP_NODE_HOST=localhost:8080 REACT_APP_OAUTH_ENABLED=true npm run start
-    ```
-    (The env vars have the prefix REACT_APP_ as it is the requirement of React in order to pass the unprefixed vars to browser)
+- **STRATO Wallet** — OIDC/Keycloak login (handled by `nginx-packager` which already
+  protects `/smd/`); identity comes from `POST /apex-api/user` and transactions are
+  signed server-side by the vault via `POST /strato/v2.3/signature`.
+- **External wallets** — MetaMask / Coinbase / WalletConnect via RainbowKit.
 
-4. Open `localhost:8080/` (**NOTE: PORT 8080, NOT THE 3000!!**) in the browser, login and start making changes in SMD code to see updates live in browser. 
+Both submit transactions over the STRATO chain JSON-RPC at `/rpc`.
 
-Alternatively, this may done manually by changing the Nginx config inside the Nginx container after it has already been started and restarting the service:
+### Backend requirements (nginx-packager)
 
-1. Update STRATO's nginx config
-    Get into the nginx container:
-    ```
-    sudo docker exec -it strato_nginx_1 bash
-    ```
-2. Edit the config with vim or nano:
+- `JSONRPC_ENABLED=true` — exposes `/rpc` (required by the STRATO wallet connector).
+- `/strato/v2.3/signature` location — added to proxy vault signing for the STRATO wallet.
+- `window.ENV.CHAIN_ID` must be set (via `/smd/config.js`, generated at container
+  startup from `ethconf.yaml`) for the STRATO wallet to appear; otherwise only
+  external wallets are offered.
 
-    ```
-    vim /usr/local/openresty/nginx/conf/nginx.conf
-    ```
+## Layout
 
-    Replace the existing `location / {...}` block with the following, replacing the IP with the correct IP based on your OS:
-    
-    ```
-    location / {
-      set $is_ui "true";
-      rewrite_by_lua_file  lua/openid.lua;
-      proxy_set_header Accept-Encoding "";
-      proxy_pass http://<SMD_DEV_MODE_HOST_IP>:3000/;
-    }
-    ```
-
-    And add a new location block to enable the web socket connection:
-
-    ```
-    location /sockjs-node {
-      proxy_set_header Upgrade $http_upgrade;
-      proxy_set_header Connection "upgrade";
-      proxy_http_version 1.1;
-      proxy_pass http://<SMD_DEV_MODE_HOST_IP>:3000/sockjs-node;
-    }
-    ```
-3. Validate and reload config:
-    
-    ```
-    openresty -t   # check for validation errors
-    openresty -s reload
-    ```
-    If there is an error in the config, the first validation step will warn you of those errors.
-
-4. Run SMD locally as shown above.
-
+- `src/lib/` — `env`, `api` (axios), `auth`, `csrf`, `wagmi`, `stratoChain`, `stratoWallet`.
+- `src/context/UserContext.tsx` — auth/session + connected-wallet state (`useUser`).
+- `src/services/` — TanStack Query hooks and STRATO/CIRRUS calls.
+- `src/components/` — `ui/` (shadcn), `layout/`, feature components.
+- `src/pages/` — `AccountsPage`, `ContractsPage`.
