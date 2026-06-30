@@ -14,7 +14,6 @@ import {
   Droplets,
   Shield,
   HandCoins,
-  Vault,
 
   ArrowDownToLine,
   X
@@ -60,7 +59,6 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
   {
     label: 'PRO',
     items: [
-      { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
       { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
       { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
       { icon: BarChart3, label: 'Analytics', path: '/dashboard/stats' },

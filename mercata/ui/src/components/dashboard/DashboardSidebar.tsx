@@ -15,7 +15,6 @@ import {
   Shield,
   LucideIcon,
   HandCoins,
-  Vault,
   ArrowDownToLine
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
@@ -60,7 +59,6 @@ const NAV_CATEGORIES: NavCategory[] = [
   {
     label: 'PRO',
     items: [
-      { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
       { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
       { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
       { icon: BarChart3, label: 'Analytics', path: '/dashboard/stats' },
