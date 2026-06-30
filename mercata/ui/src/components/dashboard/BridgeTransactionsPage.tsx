@@ -31,7 +31,7 @@ const BridgeTransactionsPage = ({ isAdmin = false }: { isAdmin?: boolean }) => {
     },
     {
       key: 'WithdrawalInitiated',
-      label: 'Withdrawal',
+      label: 'Bridge Out',
     },
   ];
 

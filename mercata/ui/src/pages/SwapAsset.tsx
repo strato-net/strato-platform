@@ -16,10 +16,10 @@ const SwapAsset = () => {
       <DashboardSidebar />
 
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
-        <DashboardHeader title="Swap" />
+        <DashboardHeader title="Trade" />
         <main className="p-4 md:p-6">
           {!isLoggedIn && (
-            <GuestSignInBanner message="Sign in to swap tokens and exchange digital assets" />
+            <GuestSignInBanner message="Sign in to trade tokens and exchange digital assets" />
           )}
           <div className="max-w-2xl mx-auto space-y-4 md:space-y-6">
             {/* Main Swap Widget */}

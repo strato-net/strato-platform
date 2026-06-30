@@ -386,7 +386,7 @@ const SwapDialog = ({
   <Dialog open={isOpen} onOpenChange={onOpenChange}>
     <DialogContent className="max-w-[95vw] sm:max-w-md">
       <DialogHeader>
-        <DialogTitle className="text-lg md:text-xl">Confirm Swap</DialogTitle>
+        <DialogTitle className="text-lg md:text-xl">Confirm Trade</DialogTitle>
         <DialogDescription className="text-xs md:text-sm">
           Please review the details below. Slippage tolerance and fees have already been applied.
         </DialogDescription>
@@ -430,7 +430,7 @@ const SwapDialog = ({
           Cancel
         </Button>
         <Button disabled={isLoading} onClick={onConfirm} className="w-full sm:w-auto bg-strato-blue hover:bg-strato-blue/90">
-          {isLoading && <LoadingSpinner />} Confirm Swap
+          {isLoading && <LoadingSpinner />} Confirm Trade
         </Button>
       </DialogFooter>
     </DialogContent>
@@ -1096,7 +1096,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
         onClick={() => setIsDialogOpen(true)}
         disabled={guestMode || isSwapDisabled() || !!pool?.isDisabled || !!pool?.isPaused}
       >
-        {pool?.isDisabled ? "This pool is disabled" : pool?.isPaused ? "Pool is paused by admin at this time" : "Swap Assets"}
+        {pool?.isDisabled ? "This pool is disabled" : pool?.isPaused ? "Pool is paused by admin at this time" : "Trade Assets"}
       </Button>
 
       <SwapDialog

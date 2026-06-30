@@ -4,8 +4,6 @@ import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
-import DashboardFAQ from "../components/dashboard/DashboardFAQ";
-import BorrowingSection from "../components/dashboard/BorrowingSection";
 import { Wallet, Coins, Shield, Loader2, Trophy, Send, Book, ArrowRightLeft, Gem, Mail, Gift } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
@@ -14,7 +12,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useNetBalance } from "@/hooks/useNetBalance";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
 import PortfolioValueChart from "@/components/dashboard/PortfolioValueChart";
-import { useLendingContext } from "@/context/LendingContext";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
 import { useUserLeaderboardRank } from "@/hooks/useUserLeaderboardRank";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
@@ -60,7 +57,6 @@ const Dashboard = () => {
     }
     return 'netBalance';
   });
-  const { loans } = useLendingContext();
   const { contactEnabled } = useNetwork();
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(() => {
@@ -363,7 +359,7 @@ const Dashboard = () => {
                 className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
               >
                 <Send size={18} />
-                <span className="text-xs md:text-sm">Transfer</span>
+                <span className="text-xs md:text-sm">Send</span>
               </Button>
               <Button
                 onClick={() => navigate("/dashboard/borrow")}
@@ -377,7 +373,7 @@ const Dashboard = () => {
                 className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
               >
                 <ArrowRightLeft size={18} />
-                <span className="text-xs md:text-sm">Swap</span>
+                <span className="text-xs md:text-sm">Trade</span>
               </Button>
             </div>
           )}
@@ -421,22 +417,11 @@ const Dashboard = () => {
           </div>
 
           <div className="mb-8">
-            <BorrowingSection
-              loanData={loans}
-              guestMode={!isLoggedIn}
-            />
-          </div>
-
-          <div className="mb-8">
             <MyPoolParticipationSection
               poolTokens={poolTokens}
               loading={loadingEarningAssets}
               guestMode={!isLoggedIn}
             />
-          </div>
-
-          <div className="mb-8">
-            <DashboardFAQ />
           </div>
         </main>
       </div>

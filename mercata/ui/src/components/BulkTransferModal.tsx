@@ -364,7 +364,7 @@ const BulkTransferModal = ({
   const renderUploadState = () => (
     <>
       <DialogHeader>
-        <DialogTitle>Bulk Transfer</DialogTitle>
+        <DialogTitle>Bulk Send</DialogTitle>
         <DialogDescription>
           Upload a CSV file to transfer tokens to multiple recipients.
         </DialogDescription>

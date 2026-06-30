@@ -55,7 +55,7 @@ const Transfer = () => {
   const isVaultUser = !!userName;
   const guestMode = !isLoggedIn;
   useEffect(() => {
-    document.title = "Transfer Assets | STRATO";
+    document.title = "Send Assets | STRATO";
   }, []);
   const [tokens, setTokens] = useState<Token[]>([]);
   const [recipient, setRecipient] = useState<string>("");
@@ -219,14 +219,14 @@ const Transfer = () => {
       <DashboardSidebar />
 
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
-        <DashboardHeader title="Transfer" />
+        <DashboardHeader title="Send" />
         <main className="p-4 md:p-6">
           {guestMode && (
-            <GuestSignInBanner message="Sign in to transfer tokens to other addresses" />
+            <GuestSignInBanner message="Sign in to send tokens to another STRATO account" />
           )}
           <div className="max-w-2xl mx-auto bg-card shadow-md rounded-lg p-6 space-y-6 border border-border">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Transfer your tokens</h2>
+              <h2 className="text-xl font-semibold">Send your tokens</h2>
               <Button
                 variant="outline"
                 size="sm"
@@ -235,7 +235,7 @@ const Transfer = () => {
                 title={tokens.length === 0 ? "No tokens available" : "Upload CSV for bulk transfer"}
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Bulk Transfer
+                Bulk Send
               </Button>
             </div>
 
@@ -349,7 +349,22 @@ const Transfer = () => {
 
             {/* Recipient Address */}
             <div className="space-y-2">
-              <label className="text-sm text-muted-foreground">Recipient Address</label>
+              <label className="text-sm text-muted-foreground">Recipient STRATO Address</label>
+              <div className="rounded-md border border-blue-300 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800 p-3">
+                <div className="flex items-start gap-2 text-blue-800 dark:text-blue-300 text-sm">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <p>
+                    This sends tokens to another STRATO account. It is{" "}
+                    <span className="font-semibold">not</span> a bridge withdrawal — do not
+                    enter an Ethereum or other external chain address. To move tokens off
+                    STRATO, use the{" "}
+                    <Link to="/dashboard/withdrawals" className="font-medium underline">
+                      Bridge Out page
+                    </Link>
+                    .
+                  </p>
+                </div>
+              </div>
               <Input
                 type="text"
                 value={recipient}
@@ -369,7 +384,7 @@ const Transfer = () => {
                         If you are trying to withdraw to an external chain (e.g. Ethereum),
                         please use the{" "}
                         <Link to="/dashboard/withdrawals" className="font-medium underline">
-                          Withdraw page
+                          Bridge Out page
                         </Link>{" "}
                         instead.
                       </p>
@@ -462,7 +477,7 @@ const Transfer = () => {
                 (nonceWarning && !nonceOverride)
               }
             >
-              {swapLoading ? <span>Processing…</span> : "Transfer"}
+              {swapLoading ? <span>Processing…</span> : "Send"}
             </Button>
           </div>
 
