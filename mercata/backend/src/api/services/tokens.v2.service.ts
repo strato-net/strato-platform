@@ -702,18 +702,6 @@ export const getNetBalanceHistory = async (
     requestFilters.push({ address: addr, path: `requests[${reqId}]` });
   }
 
-  const mappingCollectionNames = [
-    '_balances',
-    'claimableAssets',
-    'collateralConfigs',
-    'collateralGlobalStates',
-    'prices',
-    ...(requestFilters.length ? ['requests'] : []),
-    'userCollaterals',
-    'userLoan',
-    'vaults'
-  ];
-
   const carryVaultAddrSet = new Set(carryVaultAddrs);
   const initialData = { tokens: {}, userLoan: {}, vaultConfig: vaultConfig || undefined, carryVaultAddrs: carryVaultAddrSet };
 
@@ -730,7 +718,7 @@ export const getNetBalanceHistory = async (
       requestFilters,
       priceOracle,
     },
-    mappingCollectionNames,
+    vaultConfig,
     initialData,
     updatePortfolioInfoStorage,
     updatePortfolioInfoMapping,
