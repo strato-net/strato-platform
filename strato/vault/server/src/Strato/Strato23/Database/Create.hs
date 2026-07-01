@@ -31,6 +31,22 @@ CREATE INDEX IF NOT EXISTS indexed_address ON users (address);
 CREATE INDEX IF NOT EXISTS indexed_nameId  ON users (x_user_unique_name , x_identity_provider_id);
 |]
 
+mpcKeysTable :: Query
+mpcKeysTable =
+  [sql|
+CREATE TABLE IF NOT EXISTS mpc_keys(
+  id serial              PRIMARY KEY,
+  x_user_unique_name     varchar(512) NOT NULL,
+  x_identity_provider_id varchar(512) NOT NULL,
+  salt bytea             NOT NULL,
+  nonce bytea            NOT NULL,
+  enc_shard bytea        NOT NULL,
+  address bytea          NOT NULL,
+  UNIQUE (x_user_unique_name, x_identity_provider_id)
+);
+CREATE INDEX IF NOT EXISTS indexed_mpc_nameId ON mpc_keys (x_user_unique_name, x_identity_provider_id);
+|]
+
 messageTable :: Query
 messageTable =
   [sql|
