@@ -10,7 +10,6 @@ import { useUser } from "@/context/UserContext";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useNetBalance } from "@/hooks/useNetBalance";
-import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
 import PortfolioValueChart from "@/components/dashboard/PortfolioValueChart";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
 import { useUserLeaderboardRank } from "@/hooks/useUserLeaderboardRank";
@@ -84,24 +83,16 @@ const Dashboard = () => {
     [inactiveTokens]
   );
 
-  // Sort earning assets by value, then categorize in a single pass
-  const { nonPoolTokens, poolTokens } = useMemo(() => {
-    const sorted = [...earningAssets].sort((a, b) => {
-      const valueA = parseFloat(a.value || "0");
-      const valueB = parseFloat(b.value || "0");
-      return valueB - valueA;
-    });
-    const nonPool: typeof earningAssets = [];
-    const pool: typeof earningAssets = [];
-    for (const token of sorted) {
-      if (token.isPoolToken) {
-        pool.push(token);
-      } else {
-        nonPool.push(token);
-      }
-    }
-    return { nonPoolTokens: nonPool, poolTokens: pool };
-  }, [earningAssets]);
+  // Sort earning assets by value
+  const sortedTokens = useMemo(
+    () =>
+      [...earningAssets].sort((a, b) => {
+        const valueA = parseFloat(a.value || "0");
+        const valueB = parseFloat(b.value || "0");
+        return valueB - valueA;
+      }),
+    [earningAssets]
+  );
 
   // Use centralized net balance calculation hook
   const { netBalance: totalBalance, cataBalance, totalBorrowed, isLoading: isLoadingNetBalance } = useNetBalance({
@@ -410,16 +401,8 @@ const Dashboard = () => {
           <div className="mb-8">
             <AssetsList
               loading={loadingEarningAssets || loadingInactiveTokens}
-              tokens={nonPoolTokens}
+              tokens={sortedTokens}
               inActiveTokens={isLoggedIn ? inactiveTokens : []}
-              guestMode={!isLoggedIn}
-            />
-          </div>
-
-          <div className="mb-8">
-            <MyPoolParticipationSection
-              poolTokens={poolTokens}
-              loading={loadingEarningAssets}
               guestMode={!isLoggedIn}
             />
           </div>

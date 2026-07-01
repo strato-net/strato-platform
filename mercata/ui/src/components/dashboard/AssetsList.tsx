@@ -83,14 +83,14 @@ const AssetsList = ({
       {isDashboard && (
         <div className="p-4 md:p-5">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <h2 className="font-bold text-lg">My Deposits</h2>
+            <h2 className="font-bold text-lg">My Tokens</h2>
             {/* Mobile: full width button */}
             <Button
               className="w-full sm:hidden flex items-center justify-center gap-2"
               onClick={() => window.location.href = "/dashboard/deposits"}
             >
               <Plus size={16} />
-              Deposit
+              Fund
             </Button>
             {/* Desktop: small button */}
             <Button
@@ -99,7 +99,7 @@ const AssetsList = ({
               onClick={() => window.location.href = "/dashboard/deposits"}
             >
               <Plus size={16} />
-              Deposit
+              Fund
             </Button>
           </div>
         </div>
@@ -109,16 +109,14 @@ const AssetsList = ({
         {!isDashboard && (
           <div className="p-4 text-right border-b border-border flex justify-between">
             <span className="font-bold inline-flex items-center gap-1">
-              Earning Assets / Best Available APY
-              <BestApyInfoTooltip />
+              Earning Assets
             </span>
           </div>
         )}
         {isDashboard && (
           <div className="p-3 md:p-4 text-right flex justify-between">
             <span className="font-bold text-sm md:text-base inline-flex items-center gap-1">
-              Earning Assets / Best Available APY
-              <BestApyInfoTooltip />
+              Earning Assets
             </span>
           </div>
         )}
@@ -320,11 +318,10 @@ const AssetsList = ({
             </Button>
           </div>
           <div
-            className={`transition-all duration-300 ease-in-out overflow-hidden ${
-              showNonEarningAssetsTable
-                ? "max-h-[400px] opacity-100"
-                : "max-h-0 opacity-0"
-            }`}
+            className={`transition-all duration-300 ease-in-out overflow-hidden ${showNonEarningAssetsTable
+              ? "max-h-[400px] opacity-100"
+              : "max-h-0 opacity-0"
+              }`}
           >
             <div className="overflow-y-auto max-h-[400px] px-3 md:px-0">
               <table className="w-full">
