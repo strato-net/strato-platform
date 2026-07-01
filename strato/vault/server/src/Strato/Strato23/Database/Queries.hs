@@ -131,6 +131,50 @@ postUserKeyQuery' userName oauthProvider KeyStore {..} conn = do
             }
       return True
 
+-- MPC key shards (separate table; mirrors the user-key queries by name+provider).
+getMpcShardQuery' :: T.Text -> T.Text -> Query (O.Field PGBytea, O.Field PGBytea, O.Field PGBytea, O.Field PGBytea)
+getMpcShardQuery' username oauthRealm = proc () -> do
+  (_, name, oauth, salt, nonce, encShard, address) <- selectTable mpcKeysTable -< ()
+  restrict -< (name .== toFields username .&& oauth .== toFields oauthRealm)
+  returnA -< (salt, nonce, encShard, address)
+
+postMpcKeyQuery' ::
+  T.Text ->
+  T.Text ->
+  ByteString -> -- salt
+  SecretBox.Nonce ->
+  ByteString -> -- encrypted shard
+  Address ->
+  Connection ->
+  IO Bool
+postMpcKeyQuery' userName oauthProvider salt nonce encShard addr conn = do
+  (ids :: [Int32]) <- runSelect conn $ proc () -> do
+    (rid, name, oauth, _, _, _, _) <- selectTable mpcKeysTable -< ()
+    restrict -< (name .== toFields userName .&& oauth .== toFields oauthProvider)
+    returnA -< rid
+  case listToMaybe ids of
+    Just _ -> return False
+    Nothing -> do
+      void $
+        runInsert
+          conn
+          Insert
+            { iTable = mpcKeysTable,
+              iRows =
+                [ ( Nothing,
+                    toFields userName,
+                    toFields oauthProvider,
+                    toFields salt,
+                    toFields nonce,
+                    toFields encShard,
+                    toFields addr
+                  )
+                ],
+              iReturning = rCount,
+              iOnConflict = Nothing
+            }
+      return True
+
 getMessageQuery :: Query (O.Field PGBytea, O.Field PGBytea, O.Field PGBytea)
 getMessageQuery = proc () -> do
   (id', salt, nonce, enc_msg) <- selectTable messageTable -< ()

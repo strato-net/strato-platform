@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchLeaderboard, normalizeRewardsAddress } from "@/services/rewardsService";
+import { api } from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
+
+interface UserRankResponse {
+  rank: number | null;
+  totalRewardsEarned: string | null;
+  total: number;
+}
 
 export const useUserLeaderboardRank = () => {
   const { userAddress, isLoggedIn } = useUser();
@@ -17,48 +23,10 @@ export const useUserLeaderboardRank = () => {
 
     try {
       setLoading(true);
-      // Fetch all leaderboard entries to find user's rank
-      // Backend max limit is 100, so we paginate
-      let offset = 0;
-      const limit = 100;
-      let found = false;
-      let userRank: number | null = null;
-      let userTotalEarned: string | null = null;
-      const normalizedUserAddress = normalizeRewardsAddress(userAddress);
-
-      while (!found) {
-        const response = await fetchLeaderboard(forceRefresh, limit, offset);
-        
-        if (response.entries.length === 0) {
-          break; // No more entries
-        }
-
-        const userEntry = response.entries.find(
-          (entry) => normalizeRewardsAddress(entry.address) === normalizedUserAddress
-        );
-
-        if (userEntry) {
-          userRank = userEntry.rank;
-          userTotalEarned = userEntry.totalRewardsEarned;
-          found = true;
-          break;
-        }
-
-        // If we got less than limit entries or reached total, we've reached the end
-        if (response.entries.length < limit || offset + limit >= response.total) {
-          break;
-        }
-
-        offset += limit;
-        
-        // Safety check: don't fetch more than total entries
-        if (offset >= response.total) {
-          break;
-        }
-      }
-
-      setRank(userRank);
-      setTotalEarned(userTotalEarned);
+      const params = forceRefresh ? { refresh: "true" } : {};
+      const response = await api.get<UserRankResponse>("/rewards/leaderboard/me", { params });
+      setRank(response.data.rank);
+      setTotalEarned(response.data.totalRewardsEarned);
     } catch (error) {
       console.error("Failed to fetch user rank:", error);
       setRank(null);
@@ -76,4 +44,3 @@ export const useUserLeaderboardRank = () => {
 
   return { rank, totalEarned, loading, refetch };
 };
-

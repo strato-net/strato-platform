@@ -299,7 +299,7 @@ const LendingPoolSection = () => {
                           <Button
                             onClick={() => handleLiquidityAction("withdraw")}
                             variant="outline"
-                            className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full"
+                            className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 w-full"
                             disabled={
                               loadingLiquidity ||
                               isProcessing ||
@@ -425,7 +425,7 @@ const LendingPoolSection = () => {
                         <Button
                           onClick={() => handleLiquidityAction("withdraw")}
                           variant="outline"
-                          className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full"
+                          className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 w-full"
                           disabled={
                             loadingLiquidity ||
                             isProcessing ||

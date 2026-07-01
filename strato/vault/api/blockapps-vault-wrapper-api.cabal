@@ -26,6 +26,7 @@ library
   exposed-modules:
       Strato.Strato23.API
       Strato.Strato23.API.Key
+      Strato.Strato23.API.MPC
       Strato.Strato23.API.Password
       Strato.Strato23.API.Ping
       Strato.Strato23.API.Signature

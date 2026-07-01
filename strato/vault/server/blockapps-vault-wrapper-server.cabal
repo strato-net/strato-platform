@@ -31,6 +31,7 @@ library
       Strato.Strato23.Monad
       Strato.Strato23.Server
       Strato.Strato23.Server.Key
+      Strato.Strato23.Server.MPC
       Strato.Strato23.Server.Password
       Strato.Strato23.Server.Ping
       Strato.Strato23.Server.Signature
