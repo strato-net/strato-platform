@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CopyButton } from "@/components/CopyButton";
 import { AddrLink } from "@/components/explorer/AddrLink";
 import { WalletPolicyDialog } from "@/components/accounts/WalletPolicyDialog";
+import { MultisigDialog } from "@/components/accounts/MultisigDialog";
 import { useMyUserWallets } from "@/services/userWallets";
 
 /** Lists the User wallet contracts the connected account is authorized on. */
@@ -38,7 +39,7 @@ export function MyWalletsCard({ ownerAddress }: { ownerAddress?: string | null }
               <TableRow>
                 <TableHead>Username</TableHead>
                 <TableHead>Wallet address</TableHead>
-                <TableHead className="text-right">Policy</TableHead>
+                <TableHead className="text-right">Manage</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -52,7 +53,10 @@ export function MyWalletsCard({ ownerAddress }: { ownerAddress?: string | null }
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <WalletPolicyDialog wallet={w} />
+                    <div className="flex items-center justify-end gap-2">
+                      <MultisigDialog wallet={w} />
+                      <WalletPolicyDialog wallet={w} />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
