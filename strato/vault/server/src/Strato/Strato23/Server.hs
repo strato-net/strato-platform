@@ -15,6 +15,7 @@ import Servant.OpenApi (toOpenApi)
 import Strato.Strato23.API
 import Strato.Strato23.Monad
 import Strato.Strato23.Server.Key
+import Strato.Strato23.Server.MPC
 import Strato.Strato23.Server.Password
 import Strato.Strato23.Server.Ping
 import Strato.Strato23.Server.Signature
@@ -31,6 +32,8 @@ vaultWrapper =
     :<|> postSignature'
     :<|> postPassword
     :<|> verifyPassword
+    :<|> postMPCKey'
+    :<|> getMPCKey'
 
 serveVaultWrapper :: VaultWrapperEnv -> Servant.Server VaultWrapperAPI
 serveVaultWrapper env = hoistServer serverProxy (enterVaultWrapper env) vaultWrapper
