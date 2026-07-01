@@ -431,6 +431,18 @@ export function useMultisigActions({ walletAddress }: MultisigActionCtx) {
     [callWallet, walletAddress]
   );
 
+  /**
+   * Propose/vote to transfer `amountRaw` (smallest units) of the token at
+   * `tokenAddress` out of the treasury to `to`. Executes as `token.transfer(to,
+   * amount)` from the wallet once the vote threshold is met. Args are normalized so
+   * every vote on the same transfer maps to the same issueId.
+   */
+  const proposeTransfer = useCallback(
+    (tokenAddress: string, to: string, amountRaw: string) =>
+      castVote("transfer", [strip0x(to), String(amountRaw)], tokenAddress),
+    [castVote]
+  );
+
   return {
     enableMultisig,
     setLogic,
@@ -441,6 +453,7 @@ export function useMultisigActions({ walletAddress }: MultisigActionCtx) {
     swapSigner,
     setDefaultThreshold,
     castVote,
+    proposeTransfer,
   };
 }
 

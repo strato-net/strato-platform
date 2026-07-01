@@ -1,6 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Users, Plus, X, ShieldCheck, AlertTriangle, Check, Vote } from "lucide-react";
+import { parseUnits, formatUnits } from "viem";
+import {
+  Users,
+  Plus,
+  X,
+  ShieldCheck,
+  AlertTriangle,
+  Check,
+  Vote,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -14,6 +25,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -23,6 +41,8 @@ import { AddrLink } from "@/components/explorer/AddrLink";
 import { shortenHex } from "@/lib/utils";
 import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
+import { useMyTokens, type TokenBalance } from "@/services/tokens";
+import { useUserSearch } from "@/services/accounts";
 import type { UserWallet } from "@/services/userWallets";
 import {
   useAdminRegistryLogic,
@@ -44,6 +64,15 @@ import {
 /* --------------------------------------------------------------------------------- */
 
 const eq = (a?: string, b?: string) => !!a && !!b && strip0x(a) === strip0x(b);
+
+const isAddressLike = (s: string) => /^(0x)?[0-9a-fA-F]{40}$/.test(s.trim());
+
+const PERCENTS = [25, 50, 75, 100] as const;
+
+/** Balance of a token as a human-readable decimal string. */
+function humanBalance(t: TokenBalance): string {
+  return safeFormatUnits(t.balance, t.decimals);
+}
 
 /** Human-readable label + canonical args for a governance issue's function. */
 function describeIssue(func: string, args: string[]): { label: string; canonical: string[] } {
@@ -67,11 +96,52 @@ function describeIssue(func: string, args: string[]): { label: string; canonical
       return { label: `Transfer ownership → ${shortenHex(a0, 6, 4)}`, canonical: [strip0x(a0)] };
     case "setLogicContract":
       return { label: `Set logic contract → ${shortenHex(a0, 6, 4)}`, canonical: [strip0x(a0)] };
+    case "transfer":
+      return {
+        label: `Transfer → ${shortenHex(a0, 6, 4)}`,
+        canonical: [strip0x(a0), String(args[1] ?? "0")],
+      };
     case "callContract":
       return { label: `Call ${shortenHex(a0, 6, 4)}·${args[1] ?? ""}`, canonical: args };
     default:
       return { label: func || "(unknown)", canonical: args };
   }
+}
+
+type TokenMeta = { symbol: string; decimals: number };
+
+/** Map token contract address → metadata, from a set of balances. */
+function useTokenMeta(address?: string | null): Map<string, TokenMeta> {
+  const { data } = useMyTokens(address);
+  return useMemo(() => {
+    const m = new Map<string, TokenMeta>();
+    for (const t of data ?? []) m.set(strip0x(t.address), { symbol: t.symbol, decimals: t.decimals });
+    return m;
+  }, [data]);
+}
+
+function safeFormatUnits(raw: string, decimals: number): string {
+  try {
+    return formatUnits(BigInt(raw), decimals);
+  } catch {
+    return raw;
+  }
+}
+
+/** Human label for an issue, formatting `transfer` amounts with token metadata. */
+function labelForIssue(
+  issue: { func: string; target: string; args: string[] },
+  tokenMeta: Map<string, TokenMeta>
+): string {
+  if (issue.func === "transfer") {
+    const meta = tokenMeta.get(strip0x(issue.target));
+    const to = issue.args[0] ?? "";
+    const raw = issue.args[1] ?? "0";
+    const amt = meta ? safeFormatUnits(raw, meta.decimals) : raw;
+    const sym = meta?.symbol ?? shortenHex(issue.target, 5, 4);
+    return `Transfer ${amt} ${sym} → ${shortenHex(to, 6, 4)}`;
+  }
+  return describeIssue(issue.func, issue.args).label;
 }
 
 /* --------------------------------------------------------------------------------- */
@@ -265,12 +335,16 @@ function EnablePanel({
 
 function EnabledView({ wallet }: { wallet: UserWallet }) {
   return (
-    <Tabs defaultValue="signers" className="mt-1">
-      <TabsList className="grid w-full grid-cols-3">
+    <Tabs defaultValue="treasury" className="mt-1">
+      <TabsList className="grid w-full grid-cols-4">
+        <TabsTrigger value="treasury">Treasury</TabsTrigger>
         <TabsTrigger value="signers">Signers</TabsTrigger>
         <TabsTrigger value="issues">Issues</TabsTrigger>
         <TabsTrigger value="history">History</TabsTrigger>
       </TabsList>
+      <TabsContent value="treasury" className="mt-4">
+        <TreasuryTab wallet={wallet} />
+      </TabsContent>
       <TabsContent value="signers" className="mt-4">
         <SignersTab wallet={wallet} />
       </TabsContent>
@@ -498,7 +572,8 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
   const { config } = useIsMultisig(wallet.address);
   const { data: signers = [] } = useSigners(wallet.address);
   const { data: issues = [], isLoading } = useOpenIssues(wallet.address);
-  const { castVote, addSigner, removeSigner, swapSigner, setDefaultThreshold } =
+  const tokenMeta = useTokenMeta(wallet.address);
+  const { castVote, addSigner, removeSigner, swapSigner, setDefaultThreshold, proposeTransfer } =
     useMultisigActions({ walletAddress: wallet.address });
 
   const me = strip0x(userAddress ?? "");
@@ -529,6 +604,9 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
         case "setDefaultVotingThresholdBps":
           await setDefaultThreshold(Number(issue.args[0] ?? 0));
           break;
+        case "transfer":
+          await proposeTransfer(issue.target, issue.args[0] ?? "", String(issue.args[1] ?? "0"));
+          break;
         default:
           await castVote(issue.func, canonical, issue.target);
       }
@@ -557,7 +635,7 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
   return (
     <div className="space-y-3">
       {issues.map((issue) => {
-        const { label } = describeIssue(issue.func, issue.args);
+        const label = labelForIssue(issue, tokenMeta);
         const count = issue.voters.length;
         const iVoted = issue.voters.some((v) => eq(v, me));
         const pct = needed > 0 ? Math.min(100, (count / needed) * 100) : 0;
@@ -612,6 +690,7 @@ const PAGE = 10;
 function HistoryTab({ wallet }: { wallet: UserWallet }) {
   const [page, setPage] = useState(0);
   const { data: executed = [], isLoading } = useExecutedIssues(wallet.address, PAGE, page * PAGE);
+  const tokenMeta = useTokenMeta(wallet.address);
 
   return (
     <div className="space-y-3">
@@ -622,7 +701,7 @@ function HistoryTab({ wallet }: { wallet: UserWallet }) {
       ) : (
         <div className="space-y-2">
           {executed.map((ex, i) => {
-            const { label } = describeIssue(ex.func, ex.args);
+            const label = labelForIssue(ex, tokenMeta);
             return (
               <div
                 key={`${ex.issueId}-${i}`}
@@ -666,6 +745,380 @@ function HistoryTab({ wallet }: { wallet: UserWallet }) {
           </div>
         </>
       ) : null}
+    </div>
+  );
+}
+
+/* --------------------------------------------------------------------------------- */
+/* Treasury tab                                                                       */
+/* --------------------------------------------------------------------------------- */
+
+function TreasuryTab({ wallet }: { wallet: UserWallet }) {
+  const { userAddress } = useUser();
+  const { canSubmit } = useSubmitTransaction();
+  const queryClient = useQueryClient();
+  const { data: signers = [] } = useSigners(wallet.address);
+  const { proposeTransfer } = useMultisigActions({ walletAddress: wallet.address });
+
+  const me = strip0x(userAddress ?? "");
+  const iAmSigner = signers.some((s) => eq(s, me));
+
+  const { data: myTokens = [] } = useMyTokens(userAddress); // depositor's balances
+  const { data: treasury = [] } = useMyTokens(wallet.address); // multisig's balances
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["my-tokens", userAddress] });
+    queryClient.invalidateQueries({ queryKey: ["my-tokens", wallet.address] });
+    queryClient.invalidateQueries({ queryKey: ["multisig-open-issues", wallet.address] });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Holdings */}
+      <div className="space-y-2">
+        <Label>Treasury holdings</Label>
+        {treasury.length === 0 ? (
+          <p className="text-sm text-muted-foreground">This multisig holds no tokens yet.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {treasury.map((t) => (
+              <div
+                key={t.address}
+                className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
+              >
+                <span className="font-medium">{t.symbol}</span>
+                <span className="font-mono text-xs">{humanBalance(t)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Separator />
+
+      {/* Deposit */}
+      <DepositForm
+        toAddress={wallet.address}
+        tokens={myTokens}
+        disabled={!canSubmit}
+        onDone={refresh}
+      />
+
+      <Separator />
+
+      {/* Propose transfer */}
+      <ProposeTransferForm
+        tokens={treasury}
+        iAmSigner={iAmSigner}
+        canSubmit={canSubmit}
+        onPropose={proposeTransfer}
+        onDone={refresh}
+      />
+    </div>
+  );
+}
+
+/** Token select + amount input + percentage buttons. */
+function TokenAmount({
+  tokens,
+  symbol,
+  setSymbol,
+  amount,
+  setAmount,
+  placeholder,
+}: {
+  tokens: TokenBalance[];
+  symbol: string;
+  setSymbol: (s: string) => void;
+  amount: string;
+  setAmount: (s: string) => void;
+  placeholder: string;
+}) {
+  const token = tokens.find((t) => t.symbol === symbol);
+
+  useEffect(() => {
+    if (tokens.length && !tokens.some((t) => t.symbol === symbol)) setSymbol(tokens[0].symbol);
+  }, [tokens, symbol, setSymbol]);
+
+  const setPct = (p: number) => {
+    if (!token) return;
+    setAmount(formatUnits((BigInt(token.balance) * BigInt(p)) / 100n, token.decimals));
+  };
+
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <Select value={symbol} onValueChange={setSymbol}>
+          <SelectTrigger className="w-32">
+            <SelectValue placeholder={tokens.length ? "Token" : "No tokens"} />
+          </SelectTrigger>
+          <SelectContent>
+            {tokens.map((t) => (
+              <SelectItem key={t.address} value={t.symbol}>
+                {t.symbol}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          placeholder={placeholder}
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+      </div>
+      {token ? (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            Balance: {humanBalance(token)} {token.symbol}
+          </span>
+          <div className="flex gap-1">
+            {PERCENTS.map((p) => (
+              <Button
+                key={p}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => setPct(p)}
+              >
+                {p === 100 ? "Max" : `${p}%`}
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function DepositForm({
+  toAddress,
+  tokens,
+  disabled,
+  onDone,
+}: {
+  toAddress: string;
+  tokens: TokenBalance[];
+  disabled: boolean;
+  onDone: () => void;
+}) {
+  const { submit } = useSubmitTransaction();
+  const [symbol, setSymbol] = useState("");
+  const [amount, setAmount] = useState("");
+  const [busy, setBusy] = useState(false);
+  const token = tokens.find((t) => t.symbol === symbol);
+
+  const deposit = async () => {
+    if (!token) {
+      toast.error("Select a token to deposit");
+      return;
+    }
+    let raw = 0n;
+    try {
+      raw = parseUnits(amount, token.decimals);
+      if (raw <= 0n) throw new Error();
+    } catch {
+      toast.error("Enter a positive amount");
+      return;
+    }
+    if (raw > BigInt(token.balance)) {
+      toast.error("Amount exceeds your balance");
+      return;
+    }
+    setBusy(true);
+    try {
+      // A plain ERC-20 transfer from your account into the multisig — no vote needed.
+      await submit("FUNCTION", {
+        contractName: token.symbol,
+        contractAddress: token.address,
+        value: 0,
+        method: "transfer",
+        args: { to: strip0x(toAddress), value: raw.toString() },
+        metadata: {},
+      });
+      toast.success(`Deposited ${amount} ${token.symbol}`);
+      setAmount("");
+      onDone();
+    } catch (err: any) {
+      toast.error("Deposit failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <ArrowDownToLine className="h-4 w-4 text-muted-foreground" />
+        Deposit tokens
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Move tokens from your connected account into this multisig's treasury.
+      </p>
+      <TokenAmount
+        tokens={tokens}
+        symbol={symbol}
+        setSymbol={setSymbol}
+        amount={amount}
+        setAmount={setAmount}
+        placeholder="Amount to deposit"
+      />
+      <Button
+        onClick={deposit}
+        disabled={busy || disabled || !token || !amount.trim()}
+        className="w-full"
+      >
+        {busy ? "Depositing…" : "Deposit"}
+      </Button>
+    </div>
+  );
+}
+
+function ProposeTransferForm({
+  tokens,
+  iAmSigner,
+  canSubmit,
+  onPropose,
+  onDone,
+}: {
+  tokens: TokenBalance[];
+  iAmSigner: boolean;
+  canSubmit: boolean;
+  onPropose: (tokenAddress: string, to: string, amountRaw: string) => Promise<unknown>;
+  onDone: () => void;
+}) {
+  const [symbol, setSymbol] = useState("");
+  const [amount, setAmount] = useState("");
+  const [recipient, setRecipient] = useState("");
+  const [recipientAddress, setRecipientAddress] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const token = tokens.find((t) => t.symbol === symbol);
+
+  const searchTerm = isAddressLike(recipient) ? "" : recipient;
+  const { data: matches } = useUserSearch(searchTerm);
+  const suggestions = useMemo(() => (matches ?? []).slice(0, 6), [matches]);
+  const resolvedTo = isAddressLike(recipient) ? strip0x(recipient) : recipientAddress;
+
+  const propose = async () => {
+    if (!iAmSigner) {
+      toast.error("Only a signer can propose a transfer");
+      return;
+    }
+    if (!token) {
+      toast.error("Select a token");
+      return;
+    }
+    if (strip0x(resolvedTo).length !== 40) {
+      toast.error("Enter a valid recipient address or pick a user");
+      return;
+    }
+    let raw = 0n;
+    try {
+      raw = parseUnits(amount, token.decimals);
+      if (raw <= 0n) throw new Error();
+    } catch {
+      toast.error("Enter a positive amount");
+      return;
+    }
+    if (raw > BigInt(token.balance)) {
+      toast.error("Amount exceeds the treasury balance");
+      return;
+    }
+    setBusy(true);
+    try {
+      await onPropose(token.address, resolvedTo, raw.toString());
+      toast.success("Transfer proposed", {
+        description: "Signers can vote on it in the Issues tab (executes at threshold).",
+      });
+      setAmount("");
+      setRecipient("");
+      setRecipientAddress("");
+      onDone();
+    } catch (err: any) {
+      toast.error("Proposal failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <ArrowUpFromLine className="h-4 w-4 text-muted-foreground" />
+        Propose a transfer
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Create a proposal to send tokens from the treasury to another address. It executes
+        once enough signers vote.
+      </p>
+
+      {!iAmSigner ? (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>Only a signer can propose a transfer.</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {/* Recipient */}
+      <div className="relative space-y-1">
+        <Input
+          placeholder="Recipient address or username"
+          autoComplete="off"
+          value={recipient}
+          onChange={(e) => {
+            const v = e.target.value;
+            setRecipient(v);
+            setRecipientAddress(isAddressLike(v) ? strip0x(v) : "");
+            setShowSuggestions(true);
+          }}
+          onFocus={() => setShowSuggestions(true)}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+          className="font-mono text-xs"
+        />
+        {showSuggestions && suggestions.length > 0 ? (
+          <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
+            {suggestions.map((u) => (
+              <button
+                type="button"
+                key={u.address}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setRecipient(u.username);
+                  setRecipientAddress(u.address);
+                  setShowSuggestions(false);
+                }}
+                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+              >
+                <span className="font-medium">{u.username}</span>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {shortenHex(u.address)}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {recipientAddress && !isAddressLike(recipient) ? (
+          <p className="font-mono text-xs text-muted-foreground">→ {recipientAddress}</p>
+        ) : null}
+      </div>
+
+      <TokenAmount
+        tokens={tokens}
+        symbol={symbol}
+        setSymbol={setSymbol}
+        amount={amount}
+        setAmount={setAmount}
+        placeholder="Amount to send"
+      />
+      <Button
+        onClick={propose}
+        disabled={busy || !canSubmit || !iAmSigner || !token || !amount.trim()}
+        className="w-full"
+      >
+        {busy ? "Proposing…" : "Propose transfer"}
+      </Button>
     </div>
   );
 }
