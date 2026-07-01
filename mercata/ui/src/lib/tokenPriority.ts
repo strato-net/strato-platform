@@ -6,7 +6,7 @@ import { usdstAddress } from "./constants";
  * (e.g. in the transfer dropdown)
  *
  * Current, divides tokens into 5 priority groups:
- * 1. USDST
+ * 1. Native Tokens
  * 2. Collateral tokens (GOLDST, WBTC, ETH, etc)
  * 3. Special LP Tokens (MUSDST, SUSDST)
  * 4. LP Tokens (contains "LP" in symbol)
@@ -56,4 +56,43 @@ export const sortTokensCompareFn = (a: Token, b: Token) => {
 
   // Within same priority, sort alphabetically by symbol
   return sortAlphabeticallyCompareFn(a, b);
+};
+
+/**
+ * Canonical display order (by symbol) for tokens the user has no balance in,
+ * used by the Dashboard "My Tokens" list. Matched case-insensitively.
+ * Any symbol not listed here ("Others") is placed last.
+ */
+export const EARNING_ASSET_SYMBOL_ORDER: string[] = [
+  // Native tokens
+  "STRATO", "GOLDST", "SILVST", "USDST",
+  // Yield Vaults
+  "CarryETH", "CarryWBTC", "YieldUSDC","saveUSDST",
+  // Wrapped tokens
+  "ETH", "WBTC",
+  // Stable coins
+  "USDC", "USDT",
+  // Staking tokens
+  "wstETH", "rETH", "syrupUSDC", "sUSDs",
+  // Gold tokens
+  "PAXG", "XAUt",
+  // Other 
+  "BOOE", 
+  // LP tokens
+  "SLP","lendUSDST", "safetyUSDST", "sUSDS-USDST-LP", "bCSPXST-USDST-LP",  "syrupUSDC-USDST-LP",
+  "ETH-USDST-LP", "GOLDST-USDST-LP", "syrupUSDC-USDST-LP",
+  "USDT-USDC-USDST-LP",  "SILVST-USDST-LP",
+];
+
+const earningAssetSymbolRankMap = new Map(
+  EARNING_ASSET_SYMBOL_ORDER.map((symbol, index) => [symbol.toLowerCase(), index])
+);
+
+/**
+ * Rank for the canonical no-balance ordering; lower means higher in the list.
+ * Unknown symbols ("Others") sort last.
+ */
+export const getEarningAssetSymbolRank = (symbol?: string): number => {
+  const rank = earningAssetSymbolRankMap.get((symbol || "").toLowerCase());
+  return rank === undefined ? EARNING_ASSET_SYMBOL_ORDER.length : rank;
 };

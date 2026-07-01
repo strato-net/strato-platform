@@ -9,6 +9,7 @@ import { useEarnContext } from "@/context/EarnContext";
 import { buildEarnApyMap } from "@/utils/earnUtils";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
+import { getEarningAssetSymbolRank } from "@/lib/tokenPriority";
 
 const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | undefined): boolean => {
   const symbol = asset?._symbol?.toLowerCase?.() || "";
@@ -79,9 +80,17 @@ const AssetsList = ({
       // Tokens the user holds a balance in come first
       const balanceDiff = (hasBalance(b) ? 1 : 0) - (hasBalance(a) ? 1 : 0);
       if (balanceDiff !== 0) return balanceDiff;
-      const valueA = parseFloat(a.value || "0");
-      const valueB = parseFloat(b.value || "0");
-      return valueB - valueA;
+
+      // Held tokens: sort by value (descending)
+      if (hasBalance(a) && hasBalance(b)) {
+        return parseFloat(b.value || "0") - parseFloat(a.value || "0");
+      }
+
+      // Non-held tokens: sort by canonical symbol order, then alphabetically
+      const rankA = getEarningAssetSymbolRank(a._symbol);
+      const rankB = getEarningAssetSymbolRank(b._symbol);
+      if (rankA !== rankB) return rankA - rankB;
+      return (a._symbol || "").localeCompare(b._symbol || "");
     });
   }, [tokens]);
 
