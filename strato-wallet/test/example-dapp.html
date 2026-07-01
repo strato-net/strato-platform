@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>STRATO Wallet — test dApp</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+      button { padding: 0.5rem 0.9rem; margin: 0.25rem 0.25rem 0.25rem 0; cursor: pointer; }
+      pre { background: #f4f4f5; padding: 0.75rem; border-radius: 8px; white-space: pre-wrap; word-break: break-all; }
+      .wallet { border: 1px solid #ddd; border-radius: 8px; padding: 0.5rem 0.75rem; margin: 0.25rem 0; display: flex; gap: 0.5rem; align-items: center; cursor: pointer; background: #fff; width: 100%; text-align: left; font-size: 1rem; }
+      .wallet.active { border-color: #001B70; background: #eef1fb; }
+      .wallet img { width: 24px; height: 24px; }
+      .muted { color: #888; font-size: 0.85rem; }
+    </style>
+  </head>
+  <body>
+    <h1>STRATO Wallet — test dApp</h1>
+    <p>This page exercises EIP-6963 discovery and the core EIP-1193 / STRATO methods.</p>
+
+    <h3>1. Discovered wallets (EIP-6963)</h3>
+    <p class="muted">Click a wallet to connect (calls <code>eth_requestAccounts</code> on it).</p>
+    <div id="wallets"></div>
+    <p id="selected" class="muted"></p>
+
+    <h3>2. Actions (use the connected wallet)</h3>
+    <button id="chainId">eth_chainId</button>
+    <button id="balance">eth_getBalance</button>
+    <button id="sign">personal_sign</button>
+    <button id="bloc">strato_sendBlocTransaction</button>
+
+    <h3>Log</h3>
+    <pre id="log"></pre>
+
+    <script type="module">
+      const providers = new Map();
+      let selectedUuid = null;
+      let account = null;
+
+      const log = (...a) => {
+        document.getElementById("log").textContent =
+          a.map((x) => (typeof x === "string" ? x : JSON.stringify(x, null, 2))).join(" ") +
+          "\n\n" + document.getElementById("log").textContent;
+      };
+
+      // EIP-6963 discovery.
+      window.addEventListener("eip6963:announceProvider", (e) => {
+        const { info, provider } = e.detail;
+        providers.set(info.uuid, { info, provider });
+        render();
+      });
+      window.dispatchEvent(new Event("eip6963:requestProvider"));
+
+      function active() {
+        return selectedUuid ? providers.get(selectedUuid)?.provider : window.ethereum;
+      }
+
+      async function connect(uuid) {
+        const entry = providers.get(uuid);
+        if (!entry) return;
+        try {
+          const accounts = await entry.provider.request({ method: "eth_requestAccounts" });
+          selectedUuid = uuid;
+          account = accounts[0];
+          document.getElementById("selected").textContent =
+            `Connected to ${entry.info.name}: ${account}`;
+          render();
+          log(`${entry.info.name} connected ->`, accounts);
+        } catch (e) {
+          log("connect error:", e.message || String(e));
+        }
+      }
+
+      function render() {
+        const el = document.getElementById("wallets");
+        el.innerHTML = "";
+        for (const { info } of providers.values()) {
+          const row = document.createElement("button");
+          row.className = "wallet" + (info.uuid === selectedUuid ? " active" : "");
+          row.innerHTML = `<img src="${info.icon}" alt=""/> <b>${info.name}</b> <span class="muted">${info.rdns}</span>`;
+          row.onclick = () => connect(info.uuid);
+          el.appendChild(row);
+        }
+        if (!providers.size) el.textContent = "No wallets announced yet.";
+      }
+      render();
+
+      const call = (method, params) => active().request({ method, params });
+
+      document.getElementById("chainId").onclick = async () =>
+        log("eth_chainId ->", await call("eth_chainId").catch((e) => e.message));
+      document.getElementById("balance").onclick = async () =>
+        log("eth_getBalance ->", await call("eth_getBalance", [account, "latest"]).catch((e) => e.message));
+      document.getElementById("sign").onclick = async () =>
+        log("personal_sign ->", await call("personal_sign", ["0x48656c6c6f", account]).catch((e) => e.message));
+      document.getElementById("bloc").onclick = async () =>
+        log("strato_sendBlocTransaction ->", await active().request({
+          method: "strato_sendBlocTransaction",
+          params: [{ type: "FUNCTION", payload: { contractName: "Example", methodName: "ping", args: {} } }],
+        }).catch((e) => e.message));
+    </script>
+  </body>
+</html>
