@@ -8,9 +8,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/CopyButton";
 import { AddrLink } from "@/components/explorer/AddrLink";
 import { WalletPolicyDialog } from "@/components/accounts/WalletPolicyDialog";
+import { MultisigDialog } from "@/components/accounts/MultisigDialog";
 import { useMyUserWallets } from "@/services/userWallets";
 
 /** Lists the User wallet contracts the connected account is authorized on. */
@@ -22,8 +24,8 @@ export function MyWalletsCard({ ownerAddress }: { ownerAddress?: string | null }
       <CardHeader>
         <CardTitle>My User wallets</CardTitle>
         <CardDescription>
-          User wallet contracts your connected account controls. Manage each wallet's policy
-          (logic contract) below.
+          User wallet contracts your connected account controls or is a multisig signer on.
+          Manage each wallet's policy or multisig below.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -38,13 +40,22 @@ export function MyWalletsCard({ ownerAddress }: { ownerAddress?: string | null }
               <TableRow>
                 <TableHead>Username</TableHead>
                 <TableHead>Wallet address</TableHead>
-                <TableHead className="text-right">Policy</TableHead>
+                <TableHead className="text-right">Manage</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {(wallets ?? []).map((w) => (
                 <TableRow key={w.address}>
-                  <TableCell className="font-medium">{w.username || "—"}</TableCell>
+                  <TableCell className="font-medium">
+                    <span className="inline-flex items-center gap-2">
+                      {w.username || "—"}
+                      {w.multisig ? (
+                        <Badge variant="secondary" className="text-[10px]">
+                          Multisig
+                        </Badge>
+                      ) : null}
+                    </span>
+                  </TableCell>
                   <TableCell className="font-mono text-xs">
                     <span className="inline-flex items-center gap-1.5">
                       <AddrLink address={w.address} />
@@ -52,7 +63,10 @@ export function MyWalletsCard({ ownerAddress }: { ownerAddress?: string | null }
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <WalletPolicyDialog wallet={w} />
+                    <div className="flex items-center justify-end gap-2">
+                      <MultisigDialog wallet={w} />
+                      <WalletPolicyDialog wallet={w} />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

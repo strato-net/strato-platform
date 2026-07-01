@@ -41,8 +41,11 @@ export function SendTokensDialog({ disabled }: { disabled?: boolean }) {
   const { submit } = useSubmitTransaction();
 
   // Send-from wallet: "direct" (connected account) or a User wallet contract address.
+  // Multisig wallets are excluded — sending from one requires a signer vote, not a
+  // direct transfer.
   const [fromWallet, setFromWallet] = useState(DIRECT);
-  const { data: wallets } = useMyUserWallets(userAddress);
+  const { data: allWallets } = useMyUserWallets(userAddress);
+  const wallets = useMemo(() => (allWallets ?? []).filter((w) => !w.multisig), [allWallets]);
   const wallet = wallets?.find((w) => w.address === fromWallet);
   const holder = fromWallet === DIRECT ? userAddress : fromWallet;
   const walletUsername = fromWallet === DIRECT ? "" : wallet?.username ?? "";
