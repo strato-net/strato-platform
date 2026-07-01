@@ -508,6 +508,66 @@ contract Describe_StratoStaking {
         require(rejected, "Cannot recover scheduled reward reserve");
     }
 
+    function it_protects_accrued_unclaimed_rewards_from_untracked_recovery() public {
+        _stake(user1, address(operatorA), 1000e18);
+        _startRewards(1000e18, 100, 0);
+
+        fastForward(10);
+        staking.stopRewardSchedule();
+
+        require(staking.allocatedRewardLiability() == 100e18, "Accrued rewards tracked as liability");
+        require(staking.recoverableUntrackedStrato() == 0, "Accrued rewards are not untracked");
+
+        bool accruedRecoveryRejected = false;
+        try staking.recoverUntrackedStrato(address(this), 1) {
+        } catch {
+            accruedRecoveryRejected = true;
+        }
+        require(accruedRecoveryRejected, "Cannot recover accrued rewards as untracked");
+
+        strato.mint(address(this), 250e18);
+        require(IERC20(address(strato)).transfer(address(staking), 250e18), "Direct STRATO transfer");
+        require(staking.recoverableUntrackedStrato() == 250e18, "Only direct STRATO transfer is untracked");
+
+        staking.recoverUntrackedStrato(address(this), 250e18);
+        require(staking.recoverableUntrackedStrato() == 0, "Direct transfer recovered");
+
+        user1.do(address(staking), "claimRewards", _claimOperators(address(operatorA)));
+        require(staking.allocatedRewardLiability() == 5e18, "Commission liability remains");
+
+        operatorA.do(address(staking), "claimOperatorRewards()");
+        require(staking.allocatedRewardLiability() == 0, "Liability cleared after claims");
+    }
+
+    function it_allows_owner_to_backfill_allocated_reward_liability() public {
+        funder.do(address(staking), "depositRewards(uint256)", 500e18);
+
+        strato.mint(address(this), 250e18);
+        require(IERC20(address(strato)).transfer(address(staking), 250e18), "Direct STRATO transfer");
+        require(staking.recoverableUntrackedStrato() == 250e18, "Direct transfer starts untracked");
+
+        staking.setAllocatedRewardLiability(100e18);
+        require(staking.allocatedRewardLiability() == 100e18, "Liability backfilled");
+        require(staking.recoverableUntrackedStrato() == 150e18, "Backfilled liability is protected");
+
+        bool nonOwnerRejected = false;
+        try user1.do(address(staking), "setAllocatedRewardLiability(uint256)", 101e18) {
+        } catch {
+            nonOwnerRejected = true;
+        }
+        require(nonOwnerRejected, "Only owner can backfill liability");
+
+        bool overBackfillRejected = false;
+        try staking.setAllocatedRewardLiability(251e18) {
+        } catch {
+            overBackfillRejected = true;
+        }
+        require(overBackfillRejected, "Cannot backfill beyond reward backing");
+
+        staking.setAllocatedRewardLiability(0);
+        require(staking.recoverableUntrackedStrato() == 250e18, "Setter can clear migration value");
+    }
+
     function it_recovers_only_untracked_strato_transfers() public {
         _stake(user1, address(operatorA), 1000e18);
         funder.do(address(staking), "depositRewards(uint256)", 500e18);

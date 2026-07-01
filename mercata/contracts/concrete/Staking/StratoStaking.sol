@@ -45,6 +45,7 @@ contract  StratoStaking is Ownable {
     event RewardReserveRecovered(address indexed to, uint256 amount);
     event UntrackedStratoRecovered(address indexed to, uint256 amount);
     event StrayTokenRecovered(address indexed token, address indexed to, uint256 amount);
+    event AllocatedRewardLiabilitySet(uint256 oldAmount, uint256 newAmount);
 
     uint256 public constant PRECISION = 1e18;
     uint256 public constant BPS_DIVISOR = 10000;
@@ -89,6 +90,10 @@ contract  StratoStaking is Ownable {
     mapping(address => mapping(address => uint256)) public  pendingDelegatorRewards;
     mapping(address => mapping(uint256 => StakingUnbondRequest)) public  unbondingQueue;
     mapping(address => uint256) public  unbondingRequestCount;
+
+    // Rewards can leave rewardReserve before they are claimed. This protects
+    // accrued-but-unpaid rewards from being treated as recoverable STRATO.
+    uint256 public allocatedRewardLiability;
 
     constructor(address initialOwner) Ownable(initialOwner) { }
 
@@ -175,7 +180,7 @@ contract  StratoStaking is Ownable {
 
     function recoverableUntrackedStrato() public view returns (uint256) {
         uint256 balance = IERC20(address(stratoToken)).balanceOf(address(this));
-        uint256 tracked = principalBalance() + rewardReserve;
+        uint256 tracked = principalBalance() + rewardReserve + allocatedRewardLiability;
         if (balance <= tracked) return 0;
         return balance - tracked;
     }
@@ -207,6 +212,7 @@ contract  StratoStaking is Ownable {
                 baseRewardPerOperatorStored += perOperator;
                 rewardReserve -= allocatedBase;
                 scheduledRewardRemaining -= allocatedBase;
+                allocatedRewardLiability += allocatedBase;
             }
         }
 
@@ -221,6 +227,7 @@ contract  StratoStaking is Ownable {
                 globalStakeRewardPerTokenStored += rewardPerStake;
                 rewardReserve -= allocatedStake;
                 scheduledRewardRemaining -= allocatedStake;
+                allocatedRewardLiability += allocatedStake;
             }
         }
 
@@ -301,6 +308,14 @@ contract  StratoStaking is Ownable {
         unbondingRequestCount[user] = requestId + 1;
         totalUnbonding += amount;
         return requestId;
+    }
+
+    function _releaseRewardLiability(uint256 amount) internal {
+        if (amount >= allocatedRewardLiability) {
+            allocatedRewardLiability = 0;
+        } else {
+            allocatedRewardLiability -= amount;
+        }
     }
 
     function _depositRewards(uint256 amount) internal returns (uint256) {
@@ -481,6 +496,15 @@ contract  StratoStaking is Ownable {
         _depositRewards(amount);
     }
 
+    function setAllocatedRewardLiability(uint256 amount) external onlyOwner onlyInitialized {
+        require(amount + rewardReserve <= rewardBalance(), "SS: liability unavailable");
+
+        uint256 oldAmount = allocatedRewardLiability;
+        allocatedRewardLiability = amount;
+
+        emit AllocatedRewardLiabilitySet(oldAmount, amount);
+    }
+
     function startRewardSchedule(
         uint256 rewardAmount,
         uint256 startTime,
@@ -633,6 +657,7 @@ contract  StratoStaking is Ownable {
 
         require(totalClaimed > 0, "SS: no rewards");
         require(rewardBalance() >= totalClaimed, "SS: rewards unavailable");
+        _releaseRewardLiability(totalClaimed);
         require(IERC20(address(stratoToken)).transfer(msg.sender, totalClaimed), "SS: reward transfer failed");
 
         emit DelegatorRewardsClaimed(msg.sender, totalClaimed);
@@ -653,6 +678,7 @@ contract  StratoStaking is Ownable {
         v.pendingCommission = 0;
 
         require(rewardBalance() >= amount, "SS: rewards unavailable");
+        _releaseRewardLiability(amount);
         require(IERC20(address(stratoToken)).transfer(msg.sender, amount), "SS: operator reward transfer failed");
 
         emit OperatorRewardsClaimed(operator, amount);
