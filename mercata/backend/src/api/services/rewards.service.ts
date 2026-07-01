@@ -292,6 +292,28 @@ export interface RewardsOverview {
   currentSeason: number;
 }
 
+// --- Overview caches ---
+const OVERVIEW_CACHE_TTL = 30_000; // 30s — full response
+const SYMBOL_CACHE_TTL = 3_600_000; // 1hr — token symbol never changes
+
+let _overviewCache: { data: RewardsOverview; expiresAt: number } | null = null;
+let _rewardTokenSymbol: { symbol: string | null; expiresAt: number } | null = null;
+
+const getCachedTokenSymbol = async (accessToken: string, tokenAddress: string): Promise<string | null> => {
+  if (_rewardTokenSymbol && Date.now() < _rewardTokenSymbol.expiresAt) return _rewardTokenSymbol.symbol;
+  try {
+    const { data } = await cirrus.get(accessToken, `/${Token}`, {
+      params: { address: "eq." + tokenAddress, select: "_symbol" }
+    });
+    const symbol = data?.[0]?._symbol || null;
+    _rewardTokenSymbol = { symbol, expiresAt: Date.now() + SYMBOL_CACHE_TTL };
+    return symbol;
+  } catch (error) {
+    console.error(`Error fetching token symbol for ${tokenAddress}:`, error);
+    return null;
+  }
+};
+
 /**
  * Get global Rewards contract overview data
  * @param accessToken - Access token for authentication
@@ -302,11 +324,17 @@ export const fetchRewardsOverview = async (
   accessToken: string,
   forceRefresh: boolean = false
 ): Promise<RewardsOverview> => {
+  const startedAt = performance.now();
+
+  // Full response cache (30s) — all data is global
+  if (!forceRefresh && _overviewCache && Date.now() < _overviewCache.expiresAt) {
+    console.log(`[rewards/overview] total response time: ${(performance.now() - startedAt).toFixed(2)}ms (cached)`);
+    return _overviewCache.data;
+  }
+
   const rewardsAddress = getRewardsAddress();
 
   try {
-    // All these functions now use the same cached contract state, so they're fast
-    // fetchAllUsersLeaderboard also uses cached contract state + cached claimed rewards
     const [contractData, activitiesMap, activityStatesMap, allUsersLeaderboard] = await Promise.all([
       fetchRewardsContractData(accessToken, rewardsAddress, forceRefresh),
       fetchActivities(accessToken, rewardsAddress, forceRefresh),
@@ -314,46 +342,26 @@ export const fetchRewardsOverview = async (
       fetchAllUsersLeaderboard(accessToken, rewardsAddress, forceRefresh)
     ]);
 
-    // Count only actively-emitting activities (matches UI visibility filter)
     const activeActivityCount = Array.from(activitiesMap.values())
       .filter((a) => BigInt(a.emissionRate || "0") > 0n).length;
 
-    // Hardcoded season info for now
     const currentSeason = 2;
 
-
-    // Sum up total stake across all activities
     let totalStake = BigInt(0);
     activityStatesMap.forEach((state: any) => {
-      const stake = BigInt(state?.totalStake || "0");
-      totalStake += stake;
+      totalStake += BigInt(state?.totalStake || "0");
     });
 
-    // Sum up total distributed (all users' unclaimed + pending + claimed rewards)
     let totalDistributed = BigInt(0);
     allUsersLeaderboard.forEach((user) => {
       totalDistributed += BigInt(user.totalRewardsEarned);
     });
 
-    // Fetch token symbol
-    let rewardTokenSymbol: string | null = null;
-    try {
-      if (contractData.rewardToken) {
-        const { data } = await cirrus.get(accessToken, `/${Token}`, {
-          params: {
-            address: "eq." + contractData.rewardToken,
-            select: "_symbol",
-          }
-        });
-        const token = data?.[0];
-        rewardTokenSymbol = token?._symbol || null;
-      }
-    } catch (error) {
-      console.error(`Error fetching token symbol for ${contractData.rewardToken}:`, error);
-      // Continue without symbol, will be null
-    }
+    const rewardTokenSymbol = contractData.rewardToken
+      ? await getCachedTokenSymbol(accessToken, contractData.rewardToken)
+      : null;
 
-    return {
+    const result: RewardsOverview = {
       rewardToken: contractData.rewardToken,
       rewardTokenSymbol,
       totalRewardsEmission: contractData.totalRewardsEmission,
@@ -363,6 +371,10 @@ export const fetchRewardsOverview = async (
       totalDistributed: totalDistributed.toString(),
       currentSeason
     };
+
+    _overviewCache = { data: result, expiresAt: Date.now() + OVERVIEW_CACHE_TTL };
+    console.log(`[rewards/overview] total response time: ${(performance.now() - startedAt).toFixed(2)}ms`);
+    return result;
   } catch (error) {
     console.error("Failed to fetch Rewards overview:", error);
     throw error;
