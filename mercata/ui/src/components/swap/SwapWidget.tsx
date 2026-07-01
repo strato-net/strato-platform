@@ -866,7 +866,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
 
       toast({
         title: "Success",
-        description: `Swapped ${fromAmount} ${fromAsset._symbol} for ${toAmount} ${toAsset._symbol}`,
+        description: `Traded ${fromAmount} ${fromAsset._symbol} for ${toAmount} ${toAsset._symbol}`,
         variant: "success",
       });
     } finally {
@@ -1000,7 +1000,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
             activityName={activity.activity.name}
             inputAmount={fromAmount}
             swapTokenInAddress={fromAsset?.address}
-            actionLabel="Swap"
+            actionLabel="Trade"
           />
         );
       })()}
