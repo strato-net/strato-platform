@@ -343,7 +343,7 @@ const Dashboard = () => {
                 className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
               >
                 <Wallet size={18} />
-                <span className="text-xs md:text-sm">Deposit</span>
+                <span className="text-xs md:text-sm">Fund</span>
               </Button>
               <Button
                 onClick={() => navigate("/dashboard/transfer")}

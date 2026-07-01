@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useLayoutEffect } from "react";
 import { Link } from "react-router-dom";
 import { Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "../ui/button";
@@ -59,6 +59,7 @@ const AssetsList = ({
 }: AssetsProps) => {
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
+  const [showAllTokens, setShowAllTokens] = useState(false);
   const { tokenApys, tokenApysLoaded } = useEarnContext();
 
   const earnByAddr = useMemo(() => {
@@ -70,13 +71,59 @@ const AssetsList = ({
   const shouldShowLoading = loading && !hasEarningAssets;
   const shouldShowInactiveLoading = loading && !hasInactiveTokens;
 
+  const hasBalance = (asset: EarningAsset) =>
+    !!asset?.totalBalance && asset.totalBalance !== "0";
+
   const sortedTokens = useMemo(() => {
     return [...tokens].sort((a, b) => {
+      // Tokens the user holds a balance in come first
+      const balanceDiff = (hasBalance(b) ? 1 : 0) - (hasBalance(a) ? 1 : 0);
+      if (balanceDiff !== 0) return balanceDiff;
       const valueA = parseFloat(a.value || "0");
       const valueB = parseFloat(b.value || "0");
       return valueB - valueA;
     });
   }, [tokens]);
+
+  // Collapsed view shows at least 10 tokens, or all held tokens if the user
+  // has balances in more than 10. A "Show More" button reveals the rest.
+  const collapsedCount = useMemo(() => {
+    const balanceCount = sortedTokens.filter(hasBalance).length;
+    return Math.max(10, balanceCount);
+  }, [sortedTokens]);
+
+  const visibleTokens = showAllTokens
+    ? sortedTokens
+    : sortedTokens.slice(0, collapsedCount);
+  const hiddenCount = sortedTokens.length - collapsedCount;
+
+  // Refs used to keep the toggle button's viewport position stable when
+  // expanding, so the newly revealed tokens appear right where the button was.
+  const toggleWrapRef = useRef<HTMLDivElement>(null);
+  const firstRevealedRowRef = useRef<HTMLTableRowElement>(null);
+  const anchorTopRef = useRef<number | null>(null);
+  const didToggleRef = useRef(false);
+
+  const handleToggleTokens = () => {
+    didToggleRef.current = true;
+    if (!showAllTokens) {
+      anchorTopRef.current = toggleWrapRef.current?.getBoundingClientRect().top ?? null;
+    }
+    setShowAllTokens((prev) => !prev);
+  };
+
+  useLayoutEffect(() => {
+    if (!didToggleRef.current) return;
+    if (showAllTokens) {
+      if (anchorTopRef.current != null && firstRevealedRowRef.current) {
+        const newTop = firstRevealedRowRef.current.getBoundingClientRect().top;
+        window.scrollBy({ top: newTop - anchorTopRef.current });
+      }
+      anchorTopRef.current = null;
+    } else {
+      toggleWrapRef.current?.scrollIntoView({ block: "nearest" });
+    }
+  }, [showAllTokens]);
 
   return (
     <div className={`w-full overflow-hidden ${isDashboard ? 'bg-card rounded-xl border border-border shadow-sm' : ''}`}>
@@ -121,31 +168,31 @@ const AssetsList = ({
           </div>
         )}
         <div className={`w-full ${isDashboard ? 'overflow-x-auto md:overflow-visible px-3 md:px-0' : 'overflow-x-auto'}`}>
-          <table className="w-full">
+          <table className="w-full table-fixed">
             <thead>
               <tr className="bg-muted/50">
-                <th className="text-left text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                <th className="w-[24%] text-left text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Asset
                 </th>
-                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell w-[15%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   <span className="inline-flex items-center gap-1 justify-end w-full">
                     Best Available APY
                     <BestApyInfoTooltip />
                   </span>
                 </th>
-                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell w-[13%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   Price
                 </th>
-                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell w-[13%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   Available
                 </th>
-                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell w-[13%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   Collateral
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                <th className="w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Value
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                <th className="w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Balance
                 </th>
               </tr>
@@ -162,11 +209,12 @@ const AssetsList = ({
                     </div>
                   </td>
                 </tr>
-              ) : sortedTokens.length > 0 ? (
-                sortedTokens.map(
+              ) : visibleTokens.length > 0 ? (
+                visibleTokens.map(
                   (asset, index) => (
                     <tr
                       key={index}
+                      ref={index === collapsedCount ? firstRevealedRowRef : undefined}
                       className="hover:bg-muted/50 transition-colors"
                     >
                       <td className="py-3 md:py-4 px-3 md:px-4">
@@ -297,6 +345,28 @@ const AssetsList = ({
             </tbody>
           </table>
         </div>
+        {!shouldShowLoading && hiddenCount > 0 && (
+          <div ref={toggleWrapRef} className="flex justify-center py-3 border-t border-border">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground gap-1"
+              onClick={handleToggleTokens}
+            >
+              {showAllTokens ? (
+                <>
+                  Show Less
+                  <ChevronUp size={16} />
+                </>
+              ) : (
+                <>
+                  Show More ({hiddenCount})
+                  <ChevronDown size={16} />
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
 
       {isDashboard && !guestMode && (
