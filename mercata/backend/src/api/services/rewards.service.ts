@@ -641,4 +641,44 @@ export const fetchLeaderboard = async (
   }
 };
 
+export interface UserRankResponse {
+  rank: number | null;
+  totalRewardsEarned: string | null;
+  total: number;
+}
+
+export const fetchUserRank = async (
+  accessToken: string,
+  userAddress: string,
+  forceRefresh: boolean = false
+): Promise<UserRankResponse> => {
+  const rewardsAddress = getRewardsAddress();
+  const normalizedUser = normalizeUserAddress(userAddress);
+
+  try {
+    const users = await fetchAllUsersLeaderboard(accessToken, rewardsAddress, forceRefresh);
+
+    const sorted = users.sort((a, b) => {
+      return compareBigInt(BigInt(a.totalRewardsEarned), BigInt(b.totalRewardsEarned));
+    });
+
+    const index = sorted.findIndex(
+      (entry) => normalizeUserAddress(entry.address) === normalizedUser
+    );
+
+    if (index === -1) {
+      return { rank: null, totalRewardsEarned: null, total: sorted.length };
+    }
+
+    return {
+      rank: index + 1,
+      totalRewardsEarned: sorted[index].totalRewardsEarned,
+      total: sorted.length,
+    };
+  } catch (error) {
+    console.error("Failed to fetch user rank:", error);
+    throw error;
+  }
+};
+
 

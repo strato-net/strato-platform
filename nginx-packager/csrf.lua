@@ -230,6 +230,7 @@ local wallet_auth_route_prefixes = {
     "/api/earn/",
     "/api/lend/",
     "/api/lending/",
+    "/api/psm/",
     "/api/refer/",
     "/api/rewards/",
     "/api/swap-pools/",
