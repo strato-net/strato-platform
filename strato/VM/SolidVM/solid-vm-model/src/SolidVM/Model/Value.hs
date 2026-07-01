@@ -16,6 +16,8 @@ module SolidVM.Model.Value
     valEquals,
     valueTypeName,
     getConst,
+    weakGetVar,
+    forceLoadVar,
   )
 where
 
@@ -26,6 +28,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
 import Control.Applicative ((<|>))
 import Control.DeepSeq (NFData, rnf)
+import Control.Monad ((<=<))
 import Data.Aeson (ToJSON(..), FromJSON(..), object, (.=), (.:), (.:?), (.!=))
 import qualified Data.Aeson as Aeson
 import Text.Format
@@ -378,6 +381,20 @@ instance Format Value where
 getConst :: Variable -> Value
 getConst (Constant v) = v
 getConst (Variable _) = SNULL
+
+weakGetVar :: MonadIO m => Variable -> m Value
+weakGetVar (Constant c) = return c
+weakGetVar (Variable v) = liftIO $ readIORef v
+
+forceLoadVar :: MonadIO m => Variable -> m Value
+forceLoadVar = forceLoadVal <=< weakGetVar
+  where forceLoadVal :: MonadIO m => Value -> m Value
+        forceLoadVal v = case v of
+          SStruct n m -> SStruct n . fmap Constant <$> traverse forceLoadVar m
+          STuple vs -> STuple . fmap Constant <$> traverse forceLoadVar vs
+          SArray vs -> SArray . fmap Constant <$> traverse forceLoadVar vs
+          SMap m -> SMap . fmap Constant <$> traverse forceLoadVar m
+          _ -> pure v
 
 instance ToJSON Variable where
   toJSON (Constant v) = toJSON v

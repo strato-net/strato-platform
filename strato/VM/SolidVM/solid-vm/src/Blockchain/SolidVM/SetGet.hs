@@ -11,7 +11,6 @@
 
 module Blockchain.SolidVM.SetGet
   ( setVar,
-    weakGetVar,
     getStorageValue,
     getVar,
     getIntEither,
@@ -161,9 +160,6 @@ getStorageValue addr key = do
     MS.BDefault -> pure $ SReference key
     _ -> pure $ fromBasic theValue
 
-weakGetVar :: MonadIO m => Variable -> m Value
-weakGetVar (Constant c) = return c
-weakGetVar (Variable v) = liftIO $ readIORef v
 --fromm variable to value
 getVar :: MonadSM m => Variable -> m Value
 getVar (Constant (SReference key)) = do

@@ -1,4 +1,8 @@
 node_modules
+dist
+legacy
 Dockerfile
 Makefile
 .dockerignore
+.git
+*.log

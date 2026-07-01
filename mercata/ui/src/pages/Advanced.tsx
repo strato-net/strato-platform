@@ -26,8 +26,9 @@ import RepayForm from "@/components/borrow/RepayForm";
 import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
 import { useSmartPolling } from "@/hooks/useSmartPolling";
 import LiquidationAlertBanner from '@/components/ui/LiquidationAlertBanner';
+import DirectMintPSMSection from '@/components/dashboard/DirectMintPSMSection';
 
-type TopTab = "borrow" | "lending" | "swap" | "liquidations" | "safety";
+type TopTab = "borrow" | "lending" | "swap" | "liquidations" | "safety" | "psm";
 
 const Advanced = () => {
   const [searchParams] = useSearchParams();
@@ -42,7 +43,7 @@ const Advanced = () => {
     const tabParam = searchParams.get('tab');
     const subtabParam = searchParams.get('subtab');
 
-    if (tabParam && ['lending', 'swap', 'liquidations', 'safety', 'borrow'].includes(tabParam)) {
+    if (tabParam && ['lending', 'swap', 'liquidations', 'safety', 'borrow', 'psm'].includes(tabParam)) {
       setActiveTab(tabParam as TopTab);
     }
 
@@ -193,7 +194,7 @@ const Advanced = () => {
           <Card className="mb-2 md:mb-6 bg-transparent border-0 rounded-none shadow-none">
             <CardContent className="p-0 md:pt-4">
               <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TopTab)} className="w-full">
-                <TabsList className="grid w-full grid-cols-5 mb-3 md:mb-4 h-auto gap-0.5 md:gap-1">
+                <TabsList className="grid w-full grid-cols-6 mb-3 md:mb-4 h-auto gap-0.5 md:gap-1">
                   <TabsTrigger value="borrow" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                     Borrow
                   </TabsTrigger>
@@ -205,6 +206,9 @@ const Advanced = () => {
                   </TabsTrigger>
                   <TabsTrigger value="safety" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                     Safety
+                  </TabsTrigger>
+                  <TabsTrigger value="psm" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                    PSM
                   </TabsTrigger>
                   <TabsTrigger value="liquidations" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                     Liquidations
@@ -311,6 +315,12 @@ const Advanced = () => {
                     <GuestSignInBanner message="Sign in to stake USDST in the Safety Module" />
                   )}
                   <SafetyModuleSection />
+                </TabsContent>
+                <TabsContent value="psm">
+                  {!isLoggedIn && (
+                    <GuestSignInBanner message="Sign in to use the Direct Mint PSM" />
+                  )}
+                  <DirectMintPSMSection />
                 </TabsContent>
                 <TabsContent value="liquidations">
                   {!isLoggedIn && (

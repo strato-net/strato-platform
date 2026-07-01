@@ -5,6 +5,30 @@ import { PENDING_STRATO_WALLET_CONNECT_KEY, redirectToLogin } from "@/lib/auth";
 import { type Address, type EIP1193Provider, type Hex, keccak256, toRlp } from "viem";
 import { getStratoChainId, rpcUrl } from "@/lib/stratoChain";
 
+const EXTERNAL_WALLET_KEY = "bridge-external-wallet";
+
+let _suppressReconnect = false;
+
+export function suppressStratoReconnect() {
+  _suppressReconnect = true;
+}
+
+export function allowStratoReconnect() {
+  _suppressReconnect = false;
+}
+
+export function markExternalWalletActive() {
+  localStorage.setItem(EXTERNAL_WALLET_KEY, "1");
+}
+
+export function clearExternalWalletActive() {
+  localStorage.removeItem(EXTERNAL_WALLET_KEY);
+}
+
+export function isExternalWalletActive(): boolean {
+  return localStorage.getItem(EXTERNAL_WALLET_KEY) === "1";
+}
+
 function toMinimalHex(n: number | bigint): Hex {
   if (n === 0 || n === 0n) return "0x";
   const hex = typeof n === "bigint" ? n.toString(16) : n.toString(16);
@@ -226,6 +250,7 @@ function stratoConnector(walletDetails: Record<string, unknown> = {}) {
     },
 
     async isAuthorized() {
+      if (_suppressReconnect || isExternalWalletActive()) return false;
       if (currentAddress) return true;
       const stored = getStoredStratoConnection(config.state);
       if (stored) {
