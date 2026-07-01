@@ -43,6 +43,7 @@ import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { useMyTokens, type TokenBalance } from "@/services/tokens";
 import { useUserSearch } from "@/services/accounts";
+import { useContractGroups, useContractInfo, functionArgs } from "@/services/contracts";
 import type { UserWallet } from "@/services/userWallets";
 import {
   useAdminRegistryLogic,
@@ -52,8 +53,6 @@ import {
   useExecutedIssues,
   useMultisigActions,
   votesNeeded,
-  bpsToPct,
-  pctToBps,
   strip0x,
   isZeroAddr,
   type OpenIssue,
@@ -88,10 +87,8 @@ function describeIssue(func: string, args: string[]): { label: string; canonical
         canonical: [strip0x(a0), strip0x(args[1] ?? "")],
       };
     case "setDefaultVotingThresholdBps":
-      return {
-        label: `Set threshold to ${bpsToPct(Number(a0) || 0)}%`,
-        canonical: [String(Number(a0) || 0)],
-      };
+      // Label is rendered as "M of N" by labelForIssue (needs the signer count).
+      return { label: "Set approval threshold", canonical: [String(Number(a0) || 0)] };
     case "transferOwnership":
       return { label: `Transfer ownership → ${shortenHex(a0, 6, 4)}`, canonical: [strip0x(a0)] };
     case "setLogicContract":
@@ -128,10 +125,21 @@ function safeFormatUnits(raw: string, decimals: number): string {
   }
 }
 
-/** Human label for an issue, formatting `transfer` amounts with token metadata. */
+/**
+ * Convert an "M of N" approval to basis points: the largest bps whose votesNeeded is
+ * exactly M under the contract rule `10000*votes >= bps*N`. 2-of-2 → 10000, 2-of-3 →
+ * 6666, 1-of-3 → 3333.
+ */
+function mOfNToBps(m: number, n: number): number {
+  if (n <= 0) return 10000;
+  return Math.max(1, Math.min(10000, Math.floor((m * 10000) / n)));
+}
+
+/** Human label for an issue: `transfer` amounts and threshold changes get formatted. */
 function labelForIssue(
   issue: { func: string; target: string; args: string[] },
-  tokenMeta: Map<string, TokenMeta>
+  tokenMeta: Map<string, TokenMeta>,
+  signerCount: number
 ): string {
   if (issue.func === "transfer") {
     const meta = tokenMeta.get(strip0x(issue.target));
@@ -140,6 +148,10 @@ function labelForIssue(
     const amt = meta ? safeFormatUnits(raw, meta.decimals) : raw;
     const sym = meta?.symbol ?? shortenHex(issue.target, 5, 4);
     return `Transfer ${amt} ${sym} → ${shortenHex(to, 6, 4)}`;
+  }
+  if (issue.func === "setDefaultVotingThresholdBps") {
+    const bps = Number(issue.args[0]) || 0;
+    return `Set approval to ${votesNeeded(signerCount, bps)} of ${signerCount}`;
   }
   return describeIssue(issue.func, issue.args).label;
 }
@@ -310,7 +322,8 @@ function EnablePanel({
             Add signer
           </Button>
           <p className="text-xs text-muted-foreground">
-            The default voting threshold is 60%; you can change it once enabled.
+            By default ~60% of signers must approve each action (e.g. 2 of 2, 2 of 3). You can
+            change this once enabled.
           </p>
         </div>
       ) : null}
@@ -374,12 +387,14 @@ function SignersTab({ wallet }: { wallet: UserWallet }) {
 
   const me = strip0x(userAddress ?? "");
   const iAmSigner = signers.some((s) => eq(s, me));
-  const thresholdPct = bpsToPct(config.defaultThresholdBps || 6000);
-  const needed = votesNeeded(signers.length, config.defaultThresholdBps || 6000);
+  const signerCount = signers.length;
+  const needed = votesNeeded(signerCount, config.defaultThresholdBps || 6000);
 
   const [newSigner, setNewSigner] = useState("");
-  const [thresholdInput, setThresholdInput] = useState(String(thresholdPct));
+  const [targetM, setTargetM] = useState<number | null>(null);
   const [busy, setBusy] = useState<string>("");
+
+  const selectedM = Math.min(Math.max(targetM ?? needed, 1), Math.max(1, signerCount));
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["multisig-signers", wallet.address] });
@@ -440,17 +455,15 @@ function SignersTab({ wallet }: { wallet: UserWallet }) {
 
   const doThreshold = async () => {
     if (!guard()) return;
-    const pct = Number(thresholdInput);
-    if (!(pct > 0 && pct <= 100)) {
-      toast.error("Threshold must be between 1 and 100%");
-      return;
-    }
+    if (signerCount === 0) return;
+    const bps = mOfNToBps(selectedM, signerCount);
     setBusy("threshold");
     try {
-      await setDefaultThreshold(pctToBps(pct));
-      toast.success("Vote cast to change threshold", {
-        description: "Executes once the threshold is met.",
+      await setDefaultThreshold(bps);
+      toast.success("Vote cast to change approval", {
+        description: `Proposing ${selectedM} of ${signerCount}. Executes once the threshold is met.`,
       });
+      setTargetM(null);
       invalidate();
     } catch (err: any) {
       toast.error("Failed", { description: String(err?.message || err) });
@@ -470,31 +483,31 @@ function SignersTab({ wallet }: { wallet: UserWallet }) {
         </Alert>
       ) : null}
 
-      {/* Threshold */}
+      {/* Approval threshold */}
       <div className="rounded-lg border border-border p-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-medium">Voting threshold</div>
-            <div className="text-xs text-muted-foreground">
-              {thresholdPct}% · {needed} of {signers.length} signer{signers.length === 1 ? "" : "s"} required
-            </div>
-          </div>
+        <div className="text-sm font-medium">Approval threshold</div>
+        <div className="text-xs text-muted-foreground">
+          {needed} of {signerCount} signer{signerCount === 1 ? "" : "s"} must approve each action
         </div>
         <div className="mt-3 flex items-center gap-2">
-          <Input
-            type="number"
-            min={1}
-            max={100}
-            value={thresholdInput}
-            onChange={(e) => setThresholdInput(e.target.value)}
-            className="w-24"
-          />
-          <span className="text-sm text-muted-foreground">%</span>
+          <Select value={String(selectedM)} onValueChange={(v) => setTargetM(Number(v))}>
+            <SelectTrigger className="w-20">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: Math.max(1, signerCount) }, (_, i) => i + 1).map((m) => (
+                <SelectItem key={m} value={String(m)}>
+                  {m}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-sm text-muted-foreground">of {signerCount}</span>
           <Button
             size="sm"
             variant="outline"
             onClick={doThreshold}
-            disabled={busy !== "" || !canSubmit || !iAmSigner}
+            disabled={busy !== "" || !canSubmit || !iAmSigner || selectedM === needed}
             className="ml-auto"
           >
             {busy === "threshold" ? "Voting…" : "Propose change"}
@@ -580,6 +593,13 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
   const iAmSigner = signers.some((s) => eq(s, me));
   const needed = votesNeeded(signers.length, config.defaultThresholdBps || 6000);
   const [busy, setBusy] = useState<string>("");
+  const [proposing, setProposing] = useState(false);
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["multisig-open-issues", wallet.address] });
+    queryClient.invalidateQueries({ queryKey: ["multisig-signers", wallet.address] });
+    queryClient.invalidateQueries({ queryKey: ["multisig-config", wallet.address] });
+  };
 
   const vote = async (issue: OpenIssue) => {
     if (!iAmSigner) {
@@ -611,9 +631,7 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
           await castVote(issue.func, canonical, issue.target);
       }
       toast.success("Vote cast");
-      queryClient.invalidateQueries({ queryKey: ["multisig-open-issues", wallet.address] });
-      queryClient.invalidateQueries({ queryKey: ["multisig-signers", wallet.address] });
-      queryClient.invalidateQueries({ queryKey: ["multisig-config", wallet.address] });
+      invalidate();
     } catch (err: any) {
       toast.error("Vote failed", { description: String(err?.message || err) });
     } finally {
@@ -621,21 +639,46 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
     }
   };
 
-  if (isLoading) {
-    return <p className="py-6 text-center text-sm text-muted-foreground">Loading issues…</p>;
-  }
-  if (issues.length === 0) {
-    return (
-      <p className="py-6 text-center text-sm text-muted-foreground">
-        No open issues. Proposals you create from the Signers tab appear here for voting.
-      </p>
-    );
-  }
-
   return (
-    <div className="space-y-3">
-      {issues.map((issue) => {
-        const label = labelForIssue(issue, tokenMeta);
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-medium">Open issues</div>
+        <Button
+          size="sm"
+          variant={proposing ? "secondary" : "outline"}
+          onClick={() => setProposing((v) => !v)}
+          disabled={!iAmSigner}
+        >
+          {proposing ? "Close" : "Propose issue"}
+        </Button>
+      </div>
+
+      {!iAmSigner ? (
+        <p className="text-xs text-muted-foreground">
+          Only a signer can propose or vote on issues.
+        </p>
+      ) : null}
+
+      {proposing ? (
+        <ProposeIssueForm
+          walletAddress={wallet.address}
+          onDone={() => {
+            invalidate();
+            setProposing(false);
+          }}
+        />
+      ) : null}
+
+      {isLoading ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">Loading issues…</p>
+      ) : issues.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">
+          No open issues. Proposals appear here for signers to vote on.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {issues.map((issue) => {
+        const label = labelForIssue(issue, tokenMeta, signers.length);
         const count = issue.voters.length;
         const iVoted = issue.voters.some((v) => eq(v, me));
         const pct = needed > 0 ? Math.min(100, (count / needed) * 100) : 0;
@@ -677,6 +720,270 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
           </div>
         );
       })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* --------------------------------------------------------------------------------- */
+/* Propose a generic issue                                                            */
+/* --------------------------------------------------------------------------------- */
+
+/**
+ * Propose an arbitrary issue: target contract + function + positional args → the
+ * multisig's `castVoteOnIssue`, which executes `target.func(args)` from the wallet
+ * once the vote threshold is met. If the target resolves to a known contract, its
+ * functions/args are offered from the ABI; otherwise everything can be entered by hand.
+ */
+function ProposeIssueForm({
+  walletAddress,
+  onDone,
+}: {
+  walletAddress: string;
+  onDone: () => void;
+}) {
+  const { canSubmit } = useSubmitTransaction();
+  const { castVote } = useMultisigActions({ walletAddress });
+
+  const [target, setTarget] = useState("");
+  const [showSug, setShowSug] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
+  const [selectedFunc, setSelectedFunc] = useState("");
+  const [manualFunc, setManualFunc] = useState("");
+  const [abiArgs, setAbiArgs] = useState<Record<string, string>>({});
+  const [manualArgs, setManualArgs] = useState<string[]>([""]);
+  const [busy, setBusy] = useState(false);
+
+  const isAddr = isAddressLike(target);
+  const searchQ = isAddr ? strip0x(target) : target.trim().length >= 2 ? target.trim() : "";
+  const { data: groups } = useContractGroups(searchQ);
+
+  const resolvedAddress = isAddr ? strip0x(target) : "";
+  const resolvedName = useMemo(() => {
+    if (!resolvedAddress || !groups) return "";
+    const g = groups.find((grp) => grp.addresses.some((a) => strip0x(a) === resolvedAddress));
+    return g?.name ?? "";
+  }, [groups, resolvedAddress]);
+
+  const { data: info } = useContractInfo(resolvedName || null, resolvedAddress || null);
+  const abiFunctions = useMemo(() => {
+    const fns = (info?._functions ?? {}) as Record<string, any>;
+    return Object.keys(fns)
+      .filter((f) => {
+        if (!f || f === "constructor") return false;
+        const vis = fns[f]?._funcVisibility;
+        return !vis || vis === "public" || vis === "external";
+      })
+      .sort();
+  }, [info]);
+
+  const useAbi = !manualMode && abiFunctions.length > 0;
+  const abiFuncArgs = useMemo(
+    () => (useAbi && selectedFunc && info ? functionArgs(info, selectedFunc) : []),
+    [useAbi, selectedFunc, info]
+  );
+  const func = (useAbi ? selectedFunc : manualFunc).trim();
+
+  const suggestions = useMemo(() => {
+    if (isAddr || !groups || searchQ.length < 2) return [];
+    const out: { name: string; address: string }[] = [];
+    for (const g of groups) for (const a of g.addresses.slice(0, 3)) out.push({ name: g.name, address: a });
+    return out.slice(0, 8);
+  }, [groups, isAddr, searchQ]);
+
+  const buildArgs = (): string[] => {
+    if (useAbi && selectedFunc) {
+      return abiFuncArgs.map((a) => {
+        const v = (abiArgs[a.name] ?? "").trim();
+        return /address/i.test(a.type) ? strip0x(v) : v;
+      });
+    }
+    return manualArgs.map((a) => a.trim()).filter((a) => a.length > 0);
+  };
+
+  const reset = () => {
+    setTarget("");
+    setSelectedFunc("");
+    setManualFunc("");
+    setAbiArgs({});
+    setManualArgs([""]);
+    setManualMode(false);
+  };
+
+  const submit = async () => {
+    if (resolvedAddress.length !== 40) {
+      toast.error("Enter a valid contract address");
+      return;
+    }
+    if (!func) {
+      toast.error("Enter a function name");
+      return;
+    }
+    setBusy(true);
+    try {
+      await castVote(func, buildArgs(), resolvedAddress);
+      toast.success("Issue proposed", { description: "Signers can vote on it below." });
+      reset();
+      onDone();
+    } catch (err: any) {
+      toast.error("Proposal failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-3">
+      {/* Target contract */}
+      <div className="relative space-y-1">
+        <Label>Target contract</Label>
+        <Input
+          placeholder="Contract address or name"
+          autoComplete="off"
+          value={target}
+          onChange={(e) => {
+            setTarget(e.target.value);
+            setShowSug(true);
+            setSelectedFunc("");
+          }}
+          onFocus={() => setShowSug(true)}
+          onBlur={() => setTimeout(() => setShowSug(false), 150)}
+          className="font-mono text-xs"
+        />
+        {showSug && suggestions.length > 0 ? (
+          <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
+            {suggestions.map((s) => (
+              <button
+                type="button"
+                key={`${s.name}-${s.address}`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setTarget(strip0x(s.address));
+                  setShowSug(false);
+                }}
+                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+              >
+                <span className="font-medium">{s.name}</span>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {shortenHex(s.address)}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {resolvedAddress && resolvedName ? (
+          <p className="text-xs text-muted-foreground">Resolved contract: {resolvedName}</p>
+        ) : null}
+      </div>
+
+      {/* Function */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <Label>Function</Label>
+          {abiFunctions.length > 0 ? (
+            <button
+              type="button"
+              className="text-xs text-muted-foreground underline"
+              onClick={() => {
+                setManualMode((m) => !m);
+                setSelectedFunc("");
+              }}
+            >
+              {manualMode ? "Pick from contract" : "Enter manually"}
+            </button>
+          ) : null}
+        </div>
+        {useAbi ? (
+          <Select value={selectedFunc} onValueChange={setSelectedFunc}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select a function" />
+            </SelectTrigger>
+            <SelectContent>
+              {abiFunctions.map((f) => (
+                <SelectItem key={f} value={f}>
+                  {f}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Input
+            placeholder="functionName"
+            value={manualFunc}
+            onChange={(e) => setManualFunc(e.target.value)}
+            className="font-mono text-xs"
+          />
+        )}
+      </div>
+
+      {/* Arguments */}
+      <div className="space-y-1">
+        <Label>Arguments</Label>
+        {useAbi && selectedFunc ? (
+          abiFuncArgs.length === 0 ? (
+            <p className="text-xs text-muted-foreground">This function takes no arguments.</p>
+          ) : (
+            abiFuncArgs.map((a) => (
+              <Input
+                key={a.name}
+                placeholder={`${a.name} (${a.type})`}
+                value={abiArgs[a.name] ?? ""}
+                onChange={(e) => setAbiArgs((prev) => ({ ...prev, [a.name]: e.target.value }))}
+                className="font-mono text-xs"
+              />
+            ))
+          )
+        ) : (
+          <>
+            {manualArgs.map((a, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Input
+                  placeholder={`arg ${i + 1}`}
+                  value={a}
+                  onChange={(e) =>
+                    setManualArgs((prev) => prev.map((x, idx) => (idx === i ? e.target.value : x)))
+                  }
+                  className="font-mono text-xs"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() =>
+                    setManualArgs((prev) =>
+                      prev.length === 1 ? [""] : prev.filter((_, idx) => idx !== i)
+                    )
+                  }
+                  aria-label="Remove argument"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setManualArgs((prev) => [...prev, ""])}
+              className="gap-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add argument
+            </Button>
+          </>
+        )}
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        Arguments are passed positionally. When the vote passes, the multisig calls the function
+        on the target contract.
+      </p>
+      <Button
+        onClick={submit}
+        disabled={busy || !canSubmit || resolvedAddress.length !== 40 || !func}
+        className="w-full"
+      >
+        {busy ? "Proposing…" : "Propose issue"}
+      </Button>
     </div>
   );
 }
@@ -691,6 +998,7 @@ function HistoryTab({ wallet }: { wallet: UserWallet }) {
   const [page, setPage] = useState(0);
   const { data: executed = [], isLoading } = useExecutedIssues(wallet.address, PAGE, page * PAGE);
   const tokenMeta = useTokenMeta(wallet.address);
+  const { data: signers = [] } = useSigners(wallet.address);
 
   return (
     <div className="space-y-3">
@@ -701,7 +1009,7 @@ function HistoryTab({ wallet }: { wallet: UserWallet }) {
       ) : (
         <div className="space-y-2">
           {executed.map((ex, i) => {
-            const label = labelForIssue(ex, tokenMeta);
+            const label = labelForIssue(ex, tokenMeta, signers.length);
             return (
               <div
                 key={`${ex.issueId}-${i}`}
