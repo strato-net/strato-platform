@@ -83,17 +83,6 @@ const Dashboard = () => {
     [inactiveTokens]
   );
 
-  // Sort earning assets by value
-  const sortedTokens = useMemo(
-    () =>
-      [...earningAssets].sort((a, b) => {
-        const valueA = parseFloat(a.value || "0");
-        const valueB = parseFloat(b.value || "0");
-        return valueB - valueA;
-      }),
-    [earningAssets]
-  );
-
   // Use centralized net balance calculation hook
   const { netBalance: totalBalance, cataBalance, totalBorrowed, isLoading: isLoadingNetBalance } = useNetBalance({
     cataToken,
@@ -346,11 +335,11 @@ const Dashboard = () => {
                 <span className="text-xs md:text-sm">Fund</span>
               </Button>
               <Button
-                onClick={() => navigate("/dashboard/transfer")}
+                onClick={() => navigate("/dashboard/swap")}
                 className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
               >
-                <Send size={18} />
-                <span className="text-xs md:text-sm">Send</span>
+                <ArrowRightLeft size={18} />
+                <span className="text-xs md:text-sm">Trade</span>
               </Button>
               <Button
                 onClick={() => navigate("/dashboard/borrow")}
@@ -360,11 +349,11 @@ const Dashboard = () => {
                 <span className="text-xs md:text-sm">Borrow</span>
               </Button>
               <Button
-                onClick={() => navigate("/dashboard/swap")}
+                onClick={() => navigate("/dashboard/transfer")}
                 className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
               >
-                <ArrowRightLeft size={18} />
-                <span className="text-xs md:text-sm">Trade</span>
+                <Send size={18} />
+                <span className="text-xs md:text-sm">Send</span>
               </Button>
             </div>
           )}
@@ -401,7 +390,7 @@ const Dashboard = () => {
           <div className="mb-8">
             <AssetsList
               loading={loadingEarningAssets || loadingInactiveTokens}
-              tokens={sortedTokens}
+              tokens={earningAssets}
               inActiveTokens={isLoggedIn ? inactiveTokens : []}
               guestMode={!isLoggedIn}
             />

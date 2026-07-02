@@ -79,7 +79,7 @@ export const EARNING_ASSET_SYMBOL_ORDER: string[] = [
   // Other 
   "BOOE", 
   // LP tokens
-  "SLP","lendUSDST", "safetyUSDST", "sUSDS-USDST-LP", "bCSPXST-USDST-LP",  "syrupUSDC-USDST-LP",
+  "SLP","lendUSDST", "safetyUSDST", "sUSDS-USDST-LP", "bCSPXST-USDST-LP",
   "ETH-USDST-LP", "GOLDST-USDST-LP", "syrupUSDC-USDST-LP",
   "USDT-USDC-USDST-LP",  "SILVST-USDST-LP",
 ];

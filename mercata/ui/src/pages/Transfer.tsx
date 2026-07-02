@@ -129,7 +129,7 @@ const Transfer = () => {
       .then(({ data }) => {
         if (data.nonce === 0) setNonceWarning(true);
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => controller.abort();
   }, [recipient, recipientError, isLoggedIn]);
 
@@ -169,8 +169,7 @@ const Transfer = () => {
 
       toast({
         title: "Success",
-        description: `Sent ${fromAmount} ${
-          fromAsset?.token?._symbol ||
+        description: `Sent ${fromAmount} ${fromAsset?.token?._symbol ||
           fromAsset?.token?._name
           } to ${recipient}`,
       });
@@ -181,7 +180,7 @@ const Transfer = () => {
       fetchUserTokens().then((updatedTokens) => {
         const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);
         setFromAsset(updatedToken || null);
-      }).catch(() => {});
+      }).catch(() => { });
       fetchUsdstBalance();
     } catch (error) {
       console.error("Transfer error:", error);
@@ -226,7 +225,7 @@ const Transfer = () => {
           )}
           <div className="max-w-2xl mx-auto bg-card shadow-md rounded-lg p-6 space-y-6 border border-border">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Send your tokens</h2>
+              <h2 className="text-xl font-semibold">Send tokens to STRATO account</h2>
               <Button
                 variant="outline"
                 size="sm"
@@ -287,7 +286,7 @@ const Transfer = () => {
                               token?.token?._name}
                           </Button>
                         ))}
-                        
+
                         {/* Show More button if there are inactive tokens */}
                         {inactiveTokens.length > 0 && !showInactiveTokens && (
                           <Button
@@ -302,7 +301,7 @@ const Transfer = () => {
                             Show More ({inactiveTokens.length})
                           </Button>
                         )}
-                        
+
                         {/* Inactive tokens (shown when expanded) */}
                         {showInactiveTokens && inactiveTokens.map((token) => (
                           <Button
@@ -321,7 +320,7 @@ const Transfer = () => {
                               token?.token?._name}
                           </Button>
                         ))}
-                        
+
                         {/* Show Less button */}
                         {showInactiveTokens && inactiveTokens.length > 0 && (
                           <Button

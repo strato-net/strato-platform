@@ -430,7 +430,7 @@ const BulkTransferModal = ({
         <DialogDescription className="text-xs sm:text-sm">
           Review the sends before confirming. {invalidTransfers.length > 0 && (
             <span className="text-yellow-600">
-              {invalidTransfers.length} invalid transfer(s) will be skipped.
+              {invalidTransfers.length} invalid send(s) will be skipped.
             </span>
           )}
         </DialogDescription>

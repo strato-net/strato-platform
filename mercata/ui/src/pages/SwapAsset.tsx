@@ -25,16 +25,16 @@ const SwapAsset = () => {
             {/* Main Swap Widget */}
             <div className="bg-card shadow-sm rounded-xl p-4 md:p-6 border border-border">
               <div className="flex items-center justify-between mb-4 md:mb-6">
-                <h2 className="text-base md:text-xl font-semibold">Exchange your digital assets</h2>
+                <h2 className="text-base md:text-xl font-semibold">Trade your assets</h2>
               </div>
-              <SwapWidget 
+              <SwapWidget
                 userRewards={userRewards}
                 rewardsLoading={rewardsLoading}
                 guestMode={!isLoggedIn}
               />
             </div>
           </div>
-          
+
           {/* Separate Swap History Section - Full Width (hidden on mobile) */}
           {isLoggedIn && (
             <div className="hidden md:block mt-6 md:mt-8 max-w-6xl mx-auto">
