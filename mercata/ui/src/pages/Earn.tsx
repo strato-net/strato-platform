@@ -420,8 +420,16 @@ const Earn = () => {
   }, [rewardsActivities, saveUsdstAsset?.address]);
 
   const saveUsdstTvl = useMemo(() => {
+    if (saveUsdstInfo?.deployed && saveUsdstInfo.projectedTvlUsd) {
+      return saveUsdstInfo.projectedTvlUsd;
+    }
+
     if (saveUsdstInfo?.deployed && saveUsdstInfo.tvlUsd) {
       return saveUsdstInfo.tvlUsd;
+    }
+
+    if (saveUsdstInfo?.deployed && saveUsdstInfo.projectedPricingAssets) {
+      return saveUsdstInfo.projectedPricingAssets;
     }
 
     if (saveUsdstInfo?.deployed && saveUsdstInfo.pricingAssets) {

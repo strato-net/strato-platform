@@ -56,8 +56,8 @@ const buildSaveUsdstEarningAsset = (
 
   const balance = userInfo?.userShares || "0";
   const totalBalance = balance;
-  const price = info.exchangeRate || "0";
-  const redeemableValueUsd = userInfo?.redeemableAssets || "0";
+  const price = info.projectedExchangeRate || info.exchangeRate || "0";
+  const redeemableValueUsd = userInfo?.projectedRedeemableAssets || userInfo?.redeemableAssets || "0";
   const value = (Number(BigInt(redeemableValueUsd || "0")) / 1e18).toFixed(2);
 
   return {
