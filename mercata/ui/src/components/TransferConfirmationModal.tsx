@@ -33,9 +33,9 @@ const TransferConfirmationModal = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Confirm Transfer</DialogTitle>
+          <DialogTitle>Confirm Send</DialogTitle>
           <DialogDescription>
-            Please review your transfer details before confirming.
+            Please review your send details before confirming.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
@@ -80,7 +80,7 @@ const TransferConfirmationModal = ({
             onClick={onConfirm}
             disabled={swapLoading}
           >
-            {swapLoading ? "Processing..." : "Confirm Transfer"}
+            {swapLoading ? "Processing..." : "Confirm Send"}
           </Button>
         </DialogFooter>
       </DialogContent>

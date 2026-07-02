@@ -56,7 +56,7 @@ const WithdrawalsPage = () => {
         className="h-screen flex flex-col transition-all duration-300"
         style={{ paddingLeft: "var(--sidebar-width, 0px)" }}
       >
-        <DashboardHeader title="Withdrawals" />
+        <DashboardHeader title="Bridge Out" />
 
         <main className="flex-1 p-4 md:p-6 pb-10 md:pb-6 overflow-y-auto">
           {!isLoggedIn && (
@@ -67,7 +67,7 @@ const WithdrawalsPage = () => {
               <Card className="shadow-sm flex-1 flex flex-col">
                 <CardHeader className="pb-2 md:pb-4">
                   <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-base md:text-xl">Withdraw Assets</CardTitle>
+                    <CardTitle className="text-base md:text-xl">Bridge Out</CardTitle>
                     <Link
                       to="/bridge-transactions?from=withdrawals"
                       onClick={(e) => {
@@ -78,11 +78,10 @@ const WithdrawalsPage = () => {
                         }
                         setTargetTransactionTab('WithdrawalInitiated');
                       }}
-                      className={`flex items-center gap-1 text-xs md:text-sm font-semibold transition-colors whitespace-nowrap ${
-                        isLoggedIn 
-                          ? "text-blue-600 hover:text-blue-800 cursor-pointer" 
+                      className={`flex items-center gap-1 text-xs md:text-sm font-semibold transition-colors whitespace-nowrap ${isLoggedIn
+                          ? "text-blue-600 hover:text-blue-800 cursor-pointer"
                           : "text-muted-foreground hover:text-foreground cursor-pointer"
-                      }`}
+                        }`}
                     >
                       <ArrowRight size={14} className="md:w-4 md:h-4" />
                       View Transactions
@@ -100,12 +99,12 @@ const WithdrawalsPage = () => {
             <div className="w-full lg:w-[50%] flex flex-col gap-6">
               <Card className="shadow-sm flex flex-col">
                 <CardHeader>
-                  <CardTitle>Withdrawal Summary</CardTitle>
+                  <CardTitle>Bridge Out Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">
-                      Total Withdrawn (30d)
+                      Total Bridged Out (30d)
                     </span>
                     {loadingWithdrawalSummary ? (
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -124,7 +123,7 @@ const WithdrawalsPage = () => {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">
-                      Pending Withdrawals
+                      Pending Bridge Outs
                     </span>
                     {loadingWithdrawalSummary ? (
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -141,7 +140,7 @@ const WithdrawalsPage = () => {
                       </span>
                     )}
                   </div>
-                  
+
                 </CardContent>
               </Card>
 
@@ -151,8 +150,8 @@ const WithdrawalsPage = () => {
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-                    <li>Withdrawals are processed within 1-3 business days</li>
-                    <li>Double-check withdrawal address before confirming</li>
+                    <li>Bridge outs are processed within 1-3 business days</li>
+                    <li>Double-check external address before confirming</li>
                   </ul>
                 </CardContent>
               </Card>
@@ -163,7 +162,7 @@ const WithdrawalsPage = () => {
           {isLoggedIn && (
             <Card className="shadow-sm hidden md:block">
               <CardHeader>
-                <CardTitle>Withdrawal History</CardTitle>
+                <CardTitle>Bridge Out History</CardTitle>
               </CardHeader>
               <CardContent>
                 <WithdrawTransactionDetails context="withdrawals" />

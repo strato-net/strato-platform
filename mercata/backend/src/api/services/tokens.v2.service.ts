@@ -2,7 +2,7 @@ import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getRebaseFactors } from "./oracle.service";
-import { getVaultShareTokenAddress, getVaultHistoryConfig } from "./vault.service";
+import { getVaultHistoryConfig } from "./vault.service";
 import { getSaveUsdstInfo, getSaveUsdstUserInfo } from "./saveUsdst.service";
 import { getLoan } from "./lending.service";
 import { getVaults } from "./cdp.service";
@@ -76,7 +76,6 @@ const buildSaveUsdstEarningAsset = (
     price,
     collateralBalance: "0",
     totalBalance,
-    isPoolToken: false,
     value,
     apy: info.apy || "0",
   };
@@ -118,7 +117,6 @@ const buildYieldVaultEarningAsset = (
     price: ((BigInt(info.exchangeRate || "0") * BigInt(info.assetPriceWad || "0")) / BigInt(1e18)).toString(),
     collateralBalance: "0",
     totalBalance,
-    isPoolToken: false,
     value,
     apy: info.apy || "0",
   };
@@ -162,7 +160,7 @@ export const getEarningAssets = async (
   accessToken: string,
   userAddress: string
 ): Promise<EarningAsset[]> => {
-  const [tokens, collaterals, cdps, rawPrices, vaultShareToken, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap] = await Promise.all([
+  const [tokens, collaterals, cdps, rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, {
       params: {
         "balances.key": `eq.${userAddress}`,
@@ -189,7 +187,6 @@ export const getEarningAssets = async (
       },
     }),
     getCompletePriceMap(accessToken),
-    getVaultShareTokenAddress(accessToken),
     getSaveUsdstInfo(accessToken).catch(() => null),
     getSaveUsdstUserInfo(accessToken, userAddress).catch(() => null),
     getRebaseFactors(accessToken),
@@ -231,12 +228,6 @@ export const getEarningAssets = async (
       price,
       collateralBalance,
       totalBalance: totalBalance.toString(),
-      isPoolToken:
-        t._symbol?.endsWith("-LP") ||
-        t._symbol === "SUSDST" || t._symbol === "safetyUSDST" ||
-        t._symbol === "MUSDST" || t._symbol === "lendUSDST" ||
-        (vaultShareToken && t.address === vaultShareToken) ||
-        t.description === "Liquidity Provider Token",
       value,
       ...(rebaseFactor ? { rebaseFactor } : {}),
       ...(rebasingExternalSymbol ? { rebasingExternalSymbol } : {}),
@@ -295,10 +286,9 @@ export const getPublicEarningAssets = async (
   };
 
   // Fetch only tokens and prices (skip user-specific collateral data)
-  const [tokens, rawPrices, vaultShareToken, saveUsdstInfo] = await Promise.all([
+  const [tokens, rawPrices, saveUsdstInfo] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, { params: tokenParams }),
     getCompletePriceMap(accessToken),
-    getVaultShareTokenAddress(accessToken),
     getSaveUsdstInfo(accessToken).catch(() => null),
   ]);
 
@@ -315,12 +305,6 @@ export const getPublicEarningAssets = async (
       price,
       collateralBalance,
       totalBalance: totalBalance.toString(),
-      isPoolToken:
-        t._symbol?.endsWith("-LP") ||
-        t._symbol === "SUSDST" || t._symbol === "safetyUSDST" ||
-        t._symbol === "MUSDST" || t._symbol === "lendUSDST" ||
-        (vaultShareToken && t.address === vaultShareToken) ||
-        t.description === "Liquidity Provider Token",
       value,
     };
   });
