@@ -80,8 +80,8 @@ export default function MyPoolParticipationSection({
         return {
           value: info
             ? info.total.toFixed(2)
-            : vaultState.alpha && vaultState.alpha !== "0" && vaultState.alpha !== "-"
-              ? vaultState.alpha
+            : vaultState.apy && vaultState.apy !== "0" && vaultState.apy !== "-"
+              ? vaultState.apy
               : null,
           info,
         };
@@ -93,7 +93,7 @@ export default function MyPoolParticipationSection({
         info,
       };
     },
-    [liquidityInfo, lpTokenPoolMap, pools, tokenApys, vaultState.alpha, vaultState.shareTokenAddress]
+    [liquidityInfo, lpTokenPoolMap, pools, tokenApys, vaultState.apy, vaultState.shareTokenAddress]
   );
 
   const rows = useMemo(

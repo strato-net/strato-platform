@@ -584,7 +584,7 @@ const Earn = () => {
     () =>
       vaultEarnApyInfo ||
       buildNativeRewardsApyInfo(
-        vaultState.alpha,
+        vaultState.apy,
         vaultRewardActivity?.emissionRate ? vaultRewardActivity.emissionRate.toString() : null,
         vaultRewardActivity?.totalStakeUsd ?? vaultState.totalEquity ?? null,
         "vault"
@@ -593,13 +593,13 @@ const Earn = () => {
       vaultEarnApyInfo,
       vaultRewardActivity?.emissionRate,
       vaultRewardActivity?.totalStakeUsd,
-      vaultState.alpha,
+      vaultState.apy,
       vaultState.totalEquity,
     ]
   );
   const vaultDisplayApyRaw = resolvedVaultApyInfo
     ? resolvedVaultApyInfo.total.toFixed(2)
-    : vaultState.alpha;
+    : vaultState.apy;
   const allOpportunities = useMemo<OpportunityRow[]>(() => {
     const rows: OpportunityRow[] = [];
 

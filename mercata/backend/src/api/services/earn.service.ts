@@ -61,7 +61,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     },
   );
 
-  const { vaultAPY, vaultRewardApy, currentVaultBalances } = await computeVaultApys(
+  const { vaultAPY, vaultRewardApy } = await computeVaultApys(
     accessToken, vaultAddr, ctx, phase1b, rewardActivities,
   );
 
@@ -75,19 +75,10 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   const exchangeRateHistory = indexYieldHistoryRows(mergeBackfillRows(phase1.exchangeRateRows ?? []));
   const baseYieldByAddr = addBaseYieldApys(add, exchangeRateHistory, anchorsMs);
 
-  const vaultWeightedApy = currentVaultBalances.size > 0 && baseYieldByAddr.size > 0
-    ? weightedBaseYield(
-        ctx.filteredVaultAssets,
-        ctx.filteredVaultAssets.map(a => currentVaultBalances.get(a) ?? "0"),
-        ctx.prices, baseYieldByAddr,
-      )
-    : null;
-
   await addPoolApys(accessToken, add, phase1.pools, phase1b.stablePools, ctx, rewardActivities, baseYieldByAddr);
 
   if (ctx.shareTokenAddress) {
     if (isPositiveApy(vaultAPY)) add(ctx.shareTokenAddress, { source: "vault", apy: vaultAPY });
-    if (isPositiveApy(vaultWeightedApy)) add(ctx.shareTokenAddress, { source: "vault_weighted", apy: vaultWeightedApy });
     if (isPositiveApy(vaultRewardApy)) add(ctx.shareTokenAddress, { source: "rewards", apy: vaultRewardApy, meta: "vault" });
   }
 
@@ -276,7 +267,7 @@ async function computeVaultApys(
       ctx.filteredVaultAssets, ctx.prices,
     );
 
-    vaultAPY = vaultMetrics.alpha !== APY_UNAVAILABLE ? vaultMetrics.alpha : null;
+    vaultAPY = vaultMetrics.apy !== APY_UNAVAILABLE ? vaultMetrics.apy : null;
     const vaultRewardsActivity = findRewardActivity(rewardActivities, {
       sourceContract: ctx.shareTokenAddress,
       stakeAssetAddress: ctx.shareTokenAddress,
@@ -289,7 +280,7 @@ async function computeVaultApys(
     vaultRewardApy = computeRewardsApy(vaultRewardsActivity?.emissionRate, vaultRewardsActivity?.totalStakeUsd);
   }
 
-  return { vaultAPY, vaultRewardApy, currentVaultBalances };
+  return { vaultAPY, vaultRewardApy };
 }
 
 // ── APY assembly helpers ──────────────────────────────────────────────────────
