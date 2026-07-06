@@ -5,6 +5,10 @@ export const safetyModuleAddress = "0000000000000000000000000000000000001015"
 export const sUsdstAddress = "0000000000000000000000000000000000001016"
 export const mUsdstAddress = "000000000000000000000000000000000000100f"
 export const cataAddress = "2680dc6693021cd3fefb84351570874fbef8332a"
+export const stratoTokenAddresses = [
+  "8ee9a3391e38176feebf5d43cb2c1d6c4f728b04", // Helium testnet
+  "2ca3e170e6714282da77815f7864b17f612f5f83", // Upquark mainnet
+]
 export const rewardsAddress = "0000000000000000000000000000000000001020" // TODO: Update with actual deployed address
 export const DECIMAL = 18
 export const WAD = 10n ** 18n;

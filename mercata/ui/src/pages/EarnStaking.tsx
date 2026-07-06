@@ -635,7 +635,7 @@ const EarnStaking = () => {
                 {formatRewardPeriodStatus(info.periodStart, info.periodFinish)}
                 {" · "}
                 <a
-                  href="https://docs.strato.network/staking" // TODO: replace placeholder with final docs/blog URL
+                  href="https://docs.strato.nexus/tokenomics/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-medium text-primary hover:underline"

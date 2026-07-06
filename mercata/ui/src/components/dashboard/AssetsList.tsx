@@ -10,6 +10,7 @@ import { buildEarnApyMap } from "@/utils/earnUtils";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { getEarningAssetSymbolRank } from "@/lib/tokenPriority";
+import { stratoTokenAddresses } from "@/lib/constants";
 
 const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | undefined): boolean => {
   const symbol = asset?._symbol?.toLowerCase?.() || "";
@@ -51,6 +52,9 @@ interface AssetsProps {
 
 const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
 
+const isStratoAsset = (asset: { address?: string } | null | undefined): boolean =>
+  stratoTokenAddresses.includes(normAddr(asset?.address || ""));
+
 const AssetsList = ({
   loading,
   tokens,
@@ -77,6 +81,10 @@ const AssetsList = ({
 
   const sortedTokens = useMemo(() => {
     return [...tokens].sort((a, b) => {
+      // STRATO is always pinned to the top, held or not
+      const stratoDiff = (isStratoAsset(b) ? 1 : 0) - (isStratoAsset(a) ? 1 : 0);
+      if (stratoDiff !== 0) return stratoDiff;
+
       // Tokens the user holds a balance in come first
       const balanceDiff = (hasBalance(b) ? 1 : 0) - (hasBalance(a) ? 1 : 0);
       if (balanceDiff !== 0) return balanceDiff;
@@ -276,6 +284,11 @@ const AssetsList = ({
                               })()}
                             </div>
                           </div>
+                          {isStratoAsset(asset) && (
+                            <Button asChild size="sm" className="ml-2 shrink-0">
+                              <Link to="/dashboard/earn-staking">Stake</Link>
+                            </Button>
+                          )}
                         </div>
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
