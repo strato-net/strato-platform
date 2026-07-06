@@ -12,6 +12,12 @@ export interface UserWallet {
   /** The User wallet contract address. */
   address: string;
   username: string;
+  /**
+   * True when the connected account controls this wallet as a multisig **signer**
+   * (it's in the wallet's `adminMap`) rather than as a direct owner/authorized
+   * account. Multisig wallets are self-owned, so signers aren't in `userAddressMap`.
+   */
+  multisig?: boolean;
 }
 
 function extractUsername(row: any): string {
@@ -21,12 +27,14 @@ function extractUsername(row: any): string {
 }
 
 /**
- * User wallets that `ownerAddress` controls. A User contract tracks its authorized
- * accounts in the `userAddressMap` mapping (address => uint), which enforces a 1:1
- * relation, exposed by cirrus via the `mapping` table (columns: address = the User
- * contract, key = the authorized account). We join back to `storage` for the
- * wallet's username:
- *   /cirrus/search/mapping?collection_name=eq.userAddressMap&key->>key=eq.<addr>&select=address,storage(data->>username)
+ * User wallets the connected account can act on. Two sources, merged and deduped:
+ *  - `userAddressMap` (address => uint): wallets it owns / is an authorized account on.
+ *  - `adminMap` (address => uint, value = index+1): wallets it's a multisig **signer**
+ *    on. Once a wallet is converted to a self-owned multisig, `transferOwnership`
+ *    clears its owner out of `userAddressMap`, so signers only appear here.
+ * Both cirrus queries key on the connected account and join `storage` for the username;
+ * the global AdminRegistry/Governance also have an `adminMap` but no username, so
+ * requiring a username naturally excludes them.
  */
 export function useMyUserWallets(ownerAddress?: string | null) {
   return useQuery({
@@ -34,13 +42,27 @@ export function useMyUserWallets(ownerAddress?: string | null) {
     enabled: !!ownerAddress,
     queryFn: async (): Promise<UserWallet[]> => {
       const key = strip0x(ownerAddress!);
-      const { data } = await api.get(
-        `${env.CIRRUS_URL}/mapping?collection_name=eq.userAddressMap&key-%3E%3Ekey=eq.${key}&select=address,storage(data-%3E%3Eusername)`
-      );
-      if (!Array.isArray(data)) return [];
-      return data
-        .map((row: any) => ({ address: row?.address ?? "", username: extractUsername(row) }))
-        .filter((w) => w.address);
+      const select = "select=address,storage(data-%3E%3Eusername)";
+      const [ownedRes, signerRes] = await Promise.all([
+        api.get(`${env.CIRRUS_URL}/mapping?collection_name=eq.userAddressMap&key-%3E%3Ekey=eq.${key}&${select}`),
+        api.get(`${env.CIRRUS_URL}/mapping?collection_name=eq.adminMap&key-%3E%3Ekey=eq.${key}&value=gt.0&${select}`),
+      ]);
+
+      const byAddr = new Map<string, UserWallet>();
+      for (const row of Array.isArray(ownedRes.data) ? ownedRes.data : []) {
+        const address = row?.address ?? "";
+        if (!address) continue;
+        byAddr.set(address, { address, username: extractUsername(row), multisig: false });
+      }
+      for (const row of Array.isArray(signerRes.data) ? signerRes.data : []) {
+        const address = row?.address ?? "";
+        const username = extractUsername(row);
+        if (!address || !username) continue; // no username => a global registry, skip
+        const existing = byAddr.get(address);
+        if (existing) existing.multisig = true;
+        else byAddr.set(address, { address, username, multisig: true });
+      }
+      return [...byAddr.values()];
     },
     refetchInterval: 15000,
   });

@@ -200,7 +200,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "Transfer": {
     contract_name: "Token",
     event_name: "Transfer",
-    displayName: "Transfer",
+    displayName: "Send",
     iconConfig: { icon: Send, color: "bg-blue-500" },
     getTokenAddress: (event: Event) => [event.address].filter(Boolean),
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
@@ -237,7 +237,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "Transfer",
+        title: "Send",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -258,7 +258,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "YieldVaultTransfer": {
     contract_name: "YieldVault",
     event_name: "Transfer",
-    displayName: "YieldVault Transfer",
+    displayName: "YieldVault Send",
     iconConfig: { icon: Send, color: "bg-cyan-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const vaultName = tokenSymbols.get(event.address) || tokenSymbols.get(normalizeAddress(event.address));
@@ -290,7 +290,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: vaultName ? `${vaultName} Transfer` : "YieldVault Transfer",
+        title: vaultName ? `${vaultName} Send` : "YieldVault Send",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -311,7 +311,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "SaveUSDSTVaultTransfer": {
     contract_name: "SaveUSDSTVault",
     event_name: "Transfer",
-    displayName: "SaveUSDST Transfer",
+    displayName: "SaveUSDST Send",
     iconConfig: { icon: Send, color: "bg-cyan-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const from = event.attributes.from || event.attributes.From || "";
@@ -341,7 +341,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "SaveUSDST Transfer",
+        title: "SaveUSDST Send",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -453,7 +453,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "Withdraw": {
     contract_name: "MercataBridge",
     event_name: "WithdrawalRequested",
-    displayName: "Withdrawal",
+    displayName: "Bridge Out",
     iconConfig: { icon: Upload, color: "bg-red-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.token || event.attributes.Token;
@@ -524,7 +524,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       }
 
       return {
-        title: "Withdrawal",
+        title: "Bridge Out",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -545,7 +545,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "NativeWithdraw": {
     contract_name: "StratoNativeBridge",
     event_name: "NativeWithdrawalRequested",
-    displayName: "Native Withdrawal",
+    displayName: "Native Bridge Out",
     iconConfig: { icon: Upload, color: "bg-red-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
@@ -639,7 +639,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "Swap": {
     contract_name: "Pool",
     event_name: "Swap",
-    displayName: "Swap",
+    displayName: "Trade",
     iconConfig: { icon: ArrowLeftRight, color: "bg-orange-500" },
     getTokenAddress: (event: Event) => {
       const tokenIn = event.attributes.tokenIn || event.attributes.token_in;
@@ -689,7 +689,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "Swap",
+        title: "Trade",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
