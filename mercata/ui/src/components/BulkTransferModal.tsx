@@ -364,9 +364,9 @@ const BulkTransferModal = ({
   const renderUploadState = () => (
     <>
       <DialogHeader>
-        <DialogTitle>Bulk Transfer</DialogTitle>
+        <DialogTitle>Bulk Send</DialogTitle>
         <DialogDescription>
-          Upload a CSV file to transfer tokens to multiple recipients.
+          Upload a CSV file to send tokens to multiple recipients.
         </DialogDescription>
       </DialogHeader>
 
@@ -426,11 +426,11 @@ const BulkTransferModal = ({
   const renderPreviewState = () => (
     <>
       <DialogHeader>
-        <DialogTitle className="text-lg sm:text-xl">Review Transfers</DialogTitle>
+        <DialogTitle className="text-lg sm:text-xl">Review Sends</DialogTitle>
         <DialogDescription className="text-xs sm:text-sm">
-          Review the transfers before confirming. {invalidTransfers.length > 0 && (
+          Review the sends before confirming. {invalidTransfers.length > 0 && (
             <span className="text-yellow-600">
-              {invalidTransfers.length} invalid transfer(s) will be skipped.
+              {invalidTransfers.length} invalid send(s) will be skipped.
             </span>
           )}
         </DialogDescription>
@@ -706,7 +706,7 @@ const BulkTransferModal = ({
   const renderResultsState = () => (
     <>
       <DialogHeader>
-        <DialogTitle>Transfer Results</DialogTitle>
+        <DialogTitle>Send Results</DialogTitle>
         <DialogDescription>
           {successCount} successful, {failureCount} failed
         </DialogDescription>

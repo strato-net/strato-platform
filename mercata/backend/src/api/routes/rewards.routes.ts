@@ -255,4 +255,34 @@ router.post("/claim/:activityId", walletAuth, RewardsController.claimActivityRew
  */
 router.get("/leaderboard", authHandler.authorizeRequest(true), RewardsController.getLeaderboard);
 
+/**
+ * @openapi
+ * /rewards/leaderboard/me:
+ *   get:
+ *     summary: Get the current user's rank on the leaderboard
+ *     tags: [Rewards]
+ *     responses:
+ *       200:
+ *         description: User rank response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 rank:
+ *                   type: integer
+ *                   nullable: true
+ *                   description: User's rank (1-based), null if not on leaderboard
+ *                 totalRewardsEarned:
+ *                   type: string
+ *                   nullable: true
+ *                   description: Total rewards earned by the user
+ *                 total:
+ *                   type: integer
+ *                   description: Total number of users on the leaderboard
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/leaderboard/me", userRewardsAuth, RewardsController.getMyRank);
+
 export default router;

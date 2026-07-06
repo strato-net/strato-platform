@@ -50,6 +50,39 @@ usersTable =
         requiredTableField "address"
       )
 
+-- MPC key shards: the Vault-held shard of a 2-of-2 split key, encrypted at rest
+-- with the same SecretBox master key as the `users` table. Kept entirely separate
+-- from `users` so the existing key/signature flows are untouched.
+mpcKeysTable ::
+  Table
+    ( Maybe (Field PGInt4),
+      Field PGText,
+      Field PGText,
+      Field PGBytea,
+      Field PGBytea,
+      Field PGBytea,
+      Field PGBytea
+    )
+    ( Field PGInt4,
+      Field PGText,
+      Field PGText,
+      Field PGBytea,
+      Field PGBytea,
+      Field PGBytea,
+      Field PGBytea
+    )
+mpcKeysTable =
+  Table "mpc_keys" $
+    p7
+      ( optionalTableField "id",
+        requiredTableField "x_user_unique_name",
+        requiredTableField "x_identity_provider_id",
+        requiredTableField "salt",
+        requiredTableField "nonce",
+        requiredTableField "enc_shard",
+        requiredTableField "address"
+      )
+
 messageTable ::
   Table
     ( Maybe (Field PGInt4),

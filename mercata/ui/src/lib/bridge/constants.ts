@@ -13,7 +13,7 @@ export const BRIDGE_MODE_LABELS = {
   convert: {
     title: "Redeem to Stablecoins",
     description: "Redeem USDST back to external stablecoins",
-    amountLabel: "Amount (USDST to withdraw)",
+    amountLabel: "Amount (USDST to bridge out)",
   },
   bridge: {
     title: "Bridge Out Your Tokens",
