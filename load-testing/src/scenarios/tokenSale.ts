@@ -282,85 +282,140 @@ export class TokenSaleScenario extends AppScenario {
         const client = this.backendClients[i % this.backendClients.length];
 
         // --- Sepolia broadcast leg ---
+        // Wrapped so any thrown exception (RPC reset, signer failure, JSON
+        // parse error, etc.) is recorded as a failed sepoliaDeposit metric
+        // instead of being swallowed by runRateLimited's outer catch.
         const submitTime = Date.now();
-        const result = await broadcaster.broadcastDepositERC20({
-          nonceOffset: i,
-          stratoRecipient: broadcasterRecipient,
-          targetStratoToken: broadcasterTarget,
-          amountWei: broadcasterAmount,
-          awaitConfirmation: b.awaitConfirmation === true,
-          permitDeadlineSec: b.permitDeadlineSec,
-        });
+        let broadcastTxHash: string | null = null;
+        try {
+          const result = await broadcaster.broadcastDepositERC20({
+            nonceOffset: i,
+            stratoRecipient: broadcasterRecipient,
+            targetStratoToken: broadcasterTarget,
+            amountWei: broadcasterAmount,
+            awaitConfirmation: b.awaitConfirmation === true,
+            permitDeadlineSec: b.permitDeadlineSec,
+          });
 
-        const broadcastMetric: TxMetric = {
-          txHash: result.txHash,
-          nodeName,
-          scenario: `${scenario}:sepoliaDeposit`,
-          batchIndex: i,
-          submitTime,
-          submitDuration: result.submitDurationMs,
-          confirmTime: submitTime + result.submitDurationMs + result.confirmDurationMs,
-          confirmDuration: result.confirmDurationMs,
-          totalDuration: result.submitDurationMs + result.confirmDurationMs,
-          status: result.status,
-          error: result.error,
-        };
-        this.collector.recordTx(broadcastMetric);
-        txMetrics.push(broadcastMetric);
+          const broadcastMetric: TxMetric = {
+            txHash: result.txHash,
+            nodeName,
+            scenario: `${scenario}:sepoliaDeposit`,
+            batchIndex: i,
+            submitTime,
+            submitDuration: result.submitDurationMs,
+            confirmTime: submitTime + result.submitDurationMs + result.confirmDurationMs,
+            confirmDuration: result.confirmDurationMs,
+            totalDuration: result.submitDurationMs + result.confirmDurationMs,
+            status: result.status,
+            error: result.error,
+          };
+          this.collector.recordTx(broadcastMetric);
+          txMetrics.push(broadcastMetric);
 
-        if (shouldLogProgress(i) || result.status === "failed") {
-          console.log(
-            `[tokenSale] sepolia #${i} nonce=${broadcaster.startNonce + i} ` +
-              `${result.status} ${result.txHash.substring(0, 18)}... ` +
-              `submit=${result.submitDurationMs}ms confirm=${result.confirmDurationMs}ms ` +
-              `${result.error ?? ""}`,
+          if (shouldLogProgress(i) || result.status === "failed") {
+            console.log(
+              `[tokenSale] sepolia #${i} nonce=${broadcaster.startNonce + i} ` +
+                `${result.status} ${result.txHash.substring(0, 18)}... ` +
+                `submit=${result.submitDurationMs}ms confirm=${result.confirmDurationMs}ms ` +
+                `${result.error ?? ""}`,
+            );
+          }
+
+          // If the broadcast itself failed there's nothing meaningful to bridge —
+          // the bridge service won't find a DepositRouted event.
+          if (result.status === "failed") return;
+          broadcastTxHash = result.txHash;
+        } catch (err: any) {
+          const message = err?.message ?? String(err);
+          console.warn(
+            `[tokenSale] sepolia #${i} THREW after ${Date.now() - submitTime}ms: ${message}`,
           );
+          const broadcastMetric: TxMetric = {
+            txHash: `sepoliaDeposit:${i}`,
+            nodeName,
+            scenario: `${scenario}:sepoliaDeposit`,
+            batchIndex: i,
+            submitTime,
+            submitDuration: Date.now() - submitTime,
+            confirmTime: Date.now(),
+            confirmDuration: 0,
+            totalDuration: Date.now() - submitTime,
+            status: "failed",
+            error: message,
+          };
+          this.collector.recordTx(broadcastMetric);
+          txMetrics.push(broadcastMetric);
+          return;
         }
-
-        // If the broadcast itself failed there's nothing meaningful to bridge —
-        // the bridge service won't find a DepositRouted event.
-        if (result.status === "failed") return;
 
         // --- Bridge request leg (AUTO_FORGE) ---
-        const bridgeBody = { ...baseBridgeBody, externalTxHash: result.txHash };
+        const bridgeBody = { ...baseBridgeBody, externalTxHash: broadcastTxHash };
         const bridgeSubmitTime = Date.now();
-        const res = await this.postWithRetry({
-          client,
-          path: "/api/bridge/requestDepositAction",
-          body: bridgeBody,
-          legName: "bridgeRequest",
-          iterationIdx: i,
-          maxRetries: cfg.requestRetries ?? 3,
-          scenarioLabel: TokenSaleScenario.LABEL,
-        });
-        const data = res.data ?? {};
-        const reported = data?.data?.status ?? data?.status;
-        const hash = data?.data?.hash ?? data?.hash ?? `bridgeReq:${i}`;
-        const bridgeOk =
-          res.status >= 200 &&
-          res.status < 300 &&
-          (reported === undefined || reported === "success" || reported === "Success");
-        if (!bridgeOk) {
+        try {
+          const res = await this.postWithRetry({
+            client,
+            path: "/api/bridge/requestDepositAction",
+            body: bridgeBody,
+            legName: "bridgeRequest",
+            iterationIdx: i,
+            maxRetries: cfg.requestRetries ?? 3,
+            scenarioLabel: TokenSaleScenario.LABEL,
+          });
+          const data = res.data ?? {};
+          const reported = data?.data?.status ?? data?.status;
+          const hash = data?.data?.hash ?? data?.hash ?? `bridgeReq:${i}`;
+          const bridgeOk =
+            res.status >= 200 &&
+            res.status < 300 &&
+            (reported === undefined || reported === "success" || reported === "Success");
+          if (!bridgeOk) {
+            const bodyStr =
+              res.data === undefined
+                ? "<no response body>"
+                : typeof res.data === "string"
+                  ? res.data.slice(0, 400)
+                  : (JSON.stringify(res.data) ?? String(res.data)).slice(0, 400);
+            console.warn(
+              `[tokenSale] bridgeRequest #${i} FAILED: httpStatus=${res.status} ` +
+                `respErr=${res.error ?? "?"} ` +
+                `body=${bodyStr}`,
+            );
+          } else if (shouldLogProgress(i)) {
+            console.log(
+              `[tokenSale] bridgeRequest #${i} ok ${res.durationMs}ms hash=${String(hash).substring(0, 18)}`,
+            );
+          }
+          this.recordRequestMetric({
+            txMetrics,
+            nodeName,
+            scenario: `${scenario}:bridgeRequest`,
+            userId: i,
+            submitTime: bridgeSubmitTime,
+            res,
+            success: bridgeOk,
+            hashOverride: hash,
+          });
+        } catch (err: any) {
+          const message = err?.message ?? String(err);
           console.warn(
-            `[tokenSale] bridgeRequest #${i} FAILED: httpStatus=${res.status} ` +
-              `respErr=${res.error ?? "?"} ` +
-              `body=${typeof res.data === "string" ? res.data.slice(0, 400) : JSON.stringify(res.data).slice(0, 400)}`,
+            `[tokenSale] bridgeRequest #${i} THREW after ${Date.now() - bridgeSubmitTime}ms: ${message}`,
           );
-        } else if (shouldLogProgress(i)) {
-          console.log(
-            `[tokenSale] bridgeRequest #${i} ok ${res.durationMs}ms hash=${String(hash).substring(0, 18)}`,
-          );
+          this.recordRequestMetric({
+            txMetrics,
+            nodeName,
+            scenario: `${scenario}:bridgeRequest`,
+            userId: i,
+            submitTime: bridgeSubmitTime,
+            res: {
+              status: 0,
+              durationMs: Date.now() - bridgeSubmitTime,
+              error: message,
+            },
+            success: false,
+            hashOverride: `bridgeReq:${i}`,
+          });
         }
-        this.recordRequestMetric({
-          txMetrics,
-          nodeName,
-          scenario: `${scenario}:bridgeRequest`,
-          userId: i,
-          submitTime: bridgeSubmitTime,
-          res,
-          success: bridgeOk,
-          hashOverride: hash,
-        });
       },
     );
     const runEnd = Date.now();

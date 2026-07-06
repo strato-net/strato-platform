@@ -16,7 +16,6 @@ where
 import Blockchain.EthConf.Model
 import Control.Exception (catch, IOException)
 import Control.Monad.Composable.Streaming
-import Control.Monad.IO.Class
 import qualified Data.ByteString as B
 import Data.Default
 import Data.String
@@ -43,11 +42,11 @@ connStr = postgreSQLConnectionString . sqlConfig $ ethConf
 cirrusConnStr :: B.ByteString
 cirrusConnStr = postgreSQLConnectionString . cirrusConfig $ ethConf
 
-runStreamMConfigured :: MonadIO m =>
+runStreamMConfigured :: MonadUnliftIO m =>
                         ClientId -> StreamM m a -> m a
 runStreamMConfigured name =
-  let k = kafkaConfig ethConf
-  in runStreamM name (fromString $ kafkaHost k, fromIntegral $ kafkaPort k)
+  let k = streamingConfig ethConf
+  in runStreamM name (fromString $ streamingHost k, fromIntegral $ streamingPort k)
 
 lookupRedisBlockDBConfig :: Redis.ConnectInfo
 lookupRedisBlockDBConfig = redisConnection $ redisBlockDBConfig ethConf

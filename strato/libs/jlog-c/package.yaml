@@ -1,0 +1,28 @@
+name:                jlog-c
+version:             0.1.0.0
+license:             BSD-3-Clause
+license-file:        cbits/LICENSE
+
+# JLog C library embedded as Haskell package
+# Original: https://github.com/omniti-labs/jlog (BSD-3-Clause)
+
+dependencies:
+- base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+  exposed-modules:
+  - JLog.FFI
+  c-sources:
+  - cbits/jlog.c
+  - cbits/jlog_hash.c
+  - cbits/jlog_io.c
+  - cbits/jlog_compress.c
+  include-dirs:
+  - cbits
+  cc-options:
+  - -DHAVE_STDINT_H
+  - -DHAVE_SYS_TYPES_H
+  - -DHAVE_UNISTD_H
+  - -D_GNU_SOURCE
+  - -Wno-format-truncation

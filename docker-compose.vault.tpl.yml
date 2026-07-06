@@ -12,11 +12,11 @@ services:
     - postgres
     environment:
     - keyStoreCacheTimeout=${keyStoreCacheTimeout:-60}
-    - postgres_host=postgres
+    - postgres_host=${postgres_host:-postgres}
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
-    - postgres_user=postgres
-    - postgres_vault_wrapper_db=oauth
+    - postgres_user=${postgres_user:-postgres}
+    - postgres_vault_wrapper_db=${postgres_vault_wrapper_db:-oauth}
     - VAULTWRAPPER_DEBUG=${VAULTWRAPPER_DEBUG}
     build: .
     image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}

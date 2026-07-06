@@ -140,6 +140,7 @@ postBlocTransactionBody ::
 postBlocTransactionBody = client (Proxy @PostBlocTransactionBody)
 
 postBlocTransactionUnsigned ::
+  Maybe String ->
   PostBlocTransactionRequest ->
   ClientM [BlocTransactionUnsignedResult]
 postBlocTransactionUnsigned = client (Proxy @PostBlocTransactionUnsigned)

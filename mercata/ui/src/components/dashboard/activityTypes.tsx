@@ -174,7 +174,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "Transfer": {
     contract_name: "Token",
     event_name: "Transfer",
-    displayName: "Transfer",
+    displayName: "Send",
     filterConfig: { type: "or", attributes: ["from", "to"], excludeProtocolAddresses: ["from", "to"] },
     iconConfig: { icon: Send, color: "bg-blue-500" },
     getTokenAddress: (event: Event) => [event.address].filter(Boolean),
@@ -212,7 +212,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "Transfer",
+        title: "Send",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -233,7 +233,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "YieldVaultTransfer": {
     contract_name: "YieldVault",
     event_name: "Transfer",
-    displayName: "YieldVault Transfer",
+    displayName: "YieldVault Send",
     filterConfig: { type: "or", attributes: ["from", "to"], excludeProtocolAddresses: ["from", "to"] },
     iconConfig: { icon: Send, color: "bg-cyan-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
@@ -266,7 +266,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: vaultName ? `${vaultName} Transfer` : "YieldVault Transfer",
+        title: vaultName ? `${vaultName} Send` : "YieldVault Send",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -287,7 +287,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "SaveUSDSTVaultTransfer": {
     contract_name: "SaveUSDSTVault",
     event_name: "Transfer",
-    displayName: "SaveUSDST Transfer",
+    displayName: "SaveUSDST Send",
     filterConfig: { type: "or", attributes: ["from", "to"], excludeProtocolAddresses: ["from", "to"] },
     iconConfig: { icon: Send, color: "bg-cyan-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
@@ -318,7 +318,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "SaveUSDST Transfer",
+        title: "SaveUSDST Send",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -416,10 +416,23 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       };
     },
   },
+  "NativeDeposit": {
+    contract_name: "StratoNativeBridge",
+    event_name: "NativeDepositCompleted",
+    displayName: "Native Deposit",
+    filterConfig: { type: "single", attribute: "stratoRecipient" },
+    iconConfig: { icon: Download, color: "bg-green-500" },
+    getTokenAddress: (event: Event) => {
+      const token = event.attributes.stratoToken || event.attributes.strato_token;
+      return token ? [token] : [];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData =>
+      activityTypes.Deposit.handler(event, tokenSymbols, userAddress, tokenImages),
+  },
   "Withdraw": {
     contract_name: "MercataBridge",
     event_name: "WithdrawalRequested",
-    displayName: "Withdrawal",
+    displayName: "Bridge Out",
     filterConfig: { type: "single", attribute: "user" },
     iconConfig: { icon: Upload, color: "bg-red-500" },
     getTokenAddress: (event: Event) => {
@@ -491,7 +504,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       }
 
       return {
-        title: "Withdrawal",
+        title: "Bridge Out",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -507,6 +520,35 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           },
         },
       };
+    },
+  },
+  "NativeWithdraw": {
+    contract_name: "StratoNativeBridge",
+    event_name: "NativeWithdrawalRequested",
+    displayName: "Native Bridge Out",
+    filterConfig: { type: "single", attribute: "stratoSender" },
+    iconConfig: { icon: Upload, color: "bg-red-500" },
+    getTokenAddress: (event: Event) => {
+      const token = event.attributes.stratoToken || event.attributes.strato_token;
+      const externalToken = event.attributes.representationToken || event.attributes.representation_token;
+      return [token, externalToken].filter(Boolean) as string[];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const attributes = event.attributes;
+      const normalizedEvent = {
+        ...event,
+        attributes: {
+          ...attributes,
+          token: attributes.stratoToken || attributes.strato_token,
+          user: attributes.stratoSender || attributes.strato_sender,
+          dest: attributes.externalRecipient || attributes.external_recipient,
+          destChainId: attributes.externalChainId || attributes.external_chain_id,
+          externalToken: attributes.representationToken || attributes.representation_token,
+          externalTokenAmount: attributes.stratoTokenAmount || attributes.strato_token_amount || "0",
+        },
+      } as Event;
+
+      return activityTypes.Withdraw.handler(normalizedEvent, tokenSymbols, userAddress, tokenImages);
     },
   },
   "CDPMint": {
@@ -579,7 +621,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "Swap": {
     contract_name: "Pool",
     event_name: "Swap",
-    displayName: "Swap",
+    displayName: "Trade",
     filterConfig: { type: "single", attribute: "sender" },
     iconConfig: { icon: ArrowLeftRight, color: "bg-orange-500" },
     getTokenAddress: (event: Event) => {
@@ -630,7 +672,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "Swap",
+        title: "Trade",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -1543,4 +1585,3 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     },
   },
 };
-

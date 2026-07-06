@@ -13,11 +13,8 @@ import {
   BarChart3,
   Droplets,
   Shield,
-  UserPlus,
   LucideIcon,
   HandCoins,
-  Vault,
-  CreditCard,
   ArrowDownToLine
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
@@ -46,10 +43,10 @@ const NAV_CATEGORIES: NavCategory[] = [
     label: 'TRADE',
     items: [
       { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
-      { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
+      { icon: ArrowLeftRight, label: 'Trade', path: '/dashboard/swap' },
       { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
-      { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
-      { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
+      { icon: Send, label: 'Send', path: '/dashboard/transfer' },
+      { icon: Download, label: 'Bridge Out', path: '/dashboard/withdrawals' },
     ],
   },
   {
@@ -60,17 +57,9 @@ const NAV_CATEGORIES: NavCategory[] = [
     ],
   },
   {
-    label: 'SPEND',
-    items: [
-      { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
-    ],
-  },
-  {
     label: 'PRO',
     items: [
-      { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
       { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
-      { icon: UserPlus, label: 'Referrals', path: '/dashboard/referrals' },
       { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
       { icon: BarChart3, label: 'Analytics', path: '/dashboard/stats' },
       { icon: Shield, label: 'Admin', path: '/dashboard/admin', adminOnly: true },

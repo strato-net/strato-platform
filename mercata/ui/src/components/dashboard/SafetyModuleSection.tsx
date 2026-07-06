@@ -474,7 +474,7 @@ const SafetyModuleSection = () => {
                         <Button
                           onClick={() => handleRedeemAction("redeem")}
                           variant="outline"
-                          className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full sm:w-28 hidden sm:flex sm:items-center sm:justify-center"
+                          className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 w-full sm:w-28 hidden sm:flex sm:items-center sm:justify-center"
                           disabled={loading || isProcessing || !isRedeemAmountValid() || !safetyInfo?.canRedeem}
                         >
                           {isProcessing ? (
@@ -524,7 +524,7 @@ const SafetyModuleSection = () => {
                     <Button
                       onClick={() => handleRedeemAction("redeem")}
                       variant="outline"
-                      className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full mt-4 sm:hidden"
+                      className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 w-full mt-4 sm:hidden"
                       disabled={loading || isProcessing || !isRedeemAmountValid() || !safetyInfo?.canRedeem}
                     >
                       {isProcessing ? (

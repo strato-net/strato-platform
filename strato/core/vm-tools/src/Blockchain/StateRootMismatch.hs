@@ -34,7 +34,6 @@ import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Streaming
 import Control.Monad.IO.Class
 import Control.Monad.Reader
-import Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8 as BC
 import Data.Foldable (for_)
 import Data.List (intercalate)

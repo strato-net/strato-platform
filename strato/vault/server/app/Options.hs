@@ -13,6 +13,8 @@ defineFlag "d:database" ("oauth" :: String) "Postgres database name"
 defineFlag "port" (8000 :: Int) "The port which the server runs on"
 defineFlag "keyStoreCacheTimeout" (60 :: Integer) "The number of seconds nonces are held in the global source code cache"
 defineFlag "vaultPasswordFile" ("" :: String) "Path to file containing vault encryption password"
+defineFlag "username" ("admin" :: String) "Username for key import"
+defineFlag "oauthProvider" ("admin" :: String) "OAuth provider for key import"
 
 defineFlag "pgPoolSize" (100 :: Int) "Maximum number of connections in the Postgres pool"
 defineFlag "pgPoolIdleTimeout" (30 :: Int) "Idle connection timeout in seconds before pool closes connections"

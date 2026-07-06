@@ -1,5 +1,0 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
-
-exports[`Lib: checkMode is oauth enabled 1`] = `false`;
-
-exports[`Lib: checkMode is oauth enabled 2`] = `true`;

@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from 'next-themes';
-import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3, Droplets, Download, Coins, UserPlus, Vault, CreditCard, HandCoins, ArrowDownToLine } from 'lucide-react';
+import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3, Droplets, Download, Coins, HandCoins, ArrowDownToLine } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
@@ -39,10 +39,10 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
       label: 'TRADE',
       items: [
         { icon: <ArrowDownToLine size={20} />, label: 'Fund', path: '/dashboard/deposits' },
-        { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },
+        { icon: <ArrowRightLeft size={20} />, label: 'Trade', path: '/dashboard/swap' },
         { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
-        { icon: <Send size={20} />, label: 'Transfer', path: '/dashboard/transfer' },
-        { icon: <Download size={20} />, label: 'Withdrawals', path: '/dashboard/withdrawals' },
+        { icon: <Send size={20} />, label: 'Send', path: '/dashboard/transfer' },
+        { icon: <Download size={20} />, label: 'Bridge Out', path: '/dashboard/withdrawals' },
       ],
     },
     {
@@ -53,17 +53,9 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
       ],
     },
     {
-      label: 'SPEND',
-      items: [
-        { icon: <CreditCard size={20} />, label: 'Card', path: '/dashboard/credit-card' },
-      ],
-    },
-    {
       label: 'PRO',
       items: [
-        { icon: <Vault size={20} />, label: 'Vault', path: '/dashboard/vault' },
         { icon: <Droplets size={20} />, label: 'Advanced', path: '/dashboard/advanced' },
-        { icon: <UserPlus size={20} />, label: 'Referrals', path: '/dashboard/referrals' },
         { icon: <Activity size={20} />, label: 'Activity Feed', path: '/dashboard/activity' },
         { icon: <BarChart3 size={20} />, label: 'Analytics', path: '/dashboard/stats' },
         { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin', adminOnly: true },

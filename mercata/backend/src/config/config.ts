@@ -117,12 +117,12 @@ export const defaultVaultFactoryFor: Record<string, string> = {
 
 export const defaultStratoNativeBridgeFor: Record<string, string> = {
   "114784819836269": "49f69252b00235030a4dcd4c7ef17a64ef346258", // Helium testnet
-  "33056204878082667": "", // Upquark mainnet
+  "33056204878082667": "4d9e9c39180a75091b9c35bbb9064d67c7fdde5a", // Upquark mainnet
 };
 
 export const defaultStratoNativeCustodyVaultFor: Record<string, string> = {
   "114784819836269": "8cfe7b576f69260673e9a1a9517137f12a49ed93", // Helium testnet
-  "33056204878082667": "", // Upquark mainnet
+  "33056204878082667": "db967ac5c497e6a2bd6f89036d2b63851760318f", // Upquark mainnet
 };
 
 export const defaultMetalForgeFor: Record<string, string> = {
@@ -138,6 +138,11 @@ export const defaultCreditCardTopUpFor: Record<string, string> = {
 export const defaultVaultFor: Record<string, string> = {
   "114784819836269": "d556695364551c8c7eb336f0bed9aed9e1acd69d", // Helium testnet
   "33056204878082667": "34bc729f66106a146b0864e673a3571b28fa23e1", // Upquark mainnet
+};
+
+export const defaultDirectMintPsmFor: Record<string, string> = {
+  "114784819836269": "0b30adc5f2d90bada37afa699b75f485f04e7287", // Helium testnet
+  "33056204878082667": "b1efdc86eecfbedf83d0295671214fee451786f3"
 };
 
 export const defaultSaveUsdstVaultFor: Record<string, string> = {
@@ -173,6 +178,7 @@ export let vault: string = '';
 export let saveUsdstVault: string = '';
 export let ethCarryVault: string = '';
 export let wbtcCarryVault: string = '';
+export let directMintPsm: string = '';
 export let stratoNativeBridge: string = '';
 export let stratoNativeCustodyVault: string = '';
 export let usdcYieldVault: string = '';
@@ -249,6 +255,14 @@ export function setSaveUsdstVaultConfig(networkId: string) {
   }
 }
 
+export function setDirectMintPsmConfig(networkId: string) {
+  if (process.env.DIRECT_MINT_PSM) {
+    directMintPsm = process.env.DIRECT_MINT_PSM;
+  } else {
+    directMintPsm = defaultDirectMintPsmFor[networkId] || "";
+  }
+}
+
 export function setVaultConfig(networkId: string) {
   if (process.env.VAULT) {
     vault = process.env.VAULT;
@@ -286,6 +300,7 @@ export async function initNetworkConfig() {
   setSaveUsdstVaultConfig(networkId);
   setVaultConfig(networkId);
   setCarryVaultConfig(networkId);
+  setDirectMintPsmConfig(networkId);
   setUsdcYieldVaultConfig(networkId);
 }
 
@@ -301,6 +316,8 @@ export async function getInternalAddresses() {
   // Static: well-known system contract addresses from config
   const addresses: string[] = [
     mercataBridge,
+    stratoNativeBridge,
+    stratoNativeCustodyVault,
     burnAddress,
   ];
 

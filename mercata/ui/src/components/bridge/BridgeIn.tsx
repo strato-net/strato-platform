@@ -374,7 +374,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   );
 
   const nativeBridgeTokens = useMemo(
-    () => bridgeableTokens.filter((token) => token.routeType === "native"),
+    () => bridgeableTokens.filter((token) => token.routeType === "native" && !token.depositsPaused),
     [bridgeableTokens]
   );
 
@@ -550,7 +550,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       setSelectedToken(depositableBridgeTokens[0] || nativeBridgeTokens[0]);
     } else if (
       selectedToken &&
-      !bridgeableTokens.some((t) => t.id === selectedToken.id)
+      ![...depositableBridgeTokens, ...nativeBridgeTokens].some((t) => t.id === selectedToken.id)
     ) {
       setSelectedToken(depositableBridgeTokens[0] || nativeBridgeTokens[0] || null);
     }
@@ -565,7 +565,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     prevExternalTokenRef.current = currentExternal;
   }, [
     availableNetworks,
-    bridgeableTokens,
     depositableBridgeTokens,
     nativeBridgeTokens,
     selectedNetwork,

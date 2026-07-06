@@ -90,7 +90,8 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
 
   const currentTokens = useMemo(() => {
     return bridgeableTokens.filter((token) =>
-      isSaving ? !token.isDefaultRoute : token.isDefaultRoute
+      (token.routeType !== "native" || !token.withdrawalsPaused) &&
+      (isSaving ? !token.isDefaultRoute : token.isDefaultRoute)
     );
   }, [bridgeableTokens, isSaving]);
 
@@ -557,7 +558,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
           ? "Processing..."
           : isConnected && !walletSignerReady
           ? "Connecting wallet..."
-          : "Withdraw"}
+          : "Bridge Out"}
         </Button>
 
       <AdvancedOptionsDropdown

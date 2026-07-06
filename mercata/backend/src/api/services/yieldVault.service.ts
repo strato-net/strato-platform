@@ -260,17 +260,23 @@ const getExchangeRate = (totalAssets: bigint, totalShares: bigint): bigint => {
   return (totalAssets * WAD) / totalShares;
 };
 
+const getActiveAssets = (totalAssets: bigint, totalClaimableAssets: bigint): bigint =>
+  totalAssets > totalClaimableAssets ? totalAssets - totalClaimableAssets : 0n;
+
+const getFreeIdleAssets = (idleAssets: bigint, totalClaimableAssets: bigint): bigint =>
+  idleAssets > totalClaimableAssets ? idleAssets - totalClaimableAssets : 0n;
+
 const previewRedeemAssets = (shares: bigint, totalAssets: bigint, totalShares: bigint): bigint => {
   if (shares <= 0n) return 0n;
   if (totalShares <= 0n) return shares;
   if (totalAssets <= 0n) return 0n;
-  return (shares * (totalAssets + 1n)) / (totalShares + 1n);
+  return (shares * totalAssets) / totalShares;
 };
 
 const previewRedeemShares = (assets: bigint, totalAssets: bigint, totalShares: bigint): bigint => {
   if (assets <= 0n) return 0n;
   if (totalAssets <= 0n || totalShares <= 0n) return assets;
-  return (assets * (totalShares + 1n)) / (totalAssets + 1n);
+  return (assets * totalShares) / totalAssets;
 };
 
 const tokenDecimalsUnit = (underlyingDecimals: number): bigint => {
@@ -350,9 +356,9 @@ function emptyUserInfo(def: YieldVaultDef | null, key: string): YieldVaultUserIn
 }
 
 const getVaultState = async (
+  serviceToken: string,
   vaultAddress: string
 ): Promise<Record<string, any> | null> => {
-  const serviceToken = await getServiceToken();
   const { data } = await cirrus.get(serviceToken, `/${YieldVault}`, {
     params: {
       address: `eq.${vaultAddress}`,
@@ -1224,7 +1230,7 @@ const getHistoricalStorageSnapshot = async (
   accessToken: string,
   vaultAddress: string,
   timestampIso: string
-): Promise<{ totalSupply: bigint; deployedAssets: bigint } | null> => {
+): Promise<{ totalSupply: bigint; deployedAssets: bigint; totalClaimableAssets: bigint } | null> => {
   try {
     const { data } = await cirrus.get(accessToken, "/history@storage", {
       params: {
@@ -1239,6 +1245,7 @@ const getHistoricalStorageSnapshot = async (
     return {
       totalSupply: parseBigIntLike(storageData._totalSupply),
       deployedAssets: parseBigIntLike(storageData.deployedAssets),
+      totalClaimableAssets: parseBigIntLike(storageData.totalClaimableAssets),
     };
   } catch {
     return null;
@@ -1272,10 +1279,10 @@ const computeApy = async (
   accessToken: string,
   vaultAddress: string,
   assetAddress: string,
-  totalAssetsNow: bigint,
+  activeAssetsNow: bigint,
   totalSharesNow: bigint
 ): Promise<string> => {
-  if (!vaultAddress || !assetAddress || totalSharesNow <= 0n || totalAssetsNow <= 0n) {
+  if (!vaultAddress || !assetAddress || totalSharesNow <= 0n || activeAssetsNow <= 0n) {
     return "0.00";
   }
 
@@ -1299,10 +1306,14 @@ const computeApy = async (
 
     if (!historicalStorage) return "-";
 
-    const rateNow = getExchangeRate(totalAssetsNow, totalSharesNow);
+    const rateNow = getExchangeRate(activeAssetsNow, totalSharesNow);
     const historicalTotalAssets = (historicalAssetBal > 0n ? historicalAssetBal : 0n) + historicalStorage.deployedAssets;
-    const rateStart = getExchangeRate(
+    const historicalActiveAssets = getActiveAssets(
       historicalTotalAssets,
+      historicalStorage.totalClaimableAssets
+    );
+    const rateStart = getExchangeRate(
+      historicalActiveAssets,
       historicalStorage.totalSupply > 0n ? historicalStorage.totalSupply : 0n
     );
 
@@ -1334,7 +1345,7 @@ export const getYieldVaultInfo = async (
   // regardless of Cirrus column-level ACL on their personal token.
   const serviceToken = await getServiceToken();
 
-  const vaultState = await getVaultState(def.address);
+  const vaultState = await getVaultState(serviceToken, def.address);
   if (!vaultState) return fallback;
   if (!vaultState.vaultInitialized) return { ...fallback, configured: true };
 
@@ -1357,21 +1368,24 @@ export const getYieldVaultInfo = async (
   const idleAssets = parseBigIntLike(liveAssetBalance);
   const deployedAssets = parseBigIntLike(vaultState.deployedAssets);
   const totalAssets = idleAssets + deployedAssets;
+  const totalClaimableAssets = parseBigIntLike(vaultState.totalClaimableAssets);
+  const activeAssets = getActiveAssets(totalAssets, totalClaimableAssets);
+  const freeIdleAssets = getFreeIdleAssets(idleAssets, totalClaimableAssets);
   const totalShares = parseBigIntLike(vaultState._totalSupply);
   const decimals = Number(vaultState._underlyingDecimals ?? 18);
-  const exchangeRate = getExchangeRate(totalAssets, totalShares);
+  const exchangeRate = getExchangeRate(activeAssets, totalShares);
   const minIdleBps = parseBigIntLike(vaultState.minIdleBps);
   const totalQueuedShares = parseBigIntLike(vaultState.totalQueuedShares);
   const minIdleRequirement =
-    minIdleBps > 0n ? (totalAssets * minIdleBps + 9999n) / 10000n : 0n;
+    minIdleBps > 0n ? (activeAssets * minIdleBps + 9999n) / 10000n : 0n;
   const maxDeploy =
-    totalQueuedShares > 0n || idleAssets <= minIdleRequirement
+    totalQueuedShares > 0n || freeIdleAssets <= minIdleRequirement
       ? 0n
-      : idleAssets - minIdleRequirement;
+      : freeIdleAssets - minIdleRequirement;
   const deployBlockedReason =
     totalQueuedShares > 0n
       ? "Withdrawal queue is open"
-      : idleAssets <= minIdleRequirement
+      : freeIdleAssets <= minIdleRequirement
         ? "Idle reserve requirement reached"
         : null;
 
@@ -1407,7 +1421,7 @@ export const getYieldVaultInfo = async (
   ).catch(() => [] as YieldVaultStrategyHolding[]);
 
   const tvlUsd = underlyingUsdWad(idleAssets + deployedAssets, assetPrice, decimals);
-  const apy = await computeApy(serviceToken, def.address, assetAddress, totalAssets, totalShares);
+  const apy = await computeApy(serviceToken, def.address, assetAddress, activeAssets, totalShares);
 
   return {
     key,
@@ -1430,7 +1444,7 @@ export const getYieldVaultInfo = async (
     paused: Boolean(vaultState._paused),
     minIdleBps: String(vaultState.minIdleBps || "0"),
     totalQueuedShares: String(vaultState.totalQueuedShares || "0"),
-    totalClaimableAssets: String(vaultState.totalClaimableAssets || "0"),
+    totalClaimableAssets: totalClaimableAssets.toString(),
     strategyHoldings,
     maxDeploy: maxDeploy.toString(),
     minIdleRequirement: minIdleRequirement.toString(),
@@ -1458,16 +1472,21 @@ export const getYieldVaultUserInfo = async (
   const idleAssets = parseBigIntLike(info.idleAssets);
   const totalShares = parseBigIntLike(info.totalShares);
   const totalQueuedShares = parseBigIntLike(info.totalQueuedShares);
+  const totalClaimableAssets = parseBigIntLike(info.totalClaimableAssets);
+  const activeAssets = getActiveAssets(totalAssets, totalClaimableAssets);
+  const freeIdleAssets = getFreeIdleAssets(idleAssets, totalClaimableAssets);
 
   const [claimableAssetsRaw, activeRequestIdRaw] = await Promise.all([
     getYieldVaultMappingValue(accessToken, info.vaultAddress, "claimableAssets", userAddress).catch(() => "0"),
     getYieldVaultMappingValue(accessToken, info.vaultAddress, "activeRequestId", userAddress).catch(() => "0"),
   ]);
 
-  const redeemableAssets = previewRedeemAssets(userShares, totalAssets, totalShares);
-  const idleShares = totalQueuedShares > 0n ? 0n : previewRedeemShares(idleAssets, totalAssets, totalShares);
+  const redeemableAssets = previewRedeemAssets(userShares, activeAssets, totalShares);
+  const idleShares = totalQueuedShares > 0n ? 0n : previewRedeemShares(freeIdleAssets, activeAssets, totalShares);
   const maxRedeem = userShares < idleShares ? userShares : idleShares;
-  const maxWithdraw = previewRedeemAssets(maxRedeem, totalAssets, totalShares);
+  const maxWithdraw = totalQueuedShares > 0n
+    ? 0n
+    : redeemableAssets < freeIdleAssets ? redeemableAssets : freeIdleAssets;
   const claimableAssets = parseBigIntLike(claimableAssetsRaw);
   const activeRequestId = parseBigIntLike(activeRequestIdRaw);
 
@@ -1484,7 +1503,7 @@ export const getYieldVaultUserInfo = async (
       pendingWithdrawal = {
         requestId: activeRequestId.toString(),
         shares: pendingShares.toString(),
-        estimatedAssets: previewRedeemAssets(pendingShares, totalAssets, totalShares).toString(),
+        estimatedAssets: previewRedeemAssets(pendingShares, activeAssets, totalShares).toString(),
         receiver: normalizeAddress(request?.receiver),
       };
     }

@@ -1,0 +1,488 @@
+// Background service worker = the wallet core. It (1) routes dApp JSON-RPC over
+// the long-lived port from content scripts, and (2) serves the popup UI's control
+// calls (keyring/networks/approvals) over runtime.sendMessage.
+
+import { defineBackground } from "wxt/sandbox";
+import { type Address } from "viem";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import {
+  KEEPALIVE_PORT,
+  INPAGE_TARGET,
+  RpcError,
+  RpcErrors,
+  isRpcEnvelope,
+} from "@/src/messaging/protocol";
+import { isControlMessage, type ControlResponse } from "@/src/messaging/control";
+import { handleRpc } from "@/src/core/rpc-engine";
+import { keyring } from "@/src/core/keyring";
+import { approvals } from "@/src/core/approvals";
+import {
+  getNetworks,
+  getSelectedNetwork,
+  setSelectedNetwork,
+  upsertNetwork,
+  signatureUrl,
+  mpcKeyUrl,
+  userInfoUrl,
+  nativeSymbol,
+  isStratoNetwork,
+  getShowTestnets,
+  setShowTestnets,
+  type StratoNetwork,
+} from "@/src/core/networks";
+import { fetchEvmTokens, fetchEvmActivity } from "@/src/core/evm-portfolio";
+import { loginWithStrato, fetchAddress } from "@/src/core/oauth";
+import { splitKey, postMpcShard } from "@/src/core/mpc";
+import { installCsrfBypassRule } from "@/src/core/csrf-bypass";
+import { getTxs } from "@/src/core/history";
+import { fetchActivity } from "@/src/core/activity";
+import { fetchTokens, fetchDefi } from "@/src/core/portfolio";
+import { fetchTokenDetail, fetchPriceHistory } from "@/src/core/token-detail";
+import { fetchPools, executeSwap, type SwapRequest } from "@/src/core/swap";
+import {
+  fetchBridgeConfig,
+  fetchBridgeHistory,
+  executeWithdrawal,
+  executeDeposit,
+  type BridgeRoute,
+  type BridgeConfig,
+} from "@/src/core/bridge";
+import { rpcCall } from "@/src/core/rpc";
+import { sendEvmTransaction, encodeErc20Transfer } from "@/src/core/tx-evm";
+import { sendBlocTransaction, sendBlocCalls, type BlocTxParams } from "@/src/core/tx-strato";
+import { listPermissions, revokePermission } from "@/src/core/permissions";
+import { runWatchers } from "@/src/core/watchers";
+import {
+  listNotifications,
+  unreadCount,
+  markRead,
+  markAllRead,
+  clearNotifications,
+  getNotifSettings,
+  setNotifSettings,
+  refreshBadge,
+  type NotifSettings,
+} from "@/src/core/notifications";
+
+export default defineBackground(() => {
+  // Clicking the toolbar icon opens the side panel (needs no action popup).
+  chrome.sidePanel
+    ?.setPanelBehavior?.({ openPanelOnActionClick: true })
+    .catch((e) => console.error("setPanelBehavior failed", e));
+
+  // Allow the Bearer-token vault signature POST past nginx's CSRF guard.
+  installCsrfBypassRule();
+
+  // Event notifications: a periodic alarm wakes the (ephemeral) worker to poll
+  // on-chain state and fire notifications on transitions. MV3 alarms persist and
+  // run while the browser is open even with the UI closed. Only create it if it
+  // doesn't already exist — re-creating on every cold start would reset its
+  // schedule (and frequent SW restarts could then starve it). Polling is driven
+  // solely by the alarm, never on cold start, to avoid redundant Cirrus reads.
+  const WATCH_ALARM = "strato-watch";
+  (async () => {
+    if (!(await browser.alarms?.get?.(WATCH_ALARM))) {
+      await browser.alarms?.create?.(WATCH_ALARM, { delayInMinutes: 0.5, periodInMinutes: 2 });
+    }
+  })().catch(() => {});
+  browser.alarms?.onAlarm.addListener((alarm) => {
+    if (alarm.name === WATCH_ALARM) runWatchers().catch((e) => console.error("watch", e));
+  });
+  // Sync the unread badge on startup (cheap, local).
+  refreshBadge().catch(() => {});
+
+  // Clicking an OS notification opens the wallet to the relevant view.
+  browser.notifications?.onClicked?.addListener((id) => {
+    openNotification(id).catch((e) => console.error("notif click", e));
+  });
+
+  // If the user closes the approval popup without deciding, reject the pending
+  // requests so the dApp gets a clean rejection instead of spinning forever.
+  browser.windows?.onRemoved?.addListener((windowId) => {
+    approvals.onWindowClosed(windowId).catch(() => {
+      /* nothing actionable if cleanup fails */
+    });
+  });
+
+  // Keep-alive: the popup/approval UI holds this port open so the service worker
+  // (and its in-memory keyring + pending approvals) survives while a wallet
+  // window is open. Accepting the connection is all that's needed.
+  browser.runtime.onConnect.addListener((port) => {
+    if (port.name !== KEEPALIVE_PORT) return;
+    port.onDisconnect.addListener(() => {
+      /* no-op; the port's lifetime is what matters */
+    });
+  });
+
+  // Single message router: dApp JSON-RPC (from content scripts) + popup control.
+  browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (isRpcEnvelope(msg)) {
+      const s = sender as { origin?: string; url?: string };
+      const origin = s.origin ?? s.url ?? "unknown";
+      const req = msg.payload;
+      handleRpc(origin, req)
+        .then((result) => sendResponse({ id: req.id, result }))
+        .catch((e) => {
+          const err =
+            e instanceof RpcError
+              ? { code: e.code, message: e.message, data: e.data }
+              : { code: RpcErrors.internal.code, message: (e as Error).message };
+          sendResponse({ id: req.id, error: err });
+        });
+      return true;
+    }
+    if (isControlMessage(msg)) {
+      dispatchControl(msg.method, msg.args)
+        .then((result) => sendResponse({ ok: true, result } satisfies ControlResponse))
+        .catch((e) =>
+          sendResponse({ ok: false, error: (e as Error).message } satisfies ControlResponse)
+        );
+      return true;
+    }
+    return true; // keep the channel open for the async response
+  });
+});
+
+// Push an EIP-1193 provider event to the content scripts of the given origins.
+async function sendEventToOrigins(
+  origins: Set<string>,
+  event: string,
+  data: unknown
+): Promise<void> {
+  if (origins.size === 0) return;
+  const tabs = await browser.tabs.query({});
+  for (const tab of tabs) {
+    if (!tab.id || !tab.url) continue;
+    let origin: string;
+    try {
+      origin = new URL(tab.url).origin;
+    } catch {
+      continue;
+    }
+    if (!origins.has(origin)) continue;
+    browser.tabs
+      .sendMessage(tab.id, { target: INPAGE_TARGET, payload: { event, data } })
+      .catch(() => {
+        /* no content script in that tab; ignore */
+      });
+  }
+}
+
+// Broadcast to all connected origins (so we never leak to unapproved sites).
+async function broadcastEvent(event: string, data: unknown): Promise<void> {
+  const origins = new Set((await listPermissions()).map((p) => p.origin));
+  await sendEventToOrigins(origins, event, data);
+}
+
+// Open the wallet UI (a popup window) at the route a notification points to, mark
+// it read, and dismiss the OS toast.
+async function openNotification(id: string): Promise<void> {
+  const notif = (await listNotifications()).find((n) => n.id === id);
+  await markRead(id);
+  browser.notifications?.clear?.(id).catch?.(() => {});
+  // Switch to the account the notification is about so the opened view is in
+  // that account's context.
+  if (notif?.address) {
+    try {
+      const current = await keyring.getSelectedAddress();
+      if (current?.toLowerCase() !== notif.address.toLowerCase()) {
+        await keyring.setSelectedAddress(notif.address as Address);
+        await broadcastEvent("accountsChanged", [notif.address]);
+      }
+    } catch (e) {
+      console.error("notif account switch", e);
+    }
+  }
+  const route = notif?.route ?? "notifications";
+  const url = browser.runtime.getURL(`/popup.html#/${route}`);
+  try {
+    await browser.windows.create({ url, type: "popup", width: 380, height: 620, focused: true });
+  } catch {
+    /* best effort */
+  }
+}
+
+// The STRATO network a bridge operation targets: the selected one if it's a
+// STRATO chain (so STRATO Helium bridges against Helium), else the first STRATO
+// network (mainnet) — used when bridging while a non-STRATO chain is selected.
+async function stratoForBridge(): Promise<StratoNetwork | undefined> {
+  const selected = await getSelectedNetwork();
+  if (isStratoNetwork(selected)) return selected;
+  return (await getNetworks()).find(isStratoNetwork);
+}
+
+// Control handler registry used by the popup UI.
+async function dispatchControl(method: string, args: unknown[]): Promise<unknown> {
+  switch (method) {
+    // wallet lifecycle
+    case "wallet.isInitialized":
+      return keyring.isInitialized();
+    case "wallet.isUnlocked":
+      return keyring.isUnlocked();
+    case "wallet.create":
+      return keyring.createVault(args[0] as string, args[1] as string | undefined);
+    case "wallet.unlock":
+      return keyring.unlock(args[0] as string);
+    case "wallet.lock":
+      await keyring.lock();
+      return true;
+    case "wallet.revealMnemonic":
+      return keyring.revealMnemonic(args[0] as string, args[1] as string | undefined);
+    case "wallet.exportPrivateKey":
+      return keyring.exportPrivateKey(args[0] as Address, args[1] as string);
+
+    // accounts
+    case "accounts.list":
+      return keyring.getAccounts();
+    case "wallets.list":
+      return keyring.listHdWallets();
+    case "accounts.selected":
+      return keyring.getSelectedAddress();
+    case "accounts.rename":
+      return keyring.renameAccount(args[0] as Address, args[1] as string);
+    case "accounts.remove": {
+      const newSelected = await keyring.removeAccount(args[0] as Address);
+      // Connected dApps follow the new active account (or see a disconnect).
+      await broadcastEvent("accountsChanged", newSelected ? [newSelected] : []);
+      return newSelected;
+    }
+    case "accounts.select": {
+      await keyring.setSelectedAddress(args[0] as Address);
+      // Connected dApps follow the active account.
+      await broadcastEvent("accountsChanged", [args[0] as Address]);
+      return true;
+    }
+    case "accounts.addHd":
+      return keyring.addHdAccount(args[0] as string | undefined, args[1] as string | undefined);
+    case "accounts.importPrivateKey":
+      return keyring.importPrivateKey(args[0] as string, args[1] as string | undefined);
+    case "accounts.importSeed":
+      return keyring.importHdWallet(args[0] as string, args[1] as string | undefined);
+    case "accounts.createWallet":
+      return keyring.createHdWallet(args[0] as string | undefined);
+    case "oauth.login": {
+      // Interactive "Login with STRATO": OAuth (PKCE) -> address -> remote account.
+      const network = args[0]
+        ? (await getNetworks()).find((n) => n.id === args[0]) ?? (await getSelectedNetwork())
+        : await getSelectedNetwork();
+      if (!network.oauthIssuer || !network.oauthClientId) {
+        throw new Error(
+          "This network has no OAuth issuer/client configured. Set them in Settings."
+        );
+      }
+      const tokens = await loginWithStrato(network.oauthIssuer, network.oauthClientId);
+      const { address, username } = await fetchAddress(
+        userInfoUrl(network),
+        tokens.accessToken
+      );
+      return keyring.addOAuthAccount(
+        address as Address,
+        tokens,
+        signatureUrl(network),
+        username
+      );
+    }
+    case "mpc.create": {
+      // Create a 2-of-2 MPC account: OAuth login -> generate key locally -> split
+      // -> send Vault its shard -> store the wallet's shard. The full key only
+      // exists transiently here at creation; signing reconstructs it client-side.
+      const network = args[0]
+        ? (await getNetworks()).find((n) => n.id === args[0]) ?? (await getSelectedNetwork())
+        : await getSelectedNetwork();
+      if (!isStratoNetwork(network)) throw new Error("MPC accounts are STRATO-only");
+      if (!network.oauthIssuer || !network.oauthClientId) {
+        throw new Error("This network has no OAuth issuer/client configured. Set them in Settings.");
+      }
+      const tokens = await loginWithStrato(network.oauthIssuer, network.oauthClientId);
+      const priv = generatePrivateKey();
+      const address = privateKeyToAccount(priv).address;
+      const { shardA, shardB } = splitKey(priv);
+      await postMpcShard(mpcKeyUrl(network), tokens.accessToken, shardB, address);
+      return keyring.addMpcAccount(address, shardA, tokens, mpcKeyUrl(network), signatureUrl(network));
+    }
+
+    // networks
+    case "networks.list":
+      return getNetworks();
+    case "networks.selected":
+      return getSelectedNetwork();
+    case "networks.select":
+      return setSelectedNetwork(args[0] as string);
+    case "networks.upsert":
+      return upsertNetwork(args[0] as StratoNetwork);
+    case "settings.showTestnets":
+      return getShowTestnets();
+    case "settings.setShowTestnets":
+      return setShowTestnets(args[0] as boolean);
+
+    // balances / sending from the popup
+    case "balance": {
+      const network = await getSelectedNetwork();
+      return rpcCall<string>(network.rpcUrl, "eth_getBalance", [
+        args[0] as Address,
+        "latest",
+      ]);
+    }
+    case "tx.sendEvm": {
+      const network = await getSelectedNetwork();
+      return sendEvmTransaction(network, {
+        from: args[0] as Address,
+        to: args[1] as string,
+        value: args[2] as string,
+      });
+    }
+    case "tx.sendBloc": {
+      const network = await getSelectedNetwork();
+      return sendBlocTransaction(network, args[0] as Address, args[1] as BlocTxParams);
+    }
+    case "tx.sendToken": {
+      const network = await getSelectedNetwork();
+      const [from, tokenAddress, to, value] = args as [Address, string, string, string];
+      if (isStratoNetwork(network)) {
+        // STRATO: any BlockApps-Token (incl. native USDST) via Token.transfer.
+        return sendBlocCalls(
+          network,
+          from,
+          [
+            {
+              contractName: "Token",
+              contractAddress: String(tokenAddress).replace(/^0x/, ""),
+              method: "transfer",
+              args: { to: String(to).replace(/^0x/, ""), value },
+            },
+          ],
+          { gasLimit: 32_100_000_000, gasPrice: 1 }
+        );
+      }
+      // EVM: native coin → value transfer; ERC-20 → encoded transfer() calldata.
+      const isNative = /^0x0+$/i.test(String(tokenAddress));
+      if (isNative) {
+        return sendEvmTransaction(network, { from, to, value: String(value) });
+      }
+      return sendEvmTransaction(network, {
+        from,
+        to: tokenAddress,
+        data: encodeErc20Transfer(to, value),
+        value: "0",
+      });
+    }
+
+    // approvals
+    case "approvals.queue":
+      return approvals.getQueue();
+    case "approvals.resolve":
+      return approvals.resolve(args[0] as string, args[1]);
+    case "approvals.reject":
+      return approvals.reject(args[0] as string, RpcErrors.userRejected);
+
+    // activity
+    case "history.list":
+      return getTxs(args[0] as Address, args[1] as string);
+    case "activity.list": {
+      const n = await getSelectedNetwork();
+      return isStratoNetwork(n)
+        ? fetchActivity(n, args[0] as string, (args[1] as number) ?? 25)
+        : fetchEvmActivity(n.chainId, args[0] as string, nativeSymbol(n));
+    }
+    case "tokens.list": {
+      const n = await getSelectedNetwork();
+      return isStratoNetwork(n)
+        ? fetchTokens(n, args[0] as string)
+        : fetchEvmTokens(n.chainId, args[0] as string);
+    }
+    case "defi.list": {
+      const n = await getSelectedNetwork();
+      return isStratoNetwork(n) ? fetchDefi(n, args[0] as string) : [];
+    }
+    // token details (STRATO tokens + DeFi position tokens)
+    case "token.detail": {
+      const n = await getSelectedNetwork();
+      if (!isStratoNetwork(n)) return null;
+      return fetchTokenDetail(n, args[0] as string, args[1] as string);
+    }
+    case "token.priceHistory": {
+      const n = await getSelectedNetwork();
+      if (!isStratoNetwork(n)) return [];
+      return fetchPriceHistory(n, args[0] as string, args[1] as number, args[2] as number);
+    }
+    case "token.activity": {
+      const n = await getSelectedNetwork();
+      if (!isStratoNetwork(n)) return [];
+      return fetchActivity(n, args[1] as string, 50, args[0] as string);
+    }
+    case "swap.pools": {
+      const n = await getSelectedNetwork();
+      return isStratoNetwork(n) ? fetchPools(n) : [];
+    }
+    case "swap.execute":
+      return executeSwap(await getSelectedNetwork(), args[0] as Address, args[1] as SwapRequest);
+
+    // bridge (registry lives on STRATO regardless of the selected network)
+    case "bridge.config": {
+      const strato = await stratoForBridge();
+      return strato
+        ? fetchBridgeConfig(strato)
+        : { bridgeAddr: "", nativeBridgeAddr: "", custodyVault: "", routes: [], chains: [] };
+    }
+    case "bridge.history": {
+      const strato = await stratoForBridge();
+      return strato ? fetchBridgeHistory(strato, args[0] as string) : [];
+    }
+    case "bridge.withdraw": {
+      const strato = await stratoForBridge();
+      if (!strato) throw new Error("No STRATO network configured");
+      return executeWithdrawal(
+        strato,
+        args[1] as BridgeConfig,
+        args[0] as Address,
+        args[2] as BridgeRoute,
+        args[3] as string,
+        args[4] as string
+      );
+    }
+    case "bridge.deposit": {
+      // Source is the currently-selected EVM network.
+      return executeDeposit(
+        await getSelectedNetwork(),
+        args[0] as Address,
+        args[1] as BridgeRoute,
+        args[2] as string,
+        args[3] as string,
+        args[4] as string
+      );
+    }
+
+    // notifications
+    case "notifications.list":
+      return listNotifications();
+    case "notifications.unreadCount":
+      return unreadCount();
+    case "notifications.markRead":
+      return markRead(args[0] as string);
+    case "notifications.markAllRead":
+      return markAllRead();
+    case "notifications.clear":
+      return clearNotifications();
+    case "notifications.settings":
+      return getNotifSettings();
+    case "notifications.setSettings":
+      return setNotifSettings(args[0] as Partial<NotifSettings>);
+    case "notifications.checkNow":
+      await runWatchers();
+      return true;
+
+    // permissions
+    case "permissions.list":
+      return listPermissions();
+    case "permissions.revoke": {
+      const origin = args[0] as string;
+      await revokePermission(origin);
+      // Tell the site it's disconnected (no accounts).
+      await sendEventToOrigins(new Set([origin]), "accountsChanged", []);
+      return true;
+    }
+
+    default:
+      throw new Error(`Unknown control method: ${method}`);
+  }
+}

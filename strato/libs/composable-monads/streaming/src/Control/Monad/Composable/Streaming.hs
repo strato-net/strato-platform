@@ -1,16 +1,9 @@
 -- | Umbrella module for message streaming.
--- 
--- This module re-exports the active streaming client library.
--- To switch, change the import below AND the dependency in package.yaml.
 --
--- Available client libraries:
---   kafka-monad        -> import Control.Monad.Composable.Kafka
---   streaming-kafka-hw -> import Control.Monad.Composable.Streaming.Kafka
---   streaming-redpanda -> import Control.Monad.Composable.Streaming.Redpanda
---   streaming-rabbitmq -> import Control.Monad.Composable.Streaming.RabbitMQ
-
+-- This module re-exports the active streaming client library.
+-- To switch, change the backend dependency in package.yaml.
 module Control.Monad.Composable.Streaming (
-  module Control.Monad.Composable.Kafka
+  module Control.Monad.Composable.Streaming.Backend
 ) where
 
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming.Backend
