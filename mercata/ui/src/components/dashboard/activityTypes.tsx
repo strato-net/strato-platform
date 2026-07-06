@@ -162,13 +162,6 @@ export type ActivityHandler = (
 export type TokenAddressExtractor = (event: Event) => string[];
 
 /**
- * Filter configuration for backend event filtering
- */
-export type FilterConfig =
-  | { type: "single"; attribute: string; excludeProtocolAddresses?: string[] }
-  | { type: "or"; attributes: string[]; excludeProtocolAddresses?: string[] };
-
-/**
  * Icon and color configuration for activity types
  */
 export interface ActivityIconConfig {
@@ -195,11 +188,6 @@ export interface ActivityTypeConfig {
    */
   getTokenAddress?: TokenAddressExtractor;
   /**
-   * Filter configuration for backend event filtering
-   * Defines how to filter events for "My Activity" view
-   */
-  filterConfig: FilterConfig;
-  /**
    * Icon and color configuration for the activity type
    */
   iconConfig: ActivityIconConfig;
@@ -213,7 +201,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "Token",
     event_name: "Transfer",
     displayName: "Transfer",
-    filterConfig: { type: "or", attributes: ["from", "to"], excludeProtocolAddresses: ["from", "to"] },
     iconConfig: { icon: Send, color: "bg-blue-500" },
     getTokenAddress: (event: Event) => [event.address].filter(Boolean),
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
@@ -272,7 +259,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "YieldVault",
     event_name: "Transfer",
     displayName: "YieldVault Transfer",
-    filterConfig: { type: "or", attributes: ["from", "to"], excludeProtocolAddresses: ["from", "to"] },
     iconConfig: { icon: Send, color: "bg-cyan-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const vaultName = tokenSymbols.get(event.address) || tokenSymbols.get(normalizeAddress(event.address));
@@ -326,7 +312,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "SaveUSDSTVault",
     event_name: "Transfer",
     displayName: "SaveUSDST Transfer",
-    filterConfig: { type: "or", attributes: ["from", "to"], excludeProtocolAddresses: ["from", "to"] },
     iconConfig: { icon: Send, color: "bg-cyan-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const from = event.attributes.from || event.attributes.From || "";
@@ -378,7 +363,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "MercataBridge",
     event_name: "DepositCompleted",
     displayName: "Deposit",
-    filterConfig: { type: "single", attribute: "stratoRecipient" },
     iconConfig: { icon: Download, color: "bg-green-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
@@ -458,7 +442,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "StratoNativeBridge",
     event_name: "NativeDepositCompleted",
     displayName: "Native Deposit",
-    filterConfig: { type: "single", attribute: "stratoRecipient" },
     iconConfig: { icon: Download, color: "bg-green-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
@@ -471,7 +454,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "MercataBridge",
     event_name: "WithdrawalRequested",
     displayName: "Withdrawal",
-    filterConfig: { type: "single", attribute: "user" },
     iconConfig: { icon: Upload, color: "bg-red-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.token || event.attributes.Token;
@@ -564,7 +546,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "StratoNativeBridge",
     event_name: "NativeWithdrawalRequested",
     displayName: "Native Withdrawal",
-    filterConfig: { type: "single", attribute: "stratoSender" },
     iconConfig: { icon: Upload, color: "bg-red-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
@@ -593,7 +574,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "CDPEngine",
     event_name: "USDSTMinted",
     displayName: "CDP Mint",
-    filterConfig: { type: "single", attribute: "owner" },
     iconConfig: { icon: Landmark, color: "bg-purple-500" },
     getTokenAddress: (event: Event) => {
       const asset = event.attributes.asset || event.attributes.Asset;
@@ -660,7 +640,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "Pool",
     event_name: "Swap",
     displayName: "Swap",
-    filterConfig: { type: "single", attribute: "sender" },
     iconConfig: { icon: ArrowLeftRight, color: "bg-orange-500" },
     getTokenAddress: (event: Event) => {
       const tokenIn = event.attributes.tokenIn || event.attributes.token_in;
@@ -732,7 +711,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "Pool",
     event_name: "AddLiquidity",
     displayName: "Add Liquidity",
-    filterConfig: { type: "single", attribute: "provider" },
     iconConfig: { icon: Plus, color: "bg-green-700" },
     getTokenAddress: (event: Event) => {
       // Token addresses aren't in the event, but we'll fetch them from the pool
@@ -824,7 +802,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "Rewards",
     event_name: "RewardsClaimed",
     displayName: "Rewards Claimed",
-    filterConfig: { type: "single", attribute: "user" },
     iconConfig: { icon: Gift, color: "bg-gradient-to-br from-emerald-400 to-teal-500" },
     getTokenAddress: (event: Event) => {
       // The reward token address is stored in the Rewards contract, not in the event
@@ -878,7 +855,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "StratoStaking",
     event_name: "Staked",
     displayName: "STRATO Staked",
-    filterConfig: { type: "single", attribute: "user" },
     iconConfig: { icon: ShieldCheck, color: "bg-cyan-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const user = getEventAttribute(event, "user", "User");
@@ -906,7 +882,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "StratoStaking",
     event_name: "StakeMoved",
     displayName: "STRATO Stake Moved",
-    filterConfig: { type: "single", attribute: "user" },
     iconConfig: { icon: ArrowLeftRight, color: "bg-cyan-600" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const user = getEventAttribute(event, "user", "User");
@@ -936,7 +911,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "StratoStaking",
     event_name: "UnbondingStarted",
     displayName: "STRATO Unstake Queued",
-    filterConfig: { type: "single", attribute: "user" },
     iconConfig: { icon: Clock, color: "bg-cyan-400" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const user = getEventAttribute(event, "user", "User");
@@ -970,7 +944,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "StratoStaking",
     event_name: "UnbondedWithdrawn",
     displayName: "STRATO Withdrawn",
-    filterConfig: { type: "single", attribute: "user" },
     iconConfig: { icon: Upload, color: "bg-cyan-700" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const user = getEventAttribute(event, "user", "User");
@@ -996,7 +969,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "StratoStaking",
     event_name: "DelegatorRewardsClaimed",
     displayName: "STRATO Rewards Claimed",
-    filterConfig: { type: "single", attribute: "user" },
     iconConfig: { icon: Gift, color: "bg-gradient-to-br from-cyan-400 to-teal-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const user = getEventAttribute(event, "user", "User");
@@ -1022,7 +994,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "StratoStaking",
     event_name: "SelfBonded",
     displayName: "STRATO Self-Bonded",
-    filterConfig: { type: "single", attribute: "operator" },
     iconConfig: { icon: Coins, color: "bg-sky-600" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const operator = getEventAttribute(event, "operator", "Operator");
@@ -1048,7 +1019,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "StratoStaking",
     event_name: "SelfBondUnbondingStarted",
     displayName: "STRATO Self-Bond Unstaking",
-    filterConfig: { type: "single", attribute: "operator" },
     iconConfig: { icon: Clock, color: "bg-sky-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const operator = getEventAttribute(event, "operator", "Operator");
@@ -1080,7 +1050,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "StratoStaking",
     event_name: "OperatorRewardsClaimed",
     displayName: "STRATO Operator Rewards Claimed",
-    filterConfig: { type: "single", attribute: "operator" },
     iconConfig: { icon: Gift, color: "bg-gradient-to-br from-sky-400 to-cyan-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const operator = getEventAttribute(event, "operator", "Operator");
@@ -1106,7 +1075,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "LendingPool",
     event_name: "Borrowed",
     displayName: "Borrow",
-    filterConfig: { type: "single", attribute: "user" },
     iconConfig: { icon: Landmark, color: "bg-indigo-500" },
     getTokenAddress: (event: Event) => {
       const asset = event.attributes.asset || event.attributes.Asset;
@@ -1161,7 +1129,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "LendingPool",
     event_name: "Deposited",
     displayName: "Savings",
-    filterConfig: { type: "single", attribute: "user" },
     iconConfig: { icon: Coins, color: "bg-emerald-500" },
     getTokenAddress: (event: Event) => {
       const asset = event.attributes.asset || event.attributes.Asset;
@@ -1216,7 +1183,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "Escrow",
     event_name: "Redeemed",
     displayName: "Referral Redeemed",
-    filterConfig: { type: "or", attributes: ["sender", "recipient"] },
     iconConfig: { icon: UserPlus, color: "bg-pink-500" },
     getTokenAddress: (event: Event) => {
       // Helper to normalize arrays from object format (handles Cirrus/PostgREST JSONB format)
@@ -1402,7 +1368,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "Vault",
     event_name: "Deposited",
     displayName: "Vault Deposit",
-    filterConfig: { type: "single", attribute: "user" },
     iconConfig: { icon: Download, color: "bg-teal-500" },
     getTokenAddress: (event: Event) => {
       const asset = event.attributes.asset || event.attributes.Asset;
@@ -1461,7 +1426,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "Vault",
     event_name: "Withdrawn",
     displayName: "Vault Withdrawal",
-    filterConfig: { type: "single", attribute: "user" },
     iconConfig: { icon: Upload, color: "bg-amber-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const user = event.attributes.user || event.attributes.User || "";
@@ -1512,7 +1476,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "Vault",
     event_name: "WithdrawalPayout",
     displayName: "Vault Payout",
-    filterConfig: { type: "single", attribute: "user" },
     iconConfig: { icon: Banknote, color: "bg-yellow-500" },
     getTokenAddress: (event: Event) => {
       const asset = event.attributes.asset || event.attributes.Asset;
@@ -1566,7 +1529,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "MetalForge",
     event_name: "MetalMinted",
     displayName: "Metal Mint",
-    filterConfig: { type: "single", attribute: "buyer" },
     iconConfig: { icon: Gem, color: "bg-yellow-600" },
     getTokenAddress: (event: Event) => {
       const metalToken = event.attributes.metalToken || event.attributes.metal_token;
@@ -1635,7 +1597,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "YieldVault",
     event_name: "Deposit",
     displayName: "YieldVault Deposit",
-    filterConfig: { type: "single", attribute: "owner" },
     iconConfig: { icon: Download, color: "bg-cyan-500" },
     getTokenAddress: (event: Event) => {
       const asset = (event as any).asset_address;
@@ -1690,7 +1651,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "YieldVault",
     event_name: "Withdraw",
     displayName: "YieldVault Withdraw",
-    filterConfig: { type: "or", attributes: ["owner", "receiver"] },
     iconConfig: { icon: Upload, color: "bg-cyan-600" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const owner = event.attributes.owner || event.attributes.Owner || "";
@@ -1743,7 +1703,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "YieldVault",
     event_name: "WithdrawalRequested",
     displayName: "YieldVault Withdrawal Requested",
-    filterConfig: { type: "single", attribute: "owner" },
     iconConfig: { icon: Clock, color: "bg-cyan-400" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const owner = event.attributes.owner || event.attributes.Owner || "";
@@ -1802,7 +1761,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "YieldVault",
     event_name: "WithdrawalClaimed",
     displayName: "YieldVault Claimed",
-    filterConfig: { type: "single", attribute: "owner" },
     iconConfig: { icon: CheckCircle, color: "bg-cyan-700" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const owner = event.attributes.owner || event.attributes.Owner || "";

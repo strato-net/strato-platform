@@ -30,11 +30,7 @@ npm run deploy
 - `OAUTH_CLIENT_ID` - OAuth client ID
 - `OAUTH_CLIENT_SECRET` - OAuth client secret
 
-`BaseCodeCollection` selects the staking STRATO token by `block.chainid`:
-- Helium testnet: `8ee9a3391e38176feebf5d43cb2c1d6c4f728b04`
-- Upquark mainnet: `2ca3e170e6714282da77815f7864b17f612f5f83`
-
-**Output**: Prints all deployed contract addresses, including `SaveUSDSTVault`, `StratoNativeBridge`, `StratoNativeCustodyVault`, `StratoStaking`, and `ValidatorRegistry`, and provides ready-to-paste `.env` snippets.
+**Output**: Prints all deployed contract addresses, including `SaveUSDSTVault`, `StratoNativeBridge`, and `StratoNativeCustodyVault`, and provides ready-to-paste `.env` snippets.
 
 **Native bridge role seeding**:
 - During full `Mercata` deployment, the native STRATO contracts now take explicit `bridgeOperator`, `admin`, and `guardian` addresses in `initialize(...)`.

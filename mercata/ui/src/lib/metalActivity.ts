@@ -2,7 +2,7 @@ import { api } from '@/lib/axios';
 import type { Event } from '@mercata/shared-types';
 
 export const METAL_ACTIVITY_PAIR = [
-  { contract_name: "MetalForge", event_name: "MetalMinted", filterConfig: { type: "single" as const, attribute: "buyer" } }
+  { contract_name: "MetalForge", event_name: "MetalMinted" }
 ];
 
 export interface MetalTx {

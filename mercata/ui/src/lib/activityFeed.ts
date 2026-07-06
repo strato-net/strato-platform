@@ -1,6 +1,5 @@
 import { api } from './axios';
 import type { EventResponse, ContractInfoResponse } from '@mercata/shared-types';
-import type { FilterConfig } from '@/components/dashboard/activityTypes';
 
 export interface EventsFilters {
   limit?: number;
@@ -32,7 +31,7 @@ export const activityFeedApi = {
    * Fetch activities filtered by exact (contract_name, event_name) pairs
    */
   getActivities: async (
-    activityTypePairs: Array<{ contract_name: string; event_name: string; filterConfig: FilterConfig }>,
+    activityTypePairs: Array<{ contract_name: string; event_name: string }>,
     options: {
       limit?: number;
       offset?: number;
@@ -40,13 +39,22 @@ export const activityFeedApi = {
       timeRange?: 'all' | 'today' | 'week' | 'month';
     } = {}
   ): Promise<EventResponse> => {
-    const response = await api.post('/events/activities', {
-      activityTypePairs,
-      limit: options.limit,
-      offset: options.offset,
-      myActivity: options.myActivity,
-      timeRange: options.timeRange,
-    });
+    const params = new URLSearchParams();
+
+    // Format: "contract1:event1,contract2:event2" — filter configs are
+    // resolved server-side, and GET keeps the endpoint anonymously accessible.
+    params.append('activity_types', activityTypePairs
+      .map(p => `${p.contract_name}:${p.event_name}`)
+      .join(','));
+
+    if (options.limit) params.append('limit', options.limit.toString());
+    if (options.offset) params.append('offset', options.offset.toString());
+    if (options.myActivity) params.append('my_activity', 'true');
+    if (options.timeRange && options.timeRange !== 'all') {
+      params.append('time_range', options.timeRange);
+    }
+
+    const response = await api.get(`/events/activities?${params.toString()}`);
     return response.data as EventResponse;
   },
 

@@ -45,7 +45,6 @@ contract  StratoStaking is Ownable {
     event RewardReserveRecovered(address indexed to, uint256 amount);
     event UntrackedStratoRecovered(address indexed to, uint256 amount);
     event StrayTokenRecovered(address indexed token, address indexed to, uint256 amount);
-    event AllocatedRewardLiabilitySet(uint256 oldAmount, uint256 newAmount);
 
     uint256 public constant PRECISION = 1e18;
     uint256 public constant BPS_DIVISOR = 10000;
@@ -140,6 +139,7 @@ contract  StratoStaking is Ownable {
     }
 
     function setValidatorRegistry(address _validatorRegistry) external onlyOwner onlyInitialized {
+        require(address(validatorRegistry) == address(0), "SS: registry set");
         require(_validatorRegistry != address(0), "SS: registry=0");
         validatorRegistry = ValidatorRegistry(_validatorRegistry);
         emit ValidatorRegistrySet(_validatorRegistry);
@@ -494,15 +494,6 @@ contract  StratoStaking is Ownable {
         require(amount > 0, "SS: amount=0");
         _updateGlobalRewards();
         _depositRewards(amount);
-    }
-
-    function setAllocatedRewardLiability(uint256 amount) external onlyOwner onlyInitialized {
-        require(amount + rewardReserve <= rewardBalance(), "SS: liability unavailable");
-
-        uint256 oldAmount = allocatedRewardLiability;
-        allocatedRewardLiability = amount;
-
-        emit AllocatedRewardLiabilitySet(oldAmount, amount);
     }
 
     function startRewardSchedule(

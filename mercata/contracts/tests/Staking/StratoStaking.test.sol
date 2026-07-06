@@ -539,33 +539,16 @@ contract Describe_StratoStaking {
         require(staking.allocatedRewardLiability() == 0, "Liability cleared after claims");
     }
 
-    function it_allows_owner_to_backfill_allocated_reward_liability() public {
-        funder.do(address(staking), "depositRewards(uint256)", 500e18);
+    function it_rejects_repointing_validator_registry_after_wiring() public {
+        ValidatorRegistry replacement = new ValidatorRegistry(address(this));
 
-        strato.mint(address(this), 250e18);
-        require(IERC20(address(strato)).transfer(address(staking), 250e18), "Direct STRATO transfer");
-        require(staking.recoverableUntrackedStrato() == 250e18, "Direct transfer starts untracked");
-
-        staking.setAllocatedRewardLiability(100e18);
-        require(staking.allocatedRewardLiability() == 100e18, "Liability backfilled");
-        require(staking.recoverableUntrackedStrato() == 150e18, "Backfilled liability is protected");
-
-        bool nonOwnerRejected = false;
-        try user1.do(address(staking), "setAllocatedRewardLiability(uint256)", 101e18) {
+        bool rejected = false;
+        try staking.setValidatorRegistry(address(replacement)) {
         } catch {
-            nonOwnerRejected = true;
+            rejected = true;
         }
-        require(nonOwnerRejected, "Only owner can backfill liability");
-
-        bool overBackfillRejected = false;
-        try staking.setAllocatedRewardLiability(251e18) {
-        } catch {
-            overBackfillRejected = true;
-        }
-        require(overBackfillRejected, "Cannot backfill beyond reward backing");
-
-        staking.setAllocatedRewardLiability(0);
-        require(staking.recoverableUntrackedStrato() == 250e18, "Setter can clear migration value");
+        require(rejected, "Registry should only be set once");
+        require(address(staking.validatorRegistry()) == address(registry), "Registry unchanged");
     }
 
     function it_recovers_only_untracked_strato_transfers() public {
