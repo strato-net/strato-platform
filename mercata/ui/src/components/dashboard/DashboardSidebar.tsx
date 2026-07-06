@@ -15,6 +15,7 @@ import {
   Shield,
   LucideIcon,
   HandCoins,
+  Layers,
   ArrowDownToLine
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
@@ -53,6 +54,7 @@ const NAV_CATEGORIES: NavCategory[] = [
     label: 'EARN',
     items: [
       { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
+      { icon: Layers, label: 'Stake', path: '/dashboard/earn-staking' },
       { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
     ],
   },

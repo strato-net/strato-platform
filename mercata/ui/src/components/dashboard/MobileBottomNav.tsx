@@ -14,7 +14,7 @@ import {
   Droplets,
   Shield,
   HandCoins,
-
+  Layers,
   ArrowDownToLine,
   X
 } from 'lucide-react';
@@ -53,6 +53,7 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
     label: 'EARN',
     items: [
       { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
+      { icon: Layers, label: 'Stake', path: '/dashboard/earn-staking' },
       { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
     ],
   },
