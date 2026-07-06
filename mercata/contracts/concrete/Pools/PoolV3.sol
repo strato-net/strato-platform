@@ -231,6 +231,7 @@ contract record PoolV3 is Ownable {
         uint initialSqrtPriceWad,
         address factoryAddr
     ) external onlyOwner {
+        require(sqrtPriceWad == 0, "Already initialized");
         require(tokenAAddr != address(0), "Zero tokenA address");
         require(tokenBAddr != address(0), "Zero tokenB address");
         require(factoryAddr != address(0), "Zero factory address");
@@ -405,7 +406,9 @@ contract record PoolV3 is Ownable {
     }
 
     /// @notice Update a tick's liquidity bookkeeping for a position change
-    function _updateTick(int tick, int liquidityDelta, bool isUpper) internal {
+    /// @return True when the tick's liquidity just dropped to zero; the caller must
+    ///         _clearTick it only after its fee accounting no longer needs the tick
+    function _updateTick(int tick, int liquidityDelta, bool isUpper) internal returns (bool) {
         V3TickInfo storage info = ticks[tick];
         // liquidityGross tracks total liquidity referencing this tick; add and remove
         // apply the same signed delta because a position references each of its ticks once
@@ -435,12 +438,22 @@ contract record PoolV3 is Ownable {
         }
 
         if (grossBefore > 0 && grossAfter == 0) {
+            // De-initialize for next-tick search now, but leave feeGrowthOutside intact:
+            // _updatePosition still needs it for the position's final fee accrual, and
+            // clears the tick afterwards (V3 clears ticks only after Position.update)
             info.initialized = false;
-            info.feeGrowthOutsideA = 0;
-            info.feeGrowthOutsideB = 0;
-            info.liquidityNet = 0;
             _removeTick(tick);
+            return true;
         }
+        return false;
+    }
+
+    /// @notice Fully reset a tick whose liquidity dropped to zero (V3's Tick.clear)
+    function _clearTick(int tick) internal {
+        V3TickInfo storage info = ticks[tick];
+        info.feeGrowthOutsideA = 0;
+        info.feeGrowthOutsideB = 0;
+        info.liquidityNet = 0;
     }
 
     /// @notice Cross an initialized tick during a swap, flipping fee growth and applying net liquidity
@@ -482,8 +495,8 @@ contract record PoolV3 is Ownable {
 
     /// @notice Update position liquidity and accrue owed fees to the position
     function _updatePosition(address positionOwner, int tickLower, int tickUpper, int liquidityDelta) internal {
-        _updateTick(tickLower, liquidityDelta, false);
-        _updateTick(tickUpper, liquidityDelta, true);
+        bool flippedLower = _updateTick(tickLower, liquidityDelta, false);
+        bool flippedUpper = _updateTick(tickUpper, liquidityDelta, true);
 
         (int insideA, int insideB) = _feeGrowthInside(tickLower, tickUpper);
 
@@ -504,6 +517,16 @@ contract record PoolV3 is Ownable {
         int newPosLiquidity = int(pos.liquidity) + liquidityDelta;
         require(newPosLiquidity >= 0, "Position liquidity underflow");
         pos.liquidity = uint(newPosLiquidity);
+
+        // Only now is it safe to wipe ticks this burn emptied; clearing them before the
+        // fee accrual above would zero the feeGrowthOutside snapshots that
+        // _feeGrowthInside just read, crediting phantom fees to the position
+        if (flippedLower) {
+            _clearTick(tickLower);
+        }
+        if (flippedUpper) {
+            _clearTick(tickUpper);
+        }
     }
 
     /// @notice Read a position's liquidity and currently collectable amounts
@@ -674,7 +697,10 @@ contract record PoolV3 is Ownable {
             bool targetIsTick = false;
             if (found) {
                 tickSqrt = getSqrtPriceAtTick(nextTick);
-                if (isAToB ? tickSqrt > limit : tickSqrt < limit) {
+                // >= / <= (not strict): a tick sitting exactly on the limit must still be
+                // the step target so it gets crossed when reached (Uniswap V3 semantics);
+                // otherwise currentTick would pass the tick while its liquidityNet was never applied
+                if (isAToB ? tickSqrt >= limit : tickSqrt <= limit) {
                     targetSqrt = tickSqrt;
                     targetIsTick = true;
                 }
