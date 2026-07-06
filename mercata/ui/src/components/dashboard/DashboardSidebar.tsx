@@ -64,7 +64,7 @@ const NAV_CATEGORIES: NavCategory[] = [
       { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
       { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
       { icon: BarChart3, label: 'Analytics', path: '/dashboard/stats' },
-      { icon: Shield, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
+      { icon: Shield, label: 'Admin', path: '/dashboard/admin' },
     ],
   },
 ];

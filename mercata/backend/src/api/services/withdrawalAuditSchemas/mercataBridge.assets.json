@@ -1,0 +1,59 @@
+{
+  "table": "/BlockApps-MercataBridge-assets",
+  "source": "MercataBridge.assets mapping",
+  "contract": "mercata/contracts/concrete/Bridge/MercataBridge.sol",
+  "keyShape": {
+    "key": {
+      "name": "externalToken",
+      "type": "address_string_no_0x"
+    },
+    "key2": {
+      "name": "externalChainId",
+      "type": "uint256_string_or_number"
+    }
+  },
+  "knownColumns": {
+    "address": {
+      "type": "address_string_no_0x",
+      "usage": "MercataBridge contract address"
+    },
+    "key": {
+      "type": "address_string_no_0x",
+      "usage": "External token"
+    },
+    "key2": {
+      "type": "uint256_string_or_number",
+      "usage": "External chain id"
+    },
+    "value": {
+      "type": "AssetInfo",
+      "usage": "Route configuration"
+    },
+    "block_timestamp": {
+      "type": "timestamp_string",
+      "usage": "Record update timestamp"
+    }
+  },
+  "valueShape": {
+    "enabled": "bool",
+    "externalChainId": "uint256_string_or_number",
+    "externalDecimals": "uint8_string_or_number",
+    "externalName": "string",
+    "externalSymbol": "string",
+    "externalToken": "address_string_no_0x",
+    "maxPerWithdrawal": "uint256_string",
+    "stratoToken": "address_string_no_0x"
+  },
+  "supportedFilters": [
+    "address=eq.<mercataBridge>",
+    "key=eq.<externalToken>",
+    "key2=eq.<externalChainId>",
+    "value->>enabled=eq.true",
+    "value->>stratoToken=eq.<stratoToken>"
+  ],
+  "safeSelect": [
+    "key",
+    "key2",
+    "value"
+  ]
+}

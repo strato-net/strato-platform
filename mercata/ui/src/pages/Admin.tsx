@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Vote, Database, ChevronDown, ArrowRightLeft, Vault } from 'lucide-react';
+import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Vote, Database, ChevronDown, ArrowRightLeft, Vault, FileSearch } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import CreateTokenForm from '@/components/admin/CreateTokenForm';
 import CreatePoolForm from '@/components/admin/CreatePoolForm';
@@ -17,6 +17,7 @@ import VoteTab from '@/components/admin/VoteTab';
 import BridgeTransactionsPage from '@/components/dashboard/BridgeTransactionsPage';
 import VaultAdminTab from '@/components/admin/VaultAdminTab';
 import YieldVaultAdminTab from '@/components/admin/YieldVaultAdminTab';
+import WithdrawalAuditList from '@/components/admin/WithdrawalAuditList';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -56,7 +57,7 @@ const Admin = () => {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 ">
           <div className="w-full overflow-x-auto">
-            <TabsList className="grid grid-cols-7 w-full min-w-[700px] md:min-w-0">
+            <TabsList className="grid grid-cols-8 w-full min-w-[800px] md:min-w-0">
               <TabsTrigger value="pools" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
                 <Droplets className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">Create Pools</span>
@@ -131,6 +132,11 @@ const Admin = () => {
                 <span className="hidden sm:inline">Bridge</span>
                 <span className="sm:hidden">Bridge</span>
               </TabsTrigger>
+              <TabsTrigger value="was" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
+                <FileSearch className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">WAS</span>
+                <span className="sm:hidden">WAS</span>
+              </TabsTrigger>
               <TabsTrigger value="vault" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
                 <Vault className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">Vault</span>
@@ -203,6 +209,9 @@ const Admin = () => {
           </TabsContent>
           <TabsContent value="bridge" className="space-y-6">
             <BridgeTransactionsPage isAdmin={true} />
+          </TabsContent>
+          <TabsContent value="was" className="space-y-6">
+            <WithdrawalAuditList />
           </TabsContent>
           <TabsContent value="vault" className="space-y-6">
             <Card>

@@ -1,0 +1,57 @@
+{
+  "table": "/BlockApps-MercataBridge",
+  "source": "MercataBridge contract record",
+  "contract": "mercata/contracts/concrete/Bridge/MercataBridge.sol",
+  "knownColumns": {
+    "address": {
+      "type": "address_string_no_0x",
+      "usage": "MercataBridge contract address"
+    },
+    "_owner": {
+      "type": "address_string_no_0x",
+      "usage": "Owner/admin registry"
+    },
+    "depositsPaused": {
+      "type": "bool",
+      "usage": "Deposit circuit breaker"
+    },
+    "withdrawalsPaused": {
+      "type": "bool",
+      "usage": "Withdrawal circuit breaker"
+    },
+    "tokenFactory": {
+      "type": "address_string_no_0x",
+      "usage": "TokenFactory address"
+    },
+    "withdrawalCounter": {
+      "type": "uint256_string_or_number",
+      "usage": "Latest standard withdrawal id"
+    },
+    "DECIMAL_PLACES": {
+      "type": "uint256_string_or_number",
+      "usage": "Bridge decimal conversion constant"
+    },
+    "USDST_ADDRESS": {
+      "type": "address_string_no_0x",
+      "usage": "USDST token address"
+    },
+    "WITHDRAWAL_ABORT_DELAY": {
+      "type": "uint256_string_or_number",
+      "usage": "User abort delay"
+    }
+  },
+  "supportedFilters": [
+    "address=eq.<mercataBridge>"
+  ],
+  "safeSelect": [
+    "address",
+    "_owner",
+    "depositsPaused",
+    "withdrawalsPaused",
+    "tokenFactory",
+    "withdrawalCounter",
+    "DECIMAL_PLACES",
+    "USDST_ADDRESS",
+    "WITHDRAWAL_ABORT_DELAY"
+  ]
+}

@@ -255,6 +255,34 @@ router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeControl
 
 /**
  * @openapi
+ * /bridge/withdrawal-audits/recent:
+ *   get:
+ *     summary: Get recent withdrawal audit statuses for admins
+ *     tags: [Bridge]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Recent withdrawal audit statuses
+ */
+router.get("/withdrawal-audits/recent", authHandler.authorizeRequest(), BridgeController.getRecentWithdrawalAudits);
+
+/**
+ * @openapi
+ * /bridge/withdrawal-audits/{routeType}/{withdrawalId}:
+ *   get:
+ *     summary: Get a cached or queued withdrawal provenance audit
+ *     tags: [Bridge]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Withdrawal audit trace
+ */
+router.get("/withdrawal-audits/:routeType/:withdrawalId", authHandler.authorizeRequest(), BridgeController.getWithdrawalAudit);
+
+/**
+ * @openapi
  * /bridge/transactions/{type}:
  *   get:
  *     summary: Retrieve bridge transaction history

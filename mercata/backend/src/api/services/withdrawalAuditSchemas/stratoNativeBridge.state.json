@@ -1,0 +1,67 @@
+{
+  "table": "/BlockApps-StratoNativeBridge",
+  "source": "StratoNativeBridge contract record",
+  "contract": "mercata/contracts/concrete/Bridge/StratoNativeBridge.sol",
+  "knownColumns": {
+    "address": {
+      "type": "address_string_no_0x",
+      "usage": "StratoNativeBridge contract address"
+    },
+    "_owner": {
+      "type": "address_string_no_0x",
+      "usage": "Owner/admin registry"
+    },
+    "tokenFactory": {
+      "type": "address_string_no_0x",
+      "usage": "TokenFactory address"
+    },
+    "custodyVault": {
+      "type": "address_string_no_0x",
+      "usage": "Native custody vault address"
+    },
+    "bridgeOperator": {
+      "type": "address_string_no_0x",
+      "usage": "Native bridge operator"
+    },
+    "guardian": {
+      "type": "address_string_no_0x",
+      "usage": "Guardian address"
+    },
+    "depositsPaused": {
+      "type": "bool",
+      "usage": "Native deposit circuit breaker"
+    },
+    "withdrawalsPaused": {
+      "type": "bool",
+      "usage": "Native withdrawal circuit breaker"
+    },
+    "withdrawalCounter": {
+      "type": "uint256_string_or_number",
+      "usage": "Latest native withdrawal id"
+    },
+    "WITHDRAWAL_ABORT_DELAY": {
+      "type": "uint256_string_or_number",
+      "usage": "User abort delay"
+    },
+    "INSTANT_WITHDRAWAL_DELAY_SECONDS": {
+      "type": "uint256_string_or_number",
+      "usage": "Native instant withdrawal delay"
+    }
+  },
+  "supportedFilters": [
+    "address=eq.<stratoNativeBridge>"
+  ],
+  "safeSelect": [
+    "address",
+    "_owner",
+    "tokenFactory",
+    "custodyVault",
+    "bridgeOperator",
+    "guardian",
+    "depositsPaused",
+    "withdrawalsPaused",
+    "withdrawalCounter",
+    "WITHDRAWAL_ABORT_DELAY",
+    "INSTANT_WITHDRAWAL_DELAY_SECONDS"
+  ]
+}

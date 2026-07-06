@@ -1,0 +1,181 @@
+{
+  "table": "/event",
+  "source": "Generic Cirrus event table used across backend helpers",
+  "confidence": "codebase-inferred",
+  "knownColumns": {
+    "event_name": {
+      "type": "string",
+      "usage": "Filter by Solidity event name"
+    },
+    "address": {
+      "type": "address_string_no_0x",
+      "usage": "Emitting contract address"
+    },
+    "attributes": {
+      "type": "object",
+      "usage": "Decoded event args. Supports attributes->>field filters."
+    },
+    "block_timestamp": {
+      "type": "timestamp_string",
+      "usage": "Ordering and display"
+    },
+    "block_number": {
+      "type": "integer_string_or_number",
+      "usage": "Coarse event order; not sufficient by itself for same-block ordering"
+    },
+    "transaction_hash": {
+      "type": "string",
+      "usage": "Transaction evidence and grouping"
+    },
+    "transaction_sender": {
+      "type": "address_string_no_0x",
+      "usage": "Transaction sender. Cirrus error hints confirm this column exists."
+    }
+  },
+  "knownMissingColumns": {
+    "transaction_index": {
+      "reason": "Cirrus returned column event.transaction_index does not exist"
+    },
+    "event_index": {
+      "reason": "Not found in codebase query usage; do not select until manually verified"
+    },
+    "log_index": {
+      "reason": "Not found in codebase query usage; do not select until manually verified"
+    }
+  },
+  "supportedFilters": [
+    "event_name=eq.<EventName>",
+    "address=eq.<emittingContract>",
+    "attributes->>field=eq.<value>",
+    "attributes->>field=in.(<values>)",
+    "or=(event_name.eq.A,event_name.eq.B)"
+  ],
+  "safeSelect": [
+    "event_name",
+    "address",
+    "attributes",
+    "block_timestamp",
+    "block_number",
+    "transaction_hash",
+    "transaction_sender"
+  ],
+  "wasEvents": {
+    "MercataBridge.DepositCompleted": {
+      "attributes": {
+        "externalChainId": "uint256",
+        "externalSender": "address",
+        "externalTxHash": "string",
+        "stratoRecipient": "address",
+        "stratoToken": "address",
+        "stratoTokenAmount": "uint256"
+      }
+    },
+    "MercataBridge.WithdrawalRequested": {
+      "attributes": {
+        "dest": "address",
+        "destChainId": "uint256",
+        "externalTokenAmount": "uint256",
+        "stratoTokenAmount": "uint256",
+        "token": "address",
+        "user": "address",
+        "withdrawalId": "uint256",
+        "useHotWallet": "bool"
+      }
+    },
+    "MercataBridge.WithdrawalPending": {
+      "attributes": {
+        "custodyTxHash": "string",
+        "withdrawalId": "uint256"
+      }
+    },
+    "StratoNativeBridge.NativeDepositCompleted": {
+      "attributes": {
+        "depositId": "string",
+        "externalChainId": "uint256",
+        "externalBridge": "address",
+        "externalRedemptionId": "uint256",
+        "externalSender": "address",
+        "externalTxHash": "string",
+        "stratoRecipient": "address",
+        "stratoToken": "address",
+        "stratoTokenAmount": "uint256"
+      }
+    },
+    "StratoNativeBridge.NativeWithdrawalRequested": {
+      "attributes": {
+        "withdrawalId": "uint256",
+        "externalChainId": "uint256",
+        "externalBridge": "address",
+        "externalRecipient": "address",
+        "representationToken": "address",
+        "stratoSender": "address",
+        "stratoToken": "address",
+        "stratoTokenAmount": "uint256",
+        "useInstantPath": "bool"
+      }
+    },
+    "StratoNativeBridge.NativeWithdrawalPending": {
+      "attributes": {
+        "withdrawalId": "uint256",
+        "externalTxHash": "string"
+      }
+    },
+    "StratoNativeBridge.NativeWithdrawalProposalRecorded": {
+      "attributes": {
+        "withdrawalId": "uint256",
+        "nativeMintProposalHash": "string"
+      }
+    },
+    "Token.Transfer": {
+      "attributes": {
+        "from": "address",
+        "to": "address",
+        "value": "uint256"
+      }
+    },
+    "MetalForge.MetalMinted": {
+      "attributes": {
+        "buyer": "address",
+        "metalToken": "address",
+        "payToken": "address",
+        "payAmount": "uint256",
+        "metalAmount": "uint256",
+        "metalPrice": "uint256",
+        "feeAmount": "uint256",
+        "totalMinted": "uint256"
+      }
+    },
+    "CDPEngine.USDSTMinted": {
+      "attributes": {
+        "user": "address",
+        "asset": "address",
+        "amountUSD": "uint256",
+        "totalScaledDebt": "uint256",
+        "rateAccumulator": "uint256"
+      }
+    },
+    "DirectMintPSM.DirectPSMMinted": {
+      "attributes": {
+        "user": "address",
+        "depositAmount": "uint256",
+        "mintAmount": "uint256",
+        "againstToken": "address"
+      }
+    },
+    "StablePool.Swap": {
+      "attributes": {
+        "sender": "address",
+        "tokenIn": "address",
+        "tokenOut": "address",
+        "amountIn": "uint256",
+        "amountOut": "uint256"
+      }
+    },
+    "Rewards.RewardsClaimed": {
+      "attributes": {
+        "user": "address",
+        "amount": "uint256"
+      }
+    }
+  }
+}

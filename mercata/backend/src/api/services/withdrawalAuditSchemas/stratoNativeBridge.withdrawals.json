@@ -1,0 +1,68 @@
+{
+  "table": "/BlockApps-StratoNativeBridge-withdrawals",
+  "source": "StratoNativeBridge.withdrawals mapping",
+  "contract": "mercata/contracts/concrete/Bridge/StratoNativeBridge.sol",
+  "keyShape": {
+    "key": {
+      "name": "withdrawalId",
+      "type": "uint256_string"
+    }
+  },
+  "knownColumns": {
+    "address": {
+      "type": "address_string_no_0x",
+      "usage": "StratoNativeBridge contract address"
+    },
+    "key": {
+      "type": "uint256_string",
+      "usage": "Withdrawal id"
+    },
+    "value": {
+      "type": "NativeWithdrawalInfo",
+      "usage": "Record value"
+    },
+    "block_timestamp": {
+      "type": "timestamp_string",
+      "usage": "Record update timestamp"
+    }
+  },
+  "valueShape": {
+    "bridgeStatus": "uint8_string_or_number",
+    "externalTxHash": "string",
+    "externalChainId": "uint256_string_or_number",
+    "externalBridge": "address_string_no_0x",
+    "externalRecipient": "address_string_no_0x",
+    "representationToken": "address_string_no_0x",
+    "externalTokenAmount": "uint256_string",
+    "requestedAt": "uint256_string",
+    "stratoSender": "address_string_no_0x",
+    "stratoToken": "address_string_no_0x",
+    "stratoTokenAmount": "uint256_string",
+    "timestamp": "uint256_string",
+    "nativeMintProposalHash": "string",
+    "nativeMintNotBefore": "uint256_string",
+    "useInstantPath": "bool"
+  },
+  "supportedFilters": [
+    "address=eq.<stratoNativeBridge>",
+    "key=eq.<withdrawalId>",
+    "value->>bridgeStatus=in.(1,2)",
+    "value->>bridgeStatus=in.(1,2,3,4)",
+    "value->>bridgeStatus=eq.<status>",
+    "value->>stratoSender=eq.<address>",
+    "value->>stratoToken=eq.<address>",
+    "value->>externalChainId=eq.<chainId>"
+  ],
+  "safeSelect": [
+    "key",
+    "value",
+    "block_timestamp"
+  ],
+  "statusEnum": {
+    "0": "NONE",
+    "1": "INITIATED",
+    "2": "PENDING_REVIEW",
+    "3": "COMPLETED",
+    "4": "ABORTED"
+  }
+}

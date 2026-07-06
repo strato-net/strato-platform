@@ -1,0 +1,17 @@
+{
+  "purpose": "Cirrus table schemas used by the Withdrawal Auditing Service POC.",
+  "notes": [
+    "These schemas document the table shapes the WAS is allowed to query.",
+    "Do not add selected columns to withdrawalAudit.service.ts unless they are present in these files or verified from Cirrus.",
+    "The generic /event table does not expose transaction_index or event_index in this codebase; use block_number, transaction_hash, transaction_sender, and block_timestamp only."
+  ],
+  "schemas": [
+    "event.json",
+    "mercataBridge.withdrawals.json",
+    "stratoNativeBridge.withdrawals.json",
+    "mercataBridge.assets.json",
+    "stratoNativeBridge.assets.json",
+    "mercataBridge.state.json",
+    "stratoNativeBridge.state.json"
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "table": "/BlockApps-StratoNativeBridge-assets",
+  "source": "StratoNativeBridge.assets mapping",
+  "contract": "mercata/contracts/concrete/Bridge/StratoNativeBridge.sol",
+  "keyShape": {
+    "key": {
+      "name": "stratoToken",
+      "type": "address_string_no_0x"
+    },
+    "key2": {
+      "name": "externalChainId",
+      "type": "uint256_string_or_number"
+    }
+  },
+  "knownColumns": {
+    "address": {
+      "type": "address_string_no_0x",
+      "usage": "StratoNativeBridge contract address"
+    },
+    "key": {
+      "type": "address_string_no_0x",
+      "usage": "STRATO native token"
+    },
+    "key2": {
+      "type": "uint256_string_or_number",
+      "usage": "External chain id"
+    },
+    "value": {
+      "type": "NativeAssetConfig",
+      "usage": "Native route configuration"
+    },
+    "block_timestamp": {
+      "type": "timestamp_string",
+      "usage": "Record update timestamp"
+    }
+  },
+  "valueShape": {
+    "enabled": "bool",
+    "externalChainId": "uint256_string_or_number",
+    "externalBridge": "address_string_no_0x",
+    "representationToken": "address_string_no_0x",
+    "externalName": "string",
+    "externalSymbol": "string",
+    "maxPerWithdrawal": "uint256_string",
+    "instantWithdrawalThreshold": "uint256_string",
+    "stratoToken": "address_string_no_0x"
+  },
+  "supportedFilters": [
+    "address=eq.<stratoNativeBridge>",
+    "key=eq.<stratoToken>",
+    "key2=eq.<externalChainId>",
+    "value->>enabled=eq.true",
+    "value->>representationToken=eq.<representationToken>"
+  ],
+  "safeSelect": [
+    "key",
+    "key2",
+    "value"
+  ]
+}

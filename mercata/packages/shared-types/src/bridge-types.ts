@@ -151,6 +151,69 @@ export interface WithdrawalSummaryResponse {
   availableToWithdraw: string;     // Available balance to withdraw in wei (string format)
 }
 
+export type WithdrawalAuditRouteType = "standard" | "native";
+export type WithdrawalAuditStatusGroup = "aborted" | "complete" | "other";
+export type WithdrawalAuditStatus = "queued" | "running" | "complete" | "failed";
+export type WithdrawalAuditDecision = "APPROVE" | "REJECT" | "MANUAL_REVIEW";
+export type WithdrawalAuditRiskLevel = "low" | "medium" | "high";
+export type WithdrawalAuditStepResult = "clean" | "tainted" | "unknown" | "info";
+
+export interface NormalizedWithdrawalAudit {
+  routeType: WithdrawalAuditRouteType;
+  withdrawalId: string;
+  bridgeStatus: string;
+  stratoSender: string;
+  stratoToken: string;
+  stratoTokenAmount: string;
+  externalChainId: string;
+  externalRecipient: string;
+  externalToken?: string;
+  externalTokenAmount?: string;
+  blockTimestamp?: string;
+  timestamp?: string;
+  nativeMintProposalHash?: string;
+  custodyTxHash?: string;
+}
+
+export interface WithdrawalAuditStep {
+  index: number;
+  eventType: string;
+  position?: string;
+  actor?: string;
+  token?: string;
+  amount?: string;
+  result: WithdrawalAuditStepResult;
+  explanation: string;
+  evidence: Record<string, string>;
+}
+
+export interface WithdrawalAuditTrace {
+  status: WithdrawalAuditStatus;
+  decision?: WithdrawalAuditDecision;
+  riskLevel?: WithdrawalAuditRiskLevel;
+  withdrawal: NormalizedWithdrawalAudit;
+  quickRun?: boolean;
+  stoppedEarly?: boolean;
+  coverage?: {
+    clean: string;
+    tainted: string;
+    unknown: string;
+  };
+  summary: string[];
+  steps: WithdrawalAuditStep[];
+  updatedAt: string;
+  error?: string;
+}
+
+export interface WithdrawalAuditListItem {
+  withdrawal: NormalizedWithdrawalAudit;
+  audit: WithdrawalAuditTrace;
+}
+
+export interface WithdrawalAuditListResponse {
+  data: WithdrawalAuditListItem[];
+}
+
 // ============================================================================
 // CRYPTO CREDIT CARD CONFIG
 // ============================================================================

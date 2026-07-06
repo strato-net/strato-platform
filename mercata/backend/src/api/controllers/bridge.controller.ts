@@ -9,7 +9,17 @@ import {
   getBridgeTransactions,
   getWithdrawalSummary
 } from "../services/bridge.service";
-import { validateRequestWithdrawal, validateDepositAction, validateTransactionType } from "../validators/bridge.validators";
+import {
+  validateRequestWithdrawal,
+  validateDepositAction,
+  validateTransactionType,
+  validateWithdrawalAuditId,
+  validateWithdrawalAuditRouteType,
+} from "../validators/bridge.validators";
+import {
+  getRecentWithdrawalAudits,
+  getWithdrawalAudit,
+} from "../services/withdrawalAudit.service";
 import { validateRawParams } from "../validators/common.validators";
 import {
   NetworkConfig,
@@ -18,7 +28,8 @@ import {
   WithdrawalRequestParams,
   DepositActionRequestParams,
   TransactionResponse,
-  WithdrawalSummaryResponse
+  WithdrawalSummaryResponse,
+  WithdrawalAuditStatusGroup
 } from "@mercata/shared-types";
 import { isUserAdmin } from "../services/user.service";
 
@@ -180,6 +191,45 @@ class BridgeController {
     try {
       const { accessToken, address: userAddress } = req;
       const result: WithdrawalSummaryResponse = await getWithdrawalSummary(accessToken, userAddress as string);
+      res.json(result);
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async getRecentWithdrawalAudits(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const limit = Math.min(Math.max(Number(req.query.limit || 10), 1), 10);
+      const quickRun = req.query.quickRun === "true";
+      const statusGroup = ["aborted", "complete", "other"].includes(String(req.query.statusGroup))
+        ? String(req.query.statusGroup) as WithdrawalAuditStatusGroup
+        : "other";
+      const result = await getRecentWithdrawalAudits(limit, quickRun, statusGroup);
+      res.json(result);
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async getWithdrawalAudit(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const routeType = validateWithdrawalAuditRouteType(req.params.routeType);
+      const withdrawalId = validateWithdrawalAuditId(req.params.withdrawalId);
+      const quickRun = req.query.quickRun === "true";
+      const result = await getWithdrawalAudit(routeType, withdrawalId, quickRun);
+      if (!result) {
+        res.status(404).json({ error: "Withdrawal not found" });
+        return;
+      }
+
       res.json(result);
     } catch (error: any) {
       next(error);

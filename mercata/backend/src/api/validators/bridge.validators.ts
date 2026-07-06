@@ -119,3 +119,27 @@ export function validateTransactionType(type: string): 'withdrawal' | 'deposit' 
 
   return type as 'withdrawal' | 'deposit';
 }
+
+export function validateWithdrawalAuditRouteType(type: string): 'standard' | 'native' {
+  if (!type || typeof type !== 'string') {
+    throw new Error("Withdrawal audit route type is required and must be a string");
+  }
+
+  if (!['standard', 'native'].includes(type)) {
+    throw new Error("Invalid withdrawal audit route type. Must be 'standard' or 'native'");
+  }
+
+  return type as 'standard' | 'native';
+}
+
+export function validateWithdrawalAuditId(withdrawalId: string): string {
+  if (!withdrawalId || typeof withdrawalId !== "string" || !/^[0-9]+$/.test(withdrawalId)) {
+    throw new Error("Invalid withdrawal id. Must be a positive integer string");
+  }
+
+  if (BigInt(withdrawalId) <= 0n) {
+    throw new Error("Invalid withdrawal id. Must be a positive integer string");
+  }
+
+  return withdrawalId;
+}

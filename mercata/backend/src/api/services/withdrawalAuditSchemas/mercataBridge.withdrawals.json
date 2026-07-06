@@ -1,0 +1,65 @@
+{
+  "table": "/BlockApps-MercataBridge-withdrawals",
+  "source": "MercataBridge.withdrawals mapping",
+  "contract": "mercata/contracts/concrete/Bridge/MercataBridge.sol",
+  "keyShape": {
+    "key": {
+      "name": "withdrawalId",
+      "type": "uint256_string"
+    }
+  },
+  "knownColumns": {
+    "address": {
+      "type": "address_string_no_0x",
+      "usage": "MercataBridge contract address"
+    },
+    "key": {
+      "type": "uint256_string",
+      "usage": "Withdrawal id"
+    },
+    "value": {
+      "type": "WithdrawalInfo",
+      "usage": "Record value"
+    },
+    "block_timestamp": {
+      "type": "timestamp_string",
+      "usage": "Record update timestamp"
+    }
+  },
+  "valueShape": {
+    "bridgeStatus": "uint8_string_or_number",
+    "custodyTxHash": "string",
+    "externalChainId": "uint256_string_or_number",
+    "externalRecipient": "address_string_no_0x",
+    "externalToken": "address_string_no_0x",
+    "externalTokenAmount": "uint256_string",
+    "requestedAt": "uint256_string",
+    "stratoSender": "address_string_no_0x",
+    "stratoToken": "address_string_no_0x",
+    "stratoTokenAmount": "uint256_string",
+    "timestamp": "uint256_string",
+    "useHotWallet": "bool"
+  },
+  "supportedFilters": [
+    "address=eq.<mercataBridge>",
+    "key=eq.<withdrawalId>",
+    "value->>bridgeStatus=in.(1,2)",
+    "value->>bridgeStatus=in.(1,2,3,4)",
+    "value->>bridgeStatus=eq.<status>",
+    "value->>stratoSender=eq.<address>",
+    "value->>stratoToken=eq.<address>",
+    "value->>externalChainId=eq.<chainId>"
+  ],
+  "safeSelect": [
+    "key",
+    "value",
+    "block_timestamp"
+  ],
+  "statusEnum": {
+    "0": "NONE",
+    "1": "INITIATED",
+    "2": "PENDING_REVIEW",
+    "3": "COMPLETED",
+    "4": "ABORTED"
+  }
+}

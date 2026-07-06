@@ -45,6 +45,7 @@ import BridgeTransactionsPage from "./pages/BridgeTransactionsPage";
 import MetalTransactionsPage from "./pages/MetalTransactionsPage";
 import WithdrawalsPage from "./pages/WithdrawalsPage";
 import Admin from "./pages/Admin";
+import AdminWithdrawalAuditSummary from "./pages/AdminWithdrawalAuditSummary";
 import ProtectedRoute from "./components/ProtectedRoute";
 import GuestAccessibleRoute from "./components/GuestAccessibleRoute";
 import {
@@ -54,7 +55,6 @@ import {
 } from "@rainbow-me/rainbowkit/wallets";
 import { stratoWallet } from "@/lib/stratoWallet";
 import { initStratoChain, getStratoChain } from "@/lib/stratoChain";
-import AdminRoute from "./components/AdminRoute";
 import { TokenProvider } from "./context/TokenContext";
 import { BridgeProvider } from "@/context/BridgeContext";
 import { EarnProvider } from "@/context/EarnContext";
@@ -385,9 +385,15 @@ const App = () => {
                                                   path="/dashboard/admin"
                                                   element={
                                                     <ProtectedRoute>
-                                                      <AdminRoute>
-                                                        <Admin />
-                                                      </AdminRoute>
+                                                      <Admin />
+                                                    </ProtectedRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/admin/withdrawal-audits/:routeType/:withdrawalId"
+                                                  element={
+                                                    <ProtectedRoute>
+                                                      <AdminWithdrawalAuditSummary />
                                                     </ProtectedRoute>
                                                   }
                                                 />
