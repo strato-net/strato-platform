@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useAccount } from "wagmi";
 import { formatUnits } from "ethers";
-import { ArrowLeft, CheckCircle2, Clock, Loader2, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, Gift, Info, Layers, Loader2, RefreshCw, Search, Shield, TrendingUp, Trophy, Wallet, type LucideIcon } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
@@ -188,7 +188,10 @@ const TipLabel = ({ label, tooltip, className }: { label: string; tooltip: strin
   <TooltipProvider>
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className={`cursor-help ${className || ""}`}>{label}</span>
+        <span className={`inline-flex items-center gap-1 ${className || ""}`}>
+          {label}
+          <Info className="h-3 w-3 shrink-0 text-muted-foreground" />
+        </span>
       </TooltipTrigger>
       <TooltipContent className="max-w-[16rem]">
         <p>{tooltip}</p>
@@ -197,14 +200,13 @@ const TipLabel = ({ label, tooltip, className }: { label: string; tooltip: strin
   </TooltipProvider>
 );
 
-const StatCard = ({ label, tooltip, value }: { label: string; tooltip?: string; value: string }) => (
+const StatCard = ({ label, tooltip, value, icon: Icon }: { label: string; tooltip?: string; value: string; icon?: LucideIcon }) => (
   <Card>
     <CardContent className="p-4">
-      {tooltip ? (
-        <TipLabel label={label} tooltip={tooltip} className="block w-fit text-xs text-muted-foreground" />
-      ) : (
-        <p className="text-xs text-muted-foreground">{label}</p>
-      )}
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
+        {tooltip ? <TipLabel label={label} tooltip={tooltip} /> : <span>{label}</span>}
+      </div>
       <p className="mt-1 font-semibold">{value}</p>
     </CardContent>
   </Card>
@@ -401,19 +403,15 @@ const EarnStaking = () => {
 
     let unbondingTotal = 0n;
     let readyTotal = 0n;
-    let nextReleaseTime: string | null = null;
     for (const request of active) {
       if (request.ready) {
         readyTotal += BigInt(request.amount || "0");
       } else {
         unbondingTotal += BigInt(request.amount || "0");
-        if (nextReleaseTime === null || Number(request.releaseTime) < Number(nextReleaseTime)) {
-          nextReleaseTime = request.releaseTime;
-        }
       }
     }
 
-    return { active, withdrawn, unbondingTotal, readyTotal, nextReleaseTime };
+    return { active, withdrawn, unbondingTotal, readyTotal };
   }, [info?.unbondingRequests]);
 
   const runAction = async (action: () => Promise<void>, successTitle: string, processing: ProcessingAction) => {
@@ -633,32 +631,38 @@ const EarnStaking = () => {
             label="Available to Stake"
             tooltip="STRATO available in your wallet to stake."
             value={`${formatToken(info.walletBalance, decimals)} ${symbol}`}
+            icon={Wallet}
           />
           <StatCard
             label="Amount Staked"
             tooltip="Total STRATO you currently have delegated across all validators."
             value={`${formatToken(info.userTotalStake, decimals)} ${symbol}`}
+            icon={Layers}
           />
           <StatCard
             label="APY"
             tooltip="Estimated annual yield for delegating STRATO, based on the current reward schedule and total network stake. Shown net of validator commission."
             value={info.estimatedApy === "-" ? "-" : `${info.estimatedApy}%`}
+            icon={TrendingUp}
           />
           <StatCard
             label="Total Rewards"
             tooltip="Lifetime STRATO you've earned through staking, including rewards already claimed."
             value={`${formatToken(info.totalEarned, decimals)} ${symbol}`}
+            icon={Trophy}
           />
           <StatCard
             label="Claimable"
             tooltip="Rewards you've earned and can claim now without unstaking your delegated STRATO. Claiming doesn't affect your staked balance."
             value={`${formatToken(info.claimableRewards, decimals)} ${symbol}`}
+            icon={Gift}
           />
           {info.isOperator && (
             <StatCard
               label="Self-Bond"
               tooltip="STRATO you've bonded as a validator operator. Separate from delegated stake."
               value={`${formatToken(operatorValidator?.selfBond, decimals)} ${symbol}`}
+              icon={Shield}
             />
           )}
         </div>
@@ -1084,10 +1088,15 @@ const EarnStaking = () => {
                 <div>
                   <h2 className="text-lg font-semibold">Withdrawals</h2>
                   <p className="text-sm text-muted-foreground">
-                    Unbonding {formatToken(withdrawalQueue.unbondingTotal.toString(), decimals)} {symbol}
-                    {withdrawalQueue.nextReleaseTime && ` (next ready ${formatReleaseTime(withdrawalQueue.nextReleaseTime)})`}
+                    Unbonding{" "}
+                    <span className="font-semibold text-foreground">
+                      {formatToken(withdrawalQueue.unbondingTotal.toString(), decimals)} {symbol}
+                    </span>
                     {" · "}
-                    Ready {formatToken(withdrawalQueue.readyTotal.toString(), decimals)} {symbol}
+                    Ready{" "}
+                    <span className="font-semibold text-foreground">
+                      {formatToken(withdrawalQueue.readyTotal.toString(), decimals)} {symbol}
+                    </span>
                   </p>
                 </div>
               </div>
@@ -1101,7 +1110,7 @@ const EarnStaking = () => {
                 ) : (
                   <CheckCircle2 className="mr-2 h-4 w-4" />
                 )}
-                {processingAction === "withdraw" ? "Withdrawing" : "Withdraw Ready"}
+                {processingAction === "withdraw" ? "Withdrawing" : "Withdraw"}
               </Button>
             </div>
 
