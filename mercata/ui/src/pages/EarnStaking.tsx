@@ -197,6 +197,7 @@ const EarnStaking = () => {
   const [selfUnbondAmount, setSelfUnbondAmount] = useState("");
   const [validatorSearch, setValidatorSearch] = useState("");
   const [showInactiveValidators, setShowInactiveValidators] = useState(false);
+  const [showWithdrawnHistory, setShowWithdrawnHistory] = useState(false);
   const [actionMode, setActionMode] = useState<StakingActionMode | null>(null);
   const [actionOperator, setActionOperator] = useState("");
 
@@ -339,6 +340,30 @@ const EarnStaking = () => {
     () => (info?.unbondingRequests || []).filter((request) => request.ready && !request.claimed),
     [info?.unbondingRequests]
   );
+
+  const withdrawalQueue = useMemo(() => {
+    const requests = info?.unbondingRequests || [];
+    const active = requests
+      .filter((request) => !request.claimed)
+      .sort((a, b) => (a.ready === b.ready ? Number(a.releaseTime) - Number(b.releaseTime) : a.ready ? -1 : 1));
+    const withdrawn = requests.filter((request) => request.claimed);
+
+    let unbondingTotal = 0n;
+    let readyTotal = 0n;
+    let nextReleaseTime: string | null = null;
+    for (const request of active) {
+      if (request.ready) {
+        readyTotal += BigInt(request.amount || "0");
+      } else {
+        unbondingTotal += BigInt(request.amount || "0");
+        if (nextReleaseTime === null || Number(request.releaseTime) < Number(nextReleaseTime)) {
+          nextReleaseTime = request.releaseTime;
+        }
+      }
+    }
+
+    return { active, withdrawn, unbondingTotal, readyTotal, nextReleaseTime };
+  }, [info?.unbondingRequests]);
 
   const runAction = async (action: () => Promise<void>, successTitle: string, processing: ProcessingAction) => {
     try {
@@ -992,8 +1017,13 @@ const EarnStaking = () => {
               <div className="flex items-center gap-2">
                 <Clock className="h-5 w-5 text-muted-foreground" />
                 <div>
-                  <h2 className="text-lg font-semibold">Pending Withdrawals</h2>
-                  <p className="text-sm text-muted-foreground">Unstaked delegation and self-bond withdrawals share this queue.</p>
+                  <h2 className="text-lg font-semibold">Withdrawals</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Unbonding {formatToken(withdrawalQueue.unbondingTotal.toString(), decimals)} {symbol}
+                    {withdrawalQueue.nextReleaseTime && ` (next ready ${formatReleaseTime(withdrawalQueue.nextReleaseTime)})`}
+                    {" · "}
+                    Ready {formatToken(withdrawalQueue.readyTotal.toString(), decimals)} {symbol}
+                  </p>
                 </div>
               </div>
               <Button
@@ -1011,19 +1041,42 @@ const EarnStaking = () => {
             </div>
 
             <div className="mt-4 space-y-2">
-              {(info.unbondingRequests || []).map((request) => (
+              {withdrawalQueue.active.map((request) => (
                 <div key={request.id} className="flex flex-col gap-1 rounded-lg border border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="font-medium">{formatToken(request.amount, decimals)} {symbol}</p>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>{request.claimed ? "Withdrawn" : request.ready ? "Ready" : formatReleaseTime(request.releaseTime)}</span>
-                    {request.ready && !request.claimed && <Badge variant="secondary">Ready</Badge>}
+                    <span>{request.ready ? "Ready" : formatReleaseTime(request.releaseTime)}</span>
+                    {request.ready && <Badge variant="secondary">Ready</Badge>}
                   </div>
                 </div>
               ))}
 
-              {info.unbondingRequests.length === 0 && (
+              {withdrawalQueue.active.length === 0 && (
                 <div className="rounded-lg border border-border p-4 text-sm text-muted-foreground">
                   No pending withdrawals.
+                </div>
+              )}
+
+              {withdrawalQueue.withdrawn.length > 0 && (
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+                    onClick={() => setShowWithdrawnHistory((current) => !current)}
+                  >
+                    {showWithdrawnHistory ? "Hide" : "Show"} withdrawn ({withdrawalQueue.withdrawn.length})
+                  </button>
+
+                  {showWithdrawnHistory && (
+                    <div className="mt-2 space-y-2">
+                      {withdrawalQueue.withdrawn.map((request) => (
+                        <div key={request.id} className="flex flex-col gap-1 rounded-lg border border-border/50 px-4 py-3 text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                          <p className="font-medium">{formatToken(request.amount, decimals)} {symbol}</p>
+                          <span className="text-sm">Withdrawn</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
