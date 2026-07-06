@@ -60,6 +60,9 @@ type StakingActionMode = "stake" | "claim" | "unstake" | "move";
 // Move stake is temporarily hidden from the UI; the modal flow and backend
 // endpoint remain intact so it can be re-enabled by flipping this flag.
 const SHOW_MOVE_BUTTON = false;
+
+// Validators shown before the "Show all" toggle expands the list.
+const VALIDATOR_DISPLAY_LIMIT = 10;
 type ProcessingAction = "stake" | "claim" | "unstake" | "move" | "withdraw" | "operator-claim" | "commission" | "bond" | "self-unbond";
 
 type StakingInfo = {
@@ -234,6 +237,7 @@ const EarnStaking = () => {
   const [selfUnbondAmount, setSelfUnbondAmount] = useState("");
   const [validatorSearch, setValidatorSearch] = useState("");
   const [showInactiveValidators, setShowInactiveValidators] = useState(false);
+  const [showAllValidators, setShowAllValidators] = useState(false);
   const [showWithdrawnHistory, setShowWithdrawnHistory] = useState(false);
   const [actionMode, setActionMode] = useState<StakingActionMode | null>(null);
   const [actionOperator, setActionOperator] = useState("");
@@ -339,6 +343,10 @@ const EarnStaking = () => {
       ].some((value) => (value || "").toLowerCase().includes(query));
     });
   }, [showInactiveValidators, validatorSearch, validators]);
+
+  const displayedValidators = showAllValidators
+    ? filteredValidators
+    : filteredValidators.slice(0, VALIDATOR_DISPLAY_LIMIT);
 
   const actionValidator = useMemo(
     () => validators.find((validator) => validatorKey(validator) === actionOperator),
@@ -882,12 +890,12 @@ const EarnStaking = () => {
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Showing {filteredValidators.length} of {validators.length}
+                  Showing {displayedValidators.length} of {validators.length}
                 </p>
               </div>
 
               <div className="space-y-3 md:hidden">
-                {filteredValidators.map((validator) => {
+                {displayedValidators.map((validator) => {
                   const operator = validatorKey(validator);
                   const label = validator.name || truncateAddress(operator, 8, 6);
                   const userStake = BigInt(validator.userStake || "0");
@@ -1003,7 +1011,7 @@ const EarnStaking = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredValidators.map((validator) => {
+                    {displayedValidators.map((validator) => {
                       const operator = validatorKey(validator);
                       const label = validator.name || truncateAddress(operator, 8, 6);
                       const userStake = BigInt(validator.userStake || "0");
@@ -1076,6 +1084,14 @@ const EarnStaking = () => {
                   </tbody>
                 </table>
               </div>
+
+              {filteredValidators.length > VALIDATOR_DISPLAY_LIMIT && (
+                <div className="flex justify-center">
+                  <Button variant="ghost" size="sm" onClick={() => setShowAllValidators((current) => !current)}>
+                    {showAllValidators ? "Show less" : `Show all ${filteredValidators.length} validators`}
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -66,6 +66,8 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
 
   const isActive = (itemPath: string) => {
     if (itemPath === '/dashboard') return location.pathname === '/dashboard';
+    // Stake (/dashboard/earn-staking) has its own nav item, so Earn must not match it
+    if (itemPath === '/dashboard/earn') return location.pathname.startsWith(itemPath) && !location.pathname.startsWith('/dashboard/earn-staking');
     return location.pathname.startsWith(itemPath);
   };
 
