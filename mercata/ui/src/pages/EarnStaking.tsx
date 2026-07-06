@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTheme } from "next-themes";
 import { useAccount } from "wagmi";
 import { formatUnits } from "ethers";
 import { ArrowLeft, CheckCircle2, Clock, Loader2, RefreshCw, Search } from "lucide-react";
@@ -21,6 +22,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/lib/axios";
+import STRATOICON from "@/assets/icon.png";
+import STRATOICONDARK from "@/assets/dark-theme-strato-compressed-logo.png";
 import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import { safeParseUnits, truncateAddress } from "@/utils/numberUtils";
@@ -179,6 +182,7 @@ const EarnStaking = () => {
   const navigate = useNavigate();
   const { isLoggedIn, isAppAuthenticated } = useUser();
   const { isConnected } = useAccount();
+  const { resolvedTheme } = useTheme();
   const { toast } = useToast();
   const [info, setInfo] = useState<StakingInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -590,15 +594,31 @@ const EarnStaking = () => {
         </div>
 
         <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Reward Period</p>
-            <p className="mt-1 text-lg font-semibold">{info.rewardPeriodName || "STRATO staking rewards"}</p>
-            {info.rewardPeriodDescription && (
-              <p className="mt-1 text-sm text-muted-foreground">{info.rewardPeriodDescription}</p>
-            )}
-            <p className="mt-2 text-sm text-muted-foreground">
-              {formatRewardPeriodStatus(info.periodStart, info.periodFinish)}
-            </p>
+          <CardContent className="flex items-center gap-4 p-4">
+            <img
+              src={resolvedTheme === "dark" ? STRATOICONDARK : STRATOICON}
+              alt="STRATO"
+              className="h-14 w-14 shrink-0 rounded-lg"
+            />
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Reward Period</p>
+              <p className="mt-1 text-lg font-semibold">{info.rewardPeriodName || "STRATO staking rewards"}</p>
+              {info.rewardPeriodDescription && (
+                <p className="mt-1 text-sm text-muted-foreground">{info.rewardPeriodDescription}</p>
+              )}
+              <p className="mt-2 text-sm text-muted-foreground">
+                {formatRewardPeriodStatus(info.periodStart, info.periodFinish)}
+                {" · "}
+                <a
+                  href="https://docs.strato.network/staking" // TODO: replace placeholder with final docs/blog URL
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-primary hover:underline"
+                >
+                  Learn More &raquo;
+                </a>
+              </p>
+            </div>
           </CardContent>
         </Card>
 
