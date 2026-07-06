@@ -4,11 +4,11 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { requestWalletConnection } from "@/lib/auth";
 import { useEarnContext } from "@/context/EarnContext";
 import { useTokenContext } from "@/context/TokenContext";
-import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import { useRewards } from "@/hooks/useRewards";
 import { formatEmissionRatePerDay } from "@/services/rewardsService";
 import { findBestEarnApyInfo, buildEarnApyMap } from "@/utils/earnUtils";
-import { usdstAddress } from "@/lib/constants";
+import type { UserRewardsData } from "@/services/rewardsService";
+import { rewardsEnabled, usdstAddress } from "@/lib/constants";
 
 /** GOLDST / SILVST — images from TokenContext (earningAssets ∪ inactiveTokens) */
 const METAL_PROMO_TOKEN_ADDRESSES = [
@@ -56,13 +56,13 @@ const resolvePromoRows = (
 
 interface GuestPromoSectionProps {
   variant: 1 | 2 | 3; // 1 = logged out, 2 = logged in 0 portfolio, 3 = logged in with portfolio
+  userRewards?: UserRewardsData | null;
 }
 
-const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
+const GuestPromoSection = ({ variant, userRewards }: GuestPromoSectionProps) => {
   const navigate = useNavigate();
   const [rewardsButtonHovered, setRewardsButtonHovered] = useState(false);
   const { tokenApys, tokenApysLoaded } = useEarnContext();
-  const { userRewards } = useRewardsUserInfo();
   const { state: rewardsState } = useRewards();
   const { earningAssets, inactiveTokens, loadingEarningAssets } = useTokenContext();
   const tokensLoading = loadingEarningAssets || earningAssets.length === 0;
@@ -130,6 +130,8 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
   }, [tokenApys]);
 
   if (variant === 3) {
+    if (!rewardsEnabled) return null;
+
     return (
       <div className="mb-8">
         <div
@@ -197,7 +199,7 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
     <div className="space-y-4 mb-8">
       {/* Hero Banner */}
       <div
-        className="rounded-2xl overflow-hidden"
+        className={`rounded-2xl overflow-hidden ${rewardsEnabled ? "" : "hidden"}`}
         style={{
           background:
             "linear-gradient(135deg, #0A0F29 0%, #001B70 55%, #102a80 100%)",

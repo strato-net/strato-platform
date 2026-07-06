@@ -14,7 +14,6 @@ import {
   Droplets,
   Shield,
   HandCoins,
-  Vault,
 
   ArrowDownToLine,
   X
@@ -39,15 +38,15 @@ const PRIMARY_NAV_ITEMS = [
   { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
   { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
   { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
-  { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
+  { icon: ArrowLeftRight, label: 'Trade', path: '/dashboard/swap' },
 ];
 
 const MORE_CATEGORIES: MoreNavCategory[] = [
   {
     label: 'TRADE',
     items: [
-      { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
-      { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
+      { icon: Send, label: 'Send', path: '/dashboard/transfer' },
+      { icon: Download, label: 'Bridge Out', path: '/dashboard/withdrawals' },
     ],
   },
   {
@@ -60,7 +59,6 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
   {
     label: 'PRO',
     items: [
-      { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
       { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
       { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
       { icon: BarChart3, label: 'Analytics', path: '/dashboard/stats' },

@@ -35,6 +35,7 @@ import qualified Data.Map as Map
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Database.Esqueleto.Internal.Internal as E
 import qualified Database.Esqueleto.Legacy as E
 import Database.Persist.Postgresql
 import Numeric.Natural
@@ -64,6 +65,7 @@ type API =
     :> QueryParam "minnumber" Natural
     :> QueryParam "maxnumber" Natural
     :> QueryParam "index" Int
+    :> QueryParam "search" Text
     :> QueryParam "sortby" Sortby
     :> Get '[JSON] [Block']
 
@@ -86,6 +88,7 @@ data BlocksFilterParams = BlocksFilterParams
     qbMinNumber :: Maybe Natural,
     qbMaxNumber :: Maybe Natural,
     qbIndex :: Maybe Int,
+    qbSearch :: Maybe Text,
     qbSortby :: Maybe Sortby
   }
   deriving (Eq, Ord)
@@ -93,6 +96,7 @@ data BlocksFilterParams = BlocksFilterParams
 blocksFilterParams :: BlocksFilterParams
 blocksFilterParams =
   BlocksFilterParams
+    Nothing
     Nothing
     Nothing
     Nothing
@@ -137,6 +141,7 @@ getBlocksFilter = uncurryBlocksFilterParams getBlocksFilter'
         qbMinNumber
         qbMaxNumber
         qbIndex
+        qbSearch
         qbSortby
 
 server :: Selectable BlocksFilterParams [Block] m => ServerT API m
@@ -180,7 +185,14 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable BlocksFilterParams [B
                         )
                         qbTxAddress,
                       fmap (\v -> bdRef E.^. BlockDataRefId E.==. E.val (toBlockDataRefId v)) qbBlockId,
-                      fmap (\v -> bdRef E.^. BlockDataRefHash E.==. E.val v) qbHash
+                      fmap (\v -> bdRef E.^. BlockDataRefHash E.==. E.val v) qbHash,
+                      fmap (\search ->
+                          let isWhiteSpace c = c `elem` [' ', '\n', '\t']
+                              searches = filter (not . T.null) $ T.dropAround isWhiteSpace <$> T.split (== ',') search
+                              queries = (\v -> (E.unsafeSqlCastAs "TEXT" (bdRef E.^. BlockDataRefHash) `E.like` E.val (T.unpack $ "%" <> v <> "%"))
+                                         E.||. (E.unsafeSqlCastAs "TEXT" (bdRef E.^. BlockDataRefCoinbase) `E.like` E.val (T.unpack $ "%" <> v <> "%"))) <$> searches
+                           in foldr (E.||.) (E.val False) queries
+                        ) qbSearch
                     ]
 
             unless (null criteria) $
@@ -235,10 +247,11 @@ getBlockInfo ::
   Maybe Natural ->
   Maybe Natural ->
   Maybe Int ->
+  Maybe Text ->
   Maybe Sortby ->
   m [Block']
-getBlockInfo a b c d e f g h i j k l m n o p q r s =
-  getBlockInfo' (BlocksFilterParams a b c d e f g h i j k l m n o p q r s)
+getBlockInfo a b c d e f g h i j k l m n o p q r s t =
+  getBlockInfo' (BlocksFilterParams a b c d e f g h i j k l m n o p q r s t)
 
 getBlockInfo' :: Selectable BlocksFilterParams [Block] m => BlocksFilterParams -> m [Block']
 getBlockInfo' b = map Block' . fromMaybe [] <$> select (Proxy @[Block]) b
@@ -263,6 +276,7 @@ blockQueryParams =
     "minnumber",
     "maxnumber",
     "index",
+    "search",
     "chainid"
   ]
 

@@ -147,7 +147,7 @@ indexP2P ::
   m ()
 indexP2P idxEvents = do
   forM_ idxEvents $ \case
-    RanBlock b -> do
+    RanBlock b _receipts -> do
       $logInfoS "p2pIndexer" . T.pack $ "Inserting Redis block with sha: " ++ format (blockHash b)
       A.insert (A.Proxy @(P2P OutputBlock)) (blockHash b) $ P2P b
     NewBestBlock (sha, num) -> do

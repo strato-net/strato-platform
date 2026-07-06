@@ -558,7 +558,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
           ? "Processing..."
           : isConnected && !walletSignerReady
           ? "Connecting wallet..."
-          : "Withdraw"}
+          : "Bridge Out"}
         </Button>
 
       <AdvancedOptionsDropdown

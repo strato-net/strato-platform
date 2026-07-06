@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+/* Dark theme tokens (match the other dashboards). The solid backdrop on the
+   root makes the body's translucent fill composite to the intended near-black. */
+.dark {
+  color-scheme: dark;
+  background-color: rgb(3 7 17);
+}
+.dark body {
+  background-color: rgba(3, 7, 17, 0.8);
+  color: rgb(225, 231, 239);
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
