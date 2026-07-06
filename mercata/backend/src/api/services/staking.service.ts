@@ -69,6 +69,7 @@ export interface StratoStakingInfo {
   estimatedApy: string;
   userTotalStake: string;
   claimableRewards: string;
+  totalEarned: string;
   isOperator: boolean;
   operatorAddress: string;
   operatorClaimableRewards: string;
@@ -168,6 +169,7 @@ const emptyInfo = (): StratoStakingInfo => ({
   estimatedApy: "-",
   userTotalStake: "0",
   claimableRewards: "0",
+  totalEarned: "0",
   isOperator: false,
   operatorAddress: "",
   operatorClaimableRewards: "0",
@@ -436,6 +438,35 @@ const getUnbondingRequests = async (
   }
 };
 
+// Lifetime claimed rewards (delegator and operator), summed from Cirrus events.
+// Combined with current claimable rewards this gives total earned through staking.
+const getLifetimeClaimedRewards = async (
+  accessToken: string,
+  userAddress?: string
+): Promise<bigint> => {
+  const address = stakingAddress();
+  const user = normalizeAddress(userAddress);
+  if (!address || !user) return 0n;
+
+  try {
+    const { data } = await cirrus.get(accessToken, `/${constants.Event}`, {
+      params: {
+        address: `eq.${address}`,
+        or: `(and(event_name.eq.DelegatorRewardsClaimed,attributes->>user.eq.${user}),and(event_name.eq.OperatorRewardsClaimed,attributes->>operator.eq.${user}))`,
+        select: "amount:attributes->>amount",
+        limit: "1000",
+      },
+    });
+
+    return (data || []).reduce(
+      (sum: bigint, row: any) => sum + parseBigIntLike(row.amount),
+      0n
+    );
+  } catch {
+    return 0n;
+  }
+};
+
 const projectedRewardIndexes = (state: Record<string, any>): {
   baseIndex: bigint;
   stakeIndex: bigint;
@@ -599,6 +630,7 @@ export const getStratoStakingInfo = async (
     userRewardPaid,
     unbondingRequests,
     validatorProfiles,
+    lifetimeClaimedRewards,
   ] = await Promise.all([
     getTokenInfo(accessToken, tokenAddress),
     getTokenBalance(accessToken, tokenAddress, userAddress),
@@ -608,6 +640,7 @@ export const getStratoStakingInfo = async (
     getUserMap(accessToken, "userRewardPerStakePaid", userAddress),
     getUnbondingRequests(accessToken, userAddress),
     getValidatorProfiles(accessToken),
+    getLifetimeClaimedRewards(accessToken, userAddress),
   ]);
 
   let userTotalStake = 0n;
@@ -714,6 +747,13 @@ export const getStratoStakingInfo = async (
     estimatedApy,
     userTotalStake: userTotalStake.toString(),
     claimableRewards: claimableRewards.toString(),
+    totalEarned: (
+      lifetimeClaimedRewards +
+      claimableRewards +
+      operatorPendingBaseRewards +
+      operatorPendingCommission +
+      operatorPendingSelfBondRewards
+    ).toString(),
     isOperator,
     operatorAddress: connectedOperatorAddress,
     operatorClaimableRewards: (operatorPendingBaseRewards + operatorPendingCommission + operatorPendingSelfBondRewards).toString(),

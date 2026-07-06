@@ -21,11 +21,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/axios";
 import STRATOICON from "@/assets/icon.png";
 import STRATOICONDARK from "@/assets/dark-theme-strato-compressed-logo.png";
 import { useUser } from "@/context/UserContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { useToast } from "@/hooks/use-toast";
+import { STAKING_STAKE_FEE, STAKING_ACTION_FEE } from "@/lib/constants";
 import { safeParseUnits, truncateAddress } from "@/utils/numberUtils";
 
 type StakingValidator = {
@@ -53,6 +56,10 @@ type UnbondingRequest = {
 };
 
 type StakingActionMode = "stake" | "claim" | "unstake" | "move";
+
+// Move stake is temporarily hidden from the UI; the modal flow and backend
+// endpoint remain intact so it can be re-enabled by flipping this flag.
+const SHOW_MOVE_BUTTON = false;
 type ProcessingAction = "stake" | "claim" | "unstake" | "move" | "withdraw" | "operator-claim" | "commission" | "bond" | "self-unbond";
 
 type StakingInfo = {
@@ -82,6 +89,7 @@ type StakingInfo = {
   estimatedApy: string;
   userTotalStake: string;
   claimableRewards: string;
+  totalEarned: string;
   isOperator: boolean;
   operatorAddress: string;
   operatorClaimableRewards: string;
@@ -176,6 +184,32 @@ const formatRewardPeriodStatus = (startTime: string | undefined, finishTime: str
   return `Ended ${formatReleaseTime(finishTime || "0")}`;
 };
 
+const TipLabel = ({ label, tooltip, className }: { label: string; tooltip: string; className?: string }) => (
+  <TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={`cursor-help ${className || ""}`}>{label}</span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[16rem]">
+        <p>{tooltip}</p>
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+);
+
+const StatCard = ({ label, tooltip, value }: { label: string; tooltip?: string; value: string }) => (
+  <Card>
+    <CardContent className="p-4">
+      {tooltip ? (
+        <TipLabel label={label} tooltip={tooltip} className="block w-fit text-xs text-muted-foreground" />
+      ) : (
+        <p className="text-xs text-muted-foreground">{label}</p>
+      )}
+      <p className="mt-1 font-semibold">{value}</p>
+    </CardContent>
+  </Card>
+);
+
 const validatorKey = (validator: StakingValidator): string => validator.operator || validator.address;
 
 const EarnStaking = () => {
@@ -183,6 +217,7 @@ const EarnStaking = () => {
   const { isLoggedIn, isAppAuthenticated } = useUser();
   const { isConnected } = useAccount();
   const { resolvedTheme } = useTheme();
+  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { toast } = useToast();
   const [info, setInfo] = useState<StakingInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -222,6 +257,18 @@ const EarnStaking = () => {
     window.scrollTo(0, 0);
     refreshInfo();
   }, [refreshInfo]);
+
+  useEffect(() => {
+    if (isLoggedIn) fetchUsdstBalance();
+  }, [isLoggedIn, fetchUsdstBalance]);
+
+  // Fees are paid in USDST; vouchers also cover fees (same rule as the metals flow).
+  const feeFunds = useMemo(
+    () => BigInt(usdstBalance || "0") + BigInt(voucherBalance || "0"),
+    [usdstBalance, voucherBalance]
+  );
+  const canCoverStakeFee = feeFunds >= safeParseUnits(STAKING_STAKE_FEE);
+  const canCoverActionFee = feeFunds >= safeParseUnits(STAKING_ACTION_FEE);
 
   const actionButtonLabel = (action: ProcessingAction, label: string, pendingLabel: string) => (
     processingAction === action ? (
@@ -314,21 +361,25 @@ const EarnStaking = () => {
   const moveAmountParsed = useMemo(() => safeParseUnits(moveAmount, decimals), [decimals, moveAmount]);
   const stakeReady =
     isLoggedIn &&
+    canCoverStakeFee &&
     !!actionValidator?.active &&
     totalStakeAmount > 0n &&
     totalStakeAmount <= walletBalance;
   const claimReady =
     isLoggedIn &&
+    canCoverActionFee &&
     !!actionValidator &&
     actionValidatorRewards > 0n;
   const unstakeReady =
     isLoggedIn &&
+    canCoverActionFee &&
     !!actionValidator &&
     actionValidatorStake > 0n &&
     unstakeAmountParsed > 0n &&
     unstakeAmountParsed <= actionValidatorStake;
   const moveReady =
     isLoggedIn &&
+    canCoverActionFee &&
     !!actionValidator &&
     actionValidatorStake > 0n &&
     moveAmountParsed > 0n &&
@@ -577,46 +628,46 @@ const EarnStaking = () => {
 
     return (
       <div className="space-y-5">
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Delegation APY</p>
-              <p className="mt-1 font-semibold">{info.estimatedApy === "-" ? "-" : `${info.estimatedApy}%`}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Wallet</p>
-              <p className="mt-1 font-semibold">{formatToken(info.walletBalance, decimals)} {symbol}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Network Stake</p>
-              <p className="mt-1 font-semibold">{formatToken(info.totalRewardableStake, decimals)} {symbol}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Your Stake</p>
-              <p className="mt-1 font-semibold">{formatToken(info.userTotalStake, decimals)} {symbol}</p>
-            </CardContent>
-          </Card>
+        <div className={`grid gap-3 md:grid-cols-3 ${info.isOperator ? "xl:grid-cols-6" : "xl:grid-cols-5"}`}>
+          <StatCard
+            label="Available to Stake"
+            tooltip="STRATO available in your wallet to stake."
+            value={`${formatToken(info.walletBalance, decimals)} ${symbol}`}
+          />
+          <StatCard
+            label="Amount Staked"
+            tooltip="Total STRATO you currently have delegated across all validators."
+            value={`${formatToken(info.userTotalStake, decimals)} ${symbol}`}
+          />
+          <StatCard
+            label="APY"
+            tooltip="Estimated annual yield for delegating STRATO, based on the current reward schedule and total network stake. Shown net of validator commission."
+            value={info.estimatedApy === "-" ? "-" : `${info.estimatedApy}%`}
+          />
+          <StatCard
+            label="Total Rewards"
+            tooltip="Lifetime STRATO you've earned through staking, including rewards already claimed."
+            value={`${formatToken(info.totalEarned, decimals)} ${symbol}`}
+          />
+          <StatCard
+            label="Claimable"
+            tooltip="Rewards you've earned and can claim now without unstaking your delegated STRATO. Claiming doesn't affect your staked balance."
+            value={`${formatToken(info.claimableRewards, decimals)} ${symbol}`}
+          />
           {info.isOperator && (
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Self-Bond</p>
-                <p className="mt-1 font-semibold">{formatToken(operatorValidator?.selfBond, decimals)} {symbol}</p>
-              </CardContent>
-            </Card>
+            <StatCard
+              label="Self-Bond"
+              tooltip="STRATO you've bonded as a validator operator. Separate from delegated stake."
+              value={`${formatToken(operatorValidator?.selfBond, decimals)} ${symbol}`}
+            />
           )}
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Claimable</p>
-              <p className="mt-1 font-semibold">{formatToken(info.claimableRewards, decimals)} {symbol}</p>
-            </CardContent>
-          </Card>
         </div>
+
+        {isLoggedIn && !canCoverStakeFee && (
+          <p className="text-xs text-yellow-600">
+            You need USDST or vouchers to cover transaction fees — fund your account before staking.
+          </p>
+        )}
 
         <Card>
           <CardContent className="flex items-center gap-4 p-4">
@@ -879,7 +930,7 @@ const EarnStaking = () => {
                           className="w-full"
                           size="sm"
                           onClick={() => openActionModal(validator, "stake")}
-                          disabled={!isLoggedIn || !validator.active || submitting}
+                          disabled={!isLoggedIn || !canCoverStakeFee || !validator.active || submitting}
                         >
                           Stake
                         </Button>
@@ -888,25 +939,27 @@ const EarnStaking = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => openActionModal(validator, "claim")}
-                          disabled={!isLoggedIn || pendingRewards <= 0n || submitting}
+                          disabled={!isLoggedIn || !canCoverActionFee || pendingRewards <= 0n || submitting}
                         >
                           Claim
                         </Button>
-                        <Button
-                          className="w-full"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openActionModal(validator, "move")}
-                          disabled={!isLoggedIn || userStake <= 0n || !hasMoveTarget || submitting}
-                        >
-                          Move
-                        </Button>
+                        {SHOW_MOVE_BUTTON && (
+                          <Button
+                            className="w-full"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openActionModal(validator, "move")}
+                            disabled={!isLoggedIn || userStake <= 0n || !hasMoveTarget || submitting}
+                          >
+                            Move
+                          </Button>
+                        )}
                         <Button
                           className="w-full"
                           variant="outline"
                           size="sm"
                           onClick={() => openActionModal(validator, "unstake")}
-                          disabled={!isLoggedIn || userStake <= 0n || submitting}
+                          disabled={!isLoggedIn || !canCoverActionFee || userStake <= 0n || submitting}
                         >
                           Unstake
                         </Button>
@@ -927,11 +980,21 @@ const EarnStaking = () => {
                   <thead className="sticky top-0 z-10 bg-muted">
                     <tr className="border-b border-border">
                       <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Validator</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Total Stake ({symbol})</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Your Stake ({symbol})</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Rewards ({symbol})</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Est. APY</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Commission %</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
+                        <TipLabel label="Total Stake" tooltip="All STRATO staked with this validator, including delegations and the operator's self-bond." />
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
+                        <TipLabel label="Your Stake" tooltip="STRATO you have delegated to this validator." />
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
+                        <TipLabel label="Rewards" tooltip="Rewards you've accrued from this validator and can claim now." />
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
+                        <TipLabel label="Est. APY" tooltip="Estimated annual percentage yield from this validator, after its commission is deducted." />
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
+                        <TipLabel label="Commission" tooltip="The percentage of your staking rewards this validator keeps as a fee for operating the node." />
+                      </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Actions</th>
                     </tr>
                   </thead>
@@ -963,7 +1026,7 @@ const EarnStaking = () => {
                               <Button
                                 size="sm"
                                 onClick={() => openActionModal(validator, "stake")}
-                                disabled={!isLoggedIn || !validator.active || submitting}
+                                disabled={!isLoggedIn || !canCoverStakeFee || !validator.active || submitting}
                               >
                                 Stake
                               </Button>
@@ -971,23 +1034,25 @@ const EarnStaking = () => {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => openActionModal(validator, "claim")}
-                                disabled={!isLoggedIn || pendingRewards <= 0n || submitting}
+                                disabled={!isLoggedIn || !canCoverActionFee || pendingRewards <= 0n || submitting}
                               >
                                 Claim
                               </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openActionModal(validator, "move")}
-                                disabled={!isLoggedIn || userStake <= 0n || !hasMoveTarget || submitting}
-                              >
-                                Move
-                              </Button>
+                              {SHOW_MOVE_BUTTON && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openActionModal(validator, "move")}
+                                  disabled={!isLoggedIn || userStake <= 0n || !hasMoveTarget || submitting}
+                                >
+                                  Move
+                                </Button>
+                              )}
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => openActionModal(validator, "unstake")}
-                                disabled={!isLoggedIn || userStake <= 0n || submitting}
+                                disabled={!isLoggedIn || !canCoverActionFee || userStake <= 0n || submitting}
                               >
                                 Unstake
                               </Button>
@@ -1029,7 +1094,7 @@ const EarnStaking = () => {
               <Button
                 variant="outline"
                 onClick={handleWithdrawReady}
-                disabled={!isLoggedIn || submitting || readyUnbondingRequests.length === 0}
+                disabled={!isLoggedIn || !canCoverActionFee || submitting || readyUnbondingRequests.length === 0}
               >
                 {processingAction === "withdraw" ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
