@@ -438,6 +438,36 @@ const getUnbondingRequests = async (
   }
 };
 
+// Total STRATO the user has locked in the staking contract: delegated stake,
+// operator self-bond, and unclaimed unbonding amounts. Consumed by the tokens
+// service so staked STRATO stays visible in portfolio balances.
+export const getUserStakedStratoBalance = async (
+  accessToken: string,
+  userAddress?: string
+): Promise<{ tokenAddress: string; amount: bigint }> => {
+  const address = stakingAddress();
+  const user = normalizeAddress(userAddress);
+  const tokenAddress = stratoTokenAddress();
+  if (!address || !user || !tokenAddress) return { tokenAddress, amount: 0n };
+
+  const [delegations, operatorRows, unbondingRequests] = await Promise.all([
+    getUserMap(accessToken, "delegatedStake", user),
+    cirrus.get(accessToken, `/${StratoStaking}-operators`, {
+      params: { address: `eq.${address}`, key: `eq.${user}`, select: "value" },
+    }).catch(() => ({ data: [] })),
+    getUnbondingRequests(accessToken, user),
+  ]);
+
+  let amount = 0n;
+  for (const stake of delegations.values()) amount += stake;
+  amount += parseBigIntLike((operatorRows.data?.[0]?.value || {}).selfBond);
+  for (const request of unbondingRequests) {
+    if (!request.claimed) amount += parseBigIntLike(request.amount);
+  }
+
+  return { tokenAddress, amount };
+};
+
 // Lifetime claimed rewards (delegator and operator), summed from Cirrus events.
 // Combined with current claimable rewards this gives total earned through staking.
 const getLifetimeClaimedRewards = async (

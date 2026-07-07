@@ -4,6 +4,7 @@ import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getRebaseFactors } from "./oracle.service";
 import { getVaultHistoryConfig } from "./vault.service";
 import { getSaveUsdstInfo, getSaveUsdstUserInfo } from "./saveUsdst.service";
+import { getUserStakedStratoBalance } from "./staking.service";
 import { getLoan } from "./lending.service";
 import { getVaults } from "./cdp.service";
 import { listVaultDefs, getYieldVaultInfo, getYieldVaultUserInfo } from "./yieldVault.service";
@@ -160,7 +161,7 @@ export const getEarningAssets = async (
   accessToken: string,
   userAddress: string
 ): Promise<EarningAsset[]> => {
-  const [tokens, collaterals, cdps, rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap] = await Promise.all([
+  const [tokens, collaterals, cdps, rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap, stakedStrato] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, {
       params: {
         "balances.key": `eq.${userAddress}`,
@@ -190,6 +191,7 @@ export const getEarningAssets = async (
     getSaveUsdstInfo(accessToken).catch(() => null),
     getSaveUsdstUserInfo(accessToken, userAddress).catch(() => null),
     getRebaseFactors(accessToken),
+    getUserStakedStratoBalance(accessToken, userAddress).catch(() => ({ tokenAddress: "", amount: 0n })),
   ]);
 
   const collateralMap = new Map<string, bigint>();
@@ -211,7 +213,11 @@ export const getEarningAssets = async (
     const balance = t.balances?.[0]?.balance || "0";
     const price = rawPrices.get(t.address) || "0";
     const collateralBalance = (collateralMap.get(t.address) || 0n).toString();
-    const totalBalance = BigInt(balance) + BigInt(collateralBalance);
+    const stakedBalance =
+      stakedStrato.amount > 0n && (t.address || "").toLowerCase() === stakedStrato.tokenAddress
+        ? stakedStrato.amount.toString()
+        : "0";
+    const totalBalance = BigInt(balance) + BigInt(collateralBalance) + BigInt(stakedBalance);
     const value =
       price && price !== "0"
         ? (
@@ -227,6 +233,7 @@ export const getEarningAssets = async (
       balance,
       price,
       collateralBalance,
+      stakedBalance,
       totalBalance: totalBalance.toString(),
       value,
       ...(rebaseFactor ? { rebaseFactor } : {}),

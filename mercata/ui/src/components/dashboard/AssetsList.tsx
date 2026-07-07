@@ -188,28 +188,31 @@ const AssetsList = ({
           <table className="w-full table-fixed">
             <thead>
               <tr className="bg-muted/50">
-                <th className="w-[24%] text-left text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                <th className="w-[22%] text-left text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Asset
                 </th>
-                <th className="hidden md:table-cell w-[15%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell w-[14%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   <span className="inline-flex items-center gap-1 justify-end w-full">
                     Best Available APY
                     <BestApyInfoTooltip />
                   </span>
                 </th>
-                <th className="hidden md:table-cell w-[13%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   Price
                 </th>
-                <th className="hidden md:table-cell w-[13%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   Available
                 </th>
-                <th className="hidden md:table-cell w-[13%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   Collateral
                 </th>
-                <th className="w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                  Staked
+                </th>
+                <th className="w-[10%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Value
                 </th>
-                <th className="w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                <th className="w-[10%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Balance
                 </th>
               </tr>
@@ -218,7 +221,7 @@ const AssetsList = ({
               {shouldShowLoading ? (
                 <tr className="hover:bg-muted/50 transition-colors">
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="py-4 px-4 whitespace-nowrap w-full"
                   >
                     <div className="w-full flex justify-center items-center h-16">
@@ -323,6 +326,13 @@ const AssetsList = ({
                             : formatBalance(asset.collateralBalance, undefined, 18, 1, 4)}
                         </p>
                       </td>
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
+                        <p className="font-medium text-foreground">
+                          {guestMode || !asset?.stakedBalance || asset.stakedBalance === "0"
+                            ? "-"
+                            : formatBalance(asset.stakedBalance, undefined, 18, 1, 4)}
+                        </p>
+                      </td>
                       <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-sm md:text-base text-foreground">
                           {guestMode || !asset?.value || asset.value === "0.00" || parseFloat(asset.value) === 0
@@ -355,7 +365,7 @@ const AssetsList = ({
               ) : (
                 <tr className="hover:bg-muted/50 transition-colors">
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="py-4 px-4 whitespace-nowrap w-full"
                   >
                     <div className="w-full flex justify-center items-center h-16">
