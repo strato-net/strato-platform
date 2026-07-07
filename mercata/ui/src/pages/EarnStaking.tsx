@@ -29,7 +29,7 @@ import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useToast } from "@/hooks/use-toast";
 import { STAKING_STAKE_FEE, STAKING_ACTION_FEE } from "@/lib/constants";
-import { safeParseUnits, truncateAddress } from "@/utils/numberUtils";
+import { safeParseUnits, truncateAddress, truncateDecimals } from "@/utils/numberUtils";
 
 type StakingValidator = {
   address: string;
@@ -106,8 +106,9 @@ type StakingInfo = {
 
 const formatToken = (value: string | undefined, decimals: number, maxFractionDigits = 4): string => {
   try {
-    const amount = Number(formatUnits(value || "0", decimals));
-    if (!Number.isFinite(amount) || Math.abs(amount) < 0.000001) return "0";
+    // Truncate (never round) so displayed amounts match the portfolio's formatBalance convention.
+    const amount = Number(truncateDecimals(formatUnits(value || "0", decimals), maxFractionDigits));
+    if (!Number.isFinite(amount) || amount === 0) return "0";
     return amount.toLocaleString("en-US", {
       minimumFractionDigits: 0,
       maximumFractionDigits: maxFractionDigits,
