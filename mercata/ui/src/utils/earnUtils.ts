@@ -1,6 +1,6 @@
 import { ApySource, TokenApyEntry } from "@mercata/shared-types";
 
-const CATA_PRICE_USD = 0.25;
+const CATA_PRICE_USD = 0.9;
 
 export interface EarnApyBreakdownItem {
   label: string;
@@ -206,7 +206,7 @@ const buildTokenCompositeInfo = (
     usableApys.filter(
       (item) =>
         (item.source === "swap" && !!item.poolAddress) ||
-        (!item.poolAddress && (item.source === "lending" || item.source === "safety" || item.source === "vault"))
+        (!item.poolAddress && (item.source === "lending" || item.source === "safety" || item.source === "vault" || item.source === "staking"))
     )
   );
 

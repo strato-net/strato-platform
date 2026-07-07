@@ -28,6 +28,12 @@ export const getActivityLink = (activityName: string): string | null => {
     return '/dashboard/earn-save';
   }
 
+  // STRATO staking activities - goes to the Stake page
+  // (matched on 'strato staking' so LP-staking style names don't collide)
+  if (lowerName.includes('strato staking')) {
+    return '/dashboard/earn-staking';
+  }
+
   // ETH Carry Vault
   if (lowerName.includes('eth carry vault')) {
     return '/dashboard/earn-yield-vault?vault=eth-carry';
