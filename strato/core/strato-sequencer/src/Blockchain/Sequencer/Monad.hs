@@ -287,4 +287,4 @@ fuseChannels = do
       [ conduitBatchSource "sequencer" streamingAddress unseqEventsTopicName .| mapC UnseqEvents,
         sourceTMChan timers .| mapC TimerFire
       ]
-      4096 -- 🙏
+      1 -- Keep decoded Kafka batches from piling up ahead of eventHandler.
