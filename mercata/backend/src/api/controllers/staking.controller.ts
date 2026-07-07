@@ -20,21 +20,32 @@ import {
   withdrawStratoUnbonded,
 } from "../services/staking.service";
 
-const isPositiveAmount = (value: unknown): boolean => {
-  try {
-    return BigInt(String(value || "0")) > 0n;
-  } catch {
-    return false;
+// Amounts must be integer values. Strings are the canonical form; plain JSON
+// numbers are accepted only within Number.MAX_SAFE_INTEGER — beyond that,
+// JSON.parse has already rounded the value, so the request is rejected rather
+// than building a transaction for a silently corrupted amount.
+const parseAmount = (value: unknown): bigint | null => {
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) ? BigInt(value) : null;
   }
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) {
+    return BigInt(value.trim());
+  }
+  return null;
+};
+
+const isPositiveAmount = (value: unknown): boolean => {
+  const parsed = parseAmount(value ?? "0");
+  return parsed !== null && parsed > 0n;
 };
 
 const isNonNegativeAmount = (value: unknown): boolean => {
-  try {
-    return BigInt(String(value)) >= 0n;
-  } catch {
-    return false;
-  }
+  const parsed = parseAmount(value);
+  return parsed !== null && parsed >= 0n;
 };
+
+const isAddressLike = (value: unknown): boolean =>
+  typeof value === "string" && /^(0x)?[0-9a-fA-F]{40}$/.test(value.trim());
 
 const parseOptionalBoolean = (value: unknown): boolean | null => {
   if (value === undefined) return false;
@@ -68,7 +79,7 @@ class StakingController {
   static async stake(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const delegations = Array.isArray(req.body?.delegations) ? req.body.delegations : [];
-      if (!delegations.length || delegations.some((item: any) => !item?.operator || !isPositiveAmount(item?.amount))) {
+      if (!delegations.length || delegations.some((item: any) => !isAddressLike(item?.operator) || !isPositiveAmount(item?.amount))) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid delegations" });
         return;
       }
@@ -83,7 +94,7 @@ class StakingController {
   static async moveStake(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { fromOperator, toOperator, amount } = req.body || {};
-      if (!fromOperator || !toOperator || !isPositiveAmount(amount)) {
+      if (!isAddressLike(fromOperator) || !isAddressLike(toOperator) || !isPositiveAmount(amount)) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid move stake request" });
         return;
       }
@@ -98,7 +109,7 @@ class StakingController {
   static async unstake(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { operator, amount } = req.body || {};
-      if (!operator || !isPositiveAmount(amount)) {
+      if (!isAddressLike(operator) || !isPositiveAmount(amount)) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid unstake request" });
         return;
       }
@@ -118,7 +129,7 @@ class StakingController {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid claimAll" });
         return;
       }
-      if (!claimAll && !operators.length) {
+      if (!claimAll && (!operators.length || operators.some((operator: unknown) => !isAddressLike(operator)))) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid claim request" });
         return;
       }
@@ -143,7 +154,7 @@ class StakingController {
     try {
       const requestIds = Array.isArray(req.body?.requestIds) ? req.body.requestIds : [];
       const withdrawAll = parseOptionalBoolean(req.body?.withdrawAll);
-      if (withdrawAll === null) {
+      if (withdrawAll === null || requestIds.some((id: unknown) => !isNonNegativeAmount(id))) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid withdrawAll" });
         return;
       }
@@ -221,7 +232,7 @@ class StakingController {
         ? req.body.operators
         : [req.body || {}];
 
-      if (!operatorInputs.length || operatorInputs.some((item: any) => !item?.operator || item?.commissionBps === undefined)) {
+      if (!operatorInputs.length || operatorInputs.some((item: any) => !isAddressLike(item?.operator) || !isNonNegativeAmount(item?.commissionBps))) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid operator request" });
         return;
       }
@@ -247,7 +258,7 @@ class StakingController {
   static async removeOperator(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { operator } = req.body || {};
-      if (!operator) {
+      if (!isAddressLike(operator)) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid operator" });
         return;
       }
@@ -262,7 +273,7 @@ class StakingController {
   static async setOperatorCommission(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { operator, commissionBps } = req.body || {};
-      if (!operator || commissionBps === undefined || !isNonNegativeAmount(commissionBps)) {
+      if (!isAddressLike(operator) || commissionBps === undefined || !isNonNegativeAmount(commissionBps)) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid operator commission request" });
         return;
       }
@@ -277,7 +288,7 @@ class StakingController {
   static async startRewardSchedule(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { rewardAmount, startTime, duration, baseRewardBps, name, description } = req.body || {};
-      if (!isPositiveAmount(rewardAmount) || !isPositiveAmount(startTime) || !isPositiveAmount(duration) || baseRewardBps === undefined) {
+      if (!isPositiveAmount(rewardAmount) || !isPositiveAmount(startTime) || !isPositiveAmount(duration) || !isNonNegativeAmount(baseRewardBps)) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid reward schedule" });
         return;
       }
@@ -310,7 +321,7 @@ class StakingController {
   static async setParams(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { unbondingSeconds, baseRewardBps, maxCommissionBps, maxBatchSize } = req.body || {};
-      if ([unbondingSeconds, baseRewardBps, maxCommissionBps, maxBatchSize].some((value) => value === undefined)) {
+      if ([unbondingSeconds, baseRewardBps, maxCommissionBps, maxBatchSize].some((value) => !isNonNegativeAmount(value))) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid params" });
         return;
       }
