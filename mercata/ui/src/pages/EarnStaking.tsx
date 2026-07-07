@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useAccount } from "wagmi";
@@ -27,6 +27,9 @@ import STRATOICON from "@/assets/icon.png";
 import STRATOICONDARK from "@/assets/dark-theme-strato-compressed-logo.png";
 import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
+import { useEarnContext } from "@/context/EarnContext";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { EarnApyInfo } from "@/utils/earnUtils";
 import { useToast } from "@/hooks/use-toast";
 import { STAKING_STAKE_FEE, STAKING_ACTION_FEE } from "@/lib/constants";
 import { safeParseUnits, truncateAddress, truncateDecimals } from "@/utils/numberUtils";
@@ -204,7 +207,7 @@ const TipLabel = ({ label, tooltip, className }: { label: string; tooltip: strin
   </TooltipProvider>
 );
 
-const StatCard = ({ label, tooltip, value, icon: Icon }: { label: string; tooltip?: string; value: string; icon?: LucideIcon }) => (
+const StatCard = ({ label, tooltip, value, icon: Icon }: { label: string; tooltip?: string; value: ReactNode; icon?: LucideIcon }) => (
   <Card>
     <CardContent className="p-4">
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -224,6 +227,7 @@ const EarnStaking = () => {
   const { isConnected } = useAccount();
   const { resolvedTheme } = useTheme();
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
+  const { tokenApys } = useEarnContext();
   const { toast } = useToast();
   const [info, setInfo] = useState<StakingInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -276,6 +280,43 @@ const EarnStaking = () => {
   );
   const canCoverStakeFee = feeFunds >= safeParseUnits(STAKING_STAKE_FEE);
   const canCoverActionFee = feeFunds >= safeParseUnits(STAKING_ACTION_FEE);
+
+  // CATA rewards APY for the staking activity, read from the same earn map the
+  // portfolio uses so the two screens always show the same combined figure.
+  const stakingRewardsApy = useMemo(() => {
+    const strato = (info?.stratoTokenAddress || "").toLowerCase().replace(/^0x/, "");
+    if (!strato) return 0;
+    const entry = tokenApys.find((t) => (t.token || "").toLowerCase().replace(/^0x/, "") === strato);
+    const rewards = entry?.apys.find((a) => a.source === "rewards" && a.meta === "staking");
+    const parsed = parseFloat(rewards?.apy || "0");
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  }, [tokenApys, info?.stratoTokenAddress]);
+
+  // Native staking APY plus CATA rewards. Validator commission only applies to
+  // the native part; rewards are paid directly by the Rewards contract.
+  const combinedApy = (nativeApy: string): string => {
+    const native = nativeApy && nativeApy !== "-" ? parseFloat(nativeApy) || 0 : 0;
+    const total = native + stakingRewardsApy;
+    return total > 0 ? `${total.toFixed(2)}%` : "-";
+  };
+
+  // Native / Rewards / Total rows for the shared EarnApyTooltip, matching the
+  // breakdown convention used on the portfolio and Earn pages.
+  const apyBreakdownInfo = (nativeApy: string): EarnApyInfo | null => {
+    const native = nativeApy && nativeApy !== "-" ? parseFloat(nativeApy) || 0 : 0;
+    const breakdown = [
+      native > 0 ? { label: "Native APY", apy: native.toFixed(2) } : null,
+      stakingRewardsApy > 0 ? { label: "Rewards APY", apy: stakingRewardsApy.toFixed(2) } : null,
+    ].filter((item): item is { label: string; apy: string } => item !== null);
+    if (breakdown.length === 0) return null;
+    return { total: native + stakingRewardsApy, source: "staking", breakdown };
+  };
+
+  const apyWithBreakdown = (nativeApy: string): ReactNode => (
+    <EarnApyTooltip info={apyBreakdownInfo(nativeApy)}>
+      <span>{combinedApy(nativeApy)}</span>
+    </EarnApyTooltip>
+  );
 
   const actionButtonLabel = (action: ProcessingAction, label: string, pendingLabel: string) => (
     processingAction === action ? (
@@ -650,8 +691,8 @@ const EarnStaking = () => {
           />
           <StatCard
             label="APY"
-            tooltip="Estimated annual yield for delegating STRATO, based on the current reward schedule and total network stake. Shown net of validator commission."
-            value={info.estimatedApy === "-" ? "-" : `${info.estimatedApy}%`}
+            tooltip="Estimated annual yield for delegating STRATO. Native APY comes from the staking reward schedule, net of validator commission. Rewards APY comes from platform reward emissions."
+            value={apyWithBreakdown(info.estimatedApy)}
             icon={TrendingUp}
           />
           <StatCard
@@ -930,7 +971,7 @@ const EarnStaking = () => {
                         </div>
                         <div className="rounded-md bg-muted/30 px-3 py-2">
                           <p className="text-xs text-muted-foreground">Est. APY</p>
-                          <p className="font-semibold">{validator.estimatedApy === "-" ? "-" : `${validator.estimatedApy}%`}</p>
+                          <p className="font-semibold">{apyWithBreakdown(validator.estimatedApy)}</p>
                         </div>
                         <div className="rounded-md bg-muted/30 px-3 py-2">
                           <p className="text-xs text-muted-foreground">Commission</p>
@@ -1003,7 +1044,7 @@ const EarnStaking = () => {
                         <TipLabel label="Rewards" tooltip="Rewards you've accrued from this validator and can claim now." />
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
-                        <TipLabel label="Est. APY" tooltip="Estimated annual percentage yield from this validator, after its commission is deducted." />
+                        <TipLabel label="Est. APY" tooltip="Estimated annual yield from this validator: Native APY after its commission, plus platform Rewards APY when active." />
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
                         <TipLabel label="Commission" tooltip="The percentage of your staking rewards this validator keeps as a fee for operating the node." />
@@ -1032,7 +1073,7 @@ const EarnStaking = () => {
                           <td className="px-4 py-3 text-right text-sm">{formatToken(validator.totalStake, decimals)}</td>
                           <td className="px-4 py-3 text-right text-sm">{formatToken(validator.userStake, decimals)}</td>
                           <td className="px-4 py-3 text-right text-sm">{formatToken(validator.pendingRewards, decimals)}</td>
-                          <td className="px-4 py-3 text-right text-sm">{validator.estimatedApy === "-" ? "-" : `${validator.estimatedApy}%`}</td>
+                          <td className="px-4 py-3 text-right text-sm">{apyWithBreakdown(validator.estimatedApy)}</td>
                           <td className="px-4 py-3 text-right text-sm">{formatPercentFromBps(validator.commissionBps)}</td>
                           <td className="px-4 py-3">
                             <div className="flex justify-end gap-2">
@@ -1221,7 +1262,7 @@ const EarnStaking = () => {
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className="rounded-md bg-muted/40 px-3 py-2">
                       <p className="text-xs text-muted-foreground">Est. APY</p>
-                      <p className="font-semibold">{actionValidator.estimatedApy === "-" ? "-" : `${actionValidator.estimatedApy}%`}</p>
+                      <p className="font-semibold">{apyWithBreakdown(actionValidator.estimatedApy)}</p>
                     </div>
                     <div className="rounded-md bg-muted/40 px-3 py-2">
                       <p className="text-xs text-muted-foreground">Commission</p>

@@ -5,6 +5,7 @@ import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 import { castVoteOnIssue } from "./user.service";
+import { getOraclePrices } from "./oracle.service";
 
 const { Token, StratoStaking, ValidatorRegistry } = constants;
 const WAD = 10n ** 18n;
@@ -52,6 +53,7 @@ export interface StratoStakingInfo {
   totalSelfBond: string;
   totalUnbonding: string;
   totalRewardableStake: string;
+  totalRewardableStakeUsd: string;
   activeValidatorCount: string;
   rewardReserve: string;
   rewardPeriodAmount: string;
@@ -68,6 +70,7 @@ export interface StratoStakingInfo {
   stakeRewardRate: string;
   estimatedApy: string;
   userTotalStake: string;
+  userTotalStakeUsd: string;
   claimableRewards: string;
   totalEarned: string;
   isOperator: boolean;
@@ -152,6 +155,7 @@ const emptyInfo = (): StratoStakingInfo => ({
   totalSelfBond: "0",
   totalUnbonding: "0",
   totalRewardableStake: "0",
+  totalRewardableStakeUsd: "0",
   activeValidatorCount: "0",
   rewardReserve: "0",
   rewardPeriodAmount: "0",
@@ -168,6 +172,7 @@ const emptyInfo = (): StratoStakingInfo => ({
   stakeRewardRate: "0",
   estimatedApy: "-",
   userTotalStake: "0",
+  userTotalStakeUsd: "0",
   claimableRewards: "0",
   totalEarned: "0",
   isOperator: false,
@@ -319,6 +324,23 @@ const getTokenAllowance = async (
     });
 
     return parseBigIntLike(data?.[0]?.value);
+  } catch {
+    return 0n;
+  }
+};
+
+// STRATO oracle price (WAD); used to express network stake as USD TVL. Reads
+// through getOraclePrices so it always agrees with the portfolio price map.
+const getStratoTokenPriceWad = async (accessToken: string): Promise<bigint> => {
+  const token = stratoTokenAddress();
+  if (!token) return 0n;
+
+  try {
+    const prices = await getOraclePrices(accessToken, {
+      key: `eq.${token}`,
+      select: "asset:key,price:value::text",
+    });
+    return parseBigIntLike(prices.get(token));
   } catch {
     return 0n;
   }
@@ -641,6 +663,27 @@ const validatorApyBps = (
   return (grossBps * (BPS_DIVISOR - netCommissionBps)) / BPS_DIVISOR;
 };
 
+// Best available net APY across active validators — matches the "Best
+// Available APY" convention used on the Earn page. Consumed by the earn
+// service so the portfolio STRATO row can show combined native + rewards APY.
+export const getStratoStakingNetworkApy = async (accessToken: string): Promise<string | null> => {
+  const state = await getContractState(accessToken);
+  if (!state) return null;
+
+  const currentIndexes = projectedRewardIndexes(state);
+  const operatorRows = await getOperatorRows(accessToken);
+
+  let bestBps = 0n;
+  for (const row of operatorRows) {
+    const value = row.value || {};
+    if (!parseBoolLike(value.active)) continue;
+    const apyBps = validatorApyBps(state, parseBigIntLike(value.commissionBps), currentIndexes.stakeRewardRate);
+    if (apyBps > bestBps) bestBps = apyBps;
+  }
+
+  return bestBps > 0n ? formatBpsAsPercent(bestBps) : null;
+};
+
 export const getStratoStakingInfo = async (
   accessToken: string,
   userAddress?: string
@@ -661,6 +704,7 @@ export const getStratoStakingInfo = async (
     unbondingRequests,
     validatorProfiles,
     lifetimeClaimedRewards,
+    stratoPriceWad,
   ] = await Promise.all([
     getTokenInfo(accessToken, tokenAddress),
     getTokenBalance(accessToken, tokenAddress, userAddress),
@@ -671,13 +715,13 @@ export const getStratoStakingInfo = async (
     getUnbondingRequests(accessToken, userAddress),
     getValidatorProfiles(accessToken),
     getLifetimeClaimedRewards(accessToken, userAddress),
-  ]);
+    getStratoTokenPriceWad(accessToken),
+  ] as const);
 
   let userTotalStake = 0n;
   let claimableRewards = 0n;
   let userWeightedApyBps = 0n;
-  let activeApyBpsTotal = 0n;
-  let activeApyCount = 0n;
+  let bestActiveApyBps = 0n;
   let isOperator = false;
   let connectedOperatorAddress = "";
   let operatorPendingBaseRewards = 0n;
@@ -714,9 +758,8 @@ export const getStratoStakingInfo = async (
       currentOperatorCommissionBps = commissionBps;
     }
 
-    if (parseBoolLike(value.active)) {
-      activeApyBpsTotal += apyBps;
-      activeApyCount += 1n;
+    if (parseBoolLike(value.active) && apyBps > bestActiveApyBps) {
+      bestActiveApyBps = apyBps;
     }
 
     userTotalStake += userStake;
@@ -742,10 +785,12 @@ export const getStratoStakingInfo = async (
     };
   });
 
+  // Your actual (stake-weighted) APY once you're delegated; best available
+  // across active validators until then.
   const estimatedApy = userTotalStake > 0n
     ? formatBpsAsPercent(userWeightedApyBps / userTotalStake)
-    : activeApyCount > 0n
-      ? formatBpsAsPercent(activeApyBpsTotal / activeApyCount)
+    : bestActiveApyBps > 0n
+      ? formatBpsAsPercent(bestActiveApyBps)
       : "-";
 
   return {
@@ -760,6 +805,9 @@ export const getStratoStakingInfo = async (
     totalSelfBond: String(state.totalSelfBond || "0"),
     totalUnbonding: String(state.totalUnbonding || "0"),
     totalRewardableStake: String(state.totalRewardableStake || "0"),
+    totalRewardableStakeUsd: stratoPriceWad > 0n
+      ? ((parseBigIntLike(state.totalRewardableStake) * stratoPriceWad) / WAD).toString()
+      : "0",
     activeValidatorCount: String(state.activeOperatorCount || "0"),
     rewardReserve: currentIndexes.rewardReserve.toString(),
     rewardPeriodAmount: String(state.rewardPeriodAmount || "0"),
@@ -776,6 +824,7 @@ export const getStratoStakingInfo = async (
     stakeRewardRate: currentIndexes.stakeRewardRate.toString(),
     estimatedApy,
     userTotalStake: userTotalStake.toString(),
+    userTotalStakeUsd: stratoPriceWad > 0n ? ((userTotalStake * stratoPriceWad) / WAD).toString() : "0",
     claimableRewards: claimableRewards.toString(),
     totalEarned: (
       lifetimeClaimedRewards +

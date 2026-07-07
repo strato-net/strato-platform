@@ -52,8 +52,11 @@ const TOP_OPPORTUNITY_MIN_POOL_TVL = 100000n * WAD;
 
 type StakingEarnInfo = {
   tokenSymbol: string;
+  stratoTokenAddress: string;
   totalRewardableStake: string;
+  totalRewardableStakeUsd: string;
   userTotalStake: string;
+  userTotalStakeUsd: string;
   validators: Array<{
     active: boolean;
     estimatedApy: string;
@@ -505,15 +508,37 @@ const Earn = () => {
 
     return values.length ? Math.max(...values).toFixed(2) : undefined;
   }, [stakingInfo?.validators]);
-  const stakingTotalStakedLabel = stakingInfo
-    ? `${formatTokenAmount(stakingInfo.totalRewardableStake)} ${stakingInfo.tokenSymbol || "STRATO"}`
-    : "--";
+  // Combined staking APY (best validator native + platform rewards), matching
+  // the Stake page and portfolio convention.
+  const stakingApyInfo = useMemo<EarnApyInfo | null>(() => {
+    const native = Number(stakingBestApyRaw) || 0;
+    const strato = normalizeAddress(stakingInfo?.stratoTokenAddress || "");
+    const rewardsEntry = strato
+      ? tokenApys
+          .find((entry) => normalizeAddress(entry.token) === strato)
+          ?.apys.find((item) => item.source === "rewards" && item.meta === "staking")
+      : undefined;
+    const rewards = Number(rewardsEntry?.apy) || 0;
+    const breakdown = [
+      native > 0 ? { label: "Native APY", apy: native.toFixed(2) } : null,
+      rewards > 0 ? { label: "Rewards APY", apy: rewards.toFixed(2) } : null,
+    ].filter((item): item is { label: string; apy: string } => item !== null);
+    if (breakdown.length === 0) return null;
+    return { total: native + rewards, source: "staking", breakdown };
+  }, [stakingBestApyRaw, stakingInfo?.stratoTokenAddress, tokenApys]);
+  const stakingDisplayApyRaw = stakingApyInfo ? stakingApyInfo.total.toFixed(2) : stakingBestApyRaw;
+  // USD TVL once the STRATO oracle price is set; token units until then.
+  const stakingTotalStakedLabel = !stakingInfo
+    ? "--"
+    : safeBigInt(stakingInfo.totalRewardableStakeUsd) > 0n
+      ? `$${formatUsd(stakingInfo.totalRewardableStakeUsd)}`
+      : `${formatTokenAmount(stakingInfo.totalRewardableStake)} ${stakingInfo.tokenSymbol || "STRATO"}`;
 
   const getOpportunityTvl = (opportunity: OpportunityRow): bigint => {
     if (opportunity.kind === "saveUsdst") return safeBigInt(saveUsdstTvl);
     if (opportunity.kind === "vault") return safeBigInt(vaultState.totalEquity);
     if (opportunity.kind === "lending") return safeBigInt(liquidityInfo?.totalUSDSTSupplied?.toString());
-    if (opportunity.kind === "staking") return 0n;
+    if (opportunity.kind === "staking") return safeBigInt(stakingInfo?.totalRewardableStakeUsd);
     if (opportunity.kind === "yieldVault") {
       const vData = yieldVaults[YIELD_VAULTS[opportunity.vaultIndex].key];
       return safeBigInt(vData?.tvlUsd);
@@ -581,9 +606,11 @@ const Earn = () => {
     }
 
     if (opportunity.kind === "staking") {
-      return stakingInfo
-        ? `${formatTokenAmount(stakingInfo.userTotalStake)} ${stakingInfo.tokenSymbol || "STRATO"}`
-        : "--";
+      if (!stakingInfo) return "--";
+      // USD once the STRATO oracle price is set; token units until then.
+      return safeBigInt(stakingInfo.userTotalStakeUsd) > 0n || safeBigInt(stakingInfo.userTotalStake) === 0n
+        ? `$${formatUsd(stakingInfo.userTotalStakeUsd)}`
+        : `${formatTokenAmount(stakingInfo.userTotalStake)} ${stakingInfo.tokenSymbol || "STRATO"}`;
     }
 
     if (opportunity.kind === "yieldVault") {
@@ -668,7 +695,7 @@ const Earn = () => {
 
     if (activeFilter === "all" || activeFilter === "pools") {
       if (activeFilter === "all") {
-        rows.push({ kind: "staking", apySortValue: parseApy(stakingBestApyRaw) });
+        rows.push({ kind: "staking", apySortValue: parseApy(stakingDisplayApyRaw) });
       }
       rows.push({ kind: "lending", apySortValue: parseApy(lendingDisplayApyRaw) });
       for (const pool of sortedPools) {
@@ -677,7 +704,7 @@ const Earn = () => {
     }
 
     return rows.sort(compareOpportunities);
-  }, [activeFilter, lendingDisplayApyRaw, saveUsdstDisplayApyRaw, saveUsdstTvl, sortedPools, stakingBestApyRaw, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, liquidityInfo?.totalUSDSTSupplied, yieldVaults, yieldVaultApyInfos]);
+  }, [activeFilter, lendingDisplayApyRaw, saveUsdstDisplayApyRaw, saveUsdstTvl, sortedPools, stakingDisplayApyRaw, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, liquidityInfo?.totalUSDSTSupplied, yieldVaults, yieldVaultApyInfos]);
 
   const vaultAlpha = formatApyDisplay(vaultDisplayApyRaw);
   const rankedTopCandidates = useMemo<OpportunityRow[]>(() => {
@@ -690,7 +717,7 @@ const Earn = () => {
         vaultIndex: i,
       })),
       { kind: "lending", apySortValue: parseApy(lendingDisplayApyRaw) },
-      { kind: "staking", apySortValue: parseApy(stakingBestApyRaw) },
+      { kind: "staking", apySortValue: parseApy(stakingDisplayApyRaw) },
       ...sortedPools.map((pool) => ({
         kind: "pool" as const,
         apySortValue: parseApy(getPoolDisplayApy(pool)),
@@ -701,7 +728,7 @@ const Earn = () => {
     return rankedCandidates.filter(isEligibleForTopOpportunity).length > 0
       ? rankedCandidates.filter(isEligibleForTopOpportunity)
       : rankedCandidates;
-  }, [lendingDisplayApyRaw, liquidityInfo?.totalUSDSTSupplied, saveUsdstDisplayApyRaw, saveUsdstTvl, sortedPools, stakingBestApyRaw, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, yieldVaults, yieldVaultApyInfos]);
+  }, [lendingDisplayApyRaw, liquidityInfo?.totalUSDSTSupplied, saveUsdstDisplayApyRaw, saveUsdstTvl, sortedPools, stakingDisplayApyRaw, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, yieldVaults, yieldVaultApyInfos]);
   const getOpportunityMeta = (opportunity: OpportunityRow) => {
     if (opportunity.kind === "saveUsdst") {
       return {
@@ -766,8 +793,8 @@ const Earn = () => {
       return {
         title: "Stake STRATO",
         subtitle: "Delegate STRATO to approved validators",
-        apyRaw: stakingBestApyRaw,
-        tvl: stakingInfo?.totalRewardableStake || "0",
+        apyRaw: stakingDisplayApyRaw,
+        tvl: stakingInfo?.totalRewardableStakeUsd || "0",
         badge: "Staking",
         rateLabel: "Best Available APY",
         actionLabel: "Stake",
@@ -797,7 +824,7 @@ const Earn = () => {
       return yieldVaultApyInfos[YIELD_VAULTS[opportunity.vaultIndex].key] ?? null;
     }
     if (opportunity.kind === "lending") return lendingEarnApyInfo;
-    if (opportunity.kind === "staking") return null;
+    if (opportunity.kind === "staking") return stakingApyInfo;
     return getPoolEarnApyInfo(opportunity.pool);
   };
 
@@ -818,7 +845,7 @@ const Earn = () => {
     }
 
     if (key === "staking" || key === "strato-staking") {
-      return { kind: "staking", apySortValue: parseApy(stakingBestApyRaw) };
+      return { kind: "staking", apySortValue: parseApy(stakingDisplayApyRaw) };
     }
 
     const yieldVaultIdx = YIELD_VAULTS.findIndex((v) => v.key === key);
@@ -840,7 +867,7 @@ const Earn = () => {
     lendingDisplayApyRaw,
     saveUsdstDisplayApyRaw,
     sortedPools,
-    stakingBestApyRaw,
+    stakingDisplayApyRaw,
     tokenApys,
     tokenApysLoaded,
     vaultDisplayApyRaw,
@@ -862,8 +889,8 @@ const Earn = () => {
     );
   }, [configuredFeaturedOpportunity, rankedTopCandidates]);
 
-  const topOpportunityMeta = useMemo(() => getOpportunityMeta(topOpportunity), [topOpportunity, lendingDisplayApyRaw, saveUsdstDisplayApyRaw, saveUsdstTvl, stakingBestApyRaw, stakingInfo?.totalRewardableStake, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, liquidityInfo?.totalUSDSTSupplied, navigate]);
-  const topOpportunityApyInfo = useMemo(() => getOpportunityApyInfo(topOpportunity), [topOpportunity, saveUsdstApyInfo, resolvedVaultApyInfo, lendingEarnApyInfo, tokenApys]);
+  const topOpportunityMeta = useMemo(() => getOpportunityMeta(topOpportunity), [topOpportunity, lendingDisplayApyRaw, saveUsdstDisplayApyRaw, saveUsdstTvl, stakingDisplayApyRaw, stakingInfo?.totalRewardableStake, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, liquidityInfo?.totalUSDSTSupplied, navigate]);
+  const topOpportunityApyInfo = useMemo(() => getOpportunityApyInfo(topOpportunity), [topOpportunity, saveUsdstApyInfo, resolvedVaultApyInfo, lendingEarnApyInfo, stakingApyInfo, tokenApys]);
   const topOpportunityApy = useMemo(() => {
     if (topOpportunity.kind === "yieldVault") {
       const cfg = YIELD_VAULTS[topOpportunity.vaultIndex];
@@ -885,14 +912,14 @@ const Earn = () => {
       vaultState.totalEquity,
       lendingDisplayApyRaw,
       liquidityInfo?.totalUSDSTSupplied,
-      stakingBestApyRaw,
+      stakingDisplayApyRaw,
       stakingInfo?.totalRewardableStake,
       navigate,
     ]
   );
   const featuredOpportunityApyInfo = useMemo(
     () => (configuredFeaturedOpportunity ? getOpportunityApyInfo(configuredFeaturedOpportunity) : null),
-    [configuredFeaturedOpportunity, saveUsdstApyInfo, resolvedVaultApyInfo, lendingEarnApyInfo, tokenApys]
+    [configuredFeaturedOpportunity, saveUsdstApyInfo, resolvedVaultApyInfo, lendingEarnApyInfo, stakingApyInfo, tokenApys]
   );
   const featuredOpportunityApy = useMemo(() => {
     if (!configuredFeaturedOpportunity || !featuredOpportunityMeta) {
@@ -1031,7 +1058,7 @@ const Earn = () => {
                           </span>
                         </EarnApyTooltip>
                         <p className="text-[11px] font-medium text-muted-foreground md:text-xs">
-                          {configuredFeaturedOpportunity.kind === "staking" ? "Total Staked" : "TVL"}
+                          TVL
                         </p>
                         <p className="text-sm font-medium text-foreground/80 md:text-sm">
                           {configuredFeaturedOpportunity.kind === "staking"
@@ -1139,7 +1166,7 @@ const Earn = () => {
                         </span>
                       </EarnApyTooltip>
                       <p className="text-[11px] font-medium text-muted-foreground md:text-xs">
-                        {topOpportunity.kind === "staking" ? "Total Staked" : "TVL"}
+                        TVL
                       </p>
                       <p className="text-sm font-medium text-foreground/80 md:text-sm">
                         {topOpportunity.kind === "yieldVault"
@@ -1283,13 +1310,9 @@ const Earn = () => {
                               <td className="px-4 py-3">
                                 <p className="text-sm font-semibold">
                                   ${formatUsd(saveUsdstTvl)}
-                                </p>
-                                <p className="text-xs text-muted-foreground">TVL</p>
-                              </td>
+                                </p>                              </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>
-                                <p className="text-xs text-muted-foreground">Your Position</p>
-                              </td>
+                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>                              </td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 Savings Vault
                               </td>
@@ -1350,13 +1373,9 @@ const Earn = () => {
                                 </EarnApyTooltip>
                               </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">${formatUsd(vaultState.totalEquity)}</p>
-                                <p className="text-xs text-muted-foreground">TVL</p>
-                              </td>
+                                <p className="text-sm font-semibold">${formatUsd(vaultState.totalEquity)}</p>                              </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>
-                                <p className="text-xs text-muted-foreground">Your Position</p>
-                              </td>
+                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>                              </td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 Diversified Vault
                               </td>
@@ -1429,13 +1448,9 @@ const Earn = () => {
                                       return s === "--" ? "--" : `$${s}`;
                                     })()
                                     : "--"}
-                                </p>
-                                <p className="text-xs text-muted-foreground">TVL</p>
-                              </td>
+                                </p>                              </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>
-                                <p className="text-xs text-muted-foreground">Your Position</p>
-                              </td>
+                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>                              </td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 {cfg.badge}
                               </td>
@@ -1467,7 +1482,7 @@ const Earn = () => {
                         }
 
                         if (opportunity.kind === "staking") {
-                          const stakingApyDisplay = formatApyDisplay(stakingBestApyRaw);
+                          const stakingApyDisplay = formatApyDisplay(stakingDisplayApyRaw);
                           return (
                             <tr
                               key="staking"
@@ -1492,18 +1507,16 @@ const Earn = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <p className={`text-sm font-semibold ${stakingApyDisplay.className}`}>
-                                  {stakingApyDisplay.label}
-                                </p>
+                                <EarnApyTooltip info={stakingApyInfo}>
+                                  <p className={`text-sm font-semibold cursor-default ${stakingApyDisplay.className}`}>
+                                    {stakingApyDisplay.label}
+                                  </p>
+                                </EarnApyTooltip>
                               </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">{stakingTotalStakedLabel}</p>
-                                <p className="text-xs text-muted-foreground">Total Staked</p>
-                              </td>
+                                <p className="text-sm font-semibold">{stakingTotalStakedLabel}</p>                              </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>
-                                <p className="text-xs text-muted-foreground">Your Position</p>
-                              </td>
+                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>                              </td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 Protocol staking
                               </td>
@@ -1565,13 +1578,9 @@ const Earn = () => {
                                   {loadingLiquidity || !liquidityInfo?.totalUSDSTSupplied
                                     ? "$0.00"
                                     : `$${formatUsd(liquidityInfo.totalUSDSTSupplied.toString())}`}
-                                </p>
-                                <p className="text-xs text-muted-foreground">TVL</p>
-                              </td>
+                                </p>                              </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>
-                                <p className="text-xs text-muted-foreground">Your Position</p>
-                              </td>
+                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>                              </td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 Lending pool
                               </td>
@@ -1630,13 +1639,9 @@ const Earn = () => {
                                 </EarnApyTooltip>
                               </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">${formatUsd(pool.totalLiquidityUSD)}</p>
-                                <p className="text-xs text-muted-foreground">TVL</p>
-                              </td>
+                                <p className="text-sm font-semibold">${formatUsd(pool.totalLiquidityUSD)}</p>                              </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>
-                                <p className="text-xs text-muted-foreground">Your Position</p>
-                              </td>
+                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>                              </td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 Swap fees
                               </td>
