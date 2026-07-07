@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import routes from "./api/routes";
 import { initOpenIdConfig, initNetworkConfig } from "./config/config";
+import { initDbPool } from "./utils/dbService";
 import { errorHandler, notFoundHandler } from "./api/middleware/errorHandler";
 import { requestContext } from "./utils/requestContext";
 import { requestLogger, getRequestStats, resetRequestStats } from "./api/middleware/requestLogger";
@@ -52,6 +53,7 @@ app.use(errorHandler);
   try {
     await initOpenIdConfig();
     await initNetworkConfig();
+    initDbPool();
     app.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
     });

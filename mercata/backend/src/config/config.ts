@@ -36,6 +36,9 @@ export const clientId = process.env.OAUTH_CLIENT_ID;
 export const clientSecret = process.env.OAUTH_CLIENT_SECRET;
 export const nodeUrl = process.env.NODE_URL;
 
+// Direct Postgres access to cirrus DB (used instead of Cirrus/PostgREST for heavy queries)
+export const cirrusDbName = "cirrus";
+
 // Smart contract addresses
 export const burnAddress = process.env.BURN_ADDRESS || "0000000000000000000000000000000000000000";
 export const priceOracle = process.env.PRICE_ORACLE || "0000000000000000000000000000000000001002";
