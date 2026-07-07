@@ -40,7 +40,7 @@ sed -e 's|__strato_postgres_user__|'"${postgres_user}"'|g' \
 cat /tmp/eth-config.js > models/strato/eth/config.js
 
 echo 'Waiting for postgres to be available...'
-until pg_isready -h ${postgres_host} -p ${postgres_port}
+until pg_isready -h ${postgres_host} -p ${postgres_port} -U ${postgres_user}
 do
     echo "Check at $(date)"
     sleep 1

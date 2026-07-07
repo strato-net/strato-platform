@@ -1,0 +1,8 @@
+node_modules/
+.output/
+.wxt/
+stats.html
+*.zip
+
+# extension signing key (keep out of git)
+.secrets/

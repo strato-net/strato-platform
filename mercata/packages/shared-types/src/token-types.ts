@@ -17,7 +17,6 @@ export interface Token {
 export interface EarningAsset extends Token {
   collateralBalance: string;
   totalBalance: string;
-  isPoolToken: boolean;
   value: string;
   apy?: string;
   rebaseFactor?: string;

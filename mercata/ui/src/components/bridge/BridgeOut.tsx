@@ -297,8 +297,8 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       }
 
       toast({
-        title: "Withdrawal requested",
-        description: `Your withdrawal request is pending approval. The approved amount of ${selectedToken.externalSymbol} will be transferred to ${externalRecipient}.`,
+        title: "Bridge out requested",
+        description: `Your bridge out request is pending approval. The approved amount of ${selectedToken.externalSymbol} will be transferred to ${externalRecipient}.`,
       });
 
       setAmount("");
@@ -421,7 +421,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         disabled={isButtonDisabled}
         className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
-        {isLoading ? "Processing..." : "Withdraw"}
+        {isLoading ? "Processing..." : "Bridge Out"}
         </Button>
 
       <AdvancedOptionsDropdown

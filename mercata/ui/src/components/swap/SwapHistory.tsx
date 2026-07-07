@@ -40,7 +40,7 @@ const LoadingRow = () => (
 const EmptyRow = () => (
   <TableRow>
     <TableCell colSpan={7} className="text-center py-8">
-      <p className="text-muted-foreground">No swap history found for this pair</p>
+      <p className="text-muted-foreground">No trade history found for this pair</p>
     </TableCell>
   </TableRow>
 );
@@ -105,9 +105,9 @@ const PaginationInfo = ({ currentPage, itemsPerPage, swapHistoryCount, swapHisto
   return (
     <div className="text-sm text-muted-foreground">
       {start === 1 && end === swapHistoryCount ? (
-        `Showing ${swapHistoryLength} swap${swapHistoryLength !== 1 ? 's' : ''}`
+        `Showing ${swapHistoryLength} trade${swapHistoryLength !== 1 ? 's' : ''}`
       ) : (
-        `Showing ${start} to ${end} of ${swapHistoryCount} swaps`
+        `Showing ${start} to ${end} of ${swapHistoryCount} trades`
       )}
     </div>
   );
@@ -220,7 +220,7 @@ const SwapHistory: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Swap History</h3>
+        <h3 className="text-lg font-semibold">Trade History</h3>
         {userAddress && (
           <Button
             variant={showMySwapsOnly ? "default" : "outline"}
@@ -229,7 +229,7 @@ const SwapHistory: React.FC = () => {
             disabled={!pool?.address || swapHistoryLoading}
           >
             {swapHistoryLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            {showMySwapsOnly ? "Showing My Swaps" : "Show My Swaps"}
+            {showMySwapsOnly ? "Showing My Trades" : "Show My Trades"}
           </Button>
         )}
       </div>
@@ -284,7 +284,7 @@ const SwapHistory: React.FC = () => {
       ) : (
         <div className="bg-muted/50 rounded-lg p-6 text-center">
           <p className="text-muted-foreground">
-            {poolLoading ? "Loading pool data..." : "Please select both token pairs to view swap history"}
+            {poolLoading ? "Loading pool data..." : "Please select both token pairs to view trade history"}
           </p>
         </div>
       )}
