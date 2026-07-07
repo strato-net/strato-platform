@@ -9,6 +9,7 @@ const YIELD_ANCHOR_UTC_HOUR = 12;
 const DEFAULT_YIELD_WINDOW_DAYS = 30;
 const YIELD_ANCHOR_STEP_DAYS = 1;
 const MAX_YIELD_HISTORY_CACHE_KEYS = 8;
+const YIELD_HISTORY_CACHE_TTL_MS = 60_000; // 60 seconds TTL to ensure consistent APY across backend instances
 
 export const ZERO_APY = "0.00";
 export const DEFAULT_SWAP_FEE_BPS = 30;
@@ -22,6 +23,7 @@ export interface YieldHistoryInterval {
 
 type YieldHistoryCacheEntry = {
   rows: YieldHistoryRow[];
+  expiry: number;
 };
 
 const yieldHistoryCache = new Map<string, YieldHistoryCacheEntry>();
@@ -125,9 +127,9 @@ function buildYieldCacheKey(
   return `${priceOracle.toLowerCase()}|${windowStart}|${windowEndExclusive}|${addresses.join(",")}`;
 }
 
-function setYieldHistoryCacheEntry(cacheKey: string, entry: YieldHistoryCacheEntry): void {
+function setYieldHistoryCacheEntry(cacheKey: string, rows: YieldHistoryRow[]): void {
   if (yieldHistoryCache.has(cacheKey)) yieldHistoryCache.delete(cacheKey);
-  yieldHistoryCache.set(cacheKey, entry);
+  yieldHistoryCache.set(cacheKey, { rows, expiry: Date.now() + YIELD_HISTORY_CACHE_TTL_MS });
 
   if (yieldHistoryCache.size > MAX_YIELD_HISTORY_CACHE_KEYS) {
     const oldestKey = yieldHistoryCache.keys().next().value;
@@ -165,8 +167,9 @@ export async function getYieldExchangeRateRowsCached(
   const cacheKey = buildYieldCacheKey(query, normalizedAddrs);
   const cached = yieldHistoryCache.get(cacheKey);
   const staleRows = cached?.rows ?? [];
-  if (cached) {
-    setYieldHistoryCacheEntry(cacheKey, cached);
+
+  // Return cached data only if it exists and hasn't expired
+  if (cached && cached.expiry > Date.now()) {
     return cached.rows;
   }
 
@@ -176,7 +179,7 @@ export async function getYieldExchangeRateRowsCached(
   const fetchPromise = (async () => {
     try {
       const rows = await fetchYieldExchangeRateRows(accessToken, query, normalizedAddrs);
-      setYieldHistoryCacheEntry(cacheKey, { rows });
+      setYieldHistoryCacheEntry(cacheKey, rows);
       return rows;
     } catch {
       return staleRows;
