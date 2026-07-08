@@ -166,6 +166,36 @@ const sourceForProtocolEvent = (eventName: string): TraceLot["source"] => {
   return "transfer";
 };
 
+const transferEventAmount = (edge: TraceEdge): bigint | undefined =>
+  toBigInt(eventAttribute(edge.to.event || edge.event!, "value"));
+
+const matchesDepositAnchor = (
+  event: CirrusEventRow,
+  edge: TraceEdge,
+): boolean => {
+  const owner = normalizeAddress(edge.to.owner);
+  const token = normalizeAddress(edge.to.token);
+  const lotAmount = toBigInt(edge.to.amount);
+  const originalTransferAmount = transferEventAmount(edge);
+  const anchorAmount = toBigInt(eventAttribute(event, "stratoTokenAmount"));
+  if (lotAmount === undefined || anchorAmount === undefined) return false;
+
+  return (
+    normalizedEventAttribute(event, "stratoRecipient") === owner &&
+    normalizedEventAttribute(event, "stratoToken") === token &&
+    anchorAmount >= lotAmount &&
+    (originalTransferAmount === undefined || anchorAmount === originalTransferAmount)
+  );
+};
+
+const trustAnchorTypeFor = (eventName: string): TrustAnchor["type"] | null => {
+  if (eventName === "DepositCompleted") return "MercataBridge.DepositCompleted";
+  if (eventName === "NativeDepositCompleted") {
+    return "StratoNativeBridge.NativeDepositCompleted";
+  }
+  return null;
+};
+
 const isBeforeCursorEvent = (
   event: CirrusEventRow,
   cursor: TraceCursor,
@@ -376,7 +406,30 @@ export const createWithdrawalRepository = (
       );
     },
 
-    fetchTrustAnchor: async (_edge: TraceEdge): Promise<TrustAnchor | null> =>
-      null,
+    fetchTrustAnchor: async (edge: TraceEdge): Promise<TrustAnchor | null> => {
+      if (!edge.event?.block_number || !edge.event.transaction_hash) return null;
+
+      const rows = await cirrus.getRows<CirrusEventRow>(EVENT_TABLE, {
+        block_number: `eq.${edge.event.block_number}`,
+        transaction_hash: `eq.${edge.event.transaction_hash}`,
+        event_name: "in.(DepositCompleted,NativeDepositCompleted)",
+        select: EVENT_SELECT,
+        limit: 10,
+      });
+
+      const anchorEvent = rows.find((event) => matchesDepositAnchor(event, edge));
+      if (!anchorEvent) return null;
+
+      const type = trustAnchorTypeFor(anchorEvent.event_name);
+      if (!type) return null;
+
+      return {
+        type,
+        owner: normalizeAddress(edge.to.owner),
+        token: normalizeAddress(edge.to.token),
+        amount: edge.to.amount,
+        event: anchorEvent,
+      };
+    },
   };
 };
