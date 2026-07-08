@@ -34,7 +34,7 @@ const nativeDepositSnapshot = readJson(
 const owner = "3333333333333333333333333333333333333333";
 const token = "4444444444444444444444444444444444444444";
 const amount = "100";
-const blockNumber = "99";
+const blockNumber = "75001";
 const transactionHash = "0xanchor";
 
 const config: WasConfig = {
@@ -43,6 +43,7 @@ const config: WasConfig = {
   stratoNativeBridge: "4d9e9c39180a75091b9c35bbb9064d67c7fdde5a",
   port: 3002,
   pollIntervalMs: 30_000,
+  trustAnchorBlock: 75_000,
   includeTerminalWithdrawals: true,
 };
 
@@ -107,6 +108,19 @@ const edge = (value = amount): TraceEdge => ({
   explanation: "Transfer lot traces backward to the sender.",
 });
 
+const historicalEdge = (blockNumber: string): TraceEdge => ({
+  ...edge(),
+  event: {
+    ...transferEvent(),
+    block_number: blockNumber,
+    transaction_hash: `0xhistorical${blockNumber}`,
+  },
+  to: {
+    ...edge().to,
+    blockNumber,
+  },
+});
+
 const createMockCirrusClient = (rows: CirrusEventRow[]) => {
   const requests: { table: string; params?: CirrusQueryParams }[] = [];
   const client: CirrusClient = {
@@ -136,6 +150,30 @@ test("fetchTrustAnchor returns standard bridge deposit anchor", async () => {
   assert.equal(anchor.token, token);
   assert.equal(anchor.amount, amount);
   assert.equal(anchor.event.event_name, "DepositCompleted");
+});
+
+test("fetchTrustAnchor trusts any event before configured trust anchor block", async () => {
+  const { client, requests } = createMockCirrusClient([]);
+  const repository = createWithdrawalRepository(client, config);
+
+  const anchor = await repository.fetchTrustAnchor(historicalEdge("74999"));
+
+  assert.ok(anchor);
+  assert.equal(anchor.type, "Historical.TrustAnchorBlock");
+  assert.equal(anchor.owner, owner);
+  assert.equal(anchor.token, token);
+  assert.equal(anchor.amount, amount);
+  assert.equal(requests.length, 0);
+});
+
+test("fetchTrustAnchor does not trust event at configured trust anchor block", async () => {
+  const { client, requests } = createMockCirrusClient([]);
+  const repository = createWithdrawalRepository(client, config);
+
+  const anchor = await repository.fetchTrustAnchor(historicalEdge("75000"));
+
+  assert.equal(anchor, null);
+  assert.equal(requests.length, 1);
 });
 
 test("fetchTrustAnchor returns native bridge deposit anchor", async () => {

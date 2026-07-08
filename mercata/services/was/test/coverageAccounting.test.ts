@@ -212,3 +212,49 @@ test("traceWithdrawal marks only missing evidence coverage unknown", async () =>
   assertCoverageSum(trace.coverage!);
 });
 
+test("traceWithdrawal stops at configured skipped address", async () => {
+  let fundingFetches = 0;
+  const repository = repositoryFor(
+    async () => {
+      fundingFetches += 1;
+      return [transferLot("100")];
+    },
+    async () => null,
+  );
+  const trace = await createProvenanceEngine(repository).traceWithdrawal({
+    withdrawal,
+    skipAddresses: [owner],
+  });
+
+  assert.equal(fundingFetches, 0);
+  assert.equal(trace.coverage?.clean, "0");
+  assert.equal(trace.coverage?.unknown, "100");
+  assert.ok(
+    trace.traceTree.children.some((child) => child.label === "SkippedAddress"),
+  );
+  assertCoverageSum(trace.coverage!);
+});
+
+test("traceWithdrawal treats configured trusted protocol address as clean", async () => {
+  let fundingFetches = 0;
+  const repository = repositoryFor(
+    async () => {
+      fundingFetches += 1;
+      return [transferLot("100")];
+    },
+    async () => null,
+  );
+  const trace = await createProvenanceEngine(repository).traceWithdrawal({
+    withdrawal,
+    trustedProtocolAddresses: [owner],
+  });
+
+  assert.equal(fundingFetches, 0);
+  assert.equal(trace.coverage?.clean, "100");
+  assert.equal(trace.coverage?.unknown, "0");
+  assert.ok(
+    trace.traceTree.children.some((child) => child.label === "TrustedProtocolAddress"),
+  );
+  assertCoverageSum(trace.coverage!);
+});
+
