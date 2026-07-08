@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatWeiToDecimalHP } from "@/utils/numberUtils";
 
+const TRACE_LOT_DISPLAY_LIMIT = 100;
+
 const decisionVariant = (decision?: WithdrawalAuditDecision): "default" | "secondary" | "destructive" | "outline" => {
   if (decision === "REJECT") return "destructive";
   if (decision === "MANUAL_REVIEW") return "secondary";
@@ -29,6 +31,139 @@ const resultClass = (result: WithdrawalAuditStepResult) => {
 const shortAddress = (value?: string) => {
   if (!value) return "-";
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
+};
+
+type TraceOmissionSummary = {
+  totalNodes: number;
+  totalLots: number;
+  omittedNodes: number;
+  omittedLots: number;
+  omittedTrustAnchors: number;
+  omittedClean: number;
+  omittedTainted: number;
+  omittedUnknown: number;
+  omittedMaxDepth: number;
+};
+
+const emptyOmissionSummary = (): TraceOmissionSummary => ({
+  totalNodes: 0,
+  totalLots: 0,
+  omittedNodes: 0,
+  omittedLots: 0,
+  omittedTrustAnchors: 0,
+  omittedClean: 0,
+  omittedTainted: 0,
+  omittedUnknown: 0,
+  omittedMaxDepth: 0,
+});
+
+const mergeSummary = (target: TraceOmissionSummary, source: TraceOmissionSummary) => {
+  target.totalNodes += source.totalNodes;
+  target.totalLots += source.totalLots;
+  target.omittedNodes += source.omittedNodes;
+  target.omittedLots += source.omittedLots;
+  target.omittedTrustAnchors += source.omittedTrustAnchors;
+  target.omittedClean += source.omittedClean;
+  target.omittedTainted += source.omittedTainted;
+  target.omittedUnknown += source.omittedUnknown;
+  target.omittedMaxDepth += source.omittedMaxDepth;
+};
+
+const summarizeTraceTree = (
+  node: WithdrawalAuditTraceNode,
+  omitted = false,
+): TraceOmissionSummary => {
+  const summary = emptyOmissionSummary();
+  summary.totalNodes = 1;
+  if (node.type === "lot") summary.totalLots = 1;
+
+  if (omitted) {
+    summary.omittedNodes = 1;
+    if (node.type === "lot") summary.omittedLots = 1;
+    if (node.type === "trust_anchor") summary.omittedTrustAnchors = 1;
+    if (node.type === "max_depth") summary.omittedMaxDepth = 1;
+    if (node.result === "clean") summary.omittedClean = 1;
+    if (node.result === "tainted") summary.omittedTainted = 1;
+    if (node.result === "unknown") summary.omittedUnknown = 1;
+  }
+
+  for (const child of node.children) {
+    mergeSummary(summary, summarizeTraceTree(child, omitted));
+  }
+
+  return summary;
+};
+
+const limitTraceTreeByLots = (
+  node: WithdrawalAuditTraceNode,
+  maxLots: number,
+): { tree: WithdrawalAuditTraceNode | null; summary: TraceOmissionSummary } => {
+  let renderedLots = 0;
+  const summary = emptyOmissionSummary();
+
+  const visit = (current: WithdrawalAuditTraceNode): WithdrawalAuditTraceNode | null => {
+    if (current.type === "lot") {
+      renderedLots += 1;
+      if (renderedLots > maxLots) {
+        mergeSummary(summary, summarizeTraceTree(current, true));
+        return null;
+      }
+    }
+
+    const children: WithdrawalAuditTraceNode[] = [];
+    for (const child of current.children) {
+      const limitedChild = visit(child);
+      if (limitedChild) {
+        children.push(limitedChild);
+      }
+    }
+
+    return {
+      ...current,
+      children,
+    };
+  };
+
+  const tree = visit(node);
+  const totals = summarizeTraceTree(node);
+  summary.totalNodes = totals.totalNodes;
+  summary.totalLots = totals.totalLots;
+
+  return { tree, summary };
+};
+
+const TraceOmissionNotice = ({ summary }: { summary: TraceOmissionSummary }) => {
+  if (!summary.omittedLots) return null;
+
+  const terminalDetails = [
+    summary.omittedTrustAnchors > 0
+      ? `${summary.omittedTrustAnchors} trust anchor node${summary.omittedTrustAnchors === 1 ? "" : "s"}`
+      : "",
+    summary.omittedClean > 0
+      ? `${summary.omittedClean} clean node${summary.omittedClean === 1 ? "" : "s"}`
+      : "",
+    summary.omittedTainted > 0
+      ? `${summary.omittedTainted} tainted node${summary.omittedTainted === 1 ? "" : "s"}`
+      : "",
+    summary.omittedUnknown > 0
+      ? `${summary.omittedUnknown} unknown node${summary.omittedUnknown === 1 ? "" : "s"}`
+      : "",
+    summary.omittedMaxDepth > 0
+      ? `${summary.omittedMaxDepth} max-depth stop${summary.omittedMaxDepth === 1 ? "" : "s"}`
+      : "",
+  ].filter(Boolean);
+
+  return (
+    <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-900">
+      Showing the first {TRACE_LOT_DISPLAY_LIMIT} funding lots. Omitted {summary.omittedLots} of{" "}
+      {summary.totalLots} lots ({summary.omittedNodes} trace nodes hidden).
+      {terminalDetails.length > 0 && (
+        <div className="mt-2">
+          Omitted subtree summary: {terminalDetails.join(", ")}.
+        </div>
+      )}
+    </div>
+  );
 };
 
 const TraceTreeNode = ({ node, depth = 0 }: { node: WithdrawalAuditTraceNode; depth?: number }) => (
@@ -71,7 +206,7 @@ const AdminWithdrawalAuditSummary = () => {
     setLoading(true);
     try {
       const { data } = await api.get<WithdrawalAuditTrace>(
-        `/bridge/withdrawal-audits/${routeType}/${withdrawalId}?maxDepth=5`,
+        `/bridge/withdrawal-audits/${routeType}/${withdrawalId}`,
       );
       setTrace(data);
     } finally {
@@ -98,6 +233,10 @@ const AdminWithdrawalAuditSummary = () => {
       ["Unknown", trace.coverage.unknown],
     ];
   }, [trace?.coverage]);
+  const limitedTrace = useMemo(() => {
+    if (!trace?.traceTree) return null;
+    return limitTraceTreeByLots(trace.traceTree, TRACE_LOT_DISPLAY_LIMIT);
+  }, [trace?.traceTree]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -134,7 +273,7 @@ const AdminWithdrawalAuditSummary = () => {
                     <CardTitle>Decision</CardTitle>
                     <CardDescription>
                       Backend WAS status: {trace.status}
-                      {trace.maxDepth ? ` (max depth ${trace.maxDepth})` : ""}
+                      {trace.maxDepth ? ` (max depth ${trace.maxDepth})` : " (full depth)"}
                     </CardDescription>
                   </div>
                   <Badge variant={decisionVariant(trace.decision)}>
@@ -183,7 +322,7 @@ const AdminWithdrawalAuditSummary = () => {
                 <ul className="list-disc space-y-2 pl-5 text-sm">
                   {trace.stoppedEarly && (
                     <li className="text-yellow-700">
-                      Quick run stopped before the full trace completed.
+                      Trace stopped before the full depth completed.
                     </li>
                   )}
                   {trace.summary.map((item, index) => (
@@ -200,8 +339,11 @@ const AdminWithdrawalAuditSummary = () => {
                 <CardDescription>Tree of funding evidence used by the POC WAS.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {trace.traceTree ? (
-                  <TraceTreeNode node={trace.traceTree} />
+                {limitedTrace?.tree ? (
+                  <>
+                    <TraceOmissionNotice summary={limitedTrace.summary} />
+                    <TraceTreeNode node={limitedTrace.tree} />
+                  </>
                 ) : (
                   <p className="text-sm text-muted-foreground">
                     {isPending ? "Trace is still running." : "No trace tree available."}

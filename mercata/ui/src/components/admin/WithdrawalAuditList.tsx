@@ -47,7 +47,7 @@ const WithdrawalAuditList = () => {
     setLoading(true);
     try {
       const { data } = await api.get<WithdrawalAuditListResponse>(
-        `/bridge/withdrawal-audits/recent?limit=10&maxDepth=5&statusGroup=${statusGroup}`,
+        `/bridge/withdrawal-audits/recent?limit=10&statusGroup=${statusGroup}`,
       );
       setItems(data.data || []);
     } finally {
