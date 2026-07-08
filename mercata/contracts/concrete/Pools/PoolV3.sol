@@ -4,7 +4,7 @@ import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
-/// @notice Per-tick state for concentrated liquidity accounting
+/// @notice Per-tick state for concentrated liquidity accounting (Uniswap V3 Tick.Info)
 struct V3TickInfo {
     uint liquidityGross;
     int liquidityNet;
@@ -22,6 +22,13 @@ struct V3Position {
     uint tokensOwedB;
 }
 
+/// @notice A TWAP oracle checkpoint (Uniswap V3 Oracle.Observation, tick accumulator only)
+struct V3Observation {
+    uint blockTimestamp;
+    int tickCumulative;
+    bool initialized;
+}
+
 /**
  * @title PoolV3
  * @notice A concentrated liquidity pool (Uniswap V3-style) for trading between two ERC20 tokens
@@ -31,11 +38,23 @@ struct V3Position {
  *
  * Key Features:
  * - Concentrated liquidity: positions earn fees only while the price is inside their range
- * - Tick-crossing swaps with per-range liquidity
+ * - Tick-crossing swaps with per-range liquidity; the next initialized tick is found via a
+ *   tick bitmap (one 256-bit word per 256 tick-spacings, as in Uniswap V3 TickBitmap), so
+ *   swap cost is independent of how many ticks are initialized
  * - Fee growth accounting per unit of in-range liquidity (LP share stays in pool, protocol
  *   share is sent to the fee collector, mirroring Pool.sol conventions)
  * - Positions are records keyed by (owner, tickLower, tickUpper) — no LP token is minted
- * - Built-in TWAP oracle: time-weighted tick accumulator (V3-style geometric mean TWAP)
+ * - TWAP oracle: ring buffer of tick-accumulator observations (V3-style geometric-mean TWAP);
+ *   cardinality is grown permissionlessly via increaseObservationCardinalityNext
+ * - sync()/skim() balance reconciliation, factory-gated, mirroring Pool.sol
+ *
+ * Custody / guard semantics (deliberate, documented for reviewers):
+ * - paused: blocks mint + swap; burn and collect still work (LPs can always exit a paused pool)
+ * - disabled: emergency freeze — blocks mint, swap, burn AND collect until re-enabled.
+ *   This is the platform's nuclear option and matches V2 Pool's whenNotDisabled posture.
+ * - inactive token: blocks mint + swap but NOT burn/collect. This deliberately diverges from
+ *   V2 Pool (whose removeLiquidity requires active tokens) in favor of Uniswap's principle
+ *   that LP exit is always possible; use setDisabled for a full freeze.
  *
  * @author Mercata Protocol
  * @version 1.0.0
@@ -59,6 +78,15 @@ contract record PoolV3 is Ownable {
     /// @notice Emitted when a swap occurs
     event Swap(address sender, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut, uint sqrtPriceWad, int tick, uint liquidity);
 
+    /// @notice Emitted when tracked balances are re-synced to actual token balances
+    event Sync(uint tokenABalance, uint tokenBBalance);
+
+    /// @notice Emitted when excess token balances are skimmed
+    event Skim(address to, uint excessA, uint excessB);
+
+    /// @notice Emitted when the observation ring buffer is grown
+    event IncreaseObservationCardinalityNext(uint observationCardinalityNextOld, uint observationCardinalityNextNew);
+
     // ============ CONSTANTS ============
 
     uint constant WAD = 1e18;
@@ -67,6 +95,12 @@ contract record PoolV3 is Ownable {
     /// range whose sqrt prices stay representable in WAD (1e18) scaling
     int constant MIN_TICK = -443636;
     int constant MAX_TICK = 443636;
+
+    /// @notice All 256 bits of a bitmap word set (2**256 - 1)
+    uint constant MAX_WORD = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
+
+    /// @notice Maximum observation ring size (as in Uniswap V3)
+    uint constant MAX_CARDINALITY = 65535;
 
     // ============ STATE VARIABLES ============
 
@@ -112,19 +146,26 @@ contract record PoolV3 is Ownable {
     /// @notice Per-tick state
     mapping(int => V3TickInfo) public record ticks;
 
-    /// @notice List of currently initialized ticks (unordered; scanned for next-tick lookup)
-    int[] public record tickList;
+    /// @notice Bitmap of initialized ticks: word index => 256-bit word, one bit per tick spacing
+    /// @dev Word index is floor(tick / tickSpacing / 256), as in Uniswap V3 TickBitmap
+    mapping(int => uint) public record tickBitmap;
 
     /// @notice Positions: owner => tickLower => tickUpper => position
     mapping(address => mapping(int => mapping(int => V3Position))) public record positions;
 
     // ============ TWAP ORACLE ============
 
-    /// @notice Time-weighted sum of currentTick (tick-seconds)
-    int public tickCumulative;
+    /// @notice Oracle observations ring buffer (slot => observation)
+    mapping(uint => V3Observation) public record observations;
 
-    /// @notice Timestamp of the last oracle accumulator update
-    uint public observationTimestamp;
+    /// @notice Slot of the most recently written observation
+    uint public observationIndex;
+
+    /// @notice Number of observation slots currently in the ring
+    uint public observationCardinality;
+
+    /// @notice Ring size the buffer will grow to once the current ring is full
+    uint public observationCardinalityNext;
 
     // ============ ADMIN FLAGS ============
 
@@ -211,6 +252,53 @@ contract record PoolV3 is Ownable {
         return (a + b - 1) / b;
     }
 
+    /// @dev Integer division rounding toward negative infinity (for negative tick indexing).
+    ///      SolidVM's `/` already floors for negative operands (-10 / 256 == -1, unlike the
+    ///      EVM's truncation), so no correction term is needed; this wrapper just documents
+    ///      the intent at the call sites
+    function _floorDiv(int a, int b) internal pure returns (int) {
+        return a / b;
+    }
+
+    /// @dev 2**n for n in [0, 255], built from squaring constants (SolidVM-safe: no variable shifts)
+    function _pow2(uint n) internal pure returns (uint) {
+        require(n <= 255, "pow2 out of range");
+        uint r = 1;
+        if ((n & 1) != 0)   r *= 2;
+        if ((n & 2) != 0)   r *= 4;
+        if ((n & 4) != 0)   r *= 16;
+        if ((n & 8) != 0)   r *= 256;
+        if ((n & 16) != 0)  r *= 65536;
+        if ((n & 32) != 0)  r *= 4294967296;
+        if ((n & 64) != 0)  r *= 18446744073709551616;
+        if ((n & 128) != 0) r *= 340282366920938463463374607431768211456;
+        return r;
+    }
+
+    /// @dev Index of the most significant set bit (Uniswap V3 BitMath.mostSignificantBit)
+    function _msb(uint x) internal pure returns (uint) {
+        require(x > 0, "msb of zero");
+        uint v = x;
+        uint r = 0;
+        if (v >= 340282366920938463463374607431768211456) { v /= 340282366920938463463374607431768211456; r += 128; }
+        if (v >= 18446744073709551616) { v /= 18446744073709551616; r += 64; }
+        if (v >= 4294967296) { v /= 4294967296; r += 32; }
+        if (v >= 65536) { v /= 65536; r += 16; }
+        if (v >= 256)   { v /= 256;   r += 8; }
+        if (v >= 16)    { v /= 16;    r += 4; }
+        if (v >= 4)     { v /= 4;     r += 2; }
+        if (v >= 2)     { r += 1; }
+        return r;
+    }
+
+    /// @dev Index of the least significant set bit (Uniswap V3 BitMath.leastSignificantBit)
+    function _lsb(uint x) internal pure returns (uint) {
+        require(x > 0, "lsb of zero");
+        // x & (x - 1) clears the lowest set bit; the difference isolates it
+        uint lowBit = x - (x & (x - 1));
+        return _msb(lowBit);
+    }
+
     // ============ CONSTRUCTOR ============
 
     constructor(address initialOwner) Ownable(initialOwner) {}
@@ -250,7 +338,15 @@ contract record PoolV3 is Ownable {
 
         sqrtPriceWad = initialSqrtPriceWad;
         currentTick = getTickAtSqrtPrice(initialSqrtPriceWad);
-        observationTimestamp = block.timestamp;
+
+        // Bootstrap the oracle ring buffer with a single observation (V3 Oracle.initialize)
+        observationIndex = 0;
+        observationCardinality = 1;
+        observationCardinalityNext = 1;
+        V3Observation storage obs0 = observations[0];
+        obs0.blockTimestamp = block.timestamp;
+        obs0.tickCumulative = 0;
+        obs0.initialized = true;
 
         emit Initialize(initialSqrtPriceWad, currentTick);
     }
@@ -310,6 +406,67 @@ contract record PoolV3 is Ownable {
         return lo;
     }
 
+    // ============ TICK BITMAP (Uniswap V3 TickBitmap) ============
+
+    /// @dev (word index, bit index) of a compressed tick
+    function _bitmapPosition(int compressed) internal pure returns (int, uint) {
+        int wordPos = _floorDiv(compressed, 256);
+        uint bitPos = uint(compressed - wordPos * 256); // always in [0, 255]
+        return (wordPos, bitPos);
+    }
+
+    /// @notice Flip a tick's initialized bit in the bitmap
+    function _flipTick(int tick) internal {
+        require(tick % tickSpacing == 0, "Tick not spaced");
+        (int wordPos, uint bitPos) = _bitmapPosition(tick / tickSpacing);
+        uint bit = _pow2(bitPos);
+        uint word = tickBitmap[wordPos];
+        // XOR without ^ (unsupported): add the bit if clear, remove it if set
+        if ((word & bit) != 0) {
+            tickBitmap[wordPos] = word - bit;
+        } else {
+            tickBitmap[wordPos] = word + bit;
+        }
+    }
+
+    /// @notice Next initialized tick within one bitmap word, in the swap direction
+    /// @param tick The current tick (need not be spacing-aligned)
+    /// @param lte If true search at-or-below `tick` (price moving down), else strictly above (moving up)
+    /// @return next The next initialized tick, or the word boundary if the word has no set bits
+    /// @return initialized Whether `next` is an initialized tick (false = word-boundary sentinel)
+    /// @dev Word-boundary results let the swap loop step word by word, exactly as Uniswap V3;
+    ///      the caller must clamp `next` to [MIN_TICK, MAX_TICK]
+    function _nextInitializedTickWithinOneWord(int tick, bool lte) internal view returns (int, bool) {
+        int compressed = _floorDiv(tick, tickSpacing);
+
+        if (lte) {
+            (int wordPos, uint bitPos) = _bitmapPosition(compressed);
+            // Bits at or below bitPos
+            uint mask = MAX_WORD;
+            if (bitPos < 255) {
+                mask = _pow2(bitPos + 1) - 1;
+            }
+            uint masked = tickBitmap[wordPos] & mask;
+            if (masked != 0) {
+                return ((compressed - int(bitPos - _msb(masked))) * tickSpacing, true);
+            }
+            return ((compressed - int(bitPos)) * tickSpacing, false);
+        }
+
+        (int wordPosUp, uint bitPosUp) = _bitmapPosition(compressed + 1);
+        // Bits at or above bitPosUp: subtract off the low bits
+        uint word = tickBitmap[wordPosUp];
+        uint lowMask = 0;
+        if (bitPosUp > 0) {
+            lowMask = _pow2(bitPosUp) - 1;
+        }
+        uint maskedUp = word - (word & lowMask);
+        if (maskedUp != 0) {
+            return ((compressed + 1 + int(_lsb(maskedUp) - bitPosUp)) * tickSpacing, true);
+        }
+        return ((compressed + 1 + int(255 - bitPosUp)) * tickSpacing, false);
+    }
+
     // ============ AMOUNT MATH ============
 
     /// @notice TokenA amount needed for `liquidityAmt` between two sqrt prices (sqrtLower < sqrtUpper)
@@ -329,81 +486,167 @@ contract record PoolV3 is Ownable {
         return roundUp ? _divRoundUp(numerator, WAD) : numerator / WAD;
     }
 
+    /// @dev Token amounts for `liquidityAmount` over a range at the current price.
+    ///      roundUp=true when depositing (mint), roundUp=false when withdrawing (burn),
+    ///      so rounding always favors the pool
+    function _amountsForLiquidity(
+        int tickLower,
+        int tickUpper,
+        uint liquidityAmount,
+        bool roundUp
+    ) internal view returns (uint, uint) {
+        uint sqrtLower = getSqrtPriceAtTick(tickLower);
+        uint sqrtUpper = getSqrtPriceAtTick(tickUpper);
+        if (currentTick < tickLower) {
+            return (_amountADelta(sqrtLower, sqrtUpper, liquidityAmount, roundUp), 0);
+        }
+        if (currentTick < tickUpper) {
+            return (
+                _amountADelta(sqrtPriceWad, sqrtUpper, liquidityAmount, roundUp),
+                _amountBDelta(sqrtLower, sqrtPriceWad, liquidityAmount, roundUp)
+            );
+        }
+        return (0, _amountBDelta(sqrtLower, sqrtUpper, liquidityAmount, roundUp));
+    }
+
     /// @notice Token amounts required to mint `liquidityAmount` over a range at the current price
     function getAmountsForLiquidity(
         int tickLower,
         int tickUpper,
         uint liquidityAmount
     ) public view returns (uint tokenAAmount, uint tokenBAmount) {
-        uint sqrtLower = getSqrtPriceAtTick(tickLower);
-        uint sqrtUpper = getSqrtPriceAtTick(tickUpper);
-        if (currentTick < tickLower) {
-            tokenAAmount = _amountADelta(sqrtLower, sqrtUpper, liquidityAmount, true);
-        } else if (currentTick < tickUpper) {
-            tokenAAmount = _amountADelta(sqrtPriceWad, sqrtUpper, liquidityAmount, true);
-            tokenBAmount = _amountBDelta(sqrtLower, sqrtPriceWad, liquidityAmount, true);
-        } else {
-            tokenBAmount = _amountBDelta(sqrtLower, sqrtUpper, liquidityAmount, true);
-        }
-        return (tokenAAmount, tokenBAmount);
+        return _amountsForLiquidity(tickLower, tickUpper, liquidityAmount, true);
     }
 
-    // ============ TWAP ORACLE ============
+    // ============ TWAP ORACLE (Uniswap V3 Oracle, tick accumulator only) ============
 
-    /// @notice Advance the tick-seconds accumulator using the tick in effect since the last update
-    function _updateOracle() internal {
-        if (block.timestamp > observationTimestamp) {
-            tickCumulative += currentTick * int(block.timestamp - observationTimestamp);
-            observationTimestamp = block.timestamp;
+    /// @notice Record a checkpoint of the tick accumulator (at most one per timestamp)
+    /// @dev Called before any state-changing operation, so it always integrates the tick
+    ///      that was in effect since the previous observation (V3 Oracle.write)
+    function _writeObservation() internal {
+        V3Observation storage last = observations[observationIndex];
+        if (last.blockTimestamp == block.timestamp) {
+            return;
+        }
+
+        uint cardinality = observationCardinality;
+        // Grow into pre-announced slots only when the ring is about to wrap (V3 semantics)
+        if (observationCardinalityNext > cardinality && observationIndex == cardinality - 1) {
+            cardinality = observationCardinalityNext;
+        }
+
+        uint indexUpdated = (observationIndex + 1) % cardinality;
+        int newCumulative = last.tickCumulative + currentTick * int(block.timestamp - last.blockTimestamp);
+
+        V3Observation storage obs = observations[indexUpdated];
+        obs.blockTimestamp = block.timestamp;
+        obs.tickCumulative = newCumulative;
+        obs.initialized = true;
+
+        observationIndex = indexUpdated;
+        observationCardinality = cardinality;
+    }
+
+    /// @notice Grow the observation ring buffer (permissionless, as in Uniswap V3)
+    /// @param next The desired minimum ring size
+    function increaseObservationCardinalityNext(uint next) external nonReentrant {
+        require(next > 0 && next <= MAX_CARDINALITY, "Invalid cardinality");
+        if (next > observationCardinalityNext) {
+            emit IncreaseObservationCardinalityNext(observationCardinalityNext, next);
+            observationCardinalityNext = next;
         }
     }
 
-    /// @notice Current tick-seconds accumulator and timestamp
-    /// @dev TWAP tick over [t1, t2] = (tickCumulative(t2) - tickCumulative(t1)) / (t2 - t1);
-    ///      TWAP price = 1.0001^twapTick (geometric mean, V3-style)
-    function observe() external view returns (int tickCumulative_, uint timestamp) {
-        tickCumulative_ = tickCumulative;
-        if (block.timestamp > observationTimestamp) {
-            tickCumulative_ += currentTick * int(block.timestamp - observationTimestamp);
+    /// @notice Read an observation slot
+    function getObservation(uint slot) external view returns (uint blockTimestamp, int tickCumulative, bool initialized) {
+        V3Observation storage obs = observations[slot];
+        return (obs.blockTimestamp, obs.tickCumulative, obs.initialized);
+    }
+
+    /// @dev Ring binary search for the two observations straddling `target` (V3 Oracle.binarySearch).
+    ///      Precondition: oldest.blockTimestamp <= target < newest.blockTimestamp
+    function _observationBinarySearch(uint target) internal view returns (uint, uint) {
+        uint cardinality = observationCardinality;
+        int l = int((observationIndex + 1) % cardinality); // oldest slot
+        int r = l + int(cardinality) - 1;                  // newest slot (mod cardinality)
+
+        // Bounded defensively; the precondition guarantees convergence well within this
+        for (uint iter = 0; iter < 2 * cardinality + 16; iter++) {
+            int i = (l + r) / 2;
+            uint beforeIdx = uint(i) % cardinality;
+            V3Observation storage beforeOrAt = observations[beforeIdx];
+
+            // Uninitialized slots (ring grew but hasn't wrapped): keep to the recent side
+            if (!beforeOrAt.initialized) {
+                l = i + 1;
+                continue;
+            }
+
+            uint afterIdx = (uint(i) + 1) % cardinality;
+            V3Observation storage atOrAfter = observations[afterIdx];
+
+            if (beforeOrAt.blockTimestamp <= target && target <= atOrAfter.blockTimestamp) {
+                return (beforeIdx, afterIdx);
+            }
+            if (beforeOrAt.blockTimestamp > target) {
+                r = i - 1;
+            } else {
+                l = i + 1;
+            }
         }
-        return (tickCumulative_, block.timestamp);
+        require(false, "Observation search failed");
+        return (0, 0);
+    }
+
+    /// @notice Tick accumulator as of `secondsAgo` seconds ago (V3 Oracle.observeSingle)
+    /// @dev TWAP tick over a window w = (observe(0) - observe(w)) / w;
+    ///      TWAP price = 1.0001^twapTick (geometric mean, V3-style).
+    ///      Reverts with 'OLD' when the ring no longer holds data that far back —
+    ///      call increaseObservationCardinalityNext to retain a longer history.
+    function observe(uint secondsAgo) public view returns (int) {
+        if (secondsAgo == 0) {
+            V3Observation storage last = observations[observationIndex];
+            if (last.blockTimestamp == block.timestamp) {
+                return last.tickCumulative;
+            }
+            return last.tickCumulative + currentTick * int(block.timestamp - last.blockTimestamp);
+        }
+
+        uint target = block.timestamp - secondsAgo;
+
+        // At or after the newest observation: extrapolate with the current tick
+        V3Observation storage newest = observations[observationIndex];
+        if (newest.blockTimestamp <= target) {
+            return newest.tickCumulative + currentTick * int(target - newest.blockTimestamp);
+        }
+
+        // Older than the oldest retained observation: unanswerable
+        uint oldestIdx = (observationIndex + 1) % observationCardinality;
+        V3Observation storage oldestCandidate = observations[oldestIdx];
+        if (!oldestCandidate.initialized) {
+            oldestIdx = 0; // ring grew but has not wrapped: true oldest is slot 0
+        }
+        V3Observation storage oldest = observations[oldestIdx];
+        require(oldest.blockTimestamp <= target, "OLD");
+
+        (uint beforeIdx, uint afterIdx) = _observationBinarySearch(target);
+        V3Observation storage beforeOrAt = observations[beforeIdx];
+        V3Observation storage atOrAfter = observations[afterIdx];
+
+        if (beforeOrAt.blockTimestamp == target) {
+            return beforeOrAt.tickCumulative;
+        }
+        if (atOrAfter.blockTimestamp == target) {
+            return atOrAfter.tickCumulative;
+        }
+        // Linear interpolation between the surrounding observations
+        return beforeOrAt.tickCumulative
+            + ((atOrAfter.tickCumulative - beforeOrAt.tickCumulative)
+                * int(target - beforeOrAt.blockTimestamp))
+              / int(atOrAfter.blockTimestamp - beforeOrAt.blockTimestamp);
     }
 
     // ============ TICK MANAGEMENT ============
-
-    function _insertTick(int tick) internal {
-        tickList.push(tick);
-    }
-
-    function _removeTick(int tick) internal {
-        for (uint i = 0; i < tickList.length; i++) {
-            if (tickList[i] == tick) {
-                tickList[i] = tickList[tickList.length - 1];
-                tickList.length--;
-                return;
-            }
-        }
-    }
-
-    /// @notice Find the next initialized tick in the swap direction
-    /// @param isAToB If true price moves down (find greatest tick <= currentTick), else up (smallest tick > currentTick)
-    function _nextInitializedTick(bool isAToB) internal view returns (int nextTick, bool found) {
-        for (uint i = 0; i < tickList.length; i++) {
-            int t = tickList[i];
-            if (isAToB) {
-                if (t <= currentTick && (!found || t > nextTick)) {
-                    nextTick = t;
-                    found = true;
-                }
-            } else {
-                if (t > currentTick && (!found || t < nextTick)) {
-                    nextTick = t;
-                    found = true;
-                }
-            }
-        }
-        return (nextTick, found);
-    }
 
     /// @notice Update a tick's liquidity bookkeeping for a position change
     /// @return True when the tick's liquidity just dropped to zero; the caller must
@@ -427,7 +670,7 @@ contract record PoolV3 is Ownable {
                 info.feeGrowthOutsideB = 0;
             }
             info.initialized = true;
-            _insertTick(tick);
+            _flipTick(tick);
         }
 
         info.liquidityGross = grossAfter;
@@ -442,7 +685,7 @@ contract record PoolV3 is Ownable {
             // _updatePosition still needs it for the position's final fee accrual, and
             // clears the tick afterwards (V3 clears ticks only after Position.update)
             info.initialized = false;
-            _removeTick(tick);
+            _flipTick(tick);
             return true;
         }
         return false;
@@ -562,10 +805,10 @@ contract record PoolV3 is Ownable {
         require(block.timestamp <= deadline, "EXPIRED");
         _checkTicks(tickLower, tickUpper);
 
-        _updateOracle();
+        _writeObservation();
         _updatePosition(msg.sender, tickLower, tickUpper, int(liquidityAmount));
 
-        (tokenAAmount, tokenBAmount) = getAmountsForLiquidity(tickLower, tickUpper, liquidityAmount);
+        (tokenAAmount, tokenBAmount) = _amountsForLiquidity(tickLower, tickUpper, liquidityAmount, true);
         require(tokenAAmount > 0 || tokenBAmount > 0, "Zero amounts");
         require(tokenAAmount <= maxTokenAAmount && tokenBAmount <= maxTokenBAmount, "Slippage check failed");
 
@@ -599,20 +842,13 @@ contract record PoolV3 is Ownable {
         require(block.timestamp <= deadline, "EXPIRED");
         _checkTicks(tickLower, tickUpper);
 
-        _updateOracle();
+        _writeObservation();
         _updatePosition(msg.sender, tickLower, tickUpper, -int(liquidityAmount));
 
         if (liquidityAmount > 0) {
-            uint sqrtLower = getSqrtPriceAtTick(tickLower);
-            uint sqrtUpper = getSqrtPriceAtTick(tickUpper);
-            if (currentTick < tickLower) {
-                tokenAAmount = _amountADelta(sqrtLower, sqrtUpper, liquidityAmount, false);
-            } else if (currentTick < tickUpper) {
-                tokenAAmount = _amountADelta(sqrtPriceWad, sqrtUpper, liquidityAmount, false);
-                tokenBAmount = _amountBDelta(sqrtLower, sqrtPriceWad, liquidityAmount, false);
+            (tokenAAmount, tokenBAmount) = _amountsForLiquidity(tickLower, tickUpper, liquidityAmount, false);
+            if (currentTick >= tickLower && currentTick < tickUpper) {
                 liquidity -= liquidityAmount;
-            } else {
-                tokenBAmount = _amountBDelta(sqrtLower, sqrtUpper, liquidityAmount, false);
             }
 
             V3Position storage pos = positions[msg.sender][tickLower][tickUpper];
@@ -659,7 +895,9 @@ contract record PoolV3 is Ownable {
     /// @param isAToB If true, swap tokenA for tokenB (price moves down); else tokenB for tokenA
     /// @param amountIn Maximum input amount (fully consumed unless the price limit or liquidity edge is hit)
     /// @param minAmountOut Minimum output amount (slippage protection)
-    /// @param sqrtPriceLimitWad Optional price limit (0 = no limit beyond tick bounds)
+    /// @param sqrtPriceLimitWad Optional price limit (0 = no limit beyond tick bounds).
+    ///        Must be strictly inside (minSqrtPrice, maxSqrtPrice), as in Uniswap V3
+    /// @return amountInUsed The input tokens actually consumed (may be < amountIn on a partial fill)
     /// @return amountOut The output tokens sent to the caller
     function swap(
         bool isAToB,
@@ -667,20 +905,25 @@ contract record PoolV3 is Ownable {
         uint minAmountOut,
         uint sqrtPriceLimitWad,
         uint deadline
-    ) external whenNotPaused onlyActiveTokens nonReentrant returns (uint amountOut) {
+    ) external whenNotPaused onlyActiveTokens nonReentrant returns (uint amountInUsed, uint amountOut) {
         require(amountIn > 0 && minAmountOut > 0, "Invalid input");
         require(block.timestamp <= deadline, "EXPIRED");
 
-        _updateOracle();
+        _writeObservation();
 
+        // Price limits are strictly exclusive of the tick-domain endpoints (V3 semantics):
+        // the pool price can approach but never reach the MIN/MAX sqrt price, so the
+        // ticks at the domain edge can never be crossed and currentTick stays in range
+        uint minSqrt = getSqrtPriceAtTick(MIN_TICK);
+        uint maxSqrt = getSqrtPriceAtTick(MAX_TICK);
         uint limit = sqrtPriceLimitWad;
         if (limit == 0) {
-            limit = isAToB ? getSqrtPriceAtTick(MIN_TICK) : getSqrtPriceAtTick(MAX_TICK);
+            limit = isAToB ? minSqrt + 1 : maxSqrt - 1;
         }
         if (isAToB) {
-            require(limit < sqrtPriceWad && limit >= getSqrtPriceAtTick(MIN_TICK), "Invalid price limit");
+            require(limit < sqrtPriceWad && limit > minSqrt, "Invalid price limit");
         } else {
-            require(limit > sqrtPriceWad && limit <= getSqrtPriceAtTick(MAX_TICK), "Invalid price limit");
+            require(limit > sqrtPriceWad && limit < maxSqrt, "Invalid price limit");
         }
 
         uint feeRate = feeBps;
@@ -689,44 +932,39 @@ contract record PoolV3 is Ownable {
         uint protocolFees = 0;
 
         while (remaining > 0 && sqrtPriceWad != limit) {
-            (int nextTick, bool found) = _nextInitializedTick(isAToB);
+            uint stepStartSqrt = sqrtPriceWad;
 
-            // Target price for this step: next initialized tick, clamped by the limit
-            uint tickSqrt = 0;
+            (int foundTick, bool nextInitialized) = _nextInitializedTickWithinOneWord(currentTick, isAToB);
+            int nextTick = foundTick;
+            if (nextTick < MIN_TICK) {
+                nextTick = MIN_TICK;
+            } else if (nextTick > MAX_TICK) {
+                nextTick = MAX_TICK;
+            }
+            uint tickSqrt = getSqrtPriceAtTick(nextTick);
+
+            // Target price for this step: the next tick (initialized or word boundary),
+            // clamped by the limit. >= / <= (not strict): a tick sitting exactly on the
+            // limit must still be the step target so it gets crossed when reached
+            // (Uniswap V3 semantics); otherwise currentTick would pass the tick while
+            // its liquidityNet was never applied
             uint targetSqrt = limit;
             bool targetIsTick = false;
-            if (found) {
-                tickSqrt = getSqrtPriceAtTick(nextTick);
-                // >= / <= (not strict): a tick sitting exactly on the limit must still be
-                // the step target so it gets crossed when reached (Uniswap V3 semantics);
-                // otherwise currentTick would pass the tick while its liquidityNet was never applied
-                if (isAToB ? tickSqrt >= limit : tickSqrt <= limit) {
-                    targetSqrt = tickSqrt;
-                    targetIsTick = true;
-                }
-            }
-
-            if (liquidity == 0) {
-                // No in-range liquidity: jump to the target without trading
-                sqrtPriceWad = targetSqrt;
-                if (targetIsTick) {
-                    _crossTick(nextTick, isAToB);
-                    currentTick = isAToB ? nextTick - 1 : nextTick;
-                    continue;
-                }
-                currentTick = getTickAtSqrtPrice(sqrtPriceWad);
-                break; // reached the limit with nothing to trade against
+            if (isAToB ? tickSqrt >= limit : tickSqrt <= limit) {
+                targetSqrt = tickSqrt;
+                targetIsTick = true;
             }
 
             // Net input needed to move the price all the way to the target
+            // (zero when there is no in-range liquidity: the price jumps for free)
             uint netNeeded = isAToB
                 ? _amountADelta(targetSqrt, sqrtPriceWad, liquidity, true)
                 : _amountBDelta(sqrtPriceWad, targetSqrt, liquidity, true);
             uint netAvail = (remaining * (10000 - feeRate)) / 10000;
 
-            uint netUsed;
-            uint grossUsed;
-            uint newSqrt;
+            uint netUsed = 0;
+            uint grossUsed = 0;
+            uint newSqrt = 0;
             if (netAvail >= netNeeded) {
                 // Reach the target exactly
                 netUsed = netNeeded;
@@ -770,10 +1008,15 @@ contract record PoolV3 is Ownable {
             sqrtPriceWad = newSqrt;
 
             if (targetIsTick && newSqrt == tickSqrt) {
-                _crossTick(nextTick, isAToB);
+                // Reached the next tick: apply its liquidity if it is a real initialized
+                // tick; word-boundary sentinels just advance the search window (V3 does
+                // the same tick bookkeeping for both)
+                if (nextInitialized) {
+                    _crossTick(nextTick, isAToB);
+                }
                 currentTick = isAToB ? nextTick - 1 : nextTick;
-            } else {
-                currentTick = getTickAtSqrtPrice(sqrtPriceWad);
+            } else if (newSqrt != stepStartSqrt) {
+                currentTick = getTickAtSqrtPrice(newSqrt);
             }
         }
 
@@ -799,11 +1042,41 @@ contract record PoolV3 is Ownable {
         }
 
         emit Swap(msg.sender, address(inputToken), address(outputToken), consumed, amountOut, sqrtPriceWad, currentTick, liquidity);
-        return amountOut;
+        return (consumed, amountOut);
+    }
+
+    // ============ BALANCE RECONCILIATION (mirrors Pool.sol) ============
+
+    /// @notice Sync tracked balances with actual token balances (e.g., after a token migration)
+    /// @dev Unlike V2, this does not touch pricing: the pool price lives in sqrtPriceWad,
+    ///      so sync only repairs the tracked-balance bookkeeping used by collect/skim
+    function sync() external onlyPoolV3Factory {
+        tokenABalance = tokenA.balanceOf(address(this));
+        tokenBBalance = tokenB.balanceOf(address(this));
+        emit Sync(tokenABalance, tokenBBalance);
+    }
+
+    /// @notice Transfer any token balance in excess of the tracked balances to `to`
+    /// @param to Address to send the excess tokens to
+    function skim(address to) external onlyPoolV3Factory {
+        require(to != address(0), "Invalid recipient");
+        uint excessA = tokenA.balanceOf(address(this)) - tokenABalance;
+        uint excessB = tokenB.balanceOf(address(this)) - tokenBBalance;
+
+        if (excessA > 0) {
+            require(tokenA.transfer(to, excessA), "TokenA skim failed");
+        }
+        if (excessB > 0) {
+            require(tokenB.transfer(to, excessB), "TokenB skim failed");
+        }
+
+        emit Skim(to, excessA, excessB);
     }
 
     /// @notice Transfer the pool to a new factory
-    /// @dev This function can only be called by the current PoolV3Factory contract
+    /// @dev This function can only be called by the current PoolV3Factory contract.
+    ///      The new factory must then adopt the pool via registerPoolsFromFactory
+    ///      so its registry stays consistent
     function transferPoolToFactory(address newFactory) external onlyPoolV3Factory {
         require(newFactory != address(0), "Invalid factory address");
         poolV3Factory = PoolV3Factory(newFactory);
