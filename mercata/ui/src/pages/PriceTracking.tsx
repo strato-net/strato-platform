@@ -33,7 +33,7 @@ type ChartType = 'line' | 'candlestick';
 type SpotPriceMode = 'both' | 'pool' | 'spot';
 
 interface AssetPriceData {
-  asset: EarningAsset | { address: string; symbol: string; isPoolToken: boolean };
+  asset: EarningAsset | { address: string; symbol: string };
   data: OHLCData[];
   loading: boolean;
   error?: string;
@@ -623,7 +623,6 @@ const PriceTracking = () => {
               price: token.price || token.token?.price || '0',
               balance,
               value: token.value || '0',
-              isPoolToken: false, // No LP tokens in the list
               isPool: false, // Regular token, not a pool
               collateralBalance: '0',
             };
@@ -648,7 +647,6 @@ const PriceTracking = () => {
             price: poolPrice,
             balance: '0',
             value: '0',
-            isPoolToken: false,
             isPool: true, // This is a pool, not an LP token
             collateralBalance: '0',
             poolName: pool.poolName,
@@ -1388,8 +1386,6 @@ const PriceTracking = () => {
                   <SelectContent>
                     <SelectItem value="none">Select asset...</SelectItem>
                     {filteredAssets.map((a) => {
-                      const isPool = (a as any).isPool === true;
-                      const isLPToken = a.isPoolToken && !isPool;
                       const label = a.symbol;
                       return (
                         <SelectItem key={a.address} value={a.address}>

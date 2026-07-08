@@ -17,6 +17,7 @@ import {
 } from "../helpers/earnRewards.helper";
 import { computeEquityFromMaps, computeVaultPerformanceMetrics, safeBigInt } from "../helpers/vaultPerformance.helper";
 import { listVaultDefs, getYieldVaultInfo } from "./yieldVault.service";
+import { getStratoStakingNetworkApy } from "./staking.service";
 import { getCarryVaultUsdPriceMap } from "../helpers/oracle.helper";
 import { ApySource, TokenApyEntry } from "@mercata/shared-types";
 
@@ -68,6 +69,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   addLendingApys(add, ctx, rewardActivities);
   addDirectMintRewards(add, rewardActivities);
   addSaveUsdstApys(add, ctx, phase1b, rewardActivities, saveUsdstVault);
+  await addStakingApys(accessToken, add, rewardActivities);
 
   const exchangeRateHistory = indexYieldHistoryRows(mergeBackfillRows(phase1.exchangeRateRows ?? []));
   const baseYieldByAddr = addBaseYieldApys(add, exchangeRateHistory, anchorsMs);
@@ -312,6 +314,22 @@ function addDirectMintRewards(add: AddFn, rewardActivities: any[]) {
   const activity = findRewardActivity(rewardActivities, { sourceContract: constants.mercataBridge });
   const apy = computeRewardsApy(activity?.emissionRate, activity?.totalStakeUsd);
   if (apy) add(constants.USDST, { source: "rewards", apy, meta: "direct_mint" });
+}
+
+// STRATO staking: native schedule APY plus the CATA rewards activity (if one is
+// registered against the staking contract), both keyed to the STRATO token so
+// the portfolio row shows the combined figure.
+async function addStakingApys(accessToken: string, add: AddFn, rewardActivities: any[]) {
+  const stratoToken = normalizeAddress(constants.stratoToken);
+  const stakingSource = normalizeAddress(constants.stratoStaking);
+  if (!stratoToken || !stakingSource) return;
+
+  const nativeApy = await getStratoStakingNetworkApy(accessToken).catch(() => null);
+  if (isPositiveApy(nativeApy)) add(stratoToken, { source: "staking", apy: nativeApy });
+
+  const activity = findRewardActivity(rewardActivities, { sourceContract: stakingSource });
+  const rewardsApy = computeRewardsApy(activity?.emissionRate, activity?.totalStakeUsd);
+  if (rewardsApy) add(stratoToken, { source: "rewards", apy: rewardsApy, meta: "staking" });
 }
 
 function addSaveUsdstApys(add: AddFn, ctx: Phase1Ctx, phase1b: Phase1bData, rewardActivities: any[], saveUsdstVault: string) {

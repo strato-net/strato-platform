@@ -7,7 +7,7 @@ const { DECIMALS, BPS_DIVISOR } = constants;
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 export const APY_UNAVAILABLE = "-";
-const CATA_PRICE_USD = 0.25;
+const CATA_PRICE_USD = 0.9;
 const SECONDS_PER_YEAR = 86400 * 365;
 
 const STAKE_SEMANTICS = stakeSemanticsConfig as any;
@@ -91,6 +91,19 @@ function computeRewardStakeUsd(
 
   if (USD_NOTIONAL_SWAP_SOURCES.has(sourceContract) || USD_NOTIONAL_DEPOSIT_COMPLETED_SOURCES.has(sourceContract) || USD_NOTIONAL_AMOUNT_USD_SOURCES.has(sourceContract))
     return { stakeAssetAddress: null, totalStakeUsd: totalStake || "0" };
+
+  // STRATO staking: the activity's stake is in STRATO token units, but the
+  // source is the staking contract, so the price lookup must go through the
+  // configured STRATO token rather than the source address itself.
+  const stratoStakingSource = normalizeAddress(constants.stratoStaking);
+  if (stratoStakingSource && sourceContract === stratoStakingSource) {
+    const stratoToken = normalizeAddress(constants.stratoToken);
+    const stratoPrice = getPriceForAddress(ctx.priceMap, stratoToken);
+    return {
+      stakeAssetAddress: stratoToken || null,
+      totalStakeUsd: stratoPrice ? toUsdValue(totalStake, stratoPrice) : null,
+    };
+  }
 
   const stakeAssetAddress = TOKEN_UNITS_SOURCES.has(sourceContract) || (saveUsdstSource && sourceContract === saveUsdstSource)
     ? sourceContract : null;
