@@ -191,6 +191,7 @@ const resolveTraceEdge = async (lot: TraceLot): Promise<TraceEdge> => {
 
 interface TraceQueueItem {
   cursor: TraceCursor;
+  coverageAmount: string;
   node: WithdrawalAuditTraceNode;
 }
 
@@ -247,17 +248,18 @@ const traceLotsBackward = async (
         depth: 0,
         beforeEvent: withdrawalEvent,
       },
+      coverageAmount: context.withdrawal.stratoTokenAmount,
       node: traceTree,
     },
   ];
   let stoppedEarly = false;
 
   while (queue.length) {
-    const { cursor, node } = queue.shift()!;
+    const { cursor, coverageAmount, node } = queue.shift()!;
 
     if (context.maxDepth !== undefined && cursor.depth >= context.maxDepth) {
       stoppedEarly = true;
-      addCoverage(coverage, "unknown", cursor.amount);
+      addCoverage(coverage, "unknown", coverageAmount);
       node.children.push(
         createNode(
           "max_depth",
@@ -282,7 +284,7 @@ const traceLotsBackward = async (
     const fundingLots = await repository.fetchFundingLots(cursor);
 
     if (!fundingLots.length) {
-      addCoverage(coverage, "unknown", cursor.amount);
+      addCoverage(coverage, "unknown", coverageAmount);
       node.children.push(
         createNode(
           "unknown",
@@ -304,8 +306,27 @@ const traceLotsBackward = async (
     }
 
     let coveredByLots = "0";
-    for (const lot of fundingLots) {
+    let coveredByLotsCoverage = "0";
+    const cursorAmount = BigInt(cursor.amount || "0");
+    const cursorCoverageAmount = BigInt(coverageAmount || "0");
+    const totalFundingAmount = fundingLots.reduce(
+      (total, lot) => total + BigInt(lot.amount || "0"),
+      0n,
+    );
+
+    for (const [index, lot] of fundingLots.entries()) {
       coveredByLots = addAmounts(coveredByLots, lot.amount);
+      const lotAmount = BigInt(lot.amount || "0");
+      const isLastLot = index === fundingLots.length - 1;
+      const lotCoverageAmount =
+        cursorAmount > 0n && isLastLot && totalFundingAmount >= cursorAmount
+          ? cursorCoverageAmount - BigInt(coveredByLotsCoverage || "0")
+          : (cursorCoverageAmount * lotAmount) / (cursorAmount || 1n);
+      const lotCoverageAmountString = lotCoverageAmount.toString();
+      coveredByLotsCoverage = addAmounts(
+        coveredByLotsCoverage,
+        lotCoverageAmountString,
+      );
       const lotNode = createNode(
         "lot",
         lot.source,
@@ -327,7 +348,7 @@ const traceLotsBackward = async (
       const trustAnchor = await repository.fetchTrustAnchor(edge);
 
       if (trustAnchor) {
-        addCoverage(coverage, "clean", lot.amount);
+        addCoverage(coverage, "clean", lotCoverageAmountString);
         lotNode.children.push(
           createNode(
             "trust_anchor",
@@ -367,7 +388,7 @@ const traceLotsBackward = async (
       lotNode.children.push(edgeNode);
 
       if (edge.result === "tainted") {
-        addCoverage(coverage, "tainted", lot.amount);
+        addCoverage(coverage, "tainted", lotCoverageAmountString);
         continue;
       }
 
@@ -397,17 +418,22 @@ const traceLotsBackward = async (
             beforeEvent: edge.event,
             sourceLot: edge.from,
           },
+          coverageAmount: lotCoverageAmountString,
           node: cursorNode,
         });
         continue;
       }
 
-      addCoverage(coverage, "unknown", lot.amount);
+      addCoverage(coverage, "unknown", lotCoverageAmountString);
     }
 
     if (compareAmounts(coveredByLots, cursor.amount) < 0) {
       const unknownRemainder = subtractAmounts(cursor.amount, coveredByLots);
-      addCoverage(coverage, "unknown", unknownRemainder);
+      const unknownCoverageRemainder = subtractAmounts(
+        coverageAmount,
+        coveredByLotsCoverage,
+      );
+      addCoverage(coverage, "unknown", unknownCoverageRemainder);
       node.children.push(
         createNode(
           "unknown",
@@ -417,10 +443,11 @@ const traceLotsBackward = async (
           {
             actor: cursor.owner,
             token: cursor.token,
-            amount: unknownRemainder,
+            amount: unknownCoverageRemainder,
             evidence: {
               requiredAmount: cursor.amount,
               coveredAmount: coveredByLots,
+              missingEvidenceAmount: unknownRemainder,
               depth: String(cursor.depth),
             },
           },
