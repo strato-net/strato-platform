@@ -560,6 +560,109 @@ contract Describe_SaveUSDSTVault is Authorizable {
         require(vault.totalSupply() == 0, "all shares burned");
     }
 
+    function it_caps_accrual_by_distributor_allowance() public {
+        User saver = new User();
+        User distributor = new User();
+
+        Token(USDST).mint(address(saver), 100e18);
+        saver.do(USDST, "approve", address(vault), INFINITY);
+        saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
+
+        // Distributor holds plenty of balance but only approves 1 USDST.
+        Token(USDST).mint(address(distributor), 25e18);
+        distributor.do(USDST, "approve", address(vault), 1e18);
+        configureFundedAccrual(distributor, MAX_RATE);
+
+        fastForward(MONTH);
+        (uint target, uint funded) = vault.pendingAccrual();
+        require(target > 1e18, "target should exceed the approved amount");
+        require(funded == 1e18, "funded amount should be capped by allowance");
+
+        uint credited = vault.accrue();
+        require(credited == 1e18, "accrual should be capped by allowance");
+        require(vault.totalAssets() == 101e18, "managed assets should only include allowed amount");
+        require(IERC20(USDST).balanceOf(address(distributor)) == 24e18, "distributor keeps unapproved balance");
+    }
+
+    function it_accrues_at_old_rate_before_applying_new_rate() public {
+        User saver = new User();
+        User distributor = new User();
+
+        Token(USDST).mint(address(saver), 100e18);
+        saver.do(USDST, "approve", address(vault), INFINITY);
+        saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
+
+        Token(USDST).mint(address(distributor), 25e18);
+        distributor.do(USDST, "approve", address(vault), INFINITY);
+        configureFundedAccrual(distributor, MAX_RATE);
+
+        fastForward(MONTH);
+
+        // Dropping the rate to flat must first settle the elapsed month at MAX_RATE.
+        uint credited = vault.setPerSecondSavingsRate(1e27);
+        require(credited > 5e18 && credited < 6e18, "rate change should accrue elapsed period at old rate");
+        require(vault.totalAssets() == 100e18 + credited, "managed assets should include old-rate accrual");
+        require(vault.lastAccrual() == block.timestamp, "accrual clock should reset on rate change");
+
+        fastForward(MONTH);
+        require(vault.accrue() == 0, "flat rate should stop further accrual");
+        require(vault.totalAssets() == 100e18 + credited, "no accrual should occur at flat rate");
+    }
+
+    function it_continues_accrual_while_paused() public {
+        User saver = new User();
+        User distributor = new User();
+
+        Token(USDST).mint(address(saver), 100e18);
+        saver.do(USDST, "approve", address(vault), INFINITY);
+        saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
+
+        Token(USDST).mint(address(distributor), 25e18);
+        distributor.do(USDST, "approve", address(vault), INFINITY);
+        configureFundedAccrual(distributor, MAX_RATE);
+
+        fastForward(MONTH);
+        vault.pause();
+
+        // Documents current behavior: pause blocks user flows but not reward streaming.
+        // Emergency-stopping accrual requires zeroing the rate or revoking the distributor allowance.
+        uint credited = vault.accrue();
+        require(credited > 0, "accrue should still credit while paused");
+        require(vault.totalAssets() == 100e18 + credited, "accrual should land while paused");
+
+        vault.unpause();
+        uint saverBefore = IERC20(USDST).balanceOf(address(saver));
+        saver.do(address(vault), "redeem(uint256,address,address)", 100e18, address(saver), address(saver));
+        uint saverGot = IERC20(USDST).balanceOf(address(saver)) - saverBefore;
+        require(saverGot == 100e18 + credited, "saver should receive paused-period accrual after unpause");
+    }
+
+    function it_accrues_within_redeem_so_exit_includes_pending_yield() public {
+        User saver = new User();
+        User distributor = new User();
+
+        Token(USDST).mint(address(saver), 100e18);
+        saver.do(USDST, "approve", address(vault), INFINITY);
+        saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
+
+        Token(USDST).mint(address(distributor), 25e18);
+        distributor.do(USDST, "approve", address(vault), INFINITY);
+        configureFundedAccrual(distributor, MAX_RATE);
+
+        fastForward(MONTH);
+        (uint target, uint funded) = vault.pendingAccrual();
+        require(target == funded && funded > 0, "expected funded pending accrual");
+
+        // Redeem without an explicit accrue() call: the exit itself must settle pending yield.
+        uint saverBefore = IERC20(USDST).balanceOf(address(saver));
+        saver.do(address(vault), "redeem(uint256,address,address)", 100e18, address(saver), address(saver));
+        uint saverGot = IERC20(USDST).balanceOf(address(saver)) - saverBefore;
+
+        require(saverGot == 100e18 + funded, "redeem should pay principal plus pending accrual");
+        require(vault.totalSupply() == 0, "all shares should be burned");
+        require(vault.totalAssets() == 0, "vault should be empty");
+    }
+
     /// @notice For any deposit amount, deposit then full redeem returns the original amount (within 1 wei rounding).
     function property_deposit_redeem_round_trip_conserves_value(uint seed) public {
         uint amount = (seed % 1000000) + 1;
