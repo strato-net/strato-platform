@@ -376,7 +376,7 @@ const EarnSave = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    document.title = "Save USDST | STRATO";
+    document.title = "USDST Savings Vault | STRATO";
     window.scrollTo(0, 0);
   }, []);
 
@@ -623,7 +623,7 @@ const EarnSave = () => {
         className="transition-all duration-300 md:pl-64"
         style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}
       >
-        <DashboardHeader title="Save USDST" />
+        <DashboardHeader title="USDST Savings Vault" />
 
         <main className="pb-16 md:pb-6">
           {!isLoggedIn && (
@@ -676,7 +676,7 @@ const EarnSave = () => {
                               <PiggyBank className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                             </div>
                             <div>
-                              <h1 className="text-xl md:text-2xl font-semibold tracking-tight">Save USDST</h1>
+                              <h1 className="text-xl md:text-2xl font-semibold tracking-tight">USDST Savings Vault</h1>
                               <p className="text-xs text-muted-foreground">
                                 Simple USD savings, natively on STRATO.
                               </p>

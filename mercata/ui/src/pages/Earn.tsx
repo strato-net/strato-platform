@@ -740,7 +740,7 @@ const Earn = () => {
   const getOpportunityMeta = (opportunity: OpportunityRow) => {
     if (opportunity.kind === "saveUsdst") {
       return {
-        title: "Savings Vault",
+        title: "USDST Savings Vault",
         subtitle: "Stable USD savings with yield plus rewards",
         apyRaw: saveUsdstDisplayApyRaw,
         tvl: saveUsdstTvl,
@@ -1301,7 +1301,7 @@ const Earn = () => {
                                   <div className="w-8 h-8 rounded-full bg-emerald-500/15 dark:bg-emerald-400/15 flex items-center justify-center shrink-0">
                                     <PiggyBank className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                                   </div>
-                                  <p className="font-medium truncate">Savings Vault</p>
+                                  <p className="font-medium truncate">USDST Savings Vault</p>
                                   <Badge variant="secondary" className="text-[10px]">Savings Vault</Badge>
                                   {saveUsdstRewardMeta.earnsRewards && (
                                     <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Rewards</Badge>
