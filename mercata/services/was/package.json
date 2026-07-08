@@ -7,6 +7,8 @@
     "start": "ts-node src/index.ts",
     "dev": "nodemon src/index.ts",
     "build": "tsc",
+    "schema:snapshot": "ts-node scripts/fetchSchemaSnapshot.ts",
+    "test": "node --test --require ts-node/register test/schemaHarness.test.ts",
     "postinstall": "(cd ../../packages/shared-types && npm install && npm run build)"
   },
   "engines": {
