@@ -1,4 +1,6 @@
 import {
+  WithdrawalAuditDecision,
+  WithdrawalAuditRiskLevel,
   WithdrawalAuditTrace,
   WithdrawalAuditTraceNode,
 } from "@mercata/shared-types";
@@ -34,6 +36,36 @@ const addCoverage = (
   } else {
     coverage.unknown = addAmounts(coverage.unknown, amount);
   }
+};
+
+export const classifyTraceCoverage = (
+  coverage: TraceCoverage,
+): {
+  decision: WithdrawalAuditDecision;
+  riskLevel: WithdrawalAuditRiskLevel;
+  summary: string;
+} => {
+  if (BigInt(coverage.tainted || "0") > 0n) {
+    return {
+      decision: "REJECT",
+      riskLevel: "high",
+      summary: "Trace found tainted provenance and should be rejected.",
+    };
+  }
+
+  if (BigInt(coverage.unknown || "0") > 0n) {
+    return {
+      decision: "MANUAL_REVIEW",
+      riskLevel: "medium",
+      summary: "Trace has unknown provenance and requires manual review.",
+    };
+  }
+
+  return {
+    decision: "APPROVE",
+    riskLevel: "low",
+    summary: "Trace reached verified trust anchors for all covered value.",
+  };
 };
 
 const compareAmounts = (left: string, right: string): number => {
@@ -485,16 +517,17 @@ export const createProvenanceEngine = (
       withdrawalEvent || undefined,
       repository,
     );
+    const classification = classifyTraceCoverage(traceResult.coverage);
 
     return {
       status: "complete",
-      decision: "MANUAL_REVIEW",
-      riskLevel: "medium",
+      decision: classification.decision,
+      riskLevel: classification.riskLevel,
       withdrawal: context.withdrawal,
       maxDepth: context.maxDepth,
       stoppedEarly: traceResult.stoppedEarly,
       coverage: traceResult.coverage,
-      summary: traceResult.summary,
+      summary: [...traceResult.summary, classification.summary],
       traceTree: traceResult.traceTree,
       updatedAt: new Date().toISOString(),
     };
