@@ -1,0 +1,32 @@
+{
+  "name": "mercata-withdrawal-auditing-service",
+  "version": "1.0.0",
+  "description": "Withdrawal Auditing Service for Mercata bridge withdrawals",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "ts-node src/index.ts",
+    "dev": "nodemon src/index.ts",
+    "build": "tsc",
+    "postinstall": "(cd ../../packages/shared-types && npm install && npm run build)"
+  },
+  "engines": {
+    "node": ">=22.12 <23.0"
+  },
+  "dependencies": {
+    "@mercata/shared-types": "file:../../packages/shared-types",
+    "axios": "^1.13.6",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "@types/body-parser": "^1.19.5",
+    "@types/cors": "^2.8.18",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0",
+    "nodemon": "^3.0.1",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.2"
+  }
+}
