@@ -1,30 +1,67 @@
 /// <reference types="node" />
 
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createSnapshotBackedCirrusClient } from "../src/localEventStore";
 import { CirrusClient, CirrusEventRow, WasConfig } from "../src/types";
 
-const makeSnapshot = (rows: CirrusEventRow[]): string => {
-  const dir = mkdtempSync(join(tmpdir(), "was-event-snapshot-"));
-  writeFileSync(
-    join(dir, "page-00000.jsonl"),
-    rows.map((row) => JSON.stringify(row)).join("\n") + "\n",
-  );
+const writeSnapshot = (dir: string, rows: CirrusEventRow[]) => {
+  const rowsByBlock = new Map<string, CirrusEventRow[]>();
+  for (const row of rows) {
+    const block = String(row.block_number || "0");
+    rowsByBlock.set(block, [...(rowsByBlock.get(block) || []), row]);
+  }
+  const files = [...rowsByBlock.entries()].map(([block, blockRows]) => {
+    const rangeDir = blockRangeDir(block);
+    const file = `${rangeDir}/block-${block}.jsonl`;
+    mkdirSync(join(dir, rangeDir), { recursive: true });
+    writeFileSync(
+      join(dir, file),
+      blockRows.map((row) => JSON.stringify(row)).join("\n") + "\n",
+    );
+    return {
+      block,
+      file,
+      rowCount: blockRows.length,
+    };
+  });
   writeFileSync(
     join(dir, "manifest.json"),
     JSON.stringify(
       {
         totalRows: rows.length,
-        files: [{ file: "page-00000.jsonl", rowCount: rows.length }],
+        highestBlock: files[files.length - 1]?.block || "0",
+        files,
       },
       null,
       2,
     ),
   );
+};
+
+const blockRangeDir = (block: string): string => {
+  const blockNumber = BigInt(block || "0");
+  if (blockNumber <= 0n) return "0-0";
+
+  return [10000n, 1000n, 100n, 10n].map((span) => {
+    const start = ((blockNumber - 1n) / span) * span + 1n;
+    const end = start + span - 1n;
+    return `${start.toString()}-${end.toString()}`;
+  }).join("/");
+};
+
+const makeSnapshot = (rows: CirrusEventRow[]): string => {
+  const dir = mkdtempSync(join(tmpdir(), "was-event-snapshot-"));
+  writeSnapshot(dir, rows);
   return dir;
 };
 
@@ -56,13 +93,20 @@ const config = (snapshotDir?: string): WasConfig => ({
   eventSnapshotDir: snapshotDir,
 });
 
-const baseClient = (): { client: CirrusClient; calls: string[] } => {
-  const calls: string[] = [];
+const baseClient = (
+  eventRows: CirrusEventRow[] = [],
+): { client: CirrusClient; calls: { table: string; params?: any }[] } => {
+  const calls: { table: string; params?: any }[] = [];
   return {
     calls,
     client: {
-      getRows: async (table) => {
-        calls.push(table);
+      getRows: async (table, params) => {
+        calls.push({ table, params });
+        if (table === "/event") {
+          const offset = Number(params?.offset || 0);
+          const limit = Number(params?.limit || eventRows.length);
+          return eventRows.slice(offset, offset + limit) as any[];
+        }
         return [{ table }] as any[];
       },
       verifyConnectivity: async () => undefined,
@@ -129,9 +173,111 @@ test("snapshot-backed client delegates non-event tables to base client", async (
   const { client, calls } = baseClient();
   const wrapped = createSnapshotBackedCirrusClient(client, config(snapshotDir));
 
-  const rows = await wrapped.getRows<any>("/BlockApps-MercataBridge-withdrawals");
+  const rows = await wrapped.getRows<any>("/not-event");
 
-  assert.deepEqual(rows, [{ table: "/BlockApps-MercataBridge-withdrawals" }]);
-  assert.deepEqual(calls, ["/BlockApps-MercataBridge-withdrawals"]);
+  assert.deepEqual(rows, [{ table: "/not-event" }]);
+  assert.deepEqual(calls.map((call) => call.table), ["/not-event"]);
+});
+
+test("snapshot-backed client refreshes block files before withdrawal candidate queries", async () => {
+  const snapshotDir = makeSnapshot([
+    transfer("10", "1", "tx1"),
+  ]);
+  const { client, calls } = baseClient([
+    transfer("20", "2", "tx2"),
+    transfer("30", "3", "tx3"),
+  ]);
+  const wrapped = createSnapshotBackedCirrusClient(client, config(snapshotDir));
+
+  await wrapped.getRows<any>("/BlockApps-MercataBridge-withdrawals");
+  const rows = await wrapped.getRows<CirrusEventRow>("/event", {
+    block_number: "gt.1",
+    limit: 10,
+  });
+  const manifest = JSON.parse(
+    readFileSync(join(snapshotDir, "manifest.json"), "utf8"),
+  );
+
+  assert.deepEqual(calls.map((call) => call.table), [
+    "/event",
+    "/event",
+    "/event",
+    "/event",
+    "/BlockApps-MercataBridge-withdrawals",
+  ]);
+  assert.equal(calls[0].params.block_number, "gt.1");
+  assert.deepEqual(rows.map((row) => row.transaction_hash), ["tx2", "tx3"]);
+  assert.equal(manifest.highestBlock, "3");
+  assert.equal(manifest.totalRows, 3);
+  assert.deepEqual(
+    manifest.files.map((file: any) => file.file),
+    [
+      "1-10000/1-1000/1-100/1-10/block-1.jsonl",
+      "1-10000/1-1000/1-100/1-10/block-2.jsonl",
+      "1-10000/1-1000/1-100/1-10/block-3.jsonl",
+    ],
+  );
+});
+
+test("snapshot-backed client resolves snapshot roots and renames after append", async () => {
+  const snapshotRoot = mkdtempSync(join(tmpdir(), "was-event-snapshot-root-"));
+  const snapshotDir = join(snapshotRoot, "snapshot-1");
+  mkdirSync(snapshotDir);
+  writeSnapshot(snapshotDir, [
+    transfer("10", "1", "tx1"),
+  ]);
+  const { client } = baseClient([
+    transfer("20", "2", "tx2"),
+  ]);
+  const wrapped = createSnapshotBackedCirrusClient(client, config(snapshotRoot));
+
+  await wrapped.getRows<any>("/BlockApps-StratoNativeBridge-withdrawals");
+  const nextSnapshotDir = join(snapshotRoot, "snapshot-2");
+  const manifest = JSON.parse(
+    readFileSync(join(nextSnapshotDir, "manifest.json"), "utf8"),
+  );
+
+  assert.equal(existsSync(snapshotDir), false);
+  assert.equal(
+    existsSync(join(nextSnapshotDir, "1-10000/1-1000/1-100/1-10/block-2.jsonl")),
+    true,
+  );
+  assert.equal(manifest.highestBlock, "2");
+  assert.equal(manifest.totalRows, 2);
+});
+
+test("snapshot-backed client stores appended block files in nested range folders", async () => {
+  const snapshotDir = makeSnapshot([
+    transfer("10", "100", "tx100"),
+  ]);
+  const { client } = baseClient([
+    transfer("101", "101", "tx101"),
+    transfer("200", "200", "tx200"),
+    transfer("201", "201", "tx201"),
+  ]);
+  const wrapped = createSnapshotBackedCirrusClient(client, config(snapshotDir));
+
+  await wrapped.getRows<any>("/BlockApps-MercataBridge-withdrawals");
+  const manifest = JSON.parse(
+    readFileSync(join(snapshotDir, "manifest.json"), "utf8"),
+  );
+
+  assert.deepEqual(
+    manifest.files.map((file: any) => file.file),
+    [
+      "1-10000/1-1000/1-100/91-100/block-100.jsonl",
+      "1-10000/1-1000/101-200/101-110/block-101.jsonl",
+      "1-10000/1-1000/101-200/191-200/block-200.jsonl",
+      "1-10000/1-1000/201-300/201-210/block-201.jsonl",
+    ],
+  );
+  assert.equal(
+    existsSync(join(snapshotDir, "1-10000/1-1000/101-200/101-110/block-101.jsonl")),
+    true,
+  );
+  assert.equal(
+    existsSync(join(snapshotDir, "1-10000/1-1000/201-300/201-210/block-201.jsonl")),
+    true,
+  );
 });
 

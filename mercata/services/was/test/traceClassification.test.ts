@@ -139,3 +139,16 @@ test("traceWithdrawal sends unknown coverage to manual review as medium risk", a
   assert.ok(trace.summary.some((line) => line.includes("requires manual review")));
 });
 
+test("resolveTraceEdge flags zero-address transfer mint as tainted", async () => {
+  const mintLot = lot();
+  mintLot.event!.attributes.from = "0000000000000000000000000000000000000000";
+
+  const edge = await createProvenanceEngine(
+    repositoryFor(async () => [], async () => null),
+  ).resolveTraceEdge(mintLot);
+
+  assert.equal(edge.result, "tainted");
+  assert.equal(edge.from, undefined);
+  assert.ok(edge.explanation.includes("zero address"));
+});
+

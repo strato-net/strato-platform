@@ -212,6 +212,36 @@ test("traceWithdrawal marks only missing evidence coverage unknown", async () =>
   assertCoverageSum(trace.coverage!);
 });
 
+test("traceWithdrawal rejects unverified zero-address transfer mint", async () => {
+  let fundingFetches = 0;
+  const repository = repositoryFor(
+    async () => {
+      fundingFetches += 1;
+      return [
+        transferLot("100", {
+          event: event("Transfer", {
+            from: "0000000000000000000000000000000000000000",
+            to: owner,
+            value: "100",
+          }),
+        }),
+      ];
+    },
+    async () => null,
+  );
+  const trace = await createProvenanceEngine(repository).traceWithdrawal({
+    withdrawal,
+  });
+
+  assert.equal(fundingFetches, 1);
+  assert.equal(trace.decision, "REJECT");
+  assert.equal(trace.riskLevel, "high");
+  assert.equal(trace.coverage?.clean, "0");
+  assert.equal(trace.coverage?.tainted, "100");
+  assert.equal(trace.coverage?.unknown, "0");
+  assertCoverageSum(trace.coverage!);
+});
+
 test("traceWithdrawal stops at configured skipped address", async () => {
   let fundingFetches = 0;
   const repository = repositoryFor(
