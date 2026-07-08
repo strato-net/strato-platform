@@ -24,7 +24,7 @@ contract record PoolV3Factory is Ownable {
     // ============ EVENTS ============
 
     /// @notice Event emitted when a new pool is created
-    event NewPoolV3(address tokenA, address tokenB, uint feeBps, address pool);
+    event NewPoolV3(address tokenA, address tokenB, uint fee, address pool);
 
     /// @notice Event emitted when the token factory is updated
     event TokenFactoryUpdated(address newFactory);
@@ -36,20 +36,20 @@ contract record PoolV3Factory is Ownable {
     event LpSharePercentUpdated(uint newLpSharePercent);
 
     /// @notice Event emitted when a fee tier is enabled
-    event FeeTierEnabled(uint feeBps, int tickSpacing);
+    event FeeTierEnabled(uint fee, int tickSpacing);
 
     /// @notice Event emitted when pools are migrated between factories
     event PoolsMigrated(address fromFactory, address toFactory, uint count);
 
     // ============ STATE VARIABLES ============
 
-    /// @notice Mapping of tokenA => tokenB => feeBps => pool address
+    /// @notice Mapping of tokenA => tokenB => fee (pips) => pool address (both token orders registered)
     mapping(address => mapping(address => mapping(uint => address))) public record pools;
 
     /// @notice Array of all pool addresses
     address[] public record allPools;
 
-    /// @notice Enabled fee tiers: feeBps => tickSpacing (0 = tier disabled)
+    /// @notice Enabled fee tiers: fee in pips (1e6 denominator) => tickSpacing (0 = tier disabled)
     mapping(uint => int) public record feeTiers;
 
     /// @notice Token factory contract address
@@ -81,17 +81,17 @@ contract record PoolV3Factory is Ownable {
         feeCollector = _feeCollector;
         lpSharePercent = 7000;
 
-        // Default fee tiers (feeBps => tickSpacing), mirroring Uniswap V3 conventions
-        feeTiers[5] = 10;
-        feeTiers[30] = 60;
-        feeTiers[100] = 200;
+        // Default fee tiers (fee in pips => tickSpacing), canonical Uniswap V3 values
+        feeTiers[500] = 10;
+        feeTiers[3000] = 60;
+        feeTiers[10000] = 200;
 
         emit LpSharePercentUpdated(lpSharePercent);
         emit FeeCollectorsUpdated(feeCollector);
         emit TokenFactoryUpdated(tokenFactory);
-        emit FeeTierEnabled(5, 10);
-        emit FeeTierEnabled(30, 60);
-        emit FeeTierEnabled(100, 200);
+        emit FeeTierEnabled(500, 10);
+        emit FeeTierEnabled(3000, 60);
+        emit FeeTierEnabled(10000, 200);
     }
 
     // ============ MODIFIERS ============
@@ -128,14 +128,14 @@ contract record PoolV3Factory is Ownable {
     }
 
     /// @notice Enable a fee tier (owner only)
-    /// @param feeBps Fee in basis points
+    /// @param fee Fee in pips (hundredths of a bip, 1e6 denominator; canonical V3 bounds)
     /// @param tickSpacing Tick spacing for pools of this tier
-    function enableFeeTier(uint feeBps, int tickSpacing) external onlyOwner {
-        require(feeBps > 0 && feeBps <= 1000, "Invalid fee rate"); // Max 10%
-        require(tickSpacing > 0 && tickSpacing <= 32768, "Invalid tick spacing");
-        require(feeTiers[feeBps] == 0, "Fee tier exists");
-        feeTiers[feeBps] = tickSpacing;
-        emit FeeTierEnabled(feeBps, tickSpacing);
+    function enableFeeTier(uint fee, int tickSpacing) external onlyOwner {
+        require(fee > 0 && fee < 1000000, "Invalid fee");
+        require(tickSpacing > 0 && tickSpacing < 16384, "Invalid tick spacing");
+        require(feeTiers[fee] == 0, "Fee tier exists");
+        feeTiers[fee] = tickSpacing;
+        emit FeeTierEnabled(fee, tickSpacing);
     }
 
     /// @notice Update LP share for a specific pool (owner only)
@@ -150,36 +150,38 @@ contract record PoolV3Factory is Ownable {
     // ============ POOL MANAGEMENT ============
 
     /// @notice Create a new concentrated liquidity pool for tokenA/tokenB at a fee tier
-    /// @param tokenA The first token in the pair
-    /// @param tokenB The second token in the pair
-    /// @param feeBps The fee tier in basis points (must be an enabled tier)
-    /// @param initialSqrtPriceWad Initial sqrt(tokenB/tokenA price), WAD-scaled
+    /// @param tokenA Becomes the pool's token0. NOTE: creation order is preserved (canonical
+    ///        V3 sorts by address); the registry stores both directions so lookups are
+    ///        order-independent, but the pool's price is always token1 per token0
+    /// @param tokenB Becomes the pool's token1
+    /// @param fee The fee tier in pips (must be an enabled tier)
+    /// @param initialSqrtPriceX96 Initial sqrt(token1/token0 price), Q64.96
     function createPoolV3(
         address tokenA,
         address tokenB,
-        uint feeBps,
-        uint initialSqrtPriceWad
+        uint fee,
+        uint initialSqrtPriceX96
     ) external tokensActive(tokenA, tokenB) onlyOwner returns (address pool) {
         require(feeCollector != address(0), "Factory not initialized");
         require(tokenA != address(0) && tokenB != address(0), "Zero address");
         require(tokenA != tokenB, "Identical addresses");
-        require(initialSqrtPriceWad > 0, "Zero initial price");
-        int tickSpacing = feeTiers[feeBps];
+        require(initialSqrtPriceX96 > 0, "Zero initial price");
+        int tickSpacing = feeTiers[fee];
         require(tickSpacing > 0, "Fee tier not enabled");
-        require(pools[tokenA][tokenB][feeBps] == address(0) && pools[tokenB][tokenA][feeBps] == address(0), "Pool exists");
+        require(pools[tokenA][tokenB][fee] == address(0) && pools[tokenB][tokenA][fee] == address(0), "Pool exists");
 
         // deploy new pool
         _updatePoolV3Implementation();
         pool = address(new Proxy(poolV3Implementation, address(this)));
-        PoolV3(pool).initialize(tokenA, tokenB, feeBps, tickSpacing, initialSqrtPriceWad, address(this));
+        PoolV3(pool).initialize(tokenA, tokenB, fee, tickSpacing, initialSqrtPriceX96, address(this));
         PoolV3(pool).transferOwnership(owner());
 
         // update pool registry
-        pools[tokenA][tokenB][feeBps] = pool;
-        pools[tokenB][tokenA][feeBps] = pool; // support both directions
+        pools[tokenA][tokenB][fee] = pool;
+        pools[tokenB][tokenA][fee] = pool; // support both directions
         allPools.push(pool);
 
-        emit NewPoolV3(tokenA, tokenB, feeBps, pool);
+        emit NewPoolV3(tokenA, tokenB, fee, pool);
 
         return pool;
     }
@@ -247,14 +249,14 @@ contract record PoolV3Factory is Ownable {
             require(address(PoolV3(pool).poolV3Factory()) == address(this), "Pool does not belong to this factory");
 
             PoolV3 poolContract = PoolV3(pool);
-            address tokenA = address(poolContract.tokenA());
-            address tokenB = address(poolContract.tokenB());
-            uint feeBps = poolContract.feeBps();
+            address token0Addr = address(poolContract.token0());
+            address token1Addr = address(poolContract.token1());
+            uint fee = poolContract.fee();
 
             // Only register if a pool for this pair + fee tier doesn't already exist
-            if (pools[tokenA][tokenB][feeBps] == address(0) && pools[tokenB][tokenA][feeBps] == address(0)) {
-                pools[tokenA][tokenB][feeBps] = pool;
-                pools[tokenB][tokenA][feeBps] = pool;
+            if (pools[token0Addr][token1Addr][fee] == address(0) && pools[token1Addr][token0Addr][fee] == address(0)) {
+                pools[token0Addr][token1Addr][fee] = pool;
+                pools[token1Addr][token0Addr][fee] = pool;
                 allPools.push(pool);
             }
         }
