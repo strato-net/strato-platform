@@ -84,6 +84,8 @@ const subtractAmounts = (left: string, right: string): string =>
 const normalizeAddress = (address: string): string =>
   address.toLowerCase().replace(/^0x/, "");
 
+const ZERO_ADDRESS = "0000000000000000000000000000000000000000";
+
 const eventAttribute = (lot: TraceLot, key: string): string | undefined => {
   const value = lot.event?.attributes[key];
   return value === undefined ? undefined : String(value);
@@ -122,9 +124,20 @@ const resolveTraceEdge = async (lot: TraceLot): Promise<TraceEdge> => {
   }
 
   if (lot.source === "transfer") {
+    const fromAddress = eventAttribute(lot, "from");
+    if (fromAddress && normalizeAddress(fromAddress) === ZERO_ADDRESS) {
+      return {
+        type: "transfer",
+        to: lot,
+        event: lot.event,
+        result: "tainted",
+        explanation: "Transfer lot is an unverified mint from the zero address.",
+      };
+    }
+
     const from = makeInputLot(
       lot,
-      eventAttribute(lot, "from"),
+      fromAddress,
       lot.token,
       lot.amount,
       "transfer",
