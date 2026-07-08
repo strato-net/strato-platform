@@ -47,7 +47,7 @@ const WithdrawalAuditList = () => {
     setLoading(true);
     try {
       const { data } = await api.get<WithdrawalAuditListResponse>(
-        `/bridge/withdrawal-audits/recent?limit=10&quickRun=true&statusGroup=${statusGroup}`,
+        `/bridge/withdrawal-audits/recent?limit=10&maxDepth=5&statusGroup=${statusGroup}`,
       );
       setItems(data.data || []);
     } finally {
@@ -70,7 +70,7 @@ const WithdrawalAuditList = () => {
       <CardHeader>
         <CardTitle>Withdrawal Reviews</CardTitle>
         <CardDescription>
-          Last 10 withdrawal requests with backend WAS trace status. Quick run is enabled for this POC.
+          Last 10 withdrawal requests with backend WAS trace status. Max trace depth is 5 for this POC.
         </CardDescription>
       </CardHeader>
       <CardContent>

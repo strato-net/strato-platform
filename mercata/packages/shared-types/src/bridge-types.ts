@@ -187,12 +187,34 @@ export interface WithdrawalAuditStep {
   evidence: Record<string, string>;
 }
 
+export type WithdrawalAuditTraceNodeType =
+  | "withdrawal"
+  | "cursor"
+  | "lot"
+  | "edge"
+  | "trust_anchor"
+  | "unknown"
+  | "max_depth";
+
+export interface WithdrawalAuditTraceNode {
+  id: string;
+  type: WithdrawalAuditTraceNodeType;
+  label: string;
+  actor?: string;
+  token?: string;
+  amount?: string;
+  result: WithdrawalAuditStepResult;
+  explanation: string;
+  evidence: Record<string, string>;
+  children: WithdrawalAuditTraceNode[];
+}
+
 export interface WithdrawalAuditTrace {
   status: WithdrawalAuditStatus;
   decision?: WithdrawalAuditDecision;
   riskLevel?: WithdrawalAuditRiskLevel;
   withdrawal: NormalizedWithdrawalAudit;
-  quickRun?: boolean;
+  maxDepth?: number;
   stoppedEarly?: boolean;
   coverage?: {
     clean: string;
@@ -200,7 +222,7 @@ export interface WithdrawalAuditTrace {
     unknown: string;
   };
   summary: string[];
-  steps: WithdrawalAuditStep[];
+  traceTree: WithdrawalAuditTraceNode;
   updatedAt: string;
   error?: string;
 }

@@ -4,6 +4,7 @@ import {
   WithdrawalAuditDecision,
   WithdrawalAuditStepResult,
   WithdrawalAuditTrace,
+  WithdrawalAuditTraceNode,
 } from "@mercata/shared-types";
 import { ArrowLeft } from "lucide-react";
 import { api } from "@/lib/axios";
@@ -30,6 +31,33 @@ const shortAddress = (value?: string) => {
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
 };
 
+const TraceTreeNode = ({ node, depth = 0 }: { node: WithdrawalAuditTraceNode; depth?: number }) => (
+  <div className="space-y-3">
+    <div className="rounded-lg border border-border p-4" style={{ marginLeft: depth ? 16 : 0 }}>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="font-medium">{node.label}</div>
+        <span className={`text-sm font-semibold uppercase ${resultClass(node.result)}`}>
+          {node.result}
+        </span>
+      </div>
+      <p className="mb-3 text-sm text-foreground">{node.explanation}</p>
+      <div className="grid gap-2 text-xs text-muted-foreground md:grid-cols-2">
+        {node.actor && <div>Actor: {node.actor}</div>}
+        {node.token && <div>Token: {node.token}</div>}
+        {node.amount && <div>Amount: {node.amount}</div>}
+        {Object.entries(node.evidence || {}).map(([key, value]) => (
+          <div key={key}>
+            {key}: {value || "-"}
+          </div>
+        ))}
+      </div>
+    </div>
+    {node.children.map((child) => (
+      <TraceTreeNode key={child.id} node={child} depth={depth + 1} />
+    ))}
+  </div>
+);
+
 const AdminWithdrawalAuditSummary = () => {
   const navigate = useNavigate();
   const { routeType, withdrawalId } = useParams();
@@ -43,7 +71,7 @@ const AdminWithdrawalAuditSummary = () => {
     setLoading(true);
     try {
       const { data } = await api.get<WithdrawalAuditTrace>(
-        `/bridge/withdrawal-audits/${routeType}/${withdrawalId}?quickRun=true`,
+        `/bridge/withdrawal-audits/${routeType}/${withdrawalId}?maxDepth=5`,
       );
       setTrace(data);
     } finally {
@@ -106,7 +134,7 @@ const AdminWithdrawalAuditSummary = () => {
                     <CardTitle>Decision</CardTitle>
                     <CardDescription>
                       Backend WAS status: {trace.status}
-                      {trace.quickRun ? " (quick run)" : ""}
+                      {trace.maxDepth ? ` (max depth ${trace.maxDepth})` : ""}
                     </CardDescription>
                   </div>
                   <Badge variant={decisionVariant(trace.decision)}>
@@ -169,36 +197,14 @@ const AdminWithdrawalAuditSummary = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Trace</CardTitle>
-                <CardDescription>Ordered event evidence used by the POC WAS.</CardDescription>
+                <CardDescription>Tree of funding evidence used by the POC WAS.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {trace.steps.map((step) => (
-                  <div key={step.index} className="rounded-lg border border-border p-4">
-                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                      <div className="font-medium">
-                        {step.index}. {step.eventType}
-                      </div>
-                      <span className={`text-sm font-semibold uppercase ${resultClass(step.result)}`}>
-                        {step.result}
-                      </span>
-                    </div>
-                    <p className="mb-3 text-sm text-foreground">{step.explanation}</p>
-                    <div className="grid gap-2 text-xs text-muted-foreground md:grid-cols-2">
-                      {step.position && <div>Position: {step.position}</div>}
-                      {step.actor && <div>Actor: {step.actor}</div>}
-                      {step.token && <div>Token: {step.token}</div>}
-                      {step.amount && <div>Amount: {step.amount}</div>}
-                      {Object.entries(step.evidence || {}).map(([key, value]) => (
-                        <div key={key}>
-                          {key}: {value || "-"}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                {trace.steps.length === 0 && (
+                {trace.traceTree ? (
+                  <TraceTreeNode node={trace.traceTree} />
+                ) : (
                   <p className="text-sm text-muted-foreground">
-                    {isPending ? "Trace is still running." : "No trace steps available."}
+                    {isPending ? "Trace is still running." : "No trace tree available."}
                   </p>
                 )}
               </CardContent>
