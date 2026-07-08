@@ -6,6 +6,7 @@
   "scripts": {
     "start": "ts-node src/index.ts",
     "dev": "nodemon src/index.ts",
+    "dev:debug-events": "WAS_DEBUG_EVENT_DUMP_DIR=debug-dumps ts-node src/index.ts",
     "build": "tsc",
     "schema:snapshot": "ts-node scripts/fetchSchemaSnapshot.ts",
     "test": "node --test --require ts-node/register test/*.test.ts",
