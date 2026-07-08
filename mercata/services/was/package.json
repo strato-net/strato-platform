@@ -5,10 +5,12 @@
   "main": "src/index.ts",
   "scripts": {
     "start": "ts-node src/index.ts",
-    "dev": "nodemon src/index.ts",
-    "dev:debug-events": "WAS_DEBUG_EVENT_DUMP_DIR=debug-dumps ts-node src/index.ts",
+    "dev": "nodemon --ignore debug-dumps --ignore dist --ignore test/fixtures src/index.ts",
+    "dev:debug-events": "WAS_DEBUG_EVENT_DUMP_DIR=debug-dumps nodemon --ignore debug-dumps --ignore dist --ignore test/fixtures src/index.ts",
     "build": "tsc",
     "schema:snapshot": "ts-node scripts/fetchSchemaSnapshot.ts",
+    "events:measure-size": "ts-node scripts/measureEventTableSize.ts",
+    "events:snapshot": "ts-node scripts/snapshotEventTable.ts",
     "test": "node --test --require ts-node/register test/*.test.ts",
     "postinstall": "(cd ../../packages/shared-types && npm install && npm run build)"
   },
