@@ -53,10 +53,15 @@ const parseMaxDepth = (value: unknown): number | undefined => {
 };
 
 const parseStatusGroup = (value: unknown): WithdrawalAuditStatusGroup => {
-  if (value === "aborted" || value === "complete" || value === "other") {
+  if (
+    value === "initiated" ||
+    value === "pending-review" ||
+    value === "complete" ||
+    value === "aborted"
+  ) {
     return value;
   }
-  return "other";
+  return "initiated";
 };
 
 const parseRouteType = (value: string): WithdrawalAuditRouteType => {

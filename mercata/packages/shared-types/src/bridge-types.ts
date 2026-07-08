@@ -152,7 +152,7 @@ export interface WithdrawalSummaryResponse {
 }
 
 export type WithdrawalAuditRouteType = "standard" | "native";
-export type WithdrawalAuditStatusGroup = "aborted" | "complete" | "other";
+export type WithdrawalAuditStatusGroup = "initiated" | "pending-review" | "complete" | "aborted";
 export type WithdrawalAuditStatus = "queued" | "running" | "complete" | "failed";
 export type WithdrawalAuditDecision = "APPROVE" | "REJECT" | "MANUAL_REVIEW";
 export type WithdrawalAuditRiskLevel = "low" | "medium" | "high";

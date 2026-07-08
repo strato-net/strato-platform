@@ -62,9 +62,11 @@ type StandardWithdrawalRow = CirrusMappingRow<StandardWithdrawalValue>;
 type NativeWithdrawalRow = CirrusMappingRow<NativeWithdrawalValue>;
 
 const statusFilterFor = (statusGroup: WithdrawalAuditStatusGroup): string => {
+  if (statusGroup === "initiated") return "eq.1";
+  if (statusGroup === "pending-review") return "eq.2";
   if (statusGroup === "complete") return "eq.3";
   if (statusGroup === "aborted") return "eq.4";
-  return "in.(1,2)";
+  return "eq.1";
 };
 
 const asString = (value: string | number | boolean | undefined): string =>
@@ -219,7 +221,7 @@ const normalizeStandardWithdrawal = (
   row: StandardWithdrawalRow,
 ): NormalizedWithdrawalAudit => ({
   routeType: "standard",
-  withdrawalId: row.key,
+  withdrawalId: asString(row.key),
   bridgeStatus: asString(row.value.bridgeStatus),
   stratoSender: row.value.stratoSender,
   stratoToken: row.value.stratoToken,
@@ -237,7 +239,7 @@ const normalizeNativeWithdrawal = (
   row: NativeWithdrawalRow,
 ): NormalizedWithdrawalAudit => ({
   routeType: "native",
-  withdrawalId: row.key,
+  withdrawalId: asString(row.key),
   bridgeStatus: asString(row.value.bridgeStatus),
   stratoSender: row.value.stratoSender,
   stratoToken: row.value.stratoToken,

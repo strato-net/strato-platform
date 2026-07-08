@@ -208,9 +208,9 @@ class BridgeController {
       const maxDepth = Number.isSafeInteger(parsedMaxDepth) && parsedMaxDepth > 0
         ? parsedMaxDepth
         : undefined;
-      const statusGroup = ["aborted", "complete", "other"].includes(String(req.query.statusGroup))
+      const statusGroup = ["initiated", "pending-review", "aborted", "complete"].includes(String(req.query.statusGroup))
         ? String(req.query.statusGroup) as WithdrawalAuditStatusGroup
-        : "other";
+        : "initiated";
       const result = await getRecentWithdrawalAudits(limit, maxDepth, statusGroup);
       res.json(result);
     } catch (error: any) {

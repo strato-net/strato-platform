@@ -17,7 +17,8 @@ import {
 
 const MAX_RECENT_AUDITS = 10;
 const STATUS_GROUPS: WithdrawalAuditStatusGroup[] = [
-  "other",
+  "initiated",
+  "pending-review",
   "complete",
   "aborted",
 ];
@@ -37,7 +38,7 @@ const selectStatusGroups = (
 ): WithdrawalAuditStatusGroup[] => {
   if (request?.statusGroups?.length) return request.statusGroups;
   if (config.includeTerminalWithdrawals) return STATUS_GROUPS;
-  return ["other"];
+  return ["initiated", "pending-review"];
 };
 
 export const createWithdrawalAuditService = (
@@ -121,7 +122,7 @@ export const createWithdrawalAuditService = (
         return {
           started: false,
           completed: false,
-          groups: { other: 0, complete: 0, aborted: 0 },
+          groups: { initiated: 0, "pending-review": 0, complete: 0, aborted: 0 },
           skippedReason: "warming already running",
         };
       }
@@ -130,7 +131,8 @@ export const createWithdrawalAuditService = (
       const limit = clampLimit(request?.limit);
       const maxDepth = request?.maxDepth ?? config.traceMaxDepth;
       const groups: Record<WithdrawalAuditStatusGroup, number> = {
-        other: 0,
+        initiated: 0,
+        "pending-review": 0,
         complete: 0,
         aborted: 0,
       };

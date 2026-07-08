@@ -22,9 +22,11 @@ const isStatusGroupMatch = (
   bridgeStatus: string,
   statusGroup: WithdrawalAuditStatusGroup,
 ): boolean => {
+  if (statusGroup === "initiated") return bridgeStatus === "1";
+  if (statusGroup === "pending-review") return bridgeStatus === "2";
   if (statusGroup === "complete") return bridgeStatus === "3";
   if (statusGroup === "aborted") return bridgeStatus === "4";
-  return bridgeStatus !== "3" && bridgeStatus !== "4";
+  return false;
 };
 
 const sortNewestFirst = (

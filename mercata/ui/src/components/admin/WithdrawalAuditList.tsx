@@ -36,7 +36,7 @@ const WithdrawalAuditList = () => {
   const navigate = useNavigate();
   const [items, setItems] = useState<WithdrawalAuditListItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [statusGroup, setStatusGroup] = useState<WithdrawalAuditStatusGroup>("other");
+  const [statusGroup, setStatusGroup] = useState<WithdrawalAuditStatusGroup>("initiated");
 
   const hasPending = useMemo(
     () => items.some(({ audit }) => audit.status === "queued" || audit.status === "running"),
@@ -78,7 +78,8 @@ const WithdrawalAuditList = () => {
           <div className="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <Tabs value={statusGroup} onValueChange={(value) => setStatusGroup(value as WithdrawalAuditStatusGroup)}>
               <TabsList>
-                <TabsTrigger value="other">Others</TabsTrigger>
+                <TabsTrigger value="initiated">Initiated</TabsTrigger>
+                <TabsTrigger value="pending-review">Pending Review</TabsTrigger>
                 <TabsTrigger value="complete">Complete</TabsTrigger>
                 <TabsTrigger value="aborted">Aborted</TabsTrigger>
               </TabsList>

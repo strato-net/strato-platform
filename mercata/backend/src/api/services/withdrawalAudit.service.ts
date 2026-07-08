@@ -19,7 +19,7 @@ const wasClient = axios.create({
 export const getRecentWithdrawalAudits = async (
   limit = 10,
   maxDepth: number | undefined = undefined,
-  statusGroup: WithdrawalAuditStatusGroup = "other"
+  statusGroup: WithdrawalAuditStatusGroup = "initiated"
 ): Promise<WithdrawalAuditListResponse> => {
   const response = await wasClient.get<WithdrawalAuditListResponse>(
     "/audits/withdrawals/recent",
