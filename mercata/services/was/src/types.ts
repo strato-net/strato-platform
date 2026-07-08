@@ -23,7 +23,8 @@ export type TraceEdgeType =
 
 export type TrustAnchorType =
   | "MercataBridge.DepositCompleted"
-  | "StratoNativeBridge.NativeDepositCompleted";
+  | "StratoNativeBridge.NativeDepositCompleted"
+  | "Historical.TrustAnchorBlock";
 
 export interface WasConfig {
   nodeUrl: string;
@@ -32,6 +33,11 @@ export interface WasConfig {
   port: number;
   pollIntervalMs: number;
   traceMaxDepth?: number;
+  trustAnchorBlock?: number;
+  eventSnapshotDir?: string;
+  auditTraceDumpDir?: string;
+  traceTrustedProtocolAddresses?: string[];
+  traceSkipAddresses?: string[];
   includeTerminalWithdrawals: boolean;
   oauth?: {
     discoveryUrl?: string;
@@ -158,6 +164,8 @@ export interface TraceCoverage {
 export interface TraceContext {
   withdrawal: NormalizedWithdrawalAudit;
   maxDepth?: number;
+  trustedProtocolAddresses?: string[];
+  skipAddresses?: string[];
 }
 
 export interface ProvenanceTraceResult {

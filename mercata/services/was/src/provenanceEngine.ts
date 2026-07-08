@@ -14,6 +14,8 @@ import {
   TraceLot,
   WithdrawalCandidateRepository,
 } from "./types";
+import { logInfo } from "./logger";
+import { createTraceOperationLogger } from "./traceOperationLogger";
 
 const zeroCoverage = (unknown: string): TraceCoverage => ({
   clean: "0",
@@ -78,6 +80,9 @@ const compareAmounts = (left: string, right: string): number => {
 
 const subtractAmounts = (left: string, right: string): string =>
   (BigInt(left || "0") - BigInt(right || "0")).toString();
+
+const normalizeAddress = (address: string): string =>
+  address.toLowerCase().replace(/^0x/, "");
 
 const eventAttribute = (lot: TraceLot, key: string): string | undefined => {
   const value = lot.event?.attributes[key];
@@ -232,7 +237,22 @@ const traceLotsBackward = async (
   withdrawalEvent: TraceCursor["beforeEvent"],
   repository: WithdrawalCandidateRepository,
 ): Promise<ProvenanceTraceResult> => {
+  const traceId = `${context.withdrawal.routeType}:${context.withdrawal.withdrawalId}`;
+  const traceOperationLogger = createTraceOperationLogger(traceId);
+  const logTraceOperation = (
+    operation: string,
+    data: Record<string, unknown> = {},
+  ) => {
+    logInfo("ProvenanceEngine", operation, data);
+    traceOperationLogger.log(operation, data);
+  };
   const coverage = zeroCoverage("0");
+  const trustedProtocolAddresses = new Set(
+    (context.trustedProtocolAddresses || []).map(normalizeAddress),
+  );
+  const skipAddresses = new Set(
+    (context.skipAddresses || []).map(normalizeAddress),
+  );
   const summary: string[] = [];
   let nextNodeId = 0;
   const createNode = (
@@ -258,7 +278,7 @@ const traceLotsBackward = async (
     context.withdrawal.routeType === "native"
       ? "NativeWithdrawalRequested"
       : "WithdrawalRequested",
-    "unknown",
+    "info",
     "Withdrawal request located; provenance classification awaits trace edge implementation.",
     {
       actor: context.withdrawal.stratoSender,
@@ -286,11 +306,36 @@ const traceLotsBackward = async (
   ];
   let stoppedEarly = false;
 
+  logTraceOperation("Trace loop started", {
+    traceId,
+    owner: context.withdrawal.stratoSender,
+    token: context.withdrawal.stratoToken,
+    amount: context.withdrawal.stratoTokenAmount,
+    maxDepth: context.maxDepth ?? "none",
+  });
+
   while (queue.length) {
     const { cursor, coverageAmount, node } = queue.shift()!;
+    logTraceOperation("Trace cursor started", {
+      traceId,
+      depth: cursor.depth,
+      queueRemaining: queue.length,
+      owner: cursor.owner,
+      token: cursor.token,
+      evidenceAmount: cursor.amount,
+      coverageAmount,
+      beforeBlock: cursor.beforeEvent?.block_number || "",
+      beforeTx: cursor.beforeEvent?.transaction_hash || "",
+    });
 
     if (context.maxDepth !== undefined && cursor.depth >= context.maxDepth) {
       stoppedEarly = true;
+      logTraceOperation("Trace cursor stopped at max depth", {
+        traceId,
+        depth: cursor.depth,
+        maxDepth: context.maxDepth,
+        coverageAmount,
+      });
       addCoverage(coverage, "unknown", coverageAmount);
       node.children.push(
         createNode(
@@ -313,9 +358,89 @@ const traceLotsBackward = async (
       continue;
     }
 
+    if (trustedProtocolAddresses.has(normalizeAddress(cursor.owner))) {
+      logTraceOperation("Trace cursor reached trusted protocol address", {
+        traceId,
+        depth: cursor.depth,
+        owner: cursor.owner,
+        token: cursor.token,
+        evidenceAmount: cursor.amount,
+        coverageAmount,
+      });
+      addCoverage(coverage, "clean", coverageAmount);
+      node.children.push(
+        createNode(
+          "trust_anchor",
+          "TrustedProtocolAddress",
+          "clean",
+          "Trace stopped at a configured trusted protocol address.",
+          {
+            actor: cursor.owner,
+            token: cursor.token,
+            amount: cursor.amount,
+            evidence: {
+              depth: String(cursor.depth),
+              trustedProtocolAddress: cursor.owner,
+            },
+          },
+        ),
+      );
+      continue;
+    }
+
+    if (skipAddresses.has(normalizeAddress(cursor.owner))) {
+      logTraceOperation("Trace cursor skipped by address", {
+        traceId,
+        depth: cursor.depth,
+        owner: cursor.owner,
+        token: cursor.token,
+        evidenceAmount: cursor.amount,
+        coverageAmount,
+      });
+      addCoverage(coverage, "unknown", coverageAmount);
+      node.children.push(
+        createNode(
+          "unknown",
+          "SkippedAddress",
+          "unknown",
+          "Trace stopped because this address is configured to be skipped.",
+          {
+            actor: cursor.owner,
+            token: cursor.token,
+            amount: cursor.amount,
+            evidence: {
+              depth: String(cursor.depth),
+              skippedAddress: cursor.owner,
+            },
+          },
+        ),
+      );
+      continue;
+    }
+
+    logTraceOperation("Fetching funding lots", {
+      traceId,
+      depth: cursor.depth,
+      owner: cursor.owner,
+      token: cursor.token,
+      amount: cursor.amount,
+    });
     const fundingLots = await repository.fetchFundingLots(cursor);
+    logTraceOperation("Funding lots fetched", {
+      traceId,
+      depth: cursor.depth,
+      count: fundingLots.length,
+      totalAmount: fundingLots
+        .reduce((total, lot) => total + BigInt(lot.amount || "0"), 0n)
+        .toString(),
+    });
 
     if (!fundingLots.length) {
+      logTraceOperation("No funding lots found", {
+        traceId,
+        depth: cursor.depth,
+        coverageAmount,
+      });
       addCoverage(coverage, "unknown", coverageAmount);
       node.children.push(
         createNode(
@@ -362,7 +487,7 @@ const traceLotsBackward = async (
       const lotNode = createNode(
         "lot",
         lot.source,
-        "unknown",
+        "info",
         "Funding lot found for this trace cursor.",
         {
           actor: lot.owner,
@@ -376,10 +501,51 @@ const traceLotsBackward = async (
       );
       node.children.push(lotNode);
 
+      logTraceOperation("Resolving funding lot", {
+        traceId,
+        depth: cursor.depth,
+        lotIndex: index,
+        source: lot.source,
+        owner: lot.owner,
+        token: lot.token,
+        evidenceAmount: lot.amount,
+        coverageAmount: lotCoverageAmountString,
+        tx: lot.transactionHash || "",
+        block: lot.blockNumber || "",
+      });
       const edge = await resolveTraceEdge(lot);
+      logTraceOperation("Trace edge resolved", {
+        traceId,
+        depth: cursor.depth,
+        lotIndex: index,
+        edgeType: edge.type,
+        result: edge.result,
+        hasPredecessor: !!edge.from,
+        predecessorOwner: edge.from?.owner || "",
+        predecessorToken: edge.from?.token || "",
+        predecessorAmount: edge.from?.amount || "",
+      });
+
+      logTraceOperation("Checking trust anchor", {
+        traceId,
+        depth: cursor.depth,
+        lotIndex: index,
+        edgeType: edge.type,
+        tx: edge.event?.transaction_hash || lot.transactionHash || "",
+        block: edge.event?.block_number || lot.blockNumber || "",
+      });
       const trustAnchor = await repository.fetchTrustAnchor(edge);
 
       if (trustAnchor) {
+        logTraceOperation("Trust anchor found", {
+          traceId,
+          depth: cursor.depth,
+          lotIndex: index,
+          trustAnchorType: trustAnchor.type,
+          coverageAmount: lotCoverageAmountString,
+          tx: trustAnchor.event.transaction_hash || "",
+          block: trustAnchor.event.block_number || "",
+        });
         addCoverage(coverage, "clean", lotCoverageAmountString);
         lotNode.children.push(
           createNode(
@@ -420,15 +586,30 @@ const traceLotsBackward = async (
       lotNode.children.push(edgeNode);
 
       if (edge.result === "tainted") {
+        logTraceOperation("Tainted terminal edge found", {
+          traceId,
+          depth: cursor.depth,
+          lotIndex: index,
+          coverageAmount: lotCoverageAmountString,
+        });
         addCoverage(coverage, "tainted", lotCoverageAmountString);
         continue;
       }
 
       if (edge.from && edge.result !== "unknown") {
+        logTraceOperation("Queueing predecessor cursor", {
+          traceId,
+          nextDepth: cursor.depth + 1,
+          owner: edge.from.owner,
+          token: edge.from.token,
+          evidenceAmount: edge.from.amount,
+          coverageAmount: lotCoverageAmountString,
+          queueSizeBeforePush: queue.length,
+        });
         const cursorNode = createNode(
           "cursor",
           "TraceCursor",
-          "unknown",
+          "info",
           "Tracing the predecessor amount required by this edge.",
           {
             actor: edge.from.owner,
@@ -456,6 +637,14 @@ const traceLotsBackward = async (
         continue;
       }
 
+      logTraceOperation("Unknown terminal edge", {
+        traceId,
+        depth: cursor.depth,
+        lotIndex: index,
+        edgeType: edge.type,
+        coverageAmount: lotCoverageAmountString,
+        explanation: edge.explanation,
+      });
       addCoverage(coverage, "unknown", lotCoverageAmountString);
     }
 
@@ -465,6 +654,14 @@ const traceLotsBackward = async (
         coverageAmount,
         coveredByLotsCoverage,
       );
+      logTraceOperation("Funding remainder unknown", {
+        traceId,
+        depth: cursor.depth,
+        requiredAmount: cursor.amount,
+        coveredAmount: coveredByLots,
+        missingEvidenceAmount: unknownRemainder,
+        unknownCoverageAmount: unknownCoverageRemainder,
+      });
       addCoverage(coverage, "unknown", unknownCoverageRemainder);
       node.children.push(
         createNode(
@@ -494,6 +691,14 @@ const traceLotsBackward = async (
   if (stoppedEarly) {
     summary.push("Trace stopped before all lots reached terminal evidence.");
   }
+
+  logTraceOperation("Trace loop completed", {
+    traceId,
+    clean: coverage.clean,
+    tainted: coverage.tainted,
+    unknown: coverage.unknown,
+    stoppedEarly,
+  });
 
   return {
     coverage,

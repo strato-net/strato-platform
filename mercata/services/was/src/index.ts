@@ -6,14 +6,19 @@ import { createWithdrawalAuditService } from "./auditService";
 import { createAccessTokenProvider } from "./auth";
 import { createCirrusClient } from "./cirrusClient";
 import { loadConfig } from "./config";
+import { clearVolatileDebugOutputs } from "./debugCleanup";
 import { createWasApp } from "./http";
+import { createSnapshotBackedCirrusClient } from "./localEventStore";
 import { logError, logInfo } from "./logger";
 import { createWithdrawalAuditPoller } from "./poller";
 import { createProvenanceEngine } from "./provenanceEngine";
 import { createWithdrawalRepository } from "./withdrawalRepository";
 
 const config = loadConfig();
-const cirrusClient = createCirrusClient(config, createAccessTokenProvider(config));
+const cirrusClient = createSnapshotBackedCirrusClient(
+  createCirrusClient(config, createAccessTokenProvider(config)),
+  config,
+);
 const cache = createWithdrawalAuditCache();
 const repository = createWithdrawalRepository(cirrusClient, config);
 const provenanceEngine = createProvenanceEngine(repository);
@@ -32,6 +37,7 @@ const server = app.listen(config.port, async () => {
       port: config.port,
       pollIntervalMs: config.pollIntervalMs,
     });
+    clearVolatileDebugOutputs(config);
     await cirrusClient.verifyConnectivity();
     logInfo("Startup", "Cirrus connectivity verified");
     void auditService.warmAuditCache().catch((error) =>

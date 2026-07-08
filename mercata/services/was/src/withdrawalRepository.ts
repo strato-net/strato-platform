@@ -187,6 +187,15 @@ const trustAnchorTypeFor = (eventName: string): TrustAnchor["type"] | null => {
   return null;
 };
 
+const isBeforeTrustAnchorBlock = (
+  edge: TraceEdge,
+  trustAnchorBlock?: number,
+): boolean => {
+  if (!trustAnchorBlock || !edge.event?.block_number) return false;
+  const blockNumber = toBigInt(edge.event.block_number);
+  return blockNumber !== undefined && blockNumber < BigInt(trustAnchorBlock);
+};
+
 const safeFilePart = (value: string | number | undefined): string =>
   String(value || "unknown").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
 
@@ -480,6 +489,16 @@ export const createWithdrawalRepository = (
     },
 
     fetchTrustAnchor: async (edge: TraceEdge): Promise<TrustAnchor | null> => {
+      if (isBeforeTrustAnchorBlock(edge, config.trustAnchorBlock)) {
+        return {
+          type: "Historical.TrustAnchorBlock",
+          owner: normalizeAddress(edge.to.owner),
+          token: normalizeAddress(edge.to.token),
+          amount: edge.to.amount,
+          event: edge.event!,
+        };
+      }
+
       if (!edge.event?.block_number || !edge.event.transaction_hash) return null;
 
       const rows = await cirrus.getRows<CirrusEventRow>(EVENT_TABLE, {

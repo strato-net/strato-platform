@@ -3,6 +3,7 @@ import {
   WithdrawalAuditStatusGroup,
   WithdrawalAuditRouteType,
 } from "@mercata/shared-types";
+import { dumpAuditTrace } from "./auditTraceDump";
 import { logError, logInfo } from "./logger";
 import {
   AuditCacheKeyParts,
@@ -73,18 +74,20 @@ export const createWithdrawalAuditService = (
       const audit = await provenanceEngine.traceWithdrawal({
         withdrawal,
         maxDepth,
+        trustedProtocolAddresses: config.traceTrustedProtocolAddresses,
+        skipAddresses: config.traceSkipAddresses,
       });
 
-      cache.set(
-        cacheKeyPartsFor({
-          routeType: withdrawal.routeType,
-          withdrawalId: withdrawal.withdrawalId,
-          bridgeStatus: withdrawal.bridgeStatus,
-          timestamp: withdrawal.timestamp || withdrawal.blockTimestamp || "",
-          maxDepth,
-        }),
-        audit,
-      );
+      const keyParts = cacheKeyPartsFor({
+        routeType: withdrawal.routeType,
+        withdrawalId: withdrawal.withdrawalId,
+        bridgeStatus: withdrawal.bridgeStatus,
+        timestamp: withdrawal.timestamp || withdrawal.blockTimestamp || "",
+        maxDepth,
+      });
+
+      cache.set(keyParts, audit);
+      dumpAuditTrace(config.auditTraceDumpDir, keyParts, audit);
       completed += 1;
       logInfo("AuditService", "Trace finalized", {
         withdrawal: `${withdrawal.routeType}:${withdrawal.withdrawalId}`,
