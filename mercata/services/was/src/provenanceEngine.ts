@@ -47,12 +47,147 @@ const compareAmounts = (left: string, right: string): number => {
 const subtractAmounts = (left: string, right: string): string =>
   (BigInt(left || "0") - BigInt(right || "0")).toString();
 
-const resolveTraceEdge = async (lot: TraceLot): Promise<TraceEdge> => ({
-  type: "unsupported",
+const eventAttribute = (lot: TraceLot, key: string): string | undefined => {
+  const value = lot.event?.attributes[key];
+  return value === undefined ? undefined : String(value);
+};
+
+const edgeUnknown = (lot: TraceLot, explanation: string): TraceEdge => ({
+  type: lot.source === "unknown" ? "unsupported" : lot.source,
   to: lot,
+  event: lot.event,
   result: "unknown",
-  explanation: "Trace edge resolution is not implemented yet.",
+  explanation,
 });
+
+const makeInputLot = (
+  lot: TraceLot,
+  owner: string | undefined,
+  token: string | undefined,
+  amount: string | undefined,
+  source: TraceLot["source"],
+): TraceLot | undefined => {
+  if (!owner || !token || !amount) return undefined;
+  return {
+    owner,
+    token,
+    amount,
+    transactionHash: lot.event?.transaction_hash || lot.transactionHash,
+    blockNumber: lot.event?.block_number || lot.blockNumber,
+    source,
+    event: lot.event,
+  };
+};
+
+const resolveTraceEdge = async (lot: TraceLot): Promise<TraceEdge> => {
+  if (!lot.event) {
+    return edgeUnknown(lot, "Lot has no event evidence to resolve.");
+  }
+
+  if (lot.source === "transfer") {
+    const from = makeInputLot(
+      lot,
+      eventAttribute(lot, "from"),
+      lot.token,
+      lot.amount,
+      "transfer",
+    );
+    if (!from) {
+      return edgeUnknown(lot, "Transfer event is missing sender evidence.");
+    }
+
+    return {
+      type: "transfer",
+      from,
+      to: lot,
+      event: lot.event,
+      result: "info",
+      explanation: "Transfer lot traces backward to the sender.",
+    };
+  }
+
+  if (lot.source === "swap") {
+    const from = makeInputLot(
+      lot,
+      eventAttribute(lot, "sender"),
+      eventAttribute(lot, "tokenIn"),
+      eventAttribute(lot, "amountIn"),
+      "transfer",
+    );
+    if (!from) {
+      return edgeUnknown(lot, "Swap event is missing input token or amount.");
+    }
+
+    return {
+      type: "swap",
+      from,
+      to: lot,
+      event: lot.event,
+      result: "info",
+      explanation: "Swap output traces backward to the swap input.",
+    };
+  }
+
+  if (lot.source === "metal_mint") {
+    const from = makeInputLot(
+      lot,
+      eventAttribute(lot, "buyer"),
+      eventAttribute(lot, "payToken"),
+      eventAttribute(lot, "payAmount"),
+      "transfer",
+    );
+    if (!from) {
+      return edgeUnknown(lot, "Metal mint event is missing payment evidence.");
+    }
+
+    return {
+      type: "metal_mint",
+      from,
+      to: lot,
+      event: lot.event,
+      result: "info",
+      explanation: "Metal mint output traces backward to the payment token.",
+    };
+  }
+
+  if (lot.source === "psm") {
+    const from = makeInputLot(
+      lot,
+      eventAttribute(lot, "user"),
+      eventAttribute(lot, "againstToken"),
+      eventAttribute(lot, "depositAmount"),
+      "transfer",
+    );
+    if (!from) {
+      return edgeUnknown(lot, "PSM mint event is missing deposited token evidence.");
+    }
+
+    return {
+      type: "psm",
+      from,
+      to: lot,
+      event: lot.event,
+      result: "info",
+      explanation: "PSM mint output traces backward to the deposited token.",
+    };
+  }
+
+  if (lot.source === "cdp_mint") {
+    return edgeUnknown(
+      lot,
+      "CDP mint collateral provenance is not enabled until collateral semantics are verified.",
+    );
+  }
+
+  if (lot.source === "rewards") {
+    return edgeUnknown(
+      lot,
+      "Rewards funding provenance is not enabled until reward source semantics are verified.",
+    );
+  }
+
+  return edgeUnknown(lot, "Unsupported funding lot source.");
+};
 
 interface TraceQueueItem {
   cursor: TraceCursor;
