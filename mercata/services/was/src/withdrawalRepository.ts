@@ -358,10 +358,12 @@ export const createWithdrawalRepository = (
     },
 
     fetchFundingLots: async (cursor: TraceCursor): Promise<TraceLot[]> => {
+      const beforeBlock = toBigInt(cursor.beforeEvent?.block_number);
       const rows = await cirrus.getRows<CirrusEventRow>(EVENT_TABLE, {
         address: `eq.${normalizeAddress(cursor.token)}`,
         event_name: "eq.Transfer",
         "attributes->>to": `eq.${normalizeAddress(cursor.owner)}`,
+        ...(beforeBlock !== undefined ? { block_number: `lt.${beforeBlock}` } : {}),
         select: EVENT_SELECT,
         order: "block_number.desc",
         limit: 100,
