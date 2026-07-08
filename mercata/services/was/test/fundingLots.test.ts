@@ -122,6 +122,7 @@ test("fetchFundingLots returns one transfer that fully covers cursor amount", as
   assert.equal(requests[0].params?.address, `eq.${token}`);
   assert.equal(requests[0].params?.event_name, "eq.Transfer");
   assert.equal(requests[0].params?.["attributes->>to"], `eq.${owner}`);
+  assert.equal(requests[0].params?.block_number, "lt.100");
   assert.equal(
     requests[0].params?.select,
     "event_name,address,attributes,block_timestamp,block_number,transaction_hash,transaction_sender",
