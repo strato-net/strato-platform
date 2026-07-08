@@ -118,14 +118,23 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
 
   const balanceImpact = useMemo(() => {
     try {
-      const maxAmountWei = BigInt(maxAmount || "0");
+      const tokenBalanceWei = balanceData?.balance?.toString() || "0";
+      const actualBalance = computeMaxTransferable(
+        tokenBalanceWei,
+        selectedToken?.stratoToken === usdstAddress,
+        voucherBalance,
+        usdstBalance,
+        FEE_WEI,
+        () => {}
+      );
+      const balanceWei = BigInt(actualBalance || "0");
       const amountWei = safeParseUnits(amount || "0", DECIMAL);
-      const afterWei = maxAmountWei > amountWei ? maxAmountWei - amountWei : 0n;
-      return { before: maxAmountWei.toString(), after: afterWei.toString() };
+      const afterWei = balanceWei > amountWei ? balanceWei - amountWei : 0n;
+      return { before: balanceWei.toString(), after: afterWei.toString() };
     } catch {
       return { before: "0", after: "0" };
     }
-  }, [maxAmount, amount]);
+  }, [balanceData?.balance, selectedToken?.stratoToken, usdstBalance, voucherBalance, amount]);
 
   const hasValidAmount = !!amount && !amountError && !feeError;
 
