@@ -38,6 +38,9 @@ contract record PoolV3Factory is Ownable {
     /// @notice Event emitted when a fee tier is enabled
     event FeeTierEnabled(uint feeBps, int tickSpacing);
 
+    /// @notice Event emitted when pools are migrated between factories
+    event PoolsMigrated(address fromFactory, address toFactory, uint count);
+
     // ============ STATE VARIABLES ============
 
     /// @notice Mapping of tokenA => tokenB => feeBps => pool address
@@ -70,6 +73,7 @@ contract record PoolV3Factory is Ownable {
     /// @param _tokenFactory The address of the token factory
     /// @param _feeCollector The address of the fee collector
     function initialize(address _tokenFactory, address _feeCollector) external onlyOwner {
+        require(feeCollector == address(0), "Already initialized");
         require(_tokenFactory != address(0), "Zero token factory address");
         require(_feeCollector != address(0), "Zero fee collector address");
 
@@ -156,6 +160,7 @@ contract record PoolV3Factory is Ownable {
         uint feeBps,
         uint initialSqrtPriceWad
     ) external tokensActive(tokenA, tokenB) onlyOwner returns (address pool) {
+        require(feeCollector != address(0), "Factory not initialized");
         require(tokenA != address(0) && tokenB != address(0), "Zero address");
         require(tokenA != tokenB, "Identical addresses");
         require(initialSqrtPriceWad > 0, "Zero initial price");
@@ -185,5 +190,74 @@ contract record PoolV3Factory is Ownable {
 
     function _updatePoolV3Implementation() internal {
         poolV3Implementation = address(new PoolV3(address(owner())));
+    }
+
+    // ============ POOL MAINTENANCE (mirrors PoolFactory) ============
+
+    /// @notice Call sync on all pools or select pools
+    /// @param poolsToSync Array of pool addresses to sync (empty = all pools)
+    /// @dev This function is used to sync the pools after a token transfer
+    function syncPools(address[] poolsToSync) external onlyOwner {
+        address[] memory targetPools = poolsToSync;
+        if (targetPools.length == 0) {
+            targetPools = allPools;
+        }
+        for (uint i = 0; i < targetPools.length; i++) {
+            PoolV3(targetPools[i]).sync();
+        }
+    }
+
+    /// @notice Call skim on all pools or select pools
+    /// @param poolsToSkim Array of pool addresses to skim (empty = all pools)
+    /// @param to Address to skim the pools to
+    /// @dev This function is used to skim the pools after a token transfer
+    function skimPools(address[] poolsToSkim, address to) external onlyOwner {
+        address[] memory targetPools = poolsToSkim;
+        if (targetPools.length == 0) {
+            targetPools = allPools;
+        }
+        for (uint i = 0; i < targetPools.length; i++) {
+            PoolV3(targetPools[i]).skim(to);
+        }
+    }
+
+    // ============ FACTORY MIGRATION (mirrors PoolFactory) ============
+
+    /// @notice Transfer all pools to a new factory
+    /// @param newFactory Address of the new factory
+    /// @dev The new factory owner must then call registerPoolsFromFactory to adopt them
+    function transferPoolsToFactory(address newFactory) external onlyOwner {
+        require(newFactory != address(0), "Zero factory address");
+        for (uint i = 0; i < allPools.length; i++) {
+            address pool = allPools[i];
+            if (pool != address(0)) {
+                PoolV3(pool).transferPoolToFactory(newFactory);
+            }
+        }
+        emit PoolsMigrated(address(this), newFactory, allPools.length);
+    }
+
+    /// @notice Register pools received from another factory
+    /// @param poolAddresses Array of pool addresses to register
+    function registerPoolsFromFactory(address[] poolAddresses) external onlyOwner {
+        for (uint i = 0; i < poolAddresses.length; i++) {
+            address pool = poolAddresses[i];
+
+            // Verify the pool belongs to this factory
+            require(address(PoolV3(pool).poolV3Factory()) == address(this), "Pool does not belong to this factory");
+
+            PoolV3 poolContract = PoolV3(pool);
+            address tokenA = address(poolContract.tokenA());
+            address tokenB = address(poolContract.tokenB());
+            uint feeBps = poolContract.feeBps();
+
+            // Only register if a pool for this pair + fee tier doesn't already exist
+            if (pools[tokenA][tokenB][feeBps] == address(0) && pools[tokenB][tokenA][feeBps] == address(0)) {
+                pools[tokenA][tokenB][feeBps] = pool;
+                pools[tokenB][tokenA][feeBps] = pool;
+                allPools.push(pool);
+            }
+        }
+        emit PoolsMigrated(address(0), address(this), poolAddresses.length);
     }
 }

@@ -71,7 +71,8 @@ contract Describe_PoolV3 is Authorizable {
     function _swap(bool isAToB, uint amountIn) internal returns (uint) {
         address tokenIn = isAToB ? tokenAAddress : tokenBAddress;
         require(ERC20(tokenIn).approve(address(pool), amountIn), "Swap approval failed");
-        return pool.swap(isAToB, amountIn, 1, 0, block.timestamp + DEADLINE_OFFSET);
+        (, uint amountOut) = pool.swap(isAToB, amountIn, 1, 0, block.timestamp + DEADLINE_OFFSET);
+        return amountOut;
     }
 
     /// @dev Create a user with token balances and pool approvals for both tokens
@@ -208,7 +209,8 @@ contract Describe_PoolV3 is Authorizable {
         uint amountIn = 10e18;
         require(ERC20(tokenAAddress).approve(address(pool), amountIn), "Approval failed");
         uint balBBefore = ERC20(tokenBAddress).balanceOf(address(this));
-        uint amountOut = pool.swap(true, amountIn, 1, 0, block.timestamp + DEADLINE_OFFSET);
+        (uint amountInUsed, uint amountOut) = pool.swap(true, amountIn, 1, 0, block.timestamp + DEADLINE_OFFSET);
+        require(amountInUsed == amountIn, "Full input should be reported as consumed");
 
         // Price ~1.0, fee 0.3%: expect slightly under 9.97e18 out
         require(amountOut > 99e17 && amountOut < 997e16, "Unexpected output: " + string(amountOut));
@@ -221,11 +223,11 @@ contract Describe_PoolV3 is Authorizable {
         _mintRange(-6000, 6000, 100000e18);
 
         require(ERC20(tokenAAddress).approve(address(pool), 10e18), "Approval failed");
-        uint out1 = pool.swap(true, 10e18, 1, 0, block.timestamp + DEADLINE_OFFSET);
+        (, uint out1) = pool.swap(true, 10e18, 1, 0, block.timestamp + DEADLINE_OFFSET);
         require(out1 > 0, "A->B swap failed");
 
         require(ERC20(tokenBAddress).approve(address(pool), 5e18), "Approval failed");
-        uint out2 = pool.swap(false, 5e18, 1, 0, block.timestamp + DEADLINE_OFFSET);
+        (, uint out2) = pool.swap(false, 5e18, 1, 0, block.timestamp + DEADLINE_OFFSET);
         require(out2 > 0, "B->A swap failed");
         require(pool.sqrtPriceWad() < WAD, "Price should still be below start after partial reversal");
     }
@@ -255,7 +257,7 @@ contract Describe_PoolV3 is Authorizable {
         // Swap enough to push price below tick -60 (narrow range exits)
         uint amountIn = 500e18;
         require(ERC20(tokenAAddress).approve(address(pool), amountIn), "Approval failed");
-        uint amountOut = pool.swap(true, amountIn, 1, 0, block.timestamp + DEADLINE_OFFSET);
+        (, uint amountOut) = pool.swap(true, amountIn, 1, 0, block.timestamp + DEADLINE_OFFSET);
 
         require(amountOut > 0, "Cross-tick swap failed");
         require(pool.currentTick() < -60, "Price should have crossed below -60");
@@ -269,11 +271,13 @@ contract Describe_PoolV3 is Authorizable {
         uint limit = pool.getSqrtPriceAtTick(-10);
         uint balABefore = ERC20(tokenAAddress).balanceOf(address(this));
         require(ERC20(tokenAAddress).approve(address(pool), 10000e18), "Approval failed");
-        pool.swap(true, 10000e18, 1, limit, block.timestamp + DEADLINE_OFFSET);
+        (uint amountInUsed, ) = pool.swap(true, 10000e18, 1, limit, block.timestamp + DEADLINE_OFFSET);
 
         require(pool.sqrtPriceWad() == limit, "Price should stop at the limit");
         uint consumed = balABefore - ERC20(tokenAAddress).balanceOf(address(this));
         require(consumed < 10000e18, "Should not consume full input when limit hit");
+        // Partial fills must be visible to on-chain callers via the returned consumed amount
+        require(amountInUsed == consumed, "Returned consumed amount must match actual transfer");
     }
 
     function it_swap_reverts_when_no_liquidity() {
@@ -374,11 +378,11 @@ contract Describe_PoolV3 is Authorizable {
     function it_twap_accumulator_tracks_tick_over_time() {
         _mintRange(-6000, 6000, 100000e18);
 
-        (int cumStart, ) = pool.observe();
+        int cumStart = pool.observe(0);
 
         // Hold tick 0 for 100 seconds: accumulator unchanged (tick 0 contributes 0)
         fastForward(100);
-        (int cumAfterHold, ) = pool.observe();
+        int cumAfterHold = pool.observe(0);
         require(cumAfterHold == cumStart, "Tick 0 should contribute nothing");
 
         // Move the price down, then hold for 100 seconds
@@ -388,11 +392,13 @@ contract Describe_PoolV3 is Authorizable {
         require(tickAfterSwap < 0, "Tick should be negative after A->B swap");
 
         fastForward(100);
-        (int cumEnd, uint tEnd) = pool.observe();
+        int cumEnd = pool.observe(0);
 
-        // TWAP tick over the last 100 seconds should equal the post-swap tick
+        // TWAP tick over the last 100 seconds should equal the post-swap tick,
+        // both via a saved snapshot and via the historical lookup
         int twapTick = (cumEnd - cumAfterHold) / 100;
         require(twapTick == tickAfterSwap, "TWAP tick mismatch: " + string(twapTick) + " vs " + string(tickAfterSwap));
+        require(pool.observe(100) == cumAfterHold, "observe(100) should reproduce the saved snapshot");
     }
 
     // ============ GUARD TESTS ============
@@ -1047,6 +1053,24 @@ contract Describe_PoolV3 is Authorizable {
             thrown = true;
         }
         require(thrown, "Limit below MIN price should revert");
+
+        thrown = false;
+        try {
+            // Exactly the MIN sqrt price is also invalid: limits are strictly exclusive of the
+            // tick-domain endpoints (V3 semantics), so the edge ticks can never be crossed
+            pool.swap(true, 10e18, 1, pool.getSqrtPriceAtTick(-443636), block.timestamp + DEADLINE_OFFSET);
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "Limit exactly at MIN price should revert");
+
+        thrown = false;
+        try {
+            pool.swap(false, 10e18, 1, pool.getSqrtPriceAtTick(443636), block.timestamp + DEADLINE_OFFSET);
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "Limit exactly at MAX price should revert");
     }
 
     function it_swap_rejects_zero_inputs() {
@@ -1357,11 +1381,11 @@ contract Describe_PoolV3 is Authorizable {
     function it_twap_time_weighted_average_across_price_changes() {
         _mintRange(-6000, 6000, 100000e18);
 
-        (int cum0, ) = pool.observe();
+        int cum0 = pool.observe(0);
 
         // 100 seconds at tick 0 contributes nothing
         fastForward(100);
-        (int cum1, ) = pool.observe();
+        int cum1 = pool.observe(0);
         require(cum1 == cum0, "Tick 0 period should contribute zero");
 
         // Move price down, hold 300 seconds
@@ -1369,10 +1393,11 @@ contract Describe_PoolV3 is Authorizable {
         int tickAfter = pool.currentTick();
         require(tickAfter < 0, "Tick should be negative");
         fastForward(300);
-        (int cum2, ) = pool.observe();
+        int cum2 = pool.observe(0);
 
         // Window TWAP over the last 300s equals the held tick exactly
         require((cum2 - cum1) / 300 == tickAfter, "300s window TWAP wrong");
+        require((cum2 - pool.observe(300)) / 300 == tickAfter, "observe-based 300s TWAP wrong");
         // Whole-window accumulator: 100s * 0 + 300s * tickAfter
         require(cum2 - cum0 == tickAfter * 300, "Full accumulator mismatch");
         // Negative tick means negative accumulation (geometric-mean TWAP below 1.0)
@@ -1384,11 +1409,13 @@ contract Describe_PoolV3 is Authorizable {
         _swap(true, 500e18);
         int tickHeld = pool.currentTick();
 
-        // A mint after 100s must fold the elapsed tick-seconds into storage
+        // A mint after 100s must fold the elapsed tick-seconds into a stored observation
         fastForward(100);
         _mintRange(-600, 600, 1000e18);
-        require(pool.tickCumulative() == tickHeld * 100, "Mint should update the stored accumulator");
-        require(pool.observationTimestamp() == block.timestamp, "Timestamp should advance");
+        (uint obsTimestamp, int obsCumulative, bool obsInitialized) = pool.getObservation(pool.observationIndex());
+        require(obsInitialized, "Latest observation should be initialized");
+        require(obsCumulative == tickHeld * 100, "Mint should update the stored accumulator");
+        require(obsTimestamp == block.timestamp, "Timestamp should advance");
     }
 
     // ============ GUARD / ADMIN TESTS (EXTENDED) ============
@@ -1543,6 +1570,20 @@ contract Describe_PoolV3 is Authorizable {
         factory2.setPoolLpSharePercent(poolAddress, 4000);
         require(pool.lpSharePercent() == 4000, "New factory should administer the pool");
 
+        // The new factory adopts the pool into its registry, restoring discovery
+        // and pair+tier uniqueness (mirrors V2's registerPoolsFromFactory)
+        factory2.registerPoolsFromFactory([poolAddress]);
+        require(factory2.pools(tokenAAddress, tokenBAddress, 30) == poolAddress, "Registry should adopt the pool");
+        require(factory2.pools(tokenBAddress, tokenAAddress, 30) == poolAddress, "Reverse registry should adopt the pool");
+
+        thrown = false;
+        try {
+            factory2.createPoolV3(tokenAAddress, tokenBAddress, 30, WAD);
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "Duplicate creation after adoption should revert");
+
         thrown = false;
         try {
             pool.transferPoolToFactory(address(0));
@@ -1550,5 +1591,301 @@ contract Describe_PoolV3 is Authorizable {
             thrown = true;
         }
         require(thrown, "Zero factory address should revert");
+    }
+
+    function it_factory_batch_migration_with_registry_adoption() {
+        address pool100 = factory.createPoolV3(tokenAAddress, tokenBAddress, 100, WAD);
+
+        PoolV3Factory factory2 = new PoolV3Factory(address(this));
+        factory2.initialize(address(m.tokenFactory()), address(m.feeCollector()));
+
+        // Adopting a pool that does not point at the new factory must revert
+        bool thrown = false;
+        try {
+            factory2.registerPoolsFromFactory([poolAddress]);
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "Adopting a foreign pool should revert");
+
+        // Batch-transfer every pool, then adopt them on the other side
+        factory.transferPoolsToFactory(address(factory2));
+        require(address(pool.poolV3Factory()) == address(factory2), "Pool 1 should point at factory2");
+        require(address(PoolV3(pool100).poolV3Factory()) == address(factory2), "Pool 2 should point at factory2");
+
+        factory2.registerPoolsFromFactory([poolAddress, pool100]);
+        require(factory2.pools(tokenAAddress, tokenBAddress, 30) == poolAddress, "30bps pool adopted");
+        require(factory2.pools(tokenAAddress, tokenBAddress, 100) == pool100, "100bps pool adopted");
+
+        // Re-registration is a no-op, not a duplicate
+        factory2.registerPoolsFromFactory([poolAddress]);
+        require(factory2.pools(tokenAAddress, tokenBAddress, 30) == poolAddress, "Re-registration stays consistent");
+    }
+
+    // ============ FACTORY GUARD TESTS ============
+
+    function it_factory_initialize_only_once() {
+        bool thrown = false;
+        try {
+            factory.initialize(address(m.tokenFactory()), address(m.feeCollector()));
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "Re-initialize should revert");
+        require(factory.lpSharePercent() == 7000, "Factory state must be unchanged");
+    }
+
+    function it_factory_create_requires_initialization() {
+        // setTokenFactory + enableFeeTier alone must not be enough to mint pools:
+        // an uninitialized factory has feeCollector == 0 and every swap would revert
+        PoolV3Factory bare = new PoolV3Factory(address(this));
+        bare.setTokenFactory(address(m.tokenFactory()));
+        bare.enableFeeTier(40, 60);
+
+        bool thrown = false;
+        try {
+            bare.createPoolV3(tokenAAddress, tokenBAddress, 40, WAD);
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "Uninitialized factory must not create pools");
+
+        bare.initialize(address(m.tokenFactory()), address(m.feeCollector()));
+        address p = bare.createPoolV3(tokenAAddress, tokenBAddress, 40, WAD);
+        require(p != address(0), "Initialized factory should create pools");
+    }
+
+    // ============ SYNC / SKIM TESTS ============
+
+    function it_skim_recovers_donated_tokens() {
+        _mintRange(-600, 600, 1000e18);
+        uint trackedA = pool.tokenABalance();
+        uint trackedB = pool.tokenBBalance();
+
+        // Donate directly to the pool, outside mint/swap accounting
+        Token(tokenAAddress).mint(poolAddress, 5e18);
+        Token(tokenBAddress).mint(poolAddress, 7e18);
+        require(ERC20(tokenAAddress).balanceOf(poolAddress) == trackedA + 5e18, "Donation A should land");
+
+        // Pool owner can skim; excess goes to the recipient, tracked balances untouched
+        User receiver = new User();
+        pool.skim(address(receiver));
+        require(ERC20(tokenAAddress).balanceOf(address(receiver)) == 5e18, "Skim should pay excess A");
+        require(ERC20(tokenBAddress).balanceOf(address(receiver)) == 7e18, "Skim should pay excess B");
+        require(pool.tokenABalance() == trackedA && pool.tokenBBalance() == trackedB, "Tracked balances must not change");
+        require(ERC20(tokenAAddress).balanceOf(poolAddress) == trackedA, "Pool A balance should match tracked");
+
+        // Pool still functions normally afterwards
+        pool.burn(-600, 600, 1000e18, block.timestamp + DEADLINE_OFFSET);
+        (uint gotA, uint gotB) = pool.collect(-600, 600, 1000000e18, 1000000e18);
+        require(gotA > 0 && gotB > 0, "Exit after skim should work");
+    }
+
+    function it_sync_repairs_tracked_balances() {
+        _mintRange(-600, 600, 1000e18);
+        Token(tokenAAddress).mint(poolAddress, 5e18);
+
+        // Factory-level batch sync adopts actual balances into the tracked ones
+        factory.syncPools([poolAddress]);
+        require(pool.tokenABalance() == ERC20(tokenAAddress).balanceOf(poolAddress), "Sync should adopt actual A balance");
+        require(pool.tokenBBalance() == ERC20(tokenBAddress).balanceOf(poolAddress), "Sync should adopt actual B balance");
+
+        // After sync the donation belongs to the pool: skim finds no excess
+        User receiver = new User();
+        factory.skimPools([poolAddress], address(receiver));
+        require(ERC20(tokenAAddress).balanceOf(address(receiver)) == 0, "Nothing to skim after sync");
+    }
+
+    function it_sync_skim_reject_strangers() {
+        _mintRange(-600, 600, 1000e18);
+        User stranger = new User();
+
+        bool thrown = false;
+        try {
+            stranger.do(poolAddress, "skim", address(stranger));
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "Stranger skim should revert");
+
+        thrown = false;
+        try {
+            stranger.do(poolAddress, "sync");
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "Stranger sync should revert");
+    }
+
+    // ============ TICK BITMAP TESTS ============
+
+    function it_swap_across_multi_word_gap() {
+        // Spacing 60: one bitmap word spans 15360 ticks. These ranges sit three words apart,
+        // so the swap must step word-by-word across empty bitmap words in both directions
+        _mintRange(-60, 60, 100000e18);
+        _mintRange(-33600, -33540, 100000e18);
+
+        uint amountOut = _swap(true, 500e18);
+        require(amountOut > 0, "Gap swap should trade");
+        require(pool.currentTick() >= -33600 && pool.currentTick() < -33540,
+            "Should land in the far range, got " + string(pool.currentTick()));
+        require(pool.liquidity() == 100000e18, "Only the far range should be active");
+
+        uint amountBack = _swap(false, 500e18);
+        require(amountBack > 0, "Return swap should trade");
+        require(pool.currentTick() >= -60 && pool.currentTick() < 60,
+            "Should return to the near range, got " + string(pool.currentTick()));
+        require(pool.liquidity() == 100000e18, "Near range should be active again");
+    }
+
+    function it_swap_crosses_word_boundary_ticks() {
+        // Spacing 60: tick 15360 = compressed 256 = bit 0 of word 1; tick -15360 = bit 0 of word -1.
+        // Crossing these exercises the bitmap's word-edge arithmetic exactly
+        _mintRange(0, 60, 50000e18);
+        _mintRange(15360, 15420, 50000e18);
+        _mintRange(-15420, -15360, 500000e18);
+
+        // Up: cross into the range starting exactly at the word-1 boundary
+        _swap(false, 400e18);
+        require(pool.currentTick() >= 15360 && pool.currentTick() < 15420,
+            "Should land in the word-boundary range, got " + string(pool.currentTick()));
+        require(pool.liquidity() == 50000e18, "Boundary range must be active");
+
+        // Down: cross back through both word boundaries into the negative-boundary range
+        _swap(true, 800e18);
+        require(pool.currentTick() >= -15420 && pool.currentTick() < -15360,
+            "Should land in the negative word-boundary range, got " + string(pool.currentTick()));
+        require(pool.liquidity() == 500000e18, "Negative boundary range must be active");
+    }
+
+    function it_swap_price_bounded_strictly_above_min_sqrt() {
+        // Draining all liquidity rides the price down, but strictly-exclusive limits stop it
+        // one wei above the MIN sqrt price (V3 semantics), keeping currentTick representable
+        _mintRange(-60, 60, 100000e18);
+        _swap(true, 1000e18);
+
+        require(pool.sqrtPriceWad() == pool.getSqrtPriceAtTick(-443636) + 1,
+            "Price must stop 1 wei above the MIN sqrt price");
+        require(pool.currentTick() == -443636, "currentTick must stay at MIN_TICK");
+        require(pool.liquidity() == 0, "No liquidity should remain active");
+    }
+
+    // ============ ORACLE RING BUFFER TESTS ============
+
+    function it_oracle_cardinality_growth_and_history() {
+        _mintRange(-6000, 6000, 100000e18);
+        pool.increaseObservationCardinalityNext(8);
+        require(pool.observationCardinalityNext() == 8, "cardinalityNext should grow");
+        require(pool.observationCardinality() == 1, "cardinality grows only on the next write");
+
+        fastForward(100);
+        _swap(true, 100e18); // checkpoint 1; ring grows to 8 on this write
+        require(pool.observationCardinality() == 8, "cardinality should grow on write");
+        int tick1 = pool.currentTick();
+
+        fastForward(100);
+        _swap(true, 100e18); // checkpoint 2
+        int tick2 = pool.currentTick();
+
+        fastForward(100);
+        int cumNow = pool.observe(0);
+
+        // Window spanning both stored checkpoints: 100s at tick1 + 100s at tick2
+        int cum200 = pool.observe(200);
+        require(cumNow - cum200 == tick1 * 100 + tick2 * 100,
+            "Two-checkpoint window mismatch: " + string(cumNow - cum200));
+    }
+
+    function it_oracle_interpolates_between_observations() {
+        _mintRange(-6000, 6000, 100000e18);
+        pool.increaseObservationCardinalityNext(4);
+
+        fastForward(100);
+        _swap(true, 500e18); // checkpoint at t1; tick becomes tickHeld from here on
+        int tickHeld = pool.currentTick();
+
+        fastForward(100);
+        pool.burn(-6000, 6000, 0, block.timestamp + DEADLINE_OFFSET); // checkpoint at t2 = t1+100
+        int cumAtT2 = pool.observe(0);
+
+        fastForward(100); // now = t2 + 100
+
+        int cumAtT1 = pool.observe(200);  // t1 exactly: a stored checkpoint
+        int cumMid = pool.observe(150);   // t1 + 50: between checkpoints, interpolated
+        require(cumAtT2 - cumAtT1 == tickHeld * 100, "Checkpoint delta wrong");
+        require(cumMid == cumAtT1 + tickHeld * 50, "Interpolated cumulative wrong: " + string(cumMid));
+    }
+
+    function it_oracle_ring_wraps_and_overwrites_oldest() {
+        _mintRange(-6000, 6000, 100000e18);
+        pool.increaseObservationCardinalityNext(3);
+
+        // Four checkpoints into a 3-slot ring: the wrap overwrites the two oldest slots
+        fastForward(100);
+        _swap(true, 50e18); // t1
+        fastForward(100);
+        _swap(true, 50e18); // t2
+        int tickAfterT2 = pool.currentTick();
+        fastForward(100);
+        _swap(true, 50e18); // t3
+        int tickAfterT3 = pool.currentTick();
+        fastForward(100);
+        _swap(true, 50e18); // t4: ring has wrapped; oldest retained checkpoint is t2
+        int tickAfterT4 = pool.currentTick();
+
+        fastForward(50); // now = t4 + 50
+
+        // Window back to t2 (oldest retained) is answerable across the wrap
+        int cumNow = pool.observe(0);
+        int cumT2 = pool.observe(250);
+        require(cumNow - cumT2 == tickAfterT2 * 100 + tickAfterT3 * 100 + tickAfterT4 * 50,
+            "Wrapped-ring accumulator mismatch: " + string(cumNow - cumT2));
+
+        // History that the wrap overwrote (t1 and earlier) is gone
+        bool thrown = false;
+        try {
+            pool.observe(360);
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "History overwritten by ring wrap must revert (OLD)");
+    }
+
+    function it_oracle_old_history_reverts() {
+        _mintRange(-6000, 6000, 100000e18);
+        // Default cardinality is 1: only the latest checkpoint is retained
+        fastForward(100);
+        _swap(true, 100e18); // overwrites the single slot at the current timestamp
+
+        bool thrown = false;
+        try {
+            pool.observe(50); // target predates the only retained observation
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "History beyond the ring must revert (OLD)");
+    }
+
+    function it_oracle_cardinality_validation() {
+        bool thrown = false;
+        try {
+            pool.increaseObservationCardinalityNext(0);
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "Zero cardinality should revert");
+
+        thrown = false;
+        try {
+            pool.increaseObservationCardinalityNext(65536);
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "Cardinality above 65535 should revert");
+
+        // Shrinking is a no-op, not an error (V3 semantics)
+        pool.increaseObservationCardinalityNext(4);
+        pool.increaseObservationCardinalityNext(2);
+        require(pool.observationCardinalityNext() == 4, "Shrink attempts must be no-ops");
     }
 }
