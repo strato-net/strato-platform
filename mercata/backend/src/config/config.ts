@@ -35,6 +35,7 @@ export async function initOpenIdConfig() {
 export const clientId = process.env.OAUTH_CLIENT_ID;
 export const clientSecret = process.env.OAUTH_CLIENT_SECRET;
 export const nodeUrl = process.env.NODE_URL;
+export const wasUrl = process.env.WAS_URL || "http://localhost:3002";
 
 // Smart contract addresses
 export const burnAddress = process.env.BURN_ADDRESS || "0000000000000000000000000000000000000000";

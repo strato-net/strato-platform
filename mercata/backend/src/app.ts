@@ -5,7 +5,6 @@ import { initOpenIdConfig, initNetworkConfig } from "./config/config";
 import { errorHandler, notFoundHandler } from "./api/middleware/errorHandler";
 import { requestContext } from "./utils/requestContext";
 import { requestLogger, getRequestStats, resetRequestStats } from "./api/middleware/requestLogger";
-import { warmWithdrawalAuditCache } from "./api/services/withdrawalAudit.service";
 
 const PORT = process.env.PORT || 3001;
 
@@ -55,7 +54,6 @@ app.use(errorHandler);
     await initNetworkConfig();
     app.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
-      void warmWithdrawalAuditCache(10, true);
     });
   } catch (error) {
     console.error("Failed to initialize server:", error);
