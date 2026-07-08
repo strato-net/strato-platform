@@ -4,6 +4,7 @@ import axios, { AxiosInstance } from "axios";
 import dotenv from "dotenv";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { PROTOCOL_ASSOCIATION_EVENT_NAMES } from "../src/protocolEventConfig";
 
 dotenv.config({ path: resolve(__dirname, "../.env") });
 dotenv.config({ path: resolve(__dirname, "../../backend/.env") });
@@ -60,12 +61,8 @@ const WAS_EVENT_NAMES = [
   "NativeDepositCompleted",
   "NativeWithdrawalRequested",
   "Transfer",
-  "MetalMinted",
-  "USDSTMinted",
-  "DirectPSMMinted",
-  "Swap",
-  "RewardsClaimed",
-];
+  ...PROTOCOL_ASSOCIATION_EVENT_NAMES,
+].filter((eventName, index, eventNames) => eventNames.indexOf(eventName) === index);
 
 const eventTargets: SnapshotTarget[] = WAS_EVENT_NAMES.map((eventName) => ({
   name: `event.${eventName}`,

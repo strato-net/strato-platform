@@ -8,6 +8,7 @@ import dotenv from "dotenv";
 import { createAccessTokenProvider } from "../src/auth";
 import { createCirrusClient } from "../src/cirrusClient";
 import { loadConfig } from "../src/config";
+import { PROTOCOL_ASSOCIATION_EVENT_NAMES } from "../src/protocolEventConfig";
 import { createWithdrawalRepository } from "../src/withdrawalRepository";
 import {
   CirrusClient,
@@ -203,7 +204,7 @@ test("fetchFundingLots queries protocol events by same block and transaction", a
   assert.equal(protocolRequest.params?.transaction_hash, `eq.${transactionHash}`);
   assert.equal(
     protocolRequest.params?.event_name,
-    "in.(Swap,MetalMinted,USDSTMinted,DirectPSMMinted,RewardsClaimed)",
+    `in.(${PROTOCOL_ASSOCIATION_EVENT_NAMES.join(",")})`,
   );
   assert.equal(
     protocolRequest.params?.select,

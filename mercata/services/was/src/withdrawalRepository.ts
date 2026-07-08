@@ -2,6 +2,12 @@ import {
   NormalizedWithdrawalAudit,
   WithdrawalAuditStatusGroup,
 } from "@mercata/shared-types";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+  PROTOCOL_ASSOCIATION_EVENT_NAMES,
+  sourceForProtocolEvent,
+} from "./protocolEventConfig";
 import {
   CirrusClient,
   CirrusEventRow,
@@ -20,13 +26,7 @@ const EVENT_TABLE = "/event";
 const WITHDRAWAL_SELECT = "key,value,block_timestamp";
 const EVENT_SELECT =
   "event_name,address,attributes,block_timestamp,block_number,transaction_hash,transaction_sender";
-const PROTOCOL_EVENT_NAMES = [
-  "Swap",
-  "MetalMinted",
-  "USDSTMinted",
-  "DirectPSMMinted",
-  "RewardsClaimed",
-];
+const DEBUG_EVENT_DUMP_DIR = process.env.WAS_DEBUG_EVENT_DUMP_DIR;
 
 interface StandardWithdrawalValue {
   bridgeStatus: string | number;
@@ -157,15 +157,6 @@ const matchesProtocolOutput = (
   return false;
 };
 
-const sourceForProtocolEvent = (eventName: string): TraceLot["source"] => {
-  if (eventName === "Swap") return "swap";
-  if (eventName === "MetalMinted") return "metal_mint";
-  if (eventName === "USDSTMinted") return "cdp_mint";
-  if (eventName === "DirectPSMMinted") return "psm";
-  if (eventName === "RewardsClaimed") return "rewards";
-  return "transfer";
-};
-
 const transferEventAmount = (edge: TraceEdge): bigint | undefined =>
   toBigInt(eventAttribute(edge.to.event || edge.event!, "value"));
 
@@ -194,6 +185,71 @@ const trustAnchorTypeFor = (eventName: string): TrustAnchor["type"] | null => {
     return "StratoNativeBridge.NativeDepositCompleted";
   }
   return null;
+};
+
+const safeFilePart = (value: string | number | undefined): string =>
+  String(value || "unknown").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
+
+const dumpProtocolAssociationAttempt = ({
+  transferEvent,
+  cursor,
+  allEvents,
+  protocolEvents,
+  matchedProtocolEvent,
+}: {
+  transferEvent: CirrusEventRow;
+  cursor: TraceCursor;
+  allEvents: CirrusEventRow[];
+  protocolEvents: CirrusEventRow[];
+  matchedProtocolEvent: CirrusEventRow | null;
+}) => {
+  if (!DEBUG_EVENT_DUMP_DIR) return;
+
+  const transactionHash = transferEvent.transaction_hash || "unknown";
+  const blockNumber = transferEvent.block_number || "unknown";
+  const transactionDir = join(
+    DEBUG_EVENT_DUMP_DIR,
+    "protocol-event-association",
+    `${safeFilePart(blockNumber)}-${safeFilePart(transactionHash)}`,
+  );
+  mkdirSync(transactionDir, { recursive: true });
+
+  const fileName = `${Date.now()}-${safeFilePart(transferEvent.address)}-${safeFilePart(eventAttribute(transferEvent, "to"))}.json`;
+  const filePath = join(transactionDir, fileName);
+  const payload = {
+    dumpedAt: new Date().toISOString(),
+    transferEvent,
+    cursor,
+    protocolEventNames: PROTOCOL_ASSOCIATION_EVENT_NAMES,
+    allEvents,
+    protocolEvents,
+    matchedProtocolEvent,
+    matchSummary: matchedProtocolEvent
+      ? {
+          matched: true,
+          eventName: matchedProtocolEvent.event_name,
+          source: sourceForProtocolEvent(matchedProtocolEvent.event_name),
+        }
+      : {
+          matched: false,
+        },
+  };
+
+  writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`);
+  appendFileSync(
+    join(DEBUG_EVENT_DUMP_DIR, "protocol-event-association-manifest.jsonl"),
+    `${JSON.stringify({
+      dumpedAt: payload.dumpedAt,
+      file: filePath,
+      blockNumber,
+      transactionHash,
+      transferToken: transferEvent.address,
+      transferTo: eventAttribute(transferEvent, "to"),
+      transferValue: eventAttribute(transferEvent, "value"),
+      matchedEventName: matchedProtocolEvent?.event_name || null,
+      allEventNames: allEvents.map((event) => event.event_name),
+    })}\n`,
+  );
 };
 
 const isBeforeCursorEvent = (
@@ -236,7 +292,7 @@ const toFundingLots = async (
       transactionHash: fundingEvent.transaction_hash,
       blockNumber: fundingEvent.block_number,
       source: protocolEvent
-        ? sourceForProtocolEvent(protocolEvent.event_name)
+        ? sourceForProtocolEvent(protocolEvent.event_name) || "transfer"
         : "transfer",
       event: fundingEvent,
     });
@@ -299,16 +355,33 @@ export const createWithdrawalRepository = (
     const rows = await cirrus.getRows<CirrusEventRow>(EVENT_TABLE, {
       block_number: `eq.${transferEvent.block_number}`,
       transaction_hash: `eq.${transferEvent.transaction_hash}`,
-      event_name: `in.(${PROTOCOL_EVENT_NAMES.join(",")})`,
+      event_name: `in.(${PROTOCOL_ASSOCIATION_EVENT_NAMES.join(",")})`,
       select: EVENT_SELECT,
       limit: 25,
     });
 
-    return (
+    const matchedProtocolEvent =
       rows.find((event) =>
         matchesProtocolOutput(event, transferEvent, cursor),
-      ) || null
-    );
+      ) || null;
+
+    if (DEBUG_EVENT_DUMP_DIR) {
+      const allEvents = await cirrus.getRows<CirrusEventRow>(EVENT_TABLE, {
+        block_number: `eq.${transferEvent.block_number}`,
+        transaction_hash: `eq.${transferEvent.transaction_hash}`,
+        select: EVENT_SELECT,
+        limit: 200,
+      });
+      dumpProtocolAssociationAttempt({
+        transferEvent,
+        cursor,
+        allEvents,
+        protocolEvents: rows,
+        matchedProtocolEvent,
+      });
+    }
+
+    return matchedProtocolEvent;
   };
 
   const fetchStandardCandidates = async (
