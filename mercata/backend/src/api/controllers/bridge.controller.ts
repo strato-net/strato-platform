@@ -204,11 +204,14 @@ class BridgeController {
   ): Promise<void> {
     try {
       const limit = Math.min(Math.max(Number(req.query.limit || 10), 1), 10);
-      const quickRun = req.query.quickRun === "true";
+      const parsedMaxDepth = Number(req.query.maxDepth);
+      const maxDepth = Number.isSafeInteger(parsedMaxDepth) && parsedMaxDepth > 0
+        ? parsedMaxDepth
+        : undefined;
       const statusGroup = ["aborted", "complete", "other"].includes(String(req.query.statusGroup))
         ? String(req.query.statusGroup) as WithdrawalAuditStatusGroup
         : "other";
-      const result = await getRecentWithdrawalAudits(limit, quickRun, statusGroup);
+      const result = await getRecentWithdrawalAudits(limit, maxDepth, statusGroup);
       res.json(result);
     } catch (error: any) {
       next(error);
@@ -223,8 +226,11 @@ class BridgeController {
     try {
       const routeType = validateWithdrawalAuditRouteType(req.params.routeType);
       const withdrawalId = validateWithdrawalAuditId(req.params.withdrawalId);
-      const quickRun = req.query.quickRun === "true";
-      const result = await getWithdrawalAudit(routeType, withdrawalId, quickRun);
+      const parsedMaxDepth = Number(req.query.maxDepth);
+      const maxDepth = Number.isSafeInteger(parsedMaxDepth) && parsedMaxDepth > 0
+        ? parsedMaxDepth
+        : undefined;
+      const result = await getWithdrawalAudit(routeType, withdrawalId, maxDepth);
       if (!result) {
         res.status(404).json({ error: "Withdrawal not found" });
         return;
