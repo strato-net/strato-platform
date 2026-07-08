@@ -1,25 +1,62 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { CirrusClient, CirrusEventRow, CirrusQueryParams, WasConfig } from "./types";
 import { logInfo } from "./logger";
 
 interface SnapshotManifestFile {
   file: string;
   rowCount: number;
+  block?: string | number;
+  firstBlock?: string | number;
+  lastBlock?: string | number;
+  page?: number;
+  offset?: number;
+  bytes?: number;
 }
 
 interface SnapshotManifest {
   totalRows: number;
   files: SnapshotManifestFile[];
+  highestBlock?: string | number;
+  totalBytes?: number;
+  totalSizeMiB?: number;
+  averageBytesPerRow?: number;
+}
+
+interface SnapshotPage {
+  page: number;
+  rows: CirrusEventRow[];
 }
 
 const EVENT_TABLE = "/event";
+const STANDARD_WITHDRAWALS_TABLE = "/BlockApps-MercataBridge-withdrawals";
+const NATIVE_WITHDRAWALS_TABLE = "/BlockApps-StratoNativeBridge-withdrawals";
+const EVENT_SELECT =
+  "event_name,address,attributes,block_timestamp,block_number,transaction_hash,transaction_sender";
+const REFRESH_PAGE_SIZE = 5000;
+const REFRESH_FETCH_CONCURRENCY = parsePositiveInteger(
+  process.env.WAS_EVENT_SNAPSHOT_FETCH_CONCURRENCY,
+  4,
+);
+const BLOCK_RANGE_SPANS = [10000n, 1000n, 100n, 10n];
 
 const normalizeAddress = (address?: string): string =>
   address ? address.toLowerCase().replace(/^0x/, "") : "";
 
 const normalizeValue = (value: unknown): string =>
   value === undefined || value === null ? "" : String(value);
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 const parseEq = (value: unknown): string | undefined => {
   if (typeof value !== "string") return undefined;
@@ -28,6 +65,15 @@ const parseEq = (value: unknown): string | undefined => {
 
 const parseLt = (value: unknown): bigint | undefined => {
   if (typeof value !== "string" || !value.startsWith("lt.")) return undefined;
+  try {
+    return BigInt(value.slice(3));
+  } catch {
+    return undefined;
+  }
+};
+
+const parseGt = (value: unknown): bigint | undefined => {
+  if (typeof value !== "string" || !value.startsWith("gt.")) return undefined;
   try {
     return BigInt(value.slice(3));
   } catch {
@@ -45,8 +91,12 @@ const parseEventNames = (value: unknown): Set<string> | undefined => {
 };
 
 const eventBlock = (event: CirrusEventRow): bigint | undefined => {
+  return toBlock(event.block_number);
+};
+
+const toBlock = (value: unknown): bigint | undefined => {
   try {
-    return BigInt(normalizeValue(event.block_number));
+    return BigInt(normalizeValue(value));
   } catch {
     return undefined;
   }
@@ -85,13 +135,20 @@ class LocalEventStore {
   private events: CirrusEventRow[] = [];
   private eventsByTransaction = new Map<string, CirrusEventRow[]>();
   private transfersByTokenTo = new Map<string, CirrusEventRow[]>();
+  private latestBlock: bigint | undefined;
+  private manifest: SnapshotManifest | undefined;
+  private refreshPromise: Promise<void> | undefined;
 
-  constructor(private readonly snapshotDir: string) {
+  constructor(private snapshotDir: string) {
     this.load();
   }
 
   private addEvent(event: CirrusEventRow) {
     this.events.push(event);
+    const block = eventBlock(event);
+    if (block !== undefined && (this.latestBlock === undefined || block > this.latestBlock)) {
+      this.latestBlock = block;
+    }
 
     const txKey = transactionKey(event);
     const txEvents = this.eventsByTransaction.get(txKey) || [];
@@ -113,6 +170,11 @@ class LocalEventStore {
     }
 
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as SnapshotManifest;
+    this.manifest = manifest;
+    const manifestBlock = toBlock(manifest.highestBlock);
+    if (manifestBlock !== undefined) {
+      this.latestBlock = manifestBlock;
+    }
     for (const file of manifest.files) {
       const filePath = join(this.snapshotDir, file.file);
       const contents = readFileSync(filePath, "utf8");
@@ -144,6 +206,154 @@ class LocalEventStore {
     candidates = candidates.filter((event) => this.matches(event, params));
     candidates = sortEvents(candidates, params.order);
     return applyPagination(candidates, params);
+  }
+
+  async refresh(baseClient: CirrusClient): Promise<void> {
+    if (this.refreshPromise) return this.refreshPromise;
+
+    this.refreshPromise = this.refreshNow(baseClient).finally(() => {
+      this.refreshPromise = undefined;
+    });
+    return this.refreshPromise;
+  }
+
+  private async refreshNow(baseClient: CirrusClient): Promise<void> {
+    const startingBlock = this.latestBlock;
+    let nextPage = 0;
+    let addedRows = 0;
+    let totalBytes = 0;
+    const files: SnapshotManifestFile[] = [];
+    let currentBlock: string | undefined;
+    let currentRows: CirrusEventRow[] = [];
+
+    const flushCurrentBlock = () => {
+      if (!currentBlock || !currentRows.length) return;
+
+      const contents = currentRows.map((row) => JSON.stringify(row)).join("\n") + "\n";
+      const bytes = Buffer.byteLength(contents, "utf8");
+      const rangeDir = blockRangeDir(currentBlock);
+      const file = `${rangeDir}/block-${safeFilePart(currentBlock)}.jsonl`;
+      mkdirSync(join(this.snapshotDir, rangeDir), { recursive: true });
+      writeFileSync(join(this.snapshotDir, file), contents);
+
+      files.push({
+        block: currentBlock,
+        file,
+        rowCount: currentRows.length,
+        bytes,
+      });
+      totalBytes += bytes;
+      currentRows = [];
+    };
+
+    while (true) {
+      const pages = Array.from(
+        { length: REFRESH_FETCH_CONCURRENCY },
+        (_, index) => nextPage + index,
+      );
+      const fetchedPages = await Promise.all(
+        pages.map((page) => this.fetchRefreshPage(baseClient, page, startingBlock)),
+      );
+      const firstShortPageIndex = fetchedPages.findIndex(
+        (fetchedPage) => fetchedPage.rows.length < REFRESH_PAGE_SIZE,
+      );
+      const pagesToWrite =
+        firstShortPageIndex >= 0
+          ? fetchedPages.slice(0, firstShortPageIndex + 1)
+          : fetchedPages;
+
+      for (const fetchedPage of pagesToWrite) {
+        for (const row of fetchedPage.rows) {
+          const block = normalizeValue(row.block_number);
+          if (currentBlock && block !== currentBlock) {
+            flushCurrentBlock();
+          }
+          currentBlock = block;
+          currentRows.push(row);
+          this.addEvent(row);
+        }
+        addedRows += fetchedPage.rows.length;
+      }
+
+      if (firstShortPageIndex >= 0) break;
+      nextPage += fetchedPages.length;
+    }
+
+    if (!addedRows) return;
+
+    flushCurrentBlock();
+    for (const [key, transfers] of this.transfersByTokenTo.entries()) {
+      this.transfersByTokenTo.set(
+        key,
+        sortEvents(transfers, "block_number.desc"),
+      );
+    }
+
+    this.updateManifest(files, totalBytes);
+    logInfo("LocalEventStore", "Appended local event snapshot rows", {
+      snapshotDir: this.snapshotDir,
+      rows: addedRows,
+      files: files.length,
+      fromBlockExclusive: startingBlock?.toString() || "",
+      latestBlock: this.latestBlock?.toString() || "",
+    });
+  }
+
+  private async fetchRefreshPage(
+    baseClient: CirrusClient,
+    page: number,
+    startingBlock: bigint | undefined,
+  ): Promise<SnapshotPage> {
+    const params: CirrusQueryParams = {
+      select: EVENT_SELECT,
+      order: "block_number.asc",
+      limit: REFRESH_PAGE_SIZE,
+      offset: page * REFRESH_PAGE_SIZE,
+      ...(startingBlock !== undefined
+        ? { block_number: `gt.${startingBlock.toString()}` }
+        : {}),
+    };
+    return {
+      page,
+      rows: await baseClient.getRows<CirrusEventRow>(EVENT_TABLE, params),
+    };
+  }
+
+  private updateManifest(files: SnapshotManifestFile[], addedBytes: number) {
+    const manifest = this.manifest || { totalRows: 0, files: [] };
+    manifest.files.push(...files);
+    manifest.totalRows = this.events.length;
+    manifest.highestBlock = this.latestBlock?.toString();
+
+    if (manifest.totalBytes !== undefined) {
+      manifest.totalBytes += addedBytes;
+      manifest.totalSizeMiB = Number((manifest.totalBytes / 1024 / 1024).toFixed(2));
+      manifest.averageBytesPerRow = manifest.totalRows
+        ? Math.round(manifest.totalBytes / manifest.totalRows)
+        : 0;
+    }
+
+    writeFileSync(
+      join(this.snapshotDir, "manifest.json"),
+      `${JSON.stringify(manifest, null, 2)}\n`,
+    );
+    this.manifest = manifest;
+    this.renameSnapshotDir();
+  }
+
+  private renameSnapshotDir() {
+    const latestBlock = this.latestBlock?.toString();
+    if (!latestBlock || !/^snapshot-\d+$/.test(basename(this.snapshotDir))) return;
+
+    const nextDir = join(dirname(this.snapshotDir), `snapshot-${latestBlock}`);
+    if (nextDir === this.snapshotDir || existsSync(nextDir)) return;
+
+    renameSync(this.snapshotDir, nextDir);
+    this.snapshotDir = nextDir;
+    logInfo("LocalEventStore", "Renamed local event snapshot directory", {
+      snapshotDir: this.snapshotDir,
+      latestBlock,
+    });
   }
 
   private selectCandidateSet(params: CirrusQueryParams): CirrusEventRow[] {
@@ -190,6 +400,12 @@ class LocalEventStore {
       if (block === undefined || block >= blockLt) return false;
     }
 
+    const blockGt = parseGt(params.block_number);
+    if (blockGt !== undefined) {
+      const block = eventBlock(event);
+      if (block === undefined || block <= blockGt) return false;
+    }
+
     for (const [key, value] of Object.entries(params)) {
       if (!key.startsWith("attributes->>")) continue;
       const attr = key.slice("attributes->>".length);
@@ -203,17 +419,71 @@ class LocalEventStore {
   }
 }
 
+const safeFilePart = (value: unknown): string =>
+  String(value || "unknown").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
+
+const blockRangeDir = (block: string): string => {
+  const blockNumber = toBlock(block) || 0n;
+  if (blockNumber <= 0n) return "0-0";
+
+  return BLOCK_RANGE_SPANS.map((span) => {
+    const start = ((blockNumber - 1n) / span) * span + 1n;
+    const end = start + span - 1n;
+    return `${start.toString()}-${end.toString()}`;
+  }).join("/");
+};
+
+const refreshesSnapshotBeforeRead = (table: string): boolean =>
+  table === STANDARD_WITHDRAWALS_TABLE || table === NATIVE_WITHDRAWALS_TABLE;
+
+const manifestHighestBlock = (manifest: SnapshotManifest): bigint | undefined => {
+  const highestBlock = toBlock(manifest.highestBlock);
+  if (highestBlock !== undefined) return highestBlock;
+
+  return manifest.files.reduce<bigint | undefined>((highest, file) => {
+    const block = toBlock(file.block ?? file.lastBlock ?? file.firstBlock);
+    if (block === undefined) return highest;
+    return highest === undefined || block > highest ? block : highest;
+  }, undefined);
+};
+
+const findLatestSnapshotDir = (snapshotRoot: string): string | undefined => {
+  if (!existsSync(snapshotRoot)) return undefined;
+
+  return readdirSync(snapshotRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && /^snapshot-\d+$/.test(entry.name))
+    .map((entry) => {
+      const dir = join(snapshotRoot, entry.name);
+      const manifestPath = join(dir, "manifest.json");
+      if (!existsSync(manifestPath)) return undefined;
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as SnapshotManifest;
+      return { dir, highestBlock: manifestHighestBlock(manifest) || 0n };
+    })
+    .filter((entry): entry is { dir: string; highestBlock: bigint } => !!entry)
+    .sort((a, b) => (a.highestBlock > b.highestBlock ? -1 : 1))[0]?.dir;
+};
+
+const resolveSnapshotDir = (snapshotPath: string): string => {
+  const resolved = resolve(snapshotPath);
+  if (existsSync(join(resolved, "manifest.json"))) return resolved;
+  return findLatestSnapshotDir(resolved) || resolved;
+};
+
 export const createSnapshotBackedCirrusClient = (
   baseClient: CirrusClient,
   config: WasConfig,
 ): CirrusClient => {
   if (!config.eventSnapshotDir) return baseClient;
 
-  const snapshotDir = resolve(config.eventSnapshotDir);
+  const snapshotDir = resolveSnapshotDir(config.eventSnapshotDir);
   const localStore = new LocalEventStore(snapshotDir);
 
   return {
     getRows: async <T>(table: string, params: CirrusQueryParams = {}) => {
+      if (refreshesSnapshotBeforeRead(table)) {
+        await localStore.refresh(baseClient);
+      }
+
       if (table === EVENT_TABLE) {
         return localStore.getRows(params) as T[];
       }
