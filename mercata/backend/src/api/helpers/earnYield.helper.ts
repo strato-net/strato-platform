@@ -10,6 +10,8 @@ const DEFAULT_YIELD_WINDOW_DAYS = 30;
 const YIELD_ANCHOR_STEP_DAYS = 1;
 const MAX_YIELD_HISTORY_CACHE_KEYS = 8;
 const YIELD_HISTORY_CACHE_TTL_MS = 60_000; // 60 seconds TTL to ensure consistent APY across backend instances
+const RAY = 10n ** 27n;
+const SECONDS_PER_YEAR = 365 * 24 * 60 * 60;
 
 export const ZERO_APY = "0.00";
 export const DEFAULT_SWAP_FEE_BPS = 30;
@@ -79,6 +81,14 @@ export function indexYieldHistoryRows(rows: any[]): Map<string, YieldHistoryInte
   }
 
   return byKey;
+}
+
+export function computePerSecondRateApy(perSecondRateRaw: string | null | undefined): string {
+  const perSecondRate = safeBigInt(perSecondRateRaw);
+  if (perSecondRate <= RAY) return ZERO_APY;
+
+  const apy = (Math.pow(Number(perSecondRate) / Number(RAY), SECONDS_PER_YEAR) - 1) * 100;
+  return Number.isFinite(apy) ? apy.toFixed(2) : "-";
 }
 
 function buildYieldAnchors(

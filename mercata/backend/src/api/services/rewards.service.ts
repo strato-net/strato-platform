@@ -327,7 +327,7 @@ export const fetchRewardsOverview = async (
       .filter((a) => BigInt(a.emissionRate || "0") > 0n).length;
 
     // Hardcoded season info for now
-    const currentSeason = 2;
+    const currentSeason = 3;
 
 
     // Sum up total stake across all activities

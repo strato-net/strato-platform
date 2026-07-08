@@ -37,14 +37,15 @@ interface MoreNavCategory {
 const PRIMARY_NAV_ITEMS = [
   { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
   { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
-  { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
   { icon: ArrowLeftRight, label: 'Trade', path: '/dashboard/swap' },
+  { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
 ];
 
 const MORE_CATEGORIES: MoreNavCategory[] = [
   {
     label: 'TRADE',
     items: [
+      { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
       { icon: Send, label: 'Send', path: '/dashboard/transfer' },
       { icon: Download, label: 'Bridge Out', path: '/dashboard/withdrawals' },
     ],
@@ -52,7 +53,6 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
   {
     label: 'EARN',
     items: [
-      { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
       { icon: Layers, label: 'Stake', path: '/dashboard/earn-staking' },
       { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
     ],
