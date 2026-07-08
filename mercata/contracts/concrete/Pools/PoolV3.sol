@@ -508,6 +508,41 @@ contract record PoolV3 is Ownable {
         return (pos.liquidity, pos.tokensOwed0, pos.tokensOwed1);
     }
 
+    struct ModifyPositionParams {
+        // the address that owns the position
+        address owner;
+        // the lower and upper tick of the position
+        int tickLower;
+        int tickUpper;
+        // any change in liquidity
+        int liquidityDelta;
+    }
+
+    /// @dev Effect some changes to a position (canonical _modifyPosition)
+    /// @param params the position details and the change to the position's liquidity to effect
+    /// @return amount0 the amount of token0 owed to the pool, negative if the pool should pay the recipient
+    /// @return amount1 the amount of token1 owed to the pool, negative if the pool should pay the recipient
+    /// @dev Canonical also returns the position's storage pointer; SolidVM cannot return
+    ///      storage references inside tuples, so callers re-fetch via Position.get. The
+    ///      amounts branch reuses _amountsForLiquidity (canonical inlines the same math)
+    function _modifyPosition(ModifyPositionParams memory params) private returns (int amount0, int amount1) {
+        _checkTicks(params.tickLower, params.tickUpper);
+
+        _updatePosition(params.owner, params.tickLower, params.tickUpper, params.liquidityDelta);
+
+        if (params.liquidityDelta != 0) {
+            (amount0, amount1) = _amountsForLiquidity(params.tickLower, params.tickUpper, params.liquidityDelta);
+
+            // current tick inside the range: write an oracle entry and shift active liquidity
+            if (currentTick >= params.tickLower && currentTick < params.tickUpper) {
+                uint liquidityBefore = liquidity; // SLOAD for gas optimization (canonical)
+                _writeObservation();
+                liquidity = LiquidityMath.addDelta(liquidityBefore, params.liquidityDelta);
+            }
+        }
+        return (amount0, amount1);
+    }
+
     // ============ CORE FUNCTIONS ============
 
     /// @notice Add liquidity to a position over [tickLower, tickUpper)
@@ -535,23 +570,21 @@ contract record PoolV3 is Ownable {
         require(recipient != address(0), "Zero recipient");
         require(amount > 0, "Invalid liquidity");
         require(block.timestamp <= deadline, "EXPIRED");
-        _checkTicks(tickLower, tickUpper);
 
-        // In-range liquidity changes write an oracle checkpoint first (canonical _modifyPosition)
-        if (currentTick >= tickLower && currentTick < tickUpper) {
-            _writeObservation();
-        }
-        _updatePosition(recipient, tickLower, tickUpper, int(amount));
+        (int amount0Int, int amount1Int) =
+            _modifyPosition(
+                ModifyPositionParams({
+                    owner: recipient,
+                    tickLower: tickLower,
+                    tickUpper: tickUpper,
+                    liquidityDelta: int(amount)
+                })
+            );
 
-        (int amount0Int, int amount1Int) = _amountsForLiquidity(tickLower, tickUpper, int(amount));
         amount0 = uint(amount0Int);
         amount1 = uint(amount1Int);
         require(amount0 > 0 || amount1 > 0, "Zero amounts");
         require(amount0 <= amount0Max && amount1 <= amount1Max, "Slippage check failed");
-
-        if (currentTick >= tickLower && currentTick < tickUpper) {
-            liquidity += amount;
-        }
 
         if (amount0 > 0) {
             require(token0.transferFrom(msg.sender, address(this), amount0), "Token0 transfer failed");
@@ -578,25 +611,24 @@ contract record PoolV3 is Ownable {
         uint deadline
     ) external whenNotDisabled nonReentrant returns (uint amount0, uint amount1) {
         require(block.timestamp <= deadline, "EXPIRED");
-        _checkTicks(tickLower, tickUpper);
 
-        // In-range liquidity changes write an oracle checkpoint first (canonical _modifyPosition)
-        if (amount > 0 && currentTick >= tickLower && currentTick < tickUpper) {
-            _writeObservation();
-        }
-        _updatePosition(msg.sender, tickLower, tickUpper, -int(amount));
+        (int amount0Int, int amount1Int) =
+            _modifyPosition(
+                ModifyPositionParams({
+                    owner: msg.sender,
+                    tickLower: tickLower,
+                    tickUpper: tickUpper,
+                    liquidityDelta: -int(amount)
+                })
+            );
 
-        if (amount > 0) {
-            (int amount0Int, int amount1Int) = _amountsForLiquidity(tickLower, tickUpper, -int(amount));
-            amount0 = uint(-amount0Int);
-            amount1 = uint(-amount1Int);
-            if (currentTick >= tickLower && currentTick < tickUpper) {
-                liquidity -= amount;
-            }
+        amount0 = uint(-amount0Int);
+        amount1 = uint(-amount1Int);
 
-            V3Position storage pos = Position.get(positions, msg.sender, tickLower, tickUpper);
-            pos.tokensOwed0 += amount0;
-            pos.tokensOwed1 += amount1;
+        if (amount0 > 0 || amount1 > 0) {
+            V3Position storage position = Position.get(positions, msg.sender, tickLower, tickUpper);
+            position.tokensOwed0 += amount0;
+            position.tokensOwed1 += amount1;
         }
 
         emit Burn(msg.sender, tickLower, tickUpper, amount, amount0, amount1);
@@ -646,6 +678,56 @@ contract record PoolV3 is Ownable {
 
     // ============ SWAP ============
 
+    struct SwapCache {
+        // liquidity at the beginning of the swap
+        uint liquidityStart;
+        // the timestamp of the current block
+        uint blockTimestamp;
+        // the current value of the tick accumulator, computed only if we cross an initialized tick
+        int tickCumulative;
+        // the current value of seconds per liquidity accumulator, computed only if we cross an initialized tick
+        int secondsPerLiquidityCumulativeX128;
+        // whether we've computed and cached the above two accumulators
+        bool computedLatestObservation;
+        // platform: LP share of fees in basis points (canonical caches feeProtocol here)
+        uint lpShare;
+    }
+
+    // the top level state of the swap, the results of which are recorded in storage at the end
+    struct SwapState {
+        // the amount remaining to be swapped in/out of the input/output asset
+        int amountSpecifiedRemaining;
+        // the amount already swapped out/in of the output/input asset
+        int amountCalculated;
+        // current sqrt(price)
+        uint sqrtPriceX96;
+        // the tick associated with the current price
+        int tick;
+        // the global fee growth of the input token
+        int feeGrowthGlobalX128;
+        // amount of input token paid as protocol fee
+        uint protocolFee;
+        // the current liquidity in range
+        uint liquidity;
+    }
+
+    struct StepComputations {
+        // the price at the beginning of the step
+        uint sqrtPriceStartX96;
+        // the next tick to swap to from the current tick in the swap direction
+        int tickNext;
+        // whether tickNext is initialized or not
+        bool initialized;
+        // sqrt(price) for the next tick (1/0)
+        uint sqrtPriceNextX96;
+        // how much is being swapped in in this step
+        uint amountIn;
+        // how much is being swapped out
+        uint amountOut;
+        // how much fee is being paid in
+        uint feeAmount;
+    }
+
     /// @notice Swap token0 for token1, or token1 for token0
     /// @param recipient Address to receive the output tokens
     /// @param zeroForOne If true, swap token0 in for token1 out (price moves down)
@@ -680,108 +762,151 @@ contract record PoolV3 is Ownable {
             require(limit > sqrtPriceX96 && limit < TickMath.MAX_SQRT_RATIO, "SPL");
         }
 
-        // Pre-swap snapshot: the oracle checkpoint and the crossing cache accrue with these
-        // values (canonical slot0Start / cache semantics)
+        // canonical slot0Start.tick; price/tick/oracle indices are read from storage directly
         int tickBefore = currentTick;
-        uint liquidityBefore = liquidity;
-        (int cacheTickCum, int cacheSplCum) = Oracle.observeSingle(
-            observations, block.timestamp, 0,
-            tickBefore, observationIndex, liquidityBefore, observationCardinality
-        );
+
+        // struct fields are assigned individually: SolidVM memory structs initialized from a
+        // literal become immutable, so canonical's SwapCache({...}) form cannot be used
+        SwapCache memory cache;
+        cache.liquidityStart = liquidity;
+        cache.blockTimestamp = block.timestamp;
+        cache.lpShare = _lpSharePercent(); // platform: canonical caches feeProtocol instead
 
         bool exactInput = amountSpecified > 0;
-        int remaining = amountSpecified;
-        int calculated = 0;
-        uint protocolFees = 0;
-        uint lpShare = _lpSharePercent();
-        uint feePips = fee;
 
-        while (remaining != 0 && sqrtPriceX96 != limit) {
-            uint stepStartSqrt = sqrtPriceX96;
+        SwapState memory state;
+        state.amountSpecifiedRemaining = amountSpecified;
+        state.amountCalculated = 0;
+        state.sqrtPriceX96 = sqrtPriceX96;
+        state.tick = tickBefore;
+        state.feeGrowthGlobalX128 = zeroForOne ? feeGrowthGlobal0X128 : feeGrowthGlobal1X128;
+        state.protocolFee = 0;
+        state.liquidity = cache.liquidityStart;
 
-            (int foundTick, bool nextInitialized) =
-                TickBitmap.nextInitializedTickWithinOneWord(tickBitmap, currentTick, tickSpacing, zeroForOne);
-            int nextTick = foundTick;
-            if (nextTick < TickMath.MIN_TICK) {
-                nextTick = TickMath.MIN_TICK;
-            } else if (nextTick > TickMath.MAX_TICK) {
-                nextTick = TickMath.MAX_TICK;
+        // continue swapping as long as we haven't used the entire input/output and haven't reached the price limit
+        while (state.amountSpecifiedRemaining != 0 && state.sqrtPriceX96 != limit) {
+            StepComputations memory step;
+
+            step.sqrtPriceStartX96 = state.sqrtPriceX96;
+
+            (step.tickNext, step.initialized) = TickBitmap.nextInitializedTickWithinOneWord(
+                tickBitmap,
+                state.tick,
+                tickSpacing,
+                zeroForOne
+            );
+
+            // ensure that we do not overshoot the min/max tick, as the tick bitmap is not aware of these bounds
+            if (step.tickNext < TickMath.MIN_TICK) {
+                step.tickNext = TickMath.MIN_TICK;
+            } else if (step.tickNext > TickMath.MAX_TICK) {
+                step.tickNext = TickMath.MAX_TICK;
             }
-            uint tickSqrt = TickMath.getSqrtRatioAtTick(nextTick);
 
-            // Step target: the next tick, clamped by the price limit. A tick exactly on the
-            // limit is still the target so it gets crossed when reached (canonical semantics)
-            uint targetSqrt = limit;
-            if (zeroForOne) {
-                if (tickSqrt >= limit) targetSqrt = tickSqrt;
-            } else {
-                if (tickSqrt <= limit) targetSqrt = tickSqrt;
-            }
+            // get the price for the next tick
+            step.sqrtPriceNextX96 = TickMath.getSqrtRatioAtTick(step.tickNext);
 
-            (uint newSqrt, uint stepIn, uint stepOut, uint stepFee) =
-                SwapMath.computeSwapStep(sqrtPriceX96, targetSqrt, liquidity, remaining, feePips);
+            // compute values to swap to the target tick, price limit, or point where input/output amount is exhausted
+            (state.sqrtPriceX96, step.amountIn, step.amountOut, step.feeAmount) = SwapMath.computeSwapStep(
+                state.sqrtPriceX96,
+                (zeroForOne ? step.sqrtPriceNextX96 < limit : step.sqrtPriceNextX96 > limit)
+                    ? limit
+                    : step.sqrtPriceNextX96,
+                state.liquidity,
+                state.amountSpecifiedRemaining,
+                fee
+            );
 
             if (exactInput) {
-                remaining -= int(stepIn + stepFee);
-                calculated -= int(stepOut);
+                state.amountSpecifiedRemaining -= int(step.amountIn + step.feeAmount);
+                state.amountCalculated -= int(step.amountOut);
             } else {
-                remaining += int(stepOut);
-                calculated += int(stepIn + stepFee);
+                state.amountSpecifiedRemaining += int(step.amountOut);
+                state.amountCalculated += int(step.amountIn + step.feeAmount);
             }
 
-            // Fee accounting (platform extension): LP share accrues as Q128 fee growth,
-            // protocol share leaves the pool to the factory's feeCollector after the loop
-            uint lpFee = (stepFee * lpShare) / 10000;
-            protocolFees += stepFee - lpFee;
-            if (lpFee > 0 && liquidity > 0) {
-                if (zeroForOne) {
-                    feeGrowthGlobal0X128 += int((lpFee * FixedPoint128.Q128) / liquidity);
-                } else {
-                    feeGrowthGlobal1X128 += int((lpFee * FixedPoint128.Q128) / liquidity);
-                }
-            }
+            // platform fee split (canonical: feeProtocol 1/x decrement): the LP share accrues
+            // as fee growth, the remainder accrues as the protocol fee sent to the feeCollector
+            uint lpFee = (step.feeAmount * cache.lpShare) / 10000;
+            state.protocolFee += step.feeAmount - lpFee;
 
-            sqrtPriceX96 = newSqrt;
+            // update global fee tracker
+            if (state.liquidity > 0)
+                state.feeGrowthGlobalX128 += int(FullMath.mulDiv(lpFee, FixedPoint128.Q128, state.liquidity));
 
-            if (newSqrt == tickSqrt) {
-                // Reached the next tick: apply its liquidity if initialized; word-boundary
-                // sentinels just advance the search window (canonical does the same)
-                if (nextInitialized) {
-                    int liquidityNet = Tick.cross(
-                        ticks, nextTick,
-                        feeGrowthGlobal0X128, feeGrowthGlobal1X128,
-                        cacheSplCum, cacheTickCum, block.timestamp
-                    );
-                    if (zeroForOne) {
-                        liquidityNet = -liquidityNet;
+            // shift tick if we reached the next price
+            if (state.sqrtPriceX96 == step.sqrtPriceNextX96) {
+                // if the tick is initialized, run the tick transition
+                if (step.initialized) {
+                    // check for the placeholder value, which we replace with the actual value the first time the swap
+                    // crosses an initialized tick
+                    if (!cache.computedLatestObservation) {
+                        (cache.tickCumulative, cache.secondsPerLiquidityCumulativeX128) = Oracle.observeSingle(
+                            observations,
+                            cache.blockTimestamp,
+                            0,
+                            tickBefore,
+                            observationIndex,
+                            cache.liquidityStart,
+                            observationCardinality
+                        );
+                        cache.computedLatestObservation = true;
                     }
-                    int newLiquidity = int(liquidity) + liquidityNet;
-                    require(newLiquidity >= 0, "Liquidity underflow on cross");
-                    liquidity = uint(newLiquidity);
+                    int liquidityNet = Tick.cross(
+                        ticks,
+                        step.tickNext,
+                        (zeroForOne ? state.feeGrowthGlobalX128 : feeGrowthGlobal0X128),
+                        (zeroForOne ? feeGrowthGlobal1X128 : state.feeGrowthGlobalX128),
+                        cache.secondsPerLiquidityCumulativeX128,
+                        cache.tickCumulative,
+                        cache.blockTimestamp
+                    );
+                    // if we're moving leftward, we interpret liquidityNet as the opposite sign
+                    if (zeroForOne) liquidityNet = -liquidityNet;
+
+                    state.liquidity = LiquidityMath.addDelta(state.liquidity, liquidityNet);
                 }
-                currentTick = zeroForOne ? nextTick - 1 : nextTick;
-            } else if (newSqrt != stepStartSqrt) {
-                currentTick = TickMath.getTickAtSqrtRatio(newSqrt);
+
+                state.tick = zeroForOne ? step.tickNext - 1 : step.tickNext;
+            } else if (state.sqrtPriceX96 != step.sqrtPriceStartX96) {
+                // recompute unless we're on a lower tick boundary (i.e. already transitioned ticks), and haven't moved
+                state.tick = TickMath.getTickAtSqrtRatio(state.sqrtPriceX96);
             }
         }
 
-        // Oracle checkpoint accrues the pre-swap tick/liquidity, only if the tick moved (canonical)
-        if (currentTick != tickBefore) {
+        // update tick and write an oracle entry if the tick change
+        if (state.tick != tickBefore) {
             (observationIndex, observationCardinality) = Oracle.write(
-                observations, observationIndex, block.timestamp,
-                tickBefore, liquidityBefore, observationCardinality, observationCardinalityNext
+                observations, observationIndex, cache.blockTimestamp,
+                tickBefore, cache.liquidityStart, observationCardinality, observationCardinalityNext
             );
+            sqrtPriceX96 = state.sqrtPriceX96;
+            currentTick = state.tick;
+        } else {
+            // otherwise just update the price
+            sqrtPriceX96 = state.sqrtPriceX96;
         }
 
+        // update liquidity if it changed
+        if (cache.liquidityStart != state.liquidity) liquidity = state.liquidity;
+
+        // update fee growth global (the protocol fee leaves the pool below instead of accruing)
+        if (zeroForOne) {
+            feeGrowthGlobal0X128 = state.feeGrowthGlobalX128;
+        } else {
+            feeGrowthGlobal1X128 = state.feeGrowthGlobalX128;
+        }
+
+        // platform settlement (canonical pays the recipient and collects via the swap callback)
         uint amountInTotal = 0;
         uint amountOutTotal = 0;
         if (exactInput) {
-            amountInTotal = uint(amountSpecified - remaining);
-            amountOutTotal = uint(-calculated);
+            amountInTotal = uint(amountSpecified - state.amountSpecifiedRemaining);
+            amountOutTotal = uint(-state.amountCalculated);
             require(amountOutTotal >= amountLimit, "Slippage check failed");
         } else {
-            amountInTotal = uint(calculated);
-            amountOutTotal = uint(-(amountSpecified - remaining));
+            amountInTotal = uint(state.amountCalculated);
+            amountOutTotal = uint(-(amountSpecified - state.amountSpecifiedRemaining));
             require(amountOutTotal > 0, "Nothing swapped");
             require(amountInTotal <= amountLimit, "Slippage check failed");
         }
@@ -790,24 +915,24 @@ contract record PoolV3 is Ownable {
         Token outputToken = zeroForOne ? token1 : token0;
 
         require(inputToken.transferFrom(msg.sender, address(this), amountInTotal), "Input transfer failed");
-        if (protocolFees > 0) {
-            require(inputToken.transfer(_feeCollector(), protocolFees), "Protocol fee transfer failed");
+        if (state.protocolFee > 0) {
+            require(inputToken.transfer(_feeCollector(), state.protocolFee), "Protocol fee transfer failed");
         }
         require(outputToken.transfer(recipient, amountOutTotal), "Output transfer failed");
 
         if (zeroForOne) {
-            token0Balance += amountInTotal - protocolFees;
+            token0Balance += amountInTotal - state.protocolFee;
             token1Balance -= amountOutTotal;
             amount0 = int(amountInTotal);
             amount1 = -int(amountOutTotal);
         } else {
-            token1Balance += amountInTotal - protocolFees;
+            token1Balance += amountInTotal - state.protocolFee;
             token0Balance -= amountOutTotal;
             amount0 = -int(amountOutTotal);
             amount1 = int(amountInTotal);
         }
 
-        emit Swap(msg.sender, recipient, amount0, amount1, sqrtPriceX96, liquidity, currentTick);
+        emit Swap(msg.sender, recipient, amount0, amount1, state.sqrtPriceX96, state.liquidity, state.tick);
         return (amount0, amount1);
     }
 
