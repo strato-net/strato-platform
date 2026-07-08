@@ -6,14 +6,15 @@ import {
   WithdrawalAuditTrace,
   WithdrawalAuditTraceNode,
 } from "@mercata/shared-types";
+import { formatUnits } from "ethers";
 import { ArrowLeft } from "lucide-react";
 import { api } from "@/lib/axios";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatWeiToDecimalHP } from "@/utils/numberUtils";
 
 const TRACE_LOT_DISPLAY_LIMIT = 100;
+const TOKEN_AMOUNT_DECIMALS = 18;
 
 const decisionVariant = (decision?: WithdrawalAuditDecision): "default" | "secondary" | "destructive" | "outline" => {
   if (decision === "REJECT") return "destructive";
@@ -31,6 +32,20 @@ const resultClass = (result: WithdrawalAuditStepResult) => {
 const shortAddress = (value?: string) => {
   if (!value) return "-";
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
+};
+
+const formatTokenAmount = (value?: string) => {
+  if (!value) return "-";
+  try {
+    return formatUnits(value, TOKEN_AMOUNT_DECIMALS);
+  } catch {
+    return value;
+  }
+};
+
+const formatEvidenceValue = (key: string, value: string) => {
+  if (!value) return "-";
+  return key.toLowerCase().includes("amount") ? formatTokenAmount(value) : value;
 };
 
 type TraceOmissionSummary = {
@@ -244,10 +259,10 @@ const TraceNodeCard = ({
       <div className="grid gap-2 text-xs text-muted-foreground md:grid-cols-2">
         {node.actor && <div>Actor: {node.actor}</div>}
         {node.token && <div>Token: {node.token}</div>}
-        {node.amount && <div>Amount: {node.amount}</div>}
+        {node.amount && <div>Amount: {formatTokenAmount(node.amount)}</div>}
         {Object.entries(node.evidence || {}).map(([key, value]) => (
           <div key={key}>
-            {key}: {value || "-"}
+            {key}: {formatEvidenceValue(key, value)}
           </div>
         ))}
       </div>
@@ -427,7 +442,7 @@ const AdminWithdrawalAuditSummary = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Requested Amount</p>
                   <p className="font-medium">
-                    {formatWeiToDecimalHP(withdrawal.stratoTokenAmount || "0", 18)}
+                    {formatTokenAmount(withdrawal.stratoTokenAmount || "0")}
                   </p>
                 </div>
                 <div>
@@ -446,7 +461,7 @@ const AdminWithdrawalAuditSummary = () => {
                 {coverageRows.map(([label, value]) => (
                   <div key={label} className="rounded-lg border border-border p-4">
                     <p className="text-sm text-muted-foreground">{label}</p>
-                    <p className="text-lg font-semibold">{formatWeiToDecimalHP(value, 18)}</p>
+                    <p className="text-lg font-semibold">{formatTokenAmount(value)}</p>
                   </div>
                 ))}
               </CardContent>
