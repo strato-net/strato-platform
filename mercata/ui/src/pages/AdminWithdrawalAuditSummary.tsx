@@ -166,9 +166,74 @@ const TraceOmissionNotice = ({ summary }: { summary: TraceOmissionSummary }) => 
   );
 };
 
-const TraceTreeNode = ({ node, depth = 0 }: { node: WithdrawalAuditTraceNode; depth?: number }) => (
-  <div className="space-y-3">
-    <div className="rounded-lg border border-border p-4" style={{ marginLeft: depth ? 16 : 0 }}>
+const collectChildLots = (node: WithdrawalAuditTraceNode): WithdrawalAuditTraceNode[] => {
+  const lots: WithdrawalAuditTraceNode[] = [];
+
+  const visit = (children: WithdrawalAuditTraceNode[]) => {
+    for (const child of children) {
+      if (child.type === "lot") {
+        lots.push(child);
+      } else {
+        visit(child.children);
+      }
+    }
+  };
+
+  visit(node.children);
+  return lots;
+};
+
+const getTraceViewChildren = (node: WithdrawalAuditTraceNode) => {
+  const childLots = collectChildLots(node);
+  return childLots.length ? childLots : node.children;
+};
+
+const findTraceNode = (
+  node: WithdrawalAuditTraceNode,
+  nodeId: string,
+): WithdrawalAuditTraceNode | null => {
+  if (node.id === nodeId) return node;
+
+  for (const child of node.children) {
+    const match = findTraceNode(child, nodeId);
+    if (match) return match;
+  }
+
+  return null;
+};
+
+const resolveTracePath = (
+  tree: WithdrawalAuditTraceNode,
+  pathIds: string[],
+): WithdrawalAuditTraceNode[] => {
+  const nodes: WithdrawalAuditTraceNode[] = [];
+
+  for (const nodeId of pathIds) {
+    const node = findTraceNode(tree, nodeId);
+    if (!node) break;
+    nodes.push(node);
+  }
+
+  return nodes;
+};
+
+const childActionLabel = (node: WithdrawalAuditTraceNode) => {
+  const children = getTraceViewChildren(node);
+  const lotCount = children.filter((child) => child.type === "lot").length;
+  if (lotCount) return `View ${lotCount} child lot${lotCount === 1 ? "" : "s"}`;
+  if (children.length) return `View ${children.length} trace detail${children.length === 1 ? "" : "s"}`;
+  return "";
+};
+
+const TraceNodeCard = ({
+  node,
+  onOpen,
+}: {
+  node: WithdrawalAuditTraceNode;
+  onOpen?: () => void;
+}) => {
+  const content = (
+    <>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="font-medium">{node.label}</div>
         <span className={`text-sm font-semibold uppercase ${resultClass(node.result)}`}>
@@ -186,12 +251,85 @@ const TraceTreeNode = ({ node, depth = 0 }: { node: WithdrawalAuditTraceNode; de
           </div>
         ))}
       </div>
+      {onOpen && (
+        <div className="mt-3 text-xs font-medium text-primary">
+          {childActionLabel(node)}
+        </div>
+      )}
+    </>
+  );
+
+  if (!onOpen) {
+    return <div className="rounded-lg border border-border p-4">{content}</div>;
+  }
+
+  return (
+    <button
+      type="button"
+      className="w-full rounded-lg border border-border p-4 text-left transition hover:bg-muted/40"
+      onClick={onOpen}
+    >
+      {content}
+    </button>
+  );
+};
+
+const TraceLotNavigator = ({ tree }: { tree: WithdrawalAuditTraceNode }) => {
+  const [activePathIds, setActivePathIds] = useState<string[]>([]);
+  const activePath = useMemo(
+    () => resolveTracePath(tree, activePathIds),
+    [tree, activePathIds],
+  );
+  const isShowingChildren = activePath.length > 0 && activePath.length === activePathIds.length;
+  const currentNode = isShowingChildren ? activePath[activePath.length - 1] : tree;
+  const visibleNodes = isShowingChildren ? getTraceViewChildren(currentNode) : [tree];
+  const visibleLotCount = visibleNodes.filter((node) => node.type === "lot").length;
+  const currentPathIds = isShowingChildren ? activePathIds : [];
+  const backLabel = currentPathIds.length === 1 ? "Back to withdrawal request" : "Back to parent lot";
+
+  const openNode = (node: WithdrawalAuditTraceNode) => {
+    if (!getTraceViewChildren(node).length) return;
+    setActivePathIds([...currentPathIds, node.id]);
+  };
+
+  return (
+    <div className="space-y-4">
+      {isShowingChildren && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium">Children of {currentNode.label}</p>
+            <p className="text-xs text-muted-foreground">
+              {visibleLotCount
+                ? "Select a child lot to inspect its funding lots."
+                : "Review terminal trace details for this lot."}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setActivePathIds(currentPathIds.slice(0, -1))}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            {backLabel}
+          </Button>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {visibleNodes.map((node) => {
+          const hasChildren = getTraceViewChildren(node).length > 0;
+          return (
+            <TraceNodeCard
+              key={node.id}
+              node={node}
+              onOpen={hasChildren ? () => openNode(node) : undefined}
+            />
+          );
+        })}
+      </div>
     </div>
-    {node.children.map((child) => (
-      <TraceTreeNode key={child.id} node={child} depth={depth + 1} />
-    ))}
-  </div>
-);
+  );
+};
 
 const AdminWithdrawalAuditSummary = () => {
   const navigate = useNavigate();
@@ -342,7 +480,7 @@ const AdminWithdrawalAuditSummary = () => {
                 {limitedTrace?.tree ? (
                   <>
                     <TraceOmissionNotice summary={limitedTrace.summary} />
-                    <TraceTreeNode node={limitedTrace.tree} />
+                    <TraceLotNavigator tree={limitedTrace.tree} />
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground">
