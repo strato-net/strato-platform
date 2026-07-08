@@ -1,71 +1,100 @@
 // SPDX-License-Identifier: MIT
 
 /// @title BitMath
-/// @notice Bit-index math, ported from Uniswap V3 core's BitMath
-/// @dev SolidVM has no inline assembly, `~`, `^`, or variable-amount shifts, so everything
-///      here is built from `&`, arithmetic and constant factors
+/// @dev This library provides functionality for computing bit properties of an unsigned integer
+///
+/// SolidVM dialect notes (vs canonical Uniswap V3 BitMath, otherwise line-for-line):
+/// - uint256/uint8 become uint (SolidVM integers are unbounded, x is capped at 2^256-1 by use)
+/// - type(uintN).max becomes the equivalent hex literal (type(...).max is not implemented)
 library BitMath {
-    /// @notice Index of the most significant set bit of x (canonical mostSignificantBit)
-    /// @dev x must be in [1, 2^256); binary search over squaring constants
+    /// @notice Returns the index of the most significant bit of the number,
+    ///     where the least significant bit is at index 0 and the most significant bit is at index 255
+    /// @dev The function satisfies the property:
+    ///     x >= 2**mostSignificantBit(x) and x < 2**(mostSignificantBit(x)+1)
+    /// @param x the value for which to compute the most significant bit, must be greater than 0
+    /// @return r the index of the most significant bit
     function mostSignificantBit(uint x) internal pure returns (uint) {
-        require(x > 0, "msb of zero");
-        uint v = x;
+        require(x > 0);
         uint r = 0;
-        if (v >= 340282366920938463463374607431768211456) {
-            v /= 340282366920938463463374607431768211456;
+
+        if (x >= 0x100000000000000000000000000000000) {
+            x >>= 128;
             r += 128;
         }
-        if (v >= 18446744073709551616) {
-            v /= 18446744073709551616;
+        if (x >= 0x10000000000000000) {
+            x >>= 64;
             r += 64;
         }
-        if (v >= 4294967296) {
-            v /= 4294967296;
+        if (x >= 0x100000000) {
+            x >>= 32;
             r += 32;
         }
-        if (v >= 65536) {
-            v /= 65536;
+        if (x >= 0x10000) {
+            x >>= 16;
             r += 16;
         }
-        if (v >= 256) {
-            v /= 256;
+        if (x >= 0x100) {
+            x >>= 8;
             r += 8;
         }
-        if (v >= 16) {
-            v /= 16;
+        if (x >= 0x10) {
+            x >>= 4;
             r += 4;
         }
-        if (v >= 4) {
-            v /= 4;
+        if (x >= 0x4) {
+            x >>= 2;
             r += 2;
         }
-        if (v >= 2) {
-            r += 1;
-        }
+        if (x >= 0x2) r += 1;
         return r;
     }
 
-    /// @notice Index of the least significant set bit of x (canonical leastSignificantBit)
+    /// @notice Returns the index of the least significant bit of the number,
+    ///     where the least significant bit is at index 0 and the most significant bit is at index 255
+    /// @dev The function satisfies the property:
+    ///     (x & 2**leastSignificantBit(x)) != 0 and (x & (2**(leastSignificantBit(x)) - 1)) == 0)
+    /// @param x the value for which to compute the least significant bit, must be greater than 0
+    /// @return r the index of the least significant bit
     function leastSignificantBit(uint x) internal pure returns (uint) {
-        require(x > 0, "lsb of zero");
-        // x & (x - 1) clears the lowest set bit; the difference isolates it
-        uint lowBit = x - (x & (x - 1));
-        return mostSignificantBit(lowBit);
-    }
+        require(x > 0);
+        uint r = 255;
 
-    /// @notice 2**n for n in [0, 255]
-    /// @dev SolidVM shift-emulation helper (no canonical equivalent: the EVM shifts instead)
-    function pow2(uint n) internal pure returns (uint) {
-        require(n <= 255, "pow2 out of range");
-        uint r = 1;
-        if ((n & 1) != 0) r *= 2;
-        if ((n & 2) != 0) r *= 4;
-        if ((n & 4) != 0) r *= 16;
-        if ((n & 8) != 0) r *= 256;
-        if ((n & 16) != 0) r *= 65536;
-        if ((n & 32) != 0) r *= 4294967296;
-        if ((n & 64) != 0) r *= 18446744073709551616;
-        if ((n & 128) != 0) r *= 340282366920938463463374607431768211456;
+        if (x & 0xffffffffffffffffffffffffffffffff > 0) {
+            r -= 128;
+        } else {
+            x >>= 128;
+        }
+        if (x & 0xffffffffffffffff > 0) {
+            r -= 64;
+        } else {
+            x >>= 64;
+        }
+        if (x & 0xffffffff > 0) {
+            r -= 32;
+        } else {
+            x >>= 32;
+        }
+        if (x & 0xffff > 0) {
+            r -= 16;
+        } else {
+            x >>= 16;
+        }
+        if (x & 0xff > 0) {
+            r -= 8;
+        } else {
+            x >>= 8;
+        }
+        if (x & 0xf > 0) {
+            r -= 4;
+        } else {
+            x >>= 4;
+        }
+        if (x & 0x3 > 0) {
+            r -= 2;
+        } else {
+            x >>= 2;
+        }
+        if (x & 0x1 > 0) r -= 1;
         return r;
     }
 }

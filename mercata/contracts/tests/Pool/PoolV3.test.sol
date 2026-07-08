@@ -1227,11 +1227,15 @@ contract Describe_PoolV3 is Authorizable {
         require(pool.liquidity() == 500e18, "Pool liquidity should be halved");
     }
 
-    function it_burn_poke_empty_position_is_noop() {
-        // NOTE: divergence from canonical V3, which reverts ('NP') when poking a
-        // nonexistent position. Here it is a harmless no-op.
-        (uint amount0, uint amount1) = pool.burn(-600, 600, 0, block.timestamp + DEADLINE_OFFSET);
-        require(amount0 == 0 && amount1 == 0, "Poking empty position should return zeros");
+    function it_burn_poke_empty_position_reverts() {
+        // CANONICAL: poking (burn 0) a position with no liquidity reverts 'NP'
+        bool thrown = false;
+        try {
+            pool.burn(-600, 600, 0, block.timestamp + DEADLINE_OFFSET);
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "Poking an empty position should revert (NP)");
         (uint posLiquidity, uint owed0, uint owed1) = pool.getPosition(address(this), -600, 600);
         require(posLiquidity == 0 && owed0 == 0 && owed1 == 0, "Empty position should stay empty");
     }

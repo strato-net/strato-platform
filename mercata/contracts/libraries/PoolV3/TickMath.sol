@@ -1,76 +1,161 @@
 // SPDX-License-Identifier: MIT
+import "BitMath.sol";
 
-/// @title TickMath
-/// @notice Math between ticks and sqrt prices — a bit-for-bit port of Uniswap V3 core's
-///         TickMath. The 20 Q128.128 constants encode sqrt(1.0001)^-(2^k); positive ticks
-///         invert via (2^256 - 1) / ratio, and the final Q128 -> Q96 conversion rounds up.
-///         Constants verified byte-identical to v3-core and to <1 ULP of a 120-digit
-///         reference by tests/Pool/poolv3_reference.py
+/// @title Math library for computing sqrt prices from ticks and vice versa
+/// @notice Computes sqrt price for ticks of size 1.0001, i.e. sqrt(1.0001^tick) as fixed point Q64.96 numbers. Supports
+/// prices between 2**-128 and 2**128
+///
+/// SolidVM dialect notes (vs canonical Uniswap V3 TickMath, otherwise line-for-line):
+/// - int/uint replace int24/uint160/uint256/int256; type(uint256).max becomes a hex literal
+/// - getTickAtSqrtRatio is canonical's exact log_2 algorithm with the inline assembly
+///   replaced by shifts: the msb ladder becomes BitMath.mostSignificantBit and each
+///   `shl/shr/or` block becomes the equivalent operators (SolidVM `>>` on negative ints is
+///   an arithmetic shift, matching the EVM's sar). Constants are byte-identical to v3-core
+///   and verified to <1 ULP of a 120-digit reference by tests/Pool/poolv3_reference.py
 library TickMath {
-    /// @dev The (inclusive) tick domain, as canonical
+    /// @dev The minimum tick that may be passed to #getSqrtRatioAtTick computed from log base 1.0001 of 2**-128
     int internal constant MIN_TICK = -887272;
+    /// @dev The maximum tick that may be passed to #getSqrtRatioAtTick computed from log base 1.0001 of 2**128
+    /// (canonical: -MIN_TICK; SolidVM cannot resolve a constant referencing another constant)
     int internal constant MAX_TICK = 887272;
 
-    /// @dev getSqrtRatioAtTick(MIN_TICK) and getSqrtRatioAtTick(MAX_TICK)
+    /// @dev The minimum value that can be returned from #getSqrtRatioAtTick. Equivalent to getSqrtRatioAtTick(MIN_TICK)
     uint internal constant MIN_SQRT_RATIO = 4295128739;
+    /// @dev The maximum value that can be returned from #getSqrtRatioAtTick. Equivalent to getSqrtRatioAtTick(MAX_TICK)
     uint internal constant MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970342;
 
-    /// @notice sqrt(1.0001^tick) as a Q64.96
-    function getSqrtRatioAtTick(int tick) internal pure returns (uint) {
+    /// @notice Calculates sqrt(1.0001^tick) * 2^96
+    /// @dev Throws if |tick| > max tick
+    /// @param tick The input tick for the above formula
+    /// @return sqrtPriceX96 A Fixed point Q64.96 number representing the sqrt of the ratio of the two assets (token1/token0)
+    /// at the given tick
+    function getSqrtRatioAtTick(int tick) internal pure returns (uint sqrtPriceX96) {
         uint absTick = tick < 0 ? uint(-tick) : uint(tick);
         require(absTick <= uint(MAX_TICK), "T");
 
-        uint ratio = (absTick & 0x1) != 0
-            ? 0xfffcb933bd6fad37aa2d162d1a594001
-            : 0x100000000000000000000000000000000;
-        if ((absTick & 0x2) != 0)     ratio = (ratio * 0xfff97272373d413259a46990580e213a) >> 128;
-        if ((absTick & 0x4) != 0)     ratio = (ratio * 0xfff2e50f5f656932ef12357cf3c7fdcc) >> 128;
-        if ((absTick & 0x8) != 0)     ratio = (ratio * 0xffe5caca7e10e4e61c3624eaa0941cd0) >> 128;
-        if ((absTick & 0x10) != 0)    ratio = (ratio * 0xffcb9843d60f6159c9db58835c926644) >> 128;
-        if ((absTick & 0x20) != 0)    ratio = (ratio * 0xff973b41fa98c081472e6896dfb254c0) >> 128;
-        if ((absTick & 0x40) != 0)    ratio = (ratio * 0xff2ea16466c96a3843ec78b326b52861) >> 128;
-        if ((absTick & 0x80) != 0)    ratio = (ratio * 0xfe5dee046a99a2a811c461f1969c3053) >> 128;
-        if ((absTick & 0x100) != 0)   ratio = (ratio * 0xfcbe86c7900a88aedcffc83b479aa3a4) >> 128;
-        if ((absTick & 0x200) != 0)   ratio = (ratio * 0xf987a7253ac413176f2b074cf7815e54) >> 128;
-        if ((absTick & 0x400) != 0)   ratio = (ratio * 0xf3392b0822b70005940c7a398e4b70f3) >> 128;
-        if ((absTick & 0x800) != 0)   ratio = (ratio * 0xe7159475a2c29b7443b29c7fa6e889d9) >> 128;
-        if ((absTick & 0x1000) != 0)  ratio = (ratio * 0xd097f3bdfd2022b8845ad8f792aa5825) >> 128;
-        if ((absTick & 0x2000) != 0)  ratio = (ratio * 0xa9f746462d870fdf8a65dc1f90e061e5) >> 128;
-        if ((absTick & 0x4000) != 0)  ratio = (ratio * 0x70d869a156d2a1b890bb3df62baf32f7) >> 128;
-        if ((absTick & 0x8000) != 0)  ratio = (ratio * 0x31be135f97d08fd981231505542fcfa6) >> 128;
-        if ((absTick & 0x10000) != 0) ratio = (ratio * 0x9aa508b5b7a84e1c677de54f3e99bc9) >> 128;
-        if ((absTick & 0x20000) != 0) ratio = (ratio * 0x5d6af8dedb81196699c329225ee604) >> 128;
-        if ((absTick & 0x40000) != 0) ratio = (ratio * 0x2216e584f5fa1ea926041bedfe98) >> 128;
-        if ((absTick & 0x80000) != 0) ratio = (ratio * 0x48a170391f7dc42444e8fa2) >> 128;
+        uint ratio = absTick & 0x1 != 0 ? 0xfffcb933bd6fad37aa2d162d1a594001 : 0x100000000000000000000000000000000;
+        if (absTick & 0x2 != 0) ratio = (ratio * 0xfff97272373d413259a46990580e213a) >> 128;
+        if (absTick & 0x4 != 0) ratio = (ratio * 0xfff2e50f5f656932ef12357cf3c7fdcc) >> 128;
+        if (absTick & 0x8 != 0) ratio = (ratio * 0xffe5caca7e10e4e61c3624eaa0941cd0) >> 128;
+        if (absTick & 0x10 != 0) ratio = (ratio * 0xffcb9843d60f6159c9db58835c926644) >> 128;
+        if (absTick & 0x20 != 0) ratio = (ratio * 0xff973b41fa98c081472e6896dfb254c0) >> 128;
+        if (absTick & 0x40 != 0) ratio = (ratio * 0xff2ea16466c96a3843ec78b326b52861) >> 128;
+        if (absTick & 0x80 != 0) ratio = (ratio * 0xfe5dee046a99a2a811c461f1969c3053) >> 128;
+        if (absTick & 0x100 != 0) ratio = (ratio * 0xfcbe86c7900a88aedcffc83b479aa3a4) >> 128;
+        if (absTick & 0x200 != 0) ratio = (ratio * 0xf987a7253ac413176f2b074cf7815e54) >> 128;
+        if (absTick & 0x400 != 0) ratio = (ratio * 0xf3392b0822b70005940c7a398e4b70f3) >> 128;
+        if (absTick & 0x800 != 0) ratio = (ratio * 0xe7159475a2c29b7443b29c7fa6e889d9) >> 128;
+        if (absTick & 0x1000 != 0) ratio = (ratio * 0xd097f3bdfd2022b8845ad8f792aa5825) >> 128;
+        if (absTick & 0x2000 != 0) ratio = (ratio * 0xa9f746462d870fdf8a65dc1f90e061e5) >> 128;
+        if (absTick & 0x4000 != 0) ratio = (ratio * 0x70d869a156d2a1b890bb3df62baf32f7) >> 128;
+        if (absTick & 0x8000 != 0) ratio = (ratio * 0x31be135f97d08fd981231505542fcfa6) >> 128;
+        if (absTick & 0x10000 != 0) ratio = (ratio * 0x9aa508b5b7a84e1c677de54f3e99bc9) >> 128;
+        if (absTick & 0x20000 != 0) ratio = (ratio * 0x5d6af8dedb81196699c329225ee604) >> 128;
+        if (absTick & 0x40000 != 0) ratio = (ratio * 0x2216e584f5fa1ea926041bedfe98) >> 128;
+        if (absTick & 0x80000 != 0) ratio = (ratio * 0x48a170391f7dc42444e8fa2) >> 128;
 
-        if (tick > 0) {
-            ratio = (2**256 - 1) / ratio;
-        }
+        // type(uint256).max
+        if (tick > 0) ratio = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff / ratio;
 
-        // Q128.128 -> Q64.96, rounding up (canonical final step)
-        uint sqrtRatio = ratio >> 32;
-        if (ratio % 4294967296 != 0) {
-            sqrtRatio += 1;
-        }
-        return sqrtRatio;
+        // this divides by 1<<32 rounding up to go from a Q128.128 to a Q128.96.
+        // we round up in the division so getTickAtSqrtRatio of the output price is always consistent
+        sqrtPriceX96 = (ratio >> 32) + (ratio % (1 << 32) == 0 ? 0 : 1);
     }
 
-    /// @notice Greatest tick whose sqrt ratio is <= the given ratio
-    /// @dev Same spec as canonical getTickAtSqrtRatio (whose assembly log2 has no SolidVM
-    ///      equivalent); a binary search over getSqrtRatioAtTick returns identical values.
-    ///      Input domain [MIN_SQRT_RATIO, MAX_SQRT_RATIO), as canonical ('R')
-    function getTickAtSqrtRatio(uint sqrtPriceX96) internal pure returns (int) {
+    /// @notice Calculates the greatest tick value such that getRatioAtTick(tick) <= ratio
+    /// @dev Throws in case sqrtPriceX96 < MIN_SQRT_RATIO, as MIN_SQRT_RATIO is the lowest value getRatioAtTick may
+    /// ever return.
+    /// @param sqrtPriceX96 The sqrt ratio for which to compute the tick as a Q64.96
+    /// @return tick The greatest tick for which the ratio is less than or equal to the input ratio
+    function getTickAtSqrtRatio(uint sqrtPriceX96) internal pure returns (int tick) {
+        // second inequality must be < because the price can never reach the price at the max tick
         require(sqrtPriceX96 >= MIN_SQRT_RATIO && sqrtPriceX96 < MAX_SQRT_RATIO, "R");
-        int lo = MIN_TICK;
-        int hi = MAX_TICK;
-        while (lo < hi) {
-            int mid = (lo + hi + 1) / 2;
-            if (getSqrtRatioAtTick(mid) <= sqrtPriceX96) {
-                lo = mid;
-            } else {
-                hi = mid - 1;
-            }
-        }
-        return lo;
+        uint ratio = sqrtPriceX96 << 32;
+
+        uint r = ratio;
+        uint msb = BitMath.mostSignificantBit(r); // canonical: eight assembly shift/or blocks
+
+        if (msb >= 128) r = ratio >> (msb - 127);
+        else r = ratio << (127 - msb);
+
+        int log_2 = (int(msb) - 128) << 64;
+
+        // canonical: fourteen assembly blocks refining log_2 one fractional bit at a time
+        uint f;
+        r = (r * r) >> 127;
+        f = r >> 128;
+        log_2 = log_2 | int(f << 63);
+        r = r >> f;
+
+        r = (r * r) >> 127;
+        f = r >> 128;
+        log_2 = log_2 | int(f << 62);
+        r = r >> f;
+
+        r = (r * r) >> 127;
+        f = r >> 128;
+        log_2 = log_2 | int(f << 61);
+        r = r >> f;
+
+        r = (r * r) >> 127;
+        f = r >> 128;
+        log_2 = log_2 | int(f << 60);
+        r = r >> f;
+
+        r = (r * r) >> 127;
+        f = r >> 128;
+        log_2 = log_2 | int(f << 59);
+        r = r >> f;
+
+        r = (r * r) >> 127;
+        f = r >> 128;
+        log_2 = log_2 | int(f << 58);
+        r = r >> f;
+
+        r = (r * r) >> 127;
+        f = r >> 128;
+        log_2 = log_2 | int(f << 57);
+        r = r >> f;
+
+        r = (r * r) >> 127;
+        f = r >> 128;
+        log_2 = log_2 | int(f << 56);
+        r = r >> f;
+
+        r = (r * r) >> 127;
+        f = r >> 128;
+        log_2 = log_2 | int(f << 55);
+        r = r >> f;
+
+        r = (r * r) >> 127;
+        f = r >> 128;
+        log_2 = log_2 | int(f << 54);
+        r = r >> f;
+
+        r = (r * r) >> 127;
+        f = r >> 128;
+        log_2 = log_2 | int(f << 53);
+        r = r >> f;
+
+        r = (r * r) >> 127;
+        f = r >> 128;
+        log_2 = log_2 | int(f << 52);
+        r = r >> f;
+
+        r = (r * r) >> 127;
+        f = r >> 128;
+        log_2 = log_2 | int(f << 51);
+        r = r >> f;
+
+        r = (r * r) >> 127;
+        f = r >> 128;
+        log_2 = log_2 | int(f << 50);
+
+        int log_sqrt10001 = log_2 * 255738958999603826347141; // 128.128 number
+
+        int tickLow = (log_sqrt10001 - 3402992956809132418596140100660247210) >> 128;
+        int tickHi = (log_sqrt10001 + 291339464771989622907027621153398088495) >> 128;
+
+        tick = tickLow == tickHi ? tickLow : (getSqrtRatioAtTick(tickHi) <= sqrtPriceX96 ? tickHi : tickLow);
     }
 }

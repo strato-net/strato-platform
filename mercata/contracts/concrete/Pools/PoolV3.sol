@@ -311,40 +311,61 @@ contract record PoolV3 is Ownable {
         int tickUpper,
         uint liquidityAmount
     ) public view returns (uint amount0, uint amount1) {
-        return _amountsForLiquidity(tickLower, tickUpper, liquidityAmount, true);
+        (int amount0Int, int amount1Int) = _amountsForLiquidity(tickLower, tickUpper, int(liquidityAmount));
+        return (uint(amount0Int), uint(amount1Int));
     }
 
-    /// @dev roundUp=true when depositing (mint), false when withdrawing (burn), as canonical
+    /// @dev Signed token deltas for a liquidity change, as canonical _modifyPosition computes
+    ///      them: positive liquidityDelta rounds up (mint), negative rounds down (burn)
     function _amountsForLiquidity(
         int tickLower,
         int tickUpper,
-        uint liquidityAmount,
-        bool roundUp
-    ) internal view returns (uint, uint) {
-        uint sqrtLower = TickMath.getSqrtRatioAtTick(tickLower);
-        uint sqrtUpper = TickMath.getSqrtRatioAtTick(tickUpper);
+        int liquidityDelta
+    ) internal view returns (int amount0, int amount1) {
         if (currentTick < tickLower) {
-            return (SqrtPriceMath.getAmount0Delta(sqrtLower, sqrtUpper, liquidityAmount, roundUp), 0);
-        }
-        if (currentTick < tickUpper) {
-            return (
-                SqrtPriceMath.getAmount0Delta(sqrtPriceX96, sqrtUpper, liquidityAmount, roundUp),
-                SqrtPriceMath.getAmount1Delta(sqrtLower, sqrtPriceX96, liquidityAmount, roundUp)
+            // current tick is below the passed range; liquidity can only become in range by crossing from left to
+            // right, when we'll need _more_ token0 (it's becoming more valuable) so user must provide it
+            amount0 = SqrtPriceMath.getAmount0Delta(
+                TickMath.getSqrtRatioAtTick(tickLower),
+                TickMath.getSqrtRatioAtTick(tickUpper),
+                liquidityDelta
+            );
+        } else if (currentTick < tickUpper) {
+            // current tick is inside the passed range
+            amount0 = SqrtPriceMath.getAmount0Delta(
+                sqrtPriceX96,
+                TickMath.getSqrtRatioAtTick(tickUpper),
+                liquidityDelta
+            );
+            amount1 = SqrtPriceMath.getAmount1Delta(
+                TickMath.getSqrtRatioAtTick(tickLower),
+                sqrtPriceX96,
+                liquidityDelta
+            );
+        } else {
+            // current tick is above the passed range; liquidity can only become in range by crossing from right to
+            // left, when we'll need _more_ token1 (it's becoming more valuable) so user must provide it
+            amount1 = SqrtPriceMath.getAmount1Delta(
+                TickMath.getSqrtRatioAtTick(tickLower),
+                TickMath.getSqrtRatioAtTick(tickUpper),
+                liquidityDelta
             );
         }
-        return (0, SqrtPriceMath.getAmount1Delta(sqrtLower, sqrtUpper, liquidityAmount, roundUp));
+        return (amount0, amount1);
     }
 
     // ============ TWAP ORACLE (wrappers over the Oracle library) ============
 
     /// @notice Grow the observation ring buffer (permissionless, as in Uniswap V3)
     /// @param next The desired minimum ring size
+    /// @dev The explicit bounds require replaces canonical's implicit uint16 range
     function increaseObservationCardinalityNext(uint next) external nonReentrant {
         require(next > 0 && next <= MAX_CARDINALITY, "Invalid cardinality");
-        if (next > observationCardinalityNext) {
-            emit IncreaseObservationCardinalityNext(observationCardinalityNext, next);
-            observationCardinalityNext = next;
-        }
+        uint observationCardinalityNextOld = observationCardinalityNext; // for the event
+        uint observationCardinalityNextNew = Oracle.grow(observations, observationCardinalityNextOld, next);
+        observationCardinalityNext = observationCardinalityNextNew;
+        if (observationCardinalityNextOld != observationCardinalityNextNew)
+            emit IncreaseObservationCardinalityNext(observationCardinalityNextOld, observationCardinalityNextNew);
     }
 
     /// @notice Read an observation slot
@@ -365,17 +386,10 @@ contract record PoolV3 is Ownable {
         int[] tickCumulatives,
         int[] secondsPerLiquidityCumulativeX128s
     ) {
-        int[] memory tickCums = new int[](secondsAgos.length);
-        int[] memory splCums = new int[](secondsAgos.length);
-        for (uint i = 0; i < secondsAgos.length; i++) {
-            (int tc, int spl) = Oracle.observeSingle(
-                observations, block.timestamp, secondsAgos[i],
-                currentTick, observationIndex, liquidity, observationCardinality
-            );
-            tickCums[i] = tc;
-            splCums[i] = spl;
-        }
-        return (tickCums, splCums);
+        return Oracle.observe(
+            observations, block.timestamp, secondsAgos,
+            currentTick, observationIndex, liquidity, observationCardinality
+        );
     }
 
     /// @notice Single-lookback convenience wrapper over observe (platform extension)
@@ -437,33 +451,41 @@ contract record PoolV3 is Ownable {
     ///         (canonical _updatePosition: Tick.update x2 -> bitmap flips -> Position.update
     ///         -> Tick.clear on emptied ticks, in exactly that order)
     function _updatePosition(address positionOwner, int tickLower, int tickUpper, int liquidityDelta) internal {
-        (int tickCum, int splCum) = Oracle.observeSingle(
-            observations, block.timestamp, 0,
-            currentTick, observationIndex, liquidity, observationCardinality
-        );
+        V3Position storage position = Position.get(positions, positionOwner, tickLower, tickUpper);
 
-        bool flippedLower = Tick.update(
-            ticks, tickLower, currentTick, liquidityDelta,
-            feeGrowthGlobal0X128, feeGrowthGlobal1X128,
-            splCum, tickCum, block.timestamp, false, maxLiquidityPerTick
-        );
-        bool flippedUpper = Tick.update(
-            ticks, tickUpper, currentTick, liquidityDelta,
-            feeGrowthGlobal0X128, feeGrowthGlobal1X128,
-            splCum, tickCum, block.timestamp, true, maxLiquidityPerTick
-        );
+        // if we need to update the ticks, do it (canonical: ticks are only touched when
+        // liquidity actually changes; pokes skip straight to the position fee accrual)
+        bool flippedLower = false;
+        bool flippedUpper = false;
+        if (liquidityDelta != 0) {
+            (int tickCum, int splCum) = Oracle.observeSingle(
+                observations, block.timestamp, 0,
+                currentTick, observationIndex, liquidity, observationCardinality
+            );
 
-        if (flippedLower) {
-            TickBitmap.flipTick(tickBitmap, tickLower, tickSpacing);
-        }
-        if (flippedUpper) {
-            TickBitmap.flipTick(tickBitmap, tickUpper, tickSpacing);
+            flippedLower = Tick.update(
+                ticks, tickLower, currentTick, liquidityDelta,
+                feeGrowthGlobal0X128, feeGrowthGlobal1X128,
+                splCum, tickCum, block.timestamp, false, maxLiquidityPerTick
+            );
+            flippedUpper = Tick.update(
+                ticks, tickUpper, currentTick, liquidityDelta,
+                feeGrowthGlobal0X128, feeGrowthGlobal1X128,
+                splCum, tickCum, block.timestamp, true, maxLiquidityPerTick
+            );
+
+            if (flippedLower) {
+                TickBitmap.flipTick(tickBitmap, tickLower, tickSpacing);
+            }
+            if (flippedUpper) {
+                TickBitmap.flipTick(tickBitmap, tickUpper, tickSpacing);
+            }
         }
 
         (int inside0, int inside1) = Tick.getFeeGrowthInside(
             ticks, tickLower, tickUpper, currentTick, feeGrowthGlobal0X128, feeGrowthGlobal1X128
         );
-        Position.update(positions, positionOwner, tickLower, tickUpper, liquidityDelta, inside0, inside1);
+        Position.update(position, liquidityDelta, inside0, inside1);
 
         // Clear emptied ticks only after the position's final fee accrual above
         if (liquidityDelta < 0) {
@@ -521,7 +543,9 @@ contract record PoolV3 is Ownable {
         }
         _updatePosition(recipient, tickLower, tickUpper, int(amount));
 
-        (amount0, amount1) = _amountsForLiquidity(tickLower, tickUpper, amount, true);
+        (int amount0Int, int amount1Int) = _amountsForLiquidity(tickLower, tickUpper, int(amount));
+        amount0 = uint(amount0Int);
+        amount1 = uint(amount1Int);
         require(amount0 > 0 || amount1 > 0, "Zero amounts");
         require(amount0 <= amount0Max && amount1 <= amount1Max, "Slippage check failed");
 
@@ -563,12 +587,14 @@ contract record PoolV3 is Ownable {
         _updatePosition(msg.sender, tickLower, tickUpper, -int(amount));
 
         if (amount > 0) {
-            (amount0, amount1) = _amountsForLiquidity(tickLower, tickUpper, amount, false);
+            (int amount0Int, int amount1Int) = _amountsForLiquidity(tickLower, tickUpper, -int(amount));
+            amount0 = uint(-amount0Int);
+            amount1 = uint(-amount1Int);
             if (currentTick >= tickLower && currentTick < tickUpper) {
                 liquidity -= amount;
             }
 
-            V3Position storage pos = positions[msg.sender][tickLower][tickUpper];
+            V3Position storage pos = Position.get(positions, msg.sender, tickLower, tickUpper);
             pos.tokensOwed0 += amount0;
             pos.tokensOwed1 += amount1;
         }
@@ -597,7 +623,8 @@ contract record PoolV3 is Ownable {
         uint amount1Requested
     ) external whenNotDisabled nonReentrant returns (uint amount0, uint amount1) {
         require(recipient != address(0), "Zero recipient");
-        V3Position storage pos = positions[msg.sender][tickLower][tickUpper];
+        // we don't need to checkTicks here, because invalid positions will never have non-zero tokensOwed{0,1}
+        V3Position storage pos = Position.get(positions, msg.sender, tickLower, tickUpper);
 
         amount0 = pos.tokensOwed0 < amount0Requested ? pos.tokensOwed0 : amount0Requested;
         amount1 = pos.tokensOwed1 < amount1Requested ? pos.tokensOwed1 : amount1Requested;

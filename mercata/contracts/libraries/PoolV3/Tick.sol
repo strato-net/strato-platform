@@ -1,35 +1,63 @@
 // SPDX-License-Identifier: MIT
 import "TickMath.sol";
+import "LiquidityMath.sol";
 
-/// @notice Per-tick state (canonical Tick.Info; declared at file level because SolidVM does
-///         not support library-nested struct references). Cumulative fields are signed ints —
-///         SolidVM has no wrapping arithmetic, and only deltas of these are meaningful
+/// @notice Per-tick state (canonical Tick.Info; file-level struct because SolidVM does not
+///         support library-nested struct references)
 struct V3TickInfo {
+    // the total position liquidity that references this tick
     uint liquidityGross;
+    // amount of net liquidity added (subtracted) when tick is crossed from left to right (right to left),
     int liquidityNet;
+    // fee growth per unit of liquidity on the _other_ side of this tick (relative to the current tick)
+    // only has relative meaning, not absolute — the value depends on when the tick is initialized
     int feeGrowthOutside0X128;
     int feeGrowthOutside1X128;
+    // the cumulative tick value on the other side of the tick
     int tickCumulativeOutside;
+    // the seconds per unit of liquidity on the _other_ side of this tick (relative to the current tick)
+    // only has relative meaning, not absolute — the value depends on when the tick is initialized
     int secondsPerLiquidityOutsideX128;
+    // the seconds spent on the other side of the tick (relative to the current tick)
+    // only has relative meaning, not absolute — the value depends on when the tick is initialized
     int secondsOutside;
+    // true iff the tick is initialized, i.e. the value is exactly equivalent to the expression liquidityGross != 0
     bool initialized;
 }
 
 /// @title Tick
-/// @notice Per-tick liquidity and growth-tracking, ported from Uniswap V3 core's Tick library
+/// @notice Contains functions for managing tick processes and relevant calculations
+///
+/// SolidVM dialect notes (vs canonical Uniswap V3 Tick, otherwise function-for-function):
+/// - uint/int replace uint128/int128/uint256/int56/uint160/uint32; cumulative fields are
+///   signed ints — canonical relies on wrap-around subtraction and only deltas of these
+///   values are meaningful
+/// - tickSpacingToMaxLiquidityPerTick: canonical truncates MIN_TICK / tickSpacing toward
+///   zero, SolidVM floors; minTick is derived as -maxTick instead (MIN_TICK == -MAX_TICK)
+/// - clear zeroes fields explicitly: canonical's `delete self[tick]` is a no-op through a
+///   library storage-mapping parameter in SolidVM (verified by probe)
 library Tick {
-    /// @notice Max position liquidity per tick for a tick spacing
-    ///         (canonical tickSpacingToMaxLiquidityPerTick)
-    /// @dev MIN_TICK == -MAX_TICK exactly, so the canonical truncated MIN_TICK / tickSpacing
-    ///      equals -(MAX_TICK / tickSpacing) without relying on division semantics
+    /// @notice Derives max liquidity per tick from given tick spacing
+    /// @dev Executed within the pool constructor
+    /// @param tickSpacing The amount of required tick separation, realized in multiples of `tickSpacing`
+    ///     e.g., a tickSpacing of 3 requires ticks to be initialized every 3rd tick i.e., ..., -6, -3, 0, 3, 6, ...
+    /// @return The max liquidity per tick
     function tickSpacingToMaxLiquidityPerTick(int tickSpacing) internal pure returns (uint) {
-        int maxUsableTick = (TickMath.MAX_TICK / tickSpacing) * tickSpacing;
-        uint numTicks = uint((maxUsableTick * 2) / tickSpacing + 1);
-        return (2**128 - 1) / numTicks;
+        int maxTick = (TickMath.MAX_TICK / tickSpacing) * tickSpacing;
+        int minTick = -maxTick; // canonical: (MIN_TICK / tickSpacing) * tickSpacing, truncated
+        uint numTicks = uint((maxTick - minTick) / tickSpacing) + 1;
+        return 0xffffffffffffffffffffffffffffffff / numTicks; // type(uint128).max
     }
 
-    /// @notice Fee growth inside a tick range (canonical getFeeGrowthInside; may be
-    ///         transiently negative — deltas are what matter)
+    /// @notice Retrieves fee growth data
+    /// @param self The mapping containing all tick information for initialized ticks
+    /// @param tickLower The lower tick boundary of the position
+    /// @param tickUpper The upper tick boundary of the position
+    /// @param tickCurrent The current tick
+    /// @param feeGrowthGlobal0X128 The all-time global fee growth, per unit of liquidity, in token0
+    /// @param feeGrowthGlobal1X128 The all-time global fee growth, per unit of liquidity, in token1
+    /// @return feeGrowthInside0X128 The all-time fee growth in token0, per unit of liquidity, inside the position's tick boundaries
+    /// @return feeGrowthInside1X128 The all-time fee growth in token1, per unit of liquidity, inside the position's tick boundaries
     function getFeeGrowthInside(
         mapping(int => V3TickInfo) storage self,
         int tickLower,
@@ -41,19 +69,45 @@ library Tick {
         V3TickInfo storage lower = self[tickLower];
         V3TickInfo storage upper = self[tickUpper];
 
-        int below0 = tickCurrent >= tickLower ? lower.feeGrowthOutside0X128 : feeGrowthGlobal0X128 - lower.feeGrowthOutside0X128;
-        int below1 = tickCurrent >= tickLower ? lower.feeGrowthOutside1X128 : feeGrowthGlobal1X128 - lower.feeGrowthOutside1X128;
-        int above0 = tickCurrent < tickUpper ? upper.feeGrowthOutside0X128 : feeGrowthGlobal0X128 - upper.feeGrowthOutside0X128;
-        int above1 = tickCurrent < tickUpper ? upper.feeGrowthOutside1X128 : feeGrowthGlobal1X128 - upper.feeGrowthOutside1X128;
+        // calculate fee growth below
+        int feeGrowthBelow0X128;
+        int feeGrowthBelow1X128;
+        if (tickCurrent >= tickLower) {
+            feeGrowthBelow0X128 = lower.feeGrowthOutside0X128;
+            feeGrowthBelow1X128 = lower.feeGrowthOutside1X128;
+        } else {
+            feeGrowthBelow0X128 = feeGrowthGlobal0X128 - lower.feeGrowthOutside0X128;
+            feeGrowthBelow1X128 = feeGrowthGlobal1X128 - lower.feeGrowthOutside1X128;
+        }
 
-        feeGrowthInside0X128 = feeGrowthGlobal0X128 - below0 - above0;
-        feeGrowthInside1X128 = feeGrowthGlobal1X128 - below1 - above1;
-        return (feeGrowthInside0X128, feeGrowthInside1X128);
+        // calculate fee growth above
+        int feeGrowthAbove0X128;
+        int feeGrowthAbove1X128;
+        if (tickCurrent < tickUpper) {
+            feeGrowthAbove0X128 = upper.feeGrowthOutside0X128;
+            feeGrowthAbove1X128 = upper.feeGrowthOutside1X128;
+        } else {
+            feeGrowthAbove0X128 = feeGrowthGlobal0X128 - upper.feeGrowthOutside0X128;
+            feeGrowthAbove1X128 = feeGrowthGlobal1X128 - upper.feeGrowthOutside1X128;
+        }
+
+        feeGrowthInside0X128 = feeGrowthGlobal0X128 - feeGrowthBelow0X128 - feeGrowthAbove0X128;
+        feeGrowthInside1X128 = feeGrowthGlobal1X128 - feeGrowthBelow1X128 - feeGrowthAbove1X128;
     }
 
-    /// @notice Update a tick's liquidity bookkeeping for a position change (canonical update)
-    /// @return True when the tick flipped between zero and nonzero liquidity; the caller
-    ///         flips the bitmap and, on burns, clears the tick after its final fee accrual
+    /// @notice Updates a tick and returns true if the tick was flipped from initialized to uninitialized, or vice versa
+    /// @param self The mapping containing all tick information for initialized ticks
+    /// @param tick The tick that will be updated
+    /// @param tickCurrent The current tick
+    /// @param liquidityDelta A new amount of liquidity to be added (subtracted) when tick is crossed from left to right (right to left)
+    /// @param feeGrowthGlobal0X128 The all-time global fee growth, per unit of liquidity, in token0
+    /// @param feeGrowthGlobal1X128 The all-time global fee growth, per unit of liquidity, in token1
+    /// @param secondsPerLiquidityCumulativeX128 The all-time seconds per max(1, liquidity) of the pool
+    /// @param tickCumulative The tick * time elapsed since the pool was first initialized
+    /// @param time The current block timestamp
+    /// @param upper true for updating a position's upper tick, or false for updating a position's lower tick
+    /// @param maxLiquidity The maximum liquidity allocation for a single tick
+    /// @return flipped Whether the tick was flipped from initialized to uninitialized, or vice versa
     function update(
         mapping(int => V3TickInfo) storage self,
         int tick,
@@ -66,50 +120,41 @@ library Tick {
         uint time,
         bool upper,
         uint maxLiquidity
-    ) internal returns (bool) {
+    ) internal returns (bool flipped) {
         V3TickInfo storage info = self[tick];
-        // liquidityGross tracks total liquidity referencing this tick; add and remove
-        // apply the same signed delta because a position references each of its ticks once
-        int grossAfterSigned = int(info.liquidityGross) + liquidityDelta;
-        require(grossAfterSigned >= 0, "Tick liquidity underflow");
+
         uint liquidityGrossBefore = info.liquidityGross;
-        uint liquidityGrossAfter = uint(grossAfterSigned);
+        uint liquidityGrossAfter = LiquidityMath.addDelta(liquidityGrossBefore, liquidityDelta);
+
         require(liquidityGrossAfter <= maxLiquidity, "LO");
 
-        if (liquidityGrossBefore == 0 && liquidityGrossAfter > 0) {
-            // Convention (as canonical): assume all prior growth happened below the tick
+        flipped = (liquidityGrossAfter == 0) != (liquidityGrossBefore == 0);
+
+        if (liquidityGrossBefore == 0) {
+            // by convention, we assume that all growth before a tick was initialized happened _below_ the tick
             if (tick <= tickCurrent) {
                 info.feeGrowthOutside0X128 = feeGrowthGlobal0X128;
                 info.feeGrowthOutside1X128 = feeGrowthGlobal1X128;
-                info.tickCumulativeOutside = tickCumulative;
                 info.secondsPerLiquidityOutsideX128 = secondsPerLiquidityCumulativeX128;
+                info.tickCumulativeOutside = tickCumulative;
                 info.secondsOutside = int(time);
-            } else {
-                info.feeGrowthOutside0X128 = 0;
-                info.feeGrowthOutside1X128 = 0;
-                info.tickCumulativeOutside = 0;
-                info.secondsPerLiquidityOutsideX128 = 0;
-                info.secondsOutside = 0;
             }
             info.initialized = true;
         }
 
         info.liquidityGross = liquidityGrossAfter;
-        if (upper) {
-            info.liquidityNet -= liquidityDelta;
-        } else {
-            info.liquidityNet += liquidityDelta;
-        }
 
-        if ((liquidityGrossAfter == 0) != (liquidityGrossBefore == 0)) {
-            return true;
-        }
-        return false;
+        // when the lower (upper) tick is crossed left to right (right to left), liquidity must be added (removed)
+        info.liquidityNet = upper
+            ? info.liquidityNet - liquidityDelta
+            : info.liquidityNet + liquidityDelta;
     }
 
-    /// @notice Fully reset a tick whose liquidity dropped to zero (canonical clear).
-    ///         Must run only after the owning position's final fee accrual: clearing first
-    ///         would zero the outside snapshots getFeeGrowthInside is about to read
+    /// @notice Clears tick data
+    /// @param self The mapping containing all initialized tick information for initialized ticks
+    /// @param tick The tick that will be cleared
+    /// @dev Canonical is `delete self[tick]`, a no-op through a library storage-mapping
+    ///      parameter in SolidVM — fields are zeroed explicitly instead
     function clear(mapping(int => V3TickInfo) storage self, int tick) internal {
         V3TickInfo storage info = self[tick];
         info.liquidityGross = 0;
@@ -122,9 +167,15 @@ library Tick {
         info.initialized = false;
     }
 
-    /// @notice Cross a tick during a swap, flipping its outside snapshots (canonical cross)
-    /// @return liquidityNet The signed liquidity change; the caller negates it for
-    ///         zero-for-one swaps and applies it to the pool's active liquidity
+    /// @notice Transitions to next tick as needed by price movement
+    /// @param self The mapping containing all tick information for initialized ticks
+    /// @param tick The destination tick of the transition
+    /// @param feeGrowthGlobal0X128 The all-time global fee growth, per unit of liquidity, in token0
+    /// @param feeGrowthGlobal1X128 The all-time global fee growth, per unit of liquidity, in token1
+    /// @param secondsPerLiquidityCumulativeX128 The current seconds per liquidity
+    /// @param tickCumulative The tick * time elapsed since the pool was first initialized
+    /// @param time The current block.timestamp
+    /// @return liquidityNet The amount of liquidity added (subtracted) when tick is crossed from left to right (right to left)
     function cross(
         mapping(int => V3TickInfo) storage self,
         int tick,
@@ -133,13 +184,13 @@ library Tick {
         int secondsPerLiquidityCumulativeX128,
         int tickCumulative,
         uint time
-    ) internal returns (int) {
+    ) internal returns (int liquidityNet) {
         V3TickInfo storage info = self[tick];
         info.feeGrowthOutside0X128 = feeGrowthGlobal0X128 - info.feeGrowthOutside0X128;
         info.feeGrowthOutside1X128 = feeGrowthGlobal1X128 - info.feeGrowthOutside1X128;
-        info.tickCumulativeOutside = tickCumulative - info.tickCumulativeOutside;
         info.secondsPerLiquidityOutsideX128 = secondsPerLiquidityCumulativeX128 - info.secondsPerLiquidityOutsideX128;
+        info.tickCumulativeOutside = tickCumulative - info.tickCumulativeOutside;
         info.secondsOutside = int(time) - info.secondsOutside;
-        return info.liquidityNet;
+        liquidityNet = info.liquidityNet;
     }
 }
