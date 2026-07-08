@@ -57,6 +57,7 @@ const FETCH_CONCURRENCY = parsePositiveInteger(
   argValue("concurrency") || process.env.WAS_EVENT_SNAPSHOT_FETCH_CONCURRENCY,
   4,
 );
+let activeBuildDir: string | undefined;
 
 function argValue(name: string): string | undefined {
   const prefix = `--${name}=`;
@@ -67,6 +68,22 @@ function parsePositiveInteger(value: string | undefined, fallback: number): numb
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
+
+function cleanupActiveBuildDir() {
+  if (!activeBuildDir) return;
+  rmSync(activeBuildDir, { recursive: true, force: true });
+  activeBuildDir = undefined;
+}
+
+process.once("SIGINT", () => {
+  cleanupActiveBuildDir();
+  process.exit(130);
+});
+
+process.once("SIGTERM", () => {
+  cleanupActiveBuildDir();
+  process.exit(143);
+});
 
 const getTokenEndpoint = async (): Promise<string | undefined> => {
   const discoveryUrl = process.env.OAUTH_DISCOVERY_URL;
@@ -278,7 +295,17 @@ const fetchEventPage = async (
 };
 
 const main = async () => {
+  console.log(
+    [
+      `mode=${MODE}`,
+      `snapshotRoot=${SNAPSHOT_ROOT}`,
+      `pageSize=${PAGE_SIZE}`,
+      `maxPages=${MAX_PAGES || "none"}`,
+      `fetchConcurrency=${FETCH_CONCURRENCY}`,
+    ].join(" "),
+  );
   const client = await createClient();
+
   const existingSnapshot = MODE === "update" ? latestSnapshotDir() : undefined;
   const existingManifest = existingSnapshot
     ? readManifest(existingSnapshot.dir)
@@ -290,9 +317,29 @@ const main = async () => {
   const startedAt = new Date().toISOString();
   const writeDir = join(SNAPSHOT_ROOT, `snapshot-building-${Date.now()}`);
   mkdirSync(writeDir, { recursive: true });
+  activeBuildDir = writeDir;
+  console.log(
+    [
+      `buildDir=${writeDir}`,
+      existingSnapshot ? `existingSnapshot=${existingSnapshot.dir}` : "existingSnapshot=",
+      fromBlock !== undefined ? `fromBlockExclusive=${fromBlock.toString()}` : "fromBlockExclusive=",
+    ].join(" "),
+  );
+  if (existingSnapshot && existingManifest) {
+    console.log(`normalizing existing snapshot files=${existingManifest.files.length}`);
+  }
   const normalizedExisting = existingSnapshot && existingManifest
     ? normalizeExistingSnapshot(existingSnapshot.dir, existingManifest, writeDir)
     : { files: [], totalRows: 0, totalBytes: 0, highestBlock: undefined };
+  if (existingSnapshot && existingManifest) {
+    console.log(
+      [
+        "normalized existing snapshot",
+        `rows=${normalizedExisting.totalRows}`,
+        `files=${normalizedExisting.files.length}`,
+      ].join(" "),
+    );
+  }
   const appendedFiles: SnapshotFile[] = [];
   let appendedRows = 0;
   let appendedBytes = 0;
@@ -329,6 +376,12 @@ const main = async () => {
 
     const batchSize = Math.min(FETCH_CONCURRENCY, remainingPages);
     const pages = Array.from({ length: batchSize }, (_, index) => nextPage + index);
+    console.log(
+      [
+        `fetchingPages=${pages.join(",")}`,
+        `offsets=${pages.map((page) => page * PAGE_SIZE).join(",")}`,
+      ].join(" "),
+    );
     const fetchedPages = await Promise.all(
       pages.map((page) => fetchEventPage(client, page, fromBlock)),
     );
@@ -397,6 +450,7 @@ const main = async () => {
 
   rmSync(finalDir, { recursive: true, force: true });
   renameSync(writeDir, finalDir);
+  activeBuildDir = undefined;
   if (existingSnapshot && existingSnapshot.dir !== finalDir) {
     rmSync(existingSnapshot.dir, { recursive: true, force: true });
   }
@@ -408,6 +462,7 @@ const main = async () => {
 };
 
 main().catch((error) => {
+  cleanupActiveBuildDir();
   console.error(error?.response?.data || error);
   process.exit(1);
 });
