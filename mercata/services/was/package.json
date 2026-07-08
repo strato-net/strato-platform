@@ -10,7 +10,9 @@
     "build": "tsc",
     "schema:snapshot": "ts-node scripts/fetchSchemaSnapshot.ts",
     "events:measure-size": "ts-node scripts/measureEventTableSize.ts",
-    "events:snapshot": "ts-node scripts/snapshotEventTable.ts",
+    "events:snapshot": "ts-node scripts/snapshotEventTable.ts --update",
+    "events:snapshot:update": "ts-node scripts/snapshotEventTable.ts --update",
+    "events:snapshot:refresh": "ts-node scripts/snapshotEventTable.ts --refresh",
     "test": "node --test --require ts-node/register test/*.test.ts",
     "postinstall": "(cd ../../packages/shared-types && npm install && npm run build)"
   },
