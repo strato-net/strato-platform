@@ -38,6 +38,10 @@ interface SnapshotPage {
   offset: number;
   rows: any[];
 }
+interface SnapshotBlock {
+  block: bigint;
+  rows: any[];
+}
 
 const rawArgs = process.argv.slice(2);
 const args = new Set(rawArgs);
@@ -116,13 +120,25 @@ const getAccessToken = async (): Promise<string | undefined> => {
   return response.data?.access_token;
 };
 
-const createClient = async (): Promise<AxiosInstance> => {
+const createCirrusClient = (accessToken: string | undefined): AxiosInstance => {
   if (!NODE_URL) throw new Error("NODE_URL is required");
-
-  const accessToken = await getAccessToken();
   return axios.create({
     baseURL: `${NODE_URL}/cirrus/search`,
     timeout: 120_000,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-Requested-With": "XMLHttpRequest",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+  });
+};
+
+const createNodeClient = (accessToken: string | undefined): AxiosInstance => {
+  if (!NODE_URL) throw new Error("NODE_URL is required");
+  return axios.create({
+    baseURL: NODE_URL,
+    timeout: 60_000,
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
@@ -186,9 +202,11 @@ const latestSnapshotDir = (): { dir: string; highestBlock: bigint } | undefined 
       const manifest = existsSync(join(dir, "manifest.json"))
         ? readManifest(dir)
         : undefined;
+      const highestBlock = highestManifestBlock(manifest, BigInt(match[1])) || 0n;
+      if (manifest && !isPlausibleManifest(manifest, highestBlock)) return undefined;
       return {
         dir,
-        highestBlock: highestManifestBlock(manifest, BigInt(match[1])) || 0n,
+        highestBlock,
       };
     })
     .filter((entry): entry is { dir: string; highestBlock: bigint } => !!entry)
@@ -196,6 +214,9 @@ const latestSnapshotDir = (): { dir: string; highestBlock: bigint } | undefined 
 
   return snapshots[0];
 };
+
+const isPlausibleManifest = (manifest: SnapshotManifest, highestBlock: bigint): boolean =>
+  manifest.files.length <= Number(highestBlock + 1n);
 
 const writeBlockFile = (
   outputDir: string,
@@ -273,7 +294,6 @@ const normalizeExistingSnapshot = (
 const fetchEventPage = async (
   client: AxiosInstance,
   page: number,
-  fromBlock: bigint | undefined,
 ): Promise<SnapshotPage> => {
   const offset = page * PAGE_SIZE;
   const response = await client.get("/event", {
@@ -282,9 +302,6 @@ const fetchEventPage = async (
       order: "block_number.asc",
       limit: PAGE_SIZE,
       offset,
-      ...(MODE === "update" && fromBlock !== undefined
-        ? { block_number: `gt.${fromBlock.toString()}` }
-        : {}),
     },
   });
   return {
@@ -292,6 +309,56 @@ const fetchEventPage = async (
     offset,
     rows: Array.isArray(response.data) ? response.data : [],
   };
+};
+
+const latestBlockNumber = async (client: AxiosInstance): Promise<bigint> => {
+  if (process.env.WAS_EVENT_SNAPSHOT_LATEST_BLOCK) {
+    return BigInt(process.env.WAS_EVENT_SNAPSHOT_LATEST_BLOCK);
+  }
+
+  const paths = [
+    "/strato-api/eth/v1.2/block/last/1",
+    "/eth/v1.2/block/last/1",
+  ];
+
+  for (const path of paths) {
+    try {
+      const response = await client.get(path);
+      const value = response.data?.[0]?.blockData?.number ?? response.data?.[0]?.number;
+      if (value !== undefined) return BigInt(String(value));
+    } catch {
+      // Try the next STRATO API base path.
+    }
+  }
+
+  throw new Error("Unable to fetch latest STRATO block number");
+};
+
+const fetchBlockEvents = async (
+  client: AxiosInstance,
+  block: bigint,
+): Promise<SnapshotBlock> => {
+  const rows: any[] = [];
+  let page = 0;
+
+  while (true) {
+    const offset = page * PAGE_SIZE;
+    const response = await client.get("/event", {
+      params: {
+        select: SELECT,
+        block_number: `eq.${block.toString()}`,
+        order: "block_number.asc",
+        limit: PAGE_SIZE,
+        offset,
+      },
+    });
+    const pageRows = Array.isArray(response.data) ? response.data : [];
+    rows.push(...pageRows);
+    if (pageRows.length < PAGE_SIZE) break;
+    page += 1;
+  }
+
+  return { block, rows };
 };
 
 const main = async () => {
@@ -304,12 +371,23 @@ const main = async () => {
       `fetchConcurrency=${FETCH_CONCURRENCY}`,
     ].join(" "),
   );
-  const client = await createClient();
+  const accessToken = await getAccessToken();
+  const client = createCirrusClient(accessToken);
+  const nodeClient = createNodeClient(accessToken);
 
   const existingSnapshot = MODE === "update" ? latestSnapshotDir() : undefined;
   const existingManifest = existingSnapshot
     ? readManifest(existingSnapshot.dir)
     : undefined;
+  if (
+    existingSnapshot &&
+    existingManifest &&
+    !isPlausibleManifest(existingManifest, existingSnapshot.highestBlock)
+  ) {
+    throw new Error(
+      `Snapshot manifest looks duplicated: ${existingSnapshot.dir} has ${existingManifest.files.length} files for highest block ${existingSnapshot.highestBlock.toString()}`,
+    );
+  }
   const fromBlock = highestManifestBlock(
     existingManifest,
     existingSnapshot?.highestBlock,
@@ -370,7 +448,35 @@ const main = async () => {
     currentRows = [];
   };
 
-  while (true) {
+  if (MODE === "update" && fromBlock !== undefined) {
+    const latestBlock = await latestBlockNumber(nodeClient);
+    console.log(
+      `latestBlock=${latestBlock.toString()} updateRange=${(fromBlock + 1n).toString()}-${latestBlock.toString()}`,
+    );
+
+    for (let block = fromBlock + 1n; block <= latestBlock;) {
+      const blocks = Array.from(
+        { length: FETCH_CONCURRENCY },
+        (_, index) => block + BigInt(index),
+      ).filter((nextBlock) => nextBlock <= latestBlock);
+      if (!blocks.length) break;
+
+      console.log(`fetchingBlocks=${blocks.map((nextBlock) => nextBlock.toString()).join(",")}`);
+      const fetchedBlocks = await Promise.all(
+        blocks.map((nextBlock) => fetchBlockEvents(client, nextBlock)),
+      );
+
+      for (const fetchedBlock of fetchedBlocks) {
+        if (!fetchedBlock.rows.length) continue;
+        currentBlock = fetchedBlock.block.toString();
+        currentRows = fetchedBlock.rows;
+        flushCurrentBlock();
+      }
+
+      block += BigInt(blocks.length);
+    }
+  } else {
+    while (true) {
     const remainingPages = MAX_PAGES > 0 ? MAX_PAGES - nextPage : FETCH_CONCURRENCY;
     if (remainingPages <= 0) break;
 
@@ -383,7 +489,7 @@ const main = async () => {
       ].join(" "),
     );
     const fetchedPages = await Promise.all(
-      pages.map((page) => fetchEventPage(client, page, fromBlock)),
+      pages.map((page) => fetchEventPage(client, page)),
     );
     const firstShortPageIndex = fetchedPages.findIndex(
       (fetchedPage) => fetchedPage.rows.length < PAGE_SIZE,
@@ -419,6 +525,7 @@ const main = async () => {
 
     if (firstShortPageIndex >= 0) break;
     nextPage += fetchedPages.length;
+    }
   }
 
   flushCurrentBlock();

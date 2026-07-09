@@ -7,6 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import axios, { AxiosInstance } from "axios";
 import { CirrusClient, CirrusEventRow, CirrusQueryParams, WasConfig } from "./types";
 import { logInfo } from "./logger";
 
@@ -28,11 +29,6 @@ interface SnapshotManifest {
   totalBytes?: number;
   totalSizeMiB?: number;
   averageBytesPerRow?: number;
-}
-
-interface SnapshotPage {
-  page: number;
-  rows: CirrusEventRow[];
 }
 
 const EVENT_TABLE = "/event";
@@ -139,7 +135,10 @@ class LocalEventStore {
   private manifest: SnapshotManifest | undefined;
   private refreshPromise: Promise<void> | undefined;
 
-  constructor(private snapshotDir: string) {
+  constructor(
+    private snapshotDir: string,
+    private readonly config: WasConfig,
+  ) {
     this.load();
   }
 
@@ -170,6 +169,12 @@ class LocalEventStore {
     }
 
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as SnapshotManifest;
+    const highestBlock = manifestHighestBlock(manifest) || 0n;
+    if (!isPlausibleManifest(manifest, highestBlock)) {
+      throw new Error(
+        `Event snapshot manifest looks duplicated: ${manifestPath} has ${manifest.files.length} files for highest block ${highestBlock.toString()}`,
+      );
+    }
     this.manifest = manifest;
     const manifestBlock = toBlock(manifest.highestBlock);
     if (manifestBlock !== undefined) {
@@ -219,7 +224,6 @@ class LocalEventStore {
 
   private async refreshNow(baseClient: CirrusClient): Promise<void> {
     const startingBlock = this.latestBlock;
-    let nextPage = 0;
     let addedRows = 0;
     let totalBytes = 0;
     const files: SnapshotManifestFile[] = [];
@@ -246,24 +250,20 @@ class LocalEventStore {
       currentRows = [];
     };
 
-    while (true) {
-      const pages = Array.from(
-        { length: REFRESH_FETCH_CONCURRENCY },
-        (_, index) => nextPage + index,
-      );
-      const fetchedPages = await Promise.all(
-        pages.map((page) => this.fetchRefreshPage(baseClient, page, startingBlock)),
-      );
-      const firstShortPageIndex = fetchedPages.findIndex(
-        (fetchedPage) => fetchedPage.rows.length < REFRESH_PAGE_SIZE,
-      );
-      const pagesToWrite =
-        firstShortPageIndex >= 0
-          ? fetchedPages.slice(0, firstShortPageIndex + 1)
-          : fetchedPages;
+    const latestBlock = await latestBlockNumber(this.config);
+    if (startingBlock === undefined || startingBlock >= latestBlock) return;
 
-      for (const fetchedPage of pagesToWrite) {
-        for (const row of fetchedPage.rows) {
+    for (let block = startingBlock + 1n; block <= latestBlock;) {
+      const blocks = Array.from(
+        { length: REFRESH_FETCH_CONCURRENCY },
+        (_, index) => block + BigInt(index),
+      ).filter((nextBlock) => nextBlock <= latestBlock);
+      const fetchedBlocks = await Promise.all(
+        blocks.map((nextBlock) => fetchBlockEvents(baseClient, nextBlock)),
+      );
+
+      for (const rows of fetchedBlocks) {
+        for (const row of rows) {
           const block = normalizeValue(row.block_number);
           if (currentBlock && block !== currentBlock) {
             flushCurrentBlock();
@@ -272,11 +272,10 @@ class LocalEventStore {
           currentRows.push(row);
           this.addEvent(row);
         }
-        addedRows += fetchedPage.rows.length;
+        addedRows += rows.length;
       }
 
-      if (firstShortPageIndex >= 0) break;
-      nextPage += fetchedPages.length;
+      block += BigInt(blocks.length);
     }
 
     if (!addedRows) return;
@@ -297,26 +296,6 @@ class LocalEventStore {
       fromBlockExclusive: startingBlock?.toString() || "",
       latestBlock: this.latestBlock?.toString() || "",
     });
-  }
-
-  private async fetchRefreshPage(
-    baseClient: CirrusClient,
-    page: number,
-    startingBlock: bigint | undefined,
-  ): Promise<SnapshotPage> {
-    const params: CirrusQueryParams = {
-      select: EVENT_SELECT,
-      order: "block_number.asc",
-      limit: REFRESH_PAGE_SIZE,
-      offset: page * REFRESH_PAGE_SIZE,
-      ...(startingBlock !== undefined
-        ? { block_number: `gt.${startingBlock.toString()}` }
-        : {}),
-    };
-    return {
-      page,
-      rows: await baseClient.getRows<CirrusEventRow>(EVENT_TABLE, params),
-    };
   }
 
   private updateManifest(files: SnapshotManifestFile[], addedBytes: number) {
@@ -457,10 +436,105 @@ const findLatestSnapshotDir = (snapshotRoot: string): string | undefined => {
       const manifestPath = join(dir, "manifest.json");
       if (!existsSync(manifestPath)) return undefined;
       const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as SnapshotManifest;
-      return { dir, highestBlock: manifestHighestBlock(manifest) || 0n };
+      const highestBlock = manifestHighestBlock(manifest) || 0n;
+      if (!isPlausibleManifest(manifest, highestBlock)) return undefined;
+      return { dir, highestBlock };
     })
     .filter((entry): entry is { dir: string; highestBlock: bigint } => !!entry)
     .sort((a, b) => (a.highestBlock > b.highestBlock ? -1 : 1))[0]?.dir;
+};
+
+const isPlausibleManifest = (
+  manifest: SnapshotManifest,
+  highestBlock: bigint,
+): boolean => manifest.files.length <= Number(highestBlock + 1n);
+
+const getTokenEndpoint = async (config: WasConfig): Promise<string | undefined> => {
+  const discoveryUrl = config.oauth?.discoveryUrl;
+  if (!discoveryUrl) return undefined;
+
+  const response = await axios.get(discoveryUrl);
+  return response.data?.token_endpoint;
+};
+
+const getAccessToken = async (config: WasConfig): Promise<string | undefined> => {
+  const clientId = config.oauth?.clientId;
+  const clientSecret = config.oauth?.clientSecret;
+  if (!clientId || !clientSecret) return undefined;
+
+  const tokenEndpoint = await getTokenEndpoint(config);
+  if (!tokenEndpoint) return undefined;
+
+  const response = await axios.post(
+    tokenEndpoint,
+    new URLSearchParams({ grant_type: "client_credentials" }),
+    {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization:
+          "Basic " + Buffer.from(`${clientId}:${clientSecret}`).toString("base64"),
+      },
+    },
+  );
+
+  return response.data?.access_token;
+};
+
+const latestBlockNumber = async (config: WasConfig): Promise<bigint> => {
+  if (process.env.WAS_EVENT_SNAPSHOT_LATEST_BLOCK) {
+    return BigInt(process.env.WAS_EVENT_SNAPSHOT_LATEST_BLOCK);
+  }
+
+  const accessToken = await getAccessToken(config);
+  const client = axios.create({
+    baseURL: config.nodeUrl,
+    timeout: 60_000,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-Requested-With": "XMLHttpRequest",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+  });
+  const paths = [
+    "/strato-api/eth/v1.2/block/last/1",
+    "/eth/v1.2/block/last/1",
+  ];
+
+  for (const path of paths) {
+    try {
+      const response = await client.get(path);
+      const value = response.data?.[0]?.blockData?.number ?? response.data?.[0]?.number;
+      if (value !== undefined) return BigInt(String(value));
+    } catch {
+      // Try the next STRATO API base path.
+    }
+  }
+
+  throw new Error("Unable to fetch latest STRATO block number");
+};
+
+const fetchBlockEvents = async (
+  baseClient: CirrusClient,
+  block: bigint,
+): Promise<CirrusEventRow[]> => {
+  const rows: CirrusEventRow[] = [];
+  let page = 0;
+
+  while (true) {
+    const pageRows = await baseClient.getRows<CirrusEventRow>(EVENT_TABLE, {
+      select: EVENT_SELECT,
+      block_number: `eq.${block.toString()}`,
+      order: "block_number.asc",
+      limit: REFRESH_PAGE_SIZE,
+      offset: page * REFRESH_PAGE_SIZE,
+    });
+    rows.push(...pageRows);
+    if (pageRows.length < REFRESH_PAGE_SIZE) break;
+    page += 1;
+  }
+
+  return rows;
 };
 
 const resolveSnapshotDir = (snapshotPath: string): string => {
@@ -476,7 +550,7 @@ export const createSnapshotBackedCirrusClient = (
   if (!config.eventSnapshotDir) return baseClient;
 
   const snapshotDir = resolveSnapshotDir(config.eventSnapshotDir);
-  const localStore = new LocalEventStore(snapshotDir);
+  const localStore = new LocalEventStore(snapshotDir, config);
 
   return {
     getRows: async <T>(table: string, params: CirrusQueryParams = {}) => {
