@@ -28,7 +28,7 @@ import Blockchain.Sequencer.Kafka (writeSeqVmTasks)
 import Blockchain.Strato.Model.Address (Address(..), addressToHex)
 import Blockchain.Strato.Model.Keccak256 (Keccak256, hash, keccak256FromHex, keccak256ToByteString, keccak256ToHex)
 import Text.Format (format)
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Control.Monad.IO.Class
 import Control.Monad.Composable.Streaming (consumeFromLatest)
 import Control.Monad.Except
@@ -48,6 +48,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import Data.Time.Calendar (fromGregorian)
 import Data.Time.Clock (UTCTime(..))
+import Data.Char (toLower)
 import Data.List (find)
 import qualified Data.Map as M
 import qualified Data.Text as T
@@ -55,7 +56,7 @@ import Data.Aeson (FromJSON(..), ToJSON(..), Value(..), withObject, (.:?), (.!=)
 import GHC.Generics (Generic)
 import Network.JsonRpc.Server
 import Numeric (showHex)
-import Prelude hiding (id)
+import Prelude
 import Network.HTTP.Client (newManager, defaultManagerSettings)
 import Network.HTTP.Types.Status (statusCode, statusMessage)
 import Servant.Client (BaseUrl (..), ClientError(..), ClientM, ResponseF(..), Scheme (Http), mkClientEnv, runClientM)
@@ -610,6 +611,40 @@ data LogFilter = LogFilter
   , lfTopics    :: [String]
   } deriving (Show, Generic)
 
+maxLogBlockRange :: Integer
+maxLogBlockRange = 10000
+
+maxLogBlock :: Integer
+maxLogBlock = 999999999
+
+maxLogResults :: Int
+maxLogResults = 1000
+
+parseLogBlockNum :: String -> Maybe Integer
+parseLogBlockNum "latest" = Just maxLogBlock
+parseLogBlockNum "pending" = Just maxLogBlock
+parseLogBlockNum block = parseBlockNum block
+
+topic0EventName :: [String] -> Maybe T.Text
+topic0EventName [] = Nothing
+topic0EventName (topic0 : _)
+  | null normalized = Nothing
+  | otherwise = T.pack <$> lookup normalized standardEventTopics
+  where
+    normalized = map toLower $ strip0x topic0
+    strip0x ('0':'x':xs) = xs
+    strip0x ('0':'X':xs) = xs
+    strip0x xs = xs
+
+standardEventTopics :: [(String, String)]
+standardEventTopics =
+  [ (eventSignatureTopic "Approval(address,address,uint256)", "Approval"),
+    (eventSignatureTopic "Transfer(address,address,uint256)", "Transfer")
+  ]
+
+eventSignatureTopic :: String -> String
+eventSignatureTopic = keccak256ToHex . hash . BC.pack
+
 instance FromJSON LogFilter where
   parseJSON = withObject "LogFilter" $ \o ->
     LogFilter
@@ -623,11 +658,19 @@ eth_getLogs = toMethod "eth_getLogs" f (Required "filter" :+: ())
   where
     f :: LogFilter -> RpcResult Server [Value]
     f filt = do
-      let fromBlock = maybe 0 (\x -> x) $ parseBlockNum (lfFromBlock filt)
-          toBlock   = maybe maxBlock (\x -> x) $ parseBlockNum (lfToBlock filt)
-          maxBlock  = 999999999
+      let fromBlock = maybe 0 id $ parseLogBlockNum (lfFromBlock filt)
+          toBlock   = maybe maxLogBlock id $ parseLogBlockNum (lfToBlock filt)
           mAddr     = fmap T.pack (lfAddress filt)
-      rows <- runCodeDBM $ queryEvents mAddr fromBlock toBlock
+          mEventName = topic0EventName (lfTopics filt)
+      when (toBlock >= fromBlock && toBlock - fromBlock > maxLogBlockRange) $
+        throwError $ rpcError (-32602) $
+          T.pack $
+            "eth_getLogs block range exceeds " ++ show maxLogBlockRange ++ " blocks; use smaller ranges"
+      rows <- runCodeDBM $ queryEvents mAddr fromBlock toBlock mEventName (maxLogResults + 1)
+      when (length rows > maxLogResults) $
+        throwError $ rpcError (-32602) $
+          T.pack $
+            "eth_getLogs result exceeds " ++ show maxLogResults ++ " candidate events; use smaller ranges or narrower filters"
       logs <- runCodeDBM $ mapM eventRowToLog rows
       let filtered = filter (matchesTopics (lfTopics filt)) logs
       return $ map toJSON filtered

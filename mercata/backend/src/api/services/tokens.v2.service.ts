@@ -1,18 +1,20 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
+import * as config from "../../config/config";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getRebaseFactors } from "./oracle.service";
-import { getVaultShareTokenAddress, getVaultHistoryConfig } from "./vault.service";
 import { getSaveUsdstInfo, getSaveUsdstUserInfo } from "./saveUsdst.service";
+import { getUserStakedStratoBalance } from "./staking.service";
 import { getLoan } from "./lending.service";
 import { getVaults } from "./cdp.service";
 import { listVaultDefs, getYieldVaultInfo, getYieldVaultUserInfo } from "./yieldVault.service";
 import { Token, EarningAsset, BalanceSnapshot } from "@mercata/shared-types";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
+import { getHistoryDirect, fetchActiveRequestIds, fetchVaultHistoryConfig } from "../helpers/historyDb.helper";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
 
-const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, YieldVault, priceOracle } = constants;
+const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, priceOracle } = constants;
 
 // Queries MercataBridge config for the unanimous externalSymbol for each given strato token address.
 // Returns a map of stratoToken -> externalSymbol.
@@ -56,8 +58,8 @@ const buildSaveUsdstEarningAsset = (
 
   const balance = userInfo?.userShares || "0";
   const totalBalance = balance;
-  const price = info.exchangeRate || "0";
-  const redeemableValueUsd = userInfo?.redeemableAssets || "0";
+  const price = info.projectedExchangeRate || info.exchangeRate || "0";
+  const redeemableValueUsd = userInfo?.projectedRedeemableAssets || userInfo?.redeemableAssets || "0";
   const value = (Number(BigInt(redeemableValueUsd || "0")) / 1e18).toFixed(2);
 
   return {
@@ -76,7 +78,6 @@ const buildSaveUsdstEarningAsset = (
     price,
     collateralBalance: "0",
     totalBalance,
-    isPoolToken: false,
     value,
     apy: info.apy || "0",
   };
@@ -118,7 +119,6 @@ const buildYieldVaultEarningAsset = (
     price: ((BigInt(info.exchangeRate || "0") * BigInt(info.assetPriceWad || "0")) / BigInt(1e18)).toString(),
     collateralBalance: "0",
     totalBalance,
-    isPoolToken: false,
     value,
     apy: info.apy || "0",
   };
@@ -162,7 +162,7 @@ export const getEarningAssets = async (
   accessToken: string,
   userAddress: string
 ): Promise<EarningAsset[]> => {
-  const [tokens, collaterals, cdps, rawPrices, vaultShareToken, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap] = await Promise.all([
+  const [tokens, collaterals, cdps, rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap, stakedStrato] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, {
       params: {
         "balances.key": `eq.${userAddress}`,
@@ -189,10 +189,10 @@ export const getEarningAssets = async (
       },
     }),
     getCompletePriceMap(accessToken),
-    getVaultShareTokenAddress(accessToken),
     getSaveUsdstInfo(accessToken).catch(() => null),
     getSaveUsdstUserInfo(accessToken, userAddress).catch(() => null),
     getRebaseFactors(accessToken),
+    getUserStakedStratoBalance(accessToken, userAddress).catch(() => ({ tokenAddress: "", amount: 0n })),
   ]);
 
   const collateralMap = new Map<string, bigint>();
@@ -214,7 +214,11 @@ export const getEarningAssets = async (
     const balance = t.balances?.[0]?.balance || "0";
     const price = rawPrices.get(t.address) || "0";
     const collateralBalance = (collateralMap.get(t.address) || 0n).toString();
-    const totalBalance = BigInt(balance) + BigInt(collateralBalance);
+    const stakedBalance =
+      stakedStrato.amount > 0n && (t.address || "").toLowerCase() === stakedStrato.tokenAddress
+        ? stakedStrato.amount.toString()
+        : "0";
+    const totalBalance = BigInt(balance) + BigInt(collateralBalance) + BigInt(stakedBalance);
     const value =
       price && price !== "0"
         ? (
@@ -230,13 +234,8 @@ export const getEarningAssets = async (
       balance,
       price,
       collateralBalance,
+      stakedBalance,
       totalBalance: totalBalance.toString(),
-      isPoolToken:
-        t._symbol?.endsWith("-LP") ||
-        t._symbol === "SUSDST" || t._symbol === "safetyUSDST" ||
-        t._symbol === "MUSDST" || t._symbol === "lendUSDST" ||
-        (vaultShareToken && t.address === vaultShareToken) ||
-        t.description === "Liquidity Provider Token",
       value,
       ...(rebaseFactor ? { rebaseFactor } : {}),
       ...(rebasingExternalSymbol ? { rebasingExternalSymbol } : {}),
@@ -295,10 +294,9 @@ export const getPublicEarningAssets = async (
   };
 
   // Fetch only tokens and prices (skip user-specific collateral data)
-  const [tokens, rawPrices, vaultShareToken, saveUsdstInfo] = await Promise.all([
+  const [tokens, rawPrices, saveUsdstInfo] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, { params: tokenParams }),
     getCompletePriceMap(accessToken),
-    getVaultShareTokenAddress(accessToken),
     getSaveUsdstInfo(accessToken).catch(() => null),
   ]);
 
@@ -315,12 +313,6 @@ export const getPublicEarningAssets = async (
       price,
       collateralBalance,
       totalBalance: totalBalance.toString(),
-      isPoolToken:
-        t._symbol?.endsWith("-LP") ||
-        t._symbol === "SUSDST" || t._symbol === "safetyUSDST" ||
-        t._symbol === "MUSDST" || t._symbol === "lendUSDST" ||
-        (vaultShareToken && t.address === vaultShareToken) ||
-        t.description === "Liquidity Provider Token",
       value,
     };
   });
@@ -687,70 +679,42 @@ export const getNetBalanceHistory = async (
   historyParams: HistoryParams,
 ): Promise<BalanceSnapshot[]> => {
 
-  // Pre-fetch vault config and carry vault active request IDs in parallel
+  // Pre-fetch vault config and carry vault active request IDs in parallel (2 queries, not N+1)
   const carryVaultAddrs = listVaultDefs().filter(v => v.address).map(v => v.address);
-  const [vaultConfig, ...activeReqIds] = await Promise.all([
-    getVaultHistoryConfig(accessToken),
-    ...carryVaultAddrs.map(addr =>
-      cirrus.get(accessToken, `/${YieldVault}-activeRequestId`, {
-        params: { address: `eq.${addr}`, key: `eq.${userAddress}`, select: 'value::text' },
-      }).then(r => r.data?.[0]?.value || "0").catch(() => "0")
-    ),
+
+  const [vaultConfig, activeReqMap] = await Promise.all([
+    fetchVaultHistoryConfig(config.vault),
+    fetchActiveRequestIds(carryVaultAddrs, userAddress).catch(() => new Map<string, string>()),
   ]);
 
-  const requestFilters: string[] = [];
-  carryVaultAddrs.forEach((addr, i) => {
-    if (activeReqIds[i] && activeReqIds[i] !== "0") {
-      requestFilters.push(`and(address.eq.${addr},path.eq.requests[${activeReqIds[i]}])`);
-    }
-  });
-
-  const storageFilters = [
-    'data->>lpToken.neq.""',
-    'data->>_symbol.like.*-LP',
-    'data->>_symbol.in.(MUSDST,SUSDST,safetyUSDST,lendUSDST,saveUSDST)',
-    'data->>sToken.gt.0',
-    'and(data->>mToken.gt.0,data->>borrowIndex.gt.0)',
-    ...(vaultConfig?.shareToken ? [`address.eq.${vaultConfig.shareToken}`] : []),
-    ...carryVaultAddrs.map(addr => `address.eq.${addr}`),
-  ]
-
-  const mappingFilters = [
-    `path.like.*${userAddress}*`,
-    `and(address.eq.${priceOracle},path.like.prices[*)`,
-    'path.like.collateralConfigs[*',
-    'path.like.collateralGlobalStates[*',
-    'and(address.eq.937efa7e3a77e20bbdbd7c0d32b6514f368c1010,path.eq._balances[0000000000000000000000000000000000001004])',
-    ...(vaultConfig?.botExecutor ? [`path.eq._balances[${vaultConfig.botExecutor}]`] : []),
-    ...carryVaultAddrs.map(addr => `path.eq._balances[${addr}]`),
-    ...carryVaultAddrs.map(addr => `and(address.eq.${addr},path.eq.claimableAssets[${userAddress}])`),
-    ...requestFilters,
-  ]
-
-  const mappingCollectionNames = [
-    '_balances',
-    'claimableAssets',
-    'collateralConfigs',
-    'collateralGlobalStates',
-    'prices',
-    ...(requestFilters.length ? ['requests'] : []),
-    'userCollaterals',
-    'userLoan',
-    'vaults'
-  ]
+  const requestFilters: { address: string; path: string }[] = [];
+  for (const [addr, reqId] of activeReqMap) {
+    requestFilters.push({ address: addr, path: `requests[${reqId}]` });
+  }
 
   const carryVaultAddrSet = new Set(carryVaultAddrs);
-  const balanceHistory = await getHistory(
-    accessToken,
+  const initialData = { tokens: {}, userLoan: {}, vaultConfig: vaultConfig || undefined, carryVaultAddrs: carryVaultAddrSet };
+
+  const balanceHistory = await getHistoryDirect(
     historyParams,
-    storageFilters,
-    mappingFilters,
-    mappingCollectionNames,
-    { tokens: {}, userLoan: {}, vaultConfig: vaultConfig || undefined, carryVaultAddrs: carryVaultAddrSet },
+    {
+      vaultShareToken: vaultConfig?.shareToken,
+      carryVaultAddrs,
+    },
+    {
+      userAddress,
+      botExecutor: vaultConfig?.botExecutor,
+      carryVaultAddrs,
+      requestFilters,
+      priceOracle,
+    },
+    vaultConfig,
+    initialData,
     updatePortfolioInfoStorage,
     updatePortfolioInfoMapping,
-    processBalanceSnapshot
+    processBalanceSnapshot,
   );
+
   return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.netBalance}));
 };
 

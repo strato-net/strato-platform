@@ -7,6 +7,7 @@ import {
   indexYieldHistoryRows, mergeBackfillRows,
   ZERO_APY, DEFAULT_SWAP_FEE_BPS, DEFAULT_LP_SHARE_BPS,
   computeLendingAPY, computeSafetyAPY, computePoolAPY, weightedBaseYield, buildVolumeMap,
+  computePerSecondRateApy,
 } from "../helpers/earnYield.helper";
 import { calculateLPTokenPrice, fetchMultiTokenStablePools, fetchStablePoolFees } from "../helpers/swapping.helper";
 import {
@@ -16,16 +17,13 @@ import {
 } from "../helpers/earnRewards.helper";
 import { computeEquityFromMaps, computeVaultPerformanceMetrics, safeBigInt } from "../helpers/vaultPerformance.helper";
 import { listVaultDefs, getYieldVaultInfo } from "./yieldVault.service";
+import { getStratoStakingNetworkApy } from "./staking.service";
 import { getCarryVaultUsdPriceMap } from "../helpers/oracle.helper";
 import { ApySource, TokenApyEntry } from "@mercata/shared-types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const { Pool, DECIMALS, Token, ZERO_ADDRESS, DAY_MS, BPS_DIVISOR } = constants;
-const SAVE_USDST_APY_TTL_MS = 60_000;
-
-const firstSaveUsdstDepositCache = new Map<string, { timestamp: Date } | null>();
-const saveUsdstApyCache = new Map<string, { value: string; expiry: number }>();
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -71,6 +69,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   addLendingApys(add, ctx, rewardActivities);
   addDirectMintRewards(add, rewardActivities);
   addSaveUsdstApys(add, ctx, phase1b, rewardActivities, saveUsdstVault);
+  await addStakingApys(accessToken, add, rewardActivities);
 
   const exchangeRateHistory = indexYieldHistoryRows(mergeBackfillRows(phase1.exchangeRateRows ?? []));
   const baseYieldByAddr = addBaseYieldApys(add, exchangeRateHistory, anchorsMs);
@@ -134,7 +133,7 @@ async function fetchPhase1(
   ] = await Promise.all([
     cirrus.get(accessToken, "/storage", { params: {
       address: `in.(${storageAddrs.join(",")})`,
-      select: "address,data->>borrowableAsset,data->>mToken,data->>totalScaledDebt,data->>borrowIndex,data->>reservesAccrued,data->>_managedAssets,data->>_totalSupply,data->>botExecutor,data->>priceOracle,data->>shareToken,data->>assetToken",
+      select: "address,data->>borrowableAsset,data->>mToken,data->>totalScaledDebt,data->>borrowIndex,data->>reservesAccrued,data->>_managedAssets,data->>_totalSupply,data->>botExecutor,data->>priceOracle,data->>shareToken,data->>assetToken,data->>perSecondSavingsRate",
     }}),
     cirrus.get(accessToken, "/mapping", { params: { select: "address,collection_name,key->>key,value::text", or: `(${mappingFilters.join(",")})` } }),
     cirrus.get(accessToken, `/${constants.Event}`, { params: { select: "address,event_name,attributes,block_timestamp", or: `(and(event_name.eq.Swap,block_timestamp.gte.${twentyFourHoursAgo}),and(address.eq.${constants.safetyModule},event_name.in.(Staked,Redeemed,RewardNotified,ShortfallCovered),block_timestamp.gte.${thirtyDaysAgo}))` } }),
@@ -228,7 +227,6 @@ function parsePhase1(phase1: Phase1Data, vaultAddr: string, rewardsAddr: string,
 async function fetchPhase1b(accessToken: string, ctx: Phase1Ctx, saveUsdstVault: string) {
   const saveUsdstAsset = ctx.saveUsdstStorage?.assetToken ?? constants.USDST;
   const saveUsdstManagedAssets = safeBigInt(ctx.saveUsdstStorage?._managedAssets);
-  const saveUsdstTotalShares = safeBigInt(ctx.saveUsdstStorage?._totalSupply);
   const vaultAddr = constants.vault;
 
   const [stablePools, shareTokenTotalSupply, vaultBalanceRows, saveUsdstApyResult] = await Promise.all([
@@ -250,10 +248,10 @@ async function fetchPhase1b(accessToken: string, ctx: Phase1Ctx, saveUsdstVault:
           select: "address,value::text",
         }}).then(res => res.data ?? []).catch(() => [])
       : Promise.resolve([] as any[]),
-    computeSaveUsdstApy(accessToken, saveUsdstVault, saveUsdstAsset, safeBigInt(ctx.saveUsdstBalance), saveUsdstManagedAssets, saveUsdstTotalShares),
+    Promise.resolve(computePerSecondRateApy(ctx.saveUsdstStorage?.perSecondSavingsRate)),
   ]);
 
-  return { stablePools, shareTokenTotalSupply, vaultBalanceRows, saveUsdstApyResult, saveUsdstManagedAssets, saveUsdstTotalShares, saveUsdstAsset };
+  return { stablePools, shareTokenTotalSupply, vaultBalanceRows, saveUsdstApyResult, saveUsdstManagedAssets, saveUsdstAsset };
 }
 
 // ── Phase 2: vault APY ────────────────────────────────────────────────────────
@@ -316,6 +314,22 @@ function addDirectMintRewards(add: AddFn, rewardActivities: any[]) {
   const activity = findRewardActivity(rewardActivities, { sourceContract: constants.mercataBridge });
   const apy = computeRewardsApy(activity?.emissionRate, activity?.totalStakeUsd);
   if (apy) add(constants.USDST, { source: "rewards", apy, meta: "direct_mint" });
+}
+
+// STRATO staking: native schedule APY plus the CATA rewards activity (if one is
+// registered against the staking contract), both keyed to the STRATO token so
+// the portfolio row shows the combined figure.
+async function addStakingApys(accessToken: string, add: AddFn, rewardActivities: any[]) {
+  const stratoToken = normalizeAddress(constants.stratoToken);
+  const stakingSource = normalizeAddress(constants.stratoStaking);
+  if (!stratoToken || !stakingSource) return;
+
+  const nativeApy = await getStratoStakingNetworkApy(accessToken).catch(() => null);
+  if (isPositiveApy(nativeApy)) add(stratoToken, { source: "staking", apy: nativeApy });
+
+  const activity = findRewardActivity(rewardActivities, { sourceContract: stakingSource });
+  const rewardsApy = computeRewardsApy(activity?.emissionRate, activity?.totalStakeUsd);
+  if (rewardsApy) add(stratoToken, { source: "rewards", apy: rewardsApy, meta: "staking" });
 }
 
 function addSaveUsdstApys(add: AddFn, ctx: Phase1Ctx, phase1b: Phase1bData, rewardActivities: any[], saveUsdstVault: string) {
@@ -567,82 +581,4 @@ async function getTokenTotalSupply(accessToken: string, tokenAddress: string): P
   } catch {
     return "0";
   }
-}
-
-// ── SaveUSDST APY (with 60s TTL cache) ───────────────────────────────────────
-
-async function computeSaveUsdstApy(
-  accessToken: string, vaultAddress: string | undefined, assetAddress: string,
-  liveBalance: bigint, managedAssets: bigint, totalShares: bigint,
-): Promise<string> {
-  if (!vaultAddress || totalShares <= 0n) return ZERO_APY;
-
-  const cached = saveUsdstApyCache.get(vaultAddress);
-  if (cached && cached.expiry > Date.now()) return cached.value;
-
-  const pricingAssets = liveBalance < managedAssets ? liveBalance : managedAssets;
-  if (pricingAssets <= 0n) return ZERO_APY;
-
-  try {
-    let firstDeposit = firstSaveUsdstDepositCache.get(vaultAddress);
-    if (firstDeposit === undefined) {
-      const { data } = await cirrus.get(accessToken, "/event", { params: {
-        address: `eq.${vaultAddress}`,
-        event_name: "eq.Deposit",
-        select: "block_timestamp",
-        order: "block_timestamp.asc",
-        limit: "1",
-      }}).catch(() => ({ data: [] as any[] }));
-      firstDeposit = data?.[0]?.block_timestamp ? { timestamp: new Date(data[0].block_timestamp) } : null;
-      firstSaveUsdstDepositCache.set(vaultAddress, firstDeposit);
-    }
-    if (!firstDeposit?.timestamp) return ZERO_APY;
-
-    const nowMs = Date.now();
-    const startMs = Math.max(nowMs - 30 * DAY_MS, firstDeposit.timestamp.getTime());
-    const lookbackDays = Math.max(1, (nowMs - startMs) / DAY_MS);
-    const startTimestamp = new Date(startMs + 1).toISOString();
-
-    const [{ data: histStorageRows }, { data: histBalanceRows }] = await Promise.all([
-      cirrus.get(accessToken, "/history@storage", { params: {
-        address: `eq.${vaultAddress}`,
-        valid_from: `lte.${startTimestamp}`,
-        valid_to: `gte.${startTimestamp}`,
-        select: "data",
-      }}).catch(() => ({ data: [] as any[] })),
-      cirrus.get(accessToken, "/history@mapping", { params: {
-        select: "value::text",
-        address: `eq.${assetAddress}`,
-        collection_name: "eq._balances",
-        "key->>key": `eq.${vaultAddress}`,
-        valid_from: `lte.${startTimestamp}`,
-        valid_to: `gte.${startTimestamp}`,
-      }}).catch(() => ({ data: [] as any[] })),
-    ]);
-
-    const histManagedAssets = safeBigInt(histStorageRows?.[0]?.data?._managedAssets);
-    const histTotalShares = safeBigInt(histStorageRows?.[0]?.data?._totalSupply);
-    const histBalance = safeBigInt(histBalanceRows?.[0]?.value);
-    if (histTotalShares <= 0n) { cacheApyResult(vaultAddress, APY_UNAVAILABLE); return APY_UNAVAILABLE; }
-
-    const histPricingAssets = histBalance < histManagedAssets ? histBalance : histManagedAssets;
-    const rateNow = (pricingAssets * DECIMALS) / totalShares;
-    const rateStart = histTotalShares > 0n && histPricingAssets > 0n ? (histPricingAssets * DECIMALS) / histTotalShares : 0n;
-    if (rateStart <= 0n) { cacheApyResult(vaultAddress, ZERO_APY); return ZERO_APY; }
-
-    const periodReturn = Number(((rateNow - rateStart) * DECIMALS) / rateStart) / 1e18;
-    if (!isFinite(periodReturn) || periodReturn <= -1) { cacheApyResult(vaultAddress, APY_UNAVAILABLE); return APY_UNAVAILABLE; }
-
-    const annualizationDays = Math.max(30, lookbackDays);
-    const apy = (Math.pow(1 + periodReturn, 365 / annualizationDays) - 1) * 100;
-    const result = isFinite(apy) ? apy.toFixed(2) : APY_UNAVAILABLE;
-    cacheApyResult(vaultAddress, result);
-    return result;
-  } catch {
-    return APY_UNAVAILABLE;
-  }
-}
-
-function cacheApyResult(vaultAddress: string, value: string) {
-  saveUsdstApyCache.set(vaultAddress, { value, expiry: Date.now() + SAVE_USDST_APY_TTL_MS });
 }

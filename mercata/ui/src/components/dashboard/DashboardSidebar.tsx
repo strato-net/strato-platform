@@ -15,7 +15,7 @@ import {
   Shield,
   LucideIcon,
   HandCoins,
-  Vault,
+  Layers,
   ArrowDownToLine
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
@@ -44,23 +44,23 @@ const NAV_CATEGORIES: NavCategory[] = [
     label: 'TRADE',
     items: [
       { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
-      { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
+      { icon: ArrowLeftRight, label: 'Trade', path: '/dashboard/swap' },
       { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
-      { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
-      { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
+      { icon: Send, label: 'Send', path: '/dashboard/transfer' },
+      { icon: Download, label: 'Bridge Out', path: '/dashboard/withdrawals' },
     ],
   },
   {
     label: 'EARN',
     items: [
       { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
+      { icon: Layers, label: 'Stake', path: '/dashboard/earn-staking' },
       { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
     ],
   },
   {
     label: 'PRO',
     items: [
-      { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
       { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
       { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
       { icon: BarChart3, label: 'Analytics', path: '/dashboard/stats' },
@@ -86,8 +86,12 @@ const DashboardSidebar = () => {
     return () => window.removeEventListener('resize', updateWidth);
   }, []);
 
-  const isActive = (path: string) =>
-    path === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(path);
+  const isActive = (path: string) => {
+    if (path === '/dashboard') return pathname === '/dashboard';
+    // Stake (/dashboard/earn-staking) has its own nav item, so Earn must not match it
+    if (path === '/dashboard/earn') return pathname.startsWith(path) && !pathname.startsWith('/dashboard/earn-staking');
+    return pathname.startsWith(path);
+  };
 
   const renderNavItem = ({ icon: Icon, label, path }: NavItem) => {
     const active = isActive(path);
