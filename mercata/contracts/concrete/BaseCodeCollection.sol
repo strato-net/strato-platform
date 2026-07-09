@@ -38,6 +38,10 @@ import "Lending/SafetyModule.sol";
 //Savings
 import "Savings/SaveUSDSTVault.sol";
 
+//Staking
+import "Staking/StratoStaking.sol";
+import "Staking/ValidatorRegistry.sol";
+
 //Bridging
 import "./Bridge/MercataBridge.sol";
 import "./Bridge/StratoNativeBridge.sol";

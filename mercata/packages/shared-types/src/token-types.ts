@@ -16,6 +16,7 @@ export interface Token {
 
 export interface EarningAsset extends Token {
   collateralBalance: string;
+  stakedBalance?: string;
   totalBalance: string;
   value: string;
   apy?: string;
