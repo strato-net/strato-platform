@@ -418,6 +418,16 @@ export function useMultisigActions({ walletAddress }: MultisigActionCtx) {
   );
 
   /**
+   * Dismiss (withdraw) an open issue. The AdminRegistry only allows this while the
+   * issue has exactly one vote, cast by the caller — i.e. only the proposer can
+   * withdraw an issue nobody else has seconded yet.
+   */
+  const dismissIssue = useCallback(
+    (issueId: string) => callWallet("dismissIssue", { _issueId: issueId }),
+    [callWallet]
+  );
+
+  /**
    * Cast a vote on (or create) an arbitrary issue. When the threshold is reached the
    * wallet executes `target.func(args)`; `target` defaults to the wallet itself.
    */
@@ -453,6 +463,7 @@ export function useMultisigActions({ walletAddress }: MultisigActionCtx) {
     swapSigner,
     setDefaultThreshold,
     castVote,
+    dismissIssue,
     proposeTransfer,
   };
 }

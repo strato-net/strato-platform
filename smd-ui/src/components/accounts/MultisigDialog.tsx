@@ -37,12 +37,12 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CopyButton } from "@/components/CopyButton";
+import { AddressInput } from "@/components/AddressInput";
 import { AddrLink } from "@/components/explorer/AddrLink";
 import { shortenHex } from "@/lib/utils";
 import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { useMyTokens, type TokenBalance } from "@/services/tokens";
-import { useUserSearch } from "@/services/accounts";
 import { useContractGroups, useContractInfo, functionArgs } from "@/services/contracts";
 import type { UserWallet } from "@/services/userWallets";
 import {
@@ -65,6 +65,9 @@ import {
 const eq = (a?: string, b?: string) => !!a && !!b && strip0x(a) === strip0x(b);
 
 const isAddressLike = (s: string) => /^(0x)?[0-9a-fA-F]{40}$/.test(s.trim());
+
+/** A bare address/account parameter (not an array of them). */
+const isPlainAddressType = (t: string) => /^(address|account)$/i.test(t.trim());
 
 const PERCENTS = [25, 50, 75, 100] as const;
 
@@ -218,7 +221,7 @@ function EnablePanel({
   const { enableMultisig } = useMultisigActions({ walletAddress: wallet.address });
 
   const me = strip0x(userAddress ?? "");
-  const [extra, setExtra] = useState<string[]>([]);
+  const [extra, setExtra] = useState<{ text: string; addr: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState("");
 
@@ -229,7 +232,14 @@ function EnablePanel({
       toast.error("Connect a wallet first");
       return;
     }
-    const signers = [me, ...extra];
+    const unresolved = extra.find((e) => e.text.trim() && !e.addr);
+    if (unresolved) {
+      toast.error("Unresolved signer", {
+        description: `"${unresolved.text}" is not a valid address or known username.`,
+      });
+      return;
+    }
+    const signers = [me, ...extra.map((e) => e.addr).filter(Boolean)];
     setBusy(true);
     try {
       await enableMultisig(adminLogic, signers, { logicSet, initialized, selfOwned });
@@ -293,13 +303,14 @@ function EnablePanel({
             </Badge>
           </div>
           {extra.map((a, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <Input
-                value={a}
-                onChange={(e) =>
-                  setExtra((prev) => prev.map((x, idx) => (idx === i ? e.target.value : x)))
+            <div key={i} className="flex items-start gap-2">
+              <AddressInput
+                value={a.text}
+                resolved={a.addr}
+                onChange={(text, addr) =>
+                  setExtra((prev) => prev.map((x, idx) => (idx === i ? { text, addr } : x)))
                 }
-                placeholder="0x… additional signer address"
+                placeholder="0x… address or username"
                 className="font-mono text-xs"
               />
               <Button
@@ -315,7 +326,7 @@ function EnablePanel({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setExtra((prev) => [...prev, ""])}
+            onClick={() => setExtra((prev) => [...prev, { text: "", addr: "" }])}
             className="gap-1.5"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -391,6 +402,7 @@ function SignersTab({ wallet }: { wallet: UserWallet }) {
   const needed = votesNeeded(signerCount, config.defaultThresholdBps || 6000);
 
   const [newSigner, setNewSigner] = useState("");
+  const [newSignerAddr, setNewSignerAddr] = useState("");
   const [targetM, setTargetM] = useState<number | null>(null);
   const [busy, setBusy] = useState<string>("");
 
@@ -412,19 +424,20 @@ function SignersTab({ wallet }: { wallet: UserWallet }) {
 
   const doAdd = async () => {
     if (!guard()) return;
-    if (strip0x(newSigner).length !== 40) {
-      toast.error("Enter a valid address");
+    if (strip0x(newSignerAddr).length !== 40) {
+      toast.error("Enter a valid address or username");
       return;
     }
-    if (signers.some((s) => eq(s, newSigner))) {
+    if (signers.some((s) => eq(s, newSignerAddr))) {
       toast.error("Already a signer");
       return;
     }
     setBusy("add");
     try {
-      await addSigner(newSigner);
+      await addSigner(newSignerAddr);
       toast.success("Vote cast to add signer", { description: "Executes once the threshold is met." });
       setNewSigner("");
+      setNewSignerAddr("");
       invalidate();
     } catch (err: any) {
       toast.error("Failed", { description: String(err?.message || err) });
@@ -553,12 +566,16 @@ function SignersTab({ wallet }: { wallet: UserWallet }) {
       {/* Add signer */}
       <div className="space-y-2">
         <Label htmlFor="new-signer">Add a signer</Label>
-        <div className="flex items-center gap-2">
-          <Input
+        <div className="flex items-start gap-2">
+          <AddressInput
             id="new-signer"
             value={newSigner}
-            onChange={(e) => setNewSigner(e.target.value)}
-            placeholder="0x… signer address"
+            resolved={newSignerAddr}
+            onChange={(text, addr) => {
+              setNewSigner(text);
+              setNewSignerAddr(addr);
+            }}
+            placeholder="0x… address or username"
             className="font-mono text-xs"
           />
           <Button onClick={doAdd} disabled={busy !== "" || !canSubmit || !iAmSigner || !newSigner.trim()}>
@@ -586,8 +603,15 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
   const { data: signers = [] } = useSigners(wallet.address);
   const { data: issues = [], isLoading } = useOpenIssues(wallet.address);
   const tokenMeta = useTokenMeta(wallet.address);
-  const { castVote, addSigner, removeSigner, swapSigner, setDefaultThreshold, proposeTransfer } =
-    useMultisigActions({ walletAddress: wallet.address });
+  const {
+    castVote,
+    addSigner,
+    removeSigner,
+    swapSigner,
+    setDefaultThreshold,
+    dismissIssue,
+    proposeTransfer,
+  } = useMultisigActions({ walletAddress: wallet.address });
 
   const me = strip0x(userAddress ?? "");
   const iAmSigner = signers.some((s) => eq(s, me));
@@ -639,6 +663,19 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
     }
   };
 
+  const dismiss = async (issue: OpenIssue) => {
+    setBusy(`${issue.issueId}:dismiss`);
+    try {
+      await dismissIssue(issue.issueId);
+      toast.success("Issue dismissed");
+      invalidate();
+    } catch (err: any) {
+      toast.error("Dismiss failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy("");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -682,6 +719,14 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
         const count = issue.voters.length;
         const iVoted = issue.voters.some((v) => eq(v, me));
         const pct = needed > 0 ? Math.min(100, (count / needed) * 100) : 0;
+        // Mirrors the contract's dismissIssue gate: a single vote, cast by the caller.
+        const canDismiss = count === 1 && eq(issue.voters[0], me);
+        const dismissHint =
+          count !== 1
+            ? "Only issues with a single vote can be dismissed"
+            : !canDismiss
+              ? "Only the proposer can dismiss this issue"
+              : "Withdraw this issue before anyone else votes on it";
         return (
           <div key={issue.issueId} className="rounded-lg border border-border p-3">
             <div className="flex items-start justify-between gap-3">
@@ -694,22 +739,35 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
                   {shortenHex(issue.issueId, 8, 6)}
                 </div>
               </div>
-              <Button
-                size="sm"
-                onClick={() => vote(issue)}
-                disabled={busy !== "" || !canSubmit || !iAmSigner || iVoted}
-                className="shrink-0"
-              >
-                {iVoted ? (
-                  <span className="inline-flex items-center gap-1">
-                    <Check className="h-3.5 w-3.5" /> Voted
-                  </span>
-                ) : busy === issue.issueId ? (
-                  "Voting…"
-                ) : (
-                  "Vote"
-                )}
-              </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                {iAmSigner ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => dismiss(issue)}
+                    disabled={busy !== "" || !canSubmit || !canDismiss}
+                    title={dismissHint}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    {busy === `${issue.issueId}:dismiss` ? "Dismissing…" : "Dismiss"}
+                  </Button>
+                ) : null}
+                <Button
+                  size="sm"
+                  onClick={() => vote(issue)}
+                  disabled={busy !== "" || !canSubmit || !iAmSigner || iVoted}
+                >
+                  {iVoted ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Check className="h-3.5 w-3.5" /> Voted
+                    </span>
+                  ) : busy === issue.issueId ? (
+                    "Voting…"
+                  ) : (
+                    "Vote"
+                  )}
+                </Button>
+              </div>
             </div>
             <div className="mt-3">
               <Progress value={pct} className="h-1.5" />
@@ -752,6 +810,7 @@ function ProposeIssueForm({
   const [selectedFunc, setSelectedFunc] = useState("");
   const [manualFunc, setManualFunc] = useState("");
   const [abiArgs, setAbiArgs] = useState<Record<string, string>>({});
+  const [abiArgAddrs, setAbiArgAddrs] = useState<Record<string, string>>({});
   const [manualArgs, setManualArgs] = useState<string[]>([""]);
   const [busy, setBusy] = useState(false);
 
@@ -796,6 +855,7 @@ function ProposeIssueForm({
     if (useAbi && selectedFunc) {
       return abiFuncArgs.map((a) => {
         const v = (abiArgs[a.name] ?? "").trim();
+        if (isPlainAddressType(a.type)) return strip0x(abiArgAddrs[a.name] || v);
         return /address/i.test(a.type) ? strip0x(v) : v;
       });
     }
@@ -807,6 +867,7 @@ function ProposeIssueForm({
     setSelectedFunc("");
     setManualFunc("");
     setAbiArgs({});
+    setAbiArgAddrs({});
     setManualArgs([""]);
     setManualMode(false);
   };
@@ -924,15 +985,29 @@ function ProposeIssueForm({
           abiFuncArgs.length === 0 ? (
             <p className="text-xs text-muted-foreground">This function takes no arguments.</p>
           ) : (
-            abiFuncArgs.map((a) => (
-              <Input
-                key={a.name}
-                placeholder={`${a.name} (${a.type})`}
-                value={abiArgs[a.name] ?? ""}
-                onChange={(e) => setAbiArgs((prev) => ({ ...prev, [a.name]: e.target.value }))}
-                className="font-mono text-xs"
-              />
-            ))
+            abiFuncArgs.map((a) =>
+              isPlainAddressType(a.type) ? (
+                <AddressInput
+                  key={a.name}
+                  value={abiArgs[a.name] ?? ""}
+                  resolved={abiArgAddrs[a.name] ?? ""}
+                  onChange={(text, addr) => {
+                    setAbiArgs((prev) => ({ ...prev, [a.name]: text }));
+                    setAbiArgAddrs((prev) => ({ ...prev, [a.name]: addr }));
+                  }}
+                  placeholder={`${a.name} (${a.type})`}
+                  className="font-mono text-xs"
+                />
+              ) : (
+                <Input
+                  key={a.name}
+                  placeholder={`${a.name} (${a.type})`}
+                  value={abiArgs[a.name] ?? ""}
+                  onChange={(e) => setAbiArgs((prev) => ({ ...prev, [a.name]: e.target.value }))}
+                  className="font-mono text-xs"
+                />
+              )
+            )
           )
         ) : (
           <>
@@ -1300,14 +1375,10 @@ function ProposeTransferForm({
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
   const [recipientAddress, setRecipientAddress] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [busy, setBusy] = useState(false);
   const token = tokens.find((t) => t.symbol === symbol);
 
-  const searchTerm = isAddressLike(recipient) ? "" : recipient;
-  const { data: matches } = useUserSearch(searchTerm);
-  const suggestions = useMemo(() => (matches ?? []).slice(0, 6), [matches]);
-  const resolvedTo = isAddressLike(recipient) ? strip0x(recipient) : recipientAddress;
+  const resolvedTo = recipientAddress;
 
   const propose = async () => {
     if (!iAmSigner) {
@@ -1370,47 +1441,16 @@ function ProposeTransferForm({
       ) : null}
 
       {/* Recipient */}
-      <div className="relative space-y-1">
-        <Input
-          placeholder="Recipient address or username"
-          autoComplete="off"
-          value={recipient}
-          onChange={(e) => {
-            const v = e.target.value;
-            setRecipient(v);
-            setRecipientAddress(isAddressLike(v) ? strip0x(v) : "");
-            setShowSuggestions(true);
-          }}
-          onFocus={() => setShowSuggestions(true)}
-          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-          className="font-mono text-xs"
-        />
-        {showSuggestions && suggestions.length > 0 ? (
-          <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
-            {suggestions.map((u) => (
-              <button
-                type="button"
-                key={u.address}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  setRecipient(u.username);
-                  setRecipientAddress(u.address);
-                  setShowSuggestions(false);
-                }}
-                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
-              >
-                <span className="font-medium">{u.username}</span>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {shortenHex(u.address)}
-                </span>
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {recipientAddress && !isAddressLike(recipient) ? (
-          <p className="font-mono text-xs text-muted-foreground">→ {recipientAddress}</p>
-        ) : null}
-      </div>
+      <AddressInput
+        value={recipient}
+        resolved={recipientAddress}
+        onChange={(text, addr) => {
+          setRecipient(text);
+          setRecipientAddress(addr);
+        }}
+        placeholder="Recipient address or username"
+        className="font-mono text-xs"
+      />
 
       <TokenAmount
         tokens={tokens}

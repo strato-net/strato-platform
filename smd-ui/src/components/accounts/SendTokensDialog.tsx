@@ -25,15 +25,11 @@ import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { useMyTokens } from "@/services/tokens";
 import { useMyUserWallets } from "@/services/userWallets";
-import { useUserSearch } from "@/services/accounts";
+import { AddressInput } from "@/components/AddressInput";
 import { shortenHex } from "@/lib/utils";
 
 const DIRECT = "direct";
 const PERCENTS = [25, 50, 75, 100] as const;
-
-function isAddressLike(s: string): boolean {
-  return /^(0x)?[0-9a-fA-F]{40}$/.test(s.trim());
-}
 
 export function SendTokensDialog({ disabled }: { disabled?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -62,24 +58,15 @@ export function SendTokensDialog({ disabled }: { disabled?: boolean }) {
     if (!tokens.some((t) => t.symbol === symbol)) setSymbol(tokens[0].symbol);
   }, [tokens, symbol]);
 
-  // Recipient: free text that's either an address or a username to search.
+  // Recipient: free text that's either an address or a username to resolve.
   const [recipient, setRecipient] = useState("");
   const [recipientAddress, setRecipientAddress] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const searchTerm = isAddressLike(recipient) ? "" : recipient;
-  const { data: userMatches } = useUserSearch(searchTerm);
 
   const [amount, setAmount] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<{ to?: string; amount?: string }>({});
 
-  const resolvedTo = isAddressLike(recipient) ? recipient.replace(/^0x/, "") : recipientAddress;
-
-  const onPickUser = (u: { username: string; address: string }) => {
-    setRecipient(u.username);
-    setRecipientAddress(u.address);
-    setShowSuggestions(false);
-  };
+  const resolvedTo = recipientAddress;
 
   const setPercent = (pct: number) => {
     if (!token) return;
@@ -143,8 +130,6 @@ export function SendTokensDialog({ disabled }: { disabled?: boolean }) {
     }
   };
 
-  const suggestions = useMemo(() => (userMatches ?? []).slice(0, 6), [userMatches]);
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -195,44 +180,19 @@ export function SendTokensDialog({ disabled }: { disabled?: boolean }) {
           </div>
 
           {/* Recipient with username autocomplete */}
-          <div className="relative space-y-2">
+          <div className="space-y-2">
             <Label htmlFor="toAddress">Recipient address or username</Label>
-            <Input
+            <AddressInput
               id="toAddress"
               placeholder="0x… or username"
-              autoComplete="off"
               value={recipient}
-              onChange={(e) => {
-                const v = e.target.value;
-                setRecipient(v);
-                setRecipientAddress(isAddressLike(v) ? v.replace(/^0x/, "") : "");
-                setShowSuggestions(true);
+              resolved={recipientAddress}
+              onChange={(text, addr) => {
+                setRecipient(text);
+                setRecipientAddress(addr);
                 setError((er) => ({ ...er, to: undefined }));
               }}
-              onFocus={() => setShowSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             />
-            {showSuggestions && suggestions.length > 0 ? (
-              <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
-                {suggestions.map((u) => (
-                  <button
-                    type="button"
-                    key={u.address}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => onPickUser(u)}
-                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
-                  >
-                    <span className="font-medium">{u.username}</span>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {shortenHex(u.address)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {recipientAddress && !isAddressLike(recipient) ? (
-              <p className="font-mono text-xs text-muted-foreground">→ {recipientAddress}</p>
-            ) : null}
             {error.to ? <p className="text-xs text-destructive">{error.to}</p> : null}
           </div>
 

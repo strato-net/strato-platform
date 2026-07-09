@@ -54,7 +54,8 @@ import UnliftIO
 
 getContracts ::
   ( MonadIO m,
-    A.Selectable AccountsFilterParams [AddressStateRef] m -- ,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable ProxyFilterParams [(AddressStateRef, String)] m
   ) =>
   Maybe Text ->
   Maybe Integer ->
@@ -86,8 +87,28 @@ getContracts mName mOffset mLimit = do
           _qaLimit = Nothing    -- No limit - get all records
         }
 
+  -- Also include proxy contracts that delegate to instances of a matching
+  -- contract, grouped under the target contract's name (e.g. searching
+  -- "AdminRegistry" also returns 0x100c, the proxy in front of it).
+  proxyRefs <-
+    case mName of
+      Nothing -> pure []
+      Just _ ->
+        fromMaybe []
+          <$> A.select
+            (A.Proxy @[(AddressStateRef, String)])
+            proxyFilterParams {_qpTargetSearch = mName}
+
   -- Group by contract name to get unique contracts
-  allContractsMap <- addressesToMap allAddrStateRefs
+  namedContractsMap <- addressesToMap allAddrStateRefs
+  allContractsMap <-
+    foldrM
+      ( \(asr, targetName) m -> do
+          ts <- liftIO getCurrentTime
+          pure $ Map.insertWith (++) (Text.pack targetName) [addressToVal ts (addressStateRefAddress asr)] m
+      )
+      namedContractsMap
+      proxyRefs
   let allContractNames = Map.keys allContractsMap
       sortedContractNames = sort allContractNames
 
