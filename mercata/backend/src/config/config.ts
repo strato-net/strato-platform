@@ -135,12 +135,12 @@ export const defaultStratoTokenFor: Record<string, string> = {
 
 export const defaultStratoStakingFor: Record<string, string> = {
   "114784819836269": "d6726e06c3c71a3bad80b5eb6925707a31729b81", // Helium testnet
-  "33056204878082667": "", // Upquark mainnet
+  "33056204878082667": "f30a022ce83bed7adeafc286c719388dcc3b3988", // Upquark mainnet
 };
 
 export const defaultValidatorRegistryFor: Record<string, string> = {
   "114784819836269": "bfbb75bb6bd0bafa2f5c5b735fe518ade76808dd", // Helium testnet
-  "33056204878082667": "", // Upquark mainnet
+  "33056204878082667": "d190674c0923a4646746b298037507bb9fc1057f", // Upquark mainnet
 };
 
 export const defaultMetalForgeFor: Record<string, string> = {
