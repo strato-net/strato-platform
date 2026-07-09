@@ -103,9 +103,16 @@ const baseClient = (
       getRows: async (table, params) => {
         calls.push({ table, params });
         if (table === "/event") {
+          const blockEq =
+            typeof params?.block_number === "string" && params.block_number.startsWith("eq.")
+              ? params.block_number.slice(3)
+              : undefined;
+          const filteredRows = blockEq
+            ? eventRows.filter((row) => String(row.block_number) === blockEq)
+            : eventRows;
           const offset = Number(params?.offset || 0);
-          const limit = Number(params?.limit || eventRows.length);
-          return eventRows.slice(offset, offset + limit) as any[];
+          const limit = Number(params?.limit || filteredRows.length);
+          return filteredRows.slice(offset, offset + limit) as any[];
         }
         return [{ table }] as any[];
       },
@@ -180,6 +187,7 @@ test("snapshot-backed client delegates non-event tables to base client", async (
 });
 
 test("snapshot-backed client refreshes block files before withdrawal candidate queries", async () => {
+  process.env.WAS_EVENT_SNAPSHOT_LATEST_BLOCK = "3";
   const snapshotDir = makeSnapshot([
     transfer("10", "1", "tx1"),
   ]);
@@ -189,37 +197,43 @@ test("snapshot-backed client refreshes block files before withdrawal candidate q
   ]);
   const wrapped = createSnapshotBackedCirrusClient(client, config(snapshotDir));
 
-  await wrapped.getRows<any>("/BlockApps-MercataBridge-withdrawals");
-  const rows = await wrapped.getRows<CirrusEventRow>("/event", {
-    block_number: "gt.1",
-    limit: 10,
-  });
-  const manifest = JSON.parse(
-    readFileSync(join(snapshotDir, "manifest.json"), "utf8"),
-  );
+  try {
+    await wrapped.getRows<any>("/BlockApps-MercataBridge-withdrawals");
+    const rows = await wrapped.getRows<CirrusEventRow>("/event", {
+      block_number: "gt.1",
+      limit: 10,
+    });
+    const manifest = JSON.parse(
+      readFileSync(join(snapshotDir, "manifest.json"), "utf8"),
+    );
 
-  assert.deepEqual(calls.map((call) => call.table), [
-    "/event",
-    "/event",
-    "/event",
-    "/event",
-    "/BlockApps-MercataBridge-withdrawals",
-  ]);
-  assert.equal(calls[0].params.block_number, "gt.1");
-  assert.deepEqual(rows.map((row) => row.transaction_hash), ["tx2", "tx3"]);
-  assert.equal(manifest.highestBlock, "3");
-  assert.equal(manifest.totalRows, 3);
-  assert.deepEqual(
-    manifest.files.map((file: any) => file.file),
-    [
-      "1-10000/1-1000/1-100/1-10/block-1.jsonl",
-      "1-10000/1-1000/1-100/1-10/block-2.jsonl",
-      "1-10000/1-1000/1-100/1-10/block-3.jsonl",
-    ],
-  );
+    assert.deepEqual(calls.map((call) => call.table), [
+      "/event",
+      "/event",
+      "/BlockApps-MercataBridge-withdrawals",
+    ]);
+    assert.deepEqual(
+      calls.slice(0, 2).map((call) => call.params.block_number),
+      ["eq.2", "eq.3"],
+    );
+    assert.deepEqual(rows.map((row) => row.transaction_hash), ["tx2", "tx3"]);
+    assert.equal(manifest.highestBlock, "3");
+    assert.equal(manifest.totalRows, 3);
+    assert.deepEqual(
+      manifest.files.map((file: any) => file.file),
+      [
+        "1-10000/1-1000/1-100/1-10/block-1.jsonl",
+        "1-10000/1-1000/1-100/1-10/block-2.jsonl",
+        "1-10000/1-1000/1-100/1-10/block-3.jsonl",
+      ],
+    );
+  } finally {
+    delete process.env.WAS_EVENT_SNAPSHOT_LATEST_BLOCK;
+  }
 });
 
 test("snapshot-backed client resolves snapshot roots and renames after append", async () => {
+  process.env.WAS_EVENT_SNAPSHOT_LATEST_BLOCK = "2";
   const snapshotRoot = mkdtempSync(join(tmpdir(), "was-event-snapshot-root-"));
   const snapshotDir = join(snapshotRoot, "snapshot-1");
   mkdirSync(snapshotDir);
@@ -231,22 +245,63 @@ test("snapshot-backed client resolves snapshot roots and renames after append", 
   ]);
   const wrapped = createSnapshotBackedCirrusClient(client, config(snapshotRoot));
 
-  await wrapped.getRows<any>("/BlockApps-StratoNativeBridge-withdrawals");
-  const nextSnapshotDir = join(snapshotRoot, "snapshot-2");
-  const manifest = JSON.parse(
-    readFileSync(join(nextSnapshotDir, "manifest.json"), "utf8"),
-  );
+  try {
+    await wrapped.getRows<any>("/BlockApps-StratoNativeBridge-withdrawals");
+    const nextSnapshotDir = join(snapshotRoot, "snapshot-2");
+    const manifest = JSON.parse(
+      readFileSync(join(nextSnapshotDir, "manifest.json"), "utf8"),
+    );
 
-  assert.equal(existsSync(snapshotDir), false);
-  assert.equal(
-    existsSync(join(nextSnapshotDir, "1-10000/1-1000/1-100/1-10/block-2.jsonl")),
-    true,
+    assert.equal(existsSync(snapshotDir), false);
+    assert.equal(
+      existsSync(join(nextSnapshotDir, "1-10000/1-1000/1-100/1-10/block-2.jsonl")),
+      true,
+    );
+    assert.equal(manifest.highestBlock, "2");
+    assert.equal(manifest.totalRows, 2);
+  } finally {
+    delete process.env.WAS_EVENT_SNAPSHOT_LATEST_BLOCK;
+  }
+});
+
+test("snapshot-backed client skips implausible latest snapshot manifests", async () => {
+  const snapshotRoot = mkdtempSync(join(tmpdir(), "was-event-snapshot-root-"));
+  const validSnapshotDir = join(snapshotRoot, "snapshot-1");
+  const invalidSnapshotDir = join(snapshotRoot, "snapshot-2");
+  mkdirSync(validSnapshotDir);
+  mkdirSync(invalidSnapshotDir);
+  writeSnapshot(validSnapshotDir, [
+    transfer("10", "1", "tx1"),
+  ]);
+  writeFileSync(
+    join(invalidSnapshotDir, "manifest.json"),
+    JSON.stringify(
+      {
+        totalRows: 10,
+        highestBlock: "2",
+        files: Array.from({ length: 4 }, (_, index) => ({
+          block: String(index),
+          file: `missing-${index}.jsonl`,
+          rowCount: 1,
+        })),
+      },
+      null,
+      2,
+    ),
   );
-  assert.equal(manifest.highestBlock, "2");
-  assert.equal(manifest.totalRows, 2);
+  const { client } = baseClient();
+  const wrapped = createSnapshotBackedCirrusClient(client, config(snapshotRoot));
+
+  const rows = await wrapped.getRows<CirrusEventRow>("/event", {
+    block_number: "eq.1",
+    transaction_hash: "eq.tx1",
+  });
+
+  assert.deepEqual(rows.map((row) => row.transaction_hash), ["tx1"]);
 });
 
 test("snapshot-backed client stores appended block files in nested range folders", async () => {
+  process.env.WAS_EVENT_SNAPSHOT_LATEST_BLOCK = "201";
   const snapshotDir = makeSnapshot([
     transfer("10", "100", "tx100"),
   ]);
@@ -257,27 +312,31 @@ test("snapshot-backed client stores appended block files in nested range folders
   ]);
   const wrapped = createSnapshotBackedCirrusClient(client, config(snapshotDir));
 
-  await wrapped.getRows<any>("/BlockApps-MercataBridge-withdrawals");
-  const manifest = JSON.parse(
-    readFileSync(join(snapshotDir, "manifest.json"), "utf8"),
-  );
+  try {
+    await wrapped.getRows<any>("/BlockApps-MercataBridge-withdrawals");
+    const manifest = JSON.parse(
+      readFileSync(join(snapshotDir, "manifest.json"), "utf8"),
+    );
 
-  assert.deepEqual(
-    manifest.files.map((file: any) => file.file),
-    [
-      "1-10000/1-1000/1-100/91-100/block-100.jsonl",
-      "1-10000/1-1000/101-200/101-110/block-101.jsonl",
-      "1-10000/1-1000/101-200/191-200/block-200.jsonl",
-      "1-10000/1-1000/201-300/201-210/block-201.jsonl",
-    ],
-  );
-  assert.equal(
-    existsSync(join(snapshotDir, "1-10000/1-1000/101-200/101-110/block-101.jsonl")),
-    true,
-  );
-  assert.equal(
-    existsSync(join(snapshotDir, "1-10000/1-1000/201-300/201-210/block-201.jsonl")),
-    true,
-  );
+    assert.deepEqual(
+      manifest.files.map((file: any) => file.file),
+      [
+        "1-10000/1-1000/1-100/91-100/block-100.jsonl",
+        "1-10000/1-1000/101-200/101-110/block-101.jsonl",
+        "1-10000/1-1000/101-200/191-200/block-200.jsonl",
+        "1-10000/1-1000/201-300/201-210/block-201.jsonl",
+      ],
+    );
+    assert.equal(
+      existsSync(join(snapshotDir, "1-10000/1-1000/101-200/101-110/block-101.jsonl")),
+      true,
+    );
+    assert.equal(
+      existsSync(join(snapshotDir, "1-10000/1-1000/201-300/201-210/block-201.jsonl")),
+      true,
+    );
+  } finally {
+    delete process.env.WAS_EVENT_SNAPSHOT_LATEST_BLOCK;
+  }
 });
 
