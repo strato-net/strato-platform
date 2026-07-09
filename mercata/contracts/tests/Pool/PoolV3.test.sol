@@ -267,43 +267,36 @@ contract Describe_PoolV3 is Authorizable {
 
         thrown = false;
         try {
-            stranger.do(address(factory), "setLpSharePercent", 5000);
+            stranger.do(address(factory), "setPoolFeeProtocol", poolAddress, 6, 6);
         } catch {
             thrown = true;
         }
-        require(thrown, "Non-owner setLpSharePercent should revert");
+        require(thrown, "Non-owner setPoolFeeProtocol should revert");
     }
 
-    function it_factory_lp_share_bounds_and_pool_override() {
+    function it_factory_fee_protocol_bounds_and_pool_setting() {
+        // CANONICAL setFeeProtocol bounds: each direction 0, or in [4, 10]
         bool thrown = false;
         try {
-            factory.setLpSharePercent(0);
+            factory.setPoolFeeProtocol(poolAddress, 3, 3);
         } catch {
             thrown = true;
         }
-        require(thrown, "Factory LP share 0 should revert");
+        require(thrown, "feeProtocol below 4 should revert");
 
         thrown = false;
         try {
-            factory.setLpSharePercent(10001);
+            factory.setPoolFeeProtocol(poolAddress, 11, 0);
         } catch {
             thrown = true;
         }
-        require(thrown, "Factory LP share > 100% should revert");
+        require(thrown, "feeProtocol above 10 should revert");
 
-        // Pool-specific override, then reset to factory default
-        factory.setPoolLpSharePercent(poolAddress, 5000);
-        require(pool.lpSharePercent() == 5000, "Pool LP share override failed");
-        factory.setPoolLpSharePercent(poolAddress, 0);
-        require(pool.lpSharePercent() == 0, "Pool LP share reset failed");
-
-        thrown = false;
-        try {
-            factory.setPoolLpSharePercent(poolAddress, 10001);
-        } catch {
-            thrown = true;
-        }
-        require(thrown, "Pool LP share > 100% should revert");
+        // Set per-direction denominators, read back the canonical packed form, reset
+        factory.setPoolFeeProtocol(poolAddress, 6, 8);
+        require(pool.feeProtocol() == 6 + (8 << 4), "Packed feeProtocol mismatch: " + string(pool.feeProtocol()));
+        factory.setPoolFeeProtocol(poolAddress, 0, 0);
+        require(pool.feeProtocol() == 0, "feeProtocol reset failed");
     }
 
     function it_factory_initialize_only_once() {
@@ -314,12 +307,12 @@ contract Describe_PoolV3 is Authorizable {
             thrown = true;
         }
         require(thrown, "Re-initialize should revert");
-        require(factory.lpSharePercent() == 7000, "Factory state must be unchanged");
+        require(factory.feeTiers(3000) == 60, "Factory state must be unchanged");
     }
 
     function it_factory_create_requires_initialization() {
         // setTokenFactory + enableFeeTier alone must not be enough to mint pools:
-        // an uninitialized factory has feeCollector == 0 and every swap would revert
+        // an uninitialized factory has feeCollector == 0 and must not create pools
         PoolV3Factory bare = new PoolV3Factory(address(this));
         bare.setTokenFactory(address(m.tokenFactory()));
         bare.enableFeeTier(40, 60);
@@ -681,17 +674,45 @@ contract Describe_PoolV3 is Authorizable {
             "Recipient should receive the canonical output");
     }
 
-    function it_swap_sends_protocol_fee_to_collector() {
+    function it_protocol_fee_accrues_and_collects() {
+        // CANONICAL: feeProtocol 6 takes 1/6 of each step's fee; the rest is LP fee growth.
+        // Total fee = 0.3% of 100e18 = 3e17; protocol delta = 3e17 / 6 = 5e16 exactly
+        // (poolv3_reference.py: protocol0 = 50000000000000000, lpOwed0 = 249999999999999999)
+        factory.setPoolFeeProtocol(poolAddress, 6, 6);
         _mintRange(-6000, 6000, 100000e18);
-
-        address collector = factory.feeCollector();
-        uint collectorBefore = ERC20(token0Address).balanceOf(collector);
 
         _swap(true, 100e18);
 
-        // CANONICAL fee split: total fee 0.3% of 100e18; protocol share 30% = 0.09e18 exactly
-        uint protocolFee = ERC20(token0Address).balanceOf(collector) - collectorBefore;
-        require(protocolFee == 90000000000000000, "Protocol fee mismatch: " + string(protocolFee));
+        require(pool.protocolFees0() == 50000000000000000, "Protocol fee mismatch: " + string(pool.protocolFees0()));
+        require(pool.protocolFees1() == 0, "No token1 protocol fee expected");
+
+        // LP fee growth accrues only the remainder
+        pool.burn(-6000, 6000, 0, block.timestamp + DEADLINE_OFFSET);
+        (, uint owed0, ) = pool.getPosition(address(this), -6000, 6000);
+        require(owed0 == 249999999999999999, "LP fee owed mismatch: " + string(owed0));
+
+        // CANONICAL collectProtocol via the factory: min semantics, pays the feeCollector,
+        // and a full drain leaves 1 wei accrued (canonical slot-clearing gas trick)
+        address collector = factory.feeCollector();
+        uint collectorBefore = ERC20(token0Address).balanceOf(collector);
+        (uint got0, uint got1) = factory.collectPoolProtocol(poolAddress, BIG, BIG);
+        require(got0 == 50000000000000000 - 1, "Full drain should leave 1 wei: " + string(got0));
+        require(got1 == 0, "No token1 protocol fee to collect");
+        require(pool.protocolFees0() == 1, "1 wei should remain accrued");
+        require(ERC20(token0Address).balanceOf(collector) == collectorBefore + got0, "Collector should be paid");
+        require(ERC20(token0Address).balanceOf(address(pool)) == pool.token0Balance(), "Tracked balance out of sync");
+    }
+
+    function it_protocol_fee_split_per_direction() {
+        // feeProtocol0 = 4 on token0 input only; token1-input swaps accrue nothing
+        factory.setPoolFeeProtocol(poolAddress, 4, 0);
+        _mintRange(-6000, 6000, 100000e18);
+
+        _swap(true, 100e18);
+        require(pool.protocolFees0() == 75000000000000000, "1/4 of 3e17 expected: " + string(pool.protocolFees0()));
+
+        _swap(false, 100e18);
+        require(pool.protocolFees1() == 0, "token1 direction is off");
     }
 
     function it_swap_crosses_tick_and_drops_liquidity() {
@@ -812,18 +833,14 @@ contract Describe_PoolV3 is Authorizable {
         _mintRange(-300, -180, 300000e18);
         require(pool.liquidity() == 100000e18, "Only [-60,60) should start active");
 
-        address collector = factory.feeCollector();
-        uint collectorBefore = ERC20(token0Address).balanceOf(collector);
-
         // CANONICAL: crossing -60 and -180, finishing at tick -213 in the deepest range
         uint amountOut = _swap(true, 2000e18);
         require(amountOut == 1969258559869827750472, "Staircase-down output mismatch: " + string(amountOut));
         require(pool.currentTick() == -213, "Final tick should be -213, got " + string(pool.currentTick()));
         require(pool.liquidity() == 300000e18, "Only the deepest range should be active");
 
-        // Protocol fee: 30% of 0.3% of 2000e18 = 1.8e18 (per-step rounding may add wei dust)
-        uint protocolFee = ERC20(token0Address).balanceOf(collector) - collectorBefore;
-        require(protocolFee >= 18e17 - 5 && protocolFee <= 18e17 + 10, "Protocol fee wrong: " + string(protocolFee));
+        // CANONICAL default: feeProtocol == 0, nothing accrues to the protocol
+        require(pool.protocolFees0() == 0, "No protocol fee should accrue by default");
     }
 
     function it_swap_multi_tick_staircase_up() {
@@ -1000,9 +1017,9 @@ contract Describe_PoolV3 is Authorizable {
         pool.burn(-6000, 6000, 0, block.timestamp + DEADLINE_OFFSET);
         (uint posLiquidity, uint owed0, uint owed1) = pool.getPosition(address(this), -6000, 6000);
         require(posLiquidity == 100000e18, "Position liquidity wrong");
-        // CANONICAL (platform fee routing): LP share = 70% of 0.3% of 100e18, floored via
-        // Q128 fee growth = 209999999999999999
-        require(owed0 == 209999999999999999, "LP fee owed mismatch: " + string(owed0));
+        // CANONICAL (feeProtocol = 0 default): the full 0.3% fee on 100e18 accrues to the LP,
+        // floored via Q128 fee growth = 299999999999999999 (poolv3_reference.py)
+        require(owed0 == 299999999999999999, "LP fee owed mismatch: " + string(owed0));
         require(owed1 == 0, "No token1 fees expected");
 
         uint bal0Before = ERC20(token0Address).balanceOf(address(this));
@@ -1069,7 +1086,7 @@ contract Describe_PoolV3 is Authorizable {
         (, uint owed2, ) = pool.getPosition(address(u2), -6000, 6000);
 
         require(owed1 == owed2, "Equal positions must earn equal fees");
-        require(owed1 >= 105e15 - 2 && owed1 <= 105e15, "Per-user fee wrong: " + string(owed1));
+        require(owed1 >= 15e16 - 2 && owed1 <= 15e16, "Per-user fee wrong: " + string(owed1));
     }
 
     function it_fees_stop_when_position_exits_range() {
@@ -1105,8 +1122,8 @@ contract Describe_PoolV3 is Authorizable {
 
         pool.burn(-6000, 6000, 0, block.timestamp + DEADLINE_OFFSET);
         (, uint owed0, uint owed1) = pool.getPosition(address(this), -6000, 6000);
-        require(owed0 >= 21e16 - 2 && owed0 <= 21e16, "Token0 fee wrong: " + string(owed0));
-        require(owed1 >= 21e16 - 2 && owed1 <= 21e16, "Token1 fee wrong: " + string(owed1));
+        require(owed0 >= 3e17 - 2 && owed0 <= 3e17, "Token0 fee wrong: " + string(owed0));
+        require(owed1 >= 3e17 - 2 && owed1 <= 3e17, "Token1 fee wrong: " + string(owed1));
     }
 
     function it_late_lp_earns_no_prior_fees() {
@@ -1139,23 +1156,24 @@ contract Describe_PoolV3 is Authorizable {
 
         pool.burn(-6000, 6000, 0, block.timestamp + DEADLINE_OFFSET);
         (, uint owed0, ) = pool.getPosition(address(this), -6000, 6000);
-        // 5 swaps x 20e18 x 0.3% x 70%, floored per-swap via Q128 growth
-        require(owed0 >= 21e16 - 5 && owed0 <= 21e16, "Accumulated fee wrong: " + string(owed0));
+        // 5 swaps x 20e18 x 0.3%, floored per-swap via Q128 growth
+        require(owed0 >= 3e17 - 5 && owed0 <= 3e17, "Accumulated fee wrong: " + string(owed0));
     }
 
-    function it_swap_lp_share_10000_sends_no_protocol_fee() {
-        factory.setPoolLpSharePercent(poolAddress, 10000);
+    function it_default_fee_protocol_zero_accrues_nothing() {
+        // CANONICAL: feeProtocol defaults to 0 — the entire fee belongs to LPs
         _mintRange(-6000, 6000, 100000e18);
-
-        address collector = factory.feeCollector();
-        uint collectorBefore = ERC20(token0Address).balanceOf(collector);
         _swap(true, 100e18);
-        require(ERC20(token0Address).balanceOf(collector) == collectorBefore, "Collector should receive nothing");
+        require(pool.protocolFees0() == 0 && pool.protocolFees1() == 0, "No protocol fees should accrue");
 
         // The entire 0.3% fee accrues to the LP
         pool.burn(-6000, 6000, 0, block.timestamp + DEADLINE_OFFSET);
         (, uint owed0, ) = pool.getPosition(address(this), -6000, 6000);
         require(owed0 >= 3e17 - 2 && owed0 <= 3e17, "LP should earn the full fee: " + string(owed0));
+
+        // Nothing to collect
+        (uint got0, uint got1) = factory.collectPoolProtocol(poolAddress, BIG, BIG);
+        require(got0 == 0 && got1 == 0, "Nothing should be collectable");
     }
 
     function it_full_exit_after_prior_fee_history_earns_no_phantom_fees() {
@@ -1184,7 +1202,7 @@ contract Describe_PoolV3 is Authorizable {
         lp2.do(poolAddress, "collect", address(lp2), int(-600), int(600), BIG, BIG);
         _userPoke(lp1, -6000, 6000);
         (, uint lp1Owed0, ) = pool.getPosition(address(lp1), -6000, 6000);
-        require(lp1Owed0 == 209999999999999999, "LP1 fee wrong: " + string(lp1Owed0));
+        require(lp1Owed0 == 299999999999999999, "LP1 fee wrong: " + string(lp1Owed0));
         lp1.do(poolAddress, "collect", address(lp1), int(-6000), int(6000), BIG, BIG);
         require(ERC20(token0Address).balanceOf(address(pool)) == pool.token0Balance(), "Token0 sync broken");
         require(ERC20(token1Address).balanceOf(address(pool)) == pool.token1Balance(), "Token1 sync broken");
@@ -1399,8 +1417,53 @@ contract Describe_PoolV3 is Authorizable {
         require(obsIdx == pool.observationIndex(), "slot0 observationIndex mismatch");
         require(obsCard == pool.observationCardinality(), "slot0 cardinality mismatch");
         require(obsCardNext == pool.observationCardinalityNext(), "slot0 cardinalityNext mismatch");
-        require(feeProtocol_ == 0, "feeProtocol is always 0 (platform fee routing)");
+        require(feeProtocol_ == pool.feeProtocol(), "slot0 feeProtocol mismatch");
+        require(feeProtocol_ == 0, "feeProtocol should default to 0");
         require(unlocked_, "Pool should be unlocked at rest");
+    }
+
+    function it_pool_born_locked_until_initialized() {
+        // CANONICAL: pools are born locked (slot0.unlocked == false); every lock-guarded
+        // call reverts 'LOK' until initialize unlocks the pool
+        PoolV3 bare = new PoolV3(address(this));
+
+        bool thrown = false;
+        try {
+            bare.mint(address(this), -60, 60, 1e18, BIG, BIG, block.timestamp + DEADLINE_OFFSET);
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "mint before initialize should revert (LOK)");
+
+        thrown = false;
+        try {
+            bare.swap(address(this), false, int(1e18), 0, 1, block.timestamp + DEADLINE_OFFSET);
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "swap before initialize should revert (LOK)");
+
+        thrown = false;
+        try {
+            bare.increaseObservationCardinalityNext(10);
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "increaseObservationCardinalityNext before initialize should revert (LOK)");
+
+        thrown = false;
+        try {
+            bare.burn(-60, 60, 0, block.timestamp + DEADLINE_OFFSET);
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "burn before initialize should revert (LOK)");
+
+        // initialize opens the pool (canonical slot0.unlocked = true)
+        bare.initialize(token0Address, token1Address, 3000, 60, Q96, address(factory));
+        (uint sqrtP_, int tick_, uint oi_, uint oc_, uint ocn_, uint fp_, bool unlocked_) = bare.slot0();
+        require(unlocked_, "Pool should unlock at initialize");
+        require(sqrtP_ == Q96 && fp_ == 0, "Fresh pool state wrong");
     }
 
     // ============ TWAP ORACLE TESTS ============
@@ -1809,11 +1872,19 @@ contract Describe_PoolV3 is Authorizable {
 
         thrown = false;
         try {
-            stranger.do(poolAddress, "setLpSharePercent", 5000);
+            stranger.do(poolAddress, "setFeeProtocol", 6, 6);
         } catch {
             thrown = true;
         }
-        require(thrown, "Non-factory setLpSharePercent should revert");
+        require(thrown, "Non-factory setFeeProtocol should revert");
+
+        thrown = false;
+        try {
+            stranger.do(poolAddress, "collectProtocol", address(stranger), BIG, BIG);
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "Non-factory collectProtocol should revert");
 
         thrown = false;
         try {
@@ -1895,15 +1966,15 @@ contract Describe_PoolV3 is Authorizable {
         // Old factory loses admin rights over the pool
         bool thrown = false;
         try {
-            factory.setPoolLpSharePercent(poolAddress, 5000);
+            factory.setPoolFeeProtocol(poolAddress, 6, 6);
         } catch {
             thrown = true;
         }
         require(thrown, "Old factory should lose pool admin");
 
         // New factory gains them
-        factory2.setPoolLpSharePercent(poolAddress, 4000);
-        require(pool.lpSharePercent() == 4000, "New factory should administer the pool");
+        factory2.setPoolFeeProtocol(poolAddress, 4, 4);
+        require(pool.feeProtocol() == 4 + (4 << 4), "New factory should administer the pool");
 
         // The new factory adopts the pool into its registry
         factory2.registerPoolsFromFactory([poolAddress]);

@@ -2,10 +2,9 @@
 """Generate PoolV3UniswapSwaps.test.sol from Uniswap v3-core's own golden snapshots.
 
 Replays the 240 cases of v3-core/test/__snapshots__/UniswapV3Pool.swaps.spec.ts.snap
-(15 pool configs x 16 swap cases) against the SolidVM PoolV3 port. With
-lpSharePercent = 10000 the pool keeps 100%% of fees as LP fee growth, which is
-exactly canonical with feeProtocol = 0 -- the configuration the snapshots were
-generated with -- so every integer output must match bit for bit.
+(15 pool configs x 16 swap cases) against the SolidVM PoolV3 port. feeProtocol
+defaults to 0 -- the configuration the snapshots were generated with -- so 100%%
+of fees accrue as LP fee growth and every integer output must match bit for bit.
 
 Platform-divergent cases (canonical accepts an exact-input swap that produces
 zero output; the port's slippage floor rejects it) are emitted as expected
@@ -194,8 +193,8 @@ import "../../abstract/ERC20/access/Authorizable.sol";
  * 15 pool configurations x 16 swap cases = 240 cases
  * ({n_ok} exact-match, {n_err} canonical reverts, {n_platform} PLATFORM-divergent zero-output reverts).
  *
- * lpSharePercent is set to 10000 so 100% of fees accrue as LP fee growth --
- * canonical behavior with feeProtocol = 0, which the snapshots were generated with.
+ * feeProtocol is left at its default 0 -- the configuration the snapshots were
+ * generated with -- so 100% of fees accrue as LP fee growth.
  * Every amount, fee growth value, and tick asserted below is canonical's exact output.
  */
 
@@ -231,7 +230,6 @@ contract Describe_PoolV3UniswapSwaps is Authorizable {{
         Token(token0Address).mint(address(this), BIG);
         Token(token1Address).mint(address(this), BIG);
         pool = PoolV3(factory.createPoolV3(token0Address, token1Address, fee, startingPrice));
-        factory.setPoolLpSharePercent(address(pool), 10000); // canonical: feeProtocol = 0
         require(ERC20(token0Address).approve(address(pool), BIG), "approve0");
         require(ERC20(token1Address).approve(address(pool), BIG), "approve1");
     }}

@@ -187,15 +187,17 @@ def compute_swap_step(sqrt_current: int, sqrt_target: int, liq: int,
 
 class Pool:
     """Minimal exact simulator: positions, ticks, bitmap-free next-tick, swap loop,
-    platform lpShare fee routing (lpFee stays as Q128 fee growth, rest leaves)."""
+    canonical feeProtocol routing (1/x of each step's fee accrues to protocol_fees,
+    the remainder stays as Q128 fee growth)."""
 
-    def __init__(self, fee_pips: int, tick_spacing: int, sqrt_price_x96: int, lp_share_bps: int = 7000):
+    def __init__(self, fee_pips: int, tick_spacing: int, sqrt_price_x96: int,
+                 fee_protocol=(0, 0)):
         self.fee = fee_pips
         self.spacing = tick_spacing
         self.sqrt_price = sqrt_price_x96
         self.tick = get_tick_at_sqrt_ratio(sqrt_price_x96)
         self.liquidity = 0
-        self.lp_share_bps = lp_share_bps
+        self.fee_protocol = fee_protocol  # (1/x token0-input, 1/x token1-input); 0 = off
         self.ticks = {}  # tick -> [gross, net]
         self.fee_growth_global = [0, 0]  # Q128 per token
         self.protocol_fees = [0, 0]
@@ -250,10 +252,13 @@ class Pool:
                 remaining += step_out
                 calculated += step_in + step_fee
 
-            lp_fee = (step_fee * self.lp_share_bps) // 10000
-            self.protocol_fees[in_idx] += step_fee - lp_fee
-            if lp_fee > 0 and self.liquidity > 0:
-                self.fee_growth_global[in_idx] += (lp_fee * Q128) // self.liquidity
+            fp = self.fee_protocol[in_idx]
+            if fp > 0:
+                delta = step_fee // fp
+                step_fee -= delta
+                self.protocol_fees[in_idx] += delta
+            if self.liquidity > 0:
+                self.fee_growth_global[in_idx] += (step_fee * Q128) // self.liquidity
 
             self.sqrt_price = sqrt_after
             if sqrt_after == sqrt_next_tick:
@@ -353,12 +358,20 @@ def main():
     used, out = p.swap(True, -200 * E18)
     print("exactOut 200e18 cross: in =", used, "out =", out, "tick =", p.tick, "L =", p.liquidity)
 
-    # fee accounting reference: 100e18 exactIn at fee 3000, lpShare 7000, L=100000e18
+    # fee accounting reference: 100e18 exactIn at fee 3000, feeProtocol 0 (default), L=100000e18
     p = Pool(3000, 60, Q96)
     p.mint(-6000, 6000, 100000 * E18)
     used, out = p.swap(True, 100 * E18)
     owed = (100000 * E18 * p.fee_growth_global[0]) // Q128
-    print("fees on 100e18: protocol0 =", p.protocol_fees[0],
+    print("fees on 100e18 (feeProtocol 0): protocol0 =", p.protocol_fees[0],
+          "feeGrowth0X128 =", p.fee_growth_global[0], "lpOwed0 =", owed)
+
+    # canonical protocol fee: same swap with feeProtocol = 6 (1/6 of the fee to the protocol)
+    p = Pool(3000, 60, Q96, fee_protocol=(6, 6))
+    p.mint(-6000, 6000, 100000 * E18)
+    used, out = p.swap(True, 100 * E18)
+    owed = (100000 * E18 * p.fee_growth_global[0]) // Q128
+    print("fees on 100e18 (feeProtocol 6): protocol0 =", p.protocol_fees[0],
           "feeGrowth0X128 =", p.fee_growth_global[0], "lpOwed0 =", owed)
 
     # round trip: 10e18 down then swap the output back up

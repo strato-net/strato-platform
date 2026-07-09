@@ -36,13 +36,16 @@ import "../../libraries/PoolV3/Position.sol";
  * - Payment: approve + transferFrom (platform token model) instead of mint/swap callbacks;
  *   consequently flash() does not exist and users may call the pool directly, so mint/swap/burn
  *   carry trailing slippage/deadline parameters that canonical V3 delegates to its periphery
- * - Protocol fees: each swap's protocol share (1 - lpSharePercent) is routed immediately to the
- *   factory's feeCollector (platform convention) instead of accruing for collectProtocol;
- *   slot0().feeProtocol is therefore always 0
+ * - Protocol fees: canonical feeProtocol model (setFeeProtocol 1/x denominators per direction,
+ *   per-step accrual into protocolFees0/1, collectProtocol withdrawal). Access is the factory
+ *   or the pool owner (canonical: the factory owner); the factory's collectPoolProtocol wrapper
+ *   routes proceeds to its feeCollector
  * - Admin: initialize carries the token/fee/factory wiring (proxy pattern); pause/disable,
  *   token-active gating, sync/skim and factory migration mirror the platform's V2 Pool
  * - Guard semantics: paused blocks mint+swap (exit stays open); disabled blocks everything;
  *   inactive tokens block mint+swap but never burn/collect
+ * - Locking: as canonical, pools are born locked (slot0.unlocked == false in fresh proxied
+ *   storage) and unlock at the end of initialize, so nothing runs before initialization
  *
  * @author Mercata Protocol
  * @version 1.0.0
@@ -68,6 +71,12 @@ contract record PoolV3 is Ownable {
 
     /// @notice Emitted when the observation ring buffer growth is scheduled
     event IncreaseObservationCardinalityNext(uint observationCardinalityNextOld, uint observationCardinalityNextNew);
+
+    /// @notice Emitted when the protocol fee denominators are changed (canonical shape)
+    event SetFeeProtocol(uint feeProtocol0Old, uint feeProtocol1Old, uint feeProtocol0New, uint feeProtocol1New);
+
+    /// @notice Emitted when accrued protocol fees are withdrawn (canonical shape)
+    event CollectProtocol(address sender, address recipient, uint amount0, uint amount1);
 
     // ============ EVENTS (platform extensions, mirrors Pool.sol) ============
 
@@ -118,8 +127,17 @@ contract record PoolV3 is Ownable {
     /// @notice Global fee growth per unit of liquidity in token1, Q128
     int public feeGrowthGlobal1X128;
 
-    /// @notice Pool-specific LP share of swap fees in basis points (0 = use factory default)
-    uint public lpSharePercent;
+    /// @notice The current protocol fee as a fraction of the swap fee, represented as an
+    ///         integer denominator 1/x, packed per input direction as
+    ///         feeProtocol0 + (feeProtocol1 << 4) (canonical slot0.feeProtocol)
+    uint public feeProtocol;
+
+    /// @notice Accrued protocol fees in token0 units, withdrawn via collectProtocol
+    ///         (canonical protocolFees.token0)
+    uint public protocolFees0;
+
+    /// @notice Accrued protocol fees in token1 units (canonical protocolFees.token1)
+    uint public protocolFees1;
 
     /// @notice Tracked balance of token0 in the pool (platform extension; see sync/skim)
     uint public token0Balance;
@@ -154,16 +172,21 @@ contract record PoolV3 is Ownable {
 
     bool public isDisabled = false;
 
-    /// @notice Reentrancy guard (canonical V3 keeps this in slot0.unlocked)
-    bool private locked;
+    /// @notice Whether the pool is unlocked (canonical slot0.unlocked). Pools are born locked —
+    ///         false in fresh (proxied) storage — and unlock at the end of initialize, so no
+    ///         lock-guarded call works before initialization, as canonical
+    bool private unlocked;
 
     // ============ MODIFIERS ============
 
-    modifier nonReentrant() {
-        require(!locked, "LOK");
-        locked = true;
+    /// @dev Mutually exclusive reentrancy protection into the pool to/from a method. This
+    ///      method also prevents entrance to a function before the pool is initialized
+    ///      (canonical lock)
+    modifier lock() {
+        require(unlocked, "LOK");
+        unlocked = false;
         _;
-        locked = false;
+        unlocked = true;
     }
 
     /// @notice Modifier to check if the caller is the pool factory
@@ -203,28 +226,58 @@ contract record PoolV3 is Ownable {
         isDisabled = _isDisabled;
     }
 
-    /// @notice Set the pool-specific LP share percentage (factory only)
-    /// @param newLpSharePercent New LP share in basis points (0 = use factory default)
-    function setLpSharePercent(uint newLpSharePercent) external onlyPoolV3Factory {
-        require(newLpSharePercent <= 10000, "Invalid LP share percent");
-        lpSharePercent = newLpSharePercent;
+    /// @notice Set the denominator of the protocol's share of the swap fee (canonical setFeeProtocol)
+    /// @param feeProtocol0 New protocol fee denominator for token0-input swaps (0, or 4..10)
+    /// @param feeProtocol1 New protocol fee denominator for token1-input swaps (0, or 4..10)
+    /// @dev Callable by the factory or the pool owner (canonical: the factory owner)
+    function setFeeProtocol(uint feeProtocol0, uint feeProtocol1) external lock onlyPoolV3Factory {
+        require(
+            (feeProtocol0 == 0 || (feeProtocol0 >= 4 && feeProtocol0 <= 10)) &&
+                (feeProtocol1 == 0 || (feeProtocol1 >= 4 && feeProtocol1 <= 10))
+        );
+        uint feeProtocolOld = feeProtocol;
+        feeProtocol = feeProtocol0 + (feeProtocol1 << 4);
+        emit SetFeeProtocol(feeProtocolOld % 16, feeProtocolOld >> 4, feeProtocol0, feeProtocol1);
+    }
+
+    /// @notice Collect the protocol fee accrued to the pool (canonical collectProtocol)
+    /// @param recipient The address to which collected protocol fees should be sent
+    /// @param amount0Requested The maximum amount of token0 to send
+    /// @param amount1Requested The maximum amount of token1 to send
+    /// @return amount0 The protocol fee collected in token0
+    /// @return amount1 The protocol fee collected in token1
+    function collectProtocol(
+        address recipient,
+        uint amount0Requested,
+        uint amount1Requested
+    ) external lock onlyPoolV3Factory returns (uint amount0, uint amount1) {
+        require(recipient != address(0), "Zero recipient");
+        amount0 = amount0Requested > protocolFees0 ? protocolFees0 : amount0Requested;
+        amount1 = amount1Requested > protocolFees1 ? protocolFees1 : amount1Requested;
+
+        if (amount0 > 0) {
+            // ensure that the slot is not cleared, for gas savings (canonical; kept so
+            // collection amounts stay bit-identical to canonical's)
+            if (amount0 == protocolFees0) amount0 -= 1;
+            protocolFees0 -= amount0;
+            token0Balance -= amount0;
+            require(token0.transfer(recipient, amount0), "Token0 transfer failed");
+        }
+        if (amount1 > 0) {
+            if (amount1 == protocolFees1) amount1 -= 1;
+            protocolFees1 -= amount1;
+            token1Balance -= amount1;
+            require(token1.transfer(recipient, amount1), "Token1 transfer failed");
+        }
+
+        emit CollectProtocol(msg.sender, recipient, amount0, amount1);
+        return (amount0, amount1);
     }
 
     // ============ INTERNAL HELPERS (platform) ============
 
     function _tokenFactory() internal view returns (TokenFactory) {
         return TokenFactory(address(PoolV3Factory(address(poolV3Factory)).tokenFactory()));
-    }
-
-    function _feeCollector() internal view returns (address) {
-        return PoolV3Factory(poolV3Factory).feeCollector();
-    }
-
-    function _lpSharePercent() internal view returns (uint) {
-        if (lpSharePercent == 0) {
-            return PoolV3Factory(poolV3Factory).lpSharePercent();
-        }
-        return lpSharePercent;
     }
 
     // ============ CONSTRUCTOR ============
@@ -272,12 +325,15 @@ contract record PoolV3 is Ownable {
         observationIndex = 0;
         (observationCardinality, observationCardinalityNext) = Oracle.initialize(observations, block.timestamp);
 
+        // pools are born locked; initialization opens them (canonical slot0.unlocked = true)
+        unlocked = true;
+
         emit Initialize(initialSqrtPriceX96, currentTick);
     }
 
     /// @notice Canonical V3 slot0 view: price, tick, oracle indices, protocol fee mode, lock
-    /// @dev feeProtocol is always 0 — the protocol share routes to the factory feeCollector
-    ///      per swap (platform extension) instead of accruing for collectProtocol
+    /// @dev feeProtocol is packed per input direction as feeProtocol0 + (feeProtocol1 << 4),
+    ///      as canonical
     function slot0() external view returns (
         uint sqrtPriceX96_,
         int tick_,
@@ -287,7 +343,7 @@ contract record PoolV3 is Ownable {
         uint feeProtocol_,
         bool unlocked_
     ) {
-        return (sqrtPriceX96, currentTick, observationIndex, observationCardinality, observationCardinalityNext, 0, !locked);
+        return (sqrtPriceX96, currentTick, observationIndex, observationCardinality, observationCardinalityNext, feeProtocol, unlocked);
     }
 
     // ============ TICK MATH (public wrappers over the TickMath library) ============
@@ -359,7 +415,7 @@ contract record PoolV3 is Ownable {
     /// @notice Grow the observation ring buffer (permissionless, as in Uniswap V3)
     /// @param next The desired minimum ring size
     /// @dev The explicit bounds require replaces canonical's implicit uint16 range
-    function increaseObservationCardinalityNext(uint next) external nonReentrant {
+    function increaseObservationCardinalityNext(uint next) external lock {
         require(next > 0 && next <= MAX_CARDINALITY, "Invalid cardinality");
         uint observationCardinalityNextOld = observationCardinalityNext; // for the event
         uint observationCardinalityNextNew = Oracle.grow(observations, observationCardinalityNextOld, next);
@@ -566,7 +622,7 @@ contract record PoolV3 is Ownable {
         uint amount0Max,
         uint amount1Max,
         uint deadline
-    ) external whenNotPaused onlyActiveTokens nonReentrant returns (uint amount0, uint amount1) {
+    ) external lock whenNotPaused onlyActiveTokens returns (uint amount0, uint amount1) {
         require(recipient != address(0), "Zero recipient");
         require(amount > 0, "Invalid liquidity");
         require(block.timestamp <= deadline, "EXPIRED");
@@ -609,7 +665,7 @@ contract record PoolV3 is Ownable {
         int tickUpper,
         uint amount,
         uint deadline
-    ) external whenNotDisabled nonReentrant returns (uint amount0, uint amount1) {
+    ) external lock whenNotDisabled returns (uint amount0, uint amount1) {
         require(block.timestamp <= deadline, "EXPIRED");
 
         (int amount0Int, int amount1Int) =
@@ -653,7 +709,7 @@ contract record PoolV3 is Ownable {
         int tickUpper,
         uint amount0Requested,
         uint amount1Requested
-    ) external whenNotDisabled nonReentrant returns (uint amount0, uint amount1) {
+    ) external lock whenNotDisabled returns (uint amount0, uint amount1) {
         require(recipient != address(0), "Zero recipient");
         // we don't need to checkTicks here, because invalid positions will never have non-zero tokensOwed{0,1}
         V3Position storage pos = Position.get(positions, msg.sender, tickLower, tickUpper);
@@ -679,6 +735,8 @@ contract record PoolV3 is Ownable {
     // ============ SWAP ============
 
     struct SwapCache {
+        // the protocol fee for the input token
+        uint feeProtocol;
         // liquidity at the beginning of the swap
         uint liquidityStart;
         // the timestamp of the current block
@@ -689,8 +747,6 @@ contract record PoolV3 is Ownable {
         int secondsPerLiquidityCumulativeX128;
         // whether we've computed and cached the above two accumulators
         bool computedLatestObservation;
-        // platform: LP share of fees in basis points (canonical caches feeProtocol here)
-        uint lpShare;
     }
 
     // the top level state of the swap, the results of which are recorded in storage at the end
@@ -746,7 +802,7 @@ contract record PoolV3 is Ownable {
         uint sqrtPriceLimitX96,
         uint amountLimit,
         uint deadline
-    ) external whenNotPaused onlyActiveTokens nonReentrant returns (int amount0, int amount1) {
+    ) external lock whenNotPaused onlyActiveTokens returns (int amount0, int amount1) {
         require(amountSpecified != 0, "AS");
         require(amountLimit > 0, "Invalid amount limit");
         require(block.timestamp <= deadline, "EXPIRED");
@@ -770,7 +826,7 @@ contract record PoolV3 is Ownable {
         SwapCache memory cache;
         cache.liquidityStart = liquidity;
         cache.blockTimestamp = block.timestamp;
-        cache.lpShare = _lpSharePercent(); // platform: canonical caches feeProtocol instead
+        cache.feeProtocol = zeroForOne ? (feeProtocol % 16) : (feeProtocol >> 4);
 
         bool exactInput = amountSpecified > 0;
 
@@ -825,14 +881,16 @@ contract record PoolV3 is Ownable {
                 state.amountCalculated += int(step.amountIn + step.feeAmount);
             }
 
-            // platform fee split (canonical: feeProtocol 1/x decrement): the LP share accrues
-            // as fee growth, the remainder accrues as the protocol fee sent to the feeCollector
-            uint lpFee = (step.feeAmount * cache.lpShare) / 10000;
-            state.protocolFee += step.feeAmount - lpFee;
+            // if the protocol fee is on, calculate how much is owed, decrement feeAmount, and increment protocolFee
+            if (cache.feeProtocol > 0) {
+                uint delta = step.feeAmount / cache.feeProtocol;
+                step.feeAmount -= delta;
+                state.protocolFee += delta;
+            }
 
             // update global fee tracker
             if (state.liquidity > 0)
-                state.feeGrowthGlobalX128 += int(FullMath.mulDiv(lpFee, FixedPoint128.Q128, state.liquidity));
+                state.feeGrowthGlobalX128 += int(FullMath.mulDiv(step.feeAmount, FixedPoint128.Q128, state.liquidity));
 
             // shift tick if we reached the next price
             if (state.sqrtPriceX96 == step.sqrtPriceNextX96) {
@@ -890,11 +948,13 @@ contract record PoolV3 is Ownable {
         // update liquidity if it changed
         if (cache.liquidityStart != state.liquidity) liquidity = state.liquidity;
 
-        // update fee growth global (the protocol fee leaves the pool below instead of accruing)
+        // update fee growth global and, if necessary, protocol fees
         if (zeroForOne) {
             feeGrowthGlobal0X128 = state.feeGrowthGlobalX128;
+            if (state.protocolFee > 0) protocolFees0 += state.protocolFee;
         } else {
             feeGrowthGlobal1X128 = state.feeGrowthGlobalX128;
+            if (state.protocolFee > 0) protocolFees1 += state.protocolFee;
         }
 
         // platform settlement (canonical pays the recipient and collects via the swap callback)
@@ -915,18 +975,15 @@ contract record PoolV3 is Ownable {
         Token outputToken = zeroForOne ? token1 : token0;
 
         require(inputToken.transferFrom(msg.sender, address(this), amountInTotal), "Input transfer failed");
-        if (state.protocolFee > 0) {
-            require(inputToken.transfer(_feeCollector(), state.protocolFee), "Protocol fee transfer failed");
-        }
         require(outputToken.transfer(recipient, amountOutTotal), "Output transfer failed");
 
         if (zeroForOne) {
-            token0Balance += amountInTotal - state.protocolFee;
+            token0Balance += amountInTotal;
             token1Balance -= amountOutTotal;
             amount0 = int(amountInTotal);
             amount1 = -int(amountOutTotal);
         } else {
-            token1Balance += amountInTotal - state.protocolFee;
+            token1Balance += amountInTotal;
             token0Balance -= amountOutTotal;
             amount0 = -int(amountOutTotal);
             amount1 = int(amountInTotal);

@@ -10,8 +10,8 @@ import "../../abstract/ERC20/access/Authorizable.sol";
  * 15 pool configurations x 16 swap cases = 240 cases
  * (166 exact-match, 50 canonical reverts, 24 PLATFORM-divergent zero-output reverts).
  *
- * lpSharePercent is set to 10000 so 100% of fees accrue as LP fee growth --
- * canonical behavior with feeProtocol = 0, which the snapshots were generated with.
+ * feeProtocol is left at its default 0 -- the configuration the snapshots were
+ * generated with -- so 100% of fees accrue as LP fee growth.
  * Every amount, fee growth value, and tick asserted below is canonical's exact output.
  */
 
@@ -47,7 +47,6 @@ contract Describe_PoolV3UniswapSwaps is Authorizable {
         Token(token0Address).mint(address(this), BIG);
         Token(token1Address).mint(address(this), BIG);
         pool = PoolV3(factory.createPoolV3(token0Address, token1Address, fee, startingPrice));
-        factory.setPoolLpSharePercent(address(pool), 10000); // canonical: feeProtocol = 0
         require(ERC20(token0Address).approve(address(pool), BIG), "approve0");
         require(ERC20(token1Address).approve(address(pool), BIG), "approve1");
     }

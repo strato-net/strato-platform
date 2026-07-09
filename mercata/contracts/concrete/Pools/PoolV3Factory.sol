@@ -32,9 +32,6 @@ contract record PoolV3Factory is Ownable {
     /// @notice Event emitted when the fee collector is updated
     event FeeCollectorsUpdated(address newFeeCollector);
 
-    /// @notice Event emitted when the default LP share is updated
-    event LpSharePercentUpdated(uint newLpSharePercent);
-
     /// @notice Event emitted when a fee tier is enabled
     event FeeTierEnabled(uint fee, int tickSpacing);
 
@@ -55,11 +52,8 @@ contract record PoolV3Factory is Ownable {
     /// @notice Token factory contract address
     address public tokenFactory;
 
-    /// @notice Fee collector address
+    /// @notice Fee collector address: the destination for collectPoolProtocol proceeds
     address public feeCollector;
-
-    /// @notice Default LP share percentage in basis points (e.g., 7000 = 70%)
-    uint public lpSharePercent;
 
     address public poolV3Implementation;
 
@@ -79,14 +73,12 @@ contract record PoolV3Factory is Ownable {
 
         tokenFactory = _tokenFactory;
         feeCollector = _feeCollector;
-        lpSharePercent = 7000;
 
         // Default fee tiers (fee in pips => tickSpacing), canonical Uniswap V3 values
         feeTiers[500] = 10;
         feeTiers[3000] = 60;
         feeTiers[10000] = 200;
 
-        emit LpSharePercentUpdated(lpSharePercent);
         emit FeeCollectorsUpdated(feeCollector);
         emit TokenFactoryUpdated(tokenFactory);
         emit FeeTierEnabled(500, 10);
@@ -112,19 +104,11 @@ contract record PoolV3Factory is Ownable {
     }
 
     /// @notice Update the fee collector address (owner only)
-    /// @dev This updates the factory's fee collector - pools read from factory
+    /// @dev The fee collector receives the proceeds of collectPoolProtocol
     function setFeeCollector(address newFeeCollector) external onlyOwner {
         require(newFeeCollector != address(0), "Zero fee collector address");
         feeCollector = newFeeCollector;
         emit FeeCollectorsUpdated(newFeeCollector);
-    }
-
-    /// @notice Update the default LP share percentage (owner only)
-    /// @param newLpSharePercent New LP share percentage in basis points
-    function setLpSharePercent(uint newLpSharePercent) external onlyOwner {
-        require(newLpSharePercent > 0 && newLpSharePercent <= 10000, "Invalid LP share percent");
-        lpSharePercent = newLpSharePercent;
-        emit LpSharePercentUpdated(newLpSharePercent);
     }
 
     /// @notice Enable a fee tier (owner only)
@@ -138,13 +122,31 @@ contract record PoolV3Factory is Ownable {
         emit FeeTierEnabled(fee, tickSpacing);
     }
 
-    /// @notice Update LP share for a specific pool (owner only)
+    /// @notice Set a pool's protocol fee denominators (owner only)
     /// @param poolAddress The address of the pool to update
-    /// @param newLpSharePercent New LP share percentage in basis points (0 = use factory default)
-    function setPoolLpSharePercent(address poolAddress, uint newLpSharePercent) external onlyOwner {
+    /// @param feeProtocol0 Protocol fee denominator for token0-input swaps (0, or 4..10;
+    ///        canonical setFeeProtocol bounds, enforced by the pool)
+    /// @param feeProtocol1 Protocol fee denominator for token1-input swaps
+    function setPoolFeeProtocol(address poolAddress, uint feeProtocol0, uint feeProtocol1) external onlyOwner {
         require(poolAddress != address(0), "Zero pool address");
         require(address(PoolV3(poolAddress).poolV3Factory()) == address(this), "Pool does not belong to this factory");
-        PoolV3(poolAddress).setLpSharePercent(newLpSharePercent);
+        PoolV3(poolAddress).setFeeProtocol(feeProtocol0, feeProtocol1);
+    }
+
+    /// @notice Collect a pool's accrued protocol fees to the factory's fee collector (owner only)
+    /// @param poolAddress The pool to collect from
+    /// @param amount0Requested The maximum amount of token0 to collect
+    /// @param amount1Requested The maximum amount of token1 to collect
+    /// @return amount0 The protocol fee collected in token0
+    /// @return amount1 The protocol fee collected in token1
+    function collectPoolProtocol(
+        address poolAddress,
+        uint amount0Requested,
+        uint amount1Requested
+    ) external onlyOwner returns (uint amount0, uint amount1) {
+        require(poolAddress != address(0), "Zero pool address");
+        require(address(PoolV3(poolAddress).poolV3Factory()) == address(this), "Pool does not belong to this factory");
+        return PoolV3(poolAddress).collectProtocol(feeCollector, amount0Requested, amount1Requested);
     }
 
     // ============ POOL MANAGEMENT ============
