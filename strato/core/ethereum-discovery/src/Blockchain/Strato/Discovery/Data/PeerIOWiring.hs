@@ -95,6 +95,10 @@ instance MonadIO m => HasPeerDB m where
     flip runSqlPool sqldb $
       SQL.updateWhere (thisPeer peer) [PPeerIp SQL.=. Just ip]
 
+  updateTcpPort peer (TCPPort pn) = liftIO $ withGlobalSQLPool $ \sqldb -> do
+    flip runSqlPool sqldb $
+      SQL.updateWhere (thisPeer peer) [PPeerTcpPort SQL.=. pn]
+
   updateTcpEnableTime peer enableTime = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere (thisPeer peer) [PPeerEnableTime SQL.=. enableTime]

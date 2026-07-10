@@ -58,8 +58,8 @@ runEthServer ::
   PeerRunner m () ->
   IO ()
 runEthServer listenPort runner =
-  runServer (TCPPort listenPort) runner $ \c a ->
-    ethServerHandler (c ^. peerSource) (c ^. peerSink) (c ^. seqSource) a
+  runServer (TCPPort listenPort) runner $ \c a p ->
+    ethServerHandler (c ^. peerSource) (c ^. peerSink) (c ^. seqSource) a p
 
 ethServerHandler ::
   MonadP2P m =>
@@ -67,8 +67,9 @@ ethServerHandler ::
   ConduitM B.ByteString Void m () ->
   ConduitM () P2pEvent m () ->
   Host ->
+  TCPPort ->
   m ()
-ethServerHandler pSource pSink seqSrc host = do
+ethServerHandler pSource pSink seqSrc host port = do
   let peerStr = "<" ++ hostToString host
   ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow peerStr
   void $ register ender
@@ -76,6 +77,7 @@ ethServerHandler pSource pSink seqSrc host = do
     Nothing -> do
       $logErrorS "runEthServer" . T.pack $ "Didn't see peer in discovery at IP " ++ peerStr ++ ". rejecting violently."
     Just p -> do
+      unless (TCPPort (pPeerTcpPort p) == port) $ updateTcpPort p port
       case pPeerPubkey p of
         Nothing -> do
           $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ peerStr ++ ". rejecting violently."

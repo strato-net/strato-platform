@@ -176,7 +176,7 @@ class RunsClient m where
     m ()
 
 class RunsServer m where
-  runServer :: TCPPort -> PeerRunner m () -> (P2pConduits m -> Host -> m ()) -> IO ()
+  runServer :: TCPPort -> PeerRunner m () -> (P2pConduits m -> Host -> TCPPort -> m ()) -> IO ()
 
 instance RunsClient ContextM where
   runClientConnection host' (TCPPort p) sSource handler = do
@@ -197,8 +197,9 @@ instance RunsServer ContextM where
           pSink = appSink app
           conduits = P2pConduits pSource pSink sSource
           ip = fromString . sockAddrToIP $ appSockAddr app
+          pn = TCPPort . fromMaybe 30303 . sockAddrToPort $ appSockAddr app
       catch
-        (handler conduits ip)
+        (handler conduits ip pn)
         (\(e :: SomeException) -> $logErrorS "runServer/Exception" . T.pack $ show e)
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockHeader) (ReaderT Config m) where

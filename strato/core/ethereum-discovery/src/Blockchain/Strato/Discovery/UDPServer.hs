@@ -167,13 +167,13 @@ handleValidPacket ::
   ECC.Point ->
   m ()
 handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
-  Ping _ ep@(Endpoint _ otherUdpPort' otherTcpPort) _ _ -> do
+  Ping _ ep@(Endpoint _ _ otherTcpPort) _ _ -> do
     time <- liftIO $ round `fmap` getPOSIXTime
     mPeer <- getPeerByIP' ip
     mPeer' <-
       case mPeer of
         Nothing -> do
-          addPeer' otherUdpPort' otherTcpPort
+          addPeer' otherUdpPort otherTcpPort
           getPeerByIP' ip
         Just p' -> do
           setPeerPubkey p' otherPubKey
