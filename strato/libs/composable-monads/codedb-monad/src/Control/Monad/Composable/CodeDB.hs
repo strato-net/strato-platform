@@ -35,9 +35,11 @@ import Control.Monad.Trans.Resource (ResourceT, runResourceT)
 import Control.Exception (try, SomeException)
 import Data.Aeson (Value, decode)
 import Data.IORef
+import Data.List (intercalate)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (listToMaybe)
 import Data.Text (Text)
+import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text
 import qualified Data.ByteString.Lazy as BL
 import qualified Database.Esqueleto.Legacy as E
@@ -127,22 +129,31 @@ data EventRow = EventRow
   , erAttributes        :: Map.Map Text Value
   } deriving (Show)
 
-queryEvents :: Maybe Text -> Integer -> Integer -> CodeDBM IO [EventRow]
-queryEvents mAddr fromBlock toBlock = do
-  let baseQuery = case mAddr of
-        Just _addr ->
-          "SELECT address, block_hash, transaction_hash, block_number, transaction_sender, event_index::int, event_name, attributes::text \
-          \FROM \"event\" WHERE LOWER(address) = LOWER(?) \
-          \AND CAST(block_number AS numeric) >= ? AND CAST(block_number AS numeric) <= ? \
-          \ORDER BY CAST(block_number AS numeric), event_index"
-        Nothing ->
-          "SELECT address, block_hash, transaction_hash, block_number, transaction_sender, event_index::int, event_name, attributes::text \
-          \FROM \"event\" WHERE CAST(block_number AS numeric) >= ? AND CAST(block_number AS numeric) <= ? \
-          \ORDER BY CAST(block_number AS numeric), event_index"
-      params = case mAddr of
-        Just addr -> [SQL.PersistText addr, SQL.PersistInt64 (fromIntegral fromBlock), SQL.PersistInt64 (fromIntegral toBlock)]
-        Nothing   -> [SQL.PersistInt64 (fromIntegral fromBlock), SQL.PersistInt64 (fromIntegral toBlock)]
-  rows <- cirrusQuery $ SQL.rawSql baseQuery params
+queryEvents :: Maybe Text -> Integer -> Integer -> Maybe Text -> Int -> CodeDBM IO [EventRow]
+queryEvents mAddr fromBlock toBlock mEventName limit = do
+  let addressFilter = case mAddr of
+        Just _addr -> ["LOWER(address) = LOWER(?)"]
+        Nothing -> []
+      eventNameFilter = case mEventName of
+        Just _eventName -> ["event_name = ?"]
+        Nothing -> []
+      blockFilters =
+        [ "CAST(block_number AS numeric) >= ?",
+          "CAST(block_number AS numeric) <= ?"
+        ]
+      baseQuery =
+        "SELECT address, block_hash, transaction_hash, block_number, transaction_sender, event_index::int, event_name, attributes::text \
+        \FROM \"event\" WHERE "
+          ++ intercalate " AND " (addressFilter ++ eventNameFilter ++ blockFilters)
+          ++ " ORDER BY CAST(block_number AS numeric), event_index LIMIT ?"
+      params =
+        maybe [] (pure . SQL.PersistText) mAddr
+          ++ maybe [] (pure . SQL.PersistText) mEventName
+          ++ [ SQL.PersistInt64 (fromIntegral fromBlock),
+               SQL.PersistInt64 (fromIntegral toBlock),
+               SQL.PersistInt64 (fromIntegral limit)
+             ]
+  rows <- cirrusQuery $ SQL.rawSql (T.pack baseQuery) params
   return $ map toEventRow rows
 
 toEventRow :: (SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Int, SQL.Single Text, SQL.Single Text) -> EventRow

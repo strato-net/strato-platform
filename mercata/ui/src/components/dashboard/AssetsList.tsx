@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useLayoutEffect } from "react";
 import { Link } from "react-router-dom";
 import { Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "../ui/button";
@@ -9,6 +9,8 @@ import { useEarnContext } from "@/context/EarnContext";
 import { buildEarnApyMap } from "@/utils/earnUtils";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
+import { getEarningAssetSymbolRank } from "@/lib/tokenPriority";
+import { stratoTokenAddresses } from "@/lib/constants";
 
 const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | undefined): boolean => {
   const symbol = asset?._symbol?.toLowerCase?.() || "";
@@ -50,6 +52,9 @@ interface AssetsProps {
 
 const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
 
+const isStratoAsset = (asset: { address?: string } | null | undefined): boolean =>
+  stratoTokenAddresses.includes(normAddr(asset?.address || ""));
+
 const AssetsList = ({
   loading,
   tokens,
@@ -59,6 +64,7 @@ const AssetsList = ({
 }: AssetsProps) => {
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
+  const [showAllTokens, setShowAllTokens] = useState(false);
   const { tokenApys, tokenApysLoaded } = useEarnContext();
 
   const earnByAddr = useMemo(() => {
@@ -70,27 +76,85 @@ const AssetsList = ({
   const shouldShowLoading = loading && !hasEarningAssets;
   const shouldShowInactiveLoading = loading && !hasInactiveTokens;
 
+  const hasBalance = (asset: EarningAsset) =>
+    !!asset?.totalBalance && asset.totalBalance !== "0";
+
   const sortedTokens = useMemo(() => {
     return [...tokens].sort((a, b) => {
-      const valueA = parseFloat(a.value || "0");
-      const valueB = parseFloat(b.value || "0");
-      return valueB - valueA;
+      // STRATO is always pinned to the top, held or not
+      const stratoDiff = (isStratoAsset(b) ? 1 : 0) - (isStratoAsset(a) ? 1 : 0);
+      if (stratoDiff !== 0) return stratoDiff;
+
+      // Tokens the user holds a balance in come first
+      const balanceDiff = (hasBalance(b) ? 1 : 0) - (hasBalance(a) ? 1 : 0);
+      if (balanceDiff !== 0) return balanceDiff;
+
+      // Held tokens: sort by value (descending)
+      if (hasBalance(a) && hasBalance(b)) {
+        return parseFloat(b.value || "0") - parseFloat(a.value || "0");
+      }
+
+      // Non-held tokens: sort by canonical symbol order, then alphabetically
+      const rankA = getEarningAssetSymbolRank(a._symbol);
+      const rankB = getEarningAssetSymbolRank(b._symbol);
+      if (rankA !== rankB) return rankA - rankB;
+      return (a._symbol || "").localeCompare(b._symbol || "");
     });
   }, [tokens]);
+
+  // Collapsed view shows at least 10 tokens, or all held tokens if the user
+  // has balances in more than 10. A "Show More" button reveals the rest.
+  const collapsedCount = useMemo(() => {
+    const balanceCount = sortedTokens.filter(hasBalance).length;
+    return Math.max(10, balanceCount);
+  }, [sortedTokens]);
+
+  const visibleTokens = showAllTokens
+    ? sortedTokens
+    : sortedTokens.slice(0, collapsedCount);
+  const hiddenCount = sortedTokens.length - collapsedCount;
+
+  // Refs used to keep the toggle button's viewport position stable when
+  // expanding, so the newly revealed tokens appear right where the button was.
+  const toggleWrapRef = useRef<HTMLDivElement>(null);
+  const firstRevealedRowRef = useRef<HTMLTableRowElement>(null);
+  const anchorTopRef = useRef<number | null>(null);
+  const didToggleRef = useRef(false);
+
+  const handleToggleTokens = () => {
+    didToggleRef.current = true;
+    if (!showAllTokens) {
+      anchorTopRef.current = toggleWrapRef.current?.getBoundingClientRect().top ?? null;
+    }
+    setShowAllTokens((prev) => !prev);
+  };
+
+  useLayoutEffect(() => {
+    if (!didToggleRef.current) return;
+    if (showAllTokens) {
+      if (anchorTopRef.current != null && firstRevealedRowRef.current) {
+        const newTop = firstRevealedRowRef.current.getBoundingClientRect().top;
+        window.scrollBy({ top: newTop - anchorTopRef.current });
+      }
+      anchorTopRef.current = null;
+    } else {
+      toggleWrapRef.current?.scrollIntoView({ block: "nearest" });
+    }
+  }, [showAllTokens]);
 
   return (
     <div className={`w-full overflow-hidden ${isDashboard ? 'bg-card rounded-xl border border-border shadow-sm' : ''}`}>
       {isDashboard && (
         <div className="p-4 md:p-5">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <h2 className="font-bold text-lg">My Deposits</h2>
+            <h2 className="font-bold text-lg">My Tokens</h2>
             {/* Mobile: full width button */}
             <Button
               className="w-full sm:hidden flex items-center justify-center gap-2"
               onClick={() => window.location.href = "/dashboard/deposits"}
             >
               <Plus size={16} />
-              Deposit
+              Fund
             </Button>
             {/* Desktop: small button */}
             <Button
@@ -99,7 +163,7 @@ const AssetsList = ({
               onClick={() => window.location.href = "/dashboard/deposits"}
             >
               <Plus size={16} />
-              Deposit
+              Fund
             </Button>
           </div>
         </div>
@@ -109,45 +173,46 @@ const AssetsList = ({
         {!isDashboard && (
           <div className="p-4 text-right border-b border-border flex justify-between">
             <span className="font-bold inline-flex items-center gap-1">
-              Earning Assets / Best Available APY
-              <BestApyInfoTooltip />
+              Earning Assets
             </span>
           </div>
         )}
         {isDashboard && (
           <div className="p-3 md:p-4 text-right flex justify-between">
             <span className="font-bold text-sm md:text-base inline-flex items-center gap-1">
-              Earning Assets / Best Available APY
-              <BestApyInfoTooltip />
+              Earning Assets
             </span>
           </div>
         )}
         <div className={`w-full ${isDashboard ? 'overflow-x-auto md:overflow-visible px-3 md:px-0' : 'overflow-x-auto'}`}>
-          <table className="w-full">
+          <table className="w-full table-fixed">
             <thead>
               <tr className="bg-muted/50">
-                <th className="text-left text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                <th className="w-[22%] text-left text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Asset
                 </th>
-                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell w-[14%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   <span className="inline-flex items-center gap-1 justify-end w-full">
                     Best Available APY
                     <BestApyInfoTooltip />
                   </span>
                 </th>
-                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   Price
                 </th>
-                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   Available
                 </th>
-                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   Collateral
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                  Staked
+                </th>
+                <th className="w-[10%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Value
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                <th className="w-[10%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Balance
                 </th>
               </tr>
@@ -156,7 +221,7 @@ const AssetsList = ({
               {shouldShowLoading ? (
                 <tr className="hover:bg-muted/50 transition-colors">
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="py-4 px-4 whitespace-nowrap w-full"
                   >
                     <div className="w-full flex justify-center items-center h-16">
@@ -164,11 +229,12 @@ const AssetsList = ({
                     </div>
                   </td>
                 </tr>
-              ) : sortedTokens.length > 0 ? (
-                sortedTokens.map(
+              ) : visibleTokens.length > 0 ? (
+                visibleTokens.map(
                   (asset, index) => (
                     <tr
                       key={index}
+                      ref={index === collapsedCount ? firstRevealedRowRef : undefined}
                       className="hover:bg-muted/50 transition-colors"
                     >
                       <td className="py-3 md:py-4 px-3 md:px-4">
@@ -221,6 +287,11 @@ const AssetsList = ({
                               })()}
                             </div>
                           </div>
+                          {isStratoAsset(asset) && (
+                            <Button asChild size="sm" className="ml-2 shrink-0">
+                              <Link to="/dashboard/earn-staking">Stake</Link>
+                            </Button>
+                          )}
                         </div>
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
@@ -255,6 +326,13 @@ const AssetsList = ({
                             : formatBalance(asset.collateralBalance, undefined, 18, 1, 4)}
                         </p>
                       </td>
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
+                        <p className="font-medium text-foreground">
+                          {guestMode || !asset?.stakedBalance || asset.stakedBalance === "0"
+                            ? "-"
+                            : formatBalance(asset.stakedBalance, undefined, 18, 1, 4)}
+                        </p>
+                      </td>
                       <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-sm md:text-base text-foreground">
                           {guestMode || !asset?.value || asset.value === "0.00" || parseFloat(asset.value) === 0
@@ -287,7 +365,7 @@ const AssetsList = ({
               ) : (
                 <tr className="hover:bg-muted/50 transition-colors">
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="py-4 px-4 whitespace-nowrap w-full"
                   >
                     <div className="w-full flex justify-center items-center h-16">
@@ -299,6 +377,28 @@ const AssetsList = ({
             </tbody>
           </table>
         </div>
+        {!shouldShowLoading && hiddenCount > 0 && (
+          <div ref={toggleWrapRef} className="flex justify-center py-3 border-t border-border">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground gap-1"
+              onClick={handleToggleTokens}
+            >
+              {showAllTokens ? (
+                <>
+                  Show Less
+                  <ChevronUp size={16} />
+                </>
+              ) : (
+                <>
+                  Show More ({hiddenCount})
+                  <ChevronDown size={16} />
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
 
       {isDashboard && !guestMode && (
@@ -320,11 +420,10 @@ const AssetsList = ({
             </Button>
           </div>
           <div
-            className={`transition-all duration-300 ease-in-out overflow-hidden ${
-              showNonEarningAssetsTable
-                ? "max-h-[400px] opacity-100"
-                : "max-h-0 opacity-0"
-            }`}
+            className={`transition-all duration-300 ease-in-out overflow-hidden ${showNonEarningAssetsTable
+              ? "max-h-[400px] opacity-100"
+              : "max-h-0 opacity-0"
+              }`}
           >
             <div className="overflow-y-auto max-h-[400px] px-3 md:px-0">
               <table className="w-full">

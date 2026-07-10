@@ -76,6 +76,14 @@ const inferStakeSemantics = (activity: {
     return { stakeDenomination: "usd_notional", stakeAssetAddress: null };
   }
 
+  // STRATO staking: stake is in STRATO token units, but the source is the
+  // staking contract, so USD pricing must go through the STRATO token address.
+  const stratoStakingSource = normalizeAddr(constants.stratoStaking || "");
+  if (stratoStakingSource && sourceContract === stratoStakingSource) {
+    const stratoToken = normalizeAddr(constants.stratoToken || "");
+    return { stakeDenomination: "token_units", stakeAssetAddress: stratoToken || null };
+  }
+
   // For everything else, the poller passes through raw units. Sometimes those units are
   // token quantities (e.g. LP token transfer `value`), but sometimes they're shares or
   // protocol-specific units. We only confidently mark token_units when the source itself
@@ -319,7 +327,7 @@ export const fetchRewardsOverview = async (
       .filter((a) => BigInt(a.emissionRate || "0") > 0n).length;
 
     // Hardcoded season info for now
-    const currentSeason = 2;
+    const currentSeason = 3;
 
 
     // Sum up total stake across all activities

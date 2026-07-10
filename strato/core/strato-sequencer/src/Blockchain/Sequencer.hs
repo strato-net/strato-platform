@@ -40,7 +40,7 @@ import Blockchain.Strato.Model.Keccak256
 import Conduit
 import Control.Concurrent hiding (yield)
 import qualified Control.Exception as E
-import Control.Monad (forever, forM, when)
+import Control.Monad (forever, forM, void, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
@@ -249,16 +249,16 @@ blockstanbulSend ::
   ) =>
   [InEvent] -> ConduitT i SeqOutEvent m ()
 blockstanbulSend = mapM_ $ \ie -> do
-      blockstanbulSend' ie
+      void $ blockstanbulSend' ie
 
 blockstanbulSend' ::
   ( MonadLogger m,
     MonadBlockstanbul m,
     (Keccak256 `A.Alters` DependentBlockEntry) m
   ) =>
-  InEvent -> ConduitT i SeqOutEvent m ()
+  InEvent -> ConduitT i SeqOutEvent m [OutputBlock]
 blockstanbulSend' msg = do
-  (p2pevs, vmevs) <- lift $ do
+  (p2pevs, vmevs, committedBlocks) <- lift $ do
     case msg of
       UnannouncedBlock blk -> createNewViewTimer blk
       _ -> pure ()
@@ -306,12 +306,13 @@ blockstanbulSend' msg = do
               (BDB.blockHeaderHash bh)
               (BDB.blockHeaderBlockNumber bh)
               (S.toList $ _validators ctx)
-    pure (p2pevs, vmevs)
+    pure (p2pevs, vmevs, committedBlocks)
 
   $logDebugS "seq/pbft/send_p2p" . T.pack $ format p2pevs
   yieldToP2p p2pevs
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
   yieldToVm vmevs
+  return committedBlocks
   where
     vmEvenP2pCheckptFilterHelper :: [OutEvent] -> ([VmTask], [P2pEvent])
     vmEvenP2pCheckptFilterHelper (x : xs) = do
@@ -354,29 +355,49 @@ transformFullTransactions pairs = do
   yieldToVm $ map pairToVmTx txs
   yieldToP2p $ map (P2pTx . snd) txs
 
-expandBlock ::
+emitOrCacheHistoricBlock ::
   ( MonadLogger m,
     MonadMonitor m,
+    MonadBlockstanbul m,
     (Keccak256 `A.Alters` DependentBlockEntry) m
   ) =>
-  SequencedBlock -> m [OutputBlock]
-expandBlock sb = do
-  readiness <- enqueueIfParentNotEmitted sb
-  case readiness of
-    NotReadyToEmit -> do
+  SequencedBlock -> ConduitT i SeqOutEvent m ()
+emitOrCacheHistoricBlock sb = do
+  ready <- lift $ isBlockReadyForEmission sb
+  if ready
+    then do
+      emitBlockAndCachedChildren sb
+      $logDebugS "expandBlock" . T.pack $ shortDescription sb ++ " is ready to emit! Emitting it and chain of dependents."
+    else do
+      lift $ cacheBlockUntilParentEmitted sb
       $logInfoS "expandBlock" . T.pack $ shortDescription sb ++ " is not yet ready to emit."
       P.incCounter seqBlocksEnqueued
-      return []
-    ReadyToEmit -> do
-      -- TODO: buildEmissionChain needs to do all of this so that we don't emit blocks missing transactions prematurely
-      dryChain <- buildEmissionChain sb
-      if dryChain /= []
-        then do
-          $logDebugS "expandBlock" . T.pack $ shortDescription sb ++ " is ready to emit! Emitting it and chain of dependents."
-          return dryChain
-        else do
-          $logDebugS "expandBlock" . T.pack $ shortDescription sb ++ " is ready to emit, but its emission chain is empty. It was likely already emitted."
-          return []
+
+emitSequencedBlock ::
+  ( MonadLogger m,
+    MonadBlockstanbul m,
+    (Keccak256 `A.Alters` DependentBlockEntry) m
+  ) =>
+  SequencedBlock -> ConduitT i SeqOutEvent m Bool
+emitSequencedBlock sb = do
+  committedBlocks <- blockstanbulSend' . PreviousBlock $ sequencedBlockToBlock sb
+  return $ any ((== sbHash sb) . outputBlockHash) committedBlocks
+
+emitBlockAndCachedChildren ::
+  ( MonadLogger m,
+    MonadMonitor m,
+    MonadBlockstanbul m,
+    (Keccak256 `A.Alters` DependentBlockEntry) m
+  ) =>
+  SequencedBlock -> ConduitT i SeqOutEvent m ()
+emitBlockAndCachedChildren sb =
+  lift (claimBlockForEmission sb) >>= \case
+    Nothing -> return ()
+    Just children -> do
+      emitted <- emitSequencedBlock sb
+      when emitted $ do
+        lift $ markBlockEmitted sb
+        mapM_ emitBlockAndCachedChildren children
 
 runConsensus ::
   ( MonadLogger m,
@@ -387,13 +408,11 @@ runConsensus ::
   SequencedBlock -> ConduitT i SeqOutEvent m ()
 runConsensus sb = do
   let blk = sequencedBlockToBlock sb
-  routed <-
-    if isHistoricBlock blk
-      then lift $ map (PreviousBlock . outputBlockToBlock) <$> expandBlock sb
-      else pure [UnannouncedBlock blk]
-  -- Blockstanbul will check that the seals and validators match up before
-  -- announcing it to the network or forwarding to the EVM.
-  traverse_ blockstanbulSend' routed
+  if isHistoricBlock blk
+    then emitOrCacheHistoricBlock sb
+    -- Blockstanbul will check that the seals and validators match up before
+    -- announcing it to the network or forwarding to the EVM.
+    else void . blockstanbulSend' $ UnannouncedBlock blk
 
 transformBlocks ::
   ( MonadLogger m,
