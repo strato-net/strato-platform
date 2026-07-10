@@ -1,9 +1,9 @@
-import { Activity, Box, FileText, Network, Server, Users } from "lucide-react";
+import { Activity, Box, Cpu, Database, FileText, MemoryStick, Network, Server, Users } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/dashboard/StatCard";
-import { BarSeriesCard, TxTypePieCard } from "@/components/dashboard/DashboardCharts";
+import { BarSeriesCard, CategoryBarCard } from "@/components/dashboard/DashboardCharts";
 import { PeersCard } from "@/components/dashboard/PeersCard";
 import { RecentTransactionsCard } from "@/components/dashboard/RecentTransactionsCard";
 import { CopyButton } from "@/components/CopyButton";
@@ -48,6 +48,8 @@ export default function DashboardPage() {
   const network = useSocketRoom<NetworkPayload>(ROOMS.GET_NETWORK_HEALTH, {});
   const txCount = useSocketRoom<{ x: number; y: number }[]>(ROOMS.TRANSACTIONS_COUNT, []);
   const blockProp = useSocketRoom<{ x: number; y: number }[]>(ROOMS.BLOCKS_PROPAGATION, []);
+  const peers = useSocketRoom<Record<string, unknown>>(ROOMS.GET_PEERS, {});
+  const peerCount = Object.keys(peers || {}).length;
 
   // The series x values are relative indices; map them to real block numbers so the
   // bar tooltips show the actual block (newest bar = lastBlock).
@@ -135,9 +137,9 @@ export default function DashboardPage() {
           <CardContent>
             {isLoggedIn ? (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <Metric icon={Activity} label="CPU" value={pct(cpu)} />
-                <Metric icon={Activity} label="Memory" value={pct(mem)} />
-                <Metric icon={Activity} label="Disk" value={pct(disk)} />
+                <Metric icon={Cpu} label="CPU" value={pct(cpu)} percent={cpu} />
+                <Metric icon={MemoryStick} label="Memory" value={pct(mem)} percent={mem} />
+                <Metric icon={Database} label="Disk" value={pct(disk)} percent={disk} />
                 <Metric
                   icon={Network}
                   label="Network"
@@ -155,26 +157,29 @@ export default function DashboardPage() {
       </Card>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Last block" value={Number(lastBlock).toLocaleString()} icon={Box} />
         <StatCard label="Users" value={Number(usersCount).toLocaleString()} icon={Users} to="/accounts" />
         <StatCard label="Contracts" value={Number(contractsCount).toLocaleString()} icon={FileText} to="/contracts" />
+        <StatCard label="Peers" value={Number(peerCount).toLocaleString()} icon={Network} />
+      </div>
+
+      {/* Block activity */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <BarSeriesCard title="Transactions per Block (Last 15)" data={txCountSeries} seriesLabel="tx" />
+        <BarSeriesCard title="Block Interval (Last 15)" data={blockPropSeries} unit="s" seriesLabel="s" />
+      </div>
+
+      {/* Recent-transaction breakdowns */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <CategoryBarCard title="Transactions by Function" data={txFnData} />
+        <CategoryBarCard title="Top Senders" data={txSenderData} />
       </div>
 
       {/* Peers + Recent transactions */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <PeersCard />
         <RecentTransactionsCard />
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <BarSeriesCard title="Transactions per Last 15 Blocks" data={txCountSeries} seriesLabel="tx" />
-        <TxTypePieCard title="Transactions by Function" data={txFnData} />
-      </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <TxTypePieCard title="Transactions by Sender" data={txSenderData} />
-        <BarSeriesCard title="Block Interval (Last 15 Blocks)" data={blockPropSeries} unit="s" seriesLabel="s" />
       </div>
 
       {/* Validators */}
@@ -221,18 +226,37 @@ function Metric({
   icon: Icon,
   label,
   value,
+  percent,
 }: {
   icon: typeof Activity;
   label: string;
   value: React.ReactNode;
+  /** When set, renders a usage meter under the value (styled by load level). */
+  percent?: number;
 }) {
+  const level =
+    typeof percent !== "number" ? null : percent >= 90 ? "critical" : percent >= 75 ? "high" : "ok";
   return (
     <div className="rounded-lg border border-border p-3">
       <div className="flex items-center gap-1 text-xs uppercase text-muted-foreground">
         <Icon className="h-3.5 w-3.5" />
         {label}
       </div>
-      <div className="mt-1 text-lg font-semibold">{value}</div>
+      <div className="mt-1 text-lg font-semibold tabular-nums">{value}</div>
+      {level !== null ? (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+          <div
+            className={
+              level === "critical"
+                ? "h-full rounded-full bg-destructive"
+                : level === "high"
+                  ? "h-full rounded-full bg-amber-500"
+                  : "h-full rounded-full bg-[hsl(var(--chart-1))]"
+            }
+            style={{ width: `${Math.min(Math.max(percent!, 0), 100)}%` }}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
