@@ -58,22 +58,45 @@ export interface DeriveUnderlyingInput {
   symbol?: string | null;
   name?: string | null;
   rebasingExternalSymbol?: string | null;
-  /** LP tokens have two underlyings — force them into the shared "LP" group. */
   isPoolToken?: boolean | null;
 }
 
-/** Dedicated group for liquidity-provider positions (two underlyings each). */
-export const LP_GROUP_KEY: GroupKey = "LP";
+/** Stablecoin / USDST-family symbols — used to pick the "primary" leg of an LP. */
+const STABLE_SYMBOLS = new Set([
+  "usdst",
+  "susdst",
+  "musdst",
+  "lendusdst",
+  "safetyusdst",
+  "susds",
+  "syrupusdc",
+  "usdc",
+  "usdt",
+  "dai",
+]);
+
+/**
+ * For an LP symbol like "ETH-USDST-LP" or "SILVST-USDST-LP", return the
+ * underlying group of its primary (first non-stablecoin) leg, so the LP is
+ * filed under that asset (ETH-USDST-LP → ETH, SILVST-USDST-LP → SILV). If every
+ * leg is a stablecoin (e.g. SYRUPUSDC-SUSDS-USDST-LP), fall back to USDST.
+ */
+const underlyingFromLpSymbol = (symbol: string): GroupKey => {
+  const legs = symbol
+    .split("-")
+    .filter((p) => p && p.toUpperCase() !== "LP");
+  const primary = legs.find((leg) => !STABLE_SYMBOLS.has(leg.toLowerCase()));
+  if (primary) return deriveUnderlying({ symbol: primary });
+  return "USDST";
+};
 
 /**
  * Resolve the canonical underlying group for a holding/position.
  *
- * Precedence: LP flag → address override → symbol override →
+ * Precedence: address override → symbol override → LP primary leg →
  * rebasingExternalSymbol → strip trailing "ST" → raw symbol uppercased.
  */
 export const deriveUnderlying = (input: DeriveUnderlyingInput): GroupKey => {
-  if (input.isPoolToken) return LP_GROUP_KEY;
-
   const addr = norm(input.address);
   if (addr && UNDERLYING_ADDRESS_OVERRIDES[addr]) {
     return UNDERLYING_ADDRESS_OVERRIDES[addr];
@@ -83,6 +106,11 @@ export const deriveUnderlying = (input: DeriveUnderlyingInput): GroupKey => {
   const symbolLower = symbol.toLowerCase();
   if (symbolLower && UNDERLYING_OVERRIDES[symbolLower]) {
     return UNDERLYING_OVERRIDES[symbolLower];
+  }
+
+  // LP tokens ("A-B-LP") group under their primary (non-stablecoin) leg.
+  if (/-lp$/i.test(symbol)) {
+    return underlyingFromLpSymbol(symbol);
   }
 
   const rebasing = (input.rebasingExternalSymbol || "").trim();
@@ -95,6 +123,41 @@ export const deriveUnderlying = (input: DeriveUnderlyingInput): GroupKey => {
 
   return symbol ? symbol.toUpperCase() : "OTHER";
 };
+
+export type AssetCategory = "Metals" | "Stocks" | "Crypto";
+
+/** Precious-metal underlyings. */
+const METAL_KEYS = new Set<GroupKey>(["GOLD", "SILV", "SILVER", "PLAT", "PALL"]);
+
+/**
+ * Tokenized-equity (stock) underlyings. Mercata equity tokens use ticker-style
+ * symbols (e.g. SPYX, TSLAX, ARBV). Extend this set as new equities are listed.
+ */
+const STOCK_KEYS = new Set<GroupKey>([
+  "SPYX",
+  "TSLAX",
+  "ARBV",
+  "BCSPX",
+  "NVDAX",
+  "AAPLX",
+  "MSFTX",
+  "AMZNX",
+  "GOOGLX",
+  "METAX",
+  "COINX",
+  "QQQX",
+]);
+
+/** Classify an underlying group into a top-level asset category. */
+export const categoryOf = (key: GroupKey): AssetCategory => {
+  const k = key.toUpperCase();
+  if (METAL_KEYS.has(k)) return "Metals";
+  if (STOCK_KEYS.has(k)) return "Stocks";
+  return "Crypto";
+};
+
+/** Display order for categories. */
+export const CATEGORY_ORDER: AssetCategory[] = ["Crypto", "Metals", "Stocks"];
 
 /** Friendly display label for a group key. */
 export const groupLabel = (key: GroupKey): string => {
@@ -163,6 +226,7 @@ export const buildGroups = (positions: TaggedPosition[]): PortfolioGroup[] => {
     groups.push({
       key,
       label: groupLabel(key),
+      category: categoryOf(key),
       totalValueUsd: grossValueUsd - debtUsd,
       grossValueUsd,
       debtUsd,

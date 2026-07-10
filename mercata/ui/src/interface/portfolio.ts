@@ -53,6 +53,8 @@ export interface PortfolioPosition {
 export interface PortfolioGroup {
   key: GroupKey;
   label: string;
+  /** Top-level asset category: "Metals" | "Stocks" | "Crypto". */
+  category: string;
   /** Net USD value of the group (gross assets minus liabilities within it). */
   totalValueUsd: number;
   /** Sum of asset (non-liability) positions. */

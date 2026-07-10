@@ -115,7 +115,6 @@ export const usePortfolio = (flows?: NetFlowsByAddress): PortfolioSummary => {
         symbol: a._symbol,
         name: a._name,
         rebasingExternalSymbol: a.rebasingExternalSymbol,
-        isPoolToken: a.isPoolToken,
       });
 
       // Flows-based estimated P&L: invested ≈ fraction of holding that was
