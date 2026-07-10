@@ -3,15 +3,19 @@ set -e
 
 echo "=== STRATO Local Auth Starting ==="
 
-# Read httpPort from ethconf.yaml (single source of truth)
+# Read config from ethconf.yaml (single source of truth)
 if [ ! -f /config/ethconf.yaml ]; then
     echo "ERROR: /config/ethconf.yaml not found. Ensure ethconf.yaml is mounted into the container."
     exit 1
 fi
 HTTP_PORT=$(yq '.networkConfig.httpPort' /config/ethconf.yaml)
-LOCAL_AUTH_HOSTNAME=$(yq '.urlConfig.vaultUrl' /config/ethconf.yaml | sed 's|http://||' | cut -d: -f1 | tr '[:upper:]' '[:lower:]')
-echo "Read httpPort from ethconf.yaml: ${HTTP_PORT}"
-echo "Read hostname from ethconf.yaml vaultUrl: ${LOCAL_AUTH_HOSTNAME}"
+NODE_URL=$(yq '.urlConfig.nodeUrl' /config/ethconf.yaml)
+COOKIE_REALM=$(yq '.urlConfig.cookieRealm' /config/ethconf.yaml)
+
+echo "Read from ethconf.yaml:"
+echo "  httpPort: ${HTTP_PORT}"
+echo "  nodeUrl: ${NODE_URL}"
+echo "  cookieRealm: ${COOKIE_REALM}"
 
 # Read postgres password if available and update DSNs
 if [ -f /run/secrets/postgres_password ]; then
@@ -56,11 +60,11 @@ KRATOS_COOKIE_SECRET_ESCAPED=$(escape_sed_replacement "$KRATOS_COOKIE_SECRET")
 
 sed -i "s|__HYDRA_SYSTEM_SECRET__|${HYDRA_SYSTEM_SECRET_ESCAPED}|g" /etc/config/hydra.yml
 sed -i "s|__HYDRA_PAIRWISE_SALT__|${HYDRA_PAIRWISE_SALT_ESCAPED}|g" /etc/config/hydra.yml
-sed -i "s|__HTTP_PORT__|${HTTP_PORT}|g" /etc/config/hydra.yml
-sed -i "s|__HOSTNAME__|${LOCAL_AUTH_HOSTNAME}|g" /etc/config/hydra.yml
+sed -i "s|__NODE_URL__|${NODE_URL}|g" /etc/config/hydra.yml
+sed -i "s|__COOKIE_REALM__|${COOKIE_REALM}|g" /etc/config/hydra.yml
 sed -i "s|__KRATOS_COOKIE_SECRET__|${KRATOS_COOKIE_SECRET_ESCAPED}|g" /etc/config/kratos.yml
-sed -i "s|__HTTP_PORT__|${HTTP_PORT}|g" /etc/config/kratos.yml
-sed -i "s|__HOSTNAME__|${LOCAL_AUTH_HOSTNAME}|g" /etc/config/kratos.yml
+sed -i "s|__NODE_URL__|${NODE_URL}|g" /etc/config/kratos.yml
+sed -i "s|__COOKIE_REALM__|${COOKIE_REALM}|g" /etc/config/kratos.yml
 
 # Function to wait for postgres
 wait_for_postgres() {
@@ -134,8 +138,8 @@ DSN="$DSN" kratos migrate sql -e --yes --config /etc/config/kratos.yml
 echo "Running Hydra migrations..."
 DSN="$HYDRA_DSN" hydra migrate sql -e --yes --config /etc/config/hydra.yml
 
-# Set login UI browser URL from ethconf port
-export KRATOS_BROWSER_URL="http://${LOCAL_AUTH_HOSTNAME}:${HTTP_PORT}/auth/kratos"
+# Set login UI browser URL
+export KRATOS_BROWSER_URL="${NODE_URL}/auth/kratos"
 
 # Start supervisor in background temporarily to start services
 /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf &
@@ -166,8 +170,8 @@ if [ "$CLIENT_EXISTS" != "200" ]; then
             \"grant_types\": [\"authorization_code\", \"refresh_token\", \"client_credentials\"],
             \"response_types\": [\"code\", \"token\", \"id_token\"],
             \"scope\": \"openid offline email profile\",
-            \"redirect_uris\": [\"http://${LOCAL_AUTH_HOSTNAME}:${HTTP_PORT}/auth/openidc/return\", \"http://localhost:${HTTP_PORT}/auth/openidc/return\", \"http://127.0.0.1:${HTTP_PORT}/auth/openidc/return\"],
-            \"post_logout_redirect_uris\": [\"http://${LOCAL_AUTH_HOSTNAME}:${HTTP_PORT}/\", \"http://localhost:${HTTP_PORT}/\", \"http://127.0.0.1:${HTTP_PORT}/\"],
+            \"redirect_uris\": [\"${NODE_URL}/auth/openidc/return\", \"http://localhost:${HTTP_PORT}/auth/openidc/return\", \"http://127.0.0.1:${HTTP_PORT}/auth/openidc/return\"],
+            \"post_logout_redirect_uris\": [\"${NODE_URL}/\", \"http://localhost:${HTTP_PORT}/\", \"http://127.0.0.1:${HTTP_PORT}/\"],
             \"token_endpoint_auth_method\": \"client_secret_basic\"
         }" > /dev/null
     echo "OAuth client '${OAUTH_CLIENT_ID}' created."
@@ -175,47 +179,7 @@ else
     echo "OAuth client '${OAUTH_CLIENT_ID}' already exists."
 fi
 
-# Create default admin user in Kratos if needed
-echo "Checking for default admin user..."
-DEFAULT_USER_EMAIL="${DEFAULT_USER_EMAIL:-admin@local.strato}"
-DEFAULT_USER_PASSWORD="${DEFAULT_USER_PASSWORD:-localdev123}"
-
-# Check if user exists by trying to get identities with that email
-EXISTING_USER=$(curl -s "http://localhost:4434/admin/identities" | grep -o "\"$DEFAULT_USER_EMAIL\"" || true)
-
-if [ -z "$EXISTING_USER" ]; then
-    echo "Creating default admin user: $DEFAULT_USER_EMAIL"
-    
-    # Create identity via Kratos Admin API
-    curl -s -X POST "http://localhost:4434/admin/identities" \
-        -H "Content-Type: application/json" \
-        -d "{
-            \"schema_id\": \"default\",
-            \"traits\": {
-                \"email\": \"$DEFAULT_USER_EMAIL\",
-                \"username\": \"admin\"
-            },
-            \"credentials\": {
-                \"password\": {
-                    \"config\": {
-                        \"password\": \"$DEFAULT_USER_PASSWORD\"
-                    }
-                }
-            },
-            \"state\": \"active\"
-        }" > /dev/null
-    
-    echo "Default user created."
-    echo ""
-    echo "============================================"
-    echo "  Default credentials:"
-    echo "    Email:    $DEFAULT_USER_EMAIL"
-    echo "    Password: $DEFAULT_USER_PASSWORD"
-    echo "============================================"
-    echo ""
-else
-    echo "Default user already exists."
-fi
+echo "Local auth admin user is created with strato-user-add."
 
 echo ""
 echo "=== STRATO Local Auth Ready ==="

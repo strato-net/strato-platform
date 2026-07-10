@@ -54,6 +54,7 @@ import SolidVM.Model.CodeCollection.Visibility (Visibility (..))
 import SolidVM.Model.SolidString (SolidString, labelToText, stringToLabel)
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
 import qualified SolidVM.Model.Type as SVMType
+import SolidVM.Model.Value (Variable(..), forceLoadVar)
 import Text.Format (format)
 
 produceResponse :: HasStreaming m => JsonRpcResponse -> m ()
@@ -124,21 +125,34 @@ ethCall id fromAddr toAddr callData = do
 
       $logInfoS "ethCall" . T.pack $ prettyCall ++ " on " ++ show toAddr
 
-      result <- SolidVM.call blockHeader toAddr fromAddr fromAddr 1000000 fromAddr
-        (hash callData) (labelToText funcName) argTexts Nothing
+      if not (isReadOnlyFunc func)
+        then do
+          $logInfoS "ethCall" . T.pack $ prettyCall ++ " => rejected non-read-only function"
+          return $ Error id "eth_call only supports read-only functions"
+        else do
+          result <- SolidVM.call blockHeader toAddr fromAddr fromAddr 1000000 fromAddr
+            (hash callData) (labelToText funcName) argTexts Nothing
 
-      case erException result of
-        Just ex -> do
-          $logInfoS "ethCall" . T.pack $ prettyCall ++ " => EXCEPTION: " ++ show ex
-          return $ Error id (show ex)
-        Nothing -> case erReturnVal result of
-          Nothing -> do
-            $logInfoS "ethCall" . T.pack $ prettyCall ++ " => (no return value)"
-            return $ Success id B.empty
-          Just retVal -> do
-            let encoded = encodeValueABI retTypes retVal
-            $logInfoS "ethCall" . T.pack $ prettyCall ++ " => " ++ show retVal
-            return $ Success id encoded
+          case erException result of
+            Just ex -> do
+              $logInfoS "ethCall" . T.pack $ prettyCall ++ " => EXCEPTION: " ++ show ex
+              return $ Error id (show ex)
+            Nothing -> case erReturnVal result of
+              Nothing -> do
+                $logInfoS "ethCall" . T.pack $ prettyCall ++ " => (no return value)"
+                return $ Success id B.empty
+              Just retVal -> do
+                -- The return value may contain IORef-backed Variables (struct
+                -- getters build their tuple with createVar), so freeze it before
+                -- the pure ABI encoder reads the members.
+                val <- forceLoadVar $ Constant retVal
+                let encoded = encodeValueABI retTypes val
+                $logInfoS "ethCall" . T.pack $ prettyCall ++ " => " ++ show val
+                return $ Success id encoded
+
+isReadOnlyFunc :: CC.Func -> Bool
+isReadOnlyFunc func =
+  CC._funcStateMutability func `elem` map Just [CC.Pure, CC.Constant, CC.View]
 
 initBestBlockContext :: VMBase m => m ()
 initBestBlockContext = do
@@ -258,10 +272,14 @@ matchStorageGetter contract selector = go (M.toList $ CC._storageDefs contract)
       | otherwise = go rest
       where
         (argTypes, retType) = getterSignature (CC._varType varDecl)
+        -- A struct-valued getter returns its members flattened into a tuple
+        -- (matching SolidVM's handleStruct), so the return signature is the list
+        -- of included member types rather than the struct itself.
+        retTypes = getterReturnTypes contract retType
         syntheticFunc = CC.Func
           { CC._funcArgs = zipWith (\i t -> (Nothing, IndexedType i t Nothing)) [0..] argTypes
-          , CC._funcVals = [(Nothing, IndexedType 0 retType Nothing)]
-          , CC._funcStateMutability = Nothing
+          , CC._funcVals = zipWith (\i t -> (Nothing, IndexedType i t Nothing)) [0..] retTypes
+          , CC._funcStateMutability = Just CC.View
           , CC._funcContents = Nothing
           , CC._funcVisibility = Just Public
           , CC._funcVirtual = False
@@ -279,3 +297,28 @@ getterSignature (SVMType.Mapping _ keyT valT _ _) =
   let (innerArgs, innerRet) = getterSignature valT
    in (keyT : innerArgs, innerRet)
 getterSignature t = ([], t)
+
+-- | Return types produced by a public-variable getter. For a struct-valued
+-- getter this flattens the struct into its member types (Solidity returns the
+-- members as a tuple), skipping members the getter omits — mappings, arrays and
+-- errors — to stay in lockstep with SolidVM's handleStruct. For any other type
+-- the getter returns a single value.
+getterReturnTypes :: CC.Contract -> SVMType.Type -> [SVMType.Type]
+getterReturnTypes contract retType =
+  case lookupStructFields contract retType of
+    Just fields -> [t | (_, t) <- fields, includeInGetter t]
+    Nothing -> [retType]
+  where
+    includeInGetter SVMType.Error {} = False
+    includeInGetter SVMType.Array {} = False
+    includeInGetter SVMType.Mapping {} = False
+    includeInGetter _ = True
+
+lookupStructFields :: CC.Contract -> SVMType.Type -> Maybe [(SolidString, SVMType.Type)]
+lookupStructFields contract t = do
+  name <- case t of
+    SVMType.Struct _ s -> Just s
+    SVMType.UnknownLabel s -> Just s
+    _ -> Nothing
+  fields <- M.lookup name (contract ^. CC.structs)
+  pure [(fieldName, CC.fieldTypeType ft) | (fieldName, ft, _) <- fields]

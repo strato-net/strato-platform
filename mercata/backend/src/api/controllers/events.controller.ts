@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import { getEvents, getContractInfo, getActivitiesByTypes, type ActivityTypePair } from "../services/events.service";
+import { ACTIVITY_FILTER_CONFIGS } from "../services/activityFilterConfigs";
 
 class EventsController {
   static async getEvents(
@@ -40,42 +41,24 @@ class EventsController {
     try {
       const { accessToken, address, query } = req;
 
-      // Parse activity type pairs from query
       // Format: activity_types=contract1:event1,contract2:event2
+      // Filter configs are resolved server-side from ACTIVITY_FILTER_CONFIGS.
       const activityTypesParam = query.activity_types as string;
       if (!activityTypesParam) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "activity_types parameter required" });
         return;
       }
 
-      // Parse filter configs from query (JSON string)
-      let filterConfigsMap: Map<string, ActivityTypePair["filterConfig"]> = new Map();
-      if (query.filter_configs) {
-        try {
-          const filterConfigs = JSON.parse(query.filter_configs as string) as Array<{
-            contract_name: string;
-            event_name: string;
-            filterConfig: ActivityTypePair["filterConfig"];
-          }>;
-          filterConfigs.forEach(config => {
-            const key = `${config.contract_name}:${config.event_name}`;
-            filterConfigsMap.set(key, config.filterConfig);
-          });
-        } catch (error) {
-          // If parsing fails, continue without filter configs (will use defaults)
-          console.warn("Failed to parse filter_configs:", error);
-        }
-      }
-
-      const activityTypePairs: ActivityTypePair[] = activityTypesParam.split(',').map((pair) => {
+      const activityTypePairs: ActivityTypePair[] = [];
+      for (const pair of activityTypesParam.split(',')) {
         const [contract_name, event_name] = pair.split(':');
-        const key = `${contract_name}:${event_name}`;
-        return {
-          contract_name,
-          event_name,
-          filterConfig: filterConfigsMap.get(key)
-        };
-      });
+        const filterConfig = ACTIVITY_FILTER_CONFIGS[`${contract_name}:${event_name}`];
+        if (!filterConfig) {
+          res.status(RestStatus.BAD_REQUEST).json({ error: `Unknown activity type: ${pair}` });
+          return;
+        }
+        activityTypePairs.push({ contract_name, event_name, filterConfig });
+      }
 
       const limit = parseInt(query.limit as string || "10");
       const offset = parseInt(query.offset as string || "0");
@@ -98,4 +81,4 @@ class EventsController {
   }
 }
 
-export default EventsController; 
+export default EventsController;

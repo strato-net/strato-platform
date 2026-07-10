@@ -4,6 +4,7 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
+const { getCreatedAddress, getIssueId, pollForCreateIssueExecution } = require('./util');
 const { rest, importer, util } = require('blockapps-rest');
 const fs = require('fs-extra');
 const path = require('path');
@@ -11,15 +12,8 @@ const path = require('path');
 // The owner of the implementation address is ignored in favor of the proxy owner
 const DEFAULT_CONSTRUCTOR_ARGS = {"initialOwner": "deadbeef"};
 
-// BATCH_TARGETS is currently filled with StablePool proxies to upgrade for Issue #6348
 const BATCH_TARGETS = [
-    "ff2befcd850183170627dcbc377c3fd573789172",
-    "bab35f9fe024e2735edae7a9c0aba4db260a649c",
-    "3d1dc151402858521bf9beaa8c72a68c9b4fc2fe",
-    "5214055d631645de83b7299604ea6ade31d87c47",
-    "9c75280f9e2368005d2b7342f19c59f9176b5962",
-    "5888fbe6d6774c1d5788a7b631fc2a2fe88c44c6",
-    "41be20683ef9d57884e0a92f203e6c3161cf0aa1"
+    "----proxy-address----",
 ];
 
 /**
@@ -156,6 +150,7 @@ async function verifyProxyAndImplementation(tokenObj, proxyAddress, contractName
  */
 async function deployImplementationAsync(tokenObj, contractArgs, baseOptions) {
   const asyncOptions = { ...baseOptions, isAsync: true };
+  const submittedAt = new Date().toISOString();
   const response = await rest.createContract(tokenObj, contractArgs, asyncOptions);
   const responseArray = Array.isArray(response) ? response : [response];
   const hashes = responseArray.map((r) => r && r.hash).filter(Boolean);
@@ -181,15 +176,55 @@ async function deployImplementationAsync(tokenObj, contractArgs, baseOptions) {
     );
   }
 
-  const created = final.txResult && final.txResult.contractsCreated;
-  const address = Array.isArray(created) ? created[0] : created;
+  const address = getCreatedAddress(final);
   if (!address) {
+    const issueId = getIssueId(final);
+    if (issueId) {
+      return pollForCreateIssueExecution(tokenObj, issueId, final, submittedAt, 'implementation address');
+    }
+
     throw new Error(
       'Deployment succeeded but no contractsCreated entry in receipt: ' +
         JSON.stringify(final)
     );
   }
   return address;
+}
+
+/**
+ * Call a contract method asynchronously and poll for the receipt.
+ *
+ * As of 04-22-2026, contract calls also route through the caller's user-contract,
+ * so the synchronous `rest.call` resolver crashes reading `a.data.contents` (data is null).
+ * `isAsync: true` + `rest.getBlocResults` bypasses the broken resolver and gives us the
+ * raw tx receipt so we can assert success ourselves.
+ */
+async function callAsync(tokenObj, callArgs, baseOptions) {
+  const asyncOptions = { ...baseOptions, isAsync: true };
+  const response = await rest.call(tokenObj, callArgs, asyncOptions);
+  const responseArray = Array.isArray(response) ? response : [response];
+  const hashes = responseArray.map((r) => r && r.hash).filter(Boolean);
+  if (hashes.length === 0) {
+    throw new Error(
+      'rest.call returned no tx hash; cannot poll for receipt: ' + JSON.stringify(response)
+    );
+  }
+
+  const finalResults = await util.until(
+    (results) => Array.isArray(results) && results.length > 0 &&
+      results.every((r) => r && r.status && r.status !== 'Pending'),
+    (opts) => rest.getBlocResults(tokenObj, hashes, opts),
+    { config, isAsync: true },
+    60000
+  );
+
+  const final = Array.isArray(finalResults) ? finalResults[0] : finalResults;
+  if (!final || final.status !== 'Success') {
+    throw new Error(
+      'Contract call failed: ' + JSON.stringify(final || finalResults)
+    );
+  }
+  return final;
 }
 
 /**
@@ -358,16 +393,21 @@ async function main() {
         cacheNonce: true,
       };
 
-      const upgradeResult = await rest.call(tokenObj, callArgs, callOptions);
+      // Async + poll: the sync resolver crashes on user-contract-routed calls (reads
+      // `.contents` on a null `data` field). We lose direct access to the solidity
+      // return value (vote issue id, if any) but confirm success via the receipt.
+      const upgradeReceipt = await callAsync(tokenObj, callArgs, callOptions);
 
-      if (upgradeResult[0]) {
-          console.log('\n======  Upgrade  Pending  ======');
-          console.log("Proxy Uploaded and Upgrade Requested.")
-          console.log("Governance Vote Required.\nVote Issue ID: " + upgradeResult[0]);
+      // If setLogicContract went through governance, the tx still succeeds here but
+      // the new implementation only takes effect after the vote resolves. Surface
+      // whatever the receipt tells us so the operator can follow up.
+      const voteHint = upgradeReceipt && upgradeReceipt.txResult && upgradeReceipt.txResult.message;
+      console.log('\n====== Upgrade Submitted ======');
+      console.log(`Tx status: ${upgradeReceipt.status}`);
+      if (voteHint) {
+        console.log(`Note (may indicate governance vote required): ${voteHint}`);
       }
-      else {
-          console.log('\n====== Upgrade Successful ======');
-      }
+      console.log('If this proxy is under governance, confirm the vote resolves before treating the upgrade as live.');
 
       console.log(`Proxy Address: ${proxyAddress}`);
       console.log(`New Implementation: ${implementationAddress}`);

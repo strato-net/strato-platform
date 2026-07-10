@@ -24,6 +24,7 @@ const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 router.get("/token-apys", authHandler.authorizeRequest(true), EarnController.getTokenApys);
 
 router.get("/save-usdst/info", authHandler.authorizeRequest(true), SaveUsdstController.getInfo);
+router.get("/save-usdst/history", authHandler.authorizeRequest(true), SaveUsdstController.getHistory);
 router.get("/save-usdst/user", authHandler.authorizeRequest(), SaveUsdstController.getUserInfo);
 router.post("/save-usdst/deposit", walletAuth, SaveUsdstController.deposit);
 router.post("/save-usdst/redeem", walletAuth, SaveUsdstController.redeem);

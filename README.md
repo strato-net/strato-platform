@@ -132,3 +132,27 @@ How the new images take effect depends on whether the node is currently running:
     ```
     strato-down && ./run.sh
     ```
+
+### 6. Restore a Synced Node Snapshot
+
+For local development that requires a STRATO node, restore a pre-synced snapshot instead of syncing from genesis. The simplest path is to start a node directly from the latest published snapshot for the network:
+
+```
+strato-up mynode --network=helium --snapshot
+```
+
+`--snapshot` downloads the latest snapshot for the network; append a timestamp (`--snapshot=YYYYMMDD-HH:mm:ssZ`) to pick a specific one. To restore without starting, or to restore from an explicit location:
+
+```
+# Latest published snapshot for the network:
+strato-snapshot restore mynode --snapshot --network helium
+
+# An explicit local file or S3 URI:
+strato-snapshot restore mynode \
+  --source s3://strato-snapshots/helium/latest.tar.zst \
+  --network helium
+
+strato-up mynode
+```
+
+Snapshot artifacts are cold copies of `.ethereumH`, Postgres, Redis, and Kafka state. See `design-documents/node-snapshot-tool-README.md` for the full CLI and `design-documents/node-snapshot-dev-loop.md` for the create/restore contract and safety checks.

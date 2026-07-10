@@ -27,20 +27,27 @@ export interface NetworkConfig {
  */
 export interface BridgeToken {
   id: string;
+  routeType: BridgeRouteType;
   stratoToken: string;           // Key: address of the STRATO token
   stratoTokenName: string;       // From TokenFactory (not in AssetInfo)
   stratoTokenSymbol: string;     // From TokenFactory (not in AssetInfo)
   externalChainId: string;       // Matches AssetInfo.externalChainId
+  externalBridge?: string;       // Native-only representation bridge address
   externalName: string;          // Matches AssetInfo.externalName
   externalToken: string;         // Matches AssetInfo.externalToken
   externalSymbol: string;        // Matches AssetInfo.externalSymbol
   externalDecimals: string;      // Matches AssetInfo.externalDecimals
   maxPerWithdrawal: string;      // Matches AssetInfo.maxPerWithdrawal
+  instantWithdrawalThreshold?: string; // Native-only; amount eligible for automatic instant bridge-out
   enabled: boolean;              // effective route enabled state
+  depositsPaused?: boolean;      // Native-only; hides native redemption/deposit routes when true
+  withdrawalsPaused?: boolean;   // Native-only; hides native withdrawal routes when true
   isDefaultRoute: boolean;       // true when route token matches asset default token
   stratoTokenImage?: string;     // First image URL from TokenFactory images
   rebaseFactor?: string;         // External-only; for example, getCurrentMultiplier() for TSLAx
 }
+
+export type BridgeRouteType = "standard" | "native";
 
 /**
  * A post-deposit action (earn yield or forge metal) returned by /bridge/depositActions
@@ -115,9 +122,10 @@ export type BridgeTransactionTab = 'DepositRecorded' | 'WithdrawalInitiated' | '
  * Parameters for requesting a withdrawal
  */
 export interface WithdrawalRequestParams {
+  routeType?: BridgeRouteType;
   externalChainId: string;
   externalRecipient: string;
-  externalToken: string;
+  externalToken?: string;
   stratoToken: string;
   stratoTokenAmount: string;
 }

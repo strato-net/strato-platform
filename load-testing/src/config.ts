@@ -94,7 +94,7 @@ export function loadConfig(configPath: string): LoadTestConfig {
         metalTokenAddress: "",
         payTokenAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010", // helium USDST
         metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6", // helium MetalForge
-        includePageLoad: true,
+        includePageLoad: false,
         logBalances: "summary",
         requestRetries: 3,
         autoForgeWaitTimeoutSec: 300,
@@ -115,10 +115,23 @@ export function loadConfig(configPath: string): LoadTestConfig {
         payAmount: "1000000000000000", // 0.001 USDST per iteration
         minMetalOut: "0",
         metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6", // helium MetalForge
-        includePageLoad: true,
+        includePageLoad: false,
         logBalances: "summary",
         requestRetries: 3,
         ...raw.scenarios?.forgeBuy,
+      },
+      pageLoad: {
+        enabled: false,
+        concurrentUsers: 50,
+        networkLabel: "helium",
+        // Defaults mirror the forge Buy page's on-mount GETs so this scenario
+        // exercises the same page-load path the forgeBuy UI hits, in
+        // isolation runs. Override via YAML to test other UI pages.
+        steps: [
+          { name: "metalForgeConfigs", path: "/api/metal-forge/configs" },
+          { name: "tokensBalance", path: "/api/tokens/balance" },
+        ],
+        ...raw.scenarios?.pageLoad,
       },
     },
     report: { ...DEFAULTS.report!, ...raw.report },
@@ -146,6 +159,7 @@ const KNOWN_SCENARIOS = new Set([
   "mixedWorkload",
   "tokenSale",
   "forgeBuy",
+  "pageLoad",
 ]);
 
 export function applyCliOverrides(
@@ -192,6 +206,7 @@ export function applyCliOverrides(
   if (overrides.concurrentUsers !== undefined) {
     config.scenarios.tokenSale.concurrentUsers = overrides.concurrentUsers;
     config.scenarios.forgeBuy.concurrentUsers = overrides.concurrentUsers;
+    config.scenarios.pageLoad.concurrentUsers = overrides.concurrentUsers;
   }
   if (overrides.totalTx !== undefined) {
     config.scenarios.tokenSale.totalTxCount = overrides.totalTx;
@@ -204,6 +219,7 @@ export function applyCliOverrides(
   if (overrides.backendUrl) {
     config.scenarios.tokenSale.backendUrl = overrides.backendUrl;
     config.scenarios.forgeBuy.backendUrl = overrides.backendUrl;
+    config.scenarios.pageLoad.backendUrl = overrides.backendUrl;
   }
   return config;
 }

@@ -278,13 +278,13 @@ fuseChannels :: (MonadIO m, MonadReader SequencerConfig m) =>
                 m (ConduitM () SeqLoopEvent SequencerM ())
 fuseChannels = do
   timers <- asks blockstanbulTimeouts
-  let k = kafkaConfig ethConf
-      kafkaAddress = (fromString $ kafkaHost k, fromIntegral $ kafkaPort k)
+  let k = streamingConfig ethConf
+      streamingAddress = (fromString $ streamingHost k, fromIntegral $ streamingPort k)
 
   let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . format))
   (debugLog . transPipe lift)
     <$> mergeSources
-      [ conduitBatchSource "sequencer" kafkaAddress unseqEventsTopicName .| mapC UnseqEvents,
+      [ conduitBatchSource "sequencer" streamingAddress unseqEventsTopicName .| mapC UnseqEvents,
         sourceTMChan timers .| mapC TimerFire
       ]
-      4096 -- 🙏
+      1 -- Keep decoded Kafka batches from piling up ahead of eventHandler.

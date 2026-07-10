@@ -55,6 +55,8 @@ async function main() {
     console.log(`Liquidity Pool: ${deployedContract.managers.liquidityPool}`);
     console.log(`Lending Registry: ${deployedContract.managers.lendingRegistry}`);
     console.log(`Mercata Bridge: ${deployedContract.managers.mercataBridge}`);
+    console.log(`Strato Native Bridge: ${deployedContract.managers.stratoNativeBridge}`);
+    console.log(`Strato Native Custody Vault: ${deployedContract.managers.stratoNativeCustodyVault}`);
     console.log(`Pool Factory: ${deployedContract.managers.poolFactory}`);
     console.log(`Token Factory: ${deployedContract.managers.tokenFactory}`);
     console.log(`Fee Collector: ${deployedContract.managers.feeCollector}`);
@@ -89,6 +91,8 @@ async function main() {
       LENDING_REGISTRY: deployedContract.managers.lendingRegistry,
       POOL_CONFIGURATOR: deployedContract.managers.poolConfigurator,
       MERCATA_BRIDGE: deployedContract.managers.mercataBridge,
+      STRATO_NATIVE_BRIDGE: deployedContract.managers.stratoNativeBridge,
+      STRATO_NATIVE_CUSTODY_VAULT: deployedContract.managers.stratoNativeCustodyVault,
       CDP_REGISTRY: deployedContract.managers.cdpRegistry,
       CDP_ENGINE: deployedContract.managers.cdpEngine,
       CDP_VAULT: deployedContract.managers.cdpVault,

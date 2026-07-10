@@ -18,7 +18,6 @@ const TRANSFER_PAIRS = Object.values(activityTypes)
   .map((c) => ({
     contract_name: c.contract_name,
     event_name: c.event_name,
-    filterConfig: c.filterConfig,
   }));
 
 const PAGE = 200;

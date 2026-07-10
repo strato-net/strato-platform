@@ -25,6 +25,7 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
+    - aeson
     - blockapps-vault-wrapper-api
     - bytestring
     - cache
@@ -108,6 +109,22 @@ executables:
       - strato-model
       - text
 
+  strato-vault-import-key:
+    source-dirs: app
+    main: ImportKey.hs
+    other-modules: [Options]
+    dependencies:
+      - blockapps-vault-wrapper-api
+      - blockapps-vault-wrapper-server
+      - base16-bytestring
+      - bytestring
+      - hflags
+      - opaleye
+      - postgresql-simple
+      - saltine
+      - strato-model
+      - text
+
   migrate-mercata:
     source-dirs: app
     main: MigrateMercata.hs
@@ -152,6 +169,23 @@ executables:
       - opaleye
       - postgresql-simple
       - saltine
+
+  migrate-key:
+    source-dirs: app
+    main: MigrateKey.hs
+    other-modules: [Options]
+    dependencies:
+      - aeson
+      - base64-bytestring
+      - blockapps-vault-wrapper-api
+      - blockapps-vault-wrapper-server
+      - bytestring
+      - hflags
+      - opaleye
+      - postgresql-simple
+      - saltine
+      - strato-model
+      - text
 
 
 tests:

@@ -13,7 +13,7 @@ export const BRIDGE_MODE_LABELS = {
   convert: {
     title: "Redeem to Stablecoins",
     description: "Redeem USDST back to external stablecoins",
-    amountLabel: "Amount (USDST to withdraw)",
+    amountLabel: "Amount (USDST to bridge out)",
   },
   bridge: {
     title: "Bridge Out Your Tokens",
@@ -176,6 +176,20 @@ export const DEPOSIT_ROUTER_ABI = [
     inputs: [],
     name: 'InvalidPermissions',
     type: 'error'
+  }
+] as const;
+
+export const STRATO_NATIVE_REPRESENTATION_BRIDGE_ABI = [
+  {
+    inputs: [
+      { name: 'representationToken', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'stratoRecipient', type: 'address' }
+    ],
+    name: 'requestRedemption',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
   }
 ] as const;
 

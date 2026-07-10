@@ -9,6 +9,36 @@ import * as config from "../../config/config";
 import { OraclePriceMap } from "@mercata/shared-types";
 
 const { Token, DECIMALS, Pool, LendingPool, SaveUSDSTVault, lendingRegistry, YieldVault } = constants;
+const RAY = 10n ** 27n;
+
+const getActiveAssets = (totalAssets: bigint, totalClaimableAssets: bigint): bigint =>
+  totalAssets > totalClaimableAssets ? totalAssets - totalClaimableAssets : 0n;
+
+const minBigInt = (...values: bigint[]): bigint =>
+  values.reduce((min, value) => value < min ? value : min);
+
+const normalizeAddress = (value: string | undefined | null): string =>
+  (value || "").toLowerCase().replace(/^0x/, "");
+
+const isZeroAddress = (value: string | undefined | null): boolean => {
+  const normalized = normalizeAddress(value);
+  return !normalized || /^0+$/.test(normalized);
+};
+
+const rpow = (x: bigint, n: bigint, base: bigint): bigint => {
+  if (x === 0n) return n === 0n ? base : 0n;
+
+  let z = n % 2n === 0n ? base : x;
+  const half = base / 2n;
+  for (n /= 2n; n > 0n; n /= 2n) {
+    x = ((x * x) + half) / base;
+    if (n % 2n === 1n) {
+      z = ((z * x) + half) / base;
+    }
+  }
+
+  return z;
+};
 
 const addMTokenPrice = async (
   accessToken: string,
@@ -110,14 +140,23 @@ const addSaveUsdstTokenPrice = async (
     return;
   }
 
-  const { data: vaultRows } = await cirrus.get(accessToken, `/${SaveUSDSTVault}`, {
-    params: {
-      address: `eq.${config.saveUsdstVault}`,
-      select: "address,assetToken,_managedAssets::text,_totalSupply::text",
-    }
-  });
+  const [{ data: vaultRows }, { data: storageRows }] = await Promise.all([
+    cirrus.get(accessToken, `/${SaveUSDSTVault}`, {
+      params: {
+        address: `eq.${config.saveUsdstVault}`,
+        select: "address,assetToken,_managedAssets::text,_totalSupply::text",
+      }
+    }),
+    cirrus.get(accessToken, "/storage", {
+      params: {
+        address: `eq.${config.saveUsdstVault}`,
+        select: "data->>perSecondSavingsRate,data->>lastAccrual,data->>rewardDistributor",
+        limit: "1",
+      }
+    }),
+  ]);
 
-  const vault = vaultRows?.[0];
+  const vault = vaultRows?.[0] ? { ...vaultRows[0], ...storageRows?.[0] } : null;
   if (!vault?.address || !vault?.assetToken) {
     return;
   }
@@ -134,7 +173,52 @@ const addSaveUsdstTokenPrice = async (
   const totalShares = BigInt(vault._totalSupply || "0");
   const liveBalance = BigInt(balanceRows?.[0]?.value || "0");
   const pricingAssets = liveBalance < managedAssets ? liveBalance : managedAssets;
-  const pricePerShare = totalShares === 0n ? DECIMALS : (pricingAssets * DECIMALS) / totalShares;
+  let projectedPricingAssets = pricingAssets;
+
+  const perSecondSavingsRate = BigInt(vault.perSecondSavingsRate || "0");
+  const lastAccrual = BigInt(vault.lastAccrual || "0");
+  const nowSec = BigInt(Math.floor(Date.now() / 1000));
+  if (
+    totalShares > 0n &&
+    managedAssets > 0n &&
+    perSecondSavingsRate > RAY &&
+    nowSec > lastAccrual &&
+    !isZeroAddress(vault.rewardDistributor)
+  ) {
+    const growthFactor = rpow(perSecondSavingsRate, nowSec - lastAccrual, RAY);
+    const targetAmount = (managedAssets * (growthFactor - RAY)) / RAY;
+    if (targetAmount > 0n) {
+      try {
+        const [{ data: distributorBalanceRows }, { data: allowanceRows }] = await Promise.all([
+          cirrus.get(accessToken, `/${Token}-_balances`, {
+            params: {
+              address: `eq.${vault.assetToken}`,
+              key: `eq.${vault.rewardDistributor}`,
+              select: "value::text",
+            }
+          }),
+          cirrus.get(accessToken, `/${Token}-_allowances`, {
+            params: {
+              address: `eq.${vault.assetToken}`,
+              key: `eq.${vault.rewardDistributor}`,
+              key2: `eq.${vault.address}`,
+              select: "value::text",
+              limit: "1",
+            }
+          }),
+        ]);
+        projectedPricingAssets += minBigInt(
+          targetAmount,
+          BigInt(distributorBalanceRows?.[0]?.value || "0"),
+          BigInt(allowanceRows?.[0]?.value || "0")
+        );
+      } catch {
+        projectedPricingAssets = pricingAssets;
+      }
+    }
+  }
+
+  const pricePerShare = totalShares === 0n ? DECIMALS : (projectedPricingAssets * DECIMALS) / totalShares;
 
   priceMap.set(vault.address, pricePerShare.toString());
 };
@@ -153,7 +237,7 @@ const addYieldVaultTokenPrices = async (
     const { data: rows } = await cirrus.get(accessToken, `/${YieldVault}`, {
       params: {
         address: `eq.${vaultAddress}`,
-        select: "address,_asset,deployedAssets::text,_totalSupply::text",
+        select: "address,_asset,deployedAssets::text,_totalSupply::text,totalClaimableAssets::text",
       },
     });
     const v = rows?.[0];
@@ -170,8 +254,9 @@ const addYieldVaultTokenPrices = async (
     const idle = BigInt(balRows?.[0]?.value || "0");
     const deployed = BigInt(v.deployedAssets || "0");
     const totalAssets = idle + deployed;
+    const activeAssets = getActiveAssets(totalAssets, BigInt(v.totalClaimableAssets || "0"));
     const totalShares = BigInt(v._totalSupply || "0");
-    const pricePerShare = totalShares === 0n ? DECIMALS : (totalAssets * DECIMALS) / totalShares;
+    const pricePerShare = totalShares === 0n ? DECIMALS : (activeAssets * DECIMALS) / totalShares;
     priceMap.set(v.address, pricePerShare.toString());
   }
 };
@@ -199,7 +284,7 @@ export const getCarryVaultUsdPriceMap = async (
     const { data: rows } = await cirrus.get(accessToken, `/${YieldVault}`, {
       params: {
         address: `eq.${vaultAddress}`,
-        select: "address,_asset,deployedAssets::text,_totalSupply::text",
+        select: "address,_asset,deployedAssets::text,_totalSupply::text,totalClaimableAssets::text",
       },
     });
     const v = rows?.[0];
@@ -216,10 +301,11 @@ export const getCarryVaultUsdPriceMap = async (
     const idle = BigInt(balRows?.[0]?.value || "0");
     const deployed = BigInt(v.deployedAssets || "0");
     const totalAssets = idle + deployed;
+    const activeAssets = getActiveAssets(totalAssets, BigInt(v.totalClaimableAssets || "0"));
     const totalShares = BigInt(v._totalSupply || "0");
     if (totalShares === 0n) continue;
 
-    const pricePerShareUnderlying = (totalAssets * DECIMALS) / totalShares;
+    const pricePerShareUnderlying = (activeAssets * DECIMALS) / totalShares;
 
     const assetKey = String(v._asset).toLowerCase();
     const assetUsdPriceStr = priceMap.get(assetKey) || priceMap.get(v._asset) || "0";

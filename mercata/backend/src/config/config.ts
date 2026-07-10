@@ -36,6 +36,9 @@ export const clientId = process.env.OAUTH_CLIENT_ID;
 export const clientSecret = process.env.OAUTH_CLIENT_SECRET;
 export const nodeUrl = process.env.NODE_URL;
 
+// Direct Postgres access to cirrus DB (used instead of Cirrus/PostgREST for heavy queries)
+export const cirrusDbName = "cirrus";
+
 // Smart contract addresses
 export const burnAddress = process.env.BURN_ADDRESS || "0000000000000000000000000000000000000000";
 export const priceOracle = process.env.PRICE_ORACLE || "0000000000000000000000000000000000001002";
@@ -115,6 +118,31 @@ export const defaultVaultFactoryFor: Record<string, string> = {
   "33056204878082667": "55c77951e9cadc73af24ec18881d01fedff1f1f1" // Upquark mainnet
 };
 
+export const defaultStratoNativeBridgeFor: Record<string, string> = {
+  "114784819836269": "49f69252b00235030a4dcd4c7ef17a64ef346258", // Helium testnet
+  "33056204878082667": "4d9e9c39180a75091b9c35bbb9064d67c7fdde5a", // Upquark mainnet
+};
+
+export const defaultStratoNativeCustodyVaultFor: Record<string, string> = {
+  "114784819836269": "8cfe7b576f69260673e9a1a9517137f12a49ed93", // Helium testnet
+  "33056204878082667": "db967ac5c497e6a2bd6f89036d2b63851760318f", // Upquark mainnet
+};
+
+export const defaultStratoTokenFor: Record<string, string> = {
+  "114784819836269": "8ee9a3391e38176feebf5d43cb2c1d6c4f728b04", // Helium testnet
+  "33056204878082667": "2ca3e170e6714282da77815f7864b17f612f5f83", // Upquark mainnet
+};
+
+export const defaultStratoStakingFor: Record<string, string> = {
+  "114784819836269": "d6726e06c3c71a3bad80b5eb6925707a31729b81", // Helium testnet
+  "33056204878082667": "f30a022ce83bed7adeafc286c719388dcc3b3988", // Upquark mainnet
+};
+
+export const defaultValidatorRegistryFor: Record<string, string> = {
+  "114784819836269": "bfbb75bb6bd0bafa2f5c5b735fe518ade76808dd", // Helium testnet
+  "33056204878082667": "d190674c0923a4646746b298037507bb9fc1057f", // Upquark mainnet
+};
+
 export const defaultMetalForgeFor: Record<string, string> = {
   "114784819836269": "c5ed981b816a626981a5747d125e0e7296b2c7c6", // Helium testnet
   "33056204878082667": "1cc5bad32dc8667878fa7c53cc5cfd6e76fdb113", // Upquark mainnet
@@ -128,6 +156,11 @@ export const defaultCreditCardTopUpFor: Record<string, string> = {
 export const defaultVaultFor: Record<string, string> = {
   "114784819836269": "d556695364551c8c7eb336f0bed9aed9e1acd69d", // Helium testnet
   "33056204878082667": "34bc729f66106a146b0864e673a3571b28fa23e1", // Upquark mainnet
+};
+
+export const defaultDirectMintPsmFor: Record<string, string> = {
+  "114784819836269": "0b30adc5f2d90bada37afa699b75f485f04e7287", // Helium testnet
+  "33056204878082667": "b1efdc86eecfbedf83d0295671214fee451786f3"
 };
 
 export const defaultSaveUsdstVaultFor: Record<string, string> = {
@@ -163,6 +196,12 @@ export let vault: string = '';
 export let saveUsdstVault: string = '';
 export let ethCarryVault: string = '';
 export let wbtcCarryVault: string = '';
+export let directMintPsm: string = '';
+export let stratoNativeBridge: string = '';
+export let stratoNativeCustodyVault: string = '';
+export let stratoToken: string = '';
+export let stratoStaking: string = '';
+export let validatorRegistry: string = '';
 export let usdcYieldVault: string = '';
 
 function setBridgeConfig(networkId: string) {
@@ -202,6 +241,30 @@ function setVaultFactoryConfig(networkId: string) {
   }
 }
 
+function setStratoNativeBridgeConfig(networkId: string) {
+  stratoNativeBridge =
+    process.env.STRATO_NATIVE_BRIDGE ||
+    defaultStratoNativeBridgeFor[networkId] ||
+    "";
+  stratoNativeCustodyVault =
+    process.env.STRATO_NATIVE_CUSTODY_VAULT ||
+    defaultStratoNativeCustodyVaultFor[networkId] ||
+    "";
+}
+
+function setStratoTokenConfig(networkId: string) {
+  stratoToken =
+    process.env.STRATO_TOKEN ||
+    process.env.STRATO_TOKEN_ADDRESS ||
+    defaultStratoTokenFor[networkId] ||
+    "";
+}
+
+function setStratoStakingConfig(networkId: string) {
+  stratoStaking = process.env.STRATO_STAKING || defaultStratoStakingFor[networkId] || "";
+  validatorRegistry = process.env.VALIDATOR_REGISTRY || defaultValidatorRegistryFor[networkId] || "";
+}
+
 function setMetalForgeConfig(networkId: string) {
   if (process.env.METAL_FORGE) {
     metalForge = process.env.METAL_FORGE;
@@ -223,6 +286,14 @@ export function setSaveUsdstVaultConfig(networkId: string) {
     saveUsdstVault = process.env.SAVE_USDST_VAULT;
   } else {
     saveUsdstVault = defaultSaveUsdstVaultFor[networkId];
+  }
+}
+
+export function setDirectMintPsmConfig(networkId: string) {
+  if (process.env.DIRECT_MINT_PSM) {
+    directMintPsm = process.env.DIRECT_MINT_PSM;
+  } else {
+    directMintPsm = defaultDirectMintPsmFor[networkId] || "";
   }
 }
 
@@ -257,11 +328,15 @@ export async function initNetworkConfig() {
   setRewardsConfig(networkId);
   setReferralConfig(networkId);
   setVaultFactoryConfig(networkId);
+  setStratoNativeBridgeConfig(networkId);
+  setStratoTokenConfig(networkId);
+  setStratoStakingConfig(networkId);
   setMetalForgeConfig(networkId);
   setCreditCardTopUpConfig(networkId);
   setSaveUsdstVaultConfig(networkId);
   setVaultConfig(networkId);
   setCarryVaultConfig(networkId);
+  setDirectMintPsmConfig(networkId);
   setUsdcYieldVaultConfig(networkId);
 }
 
@@ -277,11 +352,14 @@ export async function getInternalAddresses() {
   // Static: well-known system contract addresses from config
   const addresses: string[] = [
     mercataBridge,
+    stratoNativeBridge,
+    stratoNativeCustodyVault,
     burnAddress,
   ];
 
   // Network-specific addresses (set by initNetworkConfig)
   addresses.push(rewards || '', escrow, vaultFactory);
+  addresses.push(stratoStaking, validatorRegistry);
 
   // Lending Registry --> lendingPool, collateralVault, liquidityPool
   const { data: [lending] } = await cirrus.get(accessToken, "/BlockApps-LendingRegistry", {

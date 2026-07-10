@@ -4,10 +4,11 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { requestWalletConnection } from "@/lib/auth";
 import { useEarnContext } from "@/context/EarnContext";
 import { useTokenContext } from "@/context/TokenContext";
-import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import { useRewards } from "@/hooks/useRewards";
+import { formatEmissionRatePerDay } from "@/services/rewardsService";
 import { findBestEarnApyInfo, buildEarnApyMap } from "@/utils/earnUtils";
-import { usdstAddress } from "@/lib/constants";
+import type { UserRewardsData } from "@/services/rewardsService";
+import { rewardsEnabled, usdstAddress } from "@/lib/constants";
 
 /** GOLDST / SILVST — images from TokenContext (earningAssets ∪ inactiveTokens) */
 const METAL_PROMO_TOKEN_ADDRESSES = [
@@ -55,13 +56,13 @@ const resolvePromoRows = (
 
 interface GuestPromoSectionProps {
   variant: 1 | 2 | 3; // 1 = logged out, 2 = logged in 0 portfolio, 3 = logged in with portfolio
+  userRewards?: UserRewardsData | null;
 }
 
-const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
+const GuestPromoSection = ({ variant, userRewards }: GuestPromoSectionProps) => {
   const navigate = useNavigate();
   const [rewardsButtonHovered, setRewardsButtonHovered] = useState(false);
   const { tokenApys, tokenApysLoaded } = useEarnContext();
-  const { userRewards } = useRewardsUserInfo();
   const { state: rewardsState } = useRewards();
   const { earningAssets, inactiveTokens, loadingEarningAssets } = useTokenContext();
   const tokensLoading = loadingEarningAssets || earningAssets.length === 0;
@@ -111,6 +112,15 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
     return { dailyPointsStr: formatDailyPoints(perDay), emissionFillPct: fillPct };
   }, [userRewards, rewardsState]);
 
+  const totalDailyPointsStr = useMemo(() => {
+    const emission = rewardsState?.totalRewardsEmission;
+    if (!emission) return null;
+    const formatted = formatEmissionRatePerDay(emission);
+    if (!formatted || formatted === "0") return null;
+    const numeric = Math.round(parseFloat(formatted.replace(/,/g, "")));
+    return Number.isFinite(numeric) && numeric > 0 ? numeric.toLocaleString("en-US") : null;
+  }, [rewardsState?.totalRewardsEmission]);
+
   const highestAvailableApy = useMemo(() => {
     let best = 0;
     for (const info of buildEarnApyMap(tokenApys).values()) {
@@ -120,6 +130,8 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
   }, [tokenApys]);
 
   if (variant === 3) {
+    if (!rewardsEnabled) return null;
+
     return (
       <div className="mb-8">
         <div
@@ -141,7 +153,9 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
                 }
               </h1>
               <p className="text-white/60 text-sm md:text-base mb-6">
-                Including 11,111 reward points daily, just for holding
+                {totalDailyPointsStr
+                  ? `Including ${totalDailyPointsStr} reward points daily, just for holding`
+                  : "Including reward points daily, just for holding"}
               </p>
               <button
                 onClick={() => navigate("/dashboard/earn")}
@@ -185,7 +199,7 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
     <div className="space-y-4 mb-8">
       {/* Hero Banner */}
       <div
-        className="rounded-2xl overflow-hidden"
+        className={`rounded-2xl overflow-hidden ${rewardsEnabled ? "" : "hidden"}`}
         style={{
           background:
             "linear-gradient(135deg, #0A0F29 0%, #001B70 55%, #102a80 100%)",
@@ -207,7 +221,9 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
               }
             </h1>
             <p className="text-white/60 text-sm md:text-base mb-6">
-              Plus 11,111 reward points daily, just for holding
+              {totalDailyPointsStr
+                ? `Plus ${totalDailyPointsStr} reward points daily, just for holding`
+                : "Plus reward points daily, just for holding"}
             </p>
 
             <button
@@ -225,7 +241,9 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
             </div>
 
             <h3 className="text-white font-bold text-xl mb-1">Your Daily Points</h3>
-            <p className="text-white/50 text-base mb-4">11,111 pts/day</p>
+            <p className="text-white/50 text-base mb-4">
+              {totalDailyPointsStr ? `${totalDailyPointsStr} pts/day` : "—"}
+            </p>
 
             <div>
               <div className="w-full h-2 bg-white/10 rounded-full mb-5">

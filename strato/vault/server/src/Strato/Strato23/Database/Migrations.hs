@@ -10,7 +10,7 @@ import Data.Int (Int64)
 import Data.Maybe (listToMaybe)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.SqlQQ
-import Strato.Strato23.Database.Create (createTables, messageTable)
+import Strato.Strato23.Database.Create (createTables, messageTable, mpcKeysTable)
 
 data MigrationErrorBehavior = Throw | Catch
 
@@ -38,7 +38,8 @@ migrations =
     (Throw, removePublicKey),
     (Throw, insertOauthProvider),
     (Throw, modifytOauthProvider),
-    (Throw, removeEncKey)
+    (Throw, removeEncKey),
+    (Throw, mpcKeysTable)
   ]
 
 getSchemaVersion :: Query

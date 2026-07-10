@@ -5,6 +5,7 @@ module Strato.Strato23.API
   ( VaultWrapperAPI,
     VaultCoreAPI,
     module Strato.Strato23.API.Key,
+    module Strato.Strato23.API.MPC,
     module Strato.Strato23.API.Password,
     module Strato.Strato23.API.Ping,
     module Strato.Strato23.API.Signature,
@@ -15,6 +16,7 @@ where
 
 import Servant
 import Strato.Strato23.API.Key
+import Strato.Strato23.API.MPC
 import Strato.Strato23.API.Password
 import Strato.Strato23.API.Ping
 import Strato.Strato23.API.Signature
@@ -31,5 +33,7 @@ type VaultWrapperAPI =
     :<|> PostSignature'
     :<|> PostPassword
     :<|> VerifyPassword
+    :<|> PostMPCKey'
+    :<|> GetMPCKey'
 
 type VaultCoreAPI = GetKey :<|> PostKey :<|> GetSharedKey :<|> GetUsers :<|> PostSignature

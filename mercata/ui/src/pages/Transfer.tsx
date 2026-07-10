@@ -55,7 +55,7 @@ const Transfer = () => {
   const isVaultUser = !!userName;
   const guestMode = !isLoggedIn;
   useEffect(() => {
-    document.title = "Transfer Assets | STRATO";
+    document.title = "Send Assets | STRATO";
   }, []);
   const [tokens, setTokens] = useState<Token[]>([]);
   const [recipient, setRecipient] = useState<string>("");
@@ -129,7 +129,7 @@ const Transfer = () => {
       .then(({ data }) => {
         if (data.nonce === 0) setNonceWarning(true);
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => controller.abort();
   }, [recipient, recipientError, isLoggedIn]);
 
@@ -162,13 +162,14 @@ const Transfer = () => {
           args: [ensureHexPrefix(recipient), BigInt(weiValue)],
           nonce: Number(nonce),
           gas: 1000000n,
+          type: "legacy",
+          gasPrice: 0n,
         });
       }
 
       toast({
         title: "Success",
-        description: `Transferred ${fromAmount} ${
-          fromAsset?.token?._symbol ||
+        description: `Sent ${fromAmount} ${fromAsset?.token?._symbol ||
           fromAsset?.token?._name
           } to ${recipient}`,
       });
@@ -179,7 +180,7 @@ const Transfer = () => {
       fetchUserTokens().then((updatedTokens) => {
         const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);
         setFromAsset(updatedToken || null);
-      }).catch(() => {});
+      }).catch(() => { });
       fetchUsdstBalance();
     } catch (error) {
       console.error("Transfer error:", error);
@@ -217,14 +218,14 @@ const Transfer = () => {
       <DashboardSidebar />
 
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
-        <DashboardHeader title="Transfer" />
+        <DashboardHeader title="Send" />
         <main className="p-4 md:p-6">
           {guestMode && (
-            <GuestSignInBanner message="Sign in to transfer tokens to other addresses" />
+            <GuestSignInBanner message="Sign in to send tokens to another STRATO account" />
           )}
           <div className="max-w-2xl mx-auto bg-card shadow-md rounded-lg p-6 space-y-6 border border-border">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Transfer your tokens</h2>
+              <h2 className="text-xl font-semibold">Send tokens to STRATO account</h2>
               <Button
                 variant="outline"
                 size="sm"
@@ -233,7 +234,7 @@ const Transfer = () => {
                 title={tokens.length === 0 ? "No tokens available" : "Upload CSV for bulk transfer"}
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Bulk Transfer
+                Bulk Send
               </Button>
             </div>
 
@@ -285,7 +286,7 @@ const Transfer = () => {
                               token?.token?._name}
                           </Button>
                         ))}
-                        
+
                         {/* Show More button if there are inactive tokens */}
                         {inactiveTokens.length > 0 && !showInactiveTokens && (
                           <Button
@@ -300,7 +301,7 @@ const Transfer = () => {
                             Show More ({inactiveTokens.length})
                           </Button>
                         )}
-                        
+
                         {/* Inactive tokens (shown when expanded) */}
                         {showInactiveTokens && inactiveTokens.map((token) => (
                           <Button
@@ -319,7 +320,7 @@ const Transfer = () => {
                               token?.token?._name}
                           </Button>
                         ))}
-                        
+
                         {/* Show Less button */}
                         {showInactiveTokens && inactiveTokens.length > 0 && (
                           <Button
@@ -347,7 +348,22 @@ const Transfer = () => {
 
             {/* Recipient Address */}
             <div className="space-y-2">
-              <label className="text-sm text-muted-foreground">Recipient Address</label>
+              <label className="text-sm text-muted-foreground">Recipient STRATO Address</label>
+              <div className="rounded-md border border-blue-300 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800 p-3">
+                <div className="flex items-start gap-2 text-blue-800 dark:text-blue-300 text-sm">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <p>
+                    This sends tokens to another STRATO account. It is{" "}
+                    <span className="font-semibold">not</span> a bridge withdrawal — do not
+                    enter an Ethereum or other external chain address. To move tokens off
+                    STRATO, use the{" "}
+                    <Link to="/dashboard/withdrawals" className="font-medium underline">
+                      Bridge Out page
+                    </Link>
+                    .
+                  </p>
+                </div>
+              </div>
               <Input
                 type="text"
                 value={recipient}
@@ -367,7 +383,7 @@ const Transfer = () => {
                         If you are trying to withdraw to an external chain (e.g. Ethereum),
                         please use the{" "}
                         <Link to="/dashboard/withdrawals" className="font-medium underline">
-                          Withdraw page
+                          Bridge Out page
                         </Link>{" "}
                         instead.
                       </p>
@@ -376,7 +392,7 @@ const Transfer = () => {
                           checked={nonceOverride}
                           onCheckedChange={(v) => setNonceOverride(v === true)}
                         />
-                        <span>I understand — proceed with this transfer</span>
+                        <span>I understand — proceed with this send</span>
                       </label>
                     </div>
                   </div>
@@ -460,7 +476,7 @@ const Transfer = () => {
                 (nonceWarning && !nonceOverride)
               }
             >
-              {swapLoading ? <span>Processing…</span> : "Transfer"}
+              {swapLoading ? <span>Processing…</span> : "Send"}
             </Button>
           </div>
 

@@ -1,9 +1,33 @@
 import { createConnector } from "wagmi";
 import { type WalletDetailsParams } from "@rainbow-me/rainbowkit";
 import { type Wallet } from "@rainbow-me/rainbowkit";
-import { redirectToLogin } from "@/lib/auth";
+import { PENDING_STRATO_WALLET_CONNECT_KEY, redirectToLogin } from "@/lib/auth";
 import { type Address, type EIP1193Provider, type Hex, keccak256, toRlp } from "viem";
 import { getStratoChainId, rpcUrl } from "@/lib/stratoChain";
+
+const EXTERNAL_WALLET_KEY = "bridge-external-wallet";
+
+let _suppressReconnect = false;
+
+export function suppressStratoReconnect() {
+  _suppressReconnect = true;
+}
+
+export function allowStratoReconnect() {
+  _suppressReconnect = false;
+}
+
+export function markExternalWalletActive() {
+  localStorage.setItem(EXTERNAL_WALLET_KEY, "1");
+}
+
+export function clearExternalWalletActive() {
+  localStorage.removeItem(EXTERNAL_WALLET_KEY);
+}
+
+export function isExternalWalletActive(): boolean {
+  return localStorage.getItem(EXTERNAL_WALLET_KEY) === "1";
+}
 
 function toMinimalHex(n: number | bigint): Hex {
   if (n === 0 || n === 0n) return "0x";
@@ -107,6 +131,52 @@ function createStratoProvider(userAddress: Address, chainId: number): EIP1193Pro
   return provider;
 }
 
+function normalizeAddress(address: string | undefined): Address | null {
+  if (!address) return null;
+  return (address.startsWith("0x") ? address : `0x${address}`) as Address;
+}
+
+function stratoConnectionFrom(connection: any): { address: Address; chainId: number } | null {
+  if (connection?.connector?.id !== "stratoWallet") return null;
+  const address = normalizeAddress(connection?.accounts?.[0]);
+  return address && connection?.chainId ? { address, chainId: connection.chainId } : null;
+}
+
+function getCachedUserAddress(): Address | null {
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    return normalizeAddress(user?.userAddress);
+  } catch {
+    return null;
+  }
+}
+
+function getStoredStratoConnection(state?: any): { address: Address; chainId: number } | null {
+  const current = state?.current;
+  const stateConnection = current ? state?.connections?.get?.(current) : null;
+  const hydrated = stratoConnectionFrom(stateConnection);
+  if (hydrated) return hydrated;
+
+  try {
+    const stored = JSON.parse(localStorage.getItem("wagmi.store") || "{}");
+    const connections = stored?.state?.connections?.value;
+    const current = stored?.state?.current;
+    const conn = connections?.find(
+      ([uid, c]: [string, any]) => uid === current && c?.connector?.id === "stratoWallet"
+    )?.[1];
+    const persisted = stratoConnectionFrom(conn);
+    if (persisted) return persisted;
+  } catch {
+    const address = getCachedUserAddress();
+    const chainId = getStratoChainId();
+    return address && chainId ? { address, chainId } : null;
+  }
+
+  const address = getCachedUserAddress();
+  const chainId = getStratoChainId();
+  return address && chainId ? { address, chainId } : null;
+}
+
 function stratoConnector(walletDetails: Record<string, unknown> = {}) {
   let provider: EIP1193Provider | null = null;
   let currentAddress: Address | null = null;
@@ -119,9 +189,17 @@ function stratoConnector(walletDetails: Record<string, unknown> = {}) {
 
     async setup() {},
 
-    async connect() {
+    async connect({ isReconnecting } = {}) {
       const chainId = getStratoChainId();
       if (!chainId) throw new Error("STRATO chain not initialized");
+
+      const stored = isReconnecting ? getStoredStratoConnection(config.state) : null;
+      if (stored) {
+        currentAddress = stored.address;
+        provider = createStratoProvider(stored.address, chainId);
+        config.emitter.emit("change", { accounts: [stored.address], chainId });
+        return { accounts: [stored.address], chainId };
+      }
 
       let data: any;
       try {
@@ -129,11 +207,13 @@ function stratoConnector(walletDetails: Record<string, unknown> = {}) {
         if (!res.ok) throw new Error();
         data = await res.json();
       } catch {
+        sessionStorage.setItem(PENDING_STRATO_WALLET_CONNECT_KEY, "1");
         redirectToLogin();
         throw new Error("Authentication required");
       }
-      const addr = data.userAddress as Address;
+      const addr = normalizeAddress(data.userAddress);
       if (!addr) {
+        sessionStorage.setItem(PENDING_STRATO_WALLET_CONNECT_KEY, "1");
         redirectToLogin();
         throw new Error("Authentication required");
       }
@@ -159,6 +239,10 @@ function stratoConnector(walletDetails: Record<string, unknown> = {}) {
 
     async getProvider() {
       const chainId = getStratoChainId();
+      const stored = !currentAddress ? getStoredStratoConnection(config.state) : null;
+      if (stored) {
+        currentAddress = stored.address;
+      }
       if (!provider && currentAddress && chainId) {
         provider = createStratoProvider(currentAddress, chainId);
       }
@@ -166,12 +250,18 @@ function stratoConnector(walletDetails: Record<string, unknown> = {}) {
     },
 
     async isAuthorized() {
+      if (_suppressReconnect || isExternalWalletActive()) return false;
       if (currentAddress) return true;
+      const stored = getStoredStratoConnection(config.state);
+      if (stored) {
+        currentAddress = stored.address;
+        return true;
+      }
       try {
         const res = await fetch("/api/user/me", { credentials: "include" });
         if (!res.ok) return false;
         const data = await res.json();
-        const addr = data.userAddress as Address;
+        const addr = normalizeAddress(data.userAddress);
         if (!addr) return false;
         const chainId = getStratoChainId();
         if (!chainId) return false;
