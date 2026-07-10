@@ -45,7 +45,6 @@ module Blockchain.Context
     , setPeerAddrIfUnset
     , shouldSendToPeer
     , withActivePeer
-    , withCertifiedPeer
     ) where
 
 import           Conduit
@@ -528,7 +527,4 @@ withActivePeer p = bracket a b . const
   where
     a = setPeerActiveState (pPeerHost p) (pPeerTcpPort p) Active
     b _ = setPeerActiveState (pPeerHost p) (pPeerTcpPort p) Inactive
-
-withCertifiedPeer :: PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
-withCertifiedPeer = flip const
 
