@@ -19,6 +19,7 @@ import {
   Vault,
 
   ArrowDownToLine,
+  PieChart,
   X
 } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
@@ -38,13 +39,18 @@ interface MoreNavCategory {
 }
 
 const PRIMARY_NAV_ITEMS = [
-  { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
+  { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
   { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
   { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
   { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
 ];
 
 const MORE_CATEGORIES: MoreNavCategory[] = [
+  {
+    items: [
+      { icon: PieChart, label: 'Portfolio', path: '/portfolio' },
+    ],
+  },
   {
     label: 'TRADE',
     items: [

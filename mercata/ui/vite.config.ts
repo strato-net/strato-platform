@@ -21,6 +21,11 @@ export default defineConfig(({ mode }) => ({
       '127.0.0.1'
     ],
     proxy: {
+      '/rpc': {
+        target: 'https://node1.testnet.strato.nexus',
+        changeOrigin: true,
+        secure: true,
+      },
       '/api/bridge': {
         target: 'https://localhost:3003',
         changeOrigin: true,

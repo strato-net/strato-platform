@@ -16,6 +16,7 @@ import { UserTokensProvider } from "@/context/UserTokensContext";
 import { OracleProvider } from "@/context/OracleContext";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
+import Portfolio from "./pages/Portfolio";
 import SwapAsset from "./pages/SwapAsset";
 import Transfer from "./pages/Transfer";
 import DepositsPage from "./pages/DepositsPage";
@@ -468,6 +469,15 @@ const App = () => {
                                                   }
                                                 />
       
+                                                <Route
+                                                  path="/portfolio"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <Portfolio />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+
                                                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                                                 <Route path="*" element={<NotFound />} />
                                               </Routes>

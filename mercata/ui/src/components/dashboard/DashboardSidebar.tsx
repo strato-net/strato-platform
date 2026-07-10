@@ -18,7 +18,8 @@ import {
   HandCoins,
   Vault,
   CreditCard,
-  ArrowDownToLine
+  ArrowDownToLine,
+  PieChart
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
@@ -39,7 +40,8 @@ interface NavCategory {
 const NAV_CATEGORIES: NavCategory[] = [
   {
     items: [
-      { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
+      { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+      { icon: PieChart, label: 'Portfolio', path: '/portfolio' },
     ],
   },
   {
