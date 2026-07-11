@@ -91,18 +91,36 @@ ethCryptAccept ::
   ConduitM B.ByteString B.ByteString m (Point, EthCryptState, EthCryptState)
 ethCryptAccept = do
   hsBytes <- CB.take 307
-  let (first, second) = case BL.unpack hsBytes of
-        (x : y : _) -> (x, y)
-        _ -> error "Malformed handshake sent from peer"
-      fullSize = fromIntegral first * 256 + fromIntegral second
-      remainingSize = fullSize - 307 + 2
-  remainingBytes <- CB.take remainingSize
-  let fullBuffer = BL.drop 2 $ hsBytes `BL.append` remainingBytes
-  maybeEciesMsgIBytes <- ECIES.decrypt fullBuffer $ BL.toStrict $ BL.take 2 $ hsBytes `BL.append` remainingBytes
-  let eciesMsgIBytes = either (error . (++ ": " ++ show (BL.unpack fullBuffer)) . ("Malformed packed sent from peer: " ++)) id maybeEciesMsgIBytes
-      (signatureRLP, pubKeyRLP, otherNonceRLP, versionRLP) = case rlpSplit eciesMsgIBytes of
+  hs <- ECIES.decryptAndGetPubKey hsBytes B.empty
+  maybeResult <-
+    case hs of
+      Left _ -> return Nothing
+      Right (otherPoint, x) -> ethCryptAcceptOld otherPoint hsBytes x
+
+  case maybeResult of
+    Just x -> return x
+    Nothing -> do
+      let (first, second) = case BL.unpack hsBytes of
+            (x : y : _) -> (x, y)
+            _ -> error "Malformed handshake sent from peer"
+          fullSize = fromIntegral first * 256 + fromIntegral second
+          remainingSize = fullSize - 307 + 2
+      remainingBytes <- CB.take remainingSize
+      let fullBuffer = BL.drop 2 $ hsBytes `BL.append` remainingBytes
+      maybeEciesMsgIBytes <- ECIES.decrypt fullBuffer $ BL.toStrict $ BL.take 2 $ hsBytes `BL.append` remainingBytes
+      let eciesMsgIBytes = either (error . (++ ": " ++ show (BL.unpack fullBuffer)) . ("Malformed packed sent from peer: " ++)) id maybeEciesMsgIBytes
+      ethCryptAcceptEIP8 (hsBytes `BL.append` remainingBytes) eciesMsgIBytes
+
+ethCryptAcceptEIP8 ::
+  (MonadIO m, HasVault m) =>
+  BL.ByteString ->
+  B.ByteString ->
+  ConduitM B.ByteString B.ByteString m (Point, EthCryptState, EthCryptState)
+ethCryptAcceptEIP8 hsBytes eciesMsgIBytes = do
+  --let (RLPArray [signatureRLP, pubKeyRLP, otherNonceRLP, versionRLP], _) = rlpSplit eciesMsgIBytes
+  let (signatureRLP, pubKeyRLP, otherNonceRLP, versionRLP) = case rlpSplit eciesMsgIBytes of
         (RLPArray [a, b, c, d], _) -> (a, b, c, d)
-        _ -> error "malformed packet sent to ethCryptAccept"
+        _ -> error "malformed packet sent to ethCryptAcceptEIP8"
       otherNonce = rlpDecode otherNonceRLP
       pubKey = rlpDecode pubKeyRLP :: B.ByteString
       extSig = rlpDecode signatureRLP
@@ -110,7 +128,7 @@ ethCryptAccept = do
 
   let otherPoint = bytesToPoint pubKey
 
-  when (version /= 4) $ error "wrong version in packet sent to ethCryptAccept"
+  when (version /= 4) $ error "wrong version in packet sent to ethCryptAcceptEIP8"
 
   SharedKey sharedKey <- getShared $ pointToSecPubKey otherPoint
   let msg = word256ToBytes $ bytesToWord256 sharedKey `xor` bytesToWord256 otherNonce
@@ -151,3 +169,55 @@ ethCryptAccept = do
           key = macEncKey
         }
     )
+
+ethCryptAcceptOld ::
+  (MonadIO m, HasVault m) =>
+  Point ->
+  BL.ByteString ->
+  B.ByteString ->
+  ConduitM B.ByteString B.ByteString m (Maybe (Point, EthCryptState, EthCryptState))
+ethCryptAcceptOld otherPoint hsBytes eciesMsgIBytes = do
+  SharedKey sharedKey <- getShared $ pointToSecPubKey otherPoint
+  let otherNonce = B.take 32 $ B.drop 161 $ eciesMsgIBytes
+      msg = word256ToBytes $ bytesToWord256 sharedKey `xor` bytesToWord256 otherNonce
+      extSig = importSignature $ B.take 65 eciesMsgIBytes
+  case extSig of
+    Left err -> error err
+    Right sig -> do
+      let otherEphemeral =
+            secPubKeyToPoint $
+              fromMaybe (error "malformed signature in tcpHandshakeServer") $
+                recoverPub sig msg
+
+      ephemeralPriv <- liftIO $ newPrivateKey
+      let myEphemeral = secPubKeyToPoint $ derivePublicKey ephemeralPriv
+          myNonce = 25 :: Word256
+          ackMsg = AckMessage {ackEphemeralPubKey = myEphemeral, ackNonce = myNonce, ackKnownPeer = False}
+          cryptSecret = deriveSharedKey ephemeralPriv (pointToSecPubKey otherPoint)
+      eciesMsgOBytes <- fmap BL.toStrict $ ECIES.encrypt cryptSecret myEphemeral (BL.toStrict $ encode $ ackMsg) B.empty
+
+      yield $ eciesMsgOBytes
+
+      let SharedKey ephemeralSharedSecret = deriveSharedKey ephemeralPriv $ pointToSecPubKey otherEphemeral
+          myNonceBS = word256ToBytes myNonce
+          frameDecKey =
+            otherNonce
+              `add` myNonceBS
+              `add` ephemeralSharedSecret
+              `add` ephemeralSharedSecret
+          macEncKey = frameDecKey `add` ephemeralSharedSecret
+
+      return $
+        Just
+          ( otherPoint,
+            EthCryptState --encrypt
+              { aesState = AES.AESCTRState (initAES frameDecKey) (aesIV_ $ B.replicate 16 0) 0,
+                mac = hashUpdate (hashInitWith Keccak_256) $ (macEncKey `bXor` otherNonce) `B.append` eciesMsgOBytes,
+                key = macEncKey
+              },
+            EthCryptState --decrypt
+              { aesState = AES.AESCTRState (initAES frameDecKey) (aesIV_ $ B.replicate 16 0) 0,
+                mac = hashUpdate (hashInitWith Keccak_256) $ (macEncKey `bXor` myNonceBS) `B.append` (BL.toStrict hsBytes),
+                key = macEncKey
+              }
+          )
