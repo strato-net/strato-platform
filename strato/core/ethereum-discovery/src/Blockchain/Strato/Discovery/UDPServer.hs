@@ -178,11 +178,13 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
           getPeerByIP' ip
         Just p' -> do
           setPeerPubkey p' otherPubKey
+          updateUdpPort p' otherUdpPort
           return $ Just p'
     case mPeer' of
       Nothing -> pure ()
       Just peer -> do
-        sendPacket peer $ Pong ep 4 (time + 50)
+        let (UDPPort up') = otherUdpPort
+        sendPacket peer{pPeerUdpPort = up'} $ Pong ep 4 (time + 50)
         eErr' <- setPeerBondingState (pPeerHost peer) otherPubKey 2
         whenLeft eErr' $ \err -> do
           $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err

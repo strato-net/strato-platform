@@ -143,6 +143,7 @@ class HasPeerDB m where
   updateIP :: PPeer -> IP -> m ()
   updateTcpPort :: PPeer -> TCPPort -> m ()
   updateTcpEnableTime :: PPeer -> UTCTime -> m ()
+  updateUdpPort :: PPeer -> UDPPort -> m ()
   updatePeerDisable :: PPeer -> PeerDisable -> m ()
   updatePeerLastBestBlockHash :: PPeer -> PeerLastBestBlockHash -> m ()
   updatePeerUdpDisable :: PPeer -> PeerUdpDisable -> m ()
