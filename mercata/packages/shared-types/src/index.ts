@@ -21,3 +21,6 @@ export * from './rewards-types';
 
 // Export all earn-related types
 export * from './earn-types';
+
+// Export all PoolV3 (concentrated liquidity) types
+export * from './poolv3-types';

@@ -60,6 +60,7 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
     label: 'PRO',
     items: [
       { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
+      { icon: Droplets, label: 'V3 Liquidity', path: '/dashboard/v3-liquidity' },
       { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
       { icon: BarChart3, label: 'Analytics', path: '/dashboard/stats' },
       { icon: Shield, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
