@@ -95,6 +95,8 @@ export interface NetBalanceMappingFilterParams {
   carryVaultAddrs: string[];
   requestFilters: { address: string; path: string }[];
   priceOracle: string;
+  stratoStakingAddress?: string;
+  stratoTokenAddress?: string;
 }
 
 /**
@@ -139,6 +141,8 @@ const USER_MAPPING_COLLECTIONS = [
   'userCollaterals',
   'userLoan',
   'vaults',
+  'delegatedStake',    // StratoStaking: user's delegated stake per operator
+  'unbondingQueue',    // StratoStaking: user's unclaimed unbonding requests
 ];
 
 // Collections fetched in pass 2, filtered to relevant tokens only.
@@ -156,6 +160,7 @@ const GLOBAL_MAPPING_COLLECTIONS = [
  * - Specific `_balances` paths (liquidity pool, vault bot executor, carry vault idle assets)
  * - Carry vault claimable assets for this user
  * - User's pending withdrawal requests
+ * - StratoStaking delegatedStake and unbondingQueue for this user
  *
  * Excludes prices/collateralConfigs/collateralGlobalStates — those are fetched in pass 2.
  */
@@ -189,6 +194,9 @@ export async function fetchUserMappingHistory(
     requestPaths.push(rf.path);
   }
 
+  // Staking-specific address filter (only fetch staking data from the staking contract)
+  const stakingAddress = filters.stratoStakingAddress || '';
+
   const sql = `
     SELECT address, collection_name, key, path, value, valid_from, valid_to
     FROM "history@mapping"
@@ -200,6 +208,7 @@ export async function fetchUserMappingHistory(
         OR path = ANY($5)
         OR (address = ANY($6) AND path = $7)
         OR (address = ANY($8) AND path = ANY($9))
+        OR (address = $10 AND collection_name IN ('delegatedStake', 'unbondingQueue') AND key->>'key' = $11)
       )
   `;
 
@@ -213,6 +222,8 @@ export async function fetchUserMappingHistory(
     claimablePath,
     requestAddrs.length > 0 ? requestAddrs : [''],
     requestPaths.length > 0 ? requestPaths : [''],
+    stakingAddress,
+    filters.userAddress,
   ]);
 }
 
@@ -266,6 +277,7 @@ export async function fetchGlobalMappingHistory(
  * - borrowableAsset for lending market (mToken) tokens the user holds
  * - Underlying assets for carry vaults (needed for value calculation of claimable/queued)
  * - Vault supported assets and share token
+ * - STRATO token (if user has staked STRATO)
  */
 function computeRelevantTokens(
   storageHistory: StorageHistoryElement[],
@@ -273,9 +285,11 @@ function computeRelevantTokens(
   vaultConfig: { shareToken: string; botExecutor: string; supportedAssets: string[] } | null,
   carryVaultAddrs: string[],
   userAddress: string,
+  stratoTokenAddress?: string,
 ): string[] {
   const tokens = new Set<string>();
   const userBalancePath = `_balances[${userAddress}]`;
+  let hasStakingData = false;
 
   // 1. Direct tokens from user mapping rows
   for (const row of userMappingHistory) {
@@ -290,6 +304,9 @@ function computeRelevantTokens(
       // Token address is in key.key2
       const tokenAddr = (row.key as any)?.key2;
       if (tokenAddr) tokens.add(tokenAddr);
+    } else if (row.collection_name === 'delegatedStake' || row.collection_name === 'unbondingQueue') {
+      // User has staking data — we need STRATO token price
+      hasStakingData = true;
     }
   }
 
@@ -320,6 +337,11 @@ function computeRelevantTokens(
       if (asset) tokens.add(asset);
     }
     if (vaultConfig.shareToken) tokens.add(vaultConfig.shareToken);
+  }
+
+  // 4. STRATO token (needed for staked STRATO valuation)
+  if (hasStakingData && stratoTokenAddress) {
+    tokens.add(stratoTokenAddress);
   }
 
   return Array.from(tokens);
@@ -425,6 +447,7 @@ export async function getHistoryDirect(
     vaultConfig,
     mappingFilterParams.carryVaultAddrs,
     mappingFilterParams.userAddress,
+    mappingFilterParams.stratoTokenAddress,
   );
 
   // Pass 2: prices/configs/states filtered to relevant tokens

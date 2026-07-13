@@ -526,6 +526,25 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
       }
       return portfolioInfo;
     }
+    case 'delegatedStake': {
+      // StratoStaking: user's delegated stake to an operator
+      // key = userAddress, key2 = operatorAddress, value = stake amount
+      const stakeAmount = BigInt(newInfo.value || '0');
+      const currentStaked = portfolioInfo.stakedStrato || 0n;
+      return { ...portfolioInfo, stakedStrato: currentStaked + stakeAmount };
+    }
+    case 'unbondingQueue': {
+      // StratoStaking: user's unbonding request (unclaimed)
+      // value = { amount, releaseTime, claimed }
+      const unbondingValue = newInfo.value || {};
+      const isClaimed = unbondingValue.claimed === true || unbondingValue.claimed === 'true';
+      if (!isClaimed) {
+        const unbondingAmount = BigInt(unbondingValue.amount || '0');
+        const currentStaked = portfolioInfo.stakedStrato || 0n;
+        return { ...portfolioInfo, stakedStrato: currentStaked + unbondingAmount };
+      }
+      return portfolioInfo;
+    }
   }
   return portfolioInfo;
 }
@@ -629,6 +648,20 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
     const tokenValue = (tokenPrice / 1000000000) * (tokenBalance / 1000000000);
     netBalance += tokenValue;
   }
+
+  // Add staked STRATO value to net balance
+  const stakedStrato = snapshot.data.stakedStrato || 0n;
+  if (stakedStrato > 0n) {
+    const stratoTokenAddr = snapshot.data.stratoTokenAddress || '';
+    const stratoPrice = snapshot.data.tokens[stratoTokenAddr]?.price || 0;
+    if (stratoPrice > 0) {
+      // stakedStrato is in wei (1e18), stratoPrice is in wei (1e18)
+      // Value = (stakedStrato / 1e18) * (stratoPrice / 1e18) = stakedStrato * stratoPrice / 1e36
+      const stakedValue = (Number(stakedStrato) / 1e9) * (stratoPrice / 1e9);
+      netBalance += stakedValue;
+    }
+  }
+
   netBalance -= netLoan + parseFloat(snapshot.data.userLoan?.scaledDebt || '0');
   return { timestamp: snapshot.timestamp, data: {netBalance: netBalance / 1e18 }};
 }
@@ -692,8 +725,19 @@ export const getNetBalanceHistory = async (
     requestFilters.push({ address: addr, path: `requests[${reqId}]` });
   }
 
+  // Staking addresses for portfolio history
+  const stratoStakingAddress = config.stratoStaking || '';
+  const stratoTokenAddress = config.stratoToken || '';
+
   const carryVaultAddrSet = new Set(carryVaultAddrs);
-  const initialData = { tokens: {}, userLoan: {}, vaultConfig: vaultConfig || undefined, carryVaultAddrs: carryVaultAddrSet };
+  const initialData = {
+    tokens: {},
+    userLoan: {},
+    vaultConfig: vaultConfig || undefined,
+    carryVaultAddrs: carryVaultAddrSet,
+    stratoTokenAddress,
+    stakedStrato: 0n, // Total staked STRATO (delegated + unbonding)
+  };
 
   const balanceHistory = await getHistoryDirect(
     historyParams,
@@ -707,6 +751,8 @@ export const getNetBalanceHistory = async (
       carryVaultAddrs,
       requestFilters,
       priceOracle,
+      stratoStakingAddress,
+      stratoTokenAddress,
     },
     vaultConfig,
     initialData,
