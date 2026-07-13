@@ -4,65 +4,77 @@ import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileBottomNav from '../components/dashboard/MobileBottomNav';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import LendingPoolSection from '@/components/dashboard/LendingPoolSection';
+import { Card, CardContent } from "@/components/ui/card";
 import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
-import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
-import SafetyModuleSection from '@/components/dashboard/SafetyModuleSection';
+import BadDebtView from '@/components/cdp/BadDebtView';
+import { useUser } from '@/context/UserContext';
+import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
+import DirectMintPSMSection from '@/components/dashboard/DirectMintPSMSection';
 import VaultOverview from '@/components/vault/VaultOverview';
 import VaultUserPosition from '@/components/vault/VaultUserPosition';
 import VaultTransactions from '@/components/vault/VaultTransactions';
 import VaultUserActivity from '@/components/vault/VaultUserActivity';
 import VaultDepositModal from '@/components/vault/VaultDepositModal';
 import VaultWithdrawModal from '@/components/vault/VaultWithdrawModal';
-import { useUser } from '@/context/UserContext';
-import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { useVaultContext } from '@/context/VaultContext';
-import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
-import { safeParseUnits } from "@/utils/numberUtils";
-import { formatUnits } from "ethers";
-import { useToast } from "@/hooks/use-toast";
-import { useLendingContext } from "@/context/LendingContext";
-import { useTokenContext } from "@/context/TokenContext";
-import { CollateralData } from "@/interface";
-import PositionSection from "@/components/Positions";
-import CollateralModal from "@/components/borrow/CollateralModal";
-import { WITHDRAW_COLLATERAL_FEE, SUPPLY_COLLATERAL_FEE } from "@/lib/constants";
-import BorrowForm from "@/components/borrow/BorrowForm";
-import RepayForm from "@/components/borrow/RepayForm";
-import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
-import { useSmartPolling } from "@/hooks/useSmartPolling";
-import LiquidationAlertBanner from '@/components/ui/LiquidationAlertBanner';
-import DirectMintPSMSection from '@/components/dashboard/DirectMintPSMSection';
 
-type TopTab = "borrow" | "lending" | "swap" | "liquidations" | "safety" | "psm" | "vault";
+// Hidden imports - temporarily disabled 
+// import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
+// import SafetyModuleSection from '@/components/dashboard/SafetyModuleSection';
+// import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+// import { CardHeader, CardTitle } from "@/components/ui/card";
+// import LendingPoolSection from '@/components/dashboard/LendingPoolSection';
+// import { safeParseUnits } from "@/utils/numberUtils";
+// import { formatUnits } from "ethers";
+// import { useToast } from "@/hooks/use-toast";
+// import { useLendingContext } from "@/context/LendingContext";
+// import { useTokenContext } from "@/context/TokenContext";
+// import { CollateralData } from "@/interface";
+// import PositionSection from "@/components/Positions";
+// import CollateralModal from "@/components/borrow/CollateralModal";
+// import { WITHDRAW_COLLATERAL_FEE, SUPPLY_COLLATERAL_FEE } from "@/lib/constants";
+// import BorrowForm from "@/components/borrow/BorrowForm";
+// import RepayForm from "@/components/borrow/RepayForm";
+// import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
+// import { useSmartPolling } from "@/hooks/useSmartPolling";
+// import LiquidationAlertBanner from '@/components/ui/LiquidationAlertBanner';
+
+type TopTab = "swap" | "vault" | "psm" | "bad-debt";
+// Hidden type - temporarily disabled 
+// type TopTab = "borrow" | "lending" | "swap" | "liquidations" | "safety" | "psm" | "vault";
 
 const Advanced = () => {
   const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<TopTab>("borrow");
-  const [borrowActiveTab, setBorrowActiveTab] = useState<"borrow" | "repay">("borrow");
+  const [activeTab, setActiveTab] = useState<TopTab>("swap");
+  const { isLoggedIn } = useUser();
   const [isVaultDepositOpen, setIsVaultDepositOpen] = useState(false);
   const [isVaultWithdrawOpen, setIsVaultWithdrawOpen] = useState(false);
-  const { isLoggedIn, userAddress } = useUser();
-  const { toast } = useToast();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
-  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
   const { refreshVault } = useVaultContext();
+
+  const guestMode = !isLoggedIn;
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    const subtabParam = searchParams.get('subtab');
 
-    if (tabParam && ['lending', 'swap', 'liquidations', 'safety', 'borrow', 'psm', 'vault'].includes(tabParam)) {
+    if (tabParam && ['swap', 'vault', 'psm', 'bad-debt'].includes(tabParam)) {
       setActiveTab(tabParam as TopTab);
     }
+  }, [searchParams]);
 
+  /* Hidden state and functions - temporarily disabled 
+  const [borrowActiveTab, setBorrowActiveTab] = useState<"borrow" | "repay">("borrow");
+  const { userAddress } = useUser();
+  const { toast } = useToast();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+
+  useEffect(() => {
+    const subtabParam = searchParams.get('subtab');
     if (subtabParam && ['borrow', 'repay'].includes(subtabParam)) {
       setBorrowActiveTab(subtabParam as "borrow" | "repay");
     }
   }, [searchParams]);
 
-  // Lending borrow/repay state
   const {
     refreshLoans,
     loans,
@@ -190,8 +202,7 @@ const Advanced = () => {
       setRepayLoading(false);
     }
   };
-
-  const guestMode = !isLoggedIn;
+  */
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
@@ -204,29 +215,71 @@ const Advanced = () => {
           <Card className="mb-2 md:mb-6 bg-transparent border-0 rounded-none shadow-none">
             <CardContent className="p-0 md:pt-4">
               <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TopTab)} className="w-full">
-                <TabsList className="grid w-full grid-cols-7 mb-3 md:mb-4 h-auto gap-0.5 md:gap-1">
-                  <TabsTrigger value="borrow" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
-                    Borrow
-                  </TabsTrigger>
-                  <TabsTrigger value="lending" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
-                    Lending
-                  </TabsTrigger>
+                <TabsList className="grid w-full grid-cols-4 mb-3 md:mb-4 h-auto gap-0.5 md:gap-1">
                   <TabsTrigger value="swap" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
-                    Swap
+                    Swap Pools
                   </TabsTrigger>
                   <TabsTrigger value="vault" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                     Vault
                   </TabsTrigger>
-                  <TabsTrigger value="safety" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
-                    Safety
-                  </TabsTrigger>
                   <TabsTrigger value="psm" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                     PSM
                   </TabsTrigger>
-                  <TabsTrigger value="liquidations" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
-                    Liquidations
+                  <TabsTrigger value="bad-debt" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                    Bad Debt
                   </TabsTrigger>
                 </TabsList>
+
+                <TabsContent value="swap">
+                  {!isLoggedIn && (
+                    <GuestSignInBanner message="Sign in to add liquidity to swap pools and earn rewards" />
+                  )}
+                  <SwapPoolsSection />
+                </TabsContent>
+
+                <TabsContent value="vault">
+                  {!isLoggedIn && (
+                    <GuestSignInBanner message="Sign in to deposit or withdraw from the vault" />
+                  )}
+                  <div className="space-y-8">
+                    <VaultOverview />
+                    <VaultUserPosition
+                      onDeposit={() => setIsVaultDepositOpen(true)}
+                      onWithdraw={() => setIsVaultWithdrawOpen(true)}
+                      guestMode={guestMode}
+                    />
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                      <VaultTransactions />
+                      {!guestMode && <VaultUserActivity />}
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="psm">
+                  {!isLoggedIn && (
+                    <GuestSignInBanner message="Sign in to use the Direct Mint PSM" />
+                  )}
+                  <DirectMintPSMSection />
+                </TabsContent>
+
+                <TabsContent value="bad-debt">
+                  <BadDebtView guestMode={!isLoggedIn} />
+                </TabsContent>
+
+                {/* Hidden tabs - temporarily disabled      
+                <TabsTrigger value="borrow" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                  Borrow
+                </TabsTrigger>
+                <TabsTrigger value="lending" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                  Lending
+                </TabsTrigger>
+                <TabsTrigger value="safety" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                  Safety
+                </TabsTrigger>
+                <TabsTrigger value="liquidations" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                  Liquidations
+                </TabsTrigger>
+
                 <TabsContent value="borrow">
                   {!isLoggedIn && (
                     <GuestSignInBanner message="Sign in to borrow USDST" />
@@ -311,53 +364,28 @@ const Advanced = () => {
                     />
                   )}
                 </TabsContent>
+
                 <TabsContent value="lending">
                   {!isLoggedIn && (
                     <GuestSignInBanner message="Sign in to deposit liquidity and start earning" />
                   )}
                   <LendingPoolSection />
                 </TabsContent>
-                <TabsContent value="swap">
-                  {!isLoggedIn && (
-                    <GuestSignInBanner message="Sign in to add liquidity to swap pools and earn rewards" />
-                  )}
-                  <SwapPoolsSection />
-                </TabsContent>
-                <TabsContent value="vault">
-                  {!isLoggedIn && (
-                    <GuestSignInBanner message="Sign in to deposit or withdraw from the vault" />
-                  )}
-                  <div className="space-y-8">
-                    <VaultOverview />
-                    <VaultUserPosition
-                      onDeposit={() => setIsVaultDepositOpen(true)}
-                      onWithdraw={() => setIsVaultWithdrawOpen(true)}
-                      guestMode={guestMode}
-                    />
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-                      <VaultTransactions />
-                      {!guestMode && <VaultUserActivity />}
-                    </div>
-                  </div>
-                </TabsContent>
+
                 <TabsContent value="safety">
                   {!isLoggedIn && (
                     <GuestSignInBanner message="Sign in to stake USDST in the Safety Module" />
                   )}
                   <SafetyModuleSection />
                 </TabsContent>
-                <TabsContent value="psm">
-                  {!isLoggedIn && (
-                    <GuestSignInBanner message="Sign in to use the Direct Mint PSM" />
-                  )}
-                  <DirectMintPSMSection />
-                </TabsContent>
+
                 <TabsContent value="liquidations">
                   {!isLoggedIn && (
                     <GuestSignInBanner message="Sign in to view and liquidate unhealthy positions" />
                   )}
                   <LiquidationsSection />
                 </TabsContent>
+                */}
               </Tabs>
             </CardContent>
           </Card>
