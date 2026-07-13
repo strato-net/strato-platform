@@ -12,10 +12,10 @@ interface StatCardProps {
 }
 
 const toneClasses: Record<NonNullable<StatCardProps["tone"]>, string> = {
-  default: "text-primary",
-  success: "text-green-500",
-  warning: "text-amber-500",
-  danger: "text-destructive",
+  default: "bg-primary/10 text-primary dark:bg-primary/20 dark:text-[hsl(var(--chart-1))]",
+  success: "bg-green-500/10 text-green-500",
+  warning: "bg-amber-500/10 text-amber-500",
+  danger: "bg-destructive/10 text-destructive",
 };
 
 export function StatCard({ label, value, icon: Icon, to, tone = "default" }: StatCardProps) {
@@ -23,12 +23,12 @@ export function StatCard({ label, value, icon: Icon, to, tone = "default" }: Sta
     <Card className={cn("transition-colors", to && "hover:border-primary/50")}>
       <CardContent className="flex items-center gap-4 p-5">
         {Icon ? (
-          <div className={cn("rounded-lg bg-muted p-3", toneClasses[tone])}>
+          <div className={cn("rounded-lg p-3", toneClasses[tone])}>
             <Icon className="h-6 w-6" />
           </div>
         ) : null}
         <div className="min-w-0">
-          <div className="truncate text-2xl font-semibold">{value}</div>
+          <div className="truncate text-2xl font-semibold tabular-nums tracking-tight">{value}</div>
           <div className="text-sm text-muted-foreground">{label}</div>
         </div>
       </CardContent>

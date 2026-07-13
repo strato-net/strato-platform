@@ -1,9 +1,7 @@
 import {
   Bar,
   BarChart,
-  Cell,
-  Pie,
-  PieChart,
+  CartesianGrid,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -11,20 +9,10 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-// Muted, desaturated palette tuned to the app's deep-blue profile (primary 223 75% 40%).
-// Distinct enough to read as categories without the neon brightness of the defaults.
-const PALETTE = [
-  "#3452FE",
-  "#6050dc",
-  "#d52db7",
-  "#ff2e7e",
-  "#ff6b45",
-  "#ffab05",
-  "#dfeb25",
-  "#bfff45",
-  "#9fff65",
-  "#7fff85",
-];
+// Single validated series hue (defined in index.css for light/dark surfaces).
+// These dashboards compare magnitudes, not identities, so one hue is the rule —
+// category identity lives in the labels, never in a color cycle.
+const SERIES = "hsl(var(--chart-1))";
 
 interface XYPoint {
   x: number;
@@ -36,12 +24,19 @@ interface XYPoint {
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-2">
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
-      {/* Each chart sizes its own plot area so a legend can sit below without overflowing. */}
       <CardContent>{children}</CardContent>
     </Card>
+  );
+}
+
+function EmptyChart({ message }: { message: string }) {
+  return (
+    <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
+      {message}
+    </div>
   );
 }
 
@@ -93,103 +88,113 @@ export function BarSeriesCard({
 }) {
   return (
     <ChartCard title={title}>
-      <div className="h-56">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-          <XAxis dataKey="x" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-          <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-          <Tooltip
-            cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }}
-            content={({ active, payload, label }) => (
-              <BarTooltip
-                active={active}
-                payload={payload as { value?: number; payload?: { block?: number } }[]}
-                label={label}
-                unit={unit}
-                seriesLabel={seriesLabel}
+      {data.length === 0 ? (
+        <EmptyChart message="Waiting for block data…" />
+      ) : (
+        <div className="h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+              <CartesianGrid
+                vertical={false}
+                stroke="hsl(var(--border))"
+                strokeOpacity={0.6}
               />
-            )}
-          />
-          <Bar dataKey="y" fill="#3452FE" radius={[3, 3, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
-      </div>
+              <XAxis
+                dataKey="block"
+                tick={{ fontSize: 11 }}
+                tickLine={false}
+                axisLine={{ stroke: "hsl(var(--border))" }}
+                stroke="hsl(var(--muted-foreground))"
+                minTickGap={32}
+              />
+              <YAxis
+                tick={{ fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+                stroke="hsl(var(--muted-foreground))"
+                allowDecimals={!!unit}
+              />
+              <Tooltip
+                cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }}
+                content={({ active, payload, label }) => (
+                  <BarTooltip
+                    active={active}
+                    payload={payload as { value?: number; payload?: { block?: number } }[]}
+                    label={label}
+                    unit={unit}
+                    seriesLabel={seriesLabel}
+                  />
+                )}
+              />
+              <Bar dataKey="y" fill={SERIES} radius={[4, 4, 0, 0]} maxBarSize={28} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </ChartCard>
   );
 }
 
-export interface PieDatum {
+export interface CategoryDatum {
   name: string;
   value: number;
 }
 
-function PieTooltip({
-  active,
-  payload,
+/**
+ * Horizontal top-categories list: label · track bar · count. One hue, direct
+ * labels on every row (so no legend or tooltip is needed), tail folded into
+ * "Other" past `maxRows`. Replaces the previous multi-hue pie.
+ */
+export function CategoryBarCard({
+  title,
+  data,
+  maxRows = 6,
+  emptyMessage = "No transactions yet.",
 }: {
-  active?: boolean;
-  payload?: { name?: string; value?: number; payload?: { fill?: string } }[];
+  title: string;
+  data: CategoryDatum[];
+  maxRows?: number;
+  emptyMessage?: string;
 }) {
-  if (!active || !payload?.length) return null;
-  const entry = payload[0];
-  const color = entry?.payload?.fill;
-  return (
-    <TooltipBox>
-      <span className="inline-flex items-center gap-1.5">
-        <span className="inline-block h-2 w-2 rounded-full" style={{ background: color }} />
-        <span className="text-muted-foreground">{entry?.name}:</span>
-        <span className="font-medium">{entry?.value}</span>
-      </span>
-    </TooltipBox>
-  );
-}
+  const total = data.reduce((sum, d) => sum + d.value, 0);
+  const top = data.slice(0, maxRows);
+  const tail = data.slice(maxRows);
+  const rows =
+    tail.length > 0
+      ? [...top, { name: `Other (${tail.length})`, value: tail.reduce((s, d) => s + d.value, 0) }]
+      : top;
+  const max = rows.reduce((m, d) => Math.max(m, d.value), 0);
 
-export function TxTypePieCard({ title, data }: { title: string; data: PieDatum[] }) {
-  const pieData = data.map((d, i) => ({ ...d, fill: PALETTE[i % PALETTE.length] }));
   return (
     <ChartCard title={title}>
-      {pieData.length === 0 ? (
-        <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
-          No transactions yet.
-        </div>
+      {rows.length === 0 ? (
+        <EmptyChart message={emptyMessage} />
       ) : (
-        <div className="h-44">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={pieData}
-              dataKey="value"
-              nameKey="name"
-              innerRadius={40}
-              outerRadius={70}
-              paddingAngle={2}
-            >
-              {pieData.map((d) => (
-                <Cell key={d.name} fill={d.fill} />
-              ))}
-            </Pie>
-            <Tooltip
-              content={({ active, payload }) => (
-                <PieTooltip
-                  active={active}
-                  payload={
-                    payload as { name?: string; value?: number; payload?: { fill?: string } }[]
-                  }
-                />
-              )}
-            />
-          </PieChart>
-        </ResponsiveContainer>
+        <div className="flex h-56 flex-col justify-center gap-3">
+          {rows.map((d) => {
+            const pctOfTotal = total > 0 ? Math.round((d.value / total) * 100) : 0;
+            return (
+              <div key={d.name} className="grid grid-cols-[minmax(0,11rem)_1fr_auto] items-center gap-3">
+                <span className="truncate font-mono text-xs" title={d.name}>
+                  {d.name}
+                </span>
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${max > 0 ? Math.max((d.value / max) * 100, 2) : 0}%`,
+                      background: SERIES,
+                    }}
+                  />
+                </div>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {d.value} · {pctOfTotal}%
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
-      <div className="mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        {pieData.map((d) => (
-          <span key={d.name} className="flex items-center gap-1">
-            <span className="inline-block h-2 w-2 rounded-full" style={{ background: d.fill }} />
-            {d.name} ({d.value})
-          </span>
-        ))}
-      </div>
     </ChartCard>
   );
 }

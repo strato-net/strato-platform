@@ -47,7 +47,8 @@ async function fetchUnsignedTxs(
     { txs: [{ payload, type }], address: userAddress.replace(/^0x/, "") },
     // `username` makes the node wrap CONTRACT/FUNCTION txs as a call to the user's
     // User wallet contract, producing a MessageTX an external wallet can sign.
-    { params: { ...chainParam(), ...(username ? { username } : {}) } }
+    // Callers surface tx failures themselves, so skip the global error toast.
+    { params: { ...chainParam(), ...(username ? { username } : {}) }, skipErrorToast: true }
   );
   // Tolerate a few shapes: a raw array, or a wrapper with _unsignedTxs / txs.
   if (Array.isArray(data)) return data;
@@ -96,14 +97,19 @@ async function submitSigned(tx: UnsignedTx, sig: { r: string; s: string; v: stri
     v: sig.v,
     txVersion: 1,
   };
-  const { data } = await api.post(`${env.STRATO_URL}/transaction`, signedTx, { params: chainParam() });
+  const { data } = await api.post(`${env.STRATO_URL}/transaction`, signedTx, {
+    params: chainParam(),
+    skipErrorToast: true,
+  });
   return typeof data === "string" ? data : data?.hash ?? tx.hash ?? "";
 }
 
 async function pollResults(hashes: string[], timeout = 60000, interval = 3000): Promise<any[]> {
   const start = Date.now();
   while (true) {
-    const { data: results } = await api.post(`${env.BLOC_URL}/transactions/results`, hashes);
+    const { data: results } = await api.post(`${env.BLOC_URL}/transactions/results`, hashes, {
+      skipErrorToast: true,
+    });
     const list = Array.isArray(results) ? results : [];
     if (list.every((r: any) => r?.status !== "Pending")) return list;
     if (Date.now() - start >= timeout) return list;

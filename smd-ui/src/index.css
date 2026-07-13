@@ -35,6 +35,9 @@
 
     --radius: 0.5rem;
 
+    /* Chart series hue (validated ≥3:1 against the light card surface). */
+    --chart-1: 223 75% 40%;
+
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -73,6 +76,9 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    /* Lighter step of the same hue so marks clear 3:1 on the dark card surface. */
+    --chart-1: 223 90% 66%;
 
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
