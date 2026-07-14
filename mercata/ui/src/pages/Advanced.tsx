@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
 import BadDebtView from '@/components/cdp/BadDebtView';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
+import Vault from '@/pages/Vault';
 import { useUser } from '@/context/UserContext';
 import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 import DirectMintPSMSection from '@/components/dashboard/DirectMintPSMSection';
@@ -33,9 +34,9 @@ import DirectMintPSMSection from '@/components/dashboard/DirectMintPSMSection';
 // import { useSmartPolling } from "@/hooks/useSmartPolling";
 // import LiquidationAlertBanner from '@/components/ui/LiquidationAlertBanner';
 
-type TopTab = "swap" | "psm" | "bad-debt" | "liquidations";
+type TopTab = "swap" | "vault" | "psm" | "bad-debt" | "liquidations";
 // Hidden type - temporarily disabled per issue #7228
-// type TopTab = "borrow" | "lending" | "swap" | "liquidations" | "safety" | "psm";
+// type TopTab = "borrow" | "lending" | "swap" | "liquidations" | "safety" | "psm" | "vault";
 
 const Advanced = () => {
   const [searchParams] = useSearchParams();
@@ -45,7 +46,7 @@ const Advanced = () => {
   useEffect(() => {
     const tabParam = searchParams.get('tab');
 
-    if (tabParam && ['swap', 'psm', 'bad-debt', 'liquidations'].includes(tabParam)) {
+    if (tabParam && ['swap', 'vault', 'psm', 'bad-debt', 'liquidations'].includes(tabParam)) {
       setActiveTab(tabParam as TopTab);
     }
     // Hidden route validation - temporarily disabled per issue #7228
@@ -54,14 +55,13 @@ const Advanced = () => {
     // }
   }, [searchParams]);
 
-/* Hidden state and functions - temporarily disabled 
+  /* Hidden state and functions - temporarily disabled per issue #7228
   const [borrowActiveTab, setBorrowActiveTab] = useState<"borrow" | "repay">("borrow");
   const { userAddress } = useUser();
   const { toast } = useToast();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
-  // Subtab handling for borrow tab
   useEffect(() => {
     const subtabParam = searchParams.get('subtab');
     if (subtabParam && ['borrow', 'repay'].includes(subtabParam)) {
@@ -69,7 +69,6 @@ const Advanced = () => {
     }
   }, [searchParams]);
 
-  // Lending borrow/repay state
   const {
     refreshLoans,
     loans,
@@ -212,9 +211,12 @@ const Advanced = () => {
           <Card className="mb-2 md:mb-6 bg-transparent border-0 rounded-none shadow-none">
             <CardContent className="p-0 md:pt-4">
               <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TopTab)} className="w-full">
-                <TabsList className="grid w-full grid-cols-4 mb-3 md:mb-4 h-auto gap-0.5 md:gap-1">
+                <TabsList className="grid w-full grid-cols-5 mb-3 md:mb-4 h-auto gap-0.5 md:gap-1">
                   <TabsTrigger value="swap" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                     Swap Pools
+                  </TabsTrigger>
+                  <TabsTrigger value="vault" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                    Diversified Vault
                   </TabsTrigger>
                   <TabsTrigger value="psm" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                     PSM
@@ -226,21 +228,29 @@ const Advanced = () => {
                     Liquidations
                   </TabsTrigger>
                 </TabsList>
+
                 <TabsContent value="swap">
                   {!isLoggedIn && (
                     <GuestSignInBanner message="Sign in to add liquidity to swap pools and earn rewards" />
                   )}
                   <SwapPoolsSection />
                 </TabsContent>
+
+                <TabsContent value="vault">
+                  <Vault />
+                </TabsContent>
+
                 <TabsContent value="psm">
                   {!isLoggedIn && (
                     <GuestSignInBanner message="Sign in to use the Direct Mint PSM" />
                   )}
                   <DirectMintPSMSection />
                 </TabsContent>
+
                 <TabsContent value="bad-debt">
                   <BadDebtView guestMode={!isLoggedIn} />
                 </TabsContent>
+
                 <TabsContent value="liquidations">
                   {!isLoggedIn && (
                     <GuestSignInBanner message="Sign in to view and liquidate CDP positions" />
@@ -346,18 +356,21 @@ const Advanced = () => {
                     />
                   )}
                 </TabsContent>
+
                 <TabsContent value="lending">
                   {!isLoggedIn && (
                     <GuestSignInBanner message="Sign in to deposit liquidity and start earning" />
                   )}
                   <LendingPoolSection />
                 </TabsContent>
+
                 <TabsContent value="safety">
                   {!isLoggedIn && (
                     <GuestSignInBanner message="Sign in to stake USDST in the Safety Module" />
                   )}
                   <SafetyModuleSection />
                 </TabsContent>
+
                 <TabsContent value="lending-liquidations">
                   {!isLoggedIn && (
                     <GuestSignInBanner message="Sign in to view and liquidate unhealthy positions" />
