@@ -58,7 +58,7 @@ const getPsmAddress = (): string => {
   return addr;
 };
 
-interface MintConfigInfo {
+export interface MintConfigInfo {
   isEnabled: boolean;
   maxBalance: string;
   feeBps: string;
@@ -71,7 +71,7 @@ interface BurnConfigInfo {
   feeBps: string;
 }
 
-const parseMintConfig = (value: unknown): MintConfigInfo => {
+export const parseMintConfig = (value: unknown): MintConfigInfo => {
   const parsed = parseStructValue(value);
   const tuple = parseTupleValue(value);
   return {

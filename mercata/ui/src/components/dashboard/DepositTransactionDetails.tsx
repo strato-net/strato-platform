@@ -64,7 +64,8 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         
         const typeFilter = (outcome: string | undefined, pendingType?: string) => {
           if (!selectedType) return true;
-          const mapped = pendingType === 'saving' ? 'save' : pendingType || outcome || 'bridge';
+          const raw = pendingType === 'saving' ? 'save' : pendingType || outcome || 'bridge';
+          const mapped = raw === 'saveUsdst' ? 'save' : raw;
           return mapped === selectedType;
         };
 
@@ -158,12 +159,12 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
       key: "received",
       render: (_: any, record: any) => {
         const outcome = record.depositOutcome;
-        const hasFinal = (outcome === "forge" || outcome === "save") && record.finalTokenSymbol;
+        const hasFinal = (outcome === "forge" || outcome === "save" || outcome === "saveUsdst") && record.finalTokenSymbol;
         const symbol = hasFinal ? record.finalTokenSymbol : record.stratoTokenSymbol || '-';
         const amount = hasFinal && record.finalAmount
           ? formatWeiToDecimalHP(record.finalAmount, 18)
           : formatWeiToDecimalHP(record?.DepositInfo?.stratoTokenAmount || '0', 18);
-        const badge = outcome === "forge" ? "Metal" : outcome === "save" ? "Earn" : null;
+        const badge = outcome === "forge" ? "Metal" : outcome === "saveUsdst" ? "saveUSDST" : outcome === "save" ? "Earn" : null;
         return (
           <div>
             <span className="text-sm text-foreground">{amount} {symbol}</span>

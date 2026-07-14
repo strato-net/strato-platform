@@ -18,7 +18,7 @@ type RecentTx = {
   stratoTokenSymbol?: string;
   amount?: string;
   status?: string;
-  depositOutcome?: 'bridge' | 'save' | 'forge';
+  depositOutcome?: 'bridge' | 'save' | 'forge' | 'saveUsdst';
   finalTokenSymbol?: string;
   finalAmount?: string;
   paySymbol?: string;
@@ -80,7 +80,7 @@ const mapDeposit = (tx: Record<string, unknown>, type: 'api' | 'pending'): Recen
     externalSymbol: tx.externalSymbol as string, stratoTokenSymbol: tx.stratoTokenSymbol as string,
     amount: info?.stratoTokenAmount as string, status: info?.bridgeStatus as string,
     depositOutcome: (type === 'pending'
-      ? (tx.type === 'saving' ? 'save' : tx.type === 'forge' ? 'forge' : 'bridge')
+      ? (tx.type === 'saving' ? 'save' : tx.type === 'saveUsdst' ? 'saveUsdst' : tx.type === 'forge' ? 'forge' : 'bridge')
       : tx.depositOutcome) as RecentTx['depositOutcome'],
     finalTokenSymbol: tx.finalTokenSymbol as string | undefined,
     finalAmount: tx.finalAmount as string | undefined,

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ApySource, DepositAction } from "@mercata/shared-types";
+import { ApySource, DepositAction, DepositActionRequestParams } from "@mercata/shared-types";
 import { metalForgeService, MetalConfig, PayTokenConfig } from "@/services/metalForgeService";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -11,6 +11,7 @@ import {
   useReadContract,
   useWriteContract,
   useSwitchChain,
+  useSignMessage,
   useSignTypedData,
 } from "wagmi";
 import {
@@ -43,6 +44,7 @@ import { useUser } from "@/context/UserContext";
 import { useNetwork } from "@/context/NetworkContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
 import BridgeWalletStatus from "./BridgeWalletStatus";
 import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
 import PercentageButtons from "@/components/ui/PercentageButtons";
@@ -68,6 +70,19 @@ const METAL_BUY_FEE_WEI = safeParseUnits(METAL_BUY_FEE).toString();
 const STEP3_APY_ROW_CLASS = "mt-0.5 flex min-h-[18px] items-center";
 
 const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
+
+const buildDepositActionAuthorization = (
+  userAddress: string,
+  params: DepositActionRequestParams,
+) => [
+  "MercataBridge Deposit Action",
+  `user:${normAddr(userAddress)}`,
+  `externalChainId:${params.externalChainId}`,
+  `externalTxHash:${normAddr(params.externalTxHash)}`,
+  `action:${params.action}`,
+  `targetToken:${normAddr(params.targetToken || "0000000000000000000000000000000000000000")}`,
+  `deadline:${params.deadline || ""}`,
+].join("\n");
 
 const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: string }): string => {
   switch (info.source) {
@@ -95,6 +110,25 @@ const calcMetalAmount = (payAmount: string, metal: MetalConfig, payToken: PayTok
     const metalPrice = BigInt(metal.price);
     return metalPrice > 0n ? (fundsUSD * WAD) / metalPrice : 0n;
   } catch { return 0n; }
+};
+
+const calcPsmSaveEstimate = (
+  payAmount: string,
+  feeBps: string | undefined,
+  exchangeRate: string
+): { netUsdst: bigint; shares: bigint } => {
+  try {
+    const input = safeParseUnits(payAmount || "0", 18);
+    const fee = input * BigInt(feeBps || "0") / 10000n;
+    const netUsdst = input - fee;
+    const rate = BigInt(exchangeRate || WAD);
+    return {
+      netUsdst,
+      shares: rate > 0n ? netUsdst * WAD / rate : 0n,
+    };
+  } catch {
+    return { netUsdst: 0n, shares: 0n };
+  }
 };
 
 /** WAD-scaled oracle USD price per metal unit → formatted $ */
@@ -193,8 +227,9 @@ const CardSkeleton = ({ id }: { id: string }) => (
   </div>
 );
 
-const TokenCard = ({ active, image, symbol, estimated, onClick, disabled, apyBadge, effectivePrice, spotLabel }: {
+const TokenCard = ({ active, image, symbol, displayLabel, estimated, onClick, disabled, apyBadge, effectivePrice, spotLabel }: {
   active: boolean; image?: string; symbol: string; estimated: string;
+  displayLabel?: string;
   onClick: () => void; disabled: boolean;
   apyBadge: React.ReactNode;
   effectivePrice?: string;
@@ -210,7 +245,7 @@ const TokenCard = ({ active, image, symbol, estimated, onClick, disabled, apyBad
         ? <img src={image} alt={symbol} className="w-6 h-6 rounded-full object-cover shrink-0" />
         : <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-foreground shrink-0">{(symbol || "?").charAt(0)}</span>}
       <div>
-        <p className="text-sm font-semibold text-foreground leading-tight">{symbol}</p>
+        <p className="text-sm font-semibold text-foreground leading-tight">{displayLabel || symbol}</p>
         <p className="min-h-[14px] text-[11px] text-muted-foreground leading-tight">{effectivePrice ? `${effectivePrice}/unit` : "\u00A0"}</p>
       </div>
     </div>
@@ -294,12 +329,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
   const { switchChain } = useSwitchChain();
+  const { signMessageAsync } = useSignMessage();
   const { signTypedDataAsync } = useSignTypedData();
   const { openConnectModal } = useConnectModal();
   const { toast } = useToast();
   const { userAddress, externalEvmWalletAddress, isExternalEvmWalletConnected, isAppAuthenticated } = useUser();
-  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
+  const { fetchUsdstBalance, usdstBalance, voucherBalance, getEarningAssets } = useTokenContext();
   const { activeTokens, fetchTokens } = useUserTokens();
+  const { saveUsdstInfo, refreshSaveUsdst } = useSaveUsdstContext();
   const {
     availableNetworks,
     bridgeableTokens,
@@ -344,6 +381,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const [progressError, setProgressError] = useState<string>();
   const [progressIsNative, setProgressIsNative] = useState(true);
   const [progressIsRedemption, setProgressIsRedemption] = useState(false);
+  const [progressAction, setProgressAction] = useState(0);
+  const [progressFallback, setProgressFallback] = useState(false);
   const [metalProgressOpen, setMetalProgressOpen] = useState(false);
   const [metalSteps, setMetalSteps] = useState<MetalBuyStep[]>([]);
   const [metalProgressError, setMetalProgressError] = useState<string>();
@@ -475,10 +514,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const isNativeRedemption = selectedToken?.routeType === "native";
   const isNativeToken = !isNativeRedemption && BigInt(selectedToken?.externalToken || "0") === 0n;
   const useExternalWalletSigning = hasExternalWallet && !isAppAuthenticated;
-  const visibleMatchingActions = useMemo(
-    () => useExternalWalletSigning ? [] : matchingActions,
-    [matchingActions, useExternalWalletSigning]
-  );
 
   const {
     data: nativeBalance,
@@ -572,12 +607,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     setSelectedNetwork,
     setSelectedToken,
   ]);
-
-  useEffect(() => {
-    if (useExternalWalletSigning && selectedAction) {
-      setSelectedAction(null);
-    }
-  }, [useExternalWalletSigning, selectedAction]);
 
   useEffect(() => {
     if (selectedToken?.routeType === "native") {
@@ -847,6 +876,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     const isNative = selectedToken.routeType !== "native" && BigInt(selectedToken.externalToken || "0") === 0n;
     setProgressIsNative(isNative);
     setProgressIsRedemption(selectedToken.routeType === "native");
+    setProgressAction(selectedAction?.action || 0);
+    setProgressFallback(false);
     
     setProgressModalOpen(true);
 
@@ -1026,6 +1057,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         setCurrentStep("confirm_tx");
       }
       const chain = await resolveViemChain(activeChainId);
+      let action = selectedAction?.action || 0;
       let txHash: `0x${string}`;
       if (isNative) {
         txHash = await writeContractAsync({
@@ -1074,13 +1106,67 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       const amount18Decimals = depositAmount * 10n ** decimalDiff;
       const adjustedAmount = (amount18Decimals * WAD / factor).toString();
 
+      if (action > 0 && selectedAction) {
+        setCurrentStep("waiting_autosave");
+        if (useExternalWalletSigning) {
+          try {
+            const deadline = String(Math.floor(Date.now() / 1000) + 10 * 60);
+            const authorization = {
+              externalChainId: activeChainId,
+              externalTxHash: txHash,
+              action,
+              targetToken: action === 2 ? selectedAction.stratoToken : undefined,
+              deadline,
+            };
+            const signature = await signMessageAsync({
+              message: buildDepositActionAuthorization(stratoRecipient, authorization),
+            });
+            await requestDepositAction(
+              { ...authorization, signature },
+              { walletAuth: true },
+            );
+          } catch {
+            action = 0;
+            setProgressFallback(true);
+            setSelectedAction(null);
+            toast({
+              title: "Auto action not registered",
+              description: `Your bridge deposit is still processing and will deliver bridged ${selectedToken.externalSymbol}.`,
+            });
+          }
+        } else {
+          try {
+            await requestDepositAction({
+              externalChainId: activeChainId,
+              externalTxHash: txHash,
+              action,
+              targetToken: action === 2 ? selectedAction.stratoToken : undefined,
+            });
+          } catch {
+            action = 0;
+            setProgressFallback(true);
+            setSelectedAction(null);
+            toast({
+              title: "Auto action not registered",
+              description: `Your bridge deposit is still processing and will deliver bridged ${selectedToken.externalSymbol}.`,
+            });
+          }
+        }
+      }
+
       const existing = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
-      const action = useExternalWalletSigning ? 0 : selectedAction?.action || 0;
       existing.push({
         externalChainId: parseInt(activeChainId),
         externalTxHash: txHash,
-        type: action === 1 ? 'saving' : action === 2 ? 'forge' : 'bridge',
-        finalTokenSymbol: selectedAction?.stratoTokenSymbol,
+        type: action === 1 ? 'saving' : action === 2 ? 'forge' : action === 3 ? 'saveUsdst' : 'bridge',
+        finalTokenSymbol: action > 0 ? selectedAction?.stratoTokenSymbol : undefined,
+        finalAmount: action === 3
+          ? calcPsmSaveEstimate(
+              amount,
+              selectedAction?.feeBps,
+              saveUsdstInfo?.projectedExchangeRate || saveUsdstInfo?.exchangeRate || WAD.toString()
+            ).shares.toString()
+          : undefined,
         DepositInfo: {
           externalSender,
           stratoRecipient,
@@ -1096,16 +1182,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       localStorage.setItem('pendingDeposits', JSON.stringify(existing));
       triggerDepositRefresh();
 
-      if (action > 0 && selectedAction) {
-        setCurrentStep("waiting_autosave");
-        await requestDepositAction({
-          externalChainId: activeChainId,
-          externalTxHash: txHash,
-          action,
-          targetToken: action === 2 ? selectedAction.stratoToken : undefined,
-        }, useExternalWalletSigning ? { walletAuth: true } : undefined);
-      }
-
       // Step: Complete
       setCurrentStep("complete");
       setAmount("");
@@ -1113,6 +1189,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       await Promise.all([
         isNative ? refetchNative() : refetchToken(),
         fetchUsdstBalance(),
+        ...(action === 3 ? [refreshSaveUsdst(), getEarningAssets(false), fetchTokens()] : []),
       ]);
     } catch (error: unknown) {
       const bridgeError = normalizeError(error);
@@ -1387,13 +1464,24 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                       />
                     );
                   }),
-                  ...visibleMatchingActions.map((action) => {
+                  ...matchingActions.map((action) => {
                     let est = amount || "0";
+                    const isPsmSave = action.action === 3;
+                    const psmSaveEstimate = isPsmSave
+                      ? calcPsmSaveEstimate(
+                          amount,
+                          action.feeBps,
+                          saveUsdstInfo?.projectedExchangeRate || saveUsdstInfo?.exchangeRate || WAD.toString()
+                        )
+                      : null;
                     if (action.action === 2 && action.oraclePrice && amount) {
                       try {
                         const price = BigInt(action.oraclePrice);
                         if (price > 0n) est = truncateDecimals(formatUnits((safeParseUnits(amount, 18) * WAD) / price, 18), 6);
                       } catch { /* keep */ }
+                    }
+                    if (psmSaveEstimate) {
+                      est = truncateDecimals(formatUnits(psmSaveEstimate.shares, 18), 6);
                     }
                     const isForge = action.action === 2;
                     const forgePrices = isForge
@@ -1405,19 +1493,25 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                     const forgeSpotLabel = forgePrices && action.feeBps
                       ? `Spot ${forgePrices.spot} \u00B7 ${Number(action.feeBps) / 100}% fee`
                       : undefined;
+                    const psmSaveLabel = psmSaveEstimate
+                      ? `Net ${truncateDecimals(formatUnits(psmSaveEstimate.netUsdst, 18), 6)} USDST \u00B7 ${Number(action.feeBps || "0") / 100}% PSM fee`
+                      : undefined;
                     return (
                       <TokenCard key={action.id}
                         active={selectedAction?.id === action.id}
                         image={action.stratoTokenImage} symbol={action.stratoTokenSymbol}
+                        displayLabel={action.action === 3 ? "USDST Savings Vault" : undefined}
                         estimated={est}
                         onClick={() => {
-                          const mintRoute = sourceTokenRoutes.find(r => !r.isDefaultRoute);
-                          if (mintRoute) setSelectedToken(mintRoute);
+                          const actionRoute = action.action === 3
+                            ? sourceTokenRoutes.find(r => r.isDefaultRoute && normAddr(r.stratoToken) === normAddr(action.payToken))
+                            : sourceTokenRoutes.find(r => !r.isDefaultRoute);
+                          if (actionRoute) setSelectedToken(actionRoute);
                           setSelectedAction(action);
                         }}
                         disabled={guestMode || isLoading}
                         effectivePrice={forgePrices?.effective ?? earnPrice}
-                        spotLabel={forgeSpotLabel}
+                        spotLabel={psmSaveLabel ?? forgeSpotLabel}
                         apyBadge={<ApyLine addr={action.stratoToken} />}
                       />
                     );
@@ -1455,6 +1549,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                 ? `Buy ${selectedMetal?.symbol || "Metal"}`
                 : selectedToken?.routeType === "native"
                   ? "Redeem to STRATO"
+                  : selectedAction?.action === 3
+                    ? "Deposit to USDST Savings Vault"
                   : "Deposit"}
           </Button>
           <div className={`overflow-hidden transition-all duration-300 ease-in-out text-right ${
@@ -1499,7 +1595,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           currentStep={currentStep}
           txHash={progressTxHash}
           chainId={currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : undefined}
-          isEasySavings={(selectedAction?.action || 0) > 0}
+          isEasySavings={progressAction > 0}
+          isPsmSave={progressAction === 3}
+          isFallback={progressFallback}
+          fallbackTokenSymbol={selectedToken?.externalSymbol}
           isNative={progressIsNative}
           isRedemption={progressIsRedemption}
           error={progressError}
@@ -1509,6 +1608,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             setProgressTxHash(undefined);
             setProgressError(undefined);
             setProgressIsRedemption(false);
+            setProgressAction(0);
+            setProgressFallback(false);
           }}
         />
         <MetalBuyProgressModal

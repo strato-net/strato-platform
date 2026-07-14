@@ -11,6 +11,7 @@ import {
 } from "../services/bridge.service";
 import { validateRequestWithdrawal, validateDepositAction, validateTransactionType } from "../validators/bridge.validators";
 import { validateRawParams } from "../validators/common.validators";
+import { requestContext } from "../../utils/requestContext";
 import {
   NetworkConfig,
   BridgeToken,
@@ -85,6 +86,10 @@ class BridgeController {
     try {
       const { accessToken, body, address: userAddress } = req;
       validateDepositAction(body);
+      if (requestContext.getStore()?.externalSigning && (!body.signature || !body.deadline)) {
+        res.status(400).json({ error: "MetaMask authorization signature and deadline are required" });
+        return;
+      }
    
       const result: TransactionResponse = await requestDepositAction(accessToken, body as DepositActionRequestParams, userAddress as string);
    

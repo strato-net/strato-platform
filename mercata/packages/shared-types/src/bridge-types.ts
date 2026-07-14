@@ -50,18 +50,18 @@ export interface BridgeToken {
 export type BridgeRouteType = "standard" | "native";
 
 /**
- * A post-deposit action (earn yield or forge metal) returned by /bridge/depositActions
+ * A post-deposit action returned by /bridge/depositActions
  */
 export interface DepositAction {
   id: string;
-  action: number;                // 1 = AUTO_SAVE, 2 = AUTO_FORGE
-  stratoToken: string;           // output token address (mToken for earn, metal for forge)
+  action: number;                // 1 = AUTO_SAVE, 2 = AUTO_FORGE, 3 = AUTO_PSM_SAVE_USDST
+  stratoToken: string;           // output token address (mToken, metal, or saveUSDST)
   stratoTokenSymbol: string;
   stratoTokenName: string;
   stratoTokenImage?: string;
   payToken: string;              // STRATO pay token this applies to (join key to match VIA MINT routes)
   oraclePrice?: string;          // WAD-scaled price for estimated output calc
-  /** Metal forge fee in basis points; AUTO_FORGE (action 2) only, from MetalForge metalConfigs */
+  /** Action fee in basis points from MetalForge or DirectMintPSM configuration */
   feeBps?: string;
 }
 
@@ -94,8 +94,8 @@ export interface BridgeTransaction {
   externalName?: string;
   externalSymbol?: string;
   externalToken?: string;
-  // Deposit action outcome (only for deposits with AUTO_SAVE or AUTO_FORGE)
-  depositOutcome?: "bridge" | "save" | "forge";
+  // Deposit action outcome
+  depositOutcome?: "bridge" | "save" | "forge" | "saveUsdst";
   finalToken?: string;
   finalTokenSymbol?: string;
   finalAmount?: string;
@@ -132,7 +132,7 @@ export interface WithdrawalRequestParams {
 
 /**
  * Parameters for requesting a post-deposit action (auto-save, auto-forge, etc.)
- * @param action - Deposit action type (1 = AUTO_SAVE, 2 = AUTO_FORGE)
+ * @param action - Deposit action type (1 = AUTO_SAVE, 2 = AUTO_FORGE, 3 = AUTO_PSM_SAVE_USDST)
  * @param targetToken - Action-specific target token (e.g. metal token address for AUTO_FORGE, unused for AUTO_SAVE)
  */
 export interface DepositActionRequestParams {
@@ -140,6 +140,8 @@ export interface DepositActionRequestParams {
   externalTxHash: string;
   action: number;
   targetToken?: string;
+  signature?: string;
+  deadline?: string;
 }
 
 /**

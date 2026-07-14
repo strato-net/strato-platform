@@ -18,6 +18,9 @@ interface DepositProgressModalProps {
   txHash?: string;
   chainId?: number;
   isEasySavings?: boolean;
+  isPsmSave?: boolean;
+  isFallback?: boolean;
+  fallbackTokenSymbol?: string;
   isNative?: boolean;
   isRedemption?: boolean;
   error?: string;
@@ -30,6 +33,9 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
   txHash,
   chainId,
   isEasySavings = false,
+  isPsmSave = false,
+  isFallback = false,
+  fallbackTokenSymbol,
   isNative = true,
   isRedemption = false,
   error,
@@ -39,14 +45,30 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
   const lastActiveStepRef = useRef<number>(-1);
 
   const getSteps = () => {
-    if (isEasySavings) {
+    const completeStep = isFallback
+      ? {
+          key: "complete",
+          label: "Processing Bridge Deposit",
+          description: `The auto action was not registered. STRATO will deliver bridged ${fallbackTokenSymbol || "tokens"} instead.`,
+        }
+      : null;
+    if (isPsmSave) {
+      return [
+        { key: "approve", label: "Approve Token", description: "Approve token spending" },
+        { key: "sign_permit", label: "Sign Permit", description: "Sign permit message in your wallet" },
+        { key: "confirm_tx", label: "Confirm Transaction", description: "Confirm transaction in your wallet" },
+        { key: "waiting_tx", label: "Waiting for Transaction", description: "Transaction is being processed on-chain" },
+        { key: "waiting_autosave", label: "Preparing PSM Save", description: "Registering the PSM conversion and saveUSDST deposit" },
+        completeStep || { key: "complete", label: "Processing Deposit", description: "All set! STRATO is converting through the PSM and depositing into saveUSDST (1-2 min). You can close this modal anytime." },
+      ];
+    } else if (isEasySavings) {
       return [
         { key: "approve", label: "Approve Token", description: "Approve token spending" },
         { key: "sign_permit", label: "Sign Permit", description: "Sign permit message in your wallet" },
         { key: "confirm_tx", label: "Confirm Transaction", description: "Confirm transaction in your wallet" },
         { key: "waiting_tx", label: "Waiting for Transaction", description: "Transaction is being processed on-chain" },
         { key: "waiting_autosave", label: "Waiting for Autosave", description: "Depositing to Easy Savings..." },
-        { key: "complete", label: "Processing Deposit", description: "All set! STRATO is processing your deposit (1-2 min). You can close this modal anytime." },
+        completeStep || { key: "complete", label: "Processing Deposit", description: "All set! STRATO is processing your deposit (1-2 min). You can close this modal anytime." },
       ];
     } else {
       // For Bridge In, include approve and sign_permit steps only if it's not native (ERC20 token)

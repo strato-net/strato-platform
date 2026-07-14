@@ -57,9 +57,10 @@ library BridgeTypes {
 
     /// @notice Post-deposit action types for confirmDeposit dispatch
     enum DepositAction {
-        NONE,        // default — mint directly to recipient
-        AUTO_SAVE,   // deposit into lending pool
-        AUTO_FORGE   // forge metal via MetalForge
+        NONE,                // default — mint directly to recipient
+        AUTO_SAVE,           // deposit into lending pool
+        AUTO_FORGE,          // forge metal via MetalForge
+        AUTO_PSM_SAVE_USDST  // convert via DirectMintPSM and deposit into SaveUSDSTVault
     }
 
     /// @notice Request for a post-deposit action, stored until confirmDeposit executes it

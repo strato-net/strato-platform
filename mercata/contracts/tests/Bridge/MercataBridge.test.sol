@@ -10,6 +10,8 @@ import "../../libraries/Bridge/BridgeTypes.sol";
 import "../../concrete/Lending/LendingRegistry.sol";
 import "../../concrete/BaseCodeCollection.sol";
 import "../../concrete/Metals/MetalForge.sol";
+import "../../concrete/Pools/DirectMintPSM.sol";
+import "../../concrete/Savings/SaveUSDSTVault.sol";
 
 
 contract TestERC20 is ERC20, Ownable {
@@ -69,6 +71,8 @@ contract Describe_MercataBridge is Authorizable {
     PriceOracle oracle;
     FeeCollector feeCollector;
     TestERC20 goldToken;
+    DirectMintPSM directMintPSM;
+    SaveUSDSTVault saveUSDSTVault;
     User user1;
     User user2;
     User relayer;
@@ -178,6 +182,13 @@ contract Describe_MercataBridge is Authorizable {
         oracle.initialize();
         feeCollector = new FeeCollector(address(this));
 
+        directMintPSM = new DirectMintPSM(address(this));
+        directMintPSM.initialize(address(usdstToken), address(feeCollector), [address(testToken)], 86400);
+        saveUSDSTVault = new SaveUSDSTVault(address(this));
+        saveUSDSTVault.initialize(address(usdstToken), "Save USDST", "saveUSDST");
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(usdstToken), "mint", address(directMintPSM));
+        bridge.setPSMSaveConfig(address(directMintPSM), address(saveUSDSTVault));
+
         goldToken = TestERC20(tokenFactory.createTokenWithInitialOwner("Gold", "GOLDST", [], [], [], "GOLDST", 0, 18, address(adminRegistry)));
         Token(address(goldToken)).setStatus(2);
 
@@ -199,6 +210,7 @@ contract Describe_MercataBridge is Authorizable {
         require(address(bridge.tokenFactory()) == address(tokenFactory), "Token factory not set");
         require(!bridge.depositsPaused(), "Deposits should not be paused initially");
         require(!bridge.withdrawalsPaused(), "Withdrawals should not be paused initially");
+        require(!bridge.psmSaveEnabled(), "PSM save should be disabled initially");
         require(bridge.withdrawalCounter() == 0, "Withdrawal counter should start at 0");
     }
 
@@ -365,6 +377,14 @@ contract Describe_MercataBridge is Authorizable {
             reverted = true;
         }
         require(reverted, "Should revert setPause by non-owner");
+
+        reverted = false;
+        try {
+            user1.do(address(bridge), "setPSMSaveEnabled", false);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert setPSMSaveEnabled by non-owner");
     }
 
     // ============ DEPOSIT FLOW TESTS ============
@@ -1729,6 +1749,101 @@ contract Describe_MercataBridge is Authorizable {
         (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
         require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
         require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Tokens should be minted");
+    }
+
+    // ============ AUTO PSM SAVE USDST TESTS ============
+
+    function it_bridge_auto_psm_save_usdst_successful() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("auto PSM save transaction hash");
+
+        bridge.setPSMSaveEnabled(true);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient, address(testToken));
+        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(3), address(0));
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
+        require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
+        require(IERC20(address(testToken)).balanceOf(address(directMintPSM)) == amount, "PSM should receive bridged token");
+        require(saveUSDSTVault.totalAssets() == amount, "Vault should receive USDST");
+        require(saveUSDSTVault.balanceOf(recipient) == amount, "Recipient should receive saveUSDST");
+        require(IERC20(address(testToken)).balanceOf(recipient) == 0, "Recipient should not receive bridged token");
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == 0, "Recipient should not receive USDST");
+    }
+
+    function it_bridge_auto_psm_save_usdst_deposits_net_of_psm_fee() {
+        uint256 amount = 1000e18;
+        uint256 feeAmount = 10e18;
+        uint256 netAmount = amount - feeAmount;
+        address recipient = address(new User());
+        string memory txHash = keccak256("auto PSM save fee transaction hash");
+
+        bridge.setPSMSaveEnabled(true);
+        directMintPSM.setMintConfig(address(testToken), true, 0, 100);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient, address(testToken));
+        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(3), address(0));
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        require(IERC20(address(testToken)).balanceOf(address(directMintPSM)) == netAmount, "PSM should retain net bridged token");
+        require(IERC20(address(testToken)).balanceOf(address(feeCollector)) == feeAmount, "Fee collector should receive PSM fee");
+        require(saveUSDSTVault.totalAssets() == netAmount, "Vault should receive net USDST");
+        require(saveUSDSTVault.balanceOf(recipient) == netAmount, "Recipient should receive net saveUSDST");
+    }
+
+    function it_bridge_auto_psm_save_usdst_psm_failure_returns_bridged_token() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("auto PSM failure transaction hash");
+
+        bridge.setPSMSaveEnabled(true);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient, address(testToken));
+        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(3), address(0));
+        directMintPSM.pauseMint();
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
+        require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
+        require(IERC20(address(testToken)).balanceOf(recipient) == amount, "Recipient should receive bridged token");
+        require(IERC20(address(testToken)).balanceOf(address(directMintPSM)) == 0, "PSM should not retain bridged token");
+        require(saveUSDSTVault.balanceOf(recipient) == 0, "Recipient should not receive saveUSDST");
+    }
+
+    function it_bridge_auto_psm_save_usdst_disabled_returns_bridged_token() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("disabled auto PSM save transaction hash");
+
+        bridge.setPSMSaveEnabled(true);
+        bridge.setPSMSaveEnabled(false);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient, address(testToken));
+        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(3), address(0));
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
+        require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
+        require(IERC20(address(testToken)).balanceOf(recipient) == amount, "Recipient should receive bridged token");
+        require(IERC20(address(testToken)).balanceOf(address(directMintPSM)) == 0, "PSM should not receive bridged token");
+        require(saveUSDSTVault.balanceOf(recipient) == 0, "Recipient should not receive saveUSDST");
+    }
+
+    function it_bridge_auto_psm_save_usdst_vault_failure_rolls_back_psm() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("auto save vault failure transaction hash");
+
+        bridge.setPSMSaveEnabled(true);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient, address(testToken));
+        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(3), address(0));
+        saveUSDSTVault.pause();
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
+        require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
+        require(IERC20(address(testToken)).balanceOf(recipient) == amount, "Recipient should receive bridged token");
+        require(IERC20(address(testToken)).balanceOf(address(directMintPSM)) == 0, "PSM conversion should roll back");
+        require(IERC20(address(usdstToken)).balanceOf(address(bridge)) == 0, "Bridge should not retain USDST");
+        require(saveUSDSTVault.balanceOf(recipient) == 0, "Recipient should not receive saveUSDST");
     }
 
     // ============ AUTO FORGE TESTS ============

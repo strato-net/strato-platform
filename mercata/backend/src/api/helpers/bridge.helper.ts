@@ -1,5 +1,6 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
+import * as config from "../../config/config";
 import { ensureHexPrefix } from "../../utils/utils";
 import { BridgeToken } from "@mercata/shared-types";
 
@@ -206,7 +207,7 @@ async function fetchDepositEvents(accessToken: string, txHashes: string[]): Prom
     params: {
       select: "event_name,attributes",
       address: `eq.${constants.mercataBridge}`,
-      or: "(event_name.eq.AutoForged,event_name.eq.AutoSaved)",
+      or: "(event_name.eq.AutoForged,event_name.eq.AutoSaved,event_name.eq.AutoPSMSavedUSDST)",
       "attributes->>externalTxHash": `in.(${txHashes.join(",")})`,
     }
   });
@@ -229,6 +230,11 @@ function applyDepositOutcome(enriched: any, eventMap: Map<string, any>, stratoMa
   } else if (evt?.event_name === "AutoSaved") {
     enriched.depositOutcome = "save";
     enriched.finalAmount = evt.attributes.mTokenAmount || "0";
+  } else if (evt?.event_name === "AutoPSMSavedUSDST") {
+    enriched.depositOutcome = "saveUsdst";
+    enriched.finalToken = stripHex(config.saveUsdstVault || "");
+    enriched.finalTokenSymbol = "saveUSDST";
+    enriched.finalAmount = evt.attributes.shareAmount || "0";
   } else {
     enriched.depositOutcome = "bridge";
   }

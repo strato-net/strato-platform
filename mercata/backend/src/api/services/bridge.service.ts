@@ -19,8 +19,10 @@ import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalReques
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getOraclePrices, getRebaseFactors } from "./oracle.service";
 import { toUTCTime } from "../helpers/cirrusHelpers";
+import { parseMintConfig } from "./psm.service";
+import * as config from "../../config/config";
 
-const { MercataBridge, StratoNativeBridge, Token, LendingPool, LendingRegistry, mercataBridge, DECIMALS } = constants;
+const { MercataBridge, StratoNativeBridge, Token, LendingPool, LendingRegistry, DirectMintPSM, SaveUSDSTVault, mercataBridge, DECIMALS } = constants;
 
 const stripPagingParams = (
   params: Record<string, string | undefined>
@@ -198,6 +200,8 @@ export const requestDepositAction = async (
     externalTxHash,
     action,
     targetToken,
+    signature,
+    deadline,
   }: DepositActionRequestParams,
   userAddress: string
 ) : Promise<TransactionResponse> => {
@@ -206,6 +210,7 @@ export const requestDepositAction = async (
     externalTxHash,
     action,
     targetToken,
+    ...(signature && deadline ? { userAddress, signature, deadline } : {}),
   });
   return response.data;
 };
@@ -458,8 +463,19 @@ export const getWithdrawalSummary = async (
 export const getDepositActions = async (accessToken: string): Promise<DepositAction[]> => {
   const key = (r: any) => typeof r.key === "object" ? r.key.key : r.key;
   const val = (r: any) => typeof r.value === "string" ? JSON.parse(r.value) : r.value ?? {};
+  const asBool = (v: unknown) => v === true || ["true", "t"].includes(String(v).toLowerCase());
+  const norm = (v: unknown) => String(v ?? "").toLowerCase().replace(/^0x/, "");
 
-  const [{ data: mappings = [] }, { data: [pool] = [] }, prices, { data: [rateEvt] = [] }] = await Promise.all([
+  const [
+    { data: mappings = [] },
+    { data: [pool] = [] },
+    prices,
+    { data: [rateEvt] = [] },
+    { data: [psm] = [] },
+    { data: psmMintConfigs = [] },
+    { data: [saveVault] = [] },
+    { data: [bridgeState] = [] },
+  ] = await Promise.all([
     constants.metalForge
       ? cirrus.get(accessToken, "/mapping", {
           params: { select: "collection_name,key,value::text", collection_name: "in.(metalConfigs,isSupportedPayToken)", address: `eq.${constants.metalForge}` }
@@ -472,12 +488,54 @@ export const getDepositActions = async (accessToken: string): Promise<DepositAct
     cirrus.get(accessToken, `/${LendingPool}-ExchangeRateUpdated`, {
       params: { select: "newRate::text", order: "block_timestamp.desc", limit: "1" }
     }),
+    constants.directMintPsm
+      ? cirrus.get(accessToken, `/${DirectMintPSM}`, {
+          params: { address: `eq.${constants.directMintPsm}`, select: "mintableToken,mintPaused" }
+        }).catch(() => ({ data: [] }))
+      : Promise.resolve({ data: [] }),
+    constants.directMintPsm
+      ? cirrus.get(accessToken, `/${DirectMintPSM}-mintConfigs`, {
+          params: { address: `eq.${constants.directMintPsm}`, select: "key,value::text" }
+        }).catch(() => ({ data: [] }))
+      : Promise.resolve({ data: [] }),
+    config.saveUsdstVault
+      ? cirrus.get(accessToken, `/${SaveUSDSTVault}`, {
+          params: { address: `eq.${config.saveUsdstVault}`, select: "address,assetToken,_paused,_symbol" }
+        }).catch(() => ({ data: [] }))
+      : Promise.resolve({ data: [] }),
+    cirrus.get(accessToken, `/${MercataBridge}`, {
+      params: { address: `eq.${mercataBridge}`, select: "directMintPSM,saveUSDSTVault,psmSaveEnabled" }
+    }).catch(() => ({ data: [] })),
   ]);
 
   const metals = mappings.filter((r: any) => r.collection_name === "metalConfigs").map((r: any) => ({ addr: key(r), ...val(r) })).filter((m: any) => m.isEnabled === true);
   const payTokens = mappings.filter((r: any) => r.collection_name === "isSupportedPayToken").filter((r: any) => r.value === true || r.value === "true").map((r: any) => ({ addr: key(r) }));
   const { borrowableAsset, mToken } = pool?.lendingPool || {};
   if (mToken) prices.set(mToken, rateEvt?.newRate || (10n ** 18n).toString());
+  const psmSaveEnabled =
+    Boolean(constants.directMintPsm && config.saveUsdstVault && psm && saveVault) &&
+    asBool(bridgeState?.psmSaveEnabled) &&
+    norm(bridgeState?.directMintPSM) === norm(constants.directMintPsm) &&
+    norm(bridgeState?.saveUSDSTVault) === norm(config.saveUsdstVault) &&
+    !asBool(psm?.mintPaused) &&
+    !asBool(saveVault?._paused) &&
+    norm(psm?.mintableToken) === norm(saveVault?.assetToken);
+  const psmSaveActions: DepositAction[] = psmSaveEnabled
+    ? psmMintConfigs.flatMap((row: any) => {
+        const mintConfig = parseMintConfig(row.value);
+        if (!mintConfig.isEnabled) return [];
+        const payToken = key(row);
+        return [{
+          id: `save-usdst-${payToken}`,
+          action: 3,
+          stratoToken: saveVault.address || config.saveUsdstVault,
+          stratoTokenName: "Save USDST",
+          stratoTokenSymbol: saveVault._symbol || "saveUSDST",
+          payToken,
+          feeBps: mintConfig.feeBps,
+        }];
+      })
+    : [];
 
   const allAddrs = [...metals.map((m: any) => m.addr), ...(mToken ? [mToken] : [])];
   const tokenMap = allAddrs.length ? await getTokenMetadata(accessToken, allAddrs) : new Map();
@@ -499,6 +557,7 @@ export const getDepositActions = async (accessToken: string): Promise<DepositAct
 
   return [
     ...(borrowableAsset && mToken ? [toAction(`earn-${borrowableAsset}`, 1, mToken, borrowableAsset)] : []),
+    ...psmSaveActions,
     ...payTokens.flatMap((p: any) =>
       metals.map((m: any) => toAction(`forge-${p.addr}-${m.addr}`, 2, m.addr, p.addr, m.feeBps)),
     ),

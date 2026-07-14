@@ -104,7 +104,7 @@ router.post("/requestNativeWithdrawal", walletAuth, BridgeController.requestNati
  * @openapi
  * /bridge/requestDepositAction:
  *   post:
- *     summary: "Request a post-deposit action (auto-save to lending pool, auto-forge metal, etc.)"
+ *     summary: "Request a post-deposit action (lending, metal forge, or PSM saveUSDST)"
  *     tags: [Bridge]
  *     requestBody:
  *       required: true
@@ -125,10 +125,16 @@ router.post("/requestNativeWithdrawal", walletAuth, BridgeController.requestNati
  *                 description: External transaction hash
  *               action:
  *                 type: number
- *                 description: "Deposit action type (1 = AUTO_SAVE, 2 = AUTO_FORGE)"
+ *                 description: "Deposit action type (1 = AUTO_SAVE, 2 = AUTO_FORGE, 3 = AUTO_PSM_SAVE_USDST)"
  *               targetToken:
  *                 type: string
  *                 description: "Action-specific target token address (e.g. metal token for AUTO_FORGE, omit for AUTO_SAVE)"
+ *               signature:
+ *                 type: string
+ *                 description: MetaMask authorization signature for wallet-only requests
+ *               deadline:
+ *                 type: string
+ *                 description: Unix timestamp after which the MetaMask authorization expires
  *     responses:
  *       200:
  *         description: Deposit action request submitted
@@ -153,7 +159,7 @@ router.post("/requestDepositAction", walletAuth, BridgeController.requestDeposit
  * @openapi
  * /bridge/depositActions:
  *   get:
- *     summary: "List available post-deposit actions (earn, forge metal) with oracle prices"
+ *     summary: "List available post-deposit actions with prices and fees"
  *     tags: [Bridge]
  *     responses:
  *       200:
@@ -173,7 +179,7 @@ router.post("/requestDepositAction", walletAuth, BridgeController.requestDeposit
  *                     type: string
  *                   depositAction:
  *                     type: number
- *                     description: "1 = AUTO_SAVE, 2 = AUTO_FORGE"
+ *                     description: "1 = AUTO_SAVE, 2 = AUTO_FORGE, 3 = AUTO_PSM_SAVE_USDST"
  *                   routeType:
  *                     type: string
  *                     description: "earn | forge"

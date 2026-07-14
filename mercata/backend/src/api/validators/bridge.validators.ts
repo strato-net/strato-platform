@@ -86,11 +86,11 @@ export function validateDepositAction(args: any) {
     externalTxHash: validateHashField("externalTxHash"),
     action: Joi.number()
       .integer()
-      .min(1)
+      .valid(1, 2, 3)
       .required()
       .messages({
         "number.base": "action must be a number.",
-        "number.min": "action must be at least 1.",
+        "any.only": "action must be 1, 2, or 3.",
         "any.required": "action is required.",
       }),
     targetToken: Joi.string()
@@ -100,7 +100,19 @@ export function validateDepositAction(args: any) {
       .messages({
         "string.pattern.base": "targetToken must be a valid 40-character hex address.",
       }),
-  });
+    signature: Joi.string()
+      .optional()
+      .pattern(/^0x[a-fA-F0-9]{130}$/)
+      .messages({
+        "string.pattern.base": "signature must be a valid 65-byte hex signature.",
+      }),
+    deadline: Joi.string()
+      .optional()
+      .pattern(/^[0-9]+$/)
+      .messages({
+        "string.pattern.base": "deadline must be a Unix timestamp.",
+      }),
+  }).and("signature", "deadline");
 
   const { error } = schema.validate(args);
   if (error) {

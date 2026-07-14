@@ -7,6 +7,8 @@ import "../Admin/AdminRegistry.sol";
 import "../../libraries/Bridge/BridgeTypes.sol";
 import "../Lending/LendingRegistry.sol";
 import "../Metals/MetalForge.sol";
+import "../Pools/DirectMintPSM.sol";
+import "../Savings/SaveUSDSTVault.sol";
 
 /**
  * @title MercataBridge
@@ -115,6 +117,12 @@ contract record MercataBridge is Ownable {
     /// @notice Emitted when the metal forge address is updated
     event MetalForgeUpdated(address newForge, address oldForge);
 
+    /// @notice Emitted when the PSM and saveUSDST vault addresses are updated
+    event PSMSaveConfigUpdated(address newPSM, address oldPSM, address newVault, address oldVault);
+
+    /// @notice Emitted when PSM saveUSDST deposits are enabled or disabled
+    event PSMSaveEnabledUpdated(bool enabled);
+
     /// @notice Emitted when a user requests a post-deposit action
     event DepositActionRequested(address user, uint256 externalChainId, string externalTxHash, DepositAction action, address targetToken);
 
@@ -123,6 +131,9 @@ contract record MercataBridge is Ownable {
 
     /// @notice Emitted when a deposit is auto forged into metal
     event AutoForged(uint256 externalChainId, string externalTxHash, address payToken, uint256 payAmount, address metalToken, uint256 metalAmount);
+
+    /// @notice Emitted when a deposit is converted through the PSM and deposited into saveUSDST
+    event AutoPSMSavedUSDST(uint256 externalChainId, string externalTxHash, address payToken, uint256 payAmount, uint256 usdstAmount, uint256 shareAmount);
 
     /* ===================================================================== */
     /*                            STATE VARIABLES                            */
@@ -199,6 +210,15 @@ contract record MercataBridge is Ownable {
     /// @notice Route allowlist for one-to-many external->STRATO mappings
     /// @dev Key: (externalToken, externalChainId, targetStratoToken) -> enabled
     mapping(address => mapping(uint256 => mapping(address => bool))) public record assetRouteEnabled;
+
+    /// @notice DirectMintPSM used to convert bridged stablecoins into USDST
+    address public directMintPSM;
+
+    /// @notice SaveUSDSTVault receiving USDST produced by the PSM
+    address public saveUSDSTVault;
+
+    /// @notice Whether AUTO_PSM_SAVE_USDST actions may execute
+    bool public psmSaveEnabled;
 
 
     /* ===================================================================== */
@@ -428,6 +448,31 @@ contract record MercataBridge is Ownable {
     }
 
     /**
+     * @dev Sets the DirectMintPSM and saveUSDST vault used by AUTO_PSM_SAVE_USDST
+     * @param newPSM The DirectMintPSM address
+     * @param newVault The SaveUSDSTVault address
+     */
+    function setPSMSaveConfig(address newPSM, address newVault) external onlyOwner {
+        require(newPSM != address(0), "MB: zero PSM address");
+        require(newVault != address(0), "MB: zero save vault address");
+        emit PSMSaveConfigUpdated(newPSM, directMintPSM, newVault, saveUSDSTVault);
+        directMintPSM = newPSM;
+        saveUSDSTVault = newVault;
+    }
+
+    /**
+     * @dev Enables or disables AUTO_PSM_SAVE_USDST without pausing the PSM or vault
+     */
+    function setPSMSaveEnabled(bool enabled) external onlyOwner {
+        if (enabled) {
+            require(directMintPSM != address(0), "MB: PSM not set");
+            require(saveUSDSTVault != address(0), "MB: save vault not set");
+        }
+        psmSaveEnabled = enabled;
+        emit PSMSaveEnabledUpdated(enabled);
+    }
+
+    /**
      * @dev Sets the USDST token address
      * @notice Only the owner can update the USDST address
      * @param newUSDSTAddress The new USDST token address (must not be zero address)
@@ -597,6 +642,31 @@ contract record MercataBridge is Ownable {
         emit AutoSaved(externalChainId, normalizedTxHash, actualMintedAmount, mTokenAmount);
     }
 
+    function _autoPSMSaveUSDST(DepositInfo d, uint256 externalChainId, string normalizedTxHash) internal {
+        require(psmSaveEnabled, "MB: PSM save disabled");
+        require(directMintPSM != address(0), "MB: PSM not set");
+        require(saveUSDSTVault != address(0), "MB: save vault not set");
+
+        DirectMintPSM psm = DirectMintPSM(directMintPSM);
+        SaveUSDSTVault vault = SaveUSDSTVault(saveUSDSTVault);
+        address usdst = psm.mintableToken();
+        require(usdst == USDST_ADDRESS && vault.asset() == usdst, "MB: invalid PSM save config");
+
+        uint256 actualPayAmount = _mintFunds(d.stratoToken, address(this), d.stratoTokenAmount);
+        IERC20(d.stratoToken).approve(directMintPSM, actualPayAmount);
+
+        uint256 usdstBalanceBefore = IERC20(usdst).balanceOf(address(this));
+        psm.mint(actualPayAmount, d.stratoToken);
+        uint256 usdstAmount = IERC20(usdst).balanceOf(address(this)) - usdstBalanceBefore;
+        require(usdstAmount > 0, "MB: no USDST minted");
+
+        IERC20(usdst).approve(saveUSDSTVault, usdstAmount);
+        uint256 shareAmount = vault.deposit(usdstAmount, d.stratoRecipient);
+        require(shareAmount > 0, "MB: no saveUSDST minted");
+
+        emit AutoPSMSavedUSDST(externalChainId, normalizedTxHash, d.stratoToken, actualPayAmount, usdstAmount, shareAmount);
+    }
+
     /**
      * @dev Forges metal tokens from a deposit's minted stablecoin via MetalForge
      * @notice Mints stablecoin to the bridge, calls MetalForge.mintMetal (which mints metal to the bridge),
@@ -736,7 +806,7 @@ contract record MercataBridge is Ownable {
      * @param user The address requesting the action (must match the deposit recipient to be honored)
      * @param externalChainId The external chain identifier where the deposit occurred
      * @param externalTxHash The transaction hash on the external chain
-     * @param action The deposit action type (1 = AUTO_SAVE, 2 = AUTO_FORGE)
+     * @param action The deposit action type (1 = AUTO_SAVE, 2 = AUTO_FORGE, 3 = AUTO_PSM_SAVE_USDST)
      * @param targetToken Action-specific target token (e.g. metal token address for AUTO_FORGE, unused for AUTO_SAVE)
      */
     function requestDepositAction(address user, uint externalChainId, string externalTxHash, uint action, address targetToken) external onlyOwner {
@@ -790,6 +860,16 @@ contract record MercataBridge is Ownable {
         else if (req.action == DepositAction.AUTO_FORGE) {
             try {
                 _autoForge(d, externalChainId, normalizedTxHash, req.targetToken);
+            }
+            catch {
+                uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
+                require(actualMintedAmount > 0, "MB: no tokens minted");
+            }
+            delete depositActionRequests[d.stratoRecipient][externalChainId][normalizedTxHash];
+        }
+        else if (req.action == DepositAction.AUTO_PSM_SAVE_USDST) {
+            try {
+                _autoPSMSaveUSDST(d, externalChainId, normalizedTxHash);
             }
             catch {
                 uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
