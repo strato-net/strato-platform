@@ -9,15 +9,9 @@ import LendingPoolSection from '@/components/dashboard/LendingPoolSection';
 import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
 import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
 import SafetyModuleSection from '@/components/dashboard/SafetyModuleSection';
-import VaultOverview from '@/components/vault/VaultOverview';
-import VaultUserPosition from '@/components/vault/VaultUserPosition';
-import VaultTransactions from '@/components/vault/VaultTransactions';
-import VaultUserActivity from '@/components/vault/VaultUserActivity';
-import VaultDepositModal from '@/components/vault/VaultDepositModal';
-import VaultWithdrawModal from '@/components/vault/VaultWithdrawModal';
+import Vault from '@/pages/Vault';
 import { useUser } from '@/context/UserContext';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
-import { useVaultContext } from '@/context/VaultContext';
 import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 import { safeParseUnits } from "@/utils/numberUtils";
 import { formatUnits } from "ethers";
@@ -41,13 +35,10 @@ const Advanced = () => {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TopTab>("borrow");
   const [borrowActiveTab, setBorrowActiveTab] = useState<"borrow" | "repay">("borrow");
-  const [isVaultDepositOpen, setIsVaultDepositOpen] = useState(false);
-  const [isVaultWithdrawOpen, setIsVaultWithdrawOpen] = useState(false);
   const { isLoggedIn, userAddress } = useUser();
   const { toast } = useToast();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
-  const { refreshVault } = useVaultContext();
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');
@@ -215,7 +206,7 @@ const Advanced = () => {
                     Swap
                   </TabsTrigger>
                   <TabsTrigger value="vault" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
-                    Vault
+                    Diversified Vault
                   </TabsTrigger>
                   <TabsTrigger value="safety" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                     Safety
@@ -324,21 +315,7 @@ const Advanced = () => {
                   <SwapPoolsSection />
                 </TabsContent>
                 <TabsContent value="vault">
-                  {!isLoggedIn && (
-                    <GuestSignInBanner message="Sign in to deposit or withdraw from the vault" />
-                  )}
-                  <div className="space-y-8">
-                    <VaultOverview />
-                    <VaultUserPosition
-                      onDeposit={() => setIsVaultDepositOpen(true)}
-                      onWithdraw={() => setIsVaultWithdrawOpen(true)}
-                      guestMode={guestMode}
-                    />
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-                      <VaultTransactions />
-                      {!guestMode && <VaultUserActivity />}
-                    </div>
-                  </div>
+                  <Vault />
                 </TabsContent>
                 <TabsContent value="safety">
                   {!isLoggedIn && (
@@ -365,21 +342,6 @@ const Advanced = () => {
       </div>
 
       <MobileBottomNav />
-
-      {!guestMode && (
-        <>
-          <VaultDepositModal
-            isOpen={isVaultDepositOpen}
-            onClose={() => setIsVaultDepositOpen(false)}
-            onSuccess={() => refreshVault(false)}
-          />
-          <VaultWithdrawModal
-            isOpen={isVaultWithdrawOpen}
-            onClose={() => setIsVaultWithdrawOpen(false)}
-            onSuccess={() => refreshVault(false)}
-          />
-        </>
-      )}
     </div>
   );
 };

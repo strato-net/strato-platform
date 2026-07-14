@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import UsdstBalanceBox from "@/components/layouts/UsdstBalanceBox";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Transport, WagmiProvider } from "wagmi";
 import { mainnet, polygon, sepolia, base, baseSepolia, linea, lineaSepolia } from "wagmi/chains";
 import {
@@ -30,7 +30,6 @@ import Rewards from "./pages/Rewards";
 import Claim from "./pages/Claim";
 import CommunityRewardsOnePager from "./pages/CommunityRewardsOnePager";
 import PriceTracking from "./pages/PriceTracking";
-import Vault from "./pages/Vault";
 import Earn from "./pages/Earn";
 import EarnSave from "./pages/EarnSave";
 import EarnVault from "./pages/EarnVault";
@@ -316,11 +315,7 @@ const App = () => {
                                                 />
                                                 <Route
                                                   path="/dashboard/vault"
-                                                  element={
-                                                    <GuestAccessibleRoute>
-                                                      <Vault />
-                                                    </GuestAccessibleRoute>
-                                                  }
+                                                  element={<Navigate to="/dashboard/advanced?tab=vault" replace />}
                                                 />
                                                 <Route
                                                   path="/dashboard/earn-vault"

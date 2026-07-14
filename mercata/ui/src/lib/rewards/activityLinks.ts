@@ -49,9 +49,9 @@ export const getActivityLink = (activityName: string): string | null => {
     return '/dashboard/earn-yield-vault?vault=usdc-yield';
   }
 
-  // Vault activities - goes to the Vault page
+  // Diversified Vault activities - goes to the Advanced page, Vault tab
   if (lowerName.includes('vault')) {
-    return '/dashboard/vault';
+    return '/dashboard/advanced?tab=vault';
   }
   
   // Swap LP activities - goes to the Advanced page, Swap Pools tab
