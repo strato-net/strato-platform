@@ -64,14 +64,14 @@ export const getActivityLink = (activityName: string): string | null => {
     return '/dashboard/swap';
   }
 
-  // Borrow activities - goes to the Advanced page, Borrow tab
+  // Borrow activities - goes to the Borrow page (CDP vaults)
   if (lowerName.includes('borrow')) {
-    return '/dashboard/advanced?tab=borrow';
+    return '/dashboard/borrow';
   }
   
-  // Lending activities - goes to the Advanced page, Lending Pools tab
+  // Lending activities - goes to the Advanced page (hidden tab, defaults to swap)
   if (lowerName.includes('lend')) {
-    return '/dashboard/advanced?tab=lending';
+    return '/dashboard/advanced';
   }
 
   // Deposit activities - goes to the Deposits page
@@ -84,9 +84,9 @@ export const getActivityLink = (activityName: string): string | null => {
     return '/dashboard/withdrawals';
   }
 
-  // Safety Module activities - goes to the Advanced page, Safety tab
+  // Safety Module activities - goes to the Advanced page (hidden tab, defaults to swap)
   if (lowerName.includes('safety')) {
-    return '/dashboard/advanced?tab=safety';
+    return '/dashboard/advanced';
   }
 
   // No match found
