@@ -78,8 +78,6 @@ import { useUser } from "@/context/UserContext";
 
 
 const queryClient = new QueryClient();
-const proxiedChainIds = new Set([mainnet.id, sepolia.id, base.id, baseSepolia.id, linea.id, lineaSepolia.id]);
-const baseChains = [mainnet, polygon, sepolia, base, baseSepolia, linea, lineaSepolia] as const;
 
 const AuthGate = ({ children }: { children: ReactNode }) => {
   const { loading } = useUser();
@@ -162,15 +160,22 @@ const App = () => {
   useEffect(() => {
     if (!loading) {
       const appName = "STRATO";
+      const origin = window.location.origin;
       const stratoChain = getStratoChain();
+      const networkName = (window as { ENV?: { NETWORK_NAME?: string } }).ENV?.NETWORK_NAME || "";
+      const isProduction = networkName === "upquark";
+      const baseChains = isProduction
+        ? [mainnet, polygon, base, linea]
+        : [sepolia, baseSepolia, lineaSepolia];
+      const proxiedChainIds: Set<number> = new Set(baseChains.filter(c => c.id !== polygon.id).map(c => c.id));
       const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(
         chains.map((chain) => [
           chain.id,
           chain === stratoChain
-            ? http(`/rpc`)
+            ? http(`${origin}/rpc`)
             : proxiedChainIds.has(chain.id)
-              ? http(`/api/rpc/${chain.id}`, { fetchOptions: { credentials: "include" }, onFetchRequest: csrfOnRequest })
+              ? http(`${origin}/api/rpc/${chain.id}`, { fetchOptions: { credentials: "include" }, onFetchRequest: csrfOnRequest })
               : http(),
         ])
       );
@@ -190,7 +195,7 @@ const App = () => {
 
       const config = createConfig({
         connectors,
-        chains: chains as unknown as readonly [typeof mainnet, ...(typeof baseChains)],
+        chains: chains as unknown as readonly [typeof mainnet, ...(typeof mainnet)[]],
         transports,
       });
 
