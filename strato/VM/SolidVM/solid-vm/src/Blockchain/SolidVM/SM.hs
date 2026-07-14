@@ -957,11 +957,24 @@ getUsername = do
         if isPreUsernameFork && origin `S.member` blockappsAddresses
           then pure $ Just "BlockApps"
           else pure Nothing
-      go (x:xs) = do
-        userNameValue <- getSolidStorageKeyVal' x $ MS.StoragePath [MS.Field "username"]
-        case userNameValue of
-          MS.BString userNameString -> pure $ Just $ DT.decodeUtf8 userNameString
-          _ -> go xs
+      go (x:xs) = case x of
+        0x100c -> pure $ Just "BlockApps"
+        _ -> do
+          userNameValue <- getSolidStorageKeyVal' x $ MS.StoragePath [MS.Field "username"]
+          case userNameValue of
+            MS.BString userNameString -> do
+              let usernameText = DT.decodeUtf8 userNameString
+                  u = T.unpack usernameText
+                  userRegistry = Address 0x720
+              ch <- A.selectWithDefault (A.Proxy @AddressState) userRegistry >>= \s ->
+                pure . keccak256ToByteString $ case addressStateCodeHash s of
+                  ExternallyOwned h -> h
+                  SolidVMCode _ h   -> h
+              let addr = getNewAddressWithSalt_unsafe userRegistry u ch [SString "User", SString u]
+              if addr == x
+                then pure $ Just usernameText
+                else go xs
+            _ -> go xs
 
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   go $ currentAddress <$> cs
