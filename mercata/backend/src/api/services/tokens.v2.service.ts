@@ -662,19 +662,27 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
 
   // Add staked STRATO value to net balance
   const stakedStrato = snapshot.data.stakedStrato || 0n;
+  let stakedStratoValue = 0;
   if (stakedStrato > 0n) {
     const stratoTokenAddr = snapshot.data.stratoTokenAddress || '';
     const stratoPrice = snapshot.data.tokens[stratoTokenAddr]?.price || 0;
     if (stratoPrice > 0) {
       // stakedStrato is in wei (1e18), stratoPrice is in wei (1e18)
       // Value = (stakedStrato / 1e18) * (stratoPrice / 1e18) = stakedStrato * stratoPrice / 1e36
-      const stakedValue = (Number(stakedStrato) / 1e9) * (stratoPrice / 1e9);
-      netBalance += stakedValue;
+      stakedStratoValue = (Number(stakedStrato) / 1e9) * (stratoPrice / 1e9);
+      netBalance += stakedStratoValue;
     }
   }
 
   netBalance -= netLoan + parseFloat(snapshot.data.userLoan?.scaledDebt || '0');
-  return { timestamp: snapshot.timestamp, data: {netBalance: netBalance / 1e18 }};
+  return {
+    timestamp: snapshot.timestamp,
+    data: {
+      netBalance: netBalance / 1e18,
+      stakedStrato: Number(stakedStrato) / 1e18,
+      stakedStratoValue: stakedStratoValue / 1e18,
+    }
+  };
 }
 
 export const getBalanceHistory = async (
@@ -772,7 +780,12 @@ export const getNetBalanceHistory = async (
     processBalanceSnapshot,
   );
 
-  return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.netBalance}));
+  return balanceHistory.map(({timestamp, data}) => ({
+    timestamp,
+    balance: data.netBalance,
+    stakedStrato: data.stakedStrato,
+    stakedStratoValue: data.stakedStratoValue,
+  }));
 };
 
 export const getBorrowingHistory = async (
@@ -917,7 +930,7 @@ export const getPoolPriceHistory = async (
 export const getNetBalance = async (
   accessToken: string,
   userAddress: string
-): Promise<{ netBalance: number; totalBorrowed: number; totalAssetValue: number }> => {
+): Promise<{ netBalance: number; totalBorrowed: number; totalAssetValue: number; stakedStrato: number; stakedStratoValue: number }> => {
   const [earningAssetsResult, loanResult, vaultsResult] = await Promise.allSettled([
     getEarningAssets(accessToken, userAddress),
     getLoan(accessToken, userAddress),
@@ -925,9 +938,18 @@ export const getNetBalance = async (
   ]);
 
   let totalAssetValue = 0;
+  let stakedStrato = 0;
+  let stakedStratoValue = 0;
   if (earningAssetsResult.status === "fulfilled") {
     for (const asset of earningAssetsResult.value) {
       totalAssetValue += parseFloat(asset.value || "0");
+      // Extract staked STRATO info from the STRATO token asset
+      if (asset.stakedBalance && asset.stakedBalance !== "0") {
+        stakedStrato = Number(BigInt(asset.stakedBalance)) / 1e18;
+        stakedStratoValue = parseFloat(asset.value || "0") > 0
+          ? (stakedStrato * Number(BigInt(asset.price || "0"))) / 1e18
+          : 0;
+      }
     }
   }
 
@@ -958,5 +980,7 @@ export const getNetBalance = async (
     netBalance: totalAssetValue - totalBorrowed,
     totalBorrowed,
     totalAssetValue,
+    stakedStrato,
+    stakedStratoValue,
   };
 };
