@@ -84,6 +84,20 @@ const buildDepositActionAuthorization = (
   `deadline:${params.deadline || ""}`,
 ].join("\n");
 
+const getAutoActionFallbackMessage = (
+  action: DepositAction,
+  amount: string,
+  fallbackTokenSymbol: string,
+): string => {
+  if (action.action === 3) {
+    return `Due to high bridge volumes, we could not confirm your autosave request into USDST Savings Vault at this time. You will still receive ${amount} ${fallbackTokenSymbol} that you can convert to USDST and deposit into USDST Savings Vault.`;
+  }
+  if (action.action === 2) {
+    return `Due to high bridge volumes, we could not confirm your auto-forge request into ${action.stratoTokenSymbol} at this time. You will still receive ${amount} ${fallbackTokenSymbol} that you can use to purchase ${action.stratoTokenSymbol}.`;
+  }
+  return `Due to high bridge volumes, we could not confirm your autosave request into ${action.stratoTokenSymbol} at this time. You will still receive ${amount} ${fallbackTokenSymbol} that you can deposit manually.`;
+};
+
 const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: string }): string => {
   switch (info.source) {
     case "lending":
@@ -382,6 +396,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const [progressIsRedemption, setProgressIsRedemption] = useState(false);
   const [progressAction, setProgressAction] = useState(0);
   const [progressFallback, setProgressFallback] = useState(false);
+  const [progressFallbackMessage, setProgressFallbackMessage] = useState("");
   const [metalProgressOpen, setMetalProgressOpen] = useState(false);
   const [metalSteps, setMetalSteps] = useState<MetalBuyStep[]>([]);
   const [metalProgressError, setMetalProgressError] = useState<string>();
@@ -877,6 +892,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     setProgressIsRedemption(selectedToken.routeType === "native");
     setProgressAction(selectedAction?.action || 0);
     setProgressFallback(false);
+    setProgressFallbackMessage("");
     
     setProgressModalOpen(true);
 
@@ -1107,6 +1123,21 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
 
       if (action > 0 && selectedAction) {
         setCurrentStep("waiting_autosave");
+        const fallbackMessage = getAutoActionFallbackMessage(
+          selectedAction,
+          amount,
+          selectedToken.stratoTokenSymbol,
+        );
+        const handleActionFailure = () => {
+          action = 0;
+          setProgressFallback(true);
+          setProgressFallbackMessage(fallbackMessage);
+          setSelectedAction(null);
+          toast({
+            title: selectedAction.action === 2 ? "Auto-forge not confirmed" : "Autosave not confirmed",
+            description: fallbackMessage,
+          });
+        };
         if (useExternalWalletSigning) {
           try {
             const deadline = String(Math.floor(Date.now() / 1000) + 10 * 60);
@@ -1125,13 +1156,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               { walletAuth: true },
             );
           } catch {
-            action = 0;
-            setProgressFallback(true);
-            setSelectedAction(null);
-            toast({
-              title: "Auto action not registered",
-              description: `Your bridge deposit is still processing and will deliver bridged ${selectedToken.externalSymbol}.`,
-            });
+            handleActionFailure();
           }
         } else {
           try {
@@ -1142,13 +1167,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               targetToken: action === 2 ? selectedAction.stratoToken : undefined,
             });
           } catch {
-            action = 0;
-            setProgressFallback(true);
-            setSelectedAction(null);
-            toast({
-              title: "Auto action not registered",
-              description: `Your bridge deposit is still processing and will deliver bridged ${selectedToken.externalSymbol}.`,
-            });
+            handleActionFailure();
           }
         }
       }
@@ -1596,7 +1615,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           isEasySavings={progressAction > 0}
           isPsmSave={progressAction === 3}
           isFallback={progressFallback}
-          fallbackTokenSymbol={selectedToken?.externalSymbol}
+          fallbackMessage={progressFallbackMessage}
           isNative={progressIsNative}
           isRedemption={progressIsRedemption}
           error={progressError}
@@ -1608,6 +1627,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             setProgressIsRedemption(false);
             setProgressAction(0);
             setProgressFallback(false);
+            setProgressFallbackMessage("");
           }}
         />
         <MetalBuyProgressModal

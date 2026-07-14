@@ -20,7 +20,7 @@ interface DepositProgressModalProps {
   isEasySavings?: boolean;
   isPsmSave?: boolean;
   isFallback?: boolean;
-  fallbackTokenSymbol?: string;
+  fallbackMessage?: string;
   isNative?: boolean;
   isRedemption?: boolean;
   error?: string;
@@ -35,7 +35,7 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
   isEasySavings = false,
   isPsmSave = false,
   isFallback = false,
-  fallbackTokenSymbol,
+  fallbackMessage,
   isNative = true,
   isRedemption = false,
   error,
@@ -49,7 +49,7 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
       ? {
           key: "complete",
           label: "Processing Bridge Deposit",
-          description: `The auto action was not registered. STRATO will deliver bridged ${fallbackTokenSymbol || "tokens"} instead.`,
+          description: fallbackMessage || "The auto action was not registered. STRATO will deliver the bridged tokens instead.",
         }
       : null;
     if (isPsmSave) {
