@@ -26,6 +26,7 @@ import qualified Data.ByteString.Lazy as BSL
 import Data.Decimal
 import Data.Either
 import qualified Data.Map.Strict as Map
+import Data.Maybe (isJust)
 import Data.OpenApi hiding (value)
 import Data.Scientific
 import Data.Text (Text)
@@ -74,11 +75,79 @@ instance ToSchema ArgValue where
     pure . pure $
       NamedSchema (Just "Solidity Argument Value") $
         mempty
-          & description ?~ "A Solidity argument value"
+          & description ?~ "A Solidity argument value, optionally wrapped in a type-hint object of the shape {\"type\": \"<solidity type>\", \"value\": <argument>}"
           & example ?~ A.toJSON (ArgInt 5)
+
+-- | Arguments may be wrapped in an object of the shape
+-- {"type": "<solidity type name>", "value": <argument>} to make the intended
+-- Solidity type explicit when it cannot be inferred from the JSON encoding
+-- alone (e.g. an address vs. a numeric string).
+splitTypeHint :: ArgValue -> Maybe (Text, ArgValue)
+splitTypeHint (ArgObject o)
+  | KM.size o == 2,
+    Just (ArgString typeName) <- KM.lookup "type" o,
+    Just v <- KM.lookup "value" o =
+      Just (Text.strip typeName, v)
+splitTypeHint _ = Nothing
+
+-- | Parse a builtin Solidity type name like "uint256", "address", "bytes32",
+-- or "uint[3][]". Returns Nothing for non-builtin names (structs, enums,
+-- contracts), which can only be resolved against the contract's type definitions.
+parseSolidityTypeName :: Text -> Maybe Type
+parseSolidityTypeName full = do
+  let (base, suffixes) = Text.break (== '[') (Text.strip full)
+  baseType <- parseBase base
+  wrapArrays baseType suffixes
+  where
+    parseBase :: Text -> Maybe Type
+    parseBase t = SimpleType <$> case t of
+      "bool" -> Just TypeBool
+      "address" -> Just TypeAddress
+      "account" -> Just TypeAddress
+      "string" -> Just TypeString
+      "decimal" -> Just TypeDecimal
+      "byte" -> Just $ TypeBytes (Just 1)
+      "bytes" -> Just $ TypeBytes Nothing
+      "int" -> Just typeInt
+      "uint" -> Just typeUInt
+      _
+        | Just n <- readSuffix "bytes" t, n >= 1 && n <= 32 -> Just $ TypeBytes (Just n)
+        | Just n <- readSuffix "uint" t -> TypeInt False <$> intBytes n
+        | Just n <- readSuffix "int" t -> TypeInt True <$> intBytes n
+        | otherwise -> Nothing
+    readSuffix :: Text -> Text -> Maybe Integer
+    readSuffix pfx t = Text.stripPrefix pfx t >>= readMaybe . Text.unpack
+    -- Sizes are stored in bytes, e.g. "uint256" -> TypeInt False (Just 32)
+    intBytes :: Integer -> Maybe (Maybe Integer)
+    intBytes bits = do
+      guard $ bits `mod` 8 == 0 && bits >= 8 && bits <= 256
+      return . Just $ bits `div` 8
+    wrapArrays :: Type -> Text -> Maybe Type
+    wrapArrays ty sfx
+      | Text.null sfx = Just ty
+      | otherwise = do
+          afterOpen <- Text.stripPrefix "[" sfx
+          let (lenText, rest) = Text.break (== ']') afterOpen
+          rest' <- Text.stripPrefix "]" rest
+          ty' <-
+            if Text.null lenText
+              then Just $ TypeArrayDynamic ty
+              else TypeArrayFixed <$> readMaybe (Text.unpack lenText) <*> pure ty
+          wrapArrays ty' rest'
 
 --Used to coerce the solidity type from the argument values, without having the actual contract type info
 argValueToType :: ArgValue -> (Type, ArgValue)
+argValueToType v'
+  | Just (typeName, v) <- splitTypeHint v' = case parseSolidityTypeName typeName of
+      Just ty -> (ty, v)
+      -- A named (non-builtin) type: infer its flavor from the shape of the value
+      Nothing -> case v of
+        ArgObject _ -> (TypeStruct typeName, v)
+        ArgString s
+          | isJust (readMaybe (Text.unpack s) :: Maybe Address) -> (TypeContract typeName, v)
+          | otherwise -> (TypeEnum typeName, v)
+        ArgInt _ -> (SimpleType typeUInt, v) -- Enums may be passed as ints
+        _ -> argValueToType v
 argValueToType v@(ArgInt _) = (SimpleType typeInt, v)
 argValueToType v@(ArgBool _) = (SimpleType TypeBool, v)
 argValueToType v@(ArgString s') = maybe (SimpleType TypeString, v) id $
@@ -103,6 +172,18 @@ isSimple _ = False
 
 -- TODO: create valueToArgValue
 argValueToValue :: Maybe TypeDefs -> Type -> ArgValue -> Either Text Value
+argValueToValue defs theType argVal
+  | Just (_, inner) <- splitTypeHint argVal,
+    not (structExpectsHintFields theType) =
+      -- The declared type is authoritative here, so drop the hint and coerce the wrapped value
+      argValueToValue defs theType inner
+  where
+    -- Don't unwrap when the argument is a struct that genuinely has "type" and "value" fields
+    structExpectsHintFields (TypeStruct structName) =
+      case defs >>= Map.lookup structName . structDefs of
+        Just struct -> isJust (OMap.lookup "type" (fields struct)) && isJust (OMap.lookup "value" (fields struct))
+        Nothing -> False
+    structExpectsHintFields _ = False
 argValueToValue defs theType argVal = case theType of
   SimpleType ty -> SimpleValue <$> argValueToSimpleValue ty argVal
   TypeArrayDynamic ty -> case argVal of

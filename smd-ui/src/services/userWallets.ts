@@ -34,7 +34,8 @@ function extractUsername(row: any): string {
  *    clears its owner out of `userAddressMap`, so signers only appear here.
  * Both cirrus queries key on the connected account and join `storage` for the username;
  * the global AdminRegistry/Governance also have an `adminMap` but no username, so
- * requiring a username naturally excludes them.
+ * requiring a username naturally excludes them. Removed accounts are zeroed out in the
+ * mappings rather than deleted, so both queries require value > 0.
  */
 export function useMyUserWallets(ownerAddress?: string | null) {
   return useQuery({
@@ -44,7 +45,7 @@ export function useMyUserWallets(ownerAddress?: string | null) {
       const key = strip0x(ownerAddress!);
       const select = "select=address,storage(data-%3E%3Eusername)";
       const [ownedRes, signerRes] = await Promise.all([
-        api.get(`${env.CIRRUS_URL}/mapping?collection_name=eq.userAddressMap&key-%3E%3Ekey=eq.${key}&${select}`),
+        api.get(`${env.CIRRUS_URL}/mapping?collection_name=eq.userAddressMap&key-%3E%3Ekey=eq.${key}&value=gt.0&${select}`),
         api.get(`${env.CIRRUS_URL}/mapping?collection_name=eq.adminMap&key-%3E%3Ekey=eq.${key}&value=gt.0&${select}`),
       ]);
 

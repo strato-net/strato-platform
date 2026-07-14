@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileSidebar from "@/components/dashboard/MobileSidebar";
@@ -8,47 +8,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { useVaultContext } from "@/context/VaultContext";
-import { useSwapContext } from "@/context/SwapContext";
-import { useLendingContext } from "@/context/LendingContext";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
 import { useYieldVaultContext } from "@/hooks/useYieldVaultContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { useEarnContext } from "@/context/EarnContext";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
-import { useToast } from "@/hooks/use-toast";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
-import LiquidityDepositModal from "@/components/dashboard/LiquidityDepositModal";
-import LiquidityWithdrawModal from "@/components/dashboard/LiquidityWithdrawModal";
-import VaultDepositModal from "@/components/vault/VaultDepositModal";
 import { api } from "@/lib/axios";
-import type { Pool } from "@/interface";
 import { formatUnits } from "ethers";
-import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { CircleArrowDown, PiggyBank, ShieldCheck, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import stratoVaultLogo from "@/assets/strato-vault-logo.png";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
-import { EarnApyInfo, buildNativeRewardsApyInfo, findBestEarnApyInfo, findPoolEarnApyInfo, findVaultEarnApyInfo } from "@/utils/earnUtils";
-import {
-  mUsdstAddress,
-  LENDING_DEPOSIT_FEE,
-  rewardsEnabled,
-} from "@/lib/constants";
+import { EarnApyInfo, findBestEarnApyInfo } from "@/utils/earnUtils";
 
 const WAD = BigInt(10) ** BigInt(18);
-const TOP_OPPORTUNITY_MIN_POOL_TVL = 100000n * WAD;
 
 type StakingEarnInfo = {
   tokenSymbol: string;
@@ -138,9 +113,6 @@ const parseApy = (value: string | number | undefined): number => {
   return apy;
 };
 
-const isPoolPaused = (pool: Pool): boolean => Boolean((pool as any).isPaused);
-const isPoolDisabled = (pool: Pool): boolean => Boolean((pool as any).isDisabled);
-
 const formatApyDisplay = (value: string | number | undefined): { label: string; className: string } => {
   if (!value || value === "-") {
     return { label: "--", className: "text-foreground" };
@@ -185,43 +157,6 @@ const formatCarryVaultApyDisplayForLive = (
   }
   return formatApyDisplay(apy);
 };
-const formatMaxAmount = (weiAmount: bigint): string => {
-  const [whole, frac = ""] = formatUnits(weiAmount, 18).split(".");
-  return `${whole}.${frac.slice(0, 18)}`.replace(/\.?0+$/, "");
-};
-
-const TokenPairIcon = ({ pool, size = "sm" }: { pool: Pool; size?: "sm" | "lg" }) => {
-  const iconClass = size === "lg" ? "w-14 h-14" : "w-7 h-7";
-  const textClass = size === "lg" ? "text-lg" : "text-[10px]";
-  const overlapClass = size === "lg" ? "-space-x-4" : "-space-x-2";
-  return (
-    <div className={`flex items-center ${overlapClass} shrink-0`}>
-      {pool.tokenA?.images?.[0]?.value ? (
-        <img
-          src={pool.tokenA.images[0].value}
-          alt={pool.tokenA._symbol}
-          className={`${iconClass} rounded-full border-2 border-background object-cover`}
-        />
-      ) : (
-        <div className={`${iconClass} rounded-full border-2 border-background bg-blue-500/20 flex items-center justify-center ${textClass} font-semibold`}>
-          {(pool.tokenA?._symbol || "A").slice(0, 1)}
-        </div>
-      )}
-      {pool.tokenB?.images?.[0]?.value ? (
-        <img
-          src={pool.tokenB.images[0].value}
-          alt={pool.tokenB._symbol}
-          className={`${iconClass} rounded-full border-2 border-background object-cover`}
-        />
-      ) : (
-        <div className={`${iconClass} rounded-full border-2 border-background bg-purple-500/20 flex items-center justify-center ${textClass} font-semibold`}>
-          {(pool.tokenB?._symbol || "B").slice(0, 1)}
-        </div>
-      )}
-    </div>
-  );
-};
-
 const YIELD_VAULTS = [
   {
     key: "eth-carry",
@@ -255,42 +190,24 @@ const YIELD_VAULTS = [
 const Earn = () => {
   type OpportunityRow =
     | { kind: "saveUsdst"; apySortValue: number }
-    | { kind: "vault"; apySortValue: number }
-    | { kind: "lending"; apySortValue: number }
     | { kind: "staking"; apySortValue: number }
-    | { kind: "pool"; apySortValue: number; pool: Pool }
     | { kind: "yieldVault"; apySortValue: number; vaultIndex: number };
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<"all" | "vaults" | "pools">("all");
-  const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
-  const [isPoolDepositModalOpen, setIsPoolDepositModalOpen] = useState(false);
-  const [isPoolWithdrawModalOpen, setIsPoolWithdrawModalOpen] = useState(false);
-  const [isVaultDepositModalOpen, setIsVaultDepositModalOpen] = useState(false);
-  const [isLendingDepositModalOpen, setIsLendingDepositModalOpen] = useState(false);
-  const [lendingDepositAmount, setLendingDepositAmount] = useState("");
-  const [stakeLendingRewards, setStakeLendingRewards] = useState<boolean>(rewardsEnabled);
-  const [isLendingSubmitting, setIsLendingSubmitting] = useState(false);
   const [featuredOpportunityKey, setFeaturedOpportunityKey] = useState("");
   const [stakingInfo, setStakingInfo] = useState<StakingEarnInfo | null>(null);
-  const operationInProgressRef = useRef(false);
-
-  const { vaultState, refreshVault } = useVaultContext();
-  const { pools, fetchPools, poolsLoading } = useSwapContext();
-  const { liquidityInfo, loadingLiquidity, refreshLiquidity, depositLiquidity } = useLendingContext();
   const { saveUsdstInfo } = useSaveUsdstContext();
   const { vaults: yieldVaults, userVaults: yieldUserVaults, loading: yieldVaultsLoading } =
     useYieldVaultContext();
-  const { earningAssets, usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
+  const { earningAssets, fetchUsdstBalance } = useTokenContext();
   const { tokenApys, tokenApysLoaded } = useEarnContext();
   const { activities: rewardsActivities } = useRewardsActivities();
   const { isLoggedIn } = useUser();
-  const { toast } = useToast();
   const guestMode = !isLoggedIn;
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "STRATO Vault | STRATO";
+    document.title = "Earn | STRATO";
     window.scrollTo(0, 0);
   }, []);
 
@@ -338,97 +255,6 @@ const Earn = () => {
       fetchUsdstBalance();
     }
   }, [isLoggedIn, fetchUsdstBalance]);
-
-  useEffect(() => {
-    fetchPools();
-  }, [fetchPools]);
-
-  const handlePoolDeposit = (pool: Pool) => {
-    if (!isLoggedIn) return;
-    setSelectedPool(pool);
-    setIsPoolDepositModalOpen(true);
-  };
-
-  const handlePoolWithdraw = (pool: Pool) => {
-    if (!isLoggedIn) return;
-    setSelectedPool(pool);
-    setIsPoolWithdrawModalOpen(true);
-  };
-
-  const navigateToPoolDetails = (pool: Pool) => {
-    navigate(`/dashboard/earn-pools?pool=${pool.address}`);
-  };
-
-  const handlePoolActionSuccess = async () => {
-    await Promise.all([
-      fetchPools(),
-      refreshVault(false),
-      isLoggedIn ? fetchUsdstBalance() : Promise.resolve(),
-    ]);
-  };
-
-  const handleVaultDepositClick = () => {
-    if (!isLoggedIn) return;
-    setIsVaultDepositModalOpen(true);
-  };
-
-  const handleVaultDepositSuccess = () => {
-    refreshVault(false);
-    if (isLoggedIn) {
-      fetchUsdstBalance();
-    }
-  };
-
-  const closeLendingDepositModal = () => {
-    setIsLendingDepositModalOpen(false);
-    setLendingDepositAmount("");
-    setStakeLendingRewards(rewardsEnabled);
-  };
-
-  const handleLendingDepositClick = () => {
-    if (!isLoggedIn) return;
-    setIsLendingDepositModalOpen(true);
-  };
-
-  const isValidDecimalInput = (value: string) => /^\d+(\.\d{1,18})?$/.test(value);
-
-  const isLendingDepositValid = useMemo(() => {
-    if (!lendingDepositAmount || !isValidDecimalInput(lendingDepositAmount)) return false;
-    try {
-      const amountWei = safeParseUnits(lendingDepositAmount, 18);
-      const availableWei = safeBigInt(liquidityInfo?.supplyable?.userBalance);
-      const feeWei = safeParseUnits(LENDING_DEPOSIT_FEE, 18);
-      return amountWei > 0n && amountWei <= availableWei && amountWei + feeWei <= availableWei;
-    } catch {
-      return false;
-    }
-  }, [lendingDepositAmount, liquidityInfo?.supplyable?.userBalance]);
-
-  const handleLendingDepositSubmit = async () => {
-    if (!isLoggedIn || !isLendingDepositValid || isLendingSubmitting) return;
-    try {
-      setIsLendingSubmitting(true);
-      await depositLiquidity({
-        amount: safeParseUnits(lendingDepositAmount, 18).toString(),
-      });
-      closeLendingDepositModal();
-      toast({
-        title: "Deposit Successful",
-        description: `You have successfully deposited ${lendingDepositAmount} USDST.`,
-        variant: "success",
-      });
-      await Promise.all([refreshLiquidity(), fetchPools(), fetchUsdstBalance()]);
-    } catch {
-    } finally {
-      setIsLendingSubmitting(false);
-    }
-  };
-
-  const sortedPools = useMemo(() => {
-    return [...(pools || [])]
-      .filter((pool) => !isPoolPaused(pool) && !isPoolDisabled(pool))
-      .sort((a, b) => parseApy(b.apy) - parseApy(a.apy));
-  }, [pools]);
 
   const saveUsdstAsset = useMemo(() => {
     return earningAssets.find((asset) => {
@@ -481,11 +307,6 @@ const Earn = () => {
     [saveUsdstAsset?.address, saveUsdstInfo?.vaultAddress, tokenApys]
   );
 
-  const vaultEarnApyInfo = useMemo(() => findVaultEarnApyInfo(tokenApys), [tokenApys]);
-  const lendingEarnApyInfo = useMemo(() => findBestEarnApyInfo(tokenApys, mUsdstAddress), [tokenApys]);
-
-  // Combined (native + CATA rewards) APY per carry yield vault, keyed by cfg.key.
-  // Backend publishes entries keyed by vault address via addCarryVaultApys.
   const yieldVaultApyInfos = useMemo<Record<string, EarnApyInfo | null>>(() => {
     const out: Record<string, EarnApyInfo | null> = {};
     for (const cfg of YIELD_VAULTS) {
@@ -494,20 +315,14 @@ const Earn = () => {
     }
     return out;
   }, [tokenApys, yieldVaults]);
+
   const getYieldVaultDisplayApyRaw = (key: string): string | undefined => {
     const info = yieldVaultApyInfos[key];
     if (info) return info.total.toFixed(2);
-    // Fallback to the native-only APY from yield-vault context in case the
-    // backend hasn't surfaced combined entries yet on this network.
     return yieldVaults[key]?.apy;
   };
-  const getPoolEarnApyInfo = (pool: Pool) => findBestEarnApyInfo(tokenApys, pool.lpToken?.address);
-  const getPoolDisplayApy = (pool: Pool) => {
-    const info = getPoolEarnApyInfo(pool);
-    return info ? info.total.toFixed(2) : undefined;
-  };
+
   const saveUsdstDisplayApyRaw = saveUsdstApyInfo?.total.toFixed(2);
-  const lendingDisplayApyRaw = lendingEarnApyInfo?.total.toFixed(2);
   const stakingBestApyRaw = useMemo(() => {
     const values = (stakingInfo?.validators || [])
       .filter((validator) => validator.active)
@@ -544,23 +359,19 @@ const Earn = () => {
 
   const getOpportunityTvl = (opportunity: OpportunityRow): bigint => {
     if (opportunity.kind === "saveUsdst") return safeBigInt(saveUsdstTvl);
-    if (opportunity.kind === "vault") return safeBigInt(vaultState.totalEquity);
-    if (opportunity.kind === "lending") return safeBigInt(liquidityInfo?.totalUSDSTSupplied?.toString());
     if (opportunity.kind === "staking") return safeBigInt(stakingInfo?.totalRewardableStakeUsd);
     if (opportunity.kind === "yieldVault") {
       const vData = yieldVaults[YIELD_VAULTS[opportunity.vaultIndex].key];
       return safeBigInt(vData?.tvlUsd);
     }
-    return safeBigInt(opportunity.pool.totalLiquidityUSD);
+    return 0n;
   };
 
   const getOpportunitySimplicityRank = (opportunity: OpportunityRow): number => {
     if (opportunity.kind === "saveUsdst") return 0;
-    if (opportunity.kind === "vault") return 1;
-    if (opportunity.kind === "yieldVault") return 2;
-    if (opportunity.kind === "staking") return 3;
-    if (opportunity.kind === "lending") return 4;
-    return 5;
+    if (opportunity.kind === "yieldVault") return 1;
+    if (opportunity.kind === "staking") return 2;
+    return 3;
   };
 
   const compareOpportunities = (a: OpportunityRow, b: OpportunityRow): number => {
@@ -582,16 +393,8 @@ const Earn = () => {
     return 0;
   };
 
-  const isEligibleForTopOpportunity = (opportunity: OpportunityRow): boolean => {
-    if (opportunity.kind !== "pool") return true;
-    return getOpportunityTvl(opportunity) >= TOP_OPPORTUNITY_MIN_POOL_TVL;
-  };
-
   const isSameOpportunity = (a: OpportunityRow, b: OpportunityRow | null): boolean => {
     if (!b || a.kind !== b.kind) return false;
-    if (a.kind === "pool" && b.kind === "pool") {
-      return normalizeAddress(a.pool.address) === normalizeAddress(b.pool.address);
-    }
     if (a.kind === "yieldVault" && b.kind === "yieldVault") {
       return a.vaultIndex === b.vaultIndex;
     }
@@ -605,17 +408,8 @@ const Earn = () => {
       return `$${saveUsdstAsset?.value || "0.00"}`;
     }
 
-    if (opportunity.kind === "vault") {
-      return `$${formatUsd(vaultState.userValueUsd || "0")}`;
-    }
-
-    if (opportunity.kind === "lending") {
-      return `$${formatUsd(liquidityInfo?.withdrawable?.userBalance || "0")}`;
-    }
-
     if (opportunity.kind === "staking") {
       if (!stakingInfo) return "--";
-      // USD once the STRATO oracle price is set; token units until then.
       return safeBigInt(stakingInfo.userTotalStakeUsd) > 0n || safeBigInt(stakingInfo.userTotalStake) === 0n
         ? `$${formatUsd(stakingInfo.userTotalStakeUsd)}`
         : `${formatTokenAmount(stakingInfo.userTotalStake)} ${stakingInfo.tokenSymbol || "STRATO"}`;
@@ -630,10 +424,7 @@ const Earn = () => {
       return formatYieldVaultPositionUsd(uData, vData);
     }
 
-    const lpBalance = safeBigInt(opportunity.pool.lpToken?.totalBalance);
-    const lpPrice = safeBigInt(opportunity.pool.lpToken?.price);
-    const depositedUsd = lpPrice > 0n ? (lpBalance * lpPrice) / WAD : 0n;
-    return `$${formatUsd(depositedUsd.toString())}`;
+    return "--";
   };
 
   const rewardActivityByContract = useMemo(() => {
@@ -660,83 +451,38 @@ const Earn = () => {
     return { earnsRewards: Boolean(activity && activity.emissionRate > 0n) };
   };
 
-  const vaultRewardMeta = getRewardMeta(vaultState.shareTokenAddress);
-  const lendingRewardMeta = getRewardMeta(mUsdstAddress);
   const saveUsdstRewardMeta = getRewardMeta(saveUsdstRewardsActivity?.sourceContract || saveUsdstAsset?.address);
-  const vaultRewardActivity = rewardActivityByContract.get(vaultState.shareTokenAddress?.toLowerCase() || "");
-  const resolvedVaultApyInfo = useMemo(
-    () =>
-      vaultEarnApyInfo ||
-      buildNativeRewardsApyInfo(
-        vaultState.alpha,
-        vaultRewardActivity?.emissionRate ? vaultRewardActivity.emissionRate.toString() : null,
-        vaultRewardActivity?.totalStakeUsd ?? vaultState.totalEquity ?? null,
-        "vault"
-      ),
-    [
-      vaultEarnApyInfo,
-      vaultRewardActivity?.emissionRate,
-      vaultRewardActivity?.totalStakeUsd,
-      vaultState.alpha,
-      vaultState.totalEquity,
-    ]
-  );
-  const vaultDisplayApyRaw = resolvedVaultApyInfo
-    ? resolvedVaultApyInfo.total.toFixed(2)
-    : vaultState.alpha;
+
   const allOpportunities = useMemo<OpportunityRow[]>(() => {
     const rows: OpportunityRow[] = [];
 
-    if (activeFilter === "all" || activeFilter === "vaults") {
-      rows.push({ kind: "saveUsdst", apySortValue: parseApy(saveUsdstDisplayApyRaw) });
-      rows.push({ kind: "vault", apySortValue: parseApy(vaultDisplayApyRaw) });
-      for (let i = 0; i < YIELD_VAULTS.length; i++) {
-        const cfg = YIELD_VAULTS[i];
-        const yv = yieldVaults[cfg.key];
-        rows.push({
-          kind: "yieldVault",
-          apySortValue: yv?.deployed ? parseApy(getYieldVaultDisplayApyRaw(cfg.key)) : Number.NEGATIVE_INFINITY,
-          vaultIndex: i,
-        });
-      }
+    rows.push({ kind: "saveUsdst", apySortValue: parseApy(saveUsdstDisplayApyRaw) });
+    for (let i = 0; i < YIELD_VAULTS.length; i++) {
+      const cfg = YIELD_VAULTS[i];
+      const yv = yieldVaults[cfg.key];
+      rows.push({
+        kind: "yieldVault",
+        apySortValue: yv?.deployed ? parseApy(getYieldVaultDisplayApyRaw(cfg.key)) : Number.NEGATIVE_INFINITY,
+        vaultIndex: i,
+      });
     }
-
-    if (activeFilter === "all" || activeFilter === "pools") {
-      if (activeFilter === "all") {
-        rows.push({ kind: "staking", apySortValue: parseApy(stakingDisplayApyRaw) });
-      }
-      rows.push({ kind: "lending", apySortValue: parseApy(lendingDisplayApyRaw) });
-      for (const pool of sortedPools) {
-        rows.push({ kind: "pool", apySortValue: parseApy(getPoolDisplayApy(pool)), pool });
-      }
-    }
+    rows.push({ kind: "staking", apySortValue: parseApy(stakingDisplayApyRaw) });
 
     return rows.sort(compareOpportunities);
-  }, [activeFilter, lendingDisplayApyRaw, saveUsdstDisplayApyRaw, saveUsdstTvl, sortedPools, stakingDisplayApyRaw, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, liquidityInfo?.totalUSDSTSupplied, yieldVaults, yieldVaultApyInfos]);
+  }, [saveUsdstDisplayApyRaw, saveUsdstTvl, stakingDisplayApyRaw, tokenApys, tokenApysLoaded, yieldVaults, yieldVaultApyInfos]);
 
-  const vaultAlpha = formatApyDisplay(vaultDisplayApyRaw);
   const rankedTopCandidates = useMemo<OpportunityRow[]>(() => {
     const candidates: OpportunityRow[] = [
       { kind: "saveUsdst", apySortValue: parseApy(saveUsdstDisplayApyRaw) },
-      { kind: "vault", apySortValue: parseApy(vaultDisplayApyRaw) },
       ...YIELD_VAULTS.map((v, i) => ({
         kind: "yieldVault" as const,
         apySortValue: yieldVaults[v.key]?.deployed ? parseApy(getYieldVaultDisplayApyRaw(v.key)) : Number.NEGATIVE_INFINITY,
         vaultIndex: i,
       })),
-      { kind: "lending", apySortValue: parseApy(lendingDisplayApyRaw) },
       { kind: "staking", apySortValue: parseApy(stakingDisplayApyRaw) },
-      ...sortedPools.map((pool) => ({
-        kind: "pool" as const,
-        apySortValue: parseApy(getPoolDisplayApy(pool)),
-        pool,
-      })),
     ];
-    const rankedCandidates = [...candidates].sort(compareOpportunities);
-    return rankedCandidates.filter(isEligibleForTopOpportunity).length > 0
-      ? rankedCandidates.filter(isEligibleForTopOpportunity)
-      : rankedCandidates;
-  }, [lendingDisplayApyRaw, liquidityInfo?.totalUSDSTSupplied, saveUsdstDisplayApyRaw, saveUsdstTvl, sortedPools, stakingDisplayApyRaw, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, yieldVaults, yieldVaultApyInfos]);
+    return [...candidates].sort(compareOpportunities);
+  }, [saveUsdstDisplayApyRaw, saveUsdstTvl, stakingDisplayApyRaw, tokenApys, tokenApysLoaded, yieldVaults, yieldVaultApyInfos]);
   const getOpportunityMeta = (opportunity: OpportunityRow) => {
     if (opportunity.kind === "saveUsdst") {
       return {
@@ -749,20 +495,6 @@ const Earn = () => {
         actionLabel: "Deposit",
         onCardClick: () => navigate("/dashboard/earn-save"),
         onActionClick: () => navigate("/dashboard/earn-save"),
-      };
-    }
-
-    if (opportunity.kind === "vault") {
-      return {
-        title: "Diversified Vault",
-        subtitle: "Diversified real assets: gold, silver, ETH, BTC, stables - actively managed",
-        apyRaw: vaultDisplayApyRaw,
-        tvl: vaultState.totalEquity,
-        badge: "Diversified Vault",
-        rateLabel: "Best Available APY",
-        actionLabel: "Deposit",
-        onCardClick: () => navigate("/dashboard/earn-vault"),
-        onActionClick: () => handleVaultDepositClick(),
       };
     }
 
@@ -783,57 +515,25 @@ const Earn = () => {
       };
     }
 
-    if (opportunity.kind === "lending") {
-      return {
-        title: "USDST Lending Pool",
-        subtitle: "Earn yield by supplying USDST liquidity",
-        apyRaw: lendingDisplayApyRaw,
-        tvl: liquidityInfo?.totalUSDSTSupplied?.toString() || "0",
-        badge: "Lending",
-        rateLabel: "Best Available APY",
-        actionLabel: "Deposit",
-        onCardClick: () => navigate("/dashboard/earn-lending"),
-        onActionClick: () => handleLendingDepositClick(),
-      };
-    }
-
-    if (opportunity.kind === "staking") {
-      return {
-        title: "Stake STRATO",
-        subtitle: "Delegate STRATO to approved validators",
-        apyRaw: stakingDisplayApyRaw,
-        tvl: stakingInfo?.totalRewardableStakeUsd || "0",
-        badge: "Staking",
-        rateLabel: "Best Available APY",
-        actionLabel: "Stake",
-        onCardClick: () => navigate("/dashboard/earn-staking"),
-        onActionClick: () => navigate("/dashboard/earn-staking"),
-      };
-    }
-
-    const pool = opportunity.pool;
     return {
-      title: pool.poolName,
-      subtitle: `Earn fees on ${pool.poolName.replace(" Pool", "")} swaps`,
-      apyRaw: getPoolDisplayApy(pool),
-      tvl: pool.totalLiquidityUSD,
-      badge: "Pool",
+      title: "Stake STRATO",
+      subtitle: "Delegate STRATO to approved validators",
+      apyRaw: stakingDisplayApyRaw,
+      tvl: stakingInfo?.totalRewardableStakeUsd || "0",
+      badge: "Staking",
       rateLabel: "Best Available APY",
-      actionLabel: "Deposit",
-      onCardClick: () => navigateToPoolDetails(pool),
-      onActionClick: () => handlePoolDeposit(pool),
-      pool,
+      actionLabel: "Stake",
+      onCardClick: () => navigate("/dashboard/earn-staking"),
+      onActionClick: () => navigate("/dashboard/earn-staking"),
     };
   };
   const getOpportunityApyInfo = (opportunity: OpportunityRow): EarnApyInfo | null => {
     if (opportunity.kind === "saveUsdst") return saveUsdstApyInfo;
-    if (opportunity.kind === "vault") return resolvedVaultApyInfo;
     if (opportunity.kind === "yieldVault") {
       return yieldVaultApyInfos[YIELD_VAULTS[opportunity.vaultIndex].key] ?? null;
     }
-    if (opportunity.kind === "lending") return lendingEarnApyInfo;
     if (opportunity.kind === "staking") return stakingApyInfo;
-    return getPoolEarnApyInfo(opportunity.pool);
+    return null;
   };
 
   const configuredFeaturedOpportunity = useMemo<OpportunityRow | null>(() => {
@@ -842,14 +542,6 @@ const Earn = () => {
 
     if (key === "save-usdst" || key === "saveusdst") {
       return { kind: "saveUsdst", apySortValue: parseApy(saveUsdstDisplayApyRaw) };
-    }
-
-    if (key === "vault") {
-      return { kind: "vault", apySortValue: parseApy(vaultDisplayApyRaw) };
-    }
-
-    if (key === "lending") {
-      return { kind: "lending", apySortValue: parseApy(lendingDisplayApyRaw) };
     }
 
     if (key === "staking" || key === "strato-staking") {
@@ -861,24 +553,13 @@ const Earn = () => {
       return { kind: "yieldVault", apySortValue: Number.NEGATIVE_INFINITY, vaultIndex: yieldVaultIdx };
     }
 
-    if (key.startsWith("pool:")) {
-      const targetAddress = normalizeAddress(key.slice(5));
-      const pool = sortedPools.find((candidate) => normalizeAddress(candidate.address) === targetAddress);
-      if (pool) {
-        return { kind: "pool", apySortValue: parseApy(getPoolDisplayApy(pool)), pool };
-      }
-    }
-
     return null;
   }, [
     featuredOpportunityKey,
-    lendingDisplayApyRaw,
     saveUsdstDisplayApyRaw,
-    sortedPools,
     stakingDisplayApyRaw,
     tokenApys,
     tokenApysLoaded,
-    vaultDisplayApyRaw,
   ]);
 
   const topOpportunity = useMemo<OpportunityRow>(() => {
@@ -897,8 +578,8 @@ const Earn = () => {
     );
   }, [configuredFeaturedOpportunity, rankedTopCandidates]);
 
-  const topOpportunityMeta = useMemo(() => getOpportunityMeta(topOpportunity), [topOpportunity, lendingDisplayApyRaw, saveUsdstDisplayApyRaw, saveUsdstTvl, stakingDisplayApyRaw, stakingInfo?.totalRewardableStake, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, liquidityInfo?.totalUSDSTSupplied, navigate]);
-  const topOpportunityApyInfo = useMemo(() => getOpportunityApyInfo(topOpportunity), [topOpportunity, saveUsdstApyInfo, resolvedVaultApyInfo, lendingEarnApyInfo, stakingApyInfo, tokenApys]);
+  const topOpportunityMeta = useMemo(() => getOpportunityMeta(topOpportunity), [topOpportunity, saveUsdstDisplayApyRaw, saveUsdstTvl, stakingDisplayApyRaw, stakingInfo?.totalRewardableStake, tokenApys, tokenApysLoaded, navigate]);
+  const topOpportunityApyInfo = useMemo(() => getOpportunityApyInfo(topOpportunity), [topOpportunity, saveUsdstApyInfo, stakingApyInfo, tokenApys]);
   const topOpportunityApy = useMemo(() => {
     if (topOpportunity.kind === "yieldVault") {
       const cfg = YIELD_VAULTS[topOpportunity.vaultIndex];
@@ -916,10 +597,6 @@ const Earn = () => {
       saveUsdstTvl,
       tokenApys,
       tokenApysLoaded,
-      vaultDisplayApyRaw,
-      vaultState.totalEquity,
-      lendingDisplayApyRaw,
-      liquidityInfo?.totalUSDSTSupplied,
       stakingDisplayApyRaw,
       stakingInfo?.totalRewardableStake,
       navigate,
@@ -927,7 +604,7 @@ const Earn = () => {
   );
   const featuredOpportunityApyInfo = useMemo(
     () => (configuredFeaturedOpportunity ? getOpportunityApyInfo(configuredFeaturedOpportunity) : null),
-    [configuredFeaturedOpportunity, saveUsdstApyInfo, resolvedVaultApyInfo, lendingEarnApyInfo, stakingApyInfo, tokenApys]
+    [configuredFeaturedOpportunity, saveUsdstApyInfo, stakingApyInfo, tokenApys]
   );
   const featuredOpportunityApy = useMemo(() => {
     if (!configuredFeaturedOpportunity || !featuredOpportunityMeta) {
@@ -942,10 +619,7 @@ const Earn = () => {
     return formatApyDisplay(featuredOpportunityMeta.apyRaw);
   }, [configuredFeaturedOpportunity, featuredOpportunityMeta, yieldVaults, yieldVaultApyInfos]);
 
-  const pageLoading =
-    vaultState.loading ||
-    (isLoggedIn && vaultState.loadingUser) ||
-    (poolsLoading && (pools?.length || 0) === 0);
+  const pageLoading = yieldVaultsLoading && !Object.keys(yieldVaults).length;
 
   if (pageLoading) {
     return (
@@ -997,7 +671,7 @@ const Earn = () => {
 
         <main className="p-4 md:p-6 pb-16 md:pb-6 space-y-8">
           {guestMode && (
-            <GuestSignInBanner message="Sign in to view your positions and manage pool deposits or withdrawals" />
+            <GuestSignInBanner message="Sign in to view your positions and deposit to earn" />
           )}
 
           <section>
@@ -1025,26 +699,14 @@ const Earn = () => {
                           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 dark:bg-emerald-400/15">
                             <PiggyBank className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                           </div>
-                        ) : configuredFeaturedOpportunity.kind === "vault" ? (
-                          <img
-                            src={stratoVaultLogo}
-                            alt="STRATO Vault"
-                            className="h-12 w-12 shrink-0 rounded-full object-cover"
-                          />
                         ) : configuredFeaturedOpportunity.kind === "yieldVault" ? (
                           <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].iconBg}`}>
                             <TrendingUp className={`h-5 w-5 ${YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].iconColor}`} />
                           </div>
-                        ) : configuredFeaturedOpportunity.kind === "lending" ? (
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-500/15 dark:bg-blue-400/15">
-                            <CircleArrowDown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                          </div>
-                        ) : configuredFeaturedOpportunity.kind === "staking" ? (
+                        ) : (
                           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 dark:bg-cyan-400/15">
                             <ShieldCheck className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
                           </div>
-                        ) : (
-                          <TokenPairIcon pool={configuredFeaturedOpportunity.pool} size="lg" />
                         )}
                         <div className="min-w-0 pt-1">
                           <h3 className="text-[26px] leading-[1.08] font-semibold tracking-tight md:text-[30px]">
@@ -1098,11 +760,7 @@ const Earn = () => {
                           e.stopPropagation();
                           featuredOpportunityMeta.onActionClick();
                         }}
-                        disabled={
-                          (featuredOpportunityMeta.actionLabel === "Deposit" && guestMode) ||
-                          (configuredFeaturedOpportunity.kind === "pool" &&
-                            (isPoolPaused(configuredFeaturedOpportunity.pool) || Boolean((configuredFeaturedOpportunity.pool as any).isDisabled)))
-                        }
+                        disabled={featuredOpportunityMeta.actionLabel === "Deposit" && guestMode}
                       >
                         {featuredOpportunityMeta.actionLabel === "View" ? "Deposit" : featuredOpportunityMeta.actionLabel}
                       </Button>
@@ -1133,26 +791,14 @@ const Earn = () => {
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 dark:bg-emerald-400/15">
                           <PiggyBank className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                         </div>
-                      ) : topOpportunity.kind === "vault" ? (
-                        <img
-                          src={stratoVaultLogo}
-                          alt="STRATO Vault"
-                          className="h-12 w-12 shrink-0 rounded-full object-cover"
-                        />
                       ) : topOpportunity.kind === "yieldVault" ? (
                         <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${YIELD_VAULTS[topOpportunity.vaultIndex].iconBg}`}>
                           <TrendingUp className={`h-5 w-5 ${YIELD_VAULTS[topOpportunity.vaultIndex].iconColor}`} />
                         </div>
-                      ) : topOpportunity.kind === "lending" ? (
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-500/15 dark:bg-blue-400/15">
-                          <CircleArrowDown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                        </div>
-                      ) : topOpportunity.kind === "staking" ? (
+                      ) : (
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 dark:bg-cyan-400/15">
                           <ShieldCheck className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
                         </div>
-                      ) : (
-                        <TokenPairIcon pool={topOpportunity.pool} size="lg" />
                       )}
                       <div className="min-w-0 pt-1">
                         <h3 className="text-[26px] leading-[1.08] font-semibold tracking-tight md:text-[30px]">
@@ -1203,11 +849,7 @@ const Earn = () => {
                         e.stopPropagation();
                         topOpportunityMeta.onActionClick();
                       }}
-                      disabled={
-                        (topOpportunityMeta.actionLabel === "Deposit" && guestMode) ||
-                        (topOpportunity.kind === "pool" &&
-                          (isPoolPaused(topOpportunity.pool) || Boolean((topOpportunity.pool as any).isDisabled)))
-                      }
+                      disabled={topOpportunityMeta.actionLabel === "Deposit" && guestMode}
                     >
                       {topOpportunityMeta.actionLabel}
                     </Button>
@@ -1218,46 +860,7 @@ const Earn = () => {
           </section>
 
           <section className="mt-2 space-y-3 border-t border-border/60 pt-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <h2 className="text-lg font-semibold">All Opportunities</h2>
-              <div className="w-full sm:w-auto overflow-x-auto">
-                <div className="inline-flex min-w-max items-center gap-2 pr-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setActiveFilter("all")}
-                    className={`h-9 rounded-full px-6 text-base font-medium transition-all ${activeFilter === "all"
-                        ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200"
-                        : "bg-transparent text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
-                      }`}
-                  >
-                    All
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setActiveFilter("vaults")}
-                    className={`h-9 rounded-full px-6 text-base font-medium transition-all ${activeFilter === "vaults"
-                        ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200"
-                        : "bg-transparent text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
-                      }`}
-                  >
-                    Vaults
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setActiveFilter("pools")}
-                    className={`h-9 rounded-full px-6 text-base font-medium transition-all ${activeFilter === "pools"
-                        ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200"
-                        : "bg-transparent text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
-                      }`}
-                  >
-                    Pools
-                  </Button>
-                </div>
-              </div>
-            </div>
+            <h2 className="text-lg font-semibold">All Opportunities</h2>
 
             <Card className="border border-border/70 overflow-hidden">
               <CardContent className="p-0">
@@ -1332,69 +935,6 @@ const Earn = () => {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       navigate("/dashboard/earn-save");
-                                    }}
-                                    disabled={guestMode}
-                                  >
-                                    <CircleArrowDown className="h-4 w-4 mr-1 shrink-0" />
-                                    Deposit
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        }
-
-                        if (opportunity.kind === "vault") {
-                          return (
-                            <tr
-                              key="vault"
-                              className="border-b border-border/50 cursor-pointer hover:bg-muted/20"
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => navigate("/dashboard/earn-vault")}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.preventDefault();
-                                  navigate("/dashboard/earn-vault");
-                                }
-                              }}
-                            >
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <img
-                                    src={stratoVaultLogo}
-                                    alt="STRATO Vault"
-                                    className="w-8 h-8 rounded-full object-cover shrink-0"
-                                  />
-                                  <p className="font-medium truncate">Diversified Vault</p>
-                                  <Badge variant="secondary" className="text-[10px]">Diversified Vault</Badge>
-                                  {vaultRewardMeta.earnsRewards && (
-                                    <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Rewards</Badge>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3">
-                                <EarnApyTooltip info={resolvedVaultApyInfo}>
-                                  <p className={`text-sm font-semibold ${vaultAlpha.className} cursor-default`}>
-                                    {vaultAlpha.label}
-                                  </p>
-                                </EarnApyTooltip>
-                              </td>
-                              <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">${formatUsd(vaultState.totalEquity)}</p>                              </td>
-                              <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>                              </td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground">
-                                Diversified Vault
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center justify-end gap-3">
-                                  <Button
-                                    className="h-9 min-w-[108px] justify-center"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleVaultDepositClick();
                                     }}
                                     disabled={guestMode}
                                   >
@@ -1547,140 +1087,8 @@ const Earn = () => {
                           );
                         }
 
-                        if (opportunity.kind === "lending") {
-                          return (
-                            <tr
-                              key="lending"
-                              className="border-b border-border/40 cursor-pointer hover:bg-muted/20"
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => navigate("/dashboard/earn-lending")}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.preventDefault();
-                                  navigate("/dashboard/earn-lending");
-                                }
-                              }}
-                            >
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className="w-8 h-8 rounded-full bg-blue-500/15 dark:bg-blue-400/15 flex items-center justify-center shrink-0">
-                                    <CircleArrowDown className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                  </div>
-                                  <p className="font-medium truncate">USDST Lending Pool</p>
-                                  <Badge variant="secondary" className="text-[10px]">Lending</Badge>
-                                  {lendingRewardMeta.earnsRewards && (
-                                    <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Rewards</Badge>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3">
-                                <EarnApyTooltip info={lendingEarnApyInfo}>
-                                  <p className="text-sm font-semibold cursor-default">
-                                    {formatApyDisplay(lendingDisplayApyRaw).label}
-                                  </p>
-                                </EarnApyTooltip>
-                              </td>
-                              <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">
-                                  {loadingLiquidity || !liquidityInfo?.totalUSDSTSupplied
-                                    ? "$0.00"
-                                    : `$${formatUsd(liquidityInfo.totalUSDSTSupplied.toString())}`}
-                                </p>                              </td>
-                              <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>                              </td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground">
-                                Lending pool
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center justify-end gap-2">
-                                  <Button
-                                    className="h-9 min-w-[108px] justify-center"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleLendingDepositClick();
-                                    }}
-                                    disabled={guestMode}
-                                  >
-                                    <CircleArrowDown className="h-4 w-4 mr-1 shrink-0" />
-                                    Deposit
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        }
-
-                        const { pool } = opportunity;
-                        const poolRewardMeta = getRewardMeta(pool.lpToken?.address);
-                        const poolApyInfo = getPoolEarnApyInfo(pool);
-                        return (
-                          <Fragment key={pool.address}>
-                            <tr
-                              className="border-b border-border/40 last:border-b-0 cursor-pointer hover:bg-muted/20"
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => navigateToPoolDetails(pool)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.preventDefault();
-                                  navigateToPoolDetails(pool);
-                                }
-                              }}
-                            >
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <TokenPairIcon pool={pool} />
-                                  <p className="font-medium truncate">{pool.poolName}</p>
-                                  <Badge variant="secondary" className="text-[10px]">Pool</Badge>
-                                  {poolRewardMeta.earnsRewards && (
-                                    <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Rewards</Badge>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3">
-                                <EarnApyTooltip info={poolApyInfo}>
-                                  <p className="text-sm font-semibold cursor-default">
-                                    {formatApyDisplay(getPoolDisplayApy(pool)).label}
-                                  </p>
-                                </EarnApyTooltip>
-                              </td>
-                              <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">${formatUsd(pool.totalLiquidityUSD)}</p>                              </td>
-                              <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>                              </td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground">
-                                Swap fees
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center justify-end gap-2">
-                                  <Button
-                                    className="h-9 min-w-[108px] justify-center"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handlePoolDeposit(pool);
-                                    }}
-                                    disabled={guestMode || isPoolPaused(pool) || Boolean((pool as any).isDisabled)}
-                                  >
-                                    <CircleArrowDown className="h-4 w-4 mr-1 shrink-0" />
-                                    Deposit
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          </Fragment>
-                        );
+                        return null;
                       })}
-
-                      {(activeFilter === "pools" && !poolsLoading && sortedPools.length === 0) && (
-                        <tr>
-                          <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={6}>
-                            No pool opportunities available.
-                          </td>
-                        </tr>
-                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1692,85 +1100,6 @@ const Earn = () => {
       </div>
 
       <MobileBottomNav />
-
-      <Dialog open={isLendingDepositModalOpen} onOpenChange={(open) => (!open ? closeLendingDepositModal() : setIsLendingDepositModalOpen(true))}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Deposit to USDST Lending Pool</DialogTitle>
-            <DialogDescription>Enter amount and confirm your deposit.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="relative">
-              <Input
-                type="number"
-                placeholder="0.00"
-                value={lendingDepositAmount}
-                onChange={(e) => setLendingDepositAmount(e.target.value)}
-                className="pl-16 h-11"
-                disabled={!isLoggedIn || isLendingSubmitting}
-              />
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">USDST</span>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              <button
-                type="button"
-                className="text-blue-600 hover:underline mr-2"
-                onClick={() => {
-                  const availableWei = safeBigInt(liquidityInfo?.supplyable?.userBalance);
-                  const feeWei = safeParseUnits(LENDING_DEPOSIT_FEE, 18);
-                  const maxWei = availableWei > feeWei ? availableWei - feeWei : 0n;
-                  setLendingDepositAmount(formatMaxAmount(maxWei));
-                }}
-              >
-                Max
-              </button>
-              Available: {formatBalance(liquidityInfo?.supplyable?.userBalance || "0", undefined, 18, 2)} USDST
-            </div>
-            <div className="text-sm text-muted-foreground">Transaction Fee: {LENDING_DEPOSIT_FEE} USDST</div>
-            {rewardsEnabled && (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="earn-lending-modal-stake"
-                  checked={stakeLendingRewards}
-                  onCheckedChange={(checked) => setStakeLendingRewards(checked === true)}
-                />
-                <label htmlFor="earn-lending-modal-stake" className="text-sm font-medium">
-                  Stake my mUSDST to earn rewards
-                </label>
-              </div>
-            )}
-            <Button className="w-full h-11" onClick={handleLendingDepositSubmit} disabled={!isLendingDepositValid || isLendingSubmitting || !isLoggedIn}>
-              {isLendingSubmitting ? "Processing..." : "Deposit"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <LiquidityDepositModal
-        isOpen={isPoolDepositModalOpen}
-        onClose={() => setIsPoolDepositModalOpen(false)}
-        selectedPool={selectedPool}
-        onDepositSuccess={handlePoolActionSuccess}
-        operationInProgressRef={operationInProgressRef}
-        usdstBalance={usdstBalance}
-        voucherBalance={voucherBalance}
-      />
-
-      <LiquidityWithdrawModal
-        isOpen={isPoolWithdrawModalOpen}
-        onClose={() => setIsPoolWithdrawModalOpen(false)}
-        selectedPool={selectedPool}
-        onWithdrawSuccess={handlePoolActionSuccess}
-        operationInProgressRef={operationInProgressRef}
-        usdstBalance={usdstBalance}
-        voucherBalance={voucherBalance}
-      />
-
-      <VaultDepositModal
-        isOpen={isVaultDepositModalOpen}
-        onClose={() => setIsVaultDepositModalOpen(false)}
-        onSuccess={handleVaultDepositSuccess}
-      />
     </div>
   );
 };

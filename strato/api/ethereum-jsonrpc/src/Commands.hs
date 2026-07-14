@@ -57,9 +57,10 @@ import GHC.Generics (Generic)
 import Network.JsonRpc.Server
 import Numeric (showHex)
 import Prelude
-import Network.HTTP.Client (newManager, defaultManagerSettings)
+import Network.HTTP.Client (Manager, newManager, defaultManagerSettings)
 import Network.HTTP.Types.Status (statusCode, statusMessage)
 import Servant.Client (BaseUrl (..), ClientError(..), ClientM, ResponseF(..), Scheme (Http), mkClientEnv, runClientM)
+import System.IO.Unsafe (unsafePerformIO)
 import Control.Monad.Composable.CodeDB (runCodeDBM, queryEvents)
 
 type Server = IO
@@ -75,10 +76,17 @@ apiBaseUrl =
     (apiPort $ apiConfig ethConf)
     "/eth/v1.2"
 
+-- | A single, process-wide HTTP connection manager. An http-client 'Manager'
+-- is a connection pool and is designed to be created once and shared for the
+-- lifetime of the process. Creating a new one per request (as this used to do)
+-- leaks keep-alive sockets to the backend until GC finalizers run, exhausting
+-- file descriptors under load. NOINLINE keeps this a single CAF.
+{-# NOINLINE sharedManager #-}
+sharedManager :: Manager
+sharedManager = unsafePerformIO $ newManager defaultManagerSettings
+
 runLocal :: ClientM a -> IO (Either ClientError a)
-runLocal action = do
-  mgr <- newManager defaultManagerSettings
-  runClientM action (mkClientEnv mgr apiBaseUrl)
+runLocal action = runClientM action (mkClientEnv sharedManager apiBaseUrl)
 
 formatClientError :: ClientError -> T.Text
 formatClientError (FailureResponse _ resp) =
