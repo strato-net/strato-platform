@@ -227,9 +227,8 @@ const CardSkeleton = ({ id }: { id: string }) => (
   </div>
 );
 
-const TokenCard = ({ active, image, symbol, displayLabel, estimated, onClick, disabled, apyBadge, effectivePrice, spotLabel }: {
+const TokenCard = ({ active, image, symbol, estimated, onClick, disabled, apyBadge, effectivePrice, spotLabel }: {
   active: boolean; image?: string; symbol: string; estimated: string;
-  displayLabel?: string;
   onClick: () => void; disabled: boolean;
   apyBadge: React.ReactNode;
   effectivePrice?: string;
@@ -243,9 +242,9 @@ const TokenCard = ({ active, image, symbol, displayLabel, estimated, onClick, di
     <div className="flex items-center gap-2 mb-1">
       {image
         ? <img src={image} alt={symbol} className="w-6 h-6 rounded-full object-cover shrink-0" />
-        : <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-foreground shrink-0">{(symbol || "?").charAt(0)}</span>}
+        : <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-foreground shrink-0">{(symbol || "??").slice(0, 2)}</span>}
       <div>
-        <p className="text-sm font-semibold text-foreground leading-tight">{displayLabel || symbol}</p>
+        <p className="text-sm font-semibold text-foreground leading-tight">{symbol}</p>
         <p className="min-h-[14px] text-[11px] text-muted-foreground leading-tight">{effectivePrice ? `${effectivePrice}/unit` : "\u00A0"}</p>
       </div>
     </div>
@@ -1500,7 +1499,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                       <TokenCard key={action.id}
                         active={selectedAction?.id === action.id}
                         image={action.stratoTokenImage} symbol={action.stratoTokenSymbol}
-                        displayLabel={action.action === 3 ? "USDST Savings Vault" : undefined}
                         estimated={est}
                         onClick={() => {
                           const actionRoute = action.action === 3
