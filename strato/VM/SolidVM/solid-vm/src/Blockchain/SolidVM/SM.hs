@@ -912,8 +912,8 @@ markDiffForAction owner key' val' = do
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
 addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
 
-addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> Maybe T.Text -> T.Text -> m ()
-addDelegatecall s c o n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o n)
+addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Keccak256 -> T.Text -> m ()
+addDelegatecall s c n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c n)
 
 -- Cirrus table namespace enforcement
 --
