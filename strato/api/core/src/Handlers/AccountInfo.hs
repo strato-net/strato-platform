@@ -197,6 +197,51 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable AccountsFilterParams 
             E.orderBy [E.asc (accStateRef E.^. AddressStateRefAddress)]
             return accStateRef
 
+-- | Filter params for proxy contracts: contracts whose 'logicContract' storage
+-- variable points at an instance of a matching target contract.
+data ProxyFilterParams = ProxyFilterParams
+  { -- | comma-separated fragments matched (ILIKE) against the target's contract name
+    _qpTargetSearch :: Maybe Text,
+    -- | exact target contract name
+    _qpTargetName :: Maybe Text
+  }
+  deriving (Eq, Ord, Show)
+
+proxyFilterParams :: ProxyFilterParams
+proxyFilterParams = ProxyFilterParams Nothing Nothing
+
+-- | Each result is a proxy contract paired with the contract name of the
+-- instance its 'logicContract' storage variable points to (e.g. the 0x100c
+-- proxy paired with "AdminRegistry").
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable ProxyFilterParams [(AddressStateRef, String)] (SQLM m) where
+  select _ ProxyFilterParams {..}
+    | isNothing _qpTargetSearch && isNothing _qpTargetName = pure $ Just []
+    | otherwise = do
+        rows <- sqlQuery $
+          E.select . E.distinct $
+            E.from $ \(proxyRef `E.InnerJoin` storage `E.InnerJoin` targetRef) -> do
+              -- storage.value holds the formatted address of the target instance
+              E.on
+                ( (E.unsafeSqlCastAs "TEXT" (storage E.^. StorageValue) :: E.SqlExpr (E.Value Text))
+                    E.==. E.val "address(" E.++. E.unsafeSqlCastAs "TEXT" (targetRef E.^. AddressStateRefAddress) E.++. E.val ")"
+                )
+              E.on (storage E.^. StorageAddressStateRefId E.==. proxyRef E.^. AddressStateRefId)
+              let searchCriterion search =
+                    let isWhiteSpace c = c `elem` [' ', '\n', '\t']
+                        searches = filter (not . T.null) $ T.dropAround isWhiteSpace <$> T.split (== ',') search
+                        queries = (\v -> targetRef E.^. AddressStateRefContractName `E.ilike` E.val (Just . T.unpack $ "%" <> v <> "%")) <$> searches
+                     in foldr (E.||.) (E.val False) queries
+                  criteria =
+                    (storage E.^. StorageKey E.==. E.val "logicContract")
+                      : catMaybes
+                        [ searchCriterion <$> _qpTargetSearch,
+                          (\v -> targetRef E.^. AddressStateRefContractName E.==. E.val (Just $ T.unpack v)) <$> _qpTargetName
+                        ]
+              E.where_ (foldl1 (E.&&.) criteria)
+              E.limit appFetchLimit
+              return (proxyRef, targetRef E.^. AddressStateRefContractName)
+        pure $ Just [(E.entityVal ref, nm) | (ref, E.Value (Just nm)) <- rows]
+
 getAccount ::
   Selectable AccountsFilterParams [AddressStateRef] m =>
   Maybe Address ->

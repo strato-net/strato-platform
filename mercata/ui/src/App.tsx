@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import UsdstBalanceBox from "@/components/layouts/UsdstBalanceBox";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Transport, WagmiProvider } from "wagmi";
 import { mainnet, polygon, sepolia, base, baseSepolia, linea, lineaSepolia } from "wagmi/chains";
 import {
@@ -30,13 +30,13 @@ import Rewards from "./pages/Rewards";
 import Claim from "./pages/Claim";
 import CommunityRewardsOnePager from "./pages/CommunityRewardsOnePager";
 import PriceTracking from "./pages/PriceTracking";
-import Vault from "./pages/Vault";
 import Earn from "./pages/Earn";
 import EarnSave from "./pages/EarnSave";
 import EarnVault from "./pages/EarnVault";
 import EarnLending from "./pages/EarnLending";
 import EarnPools from "./pages/EarnPools";
 import EarnYieldVault from "./pages/EarnYieldVault";
+import EarnStaking from "./pages/EarnStaking";
 import OnrampPage from "./pages/OnrampPage";
 
 // Import dashboard components
@@ -72,7 +72,6 @@ import { getConfig } from "./lib/config";
 import { useState, useEffect, type ReactNode } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { csrfOnRequest, initializeCsrfToken } from "./lib/csrf";
-import { captureAttribution } from "./lib/attribution";
 import { getNodeHealth, shouldShowNodeHealth, type NodeHealth } from "./lib/nodeHealth";
 import { useUser } from "@/context/UserContext";
 
@@ -98,11 +97,6 @@ const App = () => {
   // Initialize CSRF token on app startup
   useEffect(() => {
     initializeCsrfToken();
-  }, []);
-
-  // Capture inbound UTM params before any auth redirect (Keycloak strips query params).
-  useEffect(() => {
-    captureAttribution();
   }, []);
 
   useEffect(() => {
@@ -316,11 +310,7 @@ const App = () => {
                                                 />
                                                 <Route
                                                   path="/dashboard/vault"
-                                                  element={
-                                                    <GuestAccessibleRoute>
-                                                      <Vault />
-                                                    </GuestAccessibleRoute>
-                                                  }
+                                                  element={<Navigate to="/dashboard/advanced?tab=vault" replace />}
                                                 />
                                                 <Route
                                                   path="/dashboard/earn-vault"
@@ -359,6 +349,14 @@ const App = () => {
                                                   element={
                                                     <GuestAccessibleRoute>
                                                       <EarnYieldVault />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/earn-staking"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <EarnStaking />
                                                     </GuestAccessibleRoute>
                                                   }
                                                 />
