@@ -545,6 +545,17 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
       }
       return portfolioInfo;
     }
+    case 'operators': {
+      // StratoStaking: operator self-bond (if user is an operator)
+      // key = operatorAddress, value = { selfBond, ... }
+      const operatorValue = newInfo.value || {};
+      const selfBond = BigInt(operatorValue.selfBond || '0');
+      if (selfBond > 0n) {
+        const currentStaked = portfolioInfo.stakedStrato || 0n;
+        return { ...portfolioInfo, stakedStrato: currentStaked + selfBond };
+      }
+      return portfolioInfo;
+    }
   }
   return portfolioInfo;
 }

@@ -143,6 +143,7 @@ const USER_MAPPING_COLLECTIONS = [
   'vaults',
   'delegatedStake',    // StratoStaking: user's delegated stake per operator
   'unbondingQueue',    // StratoStaking: user's unclaimed unbonding requests
+  'operators',         // StratoStaking: operator self-bond (if user is an operator)
 ];
 
 // Collections fetched in pass 2, filtered to relevant tokens only.
@@ -160,7 +161,7 @@ const GLOBAL_MAPPING_COLLECTIONS = [
  * - Specific `_balances` paths (liquidity pool, vault bot executor, carry vault idle assets)
  * - Carry vault claimable assets for this user
  * - User's pending withdrawal requests
- * - StratoStaking delegatedStake and unbondingQueue for this user
+ * - StratoStaking delegatedStake, unbondingQueue, and operators (self-bond) for this user
  *
  * Excludes prices/collateralConfigs/collateralGlobalStates — those are fetched in pass 2.
  */
@@ -208,7 +209,7 @@ export async function fetchUserMappingHistory(
         OR path = ANY($5)
         OR (address = ANY($6) AND path = $7)
         OR (address = ANY($8) AND path = ANY($9))
-        OR (address = $10 AND collection_name IN ('delegatedStake', 'unbondingQueue') AND key->>'key' = $11)
+        OR (address = $10 AND collection_name IN ('delegatedStake', 'unbondingQueue', 'operators') AND key->>'key' = $11)
       )
   `;
 
