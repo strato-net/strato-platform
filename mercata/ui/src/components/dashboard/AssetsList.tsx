@@ -185,10 +185,10 @@ const AssetsList = ({
           </div>
         )}
         <div className={`w-full ${isDashboard ? 'overflow-x-auto md:overflow-visible px-3 md:px-0' : 'overflow-x-auto'}`}>
-          <table className="w-full table-fixed">
+          <table className="w-full table-fixed min-w-[480px] md:min-w-0">
             <thead>
               <tr className="bg-muted/50">
-                <th className="w-[22%] text-left text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                <th className="w-[45%] md:w-[22%] text-left text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Asset
                 </th>
                 <th className="hidden md:table-cell w-[14%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
@@ -209,10 +209,10 @@ const AssetsList = ({
                 <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   Staked
                 </th>
-                <th className="w-[10%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                <th className="w-[27%] md:w-[10%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Value
                 </th>
-                <th className="w-[10%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                <th className="w-[28%] md:w-[10%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Balance
                 </th>
               </tr>
@@ -243,32 +243,39 @@ const AssetsList = ({
                             <img
                               src={asset.images[0].value}
                               alt={asset._name}
-                              className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover"
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover shrink-0"
                             />
                           ) : (
                             <div
-                              className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs text-white font-medium shrink-0"
                               style={{ backgroundColor: "red" }}
                             >
                               {asset?._symbol?.slice(0, 2) || "??"}
                             </div>
                           )}
                           <div className="ml-2 md:ml-3 min-w-0 flex-1">
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Link
-                                    to={getAssetDetailHref(asset)}
-                                    className="font-medium text-sm md:text-base text-blue-600 truncate hover:text-blue-800 underline transition-colors"
-                                  >
-                                    {asset?._symbol || asset?._name || ""}
-                                  </Link>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>{asset?._name || ""}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
+                            <div className="flex items-center gap-2">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Link
+                                      to={getAssetDetailHref(asset)}
+                                      className="font-medium text-sm md:text-base text-blue-600 truncate hover:text-blue-800 underline transition-colors"
+                                    >
+                                      {asset?._symbol || asset?._name || ""}
+                                    </Link>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{asset?._name || ""}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              {isStratoAsset(asset) && (
+                                <Button asChild size="sm" className="shrink-0 h-7 px-2.5 text-xs">
+                                  <Link to="/dashboard/earn-staking">Stake</Link>
+                                </Button>
+                              )}
+                            </div>
                             <p className="hidden md:block text-muted-foreground text-xs truncate">
                               {asset?._name || ""}
                             </p>
@@ -287,11 +294,6 @@ const AssetsList = ({
                               })()}
                             </div>
                           </div>
-                          {isStratoAsset(asset) && (
-                            <Button asChild size="sm" className="ml-2 shrink-0">
-                              <Link to="/dashboard/earn-staking">Stake</Link>
-                            </Button>
-                          )}
                         </div>
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
