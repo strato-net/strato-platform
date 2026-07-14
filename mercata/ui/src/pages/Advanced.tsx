@@ -11,11 +11,12 @@ import { useUser } from '@/context/UserContext';
 import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 import DirectMintPSMSection from '@/components/dashboard/DirectMintPSMSection';
 
-// Hidden imports - temporarily disabled 
+// Hidden imports - temporarily disabled per issue #7228
 // import { CardHeader, CardTitle } from "@/components/ui/card";
 // import LendingPoolSection from '@/components/dashboard/LendingPoolSection';
 // import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
 // import SafetyModuleSection from '@/components/dashboard/SafetyModuleSection';
+// import LiquidationsView from '@/components/cdp/LiquidationsView'; // Moved from Borrow page per issue #7228
 // import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 // import { safeParseUnits } from "@/utils/numberUtils";
 // import { formatUnits } from "ethers";
@@ -33,8 +34,8 @@ import DirectMintPSMSection from '@/components/dashboard/DirectMintPSMSection';
 // import LiquidationAlertBanner from '@/components/ui/LiquidationAlertBanner';
 
 type TopTab = "swap" | "psm" | "bad-debt";
-// Hidden type - temporarily disabled 
-// type TopTab = "borrow" | "lending" | "swap" | "liquidations" | "safety" | "psm";
+// Hidden type - temporarily disabled   
+// type TopTab = "borrow" | "lending" | "swap" | "liquidations" | "cdp-liquidations" | "safety" | "psm";
 
 const Advanced = () => {
   const [searchParams] = useSearchParams();
@@ -48,7 +49,7 @@ const Advanced = () => {
       setActiveTab(tabParam as TopTab);
     }
     // Hidden route validation - temporarily disabled 
-    // if (tabParam && ['lending', 'swap', 'liquidations', 'safety', 'borrow', 'psm'].includes(tabParam)) {
+    // if (tabParam && ['lending', 'swap', 'liquidations', 'cdp-liquidations', 'safety', 'borrow', 'psm'].includes(tabParam)) {
     //   setActiveTab(tabParam as TopTab);
     // }
   }, [searchParams]);
@@ -238,7 +239,7 @@ const Advanced = () => {
                   <BadDebtView guestMode={!isLoggedIn} />
                 </TabsContent>
 
-                {/* Hidden tabs - temporarily disabled      
+                {/* Hidden tabs - temporarily disabled 
                 <TabsTrigger value="borrow" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                   Borrow
                 </TabsTrigger>
@@ -353,6 +354,17 @@ const Advanced = () => {
                     <GuestSignInBanner message="Sign in to view and liquidate unhealthy positions" />
                   )}
                   <LiquidationsSection />
+                </TabsContent>
+
+                // CDP Liquidations tab - Moved from Borrow page per issue #7228
+                <TabsTrigger value="cdp-liquidations" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                  CDP Liquidations
+                </TabsTrigger>
+                <TabsContent value="cdp-liquidations">
+                  {!isLoggedIn && (
+                    <GuestSignInBanner message="Sign in to view and liquidate CDP positions" />
+                  )}
+                  <LiquidationsView guestMode={!isLoggedIn} />
                 </TabsContent>
                 */}
               </Tabs>
