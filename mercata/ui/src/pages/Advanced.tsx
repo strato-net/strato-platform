@@ -11,13 +11,7 @@ import LiquidationsView from '@/components/cdp/LiquidationsView';
 import { useUser } from '@/context/UserContext';
 import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 import DirectMintPSMSection from '@/components/dashboard/DirectMintPSMSection';
-import VaultOverview from '@/components/vault/VaultOverview';
-import VaultUserPosition from '@/components/vault/VaultUserPosition';
-import VaultTransactions from '@/components/vault/VaultTransactions';
-import VaultUserActivity from '@/components/vault/VaultUserActivity';
-import VaultDepositModal from '@/components/vault/VaultDepositModal';
-import VaultWithdrawModal from '@/components/vault/VaultWithdrawModal';
-import { useVaultContext } from '@/context/VaultContext';
+import Vault from '@/pages/Vault';
 
 // Hidden imports - temporarily disabled per issue #7228
 // import { CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,11 +42,6 @@ const Advanced = () => {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TopTab>("swap");
   const { isLoggedIn } = useUser();
-  const [isVaultDepositOpen, setIsVaultDepositOpen] = useState(false);
-  const [isVaultWithdrawOpen, setIsVaultWithdrawOpen] = useState(false);
-  const { refreshVault } = useVaultContext();
-
-  const guestMode = !isLoggedIn;
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');
@@ -246,21 +235,7 @@ const Advanced = () => {
                 </TabsContent>
 
                 <TabsContent value="vault">
-                  {!isLoggedIn && (
-                    <GuestSignInBanner message="Sign in to deposit or withdraw from the vault" />
-                  )}
-                  <div className="space-y-8">
-                    <VaultOverview />
-                    <VaultUserPosition
-                      onDeposit={() => setIsVaultDepositOpen(true)}
-                      onWithdraw={() => setIsVaultWithdrawOpen(true)}
-                      guestMode={guestMode}
-                    />
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-                      <VaultTransactions />
-                      {!guestMode && <VaultUserActivity />}
-                    </div>
-                  </div>
+                  <Vault />
                 </TabsContent>
 
                 <TabsContent value="psm">
@@ -406,21 +381,6 @@ const Advanced = () => {
       </div>
 
       <MobileBottomNav />
-
-      {!guestMode && (
-        <>
-          <VaultDepositModal
-            isOpen={isVaultDepositOpen}
-            onClose={() => setIsVaultDepositOpen(false)}
-            onSuccess={() => refreshVault(false)}
-          />
-          <VaultWithdrawModal
-            isOpen={isVaultWithdrawOpen}
-            onClose={() => setIsVaultWithdrawOpen(false)}
-            onSuccess={() => refreshVault(false)}
-          />
-        </>
-      )}
     </div>
   );
 };
