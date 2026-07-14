@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
 import BadDebtView from '@/components/cdp/BadDebtView';
+import LiquidationsView from '@/components/cdp/LiquidationsView';
 import { useUser } from '@/context/UserContext';
 import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 import DirectMintPSMSection from '@/components/dashboard/DirectMintPSMSection';
@@ -18,12 +19,12 @@ import VaultDepositModal from '@/components/vault/VaultDepositModal';
 import VaultWithdrawModal from '@/components/vault/VaultWithdrawModal';
 import { useVaultContext } from '@/context/VaultContext';
 
-// Hidden imports - temporarily disabled 
+// Hidden imports - temporarily disabled per issue #7228
+// import { CardHeader, CardTitle } from "@/components/ui/card";
+// import LendingPoolSection from '@/components/dashboard/LendingPoolSection';
 // import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
 // import SafetyModuleSection from '@/components/dashboard/SafetyModuleSection';
 // import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
-// import { CardHeader, CardTitle } from "@/components/ui/card";
-// import LendingPoolSection from '@/components/dashboard/LendingPoolSection';
 // import { safeParseUnits } from "@/utils/numberUtils";
 // import { formatUnits } from "ethers";
 // import { useToast } from "@/hooks/use-toast";
@@ -39,8 +40,8 @@ import { useVaultContext } from '@/context/VaultContext';
 // import { useSmartPolling } from "@/hooks/useSmartPolling";
 // import LiquidationAlertBanner from '@/components/ui/LiquidationAlertBanner';
 
-type TopTab = "swap" | "vault" | "psm" | "bad-debt";
-// Hidden type - temporarily disabled 
+type TopTab = "swap" | "vault" | "psm" | "bad-debt" | "liquidations";
+// Hidden type - temporarily disabled per issue #7228
 // type TopTab = "borrow" | "lending" | "swap" | "liquidations" | "safety" | "psm" | "vault";
 
 const Advanced = () => {
@@ -56,9 +57,13 @@ const Advanced = () => {
   useEffect(() => {
     const tabParam = searchParams.get('tab');
 
-    if (tabParam && ['swap', 'vault', 'psm', 'bad-debt'].includes(tabParam)) {
+    if (tabParam && ['swap', 'vault', 'psm', 'bad-debt', 'liquidations'].includes(tabParam)) {
       setActiveTab(tabParam as TopTab);
     }
+    // Hidden route validation - temporarily disabled per issue #7228
+    // if (tabParam && ['lending', 'swap', 'liquidations', 'safety', 'borrow', 'psm'].includes(tabParam)) {
+    //   setActiveTab(tabParam as TopTab);
+    // }
   }, [searchParams]);
 
   /* Hidden state and functions - temporarily disabled 
@@ -215,18 +220,21 @@ const Advanced = () => {
           <Card className="mb-2 md:mb-6 bg-transparent border-0 rounded-none shadow-none">
             <CardContent className="p-0 md:pt-4">
               <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TopTab)} className="w-full">
-                <TabsList className="grid w-full grid-cols-4 mb-3 md:mb-4 h-auto gap-0.5 md:gap-1">
+                <TabsList className="grid w-full grid-cols-5 mb-3 md:mb-4 h-auto gap-0.5 md:gap-1">
                   <TabsTrigger value="swap" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                     Swap Pools
                   </TabsTrigger>
                   <TabsTrigger value="vault" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
-                    Vault
+                    Diversified Vault
                   </TabsTrigger>
                   <TabsTrigger value="psm" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                     PSM
                   </TabsTrigger>
                   <TabsTrigger value="bad-debt" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                     Bad Debt
+                  </TabsTrigger>
+                  <TabsTrigger value="liquidations" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                    Liquidations
                   </TabsTrigger>
                 </TabsList>
 
@@ -265,8 +273,14 @@ const Advanced = () => {
                 <TabsContent value="bad-debt">
                   <BadDebtView guestMode={!isLoggedIn} />
                 </TabsContent>
+                <TabsContent value="liquidations">
+                  {!isLoggedIn && (
+                    <GuestSignInBanner message="Sign in to view and liquidate CDP positions" />
+                  )}
+                  <LiquidationsView guestMode={!isLoggedIn} />
+                </TabsContent>
 
-                {/* Hidden tabs - temporarily disabled      
+                {/* Hidden tabs - temporarily disabled per issue #7228 
                 <TabsTrigger value="borrow" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                   Borrow
                 </TabsTrigger>
@@ -276,8 +290,8 @@ const Advanced = () => {
                 <TabsTrigger value="safety" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                   Safety
                 </TabsTrigger>
-                <TabsTrigger value="liquidations" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
-                  Liquidations
+                <TabsTrigger value="lending-liquidations" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                  Lending Liquidations
                 </TabsTrigger>
 
                 <TabsContent value="borrow">
@@ -378,8 +392,7 @@ const Advanced = () => {
                   )}
                   <SafetyModuleSection />
                 </TabsContent>
-
-                <TabsContent value="liquidations">
+                <TabsContent value="lending-liquidations">
                   {!isLoggedIn && (
                     <GuestSignInBanner message="Sign in to view and liquidate unhealthy positions" />
                   )}
