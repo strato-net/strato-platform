@@ -154,6 +154,7 @@ const App = () => {
   useEffect(() => {
     if (!loading) {
       const appName = "STRATO";
+      const origin = window.location.origin;
       const stratoChain = getStratoChain();
       const networkName = (window as { ENV?: { NETWORK_NAME?: string } }).ENV?.NETWORK_NAME || "";
       const isProduction = networkName === "upquark";
@@ -166,9 +167,9 @@ const App = () => {
         chains.map((chain) => [
           chain.id,
           chain === stratoChain
-            ? http(`/rpc`)
+            ? http(`${origin}/rpc`)
             : proxiedChainIds.has(chain.id)
-              ? http(`/api/rpc/${chain.id}`, { fetchOptions: { credentials: "include" }, onFetchRequest: csrfOnRequest })
+              ? http(`${origin}/api/rpc/${chain.id}`, { fetchOptions: { credentials: "include" }, onFetchRequest: csrfOnRequest })
               : http(),
         ])
       );
