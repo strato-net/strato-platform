@@ -8,37 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { useLendingContext } from "@/context/LendingContext";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
 import { useYieldVaultContext } from "@/hooks/useYieldVaultContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { useEarnContext } from "@/context/EarnContext";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
-import { useToast } from "@/hooks/use-toast";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { api } from "@/lib/axios";
 import { formatUnits } from "ethers";
-import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { CircleArrowDown, PiggyBank, ShieldCheck, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { EarnApyInfo, findBestEarnApyInfo } from "@/utils/earnUtils";
-import {
-  mUsdstAddress,
-  LENDING_DEPOSIT_FEE,
-  rewardsEnabled,
-} from "@/lib/constants";
 
 const WAD = BigInt(10) ** BigInt(18);
 
@@ -174,11 +157,6 @@ const formatCarryVaultApyDisplayForLive = (
   }
   return formatApyDisplay(apy);
 };
-const formatMaxAmount = (weiAmount: bigint): string => {
-  const [whole, frac = ""] = formatUnits(weiAmount, 18).split(".");
-  return `${whole}.${frac.slice(0, 18)}`.replace(/\.?0+$/, "");
-};
-
 const YIELD_VAULTS = [
   {
     key: "eth-carry",
@@ -212,18 +190,12 @@ const YIELD_VAULTS = [
 const Earn = () => {
   type OpportunityRow =
     | { kind: "saveUsdst"; apySortValue: number }
-    | { kind: "lending"; apySortValue: number }
     | { kind: "staking"; apySortValue: number }
     | { kind: "yieldVault"; apySortValue: number; vaultIndex: number };
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [isLendingDepositModalOpen, setIsLendingDepositModalOpen] = useState(false);
-  const [lendingDepositAmount, setLendingDepositAmount] = useState("");
-  const [stakeLendingRewards, setStakeLendingRewards] = useState<boolean>(rewardsEnabled);
-  const [isLendingSubmitting, setIsLendingSubmitting] = useState(false);
   const [featuredOpportunityKey, setFeaturedOpportunityKey] = useState("");
   const [stakingInfo, setStakingInfo] = useState<StakingEarnInfo | null>(null);
-  const { liquidityInfo, loadingLiquidity, refreshLiquidity, depositLiquidity } = useLendingContext();
   const { saveUsdstInfo } = useSaveUsdstContext();
   const { vaults: yieldVaults, userVaults: yieldUserVaults, loading: yieldVaultsLoading } =
     useYieldVaultContext();
@@ -231,7 +203,6 @@ const Earn = () => {
   const { tokenApys, tokenApysLoaded } = useEarnContext();
   const { activities: rewardsActivities } = useRewardsActivities();
   const { isLoggedIn } = useUser();
-  const { toast } = useToast();
   const guestMode = !isLoggedIn;
   const navigate = useNavigate();
 
@@ -285,51 +256,6 @@ const Earn = () => {
     }
   }, [isLoggedIn, fetchUsdstBalance]);
 
-  const closeLendingDepositModal = () => {
-    setIsLendingDepositModalOpen(false);
-    setLendingDepositAmount("");
-    setStakeLendingRewards(rewardsEnabled);
-  };
-
-  const handleLendingDepositClick = () => {
-    if (!isLoggedIn) return;
-    setIsLendingDepositModalOpen(true);
-  };
-
-  const isValidDecimalInput = (value: string) => /^\d+(\.\d{1,18})?$/.test(value);
-
-  const isLendingDepositValid = useMemo(() => {
-    if (!lendingDepositAmount || !isValidDecimalInput(lendingDepositAmount)) return false;
-    try {
-      const amountWei = safeParseUnits(lendingDepositAmount, 18);
-      const availableWei = safeBigInt(liquidityInfo?.supplyable?.userBalance);
-      const feeWei = safeParseUnits(LENDING_DEPOSIT_FEE, 18);
-      return amountWei > 0n && amountWei <= availableWei && amountWei + feeWei <= availableWei;
-    } catch {
-      return false;
-    }
-  }, [lendingDepositAmount, liquidityInfo?.supplyable?.userBalance]);
-
-  const handleLendingDepositSubmit = async () => {
-    if (!isLoggedIn || !isLendingDepositValid || isLendingSubmitting) return;
-    try {
-      setIsLendingSubmitting(true);
-      await depositLiquidity({
-        amount: safeParseUnits(lendingDepositAmount, 18).toString(),
-      });
-      closeLendingDepositModal();
-      toast({
-        title: "Deposit Successful",
-        description: `You have successfully deposited ${lendingDepositAmount} USDST.`,
-        variant: "success",
-      });
-      await Promise.all([refreshLiquidity(), fetchUsdstBalance()]);
-    } catch {
-    } finally {
-      setIsLendingSubmitting(false);
-    }
-  };
-
   const saveUsdstAsset = useMemo(() => {
     return earningAssets.find((asset) => {
       const symbol = asset._symbol?.toLowerCase?.() || "";
@@ -381,8 +307,6 @@ const Earn = () => {
     [saveUsdstAsset?.address, saveUsdstInfo?.vaultAddress, tokenApys]
   );
 
-  const lendingEarnApyInfo = useMemo(() => findBestEarnApyInfo(tokenApys, mUsdstAddress), [tokenApys]);
-
   const yieldVaultApyInfos = useMemo<Record<string, EarnApyInfo | null>>(() => {
     const out: Record<string, EarnApyInfo | null> = {};
     for (const cfg of YIELD_VAULTS) {
@@ -399,7 +323,6 @@ const Earn = () => {
   };
 
   const saveUsdstDisplayApyRaw = saveUsdstApyInfo?.total.toFixed(2);
-  const lendingDisplayApyRaw = lendingEarnApyInfo?.total.toFixed(2);
   const stakingBestApyRaw = useMemo(() => {
     const values = (stakingInfo?.validators || [])
       .filter((validator) => validator.active)
@@ -436,7 +359,6 @@ const Earn = () => {
 
   const getOpportunityTvl = (opportunity: OpportunityRow): bigint => {
     if (opportunity.kind === "saveUsdst") return safeBigInt(saveUsdstTvl);
-    if (opportunity.kind === "lending") return safeBigInt(liquidityInfo?.totalUSDSTSupplied?.toString());
     if (opportunity.kind === "staking") return safeBigInt(stakingInfo?.totalRewardableStakeUsd);
     if (opportunity.kind === "yieldVault") {
       const vData = yieldVaults[YIELD_VAULTS[opportunity.vaultIndex].key];
@@ -449,8 +371,7 @@ const Earn = () => {
     if (opportunity.kind === "saveUsdst") return 0;
     if (opportunity.kind === "yieldVault") return 1;
     if (opportunity.kind === "staking") return 2;
-    if (opportunity.kind === "lending") return 3;
-    return 4;
+    return 3;
   };
 
   const compareOpportunities = (a: OpportunityRow, b: OpportunityRow): number => {
@@ -485,10 +406,6 @@ const Earn = () => {
 
     if (opportunity.kind === "saveUsdst") {
       return `$${saveUsdstAsset?.value || "0.00"}`;
-    }
-
-    if (opportunity.kind === "lending") {
-      return `$${formatUsd(liquidityInfo?.withdrawable?.userBalance || "0")}`;
     }
 
     if (opportunity.kind === "staking") {
@@ -534,7 +451,6 @@ const Earn = () => {
     return { earnsRewards: Boolean(activity && activity.emissionRate > 0n) };
   };
 
-  const lendingRewardMeta = getRewardMeta(mUsdstAddress);
   const saveUsdstRewardMeta = getRewardMeta(saveUsdstRewardsActivity?.sourceContract || saveUsdstAsset?.address);
 
   const allOpportunities = useMemo<OpportunityRow[]>(() => {
@@ -551,10 +467,9 @@ const Earn = () => {
       });
     }
     rows.push({ kind: "staking", apySortValue: parseApy(stakingDisplayApyRaw) });
-    rows.push({ kind: "lending", apySortValue: parseApy(lendingDisplayApyRaw) });
 
     return rows.sort(compareOpportunities);
-  }, [lendingDisplayApyRaw, saveUsdstDisplayApyRaw, saveUsdstTvl, stakingDisplayApyRaw, tokenApys, tokenApysLoaded, liquidityInfo?.totalUSDSTSupplied, yieldVaults, yieldVaultApyInfos]);
+  }, [saveUsdstDisplayApyRaw, saveUsdstTvl, stakingDisplayApyRaw, tokenApys, tokenApysLoaded, yieldVaults, yieldVaultApyInfos]);
 
   const rankedTopCandidates = useMemo<OpportunityRow[]>(() => {
     const candidates: OpportunityRow[] = [
@@ -564,11 +479,10 @@ const Earn = () => {
         apySortValue: yieldVaults[v.key]?.deployed ? parseApy(getYieldVaultDisplayApyRaw(v.key)) : Number.NEGATIVE_INFINITY,
         vaultIndex: i,
       })),
-      { kind: "lending", apySortValue: parseApy(lendingDisplayApyRaw) },
       { kind: "staking", apySortValue: parseApy(stakingDisplayApyRaw) },
     ];
     return [...candidates].sort(compareOpportunities);
-  }, [lendingDisplayApyRaw, liquidityInfo?.totalUSDSTSupplied, saveUsdstDisplayApyRaw, saveUsdstTvl, stakingDisplayApyRaw, tokenApys, tokenApysLoaded, yieldVaults, yieldVaultApyInfos]);
+  }, [saveUsdstDisplayApyRaw, saveUsdstTvl, stakingDisplayApyRaw, tokenApys, tokenApysLoaded, yieldVaults, yieldVaultApyInfos]);
   const getOpportunityMeta = (opportunity: OpportunityRow) => {
     if (opportunity.kind === "saveUsdst") {
       return {
@@ -601,20 +515,6 @@ const Earn = () => {
       };
     }
 
-    if (opportunity.kind === "lending") {
-      return {
-        title: "USDST Lending Pool",
-        subtitle: "Earn yield by supplying USDST liquidity",
-        apyRaw: lendingDisplayApyRaw,
-        tvl: liquidityInfo?.totalUSDSTSupplied?.toString() || "0",
-        badge: "Lending",
-        rateLabel: "Best Available APY",
-        actionLabel: "Deposit",
-        onCardClick: () => navigate("/dashboard/earn-lending"),
-        onActionClick: () => handleLendingDepositClick(),
-      };
-    }
-
     return {
       title: "Stake STRATO",
       subtitle: "Delegate STRATO to approved validators",
@@ -632,7 +532,6 @@ const Earn = () => {
     if (opportunity.kind === "yieldVault") {
       return yieldVaultApyInfos[YIELD_VAULTS[opportunity.vaultIndex].key] ?? null;
     }
-    if (opportunity.kind === "lending") return lendingEarnApyInfo;
     if (opportunity.kind === "staking") return stakingApyInfo;
     return null;
   };
@@ -643,10 +542,6 @@ const Earn = () => {
 
     if (key === "save-usdst" || key === "saveusdst") {
       return { kind: "saveUsdst", apySortValue: parseApy(saveUsdstDisplayApyRaw) };
-    }
-
-    if (key === "lending") {
-      return { kind: "lending", apySortValue: parseApy(lendingDisplayApyRaw) };
     }
 
     if (key === "staking" || key === "strato-staking") {
@@ -661,7 +556,6 @@ const Earn = () => {
     return null;
   }, [
     featuredOpportunityKey,
-    lendingDisplayApyRaw,
     saveUsdstDisplayApyRaw,
     stakingDisplayApyRaw,
     tokenApys,
@@ -684,8 +578,8 @@ const Earn = () => {
     );
   }, [configuredFeaturedOpportunity, rankedTopCandidates]);
 
-  const topOpportunityMeta = useMemo(() => getOpportunityMeta(topOpportunity), [topOpportunity, lendingDisplayApyRaw, saveUsdstDisplayApyRaw, saveUsdstTvl, stakingDisplayApyRaw, stakingInfo?.totalRewardableStake, tokenApys, tokenApysLoaded, liquidityInfo?.totalUSDSTSupplied, navigate]);
-  const topOpportunityApyInfo = useMemo(() => getOpportunityApyInfo(topOpportunity), [topOpportunity, saveUsdstApyInfo, lendingEarnApyInfo, stakingApyInfo, tokenApys]);
+  const topOpportunityMeta = useMemo(() => getOpportunityMeta(topOpportunity), [topOpportunity, saveUsdstDisplayApyRaw, saveUsdstTvl, stakingDisplayApyRaw, stakingInfo?.totalRewardableStake, tokenApys, tokenApysLoaded, navigate]);
+  const topOpportunityApyInfo = useMemo(() => getOpportunityApyInfo(topOpportunity), [topOpportunity, saveUsdstApyInfo, stakingApyInfo, tokenApys]);
   const topOpportunityApy = useMemo(() => {
     if (topOpportunity.kind === "yieldVault") {
       const cfg = YIELD_VAULTS[topOpportunity.vaultIndex];
@@ -703,8 +597,6 @@ const Earn = () => {
       saveUsdstTvl,
       tokenApys,
       tokenApysLoaded,
-      lendingDisplayApyRaw,
-      liquidityInfo?.totalUSDSTSupplied,
       stakingDisplayApyRaw,
       stakingInfo?.totalRewardableStake,
       navigate,
@@ -712,7 +604,7 @@ const Earn = () => {
   );
   const featuredOpportunityApyInfo = useMemo(
     () => (configuredFeaturedOpportunity ? getOpportunityApyInfo(configuredFeaturedOpportunity) : null),
-    [configuredFeaturedOpportunity, saveUsdstApyInfo, lendingEarnApyInfo, stakingApyInfo, tokenApys]
+    [configuredFeaturedOpportunity, saveUsdstApyInfo, stakingApyInfo, tokenApys]
   );
   const featuredOpportunityApy = useMemo(() => {
     if (!configuredFeaturedOpportunity || !featuredOpportunityMeta) {
@@ -811,10 +703,6 @@ const Earn = () => {
                           <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].iconBg}`}>
                             <TrendingUp className={`h-5 w-5 ${YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].iconColor}`} />
                           </div>
-                        ) : configuredFeaturedOpportunity.kind === "lending" ? (
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-500/15 dark:bg-blue-400/15">
-                            <CircleArrowDown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                          </div>
                         ) : (
                           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 dark:bg-cyan-400/15">
                             <ShieldCheck className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
@@ -906,10 +794,6 @@ const Earn = () => {
                       ) : topOpportunity.kind === "yieldVault" ? (
                         <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${YIELD_VAULTS[topOpportunity.vaultIndex].iconBg}`}>
                           <TrendingUp className={`h-5 w-5 ${YIELD_VAULTS[topOpportunity.vaultIndex].iconColor}`} />
-                        </div>
-                      ) : topOpportunity.kind === "lending" ? (
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-500/15 dark:bg-blue-400/15">
-                          <CircleArrowDown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                         </div>
                       ) : (
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 dark:bg-cyan-400/15">
@@ -1203,73 +1087,6 @@ const Earn = () => {
                           );
                         }
 
-                        if (opportunity.kind === "lending") {
-                          return (
-                            <tr
-                              key="lending"
-                              className="border-b border-border/40 cursor-pointer hover:bg-muted/20"
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => navigate("/dashboard/earn-lending")}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.preventDefault();
-                                  navigate("/dashboard/earn-lending");
-                                }
-                              }}
-                            >
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className="w-8 h-8 rounded-full bg-blue-500/15 dark:bg-blue-400/15 flex items-center justify-center shrink-0">
-                                    <CircleArrowDown className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                  </div>
-                                  <p className="font-medium truncate">USDST Lending Pool</p>
-                                  <Badge variant="secondary" className="text-[10px]">Lending</Badge>
-                                  {lendingRewardMeta.earnsRewards && (
-                                    <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Rewards</Badge>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3">
-                                <EarnApyTooltip info={lendingEarnApyInfo}>
-                                  <p className="text-sm font-semibold cursor-default">
-                                    {formatApyDisplay(lendingDisplayApyRaw).label}
-                                  </p>
-                                </EarnApyTooltip>
-                              </td>
-                              <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">
-                                  {loadingLiquidity || !liquidityInfo?.totalUSDSTSupplied
-                                    ? "$0.00"
-                                    : `$${formatUsd(liquidityInfo.totalUSDSTSupplied.toString())}`}
-                                </p>
-                              </td>
-                              <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>
-                              </td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground">
-                                Lending pool
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center justify-end gap-2">
-                                  <Button
-                                    className="h-9 min-w-[108px] justify-center"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleLendingDepositClick();
-                                    }}
-                                    disabled={guestMode}
-                                  >
-                                    <CircleArrowDown className="h-4 w-4 mr-1 shrink-0" />
-                                    Deposit
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        }
-
                         return null;
                       })}
                     </tbody>
@@ -1283,59 +1100,6 @@ const Earn = () => {
       </div>
 
       <MobileBottomNav />
-
-      <Dialog open={isLendingDepositModalOpen} onOpenChange={(open) => (!open ? closeLendingDepositModal() : setIsLendingDepositModalOpen(true))}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Deposit to USDST Lending Pool</DialogTitle>
-            <DialogDescription>Enter amount and confirm your deposit.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="relative">
-              <Input
-                type="number"
-                placeholder="0.00"
-                value={lendingDepositAmount}
-                onChange={(e) => setLendingDepositAmount(e.target.value)}
-                className="pl-16 h-11"
-                disabled={!isLoggedIn || isLendingSubmitting}
-              />
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">USDST</span>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              <button
-                type="button"
-                className="text-blue-600 hover:underline mr-2"
-                onClick={() => {
-                  const availableWei = safeBigInt(liquidityInfo?.supplyable?.userBalance);
-                  const feeWei = safeParseUnits(LENDING_DEPOSIT_FEE, 18);
-                  const maxWei = availableWei > feeWei ? availableWei - feeWei : 0n;
-                  setLendingDepositAmount(formatMaxAmount(maxWei));
-                }}
-              >
-                Max
-              </button>
-              Available: {formatBalance(liquidityInfo?.supplyable?.userBalance || "0", undefined, 18, 2)} USDST
-            </div>
-            <div className="text-sm text-muted-foreground">Transaction Fee: {LENDING_DEPOSIT_FEE} USDST</div>
-            {rewardsEnabled && (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="earn-lending-modal-stake"
-                  checked={stakeLendingRewards}
-                  onCheckedChange={(checked) => setStakeLendingRewards(checked === true)}
-                />
-                <label htmlFor="earn-lending-modal-stake" className="text-sm font-medium">
-                  Stake my mUSDST to earn rewards
-                </label>
-              </div>
-            )}
-            <Button className="w-full h-11" onClick={handleLendingDepositSubmit} disabled={!isLendingDepositValid || isLendingSubmitting || !isLoggedIn}>
-              {isLendingSubmitting ? "Processing..." : "Deposit"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
