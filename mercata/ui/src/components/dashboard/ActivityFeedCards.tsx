@@ -32,6 +32,7 @@ type YieldVaultDef = {
   address: string;
   name: string;
   shareSymbol: string;
+  assetSymbol: string;
 };
 
 type YieldVaultInfo = {
@@ -61,22 +62,24 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
     try {
       const offset = (currentPage - 1) * itemsPerPage;
 
-      // Build activity type pairs with filter configs - filter by selected type if not "all"
+      // Build activity type pairs - filter by selected type if not "all"
       let activityTypePairs = Object.entries(activityTypes).map(([key, config]) => ({
         contract_name: config.contract_name,
         event_name: config.event_name,
-        filterConfig: config.filterConfig,
       }));
 
-      // Filter by selected activity type if not "all"
+      // Filter by selected activity type if not "all".
+      // Types sharing a display name (e.g. "Send") are queried together as one group.
       if (selectedActivityType !== "all") {
         const selectedConfig = activityTypes[selectedActivityType];
         if (selectedConfig) {
-          activityTypePairs = [{
-            contract_name: selectedConfig.contract_name,
-            event_name: selectedConfig.event_name,
-            filterConfig: selectedConfig.filterConfig,
-          }];
+          const selectedLabel = selectedConfig.displayName || selectedActivityType;
+          activityTypePairs = Object.entries(activityTypes)
+            .filter(([key, config]) => (config.displayName || key) === selectedLabel)
+            .map(([, config]) => ({
+              contract_name: config.contract_name,
+              event_name: config.event_name,
+            }));
         }
       }
 
@@ -159,10 +162,19 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
 
       const yieldVaultAddresses = new Set(
         response.events
+          .filter(event => event.contract_name === "YieldVault")
+          .map(event => normalizeAddress(event.address))
+          .filter(Boolean)
+      );
+      const yieldVaultTransferAddresses = new Set(
+        response.events
           .filter(event => event.contract_name === "YieldVault" && event.event_name === "Transfer")
           .map(event => normalizeAddress(event.address))
           .filter(Boolean)
       );
+
+      // Vault address (normalized) -> underlying asset symbol (e.g. USDC)
+      const vaultAssetSymbolMap = new Map<string, string>();
 
       if (yieldVaultAddresses.size > 0) {
         try {
@@ -170,8 +182,16 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
           const matchingVaults = (res.data || []).filter((vault) =>
             yieldVaultAddresses.has(normalizeAddress(vault.address))
           );
+          matchingVaults.forEach((vault) => {
+            if (vault.assetSymbol) {
+              vaultAssetSymbolMap.set(normalizeAddress(vault.address), vault.assetSymbol);
+            }
+          });
+          // Vault name labels (via /info) are only needed for share Transfer cards.
           const vaultInfos = await Promise.all(
-            matchingVaults.map((vault) =>
+            matchingVaults.filter((vault) =>
+              yieldVaultTransferAddresses.has(normalizeAddress(vault.address))
+            ).map((vault) =>
               api.get<YieldVaultInfo>(`/earn/yield-vault/${vault.key}/info`).then((infoRes) => infoRes.data).catch(() => ({
                 vaultAddress: vault.address,
                 name: vault.name,
@@ -273,6 +293,9 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
           if (event.contract_name === "YieldVault" && event.event_name === "Transfer") {
             const symbol = tokenSymbolMap.get(normalizeAddress(event.address)) || tokenSymbolMap.get(event.address);
             if (symbol) tokenSymbolsMap.set(event.address, symbol);
+          } else if (event.contract_name === "YieldVault") {
+            const assetSymbol = vaultAssetSymbolMap.get(normalizeAddress(event.address));
+            if (assetSymbol) tokenSymbolsMap.set(event.address, assetSymbol);
           }
           const cardData = config.handler(event, tokenSymbolsMap, userAddress, tokenImagesMap);
           // Add iconConfig from the activity type config
@@ -306,13 +329,17 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
     setCurrentPage(1); // Reset to first page on refresh
   }, []);
 
-  // Get activity type display names from config, sorted alphabetically
+  // Get activity type display names from config, deduplicated (merged types
+  // like "Send" share a label) and sorted alphabetically
   const activityTypeOptions = [
     { value: "all", label: "All types" },
-    ...Object.entries(activityTypes).map(([key, config]) => ({
-      value: key,
-      label: config.displayName || key,
-    })).sort((a, b) => a.label.localeCompare(b.label)),
+    ...Object.entries(activityTypes)
+      .map(([key, config]) => ({
+        value: key,
+        label: config.displayName || key,
+      }))
+      .filter((option, index, options) => options.findIndex(o => o.label === option.label) === index)
+      .sort((a, b) => a.label.localeCompare(b.label)),
   ];
 
   const paginationItems = (() => {

@@ -21,12 +21,13 @@ import qualified Data.ByteString.Char8 as BC
 import Data.List (intercalate, partition)
 import qualified Data.Map as M
 import qualified Data.Text as T
+import qualified Data.Vector as V
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.CodeCollection.Event (EventF (..), EventLog (..))
 import SolidVM.Model.CodeCollection.VarDef (IndexedType (..))
 import SolidVM.Model.SolidString (SolidString, labelToText)
 import qualified SolidVM.Model.Type as SVMType
-import SolidVM.Model.Value (Value (..))
+import SolidVM.Model.Value (Value (..), getConst)
 
 --------------------------------------------------------------------------------
 -- ABI bytes -> SolidVM text arguments
@@ -137,8 +138,41 @@ readStringLiteral s = case reads s :: [(String, String)] of
 
 encodeValueABI :: [SVMType.Type] -> Value -> B.ByteString
 encodeValueABI [] _ = B.empty
+-- A struct-valued getter return arrives as an STuple of the struct's members.
+-- The caller supplies one type per member (the struct flattened, matching
+-- SolidVM's handleStruct), so we ABI-encode it as a tuple. The length guard
+-- ensures we only do this when the type list lines up with the members, leaving
+-- the single-scalar getter path below untouched.
+encodeValueABI ts (STuple vs)
+  | length ts == V.length vs = encodeTuple ts (map getConst $ V.toList vs)
 encodeValueABI [t] v = encodeSingleValue t v
 encodeValueABI _ _ = B.empty
+
+-- | ABI-encode a sequence of values as a tuple using the standard head/tail
+-- layout: static members are written inline in the head; dynamic members get a
+-- 32-byte offset in the head and their data appended in the tail.
+encodeTuple :: [SVMType.Type] -> [Value] -> B.ByteString
+encodeTuple types vals =
+  let pairs = zip types vals
+      headSize = length pairs * 32
+      go [] _ headAcc tailAcc = headAcc <> tailAcc
+      go ((t, v) : rest) tailOff headAcc tailAcc
+        | isDynamic t =
+            let encoded = encodeDynamicTail t v
+             in go rest (tailOff + B.length encoded) (headAcc <> encodeUint256 (fromIntegral tailOff)) (tailAcc <> encoded)
+        | otherwise =
+            go rest tailOff (headAcc <> encodeSingleValue t v) tailAcc
+   in go pairs headSize B.empty B.empty
+
+-- | Tail data for a dynamic tuple member: length word followed by right-padded
+-- contents, with no leading self-relative offset (the offset lives in the head).
+encodeDynamicTail :: SVMType.Type -> Value -> B.ByteString
+encodeDynamicTail (SVMType.String _) (SString s) =
+  let bs = BC.pack s
+   in encodeUint256 (fromIntegral $ B.length bs) <> padRight32 bs
+encodeDynamicTail (SVMType.Bytes _ Nothing) (SBytes bs) =
+  encodeUint256 (fromIntegral $ B.length bs) <> padRight32 bs
+encodeDynamicTail _ _ = encodeUint256 0
 
 encodeSingleValue :: SVMType.Type -> Value -> B.ByteString
 encodeSingleValue (SVMType.Int (Just True) _) (SInteger n) = encodeInt256 n
@@ -159,6 +193,9 @@ encodeSingleValue (SVMType.Enum _ _ _) (SEnumVal _ _ v) = encodeUint256 (fromInt
 encodeSingleValue _ (SContract _ a) = padLeft32 $ addressToByteString a
 encodeSingleValue _ (SAddress a _) = padLeft32 $ addressToByteString a
 encodeSingleValue _ (SInteger n) = encodeUint256 n
+-- Unset / default struct fields read back as SNULL; encode them as a zero word
+-- so a static member always occupies its 32-byte slot (keeps tuple heads aligned).
+encodeSingleValue _ SNULL = encodeUint256 0
 encodeSingleValue _ _ = B.empty
 
 --------------------------------------------------------------------------------

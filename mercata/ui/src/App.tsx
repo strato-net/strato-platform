@@ -1,4 +1,5 @@
 import { Toaster } from "@/components/ui/toaster";
+import { Loader2 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import UsdstBalanceBox from "@/components/layouts/UsdstBalanceBox";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -36,6 +37,7 @@ import EarnVault from "./pages/EarnVault";
 import EarnLending from "./pages/EarnLending";
 import EarnPools from "./pages/EarnPools";
 import EarnYieldVault from "./pages/EarnYieldVault";
+import EarnStaking from "./pages/EarnStaking";
 import OnrampPage from "./pages/OnrampPage";
 
 // Import dashboard components
@@ -68,16 +70,21 @@ import { SaveUsdstProvider } from "@/context/SaveUsdstContext";
 import { YieldVaultProvider } from "@/context/YieldVaultContext";
 import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { csrfOnRequest, initializeCsrfToken } from "./lib/csrf";
 import { captureAttribution } from "./lib/attribution";
 import { getNodeHealth, shouldShowNodeHealth, type NodeHealth } from "./lib/nodeHealth";
+import { useUser } from "@/context/UserContext";
 
 
 const queryClient = new QueryClient();
-const proxiedChainIds = new Set([mainnet.id, sepolia.id, base.id, baseSepolia.id, linea.id, lineaSepolia.id]);
-const baseChains = [mainnet, polygon, sepolia, base, baseSepolia, linea, lineaSepolia] as const;
+
+const AuthGate = ({ children }: { children: ReactNode }) => {
+  const { loading } = useUser();
+  if (loading) return null;
+  return <>{children}</>;
+};
 
 const App = () => {
   const [projectId, setProjectId] = useState("PROJECT_ID_UNSET");
@@ -155,6 +162,12 @@ const App = () => {
     if (!loading) {
       const appName = "STRATO";
       const stratoChain = getStratoChain();
+      const networkName = (window as { ENV?: { NETWORK_NAME?: string } }).ENV?.NETWORK_NAME || "";
+      const isProduction = networkName === "upquark";
+      const baseChains = isProduction
+        ? [mainnet, polygon, base, linea]
+        : [sepolia, baseSepolia, lineaSepolia];
+      const proxiedChainIds: Set<number> = new Set(baseChains.filter(c => c.id !== polygon.id).map(c => c.id));
       const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(
         chains.map((chain) => [
@@ -182,7 +195,7 @@ const App = () => {
 
       const config = createConfig({
         connectors,
-        chains: chains as unknown as readonly [typeof mainnet, ...(typeof baseChains)],
+        chains: chains as unknown as readonly [typeof mainnet, ...(typeof mainnet)[]],
         transports,
       });
 
@@ -194,7 +207,11 @@ const App = () => {
   const creditCardTopUpAddressStr = creditCardTopUpAddress ?? undefined;
 
   if (loading) {
-    return <div>Loading configuration...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   if (configError) {
@@ -206,7 +223,11 @@ const App = () => {
   }
 
   if (!wagmiConfig) {
-    return <div>Loading configuration...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
@@ -216,6 +237,7 @@ const App = () => {
           <WagmiProvider config={wagmiConfig}>
             <RainbowKitProvider>
               <UserProvider>
+                <AuthGate>
                 <UserTokensProvider>
                   <SwapProvider>
                     <OracleProvider>
@@ -341,6 +363,14 @@ const App = () => {
                                                   }
                                                 />
                                                 <Route
+                                                  path="/dashboard/earn-staking"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <EarnStaking />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
                                                   path="/dashboard/earn-pools"
                                                   element={
                                                     <GuestAccessibleRoute>
@@ -456,6 +486,7 @@ const App = () => {
                     </OracleProvider>
                   </SwapProvider>
                 </UserTokensProvider>
+                </AuthGate>
               </UserProvider>
             </RainbowKitProvider>
           </WagmiProvider>

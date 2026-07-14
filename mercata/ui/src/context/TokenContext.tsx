@@ -492,6 +492,19 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [getEarningAssets, isLoggedIn, userAddress]);
 
+  // Inactive tokens - fetch once on mount for logged-in users only (no public endpoint)
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    getInactiveTokens(true);
+
+    return () => {
+      if (inactiveTokensAbortControllerRef.current) {
+        inactiveTokensAbortControllerRef.current.abort();
+      }
+    };
+  }, [getInactiveTokens, isLoggedIn, userAddress]);
+
   // Net balance - fetch on mount + poll every 60s for logged-in users
   useEffect(() => {
     if (!isLoggedIn) return;

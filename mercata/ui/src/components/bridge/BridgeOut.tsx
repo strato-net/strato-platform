@@ -118,14 +118,23 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
 
   const balanceImpact = useMemo(() => {
     try {
-      const maxAmountWei = BigInt(maxAmount || "0");
+      const tokenBalanceWei = balanceData?.balance?.toString() || "0";
+      const actualBalance = computeMaxTransferable(
+        tokenBalanceWei,
+        selectedToken?.stratoToken === usdstAddress,
+        voucherBalance,
+        usdstBalance,
+        FEE_WEI,
+        () => {}
+      );
+      const balanceWei = BigInt(actualBalance || "0");
       const amountWei = safeParseUnits(amount || "0", DECIMAL);
-      const afterWei = maxAmountWei > amountWei ? maxAmountWei - amountWei : 0n;
-      return { before: maxAmountWei.toString(), after: afterWei.toString() };
+      const afterWei = balanceWei > amountWei ? balanceWei - amountWei : 0n;
+      return { before: balanceWei.toString(), after: afterWei.toString() };
     } catch {
       return { before: "0", after: "0" };
     }
-  }, [maxAmount, amount]);
+  }, [balanceData?.balance, selectedToken?.stratoToken, usdstBalance, voucherBalance, amount]);
 
   const hasValidAmount = !!amount && !amountError && !feeError;
 
@@ -297,8 +306,8 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       }
 
       toast({
-        title: "Withdrawal requested",
-        description: `Your withdrawal request is pending approval. The approved amount of ${selectedToken.externalSymbol} will be transferred to ${externalRecipient}.`,
+        title: "Bridge out requested",
+        description: `Your bridge out request is pending approval. The approved amount of ${selectedToken.externalSymbol} will be transferred to ${externalRecipient}.`,
       });
 
       setAmount("");
@@ -421,7 +430,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         disabled={isButtonDisabled}
         className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
-        {isLoading ? "Processing..." : "Withdraw"}
+        {isLoading ? "Processing..." : "Bridge Out"}
         </Button>
 
       <AdvancedOptionsDropdown

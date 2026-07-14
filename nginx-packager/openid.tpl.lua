@@ -16,6 +16,22 @@ local verify_opts = {
 local theme = ngx.var.arg_theme
 local auth_params = (theme == "dark" or theme == "light") and { theme = theme } or nil
 
+-- Honor a same-origin returnTo for the post-logout landing page. Lets the SMD
+-- return to /smd/ (logged-out/guest mode) instead of the app root. Validated to
+-- prevent open redirects / header injection. Falls back to the node root.
+local post_logout_uri = node_host_with_protocol
+local logout_return_to = ngx.var.arg_returnTo
+if logout_return_to then
+  logout_return_to = ngx.unescape_uri(logout_return_to)
+  if logout_return_to:sub(1, 1) == "/"
+      and logout_return_to:sub(1, 2) ~= "//"
+      and not logout_return_to:find("://", 1, true)
+      and not logout_return_to:find("[\r\n]")
+  then
+    post_logout_uri = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://%s%s", ngx.var.http_host, logout_return_to)
+  end
+end
+
 local authenticate_opts = {
   redirect_uri = "/auth/openidc/return",
   discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
@@ -31,7 +47,7 @@ local authenticate_opts = {
   access_token_expires_in = 300,
   access_token_expires_leeway = 3,
   logout_path = "/auth/logout",
-  post_logout_redirect_uri = node_host_with_protocol,
+  post_logout_redirect_uri = post_logout_uri,
   -- redirect_after_logout_uri = "/", -- URI to redirect after app and oauth provider logouts, otherwise show "Logged Out" text message on logout_path URI
   revoke_tokens_on_logout = true,
   use_pkce = true,
@@ -64,8 +80,10 @@ local wallet_auth_route_prefixes = {
   "/api/earn/",
   "/api/lend/",
   "/api/lending/",
+  "/api/psm/",
   "/api/refer/",
   "/api/rewards/",
+  "/api/staking/",
   "/api/swap-pools/",
   "/api/tokens/",
   "/api/user/admin/",
@@ -133,10 +151,15 @@ else
   -- Else - use the openidc authenticate flow
 
   local authenticate_res, authenticate_err, authenticate_session
-  -- Allow anonymous access only for safe/read-only methods on endpoints that explicitly allow it
+  -- Allow anonymous access:
+  --   "true" -> only safe/read-only methods (GET/HEAD/OPTIONS)
+  --   "all"  -> any method (for permissionless endpoints that don't sign server-side,
+  --             e.g. /transaction/unsigned and submitting an already-signed tx)
   local method = ngx.req.get_method()
+  local anon_mode = ngx.var.allow_optional_anon_access
   local allow_anonymous_request =
-    (ngx.var.allow_optional_anon_access == "true" and (method == "GET" or method == "HEAD" or method == "OPTIONS"))
+    (anon_mode == "true" and (method == "GET" or method == "HEAD" or method == "OPTIONS"))
+    or (anon_mode == "all")
     or allow_rpc_proxy_request()
   local allow_wallet_request = allow_wallet_auth_request()
   -- if requested_uri is the UI page (like SMD), else the API call

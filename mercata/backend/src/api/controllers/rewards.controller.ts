@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { fetchUserActivities, fetchRewardsOverview, fetchAllActivities, fetchLeaderboard } from "../services/rewards.service";
+import { fetchUserActivities, fetchRewardsOverview, fetchAllActivities, fetchLeaderboard, fetchUserRank } from "../services/rewards.service";
 import { strato } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
@@ -168,6 +168,30 @@ class RewardsController {
 
       const leaderboard = await fetchLeaderboard(accessToken, forceRefresh, limit, offset);
       res.status(RestStatus.OK).json(leaderboard);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get current user's rank on the leaderboard
+   */
+  static async getMyRank(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const forceRefresh = req.query.refresh === "true";
+
+      if (!userAddress) {
+        res.status(RestStatus.UNAUTHORIZED).json({ error: "User address is required" });
+        return;
+      }
+
+      const result = await fetchUserRank(accessToken, userAddress, forceRefresh);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }

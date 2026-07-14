@@ -37,7 +37,7 @@ generateDockerComposeAllDocker = do
   let mercataBackend = def
         { image = "${MERCATABACKEND_IMAGE:-" ++ repoUrl ++ "mercata-backend:" ++ stratoVersion ++ "-" ++ hashMercataBackend ++ "}"
         , build = Just "./mercata/backend"
-        , depends_on = Just $ DependsOnList ["strato", "postgrest"]
+        , depends_on = Just $ DependsOnList ["strato", "postgres", "postgrest"]
         , init = Just True
         , environment = Just $ Map.fromList
             [ ("NODE_URL", "http://nginx")
@@ -65,12 +65,16 @@ generateDockerComposeAllDocker = do
             , ("BA_PASSWORD", "${BA_PASSWORD:-}")
             , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT:-}")
             , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY:-}")
+            , ("postgres_host", "postgres")
+            , ("postgres_port", "5432")
+            , ("postgres_user", "postgres")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
+            , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
             ]
         , restart = Just "unless-stopped"
         , logging = noLogging
@@ -101,7 +105,7 @@ generateDockerComposeAllDocker = do
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh /usr/src/app/docker-run.sh >> /logs/smd.log 2>&1"]
-        , volumes = Just ["./logs:/logs"]
+        , volumes = Just ["./logs:/logs", "./nodedata/.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }

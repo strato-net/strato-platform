@@ -20,9 +20,14 @@ export type SaveUsdstInfo = {
   totalManagedAssets: string;
   totalAssets: string;
   pricingAssets: string;
+  projectedPricingAssets: string;
   tvlUsd: string;
+  projectedTvlUsd: string;
   totalShares: string;
   exchangeRate: string;
+  projectedExchangeRate: string;
+  pendingAccrual: string;
+  pendingAccrualTarget: string;
   apy: string;
   paused: boolean;
 };
@@ -31,6 +36,7 @@ export type SaveUsdstUserInfo = SaveUsdstInfo & {
   walletAssets: string;
   userShares: string;
   redeemableAssets: string;
+  projectedRedeemableAssets: string;
   maxDeposit: string;
   maxRedeem: string;
   maxWithdraw: string;
@@ -40,9 +46,17 @@ export type SaveUsdstUserInfo = SaveUsdstInfo & {
   userAllTimeEarningsAssets: string;
 };
 
+export type SaveUsdstHistoryPoint = {
+  timestamp: number;
+  exchangeRate: string;
+  pricingAssets: string;
+  totalShares: string;
+};
+
 type SaveUsdstContextType = {
   saveUsdstInfo: SaveUsdstInfo | null;
   saveUsdstUserInfo: SaveUsdstUserInfo | null;
+  saveUsdstHistory: SaveUsdstHistoryPoint[];
   loadingSaveUsdst: boolean;
   refreshSaveUsdst: () => Promise<void>;
 };
@@ -53,6 +67,7 @@ export const SaveUsdstProvider = ({ children }: { children: ReactNode }) => {
   const { isLoggedIn } = useUser();
   const [saveUsdstInfo, setSaveUsdstInfo] = useState<SaveUsdstInfo | null>(null);
   const [saveUsdstUserInfo, setSaveUsdstUserInfo] = useState<SaveUsdstUserInfo | null>(null);
+  const [saveUsdstHistory, setSaveUsdstHistory] = useState<SaveUsdstHistoryPoint[]>([]);
   const [loadingSaveUsdst, setLoadingSaveUsdst] = useState(true);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -66,11 +81,12 @@ export const SaveUsdstProvider = ({ children }: { children: ReactNode }) => {
     setLoadingSaveUsdst(true);
 
     try {
-      const [infoResult, userResult] = await Promise.allSettled([
+      const [infoResult, userResult, historyResult] = await Promise.allSettled([
         api.get<SaveUsdstInfo>("/earn/save-usdst/info", { signal: controller.signal }),
         isLoggedIn
           ? api.get<SaveUsdstUserInfo>("/earn/save-usdst/user", { signal: controller.signal })
           : Promise.resolve({ data: null } as { data: null }),
+        api.get<SaveUsdstHistoryPoint[]>("/earn/save-usdst/history", { signal: controller.signal }),
       ]);
 
       if (controller.signal.aborted) return;
@@ -79,6 +95,9 @@ export const SaveUsdstProvider = ({ children }: { children: ReactNode }) => {
       setSaveUsdstUserInfo(
         userResult.status === "fulfilled" ? userResult.value.data : null
       );
+      setSaveUsdstHistory(
+        historyResult.status === "fulfilled" ? historyResult.value.data : []
+      );
     } catch (error: any) {
       if (controller.signal.aborted || error?.name === "AbortError" || error?.code === "ERR_CANCELED") {
         return;
@@ -86,6 +105,7 @@ export const SaveUsdstProvider = ({ children }: { children: ReactNode }) => {
 
       setSaveUsdstInfo(null);
       setSaveUsdstUserInfo(null);
+      setSaveUsdstHistory([]);
     } finally {
       if (!controller.signal.aborted) {
         setLoadingSaveUsdst(false);
@@ -106,6 +126,7 @@ export const SaveUsdstProvider = ({ children }: { children: ReactNode }) => {
       value={{
         saveUsdstInfo,
         saveUsdstUserInfo,
+        saveUsdstHistory,
         loadingSaveUsdst,
         refreshSaveUsdst,
       }}

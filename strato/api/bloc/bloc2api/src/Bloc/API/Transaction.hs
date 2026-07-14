@@ -104,6 +104,10 @@ type PostBlocTransactionUnsigned =
   "transaction"
   -- | Transaction results
     :> "unsigned" -- /transaction/unsigned
+    -- | When supplied, a CONTRACT/FUNCTION tx is wrapped as a call to the user's
+    -- on-chain User wallet contract (createContract/callContract), so it becomes a
+    -- MessageTX that an external wallet (e.g. MetaMask) can sign via EIP-712.
+    :> QueryParam "username" String
     :> ReqBody '[JSON] PostBlocTransactionRequest -- SolidVM transaction
     :> Post '[JSON] [BlocTransactionUnsignedResult]
 

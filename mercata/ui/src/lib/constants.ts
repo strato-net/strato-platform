@@ -5,6 +5,10 @@ export const safetyModuleAddress = "0000000000000000000000000000000000001015"
 export const sUsdstAddress = "0000000000000000000000000000000000001016"
 export const mUsdstAddress = "000000000000000000000000000000000000100f"
 export const cataAddress = "2680dc6693021cd3fefb84351570874fbef8332a"
+export const stratoTokenAddresses = [
+  "8ee9a3391e38176feebf5d43cb2c1d6c4f728b04", // Helium testnet
+  "2ca3e170e6714282da77815f7864b17f612f5f83", // Upquark mainnet
+]
 export const rewardsAddress = "0000000000000000000000000000000000001020" // TODO: Update with actual deployed address
 export const DECIMAL = 18
 export const WAD = 10n ** 18n;
@@ -48,7 +52,13 @@ export const WITHDRAW_USDST_FEE = "0.02"; // USDST fee for withdraw USDST transa
 export const BRIDGE_OUT_FEE = "0.02"; // USDST fee for bridge out transactions
 export const SAFETY_STAKE_FEE = "0.02"; // USDST fee for SafetyModule stake transactions
 export const SAFETY_REDEEM_FEE = "0.01"; // USDST fee for SafetyModule redeem transactions
+export const STAKING_STAKE_FEE = "0.02"; // USDST fee for STRATO staking (approve + stake = 2 calls)
+export const STAKING_ACTION_FEE = "0.01"; // USDST fee for STRATO claim/unstake/withdraw (1 call)
 export const METAL_BUY_FEE = "0.02"; // USDST fee for metal buy (approve + mintMetal = 2 calls)
+export const PSM_MINT_FEE = "0.02"; // USDST fee for PSM mint (approve + mint = 2 calls)
+export const PSM_BURN_REQUEST_FEE = "0.02"; // USDST fee for PSM burn request (approve + requestBurn = 2 calls)
+export const PSM_BURN_COMPLETE_FEE = "0.01"; // USDST fee for PSM burn complete
+export const PSM_BURN_CANCEL_FEE = "0.01"; // USDST fee for PSM burn cancel
 
 // ============================================
 // Withdrawal limits

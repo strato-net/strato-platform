@@ -148,7 +148,7 @@ const Rewards = () => {
             className="w-full"
           >
             <TabsList className="grid w-full grid-cols-3 mb-6">
-            <TabsTrigger value="activities">Activities (Season {state?.currentSeason || 2})</TabsTrigger>
+            <TabsTrigger value="activities">Activities (Season {state?.currentSeason || 3})</TabsTrigger>
                <TabsTrigger value="my-rewards">My Active Positions</TabsTrigger>
               <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
             </TabsList>
