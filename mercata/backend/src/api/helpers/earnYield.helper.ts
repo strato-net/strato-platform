@@ -9,6 +9,9 @@ const YIELD_ANCHOR_UTC_HOUR = 12;
 const DEFAULT_YIELD_WINDOW_DAYS = 30;
 const YIELD_ANCHOR_STEP_DAYS = 1;
 const MAX_YIELD_HISTORY_CACHE_KEYS = 8;
+const YIELD_HISTORY_CACHE_TTL_MS = 60_000; // 60 seconds TTL to ensure consistent APY across backend instances
+const RAY = 10n ** 27n;
+const SECONDS_PER_YEAR = 365 * 24 * 60 * 60;
 
 export const ZERO_APY = "0.00";
 export const DEFAULT_SWAP_FEE_BPS = 30;
@@ -22,6 +25,7 @@ export interface YieldHistoryInterval {
 
 type YieldHistoryCacheEntry = {
   rows: YieldHistoryRow[];
+  expiry: number;
 };
 
 const yieldHistoryCache = new Map<string, YieldHistoryCacheEntry>();
@@ -79,6 +83,14 @@ export function indexYieldHistoryRows(rows: any[]): Map<string, YieldHistoryInte
   return byKey;
 }
 
+export function computePerSecondRateApy(perSecondRateRaw: string | null | undefined): string {
+  const perSecondRate = safeBigInt(perSecondRateRaw);
+  if (perSecondRate <= RAY) return ZERO_APY;
+
+  const apy = (Math.pow(Number(perSecondRate) / Number(RAY), SECONDS_PER_YEAR) - 1) * 100;
+  return Number.isFinite(apy) ? apy.toFixed(2) : "-";
+}
+
 function buildYieldAnchors(
   nowMs: number,
   days: number = DEFAULT_YIELD_WINDOW_DAYS,
@@ -125,9 +137,9 @@ function buildYieldCacheKey(
   return `${priceOracle.toLowerCase()}|${windowStart}|${windowEndExclusive}|${addresses.join(",")}`;
 }
 
-function setYieldHistoryCacheEntry(cacheKey: string, entry: YieldHistoryCacheEntry): void {
+function setYieldHistoryCacheEntry(cacheKey: string, rows: YieldHistoryRow[]): void {
   if (yieldHistoryCache.has(cacheKey)) yieldHistoryCache.delete(cacheKey);
-  yieldHistoryCache.set(cacheKey, entry);
+  yieldHistoryCache.set(cacheKey, { rows, expiry: Date.now() + YIELD_HISTORY_CACHE_TTL_MS });
 
   if (yieldHistoryCache.size > MAX_YIELD_HISTORY_CACHE_KEYS) {
     const oldestKey = yieldHistoryCache.keys().next().value;
@@ -165,8 +177,9 @@ export async function getYieldExchangeRateRowsCached(
   const cacheKey = buildYieldCacheKey(query, normalizedAddrs);
   const cached = yieldHistoryCache.get(cacheKey);
   const staleRows = cached?.rows ?? [];
-  if (cached) {
-    setYieldHistoryCacheEntry(cacheKey, cached);
+
+  // Return cached data only if it exists and hasn't expired
+  if (cached && cached.expiry > Date.now()) {
     return cached.rows;
   }
 
@@ -176,7 +189,7 @@ export async function getYieldExchangeRateRowsCached(
   const fetchPromise = (async () => {
     try {
       const rows = await fetchYieldExchangeRateRows(accessToken, query, normalizedAddrs);
-      setYieldHistoryCacheEntry(cacheKey, { rows });
+      setYieldHistoryCacheEntry(cacheKey, rows);
       return rows;
     } catch {
       return staleRows;

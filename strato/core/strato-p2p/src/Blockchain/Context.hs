@@ -45,7 +45,6 @@ module Blockchain.Context
     , setPeerAddrIfUnset
     , shouldSendToPeer
     , withActivePeer
-    , withCertifiedPeer
     ) where
 
 import           Conduit
@@ -176,7 +175,7 @@ class RunsClient m where
     m ()
 
 class RunsServer m where
-  runServer :: TCPPort -> PeerRunner m () -> (P2pConduits m -> Host -> m ()) -> IO ()
+  runServer :: TCPPort -> PeerRunner m () -> (P2pConduits m -> Host -> TCPPort -> m ()) -> IO ()
 
 instance RunsClient ContextM where
   runClientConnection host' (TCPPort p) sSource handler = do
@@ -197,8 +196,9 @@ instance RunsServer ContextM where
           pSink = appSink app
           conduits = P2pConduits pSource pSink sSource
           ip = fromString . sockAddrToIP $ appSockAddr app
+          pn = TCPPort . fromMaybe 30303 . sockAddrToPort $ appSockAddr app
       catch
-        (handler conduits ip)
+        (handler conduits ip pn)
         (\(e :: SomeException) -> $logErrorS "runServer/Exception" . T.pack $ show e)
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockHeader) (ReaderT Config m) where
@@ -527,7 +527,4 @@ withActivePeer p = bracket a b . const
   where
     a = setPeerActiveState (pPeerHost p) (pPeerTcpPort p) Active
     b _ = setPeerActiveState (pPeerHost p) (pPeerTcpPort p) Inactive
-
-withCertifiedPeer :: PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
-withCertifiedPeer = flip const
 

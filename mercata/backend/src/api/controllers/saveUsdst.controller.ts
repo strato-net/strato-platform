@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
   depositSaveUsdst,
+  getSaveUsdstHistory,
   getSaveUsdstInfo,
   getSaveUsdstUserInfo,
   redeemAllSaveUsdst,
@@ -41,6 +42,21 @@ class SaveUsdstController {
     try {
       const info = await getSaveUsdstUserInfo(req.accessToken, req.address as string);
       res.status(RestStatus.OK).json(info);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getHistory(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const duration = typeof req.query.duration === "string" ? req.query.duration : "all";
+      const end = typeof req.query.end === "string" ? req.query.end : undefined;
+      const history = await getSaveUsdstHistory(req.accessToken, duration, end);
+      res.status(RestStatus.OK).json(history);
     } catch (error) {
       next(error);
     }

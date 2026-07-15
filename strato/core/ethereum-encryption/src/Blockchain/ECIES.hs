@@ -3,6 +3,7 @@
 
 module Blockchain.ECIES
   ( decrypt,
+    decryptAndGetPubKey,
     encrypt,
     theCurve,
   )
@@ -35,7 +36,10 @@ encrypt sharedKey myPubKey bytes prefix = do
   return $ encode $ encryptECIES sharedKey myPubKey cipherIV bytes prefix
 
 decrypt :: HasVault m => BL.ByteString -> B.ByteString -> m (Either String B.ByteString)
-decrypt bytes prefix = do
+decrypt bytes prefix = fmap snd <$> decryptAndGetPubKey bytes prefix
+
+decryptAndGetPubKey :: HasVault m => BL.ByteString -> B.ByteString -> m (Either String (Point, B.ByteString))
+decryptAndGetPubKey bytes prefix = do
   let eciesMsg = decode bytes
 
   --Special case of the next check, indicates that a different key encoding was used
@@ -56,7 +60,7 @@ decrypt bytes prefix = do
               "mac doesn't match: expected " ++ show expectedMac
                 ++ ", got "
                 ++ show (eciesMac eciesMsg)
-        else return $ Right msg
+        else return $ Right (eciesPubKey eciesMsg, msg)
 
 -----------------
 

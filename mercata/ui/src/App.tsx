@@ -38,6 +38,7 @@ import EarnVault from "./pages/EarnVault";
 import EarnLending from "./pages/EarnLending";
 import EarnPools from "./pages/EarnPools";
 import EarnYieldVault from "./pages/EarnYieldVault";
+import EarnStaking from "./pages/EarnStaking";
 import OnrampPage from "./pages/OnrampPage";
 
 // Import dashboard components
@@ -367,6 +368,14 @@ const App = () => {
                                                   element={
                                                     <GuestAccessibleRoute>
                                                       <EarnYieldVault />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/earn-staking"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <EarnStaking />
                                                     </GuestAccessibleRoute>
                                                   }
                                                 />

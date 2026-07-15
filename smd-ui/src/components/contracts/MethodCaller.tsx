@@ -4,6 +4,7 @@ import { Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AddressInput } from "@/components/AddressInput";
 import { WalletSelect } from "@/components/contracts/WalletSelect";
 import {
   Dialog,
@@ -27,6 +28,9 @@ interface MethodCallerProps {
 
 type CallResult = any;
 
+/** A bare address/account parameter (not an array of them). */
+const isPlainAddressType = (t: string) => /^(address|account)$/i.test(t.trim());
+
 export function MethodCaller({
   contractName,
   contractAddress,
@@ -45,6 +49,7 @@ export function MethodCaller({
   const [showSource, setShowSource] = useState(false);
   const [value, setValue] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
+  const [resolvedAddrs, setResolvedAddrs] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<CallResult | null>(null);
   const [error, setError] = useState<string>("");
@@ -52,13 +57,24 @@ export function MethodCaller({
   const submit = async () => {
     const parsed: Record<string, unknown> = {};
     for (const a of args) {
-      const raw = values[a.name];
+      const isAddressArg = isPlainAddressType(a.type);
+      // Address params may have been entered as a username — use the resolution.
+      const raw = isAddressArg ? resolvedAddrs[a.name] || values[a.name] : values[a.name];
       if (raw === undefined || raw === "") continue;
-      try {
-        parsed[a.name] = JSON.parse(raw);
-      } catch {
-        parsed[a.name] = raw;
+      // Keep string- and address-typed params verbatim ("123" stays a string;
+      // an all-digit address must not become a number); everything else gets a
+      // JSON parse attempt ("123" -> 123, "[1,2]" -> array) with raw fallback.
+      let parsedValue: unknown = raw;
+      if (a.type !== "string" && !isAddressArg) {
+        try {
+          parsedValue = JSON.parse(raw);
+        } catch {
+          parsedValue = raw;
+        }
       }
+      // Wrap with the declared Solidity type so bloc doesn't have to guess
+      // (e.g. "0x64" is an address, not the number 100).
+      parsed[a.name] = a.type ? { type: a.type, value: parsedValue } : parsedValue;
     }
     setPending(true);
     setResult(null);
@@ -158,16 +174,31 @@ export function MethodCaller({
                     ) : (
                       args.map((a) => (
                         <tr key={a.name} className="border-t border-border">
-                          <td className="px-3 py-2 align-middle">{a.name}</td>
+                          <td className="px-3 py-2 align-top">
+                            <div className="pt-1.5">{a.name}</div>
+                          </td>
                           <td className="px-2 py-1.5">
-                            <Input
-                              value={values[a.name] ?? ""}
-                              onChange={(e) =>
-                                setValues((v) => ({ ...v, [a.name]: e.target.value }))
-                              }
-                              placeholder={a.type}
-                              className="h-8"
-                            />
+                            {isPlainAddressType(a.type) ? (
+                              <AddressInput
+                                value={values[a.name] ?? ""}
+                                resolved={resolvedAddrs[a.name] ?? ""}
+                                onChange={(text, addr) => {
+                                  setValues((v) => ({ ...v, [a.name]: text }));
+                                  setResolvedAddrs((v) => ({ ...v, [a.name]: addr }));
+                                }}
+                                placeholder={a.type}
+                                className="h-8"
+                              />
+                            ) : (
+                              <Input
+                                value={values[a.name] ?? ""}
+                                onChange={(e) =>
+                                  setValues((v) => ({ ...v, [a.name]: e.target.value }))
+                                }
+                                placeholder={a.type}
+                                className="h-8"
+                              />
+                            )}
                           </td>
                         </tr>
                       ))

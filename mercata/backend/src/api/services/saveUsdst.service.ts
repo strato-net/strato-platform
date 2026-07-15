@@ -5,11 +5,13 @@ import { StratoPaths, constants } from "../../config/constants";
 import * as config from "../../config/config";
 import { getOraclePrices } from "./oracle.service";
 import { FunctionInput } from "../../types/types";
+import { computePerSecondRateApy } from "../helpers/earnYield.helper";
+import { getHistoryParams } from "../helpers/history.helper";
 
 const { SaveUSDSTVault, Token, USDST } = constants;
 
 const WAD = 10n ** 18n;
-const DAY_MS = 24 * 60 * 60 * 1000;
+const RAY = 10n ** 27n;
 
 export interface SaveUsdstInfo {
   configured: boolean;
@@ -21,9 +23,14 @@ export interface SaveUsdstInfo {
   totalManagedAssets: string;
   totalAssets: string;
   pricingAssets: string;
+  projectedPricingAssets: string;
   tvlUsd: string;
+  projectedTvlUsd: string;
   totalShares: string;
   exchangeRate: string;
+  projectedExchangeRate: string;
+  pendingAccrual: string;
+  pendingAccrualTarget: string;
   apy: string;
   paused: boolean;
 }
@@ -32,6 +39,7 @@ export interface SaveUsdstUserInfo extends SaveUsdstInfo {
   walletAssets: string;
   userShares: string;
   redeemableAssets: string;
+  projectedRedeemableAssets: string;
   maxDeposit: string;
   maxRedeem: string;
   maxWithdraw: string;
@@ -39,6 +47,13 @@ export interface SaveUsdstUserInfo extends SaveUsdstInfo {
   userTotalWithdrawnAssets: string;
   userNetDepositedAssets: string;
   userAllTimeEarningsAssets: string;
+}
+
+export interface SaveUsdstHistoryPoint {
+  timestamp: number;
+  exchangeRate: string;
+  pricingAssets: string;
+  totalShares: string;
 }
 
 const emptyInfo = (): SaveUsdstInfo => ({
@@ -51,9 +66,14 @@ const emptyInfo = (): SaveUsdstInfo => ({
   totalManagedAssets: "0",
   totalAssets: "0",
   pricingAssets: "0",
+  projectedPricingAssets: "0",
   tvlUsd: "0",
+  projectedTvlUsd: "0",
   totalShares: "0",
   exchangeRate: WAD.toString(),
+  projectedExchangeRate: WAD.toString(),
+  pendingAccrual: "0",
+  pendingAccrualTarget: "0",
   apy: "-",
   paused: false,
 });
@@ -63,6 +83,7 @@ const emptyUserInfo = (): SaveUsdstUserInfo => ({
   walletAssets: "0",
   userShares: "0",
   redeemableAssets: "0",
+  projectedRedeemableAssets: "0",
   maxDeposit: "0",
   maxRedeem: "0",
   maxWithdraw: "0",
@@ -109,169 +130,50 @@ const getExchangeRate = (pricingAssets: bigint, totalShares: bigint): bigint => 
   return (pricingAssets * WAD) / totalShares;
 };
 
-const firstSaveUsdstDepositCache = new Map<string, { timestamp: Date } | null>();
+const minBigInt = (...values: bigint[]): bigint =>
+  values.reduce((min, value) => value < min ? value : min);
 
-const getFirstSaveUsdstDepositDate = async (
-  accessToken: string,
-  vaultAddress: string
-): Promise<{ timestamp: Date } | null> => {
-  const cached = firstSaveUsdstDepositCache.get(vaultAddress);
-  if (cached !== undefined) return cached;
+const parseCirrusTimestamp = (value: string | undefined | null): number => {
+  if (!value) return 0;
+  const hasTimezone = /(?:z|[+-]\d{2}:?\d{2})$/i.test(value);
+  const normalized = hasTimezone ? value : `${value}Z`;
+  const parsed = Date.parse(normalized);
+  if (Number.isFinite(parsed)) return parsed;
 
-  try {
-    const { data } = await cirrus.get(accessToken, "/event", {
-      params: {
-        address: `eq.${vaultAddress}`,
-        event_name: "eq.Deposit",
-        select: "block_timestamp",
-        order: "block_timestamp.asc",
-        limit: "1",
-      },
-    });
-
-    if (!data?.length || !data[0]?.block_timestamp) {
-      firstSaveUsdstDepositCache.set(vaultAddress, null);
-      return null;
-    }
-
-    const result = { timestamp: new Date(data[0].block_timestamp) };
-    firstSaveUsdstDepositCache.set(vaultAddress, result);
-    return result;
-  } catch (error) {
-    console.warn("Failed to fetch first saveUSDST deposit timestamp:", error);
-    return null;
-  }
+  const fallback = Date.parse(value);
+  return Number.isFinite(fallback) ? fallback : 0;
 };
 
-const getHistoricalVaultStorageSnapshot = async (
-  accessToken: string,
-  vaultAddress: string,
-  timestampIso: string
-): Promise<{ managedAssets: bigint; totalShares: bigint } | null> => {
-  try {
-    const { data } = await cirrus.get(accessToken, "/history@storage", {
-      params: {
-        address: `eq.${vaultAddress}`,
-        valid_from: `lte.${timestampIso}`,
-        valid_to: `gte.${timestampIso}`,
-        select: "data",
-      },
-    });
+const isHistoricalRowActive = (
+  row: { valid_from?: string; valid_to?: string },
+  timestamp: number
+): boolean => {
+  const validFrom = parseCirrusTimestamp(row.valid_from);
+  const validTo = row.valid_to === "infinity"
+    ? Number.MAX_SAFE_INTEGER
+    : parseCirrusTimestamp(row.valid_to);
 
-    const storageData = data?.[0]?.data;
-    if (!storageData) {
-      return null;
-    }
-
-    return {
-      managedAssets: parseBigIntLike(storageData._managedAssets),
-      totalShares: parseBigIntLike(storageData._totalSupply),
-    };
-  } catch (error) {
-    console.warn("Failed to fetch historical saveUSDST storage snapshot:", error);
-    return null;
-  }
+  return validFrom <= timestamp && timestamp <= validTo;
 };
 
-const getHistoricalAssetBalance = async (
-  accessToken: string,
-  tokenAddress: string,
-  holderAddress: string,
-  timestampIso: string
-): Promise<bigint> => {
-  try {
-    const { data } = await cirrus.get(accessToken, "/history@mapping", {
-      params: {
-        select: "value::text",
-        address: `eq.${tokenAddress}`,
-        collection_name: "eq._balances",
-        "key->>key": `eq.${holderAddress}`,
-        valid_from: `lte.${timestampIso}`,
-        valid_to: `gte.${timestampIso}`,
-      },
-    });
-
-    return parseBigIntLike(data?.[0]?.value);
-  } catch (error) {
-    console.warn("Failed to fetch historical saveUSDST asset balance:", error);
-    return 0n;
-  }
+const isZeroAddress = (value: string | undefined | null): boolean => {
+  const normalized = normalizeAddress(value);
+  return !normalized || /^0+$/.test(normalized);
 };
 
-const getSaveUsdstApy = async (
-  accessToken: string,
-  vaultAddress: string,
-  assetAddress: string,
-  pricingAssetsNow: bigint,
-  totalSharesNow: bigint
-): Promise<string> => {
-  if (!vaultAddress || !assetAddress || totalSharesNow <= 0n || pricingAssetsNow <= 0n) {
-    return "0.00";
+const rpow = (x: bigint, n: bigint, base: bigint): bigint => {
+  if (x === 0n) return n === 0n ? base : 0n;
+
+  let z = n % 2n === 0n ? base : x;
+  const half = base / 2n;
+  for (n /= 2n; n > 0n; n /= 2n) {
+    x = ((x * x) + half) / base;
+    if (n % 2n === 1n) {
+      z = ((z * x) + half) / base;
+    }
   }
 
-  try {
-    const firstDeposit = await getFirstSaveUsdstDepositDate(accessToken, vaultAddress);
-    if (!firstDeposit?.timestamp) {
-      return "0.00";
-    }
-
-    const nowMs = Date.now();
-    const thirtyDaysAgoMs = nowMs - 30 * DAY_MS;
-    const inceptionMs = firstDeposit.timestamp.getTime();
-    if (!Number.isFinite(inceptionMs)) {
-      return "-";
-    }
-
-    const startMs = Math.max(thirtyDaysAgoMs, inceptionMs);
-    const lookbackDays = Math.max(1, (nowMs - startMs) / DAY_MS);
-    const startTimestamp = new Date(startMs + 1).toISOString();
-
-    const [historicalStorage, historicalAssetBalance] = await Promise.all([
-      getHistoricalVaultStorageSnapshot(accessToken, vaultAddress, startTimestamp),
-      getHistoricalAssetBalance(accessToken, assetAddress, vaultAddress, startTimestamp),
-    ]);
-
-    if (!historicalStorage) {
-      return "-";
-    }
-
-    const pricingAssetsStart =
-      historicalAssetBalance < historicalStorage.managedAssets
-        ? historicalAssetBalance
-        : historicalStorage.managedAssets;
-    const totalSharesStart = historicalStorage.totalShares;
-    const rateNow = getExchangeRate(pricingAssetsNow, totalSharesNow);
-    const rateStart = getExchangeRate(
-      pricingAssetsStart > 0n ? pricingAssetsStart : 0n,
-      totalSharesStart > 0n ? totalSharesStart : 0n
-    );
-
-    if (rateStart <= 0n) {
-      return "0.00";
-    }
-
-    const periodReturnScaled = ((rateNow - rateStart) * WAD) / rateStart;
-    const periodReturn = Number(periodReturnScaled) / 1e18;
-    if (!Number.isFinite(periodReturn)) {
-      return "-";
-    }
-    if (periodReturn <= -1) {
-      return "-";
-    }
-
-    // Keep saveUSDST native APY on a stable 30-day annualization basis so
-    // very new vault history does not explode the displayed yield.
-    const annualizationDays = Math.max(30, lookbackDays);
-    const apy = (Math.pow(1 + periodReturn, 365 / annualizationDays) - 1) * 100;
-    if (!Number.isFinite(apy)) {
-      return "-";
-    }
-
-    return apy.toFixed(2);
-  } catch (error) {
-    console.warn("Failed to compute saveUSDST APY:", error);
-    return "-";
-  }
+  return z;
 };
 
 const requireSaveUsdstVaultAddress = (): string => {
@@ -292,6 +194,25 @@ const getAssetBalance = async (
       address: `eq.${tokenAddress}`,
       key: `eq.${ownerAddress}`,
       select: "value::text",
+    },
+  });
+
+  return data?.[0]?.value || "0";
+};
+
+const getTokenAllowance = async (
+  accessToken: string,
+  tokenAddress: string,
+  ownerAddress: string,
+  spenderAddress: string
+): Promise<string> => {
+  const { data } = await cirrus.get(accessToken, `/${Token}-_allowances`, {
+    params: {
+      address: `eq.${tokenAddress}`,
+      key: `eq.${ownerAddress}`,
+      key2: `eq.${spenderAddress}`,
+      select: "value::text",
+      limit: "1",
     },
   });
 
@@ -323,14 +244,71 @@ const getVaultState = async (accessToken: string): Promise<Record<string, any> |
     return null;
   }
 
-  const { data } = await cirrus.get(accessToken, `/${SaveUSDSTVault}`, {
-    params: {
-      address: `eq.${config.saveUsdstVault}`,
-      select: "address,assetToken,_managedAssets::text,_paused,_symbol,_totalSupply::text",
-    },
-  });
+  const [{ data }, { data: storageRows }] = await Promise.all([
+    cirrus.get(accessToken, `/${SaveUSDSTVault}`, {
+      params: {
+        address: `eq.${config.saveUsdstVault}`,
+        select: "address,assetToken,_managedAssets::text,_paused,_symbol,_totalSupply::text",
+      },
+    }),
+    cirrus.get(accessToken, "/storage", {
+      params: {
+        address: `eq.${config.saveUsdstVault}`,
+        select: "data->>perSecondSavingsRate,data->>lastAccrual,data->>rewardDistributor",
+        limit: "1",
+      },
+    }),
+  ]);
 
-  return data?.[0] || null;
+  return data?.[0] ? { ...data[0], ...storageRows?.[0] } : null;
+};
+
+const getPendingAccrual = async (
+  accessToken: string,
+  vaultState: Record<string, any>,
+  vaultAddress: string,
+  assetAddress: string,
+  totalManagedAssets: bigint,
+  totalShares: bigint
+): Promise<{ targetAmount: bigint; fundedAmount: bigint }> => {
+  const perSecondSavingsRate = parseBigIntLike(vaultState.perSecondSavingsRate);
+  const lastAccrual = parseBigIntLike(vaultState.lastAccrual);
+  const rewardDistributor = vaultState.rewardDistributor || "";
+  const nowSec = BigInt(Math.floor(Date.now() / 1000));
+
+  if (
+    totalShares <= 0n ||
+    totalManagedAssets <= 0n ||
+    perSecondSavingsRate <= RAY ||
+    nowSec <= lastAccrual ||
+    isZeroAddress(rewardDistributor)
+  ) {
+    return { targetAmount: 0n, fundedAmount: 0n };
+  }
+
+  const growthFactor = rpow(perSecondSavingsRate, nowSec - lastAccrual, RAY);
+  const targetAmount = (totalManagedAssets * (growthFactor - RAY)) / RAY;
+  if (targetAmount <= 0n) {
+    return { targetAmount: 0n, fundedAmount: 0n };
+  }
+
+  let fundedAmount = 0n;
+  try {
+    const [distributorBalanceRaw, allowanceRaw] = await Promise.all([
+      getAssetBalance(accessToken, assetAddress, rewardDistributor),
+      getTokenAllowance(accessToken, assetAddress, rewardDistributor, vaultAddress),
+    ]);
+
+    fundedAmount = minBigInt(
+      targetAmount,
+      parseBigIntLike(distributorBalanceRaw),
+      parseBigIntLike(allowanceRaw)
+    );
+  } catch {
+    fundedAmount = 0n;
+  }
+
+  return { targetAmount, fundedAmount };
 };
 
 const getUserFlowTotals = async (
@@ -426,13 +404,18 @@ export const getSaveUsdstInfo = async (accessToken: string): Promise<SaveUsdstIn
   const tvlUsd = assetPrice > 0n ? (pricingAssets * assetPrice) / WAD : 0n;
   const totalShares = parseBigIntLike(vaultState._totalSupply);
   const exchangeRate = getExchangeRate(pricingAssets, totalShares);
-  const apy = await getSaveUsdstApy(
+  const pendingAccrual = await getPendingAccrual(
     accessToken,
+    vaultState,
     vaultAddress,
     assetAddress,
-    pricingAssets,
+    totalManagedAssets,
     totalShares
   );
+  const projectedPricingAssets = pricingAssets + pendingAccrual.fundedAmount;
+  const projectedTvlUsd = assetPrice > 0n ? (projectedPricingAssets * assetPrice) / WAD : 0n;
+  const projectedExchangeRate = getExchangeRate(projectedPricingAssets, totalShares);
+  const apy = computePerSecondRateApy(vaultState.perSecondSavingsRate);
 
   return {
     configured: true,
@@ -444,9 +427,14 @@ export const getSaveUsdstInfo = async (accessToken: string): Promise<SaveUsdstIn
     totalManagedAssets: totalManagedAssets.toString(),
     totalAssets: totalAssets.toString(),
     pricingAssets: pricingAssets.toString(),
+    projectedPricingAssets: projectedPricingAssets.toString(),
     tvlUsd: tvlUsd.toString(),
+    projectedTvlUsd: projectedTvlUsd.toString(),
     totalShares: totalShares.toString(),
     exchangeRate: exchangeRate.toString(),
+    projectedExchangeRate: projectedExchangeRate.toString(),
+    pendingAccrual: pendingAccrual.fundedAmount.toString(),
+    pendingAccrualTarget: pendingAccrual.targetAmount.toString(),
     apy,
     paused: Boolean(vaultState._paused),
   };
@@ -474,28 +462,98 @@ export const getSaveUsdstUserInfo = async (
   const walletAssets = parseBigIntLike(walletAssetsRaw);
   const userShares = parseBigIntLike(userSharesRaw);
   const pricingAssets = parseBigIntLike(info.pricingAssets);
+  const projectedPricingAssets = parseBigIntLike(info.projectedPricingAssets);
   const totalShares = parseBigIntLike(info.totalShares);
   const redeemableAssets =
     userShares > 0n && totalShares > 0n && pricingAssets > 0n
       ? (userShares * pricingAssets) / totalShares
       : 0n;
+  const projectedRedeemableAssets =
+    userShares > 0n && totalShares > 0n && projectedPricingAssets > 0n
+      ? (userShares * projectedPricingAssets) / totalShares
+      : 0n;
 
   const userNetDepositedAssets = flows.totalDepositedAssets - flows.totalWithdrawnAssets;
-  const userAllTimeEarningsAssets = redeemableAssets - userNetDepositedAssets;
+  const userAllTimeEarningsAssets = projectedRedeemableAssets - userNetDepositedAssets;
 
   return {
     ...info,
     walletAssets: walletAssets.toString(),
     userShares: userShares.toString(),
     redeemableAssets: redeemableAssets.toString(),
+    projectedRedeemableAssets: projectedRedeemableAssets.toString(),
     maxDeposit: info.paused ? "0" : walletAssets.toString(),
     maxRedeem: info.paused ? "0" : userShares.toString(),
-    maxWithdraw: info.paused ? "0" : redeemableAssets.toString(),
+    maxWithdraw: info.paused ? "0" : projectedRedeemableAssets.toString(),
     userTotalDepositedAssets: flows.totalDepositedAssets.toString(),
     userTotalWithdrawnAssets: flows.totalWithdrawnAssets.toString(),
     userNetDepositedAssets: userNetDepositedAssets.toString(),
     userAllTimeEarningsAssets: userAllTimeEarningsAssets.toString(),
   };
+};
+
+export const getSaveUsdstHistory = async (
+  accessToken: string,
+  duration = "all",
+  end?: string
+): Promise<SaveUsdstHistoryPoint[]> => {
+  const vaultState = await getVaultState(accessToken);
+  if (!vaultState) return [];
+
+  const vaultAddress = vaultState.address || config.saveUsdstVault;
+  const assetAddress = vaultState.assetToken || USDST;
+  const params = getHistoryParams(duration, end, 90);
+  const startTime = new Date(params.endTimestamp - (params.interval * params.numTicks)).toISOString();
+  const endTime = new Date(params.endTimestamp).toISOString();
+
+  const [storageRes, balanceRes] = await Promise.all([
+    cirrus.get(accessToken, "/history@storage", {
+      params: {
+        address: `eq.${vaultAddress}`,
+        valid_from: `lte.${endTime}`,
+        valid_to: `gte.${startTime}`,
+        select: "data,valid_from,valid_to",
+      },
+    }),
+    cirrus.get(accessToken, "/history@mapping", {
+      params: {
+        address: `eq.${assetAddress}`,
+        collection_name: "eq._balances",
+        "key->>key": `eq.${vaultAddress}`,
+        valid_from: `lte.${endTime}`,
+        valid_to: `gte.${startTime}`,
+        select: "value::text,valid_from,valid_to",
+      },
+    }),
+  ]);
+
+  const storageRows = Array.isArray(storageRes.data) ? storageRes.data : [];
+  const balanceRows = Array.isArray(balanceRes.data) ? balanceRes.data : [];
+  const points: SaveUsdstHistoryPoint[] = [];
+
+  for (let i = 0; i <= params.numTicks; i += 1) {
+    const timestamp = params.endTimestamp - (params.interval * (params.numTicks - i));
+    const storage = storageRows.find((row: any) => isHistoricalRowActive(row, timestamp));
+    if (!storage?.data) continue;
+
+    const balance = balanceRows.find((row: any) => isHistoricalRowActive(row, timestamp));
+    const totalManagedAssets = parseBigIntLike(storage.data._managedAssets);
+    const totalShares = parseBigIntLike(storage.data._totalSupply);
+    const totalAssets = parseBigIntLike(balance?.value);
+    const pricingAssets = totalAssets < totalManagedAssets ? totalAssets : totalManagedAssets;
+    const exchangeRate = getExchangeRate(pricingAssets, totalShares);
+
+    if (totalShares <= 0n || exchangeRate <= 0n) continue;
+
+    points.push({
+      timestamp,
+      exchangeRate: exchangeRate.toString(),
+      pricingAssets: pricingAssets.toString(),
+      totalShares: totalShares.toString(),
+    });
+  }
+
+  return points;
 };
 
 export const depositSaveUsdst = async (

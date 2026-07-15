@@ -25,6 +25,7 @@ module Blockchain.Slipstream.OutputData (
   dedupC,
   ProcessedCollectionRow(..),
   pipeInsertGlobalEventTable,
+  codeTableName,
   insertIndexTable,
   insertDelegatecall,
   insertCollectionTable,
@@ -115,6 +116,7 @@ data SlipstreamQuery = CreateTable
                         , sourceTableName :: TableName
                         , sourceTableColumns :: [Text]
                         , contractTableColumns :: [Text]
+                        , codeTableColumns :: [Text]
                         , viewColumns :: [(TableColumns, Text)]
                         , jsonbColumns :: [(TableColumns, Text)]
                         , primaryKeyColumns :: [Text]
@@ -269,6 +271,7 @@ slipstreamQueryText _ CreateView{..} =
         , " AS SELECT "
         , T.intercalate ", " $
             (("s." <>) <$> sourceTableColumns)
+         ++ (("x." <>) <$> codeTableColumns)
          ++ (("c." <>) <$> contractTableColumns)
          ++ concatMap (\(cols', dataColumn) -> (\(c, t) -> T.concat
             [ "CASE WHEN jsonb_exists(s."
@@ -387,7 +390,9 @@ slipstreamQueryText _ CreateView{..} =
         , tableNameToDoubleQuoteText sourceTableName
         , " s INNER JOIN "
         , tableNameToText contractTableName
-        , " c ON s.address = c.address WHERE c.creator = '"
+        , " c ON s.address = c.address INNER JOIN "
+        , tableNameToText codeTableName
+        , " x ON c.code_hash = x.code_hash WHERE x.creator = '"
         , tableNameCreator viewName
         , "' AND (c.contract_name = '"
         , tableNameContractName viewName
@@ -608,7 +613,8 @@ createIndexTable contract cc (creator, n) inherited = do
   let tableName = indexTableName creator n
       -- histTableName = historyTableName creator a n
       cols = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
-      contractCols = ["creator", "contract_name"]
+      contractCols = ["contract_name"]
+      codeCols = ["creator"]
       cols' = [(x, t) | (x, t, _) <- cols, t /= SqlJsonbArray]
       fkeys = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo (x <> "_fkey") tableName (indexTableName creator f) False x t) <$> mf) cols
   yield $ CreateView
@@ -617,6 +623,7 @@ createIndexTable contract cc (creator, n) inherited = do
     storageTableName
     (fst <$> baseColumns)
     contractCols
+    codeCols
     [(cols', "data")]
     []
     ["address"]
@@ -654,6 +661,7 @@ createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, val
     inherited
     mappingTableName
     mappingCols
+    []
     []
     [(keyNames, "key")]
     (maybe [] (\s -> [(s, "value")]) mStructVal)
@@ -694,7 +702,8 @@ createEventArrayTable (creator, n, e) cc inherited (arr, arrType) = do
     inherited
     eventArrayTableName
     cols
-    ["creator", "contract_name"]
+    ["contract_name"]
+    ["creator"]
     [(keyNames, "key")]
     []
     (["address", "block_hash", "event_index", "collection_name"] ++ (fst <$> keyNames))
@@ -958,7 +967,8 @@ createEventTable (creator, n) evName ev cc inherited = do
             inherited
             globalEventTableName
             ("id":(fst <$> eventBaseColumnsQuery))
-            ["creator", "contract_name"]
+            ["contract_name"]
+            ["creator"]
             [(cols', "attributes")]
             []
             ["address", "block_hash", "event_index"]
@@ -1155,6 +1165,9 @@ globalEventTableName = indexTableName "" "event"
 
 contractTableName :: TableName
 contractTableName = indexTableName "" "contract"
+
+codeTableName :: TableName
+codeTableName = indexTableName "" "code"
 
 mappingTableName :: TableName
 mappingTableName = indexTableName "" "mapping"
