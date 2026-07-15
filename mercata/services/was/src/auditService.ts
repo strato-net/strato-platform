@@ -70,6 +70,12 @@ export const createWithdrawalAuditService = (
 
       logInfo("AuditService", "Trace started", {
         withdrawal: `${withdrawal.routeType}:${withdrawal.withdrawalId}`,
+        statusGroup,
+        bridgeStatus: withdrawal.bridgeStatus,
+        sender: withdrawal.stratoSender,
+        token: withdrawal.stratoToken,
+        amount: withdrawal.stratoTokenAmount,
+        maxDepth,
       });
       const audit = await provenanceEngine.traceWithdrawal({
         withdrawal,
@@ -92,6 +98,9 @@ export const createWithdrawalAuditService = (
       logInfo("AuditService", "Trace finalized", {
         withdrawal: `${withdrawal.routeType}:${withdrawal.withdrawalId}`,
         decision: audit.decision,
+        riskLevel: audit.riskLevel,
+        coverage: audit.coverage,
+        stoppedEarly: audit.stoppedEarly,
       });
     }
 

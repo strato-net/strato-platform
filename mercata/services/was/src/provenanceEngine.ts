@@ -14,7 +14,6 @@ import {
   TraceLot,
   WithdrawalCandidateRepository,
 } from "./types";
-import { logInfo } from "./logger";
 import { createTraceOperationLogger } from "./traceOperationLogger";
 
 const zeroCoverage = (unknown: string): TraceCoverage => ({
@@ -256,7 +255,6 @@ const traceLotsBackward = async (
     operation: string,
     data: Record<string, unknown> = {},
   ) => {
-    logInfo("ProvenanceEngine", operation, data);
     traceOperationLogger.log(operation, data);
   };
   const coverage = zeroCoverage("0");
