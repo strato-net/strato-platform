@@ -61,6 +61,7 @@ generateDockerComposeAllDocker = do
             , ("STRIPE_PUBLISHABLE_KEY", "${STRIPE_PUBLISHABLE_KEY:-}")
             , ("STRIPE_WEBHOOK_SECRET", "${STRIPE_WEBHOOK_SECRET:-}")
             , ("ONRAMP_HOT_WALLET_ADDRESS", "${ONRAMP_HOT_WALLET_ADDRESS:-}")
+            , ("WAS_URL", "${WAS_URL:-}")
             , ("BA_USERNAME", "${BA_USERNAME:-}")
             , ("BA_PASSWORD", "${BA_PASSWORD:-}")
             , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT:-}")
