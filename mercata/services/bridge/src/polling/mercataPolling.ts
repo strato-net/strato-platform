@@ -19,6 +19,7 @@ import {
   getSafeTxHashFromEvents,
 } from "../services/cirrusService";
 import { monitorSafeTransactionStatusBatch } from "../services/safeService";
+import { getPendingNativeMintProposalHashes } from "../services/nativeMintService";
 import { logInfo, logError } from "../utils/logger";
 import { safeToBigInt } from "../utils/utils";
 import { verifyDepositsBatch } from "../services/verificationService";
@@ -348,9 +349,27 @@ export const startNativeWithdrawalTxPolling = (): void => {
         }
       }
       if (pendingManualExecution.length > 0) {
+        const pendingSafeTxHashesByChain = new Map<string, Set<string>>();
+        const manualChainIds = [
+          ...new Set(pendingManualExecution.map((withdrawal) => String(withdrawal.externalChainId))),
+        ];
+        for (const chainId of manualChainIds) {
+          try {
+            pendingSafeTxHashesByChain.set(
+              chainId,
+              await getPendingNativeMintProposalHashes(chainId),
+            );
+          } catch (error) {
+            logError("MercataPolling", error as Error, {
+              operation: "getPendingNativeMintProposalHashes",
+              chainId,
+            });
+          }
+        }
         for (const batch of chunk(pendingManualExecution, POLLING_BATCH_SIZE)) {
           await queueManualNativeWithdrawalBatch(
             batch as NonEmptyArray<NativeWithdrawalInfo>,
+            { pendingSafeTxHashesByChain },
           );
         }
       }

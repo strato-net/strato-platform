@@ -773,6 +773,7 @@ export const finalizeNativeWithdrawalBatch = async (
 
 export const queueManualNativeWithdrawalBatch = async (
   withdrawals: NonEmptyArray<NativeWithdrawalInfo>,
+  options: { pendingSafeTxHashesByChain?: Map<string, Set<string>> } = {},
 ) => {
   if (!config.nativeBridge.address) {
     throw new Error("Native bridge address not configured");
@@ -802,6 +803,17 @@ export const queueManualNativeWithdrawalBatch = async (
             existingProposalReference,
           );
         }
+        const pendingHashes = options.pendingSafeTxHashesByChain?.get(String(withdrawal.externalChainId));
+        if (
+          pendingHashes?.has(
+            (existingProposalReference.startsWith("0x")
+              ? existingProposalReference
+              : `0x${existingProposalReference}`).toLowerCase()
+          )
+        ) {
+          continue;
+        }
+
         await syncManualNativeMintProposal(
           withdrawal,
           existingProposalReference,
