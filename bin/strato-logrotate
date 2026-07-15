@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+
+# strato-logrotate: log rotation service for a STRATO node, supervised by convoke.
+#
+# Convoke launches this from the node directory (like every commands.txt entry),
+# so all paths are relative to the node dir. Every iteration it regenerates a
+# logrotate config listing the current regular files in logs/ and runs logrotate.
+#
+# Rotation policy:
+#   - rotate daily, or earlier once a file exceeds STRATO_LOGROTATE_MAX_SIZE
+#   - rotated files are compressed into logs/rotated/ with a date+time suffix
+#   - rotated files older than STRATO_LOGROTATE_RETENTION_DAYS days are deleted
+#   - copytruncate is required: neither convoke children nor the docker
+#     services ever reopen their log files
+#
+# IMPORTANT: convoke shuts the whole node down when any supervised process
+# exits, so this script must never exit - on errors it warns and keeps looping.
+
+set -u
+
+INTERVAL_SEC="${STRATO_LOGROTATE_INTERVAL_SEC:-600}"
+MAX_SIZE="${STRATO_LOGROTATE_MAX_SIZE:-100M}"
+RETENTION_DAYS="${STRATO_LOGROTATE_RETENTION_DAYS:-7}"
+
+LOGS_DIR="logs"
+ROTATED_DIR="$LOGS_DIR/rotated"
+CONF_FILE=".logrotate.conf"
+STATE_FILE=".logrotate.state"
+
+if ! command -v logrotate >/dev/null 2>&1; then
+    echo "WARNING: 'logrotate' not found on PATH; log rotation is disabled." >&2
+    echo "Install logrotate (e.g. re-run install_deps.sh) and restart the node." >&2
+    # Idle instead of exiting: convoke would bring the whole node down otherwise.
+    while true; do sleep 3600; done
+fi
+
+# logrotate refuses to rotate logs in a world-writable directory (logs/ is
+# world-writable so containers can write to it) unless an "su" directive names
+# the user to rotate as. The directive is only valid when running as root
+# (docker mode); as a regular user the check does not apply.
+SU_DIRECTIVE=""
+if [[ "$(id -u)" == "0" ]]; then
+    SU_DIRECTIVE="    su $(id -un) $(id -gn)"
+fi
+
+echo "Log rotation started: interval=${INTERVAL_SEC}s maxsize=${MAX_SIZE} retention=${RETENTION_DAYS}d"
+
+while true; do
+    mkdir -p "$ROTATED_DIR"
+
+    # Collect the log files to rotate: regular files directly under logs/
+    # (skips the rotated/ subdir) that we are allowed to truncate.
+    log_files=()
+    for f in "$LOGS_DIR"/*; do
+        [[ -f "$f" ]] || continue
+        if [[ ! -w "$f" ]]; then
+            echo "WARNING: skipping $f: not writable by $(id -un), cannot rotate" >&2
+            continue
+        fi
+        log_files+=("$f")
+    done
+
+    if ((${#log_files[@]} > 0)); then
+        {
+            for f in "${log_files[@]}"; do
+                printf '"%s/%s"\n' "$PWD" "$f"
+            done
+            cat <<EOF
+{
+    olddir $PWD/$ROTATED_DIR
+    daily
+    maxsize $MAX_SIZE
+    rotate 28
+    maxage $RETENTION_DAYS
+    missingok
+    notifempty
+    copytruncate
+    compress
+    dateext
+    dateformat -%Y%m%d-%H%M%S
+$SU_DIRECTIVE
+}
+EOF
+        } > "$CONF_FILE"
+
+        if ! logrotate -s "$STATE_FILE" "$CONF_FILE"; then
+            echo "WARNING: logrotate exited with status $?; will retry in ${INTERVAL_SEC}s" >&2
+        fi
+    fi
+
+    sleep "$INTERVAL_SEC"
+done

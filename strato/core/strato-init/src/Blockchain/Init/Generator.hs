@@ -94,6 +94,7 @@ createCommandsFile = do
         , "slipstream +RTS -T -RTS"
         , "strato-api +RTS -T -N -maxN4 -RTS"
         , "strato-network-monitor"
+        , "strato-logrotate"
         ]
 
       jsonrpcCommands =

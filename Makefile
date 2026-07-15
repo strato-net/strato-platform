@@ -270,6 +270,7 @@ build_common: generate-version-file
 	@install -m 755 bin/strato-patch-app $(HOME)/.local/bin/
 	@install -m 755 bin/strato-user-add $(HOME)/.local/bin/
 	@install -m 755 bin/strato-snapshot $(HOME)/.local/bin/
+	@install -m 755 bin/strato-logrotate $(HOME)/.local/bin/
 	@mkdir -p $(HOME)/.local/share/strato
 	@install -m 644 strato/tools/airlock/data/english.txt $(HOME)/.local/share/strato/bip39-english.txt
 	@case ":$$PATH:" in \
@@ -353,24 +354,28 @@ highway-nginx:
 strato: build_common
 	@echo Now building core-strato...
 	cp -fr strato/extraFiles/* ${STRATODIR}
+	mkdir -p ${FAKEROOT}/usr/local/bin && install -m 755 bin/strato-logrotate ${FAKEROOT}/usr/local/bin/
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} ${REPO_AWS_ECR_URL}strato:${VERSION}-${HASH_STRATO}
 
 strato_docker: build_common_docker
 	@echo Now building core-strato for docker...
 	cp -fr strato/extraFiles/* ${STRATODIR}
+	mkdir -p ${FAKEROOT}/usr/local/bin && install -m 755 bin/strato-logrotate ${FAKEROOT}/usr/local/bin/
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} ${REPO_AWS_ECR_URL}strato:${VERSION}-${HASH_STRATO}
 
 develop: build_common_fast
 	@echo Now building core-strato using --fast...
 	cp -fr strato/extraFiles/* ${STRATODIR}
+	mkdir -p ${FAKEROOT}/usr/local/bin && install -m 755 bin/strato-logrotate ${FAKEROOT}/usr/local/bin/
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} ${REPO_AWS_ECR_URL}strato:${VERSION}-${HASH_STRATO}
 
 profile: build_common_profiled
 	@echo Now building core-strato using --profile...
 	cp -fr strato/extraFiles/* ${STRATODIR}
+	mkdir -p ${FAKEROOT}/usr/local/bin && install -m 755 bin/strato-logrotate ${FAKEROOT}/usr/local/bin/
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} ${REPO_AWS_ECR_URL}strato:${VERSION}-${HASH_STRATO}
 
@@ -424,6 +429,7 @@ docker-compose:
 
 docker-build:
 	cp -fr strato/extraFiles/* ${STRATODIR}
+	mkdir -p ${FAKEROOT}/usr/local/bin && install -m 755 bin/strato-logrotate ${FAKEROOT}/usr/local/bin/
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
 
 test:
@@ -482,6 +488,7 @@ uninstall:
 	@rm -f $(HOME)/.local/bin/strato-patch-app
 	@rm -f $(HOME)/.local/bin/strato-user-add
 	@rm -f $(HOME)/.local/bin/strato-snapshot
+	@rm -f $(HOME)/.local/bin/strato-logrotate
 	@rm -f $(HOME)/.local/bin/strato-setup
 	@rm -f $(HOME)/.local/bin/convoke
 	@echo "Done"

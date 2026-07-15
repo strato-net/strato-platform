@@ -46,7 +46,12 @@ launchCommand :: (FilePath, [String]) -> IO (Async (ExitCode, ProcessID, FilePat
 launchCommand (cmd, args) = do
   let logFile = logsDir </> cmd
   createDirectoryIfMissing True logsDir
-  h <- openFile logFile WriteMode
+  -- Start with a fresh log, but keep the handle in append mode (O_APPEND):
+  -- strato-logrotate uses copytruncate, and only append-mode writers continue
+  -- at the new end of file after truncation (a plain WriteMode handle would
+  -- keep its old offset and turn the log into a sparse file).
+  writeFile logFile ""
+  h <- openFile logFile AppendMode
 
   let cp = (proc cmd args)
         { std_out = UseHandle h
