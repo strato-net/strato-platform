@@ -1465,6 +1465,11 @@ determineValue mTypeDefs argVal (Xabi.IndexedType ix xabiType) =
         either (blocError . UserError) (return . (ix,)) (argValueToValue mTypeDefs ty argVal)
 
 getSolidityType :: ArgValue -> Xabi.Type -> Either Text Type
+getSolidityType av xabiType
+  | Just (typeName, inner) <- splitTypeHint av = case xabiType of
+      -- A {"type": ..., "value": ...} hint can resolve a type name the compiler couldn't
+      Xabi.UnknownLabel _ | Just t <- parseSolidityTypeName typeName -> Right t
+      _ -> getSolidityType inner xabiType
 getSolidityType _ (Xabi.Int (Just True) b) = Right . SimpleType . TypeInt True $ fmap toInteger b
 getSolidityType _ (Xabi.Int _ b) = Right . SimpleType . TypeInt False $ fmap toInteger b
 getSolidityType _ (Xabi.String _) = Right . SimpleType $ TypeString

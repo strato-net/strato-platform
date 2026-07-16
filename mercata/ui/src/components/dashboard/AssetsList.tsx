@@ -10,6 +10,7 @@ import { buildEarnApyMap } from "@/utils/earnUtils";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { getEarningAssetSymbolRank } from "@/lib/tokenPriority";
+import { stratoTokenAddresses } from "@/lib/constants";
 
 const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | undefined): boolean => {
   const symbol = asset?._symbol?.toLowerCase?.() || "";
@@ -51,6 +52,9 @@ interface AssetsProps {
 
 const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
 
+const isStratoAsset = (asset: { address?: string } | null | undefined): boolean =>
+  stratoTokenAddresses.includes(normAddr(asset?.address || ""));
+
 const AssetsList = ({
   loading,
   tokens,
@@ -77,6 +81,10 @@ const AssetsList = ({
 
   const sortedTokens = useMemo(() => {
     return [...tokens].sort((a, b) => {
+      // STRATO is always pinned to the top, held or not
+      const stratoDiff = (isStratoAsset(b) ? 1 : 0) - (isStratoAsset(a) ? 1 : 0);
+      if (stratoDiff !== 0) return stratoDiff;
+
       // Tokens the user holds a balance in come first
       const balanceDiff = (hasBalance(b) ? 1 : 0) - (hasBalance(a) ? 1 : 0);
       if (balanceDiff !== 0) return balanceDiff;
@@ -177,31 +185,34 @@ const AssetsList = ({
           </div>
         )}
         <div className={`w-full ${isDashboard ? 'overflow-x-auto md:overflow-visible px-3 md:px-0' : 'overflow-x-auto'}`}>
-          <table className="w-full table-fixed">
+          <table className="w-full table-fixed min-w-[480px] md:min-w-0">
             <thead>
               <tr className="bg-muted/50">
-                <th className="w-[24%] text-left text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                <th className="w-[45%] md:w-[22%] text-left text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Asset
                 </th>
-                <th className="hidden md:table-cell w-[15%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell w-[14%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   <span className="inline-flex items-center gap-1 justify-end w-full">
                     Best Available APY
                     <BestApyInfoTooltip />
                   </span>
                 </th>
-                <th className="hidden md:table-cell w-[13%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   Price
                 </th>
-                <th className="hidden md:table-cell w-[13%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   Available
                 </th>
-                <th className="hidden md:table-cell w-[13%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   Collateral
                 </th>
-                <th className="w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                  Staked
+                </th>
+                <th className="w-[27%] md:w-[10%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Value
                 </th>
-                <th className="w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                <th className="w-[28%] md:w-[10%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Balance
                 </th>
               </tr>
@@ -210,7 +221,7 @@ const AssetsList = ({
               {shouldShowLoading ? (
                 <tr className="hover:bg-muted/50 transition-colors">
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="py-4 px-4 whitespace-nowrap w-full"
                   >
                     <div className="w-full flex justify-center items-center h-16">
@@ -232,32 +243,39 @@ const AssetsList = ({
                             <img
                               src={asset.images[0].value}
                               alt={asset._name}
-                              className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover"
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover shrink-0"
                             />
                           ) : (
                             <div
-                              className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs text-white font-medium shrink-0"
                               style={{ backgroundColor: "red" }}
                             >
                               {asset?._symbol?.slice(0, 2) || "??"}
                             </div>
                           )}
                           <div className="ml-2 md:ml-3 min-w-0 flex-1">
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Link
-                                    to={getAssetDetailHref(asset)}
-                                    className="font-medium text-sm md:text-base text-blue-600 truncate hover:text-blue-800 underline transition-colors"
-                                  >
-                                    {asset?._symbol || asset?._name || ""}
-                                  </Link>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>{asset?._name || ""}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
+                            <div className="flex items-center gap-2">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Link
+                                      to={getAssetDetailHref(asset)}
+                                      className="font-medium text-sm md:text-base text-blue-600 truncate hover:text-blue-800 underline transition-colors"
+                                    >
+                                      {asset?._symbol || asset?._name || ""}
+                                    </Link>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{asset?._name || ""}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              {isStratoAsset(asset) && (
+                                <Button asChild size="sm" className="shrink-0 h-7 px-2.5 text-xs">
+                                  <Link to="/dashboard/earn-staking">Stake</Link>
+                                </Button>
+                              )}
+                            </div>
                             <p className="hidden md:block text-muted-foreground text-xs truncate">
                               {asset?._name || ""}
                             </p>
@@ -310,6 +328,13 @@ const AssetsList = ({
                             : formatBalance(asset.collateralBalance, undefined, 18, 1, 4)}
                         </p>
                       </td>
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
+                        <p className="font-medium text-foreground">
+                          {guestMode || !asset?.stakedBalance || asset.stakedBalance === "0"
+                            ? "-"
+                            : formatBalance(asset.stakedBalance, undefined, 18, 1, 4)}
+                        </p>
+                      </td>
                       <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-sm md:text-base text-foreground">
                           {guestMode || !asset?.value || asset.value === "0.00" || parseFloat(asset.value) === 0
@@ -342,7 +367,7 @@ const AssetsList = ({
               ) : (
                 <tr className="hover:bg-muted/50 transition-colors">
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="py-4 px-4 whitespace-nowrap w-full"
                   >
                     <div className="w-full flex justify-center items-center h-16">

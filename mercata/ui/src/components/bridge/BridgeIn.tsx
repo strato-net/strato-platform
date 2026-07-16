@@ -81,6 +81,8 @@ const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: strin
       return info.poolAddress ? `/dashboard/earn-pools?pool=${info.poolAddress}` : "/dashboard/earn-pools";
     case "safety":
       return "/dashboard/advanced?tab=safety";
+    case "staking":
+      return "/dashboard/earn-staking";
     default:
       return "/dashboard/earn";
   }

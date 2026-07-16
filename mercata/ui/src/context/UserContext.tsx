@@ -76,6 +76,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [contractDetailsResultsLoading, setContractDetailsResultsLoading] = useState<boolean>(false);
   const [walletSignerReady, setWalletSignerReady] = useState<boolean>(false);
   const sessionExpiryLogoutStartedRef = useRef(false);
+  // Tracks whether a non-STRATO (external EVM) wallet is connected, readable from
+  // inside the polled auth check without a stale closure. Such a wallet is its own
+  // auth, so an expected 401 from the vault-only /me probe must not log it out.
+  const externalEvmConnectedRef = useRef(false);
 
   const checkAuthenticationStatus = async (initialCheck = false) => {
     try {
@@ -141,6 +145,15 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
             setIsAdmin(userData.isAdmin);
           }
         }
+      } else if (externalEvmConnectedRef.current) {
+        // Connected external EVM wallet: /me 401 is expected (it has no vault
+        // session) and is NOT a session expiry. Clear any residual vault state
+        // quietly, but never disconnect the wallet or redirect.
+        if (isLoggedIn) setIsLoggedIn(false);
+        if (stratoAddress) setStratoAddress(null);
+        if (isAdmin) setIsAdmin(false);
+        if (userName) setUserName(null);
+        localStorage.removeItem("user");
       } else {
         const hadStratoSession = !!storedUser || !!stratoAddress || isLoggedIn;
         if (hadStratoSession) {
@@ -275,12 +288,19 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const externalEvmWalletAddress = !isStratoConnector(account.connector) ? externalWalletAddress : null;
   const isExternalEvmWalletConnected = !!externalEvmWalletAddress;
   const shouldUseExternalWallet = !sessionExpiryLogoutStartedRef.current && !loading && !isLoggedIn && isExternalWalletConnected;
-  const userAddress = isLoggedIn ? stratoAddress : shouldUseExternalWallet ? externalWalletAddress : null;
+  // Uniform address source: the connected wagmi account (both the STRATO/vault
+  // connector and external EVM wallets publish their address there), falling back
+  // to the vault-derived address only for the brief window before wagmi hydrates.
+  const userAddress = externalWalletAddress ?? stratoAddress;
   const effectiveLoggedIn = isLoggedIn || shouldUseExternalWallet;
 
   useEffect(() => {
     setConnectedWalletAddress(externalWalletAddress);
   }, [externalWalletAddress]);
+
+  useEffect(() => {
+    externalEvmConnectedRef.current = isExternalEvmWalletConnected;
+  }, [isExternalEvmWalletConnected]);
 
   useEffect(() => {
     setAppAuthenticated(isLoggedIn);

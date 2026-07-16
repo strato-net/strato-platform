@@ -38,7 +38,7 @@ const getEstimatedApyPercent = (activity: Activity): number => {
     const annualCata = (Number(BigInt(activity.emissionRate)) / 1e18) * 86400 * 365;
     if (!Number.isFinite(annualCata) || annualCata < 0) return -1;
 
-    return (annualCata * 0.25 / tvlUsd) * 100;
+    return (annualCata * 0.9 / tvlUsd) * 100;
   } catch {
     return -1;
   }

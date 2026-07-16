@@ -12,14 +12,15 @@
 module Blockchain.Sequencer.DB.DependentBlockDB (
   DependentBlockDB(..),
   DependentBlockEntry,
-  EmissionReadiness(..),
   bootstrapGenesisBlock,
   lookupDependentBlockDB,
   insertDependentBlockDB,
   deleteDependentBlockDB,
   insertEmitted,
-  enqueueIfParentNotEmitted,
-  buildEmissionChain,
+  isBlockReadyForEmission,
+  cacheBlockUntilParentEmitted,
+  claimBlockForEmission,
+  markBlockEmitted,
   runWithDependentBlockDB
   ) where
 
@@ -27,7 +28,6 @@ import BlockApps.Logging
 import Blockchain.Data.BlockHeader
 import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Model.Keccak256
-import Control.Monad (join)
 import Control.Monad.Change.Alter
 import Control.Monad.Change.Modify
 import Control.Monad.IO.Class
@@ -54,8 +54,6 @@ data DependentBlockEntry
 
 instance Binary DependentBlockEntry
 
-data EmissionReadiness = NotReadyToEmit | ReadyToEmit
-
 lookupDependentBlockDB :: (MonadIO m, Accessible DependentBlockDB m) =>
                           Keccak256 -> m (Maybe DependentBlockEntry)
 lookupDependentBlockDB k = do
@@ -80,21 +78,27 @@ bootstrapGenesisBlock hash' = insert Proxy hash' Emitted
 existingParent :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe DependentBlockEntry)
 existingParent = lookup Proxy . parentHash . sbBlockData
 
-enqueueIfParentNotEmitted :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m EmissionReadiness
-enqueueIfParentNotEmitted b =
+isBlockReadyForEmission :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m Bool
+isBlockReadyForEmission b =
   existingParent b >>= \case
     Just Emitted ->
-      return ReadyToEmit
-    Just (DependentBlocks existingDeps) | b `elem` existingDeps -> return NotReadyToEmit -- case of duplicate seen
+      return True
+    Just (ChildFailedConsensus existingDeps) | not (b `elem` existingDeps) ->
+      return True
+    _ ->
+      return False
+
+cacheBlockUntilParentEmitted :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m ()
+cacheBlockUntilParentEmitted b =
+  existingParent b >>= \case
+    Just (DependentBlocks existingDeps) | b `elem` existingDeps -> return () -- case of duplicate seen
     Just (DependentBlocks existingDeps) -> do
       insert Proxy (parentHash $ sbBlockData b) $ DependentBlocks (b : existingDeps)
-      return NotReadyToEmit
-    Just (ChildFailedConsensus existingDeps) | b `elem` existingDeps -> return NotReadyToEmit -- case of duplicate seen
-    Just (ChildFailedConsensus _) ->
-      return ReadyToEmit
+    Just (ChildFailedConsensus existingDeps) | b `elem` existingDeps -> return () -- case of duplicate seen
     Nothing -> do
       insert Proxy (parentHash $ sbBlockData b) $ DependentBlocks [b]
-      return NotReadyToEmit
+    _ ->
+      return ()
 
 insertEmitted :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe OutputBlock)
 insertEmitted b =
@@ -109,30 +113,28 @@ insertEmitted b =
   where
     theBlock = sequencedBlockToOutputBlock b
 
-buildEmissionChain ::
+claimBlockForEmission ::
   ( (Keccak256 `Alters` DependentBlockEntry) m,
     MonadLogger m
   ) =>
-  SequencedBlock -> m [OutputBlock]
-buildEmissionChain b =
+  SequencedBlock -> m (Maybe [SequencedBlock])
+claimBlockForEmission b =
   lookup Proxy (sbHash b) >>= \case
     Nothing -> do
-      $logDebugS "buildEmissionChain" . T.pack $ "Got Nothing for " <> format (sbHash b)
-      insert Proxy (sbHash b) $ Emitted
-      return [theBlock]
+      $logDebugS "claimBlockForEmission" . T.pack $ "Got Nothing for " <> format (sbHash b)
+      return $ Just []
     Just Emitted -> do
-      $logDebugS "buildEmissionChain" . T.pack $ "Got Emitted for " <> format (sbHash b)
-      return []
+      $logDebugS "claimBlockForEmission" . T.pack $ "Got Emitted for " <> format (sbHash b)
+      return Nothing
     Just (DependentBlocks blocks') -> do
-      $logDebugS "buildEmissionChain" . T.pack $ "Got DependentBlocks for " <> format (sbHash b)
-      insert Proxy (sbHash b) $ Emitted
-      subChains <- sequence $ buildEmissionChain <$> blocks'
-      return $ theBlock : join subChains
+      $logDebugS "claimBlockForEmission" . T.pack $ "Got DependentBlocks for " <> format (sbHash b)
+      return $ Just blocks'
     Just (ChildFailedConsensus _) -> do
-      $logDebugS "buildEmissionChain" . T.pack $ "Got ChildFailedConsensus for " <> format (sbHash b)
-      return []
-  where
-    theBlock = sequencedBlockToOutputBlock b
+      $logDebugS "claimBlockForEmission" . T.pack $ "Got ChildFailedConsensus for " <> format (sbHash b)
+      return Nothing
+
+markBlockEmitted :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m ()
+markBlockEmitted b = insert Proxy (sbHash b) Emitted
 
 instance (MonadIO m, Accessible DependentBlockDB m) => (Keccak256 `Alters` DependentBlockEntry) m where
   lookup _ k = lookupDependentBlockDB k

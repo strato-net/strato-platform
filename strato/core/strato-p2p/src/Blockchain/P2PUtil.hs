@@ -4,6 +4,7 @@
 
 module Blockchain.P2PUtil
   ( sockAddrToIP,
+    sockAddrToPort,
     resolveIPOrHost,
   )
 where
@@ -26,6 +27,11 @@ sockAddrToIP :: S.SockAddr -> String
 sockAddrToIP (S.SockAddrInet6 _ _ host _) = let (a, b, c, d, e, f, g, h) = S.hostAddress6ToTuple host in intercalate ":" $ flip showHex "" <$> [a, b, c, d, e, f, g, h] -- horrible!!
 sockAddrToIP s@S.SockAddrInet {} = takeWhile (/= ':') (show s)
 sockAddrToIP (S.SockAddrUnix str) = str
+
+sockAddrToPort :: S.SockAddr -> Maybe Int
+sockAddrToPort (S.SockAddrInet6 pn _ _ _) = Just $ fromIntegral pn
+sockAddrToPort (S.SockAddrInet pn _) = Just $ fromIntegral pn
+sockAddrToPort (S.SockAddrUnix _) = Nothing
 
 looksLikeHostname :: String -> Bool
 looksLikeHostname =

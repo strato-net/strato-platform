@@ -18,6 +18,11 @@ STRATO_API_URL="http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2"
 
 export NODE_URL='http://nginx:8081'
 
+# Read Postgres password for direct DB queries
+if [ -f /run/secrets/postgres_password ]; then
+  export postgres_password=$(cat /run/secrets/postgres_password)
+fi
+
 echo "Waiting for STRATO node to finish syncing (checking ${STRATO_API_URL}/metadata for isSynced=true)..."
 echo "  This may take a long time if the node is catching up with the network."
 while true; do

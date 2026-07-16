@@ -94,6 +94,7 @@ type MonadCoreAPI m =
     Receipts.GetReceipts m,
     TxLast.GetLastTransactions m,
     Selectable Account.AccountsFilterParams [AddressStateRef] m,
+    Selectable Account.ProxyFilterParams [(AddressStateRef, String)] m,
     Selectable Block.BlocksFilterParams [Block] m,
     Selectable Keccak256 SourceMap m,
     Selectable Keccak256 [TransactionResult] m,

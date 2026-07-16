@@ -193,20 +193,22 @@ export const getActivitiesByTypes = async (
     return { events: [], total: 0 };
   }
 
-  // Sub-split groups by excludeProtocolAddresses config
-  // So each activity can have its own exclusion filter
+  // Sub-split groups by filter config so each activity keeps its exact My Activity filter.
   const groupEntries: [string, ActivityTypePair[]][] = [];
   for (const [contractName, pairs] of groups) {
-    const byExclusion = new Map<string, ActivityTypePair[]>();
+    const byFilterConfig = new Map<string, ActivityTypePair[]>();
     for (const pair of pairs) {
-      const key = pair.filterConfig?.excludeProtocolAddresses?.length
-        ? [...pair.filterConfig.excludeProtocolAddresses].sort().join(",")
-        : "";
-      const existing = byExclusion.get(key);
+      const key = JSON.stringify({
+        type: pair.filterConfig?.type || "",
+        attribute: pair.filterConfig?.attribute || "",
+        attributes: [...(pair.filterConfig?.attributes || [])].sort(),
+        excludeProtocolAddresses: [...(pair.filterConfig?.excludeProtocolAddresses || [])].sort(),
+      });
+      const existing = byFilterConfig.get(key);
       if (existing) existing.push(pair);
-      else byExclusion.set(key, [pair]);
+      else byFilterConfig.set(key, [pair]);
     }
-    for (const subPairs of byExclusion.values()) {
+    for (const subPairs of byFilterConfig.values()) {
       groupEntries.push([contractName, subPairs]);
     }
   }
