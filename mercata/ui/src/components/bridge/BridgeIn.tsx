@@ -540,19 +540,30 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     ? tokenBalancesByAddress.get(selectedToken.externalToken.toLowerCase())
     : undefined;
 
+  const getTokenOptionBalance = useCallback((token: typeof uniqueExternalTokens[number]) => {
+    if (token.routeType !== "native" && BigInt(token.externalToken || "0") === 0n) {
+      return nativeBalance?.value;
+    }
+    return tokenBalancesByAddress.get(token.externalToken.toLowerCase());
+  }, [nativeBalance?.value, tokenBalancesByAddress]);
+
   const isTokenOptionDisabled = useCallback((token: typeof uniqueExternalTokens[number]) => {
     if (!hasExternalWallet || !expectedChainId) return false;
-    if (token.routeType !== "native" && BigInt(token.externalToken || "0") === 0n) {
-      return nativeBalance?.value !== undefined && nativeBalance.value <= 0n;
-    }
-    const balance = tokenBalancesByAddress.get(token.externalToken.toLowerCase());
+    const balance = getTokenOptionBalance(token);
     return balance !== undefined && balance <= 0n;
-  }, [expectedChainId, hasExternalWallet, nativeBalance?.value, tokenBalancesByAddress]);
+  }, [expectedChainId, getTokenOptionBalance, hasExternalWallet]);
 
   const sortedFundTokens = useMemo(
     () => [...uniqueExternalTokens, ...nativeBridgeTokens]
       .filter((token) => token.externalSymbol || token.externalName)
-      .sort((a, b) => Number(isTokenOptionDisabled(a)) - Number(isTokenOptionDisabled(b))),
+      .sort((a, b) => {
+        const disabledOrder = Number(isTokenOptionDisabled(a)) - Number(isTokenOptionDisabled(b));
+        if (disabledOrder !== 0) return disabledOrder;
+
+        const aLabel = a.externalSymbol || a.externalName || "";
+        const bLabel = b.externalSymbol || b.externalName || "";
+        return aLabel.localeCompare(bLabel, undefined, { sensitivity: "base" });
+      }),
     [isTokenOptionDisabled, nativeBridgeTokens, uniqueExternalTokens]
   );
 
