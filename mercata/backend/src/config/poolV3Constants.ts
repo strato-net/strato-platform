@@ -59,22 +59,27 @@ export const POOL_V3_SELECT_FIELDS = [
 ] as const;
 
 /** Tick rows needed by the quote simulator (initialized ticks only) */
+// Collection tables store the mapping VALUE (the struct) as a single `value` JSONB column,
+// not as top-level columns — only the mapping keys (key/key2/key3) are top-level. Struct
+// fields are therefore read out of `value` via PostgREST JSON aliases (alias:value->>field),
+// which return the field as text (BigInt-parseable, sign preserved).
 export const POOL_V3_TICK_SELECT_FIELDS = [
   "key",
-  "liquidityNet::text",
-  "liquidityGross::text",
-  "initialized",
+  "liquidityNet:value->>liquidityNet",
+  "liquidityGross:value->>liquidityGross",
+  "initialized:value->>initialized",
 ] as const;
 
 /** Position rows for a user (positions mapping: owner => tickLower => tickUpper) */
 export const POOL_V3_POSITION_SELECT_FIELDS = [
   "address",
   "key",
-  "key_2",
-  "key_3",
-  "liquidity::text",
-  "tokensOwed0::text",
-  "tokensOwed1::text",
+  "key2",
+  "key3",
+  // struct value fields live in the `value` JSONB (see tick fields above)
+  "liquidity:value->>liquidity",
+  "tokensOwed0:value->>tokensOwed0",
+  "tokensOwed1:value->>tokensOwed1",
 ] as const;
 
 // ============================================================================

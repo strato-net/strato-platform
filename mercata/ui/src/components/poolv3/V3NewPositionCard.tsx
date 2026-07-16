@@ -15,6 +15,13 @@ import {
 
 const MINT_SLIPPAGE_BPS = 100n; // 1% headroom on the amount maxes
 
+// One-click range presets, as +/- percentage bands around the current price.
+const RANGE_PRESETS = [
+  { label: "±10%", pct: 0.1 },
+  { label: "±20%", pct: 0.2 },
+  { label: "±50%", pct: 0.5 },
+];
+
 interface V3NewPositionCardProps {
   pool: PoolV3;
   onMinted: () => void;
@@ -23,6 +30,8 @@ interface V3NewPositionCardProps {
 const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
   const { getV3AmountsForLiquidity, mintV3, loading } = useSwapContext();
   const { toast } = useToast();
+
+  const currentPrice = Number(BigInt(pool.priceWad)) / 1e18;
 
   const [tickLower, setTickLower] = useState<number | null>(null);
   const [tickUpper, setTickUpper] = useState<number | null>(null);
@@ -35,8 +44,13 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
   const previewAbortRef = useRef<AbortController | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const rangeValid = tickLower !== null && tickUpper !== null && tickLower < tickUpper;
   const inRange =
     tickLower !== null && tickUpper !== null && pool.currentTick >= tickLower && pool.currentTick < tickUpper;
+  // Which token(s) an in/out-of-range position actually consumes, so we can steer the input.
+  const needsToken0 = !rangeValid || pool.currentTick < tickUpper!; // token0 unless price is above the range
+  const needsToken1 = !rangeValid || pool.currentTick >= tickLower!; // token1 unless price is below the range
+  const previewZero = preview !== null && BigInt(preview.liquidity) === 0n;
 
   // Reset the form when the pool changes
   useEffect(() => {
@@ -47,6 +61,16 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
     setAmountInput("");
     setPreview(null);
   }, [pool.address]);
+
+  // Keep the entered token valid for the selected range: a range entirely above the price
+  // takes only token0, one entirely below takes only token1. Auto-steer so the user can't
+  // enter the token the position won't use (which would derive zero liquidity).
+  useEffect(() => {
+    if (!rangeValid) return;
+    if (amountField === "amount1" && !needsToken1) setAmountField("amount0");
+    if (amountField === "amount0" && !needsToken0) setAmountField("amount1");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickLower, tickUpper]);
 
   const applyPriceBound = (isLower: boolean, value: string) => {
     if (isLower) setPriceLowerInput(value);
@@ -62,6 +86,20 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
     else setTickUpper(tick);
   };
 
+  const applyRange = (lo: number, hi: number) => {
+    const tl = snapTick(priceToTick(lo), pool.tickSpacing);
+    const tu = snapTick(priceToTick(hi), pool.tickSpacing);
+    setTickLower(tl);
+    setTickUpper(tu);
+    setPriceLowerInput(formatTickAsPrice(tl));
+    setPriceUpperInput(formatTickAsPrice(tu));
+  };
+
+  const applyPreset = (pct: number) => {
+    if (!isFinite(currentPrice) || currentPrice <= 0) return;
+    applyRange(currentPrice * (1 - pct), currentPrice * (1 + pct));
+  };
+
   const applyFullRange = () => {
     const { tickLower: lo, tickUpper: hi } = fullRangeTicks(pool.tickSpacing);
     setTickLower(lo);
@@ -69,8 +107,6 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
     setPriceLowerInput(formatTickAsPrice(lo));
     setPriceUpperInput(formatTickAsPrice(hi));
   };
-
-  const rangeValid = tickLower !== null && tickUpper !== null && tickLower < tickUpper;
 
   // Debounced amounts preview via the backend (exact on-chain math)
   const refreshPreview = useCallback(
@@ -114,7 +150,7 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
     refreshPreview(value, amountField, tickLower!, tickUpper!);
   };
 
-  // Re-preview when the range changes with an amount already entered
+  // Re-preview when the range or entered token changes with an amount already entered
   useEffect(() => {
     if (rangeValid && amountInput && !isNaN(Number(amountInput))) {
       refreshPreview(amountInput, amountField, tickLower!, tickUpper!);
@@ -122,10 +158,10 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
       setPreview(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tickLower, tickUpper]);
+  }, [tickLower, tickUpper, amountField]);
 
   const handleMint = async () => {
-    if (!preview || !rangeValid) return;
+    if (!preview || !rangeValid || previewZero) return;
     try {
       const withSlippage = (amount: string) =>
         ((BigInt(amount) * (10000n + MINT_SLIPPAGE_BPS)) / 10000n).toString();
@@ -154,12 +190,32 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
     }
   };
 
+  const enteredSymbol = amountField === "amount0" ? pool.token0.symbol : pool.token1.symbol;
+
+  // Progressive, self-explaining button label so the user always knows the next step.
+  const buttonLabel = pool.isDisabled
+    ? "Pool is disabled"
+    : pool.isPaused
+      ? "Pool is paused"
+      : !rangeValid
+        ? "Enter a price range"
+        : !amountInput || safeParseUnits(amountInput) === 0n
+          ? "Enter an amount"
+          : previewLoading
+            ? "Calculating…"
+            : previewZero
+              ? "Amount too small"
+              : "Add Liquidity";
+
+  const canMint =
+    !loading && !previewLoading && !!preview && !previewZero && rangeValid && !pool.isPaused && !pool.isDisabled;
+
   return (
     <div className="bg-card shadow-sm rounded-xl p-4 border border-border space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">New position</h3>
         <span className="text-xs text-muted-foreground">
-          Current price: 1 {pool.token0.symbol} ≈ {formatPriceWad(pool.priceWad)} {pool.token1.symbol}
+          Current: 1 {pool.token0.symbol} ≈ {formatPriceWad(pool.priceWad)} {pool.token1.symbol}
         </span>
       </div>
 
@@ -169,10 +225,30 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
           <span className="text-xs text-muted-foreground">
             Price range ({pool.token1.symbol} per {pool.token0.symbol})
           </span>
-          <button className="text-xs text-blue-600 underline" onClick={applyFullRange}>
-            Full range
+        </div>
+
+        {/* One-click presets around the current price */}
+        <div className="flex gap-1.5">
+          {RANGE_PRESETS.map((p) => (
+            <button
+              key={p.label}
+              type="button"
+              onClick={() => applyPreset(p.pct)}
+              disabled={!isFinite(currentPrice) || currentPrice <= 0}
+              className="flex-1 px-2 py-1 rounded-lg text-[11px] font-medium border border-border text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+            >
+              {p.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={applyFullRange}
+            className="flex-1 px-2 py-1 rounded-lg text-[11px] font-medium border border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            Full
           </button>
         </div>
+
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-muted/50 rounded-lg border border-border p-2.5">
             <label className="text-[11px] text-muted-foreground">Min price</label>
@@ -184,9 +260,7 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
               className="h-8 border-none bg-transparent px-0 text-sm font-medium focus-visible:ring-0"
             />
             {tickLower !== null && (
-              <span className="text-[11px] text-muted-foreground">
-                tick {tickLower} · {formatTickAsPrice(tickLower)}
-              </span>
+              <span className="text-[11px] text-muted-foreground">tick {tickLower}</span>
             )}
           </div>
           <div className="bg-muted/50 rounded-lg border border-border p-2.5">
@@ -199,19 +273,22 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
               className="h-8 border-none bg-transparent px-0 text-sm font-medium focus-visible:ring-0"
             />
             {tickUpper !== null && (
-              <span className="text-[11px] text-muted-foreground">
-                tick {tickUpper} · {formatTickAsPrice(tickUpper)}
-              </span>
+              <span className="text-[11px] text-muted-foreground">tick {tickUpper}</span>
             )}
           </div>
         </div>
         {tickLower !== null && tickUpper !== null && tickLower >= tickUpper && (
           <p className="text-xs text-red-600">Min price must be below max price</p>
         )}
+        {rangeValid && inRange && (
+          <p className="text-xs text-green-600">
+            Range spans the current price — deposits both tokens and earns fees now.
+          </p>
+        )}
         {rangeValid && !inRange && (
           <p className="text-xs text-yellow-600">
-            Range is out of the current price — the position deposits a single token and earns no fees until the
-            price enters the range.
+            Range is entirely {pool.currentTick < tickLower! ? "above" : "below"} the current price — deposits only{" "}
+            {needsToken0 ? pool.token0.symbol : pool.token1.symbol} and earns no fees until the price enters the range.
           </p>
         )}
       </div>
@@ -219,47 +296,57 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
       {/* Deposit amount */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Deposit</span>
-          <div className="flex gap-1">
-            {(["amount0", "amount1"] as const).map((field) => (
-              <button
-                key={field}
-                className={`px-2 py-0.5 rounded-full text-[11px] font-medium border border-border ${
-                  amountField === field ? "bg-muted text-foreground" : "text-muted-foreground"
-                }`}
-                onClick={() => {
-                  setAmountField(field);
-                  setAmountInput("");
-                  setPreview(null);
-                }}
-              >
-                {field === "amount0" ? pool.token0.symbol : pool.token1.symbol}
-              </button>
-            ))}
-          </div>
+          <span className="text-xs text-muted-foreground">Deposit amount</span>
+          {inRange && (
+            <div className="flex gap-1">
+              {(["amount0", "amount1"] as const).map((field) => (
+                <button
+                  key={field}
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-medium border border-border ${
+                    amountField === field ? "bg-muted text-foreground" : "text-muted-foreground"
+                  }`}
+                  onClick={() => {
+                    setAmountField(field);
+                  }}
+                >
+                  {field === "amount0" ? pool.token0.symbol : pool.token1.symbol}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <Input
-          value={amountInput}
-          onChange={(e) => handleAmountChange(e.target.value)}
-          placeholder="0.00"
-          inputMode="decimal"
-          disabled={!rangeValid}
-          className="h-10 text-sm"
-        />
+        <div className="relative">
+          <Input
+            value={amountInput}
+            onChange={(e) => handleAmountChange(e.target.value)}
+            placeholder="0.00"
+            inputMode="decimal"
+            disabled={!rangeValid}
+            className="h-10 text-sm pr-16"
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+            {enteredSymbol}
+          </span>
+        </div>
+        {inRange && (
+          <p className="text-[11px] text-muted-foreground">
+            Enter one token — the matching amount of the other is calculated automatically.
+          </p>
+        )}
       </div>
 
-      {/* Preview */}
-      {preview && (
+      {/* Preview: the actual amounts deposited on-chain */}
+      {preview && !previewZero && (
         <div className="bg-muted/50 rounded-lg border border-border p-3 space-y-1 text-xs">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">{pool.token0.symbol} needed</span>
+            <span className="text-muted-foreground">{pool.token0.symbol} deposited</span>
             <span className="font-medium">{formatBalance(preview.amount0, pool.token0.symbol, undefined, 2, 6)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">{pool.token1.symbol} needed</span>
+            <span className="text-muted-foreground">{pool.token1.symbol} deposited</span>
             <span className="font-medium">{formatBalance(preview.amount1, pool.token1.symbol, undefined, 2, 6)}</span>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between border-t border-border pt-1 mt-1">
             <span className="text-muted-foreground">Liquidity</span>
             <span className="font-medium">{formatUnits(preview.liquidity)}</span>
           </div>
@@ -269,15 +356,9 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
       <Button
         className="w-full bg-strato-blue hover:bg-strato-blue/90"
         onClick={handleMint}
-        disabled={loading || previewLoading || !preview || !rangeValid || pool.isPaused || pool.isDisabled}
+        disabled={!canMint}
       >
-        {pool.isDisabled
-          ? "Pool is disabled"
-          : pool.isPaused
-            ? "Pool is paused"
-            : previewLoading
-              ? "Calculating…"
-              : "Add Liquidity"}
+        {buttonLabel}
       </Button>
     </div>
   );

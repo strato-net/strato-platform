@@ -222,6 +222,44 @@ export function getLiquidityForAmounts(
   return liquidityForAmount1(amount1, sqrtLower, sqrtUpper);
 }
 
+/**
+ * Liquidity implied by a token0 amount ALONE (canonical getLiquidityForAmount0 applied to
+ * the token0 sub-range). Use when the caller specifies only amount0 and wants the matching
+ * amount1 derived — unlike getLiquidityForAmounts, this does not min() against a zero
+ * amount1, which would collapse an in-range position's liquidity to 0. Returns 0 when the
+ * price is at/above the upper bound (the position then holds no token0).
+ */
+export function getLiquidityForAmount0(
+  sqrtPriceX96: bigint,
+  tickLower: number,
+  tickUpper: number,
+  amount0: bigint
+): bigint {
+  const sqrtLower = getSqrtRatioAtTick(tickLower);
+  const sqrtUpper = getSqrtRatioAtTick(tickUpper);
+  const lo = sqrtPriceX96 > sqrtLower ? sqrtPriceX96 : sqrtLower; // token0 spans [max(price,lower), upper]
+  if (sqrtUpper <= lo) return 0n;
+  return (amount0 * ((lo * sqrtUpper) / Q96)) / (sqrtUpper - lo);
+}
+
+/**
+ * Liquidity implied by a token1 amount ALONE (canonical getLiquidityForAmount1 applied to
+ * the token1 sub-range). Returns 0 when the price is at/below the lower bound (the position
+ * then holds no token1).
+ */
+export function getLiquidityForAmount1(
+  sqrtPriceX96: bigint,
+  tickLower: number,
+  tickUpper: number,
+  amount1: bigint
+): bigint {
+  const sqrtLower = getSqrtRatioAtTick(tickLower);
+  const sqrtUpper = getSqrtRatioAtTick(tickUpper);
+  const hi = sqrtPriceX96 < sqrtUpper ? sqrtPriceX96 : sqrtUpper; // token1 spans [lower, min(price,upper)]
+  if (hi <= sqrtLower) return 0n;
+  return (amount1 * Q96) / (hi - sqrtLower);
+}
+
 // ============================================================================
 // QUOTE SIMULATOR (tick-walking swap loop over indexed tick data)
 // ============================================================================

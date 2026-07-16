@@ -34,13 +34,17 @@ export function validatePoolV3QuoteArgs(args: any) {
 }
 
 export function validatePoolV3AmountsArgs(args: any) {
+  // Callers supply exactly one of: liquidity (L -> both token amounts), amount0Desired,
+  // or amount1Desired (one token amount + range -> L and the other amount). numericStringField
+  // is .required() by default, so each is made .optional() here and `.or(...)` enforces that at
+  // least one is present — otherwise the schema would (wrongly) demand all three.
   const schema = Joi.object({
     poolAddress: validateAddressField("poolAddress").required(),
     tickLower: Joi.number().integer().required(),
     tickUpper: Joi.number().integer().required(),
-    liquidity: numericStringField("liquidity"),
-    amount0Desired: numericStringField("amount0Desired"),
-    amount1Desired: numericStringField("amount1Desired"),
+    liquidity: numericStringField("liquidity").optional(),
+    amount0Desired: numericStringField("amount0Desired").optional(),
+    amount1Desired: numericStringField("amount1Desired").optional(),
   })
     .or("liquidity", "amount0Desired", "amount1Desired");
   const { error } = schema.validate(args);
@@ -65,8 +69,11 @@ export function validatePoolV3MintArgs(args: any) {
     tickLower: tickField.required(),
     tickUpper: tickField.required(),
     liquidity: numericStringField("liquidity").required(),
-    amount0Max: numericStringField("amount0Max").required(),
-    amount1Max: numericStringField("amount1Max").required(),
+    // A single-sided (out-of-range) position deposits only one token, so the unused side's
+    // max is legitimately "0" — allow zero here (a zero ceiling for a token that isn't
+    // deposited is correct: 0 deposited <= 0 max).
+    amount0Max: numericStringField("amount0Max", { allowZero: true }).required(),
+    amount1Max: numericStringField("amount1Max", { allowZero: true }).required(),
   });
   const { error } = schema.validate(args);
   if (error) throw new Error("PoolV3 Mint Argument Validation Error: " + error.message);

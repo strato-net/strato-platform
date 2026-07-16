@@ -81,14 +81,14 @@ interface RawV3Tick {
   key: string; // tick index (mapping key)
   liquidityNet: string;
   liquidityGross: string;
-  initialized: boolean;
+  initialized: string; // "true" | "false" — read from the value JSONB via ->>, so it is text
 }
 
 interface RawV3Position {
   address: string; // pool address
   key: string; // owner
-  key_2: string; // tickLower
-  key_3: string; // tickUpper
+  key2: string; // tickLower (nested-mapping keys are key/key2/key3, no underscore)
+  key3: string; // tickUpper
   liquidity: string;
   tokensOwed0: string;
   tokensOwed1: string;
@@ -196,14 +196,17 @@ const fetchInitializedTicks = async (accessToken: string, poolAddress: string): 
     const { data } = await cirrus.get(accessToken, `/${PoolV3Ticks}`, {
       params: {
         address: `eq.${normalizeAddress(poolAddress)}`,
-        initialized: "eq.true",
+        // `initialized` is a struct field inside the value JSONB, not a top-level column,
+        // so it cannot be a server-side filter here — filter the fetched rows below.
         select: POOL_V3_TICK_SELECT_FIELDS.join(","),
       },
     });
-    return (data as RawV3Tick[]).map((t) => ({
-      tick: Number(t.key),
-      liquidityNet: BigInt(t.liquidityNet),
-    }));
+    return (data as RawV3Tick[])
+      .filter((t) => String(t.initialized) === "true" && t.liquidityNet != null)
+      .map((t) => ({
+        tick: Number(t.key),
+        liquidityNet: BigInt(t.liquidityNet),
+      }));
   } catch (err) {
     // A pool that has never been minted into has no rows in its ticks collection
     // table, so Cirrus has not materialized the struct columns (liquidityNet,
@@ -286,10 +289,23 @@ export const getPositions = async (
     select: POOL_V3_POSITION_SELECT_FIELDS.join(","),
   };
   if (poolAddress) params.address = `eq.${normalizeAddress(poolAddress)}`;
-  const { data } = await cirrus.get(accessToken, `/${PoolV3Positions}`, { params });
+
+  let data: unknown;
+  try {
+    ({ data } = await cirrus.get(accessToken, `/${PoolV3Positions}`, { params }));
+  } catch (err) {
+    // The position value columns (liquidity, tokensOwed0/1) are materialized lazily on
+    // first insert; until any position is minted they do not exist and PostgREST returns
+    // 42703 (undefined_column), or 42P01 (undefined_table) if the table is absent
+    // entirely. Either way the owner has no positions. (The key columns key/key2/key3
+    // are created up front, so this only guards the value-column selection.)
+    const code = (err as any)?.response?.data?.code;
+    if (code === "42703" || code === "42P01") return [];
+    throw err;
+  }
 
   const rows = (data as RawV3Position[]).filter(
-    (r) => BigInt(r.liquidity) > 0n || BigInt(r.tokensOwed0) > 0n || BigInt(r.tokensOwed1) > 0n
+    (r) => BigInt(r.liquidity ?? "0") > 0n || BigInt(r.tokensOwed0 ?? "0") > 0n || BigInt(r.tokensOwed1 ?? "0") > 0n
   );
   if (rows.length === 0) return [];
 
@@ -301,8 +317,8 @@ export const getPositions = async (
   return rows.flatMap((row) => {
     const pool = poolByAddress.get(row.address);
     if (!pool) return [];
-    const tickLower = Number(row.key_2);
-    const tickUpper = Number(row.key_3);
+    const tickLower = Number(row.key2);
+    const tickUpper = Number(row.key3);
     const liquidity = BigInt(row.liquidity);
     const { amount0, amount1 } = v3.getAmountsForLiquidity(
       BigInt(pool.sqrtPriceX96),
@@ -348,15 +364,22 @@ export const getAmountsForLiquidity = async (
   const sqrtPrice = BigInt(raw.sqrtPriceX96);
   const currentTick = Number(raw.currentTick);
 
+  // Derive liquidity. When the caller specifies BOTH token amounts we take the canonical
+  // min() (largest L that fits within both). When only ONE is specified — the usual UI
+  // flow, where the user types one token and the other is computed — we derive L from that
+  // single amount; min()-ing against the unspecified (zero) side would wrongly collapse an
+  // in-range position's liquidity to 0.
   let liq = liquidity ?? 0n;
   if (liq === 0n) {
-    liq = v3.getLiquidityForAmounts(
-      sqrtPrice,
-      tickLower,
-      tickUpper,
-      amount0Desired ?? 0n,
-      amount1Desired ?? 0n
-    );
+    const a0 = amount0Desired ?? 0n;
+    const a1 = amount1Desired ?? 0n;
+    if (a0 > 0n && a1 > 0n) {
+      liq = v3.getLiquidityForAmounts(sqrtPrice, tickLower, tickUpper, a0, a1);
+    } else if (a0 > 0n) {
+      liq = v3.getLiquidityForAmount0(sqrtPrice, tickLower, tickUpper, a0);
+    } else if (a1 > 0n) {
+      liq = v3.getLiquidityForAmount1(sqrtPrice, tickLower, tickUpper, a1);
+    }
   }
   const { amount0, amount1 } = v3.getAmountsForLiquidity(sqrtPrice, currentTick, tickLower, tickUpper, liq, true);
   return {
