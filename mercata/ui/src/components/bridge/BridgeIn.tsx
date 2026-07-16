@@ -549,6 +549,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     return balance !== undefined && balance <= 0n;
   }, [expectedChainId, hasExternalWallet, nativeBalance?.value, tokenBalancesByAddress]);
 
+  const sortedFundTokens = useMemo(
+    () => [...uniqueExternalTokens, ...nativeBridgeTokens]
+      .filter((token) => token.externalSymbol || token.externalName)
+      .sort((a, b) => Number(isTokenOptionDisabled(a)) - Number(isTokenOptionDisabled(b))),
+    [isTokenOptionDisabled, nativeBridgeTokens, uniqueExternalTokens]
+  );
+
   const isBalanceLoading = hasExternalWallet && !!expectedChainId
     && (isNativeToken ? nativeLoading : tokenLoading);
 
@@ -1337,19 +1344,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                       <SelectValue placeholder="Token" />
                     </SelectTrigger>
                     <SelectContent>
-                      {uniqueExternalTokens.filter((t) => t.externalSymbol || t.externalName).map((t) => (
+                      {sortedFundTokens.map((t) => (
                         <SelectItem
-                          key={t.externalToken}
-                          value={(t.externalToken || "").toLowerCase()}
-                          disabled={isTokenOptionDisabled(t)}
-                        >
-                          {fundTokenLabel(t)}
-                        </SelectItem>
-                      ))}
-                      {nativeBridgeTokens.filter((t) => t.externalSymbol || t.externalName).map((t) => (
-                        <SelectItem
-                          key={t.id}
-                          value={`native:${t.id}`}
+                          key={t.routeType === "native" ? t.id : t.externalToken}
+                          value={t.routeType === "native"
+                            ? `native:${t.id}`
+                            : (t.externalToken || "").toLowerCase()}
                           disabled={isTokenOptionDisabled(t)}
                         >
                           {fundTokenLabel(t)}
