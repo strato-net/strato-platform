@@ -33,6 +33,7 @@ import qualified Crypto.Types.PubKey.ECC                 as ECC
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
+import           Data.Default                            (def)
 import           Data.Either.Combinators
 import           Data.Foldable                           (for_)
 import           Data.Maybe                              (catMaybes)
@@ -45,6 +46,7 @@ import           System.Entropy
 import           System.Random
 import qualified Text.Colors                             as CL
 import           Text.Format
+import           Text.Read                               (readMaybe)
 
 getKeyOrMakeKey :: (MonadCatch m, HasVault m, MonadIO m, MonadLogger m) =>
                    m PublicKey
@@ -167,26 +169,34 @@ handleValidPacket ::
   ECC.Point ->
   m ()
 handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
-  Ping _ ep@(Endpoint _ otherUdpPort' otherTcpPort) _ _ -> do
+  Ping _ (Endpoint _ _ otherTcpPort) _ _ -> do
     time <- liftIO $ round `fmap` getPOSIXTime
     mPeer <- getPeerByIP' ip
     mPeer' <-
       case mPeer of
         Nothing -> do
-          addPeer' otherUdpPort' otherTcpPort
+          addPeer' otherUdpPort otherTcpPort
           getPeerByIP' ip
         Just p' -> do
           setPeerPubkey p' otherPubKey
+          updateUdpPort p' otherUdpPort
           return $ Just p'
     case mPeer' of
       Nothing -> pure ()
       Just peer -> do
-        sendPacket peer $ Pong ep 4 (time + 50)
+        let (UDPPort up') = otherUdpPort
+            ipAddr = case getHostAddress addr of
+              Right ipAddr' -> ipAddr'
+              Left _ -> stringToIAddr "127.0.0.1"
+        sendPacket peer{pPeerUdpPort = up'} $ Pong (Endpoint ipAddr otherUdpPort otherTcpPort) 4 (time + 50)
         eErr' <- setPeerBondingState (pPeerHost peer) otherPubKey 2
         whenLeft eErr' $ \err -> do
           $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
           throwM err
-  Pong {} -> do
+  (Pong (Endpoint myIP myUdp _) _ _) -> do
+    let myPeer = def{pPeerHost = Host "127.0.0.1"}
+    for_ (readMaybe $ format myIP) $ updateIP myPeer
+    updateUdpPort myPeer myUdp
     mPeer <- getPeerByIP' ip
     mPeer' <-
       case mPeer of
@@ -207,23 +217,10 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
   (FindNeighbors targetPubkey _) -> do
     time <- liftIO $ round `fmap` getPOSIXTime
     let nextTime = time + 50
-    getPeerByIP' ip >>= \case
-      Nothing -> $logInfoS "handleValidPacket/FindNeighbors" "Ignoring FindNeigbors request from unknown peer"
-      Just peer -> do
-        getPeerBondingState (pPeerHost peer) otherPubKey >>= \case
---        A.select (A.Proxy @PeerBondingState) (pPeerHost peer, otherPubKey) >>= \case
-          Just b | b > 1 -> do
-            peers <- getPeersClosestTo (20 :: Natural) targetPubkey otherPubKey
-            let theNeighbors = catMaybes $ (\p -> Neighbor (mkEndpoint p) <$> mkNodeId p) <$> peers
-            sendPacket peer $ Neighbors theNeighbors nextTime
-          _ -> do
-            $logInfoS "handleValidPacket/FindNeighbors" "Recieved FindNeighbors request from a peer we are not bonded to; will attempt to bond first"
-            udpPort <- Mod.access (Mod.Proxy @UDPPort)
-            tcpPort <- Mod.access (Mod.Proxy @TCPPort)
-            mServerAddr <- A.select (A.Proxy @SockAddr) (Nothing :: Maybe Host, udpPort)
-            case getHostAddress <$> mServerAddr of
-              Just (Right hostAddress) -> sendPacket peer $ Ping 4 (Endpoint hostAddress udpPort tcpPort) (mkEndpoint peer) nextTime
-              _ -> $logErrorS "handleValidPacket/FindNeighbors" "Attempted to bond to peer but failed"
+    peers <- getPeersClosestTo (20 :: Natural) targetPubkey otherPubKey
+    let theNeighbors = catMaybes $ (\p -> Neighbor (mkEndpoint p) <$> mkNodeId p) <$> peers
+        UDPPort udpPort' = otherUdpPort
+    sendPacket def{pPeerHost = host, pPeerIp = Just ip, pPeerUdpPort = udpPort'} $ Neighbors theNeighbors nextTime
     where
       mkEndpoint PPeer {..} = Endpoint (stringToIAddr $ hostToString pPeerHost) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
       mkNodeId = fmap pointToNodeID . pPeerPubkey
@@ -253,8 +250,9 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
             whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to reset peer disable: " ++ show err
   where
     ip = addressIP addr
+    host = Host $ T.pack $ show ip
     addPeer' udpPort tcpPort = do
-      peer <- mkPeer (Just otherPubKey) (Host $ T.pack $ show ip) (Just ip) udpPort tcpPort
+      peer <- mkPeer (Just otherPubKey) host (Just ip) udpPort tcpPort
       addPeer peer
 
 getAddrPort :: SockAddr -> Either DiscoverException PortNumber

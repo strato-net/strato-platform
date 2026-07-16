@@ -141,7 +141,9 @@ class HasPeerDB m where
 
   updateUdpEnableTime :: PPeer -> UTCTime -> m ()
   updateIP :: PPeer -> IP -> m ()
+  updateTcpPort :: PPeer -> TCPPort -> m ()
   updateTcpEnableTime :: PPeer -> UTCTime -> m ()
+  updateUdpPort :: PPeer -> UDPPort -> m ()
   updatePeerDisable :: PPeer -> PeerDisable -> m ()
   updatePeerLastBestBlockHash :: PPeer -> PeerLastBestBlockHash -> m ()
   updatePeerUdpDisable :: PPeer -> PeerUdpDisable -> m ()
@@ -212,7 +214,7 @@ mkPeer pubkey host ip (UDPPort udpPort) (TCPPort tcpPort) = do
     }
 
 thisPeer :: PPeer -> [SQL.Filter PPeer]
-thisPeer peer = [PPeerHost SQL.==. pPeerHost peer, PPeerTcpPort SQL.==. pPeerTcpPort peer]
+thisPeer peer = [PPeerHost SQL.==. pPeerHost peer]
 
 thisOr100Years :: Int -> Int
 thisOr100Years = min (100 * 365 * 24 * 60 * 60) -- there is no need to be disabling peers for > 100 years y'all

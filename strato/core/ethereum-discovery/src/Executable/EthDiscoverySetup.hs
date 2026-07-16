@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Executable.EthDiscoverySetup
   ( setup,
@@ -28,6 +29,10 @@ setupSQL nodes = runSqlConn $ do
   existingPeer <- selectFirst [] []
   when (isNothing (existingPeer :: Maybe (Entity PPeer))) $ do
     logInfoN $ T.pack $ "Inserting " ++ show (length nodes) ++ " bootnodes"
+    let port' = discoveryPort $ discoveryConfig ethConf
+        udpPort = UDPPort port'
+        tcpPort = TCPPort port' -- TODO: where do we get the TCP port from?
+    void . insert =<< mkPeer Nothing (Host "127.0.0.1") (Just "127.0.0.1") udpPort tcpPort
     forM_ nodes $ \node -> do
       peer <- mkPeer Nothing (Host $ T.pack node) Nothing (UDPPort 30303) (TCPPort 30303)
       void $ insert peer

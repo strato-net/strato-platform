@@ -7,6 +7,8 @@ export const ACTIVITY_FILTER_CONFIGS: Record<string, FilterConfig> = {
   "Token:Transfer": { type: "or", attributes: ["from", "to"], excludeProtocolAddresses: ["from", "to"] },
   "YieldVault:Transfer": { type: "or", attributes: ["from", "to"], excludeProtocolAddresses: ["from", "to"] },
   "SaveUSDSTVault:Transfer": { type: "or", attributes: ["from", "to"], excludeProtocolAddresses: ["from", "to"] },
+  "SaveUSDSTVault:Deposit": { type: "single", attribute: "owner" },
+  "SaveUSDSTVault:Withdraw": { type: "or", attributes: ["owner", "receiver"] },
   "MercataBridge:DepositCompleted": { type: "single", attribute: "stratoRecipient" },
   "StratoNativeBridge:NativeDepositCompleted": { type: "single", attribute: "stratoRecipient" },
   "MercataBridge:WithdrawalRequested": { type: "single", attribute: "user" },

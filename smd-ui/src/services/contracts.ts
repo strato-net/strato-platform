@@ -100,8 +100,50 @@ export interface ContractFunction {
   signature: string;
 }
 
+/**
+ * Render a bloc xabi type descriptor (SolidVM Type JSON, e.g.
+ * { tag: "Int", signed: true, bytes: 32 }) as a Solidity type name like
+ * "uint256". Used both as the input placeholder and as the {"type","value"}
+ * hint bloc uses to disambiguate argument parsing.
+ */
+export function solidityTypeName(t: any): string {
+  if (!t) return "";
+  if (typeof t === "string") return t;
+  switch (t.tag) {
+    case "Int":
+      return `${t.signed ? "" : "u"}int${t.bytes ? t.bytes * 8 : ""}`;
+    case "String":
+      return "string";
+    case "Bytes":
+      return t.bytes ? `bytes${t.bytes}` : "bytes";
+    case "Decimal":
+      return "decimal";
+    case "Bool":
+      return "bool";
+    case "Address":
+      return "address";
+    case "Account":
+      return "account";
+    case "UnknownLabel":
+      return typeof t.contents === "string" ? t.contents : "";
+    case "Struct":
+    case "Enum":
+    case "Error":
+    case "Contract":
+      return t.typedef ?? "";
+    case "UserDefined":
+      return solidityTypeName(t.actual);
+    case "Array": {
+      const inner = solidityTypeName(t.entry ?? t.type);
+      return inner ? `${inner}[${t.length ?? ""}]` : "";
+    }
+    default:
+      return t.tag ?? "";
+  }
+}
+
 function argType(def: any): string {
-  return def?.type?.tag ?? def?.type ?? "";
+  return solidityTypeName(def?.type);
 }
 
 /** GET /bloc/v2.2/contracts/:name/:address — full contract info (function arg names/types live here). */
@@ -215,7 +257,9 @@ export async function queryCirrus(table: string, queryString: string) {
 
 async function pollTransactionResult(hash: string, maxAttempts = 30): Promise<any> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const { data } = await api.get(`${env.STRATO_URL}/transactionResult/${hash}`);
+    const { data } = await api.get(`${env.STRATO_URL}/transactionResult/${hash}`, {
+      skipErrorToast: true,
+    });
     const result = Array.isArray(data) ? data[0] : data;
     if (result?.status === "Success") return result;
     if (result?.status === "Failure") {
@@ -243,7 +287,11 @@ export async function submitStratoTx(
     { txs: [{ payload, type }] },
     // `username` routes the tx through the user's User wallet contract (server-side
     // vault signing); the node wraps CONTRACT/FUNCTION as createContract/callContract.
-    { params: { resolve: true, ...chainParam(), ...(username ? { username } : {}) } }
+    // Callers surface tx failures themselves, so skip the global error toast.
+    {
+      params: { resolve: true, ...chainParam(), ...(username ? { username } : {}) },
+      skipErrorToast: true,
+    }
   );
   const result = Array.isArray(data) ? data[0] : data;
   if (result?.status === "Pending" && result?.hash) {

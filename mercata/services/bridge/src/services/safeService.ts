@@ -60,7 +60,10 @@ export const checkSafeTxStatus = async (
       { logPrefix: "SafeService" }
     );
 
-    if (tx.isExecuted && tx.isSuccessful) return "executed";
+    if (tx.isExecuted && tx.isSuccessful) {
+      logInfo("SafeService", `Safe transaction status: executed`, { safeTxHash });
+      return "executed";
+    }
 
     const safeAddress = (tx as any).safe || config.safe.address!;
     const allTxs = await retry(
@@ -75,9 +78,11 @@ export const checkSafeTxStatus = async (
     );
 
     if (executedTx && executedTx.safeTxHash !== safeTxHash) {
+      logInfo("SafeService", `Safe transaction status: rejected (replaced by another tx)`, { safeTxHash });
       return "rejected";
     }
 
+    logInfo("SafeService", `Safe transaction status: pending`, { safeTxHash });
     return "pending";
   } catch (e) {
     logError("SafeService", e as Error, {
