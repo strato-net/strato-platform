@@ -213,6 +213,49 @@ export const dismissIssue = async (
   return { status, hash };
 };
 
+const sameAddress = (a: string, b: string): boolean =>
+  (a || "").toLowerCase().replace(/^0x/, "") === (b || "").toLowerCase().replace(/^0x/, "");
+
+const fetchIssueCreationTxArgs = async (
+  accessToken: string,
+  txHash: string,
+  target: string,
+  func: string,
+): Promise<string[] | null> => {
+  try {
+    const response = await eth.get(accessToken, "/transaction", { params: { hash: txHash } });
+    const tx = Array.isArray(response.data) ? response.data[0] : null;
+    if (!tx || !Array.isArray(tx.args)) return null;
+
+    // Issue created through the admin UI: castVoteOnIssue(_target, _func, ...variadic)
+    if (tx.funcName === "castVoteOnIssue" && sameAddress(tx.to, adminRegistry)) {
+      return tx.args.slice(2);
+    }
+    // Issue created by calling the onlyOwner function directly (Ownable fallback)
+    if (tx.funcName === func && sameAddress(tx.to, target)) {
+      return tx.args;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+// Replace string-bearing args with values parsed from the original transaction so the
+// re-submitted vote hashes to the same issueId (restores characters Cirrus dropped)
+const restoreArgsFromTx = (args: any[], txArgs: string[] | null): any[] => {
+  if (!txArgs || !Array.isArray(args) || txArgs.length !== args.length) return args;
+  return args.map((arg, i) => {
+    const src = txArgs[i];
+    if (typeof src !== "string" || (src[0] !== '"' && src[0] !== "[")) return arg;
+    try {
+      return JSONBigString.parse(src);
+    } catch {
+      return arg;
+    }
+  });
+};
+
 // Cast a vote on an issue by issueId
 export const castVoteOnIssueById = async (
   accessToken: string,
@@ -263,7 +306,9 @@ export const castVoteOnIssueById = async (
       return await castVoteOnCreateContractIssue(accessToken, userAddress, target, args);
     }
 
-    return await castVoteOnIssue(accessToken, userAddress, target, func, args);
+    const txArgs = await fetchIssueCreationTxArgs(accessToken, issue.transaction_hash, target, func);
+
+    return await castVoteOnIssue(accessToken, userAddress, target, func, restoreArgsFromTx(args, txArgs));
   } catch (error) {
     throw error;
   }
