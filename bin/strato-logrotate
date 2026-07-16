@@ -8,6 +8,8 @@
 #
 # Rotation policy:
 #   - rotate daily, or earlier once a file exceeds STRATO_LOGROTATE_MAX_SIZE
+#   - quiet logs below STRATO_LOGROTATE_MIN_SIZE are left alone by the daily
+#     rotation and keep accumulating until they reach it
 #   - rotated files are compressed into logs/rotated/ with a date+time suffix
 #   - rotated files older than STRATO_LOGROTATE_RETENTION_DAYS days are deleted
 #   - copytruncate is required: neither convoke children nor the docker
@@ -20,6 +22,7 @@ set -u
 
 INTERVAL_SEC="${STRATO_LOGROTATE_INTERVAL_SEC:-600}"
 MAX_SIZE="${STRATO_LOGROTATE_MAX_SIZE:-100M}"
+MIN_SIZE="${STRATO_LOGROTATE_MIN_SIZE:-10M}"
 RETENTION_DAYS="${STRATO_LOGROTATE_RETENTION_DAYS:-7}"
 
 LOGS_DIR="logs"
@@ -43,7 +46,7 @@ if [[ "$(id -u)" == "0" ]]; then
     SU_DIRECTIVE="    su $(id -un) $(id -gn)"
 fi
 
-echo "Log rotation started: interval=${INTERVAL_SEC}s maxsize=${MAX_SIZE} retention=${RETENTION_DAYS}d"
+echo "Log rotation started: interval=${INTERVAL_SEC}s maxsize=${MAX_SIZE} minsize=${MIN_SIZE} retention=${RETENTION_DAYS}d"
 
 while true; do
     mkdir -p "$ROTATED_DIR"
@@ -70,6 +73,7 @@ while true; do
     olddir $PWD/$ROTATED_DIR
     daily
     maxsize $MAX_SIZE
+    minsize $MIN_SIZE
     rotate 28
     maxage $RETENTION_DAYS
     missingok
