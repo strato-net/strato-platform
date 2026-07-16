@@ -192,17 +192,31 @@ export const getPoolsByPair = async (accessToken: string, tokenA: string, tokenB
 };
 
 const fetchInitializedTicks = async (accessToken: string, poolAddress: string): Promise<v3.TickData[]> => {
-  const { data } = await cirrus.get(accessToken, `/${PoolV3Ticks}`, {
-    params: {
-      address: `eq.${normalizeAddress(poolAddress)}`,
-      initialized: "eq.true",
-      select: POOL_V3_TICK_SELECT_FIELDS.join(","),
-    },
-  });
-  return (data as RawV3Tick[]).map((t) => ({
-    tick: Number(t.key),
-    liquidityNet: BigInt(t.liquidityNet),
-  }));
+  try {
+    const { data } = await cirrus.get(accessToken, `/${PoolV3Ticks}`, {
+      params: {
+        address: `eq.${normalizeAddress(poolAddress)}`,
+        initialized: "eq.true",
+        select: POOL_V3_TICK_SELECT_FIELDS.join(","),
+      },
+    });
+    return (data as RawV3Tick[]).map((t) => ({
+      tick: Number(t.key),
+      liquidityNet: BigInt(t.liquidityNet),
+    }));
+  } catch (err) {
+    // A pool that has never been minted into has no rows in its ticks collection
+    // table, so Cirrus has not materialized the struct columns (liquidityNet,
+    // initialized, ...) yet — they are created lazily on first insert. PostgREST
+    // then reports 42703 (undefined_column), or 42P01 (undefined_table) if the
+    // table itself has not been created. Either way there are no initialized ticks,
+    // which is exactly what an empty tick set means: the swap simply walks none.
+    const code = (err as any)?.response?.data?.code;
+    if (code === "42703" || code === "42P01") {
+      return [];
+    }
+    throw err;
+  }
 };
 
 // ============================================================================
