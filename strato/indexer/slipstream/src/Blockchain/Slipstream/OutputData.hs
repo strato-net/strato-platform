@@ -411,7 +411,7 @@ slipstreamQueryText _ CreateView{..} =
             , val
             ]
           ) <$> extraJoinColumns
-        , maybe "" (("GROUP BY " <>) . T.intercalate ", ") groupByClause
+        , maybe "" ((" GROUP BY " <>) . T.intercalate ", ") groupByClause
         , ";\n"
         -- , " WITH NO DATA;\n"
         -- , "CREATE UNIQUE INDEX \""
