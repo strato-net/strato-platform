@@ -300,7 +300,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
                       control={form.control}
                       name={`args.${idx}.value`}
                       rules={{
-                        required: 'Argument is required',
+                        required: abiTypeName === 'string' ? false : 'Argument is required',
                         validate: (v) => {
                           const [success, w] = validateFunctionArg(abiType, v);
                           return success ? true : (typeof w === 'string' ? w : 'Invalid argument');
