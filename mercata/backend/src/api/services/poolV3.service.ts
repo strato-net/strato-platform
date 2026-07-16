@@ -87,8 +87,8 @@ interface RawV3Tick {
 interface RawV3Position {
   address: string; // pool address
   key: string; // owner
-  key_1: string; // tickLower
-  key_2: string; // tickUpper
+  key_2: string; // tickLower
+  key_3: string; // tickUpper
   liquidity: string;
   tokensOwed0: string;
   tokensOwed1: string;
@@ -287,8 +287,8 @@ export const getPositions = async (
   return rows.flatMap((row) => {
     const pool = poolByAddress.get(row.address);
     if (!pool) return [];
-    const tickLower = Number(row.key_1);
-    const tickUpper = Number(row.key_2);
+    const tickLower = Number(row.key_2);
+    const tickUpper = Number(row.key_3);
     const liquidity = BigInt(row.liquidity);
     const { amount0, amount1 } = v3.getAmountsForLiquidity(
       BigInt(pool.sqrtPriceX96),

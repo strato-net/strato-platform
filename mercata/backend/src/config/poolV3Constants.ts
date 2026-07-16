@@ -70,8 +70,8 @@ export const POOL_V3_TICK_SELECT_FIELDS = [
 export const POOL_V3_POSITION_SELECT_FIELDS = [
   "address",
   "key",
-  "key_1",
   "key_2",
+  "key_3",
   "liquidity::text",
   "tokensOwed0::text",
   "tokensOwed1::text",
