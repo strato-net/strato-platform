@@ -34,17 +34,19 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.EthConf (ethConf, networkConfig, p2pConfig)
 import qualified Blockchain.EthConf.Model as Conf
+import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Util
 import           Blockchain.SyncDB
 import           Blockchain.Threads
 import           Conduit
-import           Control.Monad                         (forever, when)
+import           Control.Monad                         (forever, unless, when)
 import qualified Control.Monad.Change.Modify           as Mod
 import           Crypto.Types.PubKey.ECC
 import           Data.Bits                             (shiftL)
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as BC
 import qualified Data.Conduit.Binary                   as CB
+import           Data.Default                          (def)
 import           Data.List.Split
 import           Data.Maybe
 import qualified Data.Text                             as T
@@ -99,7 +101,8 @@ handleMsgClientConduit myId peer = do
         }
   $logDebugS "handleMsgClientConduit" "about to parse message"
   awaitMsg >>= \case
-    Just Hello {} ->
+    Just (Hello _ _ _ myTcpPort _) -> do
+      unless (myTcpPort == 0) . lift $ updateTcpPort def{pPeerHost = Host "127.0.0.1"} (TCPPort myTcpPort)
       yield
         =<< lift
           ( Mod.get (Mod.Proxy @BestSequencedBlock) >>= \(BestSequencedBlock bHash highestBlockNum' _) -> do
@@ -166,7 +169,7 @@ handleMsgServerConduit myPubkey peer = do
               { version = 4,
                 clientId = "STRATO/v" ++ stratoVersion ++ "/linux/Haskell",
                 capability = [ETH (fromIntegral ethVersion)],
-                port = 0,
+                port = pPeerTcpPort peer,
                 nodeId = myPubkey
               }
       yield $ Right helloMsg'

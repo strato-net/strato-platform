@@ -46,6 +46,7 @@ import           System.Entropy
 import           System.Random
 import qualified Text.Colors                             as CL
 import           Text.Format
+import           Text.Read                               (readMaybe)
 
 getKeyOrMakeKey :: (MonadCatch m, HasVault m, MonadIO m, MonadLogger m) =>
                    m PublicKey
@@ -168,7 +169,7 @@ handleValidPacket ::
   ECC.Point ->
   m ()
 handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
-  Ping _ ep@(Endpoint _ _ otherTcpPort) _ _ -> do
+  Ping _ (Endpoint _ _ otherTcpPort) _ _ -> do
     time <- liftIO $ round `fmap` getPOSIXTime
     mPeer <- getPeerByIP' ip
     mPeer' <-
@@ -184,12 +185,18 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
       Nothing -> pure ()
       Just peer -> do
         let (UDPPort up') = otherUdpPort
-        sendPacket peer{pPeerUdpPort = up'} $ Pong ep 4 (time + 50)
+            ipAddr = case getHostAddress addr of
+              Right ipAddr' -> ipAddr'
+              Left _ -> stringToIAddr "127.0.0.1"
+        sendPacket peer{pPeerUdpPort = up'} $ Pong (Endpoint ipAddr otherUdpPort otherTcpPort) 4 (time + 50)
         eErr' <- setPeerBondingState (pPeerHost peer) otherPubKey 2
         whenLeft eErr' $ \err -> do
           $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
           throwM err
-  Pong {} -> do
+  (Pong (Endpoint myIP myUdp _) _ _) -> do
+    let myPeer = def{pPeerHost = Host "127.0.0.1"}
+    for_ (readMaybe $ format myIP) $ updateIP myPeer
+    updateUdpPort myPeer myUdp
     mPeer <- getPeerByIP' ip
     mPeer' <-
       case mPeer of

@@ -77,6 +77,7 @@ ethServerHandler pSource pSink seqSrc host (TCPPort port) = do
   p <- getPeerByIP host >>= \case
     Nothing -> pure def{pPeerHost = host, pPeerIp = readMaybe (hostToString host), pPeerTcpPort = port}
     Just p -> pure p{pPeerTcpPort = port}
+  updateTcpPort p $ TCPPort port
   (p', attempt) <- withActivePeer p $ runEthServerConduit p pSource pSink seqSrc peerStr
   case (,) <$> pPeerPubkey p' <*> attempt of
     Nothing  -> $logDebugS "runEthServer" "Peer ran successfully!"
