@@ -8,7 +8,7 @@ import {
   useAccount,
   useChainId,
   useBalance,
-  useReadContract,
+  useReadContracts,
   useWriteContract,
   useSwitchChain,
   useSignTypedData,
@@ -474,6 +474,18 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const isCorrectNetwork = hasExternalWallet && !!chainId && !!expectedChainId && chainId === expectedChainId;
   const isNativeRedemption = selectedToken?.routeType === "native";
   const isNativeToken = !isNativeRedemption && BigInt(selectedToken?.externalToken || "0") === 0n;
+  const fundErc20Tokens = useMemo(() => {
+    const seen = new Set<string>();
+    return [...uniqueExternalTokens, ...nativeBridgeTokens].filter((token) => {
+      const address = (token.externalToken || "").toLowerCase();
+      if (BigInt(address || "0") === 0n || seen.has(address)) return false;
+      seen.add(address);
+      return true;
+    });
+  }, [uniqueExternalTokens, nativeBridgeTokens]);
+  const hasNativeFundToken = uniqueExternalTokens.some(
+    (token) => BigInt(token.externalToken || "0") === 0n
+  );
   const useExternalWalletSigning = hasExternalWallet && !isAppAuthenticated;
   const visibleMatchingActions = useMemo(
     () => useExternalWalletSigning ? [] : matchingActions,
@@ -488,39 +500,64 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     address: externalSenderHex,
     chainId: expectedChainId || undefined,
     query: {
-      enabled: hasExternalWallet && !!expectedChainId && isNativeToken,
+      enabled: hasExternalWallet && !!expectedChainId && hasNativeFundToken,
       refetchInterval: 15000,
     },
   });
 
   const {
-    data: tokenRawBalance,
+    data: tokenBalanceResults,
     refetch: refetchToken,
     isLoading: tokenLoading,
-  } = useReadContract({
-    address: ensureHexPrefix(selectedToken?.externalToken) as `0x${string}`,
-    abi: ERC20_ABI,
-    functionName: 'balanceOf',
-    args: externalSenderHex ? [externalSenderHex] : undefined,
-    chainId: expectedChainId || undefined,
+  } = useReadContracts({
+    contracts: fundErc20Tokens.map((token) => ({
+      address: ensureHexPrefix(token.externalToken) as `0x${string}`,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: externalSenderHex ? [externalSenderHex] : undefined,
+      chainId: expectedChainId || undefined,
+    })),
     query: {
       enabled:
         hasExternalWallet &&
         !!expectedChainId &&
-        !!selectedToken &&
-        !isNativeToken,
+        fundErc20Tokens.length > 0,
       refetchInterval: 15000,
     },
   });
 
-  const isBalanceLoading = hasExternalWallet && !!expectedChainId && (nativeLoading || tokenLoading);
+  const tokenBalancesByAddress = useMemo(() => {
+    const balances = new Map<string, bigint>();
+    tokenBalanceResults?.forEach((result, index) => {
+      if (result.status === "success") {
+        balances.set(fundErc20Tokens[index].externalToken.toLowerCase(), result.result as bigint);
+      }
+    });
+    return balances;
+  }, [fundErc20Tokens, tokenBalanceResults]);
+
+  const tokenRawBalance = selectedToken
+    ? tokenBalancesByAddress.get(selectedToken.externalToken.toLowerCase())
+    : undefined;
+
+  const isTokenOptionDisabled = useCallback((token: typeof uniqueExternalTokens[number]) => {
+    if (!hasExternalWallet || !expectedChainId) return false;
+    if (token.routeType !== "native" && BigInt(token.externalToken || "0") === 0n) {
+      return nativeBalance?.value !== undefined && nativeBalance.value <= 0n;
+    }
+    const balance = tokenBalancesByAddress.get(token.externalToken.toLowerCase());
+    return balance !== undefined && balance <= 0n;
+  }, [expectedChainId, hasExternalWallet, nativeBalance?.value, tokenBalancesByAddress]);
+
+  const isBalanceLoading = hasExternalWallet && !!expectedChainId
+    && (isNativeToken ? nativeLoading : tokenLoading);
 
   const maxAmount = useMemo(() => {
     if (isNativeToken) {
       if (!nativeBalance?.value) return "0";
       return nativeBalance.value.toString();
     } else {
-      if (!tokenRawBalance) return "0";
+      if (tokenRawBalance === undefined) return "0";
       return tokenRawBalance.toString();
     }
   }, [isNativeToken, nativeBalance?.value, tokenRawBalance]);
@@ -1301,12 +1338,20 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                     </SelectTrigger>
                     <SelectContent>
                       {uniqueExternalTokens.filter((t) => t.externalSymbol || t.externalName).map((t) => (
-                        <SelectItem key={t.externalToken} value={(t.externalToken || "").toLowerCase()}>
+                        <SelectItem
+                          key={t.externalToken}
+                          value={(t.externalToken || "").toLowerCase()}
+                          disabled={isTokenOptionDisabled(t)}
+                        >
                           {fundTokenLabel(t)}
                         </SelectItem>
                       ))}
                       {nativeBridgeTokens.filter((t) => t.externalSymbol || t.externalName).map((t) => (
-                        <SelectItem key={t.id} value={`native:${t.id}`}>
+                        <SelectItem
+                          key={t.id}
+                          value={`native:${t.id}`}
+                          disabled={isTokenOptionDisabled(t)}
+                        >
                           {fundTokenLabel(t)}
                         </SelectItem>
                       ))}
