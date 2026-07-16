@@ -272,6 +272,19 @@ build_common: generate-version-file
 	@install -m 755 bin/strato-snapshot $(HOME)/.local/bin/
 	@mkdir -p $(HOME)/.local/share/strato
 	@install -m 644 strato/tools/airlock/data/english.txt $(HOME)/.local/share/strato/bip39-english.txt
+	@case ":$$PATH:" in \
+	  *":$(HOME)/.local/bin:"*) ;; \
+	  *) \
+	    echo ""; \
+	    echo "  NOTE: $(HOME)/.local/bin is not on your PATH in this shell."; \
+	    echo "  The strato tools were installed there, but this shell won't find them yet."; \
+	    echo "  To use them now, run:"; \
+	    echo ""; \
+	    echo "      source ~/.profile      # or open a new terminal"; \
+	    echo ""; \
+	    echo "  (New login shells will pick it up automatically.)"; \
+	    echo "" ;; \
+	esac
 
 build_common_docker: generate-version-file
 	@echo building haskell libraries and creating directories in docker
