@@ -1,6 +1,11 @@
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
+import { captureAttribution } from './lib/attribution'
+
+// Capture inbound UTM attribution BEFORE anything else. This must run before
+// React mounts and before any Keycloak redirect, which strips the query string.
+captureAttribution();
 
 // Conditionally load Lucky Orange script
 // Use runtime config (from /config.js) if available, fallback to build-time env var
@@ -30,6 +35,12 @@ if (gaId && gaId.trim() !== '') {
     (window as any).dataLayer.push(arguments);
   };
   (window as any).gtag('js', new Date());
+  // Accept the cross-domain linker (_gl param) the marketing site sends so both
+  // strato.nexus and app.strato.nexus share one client ID on the unified property.
+  (window as any).gtag('set', 'linker', {
+    domains: ['strato.nexus', 'app.strato.nexus'],
+    accept_incoming: true,
+  });
   (window as any).gtag('config', gaId);
 }
 
