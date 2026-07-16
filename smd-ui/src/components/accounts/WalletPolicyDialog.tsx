@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { CopyButton } from "@/components/CopyButton";
+import { AddressInput } from "@/components/AddressInput";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { useContractState, compileContract } from "@/services/contracts";
 import {
@@ -53,7 +54,9 @@ export function WalletPolicyDialog({ wallet }: { wallet: UserWallet }) {
   const [template, setTemplate] = useState<PolicyTemplate>("allowlist");
   const [handler, setHandler] = useState("onCall");
   const [defaultAction, setDefaultAction] = useState<DefaultAction>("reject");
-  const [addresses, setAddresses] = useState<string[]>([""]);
+  const [addresses, setAddresses] = useState<{ text: string; addr: string }[]>([
+    { text: "", addr: "" },
+  ]);
   const [showSource, setShowSource] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -67,7 +70,7 @@ export function WalletPolicyDialog({ wallet }: { wallet: UserWallet }) {
       generatePolicySource(template, {
         contractName,
         handler,
-        addresses,
+        addresses: addresses.map((a) => a.addr || a.text),
         defaultAction,
       }),
     [template, contractName, handler, addresses, defaultAction]
@@ -147,11 +150,13 @@ export function WalletPolicyDialog({ wallet }: { wallet: UserWallet }) {
     }
   };
 
-  const updateAddress = (i: number, v: string) =>
-    setAddresses((prev) => prev.map((a, idx) => (idx === i ? v : a)));
-  const addAddress = () => setAddresses((prev) => [...prev, ""]);
+  const updateAddress = (i: number, text: string, addr: string) =>
+    setAddresses((prev) => prev.map((a, idx) => (idx === i ? { text, addr } : a)));
+  const addAddress = () => setAddresses((prev) => [...prev, { text: "", addr: "" }]);
   const removeAddress = (i: number) =>
-    setAddresses((prev) => (prev.length === 1 ? [""] : prev.filter((_, idx) => idx !== i)));
+    setAddresses((prev) =>
+      prev.length === 1 ? [{ text: "", addr: "" }] : prev.filter((_, idx) => idx !== i)
+    );
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -262,11 +267,12 @@ export function WalletPolicyDialog({ wallet }: { wallet: UserWallet }) {
                   <Label className="text-muted-foreground">Addresses</Label>
                   <div className="mt-1 space-y-2">
                     {addresses.map((a, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <Input
-                          value={a}
-                          onChange={(e) => updateAddress(i, e.target.value)}
-                          placeholder="0x…"
+                      <div key={i} className="flex items-start gap-2">
+                        <AddressInput
+                          value={a.text}
+                          resolved={a.addr}
+                          onChange={(text, addr) => updateAddress(i, text, addr)}
+                          placeholder="0x… address or username"
                           className="font-mono text-xs"
                         />
                         <Button

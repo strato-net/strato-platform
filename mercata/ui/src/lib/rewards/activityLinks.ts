@@ -28,6 +28,12 @@ export const getActivityLink = (activityName: string): string | null => {
     return '/dashboard/earn-save';
   }
 
+  // STRATO staking activities - goes to the Stake page
+  // (matched on 'strato staking' so LP-staking style names don't collide)
+  if (lowerName.includes('strato staking')) {
+    return '/dashboard/earn-staking';
+  }
+
   // ETH Carry Vault
   if (lowerName.includes('eth carry vault')) {
     return '/dashboard/earn-yield-vault?vault=eth-carry';
@@ -43,9 +49,9 @@ export const getActivityLink = (activityName: string): string | null => {
     return '/dashboard/earn-yield-vault?vault=usdc-yield';
   }
 
-  // Vault activities - goes to the Vault page
+  // Diversified Vault activities - goes to the Advanced page, Vault tab
   if (lowerName.includes('vault')) {
-    return '/dashboard/vault';
+    return '/dashboard/advanced?tab=vault';
   }
   
   // Swap LP activities - goes to the Advanced page, Swap Pools tab
@@ -58,14 +64,14 @@ export const getActivityLink = (activityName: string): string | null => {
     return '/dashboard/swap';
   }
 
-  // Borrow activities - goes to the Advanced page, Borrow tab
+  // Borrow activities - goes to the Borrow page (CDP vaults)
   if (lowerName.includes('borrow')) {
-    return '/dashboard/advanced?tab=borrow';
+    return '/dashboard/borrow';
   }
   
-  // Lending activities - goes to the Advanced page, Lending Pools tab
+  // Lending activities - goes to the Advanced page (hidden tab, defaults to swap)
   if (lowerName.includes('lend')) {
-    return '/dashboard/advanced?tab=lending';
+    return '/dashboard/advanced';
   }
 
   // Deposit activities - goes to the Deposits page
@@ -78,9 +84,9 @@ export const getActivityLink = (activityName: string): string | null => {
     return '/dashboard/withdrawals';
   }
 
-  // Safety Module activities - goes to the Advanced page, Safety tab
+  // Safety Module activities - goes to the Advanced page (hidden tab, defaults to swap)
   if (lowerName.includes('safety')) {
-    return '/dashboard/advanced?tab=safety';
+    return '/dashboard/advanced';
   }
 
   // No match found

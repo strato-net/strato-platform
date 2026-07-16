@@ -85,6 +85,10 @@ getParams "upquark" =
         NetworkParams
           { ethAddress = Address 0x100, -- not important
             webAddress = "54.83.139.46"
+          },
+        NetworkParams
+          { ethAddress = Address 0x100, -- not important
+            webAddress = "3.84.124.109"
           }
       ]
 

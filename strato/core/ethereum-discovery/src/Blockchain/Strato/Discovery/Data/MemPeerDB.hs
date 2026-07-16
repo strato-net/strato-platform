@@ -103,9 +103,15 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => HasPeerDB (MemPeerDBM m) where
   updateIP peer' ip = do
     peerMap <- fmap stringPPeerMap accessEnv
     atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerIp = Just ip}))
+  updateTcpPort peer' (TCPPort pn) = do
+    peerMap <- fmap stringPPeerMap accessEnv
+    atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerTcpPort = pn}))
   updateTcpEnableTime peer' enableTime = do
     peerMap <- fmap stringPPeerMap accessEnv
     atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerEnableTime = enableTime}))
+  updateUdpPort peer' (UDPPort pn) = do
+    peerMap <- fmap stringPPeerMap accessEnv
+    atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerUdpPort = pn}))
 
   updatePeerDisable peer' d = do
     peerMap <- fmap stringPPeerMap accessEnv
@@ -162,7 +168,9 @@ instance (MonadTrans t, Monad m, HasPeerDB m) => HasPeerDB (t m) where
   getClosestPeers a b = lift $ getClosestPeers a b
   updateUdpEnableTime a b = lift $ updateUdpEnableTime a b
   updateIP a b = lift $ updateIP a b
+  updateTcpPort a b = lift $ updateTcpPort a b
   updateTcpEnableTime a b = lift $ updateTcpEnableTime a b
+  updateUdpPort a b = lift $ updateUdpPort a b
   updatePeerDisable a b = lift $ updatePeerDisable a b
   updatePeerLastBestBlockHash a b = lift $ updatePeerLastBestBlockHash a b
   updatePeerUdpDisable a b = lift $ updatePeerUdpDisable a b

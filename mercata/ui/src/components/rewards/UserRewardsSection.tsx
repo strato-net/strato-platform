@@ -310,7 +310,7 @@ export const UserRewardsSection = ({
                           lowerName.includes("save usdst") ||
                           lowerName.includes("saveusdst") ||
                           (normalizedSaveUsdstSource && normalizedSource === normalizedSaveUsdstSource)
-                            ? (saveUsdstInfo?.tvlUsd || saveUsdstInfo?.pricingAssets || saveUsdstInfo?.totalAssets || null)
+                            ? (saveUsdstInfo?.projectedTvlUsd || saveUsdstInfo?.tvlUsd || saveUsdstInfo?.projectedPricingAssets || saveUsdstInfo?.pricingAssets || saveUsdstInfo?.totalAssets || null)
                             : null;
 
                         const totalStakeUsd = BigInt(activity.totalStakeUsd || fallbackStakeUsd || "0");
