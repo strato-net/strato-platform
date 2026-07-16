@@ -263,7 +263,7 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
           ]
     _ -> [])
 slipstreamQueryText _ CreateView{..} =
-  let baseColumnSet = Set.fromList $ sourceTableColumns ++ contractTableColumns
+  let baseColumnSet = Set.fromList $ sourceTableColumns ++ contractTableColumns ++ codeTableColumns
    in T.concat $
         [ "DROP VIEW IF EXISTS "
         , tableNameToDoubleQuoteText viewName
@@ -674,7 +674,7 @@ createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, val
     , ([Right "value", Left "::text"], Just "NOT IN", "('\"\"', '0', 'false')")
     , ([Left "jsonb_typeof(", Right "value", Left ")"], Just "IS", "NOT NULL")
     ]
-    Nothing
+    (Just $ ["s.address", "s.path", "x.creator", "c.contract_name"])
   let addressFK = ForeignKeyInfo (tableNameToText $ indexTableName creator n) tableName (indexTableName creator n) False "address" SqlText
   let o2mFK = ForeignKeyInfo (tableNameToText tableName) (indexTableName creator n) tableName True "address" SqlText
   pure $ addressFK : o2mFK : case getTableColumnAndType False cc [("value", valueType)] of
@@ -978,7 +978,7 @@ createEventTable (creator, n) evName ev cc inherited = do
             []
             ["address", "block_hash", "event_index"]
             [([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName')]
-            Nothing
+            (Just $ ["s.address", "s.block_hash", "s.event_index", "x.creator", "c.contract_name"])
     ) <$> [False] -- , (True, tableNameToText tableName)]
   arrayFkeys <- forM arrayNamesAndTypes $
     createEventArrayTable (crtr, cname, escapeQuotes $ labelToText evName) cc inherited
