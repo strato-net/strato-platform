@@ -144,7 +144,8 @@ contract DepositRouter is
         uint256 depositedAmount = IERC20(token).balanceOf(safe) - balanceBefore;
 
         if (depositedAmount == 0) revert ZeroAmount();
-        if (depositedAmount < amount) revert FeesNotSupported();
+        uint256 negligibleAmount = 2;
+        if (depositedAmount + negligibleAmount < amount) revert FeesNotSupported();
 
         emit DepositRouted(
             token,
