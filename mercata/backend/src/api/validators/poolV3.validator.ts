@@ -57,7 +57,9 @@ export function validatePoolV3SwapArgs(args: any) {
     zeroForOne: Joi.boolean().required(),
     amountSpecified: signedNumericStringField("amountSpecified").required(),
     amountLimit: numericStringField("amountLimit").required(),
-    sqrtPriceLimitX96: numericStringField("sqrtPriceLimitX96"),
+    // Optional price limit; the service defaults it to "0" (swap to the tick-domain edge),
+    // so it must be omittable AND accept the "0" sentinel (allowZero).
+    sqrtPriceLimitX96: numericStringField("sqrtPriceLimitX96", { allowZero: true }).optional(),
   });
   const { error } = schema.validate(args);
   if (error) throw new Error("PoolV3 Swap Argument Validation Error: " + error.message);
@@ -96,8 +98,10 @@ export function validatePoolV3CollectArgs(args: any) {
     poolAddress: validateAddressField("poolAddress").required(),
     tickLower: tickField.required(),
     tickUpper: tickField.required(),
-    amount0Requested: numericStringField("amount0Requested"),
-    amount1Requested: numericStringField("amount1Requested"),
+    // Both optional: the service defaults each to uint128-max (collect everything owed).
+    // allowZero so a caller can explicitly request zero of one side.
+    amount0Requested: numericStringField("amount0Requested", { allowZero: true }).optional(),
+    amount1Requested: numericStringField("amount1Requested", { allowZero: true }).optional(),
   });
   const { error } = schema.validate(args);
   if (error) throw new Error("PoolV3 Collect Argument Validation Error: " + error.message);
