@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { formatBalance } from "@/utils/numberUtils";
+import { formatTokenAmount } from "./poolV3Utils";
 import { formatTickAsPrice } from "./poolV3Utils";
 
 interface V3PositionsListProps {
@@ -100,19 +100,19 @@ const V3PositionsList = ({ pool, positions, loading, onChanged }: V3PositionsLis
               <div className="flex flex-col">
                 <span className="text-muted-foreground">Position value</span>
                 <span className="font-medium">
-                  {formatBalance(position.amount0, pool.token0.symbol, undefined, 2, 6)}
+                  {formatTokenAmount(position.amount0, pool.token0.decimals)} {pool.token0.symbol}
                 </span>
                 <span className="font-medium">
-                  {formatBalance(position.amount1, pool.token1.symbol, undefined, 2, 6)}
+                  {formatTokenAmount(position.amount1, pool.token1.decimals)} {pool.token1.symbol}
                 </span>
               </div>
               <div className="flex flex-col">
                 <span className="text-muted-foreground">Uncollected (principal + fees)</span>
                 <span className="font-medium">
-                  {formatBalance(position.tokensOwed0, pool.token0.symbol, undefined, 2, 6)}
+                  {formatTokenAmount(position.tokensOwed0, pool.token0.decimals)} {pool.token0.symbol}
                 </span>
                 <span className="font-medium">
-                  {formatBalance(position.tokensOwed1, pool.token1.symbol, undefined, 2, 6)}
+                  {formatTokenAmount(position.tokensOwed1, pool.token1.decimals)} {pool.token1.symbol}
                 </span>
               </div>
             </div>

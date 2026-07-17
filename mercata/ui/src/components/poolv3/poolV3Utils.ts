@@ -3,9 +3,64 @@
  * integer amounts always come from the backend (/poolv3/amounts-for-liquidity,
  * /poolv3/quote), which mirrors the on-chain math bit-for-bit.
  */
+import { formatUnits } from "ethers";
 
 export const V3_MIN_TICK = -887272;
 export const V3_MAX_TICK = 887272;
+
+/**
+ * Format a token amount (wei string/bigint) for display.
+ *
+ * Rounds (so liquidity-quantization dust such as 99.99999999e18 renders as "100.00", not
+ * the truncated "99.999999"), always shows at least 2 fraction digits so exact amounts read
+ * "1.00" / "100.00" (users can tell there is no hidden precision), keeps the whole integer
+ * part intact, keeps sub-1 values precise to `sigDigits` significant figures (0.0001235),
+ * shows a "<…" marker for values below display resolution, and locale-groups thousands.
+ *
+ * DISPLAY ONLY — never feed this back into a transaction; the exact integer wei from the
+ * backend is what gets signed.
+ */
+export const formatTokenAmount = (
+  amountWei: string | bigint,
+  decimals = 18,
+  sigDigits = 4
+): string => {
+  let wei: bigint;
+  try {
+    wei = typeof amountWei === "bigint" ? amountWei : BigInt(amountWei ?? "0");
+  } catch {
+    return "0";
+  }
+  if (wei === 0n) return "0";
+
+  // float64 carries ~15-16 significant digits — ample for rounding to `sigDigits` for display
+  const value = Number(formatUnits(wei, decimals));
+  if (!isFinite(value) || value === 0) return "0";
+
+  const abs = Math.abs(value);
+  const minShownDecimals = sigDigits + 2;
+  const minShown = Math.pow(10, -minShownDecimals); // e.g. 4 sig -> 0.000001
+  if (abs < minShown) return `<${minShown.toFixed(minShownDecimals)}`;
+
+  // Always show at least 2 fraction digits so exact values read "1.00" (signalling no hidden
+  // precision), and up to `sigDigits` significant digits of extra precision for finer amounts.
+  // Expressed purely via fraction-digit bounds: this rounds (dust -> "100.00"), never truncates,
+  // and avoids relying on Intl combining significant + fraction options (not portable).
+  let maxFractionDigits: number;
+  if (abs >= 1) {
+    // Keep the whole integer part; the extra precision budget goes to the fraction.
+    const intDigits = Math.floor(Math.log10(abs)) + 1;
+    maxFractionDigits = Math.max(2, sigDigits - intDigits);
+  } else {
+    // Sub-1: keep `sigDigits` significant figures (0.12, 0.0001235), floored at 2 decimals.
+    const leadingZeros = -Math.floor(Math.log10(abs)) - 1;
+    maxFractionDigits = leadingZeros + sigDigits;
+  }
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: maxFractionDigits,
+  }).format(value);
+};
 
 /** token1-per-token0 price for a tick (display precision) */
 export const tickToPrice = (tick: number): number => Math.pow(1.0001, tick);

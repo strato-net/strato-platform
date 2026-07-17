@@ -4,13 +4,14 @@ import { useSwapContext } from "@/context/SwapContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { formatUnits, safeParseUnits, formatBalance } from "@/utils/numberUtils";
+import { formatUnits, safeParseUnits } from "@/utils/numberUtils";
 import {
   priceToTick,
   snapTick,
   fullRangeTicks,
   formatTickAsPrice,
   formatPriceWad,
+  formatTokenAmount,
 } from "./poolV3Utils";
 
 const MINT_SLIPPAGE_BPS = 100n; // 1% headroom on the amount maxes
@@ -340,11 +341,11 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
         <div className="bg-muted/50 rounded-lg border border-border p-3 space-y-1 text-xs">
           <div className="flex justify-between">
             <span className="text-muted-foreground">{pool.token0.symbol} deposited</span>
-            <span className="font-medium">{formatBalance(preview.amount0, pool.token0.symbol, undefined, 2, 6)}</span>
+            <span className="font-medium">{formatTokenAmount(preview.amount0, pool.token0.decimals)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">{pool.token1.symbol} deposited</span>
-            <span className="font-medium">{formatBalance(preview.amount1, pool.token1.symbol, undefined, 2, 6)}</span>
+            <span className="font-medium">{formatTokenAmount(preview.amount1, pool.token1.decimals)}</span>
           </div>
           <div className="flex justify-between border-t border-border pt-1 mt-1">
             <span className="text-muted-foreground">Liquidity</span>
