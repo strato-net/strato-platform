@@ -11,8 +11,6 @@ import { startNativeRedemptionPolling } from "./polling/nativeRedemptionPolling"
 import { initializeMercataPolling } from "./polling/mercataPolling";
 import { initOpenIdConfig} from "./auth";
 import { healthMonitor } from "./utils/healthMonitor";
-import DepositActionController from "./controllers/depositAction.controller";
-import AuthHandler from "./auth/tokenMiddleware";
 
 const app = express();
 const port = process.env.PORT || 3003;
@@ -41,7 +39,6 @@ app.get("/health", async (_, res) => {
   const errorFileExists = await healthMonitor.errorFileExists();
   res.status(errorFileExists ? 500 : 200).json({status: !errorFileExists, message: 'pong'})
 });
-app.post("/request-deposit-action", AuthHandler.authorizeRequest(), DepositActionController.requestDepositAction);
 
 app.listen(port, async () => {
   try {

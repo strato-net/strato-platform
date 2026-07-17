@@ -92,6 +92,42 @@ const parseBurnConfig = (value: unknown): BurnConfigInfo => {
   };
 };
 
+export interface PsmMintState {
+  mintableToken: string;
+  mintPaused: boolean;
+  mintConfigs: Map<string, MintConfigInfo>;
+}
+
+export const getPsmMintState = async (accessToken: string): Promise<PsmMintState> => {
+  const psmAddress = getPsmAddress();
+  const [psmResponse, mintConfigResponse] = await Promise.all([
+    cirrus.get(accessToken, `/${DirectMintPSM}`, {
+      params: {
+        address: `eq.${psmAddress}`,
+        select: "mintableToken,mintPaused",
+        limit: "1",
+      },
+    }),
+    cirrus.get(accessToken, `/${DirectMintPSM}-mintConfigs`, {
+      params: {
+        address: `eq.${psmAddress}`,
+        select: "key,value::text",
+      },
+    }),
+  ]);
+
+  return {
+    mintableToken: normalizeAddress(psmResponse.data?.[0]?.mintableToken),
+    mintPaused: toBoolean(psmResponse.data?.[0]?.mintPaused),
+    mintConfigs: new Map(
+      (mintConfigResponse.data || []).map((entry: any) => [
+        normalizeAddress(entry.key),
+        parseMintConfig(entry.value),
+      ])
+    ),
+  };
+};
+
 export interface BurnRequestInfo {
   id: string;
   amount: string;

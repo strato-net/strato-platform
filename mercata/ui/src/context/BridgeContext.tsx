@@ -15,9 +15,8 @@ import {
   NetworkSummary,
   BridgeContextType,
   WithdrawalRequestOptions,
-  DepositActionRequestOptions,
 } from "@/lib/bridge/types";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, DepositActionRequestParams, WithdrawalSummaryResponse, DepositAction } from "@mercata/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction } from "@mercata/shared-types";
 
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 
@@ -282,19 +281,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
 
-  const requestDepositAction = useCallback(
-    async (params: DepositActionRequestParams, options?: DepositActionRequestOptions): Promise<TransactionResponse> => {
-      setLoading(true);
-      try {
-        const { data } = await api.post<TransactionResponse>(`/bridge/requestDepositAction`, params, options as any);
-        return data;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
-  );
-
   // ========== TRANSACTION FUNCTIONS ==========
   const fetchDepositTransactions = useCallback(
     async (rawParams: Record<string, string | undefined> = {}, context?: string): Promise<BridgeTransactionResponse> => {
@@ -380,7 +366,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         targetTransactionTab,
         setTargetTransactionTab,
         requestWithdrawal,
-        requestDepositAction,
         useBalance,
         setSelectedNetwork: handleSetSelectedNetwork,
         setSelectedToken,
