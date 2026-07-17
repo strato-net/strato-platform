@@ -547,24 +547,24 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     return tokenBalancesByAddress.get(token.externalToken.toLowerCase());
   }, [nativeBalance?.value, tokenBalancesByAddress]);
 
-  const isTokenOptionDisabled = useCallback((token: typeof uniqueExternalTokens[number]) => {
-    if (!hasExternalWallet || !expectedChainId) return false;
-    const balance = getTokenOptionBalance(token);
-    return balance !== undefined && balance <= 0n;
-  }, [expectedChainId, getTokenOptionBalance, hasExternalWallet]);
-
   const sortedFundTokens = useMemo(
     () => [...uniqueExternalTokens, ...nativeBridgeTokens]
       .filter((token) => token.externalSymbol || token.externalName)
       .sort((a, b) => {
-        const disabledOrder = Number(isTokenOptionDisabled(a)) - Number(isTokenOptionDisabled(b));
-        if (disabledOrder !== 0) return disabledOrder;
+        const aBalance = getTokenOptionBalance(a) || 0n;
+        const bBalance = getTokenOptionBalance(b) || 0n;
+        const aDecimals = BigInt(a.externalDecimals || "18");
+        const bDecimals = BigInt(b.externalDecimals || "18");
+        const normalizedA = aDecimals < bDecimals
+          ? aBalance * 10n ** (bDecimals - aDecimals)
+          : aBalance;
+        const normalizedB = bDecimals < aDecimals
+          ? bBalance * 10n ** (aDecimals - bDecimals)
+          : bBalance;
 
-        const aLabel = a.externalSymbol || a.externalName || "";
-        const bLabel = b.externalSymbol || b.externalName || "";
-        return aLabel.localeCompare(bLabel, undefined, { sensitivity: "base" });
+        return normalizedA === normalizedB ? 0 : normalizedA > normalizedB ? -1 : 1;
       }),
-    [isTokenOptionDisabled, nativeBridgeTokens, uniqueExternalTokens]
+    [getTokenOptionBalance, nativeBridgeTokens, uniqueExternalTokens]
   );
 
   const isBalanceLoading = hasExternalWallet && !!expectedChainId
@@ -1361,7 +1361,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                           value={t.routeType === "native"
                             ? `native:${t.id}`
                             : (t.externalToken || "").toLowerCase()}
-                          disabled={isTokenOptionDisabled(t)}
                         >
                           {fundTokenLabel(t)}
                         </SelectItem>
