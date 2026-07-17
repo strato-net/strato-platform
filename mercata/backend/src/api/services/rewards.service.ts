@@ -99,7 +99,11 @@ const inferStakeSemantics = (activity: {
 
 
 
+// Static address — only changes on redeploy
+let _mTokenCache: { value: string | null; expiresAt: number } | null = null;
+
 const getMTokenAddress = async (accessToken: string): Promise<string | null> => {
+  if (_mTokenCache && Date.now() < _mTokenCache.expiresAt) return _mTokenCache.value;
   try {
     const { data } = await cirrus.get(accessToken, `/${LendingPool}`, {
       params: {
@@ -109,7 +113,9 @@ const getMTokenAddress = async (accessToken: string): Promise<string | null> => 
         limit: "1",
       }
     });
-    return data?.[0]?.mToken || null;
+    const value = data?.[0]?.mToken || null;
+    _mTokenCache = { value, expiresAt: Date.now() + 3_600_000 };
+    return value;
   } catch {
     return null;
   }
@@ -431,20 +437,19 @@ export const fetchUserActivities = async (
 
     const activityIds = activities.map((a: any) => a.activityId);
 
-    const [activityStatesMap, userInfoMap, unclaimedRewards, claimedRewardsMap, bonusResult] = await Promise.all([
+    // User data + pricing in one parallel batch
+    const [activityStatesMap, userInfoMap, unclaimedRewards, claimedRewardsMap, bonusResult, priceMap, mTokenAddress, vaultShareTokenAddress] = await Promise.all([
       fetchActivityStates(accessToken, rewardsAddress, forceRefresh),
       fetchUserInfo(accessToken, rewardsAddress, normalizedUserAddress, activityIds, forceRefresh),
       fetchUnclaimedRewards(accessToken, rewardsAddress, normalizedUserAddress, forceRefresh),
       fetchClaimedRewards(accessToken, rewardsAddress),
-      fetchBonusRewards(accessToken, rewardsAddress, normalizedUserAddress)
-    ]);
-
-    // Build shared pricing context once (used for LP/share-token TVL conversions)
-    const [priceMap, mTokenAddress, vaultShareTokenAddress] = await Promise.all([
+      fetchBonusRewards(accessToken, rewardsAddress, normalizedUserAddress),
       getCompletePriceMap(accessToken),
       getMTokenAddress(accessToken),
       getVaultShareTokenAddress(accessToken).catch(() => ""),
     ]);
+
+    // Carry vault prices depend on priceMap from above
     const carryVaultUsdPriceMap = await getCarryVaultUsdPriceMap(accessToken, priceMap);
     const { sToken } = getSafetyModuleConfig();
     const pricingCtx = {
@@ -532,10 +537,13 @@ export const fetchAllActivities = async (
   const rewardsAddress = getRewardsAddress();
 
   try {
-    // Fetch all activities and their states
-    const [activitiesMap, activityStatesMap] = await Promise.all([
+    // Phase 1: contract state + pricing addresses in parallel
+    const [activitiesMap, activityStatesMap, priceMap, mTokenAddress, vaultShareTokenAddress] = await Promise.all([
       fetchActivities(accessToken, rewardsAddress, forceRefresh),
-      fetchActivityStates(accessToken, rewardsAddress, forceRefresh)
+      fetchActivityStates(accessToken, rewardsAddress, forceRefresh),
+      getCompletePriceMap(accessToken),
+      getMTokenAddress(accessToken),
+      getVaultShareTokenAddress(accessToken).catch(() => ""),
     ]);
 
     const activities = Array.from(activitiesMap.values());
@@ -544,12 +552,7 @@ export const fetchAllActivities = async (
       return [];
     }
 
-    // Build shared pricing context once (used for LP/share-token TVL conversions)
-    const [priceMap, mTokenAddress, vaultShareTokenAddress] = await Promise.all([
-      getCompletePriceMap(accessToken),
-      getMTokenAddress(accessToken),
-      getVaultShareTokenAddress(accessToken).catch(() => ""),
-    ]);
+    // Phase 2: carry vault prices (depends on priceMap from phase 1)
     const carryVaultUsdPriceMap = await getCarryVaultUsdPriceMap(accessToken, priceMap);
     const { sToken } = getSafetyModuleConfig();
     const pricingCtx = {

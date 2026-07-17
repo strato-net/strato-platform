@@ -233,7 +233,8 @@ const addYieldVaultTokenPrices = async (
   );
   if (!vaultAddrs.length) return;
 
-  for (const vaultAddress of vaultAddrs) {
+  // Parallel instead of sequential
+  await Promise.all(vaultAddrs.map(async (vaultAddress) => {
     const { data: rows } = await cirrus.get(accessToken, `/${YieldVault}`, {
       params: {
         address: `eq.${vaultAddress}`,
@@ -241,7 +242,7 @@ const addYieldVaultTokenPrices = async (
       },
     });
     const v = rows?.[0];
-    if (!v?._asset || !v.address) continue;
+    if (!v?._asset || !v.address) return;
 
     const { data: balRows } = await cirrus.get(accessToken, `/${Token}-_balances`, {
       params: {
@@ -258,7 +259,7 @@ const addYieldVaultTokenPrices = async (
     const totalShares = BigInt(v._totalSupply || "0");
     const pricePerShare = totalShares === 0n ? DECIMALS : (activeAssets * DECIMALS) / totalShares;
     priceMap.set(v.address, pricePerShare.toString());
-  }
+  }));
 };
 
 /**
@@ -280,7 +281,8 @@ export const getCarryVaultUsdPriceMap = async (
   );
   if (!vaultAddrs.length) return out;
 
-  for (const vaultAddress of vaultAddrs) {
+  // Parallel instead of sequential
+  await Promise.all(vaultAddrs.map(async (vaultAddress) => {
     const { data: rows } = await cirrus.get(accessToken, `/${YieldVault}`, {
       params: {
         address: `eq.${vaultAddress}`,
@@ -288,7 +290,7 @@ export const getCarryVaultUsdPriceMap = async (
       },
     });
     const v = rows?.[0];
-    if (!v?._asset || !v.address) continue;
+    if (!v?._asset || !v.address) return;
 
     const { data: balRows } = await cirrus.get(accessToken, `/${Token}-_balances`, {
       params: {
@@ -303,18 +305,18 @@ export const getCarryVaultUsdPriceMap = async (
     const totalAssets = idle + deployed;
     const activeAssets = getActiveAssets(totalAssets, BigInt(v.totalClaimableAssets || "0"));
     const totalShares = BigInt(v._totalSupply || "0");
-    if (totalShares === 0n) continue;
+    if (totalShares === 0n) return;
 
     const pricePerShareUnderlying = (activeAssets * DECIMALS) / totalShares;
 
     const assetKey = String(v._asset).toLowerCase();
     const assetUsdPriceStr = priceMap.get(assetKey) || priceMap.get(v._asset) || "0";
     const assetUsdPriceWad = BigInt(assetUsdPriceStr);
-    if (assetUsdPriceWad === 0n) continue;
+    if (assetUsdPriceWad === 0n) return;
 
     const pricePerShareUsdWad = (pricePerShareUnderlying * assetUsdPriceWad) / DECIMALS;
     out.set(String(v.address).toLowerCase(), pricePerShareUsdWad.toString());
-  }
+  }));
   return out;
 };
 
