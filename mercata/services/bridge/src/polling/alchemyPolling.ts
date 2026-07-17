@@ -1,44 +1,49 @@
-import { config, WAD } from "../config";
+import { config, DEPOSIT_EVENT_SIGNATURES, WAD } from "../config";
 import {
   getEnabledChains,
   getBridgeInfo,
   getRebaseFactors,
 } from "../services/cirrusService";
-import { depositBatch } from "../services/bridgeService";
+import {
+  depositBatch,
+  depositBatchWithAction,
+} from "../services/bridgeService";
 import { blockTrackingService } from "../services/blockTrackingService";
-import { NonEmptyArray, DepositArgs, ChainInfo } from "../types";
+import {
+  ActionDepositArgs,
+  ChainInfo,
+  DepositArgs,
+  NonEmptyArray,
+} from "../types";
 import {
   getCurrentBlockNumber,
   getChainLogs,
   isChainConfigured,
 } from "../services/rpcService";
 import { logError, logInfo } from "../utils/logger";
-import { normalizeAddress } from "../utils/utils";
+import {
+  classifyDepositLogs,
+  RawDepositLog,
+} from "../services/depositEventService";
 
-// DepositRouted(address,uint256,address,address,address,uint96) keccak256 hash
-import { DEPOSIT_EVENT_SIGNATURE } from "../config";
-
-const parseDepositEvents = async (logs: any[], externalChainId: number): Promise<DepositArgs[]> => {
-  return logs.map((log) => {
-    const externalToken = normalizeAddress(log.topics[1]);
-    const externalSender = normalizeAddress(log.topics[2]);
-    const stratoRecipient = normalizeAddress(log.topics[3]);
-    // Event: DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId)
-    // Data layout: [amount(32 bytes)][targetStratoToken(32 bytes)][depositId(32 bytes)]
-    const externalTokenAmount = BigInt("0x" + log.data.substring(2, 66)).toString();
-    const targetStratoTokenWord = log.data.substring(66, 130);
-    const targetStratoToken = normalizeAddress("0x" + targetStratoTokenWord.slice(-40));
-
-    return {
-      externalChainId,
-      externalSender,
-      externalToken,
-      externalTokenAmount,
-      externalTxHash: log.transactionHash,
-      stratoRecipient,
-      targetStratoToken,
-    };
-  });
+const applyRebaseFactors = async (
+  deposits: Array<DepositArgs | ActionDepositArgs>,
+) => {
+  if (deposits.length === 0) return;
+  const targetTokens = [...new Set(deposits.map((d) => d.targetStratoToken))];
+  const factors = await getRebaseFactors(targetTokens);
+  for (const deposit of deposits) {
+    const stratoKey = deposit.targetStratoToken.toLowerCase().replace(/^0x/, "");
+    const factor = factors.get(stratoKey);
+    if (!factor) continue;
+    const original = BigInt(deposit.externalTokenAmount);
+    const adjusted = (original * WAD) / factor;
+    logInfo(
+      "AlchemyPolling",
+      `Rebasing deposit ${deposit.externalTxHash}: ${original} → ${adjusted} (factor=${factor})`,
+    );
+    deposit.externalTokenAmount = adjusted.toString();
+  }
 };
 
 const pollChainForDeposits = async (chainInfo: ChainInfo) => {
@@ -51,80 +56,46 @@ const pollChainForDeposits = async (chainInfo: ChainInfo) => {
     blockchainLastProcessedBlock
   );
   
-  let currentBlock: number | null = null;
-  let depositsProcessed = false;
+  if (!isChainConfigured(externalChainId)) return;
 
-  try {
-    if (!isChainConfigured(externalChainId)) return;
+  const currentBlock = await getCurrentBlockNumber(externalChainId);
+  if (currentBlock <= lastProcessedBlock) return;
 
-    currentBlock = await getCurrentBlockNumber(externalChainId);
-    if (currentBlock <= lastProcessedBlock) {
-      return;
-    }
+  const logs = (await getChainLogs(
+    externalChainId,
+    lastProcessedBlock + 1,
+    currentBlock,
+    depositRouter,
+    DEPOSIT_EVENT_SIGNATURES,
+  )) as RawDepositLog[];
 
-    const logs = await getChainLogs(
+  if (logs.length === 0) {
+    await blockTrackingService.updateLastProcessedBlockLocally(
       externalChainId,
-      lastProcessedBlock + 1,
       currentBlock,
-      depositRouter,
-      DEPOSIT_EVENT_SIGNATURE,
     );
-
-    if (logs.length === 0) {
-      // No deposits found - only update locally
-      await blockTrackingService.updateLastProcessedBlockLocally(externalChainId, currentBlock);
-      return;
-    }
-
-    const validDeposits = await parseDepositEvents(logs, externalChainId);
-
-    const filteredDeposits = validDeposits.filter(
-      (deposit) => deposit !== null,
-    );
-    const failedParses = validDeposits.length - filteredDeposits.length;
-
-    // Apply rebase factor for xStock tokens (divide by currentMultiplier to get underlying shares)
-    if (filteredDeposits.length > 0) {
-      const targetTokens = [...new Set(filteredDeposits.map(d => d.targetStratoToken))];
-      const factors = await getRebaseFactors(targetTokens);
-      for (const deposit of filteredDeposits) {
-        const stratoKey = deposit.targetStratoToken.toLowerCase().replace(/^0x/, "");
-        const factor = factors.get(stratoKey);
-        if (factor) {
-          const original = BigInt(deposit.externalTokenAmount);
-          const adjusted = (original * WAD) / factor;
-          logInfo("AlchemyPolling", `Rebasing deposit ${deposit.externalTxHash}: ${original} → ${adjusted} (factor=${factor})`);
-          deposit.externalTokenAmount = adjusted.toString();
-        }
-      }
-    }
-
-    // Process valid deposits
-    if (filteredDeposits.length > 0) {
-      await depositBatch(filteredDeposits as NonEmptyArray<DepositArgs>);
-      depositsProcessed = true;
-    }
-
-    // If there were parse failures, throw error after processing valid ones
-    if (failedParses > 0) {
-      throw new Error(`Failed to parse ${failedParses} out of ${validDeposits.length} deposits for chain ${externalChainId}`);
-    }
-  } finally {
-    // Update lastProcessedBlock based on whether deposits were processed
-    if (currentBlock !== null && currentBlock > lastProcessedBlock) {
-      try {
-        if (depositsProcessed) {
-          // Deposits were processed - update both local and blockchain
-          await blockTrackingService.updateLastProcessedBlockEverywhere(externalChainId, currentBlock);
-        }
-        // Note: Local-only update for no deposits case is already handled above in the "no logs" section
-      } catch (updateError) {
-        // Enhance error with context before re-throwing
-        const enhancedError = new Error(`Block update failed for chain ${externalChainId} block ${currentBlock}: ${(updateError as Error).message}\nOriginal stack: ${(updateError as Error).stack}`);
-        throw enhancedError;
-      }
-    }
+    return;
   }
+
+  const classified = classifyDepositLogs(logs, externalChainId);
+  await applyRebaseFactors([
+    ...classified.standardDeposits,
+    ...classified.actionDeposits,
+  ]);
+  if (classified.standardDeposits.length > 0) {
+    await depositBatch(
+      classified.standardDeposits as NonEmptyArray<DepositArgs>,
+    );
+  }
+  if (classified.actionDeposits.length > 0) {
+    await depositBatchWithAction(
+      classified.actionDeposits as NonEmptyArray<ActionDepositArgs>,
+    );
+  }
+  await blockTrackingService.updateLastProcessedBlockEverywhere(
+    externalChainId,
+    currentBlock,
+  );
 };
 
 export const startMultiChainDepositPolling = () => {
@@ -137,7 +108,11 @@ export const startMultiChainDepositPolling = () => {
       if (info?.depositsPaused) return logInfo("AlchemyPolling", "Deposits are paused");
       const infos = Array.from(chains.values());
       (await Promise.allSettled(infos.map(pollChainForDeposits)))
-        .forEach((r, i) => r.status === "rejected" && logError("AlchemyPolling", r.reason, { operation: "pollChainForDeposits", chain: infos[i]}));
+        .forEach((result, i) => result.status === "rejected" &&
+          logError("AlchemyPolling", result.reason, {
+            operation: "pollChainForDeposits",
+            chain: infos[i],
+          }));
     } catch (e) {
       logError("AlchemyPolling", e as Error, { operation: "startMultiChainDepositPolling" });
     }
