@@ -121,6 +121,7 @@ data SlipstreamQuery = CreateTable
                         , jsonbColumns :: [(TableColumns, Text)]
                         , primaryKeyColumns :: [Text]
                         , extraJoinColumns :: [([Either Text Text], Maybe Text, Text)]
+                        , groupByClause :: Maybe [Text]
                         }
                      | InsertTable
                         { tableName :: TableName
@@ -262,7 +263,7 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
           ]
     _ -> [])
 slipstreamQueryText _ CreateView{..} =
-  let baseColumnSet = Set.fromList $ sourceTableColumns ++ contractTableColumns
+  let baseColumnSet = Set.fromList $ sourceTableColumns ++ contractTableColumns ++ codeTableColumns
    in T.concat $
         [ "DROP VIEW IF EXISTS "
         , tableNameToDoubleQuoteText viewName
@@ -410,6 +411,7 @@ slipstreamQueryText _ CreateView{..} =
             , val
             ]
           ) <$> extraJoinColumns
+        , maybe "" ((" GROUP BY " <>) . T.intercalate ", ") groupByClause
         , ";\n"
         -- , " WITH NO DATA;\n"
         -- , "CREATE UNIQUE INDEX \""
@@ -628,6 +630,7 @@ createIndexTable contract cc (creator, n) inherited = do
     []
     ["address"]
     []
+    (Just ["s.address", "x.creator", "c.contract_name"])
   pure fkeys
 
 createCollectionTable ::
@@ -671,6 +674,7 @@ createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, val
     , ([Right "value", Left "::text"], Just "NOT IN", "('\"\"', '0', 'false')")
     , ([Left "jsonb_typeof(", Right "value", Left ")"], Just "IS", "NOT NULL")
     ]
+    (Just $ ["s.address", "s.path", "x.creator", "c.contract_name"])
   let addressFK = ForeignKeyInfo (tableNameToText $ indexTableName creator n) tableName (indexTableName creator n) False "address" SqlText
   let o2mFK = ForeignKeyInfo (tableNameToText tableName) (indexTableName creator n) tableName True "address" SqlText
   pure $ addressFK : o2mFK : case getTableColumnAndType False cc [("value", valueType)] of
@@ -710,6 +714,7 @@ createEventArrayTable (creator, n, e) cc inherited (arr, arrType) = do
     [ ([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName)
     , ([Right "collection_name"], Nothing, wrapEscapeSingle $ tableNameCollectionName tableName)
     ]
+    Nothing
   pure $ case getTableColumnAndType False cc [("value", arrType)] of
     [(x, _, Just f)] -> Just $ ForeignKeyInfo (x <> "_fkey") tableName (indexTableName creator f) False x SqlJsonb
     _ -> Nothing
@@ -973,6 +978,7 @@ createEventTable (creator, n) evName ev cc inherited = do
             []
             ["address", "block_hash", "event_index"]
             [([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName')]
+            (Just $ ["s.address", "s.block_hash", "s.event_index", "x.creator", "c.contract_name"])
     ) <$> [False] -- , (True, tableNameToText tableName)]
   arrayFkeys <- forM arrayNamesAndTypes $
     createEventArrayTable (crtr, cname, escapeQuotes $ labelToText evName) cc inherited

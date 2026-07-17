@@ -43,8 +43,18 @@ for arg in "$@"; do
     esac
 done
 
-strato-setup "${SETUP_ARGS[@]}"
 NODE_DIR="$1"
+
+# If the node directory already exists, we are just (re)starting an existing node,
+# not instantiating a new one - so a snapshot restore is neither needed nor safe.
+# This must be checked before strato-setup, which creates the directory.
+if [[ "$FROM_SNAPSHOT" == "true" && -n "$NODE_DIR" && -d "$NODE_DIR" ]]; then
+    echo "Note: the --snapshot flag is ignored because node directory '$NODE_DIR' already exists;"
+    echo "      starting the existing node without downloading or restoring a snapshot."
+    FROM_SNAPSHOT="false"
+fi
+
+strato-setup "${SETUP_ARGS[@]}"
 
 if [[ "$FROM_SNAPSHOT" == "true" ]]; then
     if [[ -n "$SNAPSHOT_SOURCE" ]]; then

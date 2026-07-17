@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import UsdstBalanceBox from "@/components/layouts/UsdstBalanceBox";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Transport, WagmiProvider } from "wagmi";
 import { mainnet, polygon, sepolia, base, baseSepolia, linea, lineaSepolia } from "wagmi/chains";
 import {
@@ -31,7 +31,6 @@ import Rewards from "./pages/Rewards";
 import Claim from "./pages/Claim";
 import CommunityRewardsOnePager from "./pages/CommunityRewardsOnePager";
 import PriceTracking from "./pages/PriceTracking";
-import Vault from "./pages/Vault";
 import Earn from "./pages/Earn";
 import EarnSave from "./pages/EarnSave";
 import EarnVault from "./pages/EarnVault";
@@ -74,7 +73,6 @@ import { getConfig } from "./lib/config";
 import { useState, useEffect, type ReactNode } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { csrfOnRequest, initializeCsrfToken } from "./lib/csrf";
-import { captureAttribution } from "./lib/attribution";
 import { getNodeHealth, shouldShowNodeHealth, type NodeHealth } from "./lib/nodeHealth";
 import { useUser } from "@/context/UserContext";
 
@@ -100,11 +98,6 @@ const App = () => {
   // Initialize CSRF token on app startup
   useEffect(() => {
     initializeCsrfToken();
-  }, []);
-
-  // Capture inbound UTM params before any auth redirect (Keycloak strips query params).
-  useEffect(() => {
-    captureAttribution();
   }, []);
 
   useEffect(() => {
@@ -162,6 +155,7 @@ const App = () => {
   useEffect(() => {
     if (!loading) {
       const appName = "STRATO";
+      const origin = window.location.origin;
       const stratoChain = getStratoChain();
       const networkName = (window as { ENV?: { NETWORK_NAME?: string } }).ENV?.NETWORK_NAME || "";
       const isProduction = networkName === "upquark";
@@ -174,9 +168,9 @@ const App = () => {
         chains.map((chain) => [
           chain.id,
           chain === stratoChain
-            ? http(`/rpc`)
+            ? http(`${origin}/rpc`)
             : proxiedChainIds.has(chain.id)
-              ? http(`/api/rpc/${chain.id}`, { fetchOptions: { credentials: "include" }, onFetchRequest: csrfOnRequest })
+              ? http(`${origin}/api/rpc/${chain.id}`, { fetchOptions: { credentials: "include" }, onFetchRequest: csrfOnRequest })
               : http(),
         ])
       );
@@ -325,11 +319,7 @@ const App = () => {
                                                 />
                                                 <Route
                                                   path="/dashboard/vault"
-                                                  element={
-                                                    <GuestAccessibleRoute>
-                                                      <Vault />
-                                                    </GuestAccessibleRoute>
-                                                  }
+                                                  element={<Navigate to="/dashboard/advanced?tab=vault" replace />}
                                                 />
                                                 <Route
                                                   path="/dashboard/earn-vault"

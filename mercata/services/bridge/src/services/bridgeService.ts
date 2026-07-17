@@ -843,6 +843,16 @@ export const queueManualNativeWithdrawalBatch = async (
       );
       await recordNativeWithdrawalProposal(withdrawal.withdrawalId, proposalReference);
 
+      try {
+        await sendEmail(proposalReference, withdrawal.externalChainId);
+      } catch (emailError) {
+        logError("BridgeService", emailError as Error, {
+          operation: "sendEmail",
+          safeTxHash: proposalReference,
+          withdrawalId: withdrawal.withdrawalId,
+        });
+      }
+
       const baseMessage =
         `Native withdrawal ${withdrawal.withdrawalId} exceeds the instant threshold and remains pending manual approval/execution`;
       const suffix = proposalReference
