@@ -537,12 +537,44 @@ export const collect = async (
 };
 
 /** Admin: create a pool via the factory (owner is AdminRegistry — may surface a governance vote) */
+/** Resolve each token's decimals from the Token table (defaults to 18 if unset). */
+const fetchTokenDecimals = async (
+  accessToken: string,
+  addresses: string[]
+): Promise<Map<string, number>> => {
+  const addrs = addresses.map(normalizeAddress);
+  const { data } = await cirrus.get(accessToken, `/BlockApps-Token`, {
+    params: { address: `in.(${addrs.join(",")})`, select: "address,customDecimals" },
+  });
+  const map = new Map<string, number>();
+  for (const row of (data as { address: string; customDecimals: number | null }[]) ?? []) {
+    map.set(row.address, row.customDecimals ?? 18);
+  }
+  return map;
+};
+
 export const createPool = async (
   accessToken: string,
   params: PoolV3CreateParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
   if (!config.poolV3Factory) throw new Error("POOL_V3_FACTORY is not configured");
+
+  // Accept either an explicit Q64.96 sqrt price or a human-readable price (converted here
+  // using each token's decimals). The pool orders tokens as passed: tokenA=token0,
+  // tokenB=token1, so `price` is token1-per-token0 (tokenB per tokenA).
+  let initialSqrtPriceX96 = params.initialSqrtPriceX96;
+  if (!initialSqrtPriceX96) {
+    if (!params.price) throw new Error("Either price or initialSqrtPriceX96 is required");
+    const decimals = await fetchTokenDecimals(accessToken, [params.tokenA, params.tokenB]);
+    const dec0 = decimals.get(normalizeAddress(params.tokenA));
+    const dec1 = decimals.get(normalizeAddress(params.tokenB));
+    if (dec0 === undefined || dec1 === undefined) {
+      throw new Error("Could not resolve token decimals — are both tokens indexed?");
+    }
+    initialSqrtPriceX96 = v3.priceToSqrtPriceX96(params.price, dec0, dec1).toString();
+  }
+
   const tx = await buildFunctionTx(
     [
       {
@@ -553,7 +585,7 @@ export const createPool = async (
           tokenA: normalizeAddress(params.tokenA),
           tokenB: normalizeAddress(params.tokenB),
           fee: params.fee,
-          initialSqrtPriceX96: params.initialSqrtPriceX96,
+          initialSqrtPriceX96,
         },
       },
     ],

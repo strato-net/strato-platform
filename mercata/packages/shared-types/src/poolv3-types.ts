@@ -128,6 +128,10 @@ export interface PoolV3CreateParams {
   tokenA: string;
   tokenB: string;
   fee: number;
-  /** initial sqrt price, Q64.96 decimal string */
-  initialSqrtPriceX96: string;
+  /** initial sqrt price, Q64.96 decimal string. Provide this OR `price`. */
+  initialSqrtPriceX96?: string;
+  /** human-readable initial price, token1(tokenB) per token0(tokenA), e.g. "2000".
+   *  The backend converts it to Q64.96 using each token's decimals. Provide this OR
+   *  `initialSqrtPriceX96`. */
+  price?: string;
 }

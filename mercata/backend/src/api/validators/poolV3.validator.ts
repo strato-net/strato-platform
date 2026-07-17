@@ -108,12 +108,16 @@ export function validatePoolV3CollectArgs(args: any) {
 }
 
 export function validatePoolV3CreateArgs(args: any) {
+  // Accept either a raw Q64.96 sqrt price or a human-readable price (converted server-side
+  // from each token's decimals). Exactly one is required — `.or(...)` enforces at-least-one.
   const schema = Joi.object({
     tokenA: validateAddressField("tokenA").required(),
     tokenB: validateAddressField("tokenB").required(),
     fee: Joi.number().integer().min(1).max(999999).required(),
-    initialSqrtPriceX96: numericStringField("initialSqrtPriceX96").required(),
-  });
+    initialSqrtPriceX96: numericStringField("initialSqrtPriceX96").optional(),
+    price: numericStringField("price").optional(),
+  })
+    .or("initialSqrtPriceX96", "price");
   const { error } = schema.validate(args);
   if (error) throw new Error("PoolV3 Create Argument Validation Error: " + error.message);
 }

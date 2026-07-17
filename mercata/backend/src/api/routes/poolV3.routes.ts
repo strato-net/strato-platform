@@ -16,6 +16,11 @@ const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
  *         description: V3 pool list (deepest liquidity first)
  *   post:
  *     summary: Create a V3 pool (admin; owner is AdminRegistry, may raise a governance vote)
+ *     description: >-
+ *       Supply the initial price as EITHER `price` (human-readable) OR `initialSqrtPriceX96`
+ *       (raw Q64.96) — exactly one is required. `tokenA` becomes token0 and `tokenB` token1,
+ *       so the price is token1-per-token0 (tokenB per tokenA). `price` is converted to Q64.96
+ *       server-side using each token's decimals.
  *     tags: [PoolV3]
  *     requestBody:
  *       required: true
@@ -23,12 +28,16 @@ const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
  *         application/json:
  *           schema:
  *             type: object
- *             required: [tokenA, tokenB, fee, initialSqrtPriceX96]
+ *             required: [tokenA, tokenB, fee]
+ *             oneOf:
+ *               - { required: [price] }
+ *               - { required: [initialSqrtPriceX96] }
  *             properties:
- *               tokenA: { type: string }
- *               tokenB: { type: string }
- *               fee: { type: integer, description: "fee tier in pips (500/3000/10000)" }
- *               initialSqrtPriceX96: { type: string, description: "Q64.96 sqrt price, decimal string" }
+ *               tokenA: { type: string, description: "becomes token0" }
+ *               tokenB: { type: string, description: "becomes token1" }
+ *               fee: { type: integer, description: "fee tier in pips; must be enabled (default 500/3000/10000)" }
+ *               price: { type: string, description: "human-readable initial price, tokenB per tokenA (e.g. \"2000\", \"1793.25\"); converted to Q64.96 using token decimals. Provide this OR initialSqrtPriceX96" }
+ *               initialSqrtPriceX96: { type: string, description: "raw Q64.96 sqrt price, decimal string. Provide this OR price" }
  *     responses:
  *       200:
  *         description: Transaction result

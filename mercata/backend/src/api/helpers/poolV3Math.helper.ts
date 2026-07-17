@@ -377,6 +377,50 @@ export function sqrtPriceX96ToPriceWad(sqrtPriceX96: bigint): bigint {
   return (sqrtPriceX96 * sqrtPriceX96 * 10n ** 18n) / (Q96 * Q96);
 }
 
+/** Integer square root (floor), for bigint. */
+export function isqrt(n: bigint): bigint {
+  if (n < 0n) throw new Error("isqrt of negative");
+  if (n < 2n) return n;
+  let x = n;
+  let y = (x + 1n) / 2n;
+  while (y < x) {
+    x = y;
+    y = (x + n / x) / 2n;
+  }
+  return x;
+}
+
+/**
+ * Convert a human-readable price to a Q64.96 sqrt price.
+ * @param price token1-per-token0 as a decimal string (e.g. "2000", "1793.25")
+ * @param decimals0 decimals of token0 (tokenA)
+ * @param decimals1 decimals of token1 (tokenB)
+ * @dev The pool's raw price is in smallest units, so it equals humanPrice * 10^(decimals1 -
+ *      decimals0); sqrtPriceX96 = sqrt(rawPrice) * 2^96. Computed as the integer sqrt of a
+ *      rational (numerator/denominator) so a decimals mismatch never shifts the result.
+ *      Throws if the result falls outside the representable [MIN_SQRT_RATIO, MAX_SQRT_RATIO).
+ */
+export function priceToSqrtPriceX96(price: string, decimals0: number, decimals1: number): bigint {
+  const m = /^(\d+)(?:\.(\d+))?$/.exec(price.trim());
+  if (!m) throw new Error(`price must be a non-negative decimal string, got: ${price}`);
+  const frac = m[2] ?? "";
+  const priceNum = BigInt(m[1] + frac); // price * 10^frac.length
+  if (priceNum === 0n) throw new Error("price must be greater than zero");
+
+  // sqrtPriceX96 = sqrt( priceNum/10^fracLen * 10^(dec1-dec0) * 2^192 )
+  let numerator = priceNum << 192n;
+  let denominator = 10n ** BigInt(frac.length);
+  const e = decimals1 - decimals0;
+  if (e >= 0) numerator *= 10n ** BigInt(e);
+  else denominator *= 10n ** BigInt(-e);
+
+  const sqrtPriceX96 = isqrt(numerator / denominator);
+  if (sqrtPriceX96 < MIN_SQRT_RATIO || sqrtPriceX96 >= MAX_SQRT_RATIO) {
+    throw new Error(`price ${price} is outside the representable range for this token pair`);
+  }
+  return sqrtPriceX96;
+}
+
 /** Snap a tick toward zero to a multiple of tickSpacing */
 export function nearestUsableTick(tick: number, tickSpacing: number): number {
   const rounded = Math.round(tick / tickSpacing) * tickSpacing;
