@@ -1,32 +1,76 @@
 // ---------------- BigInt Validation Utilities ----------------
 
 /**
- * Safely converts a string to BigInt with validation
+ * Safely converts a string to BigInt with validation, handling scientific notation and decimals (truncating).
  */
 export const safeBigInt = (value: string | number | bigint): bigint => {
   if (typeof value === 'bigint') return value;
-  if (typeof value === 'number') return BigInt(value);
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new Error(`Invalid BigInt value: ${value}`);
+    }
+    return BigInt(Math.trunc(value));
+  }
   
-  const stringValue = value.toString();
-  
-  // Check if the string represents a valid number
-  if (!/^-?\d+$/.test(stringValue)) {
-    throw new Error(`Invalid BigInt value: ${stringValue}`);
+  const trimmed = value.toString().trim();
+  if (trimmed === "") {
+    throw new Error("Invalid BigInt value: empty string");
+  }
+
+  // Pure integer string - direct conversion
+  if (/^-?\d+$/.test(trimmed)) {
+    return BigInt(trimmed);
+  }
+
+  // Scientific notation (e.g., "5e+22", "1.5e10", "3E18")
+  const sciMatch = trimmed.match(/^(-?\d+\.?\d*)[eE]([+-]?\d+)$/);
+  if (sciMatch) {
+    const [, mantissa, exponent] = sciMatch;
+    const exp = parseInt(exponent, 10);
+
+    // Split mantissa into integer and decimal parts
+    const [intPart, decPart = ""] = mantissa.replace("-", "").split(".");
+    const isNegative = mantissa.startsWith("-");
+
+    // Combine and shift decimal point
+    const combined = intPart + decPart;
+    const shift = exp - decPart.length;
+
+    let result: string;
+    if (shift >= 0) {
+      result = combined + "0".repeat(shift);
+    } else {
+      // Truncate decimals (floor toward zero)
+      const cutPoint = combined.length + shift;
+      result = cutPoint > 0 ? combined.slice(0, cutPoint) : "0";
+    }
+
+    return BigInt(isNegative ? "-" + result : result);
+  }
+
+  // Decimal number without exponent - truncate to integer
+  if (/^-?\d+\.\d+$/.test(trimmed)) {
+    const intPart = trimmed.split(".")[0];
+    return BigInt(intPart || "0");
   }
   
   try {
-    return BigInt(stringValue);
+    return BigInt(trimmed);
   } catch (error) {
-    throw new Error(`Failed to convert to BigInt: ${stringValue}`);
+    throw new Error(`Invalid BigInt value: ${trimmed}`);
   }
 };
 
 /**
  * Safely converts a string to BigInt with default value
  */
-export const safeBigIntOrDefault = (value: string | number | bigint | undefined, defaultValue: bigint = 0n): bigint => {
-  if (value === undefined || value === null) return defaultValue;
-  return safeBigInt(value);
+export const safeBigIntOrDefault = (value: string | number | bigint | undefined | null, defaultValue: bigint = 0n): bigint => {
+  if (value === undefined || value === null || (typeof value === 'string' && value.trim() === "")) return defaultValue;
+  try {
+    return safeBigInt(value);
+  } catch (error) {
+    return defaultValue;
+  }
 };
 
 /**
@@ -59,7 +103,10 @@ export const bigIntToString = (value: bigint): string => {
  * Validates that a string represents a valid numeric value for BigInt conversion
  */
 export const isValidBigIntString = (value: string): boolean => {
-  return /^-?\d+$/.test(value);
+  const trimmed = value.trim();
+  return /^-?\d+$/.test(trimmed) ||
+         /^(-?\d+\.?\d*)[eE]([+-]?\d+)$/.test(trimmed) ||
+         /^-?\d+\.\d+$/.test(trimmed);
 };
 
 /**
@@ -75,9 +122,9 @@ export const parseDecimalToBigInt = (decimalString: string, decimals: number = 1
   // Pad or truncate decimal part to match decimals
   const paddedDecimal = decimalPart.padEnd(decimals, '0').slice(0, decimals);
   
-  const fullInteger = integerPart + paddedDecimal;
+  const fullInteger = (integerPart || "0") + paddedDecimal;
   
-  return safeBigInt(fullInteger);
+  return BigInt(fullInteger);
 };
 
 /**
@@ -85,15 +132,19 @@ export const parseDecimalToBigInt = (decimalString: string, decimals: number = 1
  */
 export const formatBigIntToDecimal = (value: bigint, decimals: number = 18): string => {
   const stringValue = value.toString();
+  const isNegative = stringValue.startsWith('-');
+  const absoluteValue = isNegative ? stringValue.slice(1) : stringValue;
   
-  if (stringValue.length <= decimals) {
-    return '0.' + stringValue.padStart(decimals, '0');
+  let result: string;
+  if (absoluteValue.length <= decimals) {
+    result = '0.' + absoluteValue.padStart(decimals, '0');
+  } else {
+    const integerPart = absoluteValue.slice(0, -decimals);
+    const decimalPart = absoluteValue.slice(-decimals);
+    result = integerPart + '.' + decimalPart;
   }
   
-  const integerPart = stringValue.slice(0, -decimals);
-  const decimalPart = stringValue.slice(-decimals);
-  
-  return integerPart + '.' + decimalPart;
+  return isNegative ? '-' + result : result;
 };
 
 /**
