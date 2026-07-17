@@ -4,11 +4,27 @@ import { SwapToken, LPToken, PoolCoin, RawGetPool, RawPoolFactory, RawToken, Raw
 import { safeBigInt, safeBigIntDivide } from "../../utils/bigIntUtils";
 import { toUTCTime } from "./cirrusHelpers";
 import { getOraclePrices } from "../services/oracle.service";
+import {
+  getCachedStablePoolFees,
+  getCachedTradingVolume,
+  getCachedMultiTokenStablePools,
+  setCachedStablePoolFees,
+  setCachedTradingVolume,
+  setCachedMultiTokenStablePools,
+} from "../cache/swappingCache";
 import JSONBig from "json-bigint";
 
 const { Pool, PoolSwap, StablePoolCoins, StablePoolTokenBalances, swapHistorySelectFields, swapTokenSelectFields, LendingRegistry } = constants;
 const WAD = 10n ** 18n;
 const JSONbigString = JSONBig({ storeAsString: true });
+const PRICE_ORACLE_CACHE_TTL_MS = 3_600_000;
+
+let cachedPriceOracle:
+  | {
+    address: string;
+    expiresAt: number;
+  }
+  | undefined;
 
 // ============================================================================
 // CALCULATION HELPERS
@@ -111,18 +127,10 @@ export const calculateLPTokenPrice = (
 // DATA PROCESSING HELPERS
 // ============================================================================
 
-export const buildPoolParams = (rawParams: Record<string, string | undefined>, userAddress?: string): Record<string, string> => ({
+export const buildPoolParams = (rawParams: Record<string, string | undefined>): Record<string, string> => ({
   poolFactory: "eq." + constants.poolFactory,
   ...Object.fromEntries(Object.entries(rawParams).filter(([_, v]) => v !== undefined)),
   select: rawParams.select || constants.swapSelectFields.join(","),
-  ...(rawParams.select || !userAddress ? {} : {
-    "lpToken.balances.value": "gt.0",
-    "lpToken.balances.key": `eq.${userAddress}`,
-    "tokenA.balances.value": "gt.0",
-    "tokenA.balances.key": `eq.${userAddress}`,
-    "tokenB.balances.value": "gt.0",
-    "tokenB.balances.key": `eq.${userAddress}`,
-  }),
 });
 
 export const extractTokenAddresses = <T extends { tokenA: { address: string }; tokenB: { address: string } }>(poolData: T[]): string[] => [
@@ -151,6 +159,10 @@ export const getTradingVolume24hForPools = async (
 ): Promise<Map<string, string>> => {
   if (poolAddresses.length === 0) {
     return new Map();
+  }
+  const cachedVolumeMap = getCachedTradingVolume(poolAddresses);
+  if (cachedVolumeMap) {
+    return cachedVolumeMap;
   }
 
   const { data: swapEvents } = await cirrus.get(accessToken, `/${PoolSwap}`, {
@@ -184,6 +196,8 @@ export const getTradingVolume24hForPools = async (
     const newVolume = safeBigInt(currentVolume) + tokenInVolume;
     volumeMap.set(poolAddress, newVolume.toString());
   });
+
+  setCachedTradingVolume(poolAddresses, volumeMap);
 
   return volumeMap;
 };
@@ -259,6 +273,28 @@ const extractEventActor = (event: { attributes?: unknown; transaction_sender?: u
   );
 };
 
+const getCachedPriceOracleAddress = async (accessToken: string): Promise<string | undefined> => {
+  if (cachedPriceOracle && cachedPriceOracle.expiresAt > Date.now()) {
+    return cachedPriceOracle.address;
+  }
+
+  const { data: lendingRegistryData } = await cirrus.get(accessToken, `/${LendingRegistry}`, {
+    params: {
+      address: `eq.${constants.lendingRegistry}`,
+      select: "priceOracle",
+      limit: "1",
+    },
+  });
+  const oracleAddress = lendingRegistryData?.[0]?.priceOracle;
+  if (oracleAddress) {
+    cachedPriceOracle = {
+      address: oracleAddress,
+      expiresAt: Date.now() + PRICE_ORACLE_CACHE_TTL_MS,
+    };
+  }
+  return oracleAddress;
+};
+
 const extractLiquidityTokenAmounts = (attributes: unknown): { tokenAAmount: bigint; tokenBAmount: bigint } => {
   const attrs = parseAttributes(attributes);
 
@@ -301,14 +337,7 @@ export const getUserPoolLiquidityFlowTotals = async (
 
   const poolAddresses = pools.map((pool) => pool.address);
 
-  const { data: lendingRegistryData } = await cirrus.get(accessToken, `/${LendingRegistry}`, {
-    params: {
-      address: `eq.${constants.lendingRegistry}`,
-      select: "priceOracle",
-      limit: "1",
-    },
-  });
-  const oracleAddress = lendingRegistryData?.[0]?.priceOracle;
+  const oracleAddress = await getCachedPriceOracleAddress(accessToken);
   if (!oracleAddress) return totals;
 
   const { data: events } = await cirrus.get(accessToken, "/event", {
@@ -316,6 +345,7 @@ export const getUserPoolLiquidityFlowTotals = async (
       address: `in.(${poolAddresses.join(",")})`,
       event_name: "in.(AddLiquidity,RemoveLiquidity)",
       select: "address,event_name,attributes,block_timestamp,transaction_sender",
+      or: `(attributes->>provider.eq.${normalizedUserAddress},attributes->>user.eq.${normalizedUserAddress},attributes->>sender.eq.${normalizedUserAddress},transaction_sender.eq.${normalizedUserAddress})`,
       order: "block_timestamp.asc",
       limit: "10000",
     },
@@ -645,6 +675,7 @@ export const fetchTokenMetadata = async (
   tokenAddresses: string[],
   userAddress?: string
 ): Promise<Map<string, RawToken>> => {
+  const startedAt = Date.now();
   const { data: tokens } = await cirrus.get(accessToken, `/${constants.Token}`, {
     params: {
       address: `in.(${tokenAddresses.join(",")})`,
@@ -652,6 +683,7 @@ export const fetchTokenMetadata = async (
       ...(userAddress ? { "balances.key": `eq.${userAddress}` } : {}),
     }
   });
+  console.log(`[getPools] multi-token token metadata (${tokenAddresses.length} tokens): ${Date.now() - startedAt}ms`);
 
   const tokenMap = new Map<string, RawToken>();
   (tokens as RawToken[]).forEach(t => {
@@ -782,6 +814,10 @@ export const fetchStablePoolFees = async (
 ): Promise<Map<string, number>> => {
   const map = new Map<string, number>();
   if (addresses.length === 0) return map;
+  const cachedFeeMap = getCachedStablePoolFees(addresses);
+  if (cachedFeeMap) {
+    return cachedFeeMap;
+  }
 
   const { data } = await cirrus.get(accessToken, "/BlockApps-StablePool", {
     params: {
@@ -794,6 +830,8 @@ export const fetchStablePoolFees = async (
     const fee = BigInt(row.fee || "0");
     if (fee > 0n) map.set(row.address, Number(fee / BigInt(STABLE_FEE_TO_BPS)));
   }
+
+  setCachedStablePoolFees(addresses, map);
 
   return map;
 };
@@ -823,12 +861,26 @@ export const applyStablePoolFees = async (
 export const fetchMultiTokenStablePools = async (
   accessToken: string,
 ): Promise<MultiTokenStablePool[]> => {
+  const cachedStablePools = getCachedMultiTokenStablePools();
+  if (cachedStablePools) {
+    const liveBalances = await Promise.all(
+      cachedStablePools.map(pool => fetchPoolTokenBalances(accessToken, pool.address))
+    );
+    console.log("[getPools] multi-token stable pools query: 0ms (cached)");
+    return cachedStablePools.map((pool, index) => ({
+      ...pool,
+      tokenBalances: liveBalances[index],
+    }));
+  }
+
+  const startedAt = Date.now();
   const { data: stablePools } = await cirrus.get(accessToken, "/BlockApps-StablePool", {
     params: {
       initialA: "gt.0",
       select: "address,lpToken,fee::text,BlockApps-StablePool-coins(key,value),BlockApps-StablePool-tokenBalances(key,value::text)",
     }
   });
+  console.log(`[getPools] multi-token stable pools query: ${Date.now() - startedAt}ms`);
 
   const results: MultiTokenStablePool[] = [];
   for (const pool of stablePools as any[]) {
@@ -848,6 +900,8 @@ export const fetchMultiTokenStablePools = async (
     results.push({ address: pool.address, lpToken: pool.lpToken, fee: pool.fee || "0", coins, tokenBalances });
   }
 
+  setCachedMultiTokenStablePools(results.map(({ tokenBalances, ...pool }) => pool));
+
   return results;
 };
 
@@ -863,22 +917,37 @@ export const buildMultiTokenPoolEntry = async (
   volumeMap: Map<string, string>,
   factoryData: { swapFeeRate: number; lpSharePercent: number },
   userAddress?: string,
+  preloadedTokenMetadataMap?: Map<string, RawToken>,
 ): Promise<any> => {
   const coinAddresses = stablePool.coins.map(c => c.tokenAddress);
 
-  const [tokenMetadataMap, lpTokenData] = await Promise.all([
-    fetchTokenMetadata(accessToken, coinAddresses, userAddress),
-    fetchTokenMetadata(accessToken, [stablePool.lpToken], userAddress),
-  ]);
+  let tokenMetadataMap: Map<string, RawToken>;
+  let lpTokenData: Map<string, RawToken>;
+  if (preloadedTokenMetadataMap) {
+    tokenMetadataMap = preloadedTokenMetadataMap;
+    lpTokenData = preloadedTokenMetadataMap;
+    console.log(`[getPools] multi-token ${stablePool.address} metadata queries: 0ms (batched)`);
+  } else {
+    const metadataStartedAt = Date.now();
+    [tokenMetadataMap, lpTokenData] = await Promise.all([
+      fetchTokenMetadata(accessToken, coinAddresses, userAddress),
+      fetchTokenMetadata(accessToken, [stablePool.lpToken], userAddress),
+    ]);
+    console.log(`[getPools] multi-token ${stablePool.address} metadata queries: ${Date.now() - metadataStartedAt}ms`);
+  }
 
   // Fetch prices for coins not yet in priceMap
   const missingPriceAddresses = coinAddresses.filter(addr => !priceMap.has(addr));
   if (missingPriceAddresses.length > 0) {
+    const pricesStartedAt = Date.now();
     const additionalPrices = await getOraclePrices(accessToken, {
       select: "asset:key,price:value::text",
       key: `in.(${missingPriceAddresses.join(',')})`
     });
+    console.log(`[getPools] multi-token ${stablePool.address} missing prices (${missingPriceAddresses.length} tokens): ${Date.now() - pricesStartedAt}ms`);
     additionalPrices.forEach((price, addr) => priceMap.set(addr, price));
+  } else {
+    console.log(`[getPools] multi-token ${stablePool.address} missing prices: 0ms`);
   }
 
   const coins = buildPoolCoins(stablePool.coins, tokenMetadataMap, stablePool.tokenBalances, priceMap, userAddress);

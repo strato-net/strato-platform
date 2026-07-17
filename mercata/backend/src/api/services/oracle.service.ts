@@ -18,6 +18,16 @@ const {
   StablePoolCoins,
 } = constants;
 
+const ORACLE_PRICE_CACHE_TTL_MS = 60_000;
+let oraclePriceCache: {
+  key: string;
+  expiresAt: number;
+  priceMap: OraclePriceMap;
+} | undefined;
+
+const getOraclePriceCacheKey = (params: Record<string, string>): string =>
+  JSON.stringify(Object.entries(params).sort(([a], [b]) => a.localeCompare(b)));
+
 /**
  * Check if an address is an LP token by querying the PoolFactory's allPools array
  * @param accessToken - User access token
@@ -65,15 +75,29 @@ const findPoolByLPToken = async (
 
 export const getOraclePrices = async (
   accessToken: string,
-  params: Record<string, string> = { select: "asset:key,price:value::text" }
+  params: Record<string, string> = { select: "asset:key,price:value::text" },
+  useCache = false
 ): Promise<OraclePriceMap> => {
+  const cacheKey = getOraclePriceCacheKey(params);
+  if (useCache && oraclePriceCache?.key === cacheKey && oraclePriceCache.expiresAt > Date.now()) {
+    return new Map(oraclePriceCache.priceMap);
+  }
+
   const { data: rawPrices } = await cirrus.get(accessToken, `/${PriceOracle}-prices`, { params });
 
   const prices = rawPrices as OraclePriceEntry[];
 
-  return new Map(
+  const priceMap = new Map(
     prices?.filter((p: OraclePriceEntry) => p.asset && p.price).map((p: OraclePriceEntry) => [p.asset, p.price]) || []
   );
+  if (useCache) {
+    oraclePriceCache = {
+      key: cacheKey,
+      expiresAt: Date.now() + ORACLE_PRICE_CACHE_TTL_MS,
+      priceMap: new Map(priceMap),
+    };
+  }
+  return priceMap;
 };
 
 export const getRebaseFactors = async (
