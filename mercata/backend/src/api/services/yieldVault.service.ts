@@ -1332,17 +1332,26 @@ const computeApy = async (
   }
 };
 
+// Full /info response cache per vault key — all data is global (30s)
+const VAULT_INFO_CACHE_TTL = 30_000;
+const _vaultInfoCache = new Map<string, { data: YieldVaultInfo; expiresAt: number }>();
+
 export const getYieldVaultInfo = async (
   _accessToken: string,
   key: string
 ): Promise<YieldVaultInfo> => {
+  const startedAt = performance.now();
   const def = resolveVaultDef(key);
   const fallback = emptyInfo(def, key);
   if (!def?.address) return fallback;
 
-  // All vault-level reads use the service token so every caller sees the same
-  // public state (deployedAssets, _underlyingDecimals, oracle prices, etc.)
-  // regardless of Cirrus column-level ACL on their personal token.
+  // Return cached response if warm (30s)
+  const cached = _vaultInfoCache.get(key);
+  if (cached && Date.now() < cached.expiresAt) {
+    console.log(`[yield-vault/${key}/info] total response time: ${(performance.now() - startedAt).toFixed(2)}ms (cached)`);
+    return cached.data;
+  }
+
   const serviceToken = await getServiceToken();
 
   const vaultState = await getVaultState(serviceToken, def.address);
@@ -1423,7 +1432,7 @@ export const getYieldVaultInfo = async (
   const tvlUsd = underlyingUsdWad(idleAssets + deployedAssets, assetPrice, decimals);
   const apy = await computeApy(serviceToken, def.address, assetAddress, activeAssets, totalShares);
 
-  return {
+  const result: YieldVaultInfo = {
     key,
     configured: true,
     deployed: true,
@@ -1450,6 +1459,10 @@ export const getYieldVaultInfo = async (
     minIdleRequirement: minIdleRequirement.toString(),
     deployBlockedReason,
   };
+
+  _vaultInfoCache.set(key, { data: result, expiresAt: Date.now() + VAULT_INFO_CACHE_TTL });
+  console.log(`[yield-vault/${key}/info] total response time: ${(performance.now() - startedAt).toFixed(2)}ms`);
+  return result;
 };
 
 export const getYieldVaultUserInfo = async (
@@ -1457,6 +1470,7 @@ export const getYieldVaultUserInfo = async (
   key: string,
   userAddress: string
 ): Promise<YieldVaultUserInfo> => {
+  const startedAt = performance.now();
   const info = await getYieldVaultInfo(accessToken, key);
   const def = resolveVaultDef(key);
   if (!info.deployed) return emptyUserInfo(def, key);
@@ -1509,7 +1523,7 @@ export const getYieldVaultUserInfo = async (
     }
   }
 
-  return {
+  const userResult = {
     ...info,
     walletAssets: walletAssets.toString(),
     userShares: userShares.toString(),
@@ -1522,6 +1536,9 @@ export const getYieldVaultUserInfo = async (
     activeRequestId: activeRequestId.toString(),
     pendingWithdrawal,
   };
+
+  console.log(`[yield-vault/${key}/user] total response time: ${(performance.now() - startedAt).toFixed(2)}ms`);
+  return userResult;
 };
 
 export const depositYieldVault = async (
