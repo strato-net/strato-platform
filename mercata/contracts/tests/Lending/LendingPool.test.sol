@@ -1025,4 +1025,205 @@ contract Describe_LendingPool_Basic is Authorizable {
         require(pool.getUserDebt(address(user)) > 0, "Borrow should succeed after unpause");
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // ORACLE STALENESS GATE TESTS
+    //
+    // Exercise the `priceMaxAge` staleness gate on LendingPool write paths.
+    // We only care about *collateral* asset staleness (per spec); the borrowable asset
+    // is kept fresh throughout so the collateral check fires first.
+    //
+    // Gates live in these paths:
+    //   - borrow, borrowMax            -> _requireFreshPrices(user, address(0))
+    //   - withdrawCollateral (with debt) -> _requireFreshPrices(user, address(0))
+    //   - withdrawCollateralMax        -> _requireFreshTimestamp inside the per-asset loop
+    //   - liquidationCall(All)         -> _requireFreshPrices(borrower, collateralAsset)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * @notice Stale collateral oracle must block every write path that reads collateral
+     *         prices, and refreshing the price must immediately restore the happy path.
+     *         Does not exercise borrowable-asset staleness by design.
+     */
+    function it_lending_hc_stale_collateral_price_blocks_write_paths() public {
+        LendingPool pool = m.lendingPool();
+        CollateralVault cv = m.collateralVault();
+        PriceOracle oracle = m.priceOracle();
+
+        // Enable the staleness gate for this test. Test fixture defaults it to 0.
+        uint maxAge = 1200;
+        pool.setPriceMaxAge(maxAge);
+
+        // Fresh prices at T0
+        oracle.setAssetPrice(USDST, 1e18);
+        oracle.setAssetPrice(GOLDST, 2000e18);
+
+        // Establish a borrow position while collateral price is fresh
+        User user = new User();
+        Token(GOLDST).mint(address(user), 1e18);
+        user.do(GOLDST, "approve", address(cv), 1e18);
+        user.do(address(pool), "supplyCollateral", GOLDST, 1e18);
+        user.do(address(pool), "borrow", 100e18);
+
+        // Advance past the freshness window without restamping the collateral price.
+        // Keep USDST (borrowable) fresh so the collateral gate fires first.
+        fastForward(maxAge + 1);
+        oracle.setAssetPrice(USDST, 1e18);
+
+        string staleErr = "LendingPool: stale price";
+
+        // borrow -> stale collateral
+        TestUtils.callExpectFailure(user, address(pool), "borrow", staleErr, 1e18);
+
+        // borrowMax -> stale collateral
+        TestUtils.callExpectFailure(user, address(pool), "borrowMax", staleErr);
+
+        // withdrawCollateral (has outstanding debt) -> stale collateral
+        TestUtils.callExpectFailure(user, address(pool), "withdrawCollateral", staleErr, GOLDST, 1);
+
+        // withdrawCollateralMax -> stale collateral (reverts inside the per-asset loop)
+        TestUtils.callExpectFailure(user, address(pool), "withdrawCollateralMax", staleErr, GOLDST);
+
+        // Refresh the collateral price and confirm the same paths now pass the gate.
+        // We only need to prove the staleness gate is no longer the blocker, so we
+        // pick calls that should also succeed end-to-end given the position.
+        oracle.setAssetPrice(GOLDST, 2000e18);
+        oracle.setAssetPrice(USDST, 1e18);
+
+        // borrow a tiny amount (well within capacity) should now succeed
+        uint debtBefore = pool.getUserDebt(address(user));
+        user.do(address(pool), "borrow", 1e18);
+        require(pool.getUserDebt(address(user)) > debtBefore, "borrow should succeed after refresh");
+    }
+
+    /**
+     * @notice Liquidation paths must also reject stale collateral prices.
+     *         Drives the borrower into a liquidatable state first, then lets the price age out.
+     */
+    function it_lending_hd_stale_collateral_price_blocks_liquidation() public {
+        LendingPool pool = m.lendingPool();
+        CollateralVault cv = m.collateralVault();
+        PriceOracle oracle = m.priceOracle();
+
+        // Enable the staleness gate for this test.
+        uint maxAge = 1200;
+        pool.setPriceMaxAge(maxAge);
+
+        // Fresh prices at T0
+        oracle.setAssetPrice(USDST, 1e18);
+        oracle.setAssetPrice(GOLDST, 2000e18);
+
+        // Borrower takes on max debt against GOLDST.
+        User borrower = new User();
+        Token(GOLDST).mint(address(borrower), 1e18);
+        borrower.do(GOLDST, "approve", address(cv), 1e18);
+        borrower.do(address(pool), "supplyCollateral", GOLDST, 1e18);
+        borrower.do(address(pool), "borrowMax");
+
+        // Tank the price so the position becomes unhealthy. This also restamps
+        // GOLDST's oracle timestamp, so we fastForward afterward to go stale.
+        oracle.setAssetPrice(GOLDST, 100e18);
+        require(pool.getHealthFactor(address(borrower)) < 1e18, "Borrower should be liquidatable");
+
+        // Liquidator needs USDST to cover debt; mint and approve.
+        User liquidator = new User();
+        Token(USDST).mint(address(liquidator), 1000e18);
+        liquidator.do(USDST, "approve", address(m.liquidityPool()), 1000e18);
+
+        // Age out the collateral price (keep borrowable fresh).
+        fastForward(maxAge + 1);
+        oracle.setAssetPrice(USDST, 1e18);
+
+        string staleErr = "LendingPool: stale price";
+
+        // liquidationCall -> stale collateral
+        TestUtils.callExpectFailure(
+            liquidator, address(pool), "liquidationCall",
+            staleErr, GOLDST, address(borrower), 1e18, zeroMinCollateralOut
+        );
+
+        // liquidationCallAll -> stale collateral
+        TestUtils.callExpectFailure(
+            liquidator, address(pool), "liquidationCallAll",
+            staleErr, GOLDST, address(borrower), zeroMinCollateralOut
+        );
+
+        // Refresh and confirm liquidation can now proceed past the gate.
+        oracle.setAssetPrice(GOLDST, 100e18);
+        oracle.setAssetPrice(USDST, 1e18);
+        liquidator.do(address(pool), "liquidationCall", GOLDST, address(borrower), 1e18, zeroMinCollateralOut);
+    }
+
+    /**
+     * @notice Setting priceMaxAge = 0 bypasses the staleness gate (intentional
+     *         incident-recovery escape hatch). Restoring the value re-enables it.
+     */
+    function it_lending_he_priceMaxAge_zero_disables_staleness_gate() public {
+        LendingPool pool = m.lendingPool();
+        CollateralVault cv = m.collateralVault();
+        PriceOracle oracle = m.priceOracle();
+
+        // Enable the staleness gate for this test.
+        uint originalMaxAge = 1200;
+        pool.setPriceMaxAge(originalMaxAge);
+
+        // Fresh prices at T0
+        oracle.setAssetPrice(USDST, 1e18);
+        oracle.setAssetPrice(GOLDST, 2000e18);
+
+        // Fresh borrow position
+        User user = new User();
+        Token(GOLDST).mint(address(user), 1e18);
+        user.do(GOLDST, "approve", address(cv), 1e18);
+        user.do(address(pool), "supplyCollateral", GOLDST, 1e18);
+        user.do(address(pool), "borrow", 100e18);
+
+        // Let collateral price go stale
+        fastForward(originalMaxAge + 1);
+        oracle.setAssetPrice(USDST, 1e18);
+
+        // Sanity: gate is currently blocking
+        TestUtils.callExpectFailure(user, address(pool), "borrow", "LendingPool: stale price", 1e18);
+
+        // Owner bypass
+        pool.setPriceMaxAge(0);
+        require(pool.priceMaxAge() == 0, "priceMaxAge should be 0 after bypass");
+
+        // Same call that just reverted must now succeed.
+        uint debtBefore = pool.getUserDebt(address(user));
+        user.do(address(pool), "borrow", 1e18);
+        require(pool.getUserDebt(address(user)) > debtBefore, "borrow should succeed with staleness gate disabled");
+
+        // Restore original value and confirm the gate fires again against the same stale price.
+        pool.setPriceMaxAge(originalMaxAge);
+        require(pool.priceMaxAge() == originalMaxAge, "priceMaxAge should be restored");
+        TestUtils.callExpectFailure(user, address(pool), "borrow", "LendingPool: stale price", 1e18);
+    }
+
+    /**
+     * @notice setPriceMaxAge is onlyOwner: a non-owner account cannot widen or disable
+     *         the staleness gate.
+     */
+    function it_lending_hf_setPriceMaxAge_is_onlyOwner() public {
+        LendingPool pool = m.lendingPool();
+        uint originalMaxAge = pool.priceMaxAge();
+
+        User stranger = new User();
+        bool reverted = false;
+        try stranger.do(address(pool), "setPriceMaxAge", 0) {
+            // should not reach here
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Non-owner should not be able to setPriceMaxAge");
+        require(pool.priceMaxAge() == originalMaxAge, "priceMaxAge should be unchanged after non-owner call");
+
+        // Owner can update.
+        pool.setPriceMaxAge(7200);
+        require(pool.priceMaxAge() == 7200, "Owner setPriceMaxAge should update the value");
+
+        // Restore.
+        pool.setPriceMaxAge(originalMaxAge);
+        require(pool.priceMaxAge() == originalMaxAge, "priceMaxAge should be restored");
+    }
+
 }
