@@ -1,4 +1,5 @@
 const BlockDataRef = require("../models/strato/eth/blockDataRef");
+const Peer = require("../models/strato/eth/peer");
 const winston = require("winston-color");
 const rp = require("request-promise");
 const config = require("../config/app.config");
@@ -18,7 +19,7 @@ module.exports = {
   nodeStatus: async function (req, res, next) {
     try {
       //get node's block number, best block hash, best block parent hash
-      const [lastBlock, bestBlockNumber] = await Promise.all([
+      const [lastBlock, bestBlockNumber, activePeersCount] = await Promise.all([
         BlockDataRef.findOne({
           where: {
             pow_verified: true,
@@ -38,6 +39,17 @@ module.exports = {
         // BlockDataRef.number if Redis is unavailable.
         redisBlockDB.getBestBlockNumber().catch((err) => {
           winston.warn(`Falling back to BlockDataRef for lastBlock.number: ${err.message}`);
+          return null;
+        }),
+        // Peers the node is currently connected to: active (active_state=1)
+        // and bonded (bond_state=2). Falls back to null so /status remains usable.
+        Peer.count({
+          where: {
+            active_state: 1,
+            bond_state: 2,
+          },
+        }).catch((err) => {
+          winston.warn(`Unable to fetch active peers count: ${err.message}`);
           return null;
         }),
       ]);
@@ -101,6 +113,7 @@ module.exports = {
         version: process.env.STRATO_VERSION,
         timestamp: new Date().toISOString(),
         nodeAddress,
+        activePeersCount,
         lastBlock: {
           number: bestBlockNumber !== null ? bestBlockNumber : lastBlock.number,
           hash: lastBlock.hash,
@@ -125,6 +138,7 @@ module.exports = {
         bestBlockNumber,
         pbftData,
         nodeAddress,
+        activePeersCount,
       ] = await Promise.all([
         utils.getLatestHealth(),
         BlockDataRef.findOne({
@@ -145,6 +159,17 @@ module.exports = {
         }),
         getPbftData(),
         getNodeAddress(),
+        // Peers the node is currently connected to: active (active_state=1)
+        // and bonded (bond_state=2). Falls back to null so /health remains usable.
+        Peer.count({
+          where: {
+            active_state: 1,
+            bond_state: 2,
+          },
+        }).catch((err) => {
+          winston.warn(`Unable to fetch active peers count: ${err.message}`);
+          return null;
+        }),
       ]);
 
       if (healthInfo && stallInfo && systemInfo && syncInfo) {
@@ -165,6 +190,7 @@ module.exports = {
         version: process.env.STRATO_VERSION,
         timestamp: new Date().toISOString(),
         nodeAddress,
+        activePeersCount,
         lastBlock: {
           number: bestBlockNumber !== null ? bestBlockNumber : lastBlock.number,
           hash: lastBlock.hash,
