@@ -4,7 +4,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx, until } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import * as config from "../../config/config";
-import { getBalance, getTokens, getTokenBalanceForUser } from "./tokens.service";
+import { getTokens, getTokenBalanceForUser } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 import {
@@ -445,10 +445,67 @@ export const repay = async (
   return { ...result, amountSent: amount };
 };
 
+// --- Collateral-specific caches ---
+const STATIC_CACHE_TTL = 3_600_000; // 1hr — token metadata (name, symbol, decimals, images)
+const COLLATERAL_CACHE_TTL = 30_000; // 30s — asset list, public response
+
+// Collateral asset addresses from assetConfigs — changes only on admin action (30s)
+let _collateralAssets: { list: string[]; expiresAt: number } | null = null;
+
+// Token metadata — name/symbol/decimals/images are static (1hr)
+let _collateralTokenMeta: Map<string, Record<string, any>> | null = null;
+let _collateralTokenMetaExpiry = 0;
+
+// Public collateral endpoint full response cache (30s)
+let _publicCollateralCache: { data: any; expiresAt: number } | null = null;
+
+// Direct Cirrus fetch for collateral tokens — bypasses getTokens()/getBalance() hidden overhead
+const getCollateralTokenData = async (
+  accessToken: string,
+  tokenAddresses: string[],
+  userAddress?: string
+): Promise<any[]> => {
+  if (!tokenAddresses.length) return [];
+  const metaCached = _collateralTokenMeta && Date.now() < _collateralTokenMetaExpiry
+    && tokenAddresses.every(a => _collateralTokenMeta!.has(a));
+
+  const balJoin = userAddress ? `,balances:${Token}-_balances(user:key,balance:value::text)` : '';
+  const select = metaCached
+    ? `address,_totalSupply::text${balJoin}`
+    : `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,images:${Token}-images(value)${balJoin}`;
+
+  const params: Record<string, string> = { address: `in.(${tokenAddresses.join(",")})`, select };
+  if (userAddress) params["balances.key"] = `eq.${userAddress}`;
+
+  const { data } = await cirrus.get(accessToken, `/${Token}`, { params });
+  const tokens = data || [];
+
+  if (metaCached) {
+    return tokens.map((t: any) => ({ ...(_collateralTokenMeta!.get(t.address) || {}), ...t }));
+  }
+
+  _collateralTokenMeta = _collateralTokenMeta || new Map();
+  for (const t of tokens) {
+    _collateralTokenMeta.set(t.address, {
+      _name: t._name, _symbol: t._symbol, _owner: t._owner,
+      customDecimals: t.customDecimals, images: t.images
+    });
+  }
+  _collateralTokenMetaExpiry = Date.now() + STATIC_CACHE_TTL;
+  return tokens;
+};
+
 export const collateralAndBalance = async (
   accessToken: string,
   userAddress: string,
 ) => {
+  const startedAt = performance.now();
+
+  // Speculatively fetch token data using cached asset list (parallel with getPool)
+  const cachedAssets = _collateralAssets && Date.now() < _collateralAssets.expiresAt ? _collateralAssets.list : null;
+  const earlyTokenFetch = cachedAssets
+    ? getCollateralTokenData(accessToken, cachedAssets, userAddress) : null;
+
   const registry = await getPool(accessToken, {
     select:
       `lendingPool:lendingPool_fkey(` +
@@ -468,35 +525,37 @@ export const collateralAndBalance = async (
   }
 
   const isPaused = registry.lendingPool._paused;
-
   const assets = registry.lendingPool.assetConfigs?.map((a: any) => a.asset).filter((asset: string) => asset !== registry.lendingPool.borrowableAsset) || [];
   const userCollaterals = (registry.collateralVault.userCollaterals || []).filter((c: any) => c.user === userAddress);
-  const userTokens = await getBalance(accessToken, userAddress, {
-    address: `in.(${assets.join(",")})`, select: `address,user:key,balance:value::text,token:${Token}(_name,_symbol,_owner,_totalSupply::text,customDecimals,images:${Token}-images(value))`
-  });
 
-  const tokenMap = new Map(userTokens.map((t: any) => [t.address, t]));
+  // Update cached asset list (30s)
+  _collateralAssets = { list: assets, expiresAt: Date.now() + COLLATERAL_CACHE_TTL };
+
+  // Use speculative result if asset list matches, else re-fetch
+  const assetsMatch = cachedAssets && assets.length === cachedAssets.length && assets.every((a: string) => cachedAssets.includes(a));
+  const tokenData = (assetsMatch && earlyTokenFetch)
+    ? await earlyTokenFetch
+    : await getCollateralTokenData(accessToken, assets, userAddress);
+
+  // Build token map — balance from sub-select, metadata from Token fields
+  const tokenMap = new Map(tokenData.map((t: any) => {
+    const bal = t.balances?.find((b: any) => b.user === userAddress)?.balance || "0";
+    const { balances: _, ...meta } = t;
+    return [t.address, { address: t.address, balance: bal, token: meta }];
+  }));
   const collateralMap = new Map(userCollaterals.map((c: any) => [c.asset, c]));
 
-  // Create maps for asset configs and prices
   const assetConfigMap = new Map();
   const priceMap = new Map();
-
-  // Build asset config map
   (registry.lendingPool?.assetConfigs || []).forEach((config: any) => {
     assetConfigMap.set(config.asset, config.AssetConfig);
   });
-
-  // Build price map
   (registry.oracle?.prices || []).forEach((price: any) => {
     priceMap.set(price.asset, price.price);
   });
 
-  return assets
-    .filter((asset: string) => {
-      const token = tokenMap.get(asset) as any;
-      return token;
-    })
+  const result = assets
+    .filter((asset: string) => tokenMap.has(asset))
     .map((asset: string) => {
       const token = tokenMap.get(asset) as any;
       const collateral = collateralMap.get(asset) as any;
@@ -508,7 +567,6 @@ export const collateralAndBalance = async (
       const ltv = assetConfig?.ltv || 0;
       const liquidationThreshold = assetConfig?.liquidationThreshold || 0;
 
-      // Calculate metrics using the helper function
       const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower, unsuppliedBorrowingPower, unsuppliedLTCollateralValue} = calculateCollateralMetrics(
         userBalance,
         collateralizedAmount,
@@ -535,11 +593,27 @@ export const collateralAndBalance = async (
         isPaused,
       };
     });
+
+  console.log(`[lending/collateral] total response time: ${(performance.now() - startedAt).toFixed(2)}ms`);
+  return result;
 };
 
 export const getPublicCollateralInfo = async (
   accessToken: string,
 ) => {
+  const startedAt = performance.now();
+
+  // Full response cache — all public collateral data is global (30s)
+  if (_publicCollateralCache && Date.now() < _publicCollateralCache.expiresAt) {
+    console.log(`[lending/collateral/public] total response time: ${(performance.now() - startedAt).toFixed(2)}ms (cached)`);
+    return _publicCollateralCache.data;
+  }
+
+  // Parallelize getPool + token fetch using cached asset list
+  const cachedAssets = _collateralAssets && Date.now() < _collateralAssets.expiresAt ? _collateralAssets.list : null;
+  const earlyTokenFetch = cachedAssets
+    ? getCollateralTokenData(accessToken, cachedAssets) : null;
+
   const registry = await getPool(accessToken, {
     select:
       `lendingPool:lendingPool_fkey(` +
@@ -557,38 +631,30 @@ export const getPublicCollateralInfo = async (
 
   const isPaused = registry.lendingPool._paused;
   const assets = registry.lendingPool.assetConfigs?.map((a: any) => a.asset).filter((asset: string) => asset !== registry.lendingPool.borrowableAsset) || [];
-  
-  // Fetch token metadata only (no user balances)
-  let tokenMap = new Map();
-  if (assets.length > 0) {
-    const tokens = await getTokens(accessToken, {
-      address: `in.(${assets.join(",")})`,
-      select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,images:${Token}-images(value)`
-    });
-    tokenMap = new Map(tokens.map((t: any) => [t.address, { address: t.address, balance: "0", token: t }]));
-  }
 
-  // Create maps for asset configs and prices
+  // Update cached asset list (30s)
+  _collateralAssets = { list: assets, expiresAt: Date.now() + COLLATERAL_CACHE_TTL };
+
+  // Use speculative result if asset list matches, else re-fetch
+  const assetsMatch = cachedAssets && assets.length === cachedAssets.length && assets.every((a: string) => cachedAssets.includes(a));
+  const tokenData = (assetsMatch && earlyTokenFetch)
+    ? await earlyTokenFetch
+    : await getCollateralTokenData(accessToken, assets);
+
+  const tokenMap = new Map(tokenData.map((t: any) => [t.address, t]));
+
   const assetConfigMap = new Map();
   const priceMap = new Map();
-
-  // Build asset config map
   (registry.lendingPool?.assetConfigs || []).forEach((config: any) => {
     assetConfigMap.set(config.asset, config.AssetConfig);
   });
-
-  // Build price map
   (registry.oracle?.prices || []).forEach((price: any) => {
     priceMap.set(price.asset, price.price);
   });
 
-  // Filter assets that have token data
-  const filteredAssets = assets.filter((asset: string) => {
-      const token = tokenMap.get(asset) as any;
-      return token;
-  });
-
-  const result = filteredAssets.map((asset: string) => {
+  const result = assets
+    .filter((asset: string) => tokenMap.has(asset))
+    .map((asset: string) => {
       const token = tokenMap.get(asset) as any;
       const assetConfig = assetConfigMap.get(asset);
       const assetPrice = priceMap.get(asset) || "0";
@@ -598,7 +664,6 @@ export const getPublicCollateralInfo = async (
       const ltv = assetConfig?.ltv || 0;
       const liquidationThreshold = assetConfig?.liquidationThreshold || 0;
 
-      // Calculate metrics using the helper function (all zeros for guests)
       const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower, unsuppliedBorrowingPower, unsuppliedLTCollateralValue} = calculateCollateralMetrics(
         userBalance,
         collateralizedAmount,
@@ -609,7 +674,7 @@ export const getPublicCollateralInfo = async (
 
       return {
         address: asset,
-        ...token?.token,
+        ...token,
         userBalance,
         userBalanceValue,
         collateralizedAmount,
@@ -626,6 +691,8 @@ export const getPublicCollateralInfo = async (
       };
     });
 
+  _publicCollateralCache = { data: result, expiresAt: Date.now() + COLLATERAL_CACHE_TTL };
+  console.log(`[lending/collateral/public] total response time: ${(performance.now() - startedAt).toFixed(2)}ms`);
   return result;
 };
 
