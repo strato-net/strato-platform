@@ -50,7 +50,7 @@ generateDockerCompose = do
             , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
             , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
             ]
-        , environment = Just $ Map.fromList
+        , environment = Just $ Map.fromList $
             [ ("RPC_URL_MAINNET", "${RPC_URL_MAINNET:-}")
             , ("RPC_URL_MAINNET_FALLBACK", "${RPC_URL_MAINNET_FALLBACK:-}")
             , ("RPC_URL_SEPOLIA", "${RPC_URL_SEPOLIA:-}")
@@ -79,6 +79,14 @@ generateDockerCompose = do
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
             ]
+            -- In --localAuth mode, fetch OAuth discovery/JWKS from the bundled
+            -- Hydra service directly over the docker network. This avoids the
+            -- external HTTPS endpoint, whose certificate (e.g. a Cloudflare
+            -- Origin cert) is not trusted by Node and would fail verification.
+            ++ if flags_localAuth
+               then [ ("OAUTH_INTERNAL_DISCOVERY_URL", "http://local-auth:4444/.well-known/openid-configuration")
+                    ]
+               else []
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]
         , restart = Just "unless-stopped"

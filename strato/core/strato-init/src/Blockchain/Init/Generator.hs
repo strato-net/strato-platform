@@ -36,6 +36,7 @@ import System.Process (readProcess)
 import System.Entropy (getEntropy)
 import qualified Data.ByteString as BS
 import Data.Char (toLower)
+import Data.List (isSuffixOf)
 import Turtle (chmod, roo)
 import UnliftIO.Directory
 import System.Posix.Files (setFileMode, ownerModes, groupModes, otherModes)
@@ -194,6 +195,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
       if flags_localAuth
         then do
           localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
+          assertReachableHostname localHostname
           envClientId <- lookupEnv "OAUTH_CLIENT_ID"
           envClientSecret <- lookupEnv "OAUTH_CLIENT_SECRET"
           clientId <- case envClientId of
@@ -307,3 +309,32 @@ generateClientId :: Int -> IO String
 generateClientId len = do
   suffix <- fmap (map toLower) (generatePassword len)
   return $ "strato-local-" ++ suffix
+
+-- | In --localAuth mode the OAuth issuer, discovery URL and browser redirects
+-- are all derived from the machine's hostname, so it must be a name that both
+-- browsers and the node's own containers can resolve. Cloud hosts often default
+-- to an internal-only hostname (e.g. AWS EC2's "ip-x-x-x-x.ec2.internal"), which
+-- silently produces an unreachable login flow. Fail fast at setup time with an
+-- actionable message instead.
+assertReachableHostname :: String -> IO ()
+assertReachableHostname host
+  | isUnreachable =
+      error $ unlines
+        [ "Refusing to set up --localAuth with an unreachable hostname: " ++ show host
+        , ""
+        , "In --localAuth mode the OAuth issuer, discovery URL and login redirects"
+        , "are derived from the machine's hostname, so it must be a name that both"
+        , "your browser and the node's containers can reach (e.g. a public DNS name)."
+        , ""
+        , "Set a reachable hostname before running setup, for example:"
+        , "  sudo hostnamectl set-hostname your.public.hostname"
+        , "then re-run strato-up."
+        ]
+  | otherwise = return ()
+  where
+    lowered = map toLower host
+    isUnreachable =
+      lowered == "localhost"
+        || ".ec2.internal" `isSuffixOf` lowered
+        || ".compute.internal" `isSuffixOf` lowered
+        || ".compute-1.internal" `isSuffixOf` lowered

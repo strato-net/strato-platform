@@ -33,7 +33,6 @@ defineFlag "minPeers" (10 :: Int) "Threshold for discovery to stop querying for 
 defineFlag "apiIPAddress" "" "The address containers use to reach strato-api on the host (auto-detected if empty)"
 
 defineFlag "httpPort" (8081 :: Int) "The external HTTP port for nginx"
-defineFlag "nodeHost" ("localhost" :: String) "The external hostname for the node"
 
 defineFlag "svmTrace" (False :: Bool) "Enable verbose logging in SolidVM"
 

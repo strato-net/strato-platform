@@ -27,7 +27,13 @@ export let openIdJwks: JSONWebKeySet | undefined;
  * Init function to be called from the App.js to make sure the app is served after the token endpoint is asynchronously fetched from OpenID Discovery URL 
  */
 export async function initOpenIdConfig() {
-  const { tokenEndpoint, jwks } = await fetchOpenIdConfig(process.env.OAUTH_DISCOVERY_URL);
+  // In --localAuth mode the backend reaches the bundled Hydra service directly
+  // over the docker network (OAUTH_INTERNAL_DISCOVERY_URL). This avoids the
+  // external HTTPS endpoint, whose certificate (e.g. a Cloudflare Origin cert)
+  // is not trusted by Node and would fail TLS verification. When unset (external
+  // OAuth provider), fall back to the public OAUTH_DISCOVERY_URL.
+  const discoveryUrl = process.env.OAUTH_INTERNAL_DISCOVERY_URL || process.env.OAUTH_DISCOVERY_URL;
+  const { tokenEndpoint, jwks } = await fetchOpenIdConfig(discoveryUrl);
   openIdTokenEndpoint = tokenEndpoint;
   openIdJwks = jwks;
 }

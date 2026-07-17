@@ -114,7 +114,6 @@ def deployAndSync(String network, String metricNamespacePrefix) {
       export PATH
       strato-up mynode \\
         --network=${network} \\
-        --nodeHost=\$(</host) \\
         --sslDir='/home/ubuntu/letsencrypt-ssl'
     """
     sh 'chmod +x run.sh'
@@ -215,7 +214,6 @@ def verifySnapshotRestore(String network, String archivePath, def snapshotBlock)
       export PATH
       strato-up mynode \\
         --network=${network} \\
-        --nodeHost=\$(</host) \\
         --sslDir='/home/ubuntu/letsencrypt-ssl' \\
         --snapshot-source='${archivePath}'
     """
