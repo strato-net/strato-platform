@@ -70,6 +70,10 @@ export interface PoolV3Position {
   /** already-owed (burned principal + collected-pending fees), wei strings */
   tokensOwed0: string;
   tokensOwed1: string;
+  /** fees earned since the position's last on-chain touch — not yet in tokensOwed;
+   *  realized automatically by the poke that collect/burn perform, wei strings */
+  pendingFees0: string;
+  pendingFees1: string;
   /** whether the current pool tick is inside [tickLower, tickUpper) */
   inRange: boolean;
   /** price bounds as 18-decimal token1-per-token0 wei strings */

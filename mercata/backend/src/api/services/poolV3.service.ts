@@ -37,6 +37,20 @@ const {
 } = POOL_V3_CONTRACTS;
 
 const normalizeAddress = (address: string): string => address.toLowerCase().replace(/^0x/, "");
+
+/**
+ * Parse a Cirrus numeric field to a bigint, or `undefined` when the indexer mis-serialized it.
+ * The storage decoder currently emits large signed-int struct fields (feeGrowthOutside*,
+ * feeGrowthInside*Last) as `{"length":"…"}` objects or non-decimal strings instead of a
+ * decimal. Those aren't BigInt-convertible (and would throw), so treat them as unavailable —
+ * callers must skip any computation that depends on the value rather than assume 0.
+ */
+const toBigIntOrUndefined = (v: unknown): bigint | undefined => {
+  if (typeof v === "bigint") return v;
+  if (typeof v === "number" && Number.isInteger(v)) return BigInt(v);
+  if (typeof v === "string" && /^-?\d+$/.test(v)) return BigInt(v);
+  return undefined;
+};
 const deadline = (): number => Math.floor(Date.now() / 1000) + V3_DEADLINE_SECONDS;
 
 const approvalTx = (tokenAddress: string, spender: string, amount: string) => ({
@@ -66,6 +80,8 @@ interface RawV3Pool {
   sqrtPriceX96: string;
   currentTick: number;
   liquidity: string;
+  feeGrowthGlobal0X128: string;
+  feeGrowthGlobal1X128: string;
   feeProtocol: number;
   protocolFees0: string;
   protocolFees1: string;
@@ -82,6 +98,8 @@ interface RawV3Tick {
   liquidityNet: string;
   liquidityGross: string;
   initialized: string; // "true" | "false" — read from the value JSONB via ->>, so it is text
+  feeGrowthOutside0X128: string | null; // signed Q128 (null until first written)
+  feeGrowthOutside1X128: string | null;
 }
 
 interface RawV3Position {
@@ -92,6 +110,8 @@ interface RawV3Position {
   liquidity: string;
   tokensOwed0: string;
   tokensOwed1: string;
+  feeGrowthInside0LastX128: string | null; // signed Q128 snapshot at last touch
+  feeGrowthInside1LastX128: string | null;
 }
 
 // ============================================================================
@@ -145,6 +165,7 @@ const fetchRawPools = async (
 ): Promise<RawV3Pool[]> => {
   const { data } = await cirrus.get(accessToken, `/${PoolV3Table}`, {
     params: {
+      poolV3Factory: `eq.${config.poolV3Factory}`,
       select: POOL_V3_SELECT_FIELDS.join(","),
       // uninitialized proxies/implementations have price 0
       sqrtPriceX96: "neq.0",
@@ -206,6 +227,10 @@ const fetchInitializedTicks = async (accessToken: string, poolAddress: string): 
       .map((t) => ({
         tick: Number(t.key),
         liquidityNet: BigInt(t.liquidityNet),
+        // undefined when the indexer mis-serialized the field (a crossed tick's
+        // feeGrowthOutside can arrive as {"length":...}); callers gate on this.
+        feeGrowthOutside0X128: toBigIntOrUndefined(t.feeGrowthOutside0X128),
+        feeGrowthOutside1X128: toBigIntOrUndefined(t.feeGrowthOutside1X128),
       }));
   } catch (err) {
     // A pool that has never been minted into has no rows in its ticks collection
@@ -292,7 +317,11 @@ export const getPositions = async (
 
   let data: unknown;
   try {
-    ({ data } = await cirrus.get(accessToken, `/${PoolV3Positions}`, { params }));
+    ({ data } = await cirrus.get(accessToken, `/${PoolV3Positions}`, {
+      params: {
+        ...params,
+      },
+    }));
   } catch (err) {
     // The position value columns (liquidity, tokensOwed0/1) are materialized lazily on
     // first insert; until any position is minted they do not exist and PostgREST returns
@@ -309,10 +338,15 @@ export const getPositions = async (
   );
   if (rows.length === 0) return [];
 
-  // pool state for amount computation
+  // pool + tick state for amount and pending-fee computation
   const poolAddresses = [...new Set(rows.map((r) => r.address))];
   const rawPools = await fetchRawPools(accessToken, { address: `in.(${poolAddresses.join(",")})` });
   const poolByAddress = new Map(rawPools.map((p) => [p.address, p]));
+  const ticksByPool = new Map<string, Map<number, v3.TickData>>();
+  for (const addr of poolAddresses) {
+    const ticks = await fetchInitializedTicks(accessToken, addr);
+    ticksByPool.set(addr, new Map(ticks.map((t) => [t.tick, t])));
+  }
 
   return rows.flatMap((row) => {
     const pool = poolByAddress.get(row.address);
@@ -328,6 +362,36 @@ export const getPositions = async (
       liquidity,
       false
     );
+
+    // Pending (unrealized) fees — the contract's Tick.getFeeGrowthInside + Position.update
+    // math. Only computed when EVERY fee-growth input is readable: the indexer mis-serializes
+    // feeGrowthOutside / feeGrowthInsideLast for some ticks/positions (the {"length":...}
+    // form), so any input may be unavailable. When it is, we do NOT fabricate a number —
+    // pending stays 0 and the fees are surfaced via "Collect fees" (which pokes the position
+    // and realizes them into the clean tokensOwed).
+    const lowerTick = ticksByPool.get(row.address)?.get(tickLower);
+    const upperTick = ticksByPool.get(row.address)?.get(tickUpper);
+    const feeGrowthInputs = [
+      toBigIntOrUndefined(pool.feeGrowthGlobal0X128),
+      toBigIntOrUndefined(pool.feeGrowthGlobal1X128),
+      lowerTick?.feeGrowthOutside0X128,
+      lowerTick?.feeGrowthOutside1X128,
+      upperTick?.feeGrowthOutside0X128,
+      upperTick?.feeGrowthOutside1X128,
+      toBigIntOrUndefined(row.feeGrowthInside0LastX128),
+      toBigIntOrUndefined(row.feeGrowthInside1LastX128),
+    ];
+    let pending0 = 0n;
+    let pending1 = 0n;
+    if (feeGrowthInputs.every((v) => v !== undefined)) {
+      const [g0, g1, lo0, lo1, up0, up1, last0, last1] = feeGrowthInputs as bigint[];
+      const { inside0, inside1 } = v3.getFeeGrowthInside(
+        Number(pool.currentTick), tickLower, tickUpper, g0, g1, lo0, lo1, up0, up1
+      );
+      pending0 = v3.pendingFees(liquidity, inside0, last0);
+      pending1 = v3.pendingFees(liquidity, inside1, last1);
+    }
+
     return [
       {
         poolAddress: row.address,
@@ -339,6 +403,8 @@ export const getPositions = async (
         amount1: amount1.toString(),
         tokensOwed0: row.tokensOwed0,
         tokensOwed1: row.tokensOwed1,
+        pendingFees0: pending0.toString(),
+        pendingFees1: pending1.toString(),
         inRange: Number(pool.currentTick) >= tickLower && Number(pool.currentTick) < tickUpper,
         priceLowerWad: v3.sqrtPriceX96ToPriceWad(v3.getSqrtRatioAtTick(tickLower)).toString(),
         priceUpperWad: v3.sqrtPriceX96ToPriceWad(v3.getSqrtRatioAtTick(tickUpper)).toString(),
@@ -400,7 +466,10 @@ const fetchPoolTokens = async (
   poolAddress: string
 ): Promise<{ token0: string; token1: string }> => {
   const { data } = await cirrus.get(accessToken, `/${PoolV3Table}`, {
-    params: { address: `eq.${normalizeAddress(poolAddress)}`, select: "token0,token1" },
+    params: {
+      address: `eq.${normalizeAddress(poolAddress)}`,
+      select: "token0,token1",
+    },
   });
   const row = data?.[0];
   if (!row) throw new Error(`PoolV3 not found: ${poolAddress}`);
@@ -509,30 +578,64 @@ export const burn = async (
   return executeTransaction(accessToken, tx);
 };
 
+/** True when the owner's position currently holds liquidity (poke-able). */
+const positionHasLiquidity = async (
+  accessToken: string,
+  poolAddress: string,
+  owner: string,
+  tickLower: number,
+  tickUpper: number
+): Promise<boolean> => {
+  try {
+    const { data } = await cirrus.get(accessToken, `/${PoolV3Positions}`, {
+      params: {
+        address: `eq.${normalizeAddress(poolAddress)}`,
+        key: `eq.${normalizeAddress(owner)}`,
+        key2: `eq.${tickLower}`,
+        key3: `eq.${tickUpper}`,
+        select: "liquidity:value->>liquidity",
+      },
+    });
+    return BigInt(data?.[0]?.liquidity ?? "0") > 0n;
+  } catch {
+    return false;
+  }
+};
+
 export const collect = async (
   accessToken: string,
   params: PoolV3CollectParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
   const { poolAddress, tickLower, tickUpper, amount0Requested, amount1Requested } = params;
-  const tx = await buildFunctionTx(
-    [
-      {
-        contractName: "PoolV3",
-        contractAddress: poolAddress,
-        method: "collect",
-        args: {
-          recipient: userAddress,
-          tickLower,
-          tickUpper,
-          amount0Requested: amount0Requested ?? MAX_COLLECT,
-          amount1Requested: amount1Requested ?? MAX_COLLECT,
-        },
-      },
-    ],
-    userAddress,
-    accessToken
-  );
+
+  // fees accrue to tokensOwed only when the position is touched; poke (burn 0)
+  // before collecting so pending fees are realized — canonical periphery behavior.
+  // A poke on a zero-liquidity position would revert 'NP', so gate on liquidity.
+  const txs: any[] = [];
+  if (await positionHasLiquidity(accessToken, poolAddress, userAddress, tickLower, tickUpper)) {
+    txs.push({
+      contractName: "PoolV3",
+      contractAddress: poolAddress,
+      method: "burn",
+      args: { tickLower, tickUpper, amount: "0", deadline: deadline() },
+    });
+  }
+
+  txs.push({
+    contractName: "PoolV3",
+    contractAddress: poolAddress,
+    method: "collect",
+    args: {
+      recipient: userAddress,
+      tickLower,
+      tickUpper,
+      amount0Requested: amount0Requested ?? MAX_COLLECT,
+      amount1Requested: amount1Requested ?? MAX_COLLECT,
+    },
+  });
+
+  const tx = await buildFunctionTx(txs, userAddress, accessToken);
   return executeTransaction(accessToken, tx);
 };
 

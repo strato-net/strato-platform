@@ -267,6 +267,9 @@ export function getLiquidityForAmount1(
 export interface TickData {
   tick: number;
   liquidityNet: bigint;
+  /** signed Q128 outside-growth snapshots (populated when fetched for fee computation) */
+  feeGrowthOutside0X128?: bigint;
+  feeGrowthOutside1X128?: bigint;
 }
 
 export interface PoolQuoteState {
@@ -366,6 +369,47 @@ export function simulateSwap(pool: PoolQuoteState, zeroForOne: boolean, amountSp
     tickAfter: tick,
     partialFill: remaining !== 0n,
   };
+}
+
+// ============================================================================
+// PENDING (UNCOLLECTED) POSITION FEES
+// ============================================================================
+
+/**
+ * Tick.getFeeGrowthInside, signed exact math as the contract computes it.
+ * Boundary ticks that have never been initialized contribute 0 (the contract's
+ * storage default), so pass 0n for missing tick rows.
+ */
+export function getFeeGrowthInside(
+  tickCurrent: number,
+  tickLower: number,
+  tickUpper: number,
+  feeGrowthGlobal0X128: bigint,
+  feeGrowthGlobal1X128: bigint,
+  lowerOutside0X128: bigint,
+  lowerOutside1X128: bigint,
+  upperOutside0X128: bigint,
+  upperOutside1X128: bigint
+): { inside0: bigint; inside1: bigint } {
+  const below0 = tickCurrent >= tickLower ? lowerOutside0X128 : feeGrowthGlobal0X128 - lowerOutside0X128;
+  const below1 = tickCurrent >= tickLower ? lowerOutside1X128 : feeGrowthGlobal1X128 - lowerOutside1X128;
+  const above0 = tickCurrent < tickUpper ? upperOutside0X128 : feeGrowthGlobal0X128 - upperOutside0X128;
+  const above1 = tickCurrent < tickUpper ? upperOutside1X128 : feeGrowthGlobal1X128 - upperOutside1X128;
+  return {
+    inside0: feeGrowthGlobal0X128 - below0 - above0,
+    inside1: feeGrowthGlobal1X128 - below1 - above1,
+  };
+}
+
+/**
+ * Fees a position has earned since its last on-chain touch (mint/burn/poke),
+ * i.e. exactly what the next poke would add to tokensOwed (Position.update:
+ * positive inside-growth delta x liquidity / Q128, floored).
+ */
+export function pendingFees(liquidity: bigint, insideNowX128: bigint, insideLastX128: bigint): bigint {
+  if (liquidity <= 0n) return 0n;
+  const delta = insideNowX128 - insideLastX128;
+  return delta > 0n ? (delta * liquidity) / Q128 : 0n;
 }
 
 // ============================================================================

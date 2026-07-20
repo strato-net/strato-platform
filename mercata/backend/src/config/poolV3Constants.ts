@@ -68,6 +68,9 @@ export const POOL_V3_TICK_SELECT_FIELDS = [
   "liquidityNet:value->>liquidityNet",
   "liquidityGross:value->>liquidityGross",
   "initialized:value->>initialized",
+  // signed Q128 outside-growth snapshots, needed for pending-fee computation
+  "feeGrowthOutside0X128:value->>feeGrowthOutside0X128",
+  "feeGrowthOutside1X128:value->>feeGrowthOutside1X128",
 ] as const;
 
 /** Position rows for a user (positions mapping: owner => tickLower => tickUpper) */
@@ -80,6 +83,9 @@ export const POOL_V3_POSITION_SELECT_FIELDS = [
   "liquidity:value->>liquidity",
   "tokensOwed0:value->>tokensOwed0",
   "tokensOwed1:value->>tokensOwed1",
+  // signed Q128 inside-growth snapshots as of the position's last touch
+  "feeGrowthInside0LastX128:value->>feeGrowthInside0LastX128",
+  "feeGrowthInside1LastX128:value->>feeGrowthInside1LastX128",
 ] as const;
 
 // ============================================================================

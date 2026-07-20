@@ -137,6 +137,29 @@ const V3MyPositions = ({
     }
   };
 
+  // Realize + claim accrued fees without removing liquidity: burn(0) pokes the position so
+  // fees land in the (Cirrus-readable) tokensOwed, and collect:true pays them — one atomic tx.
+  // This is how fees are surfaced given the indexer can't expose live fee growth.
+  const handleCollectFees = async (position: PoolV3Position) => {
+    try {
+      await burnV3({
+        poolAddress: position.poolAddress,
+        tickLower: position.tickLower,
+        tickUpper: position.tickUpper,
+        liquidity: "0",
+        collect: true,
+      });
+      toast({ title: "Fees collected", description: "Accrued fees sent to your wallet", variant: "success" });
+      onChanged();
+    } catch (err) {
+      toast({
+        title: "Collect failed",
+        description: err.response?.data?.message || err.message || "Transaction failed",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (!isLoggedIn) {
     return (
       <div className="bg-card shadow-sm rounded-xl p-6 border border-border text-sm text-muted-foreground">
@@ -231,7 +254,11 @@ const V3MyPositions = ({
               const key = positionKey(position);
               const percent = removePercents[key] ?? 100;
               const hasLiquidity = BigInt(position.liquidity) > 0n;
-              const hasOwed = BigInt(position.tokensOwed0) > 0n || BigInt(position.tokensOwed1) > 0n;
+              // uncollected = realized on-chain owed + fees earned since the last touch
+              // (the backend pokes before collect, so both are collectable together)
+              const uncollected0 = BigInt(position.tokensOwed0) + BigInt(position.pendingFees0 ?? "0");
+              const uncollected1 = BigInt(position.tokensOwed1) + BigInt(position.pendingFees1 ?? "0");
+              const hasOwed = uncollected0 > 0n || uncollected1 > 0n;
               const pool = selectedGroup.pool;
 
               return (
@@ -264,15 +291,19 @@ const V3MyPositions = ({
                       </span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-muted-foreground">Uncollected</span>
+                      <span className="text-muted-foreground">Uncollected (incl. pending fees)</span>
                       <span className="font-medium">
-                        {formatTokenAmount(position.tokensOwed0, pool.token0.decimals)} {pool.token0.symbol}
+                        {formatTokenAmount(uncollected0.toString(), pool.token0.decimals)} {pool.token0.symbol}
                       </span>
                       <span className="font-medium">
-                        {formatTokenAmount(position.tokensOwed1, pool.token1.decimals)} {pool.token1.symbol}
+                        {formatTokenAmount(uncollected1.toString(), pool.token1.decimals)} {pool.token1.symbol}
                       </span>
                     </div>
                   </div>
+
+                  <p className="text-[11px] text-muted-foreground">
+                    Accrued fees are paid out when you Collect fees (or remove liquidity).
+                  </p>
 
                   {hasLiquidity && (
                     <div className="flex items-center gap-3">
@@ -300,7 +331,18 @@ const V3MyPositions = ({
                         Remove {percent}%
                       </Button>
                     )}
-                    {hasOwed && (
+                    {hasLiquidity && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        disabled={txLoading || pool.isDisabled}
+                        onClick={() => handleCollectFees(position)}
+                      >
+                        Collect fees
+                      </Button>
+                    )}
+                    {!hasLiquidity && hasOwed && (
                       <Button
                         variant="outline"
                         size="sm"

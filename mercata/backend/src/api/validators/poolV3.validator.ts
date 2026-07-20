@@ -86,7 +86,11 @@ export function validatePoolV3BurnArgs(args: any) {
     poolAddress: validateAddressField("poolAddress").required(),
     tickLower: tickField.required(),
     tickUpper: tickField.required(),
-    liquidity: numericStringField("liquidity").required(),
+    // allowZero: burn(0) is a valid "poke" — it accrues fees into the position's tokensOwed
+    // without removing liquidity. Paired with collect:true this realizes and claims accrued
+    // fees (the periphery collect() pattern), which is how the app surfaces fees given the
+    // indexer can't expose live feeGrowthInside from Cirrus.
+    liquidity: numericStringField("liquidity", { allowZero: true }).required(),
     collect: Joi.boolean(),
   });
   const { error } = schema.validate(args);

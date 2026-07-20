@@ -558,7 +558,10 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
   const [autoSlippage, setAutoSlippage] = useState(true);
   const [editingField, setEditingField] = useState<'from' | 'to' | null>(null);
   const [maxTransferableError, setMaxTransferableError] = useState("");
-  const [v3Quote, setV3Quote] = useState<PoolV3Quote | null>(null);
+  // All fee-tier quotes for the current pair, keyed by pool address. No auto-optimization —
+  // the user picks the tier from the list; `v3Quote` (below) is the selected tier's quote.
+  const [v3Quotes, setV3Quotes] = useState<Record<string, PoolV3Quote | null>>({});
+  const [selectedV3PoolAddress, setSelectedV3PoolAddress] = useState<string | null>(null);
   const [v3QuoteLoading, setV3QuoteLoading] = useState(false);
   const v3QuoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const v3QuoteAbortRef = useRef<AbortController | null>(null);
@@ -572,11 +575,13 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
 
   // V3 (concentrated liquidity) derived state
   const isV3 = swapVenue === 'v3' && v3PairPools.length > 0;
-  // pool executing the current quote (best output across fee tiers), else deepest liquidity
+  // pool the user has selected among the pair's fee tiers (defaults to the first listed)
   const v3ExecPool: PoolV3 | null = useMemo(() => {
     if (v3PairPools.length === 0) return null;
-    return v3PairPools.find(p => p.address === v3Quote?.poolAddress) ?? v3PairPools[0];
-  }, [v3PairPools, v3Quote?.poolAddress]);
+    return v3PairPools.find(p => p.address === selectedV3PoolAddress) ?? v3PairPools[0];
+  }, [v3PairPools, selectedV3PoolAddress]);
+  // the selected tier's quote drives the headline amount, rate, and price impact
+  const v3Quote: PoolV3Quote | null = v3ExecPool ? (v3Quotes[v3ExecPool.address] ?? null) : null;
   const v3ZeroForOne = !!(v3ExecPool && fromAsset && v3ExecPool.token0.address === fromAsset.address);
   const v3FromPoolBalance = v3ExecPool ? (v3ZeroForOne ? v3ExecPool.token0Balance : v3ExecPool.token1Balance) : "0";
   const v3ToPoolBalance = v3ExecPool ? (v3ZeroForOne ? v3ExecPool.token1Balance : v3ExecPool.token0Balance) : "0";
@@ -749,9 +754,10 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
     }
   }, [swapVenue, v3PairPools.length, pool, poolLoading, setSwapVenue]);
 
-  // Clear stale V3 quotes when the pair or venue changes
+  // Clear stale V3 quotes and tier selection when the pair or venue changes
   useEffect(() => {
-    setV3Quote(null);
+    setV3Quotes({});
+    setSelectedV3PoolAddress(null);
   }, [fromAsset?.address, toAsset?.address, swapVenue]);
 
 
@@ -867,31 +873,36 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
         // positive = exact input (editing "from"), negative = exact output (editing "to")
         const amountSpecified = isFromInput ? wei.toString() : (-wei).toString();
 
-        const quotes = await Promise.all(
+        const results = await Promise.all(
           v3PairPools.map(p =>
             quoteV3(p.address, p.token0.address === fromAsset.address, amountSpecified, controller.signal)
+              .then((q) => [p.address, q] as const)
           )
         );
         if (controller.signal.aborted) return;
 
-        // best across fee tiers: max output for exact input, min input for exact output;
-        // full fills beat partial fills
-        const best = quotes
-          .filter((q): q is PoolV3Quote => !!q && BigInt(q.amountOut) > 0n)
-          .sort((a, b) => {
-            if (a.partialFill !== b.partialFill) return a.partialFill ? 1 : -1;
-            const cmp = isFromInput
-              ? BigInt(b.amountOut) - BigInt(a.amountOut)
-              : BigInt(a.amountIn) - BigInt(b.amountIn);
-            return cmp > 0n ? 1 : cmp < 0n ? -1 : 0;
-          })[0] ?? null;
+        // Store every tier's quote; the user chooses which to trade (no auto-optimization).
+        const quoteMap: Record<string, PoolV3Quote | null> = {};
+        for (const [addr, q] of results) quoteMap[addr] = q;
+        setV3Quotes(quoteMap);
 
-        setV3Quote(best);
-        if (best) {
+        // Keep the current selection; default to the first listed tier only if none is set yet.
+        const activeAddr =
+          selectedV3PoolAddress && v3PairPools.some((p) => p.address === selectedV3PoolAddress)
+            ? selectedV3PoolAddress
+            : v3PairPools[0].address;
+        if (activeAddr !== selectedV3PoolAddress) setSelectedV3PoolAddress(activeAddr);
+
+        // Drive the headline amount off the selected tier's quote.
+        const activePool = v3PairPools.find((p) => p.address === activeAddr)!;
+        const activeQuote = quoteMap[activeAddr] ?? null;
+        if (activeQuote) {
+          const zeroForOne = activePool.token0.address === fromAsset.address;
+          const toPoolBal = zeroForOne ? activePool.token1Balance : activePool.token0Balance;
           if (isFromInput) {
-            handleAmountInputChange(formatUnits(best.amountOut), setToAmount, setToAmountError, v3ToPoolBalance);
+            handleAmountInputChange(formatUnits(activeQuote.amountOut), setToAmount, setToAmountError, toPoolBal);
           } else {
-            handleAmountInputChange(formatUnits(best.amountIn), setFromAmount, setFromAmountError, fromAssetAvailableBalance);
+            handleAmountInputChange(formatUnits(activeQuote.amountIn), setFromAmount, setFromAmountError, fromAssetAvailableBalance);
           }
         } else if (isFromInput) {
           setToAmount("");
@@ -906,7 +917,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
         }
       }
     }, 350);
-  }, [fromAsset?.address, toAsset?.address, v3PairPools, quoteV3, v3ToPoolBalance, fromAssetAvailableBalance]);
+  }, [fromAsset?.address, toAsset?.address, v3PairPools, quoteV3, selectedV3PoolAddress, fromAssetAvailableBalance]);
 
   // ========================================================================
   // EVENT HANDLERS
@@ -933,7 +944,8 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
   const handleVenueChange = (venue: 'v2' | 'v3') => {
     if (venue === swapVenue) return;
     setSwapVenue(venue);
-    setV3Quote(null);
+    setV3Quotes({});
+    setSelectedV3PoolAddress(null);
     // Recompute the passive side for the new venue from the last edited amount
     if (editingField === 'from' && isValidInputAmount(fromAmount)) {
       if (venue === 'v3') calculateV3SwapAmount(fromAmount, true);
@@ -943,6 +955,23 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
       if (venue === 'v3') calculateV3SwapAmount(toAmount, false);
       else if (pool) calculateSwapAmount(toAmount, false);
       else setFromAmount("");
+    }
+  };
+
+  // User selects which fee tier to trade against (no auto-optimization). Re-derives the
+  // passive amount from the already-fetched quote for that tier — no new fetch.
+  const selectV3Pool = (address: string) => {
+    setSelectedV3PoolAddress(address);
+    const p = v3PairPools.find((x) => x.address === address);
+    const q = v3Quotes[address];
+    if (!p || !q || !fromAsset) return;
+    const isFromInput = editingField !== 'to';
+    const zeroForOne = p.token0.address === fromAsset.address;
+    const toPoolBal = zeroForOne ? p.token1Balance : p.token0Balance;
+    if (isFromInput) {
+      handleAmountInputChange(formatUnits(q.amountOut), setToAmount, setToAmountError, toPoolBal);
+    } else {
+      handleAmountInputChange(formatUnits(q.amountIn), setFromAmount, setFromAmountError, fromAssetAvailableBalance);
     }
   };
 
@@ -1027,7 +1056,8 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
       setToAmountError('');
       setMaxTransferableError('');
       setEditingField(null);
-      setV3Quote(null);
+      setV3Quotes({});
+      setSelectedV3PoolAddress(null);
 
       if (!isV3) await refreshSwapHistory()
       // Refresh all contexts to ensure borrow page shows updated balances
@@ -1183,6 +1213,35 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
       })()}
 
       <div className="flex flex-col gap-3 bg-muted/50 p-3 md:p-4 rounded-lg border border-border">
+        {/* Fee tier selector — all tiers for the pair; the user picks one (no auto-routing) */}
+        {isV3 && v3PairPools.length > 1 && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-muted-foreground">Fee tier</span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              {v3PairPools.map((p) => {
+                const q = v3Quotes[p.address];
+                const out = q && BigInt(q.amountOut) > 0n ? formatAmount(formatUnits(q.amountOut)) : null;
+                const selected = v3ExecPool?.address === p.address;
+                return (
+                  <button
+                    key={p.address}
+                    type="button"
+                    onClick={() => selectV3Pool(p.address)}
+                    className={`rounded-lg border p-2 text-left transition-colors ${
+                      selected ? "border-strato-blue bg-muted" : "border-border hover:bg-muted/50"
+                    }`}
+                  >
+                    <div className="text-xs font-medium">{p.fee / 10000}%</div>
+                    <div className="text-[11px] text-muted-foreground truncate">
+                      {v3QuoteLoading ? "…" : out ? `≈ ${out} ${toAsset?._symbol || ""}` : "No liquidity"}
+                      {q?.partialFill ? " · partial" : ""}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {/* Exchange Rate */}
         <div className="flex flex-col gap-1 text-sm">
           <div className="flex flex-col md:flex-row md:justify-between gap-1">
