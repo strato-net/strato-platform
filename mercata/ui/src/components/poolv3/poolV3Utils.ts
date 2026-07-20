@@ -79,11 +79,6 @@ export const snapTick = (tick: number, tickSpacing: number): number => {
   return Math.min(Math.max(snapped, minUsable), maxUsable);
 };
 
-export const fullRangeTicks = (tickSpacing: number): { tickLower: number; tickUpper: number } => {
-  const maxUsable = Math.floor(V3_MAX_TICK / tickSpacing) * tickSpacing;
-  return { tickLower: -maxUsable, tickUpper: maxUsable };
-};
-
 /** human price from an 18-decimal wei string, with sensible precision for wide ranges */
 export const formatPriceWad = (priceWad: string): string => {
   const value = Number(BigInt(priceWad)) / 1e18;
@@ -99,4 +94,15 @@ export const formatTickAsPrice = (tick: number): string => {
   if (price >= 1e15 || (price > 0 && price < 1e-9)) return price.toExponential(4);
   if (price >= 1000) return price.toLocaleString(undefined, { maximumFractionDigits: 2 });
   return price.toLocaleString(undefined, { maximumSignificantDigits: 6 });
+};
+
+/**
+ * tick -> price as a plain machine-parseable string (dot decimal, no locale grouping).
+ * For prefilling editable inputs that get parsed back — formatTickAsPrice's locale
+ * grouping ("1,952.33") would reparse as 1.
+ */
+export const tickToPriceInput = (tick: number): string => {
+  const price = tickToPrice(tick);
+  if (!isFinite(price) || price <= 0) return "0";
+  return String(Number(price.toPrecision(6)));
 };

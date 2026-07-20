@@ -1319,6 +1319,9 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
         disabled={guestMode}
       />
       {(() => {
+        // Swap rewards are only registered for V2 pools (matched by the V2 pool's address);
+        // a V3 trade doesn't touch that contract, so show nothing on the V3 route
+        if (isV3) return null;
         // Find activity by pool address (OneTime swap rewards)
         const activity = userRewards?.activities?.find(
           (a) => a.activity.sourceContract?.toLowerCase() === pool?.address?.toLowerCase()
