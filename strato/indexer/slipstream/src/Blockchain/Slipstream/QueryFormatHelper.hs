@@ -229,15 +229,8 @@ tableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . tableNameToText
 textToDoubleQuoteText :: T.Text -> T.Text
 textToDoubleQuoteText =  wrapDoubleQuotes . escapeQuotes
 
-removeSingleQuotes :: T.Text -> T.Text
-removeSingleQuotes inputText =
-  let str = T.unpack inputText
-      -- Remove the single quotes from the string
-      cleanedStr = filter (/= '\'') str
-   in T.pack cleanedStr
-
 aesonHelper :: Map.Map T.Text T.Text -> Map.Map Aeson.Key Aeson.Value
-aesonHelper m = Map.fromList $ map (\(x, y) -> (AesonKey.fromText x, Aeson.toJSON $ removeSingleQuotes y)) (Map.toList m)
+aesonHelper m = Map.fromList $ map (\(x, y) -> (AesonKey.fromText x, Aeson.toJSON y)) (Map.toList m)
 
 newtype MapWrapper = MapWrapper (Map.Map Aeson.Key Aeson.Value)
 
