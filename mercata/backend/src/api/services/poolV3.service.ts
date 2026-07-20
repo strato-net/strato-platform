@@ -133,6 +133,10 @@ const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>): PoolV3 => {
     if (!price) return 0;
     return Number((BigInt(balance) * BigInt(price)) / 10n ** 18n) / 1e18;
   };
+  // oracle spot price of the pair (token1 per token0, same orientation as priceWad)
+  const price0 = BigInt(priceMap.get(raw.token0.address) ?? "0");
+  const price1 = BigInt(priceMap.get(raw.token1.address) ?? "0");
+  const oraclePriceWad = price0 > 0n && price1 > 0n ? (price0 * 10n ** 18n) / price1 : 0n;
   return {
     address: raw.address,
     token0: buildToken(raw.token0),
@@ -143,6 +147,7 @@ const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>): PoolV3 => {
     currentTick: Number(raw.currentTick),
     liquidity: raw.liquidity,
     priceWad: priceWad.toString(),
+    oraclePriceWad: oraclePriceWad.toString(),
     token0Balance: raw.token0Balance,
     token1Balance: raw.token1Balance,
     feeProtocol: Number(raw.feeProtocol),

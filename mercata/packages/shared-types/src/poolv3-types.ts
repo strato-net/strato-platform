@@ -24,6 +24,8 @@ export interface PoolV3 {
   liquidity: string;
   /** token1 per token0 price, 18-decimal wei string */
   priceWad: string;
+  /** oracle spot price, token1 per token0, 18-decimal wei string ("0" when either token has no oracle price) */
+  oraclePriceWad: string;
   token0Balance: string;
   token1Balance: string;
   /** protocol fee denominators, canonical packed form feeProtocol0 + (feeProtocol1 << 4); 0 = off */

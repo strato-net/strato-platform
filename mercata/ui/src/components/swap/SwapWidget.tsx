@@ -512,6 +512,119 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 };
 
 // ============================================================================
+// VENUE (POOL VERSION) SELECTOR COMPONENT
+// ============================================================================
+interface VenueSelectorProps {
+  venue: 'v2' | 'v3';
+  onChange: (venue: 'v2' | 'v3') => void;
+  v2Available: boolean;
+  v3Available: boolean;
+  disabled?: boolean;
+}
+
+const VENUE_OPTIONS = [
+  { key: 'v2' as const, title: 'V2', subtitle: 'Classic pool' },
+  { key: 'v3' as const, title: 'V3', subtitle: 'Concentrated liquidity' },
+];
+
+const VenueSelector = ({ venue, onChange, v2Available, v3Available, disabled = false }: VenueSelectorProps) => (
+  <div className="flex flex-col gap-1.5">
+    <span className="text-sm text-muted-foreground font-semibold">Pool Version</span>
+    <div className="grid grid-cols-2 gap-2">
+      {VENUE_OPTIONS.map(({ key, title, subtitle }) => {
+        const available = key === 'v2' ? v2Available : v3Available;
+        const selected = venue === key && available;
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => { if (!disabled && available) onChange(key); }}
+            disabled={disabled || !available}
+            className={`rounded-lg border p-2.5 md:p-3 text-left transition-colors ${
+              selected ? 'border-strato-blue bg-muted' : 'border-border hover:bg-muted/50'
+            } ${(disabled || !available) ? 'opacity-50 cursor-not-allowed hover:bg-transparent' : ''}`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm md:text-base font-semibold">{title}</span>
+              {selected && <Check className="h-4 w-4 text-strato-blue flex-shrink-0" />}
+            </div>
+            <div className="text-[11px] md:text-xs text-muted-foreground mt-0.5">
+              {available ? subtitle : 'Not available for this pair'}
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  </div>
+);
+
+// ============================================================================
+// FEE TIER SELECTOR COMPONENT (V3)
+// ============================================================================
+const FEE_TIER_DESCRIPTIONS: Record<number, string> = {
+  100: 'Best for very stable pairs',
+  500: 'Best for stable pairs',
+  3000: 'Best for most pairs',
+  10000: 'Best for exotic pairs',
+};
+
+interface FeeTierSelectorProps {
+  pools: PoolV3[];
+  quotes: Record<string, PoolV3Quote | null>;
+  selectedAddress?: string;
+  onSelect: (address: string) => void;
+  quoteLoading: boolean;
+  toSymbol?: string;
+  disabled?: boolean;
+}
+
+const FeeTierSelector = ({ pools, quotes, selectedAddress, onSelect, quoteLoading, toSymbol, disabled = false }: FeeTierSelectorProps) => {
+  // Before an amount is entered there are no quotes yet — show each tier's TVL instead
+  const hasQuotes = Object.keys(quotes).length > 0;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-sm text-muted-foreground font-semibold">Fee Tier</span>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {pools.map((p) => {
+          const q = quotes[p.address];
+          const out = q && BigInt(q.amountOut) > 0n ? formatAmount(formatUnits(q.amountOut)) : null;
+          const selected = selectedAddress === p.address;
+          return (
+            <button
+              key={p.address}
+              type="button"
+              onClick={() => { if (!disabled) onSelect(p.address); }}
+              disabled={disabled}
+              className={`rounded-lg border p-2.5 md:p-3 text-left transition-colors ${
+                selected ? 'border-strato-blue bg-muted' : 'border-border hover:bg-muted/50'
+              } ${disabled ? 'opacity-50 cursor-not-allowed hover:bg-transparent' : ''}`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">{p.fee / 10000}%</span>
+                {selected && <Check className="h-3.5 w-3.5 text-strato-blue flex-shrink-0" />}
+              </div>
+              {FEE_TIER_DESCRIPTIONS[p.fee] && (
+                <div className="text-[11px] text-muted-foreground mt-0.5">{FEE_TIER_DESCRIPTIONS[p.fee]}</div>
+              )}
+              <div className="text-[11px] text-muted-foreground mt-1 truncate">
+                {hasQuotes ? (
+                  <>
+                    {quoteLoading ? '…' : out ? `≈ ${out} ${toSymbol || ''}` : 'No liquidity'}
+                    {q?.partialFill ? ' · partial' : ''}
+                  </>
+                ) : (
+                  `$${p.totalLiquidityUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })} TVL`
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
 // MAIN SWAP WIDGET COMPONENT
 // ============================================================================
 interface SwapWidgetProps {
@@ -588,7 +701,8 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
 
   const v2Rates = calculateExchangeRates(pool, fromAsset, toAsset);
 
-  // V3 spot rate from the executing pool's Q64.96 price (token1 per token0, wei scale)
+  // V3 exchange rate from the executing pool's Q64.96 price (token1 per token0, wei scale);
+  // the oracle spot rate comes from the price oracle via the backend, like V2's oracle ratios
   const v3Rates = useMemo(() => {
     if (!v3ExecPool) return null;
     try {
@@ -599,14 +713,21 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
       const invertedWei = v3ZeroForOne ? (WAD * WAD) / priceWad : priceWad;
       const rate = formatUnits(rateWei.toString());
       const inverted = formatUnits(invertedWei.toString());
+      const oracleWad = BigInt(v3ExecPool.oraclePriceWad || "0");
+      const oracleRate = oracleWad > 0n
+        ? formatUnits((v3ZeroForOne ? oracleWad : (WAD * WAD) / oracleWad).toString())
+        : undefined;
+      const invertedOracleRate = oracleWad > 0n
+        ? formatUnits((v3ZeroForOne ? (WAD * WAD) / oracleWad : oracleWad).toString())
+        : undefined;
       return {
         exchangeRateRaw: rate,
         exchangeRate: formatAmount(rate),
-        oracleExchangeRate: formatAmount(rate),
+        oracleExchangeRate: oracleRate ? formatAmount(oracleRate) : undefined,
         invertedExchangeRate: formatAmount(inverted),
-        invertedOracleExchangeRate: formatAmount(inverted),
+        invertedOracleExchangeRate: invertedOracleRate ? formatAmount(invertedOracleRate) : undefined,
         isFractionalRate: parseFloat(rate) < 1,
-        isFractionalOracleRate: parseFloat(rate) < 1,
+        isFractionalOracleRate: oracleRate ? parseFloat(oracleRate) < 1 : false,
       };
     } catch {
       return null;
@@ -1122,22 +1243,27 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
   // ========================================================================
   return (
     <div className="space-y-6">
-      {/* Venue toggle: only when the pair is tradable on both V2 and V3 */}
-      {(pool || isMultiToken) && v3PairPools.length > 0 && (
-        <div className="flex items-center justify-end gap-1.5">
-          <span className="text-xs text-muted-foreground mr-1">Route</span>
-          {(['v2', 'v3'] as const).map(venue => (
-            <button
-              key={venue}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium border border-border ${
-                swapVenue === venue ? 'bg-muted text-foreground' : 'bg-transparent text-muted-foreground'
-              } ${guestMode ? 'opacity-50 cursor-not-allowed' : ''}`}
-              onClick={() => { if (!guestMode) handleVenueChange(venue); }}
+      {/* Pool version + fee tier selection — shown whenever the pair trades on at least one venue */}
+      {(!!pool || v3PairPools.length > 0) && (
+        <div className="space-y-3">
+          <VenueSelector
+            venue={isV3 ? 'v3' : 'v2'}
+            onChange={handleVenueChange}
+            v2Available={!!pool}
+            v3Available={v3PairPools.length > 0}
+            disabled={guestMode}
+          />
+          {isV3 && (
+            <FeeTierSelector
+              pools={v3PairPools}
+              quotes={v3Quotes}
+              selectedAddress={v3ExecPool?.address}
+              onSelect={selectV3Pool}
+              quoteLoading={v3QuoteLoading}
+              toSymbol={toAsset?._symbol}
               disabled={guestMode}
-            >
-              {venue.toUpperCase()}
-            </button>
-          ))}
+            />
+          )}
         </div>
       )}
 
@@ -1213,35 +1339,6 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
       })()}
 
       <div className="flex flex-col gap-3 bg-muted/50 p-3 md:p-4 rounded-lg border border-border">
-        {/* Fee tier selector — all tiers for the pair; the user picks one (no auto-routing) */}
-        {isV3 && v3PairPools.length > 1 && (
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-muted-foreground">Fee tier</span>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-              {v3PairPools.map((p) => {
-                const q = v3Quotes[p.address];
-                const out = q && BigInt(q.amountOut) > 0n ? formatAmount(formatUnits(q.amountOut)) : null;
-                const selected = v3ExecPool?.address === p.address;
-                return (
-                  <button
-                    key={p.address}
-                    type="button"
-                    onClick={() => selectV3Pool(p.address)}
-                    className={`rounded-lg border p-2 text-left transition-colors ${
-                      selected ? "border-strato-blue bg-muted" : "border-border hover:bg-muted/50"
-                    }`}
-                  >
-                    <div className="text-xs font-medium">{p.fee / 10000}%</div>
-                    <div className="text-[11px] text-muted-foreground truncate">
-                      {v3QuoteLoading ? "…" : out ? `≈ ${out} ${toAsset?._symbol || ""}` : "No liquidity"}
-                      {q?.partialFill ? " · partial" : ""}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
         {/* Exchange Rate */}
         <div className="flex flex-col gap-1 text-sm">
           <div className="flex flex-col md:flex-row md:justify-between gap-1">
@@ -1261,7 +1358,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
               )
             ) : (
               <span className="font-medium text-foreground text-xs md:text-sm">
-                1 {fromAsset?._symbol || ""} ≈ {exchangeRate} ({oracleExchangeRate}*) {toAsset?._symbol || ""}
+                1 {fromAsset?._symbol || ""} ≈ {exchangeRate}{oracleExchangeRate ? ` (${oracleExchangeRate}*)` : ""} {toAsset?._symbol || ""}
               </span>
             )}
           </div>
@@ -1269,12 +1366,14 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
             <>
               <div className="md:text-right">
                 <span className="text-muted-foreground/70 text-xs md:text-sm">
-                  1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} ({invertedOracleExchangeRate}*) {fromAsset?._symbol || ""}
+                  1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate}{invertedOracleExchangeRate ? ` (${invertedOracleExchangeRate}*)` : ""} {fromAsset?._symbol || ""}
                 </span>
               </div>
-              <div className="md:text-right">
-                <span className="text-xs text-muted-foreground/70">* spot price</span>
-              </div>
+              {oracleExchangeRate && (
+                <div className="md:text-right">
+                  <span className="text-xs text-muted-foreground/70">* spot price</span>
+                </div>
+              )}
             </>
           )}
         </div>
