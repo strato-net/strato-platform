@@ -208,6 +208,7 @@ synthesizeFlat spbvs =
               then (t NE.:| sp', (Just u, bv))
               else (t NE.:| (sp' ++ [u]), (Nothing, bv))
     fieldsOnly _ = Nothing
+    build (Nothing, BDefault) s = s
     build (Nothing, bv) _ = fromBasic bv
     build (Just f, bv) (ValueStruct s) = ValueStruct $ M.insert (bsToText' f) (fromBasic bv) s
     build (Just f, bv) _ = ValueStruct $ M.singleton (bsToText' f) (fromBasic bv)
