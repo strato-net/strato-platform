@@ -15,6 +15,7 @@ RUN apt -y update && apt install -y \
       libstdc++6 \
       libtool \
       locales \
+      logrotate \
       netbase \
       netcat-openbsd \
       postgresql-client \
@@ -43,6 +44,7 @@ COPY \
   ./usr/local/bin/slipstream \
   ./usr/local/bin/strato-api \
   ./usr/local/bin/strato-indexer \
+  ./usr/local/bin/strato-logrotate \
   ./usr/local/bin/strato-network-monitor \
   ./usr/local/bin/strato-p2p \
   ./usr/local/bin/strato-sequencer \

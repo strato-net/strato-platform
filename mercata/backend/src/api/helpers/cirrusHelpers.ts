@@ -18,10 +18,10 @@ export const getTokenMetadata = async (accessToken: string, tokenAddresses: stri
   if (!tokenAddresses.length) return new Map();
   
   const { data: tokenData } = await cirrus.get(accessToken, `/${Token}`, {
-    params: { select: `address,_name,_symbol,images:${Token}-images(value)`, address: `in.(${tokenAddresses.join(",")})` }
+    params: { select: `address,_name,_symbol,status,images:${Token}-images(value)`, address: `in.(${tokenAddresses.join(",")})` }
   });
   
-  return new Map(tokenData.map((token: any) => [token.address, { name: token._name, symbol: token._symbol, image: token.images?.[0]?.value }]));
+  return new Map(tokenData.map((token: any) => [token.address, { name: token._name, symbol: token._symbol, status: token.status, image: token.images?.[0]?.value }]));
 };
 
 export const getTokenDetails = async (

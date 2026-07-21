@@ -94,6 +94,7 @@ createCommandsFile = do
         , "slipstream +RTS -T -RTS"
         , "strato-api +RTS -T -N -maxN4 -RTS"
         , "strato-network-monitor"
+        , "strato-logrotate"
         ]
 
       jsonrpcCommands =
@@ -143,6 +144,26 @@ mkFilesAndGenesis nodeDir hasFlags network = do
 
     -- Make logs directory world-writable for containers running as non-root users (e.g. prometheus)
     liftIO $ setFileMode "logs" (ownerModes .|. groupModes .|. otherModes)
+
+    -- Make the streaming broker's data directories writable by the container's
+    -- built-in user. The apache/kafka image runs as its baked-in "appuser"
+    -- (uid 1000) and writes its data into the bind-mounted broker dir
+    -- (KAFKA_LOG_DIRS). strato-init creates that dir owned by the host login
+    -- user; when the host uid is not 1000 (e.g. some Oracle Cloud VMs) appuser
+    -- cannot write it and the broker only starts if forced to run as root.
+    -- A non-root strato-init cannot chown the dir to uid 1000, so we relax its
+    -- mode instead - the same approach already used for "logs" above. The
+    -- image's own config dir (/opt/kafka/config) is owned by uid 1000, so
+    -- running as appuser keeps that writable without any root privileges.
+    --
+    -- NOTE: this is scoped to the default Kafka backend, whose brokerVolumeDirs
+    -- is just ["kafka"] (a data dir). Other backends selected at build time have
+    -- different dirs: the Redpanda/kafka-hw backend runs as the host uid:gid
+    -- (bcNeedsUserGid = True), so its dirs are already owned correctly and do
+    -- NOT need this; in particular its config dir (redpanda/config) should not
+    -- be made world-writable. If that backend ever becomes the default, give it
+    -- a narrower treatment instead of relaxing every broker dir here.
+    liftIO $ mapM_ (\d -> setFileMode d (ownerModes .|. groupModes .|. otherModes)) brokerVolumeDirs
 
     -- Copy SSL cert and key into the node's secrets/ssl/ directory
     when (not $ null flags_sslDir) $ liftIO $ do

@@ -239,7 +239,9 @@ generateDockerCompose = do
             , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
-        , command = Just ["exec /docker-run.sh >> /logs/nginx.log 2>&1"]
+        -- chmod so the host user's strato-logrotate can rotate (truncate) the
+        -- log: this container runs as root, not as the host uid.
+        , command = Just ["touch /logs/nginx.log && chmod 666 /logs/nginx.log || true; exec /docker-run.sh >> /logs/nginx.log 2>&1"]
         , restart = Just "unless-stopped"
         , healthcheck = Just Healthcheck
             { test = ["CMD", "curl", "-sf", "http://localhost:" ++ portNum ++ "/_ping"]
@@ -319,7 +321,9 @@ generateDockerCompose = do
             , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
-        , command = Just ["exec /entrypoint.sh >> /logs/local-auth.log 2>&1"]
+        -- chmod so the host user's strato-logrotate can rotate (truncate) the
+        -- log: this container runs as root, not as the host uid.
+        , command = Just ["touch /logs/local-auth.log && chmod 666 /logs/local-auth.log || true; exec /entrypoint.sh >> /logs/local-auth.log 2>&1"]
         , ports = Just ["127.0.0.1:4444:4444"]
         , restart = Just "unless-stopped"
         , logging = noLogging
