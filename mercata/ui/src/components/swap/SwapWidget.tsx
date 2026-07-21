@@ -1125,6 +1125,13 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
     const p = v3PairPools.find((x) => x.address === address);
     if (!p || !fromAsset) return;
     const isFromInput = editingField !== 'to';
+    const zeroForOne = p.token0.address === fromAsset.address;
+    const toPoolBal = zeroForOne ? p.token1Balance : p.token0Balance;
+    // The To-side cap is the pool's balance of the receive token, which differs per pool —
+    // re-validate the user-typed To amount against the newly selected pool's balance
+    if (!isFromInput && isValidInputAmount(toAmount)) {
+      handleAmountInputChange(toAmount, setToAmount, setToAmountError, toPoolBal);
+    }
     const q = v3Quotes[address];
     if (!q) {
       // no quote for this pool (e.g. no liquidity) — don't keep a stale amount from the previous pool
@@ -1134,8 +1141,6 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
       }
       return;
     }
-    const zeroForOne = p.token0.address === fromAsset.address;
-    const toPoolBal = zeroForOne ? p.token1Balance : p.token0Balance;
     if (isFromInput) {
       handleAmountInputChange(formatUnits(q.amountOut), setToAmount, setToAmountError, toPoolBal);
     } else {
@@ -1150,6 +1155,10 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
       setSwapVenue('v2');
       const isFrom = editingField !== 'to';
       const amount = isFrom ? fromAmount : toAmount;
+      // re-validate the user-typed To amount against the V2 pool's receive-side balance
+      if (!isFrom && isValidInputAmount(toAmount)) {
+        handleAmountInputChange(toAmount, setToAmount, setToAmountError, toAsset?.poolBalance || "0");
+      }
       if (pool && isValidInputAmount(amount)) calculateSwapAmount(amount, isFrom);
     } else {
       setSwapVenue('v3');
