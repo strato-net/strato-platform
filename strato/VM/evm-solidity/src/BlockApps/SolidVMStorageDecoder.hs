@@ -177,6 +177,7 @@ applyDelta' [Field n] bv _ = do
 applyDelta' sp bv (ValueArraySentinel {}) = Right $ constructFromNothing' sp bv
 applyDelta' sp@[Index _] BDefault _ = Right $ constructFromNothing' sp BDefault
 applyDelta' sp@[Index _] _ _ = Right $ constructFromNothing' sp BDefault
+applyDelta' sp@(Index _ : _) bv (SimpleValue _) = Right $ constructFromNothing' sp bv
 -- Handle case where BDefault created a SimpleValue but we now have nested fields
 applyDelta' (Field n : sp) bv (SimpleValue _) = do
   n' <- first (UnicodeError n) $ decodeUtf8' n
