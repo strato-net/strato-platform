@@ -13,10 +13,7 @@ const { bootstrapAuthEnv } = require("./lib/bootstrapAuthEnv");
 bootstrapAuthEnv();
 
 const { ethers } = require("ethers");
-const {
-  initOpenIdConfig,
-  getBAUserToken,
-} = require(path.resolve(__dirname, "../../services/bridge/dist/auth/index.js"));
+const deployAuth = require(path.resolve(__dirname, "../../contracts/deploy/auth.js"));
 const {
   CHAIN_CONFIG,
   normalizeAddress,
@@ -166,8 +163,10 @@ function isMissingRelationError(error) {
 async function getCirrusAccessToken() {
   const token = String(process.env.ACCESS_TOKEN || "").trim();
   if (token) return token;
-  await initOpenIdConfig();
-  return getBAUserToken();
+  return deployAuth.getUserToken(
+    process.env.GLOBAL_ADMIN_NAME,
+    process.env.GLOBAL_ADMIN_PASSWORD,
+  );
 }
 
 async function fetchBridgeMappingsFallback(nodeUrl, token, chains, bridgeAddressNo0x) {
