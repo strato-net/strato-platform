@@ -445,6 +445,32 @@ const DEPOSIT_ROUTER_VERSION_SELECTOR = "0x54fd4d50";
 const MIN_ACTION_ROUTER_MAJOR = 3;
 const normalizeCatalogAddress = (value: string | undefined): string =>
   (value || "").toLowerCase().replace(/^0x/, "");
+const depositActionRouteKey = (
+  externalToken: string | undefined,
+  externalChainId: string,
+  targetStratoToken: string | undefined
+): string => [
+  normalizeCatalogAddress(externalToken),
+  externalChainId,
+  normalizeCatalogAddress(targetStratoToken),
+].join(":");
+const parseDepositActionFlags = (
+  value: unknown
+): { autoForge: boolean; autoSave: boolean } => {
+  let parsed = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      parsed = {};
+    }
+  }
+  const flags = parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : {};
+  return {
+    autoForge: flags.autoForge === true || String(flags.autoForge).toLowerCase() === "true",
+    autoSave: flags.autoSave === true || String(flags.autoSave).toLowerCase() === "true",
+  };
+};
 
 const decodeAbiString = (value: unknown): string => {
   if (typeof value !== "string" || !value.startsWith("0x")) return "";
@@ -496,6 +522,7 @@ export const buildDepositActionCatalog = ({
   saveState,
   forgeConfigs,
   bridgeActionConfig,
+  bridgeActionRoutes,
 }: {
   routes: BridgeToken[];
   actionChainIds: Set<string>;
@@ -503,6 +530,7 @@ export const buildDepositActionCatalog = ({
   saveState: SaveUsdstActionState | null;
   forgeConfigs: MetalForgeConfig;
   bridgeActionConfig: { directMintPsm?: string; saveUsdstVault?: string };
+  bridgeActionRoutes: Map<string, { autoForge: boolean; autoSave: boolean }>;
 }): DepositAction[] => {
   if (!actionChainIds.size) return [];
 
@@ -515,7 +543,8 @@ export const buildDepositActionCatalog = ({
   );
   const sources = new Map<string, {
     address: string;
-    chainIds: Set<string>;
+    forgeChainIds: Set<string>;
+    saveChainIds: Set<string>;
     psmFeeBps: string;
   }>();
 
@@ -526,13 +555,19 @@ export const buildDepositActionCatalog = ({
     const address = normalizeCatalogAddress(route.stratoToken);
     const mintConfig = psmState?.mintConfigs.get(address);
     if (address !== usdst && (!psmReady || !mintConfig?.isEnabled)) continue;
+    const actionConfig = bridgeActionRoutes.get(
+      depositActionRouteKey(route.externalToken, chainId, route.stratoToken)
+    );
+    if (!actionConfig?.autoForge && !actionConfig?.autoSave) continue;
 
     const source = sources.get(address) || {
       address: route.stratoToken,
-      chainIds: new Set<string>(),
+      forgeChainIds: new Set<string>(),
+      saveChainIds: new Set<string>(),
       psmFeeBps: address === usdst ? "0" : mintConfig!.feeBps,
     };
-    source.chainIds.add(chainId);
+    if (actionConfig.autoForge) source.forgeChainIds.add(chainId);
+    if (actionConfig.autoSave) source.saveChainIds.add(chainId);
     sources.set(address, source);
   }
 
@@ -558,12 +593,11 @@ export const buildDepositActionCatalog = ({
   for (const source of sources.values()) {
     const common = {
       payToken: source.address,
-      externalChainIds: [...source.chainIds],
       minimumRouterMajorVersion: MIN_ACTION_ROUTER_MAJOR,
       psmFeeBps: source.psmFeeBps,
     };
 
-    if (saveEnabled && saveState) {
+    if (saveEnabled && saveState && source.saveChainIds.size) {
       actions.push({
         id: `save-${source.address}`,
         action: 3,
@@ -571,11 +605,12 @@ export const buildDepositActionCatalog = ({
         stratoTokenName: "Save USDST",
         stratoTokenSymbol: saveState.shareSymbol,
         oraclePrice: saveState.projectedExchangeRate,
+        externalChainIds: [...source.saveChainIds],
         ...common,
       });
     }
 
-    for (const metal of enabledMetals) {
+    for (const metal of source.forgeChainIds.size ? enabledMetals : []) {
       actions.push({
         id: `forge-${source.address}-${metal.address}`,
         action: 2,
@@ -585,6 +620,7 @@ export const buildDepositActionCatalog = ({
         stratoTokenImage: metal.imageUrl,
         oraclePrice: metal.price,
         feeBps: metal.feeBps,
+        externalChainIds: [...source.forgeChainIds],
         ...common,
       });
     }
@@ -594,7 +630,15 @@ export const buildDepositActionCatalog = ({
 };
 
 export const getDepositActions = async (accessToken: string): Promise<DepositAction[]> => {
-  const [routes, networks, psmState, saveState, forgeConfigs, bridgeActionConfig] = await Promise.all([
+  const [
+    routes,
+    networks,
+    psmState,
+    saveState,
+    forgeConfigs,
+    bridgeActionConfig,
+    bridgeActionRouteRows,
+  ] = await Promise.all([
     getBridgeableTokens(accessToken),
     getNetworkConfigs(accessToken),
     constants.directMintPsm ? getPsmMintState(accessToken) : Promise.resolve(null),
@@ -607,8 +651,21 @@ export const getDepositActions = async (accessToken: string): Promise<DepositAct
         limit: "1",
       },
     }).then(({ data }) => data?.[0] || {}),
+    cirrus.get(accessToken, "/mapping", {
+      params: {
+        address: `eq.${mercataBridge}`,
+        collection_name: "eq.depositActionConfigs",
+        select: "externalToken:key->>key,externalChainId:key->>key2,targetStratoToken:key->>key3,value",
+      },
+    }).then(({ data }) => data || []),
   ]);
 
+  const bridgeActionRoutes = new Map<string, { autoForge: boolean; autoSave: boolean }>(
+    bridgeActionRouteRows.map((row: any) => [
+      depositActionRouteKey(row.externalToken, String(row.externalChainId), row.targetStratoToken),
+      parseDepositActionFlags(row.value),
+    ])
+  );
   const routerMajors = await Promise.all(
     networks.map(async ({ externalChainId, chainInfo }) => ({
       chainId: String(externalChainId),
@@ -629,5 +686,6 @@ export const getDepositActions = async (accessToken: string): Promise<DepositAct
     saveState,
     forgeConfigs,
     bridgeActionConfig,
+    bridgeActionRoutes,
   });
 };

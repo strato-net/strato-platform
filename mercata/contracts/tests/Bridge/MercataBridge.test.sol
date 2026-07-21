@@ -207,6 +207,10 @@ contract Describe_MercataBridge is Authorizable {
 
         bridge.setDirectMintPsm(address(directMintPsm));
         bridge.setSaveUsdstVault(address(saveUsdstVault));
+        bridge.setDepositAction(address(0x5555), externalChainId, address(testToken), uint(DepositAction.AUTO_FORGE), true);
+        bridge.setDepositAction(address(0x5555), externalChainId, address(testToken), uint(DepositAction.AUTO_SAVE), true);
+        bridge.setDepositAction(address(0x6666), externalChainId, address(usdstToken), uint(DepositAction.AUTO_FORGE), true);
+        bridge.setDepositAction(address(0x6666), externalChainId, address(usdstToken), uint(DepositAction.AUTO_SAVE), true);
     }
 
     // ============ CONSTRUCTOR TESTS ============
@@ -381,6 +385,22 @@ contract Describe_MercataBridge is Authorizable {
             reverted = true;
         }
         require(reverted, "Should revert setPause by non-owner");
+
+        reverted = false;
+        try {
+            user1.do(
+                address(bridge),
+                "setDepositAction",
+                address(0x6666),
+                externalChainId,
+                address(usdstToken),
+                uint(DepositAction.AUTO_SAVE),
+                false
+            );
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert setDepositAction by non-owner");
     }
 
     // ============ DEPOSIT FLOW TESTS ============
@@ -1742,6 +1762,36 @@ contract Describe_MercataBridge is Authorizable {
         require(IERC20(address(saveUsdstVault)).balanceOf(recipient) == amount, "Recipient should receive saveUSDST");
         require(IERC20(address(usdstToken)).balanceOf(address(saveUsdstVault)) == amount, "Vault should receive USDST");
         require(IERC20(address(usdstToken)).balanceOf(address(directMintPsm)) == 0, "Direct USDST should skip PSM");
+    }
+
+    function it_bridge_disabled_action_falls_back_without_disabling_other_actions() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("disabled autosave");
+        bridge.setDepositAction(address(0x6666), externalChainId, address(usdstToken), uint(DepositAction.AUTO_SAVE), false);
+
+        relayer.do(
+            address(bridge),
+            "depositWithAction",
+            externalChainId,
+            externalSender,
+            address(0x6666),
+            amount,
+            txHash,
+            recipient,
+            address(usdstToken),
+            uint(DepositAction.AUTO_SAVE),
+            address(0),
+            uint(0)
+        );
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Disabled action should return USDST");
+        require(IERC20(address(saveUsdstVault)).balanceOf(recipient) == 0, "Disabled action should not mint shares");
+        (bool autoForgeEnabled, bool autoSaveEnabled) =
+            bridge.depositActionConfigs(address(0x6666), externalChainId, address(usdstToken));
+        require(autoForgeEnabled, "AUTO_FORGE should remain enabled");
+        require(!autoSaveEnabled, "AUTO_SAVE should be disabled");
     }
 
     function it_bridge_non_usdst_autosave_uses_psm() {

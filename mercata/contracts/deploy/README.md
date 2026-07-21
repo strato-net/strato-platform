@@ -319,11 +319,32 @@ cp .env.happy-native-redemption.example .env.happy-native-redemption
 - the STRATO native deposit reaches completed state
 - the STRATO recipient balance increases by exactly the redeemed amount
 
+#### `configure-bridge-deposit-actions.js`
+Enable or disable AUTO_FORGE and AUTO_SAVE for the configured USDC and USDT bridge routes.
+
+Dry run:
+```bash
+node configure-bridge-deposit-actions.js --env testnet
+node configure-bridge-deposit-actions.js --env prod
+```
+
+Execute:
+```bash
+node configure-bridge-deposit-actions.js --env testnet --execute
+node configure-bridge-deposit-actions.js --env prod --execute
+```
+
+Disable:
+```bash
+node configure-bridge-deposit-actions.js --env testnet --operation disable --execute
+```
+
 ## Directory Structure
 
 ```
 deploy/
 ├── auth.js         # Authentication utilities
+├── configure-bridge-deposit-actions.js # Configure bridge action availability
 ├── config.js       # Configuration management
 ├── contract.js     # Contract compilation and deployment
 ├── deploy.js       # Main code collection deployment script

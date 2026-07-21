@@ -35,6 +35,16 @@ test("builds actions only for eligible routes and configured products", () => {
     route("usdst-1", "1", constants.USDST),
     route("disabled", "1", "0x4444444444444444444444444444444444444444", false),
   ];
+  const bridgeActionRoutes = new Map(
+    routes.map((item) => [
+      [
+        item.externalToken?.toLowerCase().replace(/^0x/, ""),
+        String(item.externalChainId),
+        item.stratoToken.toLowerCase().replace(/^0x/, ""),
+      ].join(":"),
+      { autoForge: true, autoSave: true },
+    ])
+  );
   const base = {
     routes,
     actionChainIds: new Set(["1"]),
@@ -70,6 +80,7 @@ test("builds actions only for eligible routes and configured products", () => {
       directMintPsm: constants.directMintPsm,
       saveUsdstVault: vault,
     },
+    bridgeActionRoutes,
   };
 
   const actions = buildDepositActionCatalog(base);
@@ -86,6 +97,23 @@ test("builds actions only for eligible routes and configured products", () => {
     psmState: { ...base.psmState, mintPaused: true },
   });
   assert.ok(pausedPsmActions.every(({ payToken }) => payToken === constants.USDST));
+
+  const saveOnlyRoutes = new Map(bridgeActionRoutes);
+  const usdcRoute = routes[0];
+  saveOnlyRoutes.set(
+    [
+      usdcRoute.externalToken?.toLowerCase().replace(/^0x/, ""),
+      String(usdcRoute.externalChainId),
+      usdcRoute.stratoToken.toLowerCase().replace(/^0x/, ""),
+    ].join(":"),
+    { autoForge: false, autoSave: true }
+  );
+  const saveOnlyActions = buildDepositActionCatalog({
+    ...base,
+    bridgeActionRoutes: saveOnlyRoutes,
+  });
+  assert.equal(saveOnlyActions.filter(({ payToken, action }) => payToken === usdc && action === 2).length, 0);
+  assert.equal(saveOnlyActions.filter(({ payToken, action }) => payToken === usdc && action === 3).length, 1);
 
   assert.deepEqual(buildDepositActionCatalog({ ...base, actionChainIds: new Set() }), []);
 });

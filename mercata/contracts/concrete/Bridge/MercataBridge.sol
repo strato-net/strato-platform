@@ -123,6 +123,14 @@ contract record MercataBridge is Ownable {
     /// @notice Emitted when the SaveUSDST vault address is updated
     event SaveUsdstVaultUpdated(address newVault, address oldVault);
 
+    event DepositActionAvailabilityUpdated(
+        address externalToken,
+        uint256 externalChainId,
+        address targetStratoToken,
+        uint256 action,
+        bool enabled
+    );
+
     /// @notice Emitted when a user requests a post-deposit action
     event DepositActionRequested(address user, uint256 externalChainId, string externalTxHash, DepositAction action, address targetToken);
 
@@ -226,6 +234,11 @@ contract record MercataBridge is Ownable {
         uint256 minFinalOut;
     }
 
+    struct DepositActionConfig {
+        bool autoForge;
+        bool autoSave;
+    }
+
     /// @notice Deposit-keyed action intent recorded atomically by the relayer
     mapping(uint256 => mapping(string => DepositActionIntent)) public record depositActions;
 
@@ -254,6 +267,10 @@ contract record MercataBridge is Ownable {
     /// @notice Route allowlist for one-to-many external->STRATO mappings
     /// @dev Key: (externalToken, externalChainId, targetStratoToken) -> enabled
     mapping(address => mapping(uint256 => mapping(address => bool))) public record assetRouteEnabled;
+
+    /// @notice Action allowlist for each external-to-STRATO route
+    /// @dev Key: (externalToken, externalChainId, targetStratoToken) -> action flags
+    mapping(address => mapping(uint256 => mapping(address => DepositActionConfig))) public record depositActionConfigs;
 
 
     /* ===================================================================== */
@@ -567,6 +584,33 @@ contract record MercataBridge is Ownable {
         assetRouteEnabled[externalToken][externalChainId][targetStratoToken] = enabled;
     }
 
+    function setDepositAction(
+        address externalToken,
+        uint256 externalChainId,
+        address targetStratoToken,
+        uint256 action,
+        bool enabled
+    ) external onlyOwner {
+        require(
+            action == uint256(DepositAction.AUTO_FORGE) ||
+            action == uint256(DepositAction.AUTO_SAVE),
+            "MB: invalid action"
+        );
+        if (enabled) {
+            _requireRouteEnabled(externalToken, externalChainId, targetStratoToken);
+        } else {
+            require(targetStratoToken != address(0), "MB: invalid target token");
+            require(assets[externalToken][externalChainId].stratoToken != address(0), "MB: asset missing");
+        }
+        DepositActionConfig config = depositActionConfigs[externalToken][externalChainId][targetStratoToken];
+        if (action == uint256(DepositAction.AUTO_FORGE)) {
+            config.autoForge = enabled;
+        } else {
+            config.autoSave = enabled;
+        }
+        emit DepositActionAvailabilityUpdated(externalToken, externalChainId, targetStratoToken, action, enabled);
+    }
+
     /**
      * @dev Sets the hot withdrawal threshold
      * @notice Withdrawals with stratoTokenAmount below this threshold can bypass SAFE multi-sig
@@ -646,6 +690,17 @@ contract record MercataBridge is Ownable {
         bool isDefaultRoute = targetStratoToken == a.stratoToken && a.enabled;
         bool isExplicitRoute = assetRouteEnabled[externalToken][externalChainId][targetStratoToken];
         require(isDefaultRoute || isExplicitRoute, "MB: route not enabled");
+    }
+
+    function _isDepositActionEnabled(
+        DepositInfo d,
+        uint256 externalChainId,
+        uint256 action
+    ) internal view returns (bool) {
+        DepositActionConfig config = depositActionConfigs[d.externalToken][externalChainId][d.stratoToken];
+        if (action == uint256(DepositAction.AUTO_FORGE)) return config.autoForge;
+        if (action == uint256(DepositAction.AUTO_SAVE)) return config.autoSave;
+        return false;
     }
 
     function _executeDepositAction(
@@ -978,10 +1033,11 @@ contract record MercataBridge is Ownable {
         require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
         DepositActionIntent intent = depositActions[externalChainId][normalizedTxHash];
-        if (
+        bool isExecutableAction = (
             intent.action == uint256(DepositAction.AUTO_FORGE) ||
             intent.action == uint256(DepositAction.AUTO_SAVE)
-        ) {
+        ) && _isDepositActionEnabled(d, externalChainId, intent.action);
+        if (isExecutableAction) {
             try {
                 _executeDepositAction(externalChainId, normalizedTxHash);
             }
