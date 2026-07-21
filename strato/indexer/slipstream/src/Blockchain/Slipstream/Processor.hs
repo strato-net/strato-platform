@@ -184,13 +184,14 @@ processTheMessages messages = do
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top
       -- level like this
       creates =
-        [(cc, cr) | VME.CodeCollectionAdded cc cr <- messages]
+        [(cc, cr, ch) | VME.CodeCollectionAdded cc cr ch <- messages]
       delegatecalls = concatMap toList
         [Action._delegatecalls a | VME.NewAction a <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys <- mapOutput Right . fmap concat . forM creates $ \(cc, cr) -> do
+  fkeys <- mapOutput Right . fmap concat . forM creates $ \(cc, cr, ch) -> do
     $logInfoS "processTheMessages" $ "CodeCollection Added"
+    yield $ InsertTable codeTableName [("code_hash", SqlText), ("creator", SqlText)] [[Just . SimpleValue . ValueString . T.pack $ keccak256ToHex ch, Just . SimpleValue $ ValueString cr]] Nothing
     multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
     fmap concat . forM (Map.toList $ cc ^. contracts) $ \(_, c) -> do
