@@ -600,10 +600,10 @@ export const getDepositActions = async (accessToken: string): Promise<DepositAct
     constants.directMintPsm ? getPsmMintState(accessToken) : Promise.resolve(null),
     constants.saveUsdstVault ? getSaveUsdstActionState(accessToken) : Promise.resolve(null),
     constants.metalForge ? getMetalForgeConfigs(accessToken) : Promise.resolve({ metals: [], payTokens: [] }),
-    cirrus.get(accessToken, `/${MercataBridge}`, {
+    cirrus.get(accessToken, "/storage", {
       params: {
         address: `eq.${mercataBridge}`,
-        select: "directMintPsm,saveUsdstVault",
+        select: "data->>directMintPsm,data->>saveUsdstVault",
         limit: "1",
       },
     }).then(({ data }) => data?.[0] || {}),
