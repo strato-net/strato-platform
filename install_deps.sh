@@ -177,6 +177,7 @@ Darwin)
         libpq \
         librdkafka \
         libsodium \
+        logrotate \
         pkgconf \
         secp256k1 \
         xz
@@ -243,6 +244,7 @@ Linux)
             # Install STRATO dependencies
             sudo dnf install -q -y \
                 libsodium-devel \
+                logrotate \
                 postgresql15 \
                 postgresql-devel \
                 xz-devel
@@ -387,6 +389,7 @@ Linux)
             # Install remaining STRATO dependencies available in standard repos
             sudo dnf install -y \
                 libsodium-devel \
+                logrotate \
                 xz-devel
 
             # Build leveldb from source (not available in Oracle Linux 8 repositories)
@@ -568,6 +571,7 @@ EOF
                 librdkafka-dev \
                 libsecp256k1-dev \
                 libsodium-dev \
+                logrotate \
                 postgresql-client
             ;;
 
