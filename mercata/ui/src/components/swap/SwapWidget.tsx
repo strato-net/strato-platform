@@ -512,117 +512,60 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 };
 
 // ============================================================================
-// VENUE (POOL VERSION) SELECTOR COMPONENT
+// POOL SELECTOR COMPONENT
+// One card per pool the pair trades on (the V2 pool plus every V3 fee tier).
+// The pool quoting the best rate is auto-selected and labeled; the user can
+// still pick any other pool.
 // ============================================================================
-interface VenueSelectorProps {
-  venue: 'v2' | 'v3';
-  onChange: (venue: 'v2' | 'v3') => void;
-  v2Available: boolean;
-  v3Available: boolean;
+interface PoolOptionView {
+  id: string; // 'v2' or the V3 pool address
+  title: string; // "V2" | "V3 · 0.3%"
+  subtitle: string;
+  detail: string; // quote for the entered amount, or TVL before an amount is entered
+  isBest: boolean;
+}
+
+interface PoolSelectorProps {
+  options: PoolOptionView[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
   disabled?: boolean;
 }
 
-const VENUE_OPTIONS = [
-  { key: 'v2' as const, title: 'V2', subtitle: 'Classic pool' },
-  { key: 'v3' as const, title: 'V3', subtitle: 'Concentrated liquidity' },
-];
-
-const VenueSelector = ({ venue, onChange, v2Available, v3Available, disabled = false }: VenueSelectorProps) => (
+const PoolSelector = ({ options, selectedId, onSelect, disabled = false }: PoolSelectorProps) => (
   <div className="flex flex-col gap-1.5">
-    <span className="text-sm text-muted-foreground font-semibold">Pool Version</span>
-    <div className="grid grid-cols-2 gap-2">
-      {VENUE_OPTIONS.map(({ key, title, subtitle }) => {
-        const available = key === 'v2' ? v2Available : v3Available;
-        const selected = venue === key && available;
+    <span className="text-sm text-muted-foreground font-semibold">Pool</span>
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      {options.map((o) => {
+        const selected = o.id === selectedId;
         return (
           <button
-            key={key}
+            key={o.id}
             type="button"
-            onClick={() => { if (!disabled && available) onChange(key); }}
-            disabled={disabled || !available}
+            onClick={() => { if (!disabled) onSelect(o.id); }}
+            disabled={disabled}
             className={`rounded-lg border p-2.5 md:p-3 text-left transition-colors ${
               selected ? 'border-strato-blue bg-muted' : 'border-border hover:bg-muted/50'
-            } ${(disabled || !available) ? 'opacity-50 cursor-not-allowed hover:bg-transparent' : ''}`}
+            } ${disabled ? 'opacity-50 cursor-not-allowed hover:bg-transparent' : ''}`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-sm md:text-base font-semibold">{title}</span>
-              {selected && <Check className="h-4 w-4 text-strato-blue flex-shrink-0" />}
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-sm font-semibold whitespace-nowrap">{o.title}</span>
+              {o.isBest ? (
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 whitespace-nowrap">
+                  Best rate
+                </span>
+              ) : selected ? (
+                <Check className="h-3.5 w-3.5 text-strato-blue flex-shrink-0" />
+              ) : null}
             </div>
-            <div className="text-[11px] md:text-xs text-muted-foreground mt-0.5">
-              {available ? subtitle : 'Not available for this pair'}
-            </div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">{o.subtitle}</div>
+            <div className="text-[11px] text-muted-foreground mt-1 truncate">{o.detail}</div>
           </button>
         );
       })}
     </div>
   </div>
 );
-
-// ============================================================================
-// FEE TIER SELECTOR COMPONENT (V3)
-// ============================================================================
-const FEE_TIER_DESCRIPTIONS: Record<number, string> = {
-  100: 'Best for very stable pairs',
-  500: 'Best for stable pairs',
-  3000: 'Best for most pairs',
-  10000: 'Best for exotic pairs',
-};
-
-interface FeeTierSelectorProps {
-  pools: PoolV3[];
-  quotes: Record<string, PoolV3Quote | null>;
-  selectedAddress?: string;
-  onSelect: (address: string) => void;
-  quoteLoading: boolean;
-  toSymbol?: string;
-  disabled?: boolean;
-}
-
-const FeeTierSelector = ({ pools, quotes, selectedAddress, onSelect, quoteLoading, toSymbol, disabled = false }: FeeTierSelectorProps) => {
-  // Before an amount is entered there are no quotes yet — show each tier's TVL instead
-  const hasQuotes = Object.keys(quotes).length > 0;
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-sm text-muted-foreground font-semibold">Fee Tier</span>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {pools.map((p) => {
-          const q = quotes[p.address];
-          const out = q && BigInt(q.amountOut) > 0n ? formatAmount(formatUnits(q.amountOut)) : null;
-          const selected = selectedAddress === p.address;
-          return (
-            <button
-              key={p.address}
-              type="button"
-              onClick={() => { if (!disabled) onSelect(p.address); }}
-              disabled={disabled}
-              className={`rounded-lg border p-2.5 md:p-3 text-left transition-colors ${
-                selected ? 'border-strato-blue bg-muted' : 'border-border hover:bg-muted/50'
-              } ${disabled ? 'opacity-50 cursor-not-allowed hover:bg-transparent' : ''}`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold">{p.fee / 10000}%</span>
-                {selected && <Check className="h-3.5 w-3.5 text-strato-blue flex-shrink-0" />}
-              </div>
-              {FEE_TIER_DESCRIPTIONS[p.fee] && (
-                <div className="text-[11px] text-muted-foreground mt-0.5">{FEE_TIER_DESCRIPTIONS[p.fee]}</div>
-              )}
-              <div className="text-[11px] text-muted-foreground mt-1 truncate">
-                {hasQuotes ? (
-                  <>
-                    {quoteLoading ? '…' : out ? `≈ ${out} ${toSymbol || ''}` : 'No liquidity'}
-                    {q?.partialFill ? ' · partial' : ''}
-                  </>
-                ) : (
-                  `$${p.totalLiquidityUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })} TVL`
-                )}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
 
 // ============================================================================
 // MAIN SWAP WIDGET COMPONENT
@@ -671,10 +614,12 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
   const [autoSlippage, setAutoSlippage] = useState(true);
   const [editingField, setEditingField] = useState<'from' | 'to' | null>(null);
   const [maxTransferableError, setMaxTransferableError] = useState("");
-  // All fee-tier quotes for the current pair, keyed by pool address. No auto-optimization —
-  // the user picks the tier from the list; `v3Quote` (below) is the selected tier's quote.
+  // All fee-tier quotes for the current pair, keyed by pool address. Quotes are fetched
+  // whichever pool is active so every card can show its rate; the best-rate pool is
+  // auto-selected unless the user has picked one manually (`manualPool`).
   const [v3Quotes, setV3Quotes] = useState<Record<string, PoolV3Quote | null>>({});
   const [selectedV3PoolAddress, setSelectedV3PoolAddress] = useState<string | null>(null);
+  const [manualPool, setManualPool] = useState(false);
   const [v3QuoteLoading, setV3QuoteLoading] = useState(false);
   const v3QuoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const v3QuoteAbortRef = useRef<AbortController | null>(null);
@@ -769,6 +714,106 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
       setMaxTransferableError
     );
   }, [fromAsset, voucherBalance, usdstBalance]);
+
+  // ========================================================================
+  // BEST-RATE POOL COMPARISON
+  // ========================================================================
+  const isExactInput = editingField !== 'to';
+  const enteredAmount = isExactInput ? fromAmount : toAmount;
+  const hasEnteredAmount = isValidInputAmount(enteredAmount) && safeParseUnits(enteredAmount) > 0n;
+
+  // The V2 pool's answer for the entered amount (client-side reserve math), for comparison
+  const v2Compare = useMemo(() => {
+    if (!pool || !fromAsset?.address || !toAsset?.address || !hasEnteredAmount) return null;
+    try {
+      const wei = safeParseUnits(enteredAmount);
+      if (isMultiToken) {
+        return isExactInput
+          ? { outWei: BigInt(calculateMultiTokenSwapOutput(wei.toString(), pool, fromAsset.address, toAsset.address)) }
+          : { inWei: BigInt(calculateMultiTokenSwapInput(wei.toString(), pool, fromAsset.address, toAsset.address)) };
+      }
+      const isAToB = pool.tokenA?.address === fromAsset.address;
+      return isExactInput
+        ? { outWei: BigInt(calculateSwapOutput(wei.toString(), pool, isAToB)) }
+        : { inWei: BigInt(calculateSwapInput(wei.toString(), pool, isAToB)) };
+    } catch {
+      return null;
+    }
+  }, [pool, fromAsset?.address, toAsset?.address, hasEnteredAmount, enteredAmount, isExactInput, isMultiToken]);
+
+  // The pool with the best rate for the entered amount:
+  // most output for exact input, least input for exact output
+  const bestPoolId = useMemo(() => {
+    if (!hasEnteredAmount) return null;
+    const candidates: { id: string; metric: bigint }[] = [];
+    // paused/disabled V2 pools are quoted client-side, so exclude them here
+    // (the server already refuses quotes for inactive V3 pools)
+    if (v2Compare && !pool?.isPaused && !pool?.isDisabled) {
+      if (isExactInput && v2Compare.outWei !== undefined && v2Compare.outWei > 0n) {
+        candidates.push({ id: 'v2', metric: v2Compare.outWei });
+      }
+      if (!isExactInput && v2Compare.inWei !== undefined && v2Compare.inWei > 0n) {
+        candidates.push({ id: 'v2', metric: v2Compare.inWei });
+      }
+    }
+    for (const p of v3PairPools) {
+      const q = v3Quotes[p.address];
+      if (!q) continue;
+      if (isExactInput) {
+        const out = BigInt(q.amountOut);
+        if (out > 0n) candidates.push({ id: p.address, metric: out });
+      } else {
+        if (q.partialFill) continue; // did not deliver the requested output
+        const inp = BigInt(q.amountIn);
+        if (inp > 0n) candidates.push({ id: p.address, metric: inp });
+      }
+    }
+    if (candidates.length === 0) return null;
+    return candidates.reduce((best, c) =>
+      (isExactInput ? c.metric > best.metric : c.metric < best.metric) ? c : best
+    ).id;
+  }, [hasEnteredAmount, v2Compare, v3PairPools, v3Quotes, isExactInput, pool?.isPaused, pool?.isDisabled]);
+
+  const selectedPoolId = isV3 ? (v3ExecPool?.address ?? null) : (pool ? 'v2' : null);
+
+  const poolOptions = useMemo<PoolOptionView[]>(() => {
+    const tvlLine = (usd: number) => `$${(usd || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })} TVL`;
+    const rateLine = (outWei: bigint | undefined, inWei: bigint | undefined, partial: boolean) => {
+      if (isExactInput) {
+        return outWei !== undefined && outWei > 0n
+          ? `≈ ${formatAmount(formatUnits(outWei.toString()))} ${toAsset?._symbol || ''}${partial ? ' · partial' : ''}`
+          : 'No liquidity';
+      }
+      return inWei !== undefined && inWei > 0n
+        ? `≈ ${formatAmount(formatUnits(inWei.toString()))} ${fromAsset?._symbol || ''} in${partial ? ' · partial' : ''}`
+        : 'No liquidity';
+    };
+    const opts: PoolOptionView[] = [];
+    if (pool) {
+      opts.push({
+        id: 'v2',
+        title: 'V2',
+        subtitle: 'Classic pool',
+        detail: hasEnteredAmount
+          ? rateLine(v2Compare?.outWei, v2Compare?.inWei, false)
+          : tvlLine(Number(pool.totalLiquidityUSD)),
+        isBest: bestPoolId === 'v2',
+      });
+    }
+    for (const p of v3PairPools) {
+      const q = v3Quotes[p.address];
+      opts.push({
+        id: p.address,
+        title: `V3 · ${p.fee / 10000}%`,
+        subtitle: 'Concentrated liquidity',
+        detail: hasEnteredAmount
+          ? (v3QuoteLoading ? '…' : q ? rateLine(BigInt(q.amountOut), BigInt(q.amountIn), q.partialFill) : 'No liquidity')
+          : tvlLine(p.totalLiquidityUSD),
+        isBest: bestPoolId === p.address,
+      });
+    }
+    return opts;
+  }, [pool, v3PairPools, v3Quotes, v3QuoteLoading, hasEnteredAmount, v2Compare, bestPoolId, isExactInput, fromAsset?._symbol, toAsset?._symbol]);
 
   // ========================================================================
   // REFS & CUSTOM HOOKS
@@ -875,11 +920,12 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
     }
   }, [swapVenue, v3PairPools.length, pool, poolLoading, setSwapVenue]);
 
-  // Clear stale V3 quotes and tier selection when the pair or venue changes
+  // Clear stale V3 quotes, pool selection, and manual override when the pair changes
   useEffect(() => {
     setV3Quotes({});
     setSelectedV3PoolAddress(null);
-  }, [fromAsset?.address, toAsset?.address, swapVenue]);
+    setManualPool(false);
+  }, [fromAsset?.address, toAsset?.address]);
 
 
 
@@ -976,8 +1022,10 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
 
   // ========================================================================
   // V3 QUOTE LOGIC (server-side tick-walk; debounced, quotes all fee tiers)
+  // Runs whichever pool is active so the pool cards can compare rates;
+  // `applyToAmounts` drives the headline amount only when a V3 pool executes.
   // ========================================================================
-  const calculateV3SwapAmount = useCallback((inputAmount: string, isFromInput: boolean) => {
+  const fetchV3Quotes = useCallback((inputAmount: string, isFromInput: boolean, applyToAmounts: boolean) => {
     if (!fromAsset?.address || !toAsset?.address || v3PairPools.length === 0) return;
     if (!isValidInputAmount(inputAmount)) return;
 
@@ -1002,10 +1050,11 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
         );
         if (controller.signal.aborted) return;
 
-        // Store every tier's quote; the user chooses which to trade (no auto-optimization).
         const quoteMap: Record<string, PoolV3Quote | null> = {};
         for (const [addr, q] of results) quoteMap[addr] = q;
         setV3Quotes(quoteMap);
+
+        if (!applyToAmounts) return;
 
         // Keep the current selection; default to the first listed tier only if none is set yet.
         const activeAddr =
@@ -1040,53 +1089,51 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
     }, 350);
   }, [fromAsset?.address, toAsset?.address, v3PairPools, quoteV3, selectedV3PoolAddress, fromAssetAvailableBalance]);
 
+  const calculateV3SwapAmount = useCallback(
+    (inputAmount: string, isFromInput: boolean) => fetchV3Quotes(inputAmount, isFromInput, true),
+    [fetchV3Quotes]
+  );
+
   // ========================================================================
   // EVENT HANDLERS
   // ========================================================================
+  // Recompute the passive amount for the active pool, and always keep the pool cards'
+  // rate comparison fresh (V3 quotes are fetched even while the V2 pool executes).
+  const recomputeForAmount = (value: string, isFromInput: boolean) => {
+    if (!fromAsset || !toAsset || !isValidInputAmount(value)) return;
+    if (isV3) {
+      calculateV3SwapAmount(value, isFromInput);
+    } else {
+      if (pool) calculateSwapAmount(value, isFromInput);
+      fetchV3Quotes(value, isFromInput, false);
+    }
+  };
+
   const handleAmountChange = (isFromInput: boolean, value: string) => {
     setEditingField(isFromInput ? 'from' : 'to');
     if (isFromInput) {
       handleAmountInputChange(value, setFromAmount, setFromAmountError, fromAssetAvailableBalance);
-      // Calculate swap amount immediately
-      if (isValidInputAmount(value) && fromAsset && toAsset) {
-        if (isV3) calculateV3SwapAmount(value, true);
-        else if (pool) calculateSwapAmount(value, true);
-      }
     } else {
       handleAmountInputChange(value, setToAmount, setToAmountError, isV3 ? v3ToPoolBalance : (toAsset?.poolBalance || "0"));
-      // Calculate swap amount immediately
-      if (isValidInputAmount(value) && fromAsset && toAsset) {
-        if (isV3) calculateV3SwapAmount(value, false);
-        else if (pool) calculateSwapAmount(value, false);
-      }
     }
+    recomputeForAmount(value, isFromInput);
   };
 
-  const handleVenueChange = (venue: 'v2' | 'v3') => {
-    if (venue === swapVenue) return;
-    setSwapVenue(venue);
-    setV3Quotes({});
-    setSelectedV3PoolAddress(null);
-    // Recompute the passive side for the new venue from the last edited amount
-    if (editingField === 'from' && isValidInputAmount(fromAmount)) {
-      if (venue === 'v3') calculateV3SwapAmount(fromAmount, true);
-      else if (pool) calculateSwapAmount(fromAmount, true);
-      else setToAmount("");
-    } else if (editingField === 'to' && isValidInputAmount(toAmount)) {
-      if (venue === 'v3') calculateV3SwapAmount(toAmount, false);
-      else if (pool) calculateSwapAmount(toAmount, false);
-      else setFromAmount("");
-    }
-  };
-
-  // User selects which fee tier to trade against (no auto-optimization). Re-derives the
-  // passive amount from the already-fetched quote for that tier — no new fetch.
+  // Re-derives the passive amount from the already-fetched quote for that pool — no new fetch.
   const selectV3Pool = (address: string) => {
     setSelectedV3PoolAddress(address);
     const p = v3PairPools.find((x) => x.address === address);
-    const q = v3Quotes[address];
-    if (!p || !q || !fromAsset) return;
+    if (!p || !fromAsset) return;
     const isFromInput = editingField !== 'to';
+    const q = v3Quotes[address];
+    if (!q) {
+      // no quote for this pool (e.g. no liquidity) — don't keep a stale amount from the previous pool
+      if (isValidInputAmount(isFromInput ? fromAmount : toAmount)) {
+        if (isFromInput) setToAmount("");
+        else setFromAmount("");
+      }
+      return;
+    }
     const zeroForOne = p.token0.address === fromAsset.address;
     const toPoolBal = zeroForOne ? p.token1Balance : p.token0Balance;
     if (isFromInput) {
@@ -1095,6 +1142,34 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
       handleAmountInputChange(formatUnits(q.amountIn), setFromAmount, setFromAmountError, fromAssetAvailableBalance);
     }
   };
+
+  // Switch the executing pool ('v2' or a V3 pool address) and re-derive the
+  // passive amount for it from the last edited side.
+  const applyPoolSelection = (id: string) => {
+    if (id === 'v2') {
+      setSwapVenue('v2');
+      const isFrom = editingField !== 'to';
+      const amount = isFrom ? fromAmount : toAmount;
+      if (pool && isValidInputAmount(amount)) calculateSwapAmount(amount, isFrom);
+    } else {
+      setSwapVenue('v3');
+      selectV3Pool(id);
+    }
+  };
+
+  const handlePoolSelect = (id: string) => {
+    if (id === selectedPoolId) return;
+    setManualPool(true); // an explicit choice wins over best-rate auto-selection
+    applyPoolSelection(id);
+  };
+
+  // Preselect the best-rate pool as quotes arrive, unless the user picked one manually
+  useEffect(() => {
+    if (manualPool || guestMode || !bestPoolId) return;
+    if (bestPoolId === selectedPoolId) return;
+    applyPoolSelection(bestPoolId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bestPoolId, manualPool, guestMode, selectedPoolId]);
 
   const handleSwapAssets = async () => {
     // swap amounts
@@ -1224,47 +1299,29 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
     return false;
   }, [fromAmount, toAmount, fromAsset, toAsset, maxTransferableError, fromAmountError, toAmountError, isV3, v3QuoteLoading, v3Quote]);
 
-  const handleMaxClick = useCallback(() => {
+  const handleMaxClick = () => {
     if (!fromAsset) return;
-    
+
     setEditingField('from');
     const formatted = formatUnits(fromAssetAvailableBalance);
     setFromAmount(formatted);
     setFromAmountError('');
-    // Calculate swap amount immediately
-    if (fromAsset && toAsset) {
-      if (isV3) calculateV3SwapAmount(formatted, true);
-      else if (pool) calculateSwapAmount(formatted, true);
-    }
-  }, [fromAsset, toAsset, pool, fromAssetAvailableBalance, isV3, calculateV3SwapAmount]);
+    recomputeForAmount(formatted, true);
+  };
 
   // ========================================================================
   // RENDER
   // ========================================================================
   return (
     <div className="space-y-6">
-      {/* Pool version + fee tier selection — shown whenever the pair trades on at least one venue */}
-      {(!!pool || v3PairPools.length > 0) && (
-        <div className="space-y-3">
-          <VenueSelector
-            venue={isV3 ? 'v3' : 'v2'}
-            onChange={handleVenueChange}
-            v2Available={!!pool}
-            v3Available={v3PairPools.length > 0}
-            disabled={guestMode}
-          />
-          {isV3 && (
-            <FeeTierSelector
-              pools={v3PairPools}
-              quotes={v3Quotes}
-              selectedAddress={v3ExecPool?.address}
-              onSelect={selectV3Pool}
-              quoteLoading={v3QuoteLoading}
-              toSymbol={toAsset?._symbol}
-              disabled={guestMode}
-            />
-          )}
-        </div>
+      {/* Pool selection — every pool the pair trades on; the best rate is auto-selected */}
+      {poolOptions.length > 0 && (
+        <PoolSelector
+          options={poolOptions}
+          selectedId={selectedPoolId}
+          onSelect={handlePoolSelect}
+          disabled={guestMode}
+        />
       )}
 
       <TokenInput
