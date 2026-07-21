@@ -155,7 +155,21 @@ async function fetchTokenSymbols(accessToken: string, addresses: Set<string>): P
   const { data } = await cirrus.get(accessToken, `/${constants.Token}`, {
     params: { select: "address,_symbol,_name", address: `in.(${[...addresses].join(",")})` }
   });
-  return new Map((data || []).map((t: any) => [t.address, { name: t._name || "-", symbol: t._symbol || "-" }]));
+  return new Map((data || []).map((t: any) => [stripHex(t.address), { name: t._name || "-", symbol: t._symbol || "-" }]));
+}
+
+async function fetchStorageTokenSymbols(accessToken: string, addresses: Set<string>): Promise<Map<string, { name: string; symbol: string }>> {
+  if (!addresses.size) return new Map();
+  const { data } = await cirrus.get(accessToken, "/storage", {
+    params: {
+      address: `in.(${[...addresses].join(",")})`,
+      select: "address,data->>_symbol,data->>_name",
+    }
+  });
+  return new Map((data || []).map((t: any) => [
+    stripHex(t.address),
+    { name: t._name || "-", symbol: t._symbol || "-" },
+  ]));
 }
 
 async function fetchExternalMeta(accessToken: string, tokens: Set<string>): Promise<Map<string, { externalName: string; externalSymbol: string }>> {
@@ -275,7 +289,7 @@ export async function enrichTransactionData(
     if (!stratoMap.has(addr)) outcomeTokenAddrs.add(addr);
   }
   if (outcomeTokenAddrs.size) {
-    const outcomeTokenMap = await fetchTokenSymbols(accessToken, outcomeTokenAddrs);
+    const outcomeTokenMap = await fetchStorageTokenSymbols(accessToken, outcomeTokenAddrs);
     for (const [k, v] of outcomeTokenMap) stratoMap.set(k, v);
   }
 
