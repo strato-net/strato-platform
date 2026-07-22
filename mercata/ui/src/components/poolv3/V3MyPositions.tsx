@@ -7,7 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import { formatTokenAmount, formatTickAsPrice, formatPriceWad } from "./poolV3Utils";
+import { formatTokenAmount, formatTickAsPrice, formatPriceWad, poolV3TxAmounts, describePoolAmounts } from "./poolV3Utils";
+import V3ConfirmDialog, { ConfirmRow } from "./V3ConfirmDialog";
+
+type ConfirmableAction = "remove" | "fees" | "collect";
 
 interface V3MyPositionsProps {
   positions: PoolV3Position[];
@@ -59,6 +62,8 @@ const V3MyPositions = ({
   const [removePercents, setRemovePercents] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
   const [selectedPoolAddress, setSelectedPoolAddress] = useState<string | null>(null);
+  // Action awaiting user confirmation — every fund-moving button goes through the dialog
+  const [confirm, setConfirm] = useState<{ action: ConfirmableAction; position: PoolV3Position } | null>(null);
 
   const positionKey = (p: PoolV3Position) => `${p.poolAddress}:${p.tickLower}:${p.tickUpper}`;
 
@@ -101,14 +106,24 @@ const V3MyPositions = ({
     const liquidity = (BigInt(position.liquidity) * BigInt(Math.round(percent * 100))) / 10000n;
     if (liquidity === 0n) return;
     try {
-      await burnV3({
+      const res = await burnV3({
         poolAddress: position.poolAddress,
         tickLower: position.tickLower,
         tickUpper: position.tickUpper,
         liquidity: liquidity.toString(),
         collect: true,
       });
-      toast({ title: "Liquidity removed", description: `Removed ${percent}% and collected owed tokens`, variant: "success" });
+      // the batch's final collect() returns the total sent to the wallet (principal + fees)
+      const pool = poolsByAddress.get(position.poolAddress);
+      const amounts = poolV3TxAmounts(res);
+      const received = pool && amounts ? describePoolAmounts(pool, amounts) : null;
+      toast({
+        title: "Liquidity removed",
+        description: received
+          ? `Removed ${percent}% — received ${received} (incl. fees)`
+          : `Removed ${percent}% and collected owed tokens`,
+        variant: "success",
+      });
       onChanged();
     } catch (err) {
       toast({
@@ -121,12 +136,23 @@ const V3MyPositions = ({
 
   const handleCollect = async (position: PoolV3Position) => {
     try {
-      await collectV3({
+      const res = await collectV3({
         poolAddress: position.poolAddress,
         tickLower: position.tickLower,
         tickUpper: position.tickUpper,
       });
-      toast({ title: "Collected", description: "Owed tokens sent to your wallet", variant: "success" });
+      const pool = poolsByAddress.get(position.poolAddress);
+      const amounts = poolV3TxAmounts(res);
+      const received = pool && amounts ? describePoolAmounts(pool, amounts) : null;
+      toast({
+        title: "Collected",
+        description: received
+          ? `Collected ${received}`
+          : amounts
+            ? "Nothing was owed to collect"
+            : "Owed tokens sent to your wallet",
+        variant: "success",
+      });
       onChanged();
     } catch (err) {
       toast({
@@ -142,14 +168,25 @@ const V3MyPositions = ({
   // This is how fees are surfaced given the indexer can't expose live fee growth.
   const handleCollectFees = async (position: PoolV3Position) => {
     try {
-      await burnV3({
+      const res = await burnV3({
         poolAddress: position.poolAddress,
         tickLower: position.tickLower,
         tickUpper: position.tickUpper,
         liquidity: "0",
         collect: true,
       });
-      toast({ title: "Fees collected", description: "Accrued fees sent to your wallet", variant: "success" });
+      const pool = poolsByAddress.get(position.poolAddress);
+      const amounts = poolV3TxAmounts(res);
+      const received = pool && amounts ? describePoolAmounts(pool, amounts) : null;
+      toast({
+        title: "Fees collected",
+        description: received
+          ? `Collected ${received} in fees`
+          : amounts
+            ? "No fees had accrued yet"
+            : "Accrued fees sent to your wallet",
+        variant: "success",
+      });
       onChanged();
     } catch (err) {
       toast({
@@ -159,6 +196,79 @@ const V3MyPositions = ({
       });
     }
   };
+
+  const confirmedRun = async () => {
+    if (!confirm) return;
+    try {
+      if (confirm.action === "remove") await handleBurn(confirm.position);
+      else if (confirm.action === "fees") await handleCollectFees(confirm.position);
+      else await handleCollect(confirm.position);
+    } finally {
+      setConfirm(null);
+    }
+  };
+
+  // Dialog copy for the pending action (plain derivation — only meaningful while open)
+  const confirmContent = (() => {
+    if (!confirm) return null;
+    const { action, position } = confirm;
+    const pool = poolsByAddress.get(position.poolAddress);
+    if (!pool) return null;
+    const pairLabel = `${pool.token0.symbol}/${pool.token1.symbol} · ${pool.fee / 10000}%`;
+    const rangeLabel = `${formatTickAsPrice(position.tickLower)} – ${formatTickAsPrice(position.tickUpper)} ${pool.token1.symbol}/${pool.token0.symbol}`;
+    const uncollected = describePoolAmounts(pool, {
+      amount0: BigInt(position.tokensOwed0) + BigInt(position.pendingFees0 ?? "0"),
+      amount1: BigInt(position.tokensOwed1) + BigInt(position.pendingFees1 ?? "0"),
+    });
+    if (action === "remove") {
+      const percent = removePercents[positionKey(position)] ?? 100;
+      const receive = describePoolAmounts(pool, {
+        amount0: (BigInt(position.amount0) * BigInt(percent)) / 100n,
+        amount1: (BigInt(position.amount1) * BigInt(percent)) / 100n,
+      });
+      const rows: ConfirmRow[] = [
+        { label: "Position", value: pairLabel },
+        { label: "Range", value: rangeLabel },
+        { label: "Removing", value: `${percent}% of your liquidity` },
+        ...(receive ? [{ label: "Est. receive", value: receive }] : []),
+        ...(uncollected ? [{ label: "Plus uncollected fees", value: uncollected }] : []),
+      ];
+      return {
+        title: "Remove liquidity",
+        description: "The withdrawn tokens and any uncollected fees are sent to your wallet.",
+        rows,
+        warning: percent === 100 ? "This removes your entire position." : undefined,
+        confirmLabel: `Remove ${percent}%`,
+        destructive: true,
+      };
+    }
+    if (action === "fees") {
+      return {
+        title: "Collect fees",
+        description:
+          "Realizes the fees this position has earned and sends them to your wallet. Your liquidity stays in place.",
+        rows: [
+          { label: "Position", value: pairLabel },
+          { label: "Range", value: rangeLabel },
+          { label: "Est. fees (incl. pending)", value: uncollected ?? "0" },
+        ] as ConfirmRow[],
+        warning: undefined,
+        confirmLabel: "Collect fees",
+        destructive: false,
+      };
+    }
+    return {
+      title: "Collect owed tokens",
+      description: "Sends this position's collectable balance to your wallet.",
+      rows: [
+        { label: "Position", value: pairLabel },
+        { label: "Owed", value: uncollected ?? "0" },
+      ] as ConfirmRow[],
+      warning: undefined,
+      confirmLabel: "Collect",
+      destructive: false,
+    };
+  })();
 
   if (!isLoggedIn) {
     return (
@@ -326,7 +436,7 @@ const V3MyPositions = ({
                         size="sm"
                         className="flex-1"
                         disabled={txLoading || pool.isDisabled}
-                        onClick={() => handleBurn(position)}
+                        onClick={() => setConfirm({ action: "remove", position })}
                       >
                         Remove {percent}%
                       </Button>
@@ -337,7 +447,7 @@ const V3MyPositions = ({
                         size="sm"
                         className="flex-1"
                         disabled={txLoading || pool.isDisabled}
-                        onClick={() => handleCollectFees(position)}
+                        onClick={() => setConfirm({ action: "fees", position })}
                       >
                         Collect fees
                       </Button>
@@ -348,7 +458,7 @@ const V3MyPositions = ({
                         size="sm"
                         className="flex-1"
                         disabled={txLoading || pool.isDisabled}
-                        onClick={() => handleCollect(position)}
+                        onClick={() => setConfirm({ action: "collect", position })}
                       >
                         Collect
                       </Button>
@@ -364,6 +474,19 @@ const V3MyPositions = ({
           </div>
         )}
       </div>
+
+      <V3ConfirmDialog
+        open={!!confirmContent}
+        onOpenChange={(open) => { if (!open) setConfirm(null); }}
+        title={confirmContent?.title ?? ""}
+        description={confirmContent?.description}
+        rows={confirmContent?.rows ?? []}
+        warning={confirmContent?.warning}
+        confirmLabel={confirmContent?.confirmLabel ?? "Confirm"}
+        destructive={confirmContent?.destructive}
+        onConfirm={confirmedRun}
+        loading={txLoading}
+      />
     </div>
   );
 };

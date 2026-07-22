@@ -79,6 +79,36 @@ export const snapTick = (tick: number, tickSpacing: number): number => {
   return Math.min(Math.max(snapped, minUsable), maxUsable);
 };
 
+/**
+ * Token amounts returned by a PoolV3 action — mint, burn, and collect all return
+ * (amount0, amount1). Reads the LAST transaction's decoded return values from a
+ * TransactionResponse: the action tx is always last in its batch (after approvals
+ * or the fee-realizing poke) in both the OAuth and wallet signing flows.
+ * Returns null when unavailable (older backend, pending tx, unexpected shape).
+ */
+export const poolV3TxAmounts = (res: unknown): { amount0: bigint; amount1: bigint } | null => {
+  const rv = (res as { returnValues?: unknown } | null)?.returnValues;
+  if (!Array.isArray(rv) || rv.length === 0) return null;
+  const last = rv[rv.length - 1];
+  if (!Array.isArray(last) || last.length < 2) return null;
+  try {
+    return { amount0: BigInt(String(last[0])), amount1: BigInt(String(last[1])) };
+  } catch {
+    return null;
+  }
+};
+
+/** "1.23 GOLD + 4.56 USDST" for a pool action's returned amounts; null when both are zero */
+export const describePoolAmounts = (
+  pool: { token0: { symbol: string; decimals: number }; token1: { symbol: string; decimals: number } },
+  amounts: { amount0: bigint; amount1: bigint }
+): string | null => {
+  const parts: string[] = [];
+  if (amounts.amount0 > 0n) parts.push(`${formatTokenAmount(amounts.amount0, pool.token0.decimals)} ${pool.token0.symbol}`);
+  if (amounts.amount1 > 0n) parts.push(`${formatTokenAmount(amounts.amount1, pool.token1.decimals)} ${pool.token1.symbol}`);
+  return parts.length ? parts.join(" + ") : null;
+};
+
 /** human price from an 18-decimal wei string, with sensible precision for wide ranges */
 export const formatPriceWad = (priceWad: string): string => {
   const value = Number(BigInt(priceWad)) / 1e18;

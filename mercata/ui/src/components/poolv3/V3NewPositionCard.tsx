@@ -13,7 +13,11 @@ import {
   tickToPriceInput,
   formatPriceWad,
   formatTokenAmount,
+  formatTickAsPrice,
+  poolV3TxAmounts,
+  describePoolAmounts,
 } from "./poolV3Utils";
+import V3ConfirmDialog, { ConfirmRow } from "./V3ConfirmDialog";
 
 const MINT_SLIPPAGE_BPS = 100n; // 1% headroom on the amount maxes
 
@@ -47,6 +51,7 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
   const [amountInput, setAmountInput] = useState("");
   const [preview, setPreview] = useState<PoolV3AmountsPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const previewAbortRef = useRef<AbortController | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -71,6 +76,22 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
     };
     return [balanceOf(pool.token0.address), balanceOf(pool.token1.address)];
   }, [activeTokens, inactiveTokens, pool.token0.address, pool.token1.address]);
+
+  const confirmRows: ConfirmRow[] =
+    preview && rangeValid
+      ? [
+        { label: "Pool", value: `${pool.token0.symbol}/${pool.token1.symbol} · ${pool.fee / 10000}%` },
+        {
+          label: "Range",
+          value: `${formatTickAsPrice(preview.tickLower)} – ${formatTickAsPrice(preview.tickUpper)} ${pool.token1.symbol}/${pool.token0.symbol}`,
+        },
+        {
+          label: "Deposit",
+          value:
+            describePoolAmounts(pool, { amount0: BigInt(preview.amount0), amount1: BigInt(preview.amount1) }) ?? "0",
+        },
+      ]
+      : [];
 
   const enteredSymbol = amountField === "amount0" ? pool.token0.symbol : pool.token1.symbol;
   const enteredDecimals = amountField === "amount0" ? pool.token0.decimals : pool.token1.decimals;
@@ -208,7 +229,7 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
     try {
       const withSlippage = (amount: string) =>
         ((BigInt(amount) * (10000n + MINT_SLIPPAGE_BPS)) / 10000n).toString();
-      await mintV3({
+      const res = await mintV3({
         poolAddress: pool.address,
         tickLower: preview.tickLower,
         tickUpper: preview.tickUpper,
@@ -216,9 +237,14 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
         amount0Max: BigInt(preview.amount0) > 0n ? withSlippage(preview.amount0) : "0",
         amount1Max: BigInt(preview.amount1) > 0n ? withSlippage(preview.amount1) : "0",
       });
+      // mint() returns the exact amounts the pool took, which can differ slightly from the preview
+      const amounts = poolV3TxAmounts(res);
+      const deposited = amounts ? describePoolAmounts(pool, amounts) : null;
       toast({
         title: "Position created",
-        description: `Added liquidity to ${pool.token0.symbol}/${pool.token1.symbol} (${pool.fee / 10000}%)`,
+        description: deposited
+          ? `Deposited ${deposited} into ${pool.token0.symbol}/${pool.token1.symbol} (${pool.fee / 10000}%)`
+          : `Added liquidity to ${pool.token0.symbol}/${pool.token1.symbol} (${pool.fee / 10000}%)`,
         variant: "success",
       });
       setAmountInput("");
@@ -231,6 +257,14 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
         description: err.response?.data?.message || err.message || "Transaction failed",
         variant: "destructive",
       });
+    }
+  };
+
+  const confirmMint = async () => {
+    try {
+      await handleMint();
+    } finally {
+      setConfirmOpen(false);
     }
   };
 
@@ -341,9 +375,8 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
               {(["amount0", "amount1"] as const).map((field) => (
                 <button
                   key={field}
-                  className={`px-2 py-0.5 rounded-full text-[11px] font-medium border border-border ${
-                    amountField === field ? "bg-muted text-foreground" : "text-muted-foreground"
-                  }`}
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-medium border border-border ${amountField === field ? "bg-muted text-foreground" : "text-muted-foreground"
+                    }`}
                   onClick={() => {
                     setAmountField(field);
                   }}
@@ -414,11 +447,26 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
 
       <Button
         className="w-full bg-strato-blue hover:bg-strato-blue/90"
-        onClick={handleMint}
+        onClick={() => setConfirmOpen(true)}
         disabled={!canMint}
       >
         {buttonLabel}
       </Button>
+
+      <V3ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Add liquidity"
+        rows={confirmRows}
+        warning={
+          rangeValid && !inRange
+            ? `The range is entirely ${pool.currentTick < (tickLower ?? 0) ? "above" : "below"} the current price — the position earns no fees until the price enters the range.`
+            : undefined
+        }
+        confirmLabel="Add Liquidity"
+        onConfirm={confirmMint}
+        loading={loading}
+      />
     </div>
   );
 };
