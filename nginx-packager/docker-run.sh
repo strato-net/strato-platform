@@ -22,7 +22,7 @@ SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP:-172.17.0.1}
 APEX_HOST=${APEX_HOST:-apex:3009}
 # Tracking links run as a standalone stack (docker-compose.tracking.yml);
 # point TRACKING_URL at it and set TRACKING_ENABLED=true to proxy to it.
-TRACKING_URL=${TRACKING_URL:-http://tracking:3010}
+TRACKING_URL=${TRACKING_URL:-https://go.strato.nexus}
 TRACKING_ENABLED=${TRACKING_ENABLED:-false}
 DOCS_HOST=${DOCS_HOST:-docs:8080}
 POSTGREST_HOST=${POSTGREST_HOST:-postgrest:3001}
