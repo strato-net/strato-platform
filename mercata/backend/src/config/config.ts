@@ -401,6 +401,14 @@ export async function getInternalAddresses() {
   });
   addresses.push(...pools.map((pool: any) => pool.value));
 
+  // PoolV3 Factory --> all concentrated-liquidity pool addresses
+  if (poolV3Factory) {
+    const { data: v3Pools } = await cirrus.get(accessToken, "/BlockApps-PoolV3", {
+      params: { poolV3Factory: `eq.${poolV3Factory}`, select: "address" },
+    });
+    addresses.push(...v3Pools.map((pool: any) => pool.address));
+  }
+
   // Vault Factory --> all vault addresses + their botExecutor addresses
   if (vaultFactory) {
     const { data: vaults } = await cirrus.get(accessToken, "/BlockApps-VaultFactory-allVaults", {
