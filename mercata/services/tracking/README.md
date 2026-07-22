@@ -38,6 +38,43 @@ Owns the `tracking` Postgres database (created at boot) on the shared platform
 `wallet_connections`. Migrations are embedded in `src/db/migrations.ts` and run
 idempotently at startup under an advisory lock.
 
+## Deployment
+
+The service runs as a **standalone compose stack on its own server** (same
+model as the bridge service at bridge.strato.nexus): tracking + its own
+Postgres + its own nginx (`nginx/` in this directory, TLS termination). The
+stack file is generated from `docker-compose.tracking.tpl.yml` at the repo
+root by `make docker-compose`.
+
+```sh
+# Build images (repo root; files must be git-tracked for the tag hash)
+make tracking tracking-nginx docker-compose
+
+# On the tracking server: docker-compose.tracking.yml + ./ssl certs + env
+NODE_URL=https://app.strato.nexus \
+OPENID_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration \
+POSTGRES_PASSWORD=... \
+TRACKING_APP_ORIGIN=https://app.strato.nexus \
+TRACKING_COOKIE_DOMAIN=.strato.nexus \
+TRACKING_AUTHORIZED_USERS=... \
+docker compose -f docker-compose.tracking.yml up -d
+```
+
+Point the short-link domain (e.g. `go.strato.nexus`) at this server. On the
+**app node's** edge nginx, enable the proxy locations so the SPA's beacons and
+dashboard calls stay same-origin (and OIDC token injection keeps working):
+
+```
+TRACKING_ENABLED=true
+TRACKING_URL=https://go.strato.nexus
+```
+
+Traffic split: `go.strato.nexus/t/<slug>` hits this stack directly (public
+resolver, sets the session cookie with `Domain=.strato.nexus`);
+`app.strato.nexus/tracking-api/*` goes through the app edge, which validates
+the OIDC session and injects `X-USER-ACCESS-TOKEN` before proxying here. The
+service verifies the JWT signature itself, so direct callers can't forge it.
+
 ## Configuration
 
 | Env | Default | Purpose |
