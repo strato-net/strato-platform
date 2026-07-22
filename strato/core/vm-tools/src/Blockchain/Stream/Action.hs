@@ -181,8 +181,7 @@ instance FromJSON ActionData where
 
 data Delegatecall = Delegatecall
   { _delegatecallStorageAddress :: Address,
-    _delegatecallCodeAddress :: Address,
-    _delegatecallOrganization :: Maybe Text,
+    _delegatecallCodeHash :: Keccak256,
     _delegatecallContractName :: Text
   }
   deriving (Eq, Ord, Show, Read, Generic, NFData)
@@ -192,11 +191,8 @@ data Delegatecall = Delegatecall
 instance Format Delegatecall where
   format Delegatecall {..} =
     "delegatecallStorageAddress: " ++ format _delegatecallStorageAddress ++ "\n"
-      ++ "delegatecallCodeAddress: "
-      ++ format _delegatecallCodeAddress
-      ++ "\n"
-      ++ "delegatecallOrganization: "
-      ++ T.unpack (fromMaybe "<none>" _delegatecallOrganization)
+      ++ "delegatecallCodeHash: "
+      ++ format _delegatecallCodeHash
       ++ "\n"
       ++ "delegatecallContractName: "
       ++ T.unpack _delegatecallContractName
@@ -207,18 +203,16 @@ instance ToJSON Delegatecall where
   toJSON Delegatecall {..} =
     object
       [ "storageAddress" .= _delegatecallStorageAddress,
-        "codeAddress" .= _delegatecallCodeAddress,
-        "organization" .= _delegatecallOrganization,
+        "codeHash" .= _delegatecallCodeHash,
         "contractName" .= _delegatecallContractName
       ]
 
 instance FromJSON Delegatecall where
   parseJSON (Object o) = do
     s <- o .: "storageAddress"
-    c <- o .: "codeAddress"
-    r <- o .: "organization"
+    c <- o .: "codeHash"
     n <- o .: "contractName"
-    pure $ Delegatecall s c r n
+    pure $ Delegatecall s c n
   parseJSON o = fail $ "parseJSON Delegatecall: Expected object, got: " ++ show o
 
 data Action = Action

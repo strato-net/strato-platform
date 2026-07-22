@@ -8,7 +8,7 @@ import {
   useAccount,
   useChainId,
   useBalance,
-  useReadContract,
+  useReadContracts,
   useWriteContract,
   useSwitchChain,
   useSignTypedData,
@@ -476,6 +476,18 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const isCorrectNetwork = hasExternalWallet && !!chainId && !!expectedChainId && chainId === expectedChainId;
   const isNativeRedemption = selectedToken?.routeType === "native";
   const isNativeToken = !isNativeRedemption && BigInt(selectedToken?.externalToken || "0") === 0n;
+  const fundErc20Tokens = useMemo(() => {
+    const seen = new Set<string>();
+    return [...uniqueExternalTokens, ...nativeBridgeTokens].filter((token) => {
+      const address = (token.externalToken || "").toLowerCase();
+      if (BigInt(address || "0") === 0n || seen.has(address)) return false;
+      seen.add(address);
+      return true;
+    });
+  }, [uniqueExternalTokens, nativeBridgeTokens]);
+  const hasNativeFundToken = uniqueExternalTokens.some(
+    (token) => BigInt(token.externalToken || "0") === 0n
+  );
   const useExternalWalletSigning = hasExternalWallet && !isAppAuthenticated;
   const visibleMatchingActions = useMemo(
     () => useExternalWalletSigning ? [] : matchingActions,
@@ -490,39 +502,82 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     address: externalSenderHex,
     chainId: expectedChainId || undefined,
     query: {
-      enabled: hasExternalWallet && !!expectedChainId && isNativeToken,
+      enabled: hasExternalWallet && !!expectedChainId && hasNativeFundToken,
       refetchInterval: 15000,
     },
   });
 
   const {
-    data: tokenRawBalance,
+    data: tokenBalanceResults,
     refetch: refetchToken,
     isLoading: tokenLoading,
-  } = useReadContract({
-    address: ensureHexPrefix(selectedToken?.externalToken) as `0x${string}`,
-    abi: ERC20_ABI,
-    functionName: 'balanceOf',
-    args: externalSenderHex ? [externalSenderHex] : undefined,
-    chainId: expectedChainId || undefined,
+  } = useReadContracts({
+    contracts: fundErc20Tokens.map((token) => ({
+      address: ensureHexPrefix(token.externalToken) as `0x${string}`,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: externalSenderHex ? [externalSenderHex] : undefined,
+      chainId: expectedChainId || undefined,
+    })),
     query: {
       enabled:
         hasExternalWallet &&
         !!expectedChainId &&
-        !!selectedToken &&
-        !isNativeToken,
+        fundErc20Tokens.length > 0,
       refetchInterval: 15000,
     },
   });
 
-  const isBalanceLoading = hasExternalWallet && !!expectedChainId && (nativeLoading || tokenLoading);
+  const tokenBalancesByAddress = useMemo(() => {
+    const balances = new Map<string, bigint>();
+    tokenBalanceResults?.forEach((result, index) => {
+      if (result.status === "success") {
+        balances.set(fundErc20Tokens[index].externalToken.toLowerCase(), result.result as bigint);
+      }
+    });
+    return balances;
+  }, [fundErc20Tokens, tokenBalanceResults]);
+
+  const tokenRawBalance = selectedToken
+    ? tokenBalancesByAddress.get(selectedToken.externalToken.toLowerCase())
+    : undefined;
+
+  const getTokenOptionBalance = useCallback((token: typeof uniqueExternalTokens[number]) => {
+    if (token.routeType !== "native" && BigInt(token.externalToken || "0") === 0n) {
+      return nativeBalance?.value;
+    }
+    return tokenBalancesByAddress.get(token.externalToken.toLowerCase());
+  }, [nativeBalance?.value, tokenBalancesByAddress]);
+
+  const sortedFundTokens = useMemo(
+    () => [...uniqueExternalTokens, ...nativeBridgeTokens]
+      .filter((token) => token.externalSymbol || token.externalName)
+      .sort((a, b) => {
+        const aBalance = getTokenOptionBalance(a) || 0n;
+        const bBalance = getTokenOptionBalance(b) || 0n;
+        const aDecimals = BigInt(a.externalDecimals || "18");
+        const bDecimals = BigInt(b.externalDecimals || "18");
+        const normalizedA = aDecimals < bDecimals
+          ? aBalance * 10n ** (bDecimals - aDecimals)
+          : aBalance;
+        const normalizedB = bDecimals < aDecimals
+          ? bBalance * 10n ** (aDecimals - bDecimals)
+          : bBalance;
+
+        return normalizedA === normalizedB ? 0 : normalizedA > normalizedB ? -1 : 1;
+      }),
+    [getTokenOptionBalance, nativeBridgeTokens, uniqueExternalTokens]
+  );
+
+  const isBalanceLoading = hasExternalWallet && !!expectedChainId
+    && (isNativeToken ? nativeLoading : tokenLoading);
 
   const maxAmount = useMemo(() => {
     if (isNativeToken) {
       if (!nativeBalance?.value) return "0";
       return nativeBalance.value.toString();
     } else {
-      if (!tokenRawBalance) return "0";
+      if (tokenRawBalance === undefined) return "0";
       return tokenRawBalance.toString();
     }
   }, [isNativeToken, nativeBalance?.value, tokenRawBalance]);
@@ -1302,13 +1357,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                       <SelectValue placeholder="Token" />
                     </SelectTrigger>
                     <SelectContent>
-                      {uniqueExternalTokens.filter((t) => t.externalSymbol || t.externalName).map((t) => (
-                        <SelectItem key={t.externalToken} value={(t.externalToken || "").toLowerCase()}>
-                          {fundTokenLabel(t)}
-                        </SelectItem>
-                      ))}
-                      {nativeBridgeTokens.filter((t) => t.externalSymbol || t.externalName).map((t) => (
-                        <SelectItem key={t.id} value={`native:${t.id}`}>
+                      {sortedFundTokens.map((t) => (
+                        <SelectItem
+                          key={t.routeType === "native" ? t.id : t.externalToken}
+                          value={t.routeType === "native"
+                            ? `native:${t.id}`
+                            : (t.externalToken || "").toLowerCase()}
+                        >
                           {fundTokenLabel(t)}
                         </SelectItem>
                       ))}

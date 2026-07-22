@@ -88,6 +88,10 @@ import           Blockchain.P2PUtil
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka              as SK
 
+import           Control.Monad.Composable.Streaming      (StreamEnv,
+                                                          createStreamEnv,
+                                                          runStreamMUsingEnv)
+
 import           Blockchain.Strato.Discovery.ContextLite ()
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Address
@@ -129,7 +133,10 @@ data Config = Config
   { configSQLDB                    :: SQLDB,
     configRedisBlockDB             :: RBDB.RedisConnection,
     configContext                  :: IORef Context,
-    configBlockstanbulWireMessages :: IORef (S.OSet Keccak256)
+    configBlockstanbulWireMessages :: IORef (S.OSet Keccak256),
+    -- Shared per-process Kafka producer. Guarded by an MVar because milena's
+    -- KafkaState read-modify-write in execKafka is not atomic across threads.
+    configStreamEnv                :: MVar StreamEnv
   }
 
 newtype ActionTimestamp = ActionTimestamp {unActionTimestamp :: Maybe UTCTime}
@@ -391,7 +398,9 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Point PPeer (Reader
       actions = SQL.selectList [PPeerPubkey SQL.==. Just pk] []
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => Mod.Outputs (ReaderT Config m) [IngestEvent] where
-  output = void . runStreamMConfigured "strato-p2p" . SK.writeUnseqEvents
+  output ie = do
+    envVar <- asks configStreamEnv
+    withMVar envVar $ \env -> void . runStreamMUsingEnv env $ SK.writeUnseqEvents ie
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT Config m) where
   select p = liftIO . A.select p
@@ -484,11 +493,15 @@ initConfig wireMessagesRef = do
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   initState <- initContext
   initStateF <- newIORef initState
+  let k = Conf.streamingConfig ethConf
+  streamEnv <- createStreamEnv "strato-p2p" (Conf.streamingHost k, Conf.streamingPort k)
+  streamEnvVar <- newMVar streamEnv
   return $ Config
     { configSQLDB = sqlDB' dbs
     , configRedisBlockDB = RBDB.RedisConnection redisBDBPool
     , configContext = initStateF
     , configBlockstanbulWireMessages = wireMessagesRef
+    , configStreamEnv = streamEnvVar
     }
 
 initContext :: MonadIO m => m Context

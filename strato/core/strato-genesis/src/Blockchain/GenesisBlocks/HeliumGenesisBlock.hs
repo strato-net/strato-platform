@@ -367,8 +367,11 @@ supportedCollaterals = Set.toList
                      . Set.fromList
                      $ GE.assetRootAddress <$> combinedEscrows
 
+mercataCodeHash :: KECCAK256.Keccak256
+mercataCodeHash = KECCAK256.hash $ BL.toStrict $ JSON.encode mercataContracts
+
 mercataContract :: String -> CodePtr
-mercataContract = flip SolidVMCode (KECCAK256.hash $ BL.toStrict $ JSON.encode mercataContracts)
+mercataContract = flip SolidVMCode mercataCodeHash
 
 proxy :: CodePtr
 proxy = mercataContract "Proxy"
@@ -493,7 +496,7 @@ genesisBlockTemplate HeliumGenesisBlockConfig{..} =
             SolidVMContractWithStorage
               mercataAddress
               720
-              (SolidVMCode "Mercata" (KECCAK256.hash $ BL.toStrict $ JSON.encode mercataContracts))
+              (SolidVMCode "Mercata" mercataCodeHash)
               [ ("rateStrategy", BContract "RateStrategy" rateStrategyAddress)
               , ("priceOracle", BContract "PriceOracle" priceOracleAddress)
               , ("collateralVault", BContract "CollateralVault" collateralVaultAddress)
@@ -559,36 +562,36 @@ genesisBlockTemplate HeliumGenesisBlockConfig{..} =
              , safetyModuleEvents
              ],
         delegatecalls = M.fromList . map (fmap S.singleton) $
-          ((\t -> (GA.root t, Delegatecall (GA.root t) tokenImplAddress (Just "BlockApps") "Token")) <$> GA.assets)
-          ++ [ (rateStrategyAddress, Delegatecall rateStrategyAddress rateStrategyImplAddress (Just "BlockApps") "RateStrategy")
-             , (priceOracleAddress, Delegatecall priceOracleAddress priceOracleImplAddress (Just "BlockApps") "PriceOracle")
-             , (collateralVaultAddress, Delegatecall collateralVaultAddress collateralVaultImplAddress (Just "BlockApps") "CollateralVault")
-             , (liquidityPoolAddress, Delegatecall liquidityPoolAddress liquidityPoolImplAddress (Just "BlockApps") "LiquidityPool")
-             , (lendingPoolAddress, Delegatecall lendingPoolAddress lendingPoolImplAddress (Just "BlockApps") "LendingPool")
-             , (poolConfiguratorAddress, Delegatecall poolConfiguratorAddress poolConfiguratorImplAddress (Just "BlockApps") "PoolConfigurator")
-             , (lendingRegistryAddress, Delegatecall lendingRegistryAddress lendingRegistryImplAddress (Just "BlockApps") "LendingRegistry")
-             , (mercataBridgeAddress, Delegatecall mercataBridgeAddress mercataBridgeImplAddress (Just "BlockApps") "MercataBridge")
-             , (poolFactoryAddress, Delegatecall poolFactoryAddress poolFactoryImplAddress (Just "BlockApps") "PoolFactory")
-             , (tokenFactoryAddress, Delegatecall tokenFactoryAddress tokenFactoryImplAddress (Just "BlockApps") "TokenFactory")
-             , (adminRegistryAddress, Delegatecall adminRegistryAddress adminRegistryImplAddress (Just "BlockApps") "AdminRegistry")
-             , (feeCollectorAddress, Delegatecall feeCollectorAddress feeCollectorImplAddress (Just "BlockApps") "FeeCollector")
-             , (voucherAddress, Delegatecall voucherAddress voucherImplAddress (Just "BlockApps") "Voucher")
-             , (mTokenAddress, Delegatecall mTokenAddress tokenImplAddress (Just "BlockApps") "Token")
-             , (cdpEngineAddress, Delegatecall cdpEngineAddress cdpEngineImplAddress (Just "BlockApps") "CDPEngine")
-             , (cdpRegistryAddress, Delegatecall cdpRegistryAddress cdpRegistryImplAddress (Just "BlockApps") "CDPRegistry")
-             , (cdpVaultAddress, Delegatecall cdpVaultAddress cdpVaultImplAddress (Just "BlockApps") "CDPVault")
-             , (cdpReserveAddress, Delegatecall cdpReserveAddress cdpReserveImplAddress (Just "BlockApps") "CDPReserve")
-             , (safetyModuleAddress, Delegatecall safetyModuleAddress safetyModuleImplAddress (Just "BlockApps") "SafetyModule")
-             , (rewardsChefAddress, Delegatecall rewardsChefAddress rewardsChefImplAddress (Just "BlockApps") "RewardsChef")
-             , (sUsdstAddress, Delegatecall sUsdstAddress tokenImplAddress (Just "BlockApps") "Token")
-             , (ethstPoolAddress, Delegatecall ethstPoolAddress poolImplAddress (Just "BlockApps") "Pool")
-             , (ethstLpTokenAddress, Delegatecall ethstLpTokenAddress tokenImplAddress (Just "BlockApps") "Token")
-             , (wbtcstPoolAddress, Delegatecall wbtcstPoolAddress poolImplAddress (Just "BlockApps") "Pool")
-             , (wbtcstLpTokenAddress, Delegatecall wbtcstLpTokenAddress tokenImplAddress (Just "BlockApps") "Token")
-             , (goldstPoolAddress, Delegatecall goldstPoolAddress poolImplAddress (Just "BlockApps") "Pool")
-             , (goldstLpTokenAddress, Delegatecall goldstLpTokenAddress tokenImplAddress (Just "BlockApps") "Token")
-             , (silvstPoolAddress, Delegatecall silvstPoolAddress poolImplAddress (Just "BlockApps") "Pool")
-             , (silvstLpTokenAddress, Delegatecall silvstLpTokenAddress tokenImplAddress (Just "BlockApps") "Token")
+          ((\t -> (GA.root t, Delegatecall (GA.root t) mercataCodeHash "Token")) <$> GA.assets)
+          ++ [ (rateStrategyAddress, Delegatecall rateStrategyAddress mercataCodeHash "RateStrategy")
+             , (priceOracleAddress, Delegatecall priceOracleAddress mercataCodeHash "PriceOracle")
+             , (collateralVaultAddress, Delegatecall collateralVaultAddress mercataCodeHash "CollateralVault")
+             , (liquidityPoolAddress, Delegatecall liquidityPoolAddress mercataCodeHash "LiquidityPool")
+             , (lendingPoolAddress, Delegatecall lendingPoolAddress mercataCodeHash "LendingPool")
+             , (poolConfiguratorAddress, Delegatecall poolConfiguratorAddress mercataCodeHash "PoolConfigurator")
+             , (lendingRegistryAddress, Delegatecall lendingRegistryAddress mercataCodeHash "LendingRegistry")
+             , (mercataBridgeAddress, Delegatecall mercataBridgeAddress mercataCodeHash "MercataBridge")
+             , (poolFactoryAddress, Delegatecall poolFactoryAddress mercataCodeHash "PoolFactory")
+             , (tokenFactoryAddress, Delegatecall tokenFactoryAddress mercataCodeHash "TokenFactory")
+             , (adminRegistryAddress, Delegatecall adminRegistryAddress mercataCodeHash "AdminRegistry")
+             , (feeCollectorAddress, Delegatecall feeCollectorAddress mercataCodeHash "FeeCollector")
+             , (voucherAddress, Delegatecall voucherAddress mercataCodeHash "Voucher")
+             , (mTokenAddress, Delegatecall mTokenAddress mercataCodeHash "Token")
+             , (cdpEngineAddress, Delegatecall cdpEngineAddress mercataCodeHash "CDPEngine")
+             , (cdpRegistryAddress, Delegatecall cdpRegistryAddress mercataCodeHash "CDPRegistry")
+             , (cdpVaultAddress, Delegatecall cdpVaultAddress mercataCodeHash "CDPVault")
+             , (cdpReserveAddress, Delegatecall cdpReserveAddress mercataCodeHash "CDPReserve")
+             , (safetyModuleAddress, Delegatecall safetyModuleAddress mercataCodeHash "SafetyModule")
+             , (rewardsChefAddress, Delegatecall rewardsChefAddress mercataCodeHash "RewardsChef")
+             , (sUsdstAddress, Delegatecall sUsdstAddress mercataCodeHash "Token")
+             , (ethstPoolAddress, Delegatecall ethstPoolAddress mercataCodeHash "Pool")
+             , (ethstLpTokenAddress, Delegatecall ethstLpTokenAddress mercataCodeHash "Token")
+             , (wbtcstPoolAddress, Delegatecall wbtcstPoolAddress mercataCodeHash "Pool")
+             , (wbtcstLpTokenAddress, Delegatecall wbtcstLpTokenAddress mercataCodeHash "Token")
+             , (goldstPoolAddress, Delegatecall goldstPoolAddress mercataCodeHash "Pool")
+             , (goldstLpTokenAddress, Delegatecall goldstLpTokenAddress mercataCodeHash "Token")
+             , (silvstPoolAddress, Delegatecall silvstPoolAddress mercataCodeHash "Pool")
+             , (silvstLpTokenAddress, Delegatecall silvstLpTokenAddress mercataCodeHash "Token")
              ],
          validators = hgbc_validators
         }
