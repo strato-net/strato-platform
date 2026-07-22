@@ -8,6 +8,7 @@ import { api, setAppAuthenticated, setConnectedWalletAddress, setWalletSigner } 
 import { isAuthenticated, logout as authLogout, redirectToSignedOutLanding, WALLET_CONNECT_REQUEST_EVENT } from "@/lib/auth";
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
 import { readAttribution, clearAttribution } from "@/lib/attribution";
+import { trackWalletConnected } from "@/lib/tracking";
 import { ensureStratoChainInWallet } from "@/lib/stratoChain";
 
 interface UserContextType {
@@ -289,6 +290,19 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     setConnectedWalletAddress(externalWalletAddress);
   }, [externalWalletAddress]);
+
+  // Tracking-links beacon: fires when a wallet or STRATO account becomes
+  // available, whichever arrives first (guest wallet connects included).
+  // Deduped per address inside trackWalletConnected, so the STRATO connector
+  // surfacing the same address via wagmi and OAuth reports only once.
+  useEffect(() => {
+    if (!externalWalletAddress && !stratoAddress) return;
+    trackWalletConnected({
+      externalWalletAddress,
+      stratoAddress,
+      connector: account.connector?.id ?? account.connector?.name ?? null,
+    });
+  }, [externalWalletAddress, stratoAddress, account.connector?.id]);
 
   useEffect(() => {
     externalEvmConnectedRef.current = isExternalEvmWalletConnected;

@@ -63,6 +63,7 @@ HASH_PROMETHEUS := $(call dir_hash,prometheus-packager)
 HASH_SMD := $(call dir_hash,smd-ui)
 HASH_BRIDGE := $(call dir_hash,mercata/services/bridge)
 HASH_BRIDGE_NGINX := $(call dir_hash,mercata/services/bridge/nginx)
+HASH_TRACKING := $(call dir_hash,mercata/services/tracking)
 HASH_LOCAL_AUTH := $(call dir_hash,local-auth)
 
 # Check if image exists in Docker — rebuild if missing (hash in tag handles source changes)
@@ -83,6 +84,7 @@ generate-version-file:
 	@echo "HASH_NGINX=$(HASH_NGINX)" >> BUILD_METADATA
 	@echo "HASH_PROMETHEUS=$(HASH_PROMETHEUS)" >> BUILD_METADATA
 	@echo "HASH_LOCAL_AUTH=$(HASH_LOCAL_AUTH)" >> BUILD_METADATA
+	@echo "HASH_TRACKING=$(HASH_TRACKING)" >> BUILD_METADATA
 	@echo "Generated BUILD_METADATA file"
 
 # Sed substitutions for docker-compose templates
@@ -97,7 +99,7 @@ HASH_SUBS = -e 's|<HASH_STRATO>|$(HASH_STRATO)|g' \
             -e 's|<HASH_BRIDGE>|$(HASH_BRIDGE)|g' \
             -e 's|<HASH_BRIDGE_NGINX>|$(HASH_BRIDGE_NGINX)|g'
 
-.PHONY: postgrest nginx apex mercata-backend mercata-ui prometheus smd bridge bridge-nginx local-auth
+.PHONY: postgrest nginx apex mercata-backend mercata-ui prometheus smd bridge bridge-nginx tracking local-auth
 
 postgrest:
 	@if $(call image_missing,$(REPO_URL)postgrest:$(VERSION)-$(HASH_POSTGREST)); then \
@@ -175,17 +177,26 @@ bridge-nginx:
 		echo "bridge-nginx up to date"; \
 	fi
 
+tracking:
+	@if $(call image_missing,$(REPO_URL)tracking:$(VERSION)-$(HASH_TRACKING)); then \
+		echo "Building tracking ($(VERSION)-$(HASH_TRACKING))..."; \
+		docker build -t $(REPO_URL)tracking:$(VERSION)-$(HASH_TRACKING) ./mercata/services/tracking && \
+		docker tag $(REPO_URL)tracking:$(VERSION)-$(HASH_TRACKING) $(REPO_AWS_ECR_URL)tracking:$(VERSION)-$(HASH_TRACKING); \
+	else \
+		echo "tracking up to date"; \
+	fi
+
 all: local
 
-local: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui bridge bridge-nginx oracle local-auth
+local: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui bridge bridge-nginx tracking oracle local-auth
 
-docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle docker-compose
+docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx tracking oracle docker-compose
 
 all_develop: build_develop docker-compose
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx tracking oracle
 
-.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key change-vault-password install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force app
+.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key change-vault-password install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force tracking-force app
 
 app: mercata-backend mercata-ui
 	@echo ""
@@ -232,6 +243,11 @@ bridge-nginx-force:
 	@echo Now building bridge-nginx...
 	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ./mercata/services/bridge/nginx
 	docker tag ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ${REPO_AWS_ECR_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX}
+
+tracking-force:
+	@echo Now building tracking...
+	docker build -t ${REPO_URL}tracking:${VERSION}-${HASH_TRACKING} ./mercata/services/tracking
+	docker tag ${REPO_URL}tracking:${VERSION}-${HASH_TRACKING} ${REPO_AWS_ECR_URL}tracking:${VERSION}-${HASH_TRACKING}
 
 local-auth:
 	@if $(call image_missing,local-auth:$(VERSION)-$(HASH_LOCAL_AUTH)); then \

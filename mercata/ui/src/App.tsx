@@ -45,6 +45,8 @@ import BridgeTransactionsPage from "./pages/BridgeTransactionsPage";
 import MetalTransactionsPage from "./pages/MetalTransactionsPage";
 import WithdrawalsPage from "./pages/WithdrawalsPage";
 import Admin from "./pages/Admin";
+import TrackingDashboard from "./pages/TrackingDashboard";
+import TrackingLinkDetailPage from "./pages/TrackingLinkDetailPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import GuestAccessibleRoute from "./components/GuestAccessibleRoute";
 import {
@@ -391,6 +393,27 @@ const App = () => {
                                                       <AdminRoute>
                                                         <Admin />
                                                       </AdminRoute>
+                                                    </ProtectedRoute>
+                                                  }
+                                                />
+
+                                                {/* Gated in-page via /tracking-api/me: allowlisted
+                                                    sales users are not on-chain admins, so AdminRoute
+                                                    would wrongly bounce them. */}
+                                                <Route
+                                                  path="/dashboard/tracking"
+                                                  element={
+                                                    <ProtectedRoute>
+                                                      <TrackingDashboard />
+                                                    </ProtectedRoute>
+                                                  }
+                                                />
+
+                                                <Route
+                                                  path="/dashboard/tracking/:id"
+                                                  element={
+                                                    <ProtectedRoute>
+                                                      <TrackingLinkDetailPage />
                                                     </ProtectedRoute>
                                                   }
                                                 />
