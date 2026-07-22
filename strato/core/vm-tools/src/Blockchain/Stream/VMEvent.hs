@@ -9,6 +9,7 @@ module Blockchain.Stream.VMEvent
 where
 
 import Blockchain.Data.TransactionResult
+import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.Action (Action)
 import Control.Monad.Composable.Streaming
 import qualified Data.Aeson as JSON
@@ -23,15 +24,16 @@ data VMEvent
   = NewAction Action
   | CodeCollectionAdded
       { codeCollection :: CodeCollectionF (),
-        creator :: Text
+        creator :: Text,
+        codeHash :: Keccak256
       }
   | NewTransactionResult TransactionResult
   deriving (Show, Generic)
 
 instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)
-  format (CodeCollectionAdded _ cr) =
-    "CodeCollectionAdded: (" ++ show cr ++ ") "
+  format (CodeCollectionAdded _ cr ch) =
+    "CodeCollectionAdded: (" ++ show cr ++ ", " ++ keccak256ToHex ch ++ ") "
   format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)
 
 instance Binary VMEvent

@@ -714,10 +714,11 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
 
 extractCodeCollectionAddedMessages :: Action.Action -> [VMEvent]
 extractCodeCollectionAddedMessages a =
-  let mkCCAnouncement ((userName, _), cc) =
+  let mkCCAnouncement ((userName, ch), cc) =
         CodeCollectionAdded
               { codeCollection = const () <$> cc,
-                creator = userName
+                creator = userName,
+                codeHash = ch
               }
   in map mkCCAnouncement . O.assocs $ _newCodeCollections a
 

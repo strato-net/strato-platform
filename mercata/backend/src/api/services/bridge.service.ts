@@ -337,7 +337,10 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
     getRebaseFactors(accessToken),
   ]);
 
-  const tokens = enrichAssetsWithTokenData(routes, tokenMap);
+  const activeRoutes = routes.filter(({ AssetInfo }) =>
+    tokenMap.get(AssetInfo.stratoToken.toLowerCase().replace(/^0x/, ""))?.status === "2"
+  );
+  const tokens = enrichAssetsWithTokenData(activeRoutes, tokenMap);
   for (const token of tokens) {
     const factor = rebaseFactorMap.get(token.stratoToken.toLowerCase().replace(/^0x/, ''));
     if (factor) token.rebaseFactor = factor;

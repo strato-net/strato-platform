@@ -126,7 +126,7 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
     fmap catMaybes . for (GI.codeInfo genesisInfo) $ \(GI.CodeInfo src mName) -> for mName $ \_ -> do
       let srcHash = hash $ T.encodeUtf8 src
       cc <- codeCollectionFromHash False True srcHash
-      pure $ CodeCollectionAdded (() <$ cc) "BlockApps"
+      pure $ CodeCollectionAdded (() <$ cc) "BlockApps" srcHash
 
   pub Nothing ccas
 
@@ -143,10 +143,9 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
     let addressEvents = Map.findWithDefault S.empty address  events'
         dc = case addressStateCodeHash addressState of
           ExternallyOwned{} -> S.empty
-          SolidVMCode name _ -> S.singleton $ A.Delegatecall
+          SolidVMCode name ch -> S.singleton $ A.Delegatecall
             { A._delegatecallStorageAddress = address
-            , A._delegatecallCodeAddress = address
-            , A._delegatecallOrganization = Just "BlockApps"
+            , A._delegatecallCodeHash = ch
             , A._delegatecallContractName = T.pack name
             }
     let addressDelegatecalls = dc S.>< Map.findWithDefault S.empty address delegatecalls'

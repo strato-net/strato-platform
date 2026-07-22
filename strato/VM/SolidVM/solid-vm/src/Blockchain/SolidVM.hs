@@ -569,13 +569,12 @@ call' from to' fnCalltype functionName valList = do
           _ -> unknownFunction "logFunctionCall" (functionName, "asdf5" :: String) -- ^. CC.contractName)
 
   when (fnCalltype == CC.DelegateCall) $ do
-    codeContractName <- do
+    (codeHash, codeContractName) <- do
       ch <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) codeAddress
-      let n = case ch of
-                SolidVMCode n' _ -> n'
-                _ -> ""
-      return n
-    addDelegatecall storageAddress codeAddress Nothing (T.pack codeContractName)
+      pure $ case ch of
+        SolidVMCode n' h -> (h, n')
+        ExternallyOwned h -> (h, "")
+    addDelegatecall storageAddress codeHash (T.pack codeContractName)
   logFunctionCall valList storageAddress contract functionName f
   where
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
@@ -2733,8 +2732,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
         _ <- runModifiersAndStatements modContentsList commands
         pure ()
       Nothing -> return ()
-    mUserName <- getUsername
-    addDelegatecall to to mUserName $ T.pack contractName'
+    addDelegatecall to hsh $ T.pack contractName'
 
   return ()
 
