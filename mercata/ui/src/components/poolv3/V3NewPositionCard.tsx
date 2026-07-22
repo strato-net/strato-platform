@@ -11,11 +11,11 @@ import {
   priceToTick,
   snapTick,
   tickToPriceInput,
-  formatPriceWad,
   formatTokenAmount,
   formatTickAsPrice,
   poolV3TxAmounts,
   describePoolAmounts,
+  priceDomainEdge,
 } from "./poolV3Utils";
 import V3ConfirmDialog, { ConfirmRow } from "./V3ConfirmDialog";
 
@@ -42,6 +42,9 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
   const { toast } = useToast();
 
   const currentPrice = Number(BigInt(pool.priceWad)) / 1e18;
+  // pinned at the tick-domain edge = one side of the pool was drained; the "price"
+  // is the domain ceiling/floor, so anchoring ranges to it produces nonsense
+  const priceEdge = priceDomainEdge(pool);
 
   const [tickLower, setTickLower] = useState<number | null>(null);
   const [tickUpper, setTickUpper] = useState<number | null>(null);
@@ -154,7 +157,7 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
   };
 
   const applyPreset = (lowerPct: number, upperPct: number) => {
-    if (!isFinite(currentPrice) || currentPrice <= 0) return;
+    if (!isFinite(currentPrice) || currentPrice <= 0 || priceEdge) return;
     // A 0 bound anchors that side at the current tick, snapped so the range sits entirely
     // on one side of the price and deposits a single token: a below-price range ends at
     // the spacing-floor of the current tick, an above-price range starts at its ceiling.
@@ -293,9 +296,6 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
     <div className="bg-card shadow-sm rounded-xl p-4 border border-border space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">New position</h3>
-        <span className="text-xs text-muted-foreground">
-          Current: 1 {pool.token0.symbol} ≈ {formatPriceWad(pool.priceWad)} {pool.token1.symbol}
-        </span>
       </div>
 
       {/* Price range (token1 per token0) */}
@@ -313,7 +313,7 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
               key={p.label}
               type="button"
               onClick={() => applyPreset(p.lowerPct, p.upperPct)}
-              disabled={!isFinite(currentPrice) || currentPrice <= 0}
+              disabled={!isFinite(currentPrice) || currentPrice <= 0 || priceEdge !== null}
               className="px-2 py-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
             >
               <div className="text-[11px] font-medium">{p.label}</div>
@@ -321,6 +321,14 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
             </button>
           ))}
         </div>
+        {priceEdge && (
+          <p className="text-xs text-yellow-600">
+            The pool's {priceEdge === "max" ? pool.token0.symbol : pool.token1.symbol} side was fully bought
+            out, so its price sits at the tick-domain {priceEdge === "max" ? "ceiling" : "floor"} and the
+            percentage presets would anchor to it. Enter explicit Min/Max prices around the real market
+            price instead — new in-range liquidity is also what lets the pool re-price itself.
+          </p>
+        )}
 
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-muted/50 rounded-lg border border-border p-2.5">

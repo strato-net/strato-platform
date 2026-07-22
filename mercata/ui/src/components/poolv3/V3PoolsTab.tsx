@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PoolV3 } from "@/interface";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import { formatPriceWad } from "./poolV3Utils";
+import { formatPriceWad, priceDomainEdge } from "./poolV3Utils";
 import V3NewPositionCard from "./V3NewPositionCard";
 
 interface V3PoolsTabProps {
@@ -203,8 +203,20 @@ const V3PoolsTab = ({ pools, loading, onMinted }: V3PoolsTabProps) => {
                 ))}
               </div>
               <div className="text-xs text-muted-foreground mt-3">
-                Current price: 1 {selectedPool.token0.symbol} ≈ {formatPriceWad(selectedPool.priceWad)}{" "}
-                {selectedPool.token1.symbol}
+                {priceDomainEdge(selectedPool) ? (
+                  <span className="text-yellow-600">
+                    Price unavailable — one-sided liquidity (the pool has no{" "}
+                    {priceDomainEdge(selectedPool) === "max"
+                      ? selectedPool.token0.symbol
+                      : selectedPool.token1.symbol}{" "}
+                    left)
+                  </span>
+                ) : (
+                  <>
+                    Current price: 1 {selectedPool.token0.symbol} ≈ {formatPriceWad(selectedPool.priceWad)}{" "}
+                    {selectedPool.token1.symbol}
+                  </>
+                )}
               </div>
             </div>
 

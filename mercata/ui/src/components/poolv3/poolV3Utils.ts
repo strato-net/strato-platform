@@ -71,6 +71,20 @@ export const priceToTick = (price: number): number => {
   return Math.floor(Math.log(price) / Math.log(1.0001));
 };
 
+/**
+ * 'max' | 'min' when the pool's price is pinned at the tick-domain edge, else null.
+ * A swap that drains one side of the pool walks the price to the edge (~2^±128 —
+ * e.g. "3.4e+38"), which is a market-emptiness marker, not a price. At >= maxUsable
+ * the price sits above every possible position's upper bound (in-range requires
+ * currentTick < tickUpper <= maxUsable), so no liquidity can be in range.
+ */
+export const priceDomainEdge = (pool: { currentTick: number; tickSpacing: number }): "max" | "min" | null => {
+  const maxUsable = Math.floor(V3_MAX_TICK / pool.tickSpacing) * pool.tickSpacing;
+  if (pool.currentTick >= maxUsable) return "max";
+  if (pool.currentTick < -maxUsable) return "min";
+  return null;
+};
+
 /** snap a tick to the pool's tick spacing, clamped to the usable domain */
 export const snapTick = (tick: number, tickSpacing: number): number => {
   const snapped = Math.round(tick / tickSpacing) * tickSpacing;

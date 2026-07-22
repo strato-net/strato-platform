@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import { formatTokenAmount, formatTickAsPrice, formatPriceWad, poolV3TxAmounts, describePoolAmounts } from "./poolV3Utils";
+import { formatTokenAmount, formatTickAsPrice, formatPriceWad, poolV3TxAmounts, describePoolAmounts, priceDomainEdge } from "./poolV3Utils";
 import V3ConfirmDialog, { ConfirmRow } from "./V3ConfirmDialog";
 
 type ConfirmableAction = "remove" | "fees" | "collect";
@@ -355,8 +355,20 @@ const V3MyPositions = ({
                 </Badge>
               </div>
               <span className="text-xs text-muted-foreground text-right flex-shrink-0">
-                1 {selectedGroup.pool.token0.symbol} ≈ {formatPriceWad(selectedGroup.pool.priceWad)}{" "}
-                {selectedGroup.pool.token1.symbol}
+                {priceDomainEdge(selectedGroup.pool) ? (
+                  <span className="text-yellow-600">
+                    Price unavailable — no{" "}
+                    {priceDomainEdge(selectedGroup.pool) === "max"
+                      ? selectedGroup.pool.token0.symbol
+                      : selectedGroup.pool.token1.symbol}{" "}
+                    left in the pool
+                  </span>
+                ) : (
+                  <>
+                    1 {selectedGroup.pool.token0.symbol} ≈ {formatPriceWad(selectedGroup.pool.priceWad)}{" "}
+                    {selectedGroup.pool.token1.symbol}
+                  </>
+                )}
               </span>
             </div>
 
