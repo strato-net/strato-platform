@@ -87,6 +87,8 @@ export function buildSnapshots(
 export interface NetBalanceStorageFilterParams {
   vaultShareToken?: string;
   carryVaultAddrs: string[];
+  /** V3 pool addresses the user has (or had) positions in — their storage history carries sqrtPriceX96 */
+  poolV3Addrs?: string[];
 }
 
 export interface NetBalanceMappingFilterParams {
@@ -95,6 +97,10 @@ export interface NetBalanceMappingFilterParams {
   carryVaultAddrs: string[];
   requestFilters: { address: string; path: string }[];
   priceOracle: string;
+  /** include the PoolV3 `positions` nested-mapping history (liquidity/tokensOwed per range) */
+  includeV3Positions?: boolean;
+  /** tokens that must be in the pass-2 price query beyond what computeRelevantTokens finds (V3 pool token0/token1) */
+  extraRelevantTokens?: string[];
 }
 
 /**
@@ -110,7 +116,7 @@ export async function fetchStorageHistory(
   filters: NetBalanceStorageFilterParams,
 ): Promise<StorageHistoryElement[]> {
   // Collect all specific addresses into a single array for ANY()
-  const addressList: string[] = [...filters.carryVaultAddrs];
+  const addressList: string[] = [...filters.carryVaultAddrs, ...(filters.poolV3Addrs || [])];
   if (filters.vaultShareToken) addressList.push(filters.vaultShareToken);
 
   // $1 = endTime, $2 = startTime, $3 = address list
@@ -167,6 +173,9 @@ export async function fetchUserMappingHistory(
   const collections = [
     ...USER_MAPPING_COLLECTIONS,
     ...(filters.requestFilters.length > 0 ? ['requests'] : []),
+    // PoolV3 positions[owner][tickLower][tickUpper] — the owner in the path is the
+    // user, so the existing `path LIKE %user%` clause selects exactly their rows
+    ...(filters.includeV3Positions ? ['positions'] : []),
   ];
 
   // Build the _balances path array: liquidity pool + bot executor + carry vault idle assets
@@ -386,6 +395,53 @@ export async function fetchActiveRequestIds(
   return result;
 }
 
+export interface PoolV3Meta {
+  token0: string;
+  token1: string;
+}
+
+/**
+ * Pre-pass for V3 positions: find the V3 pools the user has (or had) positions in
+ * during the window, and resolve each pool's token pair. The join against the
+ * PoolV3 table also guarantees we only treat genuine V3 pools as such — other
+ * contracts may have a `positions` collection too.
+ */
+export async function fetchUserV3PoolMeta(
+  startTime: string,
+  endTime: string,
+  userAddress: string,
+): Promise<Map<string, PoolV3Meta>> {
+  const meta = new Map<string, PoolV3Meta>();
+  try {
+    const poolRows = await query<{ address: string }>(
+      `
+      SELECT DISTINCT address
+      FROM "history@mapping"
+      WHERE collection_name = 'positions'
+        AND path LIKE $3
+        AND valid_from <= $1
+        AND valid_to >= $2
+      `,
+      [endTime, startTime, `%${userAddress}%`],
+    );
+    if (poolRows.length === 0) return meta;
+
+    const metaRows = await query<{ address: string; token0: string; token1: string }>(
+      `SELECT address, token0, token1 FROM "BlockApps-PoolV3" WHERE address = ANY($1)`,
+      [poolRows.map((r) => r.address)],
+    );
+    for (const row of metaRows) {
+      if (row.token0 && row.token1) {
+        meta.set(row.address, { token0: row.token0, token1: row.token1 });
+      }
+    }
+  } catch (err) {
+    // V3 tables may not exist on chains without V3 pools — history still works without them
+    console.warn("fetchUserV3PoolMeta failed:", err);
+  }
+  return meta;
+}
+
 /**
  * Direct-SQL version of getHistory for the net-balance-history endpoint.
  *
@@ -426,6 +482,9 @@ export async function getHistoryDirect(
     mappingFilterParams.carryVaultAddrs,
     mappingFilterParams.userAddress,
   );
+  for (const extra of mappingFilterParams.extraRelevantTokens || []) {
+    if (extra && !relevantTokens.includes(extra)) relevantTokens.push(extra);
+  }
 
   // Pass 2: prices/configs/states filtered to relevant tokens
   const globalMappingHistory = await fetchGlobalMappingHistory(

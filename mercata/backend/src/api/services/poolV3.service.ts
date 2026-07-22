@@ -217,6 +217,25 @@ export const getPoolsByPair = async (accessToken: string, tokenA: string, tokenB
     .sort((x, y) => y.totalLiquidityUSD - x.totalLiquidityUSD);
 };
 
+/** Minimal token0/token1 lookup for a set of pools (portfolio valuation) */
+export const getPoolTokenPairs = async (
+  accessToken: string,
+  poolAddresses: string[]
+): Promise<Map<string, { token0: string; token1: string }>> => {
+  const pairs = new Map<string, { token0: string; token1: string }>();
+  if (poolAddresses.length === 0) return pairs;
+  const { data } = await cirrus.get(accessToken, `/${PoolV3Table}`, {
+    params: {
+      address: `in.(${poolAddresses.map(normalizeAddress).join(",")})`,
+      select: "address,token0,token1",
+    },
+  });
+  for (const row of (data as { address: string; token0: string; token1: string }[]) ?? []) {
+    if (row.token0 && row.token1) pairs.set(row.address, { token0: row.token0, token1: row.token1 });
+  }
+  return pairs;
+};
+
 const fetchInitializedTicks = async (accessToken: string, poolAddress: string): Promise<v3.TickData[]> => {
   try {
     const { data } = await cirrus.get(accessToken, `/${PoolV3Ticks}`, {
