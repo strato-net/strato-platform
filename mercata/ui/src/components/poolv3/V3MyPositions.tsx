@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { PoolV3, PoolV3Position } from "@/interface";
 import { useSwapContext } from "@/context/SwapContext";
+import { useTokenContext } from "@/context/TokenContext";
+import { useUserTokens } from "@/context/UserTokensContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -58,7 +60,18 @@ const V3MyPositions = ({
   onBrowsePools,
 }: V3MyPositionsProps) => {
   const { burnV3, collectV3, loading: txLoading } = useSwapContext();
+  const { fetchUsdstBalance } = useTokenContext();
+  const { fetchTokens } = useUserTokens();
   const { toast } = useToast();
+
+  // Withdrawn/collected tokens land in the wallet, and every tx pays its gas fee in
+  // USDST/voucher — so alongside the pool/position reload, refresh the wallet token
+  // balances and the USDST balance box. Nothing else on this page depends on tx results.
+  const refreshAfterTx = () => {
+    fetchUsdstBalance();
+    fetchTokens();
+    onChanged();
+  };
   const [removePercents, setRemovePercents] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
   const [selectedPoolAddress, setSelectedPoolAddress] = useState<string | null>(null);
@@ -124,7 +137,7 @@ const V3MyPositions = ({
           : `Removed ${percent}% and collected owed tokens`,
         variant: "success",
       });
-      onChanged();
+      refreshAfterTx();
     } catch (err) {
       toast({
         title: "Remove failed",
@@ -153,7 +166,7 @@ const V3MyPositions = ({
             : "Owed tokens sent to your wallet",
         variant: "success",
       });
-      onChanged();
+      refreshAfterTx();
     } catch (err) {
       toast({
         title: "Collect failed",
@@ -187,7 +200,7 @@ const V3MyPositions = ({
             : "Accrued fees sent to your wallet",
         variant: "success",
       });
-      onChanged();
+      refreshAfterTx();
     } catch (err) {
       toast({
         title: "Collect failed",

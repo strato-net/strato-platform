@@ -4,6 +4,7 @@
 
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
+import { POOL_V3_CONTRACTS } from "../../config/poolV3Constants";
 import { getCDPRegistry } from "./cdp.service";
 import { getPool } from "./lending.service";
 import { getPrice } from "./oracle.service";
@@ -59,6 +60,7 @@ export interface AggregatedProtocolRevenue {
     lending: ProtocolRevenue;
     swap: ProtocolRevenue;
     stablePool: ProtocolRevenue;
+    poolV3: ProtocolRevenue;
     metalForge: ProtocolRevenue;
     gas: ProtocolRevenue;
   };
@@ -867,6 +869,209 @@ export const getStablePoolProtocolRevenue = async (
 };
 
 /**
+ * Get protocol revenue from V3 (concentrated liquidity) pool operations
+ *
+ * V3 pools accrue the protocol's cut of swap fees into on-contract counters
+ * (protocolFees0/protocolFees1) and pay it out via collectProtocol(), which emits
+ * CollectProtocol(sender, recipient, amount0, amount1). Collecting decrements the
+ * counters, so — like the stable pools' adminBalances —
+ *
+ *   Revenue[T1,T2] = (protocolFees@T2 − protocolFees@T1) + Σ CollectProtocol in [T1,T2]
+ *
+ * Uses history@storage for point-in-time snapshots of the counters; for allTime the
+ * T1 counters are 0. Amounts are attributed to the pool's token0/token1 and valued
+ * at current oracle prices.
+ */
+export const getPoolV3ProtocolRevenue = async (
+  accessToken: string,
+): Promise<ProtocolRevenue> => {
+  const emptyRevenue: ProtocolRevenue = {
+    totalRevenue: "0",
+    revenueByPeriod: {
+      daily: { total: "0", byAsset: [] },
+      weekly: { total: "0", byAsset: [] },
+      monthly: { total: "0", byAsset: [] },
+      ytd: { total: "0", byAsset: [] },
+      allTime: { total: "0", byAsset: [] }
+    }
+  };
+
+  // Chains without V3 deployments have no PoolV3 table — that's zero revenue, not an error
+  let pools: Array<{ address: string; token0: string; token1: string; protocolFees0: string; protocolFees1: string }>;
+  try {
+    const { data } = await cirrus.get(accessToken, `/${POOL_V3_CONTRACTS.PoolV3}`, {
+      params: {
+        poolV3Factory: `eq.${config.poolV3Factory}`,
+        select: "address,token0,token1,protocolFees0::text,protocolFees1::text"
+      }
+    });
+    pools = (data || []).filter((p: any) => p.token0 && p.token1);
+  } catch {
+    return emptyRevenue;
+  }
+
+  if (pools.length === 0) return emptyRevenue;
+
+  try {
+    const poolByAddress = new Map(pools.map(p => [p.address, p]));
+    const poolFilter = `in.(${pools.map(p => p.address).join(',')})`;
+    const timeCutoffs = getTimeCutoffs();
+    const { oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = timeCutoffs;
+    const toIso = (ts: number) => new Date(ts * 1000).toISOString();
+
+    const safeBigInt = (v: unknown): bigint => {
+      try { return BigInt(String(v ?? "0")); } catch { return 0n; }
+    };
+    const addTo = (map: Map<string, bigint>, token: string, amount: bigint) => {
+      if (amount > 0n) map.set(token, (map.get(token) || 0n) + amount);
+    };
+
+    // Point-in-time snapshot of the accrued counters across all pools, summed by token
+    const getAccruedFeesAt = async (isoTimestamp: string): Promise<Map<string, bigint>> => {
+      const map = new Map<string, bigint>();
+      try {
+        const { data } = await cirrus.get(accessToken, "/history@storage", {
+          params: {
+            address: poolFilter,
+            valid_from: `lte.${isoTimestamp}`,
+            valid_to: `gte.${isoTimestamp}`,
+            select: "address,data"
+          }
+        });
+        for (const row of (data as any[]) || []) {
+          const pool = poolByAddress.get(row.address);
+          if (!pool) continue;
+          addTo(map, pool.token0, safeBigInt(row.data?.protocolFees0));
+          addTo(map, pool.token1, safeBigInt(row.data?.protocolFees1));
+        }
+      } catch {
+        // pools that didn't exist yet simply have no snapshot row — zero accrued
+      }
+      return map;
+    };
+
+    // Current accrued counters straight from the live PoolV3 rows
+    const nowFees = new Map<string, bigint>();
+    for (const p of pools) {
+      addTo(nowFees, p.token0, safeBigInt(p.protocolFees0));
+      addTo(nowFees, p.token1, safeBigInt(p.protocolFees1));
+    }
+
+    // Fetch period-start snapshots and CollectProtocol events in parallel
+    const [dailyStartFees, weeklyStartFees, monthlyStartFees, ytdStartFees, collectRes] =
+      await Promise.all([
+        getAccruedFeesAt(toIso(oneDayAgo)),
+        getAccruedFeesAt(toIso(oneWeekAgo)),
+        getAccruedFeesAt(toIso(oneMonthAgo)),
+        getAccruedFeesAt(toIso(ytdCutoff)),
+        cirrus.get(accessToken, `/event`, {
+          params: {
+            event_name: "eq.CollectProtocol",
+            address: poolFilter,
+            select: "address,attributes,block_timestamp",
+            order: "block_timestamp.desc"
+          }
+        })
+      ]);
+
+    // Bucket collected amounts by period and token (each event carries both sides)
+    const emptyBucket = () => new Map<string, bigint>();
+    const collectBuckets = {
+      daily: emptyBucket(), weekly: emptyBucket(), monthly: emptyBucket(),
+      ytd: emptyBucket(), allTime: emptyBucket()
+    };
+    for (const event of (collectRes.data as any[]) || []) {
+      const pool = poolByAddress.get(event.address);
+      if (!pool) continue;
+      const ts = parseTimestamp(event.block_timestamp);
+      const sides: Array<[string, bigint]> = [
+        [pool.token0, safeBigInt(event.attributes?.amount0)],
+        [pool.token1, safeBigInt(event.attributes?.amount1)]
+      ];
+      for (const [token, amount] of sides) {
+        if (amount === 0n) continue;
+        addTo(collectBuckets.allTime, token, amount);
+        if (ts >= oneDayAgo) addTo(collectBuckets.daily, token, amount);
+        if (ts >= oneWeekAgo) addTo(collectBuckets.weekly, token, amount);
+        if (ts >= oneMonthAgo) addTo(collectBuckets.monthly, token, amount);
+        if (ts >= ytdCutoff) addTo(collectBuckets.ytd, token, amount);
+      }
+    }
+
+    // Current oracle prices for both sides of every pool
+    const uniqueTokenAddresses = [...new Set(pools.flatMap(p => [p.token0, p.token1]))];
+    const priceMap = new Map<string, bigint>();
+    await Promise.all(
+      uniqueTokenAddresses.map(async (tokenAddress: string) => {
+        try {
+          const priceData = await getPrice(accessToken, tokenAddress) as { asset: string; price: string };
+          priceMap.set(tokenAddress, BigInt(priceData.price || "0"));
+        } catch {
+          console.warn(`Price not found for token ${tokenAddress}, using 0`);
+          priceMap.set(tokenAddress, 0n);
+        }
+      })
+    );
+
+    // Revenue[T1,now] = (accrued@now − accrued@T1) + collected in [T1,now], in USD
+    const DECIMALS = 10n ** 18n;
+    const computePeriodRevenue = (
+      startFees: Map<string, bigint>,
+      collected: Map<string, bigint>
+    ): Record<string, bigint> => {
+      const allTokens = new Set([...startFees.keys(), ...nowFees.keys(), ...collected.keys()]);
+      const result: Record<string, bigint> = {};
+      for (const token of allTokens) {
+        const delta = (nowFees.get(token) || 0n) - (startFees.get(token) || 0n);
+        const rawRevenue = delta + (collected.get(token) || 0n);
+        if (rawRevenue <= 0n) continue;
+        const usdRevenue = (rawRevenue * (priceMap.get(token) || 0n)) / DECIMALS;
+        if (usdRevenue > 0n) result[token] = usdRevenue;
+      }
+      return result;
+    };
+
+    const emptyMap = new Map<string, bigint>();
+    const periodRevenue = {
+      daily: computePeriodRevenue(dailyStartFees, collectBuckets.daily),
+      weekly: computePeriodRevenue(weeklyStartFees, collectBuckets.weekly),
+      monthly: computePeriodRevenue(monthlyStartFees, collectBuckets.monthly),
+      ytd: computePeriodRevenue(ytdStartFees, collectBuckets.ytd),
+      allTime: computePeriodRevenue(emptyMap, collectBuckets.allTime)
+    };
+
+    const tokenSymbolCache = new Map<string, string>();
+    const [allTimeArray, dailyArray, weeklyArray, monthlyArray, ytdArray] = await Promise.all([
+      buildRevenueArray(accessToken, periodRevenue.allTime, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.daily, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.weekly, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.monthly, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.ytd, tokenSymbolCache)
+    ]);
+
+    const calculateTotal = (revenueMap: Record<string, bigint>): string => {
+      return Object.values(revenueMap).reduce((sum, val) => sum + val, 0n).toString();
+    };
+
+    return {
+      totalRevenue: calculateTotal(periodRevenue.allTime),
+      revenueByPeriod: {
+        daily: { total: calculateTotal(periodRevenue.daily), byAsset: dailyArray },
+        weekly: { total: calculateTotal(periodRevenue.weekly), byAsset: weeklyArray },
+        monthly: { total: calculateTotal(periodRevenue.monthly), byAsset: monthlyArray },
+        ytd: { total: calculateTotal(periodRevenue.ytd), byAsset: ytdArray },
+        allTime: { total: calculateTotal(periodRevenue.allTime), byAsset: allTimeArray }
+      }
+    };
+  } catch (error: any) {
+    console.error("Error fetching PoolV3 protocol revenue:", {
+      error: error.response?.data || error.message
+    });
+    throw new Error("Failed to fetch PoolV3 protocol revenue");
+  }
+};
+
+/**
  * Get gas cost revenue from STRATO transaction fees (0.01 USDST per tx)
  */
 export const getGasCostRevenue = async (
@@ -1040,16 +1245,17 @@ export const getAggregatedProtocolRevenue = async (
 ): Promise<AggregatedProtocolRevenue> => {
   try {
     // Fetch revenue data from all protocols in parallel
-    const [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, metalForgeRevenue, gasRevenue] = await Promise.all([
+    const [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, poolV3Revenue, metalForgeRevenue, gasRevenue] = await Promise.all([
       getCDPProtocolRevenue(accessToken, userAddress),
       getLendingProtocolRevenue(accessToken),
       getSwapProtocolRevenue(accessToken),
       getStablePoolProtocolRevenue(accessToken),
+      getPoolV3ProtocolRevenue(accessToken),
       getMetalForgeProtocolRevenue(accessToken),
       getGasCostRevenue(accessToken)
     ]);
 
-    const allProtocols = [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, metalForgeRevenue, gasRevenue];
+    const allProtocols = [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, poolV3Revenue, metalForgeRevenue, gasRevenue];
     
     // Helper to aggregate revenues across protocols
     const aggregateRevenues = (...revenues: RevenueByAsset[][]): RevenueByAsset[] => {
@@ -1103,6 +1309,7 @@ export const getAggregatedProtocolRevenue = async (
         lending: lendingRevenue,
         swap: swapRevenue,
         stablePool: stablePoolRevenue,
+        poolV3: poolV3Revenue,
         metalForge: metalForgeRevenue,
         gas: gasRevenue
       },
@@ -1123,7 +1330,7 @@ export const getProtocolRevenueByPeriod = async (
   accessToken: string,
   userAddress: string,
   period: 'daily' | 'weekly' | 'monthly' | 'ytd' | 'allTime',
-  protocol?: 'cdp' | 'lending' | 'swap' | 'stablePool' | 'metalForge' | 'gas'
+  protocol?: 'cdp' | 'lending' | 'swap' | 'stablePool' | 'poolV3' | 'metalForge' | 'gas'
 ): Promise<RevenuePeriod> => {
   try {
     if (protocol) {
@@ -1140,6 +1347,9 @@ export const getProtocolRevenueByPeriod = async (
           break;
         case 'stablePool':
           revenue = await getStablePoolProtocolRevenue(accessToken);
+          break;
+        case 'poolV3':
+          revenue = await getPoolV3ProtocolRevenue(accessToken);
           break;
         case 'metalForge':
           revenue = await getMetalForgeProtocolRevenue(accessToken);

@@ -500,7 +500,7 @@ export const getPairSwapHistory = async (
     impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, event.tokenIn === a, event.pool.isStable),
     sender: event.sender,
     poolAddress: event.address,
-    poolName: "V2",
+    poolName: event.pool.isStable ? "Stable" : "V2",
   }));
 
   const merged = [...v2Entries, ...v3Result.entries]

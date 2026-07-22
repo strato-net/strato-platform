@@ -792,8 +792,9 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
     if (pool) {
       opts.push({
         id: 'v2',
-        title: 'V2',
-        subtitle: 'Classic pool',
+        // stable(-swap) pools aren't V2 constant-product pools — label them accordingly
+        title: pool.isStable ? 'Stable' : 'V2',
+        subtitle: pool.isStable ? 'Stable pool' : 'Classic pool',
         detail: hasEnteredAmount
           ? rateLine(v2Compare?.outWei, v2Compare?.inWei, false)
           // V2 totalLiquidityUSD is wei-scaled (USD × 1e18), unlike V3's plain number
@@ -1417,7 +1418,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
               <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-semibold">
                 {isV3
                   ? `V3${v3ExecPool ? ` · ${v3ExecPool.fee / 10000}%` : ''}`
-                  : 'V2'}
+                  : pool?.isStable ? 'Stable' : 'V2'}
               </Badge>
             </span>
             {!exchangeRate ? (

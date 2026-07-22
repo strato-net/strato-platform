@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PoolV3, PoolV3AmountsPreview } from "@/interface";
 import { useSwapContext } from "@/context/SwapContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +38,7 @@ interface V3NewPositionCardProps {
 
 const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
   const { getV3AmountsForLiquidity, mintV3, loading } = useSwapContext();
+  const { fetchUsdstBalance } = useTokenContext();
   const { activeTokens, inactiveTokens, fetchTokens } = useUserTokens();
   const { isLoggedIn } = useUser();
   const { toast } = useToast();
@@ -274,6 +276,7 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
       setAmountInput("");
       setPreview(null);
       fetchTokens(); // deposit changed the wallet balances shown next to Max
+      fetchUsdstBalance(); // USDST balance box: deposit side and/or the gas fee
       onMinted();
     } catch (err) {
       toast({
