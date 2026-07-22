@@ -67,6 +67,12 @@ const PROFILE_CONFIG = {
         externalChainId: 1,
         targetStratoToken: "5ed0bdfb378ac0d06249d70759536d7a41906216",
       },
+      {
+        symbol: "USDC",
+        externalToken: "176211869ca2b568f2a7d4ee941e073a821ee1ff",
+        externalChainId: 59144,
+        targetStratoToken: "6aeacaa19c68e53035bf495d15e0a328fc600ba8",
+      },
     ],
   },
 };
