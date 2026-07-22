@@ -1,7 +1,8 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
-import { Table, Select, Space, Card } from "antd";
+import { Table, Select, Card } from "antd";
 import { FrownOutlined, CopyOutlined } from "@ant-design/icons";
+import RefreshButton from "@/components/common/RefreshButton";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { formatDate, getChainName, BRIDGE_STATUS_OPTIONS, handleCopyToClipboard, getExplorerUrl, mergePendingDeposits } from "@/lib/bridge/utils";
 import { renderTruncatedAddressWithCopy } from "@/lib/bridge/components";
@@ -20,6 +21,9 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
   const [selectedChainId, setSelectedChainId] = useState<number>(0);
   const [selectedType, setSelectedType] = useState<'bridge' | 'save' | 'forge' | ''>('');
   const [transactions, setTransactions] = useState<DepositTransaction[]>([]);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const prevRefreshTrigger = useRef(refreshTrigger);
   const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter((o) => o.value !== 4);
 
   const {
@@ -43,6 +47,10 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
   useEffect(() => {
     const loadTransactions = async () => {
       try {
+        if (refreshTrigger !== prevRefreshTrigger.current) {
+          setIsRefreshing(true);
+          prevRefreshTrigger.current = refreshTrigger;
+        }
         const params: Record<string, string> = {
           limit: ITEMS_PER_PAGE.toString(),
           offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
@@ -83,13 +91,16 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         console.error("Error loading transactions:", error);
         setTransactions([]);
         setTotalCount(0);
+      } finally {
+        setIsRefreshing(false);
       }
     };
 
     loadTransactions();
-  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, selectedType, depositRefreshKey]);
+  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, selectedType, depositRefreshKey, refreshTrigger]);
 
-  
+  const handleRefresh = () => setRefreshTrigger((prev) => prev + 1);
+
 
   const columns = [
     {
@@ -221,64 +232,71 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
 
   return (
     <div className="space-y-4 ant-table-themed">
-      <Card className="bg-card rounded-xl shadow-sm border border-border">
-        <Space 
-          size="large" 
-          direction={isMobile ? "vertical" : "horizontal"} 
-          className={isMobile ? "w-full" : ""}
-          style={isMobile ? { width: '100%' } : {}}
-        >
-          <div className={isMobile ? "w-full" : ""}>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              Type
-            </label>
-            <Select
-              value={selectedType || ''}
-              onChange={(v) => {
-                setSelectedType(v === '' ? '' : v as 'bridge' | 'save' | 'forge');
-                setCurrentPage(1);
-              }}
-              style={{ width: isMobile ? '100%' : 150 }}
-              options={[
-                { value: '', label: 'All Types' },
-                { value: 'bridge', label: 'Bridge' },
-                { value: 'save', label: 'Earn' },
-                { value: 'forge', label: 'Metal' },
-              ]}
-            />
-          </div>
-          <div className={isMobile ? "w-full" : ""}>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              Status Filter
-            </label>
-            <Select
-              value={depositStatus || 0}
-              onChange={(v) => {
-                setDepositStatus(v || 0);
-                setCurrentPage(1);
-              }}
-              style={{ width: isMobile ? '100%' : 150 }}
-              options={DEPOSIT_STATUS_OPTIONS}
-            />
-          </div>
-          <div className={isMobile ? "w-full" : ""}>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              Chain Filter
-            </label>
-            <Select
-              value={selectedChainId || 0}
-              onChange={(v) => {
-                setSelectedChainId(v || 0);
-                setCurrentPage(1);
-              }}
-              style={{ width: isMobile ? '100%' : 150 }}
-              options={[
+      <Card className="bg-card rounded-xl shadow-sm border border-border [&_.ant-card-body]:p-3 md:[&_.ant-card-body]:p-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div className={isMobile ? "grid w-full grid-cols-2 gap-2.5" : "flex flex-wrap items-end gap-4"}>
+            <div className={isMobile ? "min-w-0" : ""}>
+              <label className="mb-1 block text-xs font-medium text-foreground md:text-sm">
+                Type
+              </label>
+              <Select
+                value={selectedType || ''}
+                onChange={(v) => {
+                  setSelectedType(v === '' ? '' : v as 'bridge' | 'save' | 'forge');
+                  setCurrentPage(1);
+                }}
+                size={isMobile ? "middle" : "large"}
+                style={{ width: isMobile ? '100%' : 150 }}
+                options={[
+                  { value: '', label: 'All Types' },
+                  { value: 'bridge', label: 'Bridge' },
+                  { value: 'save', label: 'Earn' },
+                  { value: 'forge', label: 'Metal' },
+                ]}
+              />
+            </div>
+            <div className={isMobile ? "min-w-0" : ""}>
+              <label className="mb-1 block text-xs font-medium text-foreground md:text-sm">
+                Status
+              </label>
+              <Select
+                value={depositStatus || 0}
+                onChange={(v) => {
+                  setDepositStatus(v || 0);
+                  setCurrentPage(1);
+                }}
+                size={isMobile ? "middle" : "large"}
+                style={{ width: isMobile ? '100%' : 150 }}
+                options={DEPOSIT_STATUS_OPTIONS}
+              />
+            </div>
+            <div className={isMobile ? "col-span-2 min-w-0" : ""}>
+              <label className="mb-1 block text-xs font-medium text-foreground md:text-sm">
+                Chain
+              </label>
+              <Select
+                value={selectedChainId || 0}
+                onChange={(v) => {
+                  setSelectedChainId(v || 0);
+                  setCurrentPage(1);
+                }}
+                size={isMobile ? "middle" : "large"}
+                style={{ width: isMobile ? '100%' : 150 }}
+                options={[
                   { value: 0, label: "All Chains" },
-                ...availableNetworks.map((n) => ({ value: parseInt(n.chainId), label: n.chainName }))
-              ]}
+                  ...availableNetworks.map((n) => ({ value: parseInt(n.chainId), label: n.chainName }))
+                ]}
+              />
+            </div>
+          </div>
+          <div className={isMobile ? "flex justify-end" : "shrink-0"}>
+            <RefreshButton
+              onRefresh={handleRefresh}
+              loading={isRefreshing}
+              className={isMobile ? "!h-8 !rounded-lg !px-3 !text-xs" : undefined}
             />
           </div>
-        </Space>
+        </div>
       </Card>
       
       <div className="bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
