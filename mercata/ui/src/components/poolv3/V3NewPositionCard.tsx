@@ -46,6 +46,27 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
   // is the domain ceiling/floor, so anchoring ranges to it produces nonsense
   const priceEdge = priceDomainEdge(pool);
 
+  // Value-weighted composition of the pool's holdings: both balances valued in
+  // token1 terms via the oracle pair price (falling back to the pool price), so
+  // the proportions compare value, not raw token counts. Makes a drained /
+  // one-sided pool visible at a glance.
+  const composition = useMemo(() => {
+    try {
+      const bal0 = BigInt(pool.token0Balance);
+      const bal1 = BigInt(pool.token1Balance);
+      if (bal0 === 0n && bal1 === 0n) return null;
+      const oracleWad = BigInt(pool.oraclePriceWad || "0");
+      const pairPriceWad = oracleWad > 0n ? oracleWad : BigInt(pool.priceWad);
+      const value0 = (bal0 * pairPriceWad) / 10n ** 18n;
+      const total = value0 + bal1;
+      if (total === 0n) return null;
+      const pct0 = Number((value0 * 10000n) / total) / 100;
+      return { pct0, pct1: 100 - pct0 };
+    } catch {
+      return null;
+    }
+  }, [pool.token0Balance, pool.token1Balance, pool.oraclePriceWad, pool.priceWad]);
+
   const [tickLower, setTickLower] = useState<number | null>(null);
   const [tickUpper, setTickUpper] = useState<number | null>(null);
   const [priceLowerInput, setPriceLowerInput] = useState("");
@@ -297,6 +318,31 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">New position</h3>
       </div>
+
+      {/* Pool composition: value-weighted share of each token currently held by the pool */}
+      {composition && (
+        <div className="space-y-1">
+          <span className="text-xs text-muted-foreground">Pool composition</span>
+          <div className="flex h-2 rounded-full overflow-hidden bg-muted">
+            <div className="bg-strato-blue" style={{ width: `${composition.pct0}%` }} />
+            <div className="bg-amber-500" style={{ width: `${composition.pct1}%` }} />
+          </div>
+          <div className="flex justify-between gap-2 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-strato-blue flex-shrink-0" />
+              <span className="truncate">
+                {formatTokenAmount(pool.token0Balance, pool.token0.decimals)} {pool.token0.symbol} ({composition.pct0.toFixed(1)}%)
+              </span>
+            </span>
+            <span className="flex items-center gap-1 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+              <span className="truncate">
+                {formatTokenAmount(pool.token1Balance, pool.token1.decimals)} {pool.token1.symbol} ({composition.pct1.toFixed(1)}%)
+              </span>
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Price range (token1 per token0) */}
       <div className="space-y-2">

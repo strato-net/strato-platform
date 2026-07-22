@@ -11,6 +11,7 @@ interface MobileNavItem {
   label: string;
   path: string;
   adminOnly?: boolean;
+  badge?: string;
 }
 
 interface MobileNavCategory {
@@ -57,7 +58,7 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
       label: 'PRO',
       items: [
         { icon: <Droplets size={20} />, label: 'Advanced', path: '/dashboard/advanced' },
-        { icon: <Droplets size={20} />, label: 'V3 Liquidity', path: '/dashboard/v3-liquidity' },
+        { icon: <Droplets size={20} />, label: 'V3 Liquidity', path: '/dashboard/v3-liquidity', badge: 'New' },
         { icon: <Activity size={20} />, label: 'Activity Feed', path: '/dashboard/activity' },
         { icon: <BarChart3 size={20} />, label: 'Analytics', path: '/dashboard/stats' },
         { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
@@ -129,6 +130,11 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
                           >
                             <span className={`flex-shrink-0 ${active ? 'text-primary' : ''}`}>{item.icon}</span>
                             <span className={`ml-3 ${active ? 'font-semibold' : ''}`}>{item.label}</span>
+                            {item.badge && (
+                              <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+                                {item.badge}
+                              </span>
+                            )}
                           </Link>
                         </li>
                       );
