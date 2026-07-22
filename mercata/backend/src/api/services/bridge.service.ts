@@ -486,7 +486,7 @@ const decodeAbiString = (value: unknown): string => {
   }
 };
 
-const getDepositRouterMajor = async (
+export const getDepositRouterMajor = async (
   chainId: string,
   depositRouter: string
 ): Promise<number | null> => {
@@ -506,7 +506,10 @@ const getDepositRouterMajor = async (
         },
         { timeout: 10_000 }
       );
-      const major = Number(decodeAbiString(data?.result).split(".")[0]);
+      if (data?.error) continue;
+      const version = decodeAbiString(data?.result);
+      if (!version) continue;
+      const major = Number(version.split(".")[0]);
       if (Number.isInteger(major)) return major;
     } catch {
       continue;

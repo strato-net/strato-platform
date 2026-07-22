@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import axios from "axios";
 import { constants } from "../../config/constants";
-import { buildDepositActionCatalog } from "./bridge.service";
+import * as rpcConfig from "../../config/rpc.config";
+import { buildDepositActionCatalog, getDepositRouterMajor } from "./bridge.service";
 import type { BridgeToken } from "@mercata/shared-types";
 
 const route = (
@@ -116,4 +118,30 @@ test("builds actions only for eligible routes and configured products", () => {
   assert.equal(saveOnlyActions.filter(({ payToken, action }) => payToken === usdc && action === 3).length, 1);
 
   assert.deepEqual(buildDepositActionCatalog({ ...base, actionChainIds: new Set() }), []);
+});
+
+const encodeAbiString = (value: string): string => {
+  const hex = Buffer.from(value, "utf8").toString("hex");
+  const length = value.length.toString(16).padStart(64, "0");
+  const padded = hex.padEnd(Math.ceil(Math.max(hex.length, 1) / 64) * 64, "0");
+  return `0x${"20".padStart(64, "0")}${length}${padded}`;
+};
+
+test("getDepositRouterMajor tries the fallback RPC when the primary returns a JSON-RPC error", async (t) => {
+  const upstream = "http://primary.invalid";
+  const fallback = "http://fallback.invalid";
+  t.mock.method(rpcConfig, "getRpcUpstream", () => ({ upstream, fallback }));
+
+  const calls: string[] = [];
+  t.mock.method(axios, "post", (async (url: string) => {
+    calls.push(url);
+    if (url === upstream) {
+      return { data: { jsonrpc: "2.0", id: 1, error: { code: -32000, message: "execution reverted" } } };
+    }
+    return { data: { jsonrpc: "2.0", id: 1, result: encodeAbiString("3.0.1") } };
+  }) as typeof axios.post);
+
+  const major = await getDepositRouterMajor("1", "0x1111111111111111111111111111111111111111");
+  assert.equal(major, 3);
+  assert.deepEqual(calls, [upstream, fallback]);
 });
