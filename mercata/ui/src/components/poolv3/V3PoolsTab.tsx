@@ -18,7 +18,12 @@ interface PairGroup {
   token1: PoolV3["token1"];
   pools: PoolV3[]; // fee tiers, deepest liquidity first
   tvl: number;
+  volume24h: number;
+  bestApy: number;
 }
+
+const formatUsd = (value: number): string =>
+  `$${(value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
 const TokenPairIcons = ({ token0, token1 }: { token0: PoolV3["token0"]; token1: PoolV3["token1"] }) => (
   <div className="flex -space-x-1.5">
@@ -51,6 +56,8 @@ const groupByPair = (pools: PoolV3[]): PairGroup[] => {
     if (existing) {
       existing.pools.push(pool);
       existing.tvl += pool.totalLiquidityUSD;
+      existing.volume24h += pool.volume24hUSD || 0;
+      existing.bestApy = Math.max(existing.bestApy, pool.apy || 0);
     } else {
       groups.set(key, {
         key,
@@ -58,6 +65,8 @@ const groupByPair = (pools: PoolV3[]): PairGroup[] => {
         token1: pool.token1,
         pools: [pool],
         tvl: pool.totalLiquidityUSD,
+        volume24h: pool.volume24hUSD || 0,
+        bestApy: pool.apy || 0,
       });
     }
   }
@@ -141,9 +150,13 @@ const V3PoolsTab = ({ pools, loading, onMinted }: V3PoolsTabProps) => {
                   </span>
                 </div>
               </div>
-              <span className="text-xs text-muted-foreground flex-shrink-0">
-                ${group.tvl.toLocaleString(undefined, { maximumFractionDigits: 0 })} TVL
-              </span>
+              <div className="flex flex-col items-end flex-shrink-0 text-xs">
+                <span className="text-muted-foreground">{formatUsd(group.tvl)} TVL</span>
+                <span className="text-muted-foreground">{formatUsd(group.volume24h)} 24h vol</span>
+                {group.bestApy > 0 && (
+                  <span className="text-green-600 font-medium">up to {group.bestApy.toFixed(2)}% APY</span>
+                )}
+              </div>
             </button>
           ))}
         </div>
@@ -172,9 +185,19 @@ const V3PoolsTab = ({ pools, loading, onMinted }: V3PoolsTabProps) => {
                         : "border-border hover:bg-muted/50"
                     }`}
                   >
-                    <div className="text-sm font-medium">{pool.fee / 10000}%</div>
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-sm font-medium">{pool.fee / 10000}%</span>
+                      {(pool.apy || 0) > 0 && (
+                        <span className="text-[11px] text-green-600 font-medium whitespace-nowrap">
+                          {pool.apy.toFixed(2)}% APY
+                        </span>
+                      )}
+                    </div>
                     <div className="text-[11px] text-muted-foreground">
-                      ${pool.totalLiquidityUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })} TVL
+                      {formatUsd(pool.totalLiquidityUSD)} TVL
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {formatUsd(pool.volume24hUSD)} 24h vol
                     </div>
                   </button>
                 ))}

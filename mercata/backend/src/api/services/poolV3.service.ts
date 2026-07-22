@@ -12,9 +12,11 @@ import {
   POOL_V3_SELECT_FIELDS,
   POOL_V3_TICK_SELECT_FIELDS,
   POOL_V3_POSITION_SELECT_FIELDS,
+  POOL_V3_SWAP_HISTORY_SELECT_FIELDS,
   V3_DEADLINE_SECONDS,
 } from "../../config/poolV3Constants";
 import * as v3 from "../helpers/poolV3Math.helper";
+import { toUTCTime } from "../helpers/cirrusHelpers";
 import { getOraclePrices } from "./oracle.service";
 import {
   PoolV3,
@@ -28,12 +30,14 @@ import {
   PoolV3CollectParams,
   PoolV3CreateParams,
   TransactionResponse,
+  SwapHistoryEntry,
 } from "@mercata/shared-types";
 
 const {
   PoolV3: PoolV3Table,
   PoolV3Ticks,
   PoolV3Positions,
+  PoolV3SwapEvent,
 } = POOL_V3_CONTRACTS;
 
 const normalizeAddress = (address: string): string => address.toLowerCase().replace(/^0x/, "");
@@ -95,6 +99,7 @@ interface RawV3Pool {
 
 interface RawV3Tick {
   key: string; // tick index (mapping key)
+  block_number: string; // latest write — disambiguates ghost rows for the same tick
   liquidityNet: string;
   liquidityGross: string;
   initialized: string; // "true" | "false" — read from the value JSONB via ->>, so it is text
@@ -114,6 +119,16 @@ interface RawV3Position {
   feeGrowthInside1LastX128: string | null;
 }
 
+interface RawV3SwapEvent {
+  address: string; // pool the swap executed in
+  id: number;
+  block_timestamp: string;
+  sender: string;
+  recipient: string;
+  amount0: string; // signed delta: positive = paid to the pool (input side)
+  amount1: string;
+}
+
 // ============================================================================
 // BUILDERS
 // ============================================================================
@@ -126,7 +141,46 @@ const buildToken = (raw: RawV3Token): PoolV3Token => ({
   image: raw.images?.[0]?.value,
 });
 
-const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>): PoolV3 => {
+/** Per-pool 24h swap input sums, in token terms (token0-in and token1-in separately) */
+interface SwapInputs24h {
+  in0: bigint;
+  in1: bigint;
+}
+
+/**
+ * 24h swap inputs per pool from the Swap event table. Each event's positive signed
+ * delta is the trade's input side; summing per token lets the caller value the
+ * volume at oracle prices.
+ */
+const fetchSwapInputs24h = async (
+  accessToken: string,
+  poolAddresses: string[]
+): Promise<Map<string, SwapInputs24h>> => {
+  const sums = new Map<string, SwapInputs24h>();
+  if (poolAddresses.length === 0) return sums;
+  try {
+    const { data } = await cirrus.get(accessToken, `/${PoolV3SwapEvent}`, {
+      params: {
+        address: `in.(${poolAddresses.join(",")})`,
+        select: "address,amount0,amount1",
+        block_timestamp: `gte.${toUTCTime(new Date(Date.now() - 24 * 60 * 60 * 1000))}`,
+      },
+    });
+    for (const ev of (data as { address: string; amount0: string; amount1: string }[]) ?? []) {
+      const amount0 = toBigIntOrUndefined(ev.amount0) ?? 0n;
+      const amount1 = toBigIntOrUndefined(ev.amount1) ?? 0n;
+      const cur = sums.get(ev.address) || { in0: 0n, in1: 0n };
+      if (amount0 > 0n) cur.in0 += amount0;
+      else if (amount1 > 0n) cur.in1 += amount1;
+      sums.set(ev.address, cur);
+    }
+  } catch {
+    // the event table is created lazily on the first swap — no swaps means zero volume
+  }
+  return sums;
+};
+
+const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>, swapInputs?: SwapInputs24h): PoolV3 => {
   const priceWad = v3.sqrtPriceX96ToPriceWad(BigInt(raw.sqrtPriceX96));
   const usd = (tokenAddress: string, balance: string): number => {
     const price = priceMap.get(tokenAddress);
@@ -137,6 +191,19 @@ const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>): PoolV3 => {
   const price0 = BigInt(priceMap.get(raw.token0.address) ?? "0");
   const price1 = BigInt(priceMap.get(raw.token1.address) ?? "0");
   const oraclePriceWad = price0 > 0n && price1 > 0n ? (price0 * 10n ** 18n) / price1 : 0n;
+
+  const totalLiquidityUSD = usd(raw.token0.address, raw.token0Balance) + usd(raw.token1.address, raw.token1Balance);
+  const volume24hUSD = swapInputs
+    ? usd(raw.token0.address, swapInputs.in0.toString()) + usd(raw.token1.address, swapInputs.in1.toString())
+    : 0;
+  // LP fee yield: the fee tier is in pips (1e6 denominator); the protocol cut
+  // (packed denominators d0 + (d1 << 4), 0 = off) is deducted from what LPs keep
+  const d0 = Number(raw.feeProtocol) % 16;
+  const d1 = Math.floor(Number(raw.feeProtocol) / 16);
+  const lpFraction = 1 - ((d0 > 0 ? 1 / d0 : 0) + (d1 > 0 ? 1 / d1 : 0)) / 2;
+  const fees24hUSD = volume24hUSD * (Number(raw.fee) / 1e6) * lpFraction;
+  const apy = totalLiquidityUSD > 0 ? Math.max(0, (fees24hUSD / totalLiquidityUSD) * 365 * 100) : 0;
+
   return {
     address: raw.address,
     token0: buildToken(raw.token0),
@@ -153,7 +220,9 @@ const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>): PoolV3 => {
     feeProtocol: Number(raw.feeProtocol),
     protocolFees0: raw.protocolFees0,
     protocolFees1: raw.protocolFees1,
-    totalLiquidityUSD: usd(raw.token0.address, raw.token0Balance) + usd(raw.token1.address, raw.token1Balance),
+    totalLiquidityUSD,
+    volume24hUSD,
+    apy,
     isPaused: raw.isPaused,
     isDisabled: raw.isDisabled,
     poolName: `${raw.token0._symbol}/${raw.token1._symbol} ${Number(raw.fee) / 10000}%`,
@@ -185,11 +254,14 @@ const attachPrices = async (accessToken: string, rawPools: RawV3Pool[]): Promise
   const tokenAddresses = [
     ...new Set(rawPools.flatMap((p) => [p.token0.address, p.token1.address])),
   ];
-  const priceMap = await getOraclePrices(accessToken, {
-    select: "asset:key,price:value::text",
-    key: `in.(${tokenAddresses.join(",")})`,
-  });
-  return rawPools.map((raw) => buildPool(raw, priceMap));
+  const [priceMap, swapInputs] = await Promise.all([
+    getOraclePrices(accessToken, {
+      select: "asset:key,price:value::text",
+      key: `in.(${tokenAddresses.join(",")})`,
+    }),
+    fetchSwapInputs24h(accessToken, rawPools.map((p) => p.address)),
+  ]);
+  return rawPools.map((raw) => buildPool(raw, priceMap, swapInputs.get(raw.address)));
 };
 
 export const getPools = async (accessToken: string): Promise<PoolV3[]> => {
@@ -236,6 +308,100 @@ export const getPoolTokenPairs = async (
   return pairs;
 };
 
+/**
+ * The newest `maxRows` swaps for a token pair across ALL of its V3 pools (every fee
+ * tier, either token order), plus the pair's total V3 swap count. Feeds the unified
+ * V2+V3 pair history endpoint in swapping.service, which merge-sorts the venues and
+ * paginates — hence top-N rather than page/offset here (a correct merged page K needs
+ * the top K of each source).
+ *
+ * Entries use the V2 SwapHistoryEntry shape plus poolAddress/poolName/fee so the
+ * table can show which pool each swap executed in. The event's amount0/amount1 are
+ * the pool's signed deltas (positive = paid to the pool), so the sign of amount0
+ * determines the trade direction. impliedPrice is normalized to tokenB-per-tokenA in
+ * the REQUESTED pair order, so rows from pools with flipped token0/token1 ordering
+ * still quote the same way.
+ */
+export const fetchPairSwapHistory = async (
+  accessToken: string,
+  tokenA: string,
+  tokenB: string,
+  maxRows: number,
+  senderAddress?: string
+): Promise<{ entries: SwapHistoryEntry[]; totalCount: number }> => {
+  const a = normalizeAddress(tokenA);
+  const b = normalizeAddress(tokenB);
+
+  // raw rows rather than getPoolsByPair: history must include disabled pools' past
+  // swaps, and the symbols/fee needed here don't require the oracle price pass
+  const rawPools = await fetchRawPools(accessToken, {
+    or: `(and(token0.eq.${a},token1.eq.${b}),and(token0.eq.${b},token1.eq.${a}))`,
+  });
+  if (rawPools.length === 0) return { entries: [], totalCount: 0 };
+  const poolByAddress = new Map(rawPools.map((p) => [p.address, p]));
+
+  // either side of the trade counts as the user's (the pool pays out to `recipient`)
+  const senderFilter = senderAddress
+    ? { or: `(sender.eq.${normalizeAddress(senderAddress)},recipient.eq.${normalizeAddress(senderAddress)})` }
+    : {};
+  const eventFilters = {
+    address: `in.(${rawPools.map((p) => p.address).join(",")})`,
+    ...senderFilter,
+  };
+
+  const [eventsResponse, countResponse] = await Promise.all([
+    cirrus.get(accessToken, `/${PoolV3SwapEvent}`, {
+      params: {
+        ...eventFilters,
+        select: POOL_V3_SWAP_HISTORY_SELECT_FIELDS.join(","),
+        order: "block_timestamp.desc",
+        limit: maxRows.toString(),
+      },
+    }),
+    cirrus.get(accessToken, `/${PoolV3SwapEvent}`, {
+      params: { ...eventFilters, select: "count()" },
+    }),
+  ]);
+
+  const swapEvents = eventsResponse.data;
+  const totalCount = countResponse.data?.[0]?.count || 0;
+  if (!Array.isArray(swapEvents)) return { entries: [], totalCount: 0 };
+
+  const entries: SwapHistoryEntry[] = (swapEvents as RawV3SwapEvent[]).flatMap((event) => {
+    const pool = poolByAddress.get(event.address);
+    if (!pool) return [];
+    const amount0 = toBigIntOrUndefined(event.amount0) ?? 0n;
+    const amount1 = toBigIntOrUndefined(event.amount1) ?? 0n;
+    const zeroForOne = amount0 > 0n;
+    const amountIn = zeroForOne ? amount0 : amount1;
+    const amountOut = -(zeroForOne ? amount1 : amount0);
+    const token0Amount = zeroForOne ? amountIn : amountOut;
+    const token1Amount = zeroForOne ? amountOut : amountIn;
+    // execution price as tokenB per tokenA in the requested order (V2's "TokenB/TokenA")
+    const [baseAmount, quoteAmount] =
+      pool.token0.address === a ? [token0Amount, token1Amount] : [token1Amount, token0Amount];
+    const impliedPrice =
+      baseAmount > 0n && quoteAmount > 0n
+        ? (Number((quoteAmount * 10n ** 18n) / baseAmount) / 1e18).toFixed(6)
+        : "0.00";
+    return [{
+      id: event.id,
+      timestamp: new Date(event.block_timestamp),
+      tokenIn: zeroForOne ? pool.token0._symbol : pool.token1._symbol,
+      tokenOut: zeroForOne ? pool.token1._symbol : pool.token0._symbol,
+      amountIn: amountIn.toString(),
+      amountOut: amountOut.toString(),
+      impliedPrice,
+      sender: event.sender,
+      poolAddress: pool.address,
+      poolName: `V3 ${Number(pool.fee) / 10000}%`,
+      fee: Number(pool.fee),
+    }];
+  });
+
+  return { entries, totalCount };
+};
+
 const fetchInitializedTicks = async (accessToken: string, poolAddress: string): Promise<v3.TickData[]> => {
   try {
     const { data } = await cirrus.get(accessToken, `/${PoolV3Ticks}`, {
@@ -246,7 +412,26 @@ const fetchInitializedTicks = async (accessToken: string, poolAddress: string): 
         select: POOL_V3_TICK_SELECT_FIELDS.join(","),
       },
     });
-    return (data as RawV3Tick[])
+    // The table can hold ghost rows per tick: zero-valued rows materialized by reads,
+    // sometimes in the SAME block as the real write (observed on node5). Keep one row
+    // per tick — newest block wins, and within a block a real (initialized) write beats
+    // a zeroed ghost. A duplicated initialized tick would otherwise be crossed twice
+    // in the swap simulation.
+    const betterRow = (a: RawV3Tick, b: RawV3Tick): RawV3Tick => {
+      const blockA = Number(a.block_number || 0);
+      const blockB = Number(b.block_number || 0);
+      if (blockA !== blockB) return blockA > blockB ? a : b;
+      if (String(a.initialized) === "true" && String(b.initialized) !== "true") return a;
+      if (String(b.initialized) === "true" && String(a.initialized) !== "true") return b;
+      return a;
+    };
+    const newestByTick = new Map<number, RawV3Tick>();
+    for (const t of data as RawV3Tick[]) {
+      const tick = Number(t.key);
+      const prev = newestByTick.get(tick);
+      newestByTick.set(tick, prev ? betterRow(prev, t) : t);
+    }
+    return [...newestByTick.values()]
       .filter((t) => String(t.initialized) === "true" && t.liquidityNet != null)
       .map((t) => ({
         tick: Number(t.key),

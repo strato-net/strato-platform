@@ -34,6 +34,10 @@ export interface PoolV3 {
   protocolFees0: string;
   protocolFees1: string;
   totalLiquidityUSD: number;
+  /** 24h trading volume in USD (input side of each swap, valued at oracle prices) */
+  volume24hUSD: number;
+  /** annualized LP fee yield in percent, from the last 24h of fees vs TVL */
+  apy: number;
   isPaused: boolean;
   isDisabled: boolean;
   poolName: string;

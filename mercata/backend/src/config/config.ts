@@ -48,7 +48,6 @@ export const poolConfigurator = process.env.POOL_CONFIGURATOR || "00000000000000
 export const lendingRegistry = process.env.LENDING_REGISTRY || "0000000000000000000000000000000000001007";
 export const mercataBridge = process.env.MERCATA_BRIDGE || "0000000000000000000000000000000000001008";
 export const poolFactory = process.env.POOL_FACTORY || "000000000000000000000000000000000000100a";
-export const poolV3Factory = process.env.POOL_V3_FACTORY || "e580220495de32ac58eb0b8717989f338c3cef34";
 export const tokenFactory = process.env.TOKEN_FACTORY || "000000000000000000000000000000000000100b";
 export const adminRegistry = process.env.ADMIN_REGISTRY || "000000000000000000000000000000000000100c";
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
@@ -117,6 +116,11 @@ export const defaultReferralServiceFor: Record<string, string> = {
 export const defaultVaultFactoryFor: Record<string, string> = {
   "114784819836269": "37b446ec53607a0cdae38c820b838baf240a8b74", // Helium testnet
   "33056204878082667": "55c77951e9cadc73af24ec18881d01fedff1f1f1" // Upquark mainnet
+};
+
+export const defaultPoolV3FactoryFor: Record<string, string> = {
+  "114784819836269": "e580220495de32ac58eb0b8717989f338c3cef34", // Helium testnet
+  "33056204878082667": "" // Upquark mainnet
 };
 
 export const defaultStratoNativeBridgeFor: Record<string, string> = {
@@ -191,6 +195,7 @@ export let networkName: string | undefined;
 export let referralUrl: string | undefined;
 export let escrow: string = '';
 export let vaultFactory: string = '';
+export let poolV3Factory: string = '';
 export let metalForge: string = '';
 export let creditCardTopUp: string = '';
 export let vault: string = '';
@@ -239,6 +244,14 @@ function setVaultFactoryConfig(networkId: string) {
     vaultFactory = process.env.VAULT_FACTORY;
   } else {
     vaultFactory = defaultVaultFactoryFor[networkId];
+  }
+}
+
+function setPoolV3FactoryConfig(networkId: string) {
+  if (process.env.POOL_V3_FACTORY) {
+    poolV3Factory = process.env.POOL_V3_FACTORY;
+  } else {
+    poolV3Factory = defaultPoolV3FactoryFor[networkId] || "";
   }
 }
 
@@ -329,6 +342,7 @@ export async function initNetworkConfig() {
   setRewardsConfig(networkId);
   setReferralConfig(networkId);
   setVaultFactoryConfig(networkId);
+  setPoolV3FactoryConfig(networkId);
   setStratoNativeBridgeConfig(networkId);
   setStratoTokenConfig(networkId);
   setStratoStakingConfig(networkId);

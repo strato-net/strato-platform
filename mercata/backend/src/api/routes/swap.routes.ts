@@ -526,6 +526,47 @@ router.post("/swap/multi-token", walletAuth, SwappingController.swapMultiToken);
 
 /**
  * @openapi
+ * /swap-history/pair/{tokenAddress1}/{tokenAddress2}:
+ *   get:
+ *     summary: Unified swap history for a token pair across its V2 pools and all V3 fee tiers
+ *     tags: [Swap]
+ *     parameters:
+ *       - name: tokenAddress1
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - name: tokenAddress2
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - name: page
+ *         in: query
+ *         required: false
+ *         description: Page number (defaults to 1)
+ *         schema:
+ *           type: integer
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         description: Page size (defaults to 10)
+ *         schema:
+ *           type: integer
+ *       - name: sender
+ *         in: query
+ *         required: false
+ *         description: Filter to the user's trades (V3 matches sender or recipient)
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Paginated merged history; entries carry poolName ("V2" / "V3 0.3%")
+ */
+router.get("/swap-history/pair/:tokenAddress1/:tokenAddress2", authHandler.authorizeRequest(true), SwappingController.getPairSwapHistory);
+
+/**
+ * @openapi
  * /swap-history/{poolAddress}:
  *   get:
  *     summary: Retrieve swap history for a pool

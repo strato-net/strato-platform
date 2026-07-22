@@ -541,20 +541,26 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   // History operations
   const refreshSwapHistory = useCallback(
     async (params?: Record<string, string>) => {
-      const poolAddress = pool?.address;
-      if (!poolAddress) return;
-  
+      // Pair history covers both venues at once (V2 pools + every V3 fee tier, each
+      // row tagged with its pool); the per-pool endpoint remains as a fallback for
+      // callers that only set `pool` (e.g. FixedSwapWidget). The endpoint string
+      // doubles as the staleness key for the in-flight request.
+      const endpoint = fromAsset?.address && toAsset?.address
+        ? `/swap-history/pair/${fromAsset.address}/${toAsset.address}`
+        : (pool?.address ? `/swap-history/${pool.address}` : null);
+      if (!endpoint) return;
+
       historyAbortControllerRef.current?.abort();
       historyAbortControllerRef.current = new AbortController();
-  
-      currentAssetPairRef.current = poolAddress;
+
+      currentAssetPairRef.current = endpoint;
       setSwapHistoryLoading(true);
-  
+
       try {
-        const { data } = await api.get(`/swap-history/${poolAddress}`, { params });
-        
-        if (currentAssetPairRef.current !== poolAddress) return;
-        
+        const { data } = await api.get(endpoint, { params });
+
+        if (currentAssetPairRef.current !== endpoint) return;
+
         setSwapHistory(data.data.map((item: any) => ({
           ...item,
           timestamp: new Date(item.timestamp)
@@ -562,18 +568,18 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         setSwapHistoryCount(data.totalCount);
       } catch (err) {
         if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') return;
-        
-        if (currentAssetPairRef.current === poolAddress) {
+
+        if (currentAssetPairRef.current === endpoint) {
           setSwapHistory([]);
           setSwapHistoryCount(0);
         }
       } finally {
-        if (currentAssetPairRef.current === poolAddress) {
+        if (currentAssetPairRef.current === endpoint) {
           setSwapHistoryLoading(false);
         }
       }
     },
-    [pool?.address]
+    [pool?.address, fromAsset?.address, toAsset?.address]
   );
 
   // ============================================================================

@@ -796,7 +796,8 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
         subtitle: 'Classic pool',
         detail: hasEnteredAmount
           ? rateLine(v2Compare?.outWei, v2Compare?.inWei, false)
-          : tvlLine(Number(pool.totalLiquidityUSD)),
+          // V2 totalLiquidityUSD is wei-scaled (USD × 1e18), unlike V3's plain number
+          : tvlLine(Number(pool.totalLiquidityUSD) / 1e18),
         isBest: bestPoolId === 'v2',
       });
     }
@@ -1264,7 +1265,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
       setV3Quotes({});
       setSelectedV3PoolAddress(null);
 
-      if (!isV3) await refreshSwapHistory()
+      await refreshSwapHistory()
       // Refresh all contexts to ensure borrow page shows updated balances
       await Promise.all([
         fetchUsdstBalance(),

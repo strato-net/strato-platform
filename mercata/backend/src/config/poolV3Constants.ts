@@ -65,6 +65,9 @@ export const POOL_V3_SELECT_FIELDS = [
 // which return the field as text (BigInt-parseable, sign preserved).
 export const POOL_V3_TICK_SELECT_FIELDS = [
   "key",
+  // the ticks table can hold stale ghost rows per key (observed after a Cirrus
+  // rebuild) — block_number lets readers keep only the newest row per tick
+  "block_number",
   "liquidityNet:value->>liquidityNet",
   "liquidityGross:value->>liquidityGross",
   "initialized:value->>initialized",
@@ -86,6 +89,17 @@ export const POOL_V3_POSITION_SELECT_FIELDS = [
   // signed Q128 inside-growth snapshots as of the position's last touch
   "feeGrowthInside0LastX128:value->>feeGrowthInside0LastX128",
   "feeGrowthInside1LastX128:value->>feeGrowthInside1LastX128",
+] as const;
+
+/** Swap event rows for the trade-history table (amount0/amount1 are the pool's signed deltas) */
+export const POOL_V3_SWAP_HISTORY_SELECT_FIELDS = [
+  "address",
+  "id",
+  "block_timestamp",
+  "sender",
+  "recipient",
+  "amount0::text",
+  "amount1::text",
 ] as const;
 
 // ============================================================================

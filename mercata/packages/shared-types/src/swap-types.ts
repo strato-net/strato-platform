@@ -122,6 +122,11 @@ export interface SwapHistoryEntry {
   amountOut: string;
   impliedPrice: string;
   sender: string;
+  /** V3 pair-scoped history only: which pool (fee tier) the swap executed in */
+  poolAddress?: string;
+  poolName?: string;
+  /** fee tier in pips (e.g. 3000 = 0.3%) */
+  fee?: number;
 }
 
 /**
