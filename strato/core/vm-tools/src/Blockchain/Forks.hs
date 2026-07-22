@@ -27,10 +27,10 @@ upquarkNetworkID :: Integer
 upquarkNetworkID = 33056204878082667
 
 heliumReceiptsRootForkBlock :: Integer
-heliumReceiptsRootForkBlock = 70000
+heliumReceiptsRootForkBlock = 125000
 
 upquarkReceiptsRootForkBlock :: Integer
-upquarkReceiptsRootForkBlock = 100000
+upquarkReceiptsRootForkBlock = 150000
 
 isReceiptsRootForkActive :: Integer -> Bool
 isReceiptsRootForkActive blockNum =
