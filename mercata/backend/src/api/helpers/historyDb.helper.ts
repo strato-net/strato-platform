@@ -46,7 +46,7 @@ export function buildSnapshots(
         }
       } else if (validFrom <= startTimestamp) {
         for (let i = 0; i < snapshots.length; i++) {
-          if (snapshots[i].timestamp <= validTo) {
+          if (snapshots[i].timestamp < validTo) {
             snapshots[i].data = reducer(snapshots[i].data, h);
           } else {
             break;
@@ -64,11 +64,11 @@ export function buildSnapshots(
         for (let i = 0; i < snapshots.length; i++) {
           if (
             snapshots[i].timestamp >= validFrom &&
-            snapshots[i].timestamp <= validTo
+            snapshots[i].timestamp < validTo
           ) {
             snapshots[i].data = reducer(snapshots[i].data, h);
           }
-          if (snapshots[i].timestamp > validTo) {
+          if (snapshots[i].timestamp >= validTo) {
             break;
           }
         }

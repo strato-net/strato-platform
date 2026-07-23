@@ -13,6 +13,7 @@ import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
 import { getHistoryDirect, fetchActiveRequestIds, fetchVaultHistoryConfig } from "../helpers/historyDb.helper";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
+import { safeBigInt } from "../helpers/vaultPerformance.helper";
 
 const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, priceOracle } = constants;
 
@@ -568,7 +569,7 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
     let tokenPrice = token?.price || 0;
     const tokenBalance = token?.balance || 0;
     if (token?.scaledDebt) {
-      const rateAccumulator = Number(BigInt(token?.rateAccumulator) / 1000000000000000000n) / 1000000000;
+      const rateAccumulator = Number(safeBigInt(token?.rateAccumulator) / 1000000000000000000n) / 1000000000;
       const loanAmt = (token?.scaledDebt || 0) * rateAccumulator;
       netLoan += loanAmt;
     }
@@ -581,15 +582,15 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
       if (token?.userQueuedShares) {
         const supply = token?.supply || '0';
         if (supply !== '0') {
-          const deployed = BigInt(token?.deployedAssets || 0);
-          const claimable = BigInt(token?.totalClaimableAssets || 0);
-          const idle = BigInt(token?.idleAssets || 0);
+          const deployed = safeBigInt(token?.deployedAssets);
+          const claimable = safeBigInt(token?.totalClaimableAssets);
+          const idle = safeBigInt(token?.idleAssets);
           const cvTotal = idle + deployed;
           const cvActive = cvTotal > claimable ? cvTotal - claimable : 0n;
           if (cvActive > 0n) {
             const ulAsset = token?.underlyingAsset || '';
             const ulPrice = snapshot.data.tokens[ulAsset]?.price || 0;
-            const queuedAssets = Number((BigInt(Math.round(token.userQueuedShares)) * cvActive) / BigInt(supply));
+            const queuedAssets = Number((safeBigInt(Math.round(token.userQueuedShares).toString()) * cvActive) / safeBigInt(supply));
             netBalance += (queuedAssets / 1000000000) * (ulPrice / 1000000000);
           }
         }
@@ -610,49 +611,49 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
           totalSupply
         );
       } else if (managedAssets) { // sUSDST
-        tokenPrice = Number((managedAssets * BigInt(1e18)) / BigInt(totalSupply));
+        tokenPrice = Number((safeBigInt(managedAssets) * BigInt(1e18)) / safeBigInt(totalSupply));
       } else if (snapshot.data.vaultConfig?.shareToken === tokenAddr) { // Vault share token
         const supportedAssets: string[] = snapshot.data.vaultConfig?.supportedAssets || [];
         let totalEquity = 0n;
         for (const assetAddr of supportedAssets) {
-          const bal = BigInt(snapshot.data.tokens[assetAddr]?.vaultAssetBalance || 0) || 0n;
-          const assetPrice = BigInt(snapshot.data.tokens[assetAddr]?.price || 0) || 0n;
+          const bal = safeBigInt(snapshot.data.tokens[assetAddr]?.vaultAssetBalance);
+          const assetPrice = safeBigInt(snapshot.data.tokens[assetAddr]?.price);
           if (assetPrice > 0n) {
             totalEquity += (bal * assetPrice) / BigInt(1e18);
           }
         }
         if (totalEquity > 0n) {
-          tokenPrice = Number((totalEquity * BigInt(1e18)) / BigInt(totalSupply));
+          tokenPrice = Number((totalEquity * BigInt(1e18)) / safeBigInt(totalSupply));
         }
       } else if (snapshot.data.carryVaultAddrs?.has(tokenAddr)) {
-        const deployed = BigInt(token?.deployedAssets || 0);
-        const claimable = BigInt(token?.totalClaimableAssets || 0);
-        const idle = BigInt(token?.idleAssets || 0);
+        const deployed = safeBigInt(token?.deployedAssets);
+        const claimable = safeBigInt(token?.totalClaimableAssets);
+        const idle = safeBigInt(token?.idleAssets);
         const cvTotalAssets = idle + deployed;
         const cvActiveAssets = cvTotalAssets > claimable ? cvTotalAssets - claimable : 0n;
         const underlyingAsset = token?.underlyingAsset || '';
-        const assetPrice = BigInt(snapshot.data.tokens[underlyingAsset]?.price || 0) || 0n;
+        const assetPrice = safeBigInt(snapshot.data.tokens[underlyingAsset]?.price);
         if (cvActiveAssets > 0n && assetPrice > 0n) {
-          tokenPrice = Number((cvActiveAssets * assetPrice) / BigInt(totalSupply));
+          tokenPrice = Number((cvActiveAssets * assetPrice) / safeBigInt(totalSupply));
         }
       } else { // mUSDST
-        const borrowIndex = BigInt(token?.borrowIndex) || 0n;
+        const borrowIndex = safeBigInt(token?.borrowIndex);
         const borrowableAsset = token?.borrowableAsset || '';
-        const reservesAccrued = BigInt(token?.reservesAccrued) || 0n;
-        const totalScaledDebt = BigInt(token?.totalScaledDebt) || 0n;
-        const cash = BigInt(snapshot.data.tokens[token?.borrowableAsset || '']?.liquidityPoolBalance) || 0n;
+        const reservesAccrued = safeBigInt(token?.reservesAccrued);
+        const totalScaledDebt = safeBigInt(token?.totalScaledDebt);
+        const cash = safeBigInt(snapshot.data.tokens[token?.borrowableAsset || '']?.liquidityPoolBalance);
         const debt = (totalScaledDebt * borrowIndex) / BigInt(1e27);
-        const badDebt = token?.badDebt || 0n;
+        const badDebt = safeBigInt(token?.badDebt);
         let underlying = cash + debt + badDebt;
         if (reservesAccrued < underlying) {
             underlying -= reservesAccrued;
         } else {
             underlying = cash;
         }
-        if (underlying == 0) {
+        if (underlying == 0n) {
           tokenPrice = 1e18;
         } else {
-          tokenPrice = Number((underlying * BigInt(1e18)) / BigInt(totalSupply));
+          tokenPrice = Number((underlying * BigInt(1e18)) / safeBigInt(totalSupply));
         }
       }
     }
@@ -750,29 +751,40 @@ export const getNetBalanceHistory = async (
     stakedStrato: 0n, // Total staked STRATO (delegated + unbonding)
   };
 
-  const balanceHistory = await getHistoryDirect(
-    historyParams,
-    {
-      vaultShareToken: vaultConfig?.shareToken,
-      carryVaultAddrs,
-    },
-    {
-      userAddress,
-      botExecutor: vaultConfig?.botExecutor,
-      carryVaultAddrs,
-      requestFilters,
-      priceOracle,
-      stratoStakingAddress,
-      stratoTokenAddress,
-    },
-    vaultConfig,
-    initialData,
-    updatePortfolioInfoStorage,
-    updatePortfolioInfoMapping,
-    processBalanceSnapshot,
-  );
+  const [balanceHistory, currentBalance] = await Promise.all([
+    getHistoryDirect(
+      historyParams,
+      {
+        vaultShareToken: vaultConfig?.shareToken,
+        carryVaultAddrs,
+      },
+      {
+        userAddress,
+        botExecutor: vaultConfig?.botExecutor,
+        carryVaultAddrs,
+        requestFilters,
+        priceOracle,
+        stratoStakingAddress,
+        stratoTokenAddress,
+      },
+      vaultConfig,
+      initialData,
+      updatePortfolioInfoStorage,
+      updatePortfolioInfoMapping,
+      processBalanceSnapshot,
+    ),
+    getNetBalance(accessToken, userAddress),
+  ]);
 
-  return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.netBalance}));
+  const historyPoints = balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.netBalance}));
+
+  // Append current live data as final point to ensure graph ends at "now" with live prices
+  historyPoints.push({
+    timestamp: Date.now(),
+    balance: currentBalance.netBalance,
+  });
+
+  return historyPoints;
 };
 
 export const getBorrowingHistory = async (
