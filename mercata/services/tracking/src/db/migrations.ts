@@ -52,4 +52,15 @@ CREATE INDEX wallet_connections_strato_addr_idx
 CREATE INDEX wallet_connections_link_idx ON wallet_connections (link_id, connected_at);
 `,
   },
+  {
+    name: "002_session_geo",
+    sql: `
+ALTER TABLE tracking_sessions
+  ADD COLUMN ip_address  TEXT,
+  ADD COLUMN geo_country TEXT,
+  ADD COLUMN geo_city    TEXT,
+  ADD COLUMN geo_lat     DOUBLE PRECISION,
+  ADD COLUMN geo_lon     DOUBLE PRECISION;
+`,
+  },
 ];

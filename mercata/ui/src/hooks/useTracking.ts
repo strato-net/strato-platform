@@ -4,6 +4,7 @@ import {
   createTrackingLink,
   getTrackingLink,
   getTrackingMe,
+  getTrackingWallet,
   listTrackingLinks,
   setTrackingLinkActive,
   TrackingApiError,
@@ -14,6 +15,7 @@ export const trackingKeys = {
   me: ['tracking', 'me'] as const,
   links: ['tracking', 'links'] as const,
   link: (id: string) => ['tracking', 'links', id] as const,
+  wallet: (id: string, address: string) => ['tracking', 'links', id, 'wallets', address] as const,
 };
 
 // One cached probe per session; guests never hit the endpoint. A 401/403 is
@@ -57,6 +59,14 @@ export function useTrackingLink(id: string | undefined) {
     queryKey: trackingKeys.link(id ?? ''),
     queryFn: () => getTrackingLink(id!),
     enabled: !!id,
+  });
+}
+
+export function useTrackingWallet(linkId: string | undefined, address: string | null) {
+  return useQuery({
+    queryKey: trackingKeys.wallet(linkId ?? '', address ?? ''),
+    queryFn: () => getTrackingWallet(linkId!, address!),
+    enabled: !!linkId && !!address,
   });
 }
 

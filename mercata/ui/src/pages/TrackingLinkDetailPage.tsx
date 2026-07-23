@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ArrowLeft, Link2 } from 'lucide-react';
@@ -8,8 +9,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import CopyButton from '@/components/ui/copy';
 import ExplorerButton from '@/components/ui/explorer';
+import ActivitySummaryTiles from '@/components/tracking/ActivitySummaryTiles';
+import WalletDetailSheet from '@/components/tracking/WalletDetailSheet';
+import WorldMap from '@/components/tracking/WorldMap';
 import { useTrackingAccess, useTrackingLink } from '@/hooks/useTracking';
-import { formatUsd, TrackingApiError } from '@/lib/trackingApi';
+import {
+  ACTIVITY_CATEGORY_LABELS,
+  ACTIVITY_CATEGORY_ORDER,
+  formatUsd,
+  TrackingApiError,
+  TrackingWalletSummary,
+} from '@/lib/trackingApi';
 import { getStratoChain } from '@/lib/stratoChain';
 
 const shortAddress = (address: string) =>
@@ -48,11 +58,29 @@ const StatTile = ({ label, value }: { label: string; value: string | number }) =
   </div>
 );
 
-const ACTIVITY_KIND_LABELS: Record<string, string> = {
-  first_action: 'First action',
-  metal_purchase: 'Metal purchase',
-  swap: 'Swap',
-  other: 'Activity',
+// Compact per-wallet chips: top three non-zero categories, then a +N overflow
+const WalletActivityChips = ({ wallet }: { wallet: TrackingWalletSummary }) => {
+  const entries = ACTIVITY_CATEGORY_ORDER.filter(
+    (category) => (wallet.activitySummary[category] ?? 0) > 0
+  );
+  if (entries.length === 0) {
+    return <span className="text-xs text-muted-foreground">No activity</span>;
+  }
+  const shown = entries.slice(0, 3);
+  return (
+    <span className="flex flex-wrap gap-1">
+      {shown.map((category) => (
+        <Badge key={category} variant="secondary" className="text-[11px] font-normal">
+          {ACTIVITY_CATEGORY_LABELS[category]}: {wallet.activitySummary[category]}
+        </Badge>
+      ))}
+      {entries.length > shown.length && (
+        <Badge variant="outline" className="text-[11px] font-normal">
+          +{entries.length - shown.length} more
+        </Badge>
+      )}
+    </span>
+  );
 };
 
 const TrackingLinkDetailPage = () => {
@@ -60,6 +88,7 @@ const TrackingLinkDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const { authorized, isLoading: accessLoading } = useTrackingAccess();
   const link = useTrackingLink(authorized ? id : undefined);
+  const [selectedWallet, setSelectedWallet] = useState<string | null>(null);
 
   const notFound = link.error instanceof TrackingApiError && link.error.status === 404;
 
@@ -150,33 +179,81 @@ const TrackingLinkDetailPage = () => {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Connected wallets</CardTitle>
+                <CardTitle className="text-base">Activity summary</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  On-chain events attributed to this link.
+                </p>
               </CardHeader>
               <CardContent>
-                {link.data.connections.length === 0 ? (
+                <ActivitySummaryTiles summary={link.data.activitySummary} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Visitor locations</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Where this link was opened (excluding bots and previews).
+                </p>
+              </CardHeader>
+              <CardContent>
+                {link.data.geoPoints.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No location data yet — locations are recorded when the link is opened.
+                  </p>
+                ) : (
+                  <WorldMap points={link.data.geoPoints} />
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Wallets</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Click a wallet for its full activity history.
+                </p>
+              </CardHeader>
+              <CardContent>
+                {link.data.walletSummaries.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No wallets connected yet.</p>
                 ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>External wallet</TableHead>
-                        <TableHead>STRATO address</TableHead>
+                        <TableHead>Wallet</TableHead>
                         <TableHead>Connector</TableHead>
-                        <TableHead>Connected</TableHead>
+                        <TableHead>Activity</TableHead>
+                        <TableHead>Last activity</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {link.data.connections.map((conn, i) => (
-                        <TableRow key={i}>
+                      {link.data.walletSummaries.map((wallet) => (
+                        <TableRow
+                          key={wallet.address}
+                          className="cursor-pointer"
+                          onClick={() => setSelectedWallet(wallet.address)}
+                        >
                           <TableCell>
-                            <AddressCell address={conn.externalWalletAddress} />
+                            {/* Copy/explorer clicks must not open the sheet */}
+                            <div
+                              className="flex flex-col gap-0.5"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <AddressCell address={wallet.externalWalletAddress} />
+                              <AddressCell address={wallet.stratoAddress} />
+                            </div>
                           </TableCell>
+                          <TableCell>{wallet.connector ?? '—'}</TableCell>
                           <TableCell>
-                            <AddressCell address={conn.stratoAddress} />
+                            <WalletActivityChips wallet={wallet} />
                           </TableCell>
-                          <TableCell>{conn.connector ?? '—'}</TableCell>
                           <TableCell className="whitespace-nowrap text-muted-foreground">
-                            {format(new Date(conn.connectedAt), 'MMM d, yyyy HH:mm')}
+                            {wallet.lastActivityAt
+                              ? formatDistanceToNow(new Date(wallet.lastActivityAt), {
+                                  addSuffix: true,
+                                })
+                              : '—'}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -250,7 +327,9 @@ const TrackingLinkDetailPage = () => {
                       {link.data.activity.map((item, i) => (
                         <TableRow key={i}>
                           <TableCell>
-                            <Badge variant="outline">{ACTIVITY_KIND_LABELS[item.kind] ?? item.kind}</Badge>
+                            <Badge variant="outline">
+                              {ACTIVITY_CATEGORY_LABELS[item.category] ?? item.category}
+                            </Badge>
                           </TableCell>
                           <TableCell>{item.description}</TableCell>
                           <TableCell>
@@ -272,6 +351,14 @@ const TrackingLinkDetailPage = () => {
           </>
         ) : null}
       </div>
+
+      {id && (
+        <WalletDetailSheet
+          linkId={id}
+          address={selectedWallet}
+          onClose={() => setSelectedWallet(null)}
+        />
+      )}
     </div>
   );
 };

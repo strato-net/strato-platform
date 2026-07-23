@@ -2,6 +2,7 @@ import { config } from "../config";
 import { query } from "../db/pool";
 import { listLinks, publicUrlForSlug, TrackingLink } from "./linkService";
 import {
+  ActivityCategory,
   ActivityEvent,
   BridgeInEvent,
   fetchActivityEvents,
@@ -54,6 +55,45 @@ export interface LinkSummary {
   lastActivityAt: string | null;
 }
 
+export type ActivitySummary = Partial<Record<ActivityCategory, number>>;
+
+export interface GeoPoint {
+  lat: number;
+  lon: number;
+  city: string | null;
+  country: string | null;
+  count: number;
+}
+
+export interface WalletSummary {
+  // Primary identity key (external address if present, else STRATO address)
+  address: string;
+  externalWalletAddress: string | null;
+  stratoAddress: string | null;
+  connector: string | null;
+  connectedAt: string;
+  // Counts over the wallet's FULL on-chain activity (not attribution-filtered)
+  activitySummary: ActivitySummary;
+  lastActivityAt: string | null;
+}
+
+export interface ActivityItem {
+  category: ActivityCategory;
+  description: string;
+  address: string;
+  txHash: string | null;
+  at: string;
+}
+
+export interface BridgeInItem {
+  address: string;
+  asset: string;
+  amount: string;
+  amountUsd: number | null;
+  txHash: string | null;
+  at: string;
+}
+
 export interface LinkDetail extends LinkSummary {
   connections: {
     externalWalletAddress: string | null;
@@ -61,27 +101,40 @@ export interface LinkDetail extends LinkSummary {
     connector: string | null;
     connectedAt: string;
   }[];
-  bridgeIns: {
-    address: string;
-    asset: string;
-    amount: string;
-    amountUsd: number | null;
-    txHash: string | null;
-    at: string;
-  }[];
-  activity: {
-    kind: "first_action" | "metal_purchase" | "swap" | "other";
-    description: string;
-    address: string;
-    txHash: string | null;
-    at: string;
-  }[];
+  bridgeIns: BridgeInItem[];
+  // Attributed-to-this-link events only (the link's own metric)
+  activity: ActivityItem[];
+  activitySummary: ActivitySummary;
+  walletSummaries: WalletSummary[];
+  geoPoints: GeoPoint[];
+}
+
+export interface WalletDetail {
+  address: string;
+  addresses: string[];
+  externalWalletAddress: string | null;
+  stratoAddress: string | null;
+  connector: string | null;
+  connectedAt: string;
+  activitySummary: ActivitySummary;
+  bridgeIns: BridgeInItem[];
+  activity: ActivityItem[];
+}
+
+interface GeoRow {
+  link_id: string;
+  geo_lat: number;
+  geo_lon: number;
+  geo_city: string | null;
+  geo_country: string | null;
+  count: string;
 }
 
 interface AttributionSnapshot {
   links: TrackingLink[];
   connections: ConnectionRow[];
   sessionAggs: Map<string, SessionAgg>;
+  geoRows: GeoRow[];
   bridgeIns: BridgeInEvent[];
   activityEvents: ActivityEvent[];
   // eventKey -> winning (link, connection); one entry per chain event, ever
@@ -165,6 +218,14 @@ const buildSnapshot = async (): Promise<AttributionSnapshot> => {
   );
   const sessionAggs = new Map(sessionAggsResult.rows.map((r) => [String(r.link_id), r]));
 
+  const geoRowsResult = await query<GeoRow>(
+    `SELECT link_id, geo_lat, geo_lon, geo_city, geo_country, COUNT(*) AS count
+     FROM tracking_sessions
+     WHERE NOT is_bot_or_preview AND geo_lat IS NOT NULL AND geo_lon IS NOT NULL
+     GROUP BY link_id, geo_lat, geo_lon, geo_city, geo_country`
+  );
+  const geoRows = geoRowsResult.rows;
+
   const trackedConnections = connections.filter((c) => !c.is_bot_or_preview);
   const stratoAddresses = [
     ...new Set(trackedConnections.map((c) => c.strato_address).filter(Boolean)),
@@ -205,6 +266,7 @@ const buildSnapshot = async (): Promise<AttributionSnapshot> => {
     links,
     connections,
     sessionAggs,
+    geoRows,
     bridgeIns,
     activityEvents,
     assignments,
@@ -323,10 +385,109 @@ export const getLinkSummaries = async (): Promise<LinkSummary[]> => {
   return snapshot.links.map((link) => summarizeLink(snapshot, link));
 };
 
-const activityKind = (event: ActivityEvent): LinkDetail["activity"][number]["kind"] => {
-  if (event.contractName === "MetalForge") return "metal_purchase";
-  if (event.contractName === "Pool" && event.eventName === "Swap") return "swap";
-  return "other";
+const countByCategory = (events: ActivityEvent[], bridgeInCount: number): ActivitySummary => {
+  const summary: ActivitySummary = {};
+  if (bridgeInCount > 0) summary.bridge_in = bridgeInCount;
+  for (const event of events) {
+    summary[event.category] = (summary[event.category] ?? 0) + 1;
+  }
+  return summary;
+};
+
+const toBridgeInItem = (snapshot: AttributionSnapshot, b: BridgeInEvent): BridgeInItem => ({
+  address: b.stratoRecipient || b.externalSender,
+  asset: snapshot.tokenSymbols.get(b.stratoToken) ?? b.stratoToken.slice(0, 8),
+  amount: tokenAmount(b.stratoTokenAmount).toLocaleString("en-US", {
+    maximumFractionDigits: 6,
+  }),
+  amountUsd: (() => {
+    const price = snapshot.oraclePrices.get(b.stratoToken);
+    return price == null ? null : tokenAmount(b.stratoTokenAmount) * price;
+  })(),
+  txHash: b.txHash,
+  at: new Date(b.timestampMs).toISOString(),
+});
+
+const toActivityItem = (event: ActivityEvent): ActivityItem => ({
+  category: event.category,
+  description: `${event.contractName}: ${event.eventName}`,
+  address: event.userAddress,
+  txHash: null, // the unified Cirrus event table has no transaction_hash column
+  at: new Date(event.timestampMs).toISOString(),
+});
+
+interface WalletIdentity {
+  address: string;
+  externalWalletAddress: string | null;
+  stratoAddress: string | null;
+  connector: string | null;
+  connectedAt: Date;
+  addresses: Set<string>;
+}
+
+// Distinct wallet identities for a link, merging connection rows that share
+// an identity key (e.g. the ext-only row and the later ext+strato row).
+const walletIdentitiesForLink = (
+  snapshot: AttributionSnapshot,
+  linkId: string
+): WalletIdentity[] => {
+  const identities = new Map<string, WalletIdentity>();
+  for (const conn of snapshot.connections) {
+    if (String(conn.link_id) !== String(linkId) || conn.is_bot_or_preview) continue;
+    const key = walletKeyOf(conn);
+    let identity = identities.get(key);
+    if (!identity) {
+      identity = {
+        address: key,
+        externalWalletAddress: null,
+        stratoAddress: null,
+        connector: null,
+        connectedAt: conn.connected_at,
+        addresses: new Set(),
+      };
+      identities.set(key, identity);
+    }
+    if (conn.external_wallet_address) {
+      identity.externalWalletAddress = conn.external_wallet_address;
+      identity.addresses.add(conn.external_wallet_address);
+    }
+    if (conn.strato_address) {
+      identity.stratoAddress = conn.strato_address;
+      identity.addresses.add(conn.strato_address);
+    }
+    identity.connector = identity.connector ?? conn.connector;
+    if (conn.connected_at < identity.connectedAt) identity.connectedAt = conn.connected_at;
+  }
+  return [...identities.values()];
+};
+
+// Full (not attribution-filtered) on-chain history for a set of addresses
+const fullActivityFor = (snapshot: AttributionSnapshot, addresses: Set<string>) => {
+  const events = snapshot.activityEvents.filter((e) => addresses.has(e.userAddress));
+  const bridgeIns = snapshot.bridgeIns.filter(
+    (b) => addresses.has(b.stratoRecipient) || addresses.has(b.externalSender)
+  );
+  return { events, bridgeIns };
+};
+
+const summarizeWallet = (
+  snapshot: AttributionSnapshot,
+  identity: WalletIdentity
+): WalletSummary => {
+  const { events, bridgeIns } = fullActivityFor(snapshot, identity.addresses);
+  const timestamps = [
+    ...events.map((e) => e.timestampMs),
+    ...bridgeIns.map((b) => b.timestampMs),
+  ].filter(Number.isFinite);
+  return {
+    address: identity.address,
+    externalWalletAddress: identity.externalWalletAddress,
+    stratoAddress: identity.stratoAddress,
+    connector: identity.connector,
+    connectedAt: identity.connectedAt.toISOString(),
+    activitySummary: countByCategory(events, bridgeIns.length),
+    lastActivityAt: timestamps.length ? new Date(Math.max(...timestamps)).toISOString() : null,
+  };
 };
 
 export const getLinkDetail = async (linkId: string): Promise<LinkDetail | null> => {
@@ -344,38 +505,68 @@ export const getLinkDetail = async (linkId: string): Promise<LinkDetail | null> 
       connectedAt: c.connected_at.toISOString(),
     }));
 
-  const bridgeIns = snapshot.bridgeIns
-    .filter((b) => snapshot.assignments.get(b.eventKey)?.linkId === link.id)
-    .map((b) => ({
-      address: b.stratoRecipient || b.externalSender,
-      asset: snapshot.tokenSymbols.get(b.stratoToken) ?? b.stratoToken.slice(0, 8),
-      amount: tokenAmount(b.stratoTokenAmount).toLocaleString("en-US", {
-        maximumFractionDigits: 6,
-      }),
-      amountUsd: (() => {
-        const price = snapshot.oraclePrices.get(b.stratoToken);
-        return price == null ? null : tokenAmount(b.stratoTokenAmount) * price;
-      })(),
-      txHash: b.txHash,
-      at: new Date(b.timestampMs).toISOString(),
-    }));
-
+  const attributedBridgeIns = snapshot.bridgeIns.filter(
+    (b) => snapshot.assignments.get(b.eventKey)?.linkId === link.id
+  );
   const attributedActivity = snapshot.activityEvents
     .filter((e) => snapshot.assignments.get(e.eventKey)?.linkId === link.id)
-    .sort((a, b) => a.timestampMs - b.timestampMs);
+    .sort((a, b) => b.timestampMs - a.timestampMs);
 
-  const seenWallets = new Set<string>();
-  const activity = attributedActivity.map((e) => {
-    const isFirst = !seenWallets.has(e.userAddress);
-    seenWallets.add(e.userAddress);
-    return {
-      kind: isFirst ? ("first_action" as const) : activityKind(e),
-      description: `${e.contractName}: ${e.eventName}`,
-      address: e.userAddress,
-      txHash: null,
-      at: new Date(e.timestampMs).toISOString(),
-    };
-  });
+  const walletSummaries = walletIdentitiesForLink(snapshot, String(link.id))
+    .map((identity) => summarizeWallet(snapshot, identity))
+    .sort((a, b) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
 
-  return { ...summary, connections, bridgeIns, activity };
+  const geoPoints: GeoPoint[] = snapshot.geoRows
+    .filter((row) => String(row.link_id) === String(link.id))
+    .map((row) => ({
+      lat: row.geo_lat,
+      lon: row.geo_lon,
+      city: row.geo_city,
+      country: row.geo_country,
+      count: Number(row.count),
+    }));
+
+  return {
+    ...summary,
+    connections,
+    bridgeIns: attributedBridgeIns.map((b) => toBridgeInItem(snapshot, b)),
+    activity: attributedActivity.map(toActivityItem),
+    activitySummary: countByCategory(attributedActivity, attributedBridgeIns.length),
+    walletSummaries,
+    geoPoints,
+  };
+};
+
+// Per-user drill-down: the wallet's FULL on-chain history (labeled as such in
+// the UI) — a prospect's pre-link activity is sales signal, so this view is
+// deliberately not attribution-filtered; link-level metrics remain attributed.
+export const getWalletDetail = async (
+  linkId: string,
+  address: string
+): Promise<WalletDetail | null> => {
+  const snapshot = await getSnapshot();
+  const link = snapshot.links.find((l) => String(l.id) === String(linkId));
+  if (!link) return null;
+
+  const identity = walletIdentitiesForLink(snapshot, String(link.id)).find(
+    (candidate) => candidate.address === address || candidate.addresses.has(address)
+  );
+  if (!identity) return null;
+
+  const { events, bridgeIns } = fullActivityFor(snapshot, identity.addresses);
+  const sorted = [...events].sort((a, b) => b.timestampMs - a.timestampMs);
+
+  return {
+    address: identity.address,
+    addresses: [...identity.addresses],
+    externalWalletAddress: identity.externalWalletAddress,
+    stratoAddress: identity.stratoAddress,
+    connector: identity.connector,
+    connectedAt: identity.connectedAt.toISOString(),
+    activitySummary: countByCategory(events, bridgeIns.length),
+    bridgeIns: bridgeIns
+      .sort((a, b) => b.timestampMs - a.timestampMs)
+      .map((b) => toBridgeInItem(snapshot, b)),
+    activity: sorted.map(toActivityItem),
+  };
 };

@@ -16,7 +16,8 @@ Chain data is never copied offchain; Cirrus remains the source of truth.
 | `GET /tracking-api/me` | OIDC | `{authorized}` — whether the user may use the dashboard |
 | `GET /tracking-api/links` | OIDC + allowlist | Link summaries with attribution rollups |
 | `POST /tracking-api/links` | OIDC + allowlist | Create a link (random slug; label/source never appear in the URL) |
-| `GET /tracking-api/links/:id` | OIDC + allowlist | Connections, bridge-ins, and activity attributed to the link |
+| `GET /tracking-api/links/:id` | OIDC + allowlist | Connections, bridge-ins, per-category activity summary, per-wallet summaries, visitor geo points, and the attributed activity feed |
+| `GET /tracking-api/links/:id/wallets/:address` | OIDC + allowlist | Per-user drill-down: the wallet's full on-chain history (deliberately not attribution-filtered — pre-link activity is sales signal) |
 | `PATCH /tracking-api/links/:id` | OIDC + allowlist | Toggle active / edit label+source |
 
 Dashboard access = Keycloak `preferred_username` in `TRACKING_AUTHORIZED_USERS`
@@ -92,6 +93,29 @@ service verifies the JWT signature itself, so direct callers can't forge it.
 | `TRACKING_ATTRIBUTION_WINDOW_DAYS` | `90` | Attribution window |
 | `TRACKING_CACHE_TTL_SECONDS` | `60` | Dashboard attribution cache |
 | `ssl` | `false` | Adds `Secure` to the session cookie |
+
+## Activity categories
+
+Cirrus events are grouped into dashboard categories (bridge in/out, swaps,
+liquidity add/remove, CDP borrow/repay via `USDSTMinted`/`USDSTBurned`,
+savings vault deposit/withdraw, transfers sent/received, metal purchases,
+vault deposits/withdrawals, lending, staking, rewards) — the mapping lives in
+`src/services/cirrusService.ts` and mirrors the marketplace backend's
+`activityFilterConfigs.ts`. Link-level summaries count only events attributed
+to the link (90-day most-recent-connection rule); the per-wallet drill-down
+shows the wallet's full history. Transfer counts include protocol-driven
+transfers (swap legs, vault moves), not just P2P sends.
+
+## IP geolocation
+
+The resolver records the visitor's IP (via `X-Forwarded-For`, forwarded by
+both nginx layers) and resolves it offline with geoip-lite (bundled MaxMind
+GeoLite2 city data — no network egress, adds ~130MB to the image; refresh the
+dataset by updating the geoip-lite package). Coordinates power the dashboard's
+visitor map; raw IPs stay in the DB and are not returned by the API. Bots
+never set the session cookie but their sessions are stored; the map excludes
+them. A visitor spoofing `X-Forwarded-For` on a direct hit to the tracking
+domain can fake their own dot — acceptable for marketing analytics.
 
 ## Known V1 limitations
 

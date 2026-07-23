@@ -34,20 +34,101 @@ export interface TrackingBridgeIn {
   asset: string;
   amount: string;
   amountUsd: number | null;
-  txHash: string;
+  txHash: string | null;
   at: string;
 }
 
+export type TrackingActivityCategory =
+  | 'bridge_in'
+  | 'bridge_out'
+  | 'swap'
+  | 'liquidity_add'
+  | 'liquidity_remove'
+  | 'cdp_borrow'
+  | 'cdp_repay'
+  | 'savings_deposit'
+  | 'savings_withdraw'
+  | 'transfer_sent'
+  | 'transfer_received'
+  | 'metal_purchase'
+  | 'vault_deposit'
+  | 'vault_withdraw'
+  | 'lending_deposit'
+  | 'lending_borrow'
+  | 'staking'
+  | 'rewards';
+
+export type TrackingActivitySummary = Partial<Record<TrackingActivityCategory, number>>;
+
+export const ACTIVITY_CATEGORY_LABELS: Record<TrackingActivityCategory, string> = {
+  bridge_in: 'Bridge in',
+  bridge_out: 'Bridge out',
+  swap: 'Swaps',
+  liquidity_add: 'Liquidity added',
+  liquidity_remove: 'Liquidity removed',
+  cdp_borrow: 'CDP borrows',
+  cdp_repay: 'CDP repays',
+  savings_deposit: 'Savings deposits',
+  savings_withdraw: 'Savings withdrawals',
+  transfer_sent: 'Transfers sent',
+  transfer_received: 'Transfers received',
+  metal_purchase: 'Metal purchases',
+  vault_deposit: 'Vault deposits',
+  vault_withdraw: 'Vault withdrawals',
+  lending_deposit: 'Lending deposits',
+  lending_borrow: 'Lending borrows',
+  staking: 'Staking',
+  rewards: 'Rewards claimed',
+};
+
+// Stable display order for summary tiles and per-wallet chips
+export const ACTIVITY_CATEGORY_ORDER = Object.keys(
+  ACTIVITY_CATEGORY_LABELS
+) as TrackingActivityCategory[];
+
 export interface TrackingActivityItem {
-  kind: 'first_action' | 'metal_purchase' | 'swap' | 'other';
+  category: TrackingActivityCategory;
   description: string;
   address: string;
   txHash: string | null;
   at: string;
 }
 
+export interface TrackingGeoPoint {
+  lat: number;
+  lon: number;
+  city: string | null;
+  country: string | null;
+  count: number;
+}
+
+export interface TrackingWalletSummary {
+  address: string;
+  externalWalletAddress: string | null;
+  stratoAddress: string | null;
+  connector: string | null;
+  connectedAt: string;
+  activitySummary: TrackingActivitySummary;
+  lastActivityAt: string | null;
+}
+
 export interface TrackingLinkDetail extends TrackingLinkSummary {
   connections: TrackingConnection[];
+  bridgeIns: TrackingBridgeIn[];
+  activity: TrackingActivityItem[];
+  activitySummary: TrackingActivitySummary;
+  walletSummaries: TrackingWalletSummary[];
+  geoPoints: TrackingGeoPoint[];
+}
+
+export interface TrackingWalletDetail {
+  address: string;
+  addresses: string[];
+  externalWalletAddress: string | null;
+  stratoAddress: string | null;
+  connector: string | null;
+  connectedAt: string;
+  activitySummary: TrackingActivitySummary;
   bridgeIns: TrackingBridgeIn[];
   activity: TrackingActivityItem[];
 }
@@ -107,6 +188,9 @@ export const getTrackingMe = () => trackingFetch<{ authorized: boolean }>('/me')
 export const listTrackingLinks = () => trackingFetch<TrackingLinkSummary[]>('/links');
 
 export const getTrackingLink = (id: string) => trackingFetch<TrackingLinkDetail>(`/links/${id}`);
+
+export const getTrackingWallet = (linkId: string, address: string) =>
+  trackingFetch<TrackingWalletDetail>(`/links/${linkId}/wallets/${address}`);
 
 export const createTrackingLink = (input: CreateLinkInput) =>
   trackingFetch<{ id: string; slug: string; url: string }>('/links', {

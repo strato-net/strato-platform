@@ -5,6 +5,7 @@ import { getLinkBySlug } from "../services/linkService";
 import { recordSessionOpen } from "../services/sessionService";
 import { isBotOrPreview } from "../utils/botDetector";
 import { isAllowedDestination } from "../utils/destinations";
+import { lookupGeo, normalizeIp } from "../utils/geo";
 import { logError } from "../utils/logger";
 
 const buildCookie = (sessionId: string): string => {
@@ -45,6 +46,8 @@ export const resolve = async (req: Request, res: Response): Promise<void> => {
 
     const bot = isBotOrPreview(req);
     const sessionId = crypto.randomUUID();
+    // req.ip honors X-Forwarded-For (trust proxy) — both nginx layers forward it
+    const geo = lookupGeo(req.ip);
     recordSessionOpen(
       sessionId,
       link.id,
@@ -52,7 +55,8 @@ export const resolve = async (req: Request, res: Response): Promise<void> => {
       typeof req.headers["user-agent"] === "string"
         ? req.headers["user-agent"].slice(0, 1024)
         : null,
-      bot
+      bot,
+      { ipAddress: normalizeIp(req.ip), ...geo }
     );
 
     if (!bot) {

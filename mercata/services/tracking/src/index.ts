@@ -38,6 +38,11 @@ app.get("/tracking-api/me", asyncHandler(admin.me));
 app.get("/tracking-api/links", requireAuthorized, asyncHandler(admin.list));
 app.post("/tracking-api/links", requireAuthorized, asyncHandler(admin.create));
 app.get("/tracking-api/links/:id", requireAuthorized, asyncHandler(admin.detail));
+app.get(
+  "/tracking-api/links/:id/wallets/:address",
+  requireAuthorized,
+  asyncHandler(admin.walletDetail)
+);
 app.patch("/tracking-api/links/:id", requireAuthorized, asyncHandler(admin.update));
 
 app.use(

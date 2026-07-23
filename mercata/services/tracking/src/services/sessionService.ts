@@ -6,19 +6,41 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export const isValidSessionId = (id: unknown): id is string =>
   typeof id === "string" && UUID_RE.test(id);
 
+export interface SessionGeo {
+  ipAddress: string | null;
+  country: string | null;
+  city: string | null;
+  lat: number | null;
+  lon: number | null;
+}
+
 // Fire-and-forget from the resolver: a DB hiccup must never delay the 302.
 export const recordSessionOpen = (
   sessionId: string,
   linkId: string,
   referrer: string | null,
   userAgent: string | null,
-  isBotOrPreview: boolean
+  isBotOrPreview: boolean,
+  geo: SessionGeo
 ): void => {
   query(
-    `INSERT INTO tracking_sessions (id, link_id, referrer, user_agent, is_bot_or_preview)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO tracking_sessions
+       (id, link_id, referrer, user_agent, is_bot_or_preview,
+        ip_address, geo_country, geo_city, geo_lat, geo_lon)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      ON CONFLICT (id) DO NOTHING`,
-    [sessionId, linkId, referrer, userAgent, isBotOrPreview]
+    [
+      sessionId,
+      linkId,
+      referrer,
+      userAgent,
+      isBotOrPreview,
+      geo.ipAddress,
+      geo.country,
+      geo.city,
+      geo.lat,
+      geo.lon,
+    ]
   ).catch((error) => logError("Session", error, { operation: "recordSessionOpen" }));
 };
 

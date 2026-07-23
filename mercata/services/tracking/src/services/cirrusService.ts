@@ -123,23 +123,62 @@ export const fetchBridgeIns = async (
 export interface ActivityEvent {
   contractName: string;
   eventName: string;
+  category: ActivityCategory;
   userAddress: string;
   timestampMs: number;
   attributes: Record<string, string>;
   eventKey: string;
 }
 
-// Contract:Event pairs that count as "meaningful STRATO actions", with the
-// attribute holding the acting user's address (mirrors the marketplace
-// backend's activityFilterConfigs).
-const ACTIVITY_PAIRS: { contract: string; event: string; userAttr: string }[] = [
-  { contract: "Pool", event: "Swap", userAttr: "sender" },
-  { contract: "MetalForge", event: "MetalMinted", userAttr: "buyer" },
-  { contract: "Vault", event: "Deposited", userAttr: "user" },
-  { contract: "LendingPool", event: "Deposited", userAttr: "user" },
-  { contract: "LendingPool", event: "Borrowed", userAttr: "user" },
-  { contract: "CDPEngine", event: "USDSTMinted", userAttr: "owner" },
-  { contract: "StratoStaking", event: "Staked", userAttr: "user" },
+export type ActivityCategory =
+  | "bridge_in"
+  | "bridge_out"
+  | "swap"
+  | "liquidity_add"
+  | "liquidity_remove"
+  | "cdp_borrow"
+  | "cdp_repay"
+  | "savings_deposit"
+  | "savings_withdraw"
+  | "transfer_sent"
+  | "transfer_received"
+  | "metal_purchase"
+  | "vault_deposit"
+  | "vault_withdraw"
+  | "lending_deposit"
+  | "lending_borrow"
+  | "staking"
+  | "rewards";
+
+// Contract:Event pairs that count as user activity, with the attribute holding
+// the acting user's address and a dashboard category. Mirrors the marketplace
+// backend's activityFilterConfigs; or-attribute pairs (Token:Transfer) appear
+// as one entry per attribute with distinct categories. bridge_in comes from
+// the dedicated DepositCompleted tables, not this list.
+const ACTIVITY_PAIRS: {
+  contract: string;
+  event: string;
+  userAttr: string;
+  category: ActivityCategory;
+}[] = [
+  { contract: "MercataBridge", event: "WithdrawalRequested", userAttr: "user", category: "bridge_out" },
+  { contract: "StratoNativeBridge", event: "NativeWithdrawalRequested", userAttr: "stratoSender", category: "bridge_out" },
+  { contract: "Pool", event: "Swap", userAttr: "sender", category: "swap" },
+  { contract: "Pool", event: "AddLiquidity", userAttr: "provider", category: "liquidity_add" },
+  { contract: "Pool", event: "RemoveLiquidity", userAttr: "provider", category: "liquidity_remove" },
+  { contract: "CDPEngine", event: "USDSTMinted", userAttr: "owner", category: "cdp_borrow" },
+  { contract: "CDPEngine", event: "USDSTBurned", userAttr: "owner", category: "cdp_repay" },
+  { contract: "SaveUSDSTVault", event: "Deposit", userAttr: "owner", category: "savings_deposit" },
+  { contract: "SaveUSDSTVault", event: "Withdraw", userAttr: "owner", category: "savings_withdraw" },
+  { contract: "Token", event: "Transfer", userAttr: "from", category: "transfer_sent" },
+  { contract: "Token", event: "Transfer", userAttr: "to", category: "transfer_received" },
+  { contract: "MetalForge", event: "MetalMinted", userAttr: "buyer", category: "metal_purchase" },
+  { contract: "Vault", event: "Deposited", userAttr: "user", category: "vault_deposit" },
+  { contract: "Vault", event: "Withdrawn", userAttr: "user", category: "vault_withdraw" },
+  { contract: "LendingPool", event: "Deposited", userAttr: "user", category: "lending_deposit" },
+  { contract: "LendingPool", event: "Borrowed", userAttr: "user", category: "lending_borrow" },
+  { contract: "StratoStaking", event: "Staked", userAttr: "user", category: "staking" },
+  { contract: "Rewards", event: "RewardsClaimed", userAttr: "user", category: "rewards" },
 ];
 
 // Post-bridge activity for the given STRATO addresses, from the unified event
@@ -166,10 +205,13 @@ export const fetchActivityEvents = async (stratoAddresses: string[]): Promise<Ac
           events.push({
             contractName: pair.contract,
             eventName: pair.event,
+            category: pair.category,
             userAddress: (row.attributes?.[pair.userAttr] || "").toLowerCase(),
             timestampMs: parseCirrusTimestamp(row.block_timestamp),
             attributes: row.attributes ?? {},
-            eventKey: `event:${row.id}`,
+            // Category in the key so a Transfer counted as sent-by-A and
+            // received-by-B stays two distinct facts
+            eventKey: `event:${row.id}:${pair.category}`,
           });
         }
       } catch (error) {

@@ -2,8 +2,14 @@ import { Response } from "express";
 import { AuthorizedRequest, resolveAuthorization } from "../auth/adminMiddleware";
 import { config } from "../config";
 import { createLink, publicUrlForSlug, updateLink } from "../services/linkService";
-import { getLinkDetail, getLinkSummaries, invalidateSnapshot } from "../services/attributionService";
+import {
+  getLinkDetail,
+  getLinkSummaries,
+  getWalletDetail,
+  invalidateSnapshot,
+} from "../services/attributionService";
 import { isAllowedDestination } from "../utils/destinations";
+import { normalizeAddress } from "../utils/addresses";
 
 // GET /tracking-api/me — 200 always; "no access" is a state, not an error
 export const me = async (req: AuthorizedRequest, res: Response): Promise<void> => {
@@ -41,6 +47,21 @@ export const create = async (req: AuthorizedRequest, res: Response): Promise<voi
 // GET /tracking-api/links
 export const list = async (_req: AuthorizedRequest, res: Response): Promise<void> => {
   res.json(await getLinkSummaries());
+};
+
+// GET /tracking-api/links/:id/wallets/:address
+export const walletDetail = async (req: AuthorizedRequest, res: Response): Promise<void> => {
+  const address = normalizeAddress(req.params.address);
+  if (!address) {
+    res.status(400).json({ error: "Invalid wallet address" });
+    return;
+  }
+  const wallet = await getWalletDetail(req.params.id, address);
+  if (!wallet) {
+    res.status(404).json({ error: "Wallet not found for this link" });
+    return;
+  }
+  res.json(wallet);
 };
 
 // GET /tracking-api/links/:id
