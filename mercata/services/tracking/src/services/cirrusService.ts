@@ -22,11 +22,26 @@ const chunk = <T>(items: T[], size: number): T[][] => {
 const inList = (values: string[]): string =>
   `in.(${values.map((v) => `"${v}"`).join(",")})`;
 
-// Cirrus timestamps are naive UTC strings; normalize to epoch millis.
-export const parseCirrusTimestamp = (raw: string): number => {
-  if (!raw) return NaN;
-  const withZone = /Z$|[+-]\d{2}:?\d{2}$/.test(raw) ? raw : `${raw}Z`;
-  return new Date(withZone).getTime();
+// Cirrus timestamps arrive in varying shapes depending on the column type and
+// PostgREST version: ISO strings with/without zone, space-separated
+// "YYYY-MM-DD HH:MM:SS", a bare "+00" offset, a " UTC" suffix, or unix epoch
+// seconds (number or numeric string). Normalize all of them to epoch millis.
+export const parseCirrusTimestamp = (raw: unknown): number => {
+  if (raw == null) return NaN;
+  if (typeof raw === "number") {
+    return raw > 1e12 ? raw : raw * 1000; // millis vs seconds heuristic
+  }
+  let s = String(raw).trim();
+  if (!s) return NaN;
+  if (/^\d+$/.test(s)) {
+    const n = Number(s);
+    return n > 1e12 ? n : n * 1000;
+  }
+  s = s.replace(/ UTC$/i, "");
+  s = s.replace(" ", "T"); // first space only: date/time separator
+  if (/[+-]\d{2}$/.test(s)) s += ":00"; // bare "+00" offset -> "+00:00"
+  if (!/Z$|[+-]\d{2}:?\d{2}$/.test(s)) s += "Z"; // naive -> UTC
+  return new Date(s).getTime();
 };
 
 export interface BridgeInEvent {
@@ -201,9 +216,20 @@ export const fetchActivityEvents = async (stratoAddresses: string[]): Promise<Ac
           },
         });
         if (!Array.isArray(data)) continue;
+        let loggedUnparseable = false;
         for (const row of data) {
           const timestampMs = parseCirrusTimestamp(row.block_timestamp);
-          if (!Number.isFinite(timestampMs)) continue; // unparseable timestamp: skip row
+          if (!Number.isFinite(timestampMs)) {
+            if (!loggedUnparseable) {
+              loggedUnparseable = true;
+              logError(
+                "Cirrus",
+                `unparseable block_timestamp: ${JSON.stringify(row.block_timestamp)}`,
+                { operation: "fetchActivityEvents", contract: pair.contract, event: pair.event }
+              );
+            }
+            continue;
+          }
           events.push({
             contractName: pair.contract,
             eventName: pair.event,
