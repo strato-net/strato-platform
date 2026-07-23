@@ -45,7 +45,6 @@ module Blockchain.Context
     , setPeerAddrIfUnset
     , shouldSendToPeer
     , withActivePeer
-    , withCertifiedPeer
     ) where
 
 import           Conduit
@@ -89,6 +88,10 @@ import           Blockchain.P2PUtil
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka              as SK
 
+import           Control.Monad.Composable.Streaming      (StreamEnv,
+                                                          createStreamEnv,
+                                                          runStreamMUsingEnv)
+
 import           Blockchain.Strato.Discovery.ContextLite ()
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Address
@@ -130,7 +133,10 @@ data Config = Config
   { configSQLDB                    :: SQLDB,
     configRedisBlockDB             :: RBDB.RedisConnection,
     configContext                  :: IORef Context,
-    configBlockstanbulWireMessages :: IORef (S.OSet Keccak256)
+    configBlockstanbulWireMessages :: IORef (S.OSet Keccak256),
+    -- Shared per-process Kafka producer. Guarded by an MVar because milena's
+    -- KafkaState read-modify-write in execKafka is not atomic across threads.
+    configStreamEnv                :: MVar StreamEnv
   }
 
 newtype ActionTimestamp = ActionTimestamp {unActionTimestamp :: Maybe UTCTime}
@@ -176,7 +182,7 @@ class RunsClient m where
     m ()
 
 class RunsServer m where
-  runServer :: TCPPort -> PeerRunner m () -> (P2pConduits m -> Host -> m ()) -> IO ()
+  runServer :: TCPPort -> PeerRunner m () -> (P2pConduits m -> Host -> TCPPort -> m ()) -> IO ()
 
 instance RunsClient ContextM where
   runClientConnection host' (TCPPort p) sSource handler = do
@@ -197,8 +203,9 @@ instance RunsServer ContextM where
           pSink = appSink app
           conduits = P2pConduits pSource pSink sSource
           ip = fromString . sockAddrToIP $ appSockAddr app
+          pn = TCPPort . fromMaybe 30303 . sockAddrToPort $ appSockAddr app
       catch
-        (handler conduits ip)
+        (handler conduits ip pn)
         (\(e :: SomeException) -> $logErrorS "runServer/Exception" . T.pack $ show e)
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockHeader) (ReaderT Config m) where
@@ -391,7 +398,9 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Point PPeer (Reader
       actions = SQL.selectList [PPeerPubkey SQL.==. Just pk] []
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => Mod.Outputs (ReaderT Config m) [IngestEvent] where
-  output = void . runStreamMConfigured "strato-p2p" . SK.writeUnseqEvents
+  output ie = do
+    envVar <- asks configStreamEnv
+    withMVar envVar $ \env -> void . runStreamMUsingEnv env $ SK.writeUnseqEvents ie
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT Config m) where
   select p = liftIO . A.select p
@@ -484,11 +493,15 @@ initConfig wireMessagesRef = do
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   initState <- initContext
   initStateF <- newIORef initState
+  let k = Conf.streamingConfig ethConf
+  streamEnv <- createStreamEnv "strato-p2p" (Conf.streamingHost k, Conf.streamingPort k)
+  streamEnvVar <- newMVar streamEnv
   return $ Config
     { configSQLDB = sqlDB' dbs
     , configRedisBlockDB = RBDB.RedisConnection redisBDBPool
     , configContext = initStateF
     , configBlockstanbulWireMessages = wireMessagesRef
+    , configStreamEnv = streamEnvVar
     }
 
 initContext :: MonadIO m => m Context
@@ -527,7 +540,4 @@ withActivePeer p = bracket a b . const
   where
     a = setPeerActiveState (pPeerHost p) (pPeerTcpPort p) Active
     b _ = setPeerActiveState (pPeerHost p) (pPeerTcpPort p) Inactive
-
-withCertifiedPeer :: PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
-withCertifiedPeer = flip const
 

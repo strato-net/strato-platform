@@ -90,7 +90,6 @@ runPeer peer sSource = do
   withActivePeer peer $
     runClientConnection (pPeerHost peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
       attempt :: (Maybe SomeException) <-
-        withCertifiedPeer peer $
           runEthClientConduit
             peer {pPeerPubkey = Just otherPubKey}
             (c ^. peerSource)

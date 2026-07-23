@@ -9,6 +9,7 @@ module Commands
 where
 
 import Binary
+import EthBlock (EthBlock(..))
 import EthLog (eventRowToLog, matchesTopics)
 import TransactionReceipt (TransactionReceipt, mkTransactionReceipt)
 import Strato.Version (stratoVersion)
@@ -469,14 +470,22 @@ eth_estimateGas = toMethod "eth_estimateGas" f (Required "txObject" :+: ())
 eth_getBlockByHash :: Method Server
 eth_getBlockByHash = toMethod "eth_getBlockByHash" f (Required "blockHash" :+: Required "fullTransactions" :+: ())
   where
-    f :: String -> Bool -> RpcResult Server (Maybe Block')
-    f blockHash _fullTxs = liftIO $ fetchBlockByHash blockHash
+    f :: String -> Bool -> RpcResult Server (Maybe EthBlock)
+    f blockHash fullTxs = do
+      mBlk <- liftIO $ fetchBlockByHash blockHash
+      return $ toEthBlock fullTxs <$> mBlk
 
 eth_getBlockByNumber :: Method Server
 eth_getBlockByNumber = toMethod "eth_getBlockByNumber" f (Required "blockNumber" :+: Required "fullTransactions" :+: ())
   where
-    f :: String -> Bool -> RpcResult Server (Maybe Block')
-    f blockNumber _fullTxs = liftIO $ fetchBlockByNumber blockNumber
+    f :: String -> Bool -> RpcResult Server (Maybe EthBlock)
+    f blockNumber fullTxs = do
+      mBlk <- liftIO $ fetchBlockByNumber blockNumber
+      return $ toEthBlock fullTxs <$> mBlk
+
+-- | Select the Ethereum block representation based on the @fullTransactions@ flag.
+toEthBlock :: Bool -> Block' -> EthBlock
+toEthBlock fullTxs = (if fullTxs then EthBlockWithFullTxs else EthBlockWithTxHashes) . bPrimeToB
 
 -- TODO: blockHash field in tx response needs the actual block hash, not the tx hash.
 -- STRATO tx JSON doesn't include the block hash, so we'd need an extra lookup.

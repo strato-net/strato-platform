@@ -51,6 +51,7 @@ import Data.Either (lefts, rights)
 import Data.Foldable (toList)
 import Data.Function
 import qualified Data.IntMap as I
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.Source
@@ -104,24 +105,17 @@ rowToInsert row =
    in processedContract newState row
 
 
-rowToCollections :: AggregateAction -> Either Text (Map.Map Text Value)
-rowToCollections row =
-  let newState = case actionStorage row of
-        Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForCollections mp
-   in Map.fromList <$> newState
+rowToCollections :: AggregateAction -> Map.Map (NE.NonEmpty Text) Value
+rowToCollections row = case actionStorage row of
+  Action.SolidVMDiff mp -> Map.fromList $ SolidVM.decodeCacheValuesForCollections mp
 
-processedContractToProcessedCollectionRows :: Map.Map Text Value -> AggregateAction -> [ProcessedCollectionRow]
-processedContractToProcessedCollectionRows state row =
-  let extractValues (ValueArrayFixed _ b) = concatMap (\(i, v') -> (\(_, ks, v) -> ("Array", (SimpleValue $ ValueInt False Nothing i):ks, v)) <$> extractValues v') $ zip [0..] b
-      extractValues (ValueArrayDynamic b) = concatMap (\(i, v') -> (\(_, ks, v) -> ("Array", (SimpleValue . ValueInt False Nothing $ fromIntegral i):ks, v)) <$> extractValues v') $ I.toList b
-      extractValues (ValueMapping b)      = concatMap (\(k, v') -> (\(_, ks, v) -> ("Mapping", (SimpleValue k):ks, v)) <$> extractValues v') $ Map.toList b
-      extractValues v                     = [("it don't matter", [], v)]
-      recordVMs = concatMap
-        (\(a, value) -> mapMaybe
-          (\(t, ks, v) -> case ks of
+processedContractToProcessedCollectionRows :: AggregateAction -> [ProcessedCollectionRow]
+processedContractToProcessedCollectionRows row =
+  let state = rowToCollections row
+      recordVMs = mapMaybe
+        (\(a NE.:| ks, v) -> case ks of
             [] -> Nothing
-            _  -> Just (a, t, ks, v)
-          ) $ extractValues value
+            _ -> Just (a, "Mapping", SimpleValue . ValueString <$> ks, v)
         ) $ Map.toList state
       processRecord (n, t, ks, v) = processedCollectionRow n t row ks v
    in processRecord <$> recordVMs
@@ -190,13 +184,14 @@ processTheMessages messages = do
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top
       -- level like this
       creates =
-        [(cc, cr) | VME.CodeCollectionAdded cc cr <- messages]
+        [(cc, cr, ch) | VME.CodeCollectionAdded cc cr ch <- messages]
       delegatecalls = concatMap toList
         [Action._delegatecalls a | VME.NewAction a <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys <- mapOutput Right . fmap concat . forM creates $ \(cc, cr) -> do
+  fkeys <- mapOutput Right . fmap concat . forM creates $ \(cc, cr, ch) -> do
     $logInfoS "processTheMessages" $ "CodeCollection Added"
+    yield $ InsertTable codeTableName [("code_hash", SqlText), ("creator", SqlText)] [[Just . SimpleValue . ValueString . T.pack $ keccak256ToHex ch, Just . SimpleValue $ ValueString cr]] Nothing
     multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
     fmap concat . forM (Map.toList $ cc ^. contracts) $ \(_, c) -> do
@@ -233,19 +228,13 @@ processTheMessages messages = do
             let indexContract = rowToInsert row
             --get columns for abstract table
             $logDebugLS "History inserts are: " $ T.pack $ show indexContract
-            for (rowToCollections row) $ \stateDiff -> do
-              let pCollections = processedContractToProcessedCollectionRows stateDiff row --get all collection rows to insert
-              pure $ BatchedInserts indexContract pCollections
+            let pCollections = processedContractToProcessedCollectionRows row
+            pure $ BatchedInserts indexContract pCollections
 
-  forM_ (lefts inserts) $ $logErrorS "processTheMessages"
-
-  -- TODO: might need to group inserts by TableName
-  let insertsByCodeHash = rights inserts
-
-  forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
+  forM_ inserts $ $logDebugLS "processTheMessages/toInsert"
 
   mapOutput Right $ do
-    forM_ insertsByCodeHash $ \ins -> do
+    forM_ inserts $ \ins -> do
 --      lift $ insertIndexTable2 $ insertToStorage $ indexInsert ins
       insertIndexTable $ indexInsert ins
       unless (null $ collectionInserts ins) $

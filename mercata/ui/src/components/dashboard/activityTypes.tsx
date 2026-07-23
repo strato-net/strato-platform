@@ -258,8 +258,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "YieldVaultTransfer": {
     contract_name: "YieldVault",
     event_name: "Transfer",
-    displayName: "YieldVault Send",
-    iconConfig: { icon: Send, color: "bg-cyan-500" },
+    displayName: "Send",
+    iconConfig: { icon: Send, color: "bg-blue-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const vaultName = tokenSymbols.get(event.address) || tokenSymbols.get(normalizeAddress(event.address));
       const from = event.attributes.from || event.attributes.From || "";
@@ -290,7 +290,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: vaultName ? `${vaultName} Send` : "YieldVault Send",
+        title: "Send",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -311,8 +311,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "SaveUSDSTVaultTransfer": {
     contract_name: "SaveUSDSTVault",
     event_name: "Transfer",
-    displayName: "SaveUSDST Send",
-    iconConfig: { icon: Send, color: "bg-cyan-500" },
+    displayName: "Send",
+    iconConfig: { icon: Send, color: "bg-blue-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const from = event.attributes.from || event.attributes.From || "";
       const to = event.attributes.to || event.attributes.To || "";
@@ -323,7 +323,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           label: "Amount",
           value: formatValue(value),
           type: "amount",
-          badge: "shares",
+          badge: "SaveUSDST shares",
           rawAmount: getFullAmount(value),
         },
         {
@@ -341,7 +341,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "SaveUSDST Send",
+        title: "Send",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -359,10 +359,119 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       };
     },
   },
+  "SaveUSDSTDeposit": {
+    contract_name: "SaveUSDSTVault",
+    event_name: "Deposit",
+    displayName: "SaveUSDST Deposit",
+    iconConfig: { icon: Download, color: "bg-cyan-500" },
+    getTokenAddress: () => [usdstAddress],
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const owner = event.attributes.owner || event.attributes.Owner || "";
+      const assets = event.attributes.assets || event.attributes.Assets || "0";
+      const shares = event.attributes.shares || event.attributes.Shares || "0";
+      const usdstSymbol = tokenSymbols.get(usdstAddress) || "USDST";
+
+      const fields: ActivityField[] = [
+        {
+          label: "Deposited",
+          value: formatValue(assets, usdstAddress),
+          type: "amount",
+          badge: usdstSymbol,
+          image: tokenImages?.get(usdstAddress),
+          imageFallback: usdstSymbol,
+          rawAmount: getFullAmount(assets),
+        },
+        {
+          label: "Shares Minted",
+          value: formatValue(shares),
+          type: "text",
+          badge: "shares",
+        },
+        {
+          label: "Depositor",
+          value: owner,
+          type: "address",
+          isUserAddress: isUserAddress(owner, userAddress),
+        },
+      ];
+
+      return {
+        title: "SaveUSDST Deposit",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Deposited"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: ["Depositor", "Shares Minted"],
+          },
+        },
+      };
+    },
+  },
+  "SaveUSDSTWithdraw": {
+    contract_name: "SaveUSDSTVault",
+    event_name: "Withdraw",
+    displayName: "SaveUSDST Withdraw",
+    iconConfig: { icon: Upload, color: "bg-cyan-600" },
+    getTokenAddress: () => [usdstAddress],
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const owner = event.attributes.owner || event.attributes.Owner || "";
+      const receiver = event.attributes.receiver || event.attributes.Receiver || "";
+      const assets = event.attributes.assets || event.attributes.Assets || "0";
+      const usdstSymbol = tokenSymbols.get(usdstAddress) || "USDST";
+
+      const fields: ActivityField[] = [
+        {
+          label: "Withdrawn",
+          value: formatValue(assets, usdstAddress),
+          type: "amount",
+          badge: usdstSymbol,
+          image: tokenImages?.get(usdstAddress),
+          imageFallback: usdstSymbol,
+          rawAmount: getFullAmount(assets),
+        },
+        {
+          label: "Owner",
+          value: owner,
+          type: "address",
+          isUserAddress: isUserAddress(owner, userAddress),
+        },
+        {
+          label: "Receiver",
+          value: receiver,
+          type: "address",
+          isUserAddress: isUserAddress(receiver, userAddress),
+        },
+      ];
+
+      return {
+        title: "SaveUSDST Withdraw",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Withdrawn"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: ["Owner", "Receiver"],
+            renderer: "addresses-with-arrow",
+          },
+        },
+      };
+    },
+  },
   "Deposit": {
     contract_name: "MercataBridge",
     event_name: "DepositCompleted",
-    displayName: "Deposit",
+    displayName: "Non-native Deposit",
     iconConfig: { icon: Download, color: "bg-green-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
@@ -420,7 +529,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ].filter(Boolean) as ActivityField[];
 
       return {
-        title: "Deposit",
+        title: "Non-native Deposit",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -447,13 +556,15 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
       return token ? [token] : [];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData =>
-      activityTypes.Deposit.handler(event, tokenSymbols, userAddress, tokenImages),
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => ({
+      ...activityTypes.Deposit.handler(event, tokenSymbols, userAddress, tokenImages),
+      title: "Native Deposit",
+    }),
   },
   "Withdraw": {
     contract_name: "MercataBridge",
     event_name: "WithdrawalRequested",
-    displayName: "Bridge Out",
+    displayName: "Non-native Bridge Out",
     iconConfig: { icon: Upload, color: "bg-red-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.token || event.attributes.Token;
@@ -524,7 +635,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       }
 
       return {
-        title: "Bridge Out",
+        title: "Non-native Bridge Out",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -567,7 +678,10 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         },
       } as Event;
 
-      return activityTypes.Withdraw.handler(normalizedEvent, tokenSymbols, userAddress, tokenImages);
+      return {
+        ...activityTypes.Withdraw.handler(normalizedEvent, tokenSymbols, userAddress, tokenImages),
+        title: "Native Bridge Out",
+      };
     },
   },
   "CDPMint": {
@@ -801,7 +915,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "RewardsClaimed": {
     contract_name: "Rewards",
     event_name: "RewardsClaimed",
-    displayName: "Rewards Claimed",
+    displayName: "Reward Points Claimed",
     iconConfig: { icon: Gift, color: "bg-gradient-to-br from-emerald-400 to-teal-500" },
     getTokenAddress: (event: Event) => {
       // The reward token address is stored in the Rewards contract, not in the event
@@ -833,7 +947,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "Rewards Claimed",
+        title: "Reward Points Claimed",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -1128,7 +1242,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "LiquidityDeposited": {
     contract_name: "LendingPool",
     event_name: "Deposited",
-    displayName: "Savings",
+    displayName: "Lending Pool Deposit",
     iconConfig: { icon: Coins, color: "bg-emerald-500" },
     getTokenAddress: (event: Event) => {
       const asset = event.attributes.asset || event.attributes.Asset;
@@ -1161,7 +1275,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "Savings",
+        title: "Lending Pool Deposit",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -1367,7 +1481,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "VaultDeposited": {
     contract_name: "Vault",
     event_name: "Deposited",
-    displayName: "Vault Deposit",
+    displayName: "Diversified Vault Deposit",
     iconConfig: { icon: Download, color: "bg-teal-500" },
     getTokenAddress: (event: Event) => {
       const asset = event.attributes.asset || event.attributes.Asset;
@@ -1405,7 +1519,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "Vault Deposit",
+        title: "Diversified Vault Deposit",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -1425,7 +1539,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "VaultWithdrawn": {
     contract_name: "Vault",
     event_name: "Withdrawn",
-    displayName: "Vault Withdrawal",
+    displayName: "Diversified Vault Withdrawal",
     iconConfig: { icon: Upload, color: "bg-amber-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const user = event.attributes.user || event.attributes.User || "";
@@ -1455,7 +1569,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "Vault Withdrawal",
+        title: "Diversified Vault Withdrawal",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -1475,7 +1589,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "VaultWithdrawalPayout": {
     contract_name: "Vault",
     event_name: "WithdrawalPayout",
-    displayName: "Vault Payout",
+    displayName: "Diversified Vault Payout",
     iconConfig: { icon: Banknote, color: "bg-yellow-500" },
     getTokenAddress: (event: Event) => {
       const asset = event.attributes.asset || event.attributes.Asset;
@@ -1507,7 +1621,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "Vault Payout",
+        title: "Diversified Vault Payout",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -1598,10 +1712,6 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     event_name: "Deposit",
     displayName: "YieldVault Deposit",
     iconConfig: { icon: Download, color: "bg-cyan-500" },
-    getTokenAddress: (event: Event) => {
-      const asset = (event as any).asset_address;
-      return asset ? [asset] : [];
-    },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const owner = event.attributes.owner || event.attributes.Owner || "";
       const assets = event.attributes.assets || event.attributes.Assets || "0";
@@ -1612,7 +1722,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           label: "Deposited",
           value: formatValue(assets),
           type: "amount",
-          badge: "assets",
+          badge: tokenSymbols.get(event.address) || "assets",
           rawAmount: getFullAmount(assets),
         },
         {
@@ -1663,7 +1773,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           label: "Withdrawn",
           value: formatValue(assets),
           type: "amount",
-          badge: "assets",
+          badge: tokenSymbols.get(event.address) || "assets",
           rawAmount: getFullAmount(assets),
         },
         {
@@ -1772,7 +1882,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           label: "Claimed",
           value: formatValue(assets),
           type: "amount",
-          badge: "assets",
+          badge: tokenSymbols.get(event.address) || "assets",
           rawAmount: getFullAmount(assets),
         },
         {

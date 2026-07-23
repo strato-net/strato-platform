@@ -16,6 +16,7 @@ executable ethereum-jsonrpc
   other-modules:
       Binary
       Commands
+      EthBlock
       EthLog
       RPC
       Server

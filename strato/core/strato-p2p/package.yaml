@@ -51,6 +51,7 @@ library:
     - containers
     - cross-monitoring
     - crypto-pubkey-types
+    - data-default
     - dns
     - either
     - ethereum-discovery

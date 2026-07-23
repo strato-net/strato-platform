@@ -88,15 +88,14 @@ add _ _ = error "add called with ByteString of length not 32"
 
 ethCryptAccept ::
   (MonadIO m, HasVault m) =>
-  Point ->
-  ConduitM B.ByteString B.ByteString m (EthCryptState, EthCryptState)
-ethCryptAccept otherPoint = do
+  ConduitM B.ByteString B.ByteString m (Point, EthCryptState, EthCryptState)
+ethCryptAccept = do
   hsBytes <- CB.take 307
-  hs <- ECIES.decrypt hsBytes B.empty
+  hs <- ECIES.decryptAndGetPubKey hsBytes B.empty
   maybeResult <-
     case hs of
       Left _ -> return Nothing
-      Right x -> ethCryptAcceptOld otherPoint hsBytes x
+      Right (otherPoint, x) -> ethCryptAcceptOld otherPoint hsBytes x
 
   case maybeResult of
     Just x -> return x
@@ -110,15 +109,14 @@ ethCryptAccept otherPoint = do
       let fullBuffer = BL.drop 2 $ hsBytes `BL.append` remainingBytes
       maybeEciesMsgIBytes <- ECIES.decrypt fullBuffer $ BL.toStrict $ BL.take 2 $ hsBytes `BL.append` remainingBytes
       let eciesMsgIBytes = either (error . (++ ": " ++ show (BL.unpack fullBuffer)) . ("Malformed packed sent from peer: " ++)) id maybeEciesMsgIBytes
-      ethCryptAcceptEIP8 otherPoint (hsBytes `BL.append` remainingBytes) eciesMsgIBytes
+      ethCryptAcceptEIP8 (hsBytes `BL.append` remainingBytes) eciesMsgIBytes
 
 ethCryptAcceptEIP8 ::
   (MonadIO m, HasVault m) =>
-  Point ->
   BL.ByteString ->
   B.ByteString ->
-  ConduitM B.ByteString B.ByteString m (EthCryptState, EthCryptState)
-ethCryptAcceptEIP8 _ hsBytes eciesMsgIBytes = do
+  ConduitM B.ByteString B.ByteString m (Point, EthCryptState, EthCryptState)
+ethCryptAcceptEIP8 hsBytes eciesMsgIBytes = do
   --let (RLPArray [signatureRLP, pubKeyRLP, otherNonceRLP, versionRLP], _) = rlpSplit eciesMsgIBytes
   let (signatureRLP, pubKeyRLP, otherNonceRLP, versionRLP) = case rlpSplit eciesMsgIBytes of
         (RLPArray [a, b, c, d], _) -> (a, b, c, d)
@@ -159,7 +157,8 @@ ethCryptAcceptEIP8 _ hsBytes eciesMsgIBytes = do
       macEncKey = frameDecKey `add` ephemeralSharedSecret
 
   return
-    ( EthCryptState --encrypt
+    ( otherPoint,
+      EthCryptState --encrypt
         { aesState = AES.AESCTRState (initAES frameDecKey) (aesIV_ $ B.replicate 16 0) 0,
           mac = hashUpdate (hashInitWith Keccak_256) $ (macEncKey `bXor` otherNonce) `B.append` eciesMsgOBytes,
           key = macEncKey
@@ -176,7 +175,7 @@ ethCryptAcceptOld ::
   Point ->
   BL.ByteString ->
   B.ByteString ->
-  ConduitM B.ByteString B.ByteString m (Maybe (EthCryptState, EthCryptState))
+  ConduitM B.ByteString B.ByteString m (Maybe (Point, EthCryptState, EthCryptState))
 ethCryptAcceptOld otherPoint hsBytes eciesMsgIBytes = do
   SharedKey sharedKey <- getShared $ pointToSecPubKey otherPoint
   let otherNonce = B.take 32 $ B.drop 161 $ eciesMsgIBytes
@@ -210,7 +209,8 @@ ethCryptAcceptOld otherPoint hsBytes eciesMsgIBytes = do
 
       return $
         Just
-          ( EthCryptState --encrypt
+          ( otherPoint,
+            EthCryptState --encrypt
               { aesState = AES.AESCTRState (initAES frameDecKey) (aesIV_ $ B.replicate 16 0) 0,
                 mac = hashUpdate (hashInitWith Keccak_256) $ (macEncKey `bXor` otherNonce) `B.append` eciesMsgOBytes,
                 key = macEncKey

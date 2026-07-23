@@ -47,7 +47,9 @@ brokerConfig = BrokerConfig
       , ("KAFKA_TRANSACTION_STATE_LOG_MIN_ISR", "1")
       ]
   , bcEntrypoint = Just ["/bin/sh", "-c"]
-  , bcCommand = Just ["exec /__cacert_entrypoint.sh /etc/kafka/docker/run >> /logs/kafka.log 2>&1"]
+  -- chmod so the host user's strato-logrotate can rotate (truncate) the log:
+  -- this container runs as the image's own user, not as the host uid.
+  , bcCommand = Just ["touch /logs/kafka.log && chmod 666 /logs/kafka.log || true; exec /__cacert_entrypoint.sh /etc/kafka/docker/run >> /logs/kafka.log 2>&1"]
   , bcHealthcheckTest = ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
   , bcVolumes = ["./logs:/logs", "./kafka:/kafka"]
   , bcPort = 9092

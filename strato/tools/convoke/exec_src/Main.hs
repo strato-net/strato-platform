@@ -46,7 +46,12 @@ launchCommand :: (FilePath, [String]) -> IO (Async (ExitCode, ProcessID, FilePat
 launchCommand (cmd, args) = do
   let logFile = logsDir </> cmd
   createDirectoryIfMissing True logsDir
-  h <- openFile logFile WriteMode
+  -- Append so logs survive restarts (like the docker service logs, which use
+  -- ">>"); strato-logrotate bounds their growth. Append mode is also required
+  -- for rotation via copytruncate: only O_APPEND writers continue at the new
+  -- end of file after truncation (a WriteMode handle would keep its old
+  -- offset and turn the log into a sparse file).
+  h <- openFile logFile AppendMode
 
   let cp = (proc cmd args)
         { std_out = UseHandle h

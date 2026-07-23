@@ -16,22 +16,20 @@ SNAPSHOT_ARCHIVE_EXT="tar.zst"
 # (purged at start of every run) prevents the unbounded accumulation of
 # /tmp/tmp.* dirs that a per-run mktemp would leave behind, especially since
 # helpers run in command-substitution subshells whose temp paths the parent's
-# EXIT trap cannot track. Default: <repo>/.snapshot-work; falls back to
-# ${TMPDIR}/strato-snapshot if that is not writable. Override with
-# STRATO_SNAPSHOT_WORKDIR.
+# EXIT trap cannot track. Kept under the caller's cwd rather than $TMPDIR: a
+# separate data drive can be slower and may lack free space for a full snapshot.
+# (SCRIPT_DIR is not a good base here: once installed via `make install`, it
+# points at ~/.local/bin, not the repo.)
+# Default: $PWD/.snapshot-work. Override with STRATO_SNAPSHOT_WORKDIR.
 init_workdir() {
   if [[ -n "${STRATO_SNAPSHOT_WORKDIR:-}" ]]; then
     WORKDIR="$STRATO_SNAPSHOT_WORKDIR"
   else
-    WORKDIR="$SCRIPT_DIR/../.snapshot-work"
+    WORKDIR="$PWD/.snapshot-work"
   fi
   # Purge any leftovers from prior (possibly crashed) runs, then recreate.
   rm -rf "$WORKDIR" 2>/dev/null || true
-  if ! mkdir -p "$WORKDIR" 2>/dev/null; then
-    WORKDIR="${TMPDIR:-/tmp}/strato-snapshot"
-    rm -rf "$WORKDIR" 2>/dev/null || true
-    mkdir -p "$WORKDIR" || die "could not create work directory: $WORKDIR"
-  fi
+  mkdir -p "$WORKDIR" 2>/dev/null || die "could not create work directory: $WORKDIR"
   WORKDIR="$(cd "$WORKDIR" && pwd)"
 }
 init_workdir
@@ -380,13 +378,12 @@ verify_checksum() {
 
 # Persistent directory for downloaded snapshot archives, so an already-downloaded
 # archive whose checksum still matches S3 can be reused instead of re-downloaded.
-# NOT purged between runs (unlike WORKDIR). Override with STRATO_SNAPSHOT_DOWNLOAD_DIR.
+# NOT purged between runs (unlike WORKDIR). Kept under the caller's cwd rather
+# than $TMPDIR so downloads never land on a different (slower/smaller) data drive.
+# Override with STRATO_SNAPSHOT_DOWNLOAD_DIR.
 snapshot_download_dir() {
-  local dir="${STRATO_SNAPSHOT_DOWNLOAD_DIR:-$SCRIPT_DIR/../.snapshot-downloads}"
-  if ! mkdir -p "$dir" 2>/dev/null; then
-    dir="${TMPDIR:-/tmp}/strato-snapshot-downloads"
-    mkdir -p "$dir" 2>/dev/null || { printf '\n'; return 1; }
-  fi
+  local dir="${STRATO_SNAPSHOT_DOWNLOAD_DIR:-$PWD/.snapshot-downloads}"
+  mkdir -p "$dir" 2>/dev/null || { printf '\n'; return 1; }
   (cd "$dir" && pwd)
 }
 
