@@ -8,6 +8,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
+    - NODE_URL=${NODE_URL}
     - OPENID_DISCOVERY_URL=${OPENID_DISCOVERY_URL}
     - ssl=${ssl:-true}
     - postgres_host=postgres
@@ -49,9 +50,23 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
+  tracking-ui:
+    environment:
+    - OIDC_AUTHORITY=${OIDC_AUTHORITY:-}
+    - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+    - EXPLORER_URL=${EXPLORER_URL:-}
+    build: ./mercata/services/tracking/ui
+    image: ${TRACKINGUI_IMAGE:-<REPO_URL>tracking-ui:<VERSION>-<HASH_TRACKING_UI>}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
   nginx:
     depends_on:
     - tracking
+    - tracking-ui
     environment:
     - ssl=${ssl:-true}
     - sslCertFileType=${sslCertFileType:-}

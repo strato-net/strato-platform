@@ -1,9 +1,8 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from 'next-themes';
-import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3, Droplets, Download, Coins, HandCoins, Layers, ArrowDownToLine, Link2 } from 'lucide-react';
+import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3, Droplets, Download, Coins, HandCoins, Layers, ArrowDownToLine } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
-import { useTrackingAccess } from '@/hooks/useTracking';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
 
@@ -12,7 +11,6 @@ interface MobileNavItem {
   label: string;
   path: string;
   adminOnly?: boolean;
-  trackingOnly?: boolean;
 }
 
 interface MobileNavCategory {
@@ -27,7 +25,6 @@ interface MobileSidebarProps {
 
 const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
   const { isAdmin } = useUser();
-  const { authorized: trackingAuthorized } = useTrackingAccess();
   const location = useLocation();
   const { resolvedTheme } = useTheme();
   const logo = resolvedTheme === 'dark' ? STRATOLOGODARK : STRATOLOGO;
@@ -62,7 +59,6 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
         { icon: <Droplets size={20} />, label: 'Advanced', path: '/dashboard/advanced' },
         { icon: <Activity size={20} />, label: 'Activity Feed', path: '/dashboard/activity' },
         { icon: <BarChart3 size={20} />, label: 'Analytics', path: '/dashboard/stats' },
-        { icon: <Link2 size={20} />, label: 'Tracking', path: '/dashboard/tracking', trackingOnly: true },
         { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
       ],
     },
@@ -108,8 +104,7 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
         <div className="flex flex-col flex-1 overflow-y-auto py-4">
           <nav className="flex-1">
             {navCategories.map((category, idx) => {
-              const visibleItems = category.items.filter(item =>
-                (!item.adminOnly || isAdmin) && (!item.trackingOnly || trackingAuthorized));
+              const visibleItems = category.items.filter(item => !item.adminOnly || isAdmin);
               if (visibleItems.length === 0) return null;
               return (
                 <div key={idx} className={idx > 0 ? 'mt-4' : ''}>

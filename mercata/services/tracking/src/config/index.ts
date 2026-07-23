@@ -12,13 +12,17 @@ const parseList = (raw: string | undefined): string[] =>
     .map((s) => s.trim())
     .filter(Boolean);
 
-// This service holds only offchain tracking data and never talks to STRATO
-// nodes or Cirrus. Its sole outbound dependency is Keycloak's JWKS (dashboard
-// JWT verification). Chain data comes from the mercata backend, which the UI
-// queries separately by wallet address.
+// The tracking stack serves its own dashboard (tracking-ui container at
+// /dashboard), so this service computes the chain joins itself: NODE_URL
+// points at a STRATO node's public edge for anonymous Cirrus reads. Keycloak
+// JWKS is the other outbound dependency (dashboard JWT verification).
 export const config = {
   port: Number(process.env.PORT || 3010),
   ssl: process.env.ssl === "true",
+  api: {
+    // STRATO node edge for Cirrus reads, e.g. https://app.strato.nexus
+    nodeUrl: (process.env.NODE_URL || "").replace(/\/$/, ""),
+  },
   auth: {
     openIdDiscoveryUrl: process.env.OPENID_DISCOVERY_URL,
     // Keycloak preferred_usernames allowed to use the dashboard. The only
@@ -45,8 +49,16 @@ export const config = {
     appOrigin: (process.env.TRACKING_APP_ORIGIN || "").replace(/\/$/, ""),
     cookieName: "strato_tid",
     cookieMaxAgeSeconds: 90 * 24 * 60 * 60,
+    attributionWindowDays: Number(process.env.TRACKING_ATTRIBUTION_WINDOW_DAYS || 90),
+    cacheTtlSeconds: Number(process.env.TRACKING_CACHE_TTL_SECONDS || 60),
   },
 };
+
+if (!config.api.nodeUrl) {
+  console.warn(
+    "[Config] NODE_URL not set — dashboard chain metrics will be empty; resolver and beacons still work"
+  );
+}
 
 if (!config.auth.openIdDiscoveryUrl) {
   console.warn(

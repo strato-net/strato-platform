@@ -1,11 +1,12 @@
 # Mercata Tracking Service
 
 Referral/tracking-link service for STRATO: sales and marketing create short
-links (`/t/<slug>`), and the service records opens, wallet connections, and
-visitor geo offchain. The dashboard UI joins that data against on-chain
-activity fetched from the mercata backend's Cirrus (bridge-ins, swaps, metal
-purchases, vault deposits, lending, staking). Chain data is never copied
-offchain; Cirrus remains the source of truth.
+links (`/t/<slug>`), the service records opens, wallet connections, and
+visitor geo offchain, and joins them against on-chain activity from Cirrus
+(bridge-ins, swaps, CDP, savings, transfers, ...). The dashboard is served by
+this stack itself at `https://<TRACKING_HOST>/dashboard` (the `ui/` app in
+this directory). Chain data is never copied offchain; Cirrus remains the
+source of truth.
 
 ## Endpoints
 
@@ -14,27 +15,30 @@ offchain; Cirrus remains the source of truth.
 | `GET /t/:slug` | none | Resolve a link: record `link_opened`, set the `strato_tid` session cookie (90 days, HttpOnly, SameSite=Lax), 302 to the allowlisted destination |
 | `POST /tracking-api/engage` | cookie | SPA boot ping; sets `engaged_at` so JS-less bots/email scanners never count as engagement |
 | `POST /tracking-api/wallet-connected` | cookie | Records external wallet and/or STRATO address for the session (deduped) |
-| `GET /tracking-api/me` | OIDC | `{authorized}` — whether the user may use the dashboard |
-| `GET /tracking-api/snapshot` | OIDC + allowlist | The full offchain dataset: links, wallet connections, session stats, geo points |
-| `POST /tracking-api/links` | OIDC + allowlist | Create a link (random slug; label/source never appear in the URL) |
-| `PATCH /tracking-api/links/:id` | OIDC + allowlist | Toggle active / edit label+source |
+| `GET /dashboard` | OIDC (SPA login) | The dashboard app (tracking-ui container) |
+| `GET /tracking-api/me` | JWT | `{authorized}` — whether the user may use the dashboard |
+| `GET /tracking-api/links` | JWT + allowlist | Link summaries with attribution rollups |
+| `POST /tracking-api/links` | JWT + allowlist | Create a link (random slug; label/source never appear in the URL) |
+| `GET /tracking-api/links/:id` | JWT + allowlist | Bridge-ins, per-category activity summary, per-wallet summaries, visitor geo points, attributed activity feed |
+| `GET /tracking-api/links/:id/wallets/:address` | JWT + allowlist | Per-user drill-down: the wallet's full on-chain history (deliberately not attribution-filtered) |
+| `PATCH /tracking-api/links/:id` | JWT + allowlist | Toggle active / edit label+source |
 
-This service holds **offchain data only** and never talks to STRATO nodes or
-Cirrus — its sole outbound dependency is Keycloak's JWKS for dashboard JWT
-verification. Chain activity is served separately by the mercata backend
-(`POST /api/tracking/activity`, addresses in → categorized Cirrus events +
-bridge-ins out), and the UI joins the two datasets with the attribution
-engine in `mercata/ui/src/lib/trackingEngine.ts`.
+The dashboard app (`ui/`) logs in with OAuth code+PKCE against the Keycloak
+realm (public client, default id `tracking-dashboard` — must be registered in
+Keycloak with `https://<TRACKING_HOST>/dashboard/callback` as a redirect URI)
+and sends `Authorization: Bearer` to `/tracking-api/*`; the service verifies
+JWT signatures via JWKS. Outbound connections from this stack: Keycloak
+(JWKS + login) and `NODE_URL` (anonymous Cirrus reads).
 
 Dashboard access = Keycloak `preferred_username` in `TRACKING_AUTHORIZED_USERS`
-(allowlist only — the on-chain-admin fallback was dropped along with node
-access, so admins who need the dashboard must be listed too).
+(allowlist only — there is no on-chain-admin fallback, so admins who need the
+dashboard must be listed too).
 
 ## Attribution
 
-Runs client-side in `mercata/ui/src/lib/trackingEngine.ts`: for each chain
-event, the most recent non-bot tracked wallet connection before the event,
-within the 90-day window, wins; ties break to the earliest-created connection.
+For each chain event: the most recent non-bot tracked wallet connection
+before the event, within `TRACKING_ATTRIBUTION_WINDOW_DAYS` (default 90),
+wins; ties break to the earliest-created connection.
 Assignment is computed once over all links' connections, so one chain event is
 never counted under two links. Bridge completion events carry both
 `externalSender` and `stratoRecipient`, so either identifier attributes the
@@ -58,9 +62,10 @@ root by `make docker-compose`.
 
 ```sh
 # Build images (repo root; files must be git-tracked for the tag hash)
-make tracking tracking-nginx docker-compose
+make tracking tracking-nginx tracking-ui docker-compose
 
 # On the tracking server: docker-compose.tracking.yml + ./ssl certs + env
+NODE_URL=https://app.strato.nexus \
 OPENID_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration \
 POSTGRES_PASSWORD=... \
 TRACKING_APP_ORIGIN=https://app.strato.nexus \
@@ -69,26 +74,26 @@ TRACKING_AUTHORIZED_USERS=... \
 docker compose -f docker-compose.tracking.yml up -d
 ```
 
-Point the short-link domain (e.g. `go.strato.nexus`) at this server. On the
-**app node's** edge nginx, enable the proxy locations so the SPA's beacons and
-dashboard calls stay same-origin (and OIDC token injection keeps working):
+Point the short-link domain (e.g. `go.strato.nexus`) at this server. The
+dashboard lives at `https://<TRACKING_HOST>/dashboard`. On the **app node's**
+edge nginx, enable the proxy locations so the mercata SPA's beacons stay
+same-origin:
 
 ```
 TRACKING_ENABLED=true
 TRACKING_URL=https://go.strato.nexus
 ```
 
-Traffic split: `go.strato.nexus/t/<slug>` hits this stack directly (public
-resolver, sets the session cookie with `Domain=.strato.nexus`);
-`app.strato.nexus/tracking-api/*` goes through the app edge, which validates
-the OIDC session and injects `X-USER-ACCESS-TOKEN` before proxying here. The
-service verifies the JWT signature itself, so direct callers can't forge it.
+Traffic split: `go.strato.nexus/t/<slug>` and `/dashboard` hit this stack
+directly; `app.strato.nexus/t/...` plus the two beacon endpoints go through
+the app edge, which forwards the client IP and proxies here.
 
 ## Configuration
 
 | Env | Default | Purpose |
 |---|---|---|
 | `PORT` | `3010` | Listen port |
+| `NODE_URL` | required for chain metrics | STRATO node edge for anonymous Cirrus reads, e.g. `https://app.strato.nexus` |
 | `OPENID_DISCOVERY_URL` | from `/run/secrets/oauth_credentials.yaml` | JWKS for dashboard JWT verification |
 | `postgres_host/port/user/password` | `postgres/5432/postgres` + secret | Writable pool |
 | `TRACKING_DB_NAME` | `tracking` | Service-owned database |
@@ -97,7 +102,14 @@ service verifies the JWT signature itself, so direct callers can't forge it.
 | `TRACKING_DEFAULT_DESTINATION` | `/dashboard/deposits` | Bridge In page |
 | `TRACKING_COOKIE_DOMAIN` | empty (host-only) | Set `.strato.nexus` in prod so a future `go.strato.nexus` CNAME shares the cookie |
 | `TRACKING_APP_ORIGIN` | empty (relative redirects) | e.g. `https://app.strato.nexus`; also used in generated link URLs |
+| `TRACKING_ATTRIBUTION_WINDOW_DAYS` | `90` | Attribution window |
+| `TRACKING_CACHE_TTL_SECONDS` | `60` | Dashboard attribution cache |
 | `ssl` | `false` | Adds `Secure` to the session cookie |
+
+tracking-ui container env (runtime `config.js`): `OIDC_AUTHORITY` (default
+`https://keycloak.blockapps.net/auth/realms/mercata`), `OIDC_CLIENT_ID`
+(default `tracking-dashboard`), `EXPLORER_URL` (default
+`https://stratoscan.strato.nexus`).
 
 ## Activity categories
 
@@ -105,7 +117,7 @@ Cirrus events are grouped into dashboard categories (bridge in/out, swaps,
 liquidity add/remove, CDP borrow/repay via `USDSTMinted`/`USDSTBurned`,
 savings vault deposit/withdraw, transfers sent/received, metal purchases,
 vault deposits/withdrawals, lending, staking, rewards) — the mapping lives in
-the mercata backend (`src/api/services/tracking.service.ts`) and mirrors its
+`src/services/cirrusService.ts` and mirrors the marketplace backend's
 `activityFilterConfigs.ts`. Link-level summaries count only events attributed
 to the link (90-day most-recent-connection rule); the per-wallet drill-down
 shows the wallet's full history. Transfer counts include protocol-driven

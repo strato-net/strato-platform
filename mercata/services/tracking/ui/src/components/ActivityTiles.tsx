@@ -1,12 +1,8 @@
-import {
-  ACTIVITY_CATEGORY_LABELS,
-  ACTIVITY_CATEGORY_ORDER,
-  TrackingActivitySummary,
-} from '@/lib/trackingApi';
+import { ACTIVITY_CATEGORY_LABELS, ACTIVITY_CATEGORY_ORDER, ActivitySummary } from '../api';
 
 // Stat tiles for per-category activity counts; zero categories are dropped so
 // the grid stays scannable.
-const ActivitySummaryTiles = ({ summary }: { summary: TrackingActivitySummary }) => {
+const ActivityTiles = ({ summary }: { summary: ActivitySummary }) => {
   const entries = ACTIVITY_CATEGORY_ORDER.filter((category) => (summary[category] ?? 0) > 0);
 
   if (entries.length === 0) {
@@ -27,4 +23,4 @@ const ActivitySummaryTiles = ({ summary }: { summary: TrackingActivitySummary })
   );
 };
 
-export default ActivitySummaryTiles;
+export default ActivityTiles;

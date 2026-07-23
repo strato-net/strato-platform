@@ -5,6 +5,7 @@ set -e
 ssl=${ssl:-true}
 sslCertFileType=${sslCertFileType:-pem}
 TRACKING_HOST=${TRACKING_HOST:-tracking:3010}
+TRACKING_UI_HOST=${TRACKING_UI_HOST:-tracking-ui:8080}
 APP_ORIGIN=${TRACKING_APP_ORIGIN:-https://app.strato.nexus}
 
 # If container is running for the first time - generate config:
@@ -20,6 +21,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i 's/<SSL_CERT_FILE_TYPE>/'"$sslCertFileType"'/g' /tmp/nginx.conf
   fi
   sed -i "s|__TRACKING_HOST__|$TRACKING_HOST|g" /tmp/nginx.conf
+  sed -i "s|__TRACKING_UI_HOST__|$TRACKING_UI_HOST|g" /tmp/nginx.conf
   sed -i "s|__APP_ORIGIN__|$APP_ORIGIN|g" /tmp/nginx.conf
 
   mv /tmp/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf

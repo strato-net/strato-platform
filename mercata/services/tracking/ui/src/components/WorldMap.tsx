@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ComposableMap, Geographies, Geography, Marker } from 'react-simple-maps';
-import { Skeleton } from '@/components/ui/skeleton';
-import { TrackingGeoPoint } from '@/lib/trackingApi';
+import { GeoPoint } from '../api';
+import { Skeleton } from './primitives';
 
 interface TooltipState {
   x: number;
@@ -13,7 +13,7 @@ interface TooltipState {
 // rides on color alone: one primary-colored mark with a surface ring, count in
 // the tooltip. Land/ink colors come from theme tokens so dark mode is a real
 // palette, not an inverted one.
-const WorldMap = ({ points }: { points: TrackingGeoPoint[] }) => {
+const WorldMap = ({ points }: { points: GeoPoint[] }) => {
   const [land, setLand] = useState<object | null>(null);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
@@ -21,7 +21,7 @@ const WorldMap = ({ points }: { points: TrackingGeoPoint[] }) => {
     let cancelled = false;
     // Lazy-load the ~200KB topojson so it stays out of the main bundle
     import('world-atlas/land-110m.json').then((mod) => {
-      if (!cancelled) setLand(mod.default ?? mod);
+      if (!cancelled) setLand((mod as { default?: object }).default ?? mod);
     });
     return () => {
       cancelled = true;
@@ -56,14 +56,8 @@ const WorldMap = ({ points }: { points: TrackingGeoPoint[] }) => {
                     strokeWidth: 0.5,
                     outline: 'none',
                   },
-                  hover: {
-                    fill: 'hsl(var(--muted))',
-                    outline: 'none',
-                  },
-                  pressed: {
-                    fill: 'hsl(var(--muted))',
-                    outline: 'none',
-                  },
+                  hover: { fill: 'hsl(var(--muted))', outline: 'none' },
+                  pressed: { fill: 'hsl(var(--muted))', outline: 'none' },
                 }}
               />
             ))
