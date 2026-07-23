@@ -44,6 +44,19 @@ export const recordSessionOpen = (
   ).catch((error) => logError("Session", error, { operation: "recordSessionOpen" }));
 };
 
+// Overrides the offline geo estimate once the live lookup lands
+export const updateSessionGeo = async (
+  sessionId: string,
+  geo: { country: string | null; city: string | null; lat: number | null; lon: number | null }
+): Promise<void> => {
+  await query(
+    `UPDATE tracking_sessions
+     SET geo_country = $2, geo_city = $3, geo_lat = $4, geo_lon = $5
+     WHERE id = $1`,
+    [sessionId, geo.country, geo.city, geo.lat, geo.lon]
+  );
+};
+
 export const markEngaged = async (sessionId: string): Promise<void> => {
   await query(
     "UPDATE tracking_sessions SET engaged_at = now() WHERE id = $1 AND engaged_at IS NULL",

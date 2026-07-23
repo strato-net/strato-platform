@@ -49,6 +49,9 @@ export const config = {
     appOrigin: (process.env.TRACKING_APP_ORIGIN || "").replace(/\/$/, ""),
     cookieName: "strato_tid",
     cookieMaxAgeSeconds: 90 * 24 * 60 * 60,
+    // ipinfo.io token for live IP geolocation (offline GeoLite2 snapshot
+    // used as fallback; see utils/geo.ts)
+    ipinfoToken: process.env.TRACKING_IPINFO_TOKEN || "",
     attributionWindowDays: Number(process.env.TRACKING_ATTRIBUTION_WINDOW_DAYS || 90),
     cacheTtlSeconds: Number(process.env.TRACKING_CACHE_TTL_SECONDS || 60),
   },

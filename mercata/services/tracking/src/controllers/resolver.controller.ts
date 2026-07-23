@@ -2,10 +2,15 @@ import crypto from "crypto";
 import { Request, Response } from "express";
 import { config } from "../config";
 import { getLinkBySlug } from "../services/linkService";
-import { recordSessionOpen } from "../services/sessionService";
+import { recordSessionOpen, updateSessionGeo } from "../services/sessionService";
 import { isBotOrPreview } from "../utils/botDetector";
 import { isAllowedDestination } from "../utils/destinations";
-import { lookupGeo, normalizeIp } from "../utils/geo";
+import {
+  isExternalGeoConfigured,
+  lookupGeoOffline,
+  normalizeIp,
+  resolveGeoExternal,
+} from "../utils/geo";
 import { logError } from "../utils/logger";
 
 const buildCookie = (sessionId: string): string => {
@@ -46,8 +51,11 @@ export const resolve = async (req: Request, res: Response): Promise<void> => {
 
     const bot = isBotOrPreview(req);
     const sessionId = crypto.randomUUID();
-    // req.ip honors X-Forwarded-For (trust proxy) — both nginx layers forward it
-    const geo = lookupGeo(req.ip);
+    // req.ip honors X-Forwarded-For (trust proxy) — both nginx layers forward
+    // it. Insert immediately with the offline estimate so the row exists
+    // before the SPA's engage/wallet-connected beacons arrive; the live
+    // lookup (when configured) overrides it asynchronously.
+    const ip = req.ip;
     recordSessionOpen(
       sessionId,
       link.id,
@@ -56,8 +64,13 @@ export const resolve = async (req: Request, res: Response): Promise<void> => {
         ? req.headers["user-agent"].slice(0, 1024)
         : null,
       bot,
-      { ipAddress: normalizeIp(req.ip), ...geo }
+      { ipAddress: normalizeIp(ip), ...lookupGeoOffline(ip) }
     );
+    if (!bot && isExternalGeoConfigured()) {
+      void resolveGeoExternal(ip)
+        .then((geo) => (geo ? updateSessionGeo(sessionId, geo) : undefined))
+        .catch((error) => logError("Resolver", error, { operation: "enrichSessionGeo" }));
+    }
 
     if (!bot) {
       res.setHeader("Set-Cookie", buildCookie(sessionId));

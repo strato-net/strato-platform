@@ -102,6 +102,7 @@ the app edge, which forwards the client IP and proxies here.
 | `TRACKING_DEFAULT_DESTINATION` | `/dashboard/deposits` | Bridge In page |
 | `TRACKING_COOKIE_DOMAIN` | empty (host-only) | Set `.strato.nexus` in prod so a future `go.strato.nexus` CNAME shares the cookie |
 | `TRACKING_APP_ORIGIN` | empty (relative redirects) | e.g. `https://app.strato.nexus`; also used in generated link URLs |
+| `TRACKING_IPINFO_TOKEN` | empty (offline fallback) | ipinfo.io token for live IP geolocation |
 | `TRACKING_ATTRIBUTION_WINDOW_DAYS` | `90` | Attribution window |
 | `TRACKING_CACHE_TTL_SECONDS` | `60` | Dashboard attribution cache |
 | `ssl` | `false` | Adds `Secure` to the session cookie |
@@ -126,13 +127,25 @@ transfers (swap legs, vault moves), not just P2P sends.
 ## IP geolocation
 
 The resolver records the visitor's IP (via `X-Forwarded-For`, forwarded by
-both nginx layers) and resolves it offline with geoip-lite (bundled MaxMind
-GeoLite2 city data — no network egress, adds ~130MB to the image; refresh the
-dataset by updating the geoip-lite package). Coordinates power the dashboard's
-visitor map; raw IPs stay in the DB and are not returned by the API. Bots
-never set the session cookie but their sessions are stored; the map excludes
-them. A visitor spoofing `X-Forwarded-For` on a direct hit to the tracking
-domain can fake their own dot — acceptable for marketing analytics.
+both nginx layers). Location resolution has two tiers:
+
+1. **Live lookup (recommended)** — set `TRACKING_IPINFO_TOKEN` (free ipinfo.io
+   account, 50k lookups/month). Runs asynchronously after the 302 and updates
+   the session row; a small in-memory cache keeps repeat opens from the same
+   IP off the quota. Always-current data — this is the fix for stale results
+   (e.g. VPN ranges resolving to their previous owner's country).
+2. **Offline fallback** — geoip-lite's bundled GeoLite2 snapshot (no egress,
+   ~130MB in the image). The snapshot is frozen at package publish time and
+   goes stale, especially for reassigned/VPN ranges; refresh it at image build
+   with `--build-arg MAXMIND_LICENSE_KEY=...` (free MaxMind account). Used for
+   the immediate insert and whenever the live lookup is unconfigured or fails.
+
+Coordinates power the dashboard's visitor map; raw IPs stay in the DB and are
+not returned by the API. Bots never set the session cookie but their sessions
+are stored; the map excludes them. A visitor spoofing `X-Forwarded-For` on a
+direct hit to the tracking domain can fake their own dot — acceptable for
+marketing analytics. Sessions recorded before the live lookup was enabled keep
+their original (possibly stale) geo.
 
 ## Known V1 limitations
 
