@@ -12,16 +12,17 @@ const parseList = (raw: string | undefined): string[] =>
     .map((s) => s.trim())
     .filter(Boolean);
 
+// This service holds only offchain tracking data and never talks to STRATO
+// nodes or Cirrus. Its sole outbound dependency is Keycloak's JWKS (dashboard
+// JWT verification). Chain data comes from the mercata backend, which the UI
+// queries separately by wallet address.
 export const config = {
   port: Number(process.env.PORT || 3010),
   ssl: process.env.ssl === "true",
-  api: {
-    // Internal edge origin, used for anonymous Cirrus reads and /strato/v2.3/key
-    nodeUrl: process.env.NODE_URL,
-  },
   auth: {
     openIdDiscoveryUrl: process.env.OPENID_DISCOVERY_URL,
-    // Keycloak preferred_usernames allowed to use the dashboard (sales/marketing)
+    // Keycloak preferred_usernames allowed to use the dashboard. The only
+    // gate — there is no on-chain admin fallback here (that would need Cirrus).
     authorizedUsers: parseList(process.env.TRACKING_AUTHORIZED_USERS).map((u) => u.toLowerCase()),
   },
   db: {
@@ -42,23 +43,10 @@ export const config = {
     // Empty in dev → host-only cookie and relative redirects
     cookieDomain: process.env.TRACKING_COOKIE_DOMAIN || "",
     appOrigin: (process.env.TRACKING_APP_ORIGIN || "").replace(/\/$/, ""),
-    attributionWindowDays: Number(process.env.TRACKING_ATTRIBUTION_WINDOW_DAYS || 90),
-    cacheTtlSeconds: Number(process.env.TRACKING_CACHE_TTL_SECONDS || 60),
     cookieName: "strato_tid",
     cookieMaxAgeSeconds: 90 * 24 * 60 * 60,
   },
-  cirrus: {
-    contractPrefix: "BlockApps-",
-    adminRegistryTable: "BlockApps-AdminRegistry-adminMap",
-  },
 };
-
-const missing: string[] = [];
-if (!config.api.nodeUrl) missing.push("NODE_URL");
-if (missing.length > 0) {
-  console.error(`Missing required environment variables: ${missing.join(", ")}`);
-  process.exit(2);
-}
 
 if (!config.auth.openIdDiscoveryUrl) {
   console.warn(
@@ -67,6 +55,6 @@ if (!config.auth.openIdDiscoveryUrl) {
 }
 if (config.auth.authorizedUsers.length === 0) {
   console.warn(
-    "[Config] TRACKING_AUTHORIZED_USERS is empty — only on-chain admins will be able to use the dashboard"
+    "[Config] TRACKING_AUTHORIZED_USERS is empty — nobody can use the dashboard endpoints"
   );
 }

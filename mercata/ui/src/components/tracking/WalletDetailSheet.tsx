@@ -1,12 +1,10 @@
 import { format, formatDistanceToNow } from 'date-fns';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import CopyButton from '@/components/ui/copy';
 import ExplorerButton from '@/components/ui/explorer';
 import ActivitySummaryTiles from '@/components/tracking/ActivitySummaryTiles';
-import { useTrackingWallet } from '@/hooks/useTracking';
-import { ACTIVITY_CATEGORY_LABELS, formatUsd } from '@/lib/trackingApi';
+import { ACTIVITY_CATEGORY_LABELS, formatUsd, TrackingWalletDetail } from '@/lib/trackingApi';
 import { getStratoChain } from '@/lib/stratoChain';
 
 const shortAddress = (address: string) =>
@@ -28,23 +26,22 @@ const AddressLine = ({ label, address }: { label: string; address: string | null
 };
 
 interface WalletDetailSheetProps {
-  linkId: string;
-  address: string | null;
+  wallet: TrackingWalletDetail | null;
+  open: boolean;
   onClose: () => void;
 }
 
-// Per-user drill-down. Shows the wallet's FULL on-chain history — including
-// activity from before the link was opened — which is deliberately broader
-// than the link's attributed metrics.
-const WalletDetailSheet = ({ linkId, address, onClose }: WalletDetailSheetProps) => {
-  const wallet = useTrackingWallet(linkId, address);
-
+// Per-user drill-down over data already computed client-side by the tracking
+// engine. Shows the wallet's FULL on-chain history — including activity from
+// before the link was opened — which is deliberately broader than the link's
+// attributed metrics.
+const WalletDetailSheet = ({ wallet, open, onClose }: WalletDetailSheetProps) => {
   return (
-    <Sheet open={!!address} onOpenChange={(open) => !open && onClose()}>
+    <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
         <SheetHeader>
           <SheetTitle className="font-mono text-base">
-            {address ? shortAddress(address) : ''}
+            {wallet ? shortAddress(wallet.address) : ''}
           </SheetTitle>
           <SheetDescription>
             All on-chain activity for this wallet (not limited to activity attributed to this
@@ -52,35 +49,27 @@ const WalletDetailSheet = ({ linkId, address, onClose }: WalletDetailSheetProps)
           </SheetDescription>
         </SheetHeader>
 
-        {wallet.isPending && address ? (
-          <div className="mt-4 space-y-2">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full" />
-            ))}
-          </div>
-        ) : wallet.isError ? (
-          <p className="mt-4 text-sm text-muted-foreground">Failed to load wallet activity.</p>
-        ) : wallet.data ? (
+        {wallet && (
           <div className="mt-4 space-y-6">
             <div className="space-y-1">
-              <AddressLine label="External wallet" address={wallet.data.externalWalletAddress} />
-              <AddressLine label="STRATO address" address={wallet.data.stratoAddress} />
+              <AddressLine label="External wallet" address={wallet.externalWalletAddress} />
+              <AddressLine label="STRATO address" address={wallet.stratoAddress} />
               <div className="text-sm text-muted-foreground">
-                Connector: {wallet.data.connector ?? '—'} · First connected{' '}
-                {format(new Date(wallet.data.connectedAt), 'MMM d, yyyy')}
+                Connector: {wallet.connector ?? '—'} · First connected{' '}
+                {format(new Date(wallet.connectedAt), 'MMM d, yyyy')}
               </div>
             </div>
 
             <div>
               <h3 className="mb-2 text-sm font-medium">Activity summary</h3>
-              <ActivitySummaryTiles summary={wallet.data.activitySummary} />
+              <ActivitySummaryTiles summary={wallet.activitySummary} />
             </div>
 
-            {wallet.data.bridgeIns.length > 0 && (
+            {wallet.bridgeIns.length > 0 && (
               <div>
                 <h3 className="mb-2 text-sm font-medium">Bridge-ins</h3>
                 <div className="space-y-2">
-                  {wallet.data.bridgeIns.map((bridge, i) => (
+                  {wallet.bridgeIns.map((bridge, i) => (
                     <div
                       key={i}
                       className="flex items-center justify-between rounded-md border border-border p-2 text-sm"
@@ -105,11 +94,11 @@ const WalletDetailSheet = ({ linkId, address, onClose }: WalletDetailSheetProps)
 
             <div>
               <h3 className="mb-2 text-sm font-medium">Activity</h3>
-              {wallet.data.activity.length === 0 ? (
+              {wallet.activity.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No STRATO activity yet.</p>
               ) : (
                 <div className="space-y-2">
-                  {wallet.data.activity.map((item, i) => (
+                  {wallet.activity.map((item, i) => (
                     <div
                       key={i}
                       className="flex items-center justify-between rounded-md border border-border p-2 text-sm"
@@ -129,7 +118,7 @@ const WalletDetailSheet = ({ linkId, address, onClose }: WalletDetailSheetProps)
               )}
             </div>
           </div>
-        ) : null}
+        )}
       </SheetContent>
     </Sheet>
   );

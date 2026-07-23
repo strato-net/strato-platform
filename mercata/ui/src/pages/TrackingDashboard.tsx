@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import CreateLinkDialog from '@/components/tracking/CreateLinkDialog';
 import TrackingLinksTable from '@/components/tracking/TrackingLinksTable';
-import { useTrackingAccess, useTrackingLinks } from '@/hooks/useTracking';
+import { useTrackingAccess, useTrackingData } from '@/hooks/useTracking';
 
 const NoAccessCard = () => (
   <Card className="mx-auto max-w-md">
@@ -29,7 +29,7 @@ const TableSkeleton = () => (
 const TrackingDashboard = () => {
   const navigate = useNavigate();
   const { authorized, isLoading: accessLoading } = useTrackingAccess();
-  const links = useTrackingLinks(authorized);
+  const data = useTrackingData(authorized);
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
@@ -67,17 +67,17 @@ const TrackingDashboard = () => {
           <TableSkeleton />
         ) : !authorized ? (
           <NoAccessCard />
-        ) : links.isPending ? (
-          <TableSkeleton />
-        ) : links.isError ? (
+        ) : data.isError ? (
           <div className="rounded-lg border border-border p-8 text-center text-sm text-muted-foreground">
             Failed to load tracking links.{' '}
-            <button className="underline" onClick={() => links.refetch()}>
+            <button className="underline" onClick={() => data.refetch()}>
               Retry
             </button>
           </div>
+        ) : data.isPending || !data.computed ? (
+          <TableSkeleton />
         ) : (
-          <TrackingLinksTable links={links.data} />
+          <TrackingLinksTable links={data.computed.linkSummaries()} />
         )}
       </div>
 

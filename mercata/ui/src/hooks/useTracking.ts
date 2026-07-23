@@ -1,22 +1,24 @@
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@/context/UserContext';
 import {
   createTrackingLink,
-  getTrackingLink,
+  getTrackingActivity,
   getTrackingMe,
-  getTrackingWallet,
-  listTrackingLinks,
+  getTrackingSnapshot,
   setTrackingLinkActive,
+  TrackingActivityResponse,
   TrackingApiError,
-  TrackingLinkSummary,
 } from '@/lib/trackingApi';
+import { collectTrackedAddresses, computeTracking, TrackingComputed } from '@/lib/trackingEngine';
 
 export const trackingKeys = {
   me: ['tracking', 'me'] as const,
-  links: ['tracking', 'links'] as const,
-  link: (id: string) => ['tracking', 'links', id] as const,
-  wallet: (id: string, address: string) => ['tracking', 'links', id, 'wallets', address] as const,
+  snapshot: ['tracking', 'snapshot'] as const,
+  activity: (addresses: string[]) => ['tracking', 'activity', addresses.join(',')] as const,
 };
+
+const EMPTY_ACTIVITY: TrackingActivityResponse = { events: [], bridgeIns: [] };
 
 // One cached probe per session; guests never hit the endpoint. A 401/403 is
 // "not authorized", not an error.
@@ -44,30 +46,46 @@ export function useTrackingAccess() {
   };
 }
 
-export function useTrackingLinks(enabled: boolean) {
-  return useQuery({
-    queryKey: trackingKeys.links,
-    queryFn: listTrackingLinks,
+// The dashboard's data spine: offchain snapshot from the tracking service +
+// chain activity for the tracked addresses from the mercata backend, joined
+// client-side by the attribution engine.
+export function useTrackingData(enabled: boolean) {
+  const snapshot = useQuery({
+    queryKey: trackingKeys.snapshot,
+    queryFn: getTrackingSnapshot,
     enabled,
     staleTime: 15_000,
     refetchInterval: 30_000,
   });
-}
 
-export function useTrackingLink(id: string | undefined) {
-  return useQuery({
-    queryKey: trackingKeys.link(id ?? ''),
-    queryFn: () => getTrackingLink(id!),
-    enabled: !!id,
-  });
-}
+  const addresses = useMemo(
+    () => (snapshot.data ? collectTrackedAddresses(snapshot.data) : []),
+    [snapshot.data]
+  );
 
-export function useTrackingWallet(linkId: string | undefined, address: string | null) {
-  return useQuery({
-    queryKey: trackingKeys.wallet(linkId ?? '', address ?? ''),
-    queryFn: () => getTrackingWallet(linkId!, address!),
-    enabled: !!linkId && !!address,
+  const activity = useQuery({
+    queryKey: trackingKeys.activity(addresses),
+    queryFn: () => getTrackingActivity(addresses),
+    enabled: enabled && addresses.length > 0,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
   });
+
+  const computed: TrackingComputed | null = useMemo(() => {
+    if (!snapshot.data) return null;
+    if (addresses.length > 0 && !activity.data) return null;
+    return computeTracking(snapshot.data, activity.data ?? EMPTY_ACTIVITY);
+  }, [snapshot.data, activity.data, addresses.length]);
+
+  return {
+    computed,
+    isPending: snapshot.isPending || (addresses.length > 0 && activity.isPending),
+    isError: snapshot.isError || activity.isError,
+    refetch: () => {
+      snapshot.refetch();
+      if (addresses.length > 0) activity.refetch();
+    },
+  };
 }
 
 export function useCreateTrackingLink() {
@@ -75,7 +93,7 @@ export function useCreateTrackingLink() {
   return useMutation({
     mutationFn: createTrackingLink,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: trackingKeys.links });
+      queryClient.invalidateQueries({ queryKey: trackingKeys.snapshot });
     },
   });
 }
@@ -85,21 +103,8 @@ export function useSetTrackingLinkActive() {
   return useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) =>
       setTrackingLinkActive(id, active),
-    onMutate: async ({ id, active }) => {
-      await queryClient.cancelQueries({ queryKey: trackingKeys.links });
-      const previous = queryClient.getQueryData<TrackingLinkSummary[]>(trackingKeys.links);
-      queryClient.setQueryData<TrackingLinkSummary[]>(trackingKeys.links, (links) =>
-        links?.map((link) => (link.id === id ? { ...link, active } : link))
-      );
-      return { previous };
-    },
-    onError: (_error, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(trackingKeys.links, context.previous);
-      }
-    },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: trackingKeys.links });
+      queryClient.invalidateQueries({ queryKey: trackingKeys.snapshot });
     },
   });
 }

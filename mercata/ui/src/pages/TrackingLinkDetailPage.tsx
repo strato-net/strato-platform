@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ArrowLeft, Link2 } from 'lucide-react';
@@ -12,12 +12,11 @@ import ExplorerButton from '@/components/ui/explorer';
 import ActivitySummaryTiles from '@/components/tracking/ActivitySummaryTiles';
 import WalletDetailSheet from '@/components/tracking/WalletDetailSheet';
 import WorldMap from '@/components/tracking/WorldMap';
-import { useTrackingAccess, useTrackingLink } from '@/hooks/useTracking';
+import { useTrackingAccess, useTrackingData } from '@/hooks/useTracking';
 import {
   ACTIVITY_CATEGORY_LABELS,
   ACTIVITY_CATEGORY_ORDER,
   formatUsd,
-  TrackingApiError,
   TrackingWalletSummary,
 } from '@/lib/trackingApi';
 import { getStratoChain } from '@/lib/stratoChain';
@@ -87,10 +86,21 @@ const TrackingLinkDetailPage = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { authorized, isLoading: accessLoading } = useTrackingAccess();
-  const link = useTrackingLink(authorized ? id : undefined);
+  const data = useTrackingData(authorized);
   const [selectedWallet, setSelectedWallet] = useState<string | null>(null);
 
-  const notFound = link.error instanceof TrackingApiError && link.error.status === 404;
+  const detail = useMemo(
+    () => (data.computed && id ? data.computed.linkDetail(id) : null),
+    [data.computed, id]
+  );
+  const selectedWalletDetail = useMemo(
+    () =>
+      data.computed && id && selectedWallet
+        ? data.computed.walletDetail(id, selectedWallet)
+        : null,
+    [data.computed, id, selectedWallet]
+  );
+  const notFound = !!data.computed && !detail;
 
   return (
     <div className="min-h-screen bg-background">
@@ -109,16 +119,16 @@ const TrackingLinkDetailPage = () => {
             <div className="flex items-center gap-1 md:space-x-2">
               <Link2 className="h-5 w-5 md:h-6 md:w-6 text-strato-blue" />
               <h1 className="text-base md:text-xl font-bold whitespace-nowrap">
-                {link.data ? link.data.label : 'Tracking Link'}
+                {detail ? detail.label : 'Tracking Link'}
               </h1>
-              {link.data && !link.data.active && <Badge variant="secondary">Inactive</Badge>}
+              {detail && !detail.active && <Badge variant="secondary">Inactive</Badge>}
             </div>
           </div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 space-y-6">
-        {accessLoading || (authorized && link.isPending) ? (
+        {accessLoading || (authorized && data.isPending) ? (
           <div className="space-y-2">
             {Array.from({ length: 4 }).map((_, i) => (
               <Skeleton key={i} className="h-24 w-full" />
@@ -136,14 +146,14 @@ const TrackingLinkDetailPage = () => {
               Link not found.
             </CardContent>
           </Card>
-        ) : link.isError ? (
+        ) : data.isError ? (
           <div className="rounded-lg border border-border p-8 text-center text-sm text-muted-foreground">
             Failed to load link details.{' '}
-            <button className="underline" onClick={() => link.refetch()}>
+            <button className="underline" onClick={() => data.refetch()}>
               Retry
             </button>
           </div>
-        ) : link.data ? (
+        ) : detail ? (
           <>
             <Card>
               <CardHeader>
@@ -153,26 +163,26 @@ const TrackingLinkDetailPage = () => {
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
                   <span className="flex items-center gap-1">
                     <span className="text-muted-foreground">URL:</span>
-                    <span className="font-mono text-xs">{link.data.url}</span>
-                    <CopyButton address={link.data.url} />
+                    <span className="font-mono text-xs">{detail.url}</span>
+                    <CopyButton address={detail.url} />
                   </span>
                   <span>
-                    <span className="text-muted-foreground">Source:</span> {link.data.source}
+                    <span className="text-muted-foreground">Source:</span> {detail.source}
                   </span>
                   <span>
-                    <span className="text-muted-foreground">Creator:</span> {link.data.creator}
+                    <span className="text-muted-foreground">Creator:</span> {detail.creator}
                   </span>
                   <span>
                     <span className="text-muted-foreground">Destination:</span>{' '}
-                    <span className="font-mono text-xs">{link.data.destination}</span>
+                    <span className="font-mono text-xs">{detail.destination}</span>
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                  <StatTile label="Opens" value={link.data.opens} />
-                  <StatTile label="Wallets" value={link.data.wallets} />
-                  <StatTile label="Bridged" value={link.data.bridgedWallets} />
-                  <StatTile label="Bridge value" value={formatUsd(link.data.bridgeValueUsd)} />
-                  <StatTile label="Activated" value={link.data.activatedWallets} />
+                  <StatTile label="Opens" value={detail.opens} />
+                  <StatTile label="Wallets" value={detail.wallets} />
+                  <StatTile label="Bridged" value={detail.bridgedWallets} />
+                  <StatTile label="Bridge value" value={formatUsd(detail.bridgeValueUsd)} />
+                  <StatTile label="Activated" value={detail.activatedWallets} />
                 </div>
               </CardContent>
             </Card>
@@ -185,7 +195,7 @@ const TrackingLinkDetailPage = () => {
                 </p>
               </CardHeader>
               <CardContent>
-                <ActivitySummaryTiles summary={link.data.activitySummary} />
+                <ActivitySummaryTiles summary={detail.activitySummary} />
               </CardContent>
             </Card>
 
@@ -197,12 +207,12 @@ const TrackingLinkDetailPage = () => {
                 </p>
               </CardHeader>
               <CardContent>
-                {link.data.geoPoints.length === 0 ? (
+                {detail.geoPoints.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     No location data yet — locations are recorded when the link is opened.
                   </p>
                 ) : (
-                  <WorldMap points={link.data.geoPoints} />
+                  <WorldMap points={detail.geoPoints} />
                 )}
               </CardContent>
             </Card>
@@ -215,7 +225,7 @@ const TrackingLinkDetailPage = () => {
                 </p>
               </CardHeader>
               <CardContent>
-                {link.data.walletSummaries.length === 0 ? (
+                {detail.walletSummaries.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No wallets connected yet.</p>
                 ) : (
                   <Table>
@@ -228,7 +238,7 @@ const TrackingLinkDetailPage = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {link.data.walletSummaries.map((wallet) => (
+                      {detail.walletSummaries.map((wallet) => (
                         <TableRow
                           key={wallet.address}
                           className="cursor-pointer"
@@ -268,7 +278,7 @@ const TrackingLinkDetailPage = () => {
                 <CardTitle className="text-base">Bridge-ins</CardTitle>
               </CardHeader>
               <CardContent>
-                {link.data.bridgeIns.length === 0 ? (
+                {detail.bridgeIns.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No confirmed bridge-ins yet.</p>
                 ) : (
                   <Table>
@@ -283,7 +293,7 @@ const TrackingLinkDetailPage = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {link.data.bridgeIns.map((bridge, i) => (
+                      {detail.bridgeIns.map((bridge, i) => (
                         <TableRow key={i}>
                           <TableCell>
                             <AddressCell address={bridge.address} />
@@ -310,7 +320,7 @@ const TrackingLinkDetailPage = () => {
                 <CardTitle className="text-base">Activity</CardTitle>
               </CardHeader>
               <CardContent>
-                {link.data.activity.length === 0 ? (
+                {detail.activity.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No STRATO activity yet.</p>
                 ) : (
                   <Table>
@@ -324,7 +334,7 @@ const TrackingLinkDetailPage = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {link.data.activity.map((item, i) => (
+                      {detail.activity.map((item, i) => (
                         <TableRow key={i}>
                           <TableCell>
                             <Badge variant="outline">
@@ -352,13 +362,11 @@ const TrackingLinkDetailPage = () => {
         ) : null}
       </div>
 
-      {id && (
-        <WalletDetailSheet
-          linkId={id}
-          address={selectedWallet}
-          onClose={() => setSelectedWallet(null)}
-        />
-      )}
+      <WalletDetailSheet
+        wallet={selectedWalletDetail}
+        open={!!selectedWallet}
+        onClose={() => setSelectedWallet(null)}
+      />
     </div>
   );
 };

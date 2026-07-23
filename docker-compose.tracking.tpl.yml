@@ -8,7 +8,6 @@ services:
       postgres:
         condition: service_healthy
     environment:
-    - NODE_URL=${NODE_URL}
     - OPENID_DISCOVERY_URL=${OPENID_DISCOVERY_URL}
     - ssl=${ssl:-true}
     - postgres_host=postgres

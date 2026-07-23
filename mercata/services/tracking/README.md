@@ -1,10 +1,11 @@
 # Mercata Tracking Service
 
 Referral/tracking-link service for STRATO: sales and marketing create short
-links (`/t/<slug>`), the service records opens and wallet connections offchain,
-and the dashboard API joins those connections against on-chain activity from
-Cirrus (bridge-ins, swaps, metal purchases, vault deposits, lending, staking).
-Chain data is never copied offchain; Cirrus remains the source of truth.
+links (`/t/<slug>`), and the service records opens, wallet connections, and
+visitor geo offchain. The dashboard UI joins that data against on-chain
+activity fetched from the mercata backend's Cirrus (bridge-ins, swaps, metal
+purchases, vault deposits, lending, staking). Chain data is never copied
+offchain; Cirrus remains the source of truth.
 
 ## Endpoints
 
@@ -14,23 +15,31 @@ Chain data is never copied offchain; Cirrus remains the source of truth.
 | `POST /tracking-api/engage` | cookie | SPA boot ping; sets `engaged_at` so JS-less bots/email scanners never count as engagement |
 | `POST /tracking-api/wallet-connected` | cookie | Records external wallet and/or STRATO address for the session (deduped) |
 | `GET /tracking-api/me` | OIDC | `{authorized}` — whether the user may use the dashboard |
-| `GET /tracking-api/links` | OIDC + allowlist | Link summaries with attribution rollups |
+| `GET /tracking-api/snapshot` | OIDC + allowlist | The full offchain dataset: links, wallet connections, session stats, geo points |
 | `POST /tracking-api/links` | OIDC + allowlist | Create a link (random slug; label/source never appear in the URL) |
-| `GET /tracking-api/links/:id` | OIDC + allowlist | Connections, bridge-ins, per-category activity summary, per-wallet summaries, visitor geo points, and the attributed activity feed |
-| `GET /tracking-api/links/:id/wallets/:address` | OIDC + allowlist | Per-user drill-down: the wallet's full on-chain history (deliberately not attribution-filtered — pre-link activity is sales signal) |
 | `PATCH /tracking-api/links/:id` | OIDC + allowlist | Toggle active / edit label+source |
 
+This service holds **offchain data only** and never talks to STRATO nodes or
+Cirrus — its sole outbound dependency is Keycloak's JWKS for dashboard JWT
+verification. Chain activity is served separately by the mercata backend
+(`POST /api/tracking/activity`, addresses in → categorized Cirrus events +
+bridge-ins out), and the UI joins the two datasets with the attribution
+engine in `mercata/ui/src/lib/trackingEngine.ts`.
+
 Dashboard access = Keycloak `preferred_username` in `TRACKING_AUTHORIZED_USERS`
-OR on-chain admin (AdminRegistry), mirroring the marketplace backend.
+(allowlist only — the on-chain-admin fallback was dropped along with node
+access, so admins who need the dashboard must be listed too).
 
 ## Attribution
 
-For each chain event: the most recent non-bot tracked wallet connection before
-the event, within `TRACKING_ATTRIBUTION_WINDOW_DAYS` (default 90), wins; ties
-break to the earliest-created connection. Assignment is computed once over all
-links' connections, so one chain event is never counted under two links.
-Bridge completion events carry both `externalSender` and `stratoRecipient`, so
-either identifier attributes the wallet.
+Runs client-side in `mercata/ui/src/lib/trackingEngine.ts`: for each chain
+event, the most recent non-bot tracked wallet connection before the event,
+within the 90-day window, wins; ties break to the earliest-created connection.
+Assignment is computed once over all links' connections, so one chain event is
+never counted under two links. Bridge completion events carry both
+`externalSender` and `stratoRecipient`, so either identifier attributes the
+wallet. Link-level metrics count attributed events only; the per-wallet
+drill-down shows full history.
 
 ## Storage
 
@@ -52,7 +61,6 @@ root by `make docker-compose`.
 make tracking tracking-nginx docker-compose
 
 # On the tracking server: docker-compose.tracking.yml + ./ssl certs + env
-NODE_URL=https://app.strato.nexus \
 OPENID_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration \
 POSTGRES_PASSWORD=... \
 TRACKING_APP_ORIGIN=https://app.strato.nexus \
@@ -81,7 +89,6 @@ service verifies the JWT signature itself, so direct callers can't forge it.
 | Env | Default | Purpose |
 |---|---|---|
 | `PORT` | `3010` | Listen port |
-| `NODE_URL` | required (docker-run.sh exports `http://nginx:8081`) | Edge origin for anonymous Cirrus reads and `/strato/v2.3/key` |
 | `OPENID_DISCOVERY_URL` | from `/run/secrets/oauth_credentials.yaml` | JWKS for dashboard JWT verification |
 | `postgres_host/port/user/password` | `postgres/5432/postgres` + secret | Writable pool |
 | `TRACKING_DB_NAME` | `tracking` | Service-owned database |
@@ -90,8 +97,6 @@ service verifies the JWT signature itself, so direct callers can't forge it.
 | `TRACKING_DEFAULT_DESTINATION` | `/dashboard/deposits` | Bridge In page |
 | `TRACKING_COOKIE_DOMAIN` | empty (host-only) | Set `.strato.nexus` in prod so a future `go.strato.nexus` CNAME shares the cookie |
 | `TRACKING_APP_ORIGIN` | empty (relative redirects) | e.g. `https://app.strato.nexus`; also used in generated link URLs |
-| `TRACKING_ATTRIBUTION_WINDOW_DAYS` | `90` | Attribution window |
-| `TRACKING_CACHE_TTL_SECONDS` | `60` | Dashboard attribution cache |
 | `ssl` | `false` | Adds `Secure` to the session cookie |
 
 ## Activity categories
@@ -100,7 +105,7 @@ Cirrus events are grouped into dashboard categories (bridge in/out, swaps,
 liquidity add/remove, CDP borrow/repay via `USDSTMinted`/`USDSTBurned`,
 savings vault deposit/withdraw, transfers sent/received, metal purchases,
 vault deposits/withdrawals, lending, staking, rewards) — the mapping lives in
-`src/services/cirrusService.ts` and mirrors the marketplace backend's
+the mercata backend (`src/api/services/tracking.service.ts`) and mirrors its
 `activityFilterConfigs.ts`. Link-level summaries count only events attributed
 to the link (90-day most-recent-connection rule); the per-wallet drill-down
 shows the wallet's full history. Transfer counts include protocol-driven

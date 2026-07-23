@@ -1,20 +1,21 @@
 import { Response } from "express";
-import { AuthorizedRequest, resolveAuthorization } from "../auth/adminMiddleware";
+import { AuthorizedRequest, resolveAuthorization } from "../auth";
 import { config } from "../config";
 import { createLink, publicUrlForSlug, updateLink } from "../services/linkService";
-import {
-  getLinkDetail,
-  getLinkSummaries,
-  getWalletDetail,
-  invalidateSnapshot,
-} from "../services/attributionService";
+import { getOffchainSnapshot } from "../services/snapshotService";
 import { isAllowedDestination } from "../utils/destinations";
-import { normalizeAddress } from "../utils/addresses";
 
 // GET /tracking-api/me — 200 always; "no access" is a state, not an error
 export const me = async (req: AuthorizedRequest, res: Response): Promise<void> => {
   const { authorized } = await resolveAuthorization(req);
   res.json({ authorized });
+};
+
+// GET /tracking-api/snapshot — the full offchain dataset (links, connections,
+// session stats, geo points). The UI joins this against chain activity fetched
+// from the mercata backend; this service holds no chain data.
+export const snapshot = async (_req: AuthorizedRequest, res: Response): Promise<void> => {
+  res.json(await getOffchainSnapshot());
 };
 
 // POST /tracking-api/links
@@ -40,42 +41,10 @@ export const create = async (req: AuthorizedRequest, res: Response): Promise<voi
   }
 
   const link = await createLink(label, source || null, destination, req.username ?? "unknown");
-  invalidateSnapshot();
   res.status(201).json({ id: String(link.id), slug: link.slug, url: publicUrlForSlug(link.slug) });
 };
 
-// GET /tracking-api/links
-export const list = async (_req: AuthorizedRequest, res: Response): Promise<void> => {
-  res.json(await getLinkSummaries());
-};
-
-// GET /tracking-api/links/:id/wallets/:address
-export const walletDetail = async (req: AuthorizedRequest, res: Response): Promise<void> => {
-  const address = normalizeAddress(req.params.address);
-  if (!address) {
-    res.status(400).json({ error: "Invalid wallet address" });
-    return;
-  }
-  const wallet = await getWalletDetail(req.params.id, address);
-  if (!wallet) {
-    res.status(404).json({ error: "Wallet not found for this link" });
-    return;
-  }
-  res.json(wallet);
-};
-
-// GET /tracking-api/links/:id
-export const detail = async (req: AuthorizedRequest, res: Response): Promise<void> => {
-  const linkDetail = await getLinkDetail(req.params.id);
-  if (!linkDetail) {
-    res.status(404).json({ error: "Link not found" });
-    return;
-  }
-  res.json(linkDetail);
-};
-
-// PATCH /tracking-api/links/:id — active toggle + label/source edits;
-// slug and destination are immutable after creation
+// PATCH /tracking-api/links/:id — active toggle + label/source edits
 export const update = async (req: AuthorizedRequest, res: Response): Promise<void> => {
   const fields: { active?: boolean; label?: string; source?: string } = {};
   if (typeof req.body?.active === "boolean") fields.active = req.body.active;
@@ -92,6 +61,5 @@ export const update = async (req: AuthorizedRequest, res: Response): Promise<voi
     res.status(404).json({ error: "Link not found" });
     return;
   }
-  invalidateSnapshot();
   res.json({ id: String(link.id), active: link.active });
 };

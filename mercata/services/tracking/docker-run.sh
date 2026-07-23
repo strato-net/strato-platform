@@ -12,10 +12,8 @@ if [ -f /run/secrets/postgres_password ]; then
   export postgres_password=$(cat /run/secrets/postgres_password)
 fi
 
-# In a standalone deployment NODE_URL points at the STRATO node's public edge
-# (e.g. https://app.strato.nexus) for anonymous Cirrus reads. The fallback is
-# the platform-stack convention (edge nginx on HTTP_PORT 8081).
-export NODE_URL="${NODE_URL:-http://nginx:8081}"
+# Deliberately no NODE_URL: this service never talks to STRATO nodes or
+# Cirrus. Chain data is served by the mercata backend.
 
 echo "Starting tracking service..."
 exec node dist/index.js

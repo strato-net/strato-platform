@@ -1,42 +1,64 @@
-// Typed client for the tracking-links service (/tracking-api). Deliberately
-// independent of lib/axios.ts: that instance redirects to login on 401 and
-// toasts on errors, both of which are wrong for tracking calls (a 403 here
-// just means "not a sales/marketing user" and renders as an in-page state).
+// Client for the tracking-links feature. Two data sources, joined client-side
+// by lib/trackingEngine.ts:
+//   - the tracking service (/tracking-api/*): offchain data only — links,
+//     sessions, wallet connections, geo. It has no node/Cirrus access.
+//   - the mercata backend (/api/tracking/*): categorized chain activity for a
+//     set of wallet addresses, from the node's own Cirrus.
+// Deliberately independent of lib/axios.ts: that instance redirects to login
+// on 401 and toasts on errors, both wrong for these calls.
 
 import { getCsrfToken } from './csrf';
 
-export interface TrackingLinkSummary {
+// ---------- Offchain shapes (tracking service) ----------
+
+export interface TrackingSnapshotLink {
   id: string;
   slug: string;
   url: string;
   label: string;
-  source: string;
+  source: string | null;
+  createdBy: string;
   destination: string;
-  creator: string;
   active: boolean;
-  opens: number;
-  wallets: number;
-  bridgedWallets: number;
-  bridgeValueUsd: number;
-  activatedWallets: number;
-  lastActivityAt: string | null;
+  createdAt: string;
 }
 
-export interface TrackingConnection {
+export interface TrackingSnapshotConnection {
+  id: string;
+  sessionId: string;
+  linkId: string;
   externalWalletAddress: string | null;
   stratoAddress: string | null;
   connector: string | null;
   connectedAt: string;
+  isBotOrPreview: boolean;
 }
 
-export interface TrackingBridgeIn {
-  address: string;
-  asset: string;
-  amount: string;
-  amountUsd: number | null;
-  txHash: string | null;
-  at: string;
+export interface TrackingSnapshotSessionStats {
+  linkId: string;
+  opens: number;
+  engagedOpens: number;
+  botOpens: number;
+  lastOpenedAt: string | null;
 }
+
+export interface TrackingSnapshotGeoPoint {
+  linkId: string;
+  lat: number;
+  lon: number;
+  city: string | null;
+  country: string | null;
+  count: number;
+}
+
+export interface TrackingSnapshot {
+  links: TrackingSnapshotLink[];
+  connections: TrackingSnapshotConnection[];
+  sessionStats: TrackingSnapshotSessionStats[];
+  geoPoints: TrackingSnapshotGeoPoint[];
+}
+
+// ---------- Chain shapes (mercata backend) ----------
 
 export type TrackingActivityCategory =
   | 'bridge_in'
@@ -86,6 +108,59 @@ export const ACTIVITY_CATEGORY_ORDER = Object.keys(
   ACTIVITY_CATEGORY_LABELS
 ) as TrackingActivityCategory[];
 
+export interface TrackingChainEvent {
+  eventKey: string;
+  category: TrackingActivityCategory;
+  contractName: string;
+  eventName: string;
+  address: string;
+  at: string;
+}
+
+export interface TrackingChainBridgeIn {
+  eventKey: string;
+  externalSender: string;
+  stratoRecipient: string;
+  asset: string;
+  amount: string;
+  amountUsd: number | null;
+  txHash: string | null;
+  at: string;
+}
+
+export interface TrackingActivityResponse {
+  events: TrackingChainEvent[];
+  bridgeIns: TrackingChainBridgeIn[];
+}
+
+// ---------- Computed shapes (produced by lib/trackingEngine.ts) ----------
+
+export interface TrackingLinkSummary {
+  id: string;
+  slug: string;
+  url: string;
+  label: string;
+  source: string;
+  destination: string;
+  creator: string;
+  active: boolean;
+  opens: number;
+  wallets: number;
+  bridgedWallets: number;
+  bridgeValueUsd: number | null;
+  activatedWallets: number;
+  lastActivityAt: string | null;
+}
+
+export interface TrackingBridgeIn {
+  address: string;
+  asset: string;
+  amount: string;
+  amountUsd: number | null;
+  txHash: string | null;
+  at: string;
+}
+
 export interface TrackingActivityItem {
   category: TrackingActivityCategory;
   description: string;
@@ -113,7 +188,6 @@ export interface TrackingWalletSummary {
 }
 
 export interface TrackingLinkDetail extends TrackingLinkSummary {
-  connections: TrackingConnection[];
   bridgeIns: TrackingBridgeIn[];
   activity: TrackingActivityItem[];
   activitySummary: TrackingActivitySummary;
@@ -156,7 +230,7 @@ export class TrackingApiError extends Error {
   }
 }
 
-async function trackingFetch<T>(path: string, init?: RequestInit): Promise<T> {
+async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const method = init?.method ?? 'GET';
   const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) };
   if (method !== 'GET') {
@@ -164,11 +238,7 @@ async function trackingFetch<T>(path: string, init?: RequestInit): Promise<T> {
     if (token) headers['X-CSRF-Token'] = token;
     if (init?.body) headers['Content-Type'] = 'application/json';
   }
-  const res = await fetch(`/tracking-api${path}`, {
-    ...init,
-    headers,
-    credentials: 'include',
-  });
+  const res = await fetch(url, { ...init, headers, credentials: 'include' });
   if (!res.ok) {
     let message = res.statusText;
     try {
@@ -183,25 +253,30 @@ async function trackingFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export const getTrackingMe = () => trackingFetch<{ authorized: boolean }>('/me');
+// ---------- Tracking service (offchain) ----------
 
-export const listTrackingLinks = () => trackingFetch<TrackingLinkSummary[]>('/links');
+export const getTrackingMe = () => jsonFetch<{ authorized: boolean }>('/tracking-api/me');
 
-export const getTrackingLink = (id: string) => trackingFetch<TrackingLinkDetail>(`/links/${id}`);
-
-export const getTrackingWallet = (linkId: string, address: string) =>
-  trackingFetch<TrackingWalletDetail>(`/links/${linkId}/wallets/${address}`);
+export const getTrackingSnapshot = () => jsonFetch<TrackingSnapshot>('/tracking-api/snapshot');
 
 export const createTrackingLink = (input: CreateLinkInput) =>
-  trackingFetch<{ id: string; slug: string; url: string }>('/links', {
+  jsonFetch<{ id: string; slug: string; url: string }>('/tracking-api/links', {
     method: 'POST',
     body: JSON.stringify(input),
   });
 
 export const setTrackingLinkActive = (id: string, active: boolean) =>
-  trackingFetch<void>(`/links/${id}`, {
+  jsonFetch<void>(`/tracking-api/links/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ active }),
+  });
+
+// ---------- Mercata backend (chain activity) ----------
+
+export const getTrackingActivity = (addresses: string[]) =>
+  jsonFetch<TrackingActivityResponse>('/api/tracking/activity', {
+    method: 'POST',
+    body: JSON.stringify({ addresses }),
   });
 
 const usdFormatter = new Intl.NumberFormat('en-US', {

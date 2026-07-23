@@ -15,6 +15,7 @@ import oracleRoutes from "./routes/oracle.routes";
 import swapRoutes from "./routes/swap.routes";
 import lendingRoutes from "./routes/lending.routes";
 import eventsRoutes from "./routes/events.routes";
+import trackingRoutes from "./routes/tracking.routes";
 import bridgeRoutes from "./routes/bridge.routes";
 import creditCardRoutes from "./routes/creditCard.routes";
 import cdpRoutes from "./routes/cdp.routes";
@@ -80,6 +81,9 @@ router.use("/lend", lendingRoutes);
 
 // ----- Events Routes -----
 router.use("/events", eventsRoutes);
+
+// Tracking-links dashboard chain-activity lookups
+router.use("/tracking", trackingRoutes);
 
 // ----- Bridge Routes -----
 router.use("/bridge", bridgeRoutes);
