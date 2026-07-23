@@ -45,8 +45,13 @@ app.get(
 app.patch("/tracking-api/links/:id", requireAuthorized, asyncHandler(admin.update));
 
 app.use(
-  (error: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    logError("TrackingService", error, { operation: "request" });
+  (error: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    logError("TrackingService", error, {
+      operation: "request",
+      method: req.method,
+      path: req.path,
+    });
+    if (error instanceof Error && error.stack) console.error(error.stack);
     if (!res.headersSent) {
       res.status(500).json({ error: "Internal server error" });
     }

@@ -93,6 +93,14 @@ export const fetchBridgeIns = async (
         : []),
     ];
     for (const row of rows) {
+      const timestampMs = parseCirrusTimestamp(row.block_timestamp);
+      if (!Number.isFinite(timestampMs)) {
+        logError("Cirrus", `unparseable block_timestamp: ${JSON.stringify(row.block_timestamp)}`, {
+          operation: "fetchBridgeIns",
+          table,
+        });
+        continue;
+      }
       const eventKey = `${table}:${row.id ?? `${row.transaction_hash}:${row.stratoRecipient}:${row.stratoTokenAmount}`}`;
       if (seen.has(eventKey)) continue;
       seen.add(eventKey);
@@ -104,7 +112,7 @@ export const fetchBridgeIns = async (
         stratoTokenAmount: row.stratoTokenAmount ?? "0",
         externalTxHash: row.externalTxHash ?? null,
         txHash: row.transaction_hash ?? null,
-        timestampMs: parseCirrusTimestamp(row.block_timestamp),
+        timestampMs,
         eventKey,
       });
     }
@@ -194,12 +202,14 @@ export const fetchActivityEvents = async (stratoAddresses: string[]): Promise<Ac
         });
         if (!Array.isArray(data)) continue;
         for (const row of data) {
+          const timestampMs = parseCirrusTimestamp(row.block_timestamp);
+          if (!Number.isFinite(timestampMs)) continue; // unparseable timestamp: skip row
           events.push({
             contractName: pair.contract,
             eventName: pair.event,
             category: pair.category,
             userAddress: (row.attributes?.[pair.userAttr] || "").toLowerCase(),
-            timestampMs: parseCirrusTimestamp(row.block_timestamp),
+            timestampMs,
             attributes: row.attributes ?? {},
             // Category in the key so a Transfer counted as sent-by-A and
             // received-by-B stays two distinct facts
