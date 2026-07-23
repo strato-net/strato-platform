@@ -25,6 +25,7 @@ module Blockchain.Slipstream.OutputData (
   dedupC,
   ProcessedCollectionRow(..),
   pipeInsertGlobalEventTable,
+  codeTableName,
   insertIndexTable,
   insertDelegatecall,
   insertCollectionTable,
@@ -115,10 +116,12 @@ data SlipstreamQuery = CreateTable
                         , sourceTableName :: TableName
                         , sourceTableColumns :: [Text]
                         , contractTableColumns :: [Text]
+                        , codeTableColumns :: [Text]
                         , viewColumns :: [(TableColumns, Text)]
                         , jsonbColumns :: [(TableColumns, Text)]
                         , primaryKeyColumns :: [Text]
                         , extraJoinColumns :: [([Either Text Text], Maybe Text, Text)]
+                        , groupByClause :: Maybe [Text]
                         }
                      | InsertTable
                         { tableName :: TableName
@@ -260,7 +263,7 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
           ]
     _ -> [])
 slipstreamQueryText _ CreateView{..} =
-  let baseColumnSet = Set.fromList $ sourceTableColumns ++ contractTableColumns
+  let baseColumnSet = Set.fromList $ sourceTableColumns ++ contractTableColumns ++ codeTableColumns
    in T.concat $
         [ "DROP VIEW IF EXISTS "
         , tableNameToDoubleQuoteText viewName
@@ -269,6 +272,7 @@ slipstreamQueryText _ CreateView{..} =
         , " AS SELECT "
         , T.intercalate ", " $
             (("s." <>) <$> sourceTableColumns)
+         ++ (("x." <>) <$> codeTableColumns)
          ++ (("c." <>) <$> contractTableColumns)
          ++ concatMap (\(cols', dataColumn) -> (\(c, t) -> T.concat
             [ "CASE WHEN jsonb_exists(s."
@@ -387,7 +391,9 @@ slipstreamQueryText _ CreateView{..} =
         , tableNameToDoubleQuoteText sourceTableName
         , " s INNER JOIN "
         , tableNameToText contractTableName
-        , " c ON s.address = c.address WHERE c.creator = '"
+        , " c ON s.address = c.address INNER JOIN "
+        , tableNameToText codeTableName
+        , " x ON c.code_hash = x.code_hash WHERE x.creator = '"
         , tableNameCreator viewName
         , "' AND (c.contract_name = '"
         , tableNameContractName viewName
@@ -405,6 +411,7 @@ slipstreamQueryText _ CreateView{..} =
             , val
             ]
           ) <$> extraJoinColumns
+        , maybe "" ((" GROUP BY " <>) . T.intercalate ", ") groupByClause
         , ";\n"
         -- , " WITH NO DATA;\n"
         -- , "CREATE UNIQUE INDEX \""
@@ -608,7 +615,8 @@ createIndexTable contract cc (creator, n) inherited = do
   let tableName = indexTableName creator n
       -- histTableName = historyTableName creator a n
       cols = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
-      contractCols = ["creator", "contract_name"]
+      contractCols = ["contract_name"]
+      codeCols = ["creator"]
       cols' = [(x, t) | (x, t, _) <- cols, t /= SqlJsonbArray]
       fkeys = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo (x <> "_fkey") tableName (indexTableName creator f) False x t) <$> mf) cols
   yield $ CreateView
@@ -617,10 +625,12 @@ createIndexTable contract cc (creator, n) inherited = do
     storageTableName
     (fst <$> baseColumns)
     contractCols
+    codeCols
     [(cols', "data")]
     []
     ["address"]
     []
+    (Just ["s.address", "x.creator", "c.contract_name"])
   pure fkeys
 
 createCollectionTable ::
@@ -655,6 +665,7 @@ createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, val
     mappingTableName
     mappingCols
     []
+    []
     [(keyNames, "key")]
     (maybe [] (\s -> [(s, "value")]) mStructVal)
     (["address", "collection_name"] ++ (fst <$> keyNames))
@@ -663,6 +674,7 @@ createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, val
     , ([Right "value", Left "::text"], Just "NOT IN", "('\"\"', '0', 'false')")
     , ([Left "jsonb_typeof(", Right "value", Left ")"], Just "IS", "NOT NULL")
     ]
+    (Just $ ["s.address", "s.path", "x.creator", "c.contract_name"])
   let addressFK = ForeignKeyInfo (tableNameToText $ indexTableName creator n) tableName (indexTableName creator n) False "address" SqlText
   let o2mFK = ForeignKeyInfo (tableNameToText tableName) (indexTableName creator n) tableName True "address" SqlText
   pure $ addressFK : o2mFK : case getTableColumnAndType False cc [("value", valueType)] of
@@ -694,13 +706,15 @@ createEventArrayTable (creator, n, e) cc inherited (arr, arrType) = do
     inherited
     eventArrayTableName
     cols
-    ["creator", "contract_name"]
+    ["contract_name"]
+    ["creator"]
     [(keyNames, "key")]
     []
     (["address", "block_hash", "event_index", "collection_name"] ++ (fst <$> keyNames))
     [ ([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName)
     , ([Right "collection_name"], Nothing, wrapEscapeSingle $ tableNameCollectionName tableName)
     ]
+    Nothing
   pure $ case getTableColumnAndType False cc [("value", arrType)] of
     [(x, _, Just f)] -> Just $ ForeignKeyInfo (x <> "_fkey") tableName (indexTableName creator f) False x SqlJsonb
     _ -> Nothing
@@ -721,7 +735,7 @@ insertIndexTable cs =
                   ValueInt False Nothing . E.blockNumber
                 ]
               baseRowVals = map (Just . SimpleValue . ($ contract)) baseVals
-              dataVals = either (const []) ((:[]) . Just . ValueMapping . Map.mapKeys ValueString . Map.fromList) $ SolidVM.decodeCacheValues list
+              dataVals = [Just . ValueMapping . Map.mapKeys ValueString . Map.fromList $ SolidVM.decodeCacheValues list]
               valsForSQL = baseRowVals ++ dataVals
               conflictUpdateCols = ["address", "block_hash", "block_timestamp", "block_number"]
               tblText = tableNameToDoubleQuoteText storageTableName
@@ -958,11 +972,13 @@ createEventTable (creator, n) evName ev cc inherited = do
             inherited
             globalEventTableName
             ("id":(fst <$> eventBaseColumnsQuery))
-            ["creator", "contract_name"]
+            ["contract_name"]
+            ["creator"]
             [(cols', "attributes")]
             []
             ["address", "block_hash", "event_index"]
             [([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName')]
+            (Just $ ["s.address", "s.block_hash", "s.event_index", "x.creator", "c.contract_name"])
     ) <$> [False] -- , (True, tableNameToText tableName)]
   arrayFkeys <- forM arrayNamesAndTypes $
     createEventArrayTable (crtr, cname, escapeQuotes $ labelToText evName) cc inherited
@@ -1155,6 +1171,9 @@ globalEventTableName = indexTableName "" "event"
 
 contractTableName :: TableName
 contractTableName = indexTableName "" "contract"
+
+codeTableName :: TableName
+codeTableName = indexTableName "" "code"
 
 mappingTableName :: TableName
 mappingTableName = indexTableName "" "mapping"

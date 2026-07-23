@@ -122,7 +122,7 @@ export async function initStratoChain(): Promise<Chain | null> {
 
     const networkName = env?.NETWORK_NAME || "";
     const isProduction = networkName === "upquark";
-    const chainLabel = networkName ? `STRATO ${networkName}` : "STRATO";
+    const chainLabel = isProduction ? "STRATO" : (networkName ? `STRATO ${networkName}` : "STRATO");
     const explorerUrl = isProduction
       ? "https://stratoscan.strato.nexus"
       : "https://stratoscan.testnet.stratomercata.com";
@@ -130,7 +130,7 @@ export async function initStratoChain(): Promise<Chain | null> {
     _chain = defineChain({
       id: _chainId,
       name: chainLabel,
-      nativeCurrency: { decimals: 18, name: "tUSDST", symbol: "tUSDST" },
+      nativeCurrency: { decimals: 18, name: "USDST", symbol: "USDST" },
       rpcUrls: { default: { http: [rpcUrl || "/rpc"] } },
       blockExplorers: { default: { name: "Stratoscan", url: explorerUrl } },
     });

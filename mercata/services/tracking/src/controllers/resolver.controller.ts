@@ -1,0 +1,83 @@
+import crypto from "crypto";
+import { Request, Response } from "express";
+import { config } from "../config";
+import { getLinkBySlug } from "../services/linkService";
+import { recordSessionOpen, updateSessionGeo } from "../services/sessionService";
+import { isBotOrPreview } from "../utils/botDetector";
+import { isAllowedDestination } from "../utils/destinations";
+import {
+  isExternalGeoConfigured,
+  lookupGeoOffline,
+  normalizeIp,
+  resolveGeoExternal,
+} from "../utils/geo";
+import { logError } from "../utils/logger";
+
+const buildCookie = (sessionId: string): string => {
+  const parts = [
+    `${config.tracking.cookieName}=${sessionId}`,
+    "Path=/",
+    `Max-Age=${config.tracking.cookieMaxAgeSeconds}`,
+    "HttpOnly",
+    "SameSite=Lax",
+  ];
+  if (config.ssl) parts.push("Secure");
+  if (config.tracking.cookieDomain) parts.push(`Domain=${config.tracking.cookieDomain}`);
+  return parts.join("; ");
+};
+
+const redirectTo = (res: Response, destination: string): void => {
+  const location = `${config.tracking.appOrigin || ""}${destination}`;
+  res.setHeader("Cache-Control", "no-store");
+  res.redirect(302, location);
+};
+
+// GET /t/:slug — must stay fast: session insert is fire-and-forget, and any
+// failure still redirects the visitor into the app.
+export const resolve = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const link = await getLinkBySlug(req.params.slug ?? "");
+    if (!link) {
+      redirectTo(res, config.tracking.defaultDestination);
+      return;
+    }
+
+    // Re-validate stored destination in case the allowlist was tightened;
+    // inactive links still record opens but land on the default page.
+    const destination =
+      link.active && isAllowedDestination(link.destination)
+        ? link.destination
+        : config.tracking.defaultDestination;
+
+    const bot = isBotOrPreview(req);
+    const sessionId = crypto.randomUUID();
+    // req.ip honors X-Forwarded-For (trust proxy) — both nginx layers forward
+    // it. Insert immediately with the offline estimate so the row exists
+    // before the SPA's engage/wallet-connected beacons arrive; the live
+    // lookup (when configured) overrides it asynchronously.
+    const ip = req.ip;
+    recordSessionOpen(
+      sessionId,
+      link.id,
+      typeof req.headers.referer === "string" ? req.headers.referer.slice(0, 2048) : null,
+      typeof req.headers["user-agent"] === "string"
+        ? req.headers["user-agent"].slice(0, 1024)
+        : null,
+      bot,
+      { ipAddress: normalizeIp(ip), ...lookupGeoOffline(ip) }
+    );
+    if (!bot && isExternalGeoConfigured()) {
+      void resolveGeoExternal(ip)
+        .then((geo) => (geo ? updateSessionGeo(sessionId, geo) : undefined))
+        .catch((error) => logError("Resolver", error, { operation: "enrichSessionGeo" }));
+    }
+
+    if (!bot) {
+      res.setHeader("Set-Cookie", buildCookie(sessionId));
+    }
+    redirectTo(res, destination);
+  } catch (error) {
+    logError("Resolver", error, { slug: req.params.slug });
+    redirectTo(res, config.tracking.defaultDestination);
+  }
+};

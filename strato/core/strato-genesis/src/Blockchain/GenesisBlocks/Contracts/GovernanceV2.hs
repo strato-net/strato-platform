@@ -34,7 +34,7 @@ insertMercataGovernanceContract owner validatorList admins gi =
     { addressInfo = initialAccounts ++ [govLogicAcct, govStorageAcct],
       codeInfo = initialCode ++ [CodeInfo governanceSrc (Just "MercataGovernance")],
       delegatecalls = M.union (delegatecalls gi) . M.fromList . map (fmap S.singleton) $
-        [ (govStorageAddr, Delegatecall govStorageAddr govLogicAddr (Just "BlockApps") "MercataGovernance")
+        [ (govStorageAddr, Delegatecall govStorageAddr governanceHash "MercataGovernance")
         ]
     }
   where
@@ -42,6 +42,7 @@ insertMercataGovernanceContract owner validatorList admins gi =
     initialCode = codeInfo gi
 
     governanceSrc = decodeUtf8 mercataGovernanceContract
+    governanceHash = KECCAK256.hash mercataGovernanceContract
 
     valIx = zip [0 ..] validatorList
     adminIx = zip [0 ..] admins
@@ -50,14 +51,14 @@ insertMercataGovernanceContract owner validatorList admins gi =
       SolidVMContractWithStorage
         govLogicAddr
         0
-        (SolidVMCode "MercataGovernance" (KECCAK256.hash mercataGovernanceContract))
+        (SolidVMCode "MercataGovernance" governanceHash)
         []
     govStorageAddr = 0x100
     govStorageAcct =
       SolidVMContractWithStorage
         govStorageAddr
         0
-        (SolidVMCode "Proxy" (KECCAK256.hash mercataGovernanceContract))
+        (SolidVMCode "Proxy" governanceHash)
         $ [ ("_owner", BAddress owner)
           , ("validators.length", BInteger . toInteger $ length validatorList)
           , ("admins.length", BInteger . toInteger $ length admins)
