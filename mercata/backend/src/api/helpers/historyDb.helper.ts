@@ -26,7 +26,7 @@ export function buildSnapshots(
     .fill(null)
     .map((_, i) => ({
       timestamp: endTimestamp - interval * (numTicks - i),
-      data: initialSnapshotData,
+      data: structuredClone(initialSnapshotData),
     }));
 
   const applyRows = <T extends { valid_from: string; valid_to: string }>(
