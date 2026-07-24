@@ -562,12 +562,20 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
 }
 
 function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index: number): {timestamp: number, data: any} {
+  const DEBUG = index === 0 || index === 40 || index === 80; // Log first, middle, and last snapshots
+  if (DEBUG) {
+    console.log(`\n=== processBalanceSnapshot index=${index} timestamp=${new Date(snapshot.timestamp).toISOString()} ===`);
+    console.log(`Token count: ${Object.keys(snapshot.data.tokens || {}).length}`);
+  }
   let netBalance: number = 0;
   let netLoan: number = 0;
   for (const tokenAddr in snapshot.data.tokens) {
     const token = snapshot.data.tokens[tokenAddr] || {};
     let tokenPrice = token?.price || 0;
     const tokenBalance = token?.balance || 0;
+    if (DEBUG && tokenBalance > 0) {
+      console.log(`Token ${tokenAddr}: balance=${tokenBalance}, price=${tokenPrice}`);
+    }
     if (token?.scaledDebt) {
       const rateAccumulator = Number(safeBigInt(token?.rateAccumulator) / 1000000000000000000n) / 1000000000;
       const loanAmt = (token?.scaledDebt || 0) * rateAccumulator;
@@ -658,6 +666,9 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
       }
     }
     const tokenValue = (tokenPrice / 1000000000) * (tokenBalance / 1000000000);
+    if (DEBUG && tokenBalance > 0) {
+      console.log(`  -> tokenValue=${tokenValue}, runningTotal=${netBalance + tokenValue}`);
+    }
     netBalance += tokenValue;
   }
 
@@ -675,6 +686,10 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
   }
 
   netBalance -= netLoan + parseFloat(snapshot.data.userLoan?.scaledDebt || '0');
+  if (DEBUG) {
+    console.log(`Final: netBalance=${netBalance}, netLoan=${netLoan}, result=${netBalance / 1e18}`);
+    console.log(`=== End snapshot ${index} ===\n`);
+  }
   return { timestamp: snapshot.timestamp, data: {netBalance: netBalance / 1e18 }};
 }
 
