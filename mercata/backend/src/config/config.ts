@@ -120,7 +120,7 @@ export const defaultVaultFactoryFor: Record<string, string> = {
 
 export const defaultPoolV3FactoryFor: Record<string, string> = {
   "114784819836269": "e6b6f05a88e649e4102a801aade9a6bae02f352d", // Helium testnet
-  "33056204878082667": "" // Upquark mainnet
+  "33056204878082667": "5d630126d908b46bcf8d00bc15e591a459375809" // Upquark mainnet
 };
 
 export const defaultStratoNativeBridgeFor: Record<string, string> = {
