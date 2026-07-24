@@ -20,11 +20,15 @@ export const config = {
       price: "69c2f2b5367bd1e5bc20f0b5",
       totalVolume: "69c2f2b5367bd1e5bc20f0b8",
       tvl: "69c2f2b5367bd1e5bc20f0b9",
+      dailyTransactions: "69ea0bdbb63c79ac46d6f18b",
+      uniqueWallets: "69ea0bdbb63c79ac46d6f18c",
     },
   },
   strato: {
     baseUrl: "https://app.strato.nexus",
     tvlEndpoint: "https://app.strato.nexus/api/metrics/tvl",
+    /** Contract address of the STRATO token backing the project-level series. */
+    projectTokenAddress: "2ca3e170e6714282da77815f7864b17f612f5f83",
   },
   tokens: [
     {
