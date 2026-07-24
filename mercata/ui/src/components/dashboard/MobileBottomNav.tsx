@@ -12,6 +12,7 @@ import {
   Download,
   BarChart3,
   Droplets,
+  SlidersHorizontal,
   Shield,
   HandCoins,
   Layers,
@@ -61,7 +62,7 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
   {
     label: 'PRO',
     items: [
-      { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
+      { icon: SlidersHorizontal, label: 'Advanced', path: '/dashboard/advanced' },
       { icon: Droplets, label: 'V3 Liquidity', path: '/dashboard/v3-liquidity', badge: 'New' },
       { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
       { icon: BarChart3, label: 'Analytics', path: '/dashboard/stats' },

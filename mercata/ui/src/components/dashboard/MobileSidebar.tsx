@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from 'next-themes';
-import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3, Droplets, Download, Coins, HandCoins, Layers, ArrowDownToLine } from 'lucide-react';
+import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3, Droplets, SlidersHorizontal, Download, Coins, HandCoins, Layers, ArrowDownToLine } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
@@ -57,7 +57,7 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
     {
       label: 'PRO',
       items: [
-        { icon: <Droplets size={20} />, label: 'Advanced', path: '/dashboard/advanced' },
+        { icon: <SlidersHorizontal size={20} />, label: 'Advanced', path: '/dashboard/advanced' },
         { icon: <Droplets size={20} />, label: 'V3 Liquidity', path: '/dashboard/v3-liquidity', badge: 'New' },
         { icon: <Activity size={20} />, label: 'Activity Feed', path: '/dashboard/activity' },
         { icon: <BarChart3 size={20} />, label: 'Analytics', path: '/dashboard/stats' },
