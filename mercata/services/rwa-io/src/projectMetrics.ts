@@ -1,7 +1,8 @@
 import { config } from "./config";
-import { logInfo } from "./logger";
+import { logInfo, logError } from "./logger";
 import { floorToHour } from "./time";
 import { pushRecords } from "./rwaIoClient";
+import { fetchDailyActivity } from "./chainActivity";
 import {
   fetchOraclePrices,
   fetchTokenStats,
@@ -82,6 +83,18 @@ export async function pushProjectMetrics(): Promise<void> {
     { tsId: ts.aum, value: aum },
     { tsId: ts.totalVolume, value: totalVolume },
   ];
+
+  // Chain activity counts (count units — not WAD). Isolated so a node-API
+  // hiccup can't block the financial series above.
+  try {
+    const activity = await fetchDailyActivity();
+    entries.push(
+      { tsId: ts.dailyTransactions, value: String(activity.transactions) },
+      { tsId: ts.uniqueWallets, value: String(activity.uniqueWallets) }
+    );
+  } catch (err) {
+    logError("Failed to compute chain activity; skipping count series", err);
+  }
 
   await Promise.all(
     entries.map(({ tsId, value }) =>

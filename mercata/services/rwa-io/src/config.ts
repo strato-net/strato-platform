@@ -27,6 +27,8 @@ export const config = {
   strato: {
     baseUrl: "https://app.strato.nexus",
     tvlEndpoint: "https://app.strato.nexus/api/metrics/tvl",
+    /** STRATO node REST API (blocks/transactions) used for chain activity counts. */
+    ethApiBaseUrl: "https://app.strato.nexus/strato-api/eth/v1.2",
     /** Contract address of the STRATO token backing the project-level series. */
     projectTokenAddress: "2ca3e170e6714282da77815f7864b17f612f5f83",
   },

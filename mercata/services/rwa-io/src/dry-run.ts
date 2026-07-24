@@ -6,6 +6,7 @@
  */
 
 import { config } from "./config";
+import { fetchDailyActivity } from "./chainActivity";
 
 const WAD_NUMBER = 1e18;
 
@@ -58,6 +59,10 @@ async function main() {
   console.log(`  tvl:                $${projTvl}`);
   console.log(`  aum:                $${projTvl}`);
   console.log(`  totalVolume (24h):  $${projVolume}`);
+
+  const activity = await fetchDailyActivity();
+  console.log(`  dailyTransactions:  ${activity.transactions}`);
+  console.log(`  uniqueWallets:      ${activity.uniqueWallets}`);
 
   for (const token of config.tokens) {
     console.log(`\n--- ${token.symbol} ---\n`);
