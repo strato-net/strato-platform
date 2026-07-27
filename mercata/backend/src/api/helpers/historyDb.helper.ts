@@ -223,6 +223,9 @@ export async function fetchUserMappingHistory(
   // Staking-specific address filter (only fetch staking data from the staking contract)
   const stakingAddress = filters.stratoStakingAddress || '';
 
+  // FIX: Exclude staking collections from general path LIKE to prevent matching
+  // delegatedStake[userA][operatorB] when querying for operatorB (as the user).
+  // Staking data is fetched via the specific key->>'key' condition instead.
   const sql = `
     SELECT address, collection_name, key, path, value, valid_from, valid_to
     FROM "history@mapping"
@@ -230,7 +233,7 @@ export async function fetchUserMappingHistory(
       AND valid_to >= $2
       AND collection_name = ANY($3)
       AND (
-        path LIKE $4
+        (path LIKE $4 AND collection_name NOT IN ('delegatedStake', 'unbondingQueue', 'operators'))
         OR path = ANY($5)
         OR (address = ANY($6) AND path = $7)
         OR (address = ANY($8) AND path = ANY($9))
