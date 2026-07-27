@@ -431,6 +431,10 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
           }
         }
       }
+      // DEBUG: Log if we're adding to an existing balance (potential double-counting)
+      if (currentBalance > 0) {
+        console.log(`[_balances] ADDING to existing! token=${newInfo.address} current=${currentBalance} +new=${newValue} =result=${currentBalance + newValue}`);
+      }
       return { ...portfolioInfo, 
         tokens: { ...portfolioInfo.tokens,
           [newInfo.address]: { ...portfolioInfo.tokens[newInfo.address],

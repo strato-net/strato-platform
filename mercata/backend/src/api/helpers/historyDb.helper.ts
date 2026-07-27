@@ -7,6 +7,31 @@ import {
 } from "./history.helper";
 
 /**
+ * Deduplicate array by a key function. Keeps first occurrence.
+ */
+function dedupByKey<T>(arr: T[], keyFn: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  return arr.filter((item) => {
+    const key = keyFn(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
+ * Sort by broadest validity period first (infinity valid_to comes first).
+ */
+function sortByBroadFirst<T extends { valid_from: string; valid_to: string }>(arr: T[]): T[] {
+  return [...arr].sort((a, b) => {
+    const aTo = a.valid_to === 'infinity' ? Number.MAX_SAFE_INTEGER : Date.parse(a.valid_to + 'Z');
+    const bTo = b.valid_to === 'infinity' ? Number.MAX_SAFE_INTEGER : Date.parse(b.valid_to + 'Z');
+    if (aTo !== bTo) return bTo - aTo;
+    return Date.parse(a.valid_from + 'Z') - Date.parse(b.valid_from + 'Z');
+  });
+}
+
+/**
  * Reconstruct time-series snapshots from raw history rows.
  * Rows should be sorted by valid_from for optimal early-termination in the inner loops.
  */
@@ -461,10 +486,23 @@ export async function getHistoryDirect(
 
   const mappingHistory = [...userMappingHistory, ...globalMappingHistory];
 
+  // Dedup and sort for consistent processing
+  const dedupedStorage = sortByBroadFirst(
+    dedupByKey(storageHistory, (row) => `${row.address}|${row.valid_from}|${row.valid_to}`)
+  );
+  const dedupedMapping = sortByBroadFirst(
+    dedupByKey(mappingHistory, (row) => 
+      `${row.address}|${row.collection_name}|${row.path}|${row.valid_from}|${row.valid_to}`
+    )
+  );
+
+  console.log(`[getHistoryDirect] Storage: ${storageHistory.length} rows → ${dedupedStorage.length} after dedup`);
+  console.log(`[getHistoryDirect] Mapping: ${mappingHistory.length} rows → ${dedupedMapping.length} after dedup`);
+
   return buildSnapshots(
     params,
-    storageHistory,
-    mappingHistory,
+    dedupedStorage,
+    dedupedMapping,
     initialSnapshotData,
     storageReducer,
     mappingReducer,
