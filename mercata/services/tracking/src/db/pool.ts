@@ -9,6 +9,7 @@ export const pool = new Pool({
   user: config.db.user,
   password: config.db.password,
   database: config.db.database,
+  ssl: config.db.ssl,
   max: 10,
 });
 

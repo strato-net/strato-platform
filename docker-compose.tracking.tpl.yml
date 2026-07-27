@@ -4,18 +4,21 @@ volumes:
     driver: local
 services:
   tracking:
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
     - NODE_URL=${NODE_URL}
     - OPENID_DISCOVERY_URL=${OPENID_DISCOVERY_URL}
     - ssl=${ssl:-true}
-    - postgres_host=postgres
-    - postgres_port=5432
-    - postgres_user=postgres
+    # Local mode: defaults hit the profile-gated postgres container below.
+    # RDS mode: point POSTGRES_HOST at the RDS endpoint, set POSTGRES_SSL
+    # (require | verify-full), and skip the local-db profile entirely.
+    - postgres_host=${POSTGRES_HOST:-postgres}
+    - postgres_port=${POSTGRES_PORT:-5432}
+    - postgres_user=${POSTGRES_USER:-postgres}
     - postgres_password=${POSTGRES_PASSWORD}
-    - POSTGRES_MAINTENANCE_DB=postgres
+    - postgres_ssl=${POSTGRES_SSL:-}
+    - postgres_ssl_ca=${POSTGRES_SSL_CA:-}
+    - POSTGRES_MAINTENANCE_DB=${POSTGRES_MAINTENANCE_DB:-postgres}
+    - TRACKING_DB_CREATE=${TRACKING_DB_CREATE:-}
     - TRACKING_DB_NAME=${TRACKING_DB_NAME:-}
     - TRACKING_AUTHORIZED_USERS=${TRACKING_AUTHORIZED_USERS:-}
     - TRACKING_DEST_ALLOWLIST=${TRACKING_DEST_ALLOWLIST:-}
@@ -34,6 +37,7 @@ services:
         max-size: "100m"
         max-file: "3"
   postgres:
+    profiles: ["local-db"]
     environment:
     - POSTGRES_DB=postgres
     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}

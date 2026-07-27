@@ -1,3 +1,5 @@
+import fs from "fs";
+
 const DB_NAME_RE = /^[a-z_][a-z0-9_]*$/;
 
 const dbName = process.env.TRACKING_DB_NAME || "tracking";
@@ -5,6 +7,37 @@ if (!DB_NAME_RE.test(dbName)) {
   console.error(`Invalid TRACKING_DB_NAME "${dbName}" — must match ${DB_NAME_RE}`);
   process.exit(2);
 }
+
+// TLS for the Postgres connection (required by AWS RDS with force_ssl):
+//   ""/disable      -> plaintext (local postgres container)
+//   require/true    -> TLS without certificate verification
+//   verify/verify-full -> TLS with verification; set postgres_ssl_ca to the
+//                      CA bundle path (e.g. the AWS RDS global bundle)
+type DbSsl = false | { rejectUnauthorized: boolean; ca?: string };
+const parseDbSsl = (): DbSsl => {
+  const mode = (process.env.postgres_ssl || "").trim().toLowerCase();
+  if (!mode || mode === "disable" || mode === "false") return false;
+  if (mode === "require" || mode === "true" || mode === "1") {
+    return { rejectUnauthorized: false };
+  }
+  if (mode === "verify" || mode === "verify-ca" || mode === "verify-full") {
+    const ssl: { rejectUnauthorized: boolean; ca?: string } = { rejectUnauthorized: true };
+    const caPath = process.env.postgres_ssl_ca;
+    if (caPath) {
+      try {
+        ssl.ca = fs.readFileSync(caPath, "utf8");
+      } catch (error) {
+        console.error(`Cannot read postgres_ssl_ca file "${caPath}":`, error);
+        process.exit(2);
+      }
+    }
+    return ssl;
+  }
+  console.error(
+    `Invalid postgres_ssl "${mode}" — use disable, require, or verify-full`
+  );
+  process.exit(2);
+};
 
 const parseList = (raw: string | undefined): string[] =>
   (raw || "")
@@ -35,8 +68,11 @@ export const config = {
     user: process.env.postgres_user || "postgres",
     password: process.env.postgres_password || "",
     database: dbName,
-    // Existing DB on the shared container, used only to CREATE DATABASE
+    ssl: parseDbSsl(),
+    // Existing DB used only for CREATE DATABASE (skipped when createDatabase
+    // is off — e.g. an RDS user without CREATEDB and a pre-created database)
     maintenanceDb: process.env.POSTGRES_MAINTENANCE_DB || "eth",
+    createDatabase: process.env.TRACKING_DB_CREATE !== "false",
   },
   tracking: {
     defaultDestination: process.env.TRACKING_DEFAULT_DESTINATION || "/dashboard/deposits",

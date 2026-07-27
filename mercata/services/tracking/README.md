@@ -47,10 +47,23 @@ drill-down shows full history.
 
 ## Storage
 
-Owns the `tracking` Postgres database (created at boot) on the shared platform
-`postgres` container: `tracking_links`, `tracking_sessions`,
+Owns the `tracking` Postgres database: `tracking_links`, `tracking_sessions`,
 `wallet_connections`. Migrations are embedded in `src/db/migrations.ts` and run
-idempotently at startup under an advisory lock.
+idempotently at startup under an advisory lock. Two database modes:
+
+- **Local container** (default for dev): start the stack with the `local-db`
+  compose profile — `COMPOSE_PROFILES=local-db docker compose -f
+  docker-compose.tracking.yml up -d`. The service creates the `tracking` DB on
+  first boot.
+- **Remote Postgres / AWS RDS**: omit the profile (no postgres container
+  starts) and set `POSTGRES_HOST` to the RDS endpoint, `POSTGRES_USER`,
+  `POSTGRES_PASSWORD`, and `POSTGRES_SSL=require` (RDS `force_ssl`) or
+  `POSTGRES_SSL=verify-full` + `POSTGRES_SSL_CA=<path to the AWS RDS CA
+  bundle mounted into the container>`. If the DB user can create databases,
+  boot handles everything (set `POSTGRES_MAINTENANCE_DB` if the maintenance DB
+  isn't `postgres`); otherwise pre-create the `tracking` database and set
+  `TRACKING_DB_CREATE=false` to skip the create step entirely. The service
+  retries the DB connection for ~60s at startup, so ordering doesn't matter.
 
 ## Deployment
 
@@ -95,7 +108,9 @@ the app edge, which forwards the client IP and proxies here.
 | `PORT` | `3010` | Listen port |
 | `NODE_URL` | required for chain metrics | STRATO node edge for anonymous Cirrus reads, e.g. `https://app.strato.nexus` |
 | `OPENID_DISCOVERY_URL` | from `/run/secrets/oauth_credentials.yaml` | JWKS for dashboard JWT verification |
-| `postgres_host/port/user/password` | `postgres/5432/postgres` + secret | Writable pool |
+| `POSTGRES_HOST/PORT/USER/PASSWORD` | `postgres/5432/postgres` | DB connection (compose maps to `postgres_*`); point at RDS for remote mode |
+| `POSTGRES_SSL` | empty (plaintext) | `require` (TLS, no verify) or `verify-full` (+ `POSTGRES_SSL_CA` bundle path) |
+| `TRACKING_DB_CREATE` | `true` | Set `false` when the DB user can't create databases (pre-created RDS DB) |
 | `TRACKING_DB_NAME` | `tracking` | Service-owned database |
 | `TRACKING_AUTHORIZED_USERS` | empty | Comma-separated Keycloak usernames (sales/marketing) |
 | `TRACKING_DEST_ALLOWLIST` | `/dashboard/deposits,/dashboard,/dashboard/swap,/dashboard/earn,/dashboard/rewards` | Allowed link destinations |

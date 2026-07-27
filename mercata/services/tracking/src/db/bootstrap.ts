@@ -18,6 +18,7 @@ const createDatabaseIfMissing = async (): Promise<void> => {
     user: config.db.user,
     password: config.db.password,
     database: config.db.maintenanceDb,
+    ssl: config.db.ssl,
   });
   await client.connect();
   try {
@@ -72,7 +73,9 @@ export const bootstrapDb = async (): Promise<void> => {
   const maxAttempts = 30;
   for (let attempt = 1; ; attempt++) {
     try {
-      await createDatabaseIfMissing();
+      if (config.db.createDatabase) {
+        await createDatabaseIfMissing();
+      }
       await runMigrations();
       logInfo("DB", "Database ready");
       return;
