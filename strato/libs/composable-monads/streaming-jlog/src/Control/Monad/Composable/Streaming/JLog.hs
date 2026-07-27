@@ -235,18 +235,25 @@ runConsume consumerGroup topicName f = do
   where
     consumeLoop topicPath subscriber = do
       -- Read batch without checkpointing, get messages + last ID
-      result <- liftIO $ readBatchNoCheckpoint topicPath subscriber
+      (msgs, lastId) <- liftIO $ waitForBatch topicPath subscriber
+      -- Process batch, then checkpoint once at the end
+      mResult <- processBatch msgs
+      liftIO $ checkpointTo topicPath subscriber lastId
+      case mResult of
+        Just r -> return r
+        Nothing -> consumeLoop topicPath subscriber
+
+    -- Keep the fast idle poll loop in concrete IO. Putting this
+    -- Nothing -> delay -> recurse path back in the polymorphic consumer
+    -- loop can allocate retained continuation thunks on every idle poll,
+    -- causing a large memory leak that can eventually crash the process.
+    waitForBatch topicPath subscriber = do
+      result <- readBatchNoCheckpoint topicPath subscriber
       case result of
         Nothing -> do
-          liftIO $ threadDelay 100000  -- 100ms poll if no messages
-          consumeLoop topicPath subscriber
-        Just (msgs, lastId) -> do
-          -- Process batch, then checkpoint once at the end
-          mResult <- processBatch msgs
-          liftIO $ checkpointTo topicPath subscriber lastId
-          case mResult of
-            Just r -> return r
-            Nothing -> consumeLoop topicPath subscriber
+          threadDelay 100000  -- 100ms poll if no messages
+          waitForBatch topicPath subscriber
+        Just batch -> return batch
     
     processBatch [] = return Nothing
     processBatch msgs = do
