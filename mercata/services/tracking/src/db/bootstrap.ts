@@ -18,6 +18,7 @@ const createDatabaseIfMissing = async (): Promise<void> => {
     user: config.db.user,
     password: config.db.password,
     database: config.db.maintenanceDb,
+    ...(config.db.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
   });
   await client.connect();
   try {

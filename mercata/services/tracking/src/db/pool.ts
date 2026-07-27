@@ -10,6 +10,7 @@ export const pool = new Pool({
   password: config.db.password,
   database: config.db.database,
   max: 10,
+  ...(config.db.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
 });
 
 export const query = <T extends object = any>(text: string, params?: any[]) =>

@@ -3,19 +3,35 @@ volumes:
   trackingpgdata:
     driver: local
 services:
+  # DB modes:
+  #   Local dev  — run the bundled postgres container by enabling its profile:
+  #                COMPOSE_PROFILES=local-db docker compose ... up -d
+  #                (the postgres_* vars below default to that container)
+  #   Remote/RDS — leave the profile disabled so no postgres container starts,
+  #                and point the service at the managed instance:
+  #                postgres_host=<rds-endpoint> postgres_user=... \
+  #                POSTGRES_PASSWORD=... POSTGRES_MAINTENANCE_DB=tracking \
+  #                docker compose ... up -d
+  #                (the tracking DB is expected to already exist on RDS)
   tracking:
     depends_on:
       postgres:
         condition: service_healthy
+        # Not required: when the local-db profile is off there is no postgres
+        # container and the service connects straight to the remote instance.
+        required: false
     environment:
     - NODE_URL=${NODE_URL}
     - OPENID_DISCOVERY_URL=${OPENID_DISCOVERY_URL}
     - ssl=${ssl:-true}
-    - postgres_host=postgres
-    - postgres_port=5432
-    - postgres_user=postgres
+    - postgres_host=${postgres_host:-postgres}
+    - postgres_port=${postgres_port:-5432}
+    - postgres_user=${postgres_user:-postgres}
     - postgres_password=${POSTGRES_PASSWORD}
-    - POSTGRES_MAINTENANCE_DB=postgres
+    # Enable TLS to the DB for remote/RDS (RDS Postgres 15+ forces SSL). Leave
+    # false for the local-db container.
+    - postgres_ssl=${postgres_ssl:-false}
+    - POSTGRES_MAINTENANCE_DB=${POSTGRES_MAINTENANCE_DB:-postgres}
     - TRACKING_DB_NAME=${TRACKING_DB_NAME:-}
     - TRACKING_AUTHORIZED_USERS=${TRACKING_AUTHORIZED_USERS:-}
     - TRACKING_DEST_ALLOWLIST=${TRACKING_DEST_ALLOWLIST:-}
@@ -34,6 +50,11 @@ services:
         max-size: "100m"
         max-file: "3"
   postgres:
+    # Development-only bundled DB. Enable with COMPOSE_PROFILES=local-db (or
+    # --profile local-db). When disabled, point the tracking service at a
+    # remote/RDS instance via postgres_host/postgres_user/POSTGRES_PASSWORD.
+    profiles:
+    - local-db
     environment:
     - POSTGRES_DB=postgres
     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}

@@ -74,6 +74,33 @@ TRACKING_AUTHORIZED_USERS=... \
 docker compose -f docker-compose.tracking.yml up -d
 ```
 
+### Database: bundled container vs. remote/RDS
+
+The stack supports two DB modes (see the header comment in
+`docker-compose.tracking.tpl.yml`):
+
+- **Local dev — bundled Postgres container.** Enable its compose profile so
+  the container starts and the service defaults point at it:
+
+  ```sh
+  COMPOSE_PROFILES=local-db docker compose -f docker-compose.tracking.yml up -d
+  ```
+
+- **Production — remote/RDS.** Leave the profile off (default) so **no
+  postgres container runs**, and point the service at the managed instance.
+  The `tracking` database is expected to already exist on RDS:
+
+  ```sh
+  postgres_host=<rds-endpoint> postgres_port=5432 postgres_user=<user> \
+  POSTGRES_PASSWORD=<pw> postgres_ssl=true POSTGRES_MAINTENANCE_DB=tracking \
+  docker compose -f docker-compose.tracking.yml up -d
+  ```
+
+  `postgres_ssl=true` enables TLS to the DB (RDS Postgres 15+ forces it).
+  `POSTGRES_MAINTENANCE_DB=tracking` makes bootstrap connect to the existing
+  `tracking` DB for its `CREATE DATABASE IF NOT EXISTS` check rather than a
+  separate maintenance DB.
+
 Point the short-link domain (e.g. `go.strato.nexus`) at this server. The
 dashboard lives at `https://<TRACKING_HOST>/dashboard`. On the **app node's**
 edge nginx, enable the proxy locations so the mercata SPA's beacons stay
@@ -95,7 +122,9 @@ the app edge, which forwards the client IP and proxies here.
 | `PORT` | `3010` | Listen port |
 | `NODE_URL` | required for chain metrics | STRATO node edge for anonymous Cirrus reads, e.g. `https://app.strato.nexus` |
 | `OPENID_DISCOVERY_URL` | from `/run/secrets/oauth_credentials.yaml` | JWKS for dashboard JWT verification |
-| `postgres_host/port/user/password` | `postgres/5432/postgres` + secret | Writable pool |
+| `postgres_host/port/user/password` | `postgres/5432/postgres` + secret | Writable pool (override host/user for remote/RDS) |
+| `postgres_ssl` | `false` | `true` enables TLS to the DB (required for RDS Postgres 15+) |
+| `POSTGRES_MAINTENANCE_DB` | `postgres` | Existing DB used only for the `CREATE DATABASE` bootstrap check; set to `tracking` on RDS where that DB pre-exists |
 | `TRACKING_DB_NAME` | `tracking` | Service-owned database |
 | `TRACKING_AUTHORIZED_USERS` | empty | Comma-separated Keycloak usernames (sales/marketing) |
 | `TRACKING_DEST_ALLOWLIST` | `/dashboard/deposits,/dashboard,/dashboard/swap,/dashboard/earn,/dashboard/rewards` | Allowed link destinations |

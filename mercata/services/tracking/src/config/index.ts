@@ -37,6 +37,11 @@ export const config = {
     database: dbName,
     // Existing DB on the shared container, used only to CREATE DATABASE
     maintenanceDb: process.env.POSTGRES_MAINTENANCE_DB || "eth",
+    // TLS to the DB. Needed for remote/managed Postgres (e.g. AWS RDS, which
+    // forces SSL on PG 15+); off for the local-db container. rejectUnauthorized
+    // is false because RDS presents an Amazon CA cert not in the default trust
+    // store — see pool.ts / bootstrap.ts.
+    ssl: process.env.postgres_ssl === "true",
   },
   tracking: {
     defaultDestination: process.env.TRACKING_DEFAULT_DESTINATION || "/dashboard/deposits",
