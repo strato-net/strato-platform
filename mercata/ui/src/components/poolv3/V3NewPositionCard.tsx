@@ -25,7 +25,8 @@ const MINT_SLIPPAGE_BPS = 100n; // 1% headroom on the amount maxes
 // One-click range strategies, as percentage bounds relative to the current price.
 // A 0 bound anchors that side of the range at the current tick (one-sided strategies).
 const RANGE_PRESETS = [
-  { label: "Stable", hint: "±2%", lowerPct: -0.02, upperPct: 0.02 },
+  { label: "Stable", hint: "±0.1%", lowerPct: -0.001, upperPct: 0.001 },
+  { label: "Tight", hint: "±5%", lowerPct: -0.05, upperPct: 0.05 },
   { label: "Wide", hint: "−50% / +100%", lowerPct: -0.5, upperPct: 1 },
   { label: "One-sided lower", hint: "−50%", lowerPct: -0.5, upperPct: 0 },
   { label: "One-sided upper", hint: "+100%", lowerPct: 0, upperPct: 1 },
@@ -184,12 +185,19 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
     // A 0 bound anchors that side at the current tick, snapped so the range sits entirely
     // on one side of the price and deposits a single token: a below-price range ends at
     // the spacing-floor of the current tick, an above-price range starts at its ceiling.
-    const tl = lowerPct === 0
+    let tl = lowerPct === 0
       ? snapTick(Math.ceil(pool.currentTick / pool.tickSpacing) * pool.tickSpacing, pool.tickSpacing)
       : snapTick(priceToTick(currentPrice * (1 + lowerPct)), pool.tickSpacing);
-    const tu = upperPct === 0
+    let tu = upperPct === 0
       ? snapTick(Math.floor(pool.currentTick / pool.tickSpacing) * pool.tickSpacing, pool.tickSpacing)
       : snapTick(priceToTick(currentPrice * (1 + upperPct)), pool.tickSpacing);
+    // A preset narrower than one tick spacing (e.g. Stable ±0.03% on a 10-spacing tier)
+    // collapses when snapped — fall back to the tightest expressible range that still
+    // straddles the current price: one spacing wide, floor-aligned to the current tick.
+    if (lowerPct < 0 && upperPct > 0 && tl >= tu) {
+      tl = snapTick(Math.floor(pool.currentTick / pool.tickSpacing) * pool.tickSpacing, pool.tickSpacing);
+      tu = snapTick(tl + pool.tickSpacing, pool.tickSpacing);
+    }
     applyTicks(tl, tu);
   };
 
@@ -356,7 +364,7 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
         </div>
 
         {/* One-click range strategies around the current price */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-5 gap-1.5">
           {RANGE_PRESETS.map((p) => (
             <button
               key={p.label}
