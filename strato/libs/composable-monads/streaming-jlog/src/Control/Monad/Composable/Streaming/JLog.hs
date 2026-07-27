@@ -386,18 +386,23 @@ conduitBatchSource clientId streamAddress topicName = do
   
   -- Read batches of messages with single checkpoint at end
   forever $ do
-    result <- liftIO $ readBatchConduit topicPath subscriber
-    case result of
-      -- No new data: wait and re-check, but do NOT emit an empty batch.
-      -- Yielding [] here pushes a no-op downstream on every poll, which (e.g.)
-      -- makes the sequencer log a full loop iteration ~10x/sec while idle.
-      -- Consumers should only ever see real data.
-      Nothing -> liftIO $ threadDelay 100000
-      Just (msgs, lastId) -> do
-        liftIO $ checkpointConduit topicPath subscriber lastId
-        let items = map (decode . LBS.fromStrict) msgs
-        yield items
+    (msgs, lastId) <- liftIO $ waitForConduitBatch topicPath subscriber
+    liftIO $ checkpointConduit topicPath subscriber lastId
+    let items = map (decode . LBS.fromStrict) msgs
+    yield items
   where
+    -- Same memory-leak concern as waitForBatch above: keep the fast
+    -- no-message poll loop in concrete IO, not in the polymorphic ConduitT
+    -- loop. Also do not yield empty batches, since consumers should only
+    -- ever see real data.
+    waitForConduitBatch topicPath subscriber = do
+      result <- readBatchConduit topicPath subscriber
+      case result of
+        Nothing -> do
+          threadDelay 100000
+          waitForConduitBatch topicPath subscriber
+        Just batch -> return batch
+
     readBatchConduit topicPath subscriber = 
       withCString topicPath $ \cpath ->
         withCString subscriber $ \csub -> do
