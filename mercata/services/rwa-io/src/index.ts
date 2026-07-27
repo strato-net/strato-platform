@@ -3,7 +3,7 @@ import cron from "node-cron";
 import { config } from "./config";
 import { logInfo, logError } from "./logger";
 import { pushTokenMetrics, clearCaches } from "./tokenMetrics";
-import { pushTvl } from "./tvl";
+import { pushProjectMetrics } from "./projectMetrics";
 
 const HEALTH_FILE = "/tmp/rwa-io-healthy";
 
@@ -11,7 +11,7 @@ async function tick(): Promise<void> {
   clearCaches();
 
   const results = await Promise.allSettled([
-    pushTvl(),
+    pushProjectMetrics(),
     ...config.tokens.map((t) => pushTokenMetrics(t)),
   ]);
 
