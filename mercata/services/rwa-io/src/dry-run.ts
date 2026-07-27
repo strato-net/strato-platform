@@ -6,6 +6,7 @@
  */
 
 import { config } from "./config";
+import { fetchDailyActivity } from "./chainActivity";
 
 const WAD_NUMBER = 1e18;
 
@@ -35,6 +36,33 @@ async function main() {
     tokenB: { _symbol: string; address: string };
     tradingVolume24h: string;
   }[];
+
+  const tvlAll = tvl as unknown as { totalUsd: string; timestamp: string };
+
+  // --- Project-level series (slug=strato) ---
+  console.log("\n=== PROJECT (STRATO) ===\n");
+  const stratoAddr = config.strato.projectTokenAddress.toLowerCase();
+  const stratoPriceEntry = prices.find((d) => d.asset.toLowerCase() === stratoAddr);
+  const stratoStats = stats.tokens.find((t) => t.address.toLowerCase() === stratoAddr);
+  const projPrice = stratoPriceEntry ? wadToDecimal(stratoPriceEntry.price, 6) : "NOT FOUND";
+  const projMcap = stratoStats
+    ? parseFloat(Number(stratoStats.marketCap).toFixed(2)).toString()
+    : "NOT FOUND";
+  const projTvl = tvlAll.totalUsd ? wadToDecimal(tvlAll.totalUsd, 2) : "0";
+  let projRawVolume = 0n;
+  for (const pool of pools) {
+    if (pool.tradingVolume24h) projRawVolume += BigInt(pool.tradingVolume24h);
+  }
+  const projVolume = wadToDecimal(projRawVolume.toString(), 2);
+  console.log(`  price:              $${projPrice}`);
+  console.log(`  marketCap:          $${projMcap}`);
+  console.log(`  tvl:                $${projTvl}`);
+  console.log(`  aum:                $${projTvl}`);
+  console.log(`  totalVolume (24h):  $${projVolume}`);
+
+  const activity = await fetchDailyActivity();
+  console.log(`  dailyTransactions:  ${activity.transactions}`);
+  console.log(`  uniqueWallets:      ${activity.uniqueWallets}`);
 
   for (const token of config.tokens) {
     console.log(`\n--- ${token.symbol} ---\n`);
