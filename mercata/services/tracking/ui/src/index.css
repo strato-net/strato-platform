@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Same token names as the mercata app so ported components (incl. the world
+   map) work unchanged; values follow the viewer's OS theme. */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --border: 214 32% 91%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --primary: 217 91% 60%;
+  --primary-foreground: 0 0% 100%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --destructive: 0 84% 60%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 96%;
+    --card: 222 44% 10%;
+    --border: 217 33% 20%;
+    --muted: 217 33% 15%;
+    --muted-foreground: 215 20% 65%;
+    --primary: 217 91% 65%;
+    --primary-foreground: 222 47% 7%;
+    --popover: 222 44% 10%;
+    --popover-foreground: 210 40% 96%;
+    --destructive: 0 72% 55%;
+  }
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+}
