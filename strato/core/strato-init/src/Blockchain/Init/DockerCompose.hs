@@ -225,7 +225,7 @@ generateDockerCompose = do
             , ("STRATO_PORT_VAULT_PROXY", "8013")
             , ("JSONRPC_ENABLED", if flags_jsonrpc then "true" else "false")
             , ("RPC_PORT", rpcPort)
-            , ("TRACKING", "true")
+            , ("TRACKING_ENABLED", "true")
             , ("TRACKING_URL", "https://go.strato.nexus")
             , ("ssl", if ssl then "true" else "false")
             ]
