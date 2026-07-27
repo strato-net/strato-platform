@@ -431,14 +431,12 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
           }
         }
       }
-      // DEBUG: Log if we're adding to an existing balance (potential double-counting)
-      if (currentBalance > 0) {
-        console.log(`[_balances] ADDING to existing! token=${newInfo.address} current=${currentBalance} +new=${newValue} =result=${currentBalance + newValue}`);
-      }
+      // FIX: REPLACE instead of ADD - _balances stores absolute values, not deltas
+      // Multiple rows for the same token were being added together causing 2-3x inflation
       return { ...portfolioInfo, 
         tokens: { ...portfolioInfo.tokens,
           [newInfo.address]: { ...portfolioInfo.tokens[newInfo.address],
-            balance: currentBalance + newValue
+            balance: newValue
           }
         }
       };
@@ -486,13 +484,13 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
       };
     }
     case 'userCollaterals': {
+      // FIX: REPLACE instead of ADD - userCollaterals stores absolute values
       const token = newInfo.key['key2'] || '';
-      const currentBalance = portfolioInfo.tokens[token]?.balance || 0;
       const newValue = newInfo.value || 0;
       return { ...portfolioInfo, 
         tokens: { ...portfolioInfo.tokens,
           [token]: { ...portfolioInfo.tokens[token],
-            balance: currentBalance + newValue
+            balance: newValue
           }
         }
       };
