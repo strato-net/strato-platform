@@ -59,6 +59,7 @@ services:
     - OIDC_AUTHORITY=${OIDC_AUTHORITY:-}
     - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
     - EXPLORER_URL=${EXPLORER_URL:-}
+    - TRACKING_APP_ORIGIN=${TRACKING_APP_ORIGIN:-}
     build: ./mercata/services/tracking/ui
     image: ${TRACKINGUI_IMAGE:-<REPO_URL>tracking-ui:<VERSION>-<HASH_TRACKING_UI>}
     restart: unless-stopped

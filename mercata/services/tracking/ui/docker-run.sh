@@ -7,6 +7,7 @@ window.ENV = {
   OIDC_AUTHORITY: '${OIDC_AUTHORITY:-https://keycloak.blockapps.net/auth/realms/mercata}',
   OIDC_CLIENT_ID: '${OIDC_CLIENT_ID:-tracking-dashboard}',
   EXPLORER_URL: '${EXPLORER_URL:-https://stratoscan.strato.nexus}',
+  APP_ORIGIN: '${TRACKING_APP_ORIGIN:-https://app.strato.nexus}',
 };
 EOF
 

@@ -123,7 +123,10 @@ the app edge, which forwards the client IP and proxies here.
 tracking-ui container env (runtime `config.js`): `OIDC_AUTHORITY` (default
 `https://keycloak.blockapps.net/auth/realms/mercata`), `OIDC_CLIENT_ID`
 (default `tracking-dashboard`), `EXPLORER_URL` (default
-`https://stratoscan.strato.nexus`).
+`https://stratoscan.strato.nexus`), `TRACKING_APP_ORIGIN` (default
+`https://app.strato.nexus`) — display-only origin the dashboard uses to render
+and copy full link URLs; redirects remain host-relative and nginx never
+consults it.
 
 ## Activity categories
 

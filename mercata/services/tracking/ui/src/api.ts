@@ -186,9 +186,14 @@ export const formatUsd = (value: number | null | undefined) =>
   value == null ? '—' : usdFormatter.format(value);
 
 // The service returns link urls as relative paths ("/t/<slug>") because a
-// slug resolves on every host that proxies /t/. Render them absolute against
-// this dashboard's own origin for display and copy.
-export const absoluteLinkUrl = (url: string) => new URL(url, window.location.origin).toString();
+// slug resolves on every host that proxies /t/. For display and copy, render
+// them against the configured app origin — the host sales actually shares —
+// falling back to this dashboard's own origin.
+const appOrigin =
+  ((window as unknown as { ENV?: Record<string, string> }).ENV?.APP_ORIGIN ??
+    'https://app.strato.nexus') || window.location.origin;
+
+export const absoluteLinkUrl = (url: string) => new URL(url, appOrigin).toString();
 
 export const shortAddress = (address: string) =>
   address.length > 14 ? `${address.slice(0, 8)}…${address.slice(-6)}` : address;
