@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { Plus } from 'lucide-react';
-import { formatUsd, listLinks, setLinkActive } from '../api';
+import { absoluteLinkUrl, formatUsd, listLinks, setLinkActive } from '../api';
 import CreateLinkModal from '../components/CreateLinkModal';
 import { Button, CopyButton, Skeleton, Switch, tdClass, thClass } from '../components/primitives';
 
@@ -78,7 +78,7 @@ const LinksPage = () => {
                   <td className={tdClass}>
                     <div className="flex items-center gap-1">
                       <span className="font-mono text-xs">/t/{link.slug}</span>
-                      <CopyButton value={link.url} label="Copy link URL" />
+                      <CopyButton value={absoluteLinkUrl(link.url)} label="Copy link URL" />
                     </div>
                     <div className="text-xs text-muted-foreground">{link.label}</div>
                   </td>

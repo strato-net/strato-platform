@@ -80,9 +80,8 @@ export const config = {
       process.env.TRACKING_DEST_ALLOWLIST ||
         "/dashboard/deposits,/dashboard,/dashboard/swap,/dashboard/earn,/dashboard/rewards"
     ),
-    // Empty in dev → host-only cookie and relative redirects
+    // Empty in dev → host-only cookie
     cookieDomain: process.env.TRACKING_COOKIE_DOMAIN || "",
-    appOrigin: (process.env.TRACKING_APP_ORIGIN || "").replace(/\/$/, ""),
     cookieName: "strato_tid",
     cookieMaxAgeSeconds: 90 * 24 * 60 * 60,
     // ipinfo.io token for live IP geolocation (offline GeoLite2 snapshot

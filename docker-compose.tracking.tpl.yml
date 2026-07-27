@@ -24,7 +24,6 @@ services:
     - TRACKING_DEST_ALLOWLIST=${TRACKING_DEST_ALLOWLIST:-}
     - TRACKING_DEFAULT_DESTINATION=${TRACKING_DEFAULT_DESTINATION:-}
     - TRACKING_COOKIE_DOMAIN=${TRACKING_COOKIE_DOMAIN:-}
-    - TRACKING_APP_ORIGIN=${TRACKING_APP_ORIGIN:-}
     - TRACKING_IPINFO_TOKEN=${TRACKING_IPINFO_TOKEN:-}
     - TRACKING_ATTRIBUTION_WINDOW_DAYS=${TRACKING_ATTRIBUTION_WINDOW_DAYS:-}
     build: ./mercata/services/tracking
@@ -75,7 +74,6 @@ services:
     environment:
     - ssl=${ssl:-true}
     - sslCertFileType=${sslCertFileType:-}
-    - TRACKING_APP_ORIGIN=${TRACKING_APP_ORIGIN:-}
     build: ./mercata/services/tracking/nginx
     image: ${TRACKINGNGINX_IMAGE:-<REPO_URL>tracking-nginx:<VERSION>-<HASH_TRACKING_NGINX>}
     ports:

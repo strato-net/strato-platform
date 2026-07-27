@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ArrowLeft } from 'lucide-react';
 import {
+  absoluteLinkUrl,
   ACTIVITY_CATEGORY_LABELS,
   ACTIVITY_CATEGORY_ORDER,
   ApiError,
@@ -102,8 +103,8 @@ const LinkDetailPage = () => {
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
                 <span className="flex items-center gap-1">
                   <span className="text-muted-foreground">URL:</span>
-                  <span className="font-mono text-xs">{link.data.url}</span>
-                  <CopyButton value={link.data.url} label="Copy link URL" />
+                  <span className="font-mono text-xs">{absoluteLinkUrl(link.data.url)}</span>
+                  <CopyButton value={absoluteLinkUrl(link.data.url)} label="Copy link URL" />
                 </span>
                 <span>
                   <span className="text-muted-foreground">Source:</span> {link.data.source}

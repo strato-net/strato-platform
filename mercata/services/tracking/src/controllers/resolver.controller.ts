@@ -26,10 +26,12 @@ const buildCookie = (sessionId: string): string => {
   return parts.join("; ");
 };
 
+// Relative Location: the browser resolves it against the host the visitor
+// actually requested, so every node edge that proxies /t/ gets its visitors
+// redirected back to itself — no configured origin, no redirect_uri param.
 const redirectTo = (res: Response, destination: string): void => {
-  const location = `${config.tracking.appOrigin || ""}${destination}`;
   res.setHeader("Cache-Control", "no-store");
-  res.redirect(302, location);
+  res.redirect(302, destination);
 };
 
 // GET /t/:slug — must stay fast: session insert is fire-and-forget, and any

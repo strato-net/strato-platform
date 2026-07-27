@@ -12,7 +12,7 @@ source of truth.
 
 | Endpoint | Auth | Purpose |
 |---|---|---|
-| `GET /t/:slug` | none | Resolve a link: record `link_opened`, set the `strato_tid` session cookie (90 days, HttpOnly, SameSite=Lax), 302 to the allowlisted destination |
+| `GET /t/:slug` | none | Resolve a link: record `link_opened`, set the `strato_tid` session cookie (90 days, HttpOnly, SameSite=Lax), 302 to the allowlisted destination **on the original host** (relative Location — visitors on any node edge that proxies `/t/` land back on that node) |
 | `POST /tracking-api/engage` | cookie | SPA boot ping; sets `engaged_at` so JS-less bots/email scanners never count as engagement |
 | `POST /tracking-api/wallet-connected` | cookie | Records external wallet and/or STRATO address for the session (deduped) |
 | `GET /dashboard` | OIDC (SPA login) | The dashboard app (tracking-ui container) |
@@ -81,7 +81,6 @@ make tracking tracking-nginx tracking-ui docker-compose
 NODE_URL=https://app.strato.nexus \
 OPENID_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration \
 POSTGRES_PASSWORD=... \
-TRACKING_APP_ORIGIN=https://app.strato.nexus \
 TRACKING_COOKIE_DOMAIN=.strato.nexus \
 TRACKING_AUTHORIZED_USERS=... \
 docker compose -f docker-compose.tracking.yml up -d
@@ -116,7 +115,6 @@ the app edge, which forwards the client IP and proxies here.
 | `TRACKING_DEST_ALLOWLIST` | `/dashboard/deposits,/dashboard,/dashboard/swap,/dashboard/earn,/dashboard/rewards` | Allowed link destinations |
 | `TRACKING_DEFAULT_DESTINATION` | `/dashboard/deposits` | Bridge In page |
 | `TRACKING_COOKIE_DOMAIN` | empty (host-only) | Set `.strato.nexus` in prod so a future `go.strato.nexus` CNAME shares the cookie |
-| `TRACKING_APP_ORIGIN` | empty (relative redirects) | e.g. `https://app.strato.nexus`; also used in generated link URLs |
 | `TRACKING_IPINFO_TOKEN` | empty (offline fallback) | ipinfo.io token for live IP geolocation |
 | `TRACKING_ATTRIBUTION_WINDOW_DAYS` | `90` | Attribution window |
 | `TRACKING_CACHE_TTL_SECONDS` | `60` | Dashboard attribution cache |

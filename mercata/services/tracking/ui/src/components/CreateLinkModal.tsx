@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createLink, TRACKING_DESTINATIONS } from '../api';
+import { absoluteLinkUrl, createLink, TRACKING_DESTINATIONS } from '../api';
 import { Button, CopyButton, inputClass, Modal } from './primitives';
 
 const CreateLinkModal = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
@@ -15,11 +15,12 @@ const CreateLinkModal = ({ open, onClose }: { open: boolean; onClose: () => void
     mutationFn: createLink,
     onSuccess: async ({ url }) => {
       queryClient.invalidateQueries({ queryKey: ['links'] });
-      setCreatedUrl(url);
+      const absolute = absoluteLinkUrl(url);
+      setCreatedUrl(absolute);
       // Safari may reject clipboard writes after an async boundary; the
       // success state always shows the URL with a manual copy button.
       try {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(absolute);
       } catch {
         // manual copy still available
       }

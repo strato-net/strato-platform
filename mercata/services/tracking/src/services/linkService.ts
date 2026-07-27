@@ -1,6 +1,5 @@
 import crypto from "crypto";
 import { query } from "../db/pool";
-import { config } from "../config";
 
 export interface TrackingLink {
   id: string;
@@ -27,8 +26,10 @@ const generateSlug = (): string => {
   return slug;
 };
 
-export const publicUrlForSlug = (slug: string): string =>
-  `${config.tracking.appOrigin || ""}/t/${slug}`;
+// Relative on purpose: a slug resolves on every host that proxies /t/, so
+// the server doesn't pin a host — the dashboard renders it absolute against
+// its own origin for copy/share.
+export const publicUrlForSlug = (slug: string): string => `/t/${slug}`;
 
 export const createLink = async (
   label: string,

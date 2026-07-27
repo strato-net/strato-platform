@@ -185,5 +185,10 @@ const usdFormatter = new Intl.NumberFormat('en-US', {
 export const formatUsd = (value: number | null | undefined) =>
   value == null ? '—' : usdFormatter.format(value);
 
+// The service returns link urls as relative paths ("/t/<slug>") because a
+// slug resolves on every host that proxies /t/. Render them absolute against
+// this dashboard's own origin for display and copy.
+export const absoluteLinkUrl = (url: string) => new URL(url, window.location.origin).toString();
+
 export const shortAddress = (address: string) =>
   address.length > 14 ? `${address.slice(0, 8)}…${address.slice(-6)}` : address;
