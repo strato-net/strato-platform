@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Pencil } from 'lucide-react';
 import {
   absoluteLinkUrl,
   ACTIVITY_CATEGORY_LABELS,
@@ -13,6 +13,7 @@ import {
   WalletSummary,
 } from '../api';
 import ActivityTiles from '../components/ActivityTiles';
+import EditLinkModal from '../components/EditLinkModal';
 import WalletPanel from '../components/WalletPanel';
 import WorldMap from '../components/WorldMap';
 import {
@@ -59,6 +60,7 @@ const LinkDetailPage = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [selectedWallet, setSelectedWallet] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
 
   const link = useQuery({
     queryKey: ['links', id],
@@ -76,6 +78,17 @@ const LinkDetailPage = () => {
           Back
         </Button>
         <h1 className="text-lg font-semibold">{link.data ? link.data.label : 'Tracking Link'}</h1>
+        {link.data && (
+          <button
+            type="button"
+            aria-label="Edit label and source"
+            title="Edit label and source"
+            className="text-muted-foreground hover:text-foreground"
+            onClick={() => setEditing(true)}
+          >
+            <Pencil size={14} />
+          </button>
+        )}
         {link.data && !link.data.active && <Badge variant="secondary">Inactive</Badge>}
       </div>
 
@@ -267,6 +280,14 @@ const LinkDetailPage = () => {
       {id && (
         <WalletPanel linkId={id} address={selectedWallet} onClose={() => setSelectedWallet(null)} />
       )}
+      <EditLinkModal
+        link={
+          editing && link.data
+            ? { id: link.data.id, label: link.data.label, source: link.data.source }
+            : null
+        }
+        onClose={() => setEditing(false)}
+      />
     </div>
   );
 };

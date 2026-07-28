@@ -128,12 +128,26 @@ export interface CreateLinkInput {
   destination: string;
 }
 
+// Every primary route in the app, labeled as users see them in the sidebar.
+// Must stay a subset of the server's TRACKING_DEST_ALLOWLIST or creation 400s.
 export const TRACKING_DESTINATIONS = [
-  { value: '/dashboard/deposits', label: 'Bridge In (Fund)' },
+  { value: '/dashboard/deposits', label: 'Fund (Bridge In)' },
   { value: '/dashboard', label: 'Portfolio' },
   { value: '/dashboard/swap', label: 'Trade' },
+  { value: '/dashboard/borrow', label: 'Borrow' },
+  { value: '/dashboard/vault', label: 'Vault' },
+  { value: '/dashboard/transfer', label: 'Send' },
+  { value: '/dashboard/withdrawals', label: 'Bridge Out' },
   { value: '/dashboard/earn', label: 'Earn' },
+  { value: '/dashboard/earn-save', label: 'Savings (USDST)' },
+  { value: '/dashboard/earn-lending', label: 'Lending' },
+  { value: '/dashboard/earn-pools', label: 'Liquidity Pools' },
+  { value: '/dashboard/earn-yield-vault', label: 'Yield Vaults' },
+  { value: '/dashboard/earn-staking', label: 'Stake' },
   { value: '/dashboard/rewards', label: 'Rewards' },
+  { value: '/dashboard/advanced', label: 'Advanced Trade' },
+  { value: '/dashboard/activity', label: 'Activity Feed' },
+  { value: '/dashboard/stats', label: 'Analytics' },
 ] as const;
 
 export class ApiError extends Error {
@@ -175,6 +189,8 @@ export const createLink = (input: CreateLinkInput) =>
   });
 export const setLinkActive = (id: string, active: boolean) =>
   apiFetch<void>(`/links/${id}`, { method: 'PATCH', body: JSON.stringify({ active }) });
+export const updateLink = (id: string, fields: { label?: string; source?: string }) =>
+  apiFetch<void>(`/links/${id}`, { method: 'PATCH', body: JSON.stringify(fields) });
 
 const usdFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',

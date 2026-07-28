@@ -86,6 +86,10 @@ export const update = async (req: AuthorizedRequest, res: Response): Promise<voi
     res.status(400).json({ error: "No editable fields provided" });
     return;
   }
+  if ((fields.label?.length ?? 0) > 200 || (fields.source?.length ?? 0) > 200) {
+    res.status(400).json({ error: "label/source too long (max 200 chars)" });
+    return;
+  }
   const link = await updateLink(req.params.id, fields);
   if (!link) {
     res.status(404).json({ error: "Link not found" });

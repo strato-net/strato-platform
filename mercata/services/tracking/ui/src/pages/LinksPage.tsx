@@ -2,15 +2,19 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
-import { Plus } from 'lucide-react';
+import { Pencil, Plus } from 'lucide-react';
 import { absoluteLinkUrl, formatUsd, listLinks, setLinkActive } from '../api';
 import CreateLinkModal from '../components/CreateLinkModal';
+import EditLinkModal from '../components/EditLinkModal';
 import { Button, CopyButton, Skeleton, Switch, tdClass, thClass } from '../components/primitives';
 
 const LinksPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<{ id: string; label: string; source: string } | null>(
+    null
+  );
 
   const links = useQuery({
     queryKey: ['links'],
@@ -80,7 +84,21 @@ const LinksPage = () => {
                       <span className="font-mono text-xs">/t/{link.slug}</span>
                       <CopyButton value={absoluteLinkUrl(link.url)} label="Copy link URL" />
                     </div>
-                    <div className="text-xs text-muted-foreground">{link.label}</div>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <span>{link.label}</span>
+                      <button
+                        type="button"
+                        aria-label="Edit label and source"
+                        title="Edit label and source"
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditing({ id: link.id, label: link.label, source: link.source });
+                        }}
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    </div>
                   </td>
                   <td className={tdClass}>{link.source}</td>
                   <td className={tdClass}>{link.creator}</td>
@@ -109,6 +127,7 @@ const LinksPage = () => {
       )}
 
       <CreateLinkModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <EditLinkModal link={editing} onClose={() => setEditing(null)} />
     </div>
   );
 };

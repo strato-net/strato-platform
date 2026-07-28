@@ -76,9 +76,29 @@ export const config = {
   },
   tracking: {
     defaultDestination: process.env.TRACKING_DEFAULT_DESTINATION || "/dashboard/deposits",
+    // Default covers every primary route in the app; must stay a superset of
+    // the dashboard UI's TRACKING_DESTINATIONS dropdown or creation 400s.
     destinationAllowlist: parseList(
       process.env.TRACKING_DEST_ALLOWLIST ||
-        "/dashboard/deposits,/dashboard,/dashboard/swap,/dashboard/earn,/dashboard/rewards"
+        [
+          "/dashboard/deposits",
+          "/dashboard",
+          "/dashboard/swap",
+          "/dashboard/borrow",
+          "/dashboard/vault",
+          "/dashboard/transfer",
+          "/dashboard/withdrawals",
+          "/dashboard/earn",
+          "/dashboard/earn-save",
+          "/dashboard/earn-lending",
+          "/dashboard/earn-pools",
+          "/dashboard/earn-yield-vault",
+          "/dashboard/earn-staking",
+          "/dashboard/rewards",
+          "/dashboard/advanced",
+          "/dashboard/activity",
+          "/dashboard/stats",
+        ].join(",")
     ),
     // Empty in dev → host-only cookie
     cookieDomain: process.env.TRACKING_COOKIE_DOMAIN || "",

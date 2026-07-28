@@ -112,7 +112,7 @@ the app edge, which forwards the client IP and proxies here.
 | `TRACKING_DB_CREATE` | `true` | Set `false` when the DB user can't create databases (pre-created RDS DB) |
 | `TRACKING_DB_NAME` | `tracking` | Service-owned database |
 | `TRACKING_AUTHORIZED_USERS` | empty | Comma-separated Keycloak usernames (sales/marketing) |
-| `TRACKING_DEST_ALLOWLIST` | `/dashboard/deposits,/dashboard,/dashboard/swap,/dashboard/earn,/dashboard/rewards` | Allowed link destinations |
+| `TRACKING_DEST_ALLOWLIST` | all primary app routes (`/dashboard/deposits`, `/dashboard`, `/dashboard/swap`, `/dashboard/borrow`, `/dashboard/vault`, `/dashboard/transfer`, `/dashboard/withdrawals`, `/dashboard/earn`, `/dashboard/earn-save`, `/dashboard/earn-lending`, `/dashboard/earn-pools`, `/dashboard/earn-yield-vault`, `/dashboard/earn-staking`, `/dashboard/rewards`, `/dashboard/advanced`, `/dashboard/activity`, `/dashboard/stats`) | Allowed link destinations |
 | `TRACKING_DEFAULT_DESTINATION` | `/dashboard/deposits` | Bridge In page |
 | `TRACKING_COOKIE_DOMAIN` | empty (host-only) | Set `.strato.nexus` in prod so a future `go.strato.nexus` CNAME shares the cookie |
 | `TRACKING_IPINFO_TOKEN` | empty (offline fallback) | ipinfo.io token for live IP geolocation |
