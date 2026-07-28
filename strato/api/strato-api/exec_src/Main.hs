@@ -48,7 +48,7 @@ import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.Cache as Cache
 import qualified Data.HashMap.Strict.InsOrd as H
 import Data.Map (fromList, traverseWithKey)
-import Data.Maybe (listToMaybe, fromMaybe)
+import Data.Maybe (listToMaybe)
 import Data.Source.Map
 import Data.OpenApi hiding (Header, delete)
 import qualified Data.OpenApi as OPENAPI
@@ -72,7 +72,6 @@ import Servant.Multipart
 import Servant.OpenApi
 import Servant.Swagger.UI
 import System.Clock
-import System.Environment (lookupEnv)
 import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
@@ -188,7 +187,7 @@ main = do
       nonceCounterTimeout = 10
 
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
-  vmJsonRpcUrl' <- fromMaybe "http://localhost:8545" <$> lookupEnv "VM_JSONRPC_URL"
+  simCounter <- newTVarIO 0
 
   let env =
         BlocEnv
@@ -196,7 +195,9 @@ main = do
             Bloc.Monad.gasLimit = Conf.gasLimit (networkConfig ethConf),
             Bloc.Monad.stateFetchLimit = stateFetchLimit',
             Bloc.Monad.globalNonceCounter = nonceCache,
-            Bloc.Monad.vmJsonRpcUrl = vmJsonRpcUrl'
+            Bloc.Monad.vmJsonRpcUrl = Conf.vmJsonRpcUrl (Conf.vmConfig ethConf),
+            Bloc.Monad.simInFlight = simCounter,
+            Bloc.Monad.simMaxConcurrent = Conf.simMaxConcurrent (Conf.vmConfig ethConf)
           }
   let bindHost' = Conf.apiListenAddress (Conf.apiConfig ethConf)
       bindPort = Conf.apiPort (Conf.apiConfig ethConf)

@@ -16,3 +16,8 @@ quarryConfig:
 
 blockConfig:
   blockTime: 13
+
+vmConfig:
+  # Transaction simulation (dry-run) settings.
+  vmJsonRpcUrl: "http://localhost:8545"
+  simMaxConcurrent: 8

@@ -47,6 +47,7 @@ defineFlag "notificationServerUrl" "" "URL of the notification server for market
 
 defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
 defineFlag "jsonrpc" (True :: Bool) "Start the Ethereum JSON-RPC server (port 8545) for wallet integration"
+defineFlag "publicDebugRpc" (False :: Bool) "Expose debug_* and eth_simulateV1 on the public /rpc endpoint (default: blocked; the bloc simulate endpoint is unaffected)"
 defineFlag "localAuth" (False :: Bool) "Use local auth (Kratos/Hydra) instead of external Keycloak"
 defineFlag "sslDir" ("" :: String) "Path to directory containing server.pem and server.key (enables SSL)"
 

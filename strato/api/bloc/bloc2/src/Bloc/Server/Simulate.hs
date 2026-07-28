@@ -48,7 +48,7 @@ import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Model.SyncState (BestBlock, WorldBestBlock)
 import Blockchain.SyncDB (SyncStatus)
 import Control.Lens ((^.))
-import Control.Monad (forM, when)
+import Control.Monad (forM, unless, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Data.Aeson ((.=))
@@ -155,87 +155,90 @@ postBlocTransactionSimulate mToken mUsername mChainId trace (PostBlocTransaction
               funcCallArgs = args
             }
 
-  -- One plan per payload, preserving body order (sandbox state accumulates
-  -- across calls). Marshaling failures become per-tx Failure results rather
-  -- than failing the whole request.
-  plans <- forM txs' $ \tx -> try @_ @ApiError $ case tx of
-    BlocTransfer _ ->
-      throwIO $ Unimplemented "TRANSFER payloads are not simulatable; use a FUNCTION transfer on the token contract"
-    BlocContract p
-      | useWallet -> do
-          (cn, contractSrc, _, ctorLits) <- marshalCreatePayload msrcs p
-          outer <-
-            marshalOuterCall userContractAddr "createContract" $
-              walletWrapCreate cn contractSrc ctorLits
-          pure $
-            SimPlan
-              (mkFuncCall userContractAddr "createContract" outer (hexGas $ mergeTxParams (contractpayloadTxParams p) txParams))
-              (SimCall userContractAddr "createContract")
-      | otherwise -> do
-          (cn, contractSrc, _, ctorLits) <- marshalCreatePayload msrcs p
-          pure $
-            SimPlan
-              ( SpecCreate
-                  TxCreateObject
-                    { createFrom = addr,
-                      createGas = hexGas $ mergeTxParams (contractpayloadTxParams p) txParams,
-                      createValue = "0x0",
-                      createContractName = cn,
-                      createSource = serializeSourceMap contractSrc,
-                      createArgs = ctorLits
-                    }
-              )
-              (SimCreate cn)
-    BlocFunction p
-      | useWallet && userContractAddr /= functionpayloadContractAddress p -> do
-          inner <- marshalInnerCallArgs (functionpayloadContractAddress p) (functionpayloadMethod p) (functionpayloadArgs p)
-          outer <-
-            marshalOuterCall userContractAddr "callContract" $
-              walletWrapCall (functionpayloadContractAddress p) (functionpayloadMethod p) inner
-          pure $
-            SimPlan
-              (mkFuncCall userContractAddr "callContract" outer (hexGas $ mergeTxParams (functionpayloadTxParams p) txParams))
-              (SimCall userContractAddr "callContract")
-      | otherwise -> do
-          args' <- marshalOuterCall (functionpayloadContractAddress p) (functionpayloadMethod p) (functionpayloadArgs p)
-          pure $
-            SimPlan
-              (mkFuncCall (functionpayloadContractAddress p) (functionpayloadMethod p) args' (hexGas $ mergeTxParams (functionpayloadTxParams p) txParams))
-              (SimCall (functionpayloadContractAddress p) (functionpayloadMethod p))
+  -- Bound the number of concurrent simulations so they cannot starve
+  -- block processing on the shared VM; excess requests are shed (503).
+  withSimSlot env $ do
+    -- One plan per payload, preserving body order (sandbox state accumulates
+    -- across calls). Marshaling failures become per-tx Failure results rather
+    -- than failing the whole request.
+    plans <- forM txs' $ \tx -> try @_ @ApiError $ case tx of
+      BlocTransfer _ ->
+        throwIO $ Unimplemented "TRANSFER payloads are not simulatable; use a FUNCTION transfer on the token contract"
+      BlocContract p
+        | useWallet -> do
+            (cn, contractSrc, _, ctorLits) <- marshalCreatePayload msrcs p
+            outer <-
+              marshalOuterCall userContractAddr "createContract" $
+                walletWrapCreate cn contractSrc ctorLits
+            pure $
+              SimPlan
+                (mkFuncCall userContractAddr "createContract" outer (hexGas $ mergeTxParams (contractpayloadTxParams p) txParams))
+                (SimCall userContractAddr "createContract")
+        | otherwise -> do
+            (cn, contractSrc, _, ctorLits) <- marshalCreatePayload msrcs p
+            pure $
+              SimPlan
+                ( SpecCreate
+                    TxCreateObject
+                      { createFrom = addr,
+                        createGas = hexGas $ mergeTxParams (contractpayloadTxParams p) txParams,
+                        createValue = "0x0",
+                        createContractName = cn,
+                        createSource = serializeSourceMap contractSrc,
+                        createArgs = ctorLits
+                      }
+                )
+                (SimCreate cn)
+      BlocFunction p
+        | useWallet && userContractAddr /= functionpayloadContractAddress p -> do
+            inner <- marshalInnerCallArgs (functionpayloadContractAddress p) (functionpayloadMethod p) (functionpayloadArgs p)
+            outer <-
+              marshalOuterCall userContractAddr "callContract" $
+                walletWrapCall (functionpayloadContractAddress p) (functionpayloadMethod p) inner
+            pure $
+              SimPlan
+                (mkFuncCall userContractAddr "callContract" outer (hexGas $ mergeTxParams (functionpayloadTxParams p) txParams))
+                (SimCall userContractAddr "callContract")
+        | otherwise -> do
+            args' <- marshalOuterCall (functionpayloadContractAddress p) (functionpayloadMethod p) (functionpayloadArgs p)
+            pure $
+              SimPlan
+                (mkFuncCall (functionpayloadContractAddress p) (functionpayloadMethod p) args' (hexGas $ mergeTxParams (functionpayloadTxParams p) txParams))
+                (SimCall (functionpayloadContractAddress p) (functionpayloadMethod p))
 
-  let specs = [simSpec pl | Right pl <- plans]
-  vmCalls <-
-    if null specs
-      then pure []
-      else
-        jsonRpcCall
-          url
-          "eth_simulateV1"
-          [ Aeson.object ["blockStateCalls" .= [Aeson.object ["calls" .= specs]]],
-            Aeson.String "latest"
-          ]
-          >>= \case
-            Left err -> throwIO . VMError $ "simulation failed: " <> err
-            Right v -> case Aeson.parseEither parseSimBlocks v of
-              Left perr -> throwIO . VMError . Text.pack $ "unexpected simulation response: " ++ perr
-              Right calls -> pure calls
+    let specs = [simSpec pl | Right pl <- plans]
+    vmCalls <-
+      if null specs
+        then pure []
+        else
+          jsonRpcCall
+            url
+            "eth_simulateV1"
+            [ Aeson.object ["blockStateCalls" .= [Aeson.object ["calls" .= specs]]],
+              Aeson.String "latest"
+            ]
+            >>= \case
+              Left err -> throwIO . VMError $ "simulation failed: " <> err
+              Right v -> case Aeson.parseEither parseSimBlocks v of
+                Left perr -> throwIO . VMError . Text.pack $ "unexpected simulation response: " ++ perr
+                Right calls -> pure calls
 
-  mTraceVal <-
-    if trace
-      then case specs of
-        [spec] ->
-          jsonRpcCall url "debug_traceCall" [Aeson.toJSON spec, Aeson.String "latest", Aeson.object ["statements" .= False]] >>= \case
-            Left err -> do
-              $logWarnS "simulate/trace" $ "debug_traceCall failed: " <> err
-              pure Nothing
-            Right v -> pure $ Just v
-        _ -> pure Nothing
-      else pure Nothing
+    mTraceVal <-
+      if trace
+        then case specs of
+          [spec] ->
+            jsonRpcCall url "debug_traceCall" [Aeson.toJSON spec, Aeson.String "latest", Aeson.object ["statements" .= False]] >>= \case
+              Left err -> do
+                $logWarnS "simulate/trace" $ "debug_traceCall failed: " <> err
+                pure Nothing
+              Right v -> pure $ Just v
+          _ -> pure Nothing
+        else pure Nothing
 
-  results <- zipPlans plans vmCalls
-  pure $ case (mTraceVal, results) of
-    (Just tv, [r]) -> [r {blocsimulateTrace = Just tv}]
-    _ -> results
+    results <- zipPlans plans vmCalls
+    pure $ case (mTraceVal, results) of
+      (Just tv, [r]) -> [r {blocsimulateTrace = Just tv}]
+      _ -> results
   where
     zipPlans [] _ = pure []
     zipPlans (Left apiErr : rest) vms = (failureResult apiErr :) <$> zipPlans rest vms
@@ -244,6 +247,24 @@ postBlocTransactionSimulate mToken mUsername mChainId trace (PostBlocTransaction
       (r :) <$> zipPlans rest vms
     zipPlans (Right _ : _) [] =
       throwIO $ VMError "simulation returned fewer results than expected"
+
+-- | Run a simulation while holding one of a bounded number of slots. When all
+-- slots are taken the request is shed immediately with a 503 rather than
+-- queuing more VM work.
+withSimSlot :: MonadUnliftIO m => Bloc.Monad.BlocEnv -> m a -> m a
+withSimSlot env = bracket acquire (const release) . const
+  where
+    counter = Bloc.Monad.simInFlight env
+    cap = Bloc.Monad.simMaxConcurrent env
+    acquire = do
+      ok <- liftIO . atomically $ do
+        n <- readTVar counter
+        if n >= cap
+          then pure False
+          else writeTVar counter (n + 1) >> pure True
+      unless ok . throwIO $
+        UnavailableError "too many simulations in progress; please retry shortly"
+    release = liftIO . atomically $ modifyTVar' counter (subtract 1)
 
 -- | The steps postUsersContractMethod' performs before signing: resolve the
 -- target contract, verify the method exists, render args to literals.
