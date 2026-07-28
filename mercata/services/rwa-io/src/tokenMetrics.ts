@@ -13,7 +13,7 @@ const WAD_NUMBER = 1e18;
  * Convert a WAD-scaled BigInt string to a decimal string with up to `decimals`
  * fractional digits (trailing zeros stripped).
  */
-function wadToDecimal(raw: string, decimals = 6): string {
+export function wadToDecimal(raw: string, decimals = 6): string {
   const n = Number(BigInt(raw)) / WAD_NUMBER;
   return parseFloat(n.toFixed(decimals)).toString();
 }
@@ -39,7 +39,7 @@ interface TokenMetrics {
 // STRATO data fetchers (shared across all tokens)
 // ---------------------------------------------------------------------------
 
-interface OraclePrice {
+export interface OraclePrice {
   asset: string;
   price: string;
 }
@@ -47,7 +47,7 @@ interface OraclePrice {
 // Cache oracle prices per tick so we only fetch once for all tokens.
 let oraclePricesCache: OraclePrice[] | undefined;
 
-async function fetchOraclePrices(): Promise<OraclePrice[]> {
+export async function fetchOraclePrices(): Promise<OraclePrice[]> {
   if (oraclePricesCache) return oraclePricesCache;
 
   const url = `${config.strato.baseUrl}/api/oracle/price`;
@@ -58,20 +58,20 @@ async function fetchOraclePrices(): Promise<OraclePrice[]> {
   return oraclePricesCache;
 }
 
-interface TokenStatsToken {
+export interface TokenStatsToken {
   address: string;
   symbol: string;
   totalSupply: string;
   marketCap: string;
 }
 
-interface TokenStatsResponse {
+export interface TokenStatsResponse {
   tokens: TokenStatsToken[];
 }
 
 let tokenStatsCache: TokenStatsResponse | undefined;
 
-async function fetchTokenStats(): Promise<TokenStatsResponse> {
+export async function fetchTokenStats(): Promise<TokenStatsResponse> {
   if (tokenStatsCache) return tokenStatsCache;
 
   const url = `${config.strato.baseUrl}/api/tokens/stats`;
@@ -112,7 +112,7 @@ interface PoolToken {
   _symbol: string;
 }
 
-interface SwapPool {
+export interface SwapPool {
   address: string;
   tokenA: PoolToken;
   tokenB: PoolToken;
@@ -121,7 +121,7 @@ interface SwapPool {
 
 let swapPoolsCache: SwapPool[] | undefined;
 
-async function fetchSwapPools(): Promise<SwapPool[]> {
+export async function fetchSwapPools(): Promise<SwapPool[]> {
   if (swapPoolsCache) return swapPoolsCache;
 
   const url = `${config.strato.baseUrl}/api/swap-pools`;

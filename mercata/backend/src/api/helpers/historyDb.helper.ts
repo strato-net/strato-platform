@@ -7,6 +7,31 @@ import {
 } from "./history.helper";
 
 /**
+ * Deduplicate array by a key function. Keeps first occurrence.
+ */
+function dedupByKey<T>(arr: T[], keyFn: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  return arr.filter((item) => {
+    const key = keyFn(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
+ * Sort by broadest validity period first (infinity valid_to comes first).
+ */
+function sortByBroadFirst<T extends { valid_from: string; valid_to: string }>(arr: T[]): T[] {
+  return [...arr].sort((a, b) => {
+    const aTo = a.valid_to === 'infinity' ? Number.MAX_SAFE_INTEGER : Date.parse(a.valid_to + 'Z');
+    const bTo = b.valid_to === 'infinity' ? Number.MAX_SAFE_INTEGER : Date.parse(b.valid_to + 'Z');
+    if (aTo !== bTo) return bTo - aTo;
+    return Date.parse(a.valid_from + 'Z') - Date.parse(b.valid_from + 'Z');
+  });
+}
+
+/**
  * Reconstruct time-series snapshots from raw history rows.
  * Rows should be sorted by valid_from for optimal early-termination in the inner loops.
  */
@@ -26,7 +51,7 @@ export function buildSnapshots(
     .fill(null)
     .map((_, i) => ({
       timestamp: endTimestamp - interval * (numTicks - i),
-      data: initialSnapshotData,
+      data: structuredClone(initialSnapshotData),
     }));
 
   const applyRows = <T extends { valid_from: string; valid_to: string }>(
@@ -46,7 +71,7 @@ export function buildSnapshots(
         }
       } else if (validFrom <= startTimestamp) {
         for (let i = 0; i < snapshots.length; i++) {
-          if (snapshots[i].timestamp <= validTo) {
+          if (snapshots[i].timestamp < validTo) {
             snapshots[i].data = reducer(snapshots[i].data, h);
           } else {
             break;
@@ -64,11 +89,11 @@ export function buildSnapshots(
         for (let i = 0; i < snapshots.length; i++) {
           if (
             snapshots[i].timestamp >= validFrom &&
-            snapshots[i].timestamp <= validTo
+            snapshots[i].timestamp < validTo
           ) {
             snapshots[i].data = reducer(snapshots[i].data, h);
           }
-          if (snapshots[i].timestamp > validTo) {
+          if (snapshots[i].timestamp >= validTo) {
             break;
           }
         }
@@ -101,6 +126,8 @@ export interface NetBalanceMappingFilterParams {
   includeV3Positions?: boolean;
   /** tokens that must be in the pass-2 price query beyond what computeRelevantTokens finds (V3 pool token0/token1) */
   extraRelevantTokens?: string[];
+  stratoStakingAddress?: string;
+  stratoTokenAddress?: string;
 }
 
 /**
@@ -145,6 +172,9 @@ const USER_MAPPING_COLLECTIONS = [
   'userCollaterals',
   'userLoan',
   'vaults',
+  'delegatedStake',    // StratoStaking: user's delegated stake per operator
+  'unbondingQueue',    // StratoStaking: user's unclaimed unbonding requests
+  'operators',         // StratoStaking: operator self-bond (if user is an operator)
 ];
 
 // Collections fetched in pass 2, filtered to relevant tokens only.
@@ -162,6 +192,7 @@ const GLOBAL_MAPPING_COLLECTIONS = [
  * - Specific `_balances` paths (liquidity pool, vault bot executor, carry vault idle assets)
  * - Carry vault claimable assets for this user
  * - User's pending withdrawal requests
+ * - StratoStaking delegatedStake, unbondingQueue, and operators (self-bond) for this user
  *
  * Excludes prices/collateralConfigs/collateralGlobalStates — those are fetched in pass 2.
  */
@@ -198,6 +229,12 @@ export async function fetchUserMappingHistory(
     requestPaths.push(rf.path);
   }
 
+  // Staking-specific address filter (only fetch staking data from the staking contract)
+  const stakingAddress = filters.stratoStakingAddress || '';
+
+  // FIX: Exclude staking collections from general path LIKE to prevent matching
+  // delegatedStake[userA][operatorB] when querying for operatorB (as the user).
+  // Staking data is fetched via the specific key->>'key' condition instead.
   const sql = `
     SELECT address, collection_name, key, path, value, valid_from, valid_to
     FROM "history@mapping"
@@ -205,10 +242,11 @@ export async function fetchUserMappingHistory(
       AND valid_to >= $2
       AND collection_name = ANY($3)
       AND (
-        path LIKE $4
+        (path LIKE $4 AND collection_name NOT IN ('delegatedStake', 'unbondingQueue', 'operators'))
         OR path = ANY($5)
         OR (address = ANY($6) AND path = $7)
         OR (address = ANY($8) AND path = ANY($9))
+        OR (address = $10 AND collection_name IN ('delegatedStake', 'unbondingQueue', 'operators') AND key->>'key' = $11)
       )
   `;
 
@@ -222,6 +260,8 @@ export async function fetchUserMappingHistory(
     claimablePath,
     requestAddrs.length > 0 ? requestAddrs : [''],
     requestPaths.length > 0 ? requestPaths : [''],
+    stakingAddress,
+    filters.userAddress,
   ]);
 }
 
@@ -275,6 +315,7 @@ export async function fetchGlobalMappingHistory(
  * - borrowableAsset for lending market (mToken) tokens the user holds
  * - Underlying assets for carry vaults (needed for value calculation of claimable/queued)
  * - Vault supported assets and share token
+ * - STRATO token (if user has staked STRATO)
  */
 function computeRelevantTokens(
   storageHistory: StorageHistoryElement[],
@@ -282,9 +323,11 @@ function computeRelevantTokens(
   vaultConfig: { shareToken: string; botExecutor: string; supportedAssets: string[] } | null,
   carryVaultAddrs: string[],
   userAddress: string,
+  stratoTokenAddress?: string,
 ): string[] {
   const tokens = new Set<string>();
   const userBalancePath = `_balances[${userAddress}]`;
+  let hasStakingData = false;
 
   // 1. Direct tokens from user mapping rows
   for (const row of userMappingHistory) {
@@ -299,6 +342,9 @@ function computeRelevantTokens(
       // Token address is in key.key2
       const tokenAddr = (row.key as any)?.key2;
       if (tokenAddr) tokens.add(tokenAddr);
+    } else if (row.collection_name === 'delegatedStake' || row.collection_name === 'unbondingQueue') {
+      // User has staking data — we need STRATO token price
+      hasStakingData = true;
     }
   }
 
@@ -329,6 +375,11 @@ function computeRelevantTokens(
       if (asset) tokens.add(asset);
     }
     if (vaultConfig.shareToken) tokens.add(vaultConfig.shareToken);
+  }
+
+  // 4. STRATO token (needed for staked STRATO valuation)
+  if (hasStakingData && stratoTokenAddress) {
+    tokens.add(stratoTokenAddress);
   }
 
   return Array.from(tokens);
@@ -481,6 +532,7 @@ export async function getHistoryDirect(
     vaultConfig,
     mappingFilterParams.carryVaultAddrs,
     mappingFilterParams.userAddress,
+    mappingFilterParams.stratoTokenAddress,
   );
   for (const extra of mappingFilterParams.extraRelevantTokens || []) {
     if (extra && !relevantTokens.includes(extra)) relevantTokens.push(extra);
@@ -496,10 +548,20 @@ export async function getHistoryDirect(
 
   const mappingHistory = [...userMappingHistory, ...globalMappingHistory];
 
+  // Dedup and sort for consistent processing
+  const dedupedStorage = sortByBroadFirst(
+    dedupByKey(storageHistory, (row) => `${row.address}|${row.valid_from}|${row.valid_to}`)
+  );
+  const dedupedMapping = sortByBroadFirst(
+    dedupByKey(mappingHistory, (row) => 
+      `${row.address}|${row.collection_name}|${row.path}|${row.valid_from}|${row.valid_to}`
+    )
+  );
+
   return buildSnapshots(
     params,
-    storageHistory,
-    mappingHistory,
+    dedupedStorage,
+    dedupedMapping,
     initialSnapshotData,
     storageReducer,
     mappingReducer,

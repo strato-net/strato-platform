@@ -31,6 +31,17 @@ export default defineConfig(({ mode }) => ({
         changeOrigin: true,
         secure: false,
       },
+      '/tracking-api': {
+        target: 'http://localhost:3010',
+        changeOrigin: true,
+        secure: false,
+      },
+      // Regex so plain /t-prefixed asset paths don't match; only the resolver.
+      '^/t/': {
+        target: 'http://localhost:3010',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
   plugins: [
