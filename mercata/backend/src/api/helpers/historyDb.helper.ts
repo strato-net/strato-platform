@@ -438,30 +438,6 @@ export async function fetchActiveRequestIds(
 }
 
 /**
- * Latest _symbol per token address from history@storage.
- * Used so graph point logs can show real symbols for plain tokens
- * (ETH/STRATO/VOUCHER etc.) that are not in the LP/vault storage filter.
- */
-async function fetchTokenSymbols(addresses: string[]): Promise<Map<string, string>> {
-  if (addresses.length === 0) return new Map();
-
-  const sql = `
-    SELECT DISTINCT ON (address) address, data->>'_symbol' AS symbol
-    FROM "history@storage"
-    WHERE address = ANY($1)
-      AND data->>'_symbol' IS NOT NULL
-      AND data->>'_symbol' != ''
-    ORDER BY address, valid_from DESC
-  `;
-  const rows = await query<{ address: string; symbol: string }>(sql, [addresses]);
-  const map = new Map<string, string>();
-  for (const row of rows) {
-    if (row.symbol) map.set(row.address, row.symbol);
-  }
-  return map;
-}
-
-/**
  * Direct-SQL version of getHistory for the net-balance-history endpoint.
  *
  * Two-pass approach:
@@ -523,26 +499,11 @@ export async function getHistoryDirect(
     )
   );
 
-  console.log(`[getHistoryDirect] Storage: ${storageHistory.length} → ${dedupedStorage.length} after dedup | Mapping: ${mappingHistory.length} → ${dedupedMapping.length} after dedup | tokens=${relevantTokens.length}`);
-
-  // Seed address→symbol so graph point logs show real symbols (not UNKNOWN)
-  const symbolMap = await fetchTokenSymbols(relevantTokens);
-  const seededInitial = {
-    ...initialSnapshotData,
-    tokens: { ...(initialSnapshotData.tokens || {}) },
-  };
-  for (const [addr, symbol] of symbolMap) {
-    seededInitial.tokens[addr] = {
-      ...(seededInitial.tokens[addr] || {}),
-      symbol,
-    };
-  }
-
   return buildSnapshots(
     params,
     dedupedStorage,
     dedupedMapping,
-    seededInitial,
+    initialSnapshotData,
     storageReducer,
     mappingReducer,
     snapshotFn,
