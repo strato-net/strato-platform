@@ -438,6 +438,30 @@ export async function fetchActiveRequestIds(
 }
 
 /**
+ * Latest _symbol per token address from history@storage.
+ * Used so graph point logs can show real symbols for plain tokens
+ * (ETH/STRATO/VOUCHER etc.) that are not in the LP/vault storage filter.
+ */
+async function fetchTokenSymbols(addresses: string[]): Promise<Map<string, string>> {
+  if (addresses.length === 0) return new Map();
+
+  const sql = `
+    SELECT DISTINCT ON (address) address, data->>'_symbol' AS symbol
+    FROM "history@storage"
+    WHERE address = ANY($1)
+      AND data->>'_symbol' IS NOT NULL
+      AND data->>'_symbol' != ''
+    ORDER BY address, valid_from DESC
+  `;
+  const rows = await query<{ address: string; symbol: string }>(sql, [addresses]);
+  const map = new Map<string, string>();
+  for (const row of rows) {
+    if (row.symbol) map.set(row.address, row.symbol);
+  }
+  return map;
+}
+
+/**
  * Direct-SQL version of getHistory for the net-balance-history endpoint.
  *
  * Two-pass approach:
@@ -499,53 +523,26 @@ export async function getHistoryDirect(
     )
   );
 
-  // Detailed debug logging
-  console.log(`\n╔══════════════════════════════════════════════════════════════════╗`);
-  console.log(`║              NET BALANCE HISTORY DEBUG                           ║`);
-  console.log(`╠══════════════════════════════════════════════════════════════════╣`);
-  console.log(`║ User Address: ${mappingFilterParams.userAddress}`);
-  console.log(`║ Time Range: ${startTime} → ${endTime}`);
-  console.log(`║ Price Oracle: ${mappingFilterParams.priceOracle}`);
-  console.log(`╠══════════════════════════════════════════════════════════════════╣`);
-  console.log(`║ STORAGE ROWS: ${storageHistory.length} fetched → ${dedupedStorage.length} after dedup`);
-  console.log(`║ MAPPING ROWS: ${mappingHistory.length} fetched → ${dedupedMapping.length} after dedup`);
-  console.log(`║   - User mapping: ${userMappingHistory.length} rows`);
-  console.log(`║   - Global mapping (prices/configs): ${globalMappingHistory.length} rows`);
-  console.log(`║ RELEVANT TOKENS: ${relevantTokens.length}`);
-  console.log(`╚══════════════════════════════════════════════════════════════════╝\n`);
+  console.log(`[getHistoryDirect] Storage: ${storageHistory.length} → ${dedupedStorage.length} after dedup | Mapping: ${mappingHistory.length} → ${dedupedMapping.length} after dedup | tokens=${relevantTokens.length}`);
 
-  // Log LP tokens found in storage
-  const lpTokensInStorage = dedupedStorage.filter(s => 
-    s.data?._symbol?.endsWith('-LP') || s.data?.lpToken
-  );
-  if (lpTokensInStorage.length > 0) {
-    console.log(`[DEBUG] LP Tokens in storage (${lpTokensInStorage.length}):`);
-    lpTokensInStorage.forEach(lp => {
-      const symbol = lp.data?._symbol || 'POOL';
-      const addr = lp.data?.lpToken || lp.address;
-      const supply = lp.data?._totalSupply || 'N/A';
-      console.log(`  - ${symbol} (${addr.slice(0,10)}...) | supply=${supply} | valid: ${lp.valid_from} → ${lp.valid_to}`);
-    });
-  }
-
-  // Log _balances rows for user (to check if any LP token balance is incorrectly included)
-  const balanceRows = dedupedMapping.filter(m => m.collection_name === '_balances');
-  console.log(`[DEBUG] User _balances rows (${balanceRows.length}):`);
-  balanceRows.slice(0, 20).forEach(b => {
-    const val = typeof b.value === 'number' ? b.value : parseFloat(b.value) || 0;
-    if (val > 0) {
-      console.log(`  - Token ${b.address.slice(0,10)}... | balance=${val.toExponential(2)} | path=${b.path}`);
-    }
-  });
-  if (balanceRows.length > 20) {
-    console.log(`  ... and ${balanceRows.length - 20} more balance rows`);
+  // Seed address→symbol so graph point logs show real symbols (not UNKNOWN)
+  const symbolMap = await fetchTokenSymbols(relevantTokens);
+  const seededInitial = {
+    ...initialSnapshotData,
+    tokens: { ...(initialSnapshotData.tokens || {}) },
+  };
+  for (const [addr, symbol] of symbolMap) {
+    seededInitial.tokens[addr] = {
+      ...(seededInitial.tokens[addr] || {}),
+      symbol,
+    };
   }
 
   return buildSnapshots(
     params,
     dedupedStorage,
     dedupedMapping,
-    initialSnapshotData,
+    seededInitial,
     storageReducer,
     mappingReducer,
     snapshotFn,

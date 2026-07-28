@@ -437,10 +437,12 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
       }
       // FIX: REPLACE instead of ADD - _balances stores absolute values, not deltas
       // Multiple rows for the same token were being added together causing 2-3x inflation
+      // walletBalance mirrors balance for diagnostics only (see processBalanceSnapshot logging)
       return { ...portfolioInfo, 
         tokens: { ...portfolioInfo.tokens,
           [newInfo.address]: { ...portfolioInfo.tokens[newInfo.address],
-            balance: newValue
+            balance: newValue,
+            walletBalance: newValue
           }
         }
       };
@@ -489,12 +491,15 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
     }
     case 'userCollaterals': {
       // FIX: REPLACE instead of ADD - userCollaterals stores absolute values
+      // collateralBalance mirrors balance for diagnostics only. NOTE: this write
+      // overwrites any wallet balance for the same token — logging surfaces that.
       const token = newInfo.key['key2'] || '';
       const newValue = newInfo.value || 0;
       return { ...portfolioInfo, 
         tokens: { ...portfolioInfo.tokens,
           [token]: { ...portfolioInfo.tokens[token],
-            balance: newValue
+            balance: newValue,
+            collateralBalance: newValue
           }
         }
       };
@@ -572,48 +577,48 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
   
   let netBalance: number = 0;
   let netLoan: number = 0;
-  const warnings: string[] = [];
+  type Bucket = 'WALLET' | 'COLLATERAL' | 'WALLET+COLLATERAL' | 'CARRY VAULT' | 'STAKED' | 'UNKNOWN SOURCE';
   const contributions: Array<{
+    bucket: Bucket;
     symbol: string;
     address: string;
     balance: number;
+    walletBalance: number;
+    collateralBalance: number;
     priceUsd: number;
     valueUsd: number;
     isLpToken: boolean;
     hasPool: boolean;
     skipped: boolean;
     reason?: string;
-    warning?: string;
+    note?: string;
   }> = [];
-  
-  // Count tokens with balance vs without
-  let tokensWithBalance = 0;
-  let tokensWithoutBalance = 0;
+
+  // Which raw source produced token.balance — both writes land on the same field,
+  // so a token present in both means one silently overwrote the other.
+  const classify = (token: any): { bucket: Bucket; note?: string } => {
+    const w = token?.walletBalance || 0;
+    const c = token?.collateralBalance || 0;
+    if (w > 0 && c > 0) {
+      const used = token?.balance || 0;
+      return {
+        bucket: 'WALLET+COLLATERAL',
+        note: `OVERWRITE: wallet=${w.toExponential(2)} coll=${c.toExponential(2)} → calc used ${used.toExponential(2)}`,
+      };
+    }
+    if (c > 0) return { bucket: 'COLLATERAL' };
+    if (w > 0) return { bucket: 'WALLET' };
+    return { bucket: 'UNKNOWN SOURCE' };
+  };
   
   for (const tokenAddr in snapshot.data.tokens) {
     const token = snapshot.data.tokens[tokenAddr] || {};
     let tokenPrice = token?.price || 0;
     const tokenBalance = token?.balance || 0;
-    const tokenSymbol = token?.symbol || 'UNKNOWN';
-    const tokenSupply = token?.supply || '0';
+    const tokenSymbol = token?.symbol || tokenAddr.slice(0, 10) + '...';
+    const walletBal = (token?.walletBalance || 0) / 1e18;
+    const collBal = (token?.collateralBalance || 0) / 1e18;
     
-    // Track token counts
-    if (tokenBalance > 0) tokensWithBalance++;
-    else tokensWithoutBalance++;
-    
-    // WARNING: Large balance check
-    const balanceInTokens = tokenBalance / 1e18;
-    if (balanceInTokens > 1e9) { // More than 1 billion tokens
-      warnings.push(`⚠️ HUGE BALANCE: ${tokenSymbol} (${tokenAddr.slice(0,10)}...) has ${balanceInTokens.toExponential(2)} tokens`);
-    }
-    
-    // WARNING: LP token with balance but it matches total supply (suspicious!)
-    if ((token?.isLpToken || tokenSymbol.endsWith('-LP')) && tokenBalance > 0 && tokenSupply !== '0') {
-      const supplyNum = parseFloat(tokenSupply);
-      if (Math.abs(tokenBalance - supplyNum) < 1e15) { // Balance equals supply (within rounding)
-        warnings.push(`🚨 LP BALANCE = SUPPLY: ${tokenSymbol} balance=${tokenBalance} supply=${tokenSupply} - USER SHOULDN'T OWN ENTIRE LP SUPPLY!`);
-      }
-    }
     if (token?.scaledDebt) {
       const rateAccumulator = Number(safeBigInt(token?.rateAccumulator) / 1000000000000000000n) / 1000000000;
       const loanAmt = (token?.scaledDebt || 0) * rateAccumulator;
@@ -623,7 +628,21 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
       if (token?.userClaimableAssets) {
         const ulAsset = token?.underlyingAsset || '';
         const ulPrice = snapshot.data.tokens[ulAsset]?.price || 0;
-        netBalance += (token.userClaimableAssets / 1000000000) * (ulPrice / 1000000000);
+        const claimableValue = (token.userClaimableAssets / 1000000000) * (ulPrice / 1000000000);
+        netBalance += claimableValue;
+        contributions.push({
+          bucket: 'CARRY VAULT',
+          symbol: `${tokenSymbol} (claimable)`,
+          address: tokenAddr,
+          balance: token.userClaimableAssets / 1e18,
+          walletBalance: 0,
+          collateralBalance: 0,
+          priceUsd: ulPrice / 1e18,
+          valueUsd: claimableValue / 1e18,
+          isLpToken: false,
+          hasPool: false,
+          skipped: false,
+        });
       }
       if (token?.userQueuedShares) {
         const supply = token?.supply || '0';
@@ -637,7 +656,21 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
             const ulAsset = token?.underlyingAsset || '';
             const ulPrice = snapshot.data.tokens[ulAsset]?.price || 0;
             const queuedAssets = Number((safeBigInt(Math.round(token.userQueuedShares).toString()) * cvActive) / safeBigInt(supply));
-            netBalance += (queuedAssets / 1000000000) * (ulPrice / 1000000000);
+            const queuedValue = (queuedAssets / 1000000000) * (ulPrice / 1000000000);
+            netBalance += queuedValue;
+            contributions.push({
+              bucket: 'CARRY VAULT',
+              symbol: `${tokenSymbol} (queued)`,
+              address: tokenAddr,
+              balance: queuedAssets / 1e18,
+              walletBalance: 0,
+              collateralBalance: 0,
+              priceUsd: ulPrice / 1e18,
+              valueUsd: queuedValue / 1e18,
+              isLpToken: false,
+              hasPool: false,
+              skipped: false,
+            });
           }
         }
       }
@@ -665,9 +698,12 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
       } else {
         // LP token without pool data - skip entirely (don't use oracle price)
         contributions.push({
+          ...classify(token),
           symbol: tokenSymbol,
           address: tokenAddr,
           balance: tokenBalance / 1e18,
+          walletBalance: walletBal,
+          collateralBalance: collBal,
           priceUsd: (token?.price || 0) / 1e18,
           valueUsd: 0,
           isLpToken: true,
@@ -679,7 +715,23 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
       }
     } else if (tokenPrice === 0) {
       const totalSupply = token?.supply || '0';
-      if (totalSupply === '0') continue;
+      if (totalSupply === '0') {
+        contributions.push({
+          ...classify(token),
+          symbol: tokenSymbol,
+          address: tokenAddr,
+          balance: tokenBalance / 1e18,
+          walletBalance: walletBal,
+          collateralBalance: collBal,
+          priceUsd: 0,
+          valueUsd: 0,
+          isLpToken: false,
+          hasPool: false,
+          skipped: true,
+          reason: 'NO PRICE / NO SUPPLY'
+        });
+        continue;
+      }
       const managedAssets = token?.managedAssets;
       if (managedAssets) { // sUSDST
         tokenPrice = Number((safeBigInt(managedAssets) * BigInt(1e18)) / safeBigInt(totalSupply));
@@ -731,29 +783,18 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
     const tokenValue = (tokenPrice / 1000000000) * (tokenBalance / 1000000000);
     const tokenValueUsd = tokenValue / 1e18;
     
-    // Check for suspicious values
-    let warning: string | undefined;
-    if (tokenValueUsd > 1e10) { // More than $10 billion
-      warning = `VALUE > $10B!`;
-    }
-    if (isLpToken && tokenSupply !== '0') {
-      const supplyNum = parseFloat(tokenSupply);
-      if (Math.abs(tokenBalance - supplyNum) < 1e15) {
-        warning = `BALANCE = TOTAL SUPPLY (bug?)`;
-      }
-    }
-    
-    // Track contribution
     contributions.push({
+      ...classify(token),
       symbol: tokenSymbol,
       address: tokenAddr,
       balance: tokenBalance / 1e18,
+      walletBalance: walletBal,
+      collateralBalance: collBal,
       priceUsd: tokenPrice / 1e18,
       valueUsd: tokenValueUsd,
       isLpToken: isLpToken || false,
       hasPool: !!(token?.pool),
       skipped: false,
-      warning
     });
     
     netBalance += tokenValue;
@@ -761,16 +802,20 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
 
   // Add staked STRATO value to net balance
   const stakedStrato = snapshot.data.stakedStrato || 0n;
+  let stakedValueUsd = 0;
   if (stakedStrato > 0n) {
     const stratoTokenAddr = snapshot.data.stratoTokenAddress || '';
     const stratoPrice = snapshot.data.tokens[stratoTokenAddr]?.price || 0;
     if (stratoPrice > 0) {
       const stakedValue = (Number(stakedStrato) / 1e9) * (stratoPrice / 1e9);
-      const stakedValueUsd = stakedValue / 1e18;
+      stakedValueUsd = stakedValue / 1e18;
       contributions.push({
+        bucket: 'STAKED',
         symbol: 'STRATO (Staked)',
         address: stratoTokenAddr,
         balance: Number(stakedStrato) / 1e18,
+        walletBalance: 0,
+        collateralBalance: 0,
         priceUsd: stratoPrice / 1e18,
         valueUsd: stakedValueUsd,
         isLpToken: false,
@@ -778,49 +823,109 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
         skipped: false
       });
       netBalance += stakedValue;
+    } else {
+      contributions.push({
+        bucket: 'STAKED',
+        symbol: 'STRATO (Staked)',
+        address: stratoTokenAddr,
+        balance: Number(stakedStrato) / 1e18,
+        walletBalance: 0,
+        collateralBalance: 0,
+        priceUsd: 0,
+        valueUsd: 0,
+        isLpToken: false,
+        hasPool: false,
+        skipped: true,
+        reason: `NO STRATO PRICE (token=${stratoTokenAddr || 'unset'})`
+      });
     }
   }
 
-  netBalance -= netLoan + parseFloat(snapshot.data.userLoan?.scaledDebt || '0');
+  const cdpDebt = parseFloat(snapshot.data.userLoan?.scaledDebt || '0');
+  netBalance -= netLoan + cdpDebt;
   const finalBalanceUsd = netBalance / 1e18;
-  
-  // Sort contributions by value (highest first)
-  contributions.sort((a, b) => b.valueUsd - a.valueUsd);
-  
-  // Log this point's breakdown
-  console.log(`\n========== POINT ${index} | ${snapshotDate} | TOTAL: $${finalBalanceUsd.toLocaleString()} ==========`);
-  console.log(`  Tokens: ${tokensWithBalance} with balance, ${tokensWithoutBalance} without`);
-  
-  // Log warnings first (if any)
-  if (warnings.length > 0) {
-    console.log(`  ┌─────────────────────────────────────────────────────────────┐`);
-    warnings.forEach(w => console.log(`  │ ${w}`));
-    console.log(`  └─────────────────────────────────────────────────────────────┘`);
-  }
-  
-  // Log top 15 contributions
-  console.log(`  TOP CONTRIBUTORS:`);
-  contributions.slice(0, 15).forEach((c, i) => {
-    const lpFlag = c.isLpToken ? (c.hasPool ? ' [LP+POOL]' : ' [LP-NO-POOL]') : '';
-    const skipFlag = c.skipped ? ` ⚠️ SKIPPED: ${c.reason}` : '';
-    const warnFlag = c.warning ? ` 🚨 ${c.warning}` : '';
-    console.log(`  ${(i+1).toString().padStart(2)}. ${c.symbol.padEnd(25)} | $${c.valueUsd.toLocaleString().padStart(20)} | bal=${c.balance.toExponential(2)} | price=$${c.priceUsd.toFixed(2)}${lpFlag}${skipFlag}${warnFlag}`);
-  });
-  
-  // Log skipped LP tokens separately
-  const skippedLPs = contributions.filter(c => c.skipped && c.isLpToken);
-  if (skippedLPs.length > 0) {
-    console.log(`  SKIPPED LP TOKENS (${skippedLPs.length}):`);
-    skippedLPs.forEach(c => {
-      console.log(`    - ${c.symbol}: balance=${c.balance.toExponential(2)}, oracle_price=$${c.priceUsd.toFixed(2)} → $${(c.balance * c.priceUsd).toLocaleString()} WOULD HAVE BEEN ADDED!`);
-    });
-  }
-  
-  if (netLoan > 0) {
-    console.log(`  --- LOAN: -$${(netLoan / 1e18).toLocaleString()}`);
-  }
-  console.log(`============================================================\n`);
+
+  logNetBalanceBreakdown(
+    `GRAPH POINT ${index} | ${snapshotDate}`,
+    contributions,
+    netLoan / 1e18,
+    cdpDebt / 1e18,
+    finalBalanceUsd,
+  );
   return { timestamp: snapshot.timestamp, data: {netBalance: finalBalanceUsd }};
+}
+
+/**
+ * Shared bucketed breakdown printer.
+ * Both the live Net Balance box and every graph point print through this so the
+ * two can be diffed section-by-section (WALLET / COLLATERAL / STAKED / ...).
+ */
+function logNetBalanceBreakdown(
+  header: string,
+  lines: Array<{
+    bucket: string;
+    symbol: string;
+    balance: number;
+    walletBalance: number;
+    collateralBalance: number;
+    priceUsd: number;
+    valueUsd: number;
+    skipped: boolean;
+    reason?: string;
+    note?: string;
+    isLpToken?: boolean;
+    hasPool?: boolean;
+  }>,
+  lendingDebt: number,
+  cdpDebt: number,
+  reportedNet: number,
+) {
+  const BUCKET_ORDER = ['WALLET', 'COLLATERAL', 'WALLET+COLLATERAL', 'STAKED', 'CARRY VAULT', 'DERIVED', 'UNKNOWN SOURCE'];
+  const added = lines.filter((l) => !l.skipped && l.valueUsd > 0);
+  const notAdded = lines.filter((l) => l.skipped || l.valueUsd <= 0);
+  const money = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+
+  console.log(`\n========== ${header} | NET: ${money(reportedNet)} ==========`);
+
+  let assetTotal = 0;
+  for (const bucket of BUCKET_ORDER) {
+    const rows = added.filter((l) => l.bucket === bucket).sort((a, b) => b.valueUsd - a.valueUsd);
+    if (rows.length === 0) continue;
+    const bucketTotal = rows.reduce((s, r) => s + r.valueUsd, 0);
+    assetTotal += bucketTotal;
+    console.log(`  [${bucket}] ${rows.length} items | subtotal ${money(bucketTotal)}`);
+    rows.slice(0, 25).forEach((r, i) => {
+      const lp = r.isLpToken ? (r.hasPool ? ' [LP+POOL]' : ' [LP]') : '';
+      console.log(
+        `    ${(i + 1).toString().padStart(2)}. ${r.symbol.padEnd(26)} ${money(r.valueUsd).padStart(20)} | qty=${r.balance.toExponential(3)} | price=${money(r.priceUsd)}${lp}`
+      );
+      if (r.note) console.log(`        ↳ ${r.note}`);
+    });
+    if (rows.length > 25) console.log(`    ... and ${rows.length - 25} more`);
+  }
+
+  if (notAdded.length > 0) {
+    console.log(`  [NOT ADDED] ${notAdded.length} items`);
+    notAdded.slice(0, 20).forEach((r) => {
+      const reason = r.reason || (r.valueUsd <= 0 ? 'VALUE = 0' : 'unknown');
+      console.log(
+        `    -   ${r.symbol.padEnd(26)} qty=${r.balance.toExponential(3)} | price=${money(r.priceUsd)} | ${reason}`
+      );
+    });
+    if (notAdded.length > 20) console.log(`    ... and ${notAdded.length - 20} more`);
+  }
+
+  const totalDebt = lendingDebt + cdpDebt;
+  console.log(`  [LOANS] lending=-${money(lendingDebt)} | cdp=-${money(cdpDebt)} | subtotal -${money(totalDebt)}`);
+  console.log(`  ----------------------------------------------------------`);
+  console.log(`  ASSETS  : ${money(assetTotal)}`);
+  console.log(`  DEBT    : -${money(totalDebt)}`);
+  console.log(`  NET     : ${money(reportedNet)}`);
+  const drift = reportedNet - (assetTotal - totalDebt);
+  if (Math.abs(drift) > 1) {
+    console.log(`  DRIFT   : ${money(drift)} (logged buckets do not fully explain NET)`);
+  }
+  console.log(`==========================================================\n`);
 }
 
 export const getBalanceHistory = async (
@@ -1072,10 +1177,93 @@ export const getNetBalance = async (
   ]);
 
   let totalAssetValue = 0;
+  const assetLines: Array<{
+    bucket: string;
+    symbol: string;
+    balance: number;
+    walletBalance: number;
+    collateralBalance: number;
+    priceUsd: number;
+    valueUsd: number;
+    skipped: boolean;
+    reason?: string;
+    note?: string;
+  }> = [];
+
   if (earningAssetsResult.status === "fulfilled") {
+    const toNum = (v: string | undefined) => {
+      try { return Number(BigInt(v || "0")) / 1e18; } catch { return 0; }
+    };
+
     for (const asset of earningAssetsResult.value) {
-      totalAssetValue += parseFloat(asset.value || "0");
+      const value = parseFloat(asset.value || "0");
+      totalAssetValue += value;
+
+      const symbol = asset._symbol || (asset as any).symbol || asset.address?.slice(0, 10) + "...";
+      const wallet = toNum(asset.balance);
+      const collateral = toNum(asset.collateralBalance);
+      const staked = toNum((asset as any).stakedBalance);
+      const price = toNum(asset.price);
+
+      // saveUSDST / carry-vault assets derive `value` from redeemable/position USD
+      // rather than qty × price, so they cannot be split into the qty buckets.
+      const qtySum = wallet + collateral + staked;
+      const impliedValue = qtySum * price;
+      const isDerived = value > 0 && Math.abs(impliedValue - value) > Math.max(1, value * 0.01);
+
+      if (value === 0 && qtySum === 0) continue;
+
+      if (isDerived) {
+        assetLines.push({
+          bucket: 'DERIVED',
+          symbol,
+          balance: qtySum,
+          walletBalance: wallet,
+          collateralBalance: collateral,
+          priceUsd: price,
+          valueUsd: value,
+          skipped: false,
+          note: `value from vault formula, not qty×price (qty×price would be $${impliedValue.toLocaleString(undefined, { maximumFractionDigits: 2 })})`,
+        });
+        continue;
+      }
+
+      if (value === 0) {
+        assetLines.push({
+          bucket: 'WALLET',
+          symbol,
+          balance: qtySum,
+          walletBalance: wallet,
+          collateralBalance: collateral,
+          priceUsd: price,
+          valueUsd: 0,
+          skipped: true,
+          reason: price === 0 ? 'NO PRICE' : 'VALUE = 0',
+        });
+        continue;
+      }
+
+      // Split the single asset into its qty buckets so each is comparable with
+      // the graph's per-bucket totals.
+      const pushBucket = (bucket: string, qty: number) => {
+        if (qty <= 0) return;
+        assetLines.push({
+          bucket,
+          symbol,
+          balance: qty,
+          walletBalance: bucket === 'WALLET' ? qty : 0,
+          collateralBalance: bucket === 'COLLATERAL' ? qty : 0,
+          priceUsd: price,
+          valueUsd: qty * price,
+          skipped: false,
+        });
+      };
+      pushBucket('WALLET', wallet);
+      pushBucket('COLLATERAL', collateral);
+      pushBucket('STAKED', staked);
     }
+  } else {
+    console.log(`[NET BALANCE BOX] earning assets FAILED: ${earningAssetsResult.reason}`);
   }
 
   let lendingDebt = 0;
@@ -1089,7 +1277,9 @@ export const getNetBalance = async (
   }
 
   let cdpDebt = 0;
+  let vaultCount = 0;
   if (vaultsResult.status === "fulfilled") {
+    vaultCount = vaultsResult.value.length;
     for (const vault of vaultsResult.value) {
       try {
         const raw = BigInt(vault.debtAmount || "0");
@@ -1101,8 +1291,18 @@ export const getNetBalance = async (
   }
 
   const totalBorrowed = lendingDebt + cdpDebt;
+  const netBalance = totalAssetValue - totalBorrowed;
+
+  logNetBalanceBreakdown(
+    `NET BALANCE BOX | user=${userAddress} | ${vaultCount} cdp vaults`,
+    assetLines,
+    lendingDebt,
+    cdpDebt,
+    netBalance,
+  );
+
   return {
-    netBalance: totalAssetValue - totalBorrowed,
+    netBalance,
     totalBorrowed,
     totalAssetValue,
   };
