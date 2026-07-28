@@ -346,10 +346,14 @@ export const getPublicEarningAssets = async (
 function updatePortfolioInfoStorage(portfolioInfo: any, newInfo: StorageHistoryElement): any {
   if (newInfo.data._symbol) {
     const totalSupply = newInfo.data._totalSupply || '0';
+    const symbol = newInfo.data._symbol || '';
+    const isLpToken = symbol.endsWith('-LP');
     return { ...portfolioInfo,
       tokens: { ...portfolioInfo.tokens,
         [newInfo.address]: { ...portfolioInfo.tokens[newInfo.address],
           supply: totalSupply,
+          symbol: symbol,
+          ...(isLpToken ? { isLpToken: true } : {}),
           ...(newInfo.data._managedAssets ? { managedAssets: BigInt(newInfo.data._managedAssets) } : {}),
           ...(newInfo.data.deployedAssets != null ? {
             deployedAssets: BigInt(newInfo.data.deployedAssets || 0),
@@ -607,12 +611,14 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
       }
     }
     if (tokenBalance === 0) continue;
-    if (tokenPrice === 0) {
-      const totalSupply = token?.supply || '0';
-      if (totalSupply === '0') continue;
+    
+    // Handle LP tokens specially - never use oracle price for them
+    const isLpToken = token?.isLpToken || token?.pool;
+    if (isLpToken) {
       const pool = token?.pool;
-      const managedAssets = token?.managedAssets;
-      if (pool) { // LP token
+      const totalSupply = token?.supply || '0';
+      if (pool && totalSupply !== '0') {
+        // Calculate LP price from underlying token values
         tokenPrice = calculateLPTokenPrice(
           pool.tokenABalance,
           pool.tokenBBalance,
@@ -620,7 +626,21 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
           snapshot.data.tokens[pool.tokenB]?.price || '0',
           totalSupply
         );
-      } else if (managedAssets) { // sUSDST
+        if (DEBUG && tokenBalance > 0) {
+          console.log(`  LP token ${tokenAddr}: calculated price from pool = ${tokenPrice}`);
+        }
+      } else {
+        // LP token without pool data - skip entirely (don't use oracle price)
+        if (DEBUG && tokenBalance > 0) {
+          console.log(`  LP token ${tokenAddr}: SKIPPED (no pool data, oracle price=${token?.price})`);
+        }
+        continue;
+      }
+    } else if (tokenPrice === 0) {
+      const totalSupply = token?.supply || '0';
+      if (totalSupply === '0') continue;
+      const managedAssets = token?.managedAssets;
+      if (managedAssets) { // sUSDST
         tokenPrice = Number((safeBigInt(managedAssets) * BigInt(1e18)) / safeBigInt(totalSupply));
       } else if (snapshot.data.vaultConfig?.shareToken === tokenAddr) { // Vault share token
         const supportedAssets: string[] = snapshot.data.vaultConfig?.supportedAssets || [];
