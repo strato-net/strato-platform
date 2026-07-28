@@ -13,6 +13,7 @@ import tokensV2Routes from "./routes/tokens.v2.routes";
 import configRoutes from "./routes/config.routes";
 import oracleRoutes from "./routes/oracle.routes";
 import swapRoutes from "./routes/swap.routes";
+import poolV3Routes from "./routes/poolV3.routes";
 import lendingRoutes from "./routes/lending.routes";
 import eventsRoutes from "./routes/events.routes";
 import bridgeRoutes from "./routes/bridge.routes";
@@ -72,6 +73,9 @@ router.use("/oracle", oracleRoutes);
 
 // ----- Swap Routes -----
 router.use(swapRoutes);
+
+// ----- PoolV3 (Concentrated Liquidity) Routes -----
+router.use("/poolv3", poolV3Routes);
 
 // ----- Lending Routes -----
 router.use("/lending", lendingRoutes);

@@ -22,6 +22,7 @@ import Transfer from "./pages/Transfer";
 import DepositsPage from "./pages/DepositsPage";
 import AssetDetail from "./pages/AssetDetail";
 import Advanced from "./pages/Advanced";
+import PoolV3Liquidity from "./pages/PoolV3Liquidity";
 import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
 import SyncingPage from "./pages/SyncingPage";
@@ -305,6 +306,14 @@ const App = () => {
                                                   element={
                                                     <GuestAccessibleRoute>
                                                       <Advanced />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/v3-liquidity"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <PoolV3Liquidity />
                                                     </GuestAccessibleRoute>
                                                   }
                                                 />

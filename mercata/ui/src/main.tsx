@@ -2,10 +2,16 @@ import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 import { captureAttribution } from './lib/attribution'
+import { trackEngage } from './lib/tracking'
 
 // Capture inbound UTM attribution BEFORE anything else. This must run before
 // React mounts and before any Keycloak redirect, which strips the query string.
 captureAttribution();
+
+// Tracking-link engagement ping. Unconditional: the session cookie set by the
+// /t/<slug> resolver is HttpOnly, so the SPA cannot check for it; the tracking
+// service no-ops when the request carries no session.
+trackEngage();
 
 // Conditionally load Lucky Orange script
 // Use runtime config (from /config.js) if available, fallback to build-time env var

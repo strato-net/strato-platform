@@ -75,6 +75,7 @@ interface AggregatedRevenueResponse {
     lending: ProtocolRevenueResponse;
     swap: ProtocolRevenueResponse;
     stablePool: ProtocolRevenueResponse;
+    poolV3?: ProtocolRevenueResponse;
     metalForge: ProtocolRevenueResponse;
     gas: ProtocolRevenueResponse;
   };
@@ -116,6 +117,8 @@ const StratoStats = () => {
 
   const [stablePoolTotalRevenue, setStablePoolTotalRevenue] = useState<string>('0');
   const [stablePoolRevenueByPeriod, setStablePoolRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
+
+  const [poolV3RevenueByPeriod, setPoolV3RevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
 
   const [metalForgeTotalRevenue, setMetalForgeTotalRevenue] = useState<string>('0');
   const [metalForgeRevenueByPeriod, setMetalForgeRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
@@ -194,6 +197,10 @@ const StratoStats = () => {
 
       setStablePoolTotalRevenue(response.data.byProtocol.stablePool.totalRevenue);
       setStablePoolRevenueByPeriod(response.data.byProtocol.stablePool.revenueByPeriod);
+
+      if (response.data.byProtocol.poolV3) {
+        setPoolV3RevenueByPeriod(response.data.byProtocol.poolV3.revenueByPeriod);
+      }
 
       setMetalForgeTotalRevenue(response.data.byProtocol.metalForge.totalRevenue);
       setMetalForgeRevenueByPeriod(response.data.byProtocol.metalForge.revenueByPeriod);
@@ -568,6 +575,24 @@ const StratoStats = () => {
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} stable pool fees
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">V3 Pool Revenue</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {revenueLoading ? (
+                          <Skeleton className="h-8 w-24" />
+                        ) : (
+                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(poolV3RevenueByPeriod[selectedPeriod].total || '0'), 18)))}`
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} V3 swap fees
                       </p>
                     </CardContent>
                   </Card>

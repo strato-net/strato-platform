@@ -203,11 +203,23 @@ const txFailureMessage = (result: any): string => {
 const isTerminalResult = (results: any[]): boolean =>
   !!failedTx(results) || results.every((result) => result?.status !== "Pending");
 
+export interface TxResponse {
+  status: string;
+  hash: string;
+  /** decoded per-tx return values (bloc's Call result contents), in submission order */
+  returnValues?: (unknown[] | null)[];
+}
+
+const callReturnValues = (results: any[]): (unknown[] | null)[] =>
+  results.map((result) =>
+    result?.data?.tag === "Call" && Array.isArray(result.data.contents) ? result.data.contents : null
+  );
+
 const postAndWaitForTxUnlocked = async (
   accessToken: string,
   stratoPostFn: () => Promise<any>,
   timeout: number = 35000
-): Promise<{ status: string; hash: string }> => {
+): Promise<TxResponse> => {
   try {
     const store = requestContext.getStore();
     const allowLowNonceRetry = !store?.externalSigning;
@@ -263,7 +275,8 @@ const postAndWaitForTxUnlocked = async (
 
       return {
         status: finalResults[0].status,
-        hash: finalResults[0].hash
+        hash: finalResults[0].hash,
+        returnValues: callReturnValues(finalResults),
       };
     }
   } catch (error: any) {
@@ -287,7 +300,7 @@ export const postAndWaitForTx = async (
   accessToken: string,
   stratoPostFn: () => Promise<any>,
   timeout: number = 35000
-): Promise<{ status: string; hash: string }> => {
+): Promise<TxResponse> => {
   const store = requestContext.getStore();
   if (store?.externalSigning) {
     return postAndWaitForTxUnlocked(accessToken, stratoPostFn, timeout);
@@ -327,10 +340,10 @@ export const postAndWaitForTx = async (
 /**
  * Executes a transaction and returns the result
  */
-export const executeTransaction = async (accessToken: string, tx: any): Promise<{ status: string; hash: string }> => {
-  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+export const executeTransaction = async (accessToken: string, tx: any): Promise<TxResponse> => {
+  const { status, hash, returnValues } = await postAndWaitForTx(accessToken, () =>
     bloc.post(accessToken, StratoPaths.transactionParallel, tx)
   );
-  
-  return { status, hash };
+
+  return { status, hash, returnValues };
 };

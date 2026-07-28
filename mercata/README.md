@@ -41,6 +41,25 @@ OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-kno
 ```
 
 - `NETWORK` options are: `testnet|prod`.
+- For concentrated liquidity (PoolV3, Uniswap V3-style) endpoints, also set `POOL_V3_FACTORY=<PoolV3Factory proxy address>` (printed by the contracts deploy; endpoints that only read pools work without it, but pool creation requires it).
+
+#### PoolV3 (concentrated liquidity) API
+
+Self-contained under `/api/poolv3` (routes/controller/service/validator files named `poolV3.*`):
+
+- `GET /poolv3/pools`, `GET /poolv3/pools/pair/:a/:b`, `GET /poolv3/pools/:address` — pool listings from the `BlockApps-PoolV3` Cirrus tables
+- `GET /poolv3/quote` — server-side swap quote; simulates the contract's tick-walking loop over indexed tick data (`src/api/helpers/poolV3Math.helper.ts`, a BigInt port of the on-chain math validated against `contracts/tests/Pool/poolv3_reference.py`)
+- `GET /poolv3/positions`, `GET /poolv3/amounts-for-liquidity` — position reads and mint previews
+- `POST /poolv3/swap`, `POST|DELETE /poolv3/positions`, `POST /poolv3/positions/collect` — transactions (approve + PoolV3 call)
+
+UI: the Trade page gains a V2/V3 route toggle when a pair exists on both; V3 liquidity management is a separate page at `/dashboard/v3-liquidity` (PRO section).
+
+Smoke test after deploying the PoolV3 contracts to a dev node:
+
+1. Create a pool: `POST /api/poolv3/pools` as an admin (`{tokenA, tokenB, fee: 3000, initialSqrtPriceX96: "79228162514264337593543950336"}` = price 1.0); approve the governance vote if raised.
+2. Verify Cirrus indexing: `GET /api/poolv3/pools` returns the pool; check the tick/position child-table names in `backend/src/config/poolV3Constants.ts` match the actual Cirrus tables (`BlockApps-PoolV3-ticks` etc.) and adjust there if the node names them differently.
+3. Mint a position on `/dashboard/v3-liquidity`, then compare `GET /api/poolv3/quote` output against an executed swap on the Trade page (V3 route) — amounts must match exactly.
+4. Burn/collect the position and confirm balances return.
 
 ### Run UI:
 

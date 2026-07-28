@@ -129,6 +129,38 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
         }
       }
 
+      // PoolV3 events (Swap/Mint) don't carry token addresses either — resolve token0/token1
+      // from the pool contract (event.address) and attach them onto the events right away,
+      // so the configs' getTokenAddress works in both the collection and routing phases.
+      const poolV3Addresses = [...new Set(
+        response.events
+          .filter(event => event.contract_name === "PoolV3")
+          .map(event => event.address)
+      )];
+      if (poolV3Addresses.length > 0) {
+        const poolV3TokenMap = new Map<string, { token0: string; token1: string }>();
+        const v3Results = await Promise.all(poolV3Addresses.map(async (poolAddress) => {
+          try {
+            const res = await api.get(`/poolv3/pools/${poolAddress}`);
+            const token0 = res.data?.token0?.address?.toLowerCase();
+            const token1 = res.data?.token1?.address?.toLowerCase();
+            return token0 && token1 ? { poolAddress, token0, token1 } : null;
+          } catch {
+            return null;
+          }
+        }));
+        v3Results.forEach(result => {
+          if (result) poolV3TokenMap.set(result.poolAddress, { token0: result.token0, token1: result.token1 });
+        });
+        response.events.forEach(event => {
+          if (event.contract_name !== "PoolV3") return;
+          const tokens = poolV3TokenMap.get(event.address);
+          if (tokens) {
+            Object.assign(event, { token0: tokens.token0, token1: tokens.token1 });
+          }
+        });
+      }
+
       // Collect token addresses using getTokenAddress from activity type configs
       const allTokenAddresses = [...new Set(
         response.events
@@ -298,11 +330,14 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
             if (assetSymbol) tokenSymbolsMap.set(event.address, assetSymbol);
           }
           const cardData = config.handler(event, tokenSymbolsMap, userAddress, tokenImagesMap);
-          // Add iconConfig from the activity type config
-          allCardData.push({
-            ...cardData,
-            iconConfig: config.iconConfig,
-          });
+          // Handlers return null for bookkeeping-only events that shouldn't be shown
+          if (cardData) {
+            // Add iconConfig from the activity type config
+            allCardData.push({
+              ...cardData,
+              iconConfig: config.iconConfig,
+            });
+          }
         }
       }
 

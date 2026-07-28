@@ -29,17 +29,17 @@ const formatTimestamp = (timestamp: Date) => {
 // ============================================================================
 // UI COMPONENTS
 // ============================================================================
-const LoadingRow = () => (
+const LoadingRow = ({ colSpan }: { colSpan: number }) => (
   <TableRow>
-    <TableCell colSpan={7} className="text-center py-8">
+    <TableCell colSpan={colSpan} className="text-center py-8">
       <Loader2 className="h-6 w-6 animate-spin mx-auto" />
     </TableCell>
   </TableRow>
 );
 
-const EmptyRow = () => (
+const EmptyRow = ({ colSpan }: { colSpan: number }) => (
   <TableRow>
-    <TableCell colSpan={7} className="text-center py-8">
+    <TableCell colSpan={colSpan} className="text-center py-8">
       <p className="text-muted-foreground">No trade history found for this pair</p>
     </TableCell>
   </TableRow>
@@ -88,6 +88,9 @@ const SwapRow = ({ swap, copiedHash, onCopy }: { swap: any; copiedHash: string |
     </TableCell>
     <TableCell className="text-sm">
       {swap.tokenIn === 'USDST' || swap.tokenOut === 'USDST' ? '$' : ''}{swap.impliedPrice}
+    </TableCell>
+    <TableCell className="text-sm text-muted-foreground">
+      {swap.poolName || 'V2'}
     </TableCell>
     <SenderCell sender={swap.sender} copiedHash={copiedHash} onCopy={onCopy} />
   </TableRow>
@@ -159,9 +162,19 @@ const SwapHistory: React.FC = () => {
   // ========================================================================
   // CONTEXT & HOOKS
   // ========================================================================
-  const { refreshSwapHistory, pool, poolLoading, swapHistory, swapHistoryCount, swapHistoryLoading } = useSwapContext();
+  const { refreshSwapHistory, pool, poolLoading, swapHistory, swapHistoryCount, swapHistoryLoading, fromAsset, toAsset } = useSwapContext();
   const { userAddress } = useUser();
   const tableRef = useRef<HTMLDivElement>(null);
+
+  // Mirror SwapContext's endpoint resolution: with a pair selected the history spans
+  // both venues (V2 pools + every V3 fee tier, each row tagged with its pool) and
+  // prices are normalized to toAsset-per-fromAsset (the requested pair order).
+  const hasPair = !!(fromAsset?.address && toAsset?.address);
+  const hasActivePool = hasPair || !!pool?.address;
+  const priceLabel = hasPair
+    ? `${toAsset?._symbol}/${fromAsset?._symbol}`
+    : `${pool?.tokenB?._symbol}/${pool?.tokenA?._symbol}`;
+  const columnCount = 8;
 
   // ========================================================================
   // STATE
@@ -181,14 +194,14 @@ const SwapHistory: React.FC = () => {
   // ========================================================================
   useEffect(() => {
     setCurrentPage(1);
-    if (pool?.address) {
+    if (hasActivePool) {
       refreshSwapHistory({
         limit: ITEMS_PER_PAGE.toString(),
         page: "1",
         ...(showMySwapsOnly && userAddress ? { sender: userAddress } : {}),
       });
     }
-  }, [pool?.address, refreshSwapHistory, showMySwapsOnly, userAddress]);
+  }, [hasActivePool, refreshSwapHistory, showMySwapsOnly, userAddress]);
 
   // ========================================================================
   // EVENT HANDLERS
@@ -204,7 +217,7 @@ const SwapHistory: React.FC = () => {
   };
 
   const handlePageChange = (newPage: number) => {
-    if (!pool?.address) return;
+    if (!hasActivePool) return;
     
     setCurrentPage(newPage);
     refreshSwapHistory({
@@ -226,7 +239,7 @@ const SwapHistory: React.FC = () => {
             variant={showMySwapsOnly ? "default" : "outline"}
             size="sm"
             onClick={() => setShowMySwapsOnly(!showMySwapsOnly)}
-            disabled={!pool?.address || swapHistoryLoading}
+            disabled={!hasActivePool || swapHistoryLoading}
           >
             {swapHistoryLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             {showMySwapsOnly ? "Showing My Trades" : "Show My Trades"}
@@ -234,7 +247,7 @@ const SwapHistory: React.FC = () => {
         )}
       </div>
 
-      {pool?.address ? (
+      {hasActivePool ? (
         <div ref={tableRef} className="bg-card rounded-lg border border-border">
           <Table>
             <TableHeader>
@@ -244,24 +257,25 @@ const SwapHistory: React.FC = () => {
                 <TableHead className="w-[120px]">Amount In</TableHead>
                 <TableHead className="w-[100px]">Token Out</TableHead>
                 <TableHead className="w-[120px]">Amount Out</TableHead>
-                <TableHead className="w-[120px]">Price {pool?.tokenB?._symbol}/{pool?.tokenA?._symbol}</TableHead>
+                <TableHead className="w-[120px]">Price {priceLabel}</TableHead>
+                <TableHead className="w-[80px]">Pool</TableHead>
                 <TableHead className="w-[100px]">Sender</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className={`transition-opacity duration-200 ${swapHistoryLoading ? "opacity-50 pointer-events-none" : ""}`}>
               {isInitialLoad ? (
-                <LoadingRow />
+                <LoadingRow colSpan={columnCount} />
               ) : swapHistory.length > 0 ? (
                 swapHistory.map((swap) => (
-                  <SwapRow 
-                    key={swap.id} 
-                    swap={swap} 
-                    copiedHash={copiedHash} 
-                    onCopy={copyToClipboard} 
+                  <SwapRow
+                    key={swap.id}
+                    swap={swap}
+                    copiedHash={copiedHash}
+                    onCopy={copyToClipboard}
                   />
                 ))
               ) : (
-                <EmptyRow />
+                <EmptyRow colSpan={columnCount} />
               )}
             </TableBody>
           </Table>

@@ -10,6 +10,7 @@ import {
   removeLiquidity,
   swap,
   getSwapHistory,
+  getPairSwapHistory,
   setPoolRates,
   pausePool,
   unpausePool,
@@ -299,6 +300,37 @@ class SwappingController {
         if (error) throw new Error("sender Validation Error: " + error.message);
       }
       const swapHistory = await getSwapHistory(accessToken, params.poolAddress, page, limit, sender);
+      res.status(RestStatus.OK).json(swapHistory);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getPairSwapHistory(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, params, query } = req;
+      validateTokenPairArgs(params);
+      validateQueryParams(query);
+
+      const page = query.page ? parseInt(query.page as string, 10) : 1;
+      const limit = query.limit ? parseInt(query.limit as string, 10) : 10;
+      const sender = query.sender as string | undefined;
+      if (sender) {
+        const { error } = validateAddressField("sender").validate(sender);
+        if (error) throw new Error("sender Validation Error: " + error.message);
+      }
+      const swapHistory = await getPairSwapHistory(
+        accessToken,
+        params.tokenAddress1,
+        params.tokenAddress2,
+        page,
+        limit,
+        sender
+      );
       res.status(RestStatus.OK).json(swapHistory);
     } catch (error) {
       next(error);
