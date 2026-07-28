@@ -36,13 +36,11 @@ const SwapAsset = () => {
           </div>
 
           {/* Separate Swap History Section - Full Width (hidden on mobile) */}
-          {isLoggedIn && (
-            <div className="hidden md:block mt-6 md:mt-8 max-w-6xl mx-auto">
-              <div className="bg-card shadow-sm rounded-xl p-6 border border-border">
-                <SwapHistory />
-              </div>
+          <div className="hidden md:block mt-6 md:mt-8 max-w-6xl mx-auto">
+            <div className="bg-card shadow-sm rounded-xl p-6 border border-border">
+              <SwapHistory />
             </div>
-          )}
+          </div>
         </main>
       </div>
 

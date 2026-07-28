@@ -37,6 +37,9 @@ import { UserRewardsData } from "@/services/rewardsService";
 // ============================================================================
 const DEFAULT_SLIPPAGE = 4; // 4%
 const POLL_INTERVAL = 10000; // 10 seconds
+// From-side amounts are capped by the user's balance (the To side by pool liquidity);
+// guests and unfunded users can still type to see quotes, with this error shown
+const INSUFFICIENT_BALANCE_MSG = "Insufficient balance";
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -264,7 +267,7 @@ const TokenInput = ({
   amountError,
   loading,
   disabled = false,
-}: TokenInputProps) => {      
+}: TokenInputProps) => {
   return (
     <div className="bg-muted/50 p-3 md:p-4 rounded-lg border border-border">
       <div className="flex flex-col sm:flex-row sm:justify-between mb-2">
@@ -279,10 +282,10 @@ const TokenInput = ({
             onFocus={onFocus}
             placeholder="0.00"
             inputMode="decimal"
-            disabled={disabled || (toWei(maxAmountWei) === 0n && isFromInput)}
+            disabled={disabled}
             className={`p-1 md:p-2 bg-transparent border-none text-sm md:text-lg font-medium focus:outline-none text-foreground placeholder:text-muted-foreground w-full ${
               amountError ? " border border-red-500 rounded-md" : ""
-              } ${(disabled || (toWei(maxAmountWei) === 0n && isFromInput)) ? "opacity-50 cursor-not-allowed" : ""}`}
+              } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
           />
           {amountError && (
             <p className="text-red-600 text-xs md:text-sm mt-1">{amountError}</p>
@@ -858,10 +861,10 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
   }, [pool?.address]);
 
   useEffect(() => {
-    if (!guestMode && swappableTokens.length === 0) {
+    if (swappableTokens.length === 0) {
       refetchSwappableTokens();
     }
-  }, [guestMode, refetchSwappableTokens, swappableTokens.length]);
+  }, [refetchSwappableTokens, swappableTokens.length]);
 
   useEffect(() => {
     if (pools.length === 0) {
@@ -872,10 +875,15 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
   // Initial setup and user-dependent effects
   useEffect(() => {
     fetchUsdstBalance();
+  }, [fetchUsdstBalance]);
+
+  // Default token selection; re-runs when pools load since the no-balance
+  // fallback picks the deepest pool's pair
+  useEffect(() => {
     if (swappableTokens.length > 0) {
       initialTokenSetup();
     }
-  }, [fetchUsdstBalance, swappableTokens.length]);
+  }, [swappableTokens.length, pools.length]);
 
   // Fetch pairable tokens when fromAsset changes
   useEffect(() => {
@@ -934,14 +942,28 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
   // ========================================================================
   // HELPER FUNCTIONS
   // ========================================================================
-  const initialTokenSetup = async () => {
-    if (!swappableTokens.length) return;
-    const tokenWithBalance = swappableTokens.find(token => 
+  const initialTokenSetup = () => {
+    if (fromAsset || !swappableTokens.length) return;
+    const tokenWithBalance = swappableTokens.find(token =>
       token.balance && BigInt(token.balance) > 0n
     );
     if (tokenWithBalance) {
       setFromAsset({ ...tokenWithBalance, balance: tokenWithBalance.balance || "0" });
+      return;
     }
+    // Guests and zero-balance users still get a default pair so pool rates and
+    // trade history populate: show the deepest pool's pair (waits for pools to load)
+    if (!pools.length) return;
+    const swappable = new Map(swappableTokens.map(token => [token.address, token]));
+    const topPool = pools
+      .filter(p => !p.isDisabled && swappable.has(p.tokenA?.address) && swappable.has(p.tokenB?.address))
+      .sort((a, b) => parseFloat(b.totalLiquidityUSD || "0") - parseFloat(a.totalLiquidityUSD || "0"))[0];
+    const from = (topPool && swappable.get(topPool.tokenA.address))
+      ?? swappable.get(usdstAddress)
+      ?? swappableTokens[0];
+    setFromAsset({ ...from, balance: from.balance || "0" });
+    const to = topPool ? swappable.get(topPool.tokenB.address) : undefined;
+    if (to) setToAsset({ ...to, balance: to.balance || "0" });
   }
 
 
@@ -994,7 +1016,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
           handleAmountInputChange(formatUnits(swapAmount), setToAmount, setToAmountError, toAsset?.poolBalance || "0");
         } else {
           const requiredInput = calculateMultiTokenSwapInput(parsedValue.toString(), pool, fromAsset!.address, toAsset!.address);
-          handleAmountInputChange(formatUnits(requiredInput), setFromAmount, setFromAmountError, fromAssetAvailableBalance);
+          handleAmountInputChange(formatUnits(requiredInput), setFromAmount, setFromAmountError, fromAssetAvailableBalance, undefined, INSUFFICIENT_BALANCE_MSG);
         }
       } else {
         // Standard 2-token pool
@@ -1005,7 +1027,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
           handleAmountInputChange(formatUnits(swapAmount), setToAmount, setToAmountError, toAsset?.poolBalance || "0");
         } else {
           const requiredInput = calculateSwapInput(parsedValue.toString(), pool, isAToB);
-          handleAmountInputChange(formatUnits(requiredInput), setFromAmount, setFromAmountError, fromAssetAvailableBalance);
+          handleAmountInputChange(formatUnits(requiredInput), setFromAmount, setFromAmountError, fromAssetAvailableBalance, undefined, INSUFFICIENT_BALANCE_MSG);
         }
       }
     } catch (err) {
@@ -1074,7 +1096,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
           if (isFromInput) {
             handleAmountInputChange(formatUnits(activeQuote.amountOut), setToAmount, setToAmountError, toPoolBal);
           } else {
-            handleAmountInputChange(formatUnits(activeQuote.amountIn), setFromAmount, setFromAmountError, fromAssetAvailableBalance);
+            handleAmountInputChange(formatUnits(activeQuote.amountIn), setFromAmount, setFromAmountError, fromAssetAvailableBalance, undefined, INSUFFICIENT_BALANCE_MSG);
           }
         } else if (isFromInput) {
           setToAmount("");
@@ -1114,7 +1136,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
   const handleAmountChange = (isFromInput: boolean, value: string) => {
     setEditingField(isFromInput ? 'from' : 'to');
     if (isFromInput) {
-      handleAmountInputChange(value, setFromAmount, setFromAmountError, fromAssetAvailableBalance);
+      handleAmountInputChange(value, setFromAmount, setFromAmountError, fromAssetAvailableBalance, undefined, INSUFFICIENT_BALANCE_MSG);
     } else {
       handleAmountInputChange(value, setToAmount, setToAmountError, isV3 ? v3ToPoolBalance : (toAsset?.poolBalance || "0"));
     }
@@ -1146,7 +1168,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
     if (isFromInput) {
       handleAmountInputChange(formatUnits(q.amountOut), setToAmount, setToAmountError, toPoolBal);
     } else {
-      handleAmountInputChange(formatUnits(q.amountIn), setFromAmount, setFromAmountError, fromAssetAvailableBalance);
+      handleAmountInputChange(formatUnits(q.amountIn), setFromAmount, setFromAmountError, fromAssetAvailableBalance, undefined, INSUFFICIENT_BALANCE_MSG);
     }
   };
 
@@ -1176,11 +1198,11 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
 
   // Preselect the best-rate pool as quotes arrive, unless the user picked one manually
   useEffect(() => {
-    if (manualPool || guestMode || !bestPoolId) return;
+    if (manualPool || !bestPoolId) return;
     if (bestPoolId === selectedPoolId) return;
     applyPoolSelection(bestPoolId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bestPoolId, manualPool, guestMode, selectedPoolId]);
+  }, [bestPoolId, manualPool, selectedPoolId]);
 
   const handleSwapAssets = async () => {
     // swap amounts
@@ -1199,7 +1221,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
 
     // Then validate amounts against the NEW assets' balances
     // prevToAmount becomes the new from amount, validate against newFrom's balance
-    handleAmountInputChange(prevToAmount, setFromAmount, setFromAmountError, newFrom?.balance || "0");
+    handleAmountInputChange(prevToAmount, setFromAmount, setFromAmountError, newFrom?.balance || "0", undefined, INSUFFICIENT_BALANCE_MSG);
     // prevFromAmount becomes the new to amount, validate against newTo's pool balance
     handleAmountInputChange(prevFromAmount, setToAmount, setToAmountError, newTo?.poolBalance || "0");
 
@@ -1331,7 +1353,6 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
           options={poolOptions}
           selectedId={selectedPoolId}
           onSelect={handlePoolSelect}
-          disabled={guestMode}
         />
       )}
 
@@ -1352,7 +1373,6 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
         onMaxClick={() => handleMaxClick()}
         amountError={fromAmountError}
         loading={poolLoading}
-        disabled={guestMode}
       />
 
       <div className="flex justify-center">
@@ -1361,7 +1381,6 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
           variant="outline"
           size="icon"
           className="rounded-full bg-muted hover:bg-muted/80 border-border"
-          disabled={guestMode}
         >
           <ArrowDownUp className="h-4 w-4" />
         </Button>
@@ -1384,7 +1403,6 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
         onMaxClick={() => {}}
         amountError={toAmountError}
         loading={poolLoading}
-        disabled={guestMode}
       />
       {(() => {
         // Swap rewards are only registered for V2 pools (matched by the V2 pool's address);
@@ -1422,11 +1440,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
               </Badge>
             </span>
             {!exchangeRate ? (
-              guestMode ? (
-                <span className="font-medium text-foreground text-xs md:text-sm">-</span>
-              ) : (
-                <LoadingSpinner />
-              )
+              <LoadingSpinner />
             ) : (
               <span className="font-medium text-foreground text-xs md:text-sm">
                 1 {fromAsset?._symbol || ""} ≈ {exchangeRate}{oracleExchangeRate ? ` (${oracleExchangeRate}*)` : ""} {toAsset?._symbol || ""}
@@ -1500,7 +1514,6 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
           autoSlippage={autoSlippage}
           onSlippageChange={setSlippage}
           onAutoToggle={setAutoSlippage}
-          disabled={guestMode}
         />
       </div>
 
@@ -1511,11 +1524,13 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
           ? (!!v3ExecPool?.isDisabled || !!v3ExecPool?.isPaused)
           : (!!pool?.isDisabled || !!pool?.isPaused))}
       >
-        {(isV3 ? v3ExecPool?.isDisabled : pool?.isDisabled)
-          ? "This pool is disabled"
-          : (isV3 ? v3ExecPool?.isPaused : pool?.isPaused)
-            ? "Pool is paused by admin at this time"
-            : "Trade Assets"}
+        {guestMode
+          ? "Sign in to trade"
+          : (isV3 ? v3ExecPool?.isDisabled : pool?.isDisabled)
+            ? "This pool is disabled"
+            : (isV3 ? v3ExecPool?.isPaused : pool?.isPaused)
+              ? "Pool is paused by admin at this time"
+              : "Trade Assets"}
       </Button>
 
       <SwapDialog
