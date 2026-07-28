@@ -896,40 +896,30 @@ export const getNetBalanceHistory = async (
     stakedStrato: 0n, // Total staked STRATO (delegated + unbonding)
   };
 
-  const [balanceHistory, currentBalance] = await Promise.all([
-    getHistoryDirect(
-      historyParams,
-      {
-        vaultShareToken: vaultConfig?.shareToken,
-        carryVaultAddrs,
-      },
-      {
-        userAddress,
-        botExecutor: vaultConfig?.botExecutor,
-        carryVaultAddrs,
-        requestFilters,
-        priceOracle,
-        stratoStakingAddress,
-        stratoTokenAddress,
-      },
-      vaultConfig,
-      initialData,
-      updatePortfolioInfoStorage,
-      updatePortfolioInfoMapping,
-      processBalanceSnapshot,
-    ),
-    getNetBalance(accessToken, userAddress),
-  ]);
+  const balanceHistory = await getHistoryDirect(
+    historyParams,
+    {
+      vaultShareToken: vaultConfig?.shareToken,
+      carryVaultAddrs,
+    },
+    {
+      userAddress,
+      botExecutor: vaultConfig?.botExecutor,
+      carryVaultAddrs,
+      requestFilters,
+      priceOracle,
+      stratoStakingAddress,
+      stratoTokenAddress,
+    },
+    vaultConfig,
+    initialData,
+    updatePortfolioInfoStorage,
+    updatePortfolioInfoMapping,
+    processBalanceSnapshot,
+  );
 
-  const historyPoints = balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.netBalance}));
-
-  // Append current live data as final point to ensure graph ends at "now" with live prices
-  historyPoints.push({
-    timestamp: Date.now(),
-    balance: currentBalance.netBalance,
-  });
-
-  return historyPoints;
+  // Return historical points only - all calculated consistently from historical data
+  return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.netBalance}));
 };
 
 export const getBorrowingHistory = async (
