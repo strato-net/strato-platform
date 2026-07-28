@@ -46,6 +46,7 @@ executable ethereum-jsonrpc
     , json-rpc-server
     , milena
     , mtl
+    , random
     , seqevents
     , servant-client
     , solid-vm-model

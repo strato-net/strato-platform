@@ -34,6 +34,7 @@ import Blockchain.DB.ModifyStateDB (pay)
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
+import Blockchain.Data.CallTrace
 import Blockchain.Data.ExecResults
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
@@ -178,6 +179,11 @@ solidVMBreakpoint ann = do
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
     [] -> pure []
     (ci : cis) -> pure $ ci {currentSourcePos = Just pos} : cis
+  mTracer <- Mod.get (Mod.Proxy @(Maybe VmTracer))
+  for_ mTracer $ \_ -> do
+    depth <- length <$> Mod.get (Mod.Proxy @[CallInfo])
+    GasInfo {_gasLeft = Gas gl} <- Mod.get (Mod.Proxy @GasInfo)
+    traceStatement mTracer (T.pack $ _sourcePositionName pos) (_sourcePositionLine pos) (_sourcePositionColumn pos) depth gl
   breakpoint runExpr
 
 -- end debugger-related code
@@ -2871,6 +2877,10 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
       Just SNULL -> findNamedReturns >>= checkMissingReturn
       Just {} -> pure val
     pure val'
+
+  for_ val' $ \v -> do
+    mTracer <- Mod.get (Mod.Proxy @(Maybe VmTracer))
+    traceSetLastOutput mTracer (renderValueShallow v)
 
   return val'
 

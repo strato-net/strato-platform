@@ -17,7 +17,21 @@ module Bloc.Server.Transaction
   ( postBlocTransaction,
     postBlocTransactionBody,
     postBlocTransactionUnsigned,
-    postBlocTransactionParallel
+    postBlocTransactionParallel,
+
+    -- * Shared marshaling (reused by Bloc.Server.Simulate)
+    resolveUserWalletAddress,
+    contractPayloadSrc,
+    constructorXabiArgs,
+    functionXabiArgs,
+    marshalCreatePayload,
+    marshalFunctionArgs,
+    marshalInnerCallArgs,
+    walletWrapCreate,
+    walletWrapCall,
+    mergeTxParams,
+    vaultGetPub,
+    checkIsSynced
   )
 where
 
@@ -116,6 +130,113 @@ mergeTxParams (Just inner) (Just outer) =
       (txparamsGasPrice inner <|> txparamsGasPrice outer)
       (txparamsNonce inner <|> txparamsNonce outer)
 mergeTxParams inner outer = inner <|> outer
+
+--------------------------------- SHARED TX MARSHALING ------------------------------------
+-- Single source of truth for turning API payloads into SolidVM transaction
+-- fields (Solidity-literal args, User-wallet wrapping). The simulation
+-- endpoint reuses these, so a dry run marshals exactly like a post.
+
+-- | CREATE2-style address of a user's on-chain User wallet contract, derived
+-- from the UserRegistry at 0x720 with the username as salt.
+resolveUserWalletAddress ::
+  (MonadIO m, A.Selectable Address AddressState m) =>
+  String ->
+  m Address
+resolveUserWalletAddress u = do
+  let userRegistry = Address 0x720
+  ch <- A.selectWithDefault (A.Proxy @AddressState) userRegistry >>= \s ->
+    pure . keccak256ToByteString $ case addressStateCodeHash s of
+      ExternallyOwned h -> h
+      SolidVMCode _ h -> h
+  pure $ getNewAddressWithSalt_unsafe userRegistry u ch [SMV.SString "User", SMV.SString u]
+
+-- | The source for a creation payload: inline src wins, else the
+-- request-level srcs map keyed by contract name.
+contractPayloadSrc :: Maybe (Map Text SourceMap) -> ContractPayload -> SourceMap
+contractPayloadSrc msrcs p = fromMaybe mempty $ inline <|> fromSrcs
+  where
+    inline = if contractpayloadSrc p == mempty then Nothing else Just (contractpayloadSrc p)
+    fromSrcs = join $ liftA2 Map.lookup (contractpayloadContract p) msrcs
+
+-- | The declared constructor parameters of a contract, keyed by name.
+constructorXabiArgs :: Contract -> Map Text Xabi.IndexedType
+constructorXabiArgs contract =
+  let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
+   in Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) (_constructor contract)
+
+-- | The declared parameters of a contract method, keyed by name.
+functionXabiArgs :: Contract -> Text -> Map Text Xabi.IndexedType
+functionXabiArgs contract funcName =
+  let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
+   in Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack funcName) $ contract ^. functions
+
+-- | Resolve a creation payload's contract in its source and render the
+-- constructor args to Solidity literals in declared-parameter order.
+marshalCreatePayload ::
+  (MonadIO m, MonadLogger m, HasCodeDB m, A.Selectable Address AddressState m) =>
+  Maybe (Map Text SourceMap) ->
+  ContractPayload ->
+  m (Text, SourceMap, Contract, [Text])
+marshalCreatePayload msrcs p = do
+  let contractSrc = contractPayloadSrc msrcs p
+      cn = fromMaybe "unnamed_contract" (contractpayloadContract p)
+  (_, theContract) <-
+    getContractDetailsForContract contractSrc (contractpayloadContract p) >>= \case
+      Nothing -> throwIO $ UserError "You need to supply at least one contract in the source"
+      Just x -> pure x
+  argsAsSource <-
+    constructArgValuesAndSource (Just $ contractToTypeDefs theContract) (contractpayloadArgs p) (constructorXabiArgs theContract)
+  pure (cn, contractSrc, theContract, argsAsSource)
+
+-- | Render a method call's args to Solidity literals against an already
+-- resolved contract's ABI.
+marshalFunctionArgs ::
+  (MonadIO m, MonadLogger m) =>
+  Contract ->
+  Maybe CC.CodeCollection ->
+  Text ->
+  Map Text ArgValue ->
+  m [Text]
+marshalFunctionArgs contract mcc funcName args =
+  constructArgValuesAndSource (Just $ contractToTypeDefsWithCC mcc contract) (Just args) (functionXabiArgs contract funcName)
+
+-- | Inner args for a wallet-routed call: rendered against the target ABI when
+-- the target contract is known, otherwise passed through as-is (the User
+-- contract forwards them verbatim).
+marshalInnerCallArgs ::
+  ( MonadIO m,
+    MonadLogger m,
+    (Keccak256 `A.Selectable` CC.CodeCollection) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m
+  ) =>
+  Address ->
+  Text ->
+  Map Text ArgValue ->
+  m [ArgValue]
+marshalInnerCallArgs target method args =
+  getContractWithCodeCollectionByAddress target method >>= \case
+    Nothing -> pure $ M.elems args
+    Just (theContract, cc) ->
+      map ArgString <$> marshalFunctionArgs theContract (Just cc) method args
+
+-- | Args for User.createContract(contractName, contractSrc, variadic args).
+walletWrapCreate :: Text -> SourceMap -> [Text] -> Map Text ArgValue
+walletWrapCreate cn contractSrc ctorLiterals =
+  M.fromList
+    [ ("contractName", ArgString cn),
+      ("contractSrc", ArgString $ sourceBlob contractSrc),
+      ("args", ArgArray . V.fromList $ ArgString <$> ctorLiterals)
+    ]
+
+-- | Args for User.callContract(contractToCall, functionName, variadic args).
+walletWrapCall :: Address -> Text -> [ArgValue] -> Map Text ArgValue
+walletWrapCall target method innerArgs =
+  M.fromList
+    [ ("contractToCall", ArgString . Text.pack $ show target),
+      ("functionName", ArgString method),
+      ("args", ArgArray $ V.fromList innerArgs)
+    ]
 
 --------------------------------- RAW (PRE-SIGNED) TRANSACTIONS ------------------------------------
 
@@ -283,13 +404,7 @@ postBlocTransactionUnsigned mUsername (PostBlocTransactionRequest mAddr txList t
     Just addr' -> return addr'
   let useWallet = maybe False (not . null) mUsername
   userContractAddr <- case (useWallet, mUsername) of
-    (True, Just u) -> do
-      let userRegistry = Address 0x720
-      ch <- A.selectWithDefault (A.Proxy @AddressState) userRegistry >>= \s ->
-        pure . keccak256ToByteString $ case addressStateCodeHash s of
-          ExternallyOwned h -> h
-          SolidVMCode _ h   -> h
-      pure $ getNewAddressWithSalt_unsafe userRegistry u ch [SMV.SString "User", SMV.SString u]
+    (True, Just u) -> resolveUserWalletAddress u
     _ -> pure addr
   -- Shared machinery: turn method calls into unsigned MessageTXs (mirrors the
   -- FUNCTION case below; reused for the wallet-wrapped CONTRACT/FUNCTION paths).
@@ -310,10 +425,7 @@ postBlocTransactionUnsigned mUsername (PostBlocTransactionRequest mAddr txList t
             case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
               Just _ -> pure ()
               Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
-            let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
-                xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
-                typeDefs = contractToTypeDefsWithCC mCodeCollection contract
-            argsAsSource <- lift $ constructArgValuesAndSource (Just typeDefs) (Just methodcallArgs) xabiArgs
+            argsAsSource <- lift $ marshalFunctionArgs contract mCodeCollection methodcallMethodName methodcallArgs
             lift . prepareUnsignedRawTx methodcallMethodName argsAsSource $
               TransactionHeader
                 (Just methodcallContractAddress)
@@ -346,31 +458,14 @@ postBlocTransactionUnsigned mUsername (PostBlocTransactionRequest mAddr txList t
         txsWithParams
     CONTRACT | useWallet -> do
       p <- fromContract tx
-      let srcMap' p' = join $ liftA2 Map.lookup (contractpayloadContract p') msrcs
-          src'' p' = if contractpayloadSrc p' == mempty then Nothing else Just $ contractpayloadSrc p'
-          getSrc' p' = fromMaybe mempty $ src'' p' <|> srcMap' p'
-          contractSrc = getSrc' p
-          cn = fromMaybe "unnamed_contract" (contractpayloadContract p)
-          srcLength = Text.length $ sourceBlob contractSrc
+      (cn, contractSrc, _, ctorArgsAsSource) <- marshalCreatePayload msrcs p
+      let srcLength = Text.length $ sourceBlob contractSrc
           metadata = Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]
-      (_, theContract@Contract {..}) <-
-        getContractDetailsForContract contractSrc (contractpayloadContract p) >>= \case
-          Nothing -> throwIO $ UserError "You need to supply at least one contract in the source"
-          Just x' -> pure x'
-      let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
-          xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) _constructor
-      ctorArgsAsSource <- constructArgValuesAndSource (Just $ contractToTypeDefs theContract) (contractpayloadArgs p) xabiArgs
-      let methodArgs =
-            M.fromList
-              [ ("contractName", ArgString cn),
-                ("contractSrc", ArgString $ sourceBlob contractSrc),
-                ("args", ArgArray . V.fromList $ ArgString <$> ctorArgsAsSource)
-              ]
           mc =
             MethodCall
               userContractAddr
               "createContract"
-              methodArgs
+              (walletWrapCreate cn contractSrc ctorArgsAsSource)
               (mergeTxParams (contractpayloadTxParams p) txParams)
               (Just metadata)
       processMethodCalls [mc]
@@ -426,22 +521,12 @@ postBlocTransactionUnsigned mUsername (PostBlocTransactionRequest mAddr txList t
           then do
             -- Wrap as User.callContract(contractToCall, functionName, args) so an
             -- external wallet signs a call to its own User contract.
-            args' <- getContractWithCodeCollectionByAddress (functionpayloadContractAddress p) (functionpayloadMethod p) >>= \case
-              Nothing -> pure $ M.elems (functionpayloadArgs p)
-              Just (theContract@Contract {..}, cc) -> do
-                let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
-                    xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) $ Map.lookup (Text.unpack $ functionpayloadMethod p) _functions
-                map ArgString <$> constructArgValuesAndSource (Just $ contractToTypeDefsWithCC (Just cc) theContract) (Just $ functionpayloadArgs p) xabiArgs
+            args' <- marshalInnerCallArgs (functionpayloadContractAddress p) (functionpayloadMethod p) (functionpayloadArgs p)
             pure $
               MethodCall
                 userContractAddr
                 "callContract"
-                ( M.fromList
-                    [ ("contractToCall", ArgString . Text.pack . show $ functionpayloadContractAddress p),
-                      ("functionName", ArgString $ functionpayloadMethod p),
-                      ("args", ArgArray $ V.fromList args')
-                    ]
-                )
+                (walletWrapCall (functionpayloadContractAddress p) (functionpayloadMethod p) args')
                 (mergeTxParams (functionpayloadTxParams p) txParams)
                 (functionpayloadMetadata p)
           else
@@ -540,14 +625,7 @@ postBlocTransaction' cacheNonce token mUsername resolve (PostBlocTransactionRequ
     Just addr' -> return addr'
   let useWallet = maybe False (not . null) mUsername
   userContractAddr <- case (useWallet, mUsername) of
-    (True, Just u) -> do
-      let userRegistry = Address 0x720
-      ch <- A.selectWithDefault (A.Proxy @AddressState) userRegistry >>= \s ->
-        pure . keccak256ToByteString $ case addressStateCodeHash s of
-          ExternallyOwned h -> h
-          SolidVMCode _ h   -> h
-      $logInfoS "postBlocTransactions'/userRegistry" . Text.pack $ show (userRegistry, ch)
-      pure $ getNewAddressWithSalt_unsafe userRegistry u ch [SMV.SString "User", SMV.SString u]
+    (True, Just u) -> resolveUserWalletAddress u
     _ -> pure addr
   $logInfoS "postBlocTransactions'/userContractAddr" . Text.pack $ show (useWallet, mUsername, userContractAddr)
   let src' :: ContractPayload -> Maybe SourceMap
@@ -587,28 +665,15 @@ postBlocTransaction' cacheNonce token mUsername resolve (PostBlocTransactionRequ
             cn = fromMaybe "unnamed_contract" (contractpayloadContract p)
         case useWallet of
           True -> do
-            let contractSrc = getSrc p
-                contractSrcText = sourceBlob $ contractSrc
-                srcLength = Text.length contractSrcText
-                contractArgs = contractpayloadArgs p
-                contractName' = contractpayloadContract p
+            (_, contractSrc, _, argsAsSource) <- marshalCreatePayload msrcs p
+            let srcLength = Text.length $ sourceBlob contractSrc
                 metadata = Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]
-
-            (_, theContract@Contract {..}) <-
-              getContractDetailsForContract contractSrc contractName' >>= \case
-                Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
-                Just x' -> pure x'
-
-            let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
-                xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) _constructor
-            argsAsSource <- constructArgValuesAndSource (Just $ contractToTypeDefs theContract) contractArgs xabiArgs
-
-            let bcp =
+                bcp =
                   FunctionParameters
                     addr
                     userContractAddr
                     "createContract"
-                    (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ sourceBlob $ contractSrc), ("args", ArgArray . V.fromList $ ArgString <$> argsAsSource)])
+                    (walletWrapCreate cn contractSrc argsAsSource)
                     (mergeTxParams (contractpayloadTxParams p) txParams)
                     (maybe (Just metadata) (\m -> Just $ metadata `Map.union` m) md)
                     resolve
@@ -634,24 +699,14 @@ postBlocTransaction' cacheNonce token mUsername resolve (PostBlocTransactionRequ
         ps <- mapM fromContract xs
         case useWallet of
           True -> do
-            methodList <- mapM (\p@(ContractPayload _ c a x m) -> do
-                              let contractSrc = getSrc p
-                                  contractSrcText = sourceBlob $ contractSrc
-                                  srcLength = Text.length contractSrcText
-                                  cn = fromMaybe "unnamed_contract" c
+            methodList <- mapM (\p@(ContractPayload _ _ _ x m) -> do
+                              (cn, contractSrc, _, argsAsSource) <- marshalCreatePayload msrcs p
+                              let srcLength = Text.length $ sourceBlob contractSrc
                                   metadata = Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]
-                              (_, theContract@Contract {..}) <-
-                                getContractDetailsForContract contractSrc c >>= \case
-                                  Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
-                                  Just x' -> pure x'
-
-                              let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
-                                  xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) _constructor
-                              argsAsSource <- constructArgValuesAndSource (Just $ contractToTypeDefs theContract) a xabiArgs
                               pure $ MethodCall
                                 userContractAddr
                                 "createContract"
-                                (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ sourceBlob $ contractSrc), ("args", ArgArray . V.fromList $ ArgString <$> argsAsSource)])
+                                (walletWrapCreate cn contractSrc argsAsSource)
                                 (mergeTxParams x txParams)
                                 (maybe (Just metadata) (\m' -> Just $ metadata `Map.union` m') m)
                           ) ps
@@ -691,22 +746,12 @@ postBlocTransaction' cacheNonce token mUsername resolve (PostBlocTransactionRequ
         p <- fromFunction x
         bfp' <- if useWallet && userContractAddr /= functionpayloadContractAddress p
           then do
-            args' <- getContractWithCodeCollectionByAddress (functionpayloadContractAddress p) (functionpayloadMethod p) >>= \case
-              Nothing -> pure $ M.elems (functionpayloadArgs p)
-              Just (theContract@Contract{..}, cc) -> do
-                let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
-                    xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) $
-                      Map.lookup (Text.unpack $ functionpayloadMethod p) _functions
-                map ArgString <$> constructArgValuesAndSource (Just $ contractToTypeDefsWithCC (Just cc) theContract) (Just $ functionpayloadArgs p) xabiArgs
+            args' <- marshalInnerCallArgs (functionpayloadContractAddress p) (functionpayloadMethod p) (functionpayloadArgs p)
             pure $ FunctionParameters
               addr
               userContractAddr
               "callContract"
-              (M.fromList $
-                [ ("contractToCall", ArgString . Text.pack . show $ functionpayloadContractAddress p)
-                , ("functionName", ArgString $ functionpayloadMethod p)
-                , ("args", ArgArray $ V.fromList args')
-                ])
+              (walletWrapCall (functionpayloadContractAddress p) (functionpayloadMethod p) args')
               (mergeTxParams (functionpayloadTxParams p) txParams)
               (functionpayloadMetadata p)
               resolve
@@ -724,17 +769,11 @@ postBlocTransaction' cacheNonce token mUsername resolve (PostBlocTransactionRequ
         bflp' <- flip (FunctionListParameters addr) resolve <$> traverse (\(FunctionPayload a m r x md) ->
             if useWallet && a /= userContractAddr
               then do
-                args' <- getContractWithCodeCollectionByAddress a m >>= \case
-                  Nothing -> pure $ M.elems r
-                  Just (theContract@Contract{..}, cc) -> do
-                    let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
-                        xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) $
-                          Map.lookup (Text.unpack m) _functions
-                    map ArgString <$> constructArgValuesAndSource (Just $ contractToTypeDefsWithCC (Just cc) theContract) (Just r) xabiArgs
+                args' <- marshalInnerCallArgs a m r
                 pure $ MethodCall
                   userContractAddr
                   "callContract"
-                  (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show a), ("functionName",ArgString m), ("args", ArgArray $ V.fromList args')])
+                  (walletWrapCall a m args')
                   (mergeTxParams x txParams)
                   md
               else pure $ MethodCall a m r (mergeTxParams x txParams) md
@@ -856,9 +895,7 @@ postUsersContractSolidVM' cacheNonce token ContractParameters {..} = do
       Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
       Just x -> pure x
 
-  let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
-      xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) _constructor
-  argsAsSource <- constructArgValuesAndSource (Just $ contractToTypeDefs theContract) args xabiArgs
+  argsAsSource <- constructArgValuesAndSource (Just $ contractToTypeDefs theContract) args (constructorXabiArgs theContract)
 
   tx <-
     signAndPrepare token fromAddr $
@@ -1058,9 +1095,7 @@ postUsersContractMethod' cacheNonce token FunctionParameters {..} = do
     Just _ -> pure ()
     Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
 
-  let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
-      xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack funcName) $ contract ^. functions
-  argsAsSource <- constructArgValuesAndSource (Just $ contractToTypeDefsWithCC (Just codeCollection) contract) (Just args) xabiArgs
+  argsAsSource <- marshalFunctionArgs contract (Just codeCollection) funcName args
 
   let network = "mercata"
 

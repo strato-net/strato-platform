@@ -17,6 +17,8 @@
 
 module Blockchain.BlockChain
   ( addBlocks,
+    addTransaction,
+    recoverProposer,
     verifyBlock,
     mineTransactions,
 --    calculateIntrinsicGas',
@@ -193,6 +195,16 @@ addBlocks unfiltered = do
                 calculateAndEmitStateDiffs srLog oldHeader
             yield . OutIndexEvent $ NewBestBlock nbb
 
+-- | Recover the proposer address from a block header's proposer seal.
+recoverProposer :: BlockHeader -> Either String Address
+recoverProposer bd = case getProposerSeal bd of
+  Nothing -> Left "no proposer seal in block header"
+  Just sig ->
+    let (r, s, v) = getSigVals sig
+     in case whoReallySignedThisTransactionEcrecover (proposalHash bd) r s (v - 0x1b) of
+          Just addr -> Right addr
+          Nothing -> Left "could not recover proposer from block seal"
+
 setParentStateRoot ::
   (MonadFail m, MonadIO m, BSDB.HasBlockSummaryDB m) =>
   OutputBlock ->
@@ -220,16 +232,7 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
         -- TODO: PLEASE REMOVE THIS FORK WHEN MERCATA-HYDROGEN IS OBSOLETE
         when (Conf.networkID (networkConfig ethConf) == 7596898649924658542 && number bd == 32624) runTheDAOFork -- Only run this if connected to mercata-hydrogen
 
-        let pHash = proposalHash bd
-            mSig = getProposerSeal bd  -- Signature is Maybe type
-        proposer <- case mSig of
-                        Just sig -> do
-                            let (r, s, v) = getSigVals sig
-                                proposerAddress = whoReallySignedThisTransactionEcrecover pHash r s (v - 0x1b)
-                            case proposerAddress of
-                              Just addr ->  return addr
-                              Nothing -> error "no proposer"
-                        Nothing -> error "no proposer"
+        proposer <- either error pure $ recoverProposer bd
 
         trrs <- addBlockTransactions b proposer
 

@@ -54,7 +54,10 @@ data BlocEnv = BlocEnv
   { stateFetchLimit :: Integer,
     txSizeLimit :: Int,
     gasLimit :: Integer,
-    globalNonceCounter :: Cache Address Nonce
+    globalNonceCounter :: Cache Address Nonce,
+    -- | Base URL of the node's ethereum-jsonrpc service, used for sandboxed
+    -- transaction simulation (same container; VM_JSONRPC_URL to override).
+    vmJsonRpcUrl :: String
   }
 
 --------------------------------------------------------------------------------

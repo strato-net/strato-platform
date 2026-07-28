@@ -17,9 +17,12 @@ module Bloc.API.Transaction (
     PostBlocTransactionUnsigned,
     PostBlocTransaction,
     PostBlocTransactionParallelExternal,
+    PostBlocTransactionSimulate,
     PostBlocTransactionRequest(..),
     BlocTransactionPayload(..),
     BlocTransactionType(..),
+    BlocSimulateResult(..),
+    SimulatedEvent(..),
     FunctionPayload(..),
     ContractPayload(..),
     TransferPayload(..),
@@ -110,6 +113,99 @@ type PostBlocTransactionUnsigned =
     :> QueryParam "username" String
     :> ReqBody '[JSON] PostBlocTransactionRequest -- SolidVM transaction
     :> Post '[JSON] [BlocTransactionUnsignedResult]
+
+-- | PostBlocTransactionSimulate dry-runs the same request body as
+-- /transaction in the node's VM sandbox: identical marshaling (args,
+-- User-wallet wrapping) but nothing is signed, nonced, or committed.
+-- chainid is declared only to be rejected explicitly (main chain only).
+type PostBlocTransactionSimulate =
+  "transaction"
+    :> "simulate" -- /transaction/simulate
+    :> QueryParam "username" String
+    :> QueryParam "chainid" Text
+    :> QueryFlag "trace"
+    :> ReqBody '[JSON] PostBlocTransactionRequest
+    :> Post '[JSON] [BlocSimulateResult]
+
+instance ToParam (QueryParam "chainid" Text) where
+  toParam _ =
+    DocQueryParam
+      "chainid"
+      []
+      "Rejected by /transaction/simulate: simulation is main-chain only"
+      Normal
+
+instance ToParam (QueryFlag "trace") where
+  toParam _ =
+    DocQueryParam
+      "trace"
+      []
+      "Include a call-frame execution trace (single-transaction bodies only)"
+      Flag
+
+-- | An event emitted during a simulated execution.
+data SimulatedEvent = SimulatedEvent
+  { simulatedeventAddress :: Text,
+    simulatedeventName :: Text,
+    simulatedeventArgs :: Map Text Text
+  }
+  deriving (Eq, Show, Generic)
+
+instance ToJSON SimulatedEvent where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance FromJSON SimulatedEvent where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance Arbitrary SimulatedEvent where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+instance ToSample SimulatedEvent where toSamples _ = noSamples
+
+instance ToSchema SimulatedEvent where
+  declareNamedSchema proxy =
+    genericDeclareNamedSchema blocSchemaOptions proxy
+      & mapped . name ?~ "SimulatedEvent"
+      & mapped . schema . description ?~ "An event emitted during a simulated execution"
+
+-- | The outcome of one simulated transaction. `response` carries the raw
+-- SolidVM return value (the same JSON form as TransactionResult.response);
+-- `data` mirrors the posted-transaction result shape (Call/Upload).
+data BlocSimulateResult = BlocSimulateResult
+  { blocsimulateStatus :: BlocTransactionStatus,
+    blocsimulateGasUsed :: Integer,
+    blocsimulateResponse :: Maybe Value,
+    blocsimulateData :: Maybe BlocTransactionData,
+    blocsimulateEvents :: [SimulatedEvent],
+    blocsimulateError :: Maybe Text,
+    blocsimulateTrace :: Maybe Value
+  }
+  deriving (Eq, Show, Generic)
+
+instance ToJSON BlocSimulateResult where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance FromJSON BlocSimulateResult where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance Arbitrary BlocSimulateResult where
+  arbitrary =
+    BlocSimulateResult
+      <$> arbitrary
+      <*> arbitrary
+      <*> pure Nothing
+      <*> pure Nothing
+      <*> arbitrary
+      <*> arbitrary
+      <*> pure Nothing
+
+instance ToSample BlocSimulateResult where toSamples _ = noSamples
+
+instance ToSchema BlocSimulateResult where
+  declareNamedSchema proxy =
+    genericDeclareNamedSchema blocSchemaOptions proxy
+      & mapped . name ?~ "BlocSimulateResult"
+      & mapped . schema . description ?~ "Result of a simulated (dry-run) transaction"
 
 data PostBlocTransactionRequest = PostBlocTransactionRequest
   { postbloctransactionrequestAddress :: Maybe Address,

@@ -18,6 +18,7 @@ library:
     - Blockchain.Bagger.BaggerState
     - Blockchain.Bagger.Transactions
     - Blockchain.Data.BlockSummary
+    - Blockchain.Data.CallTrace
     - Blockchain.Data.ExecResults
     - Blockchain.DB.BlockSummaryDB
     - Blockchain.DB.ModifyStateDB
@@ -92,4 +93,5 @@ tests:
     ghc-options: -Wall -O2 -dynamic
     dependencies:
       - hspec
+      - strato-model
       - vm-tools

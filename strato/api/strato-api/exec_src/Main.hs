@@ -42,13 +42,13 @@ import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Core.API
-import Data.Aeson
+import Data.Aeson ()
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.Cache as Cache
 import qualified Data.HashMap.Strict.InsOrd as H
 import Data.Map (fromList, traverseWithKey)
-import Data.Maybe (listToMaybe)
+import Data.Maybe (listToMaybe, fromMaybe)
 import Data.Source.Map
 import Data.OpenApi hiding (Header, delete)
 import qualified Data.OpenApi as OPENAPI
@@ -72,6 +72,7 @@ import Servant.Multipart
 import Servant.OpenApi
 import Servant.Swagger.UI
 import System.Clock
+import System.Environment (lookupEnv)
 import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
@@ -187,13 +188,15 @@ main = do
       nonceCounterTimeout = 10
 
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
+  vmJsonRpcUrl' <- fromMaybe "http://localhost:8545" <$> lookupEnv "VM_JSONRPC_URL"
 
   let env =
         BlocEnv
           { Bloc.Monad.txSizeLimit = Conf.txSizeLimit (networkConfig ethConf),
             Bloc.Monad.gasLimit = Conf.gasLimit (networkConfig ethConf),
             Bloc.Monad.stateFetchLimit = stateFetchLimit',
-            Bloc.Monad.globalNonceCounter = nonceCache
+            Bloc.Monad.globalNonceCounter = nonceCache,
+            Bloc.Monad.vmJsonRpcUrl = vmJsonRpcUrl'
           }
   let bindHost' = Conf.apiListenAddress (Conf.apiConfig ethConf)
       bindPort = Conf.apiPort (Conf.apiConfig ethConf)
@@ -288,10 +291,5 @@ addOperationIds swagger = swagger & OPENAPI.paths %~ H.mapWithKey addIdsToPathIt
 
 instance HasOpenApi a => HasOpenApi (MultipartForm Mem (MultipartData Mem) :> a) where
   toOpenApi _ = toOpenApi (Proxy :: Proxy a)
-
-instance ToSchema Value where
-  declareNamedSchema _ =
-    return $
-      NamedSchema (Just "JSON Value") mempty
 
 -----------
