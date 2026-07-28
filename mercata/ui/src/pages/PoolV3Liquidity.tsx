@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
@@ -90,7 +90,11 @@ const PoolV3Liquidity = () => {
               <TabsContent value="pools">
                 <p className="text-sm text-muted-foreground mb-4">
                   Pick a pair and fee tier, choose a price range, and deposit. Concentrated positions earn fees only
-                  while the pool price is inside the range.
+                  while the pool price is inside the range. If you are looking to trade tokens, visit the{" "}
+                  <Link to="/dashboard/swap" className="text-strato-blue hover:underline">
+                    trade page
+                  </Link>
+                  .
                 </p>
                 <V3PoolsTab pools={pools} loading={poolsLoading} onMinted={handleChanged} />
               </TabsContent>
