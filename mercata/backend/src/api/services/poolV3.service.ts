@@ -31,6 +31,7 @@ import {
   PoolV3CreateParams,
   TransactionResponse,
   SwapHistoryEntry,
+  PoolV3LiquidityDistribution,
 } from "@mercata/shared-types";
 
 const {
@@ -400,6 +401,47 @@ export const fetchPairSwapHistory = async (
   });
 
   return { entries, totalCount };
+};
+
+/**
+ * Liquidity distribution across the price axis (depth-chart data): walk the pool's
+ * initialized ticks in order accumulating liquidityNet — the running sum is the active
+ * liquidity everywhere inside [tick_i, tick_i+1). Zero-liquidity gaps are omitted.
+ * Returns null when the pool doesn't exist.
+ */
+export const getLiquidityDistribution = async (
+  accessToken: string,
+  poolAddress: string
+): Promise<PoolV3LiquidityDistribution | null> => {
+  const [rawPools, ticks] = await Promise.all([
+    fetchRawPools(accessToken, { address: `eq.${normalizeAddress(poolAddress)}` }),
+    fetchInitializedTicks(accessToken, poolAddress),
+  ]);
+  const pool = rawPools[0];
+  if (!pool) return null;
+
+  const sorted = [...ticks].sort((x, y) => x.tick - y.tick);
+  const segments: PoolV3LiquidityDistribution["segments"] = [];
+  let running = 0n;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    running += sorted[i].liquidityNet;
+    // ghost/mis-indexed tick rows could push the walk negative — clamp, never emit nonsense
+    if (running < 0n) running = 0n;
+    if (running > 0n) {
+      segments.push({
+        tickLower: sorted[i].tick,
+        tickUpper: sorted[i + 1].tick,
+        liquidity: running.toString(),
+      });
+    }
+  }
+
+  return {
+    currentTick: Number(pool.currentTick),
+    tickSpacing: Number(pool.tickSpacing),
+    liquidity: pool.liquidity,
+    segments,
+  };
 };
 
 const fetchInitializedTicks = async (accessToken: string, poolAddress: string): Promise<v3.TickData[]> => {

@@ -134,6 +134,23 @@ export interface PoolV3CollectParams {
   amount1Requested?: string;
 }
 
+/** One interval between consecutive initialized ticks with constant active liquidity */
+export interface PoolV3LiquiditySegment {
+  tickLower: number;
+  tickUpper: number;
+  /** active liquidity L across the interval (uint128 decimal string) */
+  liquidity: string;
+}
+
+/** Pool-wide liquidity distribution across the price axis (depth-chart data) */
+export interface PoolV3LiquidityDistribution {
+  currentTick: number;
+  tickSpacing: number;
+  /** the pool's current in-range liquidity (anchor: the segment containing currentTick matches this) */
+  liquidity: string;
+  segments: PoolV3LiquiditySegment[];
+}
+
 export interface PoolV3CreateParams {
   tokenA: string;
   tokenB: string;

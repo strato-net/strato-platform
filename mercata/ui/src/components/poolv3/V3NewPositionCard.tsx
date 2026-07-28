@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PoolV3, PoolV3AmountsPreview } from "@/interface";
+import { PoolV3, PoolV3AmountsPreview, PoolV3LiquidityDistribution } from "@/interface";
 import { useSwapContext } from "@/context/SwapContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -19,6 +19,7 @@ import {
   priceDomainEdge,
 } from "./poolV3Utils";
 import V3ConfirmDialog, { ConfirmRow } from "./V3ConfirmDialog";
+import V3LiquidityChart from "./V3LiquidityChart";
 
 const MINT_SLIPPAGE_BPS = 100n; // 1% headroom on the amount maxes
 
@@ -38,7 +39,7 @@ interface V3NewPositionCardProps {
 }
 
 const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
-  const { getV3AmountsForLiquidity, mintV3, loading } = useSwapContext();
+  const { getV3AmountsForLiquidity, getV3LiquidityDistribution, mintV3, loading } = useSwapContext();
   const { fetchUsdstBalance } = useTokenContext();
   const { activeTokens, inactiveTokens, fetchTokens } = useUserTokens();
   const { isLoggedIn } = useUser();
@@ -81,6 +82,24 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const previewAbortRef = useRef<AbortController | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [liquidityDist, setLiquidityDist] = useState<PoolV3LiquidityDistribution | null>(null);
+  const [liquidityDistLoading, setLiquidityDistLoading] = useState(false);
+
+  // Liquidity depth data for the range picker; pool.liquidity in the deps refreshes
+  // the chart when the pool state updates (e.g. after our own mint)
+  useEffect(() => {
+    const controller = new AbortController();
+    setLiquidityDistLoading(true);
+    getV3LiquidityDistribution(pool.address, controller.signal)
+      .then((d) => {
+        if (!controller.signal.aborted) setLiquidityDist(d);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!controller.signal.aborted) setLiquidityDistLoading(false);
+      });
+    return () => controller.abort();
+  }, [pool.address, pool.liquidity, getV3LiquidityDistribution]);
 
   const rangeValid = tickLower !== null && tickUpper !== null && tickLower < tickUpper;
   const inRange =
@@ -138,7 +157,8 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
     return [...short];
   }, [isLoggedIn, rangeValid, amountInput, enteredBalance, enteredSymbol, preview, previewZero, balance0, balance1, pool.token0.symbol, pool.token1.symbol]);
 
-  // Reset the form when the pool changes
+  // Reset the form when the pool changes; also drop the previous pool's liquidity
+  // distribution so the chart shows the skeleton instead of stale depth data
   useEffect(() => {
     setTickLower(null);
     setTickUpper(null);
@@ -146,6 +166,7 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
     setPriceUpperInput("");
     setAmountInput("");
     setPreview(null);
+    setLiquidityDist(null);
   }, [pool.address]);
 
   // Keep the entered token valid for the selected range: a range entirely above the price
@@ -178,6 +199,13 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
     setTickUpper(tu);
     setPriceLowerInput(tickToPriceInput(tl));
     setPriceUpperInput(tickToPriceInput(tu));
+  };
+
+  const clearRange = () => {
+    setTickLower(null);
+    setTickUpper(null);
+    setPriceLowerInput("");
+    setPriceUpperInput("");
   };
 
   const applyPreset = (lowerPct: number, upperPct: number) => {
@@ -283,6 +311,7 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
       });
       setAmountInput("");
       setPreview(null);
+      clearRange(); // fresh slate for the next position; the chart recenters on the pool
       fetchTokens(); // deposit changed the wallet balances shown next to Max
       fetchUsdstBalance(); // USDST balance box: deposit side and/or the gas fee
       onMinted();
@@ -334,21 +363,22 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
       {composition && (
         <div className="space-y-1">
           <span className="text-xs text-muted-foreground">Pool composition</span>
+          {/* token1 left / token0 right, matching the liquidity chart's price-axis sides */}
           <div className="flex h-2 rounded-full overflow-hidden bg-muted">
-            <div className="bg-strato-blue" style={{ width: `${composition.pct0}%` }} />
             <div className="bg-amber-500" style={{ width: `${composition.pct1}%` }} />
+            <div className="bg-strato-blue" style={{ width: `${composition.pct0}%` }} />
           </div>
           <div className="flex justify-between gap-2 text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1 min-w-0">
-              <span className="w-2 h-2 rounded-full bg-strato-blue flex-shrink-0" />
-              <span className="truncate">
-                {formatTokenAmount(pool.token0Balance, pool.token0.decimals)} {pool.token0.symbol} ({composition.pct0.toFixed(1)}%)
-              </span>
-            </span>
             <span className="flex items-center gap-1 min-w-0">
               <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
               <span className="truncate">
                 {formatTokenAmount(pool.token1Balance, pool.token1.decimals)} {pool.token1.symbol} ({composition.pct1.toFixed(1)}%)
+              </span>
+            </span>
+            <span className="flex items-center gap-1 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-strato-blue flex-shrink-0" />
+              <span className="truncate">
+                {formatTokenAmount(pool.token0Balance, pool.token0.decimals)} {pool.token0.symbol} ({composition.pct0.toFixed(1)}%)
               </span>
             </span>
           </div>
@@ -378,6 +408,18 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
             </button>
           ))}
         </div>
+
+        {/* Where the pool's liquidity sits on the price axis; drag the handles/band to set the range */}
+        <V3LiquidityChart
+          distribution={liquidityDist}
+          loading={liquidityDistLoading}
+          tickLower={tickLower}
+          tickUpper={tickUpper}
+          onRangeChange={applyTicks}
+          onRangeClear={clearRange}
+          token0Symbol={pool.token0.symbol}
+          token1Symbol={pool.token1.symbol}
+        />
         {priceEdge && (
           <p className="text-xs text-yellow-600">
             The pool's {priceEdge === "max" ? pool.token0.symbol : pool.token1.symbol} side was fully bought

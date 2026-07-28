@@ -10,6 +10,7 @@ import type {
   PoolV3Quote,
   PoolV3Position,
   PoolV3AmountsPreview,
+  PoolV3LiquidityDistribution,
   PoolV3SwapParams,
   PoolV3MintParams,
   PoolV3BurnParams,
@@ -145,6 +146,7 @@ export interface SwapContextActions {
   getV3PoolsByPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<PoolV3[]>;
   fetchV3Pools: () => Promise<PoolV3[]>;
   getV3PoolByAddress: (address: string) => Promise<PoolV3 | null>;
+  getV3LiquidityDistribution: (poolAddress: string, signal?: AbortSignal) => Promise<PoolV3LiquidityDistribution | null>;
   quoteV3: (poolAddress: string, zeroForOne: boolean, amountSpecified: string, signal?: AbortSignal) => Promise<PoolV3Quote | null>;
   swapV3: (data: PoolV3SwapParams) => Promise<void>;
   fetchV3Positions: (poolAddress?: string) => Promise<PoolV3Position[]>;

@@ -3,6 +3,7 @@ import {
   Pool, SwapHistoryEntry, SetPoolRatesParams, SwapToken, SwapContextType,
   PoolV3, PoolV3Quote, PoolV3Position, PoolV3AmountsPreview,
   PoolV3SwapParams, PoolV3MintParams, PoolV3BurnParams, PoolV3CollectParams,
+  PoolV3LiquidityDistribution,
 } from '@/interface';
 import {api} from '@/lib/axios';
 
@@ -449,6 +450,22 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const getV3LiquidityDistribution = useCallback(async (
+    poolAddress: string,
+    signal?: AbortSignal
+  ): Promise<PoolV3LiquidityDistribution | null> => {
+    try {
+      const { data } = await api.get<PoolV3LiquidityDistribution>(
+        `/poolv3/pools/${poolAddress}/liquidity`,
+        { signal }
+      );
+      return data || null;
+    } catch (err) {
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
+      return null;
+    }
+  }, []);
+
   const quoteV3 = useCallback(async (
     poolAddress: string,
     zeroForOne: boolean,
@@ -636,6 +653,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         getV3PoolsByPair,
         fetchV3Pools,
         getV3PoolByAddress,
+        getV3LiquidityDistribution,
         quoteV3,
         swapV3,
         fetchV3Positions,

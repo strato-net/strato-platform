@@ -76,6 +76,20 @@ router.get("/pools/:poolAddress", authHandler.authorizeRequest(true), PoolV3Cont
 
 /**
  * @openapi
+ * /poolv3/pools/{poolAddress}/liquidity:
+ *   get:
+ *     summary: Liquidity distribution across the price axis (depth-chart data)
+ *     tags: [PoolV3]
+ *     parameters:
+ *       - { name: poolAddress, in: path, required: true, schema: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Active liquidity per initialized-tick interval, plus current tick/spacing
+ */
+router.get("/pools/:poolAddress/liquidity", authHandler.authorizeRequest(true), PoolV3Controller.liquidity);
+
+/**
+ * @openapi
  * /poolv3/quote:
  *   get:
  *     summary: Quote a V3 swap by simulating the tick-walking swap loop over indexed state

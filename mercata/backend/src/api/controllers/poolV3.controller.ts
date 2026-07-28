@@ -7,6 +7,7 @@ import {
   getQuote,
   getPositions,
   getAmountsForLiquidity,
+  getLiquidityDistribution,
   swap,
   mint,
   burn,
@@ -56,6 +57,18 @@ class PoolV3Controller {
       const pool = await getPoolByAddress(accessToken, params.poolAddress);
       if (!pool) throw new Error("PoolV3 not found");
       res.status(RestStatus.OK).json(pool);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async liquidity(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, params } = req;
+      validatePoolV3AddressArgs(params);
+      const distribution = await getLiquidityDistribution(accessToken, params.poolAddress);
+      if (!distribution) throw new Error("PoolV3 not found");
+      res.status(RestStatus.OK).json(distribution);
     } catch (error) {
       next(error);
     }
