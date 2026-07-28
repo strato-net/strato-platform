@@ -1,5 +1,10 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
-import { Pool, SwapHistoryEntry, SetPoolRatesParams, SwapToken, SwapContextType } from '@/interface';
+import {
+  Pool, SwapHistoryEntry, SetPoolRatesParams, SwapToken, SwapContextType,
+  PoolV3, PoolV3Quote, PoolV3Position, PoolV3AmountsPreview,
+  PoolV3SwapParams, PoolV3MintParams, PoolV3BurnParams, PoolV3CollectParams,
+  PoolV3LiquidityDistribution,
+} from '@/interface';
 import {api} from '@/lib/axios';
 
 // ============================================================================
@@ -36,6 +41,10 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const [fromAsset, setFromAsset] = useState<SwapToken | undefined>();
   const [toAsset, setToAsset] = useState<SwapToken | undefined>();
   const [pool, setPool] = useState<Pool | null>(null);
+
+  // V3 (concentrated liquidity) state
+  const [swapVenue, setSwapVenue] = useState<'v2' | 'v3'>('v2');
+  const [v3PairPools, setV3PairPools] = useState<PoolV3[]>([]);
   
   // Swap history
   const [swapHistory, setSwapHistory] = useState<SwapHistoryEntry[]>([]);
@@ -404,23 +413,171 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  // ============================================================================
+  // V3 (CONCENTRATED LIQUIDITY) OPERATIONS
+  // ============================================================================
+
+  const getV3PoolsByPair = useCallback(async (tokenA: string, tokenB: string, signal?: AbortSignal): Promise<PoolV3[]> => {
+    try {
+      const { data } = await api.get<PoolV3[]>(`/poolv3/pools/pair/${tokenA}/${tokenB}`, { signal });
+      const list = data || [];
+      setV3PairPools(list);
+      return list;
+    } catch (err) {
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
+      setV3PairPools([]);
+      return [];
+    }
+  }, []);
+
+  const fetchV3Pools = useCallback(async (): Promise<PoolV3[]> => {
+    try {
+      const { data } = await api.get<PoolV3[]>('/poolv3/pools');
+      return data || [];
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to fetch V3 pools');
+      return [];
+    }
+  }, []);
+
+  const getV3PoolByAddress = useCallback(async (address: string): Promise<PoolV3 | null> => {
+    try {
+      const { data } = await api.get<PoolV3>(`/poolv3/pools/${address}`);
+      return data || null;
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to fetch V3 pool');
+      return null;
+    }
+  }, []);
+
+  const getV3LiquidityDistribution = useCallback(async (
+    poolAddress: string,
+    signal?: AbortSignal
+  ): Promise<PoolV3LiquidityDistribution | null> => {
+    try {
+      const { data } = await api.get<PoolV3LiquidityDistribution>(
+        `/poolv3/pools/${poolAddress}/liquidity`,
+        { signal }
+      );
+      return data || null;
+    } catch (err) {
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
+      return null;
+    }
+  }, []);
+
+  const quoteV3 = useCallback(async (
+    poolAddress: string,
+    zeroForOne: boolean,
+    amountSpecified: string,
+    signal?: AbortSignal
+  ): Promise<PoolV3Quote | null> => {
+    try {
+      const { data } = await api.get<PoolV3Quote>('/poolv3/quote', {
+        params: { poolAddress, zeroForOne: String(zeroForOne), amountSpecified },
+        signal,
+      });
+      return data || null;
+    } catch (err) {
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
+      return null;
+    }
+  }, []);
+
+  const swapV3 = useCallback(async (data: PoolV3SwapParams) => {
+    setLoading(true);
+    try {
+      const res = await api.post('/poolv3/swap', data);
+      return res.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchV3Positions = useCallback(async (poolAddress?: string): Promise<PoolV3Position[]> => {
+    try {
+      const { data } = await api.get<PoolV3Position[]>('/poolv3/positions', {
+        params: poolAddress ? { poolAddress } : undefined,
+      });
+      return data || [];
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to fetch V3 positions');
+      return [];
+    }
+  }, []);
+
+  const getV3AmountsForLiquidity = useCallback(async (
+    poolAddress: string,
+    tickLower: number,
+    tickUpper: number,
+    input: { liquidity?: string; amount0Desired?: string; amount1Desired?: string },
+    signal?: AbortSignal
+  ): Promise<PoolV3AmountsPreview | null> => {
+    try {
+      const { data } = await api.get<PoolV3AmountsPreview>('/poolv3/amounts-for-liquidity', {
+        params: { poolAddress, tickLower, tickUpper, ...input },
+        signal,
+      });
+      return data || null;
+    } catch (err) {
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
+      return null;
+    }
+  }, []);
+
+  const mintV3 = useCallback(async (data: PoolV3MintParams) => {
+    setLoading(true);
+    try {
+      const res = await api.post('/poolv3/positions', data);
+      return res.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const burnV3 = useCallback(async (data: PoolV3BurnParams) => {
+    setLoading(true);
+    try {
+      const res = await api.delete('/poolv3/positions', { data });
+      return res.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const collectV3 = useCallback(async (data: PoolV3CollectParams) => {
+    setLoading(true);
+    try {
+      const res = await api.post('/poolv3/positions/collect', data);
+      return res.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // History operations
   const refreshSwapHistory = useCallback(
     async (params?: Record<string, string>) => {
-      const poolAddress = pool?.address;
-      if (!poolAddress) return;
-  
+      // Pair history covers both venues at once (V2 pools + every V3 fee tier, each
+      // row tagged with its pool); the per-pool endpoint remains as a fallback for
+      // callers that only set `pool` (e.g. FixedSwapWidget). The endpoint string
+      // doubles as the staleness key for the in-flight request.
+      const endpoint = fromAsset?.address && toAsset?.address
+        ? `/swap-history/pair/${fromAsset.address}/${toAsset.address}`
+        : (pool?.address ? `/swap-history/${pool.address}` : null);
+      if (!endpoint) return;
+
       historyAbortControllerRef.current?.abort();
       historyAbortControllerRef.current = new AbortController();
-  
-      currentAssetPairRef.current = poolAddress;
+
+      currentAssetPairRef.current = endpoint;
       setSwapHistoryLoading(true);
-  
+
       try {
-        const { data } = await api.get(`/swap-history/${poolAddress}`, { params });
-        
-        if (currentAssetPairRef.current !== poolAddress) return;
-        
+        const { data } = await api.get(endpoint, { params });
+
+        if (currentAssetPairRef.current !== endpoint) return;
+
         setSwapHistory(data.data.map((item: any) => ({
           ...item,
           timestamp: new Date(item.timestamp)
@@ -428,18 +585,18 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         setSwapHistoryCount(data.totalCount);
       } catch (err) {
         if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') return;
-        
-        if (currentAssetPairRef.current === poolAddress) {
+
+        if (currentAssetPairRef.current === endpoint) {
           setSwapHistory([]);
           setSwapHistoryCount(0);
         }
       } finally {
-        if (currentAssetPairRef.current === poolAddress) {
+        if (currentAssetPairRef.current === endpoint) {
           setSwapHistoryLoading(false);
         }
       }
     },
-    [pool?.address]
+    [pool?.address, fromAsset?.address, toAsset?.address]
   );
 
   // ============================================================================
@@ -488,7 +645,22 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         setPoolRates,
         togglePause,
         toggleDisable,
-        pools
+        pools,
+        // V3 (concentrated liquidity)
+        swapVenue,
+        setSwapVenue,
+        v3PairPools,
+        getV3PoolsByPair,
+        fetchV3Pools,
+        getV3PoolByAddress,
+        getV3LiquidityDistribution,
+        quoteV3,
+        swapV3,
+        fetchV3Positions,
+        getV3AmountsForLiquidity,
+        mintV3,
+        burnV3,
+        collectV3
       }}
     >
       {children}

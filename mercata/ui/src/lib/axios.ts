@@ -105,7 +105,7 @@ async function pollTxResult(
 async function signAndSubmitUnsignedTxs(
   unsignedTxs: any[],
   onProgress?: WalletTxProgressHandler
-): Promise<{ status: string; hash: string }> {
+): Promise<{ status: string; hash: string; returnValues?: (unknown[] | null)[] }> {
   if (!_walletSignFn) throw new Error("No wallet signer available");
 
   const hashes: string[] = [];
@@ -170,7 +170,14 @@ async function signAndSubmitUnsignedTxs(
       error: result?.status === "Failure" ? result.txResult?.message || result.message : undefined,
     });
   });
-  return { status: results[0]?.status || "Success", hash: hashes[0] };
+  return {
+    status: results[0]?.status || "Success",
+    hash: hashes[0],
+    // decoded per-tx return values, same shape the OAuth flow gets from the backend
+    returnValues: results.map((r: { data?: { tag?: string; contents?: unknown[] } }) =>
+      r?.data?.tag === "Call" && Array.isArray(r.data.contents) ? r.data.contents : null
+    ),
+  };
 }
 
 api.interceptors.request.use(

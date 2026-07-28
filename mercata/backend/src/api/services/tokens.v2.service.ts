@@ -11,8 +11,11 @@ import { listVaultDefs, getYieldVaultInfo, getYieldVaultUserInfo } from "./yield
 import { Token, EarningAsset, BalanceSnapshot } from "@mercata/shared-types";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
-import { getHistoryDirect, fetchActiveRequestIds, fetchVaultHistoryConfig } from "../helpers/historyDb.helper";
+import { getHistoryDirect, fetchActiveRequestIds, fetchVaultHistoryConfig, fetchUserV3PoolMeta, PoolV3Meta } from "../helpers/historyDb.helper";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
+import { getPositions as getV3Positions, getPoolTokenPairs as getV3PoolTokenPairs } from "./poolV3.service";
+import * as v3Math from "../helpers/poolV3Math.helper";
+import { safeBigInt } from "../helpers/vaultPerformance.helper";
 
 const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, priceOracle } = constants;
 
@@ -343,12 +346,23 @@ export const getPublicEarningAssets = async (
 };
 
 function updatePortfolioInfoStorage(portfolioInfo: any, newInfo: StorageHistoryElement): any {
+  // V3 pool state: only the price is needed — position amounts at time t derive from it
+  if (portfolioInfo.v3PoolMeta?.[newInfo.address] && newInfo.data.sqrtPriceX96 != null) {
+    return { ...portfolioInfo,
+      v3Pools: { ...portfolioInfo.v3Pools,
+        [newInfo.address]: String(newInfo.data.sqrtPriceX96)
+      }
+    };
+  }
   if (newInfo.data._symbol) {
     const totalSupply = newInfo.data._totalSupply || '0';
+    const symbol = newInfo.data._symbol || '';
+    const isLpToken = symbol.endsWith('-LP');
     return { ...portfolioInfo,
       tokens: { ...portfolioInfo.tokens,
         [newInfo.address]: { ...portfolioInfo.tokens[newInfo.address],
           supply: totalSupply,
+          ...(isLpToken ? { isLpToken: true } : {}),
           ...(newInfo.data._managedAssets ? { managedAssets: BigInt(newInfo.data._managedAssets) } : {}),
           ...(newInfo.data.deployedAssets != null ? {
             deployedAssets: BigInt(newInfo.data.deployedAssets || 0),
@@ -430,10 +444,12 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
           }
         }
       }
+      // FIX: REPLACE instead of ADD - _balances stores absolute values, not deltas
+      // Multiple rows for the same token were being added together causing 2-3x inflation
       return { ...portfolioInfo, 
         tokens: { ...portfolioInfo.tokens,
           [newInfo.address]: { ...portfolioInfo.tokens[newInfo.address],
-            balance: currentBalance + newValue
+            balance: newValue
           }
         }
       };
@@ -444,6 +460,27 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
         tokens: { ...portfolioInfo.tokens,
           [newInfo.key['key'] || '']: { ...portfolioInfo.tokens[newInfo.key['key'] || ''],
             price: newValue
+          }
+        }
+      };
+    }
+    case 'positions': {
+      // PoolV3 positions[owner][tickLower][tickUpper] → {liquidity, tokensOwed0/1, ...}.
+      // Only rows on known V3 pools count — other contracts may have a 'positions' collection too.
+      if (!portfolioInfo.v3PoolMeta?.[newInfo.address]) return portfolioInfo;
+      const tickLower = parseInt(newInfo.key['key2'] || '', 10);
+      const tickUpper = parseInt(newInfo.key['key3'] || '', 10);
+      if (!Number.isFinite(tickLower) || !Number.isFinite(tickUpper)) return portfolioInfo;
+      const v = newInfo.value || {};
+      return { ...portfolioInfo,
+        v3Positions: { ...portfolioInfo.v3Positions,
+          [`${newInfo.address}:${tickLower}:${tickUpper}`]: {
+            poolAddress: newInfo.address,
+            tickLower,
+            tickUpper,
+            liquidity: String(v.liquidity ?? '0'),
+            tokensOwed0: String(v.tokensOwed0 ?? '0'),
+            tokensOwed1: String(v.tokensOwed1 ?? '0'),
           }
         }
       };
@@ -481,13 +518,13 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
       };
     }
     case 'userCollaterals': {
+      // FIX: REPLACE instead of ADD - userCollaterals stores absolute values
       const token = newInfo.key['key2'] || '';
-      const currentBalance = portfolioInfo.tokens[token]?.balance || 0;
       const newValue = newInfo.value || 0;
       return { ...portfolioInfo, 
         tokens: { ...portfolioInfo.tokens,
           [token]: { ...portfolioInfo.tokens[token],
-            balance: currentBalance + newValue
+            balance: newValue
           }
         }
       };
@@ -526,6 +563,36 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
       }
       return portfolioInfo;
     }
+    case 'delegatedStake': {
+      // StratoStaking: user's delegated stake to an operator
+      // key = userAddress, key2 = operatorAddress, value = stake amount
+      const stakeAmount = BigInt(newInfo.value || '0');
+      const currentStaked = portfolioInfo.stakedStrato || 0n;
+      return { ...portfolioInfo, stakedStrato: currentStaked + stakeAmount };
+    }
+    case 'unbondingQueue': {
+      // StratoStaking: user's unbonding request (unclaimed)
+      // value = { amount, releaseTime, claimed }
+      const unbondingValue = newInfo.value || {};
+      const isClaimed = unbondingValue.claimed === true || unbondingValue.claimed === 'true';
+      if (!isClaimed) {
+        const unbondingAmount = BigInt(unbondingValue.amount || '0');
+        const currentStaked = portfolioInfo.stakedStrato || 0n;
+        return { ...portfolioInfo, stakedStrato: currentStaked + unbondingAmount };
+      }
+      return portfolioInfo;
+    }
+    case 'operators': {
+      // StratoStaking: operator self-bond (if user is an operator)
+      // key = operatorAddress, value = { selfBond, ... }
+      const operatorValue = newInfo.value || {};
+      const selfBond = BigInt(operatorValue.selfBond || '0');
+      if (selfBond > 0n) {
+        const currentStaked = portfolioInfo.stakedStrato || 0n;
+        return { ...portfolioInfo, stakedStrato: currentStaked + selfBond };
+      }
+      return portfolioInfo;
+    }
   }
   return portfolioInfo;
 }
@@ -533,12 +600,14 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
 function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index: number): {timestamp: number, data: any} {
   let netBalance: number = 0;
   let netLoan: number = 0;
+
   for (const tokenAddr in snapshot.data.tokens) {
     const token = snapshot.data.tokens[tokenAddr] || {};
     let tokenPrice = token?.price || 0;
     const tokenBalance = token?.balance || 0;
+
     if (token?.scaledDebt) {
-      const rateAccumulator = Number(BigInt(token?.rateAccumulator) / 1000000000000000000n) / 1000000000;
+      const rateAccumulator = Number(safeBigInt(token?.rateAccumulator) / 1000000000000000000n) / 1000000000;
       const loanAmt = (token?.scaledDebt || 0) * rateAccumulator;
       netLoan += loanAmt;
     }
@@ -551,27 +620,31 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
       if (token?.userQueuedShares) {
         const supply = token?.supply || '0';
         if (supply !== '0') {
-          const deployed = BigInt(token?.deployedAssets || 0);
-          const claimable = BigInt(token?.totalClaimableAssets || 0);
-          const idle = BigInt(token?.idleAssets || 0);
+          const deployed = safeBigInt(token?.deployedAssets);
+          const claimable = safeBigInt(token?.totalClaimableAssets);
+          const idle = safeBigInt(token?.idleAssets);
           const cvTotal = idle + deployed;
           const cvActive = cvTotal > claimable ? cvTotal - claimable : 0n;
           if (cvActive > 0n) {
             const ulAsset = token?.underlyingAsset || '';
             const ulPrice = snapshot.data.tokens[ulAsset]?.price || 0;
-            const queuedAssets = Number((BigInt(Math.round(token.userQueuedShares)) * cvActive) / BigInt(supply));
+            const queuedAssets = Number((safeBigInt(Math.round(token.userQueuedShares).toString()) * cvActive) / safeBigInt(supply));
             netBalance += (queuedAssets / 1000000000) * (ulPrice / 1000000000);
           }
         }
       }
     }
+
+    // Handle LP tokens specially - never use oracle price for them
+    const isLpToken = token?.isLpToken || token?.pool;
+
     if (tokenBalance === 0) continue;
-    if (tokenPrice === 0) {
-      const totalSupply = token?.supply || '0';
-      if (totalSupply === '0') continue;
+
+    if (isLpToken) {
       const pool = token?.pool;
-      const managedAssets = token?.managedAssets;
-      if (pool) { // LP token
+      const totalSupply = token?.supply || '0';
+      if (pool && totalSupply !== '0') {
+        // Calculate LP price from underlying token values
         tokenPrice = calculateLPTokenPrice(
           pool.tokenABalance,
           pool.tokenBBalance,
@@ -579,56 +652,108 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
           snapshot.data.tokens[pool.tokenB]?.price || '0',
           totalSupply
         );
-      } else if (managedAssets) { // sUSDST
-        tokenPrice = Number((managedAssets * BigInt(1e18)) / BigInt(totalSupply));
+      } else {
+        // LP token without pool data - skip entirely (don't use oracle price)
+        continue;
+      }
+    } else if (tokenPrice === 0) {
+      const totalSupply = token?.supply || '0';
+      if (totalSupply === '0') continue;
+      const managedAssets = token?.managedAssets;
+      if (managedAssets) { // sUSDST
+        tokenPrice = Number((safeBigInt(managedAssets) * BigInt(1e18)) / safeBigInt(totalSupply));
       } else if (snapshot.data.vaultConfig?.shareToken === tokenAddr) { // Vault share token
         const supportedAssets: string[] = snapshot.data.vaultConfig?.supportedAssets || [];
         let totalEquity = 0n;
         for (const assetAddr of supportedAssets) {
-          const bal = BigInt(snapshot.data.tokens[assetAddr]?.vaultAssetBalance || 0) || 0n;
-          const assetPrice = BigInt(snapshot.data.tokens[assetAddr]?.price || 0) || 0n;
+          const bal = safeBigInt(snapshot.data.tokens[assetAddr]?.vaultAssetBalance);
+          const assetPrice = safeBigInt(snapshot.data.tokens[assetAddr]?.price);
           if (assetPrice > 0n) {
             totalEquity += (bal * assetPrice) / BigInt(1e18);
           }
         }
         if (totalEquity > 0n) {
-          tokenPrice = Number((totalEquity * BigInt(1e18)) / BigInt(totalSupply));
+          tokenPrice = Number((totalEquity * BigInt(1e18)) / safeBigInt(totalSupply));
         }
       } else if (snapshot.data.carryVaultAddrs?.has(tokenAddr)) {
-        const deployed = BigInt(token?.deployedAssets || 0);
-        const claimable = BigInt(token?.totalClaimableAssets || 0);
-        const idle = BigInt(token?.idleAssets || 0);
+        const deployed = safeBigInt(token?.deployedAssets);
+        const claimable = safeBigInt(token?.totalClaimableAssets);
+        const idle = safeBigInt(token?.idleAssets);
         const cvTotalAssets = idle + deployed;
         const cvActiveAssets = cvTotalAssets > claimable ? cvTotalAssets - claimable : 0n;
         const underlyingAsset = token?.underlyingAsset || '';
-        const assetPrice = BigInt(snapshot.data.tokens[underlyingAsset]?.price || 0) || 0n;
+        const assetPrice = safeBigInt(snapshot.data.tokens[underlyingAsset]?.price);
         if (cvActiveAssets > 0n && assetPrice > 0n) {
-          tokenPrice = Number((cvActiveAssets * assetPrice) / BigInt(totalSupply));
+          tokenPrice = Number((cvActiveAssets * assetPrice) / safeBigInt(totalSupply));
         }
       } else { // mUSDST
-        const borrowIndex = BigInt(token?.borrowIndex) || 0n;
+        const borrowIndex = safeBigInt(token?.borrowIndex);
         const borrowableAsset = token?.borrowableAsset || '';
-        const reservesAccrued = BigInt(token?.reservesAccrued) || 0n;
-        const totalScaledDebt = BigInt(token?.totalScaledDebt) || 0n;
-        const cash = BigInt(snapshot.data.tokens[token?.borrowableAsset || '']?.liquidityPoolBalance) || 0n;
+        const reservesAccrued = safeBigInt(token?.reservesAccrued);
+        const totalScaledDebt = safeBigInt(token?.totalScaledDebt);
+        const cash = safeBigInt(snapshot.data.tokens[token?.borrowableAsset || '']?.liquidityPoolBalance);
         const debt = (totalScaledDebt * borrowIndex) / BigInt(1e27);
-        const badDebt = token?.badDebt || 0n;
+        const badDebt = safeBigInt(token?.badDebt);
         let underlying = cash + debt + badDebt;
         if (reservesAccrued < underlying) {
             underlying -= reservesAccrued;
         } else {
             underlying = cash;
         }
-        if (underlying == 0) {
+        if (underlying == 0n) {
           tokenPrice = 1e18;
         } else {
-          tokenPrice = Number((underlying * BigInt(1e18)) / BigInt(totalSupply));
+          tokenPrice = Number((underlying * BigInt(1e18)) / safeBigInt(totalSupply));
         }
       }
     }
     const tokenValue = (tokenPrice / 1000000000) * (tokenBalance / 1000000000);
     netBalance += tokenValue;
   }
+
+  // V3 concentrated-liquidity positions: reconstruct the position's token amounts from
+  // the pool's price at this snapshot, then value them at the token prices at this
+  // snapshot (same historical-price replay the fungible tokens use).
+  const v3Meta = snapshot.data.v3PoolMeta || {};
+  for (const pos of Object.values(snapshot.data.v3Positions || {}) as any[]) {
+    const meta = v3Meta[pos.poolAddress];
+    if (!meta) continue;
+    let a0: bigint;
+    let a1: bigint;
+    try {
+      a0 = BigInt(pos.tokensOwed0 || '0');
+      a1 = BigInt(pos.tokensOwed1 || '0');
+      const liquidity = BigInt(pos.liquidity || '0');
+      const sqrtPriceX96 = BigInt(snapshot.data.v3Pools?.[pos.poolAddress] || '0');
+      if (liquidity > 0n && sqrtPriceX96 > 0n) {
+        const { amount0, amount1 } = v3Math.getAmountsForLiquidity(
+          sqrtPriceX96,
+          v3Math.getTickAtSqrtRatio(sqrtPriceX96),
+          pos.tickLower,
+          pos.tickUpper,
+          liquidity,
+          false,
+        );
+        a0 += amount0;
+        a1 += amount1;
+      }
+    } catch { continue; }
+    if (a0 === 0n && a1 === 0n) continue;
+    const price0 = parseFloat(snapshot.data.tokens[meta.token0]?.price) || 0;
+    const price1 = parseFloat(snapshot.data.tokens[meta.token1]?.price) || 0;
+    netBalance += (price0 / 1e9) * (Number(a0) / 1e9) + (price1 / 1e9) * (Number(a1) / 1e9);
+  }
+
+  // Add staked STRATO value to net balance
+  const stakedStrato = snapshot.data.stakedStrato || 0n;
+  if (stakedStrato > 0n) {
+    const stratoTokenAddr = snapshot.data.stratoTokenAddress || '';
+    const stratoPrice = snapshot.data.tokens[stratoTokenAddr]?.price || 0;
+    if (stratoPrice > 0) {
+      netBalance += (Number(stakedStrato) / 1e9) * (stratoPrice / 1e9);
+    }
+  }
+
   netBalance -= netLoan + parseFloat(snapshot.data.userLoan?.scaledDebt || '0');
   return { timestamp: snapshot.timestamp, data: {netBalance: netBalance / 1e18 }};
 }
@@ -679,12 +804,16 @@ export const getNetBalanceHistory = async (
   historyParams: HistoryParams,
 ): Promise<BalanceSnapshot[]> => {
 
-  // Pre-fetch vault config and carry vault active request IDs in parallel (2 queries, not N+1)
+  // Pre-fetch vault config, carry vault active request IDs, and the user's V3 pools
+  // in parallel (3 queries, not N+1)
   const carryVaultAddrs = listVaultDefs().filter(v => v.address).map(v => v.address);
+  const windowStart = new Date(historyParams.endTimestamp - historyParams.interval * historyParams.numTicks).toISOString();
+  const windowEnd = new Date(historyParams.endTimestamp).toISOString();
 
-  const [vaultConfig, activeReqMap] = await Promise.all([
+  const [vaultConfig, activeReqMap, v3PoolMeta] = await Promise.all([
     fetchVaultHistoryConfig(config.vault),
     fetchActiveRequestIds(carryVaultAddrs, userAddress).catch(() => new Map<string, string>()),
+    fetchUserV3PoolMeta(windowStart, windowEnd, userAddress),
   ]);
 
   const requestFilters: { address: string; path: string }[] = [];
@@ -692,14 +821,33 @@ export const getNetBalanceHistory = async (
     requestFilters.push({ address: addr, path: `requests[${reqId}]` });
   }
 
+  const poolV3Addrs = [...v3PoolMeta.keys()];
+  const v3PoolMetaObj: Record<string, PoolV3Meta> = Object.fromEntries(v3PoolMeta);
+  const v3PairTokens = [...new Set([...v3PoolMeta.values()].flatMap(m => [m.token0, m.token1]))];
+
+  // Staking addresses for portfolio history
+  const stratoStakingAddress = config.stratoStaking || '';
+  const stratoTokenAddress = config.stratoToken || '';
+
   const carryVaultAddrSet = new Set(carryVaultAddrs);
-  const initialData = { tokens: {}, userLoan: {}, vaultConfig: vaultConfig || undefined, carryVaultAddrs: carryVaultAddrSet };
+  const initialData = {
+    tokens: {},
+    userLoan: {},
+    vaultConfig: vaultConfig || undefined,
+    carryVaultAddrs: carryVaultAddrSet,
+    v3PoolMeta: v3PoolMetaObj,
+    v3Pools: {},
+    v3Positions: {},
+    stratoTokenAddress,
+    stakedStrato: 0n, // Total staked STRATO (delegated + unbonding)
+  };
 
   const balanceHistory = await getHistoryDirect(
     historyParams,
     {
       vaultShareToken: vaultConfig?.shareToken,
       carryVaultAddrs,
+      poolV3Addrs,
     },
     {
       userAddress,
@@ -707,6 +855,10 @@ export const getNetBalanceHistory = async (
       carryVaultAddrs,
       requestFilters,
       priceOracle,
+      includeV3Positions: poolV3Addrs.length > 0,
+      extraRelevantTokens: v3PairTokens,
+      stratoStakingAddress,
+      stratoTokenAddress,
     },
     vaultConfig,
     initialData,
@@ -715,6 +867,7 @@ export const getNetBalanceHistory = async (
     processBalanceSnapshot,
   );
 
+  // Return historical points only - all calculated consistently from historical data
   return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.netBalance}));
 };
 
@@ -857,14 +1010,45 @@ export const getPoolPriceHistory = async (
   return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.balance}));
 };
 
+/**
+ * USD value of the user's V3 concentrated-liquidity positions at the current pool
+ * price: principal at spot + realized owed + pending fees, valued at oracle prices.
+ * V3 positions aren't tokens, so the balance-driven valuation never sees them.
+ */
+const getV3PositionsValue = async (accessToken: string, userAddress: string): Promise<number> => {
+  const positions = await getV3Positions(accessToken, userAddress);
+  if (positions.length === 0) return 0;
+
+  const poolAddresses = [...new Set(positions.map((p) => p.poolAddress))];
+  const [pairs, priceMap] = await Promise.all([
+    getV3PoolTokenPairs(accessToken, poolAddresses),
+    getCompletePriceMap(accessToken),
+  ]);
+
+  let totalWadWad = 0n; // 1e36-scaled (wei amount × wei price)
+  for (const pos of positions) {
+    const pair = pairs.get(pos.poolAddress);
+    if (!pair) continue;
+    try {
+      const price0 = BigInt(priceMap.get(pair.token0) || "0");
+      const price1 = BigInt(priceMap.get(pair.token1) || "0");
+      const amount0 = BigInt(pos.amount0) + BigInt(pos.tokensOwed0) + BigInt(pos.pendingFees0 || "0");
+      const amount1 = BigInt(pos.amount1) + BigInt(pos.tokensOwed1) + BigInt(pos.pendingFees1 || "0");
+      totalWadWad += amount0 * price0 + amount1 * price1;
+    } catch { /* skip malformed rows */ }
+  }
+  return Number(totalWadWad / 10n ** 18n) / 1e18;
+};
+
 export const getNetBalance = async (
   accessToken: string,
   userAddress: string
 ): Promise<{ netBalance: number; totalBorrowed: number; totalAssetValue: number }> => {
-  const [earningAssetsResult, loanResult, vaultsResult] = await Promise.allSettled([
+  const [earningAssetsResult, loanResult, vaultsResult, v3Result] = await Promise.allSettled([
     getEarningAssets(accessToken, userAddress),
     getLoan(accessToken, userAddress),
     getVaults(accessToken, userAddress),
+    getV3PositionsValue(accessToken, userAddress),
   ]);
 
   let totalAssetValue = 0;
@@ -872,6 +1056,9 @@ export const getNetBalance = async (
     for (const asset of earningAssetsResult.value) {
       totalAssetValue += parseFloat(asset.value || "0");
     }
+  }
+  if (v3Result.status === "fulfilled") {
+    totalAssetValue += v3Result.value;
   }
 
   let lendingDebt = 0;

@@ -118,6 +118,11 @@ export const defaultVaultFactoryFor: Record<string, string> = {
   "33056204878082667": "55c77951e9cadc73af24ec18881d01fedff1f1f1" // Upquark mainnet
 };
 
+export const defaultPoolV3FactoryFor: Record<string, string> = {
+  "114784819836269": "e6b6f05a88e649e4102a801aade9a6bae02f352d", // Helium testnet
+  "33056204878082667": "5d630126d908b46bcf8d00bc15e591a459375809" // Upquark mainnet
+};
+
 export const defaultStratoNativeBridgeFor: Record<string, string> = {
   "114784819836269": "49f69252b00235030a4dcd4c7ef17a64ef346258", // Helium testnet
   "33056204878082667": "4d9e9c39180a75091b9c35bbb9064d67c7fdde5a", // Upquark mainnet
@@ -190,6 +195,7 @@ export let networkName: string | undefined;
 export let referralUrl: string | undefined;
 export let escrow: string = '';
 export let vaultFactory: string = '';
+export let poolV3Factory: string = '';
 export let metalForge: string = '';
 export let creditCardTopUp: string = '';
 export let vault: string = '';
@@ -238,6 +244,14 @@ function setVaultFactoryConfig(networkId: string) {
     vaultFactory = process.env.VAULT_FACTORY;
   } else {
     vaultFactory = defaultVaultFactoryFor[networkId];
+  }
+}
+
+function setPoolV3FactoryConfig(networkId: string) {
+  if (process.env.POOL_V3_FACTORY) {
+    poolV3Factory = process.env.POOL_V3_FACTORY;
+  } else {
+    poolV3Factory = defaultPoolV3FactoryFor[networkId] || "";
   }
 }
 
@@ -328,6 +342,7 @@ export async function initNetworkConfig() {
   setRewardsConfig(networkId);
   setReferralConfig(networkId);
   setVaultFactoryConfig(networkId);
+  setPoolV3FactoryConfig(networkId);
   setStratoNativeBridgeConfig(networkId);
   setStratoTokenConfig(networkId);
   setStratoStakingConfig(networkId);
@@ -385,6 +400,14 @@ export async function getInternalAddresses() {
     params: { address: `eq.${poolFactory}`, select: "value" },
   });
   addresses.push(...pools.map((pool: any) => pool.value));
+
+  // PoolV3 Factory --> all concentrated-liquidity pool addresses
+  if (poolV3Factory) {
+    const { data: v3Pools } = await cirrus.get(accessToken, "/BlockApps-PoolV3", {
+      params: { poolV3Factory: `eq.${poolV3Factory}`, select: "address" },
+    });
+    addresses.push(...v3Pools.map((pool: any) => pool.address));
+  }
 
   // Vault Factory --> all vault addresses + their botExecutor addresses
   if (vaultFactory) {

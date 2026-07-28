@@ -12,6 +12,7 @@ import {
   Download,
   BarChart3,
   Droplets,
+  SlidersHorizontal,
   Shield,
   HandCoins,
   Layers,
@@ -27,6 +28,7 @@ interface MoreNavItem {
   label: string;
   path: string;
   adminOnly?: boolean;
+  badge?: string;
 }
 
 interface MoreNavCategory {
@@ -60,7 +62,8 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
   {
     label: 'PRO',
     items: [
-      { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
+      { icon: SlidersHorizontal, label: 'Advanced', path: '/dashboard/advanced' },
+      { icon: Droplets, label: 'V3 Liquidity', path: '/dashboard/v3-liquidity', badge: 'New' },
       { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
       { icon: BarChart3, label: 'Analytics', path: '/dashboard/stats' },
       { icon: Shield, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
@@ -145,7 +148,7 @@ const MobileBottomNav = () => {
                       {category.label}
                     </div>
                   )}
-                  {visibleItems.map(({ icon: Icon, label, path }) => (
+                  {visibleItems.map(({ icon: Icon, label, path, badge }) => (
                     <button
                       key={path}
                       onClick={() => handleMoreItemClick(path)}
@@ -156,6 +159,11 @@ const MobileBottomNav = () => {
                     >
                       <Icon size={18} />
                       <span className="text-[13px] font-medium">{label}</span>
+                      {badge && (
+                        <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+                          {badge}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>

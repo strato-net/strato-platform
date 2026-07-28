@@ -31,6 +31,7 @@ import {
   getUserPoolLiquidityFlowTotals,
 } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
+import { fetchPairSwapHistory as fetchV3PairSwapHistory } from "./poolV3.service";
 import {
   SwapHistoryEntry,
   PoolList,
@@ -430,6 +431,83 @@ export const getSwapHistory = async (
   });
 
   return { data: swapHistory, totalCount };
+};
+
+/**
+ * Unified pair swap history: merges V2 swaps (filtered by tokenIn/tokenOut, so trades
+ * routed through multi-token stable pools count too) with V3 swaps across all the
+ * pair's fee tiers, newest first. Each source contributes its newest page×limit rows —
+ * a correct merged page K only needs the top K of each source — and the counts sum.
+ * Rows carry poolName ("V2" / "V3 0.3%") so the table can show the executing pool.
+ * impliedPrice is normalized to tokenB-per-tokenA in the REQUESTED pair order on both
+ * venues (for V2 by passing "did tokenA go in" as calculateImpliedPrice's direction).
+ */
+export const getPairSwapHistory = async (
+  accessToken: string,
+  tokenA: string,
+  tokenB: string,
+  page: number = 1,
+  limit: number = 10,
+  senderAddress?: string
+): Promise<SwapHistoryResponse> => {
+  const a = normalizeAddress(tokenA);
+  const b = normalizeAddress(tokenB);
+  const offset = (page - 1) * limit;
+  const fetchCap = offset + limit;
+  const normalizedSender = senderAddress ? normalizeAddress(senderAddress) : undefined;
+
+  const v2Filters = {
+    or: `(and(tokenIn.eq.${a},tokenOut.eq.${b}),and(tokenIn.eq.${b},tokenOut.eq.${a}))`,
+    ...(normalizedSender ? { sender: `eq.${normalizedSender}` } : {}),
+  };
+
+  const [v2EventsResponse, v2CountResponse, symbolsResponse, v3Result] = await Promise.all([
+    cirrus.get(accessToken, `/${PoolSwap}`, {
+      params: {
+        ...v2Filters,
+        select: swapHistorySelectFields.join(','),
+        order: 'block_timestamp.desc',
+        limit: fetchCap.toString(),
+      }
+    }),
+    cirrus.get(accessToken, `/${PoolSwap}`, {
+      params: { ...v2Filters, select: "count()" }
+    }),
+    // symbols from the Token table rather than the pool embed: a multi-token stable
+    // pool's tokenA/tokenB embed doesn't necessarily cover the traded pair
+    cirrus.get(accessToken, `/${constants.Token}`, {
+      params: { address: `in.(${a},${b})`, select: "address,_symbol" }
+    }),
+    // chains without V3 pools have no PoolV3 tables — pair history still works
+    fetchV3PairSwapHistory(accessToken, tokenA, tokenB, fetchCap, senderAddress)
+      .catch(() => ({ entries: [] as SwapHistoryEntry[], totalCount: 0 })),
+  ]);
+
+  const v2Events = Array.isArray(v2EventsResponse.data) ? v2EventsResponse.data as RawSwapEvent[] : [];
+  const v2Count = v2CountResponse.data?.[0]?.count || 0;
+  const symbolByAddress = new Map(
+    ((symbolsResponse.data as { address: string; _symbol: string }[]) ?? [])
+      .map((t) => [t.address, t._symbol])
+  );
+
+  const v2Entries: SwapHistoryEntry[] = v2Events.map(event => ({
+    id: event.id,
+    timestamp: new Date(event.block_timestamp),
+    tokenIn: symbolByAddress.get(event.tokenIn) ?? event.tokenIn,
+    tokenOut: symbolByAddress.get(event.tokenOut) ?? event.tokenOut,
+    amountIn: event.amountIn,
+    amountOut: event.amountOut,
+    impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, event.tokenIn === a, event.pool.isStable),
+    sender: event.sender,
+    poolAddress: event.address,
+    poolName: event.pool.isStable ? "Stable" : "V2",
+  }));
+
+  const merged = [...v2Entries, ...v3Result.entries]
+    .sort((x, y) => y.timestamp.getTime() - x.timestamp.getTime())
+    .slice(offset, offset + limit);
+
+  return { data: merged, totalCount: v2Count + v3Result.totalCount };
 };
 
 // ============================================================================

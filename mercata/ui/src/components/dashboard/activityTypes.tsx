@@ -18,6 +18,7 @@ import {
   Send,
   Coins,
   Plus,
+  Minus,
   Banknote,
   Gem,
   Clock,
@@ -141,7 +142,8 @@ const addImageToField = (
 
 /**
  * Activity handler function type
- * Processes events and returns ActivityCardData
+ * Processes events and returns ActivityCardData, or null to skip the event
+ * (e.g. bookkeeping-only events like a zero-amount PoolV3 poke burn)
  * @param event - The event data
  * @param tokenSymbols - Map of token addresses to their symbols
  * @param userAddress - Optional user address for highlighting "You"
@@ -152,7 +154,7 @@ export type ActivityHandler = (
   tokenSymbols: Map<string, string>,
   userAddress?: string | null,
   tokenImages?: Map<string, string>
-) => ActivityCardData;
+) => ActivityCardData | null;
 
 /**
  * Function to extract token/asset address(es) from an event for fetching symbol(s)
@@ -906,6 +908,273 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           },
           line2: {
             fieldLabels: ["Provider"],
+            renderer: "addresses-with-bullet",
+          },
+        },
+      };
+    },
+  },
+  "V3Swap": {
+    contract_name: "PoolV3",
+    event_name: "Swap",
+    displayName: "Trade (V3)",
+    iconConfig: { icon: ArrowLeftRight, color: "bg-orange-500" },
+    // token0/token1 aren't in the event — ActivityFeedCards resolves them from the
+    // pool (event.address) and attaches them onto the event before this runs
+    getTokenAddress: (event: Event) => {
+      const e = event as Event & { token0?: string; token1?: string };
+      return [e.token0, e.token1].filter(Boolean) as string[];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const e = event as Event & { token0?: string; token1?: string };
+      const sender = getEventAttribute(event, "sender", "recipient");
+      const toBigInt = (v: string): bigint => {
+        try { return BigInt(v || "0"); } catch { return 0n; }
+      };
+      // amount0/amount1 are the pool's signed deltas: positive = paid to the pool
+      // (the user's input side), negative = paid out by the pool (the output side)
+      const amount0 = toBigInt(getEventAttribute(event, "amount0"));
+      const amount1 = toBigInt(getEventAttribute(event, "amount1"));
+      const zeroForOne = amount0 > 0n;
+      const tokenIn = (zeroForOne ? e.token0 : e.token1) || "";
+      const tokenOut = (zeroForOne ? e.token1 : e.token0) || "";
+      const amountIn = (zeroForOne ? amount0 : amount1).toString();
+      const amountOut = (-(zeroForOne ? amount1 : amount0)).toString();
+
+      const fields: ActivityField[] = [
+        {
+          label: "Amount In",
+          value: formatValue(amountIn, tokenIn),
+          type: "amount",
+          badge: tokenSymbols.get(tokenIn),
+          image: tokenImages?.get(tokenIn),
+          imageFallback: tokenSymbols.get(tokenIn) || tokenIn,
+          rawAmount: getFullAmount(amountIn),
+        },
+        {
+          label: "Amount Out",
+          value: formatValue(amountOut, tokenOut),
+          type: "amount",
+          badge: tokenSymbols.get(tokenOut),
+          image: tokenImages?.get(tokenOut),
+          imageFallback: tokenSymbols.get(tokenOut) || tokenOut,
+          rawAmount: getFullAmount(amountOut),
+        },
+        {
+          label: "By",
+          value: sender,
+          type: "address",
+          isUserAddress: isUserAddress(sender, userAddress),
+        },
+      ];
+
+      return {
+        title: "Trade (V3)",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Amount In", "Amount Out"],
+            renderer: "amounts-with-arrow",
+          },
+          line2: {
+            fieldLabels: ["By"],
+            renderer: "addresses-with-bullet",
+          },
+        },
+      };
+    },
+  },
+  "V3AddLiquidity": {
+    contract_name: "PoolV3",
+    event_name: "Mint",
+    displayName: "Add Liquidity (V3)",
+    iconConfig: { icon: Plus, color: "bg-green-700" },
+    getTokenAddress: (event: Event) => {
+      const e = event as Event & { token0?: string; token1?: string };
+      return [e.token0, e.token1].filter(Boolean) as string[];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const e = event as Event & { token0?: string; token1?: string };
+      const provider = getEventAttribute(event, "owner", "sender");
+      const amount0 = getEventAttribute(event, "amount0") || "0";
+      const amount1 = getEventAttribute(event, "amount1") || "0";
+      const token0 = e.token0 || "";
+      const token1 = e.token1 || "";
+
+      const fields: ActivityField[] = [
+        {
+          label: "Token A Amount",
+          value: formatValue(amount0, token0),
+          type: "amount",
+          badge: tokenSymbols.get(token0),
+          image: tokenImages?.get(token0),
+          imageFallback: tokenSymbols.get(token0) || token0 || "Token 0",
+          rawAmount: getFullAmount(amount0),
+        },
+        {
+          label: "Token B Amount",
+          value: formatValue(amount1, token1),
+          type: "amount",
+          badge: tokenSymbols.get(token1),
+          image: tokenImages?.get(token1),
+          imageFallback: tokenSymbols.get(token1) || token1 || "Token 1",
+          rawAmount: getFullAmount(amount1),
+        },
+        {
+          label: "Provider",
+          value: provider,
+          type: "address",
+          isUserAddress: isUserAddress(provider, userAddress),
+        },
+      ];
+
+      return {
+        title: "Add Liquidity (V3)",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Token A Amount", "Token B Amount"],
+            renderer: "amounts-with-and",
+          },
+          line2: {
+            fieldLabels: ["Provider"],
+            renderer: "addresses-with-bullet",
+          },
+        },
+      };
+    },
+  },
+  "V3RemoveLiquidity": {
+    contract_name: "PoolV3",
+    event_name: "Burn",
+    displayName: "Remove Liquidity (V3)",
+    iconConfig: { icon: Minus, color: "bg-red-500" },
+    getTokenAddress: (event: Event) => {
+      const e = event as Event & { token0?: string; token1?: string };
+      return [e.token0, e.token1].filter(Boolean) as string[];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData | null => {
+      const e = event as Event & { token0?: string; token1?: string };
+      const owner = getEventAttribute(event, "owner");
+      const amount0 = getEventAttribute(event, "amount0") || "0";
+      const amount1 = getEventAttribute(event, "amount1") || "0";
+      // a zero-amount burn is the fee-realizing poke that precedes a collect —
+      // pure bookkeeping, not a user-visible removal
+      if (amount0 === "0" && amount1 === "0") return null;
+      const token0 = e.token0 || "";
+      const token1 = e.token1 || "";
+
+      const fields: ActivityField[] = [
+        {
+          label: "Token A Amount",
+          value: formatValue(amount0, token0),
+          type: "amount",
+          badge: tokenSymbols.get(token0),
+          image: tokenImages?.get(token0),
+          imageFallback: tokenSymbols.get(token0) || token0 || "Token 0",
+          rawAmount: getFullAmount(amount0),
+        },
+        {
+          label: "Token B Amount",
+          value: formatValue(amount1, token1),
+          type: "amount",
+          badge: tokenSymbols.get(token1),
+          image: tokenImages?.get(token1),
+          imageFallback: tokenSymbols.get(token1) || token1 || "Token 1",
+          rawAmount: getFullAmount(amount1),
+        },
+        {
+          label: "Provider",
+          value: owner,
+          type: "address",
+          isUserAddress: isUserAddress(owner, userAddress),
+        },
+      ];
+
+      return {
+        title: "Remove Liquidity (V3)",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Token A Amount", "Token B Amount"],
+            renderer: "amounts-with-and",
+          },
+          line2: {
+            fieldLabels: ["Provider"],
+            renderer: "addresses-with-bullet",
+          },
+        },
+      };
+    },
+  },
+  "V3Collect": {
+    contract_name: "PoolV3",
+    event_name: "Collect",
+    displayName: "Collect (V3)",
+    iconConfig: { icon: Coins, color: "bg-amber-500" },
+    getTokenAddress: (event: Event) => {
+      const e = event as Event & { token0?: string; token1?: string };
+      return [e.token0, e.token1].filter(Boolean) as string[];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData | null => {
+      const e = event as Event & { token0?: string; token1?: string };
+      const recipient = getEventAttribute(event, "recipient", "owner");
+      const amount0 = getEventAttribute(event, "amount0") || "0";
+      const amount1 = getEventAttribute(event, "amount1") || "0";
+      // nothing was owed — no tokens moved, nothing to show
+      if (amount0 === "0" && amount1 === "0") return null;
+      const token0 = e.token0 || "";
+      const token1 = e.token1 || "";
+
+      const fields: ActivityField[] = [
+        {
+          label: "Token A Amount",
+          value: formatValue(amount0, token0),
+          type: "amount",
+          badge: tokenSymbols.get(token0),
+          image: tokenImages?.get(token0),
+          imageFallback: tokenSymbols.get(token0) || token0 || "Token 0",
+          rawAmount: getFullAmount(amount0),
+        },
+        {
+          label: "Token B Amount",
+          value: formatValue(amount1, token1),
+          type: "amount",
+          badge: tokenSymbols.get(token1),
+          image: tokenImages?.get(token1),
+          imageFallback: tokenSymbols.get(token1) || token1 || "Token 1",
+          rawAmount: getFullAmount(amount1),
+        },
+        {
+          label: "To",
+          value: recipient,
+          type: "address",
+          isUserAddress: isUserAddress(recipient, userAddress),
+        },
+      ];
+
+      return {
+        title: "Collect (V3)",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Token A Amount", "Token B Amount"],
+            renderer: "amounts-with-and",
+          },
+          line2: {
+            fieldLabels: ["To"],
             renderer: "addresses-with-bullet",
           },
         },

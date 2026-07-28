@@ -4,6 +4,7 @@ import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
+import V3LiquiditySummary from "../components/dashboard/V3LiquiditySummary";
 import { Wallet, Coins, Shield, Loader2, Trophy, Send, Book, ArrowRightLeft, Gem, Mail, Gift } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
@@ -395,6 +396,10 @@ const Dashboard = () => {
               guestMode={!isLoggedIn}
             />
           </div>
+
+          {/* V3 concentrated-liquidity holdings — V2 LP tokens appear in the assets
+              list above, but V3 positions aren't tokens; renders only when present */}
+          <V3LiquiditySummary />
         </main>
       </div>
 

@@ -9,9 +9,15 @@ export interface VaultPerformanceMetrics {
   alpha: string;
 }
 
-export const safeBigInt = (value: string | null | undefined): bigint => {
-  if (!value) return 0n;
-  const trimmed = value.trim();
+export const safeBigInt = (value: unknown): bigint => {
+  if (value === null || value === undefined) return 0n;
+  if (typeof value === 'bigint') return value;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return 0n;
+    return BigInt(Math.trunc(value));
+  }
+  const str = String(value);
+  const trimmed = str.trim();
   if (trimmed === "") return 0n;
   if (/^-?\d+$/.test(trimmed)) return BigInt(trimmed);
 
