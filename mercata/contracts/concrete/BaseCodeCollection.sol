@@ -14,6 +14,8 @@ import "Admin/AdminRegistry.sol";
 //Swap
 import "./Pools/Pool.sol";
 import "./Pools/PoolFactory.sol";
+import "./Pools/PoolV3Factory.sol";
+import "./Pools/PoolV3.sol";
 import "./Pools/StablePool.sol";
 
 //Metals
@@ -81,6 +83,7 @@ contract record Mercata is Authorizable {
     StratoNativeBridge public stratoNativeBridge;
     StratoNativeCustodyVault public stratoNativeCustodyVault;
     PoolFactory public poolFactory;
+    PoolV3Factory public poolV3Factory;
     TokenFactory public tokenFactory;
     FeeCollector public feeCollector;
     AdminRegistry public adminRegistry;

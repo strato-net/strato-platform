@@ -13,6 +13,7 @@ import {
   BarChart3,
   Droplets,
   Shield,
+  SlidersHorizontal,
   LucideIcon,
   HandCoins,
   Layers,
@@ -27,6 +28,7 @@ interface NavItem {
   label: string;
   path: string;
   adminOnly?: boolean;
+  badge?: string;
 }
 
 interface NavCategory {
@@ -61,7 +63,8 @@ const NAV_CATEGORIES: NavCategory[] = [
   {
     label: 'PRO',
     items: [
-      { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
+      { icon: SlidersHorizontal, label: 'Advanced', path: '/dashboard/advanced' },
+      { icon: Droplets, label: 'V3 Liquidity', path: '/dashboard/v3-liquidity', badge: 'New' },
       { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
       { icon: BarChart3, label: 'Analytics', path: '/dashboard/stats' },
       { icon: Shield, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
@@ -93,7 +96,7 @@ const DashboardSidebar = () => {
     return pathname.startsWith(path);
   };
 
-  const renderNavItem = ({ icon: Icon, label, path }: NavItem) => {
+  const renderNavItem = ({ icon: Icon, label, path, badge }: NavItem) => {
     const active = isActive(path);
     return (
       <li key={path}>
@@ -110,6 +113,11 @@ const DashboardSidebar = () => {
           )}
           <Icon size={20} />
           <span className="text-sm">{label}</span>
+          {badge && (
+            <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+              {badge}
+            </span>
+          )}
         </Link>
       </li>
     );

@@ -16,6 +16,11 @@ export const ACTIVITY_FILTER_CONFIGS: Record<string, FilterConfig> = {
   "CDPEngine:USDSTMinted": { type: "single", attribute: "owner" },
   "Pool:Swap": { type: "single", attribute: "sender" },
   "Pool:AddLiquidity": { type: "single", attribute: "provider" },
+  // V3 events carry both the caller (sender/owner) and the recipient; either can be "me"
+  "PoolV3:Swap": { type: "or", attributes: ["sender", "recipient"] },
+  "PoolV3:Mint": { type: "or", attributes: ["sender", "owner"] },
+  "PoolV3:Burn": { type: "single", attribute: "owner" },
+  "PoolV3:Collect": { type: "or", attributes: ["owner", "recipient"] },
   "Rewards:RewardsClaimed": { type: "single", attribute: "user" },
   "StratoStaking:Staked": { type: "single", attribute: "user" },
   "StratoStaking:StakeMoved": { type: "single", attribute: "user" },
