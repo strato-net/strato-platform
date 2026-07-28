@@ -568,19 +568,51 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
 }
 
 function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index: number): {timestamp: number, data: any} {
-  const DEBUG = index === 0 || index === 40 || index === 80; // Log first, middle, and last snapshots
-  if (DEBUG) {
-    console.log(`\n=== processBalanceSnapshot index=${index} timestamp=${new Date(snapshot.timestamp).toISOString()} ===`);
-    console.log(`Token count: ${Object.keys(snapshot.data.tokens || {}).length}`);
-  }
+  const snapshotDate = new Date(snapshot.timestamp).toISOString();
+  
   let netBalance: number = 0;
   let netLoan: number = 0;
+  const warnings: string[] = [];
+  const contributions: Array<{
+    symbol: string;
+    address: string;
+    balance: number;
+    priceUsd: number;
+    valueUsd: number;
+    isLpToken: boolean;
+    hasPool: boolean;
+    skipped: boolean;
+    reason?: string;
+    warning?: string;
+  }> = [];
+  
+  // Count tokens with balance vs without
+  let tokensWithBalance = 0;
+  let tokensWithoutBalance = 0;
+  
   for (const tokenAddr in snapshot.data.tokens) {
     const token = snapshot.data.tokens[tokenAddr] || {};
     let tokenPrice = token?.price || 0;
     const tokenBalance = token?.balance || 0;
-    if (DEBUG && tokenBalance > 0) {
-      console.log(`Token ${tokenAddr}: balance=${tokenBalance}, price=${tokenPrice}`);
+    const tokenSymbol = token?.symbol || 'UNKNOWN';
+    const tokenSupply = token?.supply || '0';
+    
+    // Track token counts
+    if (tokenBalance > 0) tokensWithBalance++;
+    else tokensWithoutBalance++;
+    
+    // WARNING: Large balance check
+    const balanceInTokens = tokenBalance / 1e18;
+    if (balanceInTokens > 1e9) { // More than 1 billion tokens
+      warnings.push(`⚠️ HUGE BALANCE: ${tokenSymbol} (${tokenAddr.slice(0,10)}...) has ${balanceInTokens.toExponential(2)} tokens`);
+    }
+    
+    // WARNING: LP token with balance but it matches total supply (suspicious!)
+    if ((token?.isLpToken || tokenSymbol.endsWith('-LP')) && tokenBalance > 0 && tokenSupply !== '0') {
+      const supplyNum = parseFloat(tokenSupply);
+      if (Math.abs(tokenBalance - supplyNum) < 1e15) { // Balance equals supply (within rounding)
+        warnings.push(`🚨 LP BALANCE = SUPPLY: ${tokenSymbol} balance=${tokenBalance} supply=${tokenSupply} - USER SHOULDN'T OWN ENTIRE LP SUPPLY!`);
+      }
     }
     if (token?.scaledDebt) {
       const rateAccumulator = Number(safeBigInt(token?.rateAccumulator) / 1000000000000000000n) / 1000000000;
@@ -610,10 +642,14 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
         }
       }
     }
-    if (tokenBalance === 0) continue;
     
     // Handle LP tokens specially - never use oracle price for them
     const isLpToken = token?.isLpToken || token?.pool;
+    
+    if (tokenBalance === 0) {
+      continue;
+    }
+    
     if (isLpToken) {
       const pool = token?.pool;
       const totalSupply = token?.supply || '0';
@@ -626,14 +662,19 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
           snapshot.data.tokens[pool.tokenB]?.price || '0',
           totalSupply
         );
-        if (DEBUG && tokenBalance > 0) {
-          console.log(`  LP token ${tokenAddr}: calculated price from pool = ${tokenPrice}`);
-        }
       } else {
         // LP token without pool data - skip entirely (don't use oracle price)
-        if (DEBUG && tokenBalance > 0) {
-          console.log(`  LP token ${tokenAddr}: SKIPPED (no pool data, oracle price=${token?.price})`);
-        }
+        contributions.push({
+          symbol: tokenSymbol,
+          address: tokenAddr,
+          balance: tokenBalance / 1e18,
+          priceUsd: (token?.price || 0) / 1e18,
+          valueUsd: 0,
+          isLpToken: true,
+          hasPool: false,
+          skipped: true,
+          reason: `NO POOL DATA (oracle=$${((token?.price || 0) / 1e18).toFixed(2)})`
+        });
         continue;
       }
     } else if (tokenPrice === 0) {
@@ -688,9 +729,33 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
       }
     }
     const tokenValue = (tokenPrice / 1000000000) * (tokenBalance / 1000000000);
-    if (DEBUG && tokenBalance > 0) {
-      console.log(`  -> tokenValue=${tokenValue}, runningTotal=${netBalance + tokenValue}`);
+    const tokenValueUsd = tokenValue / 1e18;
+    
+    // Check for suspicious values
+    let warning: string | undefined;
+    if (tokenValueUsd > 1e10) { // More than $10 billion
+      warning = `VALUE > $10B!`;
     }
+    if (isLpToken && tokenSupply !== '0') {
+      const supplyNum = parseFloat(tokenSupply);
+      if (Math.abs(tokenBalance - supplyNum) < 1e15) {
+        warning = `BALANCE = TOTAL SUPPLY (bug?)`;
+      }
+    }
+    
+    // Track contribution
+    contributions.push({
+      symbol: tokenSymbol,
+      address: tokenAddr,
+      balance: tokenBalance / 1e18,
+      priceUsd: tokenPrice / 1e18,
+      valueUsd: tokenValueUsd,
+      isLpToken: isLpToken || false,
+      hasPool: !!(token?.pool),
+      skipped: false,
+      warning
+    });
+    
     netBalance += tokenValue;
   }
 
@@ -700,19 +765,62 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
     const stratoTokenAddr = snapshot.data.stratoTokenAddress || '';
     const stratoPrice = snapshot.data.tokens[stratoTokenAddr]?.price || 0;
     if (stratoPrice > 0) {
-      // stakedStrato is in wei (1e18), stratoPrice is in wei (1e18)
-      // Value = (stakedStrato / 1e18) * (stratoPrice / 1e18) = stakedStrato * stratoPrice / 1e36
       const stakedValue = (Number(stakedStrato) / 1e9) * (stratoPrice / 1e9);
+      const stakedValueUsd = stakedValue / 1e18;
+      contributions.push({
+        symbol: 'STRATO (Staked)',
+        address: stratoTokenAddr,
+        balance: Number(stakedStrato) / 1e18,
+        priceUsd: stratoPrice / 1e18,
+        valueUsd: stakedValueUsd,
+        isLpToken: false,
+        hasPool: false,
+        skipped: false
+      });
       netBalance += stakedValue;
     }
   }
 
   netBalance -= netLoan + parseFloat(snapshot.data.userLoan?.scaledDebt || '0');
-  if (DEBUG) {
-    console.log(`Final: netBalance=${netBalance}, netLoan=${netLoan}, result=${netBalance / 1e18}`);
-    console.log(`=== End snapshot ${index} ===\n`);
+  const finalBalanceUsd = netBalance / 1e18;
+  
+  // Sort contributions by value (highest first)
+  contributions.sort((a, b) => b.valueUsd - a.valueUsd);
+  
+  // Log this point's breakdown
+  console.log(`\n========== POINT ${index} | ${snapshotDate} | TOTAL: $${finalBalanceUsd.toLocaleString()} ==========`);
+  console.log(`  Tokens: ${tokensWithBalance} with balance, ${tokensWithoutBalance} without`);
+  
+  // Log warnings first (if any)
+  if (warnings.length > 0) {
+    console.log(`  ┌─────────────────────────────────────────────────────────────┐`);
+    warnings.forEach(w => console.log(`  │ ${w}`));
+    console.log(`  └─────────────────────────────────────────────────────────────┘`);
   }
-  return { timestamp: snapshot.timestamp, data: {netBalance: netBalance / 1e18 }};
+  
+  // Log top 15 contributions
+  console.log(`  TOP CONTRIBUTORS:`);
+  contributions.slice(0, 15).forEach((c, i) => {
+    const lpFlag = c.isLpToken ? (c.hasPool ? ' [LP+POOL]' : ' [LP-NO-POOL]') : '';
+    const skipFlag = c.skipped ? ` ⚠️ SKIPPED: ${c.reason}` : '';
+    const warnFlag = c.warning ? ` 🚨 ${c.warning}` : '';
+    console.log(`  ${(i+1).toString().padStart(2)}. ${c.symbol.padEnd(25)} | $${c.valueUsd.toLocaleString().padStart(20)} | bal=${c.balance.toExponential(2)} | price=$${c.priceUsd.toFixed(2)}${lpFlag}${skipFlag}${warnFlag}`);
+  });
+  
+  // Log skipped LP tokens separately
+  const skippedLPs = contributions.filter(c => c.skipped && c.isLpToken);
+  if (skippedLPs.length > 0) {
+    console.log(`  SKIPPED LP TOKENS (${skippedLPs.length}):`);
+    skippedLPs.forEach(c => {
+      console.log(`    - ${c.symbol}: balance=${c.balance.toExponential(2)}, oracle_price=$${c.priceUsd.toFixed(2)} → $${(c.balance * c.priceUsd).toLocaleString()} WOULD HAVE BEEN ADDED!`);
+    });
+  }
+  
+  if (netLoan > 0) {
+    console.log(`  --- LOAN: -$${(netLoan / 1e18).toLocaleString()}`);
+  }
+  console.log(`============================================================\n`);
+  return { timestamp: snapshot.timestamp, data: {netBalance: finalBalanceUsd }};
 }
 
 export const getBalanceHistory = async (
