@@ -2,7 +2,7 @@ import type { WalletClient } from "viem";
 import { api } from "@/lib/api";
 import { env, runtime } from "@/lib/env";
 
-// External-wallet transaction signing, ported from the Mercata app's flow:
+// External-wallet transaction signing, ported from the STRATO App's flow:
 //   1. POST /bloc/v2.2/transaction/unsigned  -> unsigned tx(s) with per-tx data
 //   2. walletClient.signTypedData(...)        -> STRATO EIP-712 signature
 //   3. POST /strato-api/eth/v1.2/transaction  -> submit signed tx

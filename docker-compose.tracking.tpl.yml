@@ -1,0 +1,90 @@
+#tracking-version:<VERSION>
+volumes:
+  trackingpgdata:
+    driver: local
+services:
+  tracking:
+    environment:
+    - NODE_URL=${NODE_URL}
+    - OPENID_DISCOVERY_URL=${OPENID_DISCOVERY_URL}
+    - ssl=${ssl:-true}
+    # Local mode: defaults hit the profile-gated postgres container below.
+    # RDS mode: point POSTGRES_HOST at the RDS endpoint, set POSTGRES_SSL
+    # (require | verify-full), and skip the local-db profile entirely.
+    - postgres_host=${POSTGRES_HOST:-postgres}
+    - postgres_port=${POSTGRES_PORT:-5432}
+    - postgres_user=${POSTGRES_USER:-postgres}
+    - postgres_password=${POSTGRES_PASSWORD}
+    - postgres_ssl=${POSTGRES_SSL:-}
+    - postgres_ssl_ca=${POSTGRES_SSL_CA:-}
+    - POSTGRES_MAINTENANCE_DB=${POSTGRES_MAINTENANCE_DB:-postgres}
+    - TRACKING_DB_CREATE=${TRACKING_DB_CREATE:-}
+    - TRACKING_DB_NAME=${TRACKING_DB_NAME:-}
+    - TRACKING_AUTHORIZED_USERS=${TRACKING_AUTHORIZED_USERS:-}
+    - TRACKING_DEST_ALLOWLIST=${TRACKING_DEST_ALLOWLIST:-}
+    - TRACKING_DEFAULT_DESTINATION=${TRACKING_DEFAULT_DESTINATION:-}
+    - TRACKING_COOKIE_DOMAIN=${TRACKING_COOKIE_DOMAIN:-}
+    - TRACKING_IPINFO_TOKEN=${TRACKING_IPINFO_TOKEN:-}
+    - TRACKING_ATTRIBUTION_WINDOW_DAYS=${TRACKING_ATTRIBUTION_WINDOW_DAYS:-}
+    build: ./app/services/tracking
+    image: ${TRACKING_IMAGE:-<REPO_URL>tracking:<VERSION>-<HASH_TRACKING>}
+    init: true
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  postgres:
+    profiles: ["local-db"]
+    environment:
+    - POSTGRES_DB=postgres
+    - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    image: postgres:14.18
+    volumes:
+    - trackingpgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  tracking-ui:
+    environment:
+    - OIDC_AUTHORITY=${OIDC_AUTHORITY:-}
+    - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+    - EXPLORER_URL=${EXPLORER_URL:-}
+    - TRACKING_APP_ORIGIN=${TRACKING_APP_ORIGIN:-}
+    build: ./app/services/tracking/ui
+    image: ${TRACKINGUI_IMAGE:-<REPO_URL>tracking-ui:<VERSION>-<HASH_TRACKING_UI>}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  nginx:
+    depends_on:
+    - tracking
+    - tracking-ui
+    environment:
+    - ssl=${ssl:-true}
+    - sslCertFileType=${sslCertFileType:-}
+    build: ./app/services/tracking/nginx
+    image: ${TRACKINGNGINX_IMAGE:-<REPO_URL>tracking-nginx:<VERSION>-<HASH_TRACKING_NGINX>}
+    ports:
+    - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
+    - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
+    volumes:
+    - ./ssl:/tmp/ssl:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
