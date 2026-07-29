@@ -245,18 +245,6 @@ export const getEarningAssets = async (
     };
   });
 
-  // ===== TEMP DEBUG: My Tokens list =====
-  console.log(`[MYTOKENS] user=${userAddress} tokens=${earningAssets.length}`);
-  earningAssets.forEach((a: any) => {
-    if (!a.totalBalance || a.totalBalance === "0") return;
-    console.log(
-      `[MYTOKENS] ${(a.symbol || a.name || "?").padEnd(14)} addr=${a.address} ` +
-      `wallet=${a.balance} coll=${a.collateralBalance} staked=${a.stakedBalance} ` +
-      `price=${a.price} value=$${a.value}`
-    );
-  });
-  // ===== END TEMP DEBUG =====
-
   const saveUsdstAsset = saveUsdstInfo?.deployed
     ? buildSaveUsdstEarningAsset(saveUsdstInfo, saveUsdstUserInfo ?? undefined)
     : null;
@@ -854,8 +842,6 @@ export const getNetBalanceHistory = async (
     stakedStrato: 0n, // Total staked STRATO (delegated + unbonding)
   };
 
-  console.log(`[GRAPH-ORACLE] prices query pinned to address=${priceOracle}`);
-
   const balanceHistory = await getHistoryDirect(
     historyParams,
     {
@@ -880,17 +866,6 @@ export const getNetBalanceHistory = async (
     updatePortfolioInfoMapping,
     processBalanceSnapshot,
   );
-
-  // ===== TEMP DEBUG: graph last-point prices =====
-  const lastPoint = balanceHistory[balanceHistory.length - 1];
-  if (lastPoint) {
-    console.log(`[GRAPH-PRICES] ts=${new Date(lastPoint.timestamp).toISOString()} net=${lastPoint.data.netBalance}`);
-    for (const [addr, t] of Object.entries<any>(lastPoint.data.tokens || {})) {
-      if (!t?.balance) continue;
-      console.log(`[GRAPH-PRICES] addr=${addr} bal=${t.balance} price=${t.price ?? 0}`);
-    }
-  }
-  // ===== END TEMP DEBUG =====
 
   // Return historical points only - all calculated consistently from historical data
   return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.netBalance}));

@@ -67,32 +67,13 @@ export const getOraclePrices = async (
   accessToken: string,
   params: Record<string, string> = { select: "asset:key,price:value::text" }
 ): Promise<OraclePriceMap> => {
-  const { data: rawPrices } = await cirrus.get(accessToken, `/${PriceOracle}-prices`, { params });
+  // The prices table holds rows from every deployed PriceOracle contract; without pinning
+  // to the system oracle a stale duplicate's row can win (Map keeps the last write per asset).
+  const { data: rawPrices } = await cirrus.get(accessToken, `/${PriceOracle}-prices`, {
+    params: { ...params, address: `eq.${constants.priceOracle}` },
+  });
 
   const prices = rawPrices as OraclePriceEntry[];
-
-  // ===== TEMP DEBUG: which oracle contract(s) feed the box =====
-  const { data: withAddr } = await cirrus.get(accessToken, `/${PriceOracle}-prices`, {
-    params: { select: "address,asset:key,price:value::text" },
-  }).catch(() => ({ data: [] }));
-  const rowsPerOracle = new Map<string, number>();
-  const rowsPerAsset = new Map<string, { address: string; price: string }[]>();
-  for (const r of (withAddr || []) as any[]) {
-    rowsPerOracle.set(r.address, (rowsPerOracle.get(r.address) || 0) + 1);
-    rowsPerAsset.set(r.asset, [...(rowsPerAsset.get(r.asset) || []), { address: r.address, price: r.price }]);
-  }
-  console.log(`[BOX-ORACLE] systemOracle(config)=${constants.priceOracle}`);
-  console.log(`[BOX-ORACLE] rows per oracle contract:`, [...rowsPerOracle.entries()]);
-  for (const [asset, rows] of rowsPerAsset) {
-    if (rows.length < 2) continue;
-    const winner = rows[rows.length - 1];
-    console.log(
-      `[BOX-ORACLE] DUP asset=${asset} winner=${winner.address} price=${winner.price}` +
-      (winner.address !== constants.priceOracle ? "  <-- STALE ORACLE WINS" : "") +
-      `  all=[${rows.map((r) => `${r.address}:${r.price}`).join(" , ")}]`
-    );
-  }
-  // ===== END TEMP DEBUG =====
 
   return new Map(
     prices?.filter((p: OraclePriceEntry) => p.asset && p.price).map((p: OraclePriceEntry) => [p.asset, p.price]) || []
