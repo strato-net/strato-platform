@@ -450,8 +450,7 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
       return { ...portfolioInfo, 
         tokens: { ...portfolioInfo.tokens,
           [newInfo.address]: { ...portfolioInfo.tokens[newInfo.address],
-            balance: currentBalance + newValue,
-            dbgWallet: newValue // TEMP DEBUG
+            balance: currentBalance + newValue
           }
         }
       };
@@ -526,8 +525,7 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
       return { ...portfolioInfo, 
         tokens: { ...portfolioInfo.tokens,
           [token]: { ...portfolioInfo.tokens[token],
-            balance: currentBalance + newValue,
-            dbgCollateral: newValue // TEMP DEBUG
+            balance: currentBalance + newValue
           }
         }
       };
@@ -603,11 +601,6 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
 function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index: number): {timestamp: number, data: any} {
   let netBalance: number = 0;
   let netLoan: number = 0;
-
-  // ===== TEMP DEBUG =====
-  const dbg: string[] = [];
-  let dbgCollateralValue = 0;
-  // ===== END TEMP DEBUG =====
 
   for (const tokenAddr in snapshot.data.tokens) {
     const token = snapshot.data.tokens[tokenAddr] || {};
@@ -717,21 +710,6 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
     }
     const tokenValue = (tokenPrice / 1000000000) * (tokenBalance / 1000000000);
     netBalance += tokenValue;
-
-    // ===== TEMP DEBUG =====
-    const wallet = token?.dbgWallet || 0;
-    const collateral = token?.dbgCollateral || 0;
-    if (collateral > 0) {
-      dbgCollateralValue += (tokenPrice / 1e9) * (collateral / 1e9);
-    }
-    dbg.push(
-      `    ${tokenAddr} wallet=${wallet.toExponential(3)} collateral=${collateral.toExponential(3)}`
-      + ` total=${tokenBalance.toExponential(3)} price=${(tokenPrice / 1e18).toFixed(4)}`
-      + ` value=$${(tokenValue / 1e18).toFixed(2)}`
-      + `${collateral > 0 ? ' [COLLATERAL ADDED]' : ''}`
-      + `${collateral > 0 && Math.abs(tokenBalance - (wallet + collateral)) > 1 ? ' !!MISMATCH' : ''}`,
-    );
-    // ===== END TEMP DEBUG =====
   }
 
   // V3 concentrated-liquidity positions: reconstruct the position's token amounts from
@@ -778,18 +756,6 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
   }
 
   netBalance -= netLoan + parseFloat(snapshot.data.userLoan?.scaledDebt || '0');
-
-  // ===== TEMP DEBUG =====
-  console.log(
-    `[NB-GRAPH] point=${index} ${new Date(snapshot.timestamp).toISOString()}`
-    + ` total=$${(netBalance / 1e18).toFixed(2)}`
-    + ` tokensCounted=${dbg.length}`
-    + ` withCollateral=${dbg.filter(l => l.includes('[COLLATERAL ADDED]')).length}`
-    + ` collateralValue=$${(dbgCollateralValue / 1e18).toFixed(2)}\n`
-    + dbg.join('\n'),
-  );
-  // ===== END TEMP DEBUG =====
-
   return { timestamp: snapshot.timestamp, data: {netBalance: netBalance / 1e18 }};
 }
 
