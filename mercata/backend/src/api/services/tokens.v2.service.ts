@@ -444,12 +444,13 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
           }
         }
       }
-      // FIX: REPLACE instead of ADD - _balances stores absolute values, not deltas
-      // Multiple rows for the same token were being added together causing 2-3x inflation
+      // `balance` accumulates wallet and collateral, which live in different collections.
+      // Only one row per (address, path) is valid per snapshot, so adding cannot
+      // double-count, and it keeps the result independent of row order.
       return { ...portfolioInfo, 
         tokens: { ...portfolioInfo.tokens,
           [newInfo.address]: { ...portfolioInfo.tokens[newInfo.address],
-            balance: newValue
+            balance: currentBalance + newValue
           }
         }
       };
@@ -518,13 +519,13 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
       };
     }
     case 'userCollaterals': {
-      // FIX: REPLACE instead of ADD - userCollaterals stores absolute values
       const token = newInfo.key['key2'] || '';
+      const currentBalance = portfolioInfo.tokens[token]?.balance || 0;
       const newValue = newInfo.value || 0;
       return { ...portfolioInfo, 
         tokens: { ...portfolioInfo.tokens,
           [token]: { ...portfolioInfo.tokens[token],
-            balance: newValue
+            balance: currentBalance + newValue
           }
         }
       };
