@@ -196,7 +196,10 @@ const EarnYieldVault = () => {
   const isDeployed = Boolean(effectiveInfo?.deployed);
   const assetSymbol = effectiveInfo?.assetSymbol || "Asset";
   const shareSymbol = effectiveInfo?.shareSymbol || "Shares";
-  const exchangeRate = formatExchangeRate(effectiveInfo?.exchangeRate || "0", assetSymbol);
+  const exchangeRate = formatExchangeRate(
+    effectiveInfo?.projectedExchangeRate || effectiveInfo?.exchangeRate || "0",
+    assetSymbol
+  );
   const tvlDisplay = loadingVaults ? "..." : formatUsdAmount(effectiveInfo?.tvlUsd || "0");
   const bestApyInfo = useMemo(
     () => findBestEarnApyInfo(tokenApys, effectiveInfo?.vaultAddress),
@@ -210,6 +213,11 @@ const EarnYieldVault = () => {
     }
     return { label: `+${rawTotal.toFixed(2)}%`, className: "text-foreground" };
   })();
+  // Funded accrual only runs on upgraded vaults, so the configured target is
+  // meaningful — including at 0% — exactly when accrual is initialized.
+  const targetApyPct = Number(effectiveInfo?.targetApy ?? "0");
+  const showTargetApy = isDeployed && Boolean(effectiveInfo?.accrualInitialized);
+  const targetApyLabel = Number.isFinite(targetApyPct) ? `${targetApyPct.toFixed(2)}%` : "—";
   const userShares = userInfo?.userShares || "0";
   const redeemableAssets = userInfo?.redeemableAssets || "0";
   const positionUsdWad = userInfo?.positionUsd || "0";
@@ -296,23 +304,20 @@ const EarnYieldVault = () => {
     return 0n;
   }, [actionMode, userInfo?.maxDeposit, userInfo?.userShares]);
 
-  const totalAssetsBig = BigInt(effectiveInfo?.totalAssets || "0");
-  const totalClaimableAssetsBig = BigInt(effectiveInfo?.totalClaimableAssets || "0");
-  const activeAssetsBig =
-    totalAssetsBig > totalClaimableAssetsBig ? totalAssetsBig - totalClaimableAssetsBig : 0n;
+  const projectedActiveAssetsBig = BigInt(effectiveInfo?.projectedActiveAssets || "0");
   const totalSharesBig = BigInt(effectiveInfo?.totalShares || "0");
 
   const previewValueWei = useMemo(() => {
     if (amountWei <= 0n) return 0n;
 
     if (actionMode === "deposit") {
-      return previewSharesForAssets(amountWei, activeAssetsBig, totalSharesBig);
+      return previewSharesForAssets(amountWei, projectedActiveAssetsBig, totalSharesBig);
     }
     if (actionMode === "redeem") {
-      return previewAssetsForShares(amountWei, activeAssetsBig, totalSharesBig);
+      return previewAssetsForShares(amountWei, projectedActiveAssetsBig, totalSharesBig);
     }
     return 0n;
-  }, [actionMode, amountWei, activeAssetsBig, totalSharesBig]);
+  }, [actionMode, amountWei, projectedActiveAssetsBig, totalSharesBig]);
 
   const instantWithdrawSharesWei = useMemo(() => {
     if (actionMode !== "redeem" || amountWei <= 0n) return 0n;
@@ -327,13 +332,13 @@ const EarnYieldVault = () => {
   }, [actionMode, amountWei, maxRedeemShares]);
 
   const instantWithdrawAssetsWei = useMemo(
-    () => previewAssetsForShares(instantWithdrawSharesWei, activeAssetsBig, totalSharesBig),
-    [instantWithdrawSharesWei, activeAssetsBig, totalSharesBig]
+    () => previewAssetsForShares(instantWithdrawSharesWei, projectedActiveAssetsBig, totalSharesBig),
+    [instantWithdrawSharesWei, projectedActiveAssetsBig, totalSharesBig]
   );
 
   const queuedWithdrawAssetsEstimateWei = useMemo(
-    () => previewAssetsForShares(queuedWithdrawSharesWei, activeAssetsBig, totalSharesBig),
-    [queuedWithdrawSharesWei, activeAssetsBig, totalSharesBig]
+    () => previewAssetsForShares(queuedWithdrawSharesWei, projectedActiveAssetsBig, totalSharesBig),
+    [queuedWithdrawSharesWei, projectedActiveAssetsBig, totalSharesBig]
   );
 
   const isActionAmountValid = amountWei > 0n && amountWei <= actionMaxWei;
@@ -591,7 +596,11 @@ const EarnYieldVault = () => {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                      <div
+                        className={`grid grid-cols-1 gap-3 text-sm ${
+                          showTargetApy ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"
+                        }`}
+                      >
                         <div className="rounded-lg border border-border/60 bg-background/70 p-3">
                           <p className="text-muted-foreground">Exchange Rate</p>
                           <p className="mt-1 text-lg font-semibold">{exchangeRate}</p>
@@ -624,6 +633,15 @@ const EarnYieldVault = () => {
                             Estimated annualized total yield, including rewards and native fees
                           </p>
                         </div>
+                        {showTargetApy && (
+                          <div className="rounded-lg border border-border/60 bg-background/70 p-3">
+                            <p className="text-muted-foreground">Target APY</p>
+                            <p className="mt-1 text-lg font-semibold">{targetApyLabel}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Configured savings rate the reward distributor funds
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex flex-col sm:flex-row gap-3">
