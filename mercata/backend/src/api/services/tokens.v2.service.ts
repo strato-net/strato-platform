@@ -639,6 +639,7 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
     const isLpToken = token?.isLpToken || token?.pool;
 
     if (tokenBalance === 0) continue;
+    if (snapshot.data.inactiveTokens?.has(tokenAddr)) continue;
 
     if (isLpToken) {
       const pool = token?.pool;
@@ -810,10 +811,12 @@ export const getNetBalanceHistory = async (
   const windowStart = new Date(historyParams.endTimestamp - historyParams.interval * historyParams.numTicks).toISOString();
   const windowEnd = new Date(historyParams.endTimestamp).toISOString();
 
-  const [vaultConfig, activeReqMap, v3PoolMeta] = await Promise.all([
+  const [vaultConfig, activeReqMap, v3PoolMeta, inactiveTokenRows] = await Promise.all([
     fetchVaultHistoryConfig(config.vault),
     fetchActiveRequestIds(carryVaultAddrs, userAddress).catch(() => new Map<string, string>()),
     fetchUserV3PoolMeta(windowStart, windowEnd, userAddress),
+    cirrus.get(accessToken, "/" + Token, { params: { select: "address", status: "neq.2" } })
+      .catch(() => ({ data: [] })),
   ]);
 
   const requestFilters: { address: string; path: string }[] = [];
@@ -830,11 +833,18 @@ export const getNetBalanceHistory = async (
   const stratoTokenAddress = config.stratoToken || '';
 
   const carryVaultAddrSet = new Set(carryVaultAddrs);
+  // getEarningAssets only values tokens with status ACTIVE, so the graph must drop the
+  // same PENDING/LEGACY holdings. Kept as a deny-list because vault share tokens have no
+  // Token record and must stay valued.
+  const inactiveTokens = new Set<string>(
+    ((inactiveTokenRows.data || []) as { address: string }[]).map((t) => t.address)
+  );
   const initialData = {
     tokens: {},
     userLoan: {},
     vaultConfig: vaultConfig || undefined,
     carryVaultAddrs: carryVaultAddrSet,
+    inactiveTokens,
     v3PoolMeta: v3PoolMetaObj,
     v3Pools: {},
     v3Positions: {},
