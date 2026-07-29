@@ -4,6 +4,7 @@ import "../../abstract/ERC20/ERC20.sol";
 import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/Proxy/Proxy.sol";
+import {YieldVault as YieldVaultOld} from "../../concrete/YieldVault/YieldVaultOld.sol";
 import "../../concrete/YieldVault/YieldVault.sol";
 
 contract User {
@@ -50,6 +51,68 @@ contract YieldVaultUpgradeHarness is YieldVault {
 }
 
 contract Describe_YieldVault is Authorizable {
+    struct LegacyUpgradeSnapshot {
+        address proxyOwner;
+        address vaultOwner;
+        address assetAddress;
+        bytes32 nameHash;
+        bytes32 symbolHash;
+        bool paused;
+        bool vaultInitialized;
+        bool strategyApproved;
+        uint256 decimals;
+        uint256 idle;
+        uint256 deployedAssets;
+        uint256 minIdleBps;
+        uint256 totalAssets;
+        uint256 activeAssets;
+        uint256 exchangeRate;
+        uint256 freeIdleForInstantWithdrawals;
+        uint256 freeIdleForQueueProcessing;
+        uint256 maxDeploy;
+        uint256 totalSupply;
+        uint256 assetTotalSupply;
+        uint256 strategyDebt;
+        uint64 nextRequestId;
+        uint64 queueHead;
+        uint64 queueTail;
+        uint256 totalQueuedShares;
+        uint256 totalClaimableAssets;
+        uint256 aliceShares;
+        uint256 bobShares;
+        uint256 carolShares;
+        uint256 proxyShares;
+        uint256 aliceUnderlying;
+        uint256 bobUnderlying;
+        uint256 carolUnderlying;
+        uint256 strategyUnderlying;
+        uint256 lossSinkUnderlying;
+        uint256 proxyUnderlying;
+        uint256 aliceAssetAllowance;
+        uint256 bobAssetAllowance;
+        uint256 carolAssetAllowance;
+        uint256 strategyAssetAllowance;
+        uint256 aliceShareAllowance;
+        uint256 bobShareAllowance;
+        uint256 carolShareAllowance;
+        uint64 aliceActiveRequestId;
+        uint64 bobActiveRequestId;
+        uint64 carolActiveRequestId;
+        uint256 aliceClaimableAssets;
+        uint256 bobClaimableAssets;
+        uint256 carolClaimableAssets;
+        address request1Owner;
+        uint256 request1Shares;
+        address request1Receiver;
+        uint64 request1Next;
+        bool request1Exists;
+        address request2Owner;
+        uint256 request2Shares;
+        address request2Receiver;
+        uint64 request2Next;
+        bool request2Exists;
+    }
+
     uint public INFINITY = 2 ** 256 - 1;
     uint public WAD = 1e18;
     uint public MAX_RATE = 1000000021979553151239153027;
@@ -91,6 +154,227 @@ contract Describe_YieldVault is Authorizable {
         address impl = address(new YieldVault(address(this)));
         proxiedVault = YieldVault(address(new Proxy(impl, address(this))));
         proxiedVault.initialize(asset, "ETH Carry Vault", "carryETH");
+    }
+
+    function _captureLegacyUpgradeSnapshot(
+        Proxy proxy,
+        YieldVaultOld legacyVault,
+        User alice,
+        User bob,
+        User carol,
+        User strategy,
+        User lossSink
+    ) internal view returns (LegacyUpgradeSnapshot snapshot) {
+        snapshot.proxyOwner = proxy.owner();
+        snapshot.vaultOwner = legacyVault.owner();
+        snapshot.assetAddress = legacyVault.asset();
+        snapshot.nameHash = keccak256(legacyVault.name());
+        snapshot.symbolHash = keccak256(legacyVault.symbol());
+        snapshot.paused = legacyVault.paused();
+        snapshot.vaultInitialized = legacyVault.vaultInitialized();
+        snapshot.strategyApproved = legacyVault.approvedStrategies(address(strategy));
+        snapshot.decimals = legacyVault.decimals();
+        snapshot.idle = legacyVault.idleAssets();
+        snapshot.deployedAssets = legacyVault.deployedAssets();
+        snapshot.minIdleBps = legacyVault.minIdleBps();
+        snapshot.totalAssets = legacyVault.totalAssets();
+        snapshot.activeAssets = legacyVault.activeAssets();
+        snapshot.exchangeRate = legacyVault.exchangeRate();
+        snapshot.freeIdleForInstantWithdrawals = legacyVault.freeIdleForInstantWithdrawals();
+        snapshot.freeIdleForQueueProcessing = legacyVault.freeIdleForQueueProcessing();
+        snapshot.maxDeploy = legacyVault.maxDeploy();
+        snapshot.totalSupply = legacyVault.totalSupply();
+        snapshot.assetTotalSupply = IERC20(asset).totalSupply();
+        snapshot.strategyDebt = legacyVault.strategyDebt(address(strategy));
+        snapshot.nextRequestId = legacyVault.nextRequestId();
+        snapshot.queueHead = legacyVault.queueHead();
+        snapshot.queueTail = legacyVault.queueTail();
+        snapshot.totalQueuedShares = legacyVault.totalQueuedShares();
+        snapshot.totalClaimableAssets = legacyVault.totalClaimableAssets();
+        snapshot.aliceShares = legacyVault.balanceOf(address(alice));
+        snapshot.bobShares = legacyVault.balanceOf(address(bob));
+        snapshot.carolShares = legacyVault.balanceOf(address(carol));
+        snapshot.proxyShares = legacyVault.balanceOf(address(proxy));
+        snapshot.aliceUnderlying = IERC20(asset).balanceOf(address(alice));
+        snapshot.bobUnderlying = IERC20(asset).balanceOf(address(bob));
+        snapshot.carolUnderlying = IERC20(asset).balanceOf(address(carol));
+        snapshot.strategyUnderlying = IERC20(asset).balanceOf(address(strategy));
+        snapshot.lossSinkUnderlying = IERC20(asset).balanceOf(address(lossSink));
+        snapshot.proxyUnderlying = IERC20(asset).balanceOf(address(proxy));
+        snapshot.aliceAssetAllowance = IERC20(asset).allowance(address(alice), address(proxy));
+        snapshot.bobAssetAllowance = IERC20(asset).allowance(address(bob), address(proxy));
+        snapshot.carolAssetAllowance = IERC20(asset).allowance(address(carol), address(proxy));
+        snapshot.strategyAssetAllowance = IERC20(asset).allowance(address(strategy), address(proxy));
+        snapshot.aliceShareAllowance = legacyVault.allowance(address(alice), address(proxy));
+        snapshot.bobShareAllowance = legacyVault.allowance(address(bob), address(proxy));
+        snapshot.carolShareAllowance = legacyVault.allowance(address(carol), address(proxy));
+        snapshot.aliceActiveRequestId = legacyVault.activeRequestId(address(alice));
+        snapshot.bobActiveRequestId = legacyVault.activeRequestId(address(bob));
+        snapshot.carolActiveRequestId = legacyVault.activeRequestId(address(carol));
+        snapshot.aliceClaimableAssets = legacyVault.claimableAssets(address(alice));
+        snapshot.bobClaimableAssets = legacyVault.claimableAssets(address(bob));
+        snapshot.carolClaimableAssets = legacyVault.claimableAssets(address(carol));
+        snapshot.request1Owner = legacyVault.requestOwner(1);
+        (
+            snapshot.request1Shares,
+            snapshot.request1Receiver,
+            snapshot.request1Next,
+            snapshot.request1Exists
+        ) = legacyVault.requests(1);
+        snapshot.request2Owner = legacyVault.requestOwner(2);
+        (
+            snapshot.request2Shares,
+            snapshot.request2Receiver,
+            snapshot.request2Next,
+            snapshot.request2Exists
+        ) = legacyVault.requests(2);
+    }
+
+    function _assertCanonicalLegacyUpgradeSnapshot(
+        LegacyUpgradeSnapshot snapshot,
+        User alice,
+        User bob
+    ) internal view {
+        require(snapshot.proxyOwner == address(this), "proxy owner mismatch");
+        require(snapshot.vaultOwner == address(this), "vault owner mismatch");
+        require(snapshot.assetAddress == asset, "asset mismatch");
+        require(snapshot.nameHash == keccak256("ETH Carry Vault"), "name mismatch");
+        require(snapshot.symbolHash == keccak256("carryETH"), "symbol mismatch");
+        require(!snapshot.paused, "seed should be unpaused");
+        require(snapshot.vaultInitialized, "vault should be initialized");
+        require(snapshot.strategyApproved, "strategy approval mismatch");
+        require(snapshot.decimals == 18, "decimals mismatch");
+        require(snapshot.idle == 250e18, "idle mismatch");
+        require(snapshot.deployedAssets == 200e18, "deployed assets mismatch");
+        require(snapshot.minIdleBps == 1000, "min idle mismatch");
+        require(snapshot.totalAssets == 450e18, "total assets mismatch");
+        require(snapshot.activeAssets == 400e18, "active assets mismatch");
+        require(snapshot.exchangeRate == WAD, "exchange rate mismatch");
+        require(snapshot.freeIdleForInstantWithdrawals == 0, "instant idle mismatch");
+        require(snapshot.freeIdleForQueueProcessing == 200e18, "queue idle mismatch");
+        require(snapshot.maxDeploy == 0, "max deploy mismatch");
+        require(snapshot.totalSupply == 400e18, "share supply mismatch");
+        require(snapshot.assetTotalSupply == 470e18, "asset supply mismatch");
+        require(snapshot.strategyDebt == 200e18, "strategy debt mismatch");
+        require(snapshot.nextRequestId == 3, "next request id mismatch");
+        require(snapshot.queueHead == 1, "queue head mismatch");
+        require(snapshot.queueTail == 2, "queue tail mismatch");
+        require(snapshot.totalQueuedShares == 150e18, "queued shares mismatch");
+        require(snapshot.totalClaimableAssets == 50e18, "total claim mismatch");
+        require(snapshot.aliceShares == 80e18, "alice shares mismatch");
+        require(snapshot.bobShares == 70e18, "bob shares mismatch");
+        require(snapshot.carolShares == 100e18, "carol shares mismatch");
+        require(snapshot.proxyShares == 150e18, "proxy shares mismatch");
+        require(snapshot.aliceUnderlying == 0, "alice underlying mismatch");
+        require(snapshot.bobUnderlying == 0, "bob underlying mismatch");
+        require(snapshot.carolUnderlying == 0, "carol underlying mismatch");
+        require(snapshot.strategyUnderlying == 200e18, "strategy underlying mismatch");
+        require(snapshot.lossSinkUnderlying == 20e18, "loss sink mismatch");
+        require(snapshot.proxyUnderlying == 250e18, "proxy underlying mismatch");
+        require(snapshot.aliceAssetAllowance == INFINITY, "alice asset allowance mismatch");
+        require(snapshot.bobAssetAllowance == INFINITY, "bob asset allowance mismatch");
+        require(snapshot.carolAssetAllowance == INFINITY, "carol asset allowance mismatch");
+        require(snapshot.strategyAssetAllowance == 0, "strategy asset allowance mismatch");
+        require(snapshot.aliceShareAllowance == 0, "alice share allowance mismatch");
+        require(snapshot.bobShareAllowance == 0, "bob share allowance mismatch");
+        require(snapshot.carolShareAllowance == 0, "carol share allowance mismatch");
+        require(snapshot.aliceActiveRequestId == 1, "alice request id mismatch");
+        require(snapshot.bobActiveRequestId == 2, "bob request id mismatch");
+        require(snapshot.carolActiveRequestId == 0, "carol request id mismatch");
+        require(snapshot.aliceClaimableAssets == 50e18, "alice claim mismatch");
+        require(snapshot.bobClaimableAssets == 0, "bob claim mismatch");
+        require(snapshot.carolClaimableAssets == 0, "carol claim mismatch");
+        require(snapshot.request1Owner == address(alice), "request 1 owner mismatch");
+        require(snapshot.request2Owner == address(bob), "request 2 owner mismatch");
+        require(snapshot.request1Shares == 70e18, "request 1 shares mismatch");
+        require(snapshot.request1Receiver == address(alice), "request 1 receiver mismatch");
+        require(snapshot.request1Next == 2, "request 1 link mismatch");
+        require(snapshot.request1Exists, "request 1 missing");
+        require(snapshot.request2Shares == 80e18, "request 2 shares mismatch");
+        require(snapshot.request2Receiver == address(bob), "request 2 receiver mismatch");
+        require(snapshot.request2Next == 0, "request 2 link mismatch");
+        require(snapshot.request2Exists, "request 2 missing");
+    }
+
+    function _assertLegacyStatePreserved(
+        Proxy proxy,
+        YieldVaultOld legacyView,
+        LegacyUpgradeSnapshot snapshot,
+        bool expectedPaused,
+        User alice,
+        User bob,
+        User carol,
+        User strategy,
+        User lossSink
+    ) internal view {
+        LegacyUpgradeSnapshot memory current = _captureLegacyUpgradeSnapshot(
+            proxy,
+            legacyView,
+            alice,
+            bob,
+            carol,
+            strategy,
+            lossSink
+        );
+        require(current.proxyOwner == snapshot.proxyOwner, "proxy owner changed");
+        require(current.vaultOwner == snapshot.vaultOwner, "vault owner changed");
+        require(current.assetAddress == snapshot.assetAddress, "asset changed");
+        require(current.nameHash == snapshot.nameHash, "name changed");
+        require(current.symbolHash == snapshot.symbolHash, "symbol changed");
+        require(current.paused == expectedPaused, "pause state mismatch");
+        require(current.vaultInitialized == snapshot.vaultInitialized, "initialized state changed");
+        require(current.strategyApproved == snapshot.strategyApproved, "strategy approval changed");
+        require(current.decimals == snapshot.decimals, "decimals changed");
+        require(current.idle == snapshot.idle, "idle changed");
+        require(current.deployedAssets == snapshot.deployedAssets, "deployed assets changed");
+        require(current.minIdleBps == snapshot.minIdleBps, "min idle changed");
+        require(current.totalAssets == snapshot.totalAssets, "total assets changed");
+        require(current.activeAssets == snapshot.activeAssets, "active assets changed");
+        require(current.exchangeRate == snapshot.exchangeRate, "exchange rate changed");
+        require(current.freeIdleForInstantWithdrawals == snapshot.freeIdleForInstantWithdrawals, "instant idle changed");
+        require(current.freeIdleForQueueProcessing == snapshot.freeIdleForQueueProcessing, "queue idle changed");
+        require(current.maxDeploy == snapshot.maxDeploy, "max deploy changed");
+        require(current.totalSupply == snapshot.totalSupply, "share supply changed");
+        require(current.assetTotalSupply == snapshot.assetTotalSupply, "asset supply changed");
+        require(current.strategyDebt == snapshot.strategyDebt, "strategy debt changed");
+        require(current.nextRequestId == snapshot.nextRequestId, "next request id changed");
+        require(current.queueHead == snapshot.queueHead, "queue head changed");
+        require(current.queueTail == snapshot.queueTail, "queue tail changed");
+        require(current.totalQueuedShares == snapshot.totalQueuedShares, "queued shares changed");
+        require(current.totalClaimableAssets == snapshot.totalClaimableAssets, "total claim changed");
+        require(current.aliceShares == snapshot.aliceShares, "alice shares changed");
+        require(current.bobShares == snapshot.bobShares, "bob shares changed");
+        require(current.carolShares == snapshot.carolShares, "carol shares changed");
+        require(current.proxyShares == snapshot.proxyShares, "proxy shares changed");
+        require(current.aliceUnderlying == snapshot.aliceUnderlying, "alice underlying changed");
+        require(current.bobUnderlying == snapshot.bobUnderlying, "bob underlying changed");
+        require(current.carolUnderlying == snapshot.carolUnderlying, "carol underlying changed");
+        require(current.strategyUnderlying == snapshot.strategyUnderlying, "strategy underlying changed");
+        require(current.lossSinkUnderlying == snapshot.lossSinkUnderlying, "loss sink changed");
+        require(current.proxyUnderlying == snapshot.proxyUnderlying, "proxy underlying changed");
+        require(current.aliceAssetAllowance == snapshot.aliceAssetAllowance, "alice asset allowance changed");
+        require(current.bobAssetAllowance == snapshot.bobAssetAllowance, "bob asset allowance changed");
+        require(current.carolAssetAllowance == snapshot.carolAssetAllowance, "carol asset allowance changed");
+        require(current.strategyAssetAllowance == snapshot.strategyAssetAllowance, "strategy asset allowance changed");
+        require(current.aliceShareAllowance == snapshot.aliceShareAllowance, "alice share allowance changed");
+        require(current.bobShareAllowance == snapshot.bobShareAllowance, "bob share allowance changed");
+        require(current.carolShareAllowance == snapshot.carolShareAllowance, "carol share allowance changed");
+        require(current.aliceActiveRequestId == snapshot.aliceActiveRequestId, "alice request id changed");
+        require(current.bobActiveRequestId == snapshot.bobActiveRequestId, "bob request id changed");
+        require(current.carolActiveRequestId == snapshot.carolActiveRequestId, "carol request id changed");
+        require(current.aliceClaimableAssets == snapshot.aliceClaimableAssets, "alice claim changed");
+        require(current.bobClaimableAssets == snapshot.bobClaimableAssets, "bob claim changed");
+        require(current.carolClaimableAssets == snapshot.carolClaimableAssets, "carol claim changed");
+        require(current.request1Owner == snapshot.request1Owner, "request 1 owner changed");
+        require(current.request1Shares == snapshot.request1Shares, "request 1 shares changed");
+        require(current.request1Receiver == snapshot.request1Receiver, "request 1 receiver changed");
+        require(current.request1Next == snapshot.request1Next, "request 1 link changed");
+        require(current.request1Exists == snapshot.request1Exists, "request 1 existence changed");
+        require(current.request2Owner == snapshot.request2Owner, "request 2 owner changed");
+        require(current.request2Shares == snapshot.request2Shares, "request 2 shares changed");
+        require(current.request2Receiver == snapshot.request2Receiver, "request 2 receiver changed");
+        require(current.request2Next == snapshot.request2Next, "request 2 link changed");
+        require(current.request2Exists == snapshot.request2Exists, "request 2 existence changed");
     }
 
     function _reconciledActiveAssets() internal view returns (uint256) {
@@ -1253,6 +1537,150 @@ contract Describe_YieldVault is Authorizable {
         require(vault.accountedAssets() == 100e18, "migration should snapshot existing economic assets");
         require(vault.perSecondSavingsRate() == 1e27, "migrated rate should start flat");
         require(vault.lastAccrual() == block.timestamp, "migrated timestamp mismatch");
+    }
+
+    function it_exact_old_to_new_proxy_upgrade_preserves_canonical_seed_state() public {
+        YieldVaultOld oldImplementation = new YieldVaultOld(address(this));
+        require(oldImplementation.owner() == address(this), "old implementation owner mismatch");
+
+        Proxy proxy = new Proxy(address(oldImplementation), address(this));
+        YieldVaultOld legacyVault = YieldVaultOld(address(proxy));
+        legacyVault.initialize(asset, "ETH Carry Vault", "carryETH");
+
+        User alice = new User();
+        User bob = new User();
+        User carol = new User();
+        User strategy = new User();
+        User lossSink = new User();
+
+        Token(asset).mint(address(alice), 200e18);
+        Token(asset).mint(address(bob), 150e18);
+        Token(asset).mint(address(carol), 100e18);
+        Token(asset).mint(address(strategy), 20e18);
+        alice.do(asset, "approve", address(proxy), INFINITY);
+        bob.do(asset, "approve", address(proxy), INFINITY);
+        carol.do(asset, "approve", address(proxy), INFINITY);
+        alice.do(address(proxy), "deposit(uint256,address)", 200e18, address(alice));
+        bob.do(address(proxy), "deposit(uint256,address)", 150e18, address(bob));
+        carol.do(address(proxy), "deposit(uint256,address)", 100e18, address(carol));
+
+        legacyVault.setMinIdleBps(1000);
+        legacyVault.setStrategyApproval(address(strategy), true);
+        legacyVault.deployCapital(address(strategy), 300e18);
+        strategy.do(asset, "approve", address(proxy), 320e18);
+        legacyVault.returnCapital(address(strategy), 320e18);
+        legacyVault.deployCapital(address(strategy), 220e18);
+        strategy.do(asset, "transfer", address(lossSink), 20e18);
+        legacyVault.reportStrategyLoss(address(strategy), 20e18);
+
+        uint64 aliceRequestId = alice.do(
+            address(proxy),
+            "requestRedeem(uint256,address,address)",
+            120e18,
+            address(alice),
+            address(alice)
+        );
+        uint64 bobRequestId = bob.do(
+            address(proxy),
+            "requestRedeem(uint256,address,address)",
+            80e18,
+            address(bob),
+            address(bob)
+        );
+        require(aliceRequestId == 1, "alice request id mismatch");
+        require(bobRequestId == 2, "bob request id mismatch");
+
+        (uint256 processedRequests, uint256 burnedShares, uint256 reservedAssets) =
+            legacyVault.processQueue(1, 50e18);
+        require(processedRequests == 1, "processed request count mismatch");
+        require(burnedShares == 50e18, "burned shares mismatch");
+        require(reservedAssets == 50e18, "reserved assets mismatch");
+
+        LegacyUpgradeSnapshot memory snapshot = _captureLegacyUpgradeSnapshot(
+            proxy,
+            legacyVault,
+            alice,
+            bob,
+            carol,
+            strategy,
+            lossSink
+        );
+        _assertCanonicalLegacyUpgradeSnapshot(snapshot, alice, bob);
+        log(
+            "TRACE exact-old-new point=legacy-snapshot totalAssets=" + string(snapshot.totalAssets) +
+            " totalSupply=" + string(snapshot.totalSupply) +
+            " strategyDebt=" + string(snapshot.strategyDebt) +
+            " queuedShares=" + string(snapshot.totalQueuedShares) +
+            " claimableAssets=" + string(snapshot.totalClaimableAssets)
+        );
+
+        legacyVault.pause();
+        _assertLegacyStatePreserved(
+            proxy,
+            legacyVault,
+            snapshot,
+            true,
+            alice,
+            bob,
+            carol,
+            strategy,
+            lossSink
+        );
+
+        YieldVault newImplementation = new YieldVault(address(this));
+        require(newImplementation.owner() == address(this), "new implementation owner mismatch");
+        proxy.setLogicContract(address(newImplementation));
+        YieldVault upgradedVault = YieldVault(address(proxy));
+
+        require(!upgradedVault.accrualInitialized(), "accrual should start uninitialized");
+        require(upgradedVault.accountedAssets() == 0, "accounted assets should start empty");
+        require(upgradedVault.perSecondSavingsRate() == 0, "rate should start empty");
+        require(upgradedVault.lastAccrual() == 0, "timestamp should start empty");
+        require(upgradedVault.rewardDistributor() == address(0), "distributor should start empty");
+        _assertLegacyStatePreserved(
+            proxy,
+            legacyVault,
+            snapshot,
+            true,
+            alice,
+            bob,
+            carol,
+            strategy,
+            lossSink
+        );
+
+        uint256 initializationTimestamp = block.timestamp;
+        upgradedVault.initializeAccrual();
+        require(upgradedVault.accountedAssets() == 450e18, "accounted assets migration mismatch");
+        require(upgradedVault.perSecondSavingsRate() == 1e27, "migration rate should be neutral");
+        require(upgradedVault.lastAccrual() == initializationTimestamp, "migration timestamp mismatch");
+        require(upgradedVault.accrualInitialized(), "accrual migration should initialize");
+        require(upgradedVault.rewardDistributor() == address(0), "migration distributor should be zero");
+        _assertLegacyStatePreserved(
+            proxy,
+            legacyVault,
+            snapshot,
+            true,
+            alice,
+            bob,
+            carol,
+            strategy,
+            lossSink
+        );
+
+        bool reverted = false;
+        try upgradedVault.initializeAccrual() {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "second accrual initialization should revert");
+        log(
+            "TRACE exact-old-new point=exit accountedAssets=" + string(upgradedVault.accountedAssets()) +
+            " rate=" + string(upgradedVault.perSecondSavingsRate()) +
+            " totalAssets=" + string(upgradedVault.totalAssets()) +
+            " totalSupply=" + string(upgradedVault.totalSupply()) +
+            " secondInitializeReverted=1"
+        );
     }
 
     function it_reconciled_share_rate_never_decreases_without_loss() public {
