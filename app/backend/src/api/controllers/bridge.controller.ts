@@ -19,7 +19,7 @@ import {
   DepositActionRequestParams,
   TransactionResponse,
   WithdrawalSummaryResponse
-} from "@mercata/shared-types";
+} from "@strato/shared-types";
 import { isUserAdmin } from "../services/user.service";
 
 class BridgeController {

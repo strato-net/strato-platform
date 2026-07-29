@@ -1,4 +1,4 @@
-import type { Event } from "@mercata/shared-types";
+import type { Event } from "@strato/shared-types";
 import { formatUnits } from "viem";
 import { getChainName, getExplorerUrl } from "@/lib/bridge/utils";
 import { ActivityCardData, ActivityField, LayoutConfig } from "./ActivityCard";

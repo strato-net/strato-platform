@@ -1,7 +1,7 @@
 {
-  "name": "@mercata/shared-types",
+  "name": "@strato/shared-types",
   "version": "1.0.0",
-  "description": "Shared TypeScript types for Mercata platform functionality",
+  "description": "Shared TypeScript types for STRATO platform functionality",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

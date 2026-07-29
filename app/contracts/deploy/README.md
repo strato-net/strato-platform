@@ -1,11 +1,11 @@
 # Deploy Directory
 
-This directory contains deployment and upgrade scripts for the Mercata contract system on BlockApps STRATO.
+This directory contains deployment and upgrade scripts for the STRATO contract system on BlockApps STRATO.
 
 ## Overview
 
-The deploy directory provides a toolkit for deploying and managing Mercata smart contracts, including:
-- Initial deployment of the full Mercata code collection
+The deploy directory provides a toolkit for deploying and managing STRATO smart contracts, including:
+- Initial deployment of the full STRATO code collection
 - Proxy contract upgrades for existing deployments
 - Authentication and configuration management
 - Utility functions for contract interactions
@@ -15,7 +15,7 @@ The deploy directory provides a toolkit for deploying and managing Mercata smart
 ### Main Scripts
 
 #### `deploy.js`
-Main deployment script that deploys the complete Mercata code collection.
+Main deployment script that deploys the complete STRATO code collection.
 
 **Usage**:
 ```bash
@@ -33,7 +33,7 @@ npm run deploy
 **Output**: Prints all deployed contract addresses, including `SaveUSDSTVault`, `StratoNativeBridge`, and `StratoNativeCustodyVault`, and provides ready-to-paste `.env` snippets.
 
 **Native bridge role seeding**:
-- During full `Mercata` deployment, the native STRATO contracts now take explicit `bridgeOperator`, `admin`, and `guardian` addresses in `initialize(...)`.
+- During full `STRATO` deployment, the native STRATO contracts now take explicit `bridgeOperator`, `admin`, and `guardian` addresses in `initialize(...)`.
 - The bundled `BaseCodeCollection` deploy seeds those direct-call roles to the deploying admin account (`tx.origin`) rather than the proxy owner.
 - This avoids the native runtime roles pointing at `AdminRegistry`, whose governance execution path does not satisfy the native bridge's direct role checks.
 - After deployment, rotate these roles as needed using the native bridge and custody vault setter functions once your intended operator, admin, and guardian addresses are known.
@@ -221,9 +221,9 @@ npm run configure:native-route -- \
 Run a read-only smoke check against the deployed native STRATO bridge route.
 
 This script intentionally uses a separate env file from the deployment scripts:
-- default: `mercata/contracts/.env.smoke-native-bridge`
+- default: `app/contracts/.env.smoke-native-bridge`
 - optional override: `SMOKE_NATIVE_BRIDGE_ENV_FILE=/absolute/path/to/file`
-- template: `mercata/contracts/.env.smoke-native-bridge.example`
+- template: `app/contracts/.env.smoke-native-bridge.example`
 
 **Usage**:
 ```bash
@@ -232,7 +232,7 @@ npm run smoke:native-bridge -- --external-chain-id 11155111
 
 Example env file:
 ```bash
-# mercata/contracts/.env.smoke-native-bridge
+# app/contracts/.env.smoke-native-bridge
 CHAIN_11155111_RPC_URL=<sepolia-rpc-url>
 CHAIN_11155111_NATIVE_REPRESENTATION_BRIDGE_ADDRESS=<sepolia-native-bridge-proxy>
 CHAIN_11155111_REPRESENTATION_TOKEN_ADDRESS=<sepolia-representation-token-proxy>
@@ -284,9 +284,9 @@ Run the first state-changing happy-path for the native bridge:
 - verify the STRATO recipient balance increases by the redeemed amount
 
 This script intentionally uses a separate env file:
-- default: `mercata/contracts/.env.happy-native-redemption`
+- default: `app/contracts/.env.happy-native-redemption`
 - optional override: `HAPPY_NATIVE_REDEMPTION_ENV_FILE=/absolute/path/to/file`
-- template: `mercata/contracts/.env.happy-native-redemption.example`
+- template: `app/contracts/.env.happy-native-redemption.example`
 
 **Usage**:
 ```bash

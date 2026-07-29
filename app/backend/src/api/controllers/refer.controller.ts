@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { depositToEscrow, DepositParams, getEscrowDeposit, EscrowDepositQuery, redeemEscrow, RedeemParams, getUserReferrals, cancelDeposit, CancelDepositParams, getReferralHistory, getReferralStatus } from "../services/refer.service";
-import { TransactionResponse } from "@mercata/shared-types";
+import { TransactionResponse } from "@strato/shared-types";
 import { constants } from "../../config/constants";
 import { referralUrl } from "../../config/config";
 

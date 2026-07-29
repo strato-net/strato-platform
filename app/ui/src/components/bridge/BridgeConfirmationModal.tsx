@@ -1,6 +1,6 @@
 import React from "react";
 import { Modal } from "antd";
-import { BridgeToken } from "@mercata/shared-types";
+import { BridgeToken } from "@strato/shared-types";
 import { ArrowRight, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { formatUnits, safeParseUnits } from "@/utils/numberUtils";
 import { WAD } from "@/lib/constants";

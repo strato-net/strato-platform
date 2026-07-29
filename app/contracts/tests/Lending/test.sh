@@ -2,7 +2,7 @@
 set -e
 
 # Usage:
-# cd mercata/contracts/test
+# cd app/contracts/test
 # ./test.sh BadDebt.test.sol
 
 logfile="/tmp/$(basename $1).solidvmtest.out"

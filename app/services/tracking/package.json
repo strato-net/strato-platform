@@ -1,5 +1,5 @@
 {
-  "name": "mercata-tracking-service",
+  "name": "strato-tracking-service",
   "version": "1.0.0",
   "description": "Tracking-links service: short link resolver, session/wallet event capture, and Cirrus-joined attribution dashboard API",
   "main": "src/index.ts",

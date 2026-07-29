@@ -1,4 +1,4 @@
-import type { CreditCardConfig } from "@mercata/shared-types";
+import type { CreditCardConfig } from "@strato/shared-types";
 
 const requiredStrings = (obj: Record<string, any>, keys: string[]) => {
   for (const k of keys) {

@@ -1,8 +1,8 @@
 /**
- * Protocol Fee Service - Centralized service for tracking protocol revenues across all Mercata protocols
+ * Protocol Fee Service - Centralized service for tracking protocol revenues across all STRATO protocols
  */
 
-import { cirrus } from "../../utils/mercataApiHelper";
+import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import { POOL_V3_CONTRACTS } from "../../config/poolV3Constants";
 import { getCDPRegistry } from "./cdp.service";

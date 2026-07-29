@@ -1,6 +1,6 @@
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { strato, cirrus, bridge } from "../../utils/mercataApiHelper";
+import { strato, cirrus, bridge } from "../../utils/appApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName, ensureHexPrefix } from "../../utils/utils";
 import { getTokenMetadata } from "../helpers/cirrusHelpers";
@@ -15,7 +15,7 @@ import {
   parseNativeBridgeAssets,
   QUERY_CONFIGS 
 } from "../helpers/bridge.helper";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, DepositActionRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction } from "@mercata/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, DepositActionRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction } from "@strato/shared-types";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getOraclePrices, getRebaseFactors } from "./oracle.service";
 import { toUTCTime } from "../helpers/cirrusHelpers";

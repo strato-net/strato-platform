@@ -1,6 +1,6 @@
 # Scripts Directory
 
-This directory contains utility scripts for the Mercata contracts system.
+This directory contains utility scripts for the STRATO contracts system.
 
 ## Available Scripts
 

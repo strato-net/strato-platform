@@ -25,7 +25,7 @@ const config = {
   // Contract configuration
   contractsDir: process.env.CONTRACTS_DIR || path.join(__dirname, "../concrete"),
   mainFile: process.env.MAIN_FILE || 'BaseCodeCollection.sol',
-  appName: process.env.APP_NAME || 'Mercata',
+  appName: process.env.APP_NAME || 'STRATO',
   
   // Transaction parameters – can be overridden with env vars
   gasPrice: parseInt(process.env.GAS_PRICE || '10', 10), // in Wei

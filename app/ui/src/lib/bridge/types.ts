@@ -1,4 +1,4 @@
-import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, DepositActionRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction } from "@mercata/shared-types";
+import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, DepositActionRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction } from "@strato/shared-types";
 import type { WalletTxProgressHandler } from "@/lib/axios";
 
 export interface BalanceResponse {

@@ -3,8 +3,8 @@
 module Blockchain.Init.BuildMetadata
   ( version
   , hashStrato
-  , hashMercataBackend
-  , hashMercataUi
+  , hashAppBackend
+  , hashAppUi
   , hashSmd
   , hashApex
   , hashPostgrest
@@ -21,11 +21,11 @@ version = $(getValue "VERSION")
 hashStrato :: String
 hashStrato = $(getValue "HASH_STRATO")
 
-hashMercataBackend :: String
-hashMercataBackend = $(getValue "HASH_MERCATA_BACKEND")
+hashAppBackend :: String
+hashAppBackend = $(getValue "HASH_APP_BACKEND")
 
-hashMercataUi :: String
-hashMercataUi = $(getValue "HASH_MERCATA_UI")
+hashAppUi :: String
+hashAppUi = $(getValue "HASH_APP_UI")
 
 hashSmd :: String
 hashSmd = $(getValue "HASH_SMD")

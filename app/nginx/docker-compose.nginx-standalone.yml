@@ -18,7 +18,7 @@ services:
     # https://github.com/blockapps/strato-platform/issues/3959#issuecomment-3051025844
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    image: mercata-nginx
+    image: app-nginx
     ports:
     - 80:80
     - 443:443

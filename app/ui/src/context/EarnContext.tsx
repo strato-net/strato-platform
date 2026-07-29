@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { api } from "@/lib/axios";
-import { TokenApyEntry } from "@mercata/shared-types";
+import { TokenApyEntry } from "@strato/shared-types";
 
 interface EarnContextType {
   tokenApys: TokenApyEntry[];

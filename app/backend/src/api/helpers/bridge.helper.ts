@@ -1,7 +1,7 @@
-import { cirrus } from "../../utils/mercataApiHelper";
+import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import { ensureHexPrefix } from "../../utils/utils";
-import { BridgeToken } from "@mercata/shared-types";
+import { BridgeToken } from "@strato/shared-types";
 
 // ============================================================================
 // TYPES

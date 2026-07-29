@@ -19,7 +19,7 @@ Fetches asset prices from multiple sources and pushes them to the STRATO blockch
 
 ```env
 # STRATO Configuration
-STRATO_NODE_URL=https://node1.mercata-testnet.blockapps.net/
+STRATO_NODE_URL=https://node1.testnet.strato.nexus/
 PRICE_ORACLE_ADDRESS=0000000000000000000000000000000000001002
 
 # OAuth Configuration

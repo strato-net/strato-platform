@@ -6,7 +6,7 @@
  *   2. Submit `DepositRouter.deposit(token, amount, stratoAddress,
  *      targetStratoToken, nonce, deadline, signature)` on Sepolia.
  *
- * The bridge service (mercata/services/bridge) detects the `DepositRouted`
+ * The bridge service (app/services/bridge) detects the `DepositRouted`
  * event, mints the corresponding STRATO-side token (USDST) to the recipient
  * and — when the per-deposit AUTO_FORGE action is queued via
  * /api/bridge/requestDepositAction — auto-forges the metal (e.g. GOLDST)
@@ -22,8 +22,8 @@
  * and awaited. After that every iteration only signs typed-data and calls
  * `DepositRouter.deposit(...)`.
  *
- * Minimal ABI for the Mercata DepositRouter contract — see
- * mercata/ethereum/contracts/bridge/DepositRouter.sol.
+ * Minimal ABI for the DepositRouter contract — see
+ * app/ethereum/contracts/bridge/DepositRouter.sol.
  *
  * DepositRouted event signature (topic0):
  *   0x55426533b384af6fcfee0e834a6407e3ffc370a0b1b53400c4e6ec92d7f1f750
@@ -265,7 +265,7 @@ export class SepoliaBroadcaster {
    * Sign + broadcast `DepositRouter.deposit(token, amount, stratoAddress,
    * targetStratoToken, nonce, deadline, signature)` on Sepolia.
    *
-   * Mirrors the Mercata UI's bridge-in code path for ERC20 deposits:
+   * Mirrors the APP UI's bridge-in code path for ERC20 deposits:
    *   1. Build Permit2 `PermitTransferFrom` typed-data with spender = the
    *      DepositRouter address (DepositRouter is what calls
    *      `permit2.permitTransferFrom`).

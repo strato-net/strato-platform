@@ -1,4 +1,4 @@
-import { cirrus } from "../../utils/mercataApiHelper";
+import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import { calculateLPTokenPrice } from "./swapping.helper";
 import { getExchangeRateFromCirrus } from "../services/lending.service";
@@ -6,7 +6,7 @@ import { getOraclePrices } from "../services/oracle.service";
 import { getSafetyModuleConfig } from "../services/safety.service";
 import { getVaultShareTokenPrice } from "../services/vault.service";
 import * as config from "../../config/config";
-import { OraclePriceMap } from "@mercata/shared-types";
+import { OraclePriceMap } from "@strato/shared-types";
 
 const { Token, DECIMALS, Pool, LendingPool, SaveUSDSTVault, lendingRegistry, YieldVault } = constants;
 const RAY = 10n ** 27n;

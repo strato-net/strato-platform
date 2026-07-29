@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { getRpcUpstream } from "../../config/rpc.config";
-import { eth, bloc } from "../../utils/mercataApiHelper";
+import { eth, bloc } from "../../utils/appApiHelper";
 import { StratoPaths } from "../../config/constants";
 
 class RpcController {

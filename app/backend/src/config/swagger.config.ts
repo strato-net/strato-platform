@@ -5,11 +5,11 @@ const swaggerOptions: swaggerJSDoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Mercata API',
+      title: 'STRATPO App API',
       version: version,
-      description: 'API documentation for Mercata backend - A decentralized finance platform',
+      description: 'API documentation for STRATO App backend - A decentralized finance platform',
       contact: {
-        name: 'Mercata Team',
+        name: 'STRATO Team',
       },
       license: {
         name: 'Apache-2.0',

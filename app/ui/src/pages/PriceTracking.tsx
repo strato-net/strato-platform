@@ -17,7 +17,7 @@ import {
 import CandlestickChart, { OHLCData } from '@/components/charts/CandlestickChart';
 import { Loader2, TrendingUp, TrendingDown, Search, ArrowUp, ArrowDown, GripVertical, CircleDollarSign } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { EarningAsset } from '@mercata/shared-types';
+import { EarningAsset } from '@strato/shared-types';
 import { format } from 'date-fns';
 import FixedSwapWidget from '@/components/swap/FixedSwapWidget';
 import { useSwapContext } from '@/context/SwapContext';

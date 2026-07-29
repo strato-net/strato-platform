@@ -1,7 +1,7 @@
 {
-  "name": "mercata-rewards-poller-service",
+  "name": "strato-rewards-poller-service",
   "version": "1.0.0",
-  "description": "Rewards poller service for Mercata - polls Cirrus DB and posts transactions to Rewards contract",
+  "description": "Rewards poller service for STRATO - polls Cirrus DB and posts transactions to Rewards contract",
   "main": "src/index.ts",
   "scripts": {
     "start": "ts-node src/index.ts",

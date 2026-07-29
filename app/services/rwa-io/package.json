@@ -1,5 +1,5 @@
 {
-  "name": "mercata-rwa-io-adapter",
+  "name": "strato-rwa-io-adapter",
   "version": "1.0.0",
   "description": "RWA.io time-series adapter — pushes STRATO TVL metrics to RWA.io",
   "main": "dist/index.js",

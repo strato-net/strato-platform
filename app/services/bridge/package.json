@@ -1,7 +1,7 @@
 {
-  "name": "mercata-bridge-service",
+  "name": "strato-bridge-service",
   "version": "1.0.0",
-  "description": "Bridge service for Mercata STRATO ↔ Ethereum bridge",
+  "description": "Bridge service for STRATO ↔ Ethereum",
   "main": "src/index.ts",
   "scripts": {
     "start": "ts-node src/index.ts",

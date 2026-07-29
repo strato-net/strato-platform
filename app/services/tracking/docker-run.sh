@@ -13,7 +13,7 @@ if [ -f /run/secrets/postgres_password ]; then
 fi
 
 # Deliberately no NODE_URL: this service never talks to STRATO nodes or
-# Cirrus. Chain data is served by the mercata backend.
+# Cirrus. Chain data is served by the STRATO app backend.
 
 echo "Starting tracking service..."
 exec node dist/index.js

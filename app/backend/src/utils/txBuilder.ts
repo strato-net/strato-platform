@@ -1,7 +1,7 @@
 // txBuilder.ts
 import { DeployInput, FunctionInput, BuiltTx } from "../types/types";
 import { constants } from "../config/constants";
-import { cirrus } from "./mercataApiHelper";
+import { cirrus } from "./appApiHelper";
 
 const DEFAULT_GAS_PARAMS = {
   gasLimit: 32_100_000_000,

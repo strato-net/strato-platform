@@ -1,4 +1,4 @@
-import { ApySource, TokenApyEntry } from "@mercata/shared-types";
+import { ApySource, TokenApyEntry } from "@strato/shared-types";
 
 const CATA_PRICE_USD = 0.9;
 

@@ -1,4 +1,4 @@
-# Mercata Tracking Service
+# STRATO Tracking Service
 
 Referral/tracking-link service for STRATO: sales and marketing create short
 links (`/t/<slug>`), the service records opens, wallet connections, and
@@ -88,7 +88,7 @@ docker compose -f docker-compose.tracking.yml up -d
 
 Point the short-link domain (e.g. `go.strato.nexus`) at this server. The
 dashboard lives at `https://<TRACKING_HOST>/dashboard`. On the **app node's**
-edge nginx, enable the proxy locations so the mercata SPA's beacons stay
+edge nginx, enable the proxy locations so the STRATO SPA's beacons stay
 same-origin:
 
 ```

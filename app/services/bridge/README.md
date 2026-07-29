@@ -1,6 +1,6 @@
-# Mercata Bridge Service
+# STRATO Bridge Service
 
-The Mercata Bridge Service is responsible for seamlessly bridging assets between multiple blockchain networks and the STRATO testnet. It manages deposits and withdrawals using a Safe multisig wallet and monitors blockchain activity in real-time using dynamic RPC connections.
+The STRATO Bridge Service is responsible for seamlessly bridging assets between multiple blockchain networks and the STRATO mainnet/testnet. It manages deposits and withdrawals using a Safe multisig wallet and monitors blockchain activity in real-time using dynamic RPC connections.
 
 ## Features
 
@@ -127,7 +127,7 @@ npm start
    - Bridge contract data retrieval
 
 4. **Polling Services**
-   - **Mercata Polling**: Monitors STRATO bridge events
+   - **STRATO Polling**: Monitors STRATO bridge events
    - **Alchemy Polling**: Monitors Ethereum bridge events
    - Real-time transaction status tracking
 

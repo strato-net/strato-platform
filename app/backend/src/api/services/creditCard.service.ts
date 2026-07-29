@@ -1,12 +1,12 @@
 import axios from "axios";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { strato, cirrus } from "../../utils/mercataApiHelper";
+import { strato, cirrus } from "../../utils/appApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { getRpcUpstream } from "../../config/rpc.config";
 import { extractContractName } from "../../utils/utils";
-import type { CreditCardConfig, CreditCardTopUpExecuteParams } from "@mercata/shared-types";
-import type { TransactionResponse } from "@mercata/shared-types";
+import type { CreditCardConfig, CreditCardTopUpExecuteParams, TransactionResponse } from "@strato/shared-types";
+
 
 const { CreditCardTopUp, Token, USDST } = constants;
 

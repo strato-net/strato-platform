@@ -1,4 +1,4 @@
-import { cirrus } from "../../utils/mercataApiHelper";
+import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import { hiddenSwapPools, yieldBenchmarks, compositeYieldMap, rewards as rewardsAddr, saveUsdstVault as saveUsdstVaultAddr } from "../../config/config";
 import { toUTCTime } from "../helpers/cirrusHelpers";
@@ -19,7 +19,7 @@ import { computeEquityFromMaps, computeVaultPerformanceMetrics, safeBigInt } fro
 import { listVaultDefs, getYieldVaultInfo } from "./yieldVault.service";
 import { getStratoStakingNetworkApy } from "./staking.service";
 import { getCarryVaultUsdPriceMap } from "../helpers/oracle.helper";
-import { ApySource, TokenApyEntry } from "@mercata/shared-types";
+import { ApySource, TokenApyEntry } from "@strato/shared-types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

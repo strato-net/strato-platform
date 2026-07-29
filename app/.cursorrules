@@ -176,5 +176,5 @@ At each step, ask yourself: "Am I adding any functionality or complexity that wa
 # Formatting & API quirks
 
 - When providing JSON examples (curl bodies, etc.), DO NOT include inline comments or trailing commas. Comments break copy-paste execution.
-- Unless explicitly required, omit the `0x` prefix on hex strings (addresses, hashes) because Mercata API endpoints expect plain lowercase hex without the prefix.
+- Unless explicitly required, omit the `0x` prefix on hex strings (addresses, hashes) because STRATO App API endpoints expect plain lowercase hex without the prefix.
 - DO NOT invent or "hallucinate" API endpoints. If a raw contract call is needed, show the full Strato node URL path (e.g., /bloc/v2.2/transaction). 

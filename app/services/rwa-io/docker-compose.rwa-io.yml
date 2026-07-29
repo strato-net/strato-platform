@@ -3,7 +3,7 @@ services:
     environment:
     - RWA_IO_API_KEY=${RWA_IO_API_KEY}
     build: .
-    image: mercata-rwa-io-adapter
+    image: strato-rwa-io-adapter
     restart: unless-stopped
     logging:
       driver: "json-file"

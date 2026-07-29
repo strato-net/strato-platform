@@ -1,4 +1,4 @@
-import { cirrus, bloc } from "../../../utils/mercataApiHelper";
+import { cirrus, bloc } from "../../../utils/appApiHelper";
 import { constants } from "../../../config/constants";
 
 

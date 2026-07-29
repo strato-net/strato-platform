@@ -10,7 +10,7 @@ function getExternalChainRpcUrls(): Record<string, string> {
 
 export const config = {
   api: {
-    baseUrl: process.env.MERCATA_API_URL || "http://localhost:3001",
+    baseUrl: process.env.STRATO_APP_API_URL || "http://localhost:3001",
     timeout: 30_000,
   },
   operator: {

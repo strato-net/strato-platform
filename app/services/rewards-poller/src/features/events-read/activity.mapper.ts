@@ -5,9 +5,9 @@ import { cirrus } from "../../infra/http/api";
 import { config } from "../../infra/config/runtimeConfig";
 import { parseJson } from "./eventRecord.mapper";
 
-const MERCATA_PREFIX = "BlockApps-";
-const PriceOracleEvents = `${MERCATA_PREFIX}PriceOracle-PriceUpdated`;
-const PriceOracleBatchUpdateEvents = `${MERCATA_PREFIX}PriceOracle-BatchPricesUpdated`;
+const STRATO_PREFIX = "BlockApps-";
+const PriceOracleEvents = `${STRATO_PREFIX}PriceOracle-PriceUpdated`;
+const PriceOracleBatchUpdateEvents = `${STRATO_PREFIX}PriceOracle-BatchPricesUpdated`;
 
 const PRICE_CONVERSION_MAP: Record<string, string> = {
   Swap: "tokenIn",

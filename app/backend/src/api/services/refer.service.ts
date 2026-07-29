@@ -1,10 +1,10 @@
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { strato, cirrus } from "../../utils/mercataApiHelper";
+import { strato, cirrus } from "../../utils/appApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { escrow } from "../../config/config";
 import { extractContractName } from "../../utils/utils";
-import { TransactionResponse } from "@mercata/shared-types";
+import { TransactionResponse } from "@strato/shared-types";
 import JSONBig from "json-bigint";
 
 const { Token } = constants;

@@ -17,7 +17,7 @@ import {
   WithdrawalRequestOptions,
   DepositActionRequestOptions,
 } from "@/lib/bridge/types";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, DepositActionRequestParams, WithdrawalSummaryResponse, DepositAction } from "@mercata/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, DepositActionRequestParams, WithdrawalSummaryResponse, DepositAction } from "@strato/shared-types";
 
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 

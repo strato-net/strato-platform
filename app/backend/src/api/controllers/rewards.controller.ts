@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import { fetchUserActivities, fetchRewardsOverview, fetchAllActivities, fetchLeaderboard, fetchUserRank } from "../services/rewards.service";
-import { strato } from "../../utils/mercataApiHelper";
+import { strato } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";

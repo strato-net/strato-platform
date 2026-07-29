@@ -1,4 +1,4 @@
-import { cirrus } from "../../utils/mercataApiHelper";
+import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import { getOraclePrices } from "./oracle.service";
 import { getCDPStats } from "./cdp.service";

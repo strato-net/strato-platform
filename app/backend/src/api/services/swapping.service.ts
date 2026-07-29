@@ -1,4 +1,4 @@
-import { cirrus } from "../../utils/mercataApiHelper";
+import { cirrus } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { executeTransaction } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
@@ -57,7 +57,7 @@ import {
   PoolWithTokens,
   PoolWithTokenA,
   PoolWithTokenB
-} from "@mercata/shared-types";
+} from "@strato/shared-types";
 
 const { Pool: PoolTable, PoolFactory, PoolSwap, StablePool: StablePoolTable, swapHistorySelectFields, swapTokenSelectFields } = constants;
 

@@ -1,7 +1,7 @@
 {
-  "name": "mercata-ethereum",
+  "name": "strato-ethereum",
   "version": "1.0.0",
-  "description": "Ethereum deployment for Mercata contracts with UUPS proxy support",
+  "description": "Ethereum deployment for STRATO contracts with UUPS proxy support",
   "scripts": {
     "compile": "hardhat compile",
     "deployWithProxy:sepolia": "npx hardhat run scripts/deployWithProxy.js --network sepolia",

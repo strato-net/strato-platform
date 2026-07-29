@@ -1,6 +1,6 @@
 import * as config from "../../config/config";
 import { constants } from "../../config/constants";
-import { cirrus } from "../../utils/mercataApiHelper";
+import { cirrus } from "../../utils/appApiHelper";
 import stakeSemanticsConfig from "./rewardsStakeSemantics.json";
 import { getCompletePriceMap, getCarryVaultUsdPriceMap } from "../helpers/oracle.helper";
 import { getSafetyModuleConfig } from "./safety.service";

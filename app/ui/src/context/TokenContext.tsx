@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { api } from '@/lib/axios';
 import { Token, CreateTokenPayload } from '@/interface';
-import { Token as TokenType, EarningAsset, BalanceSnapshot } from '@mercata/shared-types';
+import { Token as TokenType, EarningAsset, BalanceSnapshot } from '@strato/shared-types';
 import { cataAddress, usdstAddress } from '@/lib/constants';
 import { useUser } from '@/context/UserContext';
 import { isTxSubmitted } from '@/utils/transactionStatus';

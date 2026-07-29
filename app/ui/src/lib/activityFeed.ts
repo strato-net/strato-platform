@@ -1,5 +1,5 @@
 import { api } from './axios';
-import type { EventResponse, ContractInfoResponse } from '@mercata/shared-types';
+import type { EventResponse, ContractInfoResponse } from '@strato/shared-types';
 
 export interface EventsFilters {
   limit?: number;

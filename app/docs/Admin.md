@@ -1,6 +1,6 @@
 ## Admin
 
-Purpose: Governance and fee administration for the Mercata protocol.
+Purpose: Governance and fee administration for the STRATO protocol.
 
 Functional summary:
 - Manage admin set (add/remove/swap) via multi-admin voting.

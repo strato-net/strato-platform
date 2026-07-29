@@ -8,7 +8,7 @@ import { logInfo, logError } from "./utils/logger";
 import { validateBridgeConfig } from "./utils/configValidator";
 import { startMultiChainDepositPolling } from "./polling/alchemyPolling";
 import { startNativeRedemptionPolling } from "./polling/nativeRedemptionPolling";
-import { initializeMercataPolling } from "./polling/mercataPolling";
+import { initializeStratoPolling } from "./polling/stratoPolling";
 import { initOpenIdConfig} from "./auth";
 import { healthMonitor } from "./utils/healthMonitor";
 import DepositActionController from "./controllers/depositAction.controller";
@@ -63,7 +63,7 @@ app.listen(port, async () => {
     // Start polling services
     startMultiChainDepositPolling();
     startNativeRedemptionPolling();
-    await initializeMercataPolling();
+    await initializeStratoPolling();
 
     logInfo(
       "BridgeService",

@@ -7,7 +7,7 @@ import { logError, logInfo } from "../utils/logger";
 // Dashboard auth: verify the Keycloak JWT (via JWKS) and check the
 // sales/marketing allowlist. This is the service's ONLY outbound dependency —
 // it never talks to STRATO nodes; chain-aware authorization (e.g. on-chain
-// admins) lives in the mercata backend, so dashboard users must be listed in
+// admins) lives in the STRATO app backend, so dashboard users must be listed in
 // TRACKING_AUTHORIZED_USERS here.
 
 let jwksClientInstance: jwksClient.JwksClient | undefined;

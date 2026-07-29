@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Same token names as the mercata app so ported components (incl. the world
+/* Same token names as the STRATO app so ported components (incl. the world
    map) work unchanged; values follow the viewer's OS theme. */
 :root {
   --background: 0 0% 100%;

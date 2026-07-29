@@ -41,9 +41,9 @@ const Index = () => {
               <div>
                 {/* <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Connect</h3>
                 <ul className="space-y-2">
-                  <li><a href="https://x.com/STRATO_MERCATA" className="text-muted-foreground hover:text-foreground">Twitter</a></li>
+                  <li><a href="https://x.com/strato_net" className="text-muted-foreground hover:text-foreground">Twitter</a></li>
                   <li><a href="https://discord.gg/z5jwzD6x" className="text-muted-foreground hover:text-foreground">Discord</a></li>
-                  <li><a href="https://t.me/mercatamarket" className="text-muted-foreground hover:text-foreground">Telegram</a></li>
+                  <li><a href="https://t.me/strato_net" className="text-muted-foreground hover:text-foreground">Telegram</a></li>
                   <li><a href="https://github.com/blockapps" className="text-muted-foreground hover:text-foreground">GitHub</a></li>
                 </ul> */}
               </div>

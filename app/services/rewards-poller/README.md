@@ -1,6 +1,6 @@
-# Mercata Rewards Poller Service
+# STRATO Rewards Poller Service
 
-The Mercata Rewards Poller Service monitors protocol events from Cirrus DB and posts batch transactions to the Rewards contract to track user activity for reward distribution.
+The STRATO Rewards Poller Service monitors protocol events from Cirrus DB and posts batch transactions to the Rewards contract to track user activity for reward distribution.
 
 ## Features
 

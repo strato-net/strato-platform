@@ -1,4 +1,4 @@
-import { cirrus, strato } from "../../utils/mercataApiHelper";
+import { cirrus, strato } from "../../utils/appApiHelper";
 
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx, until } from "../../utils/txHelper";

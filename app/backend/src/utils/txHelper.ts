@@ -1,6 +1,6 @@
 import axios, { AxiosRequestConfig } from "axios";
 import { createHash } from "crypto";
-import { bloc, cirrus } from "./mercataApiHelper";
+import { bloc, cirrus } from "./appApiHelper";
 import { StratoPaths } from "../config/constants";
 import { StratoError } from "../errors";
 import { requestContext } from "./requestContext";

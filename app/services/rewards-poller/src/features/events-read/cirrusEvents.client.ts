@@ -24,7 +24,7 @@ import {
   parseActionableEventsForActivities,
 } from "./actionableEvents.parser";
 
-const MERCATA_PREFIX = "BlockApps-";
+const STRATO_PREFIX = "BlockApps-";
 
 const queryRegularEvents = async (
   eventAddresses: string[],
@@ -169,7 +169,7 @@ export const getLPTokenTransferEvents = async (
     select: "address,block_number,value::text,event_index,transaction_sender,from,to,block_timestamp",
   };
 
-  const data = await cirrus.get(`/${MERCATA_PREFIX}Token-Transfer`, {
+  const data = await cirrus.get(`/${STRATO_PREFIX}Token-Transfer`, {
     params,
   });
 

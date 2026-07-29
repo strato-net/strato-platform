@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
-import { Token as TokenType, EarningAsset } from "@mercata/shared-types";
+import { Token as TokenType, EarningAsset } from "@strato/shared-types";
 import { formatBalance } from "@/utils/numberUtils";
 import { useEarnContext } from "@/context/EarnContext";
 import { buildEarnApyMap } from "@/utils/earnUtils";

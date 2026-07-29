@@ -1,11 +1,11 @@
-import { cirrus } from "../../utils/mercataApiHelper";
+import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import { getInternalAddresses } from "../../config/config";
 import type {
   EventData,
   EventResponse,
   ContractInfoResponse,
-} from "@mercata/shared-types";
+} from "@strato/shared-types";
 
 export const getEvents = async (
   accessToken: string,

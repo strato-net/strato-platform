@@ -8,7 +8,7 @@ const router = Router();
  * @openapi
  * /events:
  *   get:
- *     summary: Query Mercata blockchain events
+ *     summary: Query STRATO blockchain events
  *     tags: [Events]
  *     parameters:
  *       - name: order

@@ -34,9 +34,9 @@ generateDockerComposeAllDocker = do
         , ("zookeeperdata", VolumeConfig { volume_driver = Just "local" })
         ]
 
-  let mercataBackend = def
-        { image = "${MERCATABACKEND_IMAGE:-" ++ repoUrl ++ "mercata-backend:" ++ stratoVersion ++ "-" ++ hashMercataBackend ++ "}"
-        , build = Just "./mercata/backend"
+  let appBackend = def
+        { image = "${APPBACKEND_IMAGE:-" ++ repoUrl ++ "app-backend:" ++ stratoVersion ++ "-" ++ hashAppBackend ++ "}"
+        , build = Just "./app/backend"
         , depends_on = Just $ DependsOnList ["strato", "postgres", "postgrest"]
         , init = Just True
         , environment = Just $ Map.fromList
@@ -70,7 +70,7 @@ generateDockerComposeAllDocker = do
             , ("postgres_user", "postgres")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
-        , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]
+        , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/app-backend.log 2>&1"]
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
@@ -80,16 +80,16 @@ generateDockerComposeAllDocker = do
         , logging = noLogging
         }
 
-  let mercataUi = def
-        { image = "${MERCATAUI_IMAGE:-" ++ repoUrl ++ "mercata-ui:" ++ stratoVersion ++ "-" ++ hashMercataUi ++ "}"
-        , build = Just "./mercata/ui"
-        , depends_on = Just $ DependsOnList ["mercata-backend"]
+  let appUi = def
+        { image = "${APPUI_IMAGE:-" ++ repoUrl ++ "app-ui:" ++ stratoVersion ++ "-" ++ hashAppUi ++ "}"
+        , build = Just "./app/ui"
+        , depends_on = Just $ DependsOnList ["app-backend"]
         , environment = Just $ Map.fromList
             [ ("LUCKY_ORANGE_SITE_ID", "${LUCKY_ORANGE_SITE_ID:-}")
             , ("GOOGLE_ANALYTICS_ID", "${GOOGLE_ANALYTICS_ID:-}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
-        , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-ui.log 2>&1"]
+        , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/app-ui.log 2>&1"]
         , volumes = Just ["./logs:/logs"]
         , restart = Just "unless-stopped"
         , logging = noLogging
@@ -259,7 +259,7 @@ generateDockerComposeAllDocker = do
   let nginx = def
         { image = "${NGINX_IMAGE:-" ++ repoUrl ++ "nginx:" ++ stratoVersion ++ "-" ++ hashNginx ++ "}"
         , build = Just "."
-        , depends_on = Just $ DependsOnList ["apex", "docs", "postgrest", "prometheus", "smd", "strato", "mercata-backend", "mercata-ui"]
+        , depends_on = Just $ DependsOnList ["apex", "docs", "postgrest", "prometheus", "smd", "strato", "app-backend", "app-ui"]
         , environment = Just $ Map.fromList
             [ ("APEX_HOST", "${APEX_HOST:-}")
             , ("blockTime", "${blockTime:-}")
@@ -365,8 +365,8 @@ generateDockerComposeAllDocker = do
   let composeFile = ComposeFile
         { namedVolumes = topLevelVolumes
         , services = Map.fromList
-            [ ("mercata-backend", mercataBackend)
-            , ("mercata-ui", mercataUi)
+            [ ("app-backend", appBackend)
+            , ("app-ui", appUi)
             , ("smd", smd)
             , ("apex", apex)
             , ("redis", redis)

@@ -334,7 +334,7 @@ export interface ApprovedToken {
 }
 
 // Re-export oracle types from shared-types package
-export type { PriceHistoryEntry, PriceHistoryResponse } from '@mercata/shared-types';
+export type { PriceHistoryEntry, PriceHistoryResponse } from '@strato/shared-types';
 
 export interface HealthImpactData {
   currentHealthFactor: number;

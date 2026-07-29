@@ -1,7 +1,7 @@
 import React from "react";
 import { formatUnits, safeParseUnits } from "@/utils/numberUtils";
 import { BRIDGE_OUT_FEE, DECIMAL, WAD } from "@/lib/constants";
-import { BridgeToken } from "@mercata/shared-types";
+import { BridgeToken } from "@strato/shared-types";
 import { AlertTriangle } from "lucide-react";
 
 const FEE_VOUCHER = parseFloat(BRIDGE_OUT_FEE) * 100;

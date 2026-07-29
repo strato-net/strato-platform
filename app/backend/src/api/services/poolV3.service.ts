@@ -3,7 +3,7 @@
  * Cirrus tables, quotes swaps by simulating the contract's tick-walking loop over
  * indexed tick data, and builds/submits PoolV3 transactions. No V2 pool code paths.
  */
-import { cirrus } from "../../utils/mercataApiHelper";
+import { cirrus } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { executeTransaction } from "../../utils/txHelper";
 import * as config from "../../config/config";
@@ -32,7 +32,7 @@ import {
   TransactionResponse,
   SwapHistoryEntry,
   PoolV3LiquidityDistribution,
-} from "@mercata/shared-types";
+} from "@strato/shared-types";
 
 const {
   PoolV3: PoolV3Table,

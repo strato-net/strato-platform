@@ -1,4 +1,4 @@
-import { bloc, cirrus, eth, strato } from "../../utils/mercataApiHelper";
+import { bloc, cirrus, eth, strato } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";

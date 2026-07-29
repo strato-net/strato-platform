@@ -19,7 +19,7 @@ Optional overrides for the STRATO endpoint and cron schedule live in `src/config
 ## Running standalone
 
 ```sh
-cd mercata/services/rwa-io
+cd app/services/rwa-io
 export RWA_IO_API_KEY=...
 docker compose -f docker-compose.rwa-io.yml up -d --build
 ```
@@ -27,7 +27,7 @@ docker compose -f docker-compose.rwa-io.yml up -d --build
 ## Local development
 
 ```sh
-cd mercata/services/rwa-io
+cd app/services/rwa-io
 npm install
 cp .env.example .env  # then fill in RWA_IO_API_KEY
 npm run dev           # ts-node, full schedule

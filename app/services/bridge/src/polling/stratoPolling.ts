@@ -44,7 +44,7 @@ const startNonOverlappingPolling = (
     try {
       await poll();
     } catch (e: any) {
-      logError("MercataPolling", e as Error, { operation });
+      logError("StratoPolling", e as Error, { operation });
     } finally {
       setTimeout(run, pollingInterval);
     }
@@ -68,7 +68,7 @@ export const startWithdrawalRequestPolling = (): void => {
         await confirmWithdrawalBatch(batch as NonEmptyArray<WithdrawalInfo>);
       }
     } catch (e: any) {
-      logError("MercataPolling", e as Error, {
+      logError("StratoPolling", e as Error, {
         operation: "startWithdrawalRequestPolling",
       });
     }
@@ -95,7 +95,7 @@ export const startDepositInitiatedPolling = (): void => {
       const results: ConfirmDepositArgs[] = deposits.map((deposit) => {
         const error = verificationResults.get(deposit.externalTxHash);
         if (error) {
-          logError("MercataPolling", error, {
+          logError("StratoPolling", error, {
             operation: "verifyDepositTransferEvents",
             externalChainId: deposit.externalChainId,
             externalTxHash: deposit.externalTxHash,
@@ -129,7 +129,7 @@ export const startDepositInitiatedPolling = (): void => {
         }
       }
     } catch (e: any) {
-      logError("MercataPolling", e as Error, {
+      logError("StratoPolling", e as Error, {
         operation: "startDepositInitiatedPolling",
       });
     }
@@ -205,7 +205,7 @@ export const startNativeDepositInitiatedPolling = (): void => {
         }
       }
     } catch (e: any) {
-      logError("MercataPolling", e as Error, {
+      logError("StratoPolling", e as Error, {
         operation: "startNativeDepositInitiatedPolling",
       });
     }
@@ -265,7 +265,7 @@ export const startWithdrawalTxPolling = (): void => {
           await handleRejectedWithdrawalBatch(batch as NonEmptyArray<Number>);
         }
     } catch (e: any) {
-      logError("MercataPolling", e as Error, {
+      logError("StratoPolling", e as Error, {
         operation: "startWithdrawalTxPolling",
         error: e.message,
         errorStack: e.stack,
@@ -308,7 +308,7 @@ export const startNativeWithdrawalRequestPolling = (): void => {
         }
       }
     } catch (e: any) {
-      logError("MercataPolling", e as Error, {
+      logError("StratoPolling", e as Error, {
         operation: "startNativeWithdrawalRequestPolling",
       });
     }
@@ -355,7 +355,7 @@ export const startNativeWithdrawalTxPolling = (): void => {
         }
       }
     } catch (e: any) {
-      logError("MercataPolling", e as Error, {
+      logError("StratoPolling", e as Error, {
         operation: "startNativeWithdrawalTxPolling",
         error: e.message,
         errorStack: e.stack,
@@ -370,8 +370,8 @@ export const startNativeWithdrawalTxPolling = (): void => {
   );
 };
 
-export const initializeMercataPolling = async () => {
-  logInfo("MercataPolling", "Initializing Mercata polling...");
+export const initializeStratoPolling = async () => {
+  logInfo("StratoPolling", "Initializing STRATO polling...");
 
   startDepositInitiatedPolling();
   startNativeDepositInitiatedPolling();
@@ -380,5 +380,5 @@ export const initializeMercataPolling = async () => {
   startWithdrawalTxPolling();
   startNativeWithdrawalTxPolling();
 
-  logInfo("MercataPolling", "Mercata polling initialized");
+  logInfo("StratoPolling", "STRATO polling initialized");
 };

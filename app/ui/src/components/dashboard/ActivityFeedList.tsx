@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { formatUnits } from "viem";
 import { activityFeedApi } from "@/lib/activityFeed";
-import type { Event } from "@mercata/shared-types";
+import type { Event } from "@strato/shared-types";
 import { useUser } from "@/context/UserContext";
 
 const ActivityFeedList = () => {

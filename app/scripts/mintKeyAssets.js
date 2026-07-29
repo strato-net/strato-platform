@@ -4,7 +4,7 @@
            directly to a target wallet using an existing admin JWT – no OAuth dance.
 
   Usage example (bash):
-    export NODE_URL=https://node.mercata.xyz
+    export NODE_URL=https://node.strato.xyz
     export ADMIN_TOKEN=<jwt-of-admin>
     export TO_ADDRESS=1b7dc206ef2fe3aab27404b88c36470ccf16c0ce
 

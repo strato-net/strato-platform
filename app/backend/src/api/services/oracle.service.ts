@@ -1,10 +1,10 @@
-import { strato, cirrus } from "../../utils/mercataApiHelper";
+import { strato, cirrus } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { getPool } from "./lending.service";
-import { PriceHistoryEntry, PriceHistoryResponse, OraclePriceEntry, OraclePriceMap } from "@mercata/shared-types";
+import { PriceHistoryEntry, PriceHistoryResponse, OraclePriceEntry, OraclePriceMap } from "@strato/shared-types";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
 import { getHistory, getHistoryParams, HistoryParams, StorageHistoryElement } from "../helpers/history.helper";

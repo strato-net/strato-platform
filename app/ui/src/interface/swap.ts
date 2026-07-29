@@ -15,9 +15,9 @@ import type {
   PoolV3MintParams,
   PoolV3BurnParams,
   PoolV3CollectParams,
-} from '@mercata/shared-types';
+} from '@strato/shared-types';
 
-export * from '@mercata/shared-types';
+export * from '@strato/shared-types';
 // UI-SPECIFIC SWAP INTERFACES
 // ============================================================================
 

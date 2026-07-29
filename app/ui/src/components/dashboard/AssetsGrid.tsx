@@ -1,4 +1,4 @@
-import { EarningAsset } from '@mercata/shared-types';
+import { EarningAsset } from '@strato/shared-types';
 import AssetCard from './AssetCard';
 
 interface AssetsGridProps {

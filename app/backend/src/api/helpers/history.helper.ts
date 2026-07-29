@@ -1,4 +1,4 @@
-import { cirrus } from "../../utils/mercataApiHelper";
+import { cirrus } from "../../utils/appApiHelper";
 
 export interface StorageHistoryElement {
   address: string;

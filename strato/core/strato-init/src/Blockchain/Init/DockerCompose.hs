@@ -38,8 +38,8 @@ generateDockerCompose = do
         , options = Nothing
         }
 
-  let mercataBackend = def
-        { image = "mercata-backend:" ++ stratoVersionTag ++ "-" ++ hashMercataBackend
+  let appBackend = def
+        { image = "app-backend:" ++ stratoVersionTag ++ "-" ++ hashAppBackend
         , user = Just userGid
         , depends_on = Just $ DependsOnList ["postgres", "postgrest"]
         , init = Just True
@@ -80,22 +80,22 @@ generateDockerCompose = do
             , ("postgres_user", "postgres")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
-        , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]
+        , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/app-backend.log 2>&1"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
 
-  let mercataUi = def
-        { image = "mercata-ui:" ++ stratoVersionTag ++ "-" ++ hashMercataUi
+  let appUi = def
+        { image = "app-ui:" ++ stratoVersionTag ++ "-" ++ hashAppUi
         , user = Just userGid
-        , depends_on = Just $ DependsOnList ["mercata-backend"]
+        , depends_on = Just $ DependsOnList ["app-backend"]
         , volumes = Just ["./logs:/logs", "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
         , environment = Just $ Map.fromList
             [ ("LUCKY_ORANGE_SITE_ID", "${LUCKY_ORANGE_SITE_ID:-}")
             , ("GOOGLE_ANALYTICS_ID", "${GOOGLE_ANALYTICS_ID:-}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
-        , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-ui.log 2>&1"]
+        , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/app-ui.log 2>&1"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
@@ -213,12 +213,12 @@ generateDockerCompose = do
                 , ("postgrest", DependsOnCondition "service_started")
                 , ("prometheus", DependsOnCondition "service_started")
                 , ("smd", DependsOnCondition "service_started")
-                , ("mercata-backend", DependsOnCondition "service_started")
-                , ("mercata-ui", DependsOnCondition "service_started")
+                , ("app-backend", DependsOnCondition "service_started")
+                , ("app-ui", DependsOnCondition "service_started")
                 , ("local-auth", DependsOnCondition "service_healthy")
                 ]
               else DependsOnList
-                ["apex", "docs", "postgrest", "prometheus", "smd", "mercata-backend", "mercata-ui"]
+                ["apex", "docs", "postgrest", "prometheus", "smd", "app-backend", "app-ui"]
         
         , environment = Just $ Map.fromList $
             [ ("STRATO_PORT_API", stratoApiPort)
@@ -335,8 +335,8 @@ generateDockerCompose = do
   let streamingService = if null (bcImage bc) then [] else [("streaming", streaming)]
   
   let baseServices =
-            [ ("mercata-backend", mercataBackend)
-            , ("mercata-ui", mercataUi)
+            [ ("app-backend", appBackend)
+            , ("app-ui", appUi)
             , ("smd", smd)
             , ("apex", apex)
             , ("redis", redis)

@@ -15,7 +15,7 @@
     DEPOSIT_USDST                   – tokenA amount to deposit per pool (wei, default 1e22)
 
   Usage example:
-    export NODE_URL=https://node.mercata.xyz
+    export NODE_URL=https://node.strato.xyz
     export ADMIN_TOKEN=<jwt>
     export POOL_FACTORY=000000000000000000000000000000000000100a
     export USDST=86a5ae535ded415203c3e27d654f9a1d454c553b

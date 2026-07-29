@@ -1,6 +1,6 @@
 import backfillRows from "../../config/exchangeRateBackfill.json";
 import { constants } from "../../config/constants";
-import { cirrus } from "../../utils/mercataApiHelper";
+import { cirrus } from "../../utils/appApiHelper";
 import { totalDebtFromScaled, calculateAPYs } from "./lending.helper";
 import { safeBigInt } from "./vaultPerformance.helper";
 

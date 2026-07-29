@@ -4,7 +4,7 @@ Standalone service that watches crypto credit card wallet balances and calls `to
 
 ## Behavior
 
-1. **Config source**: On each poll, the service calls the Mercata backend `GET /api/credit-card/watcher-config` (operator auth) to get all enabled card configs. The backend returns configs from its persisted store (threshold, top-up amount, cooldown, destination chain, token, card wallet address).
+1. **Config source**: On each poll, the service calls the STRATO App backend API `GET /api/credit-card/watcher-config` (operator auth) to get all enabled card configs. The backend returns configs from its persisted store (threshold, top-up amount, cooldown, destination chain, token, card wallet address).
 2. **Balance check**: For each config, the service calls the destination chain RPC (from `EXTERNAL_CHAIN_RPC_URLS`) to get the ERC20 balance of the card wallet for the configured token.
 3. **Top-up**: If the balance is below the config’s `thresholdAmount` and the cooldown since `lastTopUpAt` has elapsed, the service calls `POST /api/credit-card/execute-top-up` (operator auth). The backend submits `CreditCardTopUp.topUpCard` to STRATO and updates the config’s `lastTopUpAt`.
 
@@ -17,7 +17,7 @@ Standalone service that watches crypto credit card wallet balances and calls `to
 
 See `.env.example`. Required:
 
-- `MERCATA_API_URL` – backend base URL
+- `STRATO_APP_API_URL` – backend base URL
 - `OPERATOR_CLIENT_ID` – OAuth2 client id for the operator (client credentials)
 - `OPERATOR_CLIENT_SECRET` – OAuth2 client secret
 - `OPERATOR_DISCOVERY_URL` – OpenID Connect discovery URL (e.g. `https://keycloak.example/auth/realms/mercata/.well-known/openid-configuration`)

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ApySource, DepositAction } from "@mercata/shared-types";
+import { ApySource, DepositAction } from "@strato/shared-types";
 import { metalForgeService, MetalConfig, PayTokenConfig } from "@/services/metalForgeService";
 import { useToast } from "@/hooks/use-toast";
 import {

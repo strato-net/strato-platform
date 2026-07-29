@@ -1,6 +1,6 @@
 ## Bridge
 
-Purpose: Cross-system token bridging into/out of Mercata.
+Purpose: Cross-system token bridging into/out of STRATO.
 
 Functional summary:
 - Bridge-in (deposit): Off-chain relayer attests an external-chain deposit. The bridge records the deposit with replay protection and, upon confirmation, mints either USDST or the wrapped STRATO token to the recipient.

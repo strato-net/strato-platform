@@ -17,7 +17,7 @@ import { useNetwork } from "@/context/NetworkContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
-import type { BridgeToken } from "@mercata/shared-types";
+import type { BridgeToken } from "@strato/shared-types";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { Loader2, CreditCard, DollarSign, Plus, Settings, ChevronDown, ChevronUp, Clock, Info } from "lucide-react";
 import { safeParseUnits } from "@/utils/numberUtils";

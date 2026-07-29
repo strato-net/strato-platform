@@ -1,4 +1,4 @@
-import { cirrus } from "../../utils/mercataApiHelper";
+import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import * as config from "../../config/config";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
@@ -8,7 +8,7 @@ import { getUserStakedStratoBalance } from "./staking.service";
 import { getLoan } from "./lending.service";
 import { getVaults } from "./cdp.service";
 import { listVaultDefs, getYieldVaultInfo, getYieldVaultUserInfo } from "./yieldVault.service";
-import { Token, EarningAsset, BalanceSnapshot } from "@mercata/shared-types";
+import { Token, EarningAsset, BalanceSnapshot } from "@strato/shared-types";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
 import { getHistoryDirect, fetchActiveRequestIds, fetchVaultHistoryConfig, fetchUserV3PoolMeta, PoolV3Meta } from "../helpers/historyDb.helper";

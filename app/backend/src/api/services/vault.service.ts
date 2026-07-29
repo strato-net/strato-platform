@@ -2,7 +2,7 @@
  * Vault Service - Handles Multi-Asset Vault operations
  */
 
-import { strato, cirrus } from "../../utils/mercataApiHelper";
+import { strato, cirrus } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { FunctionInput } from "../../types/types";
 import { postAndWaitForTx } from "../../utils/txHelper";

@@ -1,5 +1,5 @@
 import { formatUnits } from 'viem';
-import { Token } from '@mercata/shared-types';
+import { Token } from '@strato/shared-types';
 import { useTokenContext } from '@/context/TokenContext';
 
 interface UseNetBalanceProps {

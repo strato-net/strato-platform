@@ -145,7 +145,7 @@ router.get("/:address", authHandler.authorizeRequest(true), TokensController.get
  * @openapi
  * /tokens:
  *   get:
- *     summary: List tokens registered on Mercata
+ *     summary: List tokens registered on STRATO
  *     tags: [Tokens]
  *     parameters:
  *       - name: select

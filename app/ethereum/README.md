@@ -1,6 +1,6 @@
-# Mercata Ethereum Deployment
+# STRATO Ethereum Deployment
 
-Modular Hardhat setup for deploying Mercata contracts to Ethereum networks with UUPS upgradeable proxy support.
+Modular Hardhat setup for deploying STRATO contracts to Ethereum networks with UUPS upgradeable proxy support.
 
 ## Quick Start
 

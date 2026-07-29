@@ -1,5 +1,5 @@
 import React from "react";
-import { BridgeToken } from "@mercata/shared-types";
+import { BridgeToken } from "@strato/shared-types";
 
 interface DepositTransactionSummaryProps {
   selectedToken: BridgeToken | null;

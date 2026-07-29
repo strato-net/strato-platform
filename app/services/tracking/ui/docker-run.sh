@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-# Regenerate runtime config from env at container start (mercata-ui pattern)
+# Regenerate runtime config from env at container start (app-ui pattern)
 cat > /app/dist/config.js <<EOF
 window.ENV = {
   OIDC_AUTHORITY: '${OIDC_AUTHORITY:-https://keycloak.blockapps.net/auth/realms/mercata}',

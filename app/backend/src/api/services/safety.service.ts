@@ -1,11 +1,11 @@
-import { strato, cirrus } from "../../utils/mercataApiHelper";
+import { strato, cirrus } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 
-const SafetyModule = "mercata/backend/src/api/contracts/concrete/Lending/SafetyModule.sol";
+const SafetyModule = "app/backend/src/api/contracts/concrete/Lending/SafetyModule.sol";
 const { Token } = constants;
 const WAD = 10n ** 18n;
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;

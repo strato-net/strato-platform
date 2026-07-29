@@ -125,7 +125,7 @@ export async function initStratoChain(): Promise<Chain | null> {
     const chainLabel = isProduction ? "STRATO" : (networkName ? `STRATO ${networkName}` : "STRATO");
     const explorerUrl = isProduction
       ? "https://stratoscan.strato.nexus"
-      : "https://stratoscan.testnet.stratomercata.com";
+      : "https://stratoscan.testnet.strato.nexus";
 
     _chain = defineChain({
       id: _chainId,

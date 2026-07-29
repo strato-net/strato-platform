@@ -1,5 +1,5 @@
 import { api } from '@/lib/axios';
-import type { Event } from '@mercata/shared-types';
+import type { Event } from '@strato/shared-types';
 
 export const METAL_ACTIVITY_PAIR = [
   { contract_name: "MetalForge", event_name: "MetalMinted" }

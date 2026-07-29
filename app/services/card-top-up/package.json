@@ -1,5 +1,5 @@
 {
-  "name": "mercata-card-top-up-service",
+  "name": "strato-card-top-up-service",
   "version": "1.0.0",
   "description": "Watches card wallet balances and calls topUpCard when below threshold",
   "main": "dist/index.js",

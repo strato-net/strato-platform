@@ -1,7 +1,7 @@
 import axios from "axios";
 import { clientSecret, clientId, openIdTokenEndpoint, openIdJwks } from "../config/config";
 import { createLocalJWKSet, jwtVerify, JWTPayload, JSONWebKeySet } from "jose";
-import { strato } from "./mercataApiHelper";
+import { strato } from "./appApiHelper";
 import { TokenCache, StratoKeyResponse } from "../types/types";
 import { StratoPaths } from "../config/constants";
 

@@ -2,7 +2,7 @@ import Stripe from "stripe";
 import axios from "axios";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { strato, cirrus } from "../../utils/mercataApiHelper";
+import { strato, cirrus } from "../../utils/appApiHelper";
 import { getServiceToken } from "../../utils/authHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";

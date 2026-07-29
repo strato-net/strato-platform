@@ -330,7 +330,7 @@ export function setUsdcYieldVaultConfig(networkId: string) {
 
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
-  const { eth } = await import("../utils/mercataApiHelper");
+  const { eth } = await import("../utils/appApiHelper");
   const accessToken = await getServiceToken();
   const { data } = await eth.get(accessToken, `/metadata`);
   networkId = data.networkID;
@@ -361,7 +361,7 @@ export async function initNetworkConfig() {
  * Used to exclude internal transfers from the My Activity / All Activity feed.
  */
 export async function getInternalAddresses() {
-  const { cirrus } = await import("../utils/mercataApiHelper");
+  const { cirrus } = await import("../utils/appApiHelper");
   const accessToken = await getServiceToken();
 
   // Static: well-known system contract addresses from config

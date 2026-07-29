@@ -1,6 +1,6 @@
 import "../../abstract/ERC20/access/Authorizable.sol";
 // This is the import path needed for:
-// find mercata/contracts/tests -name '*.test.sol' -print0   | xargs -0 -I {} sh -c 'echo "{}" && cd "$(dirname "{}")" && solid-vm-cli test "$(basename "{}")"'
+// find app/contracts/tests -name '*.test.sol' -print0   | xargs -0 -I {} sh -c 'echo "{}" && cd "$(dirname "{}")" && solid-vm-cli test "$(basename "{}")"'
 // It doesn't work to compile this contract alone; see https://github.com/strato-net/strato-platform/issues/4905
 
 contract User {

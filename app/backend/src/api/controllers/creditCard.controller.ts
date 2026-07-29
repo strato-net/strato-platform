@@ -14,7 +14,7 @@ import {
   getUsdstBalanceForUser,
 } from "../services/creditCard.service";
 import { validateUpsertConfig, validateAddCardBody, validateUpdateCardBody } from "../validators/creditCard.validators";
-import type { CreditCardConfig } from "@mercata/shared-types";
+import type { CreditCardConfig } from "@strato/shared-types";
 import { getServiceToken } from "../../utils/authHelper";
 
 class CreditCardController {
@@ -299,7 +299,7 @@ class CreditCardController {
   ): Promise<void> {
     try {
       const accessToken = req.accessToken as string;
-      const body = req.body as import("@mercata/shared-types").CreditCardTopUpExecuteParams;
+      const body = req.body as import("@strato/shared-types").CreditCardTopUpExecuteParams;
       if (!body?.userAddress || !body?.stratoTokenAmount || !body?.externalChainId || !body?.externalRecipient || !body?.externalToken) {
         res.status(400).json({
           error: "userAddress, stratoTokenAmount, externalChainId, externalRecipient, externalToken required",
@@ -410,7 +410,7 @@ class CreditCardController {
         res.status(404).json({ error: "Card not found" });
         return;
       }
-      const params: import("@mercata/shared-types").CreditCardTopUpExecuteParams = {
+      const params: import("@strato/shared-types").CreditCardTopUpExecuteParams = {
         userAddress: config.userAddress,
         stratoTokenAmount: amount,
         externalChainId: config.destinationChainId,

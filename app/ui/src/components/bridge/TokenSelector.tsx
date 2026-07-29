@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BridgeToken } from "@mercata/shared-types";
+import { BridgeToken } from "@strato/shared-types";
 
 interface TokenSelectorProps {
   selectedToken: BridgeToken | null;
