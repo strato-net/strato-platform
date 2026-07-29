@@ -518,13 +518,15 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
       };
     }
     case 'userCollaterals': {
-      // FIX: REPLACE instead of ADD - userCollaterals stores absolute values
+      // Kept separate from `balance`: both collections store absolute values, so sharing
+      // one field made whichever row applied last silently discard the other.
+      // processBalanceSnapshot sums them, matching getEarningAssets' totalBalance.
       const token = newInfo.key['key2'] || '';
       const newValue = newInfo.value || 0;
       return { ...portfolioInfo, 
         tokens: { ...portfolioInfo.tokens,
           [token]: { ...portfolioInfo.tokens[token],
-            balance: newValue
+            collateralBalance: newValue
           }
         }
       };
@@ -604,7 +606,7 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
   for (const tokenAddr in snapshot.data.tokens) {
     const token = snapshot.data.tokens[tokenAddr] || {};
     let tokenPrice = token?.price || 0;
-    const tokenBalance = token?.balance || 0;
+    const tokenBalance = (token?.balance || 0) + (token?.collateralBalance || 0);
 
     if (token?.scaledDebt) {
       const rateAccumulator = Number(safeBigInt(token?.rateAccumulator) / 1000000000000000000n) / 1000000000;
