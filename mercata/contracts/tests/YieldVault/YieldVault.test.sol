@@ -4,7 +4,7 @@ import "../../abstract/ERC20/ERC20.sol";
 import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/Proxy/Proxy.sol";
-import {YieldVault as YieldVaultOld} from "../../concrete/YieldVault/YieldVaultOld.sol";
+import {YieldVault as YieldVaultOld} from "../../deploy/yield-vault-testing/YieldVaultOld.sol";
 import "../../concrete/YieldVault/YieldVault.sol";
 
 contract User {
