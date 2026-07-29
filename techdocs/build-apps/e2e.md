@@ -734,8 +734,8 @@ async function batchQuery(
 
 ### Study the Reference Implementation
 
-The **mercata app** (`strato-platform/mercata/`) is the complete reference:
+The **STRATO App** (`strato-platform/app/`):
 
-- **Backend** - `mercata/backend/src/`
-- **Services** - `mercata/backend/src/api/services/`
-- **Helpers** - `mercata/backend/src/api/helpers/`
+- **Backend** - `app/backend/src/`
+- **Services** - `app/backend/src/api/services/`
+- **Helpers** - `app/backend/src/api/helpers/`

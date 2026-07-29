@@ -20,11 +20,11 @@ import { SepoliaBroadcaster, normalizeAddress0x } from "../tx/sepoliaBroadcast";
 import { AppScenario } from "./appScenario";
 
 /**
- * Scenario 1 — Token Sale TPS (canonical Mercata Bridge-In flow).
+ * Scenario 1 — Token Sale TPS (canonical App Bridge-In flow).
  *
- * Replays the Mercata UI's "Fund > Bridge-In Ethereum Sepolia, Send USDC,
+ * Replays the App UI's "Fund > Bridge-In Ethereum Sepolia, Send USDC,
  * Receive GOLDST" composition from
- * mercata/ui/src/pages/DepositsPage.tsx + components/bridge/BridgeIn.tsx.
+ * app/ui/src/pages/DepositsPage.tsx + components/bridge/BridgeIn.tsx.
  *
  * Per UI trace (BridgeIn.handleBridge with AUTO_FORGE selected):
  *   Page-load GETs (once per user, gated by includePageLoad):
@@ -40,7 +40,7 @@ import { AppScenario } from "./appScenario";
  *        { externalChainId, externalTxHash: <leg-1 hash>, action: 2,
  *          targetToken: GOLDST }
  *
- * The bridge service (mercata/services/bridge) polls Sepolia, sees the
+ * The bridge service (app/services/bridge) polls Sepolia, sees the
  * DepositRouted event, mints USDST to the recipient on STRATO and (because
  * action=2 AUTO_FORGE was queued) auto-forges USDST → GOLDST server-side.
  * The load test does NOT call /api/metal-forge/buy directly — for that

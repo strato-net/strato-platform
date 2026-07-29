@@ -1,0 +1,309 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Copy, Loader2 } from 'lucide-react';
+import { useSwapContext } from '@/context/SwapContext';
+import { useUser } from '@/context/UserContext';
+import { formatWeiAmount, formatHash } from '@/utils/numberUtils';
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+const ITEMS_PER_PAGE = 10;
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+const formatTimestamp = (timestamp: Date) => {
+  return timestamp.toLocaleDateString([], {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+};
+
+// ============================================================================
+// UI COMPONENTS
+// ============================================================================
+const LoadingRow = ({ colSpan }: { colSpan: number }) => (
+  <TableRow>
+    <TableCell colSpan={colSpan} className="text-center py-8">
+      <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+    </TableCell>
+  </TableRow>
+);
+
+const EmptyRow = ({ colSpan }: { colSpan: number }) => (
+  <TableRow>
+    <TableCell colSpan={colSpan} className="text-center py-8">
+      <p className="text-muted-foreground">No trade history found for this pair</p>
+    </TableCell>
+  </TableRow>
+);
+
+const SenderCell = ({ sender, copiedHash, onCopy }: { sender: string; copiedHash: string | null; onCopy: (text: string) => void }) => (
+  <TableCell className="font-mono text-xs">
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={() => onCopy(sender)}
+            className="flex items-center gap-1 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 active:bg-blue-100 dark:active:bg-blue-900/30 active:scale-95 transition-all duration-150 rounded px-1 py-0.5"
+          >
+            <span>
+              {copiedHash === sender ? 'Copied!' : formatHash(sender)}
+            </span>
+            <Copy className="h-3 w-3" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Click to copy full address</p>
+          <p className="font-mono text-xs break-all">{sender}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  </TableCell>
+);
+
+const SwapRow = ({ swap, copiedHash, onCopy }: { swap: any; copiedHash: string | null; onCopy: (text: string) => void }) => (
+  <TableRow key={swap.id}>
+    <TableCell className="text-sm">
+      {formatTimestamp(swap.timestamp)}
+    </TableCell>
+    <TableCell className="font-medium text-sm">
+      {swap.tokenIn}
+    </TableCell>
+    <TableCell className="text-sm">
+      {formatWeiAmount(swap.amountIn)}
+    </TableCell>
+    <TableCell className="font-medium text-sm">
+      {swap.tokenOut}
+    </TableCell>
+    <TableCell className="text-sm">
+      {formatWeiAmount(swap.amountOut)}
+    </TableCell>
+    <TableCell className="text-sm">
+      {swap.tokenIn === 'USDST' || swap.tokenOut === 'USDST' ? '$' : ''}{swap.impliedPrice}
+    </TableCell>
+    <TableCell className="text-sm text-muted-foreground">
+      {swap.poolName || 'V2'}
+    </TableCell>
+    <SenderCell sender={swap.sender} copiedHash={copiedHash} onCopy={onCopy} />
+  </TableRow>
+);
+
+const PaginationInfo = ({ currentPage, itemsPerPage, swapHistoryCount, swapHistoryLength }: {
+  currentPage: number;
+  itemsPerPage: number;
+  swapHistoryCount: number;
+  swapHistoryLength: number;
+}) => {
+  const start = (currentPage - 1) * itemsPerPage + 1;
+  const end = Math.min(currentPage * itemsPerPage, swapHistoryCount);
+  
+  return (
+    <div className="text-sm text-muted-foreground">
+      {start === 1 && end === swapHistoryCount ? (
+        `Showing ${swapHistoryLength} trade${swapHistoryLength !== 1 ? 's' : ''}`
+      ) : (
+        `Showing ${start} to ${end} of ${swapHistoryCount} trades`
+      )}
+    </div>
+  );
+};
+
+const PaginationControls = ({ 
+  currentPage, 
+  totalPages, 
+  swapHistoryLoading, 
+  onPageChange 
+}: {
+  currentPage: number;
+  totalPages: number;
+  swapHistoryLoading: boolean;
+  onPageChange: (page: number) => void;
+}) => {
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+        disabled={currentPage === 1 || swapHistoryLoading}
+      >
+        Previous
+      </Button>
+      <span className="text-sm text-muted-foreground">
+        Page {currentPage} of {totalPages}
+        {swapHistoryLoading && <span className="ml-2 text-blue-500">Loading...</span>}
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+        disabled={currentPage === totalPages || swapHistoryLoading}
+      >
+        Next
+      </Button>
+    </div>
+  );
+};
+
+// ============================================================================
+// MAIN SWAP HISTORY COMPONENT
+// ============================================================================
+const SwapHistory: React.FC = () => {
+  // ========================================================================
+  // CONTEXT & HOOKS
+  // ========================================================================
+  const { refreshSwapHistory, pool, poolLoading, swapHistory, swapHistoryCount, swapHistoryLoading, fromAsset, toAsset } = useSwapContext();
+  const { userAddress } = useUser();
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  // Mirror SwapContext's endpoint resolution: with a pair selected the history spans
+  // both venues (V2 pools + every V3 fee tier, each row tagged with its pool) and
+  // prices are normalized to toAsset-per-fromAsset (the requested pair order).
+  const hasPair = !!(fromAsset?.address && toAsset?.address);
+  const hasActivePool = hasPair || !!pool?.address;
+  const priceLabel = hasPair
+    ? `${toAsset?._symbol}/${fromAsset?._symbol}`
+    : `${pool?.tokenB?._symbol}/${pool?.tokenA?._symbol}`;
+  const columnCount = 8;
+
+  // ========================================================================
+  // STATE
+  // ========================================================================
+  const [currentPage, setCurrentPage] = useState(1);
+  const [copiedHash, setCopiedHash] = useState<string | null>(null);
+  const [showMySwapsOnly, setShowMySwapsOnly] = useState(false);
+
+  // ========================================================================
+  // COMPUTED VALUES
+  // ========================================================================
+  const totalPages = Math.ceil(swapHistoryCount / ITEMS_PER_PAGE);
+  const isInitialLoad = swapHistoryLoading && swapHistory.length === 0;
+
+  // ========================================================================
+  // EFFECTS
+  // ========================================================================
+  useEffect(() => {
+    setCurrentPage(1);
+    if (hasActivePool) {
+      refreshSwapHistory({
+        limit: ITEMS_PER_PAGE.toString(),
+        page: "1",
+        ...(showMySwapsOnly && userAddress ? { sender: userAddress } : {}),
+      });
+    }
+  }, [hasActivePool, refreshSwapHistory, showMySwapsOnly, userAddress]);
+
+  // ========================================================================
+  // EVENT HANDLERS
+  // ========================================================================
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedHash(text);
+      setTimeout(() => setCopiedHash(null), 1500);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (!hasActivePool) return;
+    
+    setCurrentPage(newPage);
+    refreshSwapHistory({
+      limit: ITEMS_PER_PAGE.toString(),
+      page: newPage.toString(),
+      ...(showMySwapsOnly && userAddress ? { sender: userAddress } : {}),
+    });
+  };
+
+  // ========================================================================
+  // RENDER
+  // ========================================================================
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Trade History</h3>
+        {userAddress && (
+          <Button
+            variant={showMySwapsOnly ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowMySwapsOnly(!showMySwapsOnly)}
+            disabled={!hasActivePool || swapHistoryLoading}
+          >
+            {swapHistoryLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            {showMySwapsOnly ? "Showing My Trades" : "Show My Trades"}
+          </Button>
+        )}
+      </div>
+
+      {hasActivePool ? (
+        <div ref={tableRef} className="bg-card rounded-lg border border-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[140px]">Time</TableHead>
+                <TableHead className="w-[100px]">Token In</TableHead>
+                <TableHead className="w-[120px]">Amount In</TableHead>
+                <TableHead className="w-[100px]">Token Out</TableHead>
+                <TableHead className="w-[120px]">Amount Out</TableHead>
+                <TableHead className="w-[120px]">Price {priceLabel}</TableHead>
+                <TableHead className="w-[80px]">Pool</TableHead>
+                <TableHead className="w-[100px]">Sender</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className={`transition-opacity duration-200 ${swapHistoryLoading ? "opacity-50 pointer-events-none" : ""}`}>
+              {isInitialLoad ? (
+                <LoadingRow colSpan={columnCount} />
+              ) : swapHistory.length > 0 ? (
+                swapHistory.map((swap) => (
+                  <SwapRow
+                    key={swap.id}
+                    swap={swap}
+                    copiedHash={copiedHash}
+                    onCopy={copyToClipboard}
+                  />
+                ))
+              ) : (
+                <EmptyRow colSpan={columnCount} />
+              )}
+            </TableBody>
+          </Table>
+
+          <div className="flex items-center justify-between px-6 py-4 border-t border-border">
+            <PaginationInfo
+              currentPage={currentPage}
+              itemsPerPage={ITEMS_PER_PAGE}
+              swapHistoryCount={swapHistoryCount}
+              swapHistoryLength={swapHistory.length}
+            />
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              swapHistoryLoading={swapHistoryLoading}
+              onPageChange={handlePageChange}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="bg-muted/50 rounded-lg p-6 text-center">
+          <p className="text-muted-foreground">
+            {poolLoading ? "Loading pool data..." : "Please select both token pairs to view trade history"}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SwapHistory;
