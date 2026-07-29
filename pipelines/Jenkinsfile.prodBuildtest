@@ -78,7 +78,7 @@ pipeline {
         slackSend(
             channel: '#engineering',
             color: 'good',
-            message: "Mainnet buildtest.mercata.blockapps.net was redeployed with STRATO v.${VERSION}"
+            message: "Mainnet buildtest.strato.nexus was redeployed with STRATO v.${VERSION}"
         )
       }
     }

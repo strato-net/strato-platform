@@ -124,7 +124,7 @@ if __name__ == "__main__":
     realm_2 = sys.argv[6]
     attempts = sys.argv[7] if len(sys.argv) > 7 else DEFAULT_ATTEMPTS
     sleep_time = sys.argv[8] if len(sys.argv) > 8 else DEFAULT_SLEEP_TIME
-    reference_node_url = sys.argv[9] if len(sys.argv) > 9 else "https://node1.mercata-testnet2.blockapps.net"
+    reference_node_url = sys.argv[9] if len(sys.argv) > 9 else "https://node1.testnet.strato.nexus"
 
     node1_url = "http://localhost"
     node2_url = reference_node_url

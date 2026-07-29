@@ -11,8 +11,8 @@ OpenResty-based nginx reverse proxy for STRATO platform with OAuth2/OIDC authent
 - **Prometheus Metrics** - Built-in metrics collection and export
 - **Security Headers** - Content-Security-Policy, X-Frame-Options, etc.
 - **API Reverse Proxy** - Routes to multiple backend services:
-  - Mercata Backend API (`/api/`)
-  - Mercata UI (`/`)
+  - STRATO App API (`/api/`)
+  - App UI (`/`)
   - STRATO API (`/strato-api/`)
   - Blockchain API (`/bloc/v2.2/`)
   - Ethereum JSON-RPC (`/rpc`, enabled when `JSONRPC_ENABLED=true`)
@@ -29,7 +29,7 @@ Browser-based API requests are protected against CSRF attacks using the double-s
 **Important**: CSRF protection **only applies to browser requests** (detected via User-Agent). API clients like curl, Postman, mobile apps, and server-to-server calls are **automatically exempt** for better developer experience.
 
 Protected endpoints (browser requests only):
-- `/api/*` - Mercata backend
+- `/api/*` - App API
 - `/apex-api/user`, `/apex-api/status` - User management
 - `/bloc/v2.2/*` - Blockchain transactions
 - `/strato-api/*` - Blockchain API

@@ -154,7 +154,7 @@ cd strato-platform
 ```
 strato-platform/
 ├── strato/              # Blockchain core (Haskell)
-├── mercata/             # DeFi application layer
+├── app/                 # DeFi application layer
 │   ├── contracts/       # Smart contracts (Solidity)
 │   ├── backend/         # REST API (Node.js/TypeScript)
 │   ├── ui/              # Web UI (React/TypeScript)
@@ -197,9 +197,9 @@ NIX=true make
 **What this does:**
 
 - Compiles the Haskell blockchain core (`strato`, `vm-runner`, `cirrus`)
-- Builds the Solidity smart contracts (`mercata/contracts`)
-- Builds the Node.js backend API (`mercata/backend`)
-- Builds the React frontend UI (`mercata/ui`)
+- Builds the Solidity smart contracts (`app/contracts`)
+- Builds the Node.js backend API (`app/backend`)
+- Builds the React frontend UI (`app/ui`)
 - Generates Docker Compose files
 
 **Build output:**
@@ -208,9 +208,9 @@ NIX=true make
 ✓ strato-core
 ✓ vm-runner
 ✓ cirrus
-✓ mercata-contracts
-✓ mercata-backend
-✓ mercata-ui
+✓ app-contracts
+✓ app-backend
+✓ app-ui
 ✓ docker-compose files generated
 ```
 
@@ -221,19 +221,19 @@ If you're only working on a specific part:
 **Backend only:**
 
 ```bash
-make mercata-backend
+make app-backend
 ```
 
 **Frontend only:**
 
 ```bash
-make mercata-ui
+make app-ui
 ```
 
 **Contracts only:**
 
 ```bash
-cd mercata/contracts
+cd app/contracts
 npm install
 npm run compile
 ```
@@ -349,13 +349,13 @@ tail -f my_node_name/logs/strato-core.log
 **Backend API:**
 
 ```bash
-tail -f my_node_name/logs/mercata-backend.log
+tail -f my_node_name/logs/app-backend.log
 ```
 
 **UI:**
 
 ```bash
-tail -f my_node_name/logs/mercata-ui.log
+tail -f my_node_name/logs/app-ui.log
 ```
 
 ### 5. Stop STRATO
@@ -504,10 +504,10 @@ Now that you have STRATO running locally:
 1. **Understand the architecture** → Read [Architecture](architecture.md)
 2. **Choose your focus area:**
    - **Blockchain Core** - Haskell codebase (`strato/`)
-   - **Smart Contracts** - Solidity contracts (`mercata/contracts/`)
-   - **Backend API** - Node.js/TypeScript (`mercata/backend/`)
-   - **Frontend UI** - React/TypeScript (`mercata/ui/`)
-   - **Services** - Background services (`mercata/services/`)
+   - **Smart Contracts** - Solidity contracts (`app/contracts/`)
+   - **Backend API** - Node.js/TypeScript (`app/backend/`)
+   - **Frontend UI** - React/TypeScript (`app/ui/`)
+   - **Services** - Background services (`app/services/`)
 3. **Make your first contribution** → Read [Contributing Guidelines](contributing.md)
 
 !!! note "Component Guides Coming Soon"

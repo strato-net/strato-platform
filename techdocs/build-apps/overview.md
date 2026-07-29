@@ -70,7 +70,7 @@ You can also run your own STRATO instance for local development:
 | **ETH JSON-RPC** | `/strato-api/eth/v1.2` | Limited Ethereum compatibility |
 
 !!! tip "Reference Implementation"
-    The **mercata** app (in `mercata/` folder) is the complete reference implementation showing how to build apps on STRATO.
+    The **STRATO App** (in `app/` folder) is the complete reference implementation showing how to build apps on STRATO.
 
 ---
 
@@ -394,7 +394,7 @@ Frontend → Your Backend → STRATO APIs → Blockchain
 - Multi-user applications
 - Server-side authentication
 
-**Example: mercata app** (`mercata/backend/`)
+**Example: STRATO App** (`app/backend/`)
 
 ### Pattern 2: Microservice Integration
 
@@ -421,10 +421,10 @@ Your Service → STRATO APIs → Blockchain
 
 ### Reference Implementation
 
-- **mercata app** - `strato-platform/mercata/` folder
-  - **Backend** - `mercata/backend/` - Shows STRATO API usage
-  - **Frontend** - `mercata/ui/` - React app
-  - **Contracts** - `mercata/contracts/` - Solidity contracts
+- **app** - `strato-platform/app/` folder
+  - **Backend** - `app/backend/` - Shows STRATO API usage
+  - **Frontend** - `app/ui/` - React app
+  - **Contracts** - `app/contracts/` - Solidity contracts
 
 ### Support
 
