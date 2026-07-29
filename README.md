@@ -1,4 +1,4 @@
-[![STRATO Mercata logo](https://strato.nexus/images/strato.nexus/2025.10.11/strato-logo.png)](https://strato.nexus)
+[![STRATO logo](https://strato.nexus/images/strato.nexus/2025.10.11/strato-logo.png)](https://strato.nexus)
 
 # STRATO Platform
 
@@ -112,10 +112,10 @@ This builds both app images and prints the command to deploy them (similar to `m
 
 #### Patch the App on a Node
 
-Update the `mercata-backend` and `mercata-ui` image tags in the node's `docker-compose.yml`:
+Update the `app-backend` and `app-ui` image tags in the node's `docker-compose.yml`:
 
 ```
-strato-patch-app mynode mercata-backend:<tag> mercata-ui:<tag>
+strato-patch-app mynode app-backend:<tag> app-ui:<tag>
 ```
 
 Use the exact image tags printed by `make app`.
@@ -126,7 +126,7 @@ How the new images take effect depends on whether the node is currently running:
 - **Node is running:** the script will print a follow-up command. To apply the new images on the live node, either:
   - Re-run docker compose up for just the app services, **reusing the same ENV VARS from your original run script** (e.g. `run.sh`), so the recreated containers get the same environment they were originally launched with:
     ```
-    <ENV VARS> docker compose -p strato up -d --no-deps mercata-backend mercata-ui
+    <ENV VARS> docker compose -p strato up -d --no-deps app-backend app-ui
     ```
   - Or restart the full node without wiping its data:
     ```

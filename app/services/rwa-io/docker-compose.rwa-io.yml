@@ -1,0 +1,12 @@
+services:
+  rwa-io:
+    environment:
+    - RWA_IO_API_KEY=${RWA_IO_API_KEY}
+    build: .
+    image: strato-rwa-io-adapter
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"

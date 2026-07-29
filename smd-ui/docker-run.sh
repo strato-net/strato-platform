@@ -6,8 +6,8 @@ set -e
 cd "$(dirname "$0")"
 
 # Read chainId and network from ethconf.yaml (single source of truth), matching
-# the mercata UI. These drive the STRATO chain in the wallet connector. Fail fast
-# (like the mercata UI) so a missing/unmounted config surfaces as a crash-loop
+# the STRATO App UI. These drive the STRATO chain in the wallet connector. Fail fast
+# (like the STRATO App UI) so a missing/unmounted config surfaces as a crash-loop
 # rather than silently dropping the STRATO wallet from the connector list.
 CHAIN_ID=$(grep "^  chainId:" /config/ethconf.yaml | awk '{print $2}')
 NETWORK_NAME=$(grep "^  network:" /config/ethconf.yaml | awk '{print $2}' | tr -d '"')

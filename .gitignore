@@ -136,4 +136,4 @@ __pycache__/
 /docs/end-user/
 .docker-built/
 
-mercata/contracts/.env.happy-eth-withdrawal
+app/contracts/.env.happy-eth-withdrawal

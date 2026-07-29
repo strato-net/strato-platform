@@ -1,0 +1,72 @@
+version: '3.8'
+services:
+  backend:
+    build: ./backend
+    image: app-backend:latest
+    environment:
+      - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+      - NODE_URL=${NODE_URL}
+      - BASE_URL=${BASE_URL}
+      - RPC_URL_MAINNET=${RPC_URL_MAINNET}
+      - RPC_URL_MAINNET_FALLBACK=${RPC_URL_MAINNET_FALLBACK}
+      - RPC_URL_SEPOLIA=${RPC_URL_SEPOLIA}
+      - RPC_URL_SEPOLIA_FALLBACK=${RPC_URL_SEPOLIA_FALLBACK}
+      - POOL_FACTORY=${POOL_FACTORY}
+      - LENDING_REGISTRY=${LENDING_REGISTRY}
+      - TOKEN_FACTORY=${TOKEN_FACTORY}
+      - ADMIN_REGISTRY=${ADMIN_REGISTRY}
+      - MERCATA_BRIDGE=${MERCATA_BRIDGE}
+      - WAGMI_PROJECT_ID=${WAGMI_PROJECT_ID}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  ui:
+    depends_on:
+      - backend
+    build: ./ui
+    image: app-ui:latest
+    environment:
+      - LUCKY_ORANGE_SITE_ID=${LUCKY_ORANGE_SITE_ID}
+      - GOOGLE_ANALYTICS_ID=${GOOGLE_ANALYTICS_ID}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  rwa-io-adapter:
+    build: ./adapters/rwa-io
+    image: app-rwa-io-adapter:latest
+    environment:
+      - RWA_IO_API_KEY=${RWA_IO_API_KEY}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  nginx:
+    environment:
+      - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+      - ssl=${ssl:-false}
+    build: ./nginx
+    image: app-nginx:latest
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./nginx/ssl:/tmp/ssl:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"

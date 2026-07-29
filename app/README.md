@@ -1,0 +1,138 @@
+# Mercata
+
+The app consists of multiple parts:
+
+- backend (ExpressJS-based API server)
+- ui (Vite/React-based UI)
+- nginx
+  - The purpose of the Nginx in the app:
+    - Handle OAuth2 authentication and authorization
+      - In the future: can be moved to the backend - handle client-credentials, authorization-code flows, keep user sessions to avoid having access token in cookie, etc.
+    - Serve backend and frontend on a single domain and port
+      - In the future: can be done the other way if we want to simplify the deployment without nginx, or do serverless
+    - **Authentication Flow**: When users click "Login" or "Start Earning", they are redirected to the OAuth provider. After successful authentication, users are automatically redirected to `/dashboard` page to minimize friction and get them directly to the main app functionality.
+- services
+  - The purpose of the services directory is to store offchain functionalities that are tied to the web application.
+  - Look at the individual services read me for further details.
+
+---
+
+## DEV MODE
+
+### Prerequisites
+
+- Node.js v22.12+ (not tested with 23+) (with nvm and npm) — see [https://nodejs.org/en/download](https://nodejs.org/en/download)
+
+### Run Backend:
+
+```
+cd backend/
+npm i
+OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration \
+  OAUTH_CLIENT_ID=localhost \
+  OAUTH_CLIENT_SECRET=client-secret-here \
+  NODE_URL=https://node5.testnet.strato.nexus \
+  BASE_URL=http://localhost \
+  POOL_FACTORY=0x100a \
+  LENDING_REGISTRY=0x1007 \
+  TOKEN_FACTORY=0x100b \
+  ADMIN_REGISTRY=0x100c \
+  npm run dev
+```
+
+- `NETWORK` options are: `testnet|prod`.
+- For concentrated liquidity (PoolV3, Uniswap V3-style) endpoints, also set `POOL_V3_FACTORY=<PoolV3Factory proxy address>` (printed by the contracts deploy; endpoints that only read pools work without it, but pool creation requires it).
+
+#### PoolV3 (concentrated liquidity) API
+
+Self-contained under `/api/poolv3` (routes/controller/service/validator files named `poolV3.*`):
+
+- `GET /poolv3/pools`, `GET /poolv3/pools/pair/:a/:b`, `GET /poolv3/pools/:address` — pool listings from the `BlockApps-PoolV3` Cirrus tables
+- `GET /poolv3/quote` — server-side swap quote; simulates the contract's tick-walking loop over indexed tick data (`src/api/helpers/poolV3Math.helper.ts`, a BigInt port of the on-chain math validated against `contracts/tests/Pool/poolv3_reference.py`)
+- `GET /poolv3/positions`, `GET /poolv3/amounts-for-liquidity` — position reads and mint previews
+- `POST /poolv3/swap`, `POST|DELETE /poolv3/positions`, `POST /poolv3/positions/collect` — transactions (approve + PoolV3 call)
+
+UI: the Trade page gains a V2/V3 route toggle when a pair exists on both; V3 liquidity management is a separate page at `/dashboard/v3-liquidity` (PRO section).
+
+Smoke test after deploying the PoolV3 contracts to a dev node:
+
+1. Create a pool: `POST /api/poolv3/pools` as an admin (`{tokenA, tokenB, fee: 3000, initialSqrtPriceX96: "79228162514264337593543950336"}` = price 1.0); approve the governance vote if raised.
+2. Verify Cirrus indexing: `GET /api/poolv3/pools` returns the pool; check the tick/position child-table names in `backend/src/config/poolV3Constants.ts` match the actual Cirrus tables (`BlockApps-PoolV3-ticks` etc.) and adjust there if the node names them differently.
+3. Mint a position on `/dashboard/v3-liquidity`, then compare `GET /api/poolv3/quote` output against an executed swap on the Trade page (V3 route) — amounts must match exactly.
+4. Burn/collect the position and confirm balances return.
+
+### Run UI:
+
+```
+cd ../../ui/
+npm i
+npm run dev
+```
+
+### Run Nginx Standalone:
+
+- Make sure the port 80 is not used on your machine: `lsof -i :80` (should return empty output)
+- Then run:
+  ```
+  cd ../nginx
+  OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration \
+    OAUTH_CLIENT_ID=localhost \
+    OAUTH_CLIENT_SECRET=client-secret-here \
+    NODE_URL=https://node5.testnet.strato.nexus \
+    docker compose -f docker-compose.nginx-standalone.yml up -d --build
+  ```
+- `NODE_URL` must match the backend's `NODE_URL` — nginx proxies `/rpc` to `NODE_URL/rpc` 
+- BEWARE! Disable any VPN on your host machine. It can interfere with Docker networking and cause a hang on [http://localhost](http://localhost).
+- If `http://localhost` does not open, try a browser incognito mode (the permanent redirect 301 to https could be cached in browser for the localhost domain, after running other software).
+- In most Linux scenarios 'host.docker.internal' will work just fine and there is no need to pass an explicit `HOST_IP` parameter into Docker Compose. If there are network issues then you can drop back to a hardcoded IP address - usually `HOST_IP=172.17.0.1 \` (the gateway IP of the default Docker bridge interface), or any static local IP of your host machine. More details here: [https://github.com/blockapps/strato-platform/issues/3959#issuecomment-3051025844](https://github.com/blockapps/strato-platform/issues/3959#issuecomment-3051025844)
+- You may also need to explicitly open ports in your Linux host's firewall configuration to allow Docker to communicate with the node processes running on your host. See iptables example below.
+- Nginx also supports the live updates of the Next.js app during development, when it is deployed with `npm run dev`.
+
+iptables example for Docker network bridge port setup:
+
+```
+0     0 ACCEPT     6    --  *      *       172.17.0.0/16        0.0.0.0/0            tcp dpt:8080
+0     0 ACCEPT     17   --  *      *       172.17.0.0/16        0.0.0.0/0            udp dpt:8080
+0     0 ACCEPT     6    --  *      *       172.17.0.0/16        0.0.0.0/0            tcp dpt:3001
+0     0 ACCEPT     17   --  *      *       172.17.0.0/16        0.0.0.0/0            udp dpt:3001
+```
+
+---
+
+## PROD MODE - DOCKERIZED
+
+### Prerequisites
+
+- Docker
+  - Linux: Docker (Engine, CLI, Compose v2 plugin)
+  - Mac/Windows: Docker Desktop
+
+### Run the Full App
+
+This single command will build and start the full application (backend, frontend, nginx) in the background. With `ssl=true` the app will be served on port 443, and with `ssl=false` on port 80.
+
+```
+# in the root directory of the project:
+sudo \
+  OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/REALM-NAME-HERE/.well-known/openid-configuration \
+  OAUTH_CLIENT_ID=client-id-here \
+  OAUTH_CLIENT_SECRET=client-secret-here \
+  NODE_URL=https://node5.strato.nexus \
+  ssl=true \
+  BASE_URL=host-url-here \
+  POOL_FACTORY=0x100a \
+  LENDING_REGISTRY=0x1007 \
+  TOKEN_FACTORY=0x100b \
+  ADMIN_REGISTRY=0x100c \
+  docker compose up -d --build
+```
+
+To enable **physical metals inquiry** emails from the app UI (SendGrid), add `SENDGRID_API_KEY` to the existing environment variables above (recipient and sender addresses are fixed in the backend):
+
+```
+SENDGRID_API_KEY=SG.your-key-here \
+```
+
+Or set `SENDGRID_API_KEY` in a `.env` file next to `docker-compose.yml`. Without it, the contact entry points stay hidden (`contactEnabled` is false).
+
+For a **STRATO dockerized node** (compose generated by `strato-setup` / `strato-up`): add `SENDGRID_API_KEY=SG...` to the node directory’s `.env` file (Compose reads it automatically) or export it in the shell before starting the stack. The generated `app-backend` service must pass `${SENDGRID_API_KEY}` into the container (included in current `strato-init` compose generators); recreate the node config or re-run setup after upgrading `strato-platform` so `docker-compose.yml` picks that up.

@@ -44,7 +44,7 @@ const html = (title, content, pageId = '') => `
   </script>
   <link href="/auth/ui/css/local.css" rel="stylesheet" />
   <link href="/auth/ui/css/login.css" rel="stylesheet" />
-  <link href="/auth/ui/css/mercata.css" rel="stylesheet" />
+  <link href="/auth/ui/css/strato.css" rel="stylesheet" />
 </head>
 <body class="" data-page-id="${pageId}">
   <div class="theme-toggle-container">
