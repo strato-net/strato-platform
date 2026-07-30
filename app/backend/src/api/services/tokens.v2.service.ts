@@ -161,9 +161,13 @@ export const getTokens = async (
   };
 };
 
+// `includeHeldNonActive` is for the net balance calculation only: it widens the query to
+// every status and then keeps non-ACTIVE tokens only where the user actually holds them.
+// The default stays ACTIVE-only so the My Tokens list is unaffected.
 export const getEarningAssets = async (
   accessToken: string,
-  userAddress: string
+  userAddress: string,
+  includeHeldNonActive = false
 ): Promise<EarningAsset[]> => {
   const [tokens, collaterals, cdps, rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap, stakedStrato] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, {
@@ -174,7 +178,7 @@ export const getEarningAssets = async (
           attributes: true,
           balance: true,
         }).join(","),
-        status: "eq.2",
+        ...(includeHeldNonActive ? {} : { status: "eq.2" }),
       },
     }),
     cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
@@ -243,7 +247,12 @@ export const getEarningAssets = async (
       ...(rebaseFactor ? { rebaseFactor } : {}),
       ...(rebasingExternalSymbol ? { rebasingExternalSymbol } : {}),
     };
-  });
+  }).filter(
+    (asset: EarningAsset) =>
+      !includeHeldNonActive ||
+      String(asset.status) === "2" ||
+      BigInt(asset.totalBalance || "0") > 0n
+  );
 
   const saveUsdstAsset = saveUsdstInfo?.deployed
     ? buildSaveUsdstEarningAsset(saveUsdstInfo, saveUsdstUserInfo ?? undefined)
@@ -1046,7 +1055,8 @@ export const getNetBalance = async (
   userAddress: string
 ): Promise<{ netBalance: number; totalBorrowed: number; totalAssetValue: number }> => {
   const [earningAssetsResult, loanResult, vaultsResult, v3Result] = await Promise.allSettled([
-    getEarningAssets(accessToken, userAddress),
+    // Held PENDING/LEGACY tokens count towards the balance, matching the history graph.
+    getEarningAssets(accessToken, userAddress, true),
     getLoan(accessToken, userAddress),
     getVaults(accessToken, userAddress),
     getV3PositionsValue(accessToken, userAddress),
