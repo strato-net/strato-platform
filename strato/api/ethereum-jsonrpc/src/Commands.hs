@@ -9,6 +9,7 @@ module Commands
 where
 
 import Binary
+import CallTrace (BlockTrace(..), mkCallFrame)
 import EthBlock (EthBlock(..))
 import EthLog (eventRowToLog, matchesTopics)
 import TransactionReceipt (TransactionReceipt, EthHex(..), mkTransactionReceipt, transactionIndex)
@@ -149,7 +150,8 @@ methods =
     eth_getLogs,
     eth_getWork,
     eth_submitWork,
-    eth_submitHashrate
+    eth_submitHashrate,
+    debug_traceBlockByHash
   ]
 
 rpc_modules :: Method Server
@@ -582,6 +584,30 @@ eth_getBlockReceipts = toMethod "eth_getBlockReceipts" f (Required "block" :+: (
       case response of
         Right (tr : _) -> return $ (mkTransactionReceipt tr tx blkNum) { transactionIndex = EthHex idx }
         Right []       -> throwError $ rpcError (-32603) "receipt not found for transaction in block"
+        Left err       -> throwError $ rpcError (-32603) (formatClientError err)
+
+-- | @callTracer@-style trace of every transaction in a block. STRATO runs
+-- SolidVM (no EVM opcodes), so the geth @structLogs@ tracer is impossible; we
+-- return the same @callTracer@ frame regardless of the requested tracer. Each
+-- entry carries the transaction @input@ (calldata, including any ERC-8021
+-- suffix); @calls@ is empty (internal calls are not instrumented). The tracer
+-- options argument is accepted and ignored. Returns @null@ for unknown blocks.
+debug_traceBlockByHash :: Method Server
+debug_traceBlockByHash = toMethod "debug_traceBlockByHash" f (Required "blockHash" :+: Optional "options" Null :+: ())
+  where
+    f :: String -> Value -> RpcResult Server (Maybe [BlockTrace])
+    f blockHash _options = do
+      mBlk <- liftIO $ fetchBlockByHash blockHash
+      case mBlk of
+        Nothing  -> return Nothing
+        Just blk -> Just <$> mapM buildTrace (blockReceiptTransactions $ bPrimeToB blk)
+
+    buildTrace :: Transaction -> RpcResult Server BlockTrace
+    buildTrace tx = do
+      response <- liftIO $ runLocal $ TxResults.getTransactionResultClient (transactionHash tx)
+      case response of
+        Right (tr : _) -> return $ BlockTrace (transactionHash tx) (mkCallFrame tr tx)
+        Right []       -> throwError $ rpcError (-32603) "trace not found for transaction in block"
         Left err       -> throwError $ rpcError (-32603) (formatClientError err)
 
 eth_getUncleByBlockHashAndIndex :: Method Server
