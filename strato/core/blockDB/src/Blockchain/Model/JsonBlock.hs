@@ -85,7 +85,8 @@ instance ToJSON RawTransaction' where
         "origin" .= rawTransactionOrigin,
         "gasPrice" .= rawTransactionGasPrice,
         "value" .= rawTransactionValue,
-        "txData" .= fmap B.unpack rawTransactionTxData
+        "txData" .= fmap B.unpack rawTransactionTxData,
+        "attribution" .= fmap B.unpack rawTransactionAttribution
       ] ++ ["txVersion" .= rawTransactionTxVersion | rawTransactionTxVersion > 0]
 
 parseHexStr :: (Integral a) => Parser String -> Parser a
@@ -125,6 +126,7 @@ instance FromJSON RawTransaction' where
     val <- t .:? "value"
     td <- fmap (fmap B.pack) (t .:? "txData")
     txVer <- t .:? "txVersion" .!= (0 :: Word8)
+    attr <- fmap (fmap B.pack) (t .:? "attribution")
 
     return
       ( RawTransaction'
@@ -150,6 +152,7 @@ instance FromJSON RawTransaction' where
               val
               td
               txVer
+              attr
           )
       )
   parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"
@@ -221,6 +224,7 @@ instance FromJSON UnsignedRawTransaction' where
               Nothing
               Nothing
               0
+              Nothing
           )
       )
   parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"
@@ -237,7 +241,7 @@ rtPrimeToRt (RawTransaction' x) = x
 newtype Transaction' = Transaction' Transaction deriving (Eq, Show)
 
 instance ToJSON Transaction' where
-  toJSON (Transaction' tx@(MessageTX nonce gasLimit (Address toAddr) funcName args network cid tr ts tv txVer)) =
+  toJSON (Transaction' tx@(MessageTX nonce gasLimit (Address toAddr) funcName args network cid tr ts tv txVer attribution)) =
     object $
       [ "kind" .= ("Transaction" :: String),
         "from" .= fromMaybe (Address 0) (whoSignedThisTransaction tx),
@@ -253,7 +257,8 @@ instance ToJSON Transaction' where
         "v" .= showHex tv "",
         "hash" .= transactionHash tx,
         "transactionType" .= show (transactionSemantics tx),
-        "txVersion" .= txVer
+        "txVersion" .= txVer,
+        "attribution" .= B.unpack attribution
       ]
   toJSON (Transaction' tx@(ContractCreationTX nonce gasLimit contractName args network code cid tr ts tv txVer)) =
     object $
@@ -321,7 +326,8 @@ instance FromJSON Transaction' where
             ts <- parseHexStr (t .: "s")
             tv <- parseHexStr (t .:? "v" .!= "0")
             txVer <- t .:? "txVersion" .!= 0
-            return . Transaction' $ MessageTX nonce gasLimit toAddr funcName args network cid tr ts tv txVer
+            attribution <- fmap (maybe B.empty B.pack) (t .:? "attribution")
+            return . Transaction' $ MessageTX nonce gasLimit toAddr funcName args network cid tr ts tv txVer attribution
           Nothing -> do
             n <- t .:? "nonce" .!= 0
             gp <- t .:? "gasPrice" .!= 0

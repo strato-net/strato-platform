@@ -98,7 +98,10 @@ mkCallFrame tr tx =
         (a : _) -> Just a
         []      -> Nothing
 
+    -- For MessageTX there is no EVM calldata, so @input@ carries just the
+    -- attribution suffix (e.g. an ERC-8021 data suffix ending in the marker),
+    -- which is exactly what an attribution parser reads from the end.
     (txDest, txVal, txInput) = case tx of
       TX.EthereumTX {TX.ethTo = mTo, TX.value = v, TX.txData = d} -> (mTo, v, d)
-      TX.MessageTX {TX.to = addr} -> (Just addr, 0, B.empty)
+      TX.MessageTX {TX.to = addr, TX.attribution = attr} -> (Just addr, 0, attr)
       TX.ContractCreationTX {} -> (Nothing, 0, B.empty)

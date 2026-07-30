@@ -1111,7 +1111,8 @@ prepareUnsignedTx gasLimit TransactionHeader {..} =
         TX.r = 0,
         TX.s = 0,
         TX.v = 0,
-        TX.txVersion = 0
+        TX.txVersion = 0,
+        TX.attribution = mempty
       }
   where
     cid = EthConf.chainId $ EthConf.networkConfig ethConf
@@ -1157,6 +1158,7 @@ preparePostUnsignedRawTx time tx contractName' args =
       Nothing
       Nothing
       (TX.txVersion tx)
+      Nothing
 
 signAndPrepare ::
   (MonadIO m, MonadLogger m, HasBlocEnv m) =>
