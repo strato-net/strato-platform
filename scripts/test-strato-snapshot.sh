@@ -33,6 +33,21 @@ assert_no_appledouble() {
   fi
 }
 
+# The kafka broker container runs as its baked-in appuser (uid 1000), not the
+# host user, so the restored kafka tree must be readable and writable by any
+# uid: files o+rw, dirs o+rwx (KRaft *.checkpoint files are written 0600 on the
+# source node and older archives carry that mode).
+assert_kafka_modes_relaxed() {
+  local kafka_dir="$1"
+  local bad
+  bad="$({ find "$kafka_dir" -type f ! -perm -0006; find "$kafka_dir" -type d ! -perm -0007; })"
+  if [[ -n "$bad" ]]; then
+    echo "kafka payload entries not world-read/writable after restore:" >&2
+    echo "$bad" >&2
+    exit 1
+  fi
+}
+
 make_fixture_snapshot() {
   local staging="$TMP/staging"
   mkdir -p "$staging/payload/ethereumH/state"
@@ -45,6 +60,10 @@ make_fixture_snapshot() {
   echo "cirrus dump fixture" > "$staging/payload/postgres-dumps/cirrus.dump"
   echo "redis-from-snapshot" > "$staging/payload/redis/appendonly.aof"
   echo "kafka-from-snapshot" > "$staging/payload/kafka/log"
+  # KRaft metadata snapshots are written 0600 (Java createTempFile) on the
+  # source node; archives published before create normalized modes carry that.
+  echo "kraft-metadata-snapshot" > "$staging/payload/kafka/kafka-logs/__cluster_metadata-0/00000000000000007271-0000000001.checkpoint"
+  chmod 600 "$staging/payload/kafka/kafka-logs/__cluster_metadata-0/00000000000000007271-0000000001.checkpoint"
 
   cat > "$staging/SNAPSHOT.json" <<'JSON'
 {
@@ -142,6 +161,8 @@ assert_file "$NODE/.ethereumH/ethconf.yaml"
 assert_file "$NODE/.ethereumH/state/value"
 assert_file "$NODE/redis/appendonly.aof"
 assert_file "$NODE/kafka/log"
+assert_file "$NODE/kafka/kafka-logs/__cluster_metadata-0/00000000000000007271-0000000001.checkpoint"
+assert_kafka_modes_relaxed "$NODE/kafka"
 assert_file "$NODE/secrets/oauth_credentials.yaml"
 assert_file "$NODE/secrets/ssl/server.key"
 assert_file "$NODE/secrets/postgres_password"
@@ -203,6 +224,9 @@ JSON
 CREATED="$TMP/created.tar.gz"
 echo "appledouble" > "$NODE/.ethereumH/state/._value"
 echo "appledouble" > "$NODE/kafka/._log"
+# Re-tighten the checkpoint to how the broker leaves it on a live node, so the
+# create below has to normalize it (the restore above already relaxed it).
+chmod 600 "$NODE/kafka/kafka-logs/__cluster_metadata-0/00000000000000007271-0000000001.checkpoint"
 STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" create "$NODE" \
   --network helium \
   --output "$CREATED" \
@@ -218,6 +242,14 @@ assert_contains "$TMP/created-inspect.out" "cirrusTip: 100"
 if tar -tzf "$CREATED" | grep -E '(^|/)\._' > "$TMP/created-appledouble.out"; then
   echo "created archive should not contain AppleDouble metadata" >&2
   cat "$TMP/created-appledouble.out" >&2
+  exit 1
+fi
+# The archive itself must record relaxed kafka modes, so even a manual
+# tar -xp restore yields files the broker's appuser (uid 1000) can use on
+# hosts whose uid differs.
+if tar -tvzf "$CREATED" | grep "__cluster_metadata-0/00000000000000007271-0000000001.checkpoint" | grep -qv "^-rw-rw-rw-"; then
+  echo "created archive should carry relaxed (0666) kafka checkpoint modes" >&2
+  tar -tvzf "$CREATED" | grep "checkpoint" >&2
   exit 1
 fi
 
