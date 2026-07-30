@@ -110,12 +110,25 @@ def deployAndSync(String network, String metricNamespacePrefix) {
     // Start the node from genesis using strato-up. Uses the network's default
     // public vault and file server, so no local vault/highway deployment is
     // needed.
+    //
+    // Kafka retention is lowered from the 168h default because this node's raw
+    // kafka log dir ships inside the published snapshot (~half its size). The
+    // node syncs from genesis each run, so every message is hours old at
+    // snapshot time and time-based retention alone never prunes; the size cap
+    // (per partition) bounds the payload regardless of sync duration, and the
+    // smaller segment size lets retention actually delete closed segments
+    // (default 1GiB segments never roll on these topics). Consumers only need
+    // the unconsumed tail -- snapshot creation gates on indexers being <=5
+    // blocks behind -- so 1h/256MiB is a wide margin over real consumer lag.
     writeFile file: "run.sh", text: """#!/bin/bash
       export PATH
       strato-up mynode \\
         --network=${network} \\
         --nodeHost=\$(</host) \\
-        --sslDir='/home/ubuntu/letsencrypt-ssl'
+        --sslDir='/home/ubuntu/letsencrypt-ssl' \\
+        --kafkaLogRetentionHours=1 \\
+        --kafkaLogRetentionBytes=268435456 \\
+        --kafkaLogSegmentBytes=67108864
     """
     sh 'chmod +x run.sh'
     withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {

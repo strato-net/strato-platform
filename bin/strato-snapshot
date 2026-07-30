@@ -370,6 +370,7 @@ verify_checksum() {
     return 0
   fi
   local actual
+  info "Verifying downloaded snapshot checksum (reads the full archive; can take a few minutes on slow disks)..."
   actual="$(sha256_file "$local_file")"
   [[ "$expected" == "$actual" ]] \
     || die "checksum mismatch for $s3_uri (expected $expected, got $actual)"
@@ -416,7 +417,8 @@ fetch_source() {
       if [[ -z "$expected" ]]; then
         info "Local snapshot found but S3 has no .sha256 to compare; re-downloading: $local_file"
       else
-        info "Found local snapshot; comparing SHA-256 against S3 (${expected})..."
+        info "Found local snapshot; comparing its SHA-256 against S3 (${expected})"
+        info "(reads the full archive; can take a few minutes on slow disks)..."
         local local_sum
         local_sum="$(sha256_file "$local_file")"
         if [[ "$local_sum" == "$expected" ]]; then
@@ -1494,6 +1496,19 @@ stage_payload() {
   copy_dir_contents_without_appledouble "$node_dir/redis" "$staging/payload/redis"
   copy_dir_contents_without_appledouble "$node_dir/kafka" "$staging/payload/kafka"
 
+  # Relax modes on the staged kafka copy so the archive carries modes usable by
+  # any uid. The kafka container runs as its baked-in "appuser" (uid 1000), not
+  # the host user (see strato-setup's world-writable kafka dir treatment), while
+  # restore extracts the payload owned by whoever runs it. KRaft writes its
+  # metadata snapshots (*.checkpoint) with mode 0600 (Java createTempFile), so
+  # without this a restore on a host whose uid is not 1000 leaves files the
+  # broker cannot read -- it dies at startup with "Could not read file
+  # ...checkpoint" -- and dirs it cannot write. Restore applies the same
+  # treatment for archives published before this normalization.
+  if [[ -d "$staging/payload/kafka" ]]; then
+    chmod -R a+rwX "$staging/payload/kafka"
+  fi
+
   # Capture only the public blockchain databases (eth, cirrus) as logical dumps,
   # not the raw postgres data dir. This excludes the local-only `oauth` database
   # (node key, user keys) and avoids shipping a node-specific postgres password.
@@ -1537,6 +1552,18 @@ restore_payload() {
   move_dir_contents "$extracted/payload/ethereumH" "$node_dir/.ethereumH"
   move_dir_contents "$extracted/payload/redis" "$node_dir/redis"
   move_dir_contents "$extracted/payload/kafka" "$node_dir/kafka"
+
+  # Mirror strato-setup's kafka-dir treatment on the restored tree. The broker
+  # container runs as its baked-in "appuser" (uid 1000), not the host user; the
+  # tree extracted above is owned by whoever ran the restore, with modes
+  # preserved from the archive. On hosts whose uid is not 1000 the broker must
+  # still be able to read everything (older archives carry 0600 KRaft
+  # *.checkpoint files) and write everywhere (roll segments, rewrite
+  # checkpoints), and a non-root restore cannot chown to uid 1000 -- so relax
+  # modes instead, exactly like strato-setup does for the empty kafka dir.
+  if [[ -d "$node_dir/kafka" ]]; then
+    chmod -R a+rwX "$node_dir/kafka"
+  fi
 
   # Load only the public blockchain databases into the target node's postgres
   # cluster (initializing it with the node's own password if empty). The node
