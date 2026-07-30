@@ -200,13 +200,19 @@ synthesizeFlat spbvs =
       basicLists = foldr (\(t, p) m -> HM.alter (Just . maybe [p] (p :)) t m) HM.empty byFields
    in HM.map (foldr build $ SimpleValue $ ValueAddress 0x0) basicLists
   where
-    fieldsOnly (StoragePath (Field t : sp), bv) = pure $ case unsnoc $ rawPathPiece <$> sp of
-      Nothing -> (t NE.:| [], (Nothing, bv))
+    fieldsOnly (StoragePath (Field t : sp), bv) = case unsnoc $ rawPathPiece <$> sp of
+      Nothing -> pure (t NE.:| [], (Nothing, bv))
       Just (sp'', (isField, u)) ->
         let sp' = snd <$> sp''
          in if isField
-              then (t NE.:| sp', (Just u, bv))
-              else (t NE.:| (sp' ++ [u]), (Nothing, bv))
+              then if bv == BDefault && u == "length"
+                     then case unsnoc sp'' of
+                       Nothing -> Nothing
+                       Just (sp''', (isField', u')) -> if isField'
+                         then pure (t NE.:| (snd <$> sp'''), (Just u', bv))
+                         else pure (t NE.:| sp', (Nothing, bv))
+                     else pure (t NE.:| sp', (Just u, bv))
+              else pure (t NE.:| (sp' ++ [u]), (Nothing, bv))
     fieldsOnly _ = Nothing
     build (Nothing, BDefault) s = s
     build (Nothing, bv) _ = fromBasic bv
