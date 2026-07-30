@@ -8,7 +8,7 @@ import Blockchain.EthConf (ethConf)
 import Blockchain.EthConf.Model (apiConfig, apiPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
-import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_sslDir)
+import Blockchain.Init.Options (flags_jsonrpc, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
@@ -266,12 +266,24 @@ generateDockerCompose = do
         , logging = noLogging
         }
 
-  -- Message broker service (configured via streaming package)
+  -- Message broker service (configured via streaming package). The retention
+  -- flags are only meaningful for the Kafka backend, so they are merged in
+  -- (left-biased union) only when the broker environment is Kafka's.
+  -- The flags are used during the network snapshot creation to avoid including the old consumed logs and
+  -- keep the snapshot size smaller.
   let bc = brokerConfig
+      kafkaRetentionEnv = Map.fromList
+        [ ("KAFKA_LOG_RETENTION_HOURS", show flags_kafkaLogRetentionHours)
+        , ("KAFKA_LOG_RETENTION_BYTES", show flags_kafkaLogRetentionBytes)
+        , ("KAFKA_LOG_SEGMENT_BYTES", show flags_kafkaLogSegmentBytes)
+        ]
+      applyKafkaRetention env
+        | Map.member "KAFKA_LOG_DIRS" env = Map.union kafkaRetentionEnv env
+        | otherwise = env
       streaming = def
         { image = bcImage bc
         , user = if bcNeedsUserGid bc then Just userGid else Nothing
-        , environment = bcEnvironment bc
+        , environment = applyKafkaRetention <$> bcEnvironment bc
         , entrypoint = bcEntrypoint bc
         , command = bcCommand bc
         , restart = Just "unless-stopped"
