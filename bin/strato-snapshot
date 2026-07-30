@@ -370,6 +370,7 @@ verify_checksum() {
     return 0
   fi
   local actual
+  info "Verifying downloaded snapshot checksum (reads the full archive; can take a few minutes on slow disks)..."
   actual="$(sha256_file "$local_file")"
   [[ "$expected" == "$actual" ]] \
     || die "checksum mismatch for $s3_uri (expected $expected, got $actual)"
@@ -416,7 +417,8 @@ fetch_source() {
       if [[ -z "$expected" ]]; then
         info "Local snapshot found but S3 has no .sha256 to compare; re-downloading: $local_file"
       else
-        info "Found local snapshot; comparing SHA-256 against S3 (${expected})..."
+        info "Found local snapshot; comparing its SHA-256 against S3 (${expected})"
+        info "(reads the full archive; can take a few minutes on slow disks)..."
         local local_sum
         local_sum="$(sha256_file "$local_file")"
         if [[ "$local_sum" == "$expected" ]]; then
