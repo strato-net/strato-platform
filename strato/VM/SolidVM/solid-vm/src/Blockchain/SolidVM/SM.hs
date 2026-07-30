@@ -912,8 +912,8 @@ markDiffForAction owner key' val' = do
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
 addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
 
-addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> Maybe T.Text -> T.Text -> m ()
-addDelegatecall s c o n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o n)
+addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Keccak256 -> T.Text -> m ()
+addDelegatecall s c n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c n)
 
 -- Cirrus table namespace enforcement
 --
@@ -960,7 +960,18 @@ getUsername = do
       go (x:xs) = do
         userNameValue <- getSolidStorageKeyVal' x $ MS.StoragePath [MS.Field "username"]
         case userNameValue of
-          MS.BString userNameString -> pure $ Just $ DT.decodeUtf8 userNameString
+          MS.BString userNameString -> do
+            let usernameText = DT.decodeUtf8 userNameString
+                u = T.unpack usernameText
+                userRegistry = Address 0x720
+            ch <- A.selectWithDefault (A.Proxy @AddressState) userRegistry >>= \s ->
+              pure . keccak256ToByteString $ case addressStateCodeHash s of
+                ExternallyOwned h -> h
+                SolidVMCode _ h   -> h
+            let addr = getNewAddressWithSalt_unsafe userRegistry u ch [SString "User", SString u]
+            if addr == x
+              then pure $ Just usernameText
+              else go xs
           _ -> go xs
 
   cs <- Mod.get (Mod.Proxy @[CallInfo])

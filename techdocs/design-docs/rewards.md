@@ -4,7 +4,7 @@
 
 The Rewards system is a global incentives controller that distributes CATA token rewards to users based on their participation in various protocol activities. The system uses an Aave-style cumulative index pattern to achieve O(1) gas efficiency for all operations.
 
-**Key Implementation File:** `mercata/contracts/concrete/Rewards/Rewards.sol`
+**Key Implementation File:** `app/contracts/concrete/Rewards/Rewards.sol`
 
 ### Core Principles
 

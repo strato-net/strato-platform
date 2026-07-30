@@ -1,0 +1,520 @@
+import { useState, useMemo, useRef, useLayoutEffect } from "react";
+import { Link } from "react-router-dom";
+import { Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "../ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
+import { Token as TokenType, EarningAsset } from "@strato/shared-types";
+import { formatBalance } from "@/utils/numberUtils";
+import { useEarnContext } from "@/context/EarnContext";
+import { buildEarnApyMap } from "@/utils/earnUtils";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
+import { getEarningAssetSymbolRank } from "@/lib/tokenPriority";
+import { stratoTokenAddresses } from "@/lib/constants";
+
+const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | undefined): boolean => {
+  const symbol = asset?._symbol?.toLowerCase?.() || "";
+  const name = asset?._name?.toLowerCase?.() || "";
+  return symbol === "saveusdst" || name.includes("save usdst") || name.includes("saveusdst");
+};
+
+const CARRY_VAULT_SHARE_MAP: Record<string, string> = {
+  carryeth: "eth-carry",
+  carrywbtc: "wbtc-carry",
+  yieldusdc: "usdc-yield",
+};
+
+const getCarryVaultKey = (asset: { _symbol?: string; _name?: string } | null | undefined): string | null => {
+  const symbol = asset?._symbol?.toLowerCase?.() || "";
+  return CARRY_VAULT_SHARE_MAP[symbol] ?? null;
+};
+
+const getAssetDetailHref = (asset: { address?: string; _symbol?: string; _name?: string } | null | undefined): string => {
+  if (isSaveUsdstAsset(asset)) {
+    return "/dashboard/earn-save";
+  }
+
+  const carryKey = getCarryVaultKey(asset);
+  if (carryKey) {
+    return `/dashboard/earn-yield-vault?vault=${carryKey}`;
+  }
+
+  return `/dashboard/deposits/${asset?.address || ""}`;
+};
+
+interface AssetsProps {
+  loading: boolean;
+  tokens: EarningAsset[];
+  isDashboard?: boolean;
+  inActiveTokens: TokenType[];
+  guestMode?: boolean;
+}
+
+const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
+
+const isStratoAsset = (asset: { address?: string } | null | undefined): boolean =>
+  stratoTokenAddresses.includes(normAddr(asset?.address || ""));
+
+const AssetsList = ({
+  loading,
+  tokens,
+  inActiveTokens,
+  isDashboard = true,
+  guestMode = false,
+}: AssetsProps) => {
+  const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
+    useState(false);
+  const [showAllTokens, setShowAllTokens] = useState(false);
+  const { tokenApys, tokenApysLoaded } = useEarnContext();
+
+  const earnByAddr = useMemo(() => {
+    return buildEarnApyMap(tokenApys);
+  }, [tokenApys]);
+
+  const hasEarningAssets = tokens.length > 0;
+  const hasInactiveTokens = inActiveTokens.length > 0;
+  const shouldShowLoading = loading && !hasEarningAssets;
+  const shouldShowInactiveLoading = loading && !hasInactiveTokens;
+
+  const hasBalance = (asset: EarningAsset) =>
+    !!asset?.totalBalance && asset.totalBalance !== "0";
+
+  const sortedTokens = useMemo(() => {
+    return [...tokens].sort((a, b) => {
+      // STRATO is always pinned to the top, held or not
+      const stratoDiff = (isStratoAsset(b) ? 1 : 0) - (isStratoAsset(a) ? 1 : 0);
+      if (stratoDiff !== 0) return stratoDiff;
+
+      // Tokens the user holds a balance in come first
+      const balanceDiff = (hasBalance(b) ? 1 : 0) - (hasBalance(a) ? 1 : 0);
+      if (balanceDiff !== 0) return balanceDiff;
+
+      // Held tokens: sort by value (descending)
+      if (hasBalance(a) && hasBalance(b)) {
+        return parseFloat(b.value || "0") - parseFloat(a.value || "0");
+      }
+
+      // Non-held tokens: sort by canonical symbol order, then alphabetically
+      const rankA = getEarningAssetSymbolRank(a._symbol);
+      const rankB = getEarningAssetSymbolRank(b._symbol);
+      if (rankA !== rankB) return rankA - rankB;
+      return (a._symbol || "").localeCompare(b._symbol || "");
+    });
+  }, [tokens]);
+
+  // Collapsed view shows at least 10 tokens, or all held tokens if the user
+  // has balances in more than 10. A "Show More" button reveals the rest.
+  const collapsedCount = useMemo(() => {
+    const balanceCount = sortedTokens.filter(hasBalance).length;
+    return Math.max(10, balanceCount);
+  }, [sortedTokens]);
+
+  const visibleTokens = showAllTokens
+    ? sortedTokens
+    : sortedTokens.slice(0, collapsedCount);
+  const hiddenCount = sortedTokens.length - collapsedCount;
+
+  // Refs used to keep the toggle button's viewport position stable when
+  // expanding, so the newly revealed tokens appear right where the button was.
+  const toggleWrapRef = useRef<HTMLDivElement>(null);
+  const firstRevealedRowRef = useRef<HTMLTableRowElement>(null);
+  const anchorTopRef = useRef<number | null>(null);
+  const didToggleRef = useRef(false);
+
+  const handleToggleTokens = () => {
+    didToggleRef.current = true;
+    if (!showAllTokens) {
+      anchorTopRef.current = toggleWrapRef.current?.getBoundingClientRect().top ?? null;
+    }
+    setShowAllTokens((prev) => !prev);
+  };
+
+  useLayoutEffect(() => {
+    if (!didToggleRef.current) return;
+    if (showAllTokens) {
+      if (anchorTopRef.current != null && firstRevealedRowRef.current) {
+        const newTop = firstRevealedRowRef.current.getBoundingClientRect().top;
+        window.scrollBy({ top: newTop - anchorTopRef.current });
+      }
+      anchorTopRef.current = null;
+    } else {
+      toggleWrapRef.current?.scrollIntoView({ block: "nearest" });
+    }
+  }, [showAllTokens]);
+
+  return (
+    <div className={`w-full overflow-hidden ${isDashboard ? 'bg-card rounded-xl border border-border shadow-sm' : ''}`}>
+      {isDashboard && (
+        <div className="p-4 md:p-5">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <h2 className="font-bold text-lg">My Tokens</h2>
+            {/* Mobile: full width button */}
+            <Button
+              className="w-full sm:hidden flex items-center justify-center gap-2"
+              onClick={() => window.location.href = "/dashboard/deposits"}
+            >
+              <Plus size={16} />
+              Fund
+            </Button>
+            {/* Desktop: small button */}
+            <Button
+              size="sm"
+              className="hidden sm:flex items-center gap-2"
+              onClick={() => window.location.href = "/dashboard/deposits"}
+            >
+              <Plus size={16} />
+              Fund
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <div>
+        {!isDashboard && (
+          <div className="p-4 text-right border-b border-border flex justify-between">
+            <span className="font-bold inline-flex items-center gap-1">
+              Earning Assets
+            </span>
+          </div>
+        )}
+        {isDashboard && (
+          <div className="p-3 md:p-4 text-right flex justify-between">
+            <span className="font-bold text-sm md:text-base inline-flex items-center gap-1">
+              Earning Assets
+            </span>
+          </div>
+        )}
+        <div className={`w-full ${isDashboard ? 'overflow-x-auto md:overflow-visible px-3 md:px-0' : 'overflow-x-auto'}`}>
+          <table className="w-full table-fixed min-w-[480px] md:min-w-0">
+            <thead>
+              <tr className="bg-muted/50">
+                <th className="w-[45%] md:w-[22%] text-left text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                  Asset
+                </th>
+                <th className="hidden md:table-cell w-[14%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                  <span className="inline-flex items-center gap-1 justify-end w-full">
+                    Best Available APY
+                    <BestApyInfoTooltip />
+                  </span>
+                </th>
+                <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                  Price
+                </th>
+                <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                  Available
+                </th>
+                <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                  Collateral
+                </th>
+                <th className="hidden md:table-cell w-[11%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                  Staked
+                </th>
+                <th className="w-[27%] md:w-[10%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                  Value
+                </th>
+                <th className="w-[28%] md:w-[10%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                  Balance
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {shouldShowLoading ? (
+                <tr className="hover:bg-muted/50 transition-colors">
+                  <td
+                    colSpan={8}
+                    className="py-4 px-4 whitespace-nowrap w-full"
+                  >
+                    <div className="w-full flex justify-center items-center h-16">
+                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                    </div>
+                  </td>
+                </tr>
+              ) : visibleTokens.length > 0 ? (
+                visibleTokens.map(
+                  (asset, index) => (
+                    <tr
+                      key={index}
+                      ref={index === collapsedCount ? firstRevealedRowRef : undefined}
+                      className="hover:bg-muted/50 transition-colors"
+                    >
+                      <td className="py-3 md:py-4 px-3 md:px-4">
+                        <div className="flex items-center">
+                          {asset?.images?.[0] ? (
+                            <img
+                              src={asset.images[0].value}
+                              alt={asset._name}
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover shrink-0"
+                            />
+                          ) : (
+                            <div
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs text-white font-medium shrink-0"
+                              style={{ backgroundColor: "red" }}
+                            >
+                              {asset?._symbol?.slice(0, 2) || "??"}
+                            </div>
+                          )}
+                          <div className="ml-2 md:ml-3 min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Link
+                                      to={getAssetDetailHref(asset)}
+                                      className="font-medium text-sm md:text-base text-blue-600 truncate hover:text-blue-800 underline transition-colors"
+                                    >
+                                      {asset?._symbol || asset?._name || ""}
+                                    </Link>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{asset?._name || ""}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              {isStratoAsset(asset) && (
+                                <Button asChild size="sm" className="shrink-0 h-7 px-2.5 text-xs">
+                                  <Link to="/dashboard/earn-staking">Stake</Link>
+                                </Button>
+                              )}
+                            </div>
+                            <p className="hidden md:block text-muted-foreground text-xs truncate">
+                              {asset?._name || ""}
+                            </p>
+                            <div className="mt-1 flex items-center gap-1.5 text-[11px] leading-tight text-muted-foreground md:hidden">
+                              <span className="shrink-0">APY</span>
+                              {(() => {
+                                const info = tokenApysLoaded ? earnByAddr.get(normAddr(asset?.address || "")) : undefined;
+                                if (!info) return <span className="min-w-0">-</span>;
+                                return (
+                                  <EarnApyTooltip info={info} side="bottom" align="start">
+                                    <span className="min-w-0 font-medium text-foreground cursor-default">
+                                      {info.total.toFixed(2)}%
+                                    </span>
+                                  </EarnApyTooltip>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
+                        {(() => {
+                          const info = tokenApysLoaded ? earnByAddr.get(normAddr(asset?.address || "")) : undefined;
+                          if (!info) return <p className="text-sm text-muted-foreground">-</p>;
+                          return (
+                            <EarnApyTooltip info={info} side="left" align="end">
+                              <span className="text-sm font-medium text-foreground cursor-default">{info.total.toFixed(2)}%</span>
+                            </EarnApyTooltip>
+                          );
+                        })()}
+                      </td>
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
+                        <p className="font-medium text-foreground">
+                          {!asset?.price || asset.price === "0"
+                            ? "-"
+                            : formatBalance(asset.price, undefined, 18, 2, 2, true)}
+                        </p>
+                      </td>
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
+                        <p className="font-medium text-foreground">
+                          {guestMode || !asset?.balance || asset.balance === "0"
+                            ? "-"
+                            : formatBalance(asset.balance, undefined, 18, 1, 2)}
+                        </p>
+                      </td>
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
+                        <p className="font-medium text-foreground">
+                          {guestMode || !asset?.collateralBalance || asset.collateralBalance === "0"
+                            ? "-"
+                            : formatBalance(asset.collateralBalance, undefined, 18, 1, 4)}
+                        </p>
+                      </td>
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
+                        <p className="font-medium text-foreground">
+                          {guestMode || !asset?.stakedBalance || asset.stakedBalance === "0"
+                            ? "-"
+                            : formatBalance(asset.stakedBalance, undefined, 18, 1, 4)}
+                        </p>
+                      </td>
+                      <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
+                        <p className="font-medium text-sm md:text-base text-foreground">
+                          {guestMode || !asset?.value || asset.value === "0.00" || parseFloat(asset.value) === 0
+                            ? "-"
+                            : `$${asset.value}`}
+                        </p>
+                      </td>
+                      <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
+                        {guestMode || !asset?.totalBalance || asset.totalBalance === "0" ? (
+                          <p className="font-medium text-sm md:text-base text-foreground">-</p>
+                        ) : (
+                          <div>
+                            <p className="font-medium text-sm md:text-base text-foreground">
+                              {formatBalance(asset.totalBalance, undefined, 18, 1, 4)}
+                            </p>
+                            {asset.rebaseFactor && asset.rebasingExternalSymbol && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                ≈ {formatBalance(
+                                  (BigInt(asset.totalBalance) * BigInt(asset.rebaseFactor) / (10n ** 18n)).toString(),
+                                  undefined, 18, 1, 4
+                                )} {asset.rebasingExternalSymbol}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                )
+              ) : (
+                <tr className="hover:bg-muted/50 transition-colors">
+                  <td
+                    colSpan={8}
+                    className="py-4 px-4 whitespace-nowrap w-full"
+                  >
+                    <div className="w-full flex justify-center items-center h-16">
+                      <div>No data to show</div>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {!shouldShowLoading && hiddenCount > 0 && (
+          <div ref={toggleWrapRef} className="flex justify-center py-3 border-t border-border">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground gap-1"
+              onClick={handleToggleTokens}
+            >
+              {showAllTokens ? (
+                <>
+                  Show Less
+                  <ChevronUp size={16} />
+                </>
+              ) : (
+                <>
+                  Show More ({hiddenCount})
+                  <ChevronDown size={16} />
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {isDashboard && !guestMode && (
+        <div>
+          <div className="mx-3 md:mx-0 border-t border-border"></div>
+          <div className="p-3 md:p-4 text-right flex justify-between items-center">
+            <span className="font-bold text-sm md:text-base">Non-earning Assets</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowNonEarningAssetsTable((prev) => !prev)}
+              className="h-8 w-8 p-0"
+            >
+              {showNonEarningAssetsTable ? (
+                <ChevronUp size={18} />
+              ) : (
+                <ChevronDown size={18} />
+              )}
+            </Button>
+          </div>
+          <div
+            className={`transition-all duration-300 ease-in-out overflow-hidden ${showNonEarningAssetsTable
+              ? "max-h-[400px] opacity-100"
+              : "max-h-0 opacity-0"
+              }`}
+          >
+            <div className="overflow-y-auto max-h-[400px] px-3 md:px-0">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-muted/50">
+                    <th className="text-left text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                      Asset
+                    </th>
+                    <th className="text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
+                      Balance
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {shouldShowInactiveLoading ? (
+                    <tr className="hover:bg-muted/50 transition-colors">
+                      <td
+                        colSpan={2}
+                        className="py-4 px-4 whitespace-nowrap w-full"
+                      >
+                        <div className="w-full flex justify-center items-center h-16">
+                          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : inActiveTokens.length > 0 ? (
+                    inActiveTokens.map((asset, index) => (
+                      <tr
+                        key={index}
+                        className="hover:bg-muted/50 transition-colors"
+                      >
+                        <td className="py-3 md:py-4 px-3 md:px-4">
+                          <div className="flex items-center">
+                            {asset?.images?.[0] ? (
+                              <img
+                                src={asset.images[0].value}
+                                alt={asset._name}
+                                className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div
+                                className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                                style={{ backgroundColor: "red" }}
+                              >
+                                {asset?._symbol?.slice(0, 2) || "??"}
+                              </div>
+                            )}
+                            <div className="ml-2 md:ml-3 min-w-0 flex-1">
+                              <Link
+                                to={getAssetDetailHref(asset)}
+                                className="font-medium text-sm md:text-base text-blue-600 hover:text-blue-800 underline transition-colors block truncate"
+                              >
+                                {asset?._symbol || asset?._name || ""}
+                              </Link>
+                              <p className="text-muted-foreground text-xs truncate">
+                                {asset?._symbol || ""}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
+                          <p className="font-medium text-sm md:text-base text-foreground">
+                            {!asset?.balance || asset.balance === "0"
+                              ? "-"
+                              : formatBalance(asset.balance, undefined, 18, 1, 2)}
+                          </p>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr className="hover:bg-muted/50 transition-colors">
+                      <td
+                        colSpan={2}
+                        className="py-4 px-4 whitespace-nowrap w-full"
+                      >
+                        <div className="w-full flex justify-center items-center h-16">
+                          <div>No data to show</div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AssetsList;

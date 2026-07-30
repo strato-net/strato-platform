@@ -107,14 +107,14 @@ cd <strato-platform>
 git checkout <approved-branch>
 git pull
 git rev-parse --short HEAD
-grep -R "parseNativeBridgeAssets\|isMappingTrue(raw.enabled)" -n mercata/backend/src
+grep -R "parseNativeBridgeAssets\|isMappingTrue(raw.enabled)" -n app/backend/src
 ```
 
 The application code can be built earlier, but do not activate the app containers for native mainnet routes until the STRATO and Ethereum contract addresses are finalized and runtime env is set. Mainnet native routes require production `STRATO_NATIVE_BRIDGE`, `STRATO_NATIVE_CUSTODY_VAULT`, and bridge-service Ethereum env values.
 
 ## 3. STRATO Mainnet Contracts
 
-Run from `mercata/contracts`.
+Run from `app/contracts`.
 
 The STRATO deployer may be a funded operational account, but it must not be the final authority. The upgrade commands below set `initialOwner` to `<ADMIN_REGISTRY_WITHOUT_0X>`, so owner-only native bridge and custody vault administration belongs to STRATO governance/admin after deployment.
 
@@ -187,7 +187,7 @@ args:
 
 ## 4. Ethereum Mainnet Contracts
 
-Run from `mercata/ethereum`.
+Run from `app/ethereum`.
 
 The Ethereum deployer may be any approved funded EOA. It should only submit deployment transactions. The initializer params below assign `DEFAULT_ADMIN_ROLE` to `<ETHEREUM_ADMIN_SAFE>`, not to the deployer. Do not continue to production activation if the deployer retains unexpected admin roles after deployment.
 
@@ -363,7 +363,7 @@ If `ATTESTATION_THRESHOLD` is greater than `1`, add one `setAttestationSigner(<s
 
 Complete this section if the STRATO-side token was originally deployed as CATA and must appear as STRATO before mainnet bridge/auction activation.
 
-Run from `mercata/contracts`.
+Run from `app/contracts`.
 
 Step 1: upgrade the CATA token proxy to the implementation that supports the rename function:
 
@@ -396,7 +396,7 @@ Token.symbol() == STRATO
 
 ## 7. Configure STRATO Native Route
 
-Run from `mercata/contracts` after Ethereum mainnet token and bridge proxies exist:
+Run from `app/contracts` after Ethereum mainnet token and bridge proxies exist:
 
 ```bash
 npm run configure:native-route -- \
@@ -436,7 +436,7 @@ CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY_1=<second-native-mint-signer-key>
 CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY_2=<third-native-mint-signer-key>
 ```
 
-Mercata backend mainnet addresses should be added to `mercata/backend/src/config/config.ts` before building the backend image. Update the Upquark entries after the production proxies are final:
+STRATO App mainnet addresses should be added to `app/backend/src/config/config.ts` before building the backend image. Update the Upquark entries after the production proxies are final:
 
 ```ts
 export const defaultStratoNativeBridgeFor: Record<string, string> = {
@@ -475,9 +475,9 @@ make app
 Use the final `strato-patch-app ...` command printed by `make app`, then recreate app containers:
 
 ```bash
-strato-patch-app <node-dir> <mercata-backend-image> <mercata-ui-image>
+strato-patch-app <node-dir> <app-backend-image> <app-ui-image>
 cd <node-dir>
-docker compose -p strato up -d --no-deps mercata-backend mercata-ui
+docker compose -p strato up -d --no-deps app-backend app-ui
 ```
 
 Restart the bridge service after native bridge-service env is set:
@@ -489,7 +489,7 @@ docker compose -p strato up -d --no-deps bridge
 Verify the running backend has native route code:
 
 ```bash
-docker exec <mercata-backend-container> sh -lc 'grep -R "parseNativeBridgeAssets\|isMappingTrue(raw.enabled)" -n dist src 2>/dev/null | head -20'
+docker exec <app-backend-container> sh -lc 'grep -R "parseNativeBridgeAssets\|isMappingTrue(raw.enabled)" -n dist src 2>/dev/null | head -20'
 ```
 
 ## 10. Verification
@@ -529,7 +529,7 @@ StratoNativeBridge.assets(<STRATO_NATIVE_TOKEN>, 1).representationToken == <ETHE
 Backend/API checks:
 
 ```bash
-curl -s "<MERCATA_BACKEND_URL>/api/v1/bridge/bridgeableTokens/1" | jq '.data // . | map(select(.routeType=="native"))'
+curl -s "<STRATO_APP_BACKEND_URL>/api/v1/bridge/bridgeableTokens/1" | jq '.data // . | map(select(.routeType=="native"))'
 ```
 
 Start with a small production bridge-out amount before moving auction inventory:
@@ -704,7 +704,7 @@ If backend does not show the native route:
 1. Confirm StratoNativeBridge route exists in Cirrus for externalChainId=1.
 2. Confirm backend env STRATO_NATIVE_BRIDGE and STRATO_NATIVE_CUSTODY_VAULT.
 3. Confirm running backend image contains parseNativeBridgeAssets and isMappingTrue(raw.enabled).
-4. Restart mercata-backend.
+4. Restart app-backend.
 ```
 
 If a native withdrawal is stuck in `INITIATED`:

@@ -19,7 +19,7 @@ module.exports = {
   nodeStatus: async function (req, res, next) {
     try {
       //get node's block number, best block hash, best block parent hash
-      const [lastBlock, bestBlockNumber, activePeersCount] = await Promise.all([
+      const [lastBlock, bestBlockNumber, activePeerCount] = await Promise.all([
         BlockDataRef.findOne({
           where: {
             pow_verified: true,
@@ -113,7 +113,7 @@ module.exports = {
         version: process.env.STRATO_VERSION,
         timestamp: new Date().toISOString(),
         nodeAddress,
-        activePeersCount,
+        activePeerCount,
         lastBlock: {
           number: bestBlockNumber !== null ? bestBlockNumber : lastBlock.number,
           hash: lastBlock.hash,
@@ -138,7 +138,7 @@ module.exports = {
         bestBlockNumber,
         pbftData,
         nodeAddress,
-        activePeersCount,
+        activePeerCount,
       ] = await Promise.all([
         utils.getLatestHealth(),
         BlockDataRef.findOne({
@@ -190,7 +190,7 @@ module.exports = {
         version: process.env.STRATO_VERSION,
         timestamp: new Date().toISOString(),
         nodeAddress,
-        activePeersCount,
+        activePeerCount,
         lastBlock: {
           number: bestBlockNumber !== null ? bestBlockNumber : lastBlock.number,
           hash: lastBlock.hash,
