@@ -29,6 +29,7 @@ library
   ghc-options: -Wall -Werror -fsimpl-tick-factor=15000
   build-depends:
       base
+    , base16-bytestring
     , bimap
     , bloc2api
     , blockDB

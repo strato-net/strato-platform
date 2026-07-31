@@ -278,7 +278,7 @@ instance ToJSON Transaction' where
         "transactionType" .= show (transactionSemantics tx),
         "txVersion" .= txVer
       ]
-  toJSON (Transaction' tx@(EthereumTX n gp gl eto val _ cid tr ts tv)) =
+  toJSON (Transaction' tx@(EthereumTX n gp gl eto val d cid tr ts tv)) =
     object $
       [ "kind" .= ("Transaction" :: String),
         "from" .= fromMaybe (Address 0) (whoSignedThisTransaction tx),
@@ -287,6 +287,7 @@ instance ToJSON Transaction' where
         "gasLimit" .= gl,
         "to" .= eto,
         "value" .= val,
+        "txData" .= B.unpack d,
         "r" .= showHex tr "",
         "s" .= showHex ts "",
         "v" .= showHex (toEthV tv cid) "",
@@ -337,7 +338,8 @@ instance FromJSON Transaction' where
             rawV <- parseHexStr (t .:? "v" .!= "0")
             tr <- parseHexStr (t .: "r")
             ts <- parseHexStr (t .: "s")
-            return . Transaction' $ EthereumTX n gp gl eto val B.empty
+            txData <- fmap (maybe B.empty B.pack) (t .:? "txData")
+            return . Transaction' $ EthereumTX n gp gl eto val txData
               (ethVToChainId rawV) tr ts (ethVToRecoveryId rawV)
   parseJSON _ = fail "expected a Transaction object with 'init' (contract deploy), 'funcName' (SolidVM call), or neither (Ethereum transaction)"
 
