@@ -10,6 +10,8 @@ import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
 import { readAttribution, clearAttribution } from "@/lib/attribution";
 import { trackWalletConnected } from "@/lib/tracking";
 import { ensureStratoChainInWallet } from "@/lib/stratoChain";
+import { clearExternalWalletActive } from "@/lib/stratoWallet";
+import { ensureHexPrefix } from "@/utils/numberUtils";
 
 interface UserContextType {
   userAddress: string | null;
@@ -281,10 +283,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const externalEvmWalletAddress = !isStratoConnector(account.connector) ? externalWalletAddress : null;
   const isExternalEvmWalletConnected = !!externalEvmWalletAddress;
   const shouldUseExternalWallet = !sessionExpiryLogoutStartedRef.current && !loading && !isLoggedIn && isExternalWalletConnected;
-  // Uniform address source: the connected wagmi account (both the STRATO/vault
-  // connector and external EVM wallets publish their address there), falling back
-  // to the vault-derived address only for the brief window before wagmi hydrates.
-  const userAddress = externalWalletAddress ?? stratoAddress;
+  // The vault identity wins whenever a vault session exists: the backend suppresses the
+  // X-Wallet-Address header and resolves data for the vault address, so the UI must not
+  // display or filter by an external wallet connected on the Fund page. Guests fall back
+  // to the wagmi account. The vault address arrives without a 0x prefix, unlike wagmi's.
+  const stratoAddressHex = ensureHexPrefix(stratoAddress) ?? null;
+  const userAddress = isLoggedIn ? stratoAddressHex : externalWalletAddress ?? stratoAddressHex;
   const effectiveLoggedIn = isLoggedIn || shouldUseExternalWallet;
 
   useEffect(() => {
@@ -329,6 +333,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
         const d = unsignedTx.data;
         return walletClient.signTypedData({
+          account: walletClient.account,
           domain: {
             name: "STRATO",
             version: "1",
@@ -366,6 +371,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const handleLogout = useCallback(() => {
+    // Mark the logout before any state clears, so the render between setUserName(null) and
+    // wagmi's async disconnect does not treat the still-connected wallet as a guest login.
+    sessionExpiryLogoutStartedRef.current = true;
+    // Without this the flag outlives the session and blocks STRATO auto-reconnect on the
+    // next login in this browser.
+    clearExternalWalletActive();
     try {
       disconnect();
     } catch {
