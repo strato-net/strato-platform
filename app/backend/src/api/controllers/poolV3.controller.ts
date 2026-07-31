@@ -3,12 +3,9 @@ import RestStatus from "http-status-codes";
 import {
   getPools,
   getPoolByAddress,
-  getPoolsByPair,
-  getQuote,
   getPositions,
   getAmountsForLiquidity,
   getLiquidityDistribution,
-  swap,
   mint,
   burn,
   collect,
@@ -16,10 +13,7 @@ import {
 } from "../services/poolV3.service";
 import {
   validatePoolV3AddressArgs,
-  validatePoolV3PairArgs,
-  validatePoolV3QuoteArgs,
   validatePoolV3AmountsArgs,
-  validatePoolV3SwapArgs,
   validatePoolV3MintArgs,
   validatePoolV3BurnArgs,
   validatePoolV3CollectArgs,
@@ -33,17 +27,6 @@ class PoolV3Controller {
     try {
       const { accessToken } = req;
       const pools = await getPools(accessToken);
-      res.status(RestStatus.OK).json(pools);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async getByPair(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { accessToken, params } = req;
-      validatePoolV3PairArgs(params);
-      const pools = await getPoolsByPair(accessToken, params.tokenAddress1, params.tokenAddress2);
       res.status(RestStatus.OK).json(pools);
     } catch (error) {
       next(error);
@@ -69,22 +52,6 @@ class PoolV3Controller {
       const distribution = await getLiquidityDistribution(accessToken, params.poolAddress);
       if (!distribution) throw new Error("PoolV3 not found");
       res.status(RestStatus.OK).json(distribution);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async quote(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { accessToken, query } = req;
-      validatePoolV3QuoteArgs(query);
-      const quote = await getQuote(
-        accessToken,
-        query.poolAddress as string,
-        query.zeroForOne === "true",
-        BigInt(query.amountSpecified as string)
-      );
-      res.status(RestStatus.OK).json(quote);
     } catch (error) {
       next(error);
     }
@@ -133,17 +100,6 @@ class PoolV3Controller {
   }
 
   // ----- writes -----
-
-  static async swap(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { accessToken, body, address: userAddress } = req;
-      validatePoolV3SwapArgs(body);
-      const result = await swap(accessToken, body, userAddress);
-      res.status(RestStatus.OK).json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
 
   static async mint(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

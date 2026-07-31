@@ -1,4 +1,4 @@
-import { Pool, PoolCoin } from "@/interface";
+import { Pool } from "@/interface";
 import { safeParseUnits } from "@/utils/numberUtils";
 
 const BPS_DENOMINATOR = 10000n;
@@ -21,82 +21,6 @@ const sqrtBigInt = (value: bigint): bigint => {
  */
 export const isMultiTokenPool = (pool: Pool): boolean => {
   return !!(pool.coins && pool.coins.length > 2);
-};
-
-/**
- * Get the oracle-based exchange rate between two tokens in a multi-token pool.
- * Returns the rate as a string (how much tokenOut you get per 1 tokenIn).
- */
-export const getMultiTokenExchangeRate = (
-  pool: Pool,
-  fromAddress: string,
-  toAddress: string
-): string => {
-  if (!pool.coins) return "0";
-  const fromCoin = pool.coins.find(c => c.address === fromAddress);
-  const toCoin = pool.coins.find(c => c.address === toAddress);
-  if (!fromCoin || !toCoin) return "0";
-
-  const fromPrice = parseFloat(fromCoin.price || "0");
-  const toPrice = parseFloat(toCoin.price || "0");
-  if (toPrice === 0) return "0";
-
-  return (fromPrice / toPrice).toString();
-};
-
-/**
- * Calculate swap output amount for a multi-token stable pool using oracle prices.
- * This is an estimation; the actual amount is determined by the contract's StableSwap formula.
- */
-export const calculateMultiTokenSwapOutput = (
-  inputAmount: string,
-  pool: Pool,
-  fromAddress: string,
-  toAddress: string
-): string => {
-  if (!inputAmount || inputAmount === "0" || !pool?.coins) return "0";
-
-  const inputAmountBigInt = BigInt(inputAmount);
-  if (inputAmountBigInt <= 0n) return "0";
-
-  // Calculate fee
-  const fee = (inputAmountBigInt * BigInt(pool.swapFeeRate)) / BigInt(10000);
-  const netInput = inputAmountBigInt - fee;
-
-  const rate = getMultiTokenExchangeRate(pool, fromAddress, toAddress);
-  const rateBigInt = BigInt(Math.round(parseFloat(rate) * 1e18));
-  if (rateBigInt === 0n) return "0";
-
-  return ((netInput * rateBigInt) / BigInt(1e18)).toString();
-};
-
-/**
- * Calculate required input amount for a multi-token stable pool (reverse calculation).
- */
-export const calculateMultiTokenSwapInput = (
-  outputAmount: string,
-  pool: Pool,
-  fromAddress: string,
-  toAddress: string
-): string => {
-  if (!outputAmount || outputAmount === "0" || !pool?.coins) return "0";
-
-  const outputAmountBigInt = BigInt(outputAmount);
-  if (outputAmountBigInt <= 0n) return "0";
-
-  const rate = getMultiTokenExchangeRate(pool, fromAddress, toAddress);
-  const rateBigInt = BigInt(Math.round(parseFloat(rate) * 1e18));
-  if (rateBigInt === 0n) return "0";
-
-  // requiredInput = outputAmount / rate
-  const requiredInput = (outputAmountBigInt * BigInt(1e18) + rateBigInt - 1n) / rateBigInt;
-
-  // Add fee back: grossInput = requiredInput / (1 - feeRate/10000)
-  const feeRate = BigInt(pool.swapFeeRate);
-  const denominatorForFee = BigInt(10000) - feeRate;
-  const grossInput = (requiredInput * BigInt(10000) + denominatorForFee - 1n) / denominatorForFee;
-
-  return grossInput.toString();
 };
 
 /**
@@ -251,24 +175,6 @@ export const calculateSwapInput = (
   const grossInput = (requiredInput * BigInt(10000) + denominatorForFee - 1n) / denominatorForFee;
 
   return grossInput.toString();
-};
-
-/**
- * Check if pool has sufficient liquidity for a swap
- */
-export const hasSufficientLiquidity = (
-  amount: string,
-  pool: Pool,
-  isAToB: boolean
-): boolean => {
-  if (!amount || amount === "0" || !pool) return false;
-
-  const amountBigInt = BigInt(amount);
-  const [inputReserve, outputReserve] = isAToB
-    ? [BigInt(pool.tokenA.poolBalance || "0"), BigInt(pool.tokenB.poolBalance || "0")]
-    : [BigInt(pool.tokenB.poolBalance || "0"), BigInt(pool.tokenA.poolBalance || "0")];
-
-  return inputReserve > 0n && outputReserve > 0n && amountBigInt <= inputReserve;
 };
 
 /**

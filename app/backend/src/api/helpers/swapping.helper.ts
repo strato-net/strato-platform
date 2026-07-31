@@ -768,6 +768,8 @@ export interface MultiTokenStablePool {
   fee: string;
   coins: { coinIndex: number; tokenAddress: string }[];
   tokenBalances: Map<string, string>;
+  isPaused: boolean;
+  isDisabled: boolean;
 }
 
 const STABLE_FEE_TO_BPS = 1e6; // StablePool.fee (1e10 scale) / 1e6 = bps (10000 scale)
@@ -826,7 +828,7 @@ export const fetchMultiTokenStablePools = async (
   const { data: stablePools } = await cirrus.get(accessToken, "/BlockApps-StablePool", {
     params: {
       initialA: "gt.0",
-      select: "address,lpToken,fee::text,BlockApps-StablePool-coins(key,value),BlockApps-StablePool-tokenBalances(key,value::text)",
+      select: "address,lpToken,fee::text,isPaused,isDisabled,BlockApps-StablePool-coins(key,value),BlockApps-StablePool-tokenBalances(key,value::text)",
     }
   });
 
@@ -845,7 +847,15 @@ export const fetchMultiTokenStablePools = async (
       tokenBalances.set(b.key, b.value);
     }
 
-    results.push({ address: pool.address, lpToken: pool.lpToken, fee: pool.fee || "0", coins, tokenBalances });
+    results.push({
+      address: pool.address,
+      lpToken: pool.lpToken,
+      fee: pool.fee || "0",
+      coins,
+      tokenBalances,
+      isPaused: pool.isPaused ?? false,
+      isDisabled: pool.isDisabled ?? false,
+    });
   }
 
   return results;
