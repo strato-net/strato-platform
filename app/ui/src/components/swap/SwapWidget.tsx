@@ -274,6 +274,7 @@ const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
           inputAmount={inputAmount}
           swapTokenInAddress={tokenIn?.address}
           actionLabel="Trade"
+          hideWhenZero
         />
       )}
 
