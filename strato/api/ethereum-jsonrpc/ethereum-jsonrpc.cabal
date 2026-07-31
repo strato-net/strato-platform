@@ -15,6 +15,7 @@ executable ethereum-jsonrpc
   main-is: Main.hs
   other-modules:
       Binary
+      CallTrace
       Commands
       EthBlock
       EthLog

@@ -9,9 +9,10 @@ module Commands
 where
 
 import Binary
+import CallTrace (BlockTrace(..), mkCallFrame)
 import EthBlock (EthBlock(..))
 import EthLog (eventRowToLog, matchesTopics)
-import TransactionReceipt (TransactionReceipt, mkTransactionReceipt)
+import TransactionReceipt (TransactionReceipt, EthHex(..), mkTransactionReceipt, transactionIndex)
 import Strato.Version (stratoVersion)
 import Blockchain.CommunicationConduit (ethVersion)
 import Blockchain.EthConf (runStreamMConfigured, ethConf)
@@ -29,7 +30,7 @@ import Blockchain.Sequencer.Kafka (writeSeqVmTasks)
 import Blockchain.Strato.Model.Address (Address(..), addressToHex)
 import Blockchain.Strato.Model.Keccak256 (Keccak256, hash, keccak256FromHex, keccak256ToByteString, keccak256ToHex)
 import Text.Format (format)
-import Control.Monad (void, when)
+import Control.Monad (void, when, zipWithM)
 import Control.Monad.IO.Class
 import Control.Monad.Composable.Streaming (consumeFromLatest)
 import Control.Monad.Except
@@ -133,6 +134,7 @@ methods =
     eth_getTransactionByBlockHashAndIndex,
     eth_getTransactionByBlockNumberAndIndex,
     eth_getTransactionReceipt,
+    eth_getBlockReceipts,
     eth_getUncleByBlockHashAndIndex,
     eth_getUncleByBlockNumberAndIndex,
     eth_getCompilers,
@@ -148,7 +150,8 @@ methods =
     eth_getLogs,
     eth_getWork,
     eth_submitWork,
-    eth_submitHashrate
+    eth_submitHashrate,
+    debug_traceBlockByHash
   ]
 
 rpc_modules :: Method Server
@@ -548,6 +551,64 @@ eth_getTransactionReceipt = toMethod "eth_getTransactionReceipt" f (Required "tx
       case find (\t -> transactionHash t == transactionResultTransactionHash tr) txs of
         Just tx -> return $ mkTransactionReceipt tr tx blkNum
         Nothing -> throwError $ rpcError (-32603) "Transaction not found in block"
+
+-- | All transaction receipts for a block. The block parameter is a 32-byte
+-- block hash, a hex block number, or a tag (@latest@/@earliest@/@pending@);
+-- returns @null@ when the block is unknown.
+eth_getBlockReceipts :: Method Server
+eth_getBlockReceipts = toMethod "eth_getBlockReceipts" f (Required "block" :+: ())
+  where
+    f :: String -> RpcResult Server (Maybe [TransactionReceipt])
+    f blockParam = do
+      mBlk <- liftIO $ fetchBlockForReceipts blockParam
+      case mBlk of
+        Nothing  -> return Nothing
+        Just blk -> do
+          let blkNum = getBlockNumber blk
+              txs    = blockReceiptTransactions $ bPrimeToB blk
+          Just <$> zipWithM (buildBlockReceipt blkNum) [0 ..] txs
+
+    -- Disambiguate a 32-byte block hash (64 hex chars) from a number/tag.
+    fetchBlockForReceipts :: String -> IO (Maybe Block')
+    fetchBlockForReceipts param
+      | length (dropHexPrefix param) == 64 = fetchBlockByHash param
+      | otherwise                          = fetchBlockByNumber param
+
+    dropHexPrefix ('0':'x':xs) = xs
+    dropHexPrefix ('0':'X':xs) = xs
+    dropHexPrefix xs           = xs
+
+    buildBlockReceipt :: Integer -> Integer -> Transaction -> RpcResult Server TransactionReceipt
+    buildBlockReceipt blkNum idx tx = do
+      response <- liftIO $ runLocal $ TxResults.getTransactionResultClient (transactionHash tx)
+      case response of
+        Right (tr : _) -> return $ (mkTransactionReceipt tr tx blkNum) { transactionIndex = EthHex idx }
+        Right []       -> throwError $ rpcError (-32603) "receipt not found for transaction in block"
+        Left err       -> throwError $ rpcError (-32603) (formatClientError err)
+
+-- | @callTracer@-style trace of every transaction in a block. STRATO runs
+-- SolidVM (no EVM opcodes), so the geth @structLogs@ tracer is impossible; we
+-- return the same @callTracer@ frame regardless of the requested tracer. Each
+-- entry carries the transaction @input@ (calldata, including any ERC-8021
+-- suffix); @calls@ is empty (internal calls are not instrumented). The tracer
+-- options argument is accepted and ignored. Returns @null@ for unknown blocks.
+debug_traceBlockByHash :: Method Server
+debug_traceBlockByHash = toMethod "debug_traceBlockByHash" f (Required "blockHash" :+: Optional "options" Null :+: ())
+  where
+    f :: String -> Value -> RpcResult Server (Maybe [BlockTrace])
+    f blockHash _options = do
+      mBlk <- liftIO $ fetchBlockByHash blockHash
+      case mBlk of
+        Nothing  -> return Nothing
+        Just blk -> Just <$> mapM buildTrace (blockReceiptTransactions $ bPrimeToB blk)
+
+    buildTrace :: Transaction -> RpcResult Server BlockTrace
+    buildTrace tx = do
+      response <- liftIO $ runLocal $ TxResults.getTransactionResultClient (transactionHash tx)
+      case response of
+        Right (tr : _) -> return $ BlockTrace (transactionHash tx) (mkCallFrame tr tx)
+        Right []       -> throwError $ rpcError (-32603) "trace not found for transaction in block"
+        Left err       -> throwError $ rpcError (-32603) (formatClientError err)
 
 eth_getUncleByBlockHashAndIndex :: Method Server
 eth_getUncleByBlockHashAndIndex = toMethod "eth_getUncleByBlockHashAndIndex" f ()
