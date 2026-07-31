@@ -129,7 +129,7 @@ const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
   const derived = useDerivedTradeInfo(state, maxSpendableWei);
   const {
     pools, poolsLoading, poolsTransitioning, quoteResponse, quoteLoading, hasQuoteResponse,
-    activePoolAddress, activePool, activeQuote, bestPoolAddress,
+    activePoolAddress, activePool, displayPool, activeQuote, bestPoolAddress,
     typedValueWei, exactOut, inputAmount, outputAmount, inputAmountWei, outputAmountWei,
     exchangeRate, invertedExchangeRate, oracleExchangeRate, invertedOracleExchangeRate,
     priceImpact, slippagePercent, minAmountOutWei,
@@ -230,7 +230,7 @@ const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
         onSelect={(token) => dispatch({ type: "SELECT_TOKEN_IN", token })}
         tokens={fromOptions}
         userBalanceWei={liveTokenIn?.balance || "0"}
-        poolBalanceWei={activePool?.tokenIn.poolBalance || liveTokenIn?.poolBalance || "0"}
+        poolBalanceWei={displayPool?.tokenIn.poolBalance || "0"}
         maxAmountWei={maxSpendableWei.toString()}
         isFromInput={true}
         onMaxClick={handleMaxClick}
@@ -258,8 +258,8 @@ const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
         onSelect={(token) => dispatch({ type: "SELECT_TOKEN_OUT", token })}
         tokens={toOptions}
         userBalanceWei={liveTokenOut?.balance || "0"}
-        poolBalanceWei={activePool?.tokenOut.poolBalance || liveTokenOut?.poolBalance || "0"}
-        maxAmountWei={activePool?.tokenOut.poolBalance || "0"}
+        poolBalanceWei={displayPool?.tokenOut.poolBalance || "0"}
+        maxAmountWei={displayPool?.tokenOut.poolBalance || "0"}
         isFromInput={false}
         amountError={outputError}
         loading={poolsLoading}

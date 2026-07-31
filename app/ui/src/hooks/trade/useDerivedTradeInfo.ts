@@ -33,6 +33,9 @@ export interface DerivedTradeInfo {
   /** pool the trade will execute on: manual selection, else best rate */
   activePoolAddress: string | null;
   activePool?: TradePool;
+  /** pool whose state the panels display: the active pool once quoting picks
+   *  one, else the pair's deepest pool — never a different pair's data */
+  displayPool?: TradePool;
   /** the active pool's quote for the typed amount */
   activeQuote?: TradeQuote;
   bestPoolAddress: string | null;
@@ -110,6 +113,12 @@ export function useDerivedTradeInfo(
 
     const activePoolAddress = selectedPoolAddress ?? bestPoolAddress;
     const activePool = matchedPools.find((p) => p.address === activePoolAddress);
+    const displayPool =
+      activePool ??
+      matchedPools.reduce<TradePool | undefined>(
+        (deepest, p) => (!deepest || p.totalLiquidityUSD > deepest.totalLiquidityUSD ? p : deepest),
+        undefined
+      );
     const activeQuoteRaw = quotes.find((q) => q.poolAddress === activePoolAddress);
     // no typed amount -> no active quote, even if a cached quote for this pair
     // lingers (the query disables on empty input but keeps its previous data);
@@ -130,8 +139,8 @@ export function useDerivedTradeInfo(
     const execRateWad =
       activeQuote && inputAmountWei > 0n
         ? (BigInt(activeQuote.amountOut) * WAD) / BigInt(activeQuote.amountIn)
-        : BigInt(activePool?.spotRateWad ?? matchedPools[0]?.spotRateWad ?? "0");
-    const oracleRateWad = BigInt(activePool?.oracleRateWad ?? matchedPools[0]?.oracleRateWad ?? "0");
+        : BigInt(displayPool?.spotRateWad ?? "0");
+    const oracleRateWad = BigInt(displayPool?.oracleRateWad ?? "0");
 
     const priceImpact = activeQuote ? activeQuote.priceImpact : null;
 
@@ -161,6 +170,7 @@ export function useDerivedTradeInfo(
       hasQuoteResponse: quoteMatches,
       activePoolAddress,
       activePool,
+      displayPool,
       activeQuote,
       bestPoolAddress,
       typedValueWei,
