@@ -17,7 +17,7 @@ import { getPositions as getV3Positions, getPoolTokenPairs as getV3PoolTokenPair
 import * as v3Math from "../helpers/poolV3Math.helper";
 import { safeBigInt } from "../helpers/vaultPerformance.helper";
 
-const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, priceOracle } = constants;
+const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, priceOracle, PriceOracle } = constants;
 
 // Queries MercataBridge config for the unanimous externalSymbol for each given strato token address.
 // Returns a map of stratoToken -> externalSymbol.
@@ -391,6 +391,9 @@ function updatePortfolioInfoStorage(portfolioInfo: any, newInfo: StorageHistoryE
     };
   } else if (newInfo.data.mToken) {
     return { ...portfolioInfo,
+      // Kept at the top level too: userLoan is stored per-user, not per-mToken, so
+      // processBalanceSnapshot needs the pool's index to unscale the user's debt.
+      lendingBorrowIndex: BigInt(newInfo.data.borrowIndex || '') || 0n,
       tokens: { ...portfolioInfo.tokens,
         [newInfo.data.mToken]: { ...portfolioInfo.tokens[newInfo.data.mToken],
           borrowIndex: BigInt(newInfo.data.borrowIndex || '') || 0n,
@@ -764,7 +767,15 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
     }
   }
 
-  netBalance -= netLoan + parseFloat(snapshot.data.userLoan?.scaledDebt || '0');
+  // userLoan holds scaled debt; actual USDST owed is scaledDebt * borrowIndex / RAY,
+  // the same conversion debtFromScaled applies for the Net Balance box.
+  const scaledDebt = parseFloat(snapshot.data.userLoan?.scaledDebt || '0');
+  const borrowIndex = safeBigInt(snapshot.data.lendingBorrowIndex);
+  const lendingDebt = borrowIndex > 0n ? scaledDebt * (Number(borrowIndex) / 1e27) : scaledDebt;
+
+  console.log(`[NB-GRAPH] idx=${index} ts=${new Date(snapshot.timestamp).toISOString()} assets=$${(netBalance / 1e18).toFixed(2)} cdpDebt=$${(netLoan / 1e18).toFixed(6)} scaledDebt=${(scaledDebt / 1e18).toFixed(6)} borrowIndex=${borrowIndex.toString()} lendingDebt=$${(lendingDebt / 1e18).toFixed(6)} netBalance=$${((netBalance - netLoan - lendingDebt) / 1e18).toFixed(2)}`);
+
+  netBalance -= netLoan + lendingDebt;
   return { timestamp: snapshot.timestamp, data: {netBalance: netBalance / 1e18 }};
 }
 
@@ -1063,11 +1074,59 @@ export const getNetBalance = async (
   ]);
 
   let totalAssetValue = 0;
+  let nonActiveValue = 0;
+  let nonActiveCount = 0;
   if (earningAssetsResult.status === "fulfilled") {
     for (const asset of earningAssetsResult.value) {
-      totalAssetValue += parseFloat(asset.value || "0");
+      const assetValue = parseFloat(asset.value || "0");
+      totalAssetValue += assetValue;
+      if (String(asset.status) !== "2") {
+        nonActiveValue += assetValue;
+        nonActiveCount += 1;
+        console.log(`[NB-BOX-INACTIVE] ${(asset as any)._symbol || asset.address} status=${asset.status} totalBalance=${asset.totalBalance} price=${asset.price} value=$${assetValue.toFixed(2)}`);
+      }
     }
   }
+  console.log(`[NB-BOX-INACTIVE-TOTAL] count=${nonActiveCount} value=$${nonActiveValue.toFixed(2)}`);
+
+  // Temporary: compare unfiltered (stale last-write) oracle vs system oracle on held assets.
+  if (earningAssetsResult.status === "fulfilled") {
+    try {
+      const { data: allOracleRows } = await cirrus.get(accessToken, `/${PriceOracle}-prices`, {
+        params: { select: "address,asset:key,price:value::text" },
+      });
+      const buggyMap = new Map<string, string>();
+      const systemMap = new Map<string, string>();
+      for (const row of allOracleRows || []) {
+        if (!row?.asset || !row?.price) continue;
+        buggyMap.set(row.asset, row.price); // last write wins — pre-fix behaviour
+        if (row.address === priceOracle) systemMap.set(row.asset, row.price);
+      }
+      let staleTokenCount = 0;
+      let staleInflation = 0;
+      for (const asset of earningAssetsResult.value) {
+        const bal = BigInt(asset.totalBalance || "0");
+        if (bal <= 0n) continue;
+        const stalePrice = buggyMap.get(asset.address);
+        const fixedPrice = systemMap.get(asset.address);
+        if (!stalePrice || !fixedPrice || stalePrice === fixedPrice) continue;
+        const staleValue = Number((bal * BigInt(stalePrice)) / DECIMALS) / Number(DECIMALS);
+        const fixedValue = Number((bal * BigInt(fixedPrice)) / DECIMALS) / Number(DECIMALS);
+        const delta = staleValue - fixedValue;
+        staleTokenCount += 1;
+        staleInflation += delta;
+        console.log(
+          `[NB-BOX-STALE] ${(asset as any)._symbol || asset.address} addr=${asset.address} ` +
+          `bal=${asset.totalBalance} stalePrice=${stalePrice} fixedPrice=${fixedPrice} ` +
+          `staleValue=$${staleValue.toFixed(2)} fixedValue=$${fixedValue.toFixed(2)} delta=$${delta.toFixed(2)}`
+        );
+      }
+      console.log(`[NB-BOX-STALE-TOTAL] tokens=${staleTokenCount} staleInflation=$${staleInflation.toFixed(2)} (amount overstated before oracle pin)`);
+    } catch (e) {
+      console.log(`[NB-BOX-STALE] skip: ${(e as Error)?.message || e}`);
+    }
+  }
+
   if (v3Result.status === "fulfilled") {
     totalAssetValue += v3Result.value;
   }
@@ -1095,6 +1154,10 @@ export const getNetBalance = async (
   }
 
   const totalBorrowed = lendingDebt + cdpDebt;
+
+  const boxLoan = loanResult.status === "fulfilled" ? loanResult.value : undefined;
+  console.log(`[NB-BOX] assets=$${totalAssetValue.toFixed(2)} cdpDebt=$${cdpDebt.toFixed(6)} totalAmountOwed=${boxLoan?.totalAmountOwed ?? "n/a"} borrowIndex=${boxLoan?.borrowIndex ?? "n/a"} lendingDebt=$${lendingDebt.toFixed(6)} netBalance=$${(totalAssetValue - totalBorrowed).toFixed(2)}`);
+
   return {
     netBalance: totalAssetValue - totalBorrowed,
     totalBorrowed,
