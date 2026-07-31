@@ -28,6 +28,32 @@ const {
 const normalizeAddress = (address?: string | null) =>
   (address || "").toLowerCase().replace(/^0x/, "");
 
+/**
+ * Market cap in USD = (price_wei * totalSupply_wei) / 10^36.
+ * Divided by 10^36 because both values carry 18 decimals.
+ * Returns a decimal string with 2 decimal places.
+ */
+const calculateMarketCap = (
+  price?: string | bigint | null,
+  totalSupply?: string | bigint | null
+): string => {
+  try {
+    const priceWei = BigInt(price || "0");
+    const totalSupplyWei = BigInt(totalSupply || "0");
+    if (priceWei === 0n || totalSupplyWei === 0n) return "0";
+
+    const marketCapWei = priceWei * totalSupplyWei;
+    const wholePart = (marketCapWei / BigInt(10) ** BigInt(36)).toString();
+    const fractionalWei = marketCapWei % (BigInt(10) ** BigInt(36));
+    const fractionalPart = (fractionalWei * BigInt(100) / (BigInt(10) ** BigInt(36))).toString().padStart(2, '0');
+
+    return `${wholePart}.${fractionalPart}`;
+  } catch (error) {
+    console.error(`Error calculating market cap for price=${price} totalSupply=${totalSupply}:`, error);
+    return "0.00";
+  }
+};
+
 const getConfiguredYieldVaultDefs = () =>
   listVaultDefs()
     .filter((vault) => Boolean(vault.address));
@@ -195,6 +221,7 @@ export const getTokens = async (
     return (response.data as any[]).map((token) => ({
       ...token,
       price: priceMap.get(token.address) || "0",
+      marketCap: calculateMarketCap(priceMap.get(token.address), token._totalSupply),
       balances: (token.balances || []).map((balance: any) => {
         // If this user has collateral for this token, add collateral info
         if (balance.user && token.address) {
@@ -288,6 +315,7 @@ export const getBalance = async (
     ...balanceData.map((t: any) => ({
       ...t,
       price: (rawPrices.get(t.address) || 0n).toString(),
+      marketCap: calculateMarketCap(rawPrices.get(t.address), t.token?._totalSupply),
       collateralBalance: (collateralMap.get(t.address) || 0n).toString(),
     })),
     ...tokensWithCollateralOnly.map((a) => ({
@@ -295,6 +323,7 @@ export const getBalance = async (
       user: address,
       balance: "0",
       price: (rawPrices.get(a) || 0n).toString(),
+      marketCap: calculateMarketCap(rawPrices.get(a), tokenDetails.get(a)?._totalSupply),
       collateralBalance: (collateralMap.get(a) || 0n).toString(),
       token: tokenDetails.get(a),
     })),
@@ -594,36 +623,14 @@ export const getTokenStats = async (
     const filteredTokens = tokens.filter((token: any) => priceData.has(token.address));
 
     const tokensWithMarketCap = filteredTokens.map((token: any) => {
-      const price = BigInt(priceData.get(token.address) || "0");
       const totalSupply = BigInt(token._totalSupply || "0");
-      // Calculate market cap: (price * totalSupply) / 10^36
-      // Both price and totalSupply are in wei (18 decimals)
-      let marketCap = "0";
-      try {
-        if (price !== 0n && totalSupply !== 0n) {
-          // Market cap in USD = (price_wei * totalSupply_wei) / 10^36
-          // We divide by 10^36 because both values have 18 decimals
-          const marketCapWei = price * totalSupply;
-          const marketCapUSD = marketCapWei / BigInt(10) ** BigInt(36);
-          
-          // Convert to decimal string with 2 decimal places
-          const wholePart = marketCapUSD.toString();
-          const fractionalWei = marketCapWei % (BigInt(10) ** BigInt(36));
-          const fractionalPart = (fractionalWei * BigInt(100) / (BigInt(10) ** BigInt(36))).toString().padStart(2, '0');
-          
-          marketCap = `${wholePart}.${fractionalPart}`;
-        }
-      } catch (error) {
-        console.error(`Error calculating market cap for ${token._symbol}:`, error);
-        marketCap = "0.00";
-      }
-      
+
       return {
         address: token.address,
         name: token._name,
         symbol: token._symbol,
         totalSupply: totalSupply.toString(),
-        marketCap: marketCap
+        marketCap: calculateMarketCap(priceData.get(token.address), totalSupply)
       };
     });
 

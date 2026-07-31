@@ -288,9 +288,9 @@ const App = () => {
                                                 <Route
                                                   path="/dashboard/deposits/:id"
                                                   element={
-                                                    <ProtectedRoute>
+                                                    <GuestAccessibleRoute>
                                                       <AssetDetail />
-                                                    </ProtectedRoute>
+                                                    </GuestAccessibleRoute>
                                                   }
                                                 />
                                                 <Route
