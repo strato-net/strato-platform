@@ -1478,6 +1478,7 @@ load_databases() {
     # pg_restore -j needs a seekable file, so copy the dump into the container.
     docker cp "$dumps_dir/$db.dump" "$cid:/tmp/$db.dump" \
       || { pg_temp_stop "$cid"; die "failed to copy dump into container for '$db'"; }
+    info "Rebuilding database '$db' from dump (data load + index rebuild; can take a few minutes on slow machines)..."
     docker exec "$cid" pg_restore -U postgres --no-owner --no-privileges \
       -j "$jobs" -d "$db" "/tmp/$db.dump" >/dev/null 2>&1 \
       || { pg_temp_stop "$cid"; die "failed to restore dump for database '$db'"; }
