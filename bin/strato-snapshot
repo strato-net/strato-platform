@@ -12,6 +12,10 @@ DEFAULT_SNAPSHOT_REGION="us-east-1"
 # Compression extension used for snapshots published under the network prefix.
 SNAPSHOT_ARCHIVE_EXT="tar.zst"
 
+# Name of the solo broker container used to prune consumed kafka history
+# before archiving (create). Fixed so a crashed run's leftover is replaced.
+KAFKA_PRUNE_CONTAINER="strato-snapshot-kafka-prune"
+
 # Reusable working area for downloads/extraction. Using one deterministic base
 # (purged at start of every run) prevents the unbounded accumulation of
 # /tmp/tmp.* dirs that a per-run mktemp would leave behind, especially since
@@ -62,6 +66,11 @@ Create options:
   --wait-timeout <seconds>   Wait for sync/layer checks before snapshotting.
   --wait-interval <seconds>  Poll interval for --wait-timeout. Default: 30.
   --include-prometheus       Include prometheus/ in the payload.
+  --skip-kafka-prune         Keep the full kafka topic history in the payload.
+                             By default, create deletes the consumed history
+                             behind the committed consumer offsets (safe: every
+                             consumer resumes at or after its committed offset)
+                             to keep the archive small.
   --skip-smoke-test          Do not restore/start-test the created artifact.
   --smoke-node-dir <dir>     Directory to use for create smoke test.
   --smoke-timeout <seconds>  Smoke-test metadata timeout. Default: 600.
@@ -99,6 +108,7 @@ cleanup() {
   for cid in "${TMP_PG_CONTAINERS[@]}"; do
     [[ -n "$cid" ]] && docker stop "$cid" >/dev/null 2>&1
   done
+  docker rm -f "$KAFKA_PRUNE_CONTAINER" >/dev/null 2>&1 || true
   # Remove this run's working area. (A crashed run that skips this is still
   # cleaned by the next run's init_workdir purge.)
   [[ -n "${WORKDIR:-}" && -d "$WORKDIR" ]] && rm -rf "$WORKDIR"
@@ -1487,6 +1497,205 @@ load_databases() {
   pg_temp_stop "$cid"
 }
 
+# --- Kafka consumed-history pruning (create) --------------------------------
+#
+# After the live layer checks prove every consumer is caught up and the node
+# is stopped, the kafka topic history behind the consumers' committed offsets
+# is dead weight in the payload: committed groups resume from their offsets,
+# and the remaining consumers (sequencer, p2p) start at the log end by design.
+# kafka-delete-records advances each partition's log-start-offset to the
+# minimum committed offset across all groups (or the log end for topics with
+# no committed groups), so by construction it can never delete anything a
+# consumer still needs. Broker-side retention caps can NOT do this safely:
+# during a from-genesis sync the sequencer runs far ahead of the VM, so any
+# cap the topic outgrows deletes unconsumed vm_tasks and vm-runner dies with
+# OffsetOutOfRange mid-sync.
+#
+# The broker is started alone (docker compose run; no consumers) with fast
+# retention-check/delete-delay overrides so freed segments are removed within
+# seconds instead of kafka's default 5-minute check cycle. Deletion works on
+# whole segments, so reclaiming space needs multi-segment topics -- nodes that
+# snapshot themselves should run with a smaller --kafkaLogSegmentBytes (the
+# default 1GiB segments never roll on these topics). Any failure here aborts
+# the prune, not the snapshot: the payload just stays larger.
+
+wait_for_prune_broker() {
+  local i
+  for i in $(seq 1 40); do
+    if docker exec "$KAFKA_PRUNE_CONTAINER" /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 3
+  done
+  warn "kafka broker for history pruning did not become ready"
+  return 1
+}
+
+# Whether all segment files freed by the prune have been removed: per pruned
+# partition at most one .log below the target may remain (the segment that
+# contains the new log-start-offset), and no half-deleted '*.deleted' files.
+kafka_prune_segments_settled() {
+  local kafka_dir="$1"
+  local plan_json="$2"
+  python3 - "$kafka_dir" "$plan_json" <<'PY'
+import json
+import pathlib
+import sys
+
+kafka_dir, plan_path = sys.argv[1], sys.argv[2]
+root = pathlib.Path(kafka_dir) / "kafka-logs"
+if not root.is_dir():
+    sys.exit(0)
+if next(root.rglob("*.deleted"), None) is not None:
+    sys.exit(1)
+with open(plan_path, encoding="utf-8") as f:
+    plan = json.load(f)
+for p in plan["partitions"]:
+    d = root / ("%s-%d" % (p["topic"], p["partition"]))
+    if not d.is_dir():
+        continue
+    below = [f for f in d.glob("*.log") if int(f.stem) < p["offset"]]
+    if len(below) > 1:
+        sys.exit(1)
+sys.exit(0)
+PY
+}
+
+run_kafka_history_prune() {
+  local node_dir="$1"
+  wait_for_prune_broker || return 1
+
+  local d
+  d="$(mktemp_dir)"
+
+  # Committed offsets per topic-partition, one row per group (min taken below).
+  docker exec "$KAFKA_PRUNE_CONTAINER" /opt/kafka/bin/kafka-consumer-groups.sh \
+      --bootstrap-server localhost:9092 --describe --all-groups --offsets 2>/dev/null \
+    | awk '$4 ~ /^[0-9]+$/ && $2 !~ /^__/ { print $2" "$3" "$4 }' > "$d/committed" || true
+  # Refuse to prune when no committed offsets are visible at all: a synced
+  # node always has them (the VM runner at minimum), so an empty list means
+  # the lookup failed -- and the latest-only fallback below would then delete
+  # history that committed consumers still need.
+  if [[ ! -s "$d/committed" ]]; then
+    warn "no committed consumer offsets found; not pruning kafka history"
+    return 1
+  fi
+
+  docker exec "$KAFKA_PRUNE_CONTAINER" /opt/kafka/bin/kafka-get-offsets.sh \
+      --bootstrap-server localhost:9092 --time -1 2>/dev/null \
+    | awk -F: 'NF == 3 && $1 !~ /^__/ && $3 ~ /^[0-9]+$/ { print $1" "$2" "$3 }' > "$d/ends" || true
+  docker exec "$KAFKA_PRUNE_CONTAINER" /opt/kafka/bin/kafka-get-offsets.sh \
+      --bootstrap-server localhost:9092 --time -2 2>/dev/null \
+    | awk -F: 'NF == 3 && $1 !~ /^__/ && $3 ~ /^[0-9]+$/ { print $1" "$2" "$3 }' > "$d/earliest" || true
+  if [[ ! -s "$d/ends" ]]; then
+    warn "could not read kafka log-end offsets; not pruning kafka history"
+    return 1
+  fi
+
+  # Per partition: prune to min committed offset, or to the log end for topics
+  # with no committed groups (their consumers start at the log end by design).
+  # Partitions already at or below the target earliest offset are skipped.
+  python3 - "$d" > "$d/prune.json" <<'PY'
+import json
+import pathlib
+import sys
+
+d = pathlib.Path(sys.argv[1])
+
+def load(name, keep_min=False):
+    rows = {}
+    for line in (d / name).read_text(encoding="utf-8").splitlines():
+        parts = line.split()
+        if len(parts) != 3:
+            continue
+        try:
+            key = (parts[0], int(parts[1]))
+            val = int(parts[2])
+        except ValueError:
+            continue
+        if keep_min and key in rows:
+            rows[key] = min(rows[key], val)
+        else:
+            rows[key] = val
+    return rows
+
+committed = load("committed", keep_min=True)
+ends = load("ends")
+earliest = load("earliest")
+
+partitions = []
+for key, end in sorted(ends.items()):
+    target = min(committed.get(key, end), end)
+    if target > earliest.get(key, 0):
+        partitions.append({"topic": key[0], "partition": key[1], "offset": target})
+json.dump({"version": 1, "partitions": partitions}, sys.stdout)
+PY
+
+  if ! python3 -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1]))["partitions"] else 1)' "$d/prune.json"; then
+    info "No consumed kafka history to prune"
+    return 0
+  fi
+
+  docker exec -i "$KAFKA_PRUNE_CONTAINER" sh -c 'cat > /tmp/strato-snapshot-prune.json' < "$d/prune.json" \
+    || { warn "could not copy prune offsets into the kafka container"; return 1; }
+  local out
+  if ! out="$(docker exec "$KAFKA_PRUNE_CONTAINER" /opt/kafka/bin/kafka-delete-records.sh \
+      --bootstrap-server localhost:9092 --offset-json-file /tmp/strato-snapshot-prune.json 2>&1)"; then
+    warn "kafka-delete-records failed: $out"
+    return 1
+  fi
+  grep -q "low_watermark" <<<"$out" || { warn "kafka-delete-records reported no deletions: $out"; return 1; }
+  grep -qi "error" <<<"$out" && warn "kafka-delete-records reported partial errors: $out"
+
+  # Wait for the broker to physically remove the freed segment files (fast
+  # because of the check-interval/delete-delay overrides on this container).
+  local waited=0
+  while (( waited < 120 )); do
+    if kafka_prune_segments_settled "$node_dir/kafka" "$d/prune.json"; then
+      info "Pruned consumed kafka history; kafka dir is now $(du -sh "$node_dir/kafka" 2>/dev/null | awk '{print $1}')"
+      return 0
+    fi
+    sleep 5
+    waited=$((waited + 5))
+  done
+  warn "timed out waiting for pruned kafka segments to be removed; staging excludes '*.deleted' files, but some consumed history may remain in the payload"
+  return 0
+}
+
+kafka_prune_teardown() {
+  local node_dir="$1"
+  # Graceful stop: a clean broker shutdown spares the restored node a full log
+  # recovery pass on first start. --rm on the run removes the container.
+  docker stop -t 60 "$KAFKA_PRUNE_CONTAINER" >/dev/null 2>&1 || true
+  docker rm -f "$KAFKA_PRUNE_CONTAINER" >/dev/null 2>&1 || true
+  (cd "$node_dir" && docker compose -p strato down --remove-orphans >/dev/null 2>&1) || true
+  wait_for_local_state_users "$node_dir"
+}
+
+prune_consumed_kafka_history() {
+  local node_dir="$1"
+  [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && return 0
+  command -v docker >/dev/null 2>&1 || { warn "docker unavailable; cannot prune kafka history"; return 1; }
+  [[ -d "$node_dir/kafka/kafka-logs" ]] || return 0
+
+  info "Pruning consumed kafka topic history before archiving (only history behind committed consumer offsets is deleted)..."
+  docker rm -f "$KAFKA_PRUNE_CONTAINER" >/dev/null 2>&1 || true
+  if ! (cd "$node_dir" && docker compose -p strato run -d --rm --no-deps \
+        --name "$KAFKA_PRUNE_CONTAINER" \
+        -e KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS=5000 \
+        -e KAFKA_LOG_SEGMENT_DELETE_DELAY_MS=1000 \
+        kafka >/dev/null 2>&1); then
+    warn "could not start the kafka broker for history pruning"
+    kafka_prune_teardown "$node_dir"
+    return 1
+  fi
+
+  local rc=0
+  run_kafka_history_prune "$node_dir" || rc=1
+  kafka_prune_teardown "$node_dir"
+  return $rc
+}
+
 stage_payload() {
   local node_dir="$1"
   local staging="$2"
@@ -1495,7 +1704,14 @@ stage_payload() {
   mkdir -p "$staging/payload"
   copy_ethereum_payload "$node_dir/.ethereumH" "$staging/payload/ethereumH"
   copy_dir_contents_without_appledouble "$node_dir/redis" "$staging/payload/redis"
-  copy_dir_contents_without_appledouble "$node_dir/kafka" "$staging/payload/kafka"
+
+  # Copy the kafka data dir, excluding half-deleted segment files ('*.deleted'):
+  # the broker removes them on startup anyway, and after the pre-archive
+  # history prune they are just freed space awaiting the delete timer.
+  if [[ -d "$node_dir/kafka" ]]; then
+    mkdir -p "$staging/payload/kafka"
+    (cd "$node_dir/kafka" && tar_without_appledouble --exclude='*.deleted' -cf - .) | (cd "$staging/payload/kafka" && tar -xpf -)
+  fi
 
   # Relax modes on the staged kafka copy so the archive carries modes usable by
   # any uid. The kafka container runs as its baked-in "appuser" (uid 1000), not
@@ -1732,7 +1948,7 @@ cmd_create() {
 
   [[ $# -ge 1 ]] || die "create requires <node-dir>"
   local node_dir network output metadata_url last_block_url cirrus_tip_url status_url strict_layers allowed_lag
-  local wait_timeout wait_interval include_prometheus skip_smoke smoke_node_dir smoke_timeout
+  local wait_timeout wait_interval include_prometheus skip_smoke smoke_node_dir smoke_timeout skip_kafka_prune
   node_dir="$1"
   shift
   network=""
@@ -1749,6 +1965,7 @@ cmd_create() {
   skip_smoke="false"
   smoke_node_dir=""
   smoke_timeout="600"
+  skip_kafka_prune="false"
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -1763,6 +1980,7 @@ cmd_create() {
       --wait-timeout) wait_timeout="$2"; shift 2 ;;
       --wait-interval) wait_interval="$2"; shift 2 ;;
       --include-prometheus) include_prometheus="true"; shift ;;
+      --skip-kafka-prune) skip_kafka_prune="true"; shift ;;
       --skip-smoke-test) skip_smoke="true"; shift ;;
       --smoke-node-dir) smoke_node_dir="$2"; shift 2 ;;
       --smoke-timeout) smoke_timeout="$2"; shift 2 ;;
@@ -1797,6 +2015,13 @@ cmd_create() {
 
   info "Stopping writers before snapshot..."
   stop_writers "$node_dir"
+
+  if [[ "$skip_kafka_prune" == "true" ]]; then
+    info "Skipping kafka history prune (--skip-kafka-prune)"
+  elif ! prune_consumed_kafka_history "$node_dir"; then
+    warn "kafka history prune did not complete; the snapshot will include full topic history"
+  fi
+
   assert_no_running_containers "$node_dir"
   assert_no_open_files "$node_dir"
   assert_clean_postgres "$node_dir"

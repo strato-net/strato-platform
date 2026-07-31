@@ -54,6 +54,9 @@ Options:
   --layer-lag <blocks>    Allowed API-indexer/Cirrus tip lag. Default: 5.
   --strict-layers         Require API-indexer and Cirrus tip verification.
   --include-prometheus    Include prometheus/ in the payload.
+  --skip-kafka-prune      Keep full kafka topic history in the payload (by
+                          default create prunes consumed history behind the
+                          committed consumer offsets before archiving).
   --run-smoke-test        Run create's post-create restore smoke test. Off by
                           default in this orchestration (the source node is
                           already verified synced and the artifact is checksummed).
@@ -82,6 +85,7 @@ WAIT_TIMEOUT="3600"
 LAYER_LAG="5"
 STRICT_LAYERS="false"
 INCLUDE_PROMETHEUS="false"
+SKIP_KAFKA_PRUNE="false"
 RUN_SMOKE_TEST="false"
 KEEP_ARCHIVE="false"
 NO_PUBLISH="false"
@@ -100,6 +104,7 @@ while [[ $# -gt 0 ]]; do
     --layer-lag) LAYER_LAG="$2"; shift 2 ;;
     --strict-layers) STRICT_LAYERS="true"; shift ;;
     --include-prometheus) INCLUDE_PROMETHEUS="true"; shift ;;
+    --skip-kafka-prune) SKIP_KAFKA_PRUNE="true"; shift ;;
     --run-smoke-test) RUN_SMOKE_TEST="true"; shift ;;
     --no-publish) NO_PUBLISH="true"; shift ;;
     --publish-only) PUBLISH_ONLY="$2"; shift 2 ;;
@@ -164,6 +169,7 @@ CREATE_ARGS=(
 # skip the smoke restore in this orchestration unless explicitly enabled.
 [[ "$RUN_SMOKE_TEST" == "true" ]] || CREATE_ARGS+=(--skip-smoke-test)
 [[ "$INCLUDE_PROMETHEUS" == "true" ]] && CREATE_ARGS+=(--include-prometheus)
+[[ "$SKIP_KAFKA_PRUNE" == "true" ]] && CREATE_ARGS+=(--skip-kafka-prune)
 
 # Run the node metadata/tip curls from inside this container, since the node
 # API is not published to the host. Empty means curl directly from the host.

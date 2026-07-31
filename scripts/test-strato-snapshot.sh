@@ -227,6 +227,10 @@ echo "appledouble" > "$NODE/kafka/._log"
 # Re-tighten the checkpoint to how the broker leaves it on a live node, so the
 # create below has to normalize it (the restore above already relaxed it).
 chmod 600 "$NODE/kafka/kafka-logs/__cluster_metadata-0/00000000000000007271-0000000001.checkpoint"
+# Half-deleted segments (renamed '*.deleted' by the broker after the history
+# prune, awaiting the delete timer) must not ship in the payload.
+mkdir -p "$NODE/kafka/kafka-logs/vmevents-0"
+echo "pruned segment" > "$NODE/kafka/kafka-logs/vmevents-0/00000000000000000000.log.deleted"
 STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" create "$NODE" \
   --network helium \
   --output "$CREATED" \
@@ -250,6 +254,10 @@ fi
 if tar -tvzf "$CREATED" | grep "__cluster_metadata-0/00000000000000007271-0000000001.checkpoint" | grep -qv "^-rw-rw-rw-"; then
   echo "created archive should carry relaxed (0666) kafka checkpoint modes" >&2
   tar -tvzf "$CREATED" | grep "checkpoint" >&2
+  exit 1
+fi
+if tar -tzf "$CREATED" | grep -q '\.deleted$'; then
+  echo "created archive should not contain half-deleted ('*.deleted') kafka segments" >&2
   exit 1
 fi
 

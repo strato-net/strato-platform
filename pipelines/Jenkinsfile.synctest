@@ -111,23 +111,25 @@ def deployAndSync(String network, String metricNamespacePrefix) {
     // public vault and file server, so no local vault/highway deployment is
     // needed.
     //
-    // Kafka retention is lowered from the 168h default because this node's raw
-    // kafka log dir ships inside the published snapshot (~half its size). The
-    // node syncs from genesis each run, so every message is hours old at
-    // snapshot time and time-based retention alone never prunes; the size cap
-    // (per partition) bounds the payload regardless of sync duration, and the
-    // smaller segment size lets retention actually delete closed segments
-    // (default 1GiB segments never roll on these topics). Consumers only need
-    // the unconsumed tail -- snapshot creation gates on indexers being <=5
-    // blocks behind -- so 1h/256MiB is a wide margin over real consumer lag.
+    // NOTE: do NOT lower kafka retention (--kafkaLogRetention*) on this node.
+    // During a from-genesis sync the sequencer runs far ahead of the VM, so
+    // vm-runner's unconsumed vm_tasks backlog is essentially the whole topic;
+    // any retention cap the topic outgrows deletes unconsumed segments and
+    // vm-runner dies with OffsetOutOfRange mid-sync. Shrinking the kafka
+    // payload happens at snapshot time instead: strato-snapshot create prunes
+    // the consumed history behind the committed consumer offsets.
+    //
+    // The smaller segment size below is safe (it deletes nothing): it only
+    // makes the broker roll log files more often, so the snapshot-time prune
+    // can reclaim consumed history at fine granularity -- whole segments are
+    // the deletion unit, and the default 1GiB segments never roll on these
+    // topics.
     writeFile file: "run.sh", text: """#!/bin/bash
       export PATH
       strato-up mynode \\
         --network=${network} \\
         --nodeHost=\$(</host) \\
         --sslDir='/home/ubuntu/letsencrypt-ssl' \\
-        --kafkaLogRetentionHours=1 \\
-        --kafkaLogRetentionBytes=268435456 \\
         --kafkaLogSegmentBytes=67108864
     """
     sh 'chmod +x run.sh'
