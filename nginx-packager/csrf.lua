@@ -237,6 +237,7 @@ local wallet_auth_route_prefixes = {
     "/api/staking/",
     "/api/swap-pools/",
     "/api/tokens/",
+    "/api/trade/",
     "/api/user/admin/",
     "/api/vault/"
 }

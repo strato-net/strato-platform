@@ -19,7 +19,7 @@ CSRF (Cross-Site Request Forgery) protection is implemented at the nginx edge us
 
 The following endpoints require CSRF tokens for state-changing operations (POST, PUT, DELETE, PATCH):
 
-- `/api/*` - Mercata backend API
+- `/api/*` - STRATP App API
 - `/apex-api/user` - User management
 - `/apex-api/status` - Status updates
 - `/bloc/v2.2/*` - Blockchain transactions

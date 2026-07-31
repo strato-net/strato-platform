@@ -1,4 +1,4 @@
-// EVM-side ABIs + constants for bridging (mirrors mercata/ui/src/lib/bridge).
+// EVM-side ABIs + constants for bridging (mirrors app/ui/src/lib/bridge).
 
 import type { Hex } from "viem";
 

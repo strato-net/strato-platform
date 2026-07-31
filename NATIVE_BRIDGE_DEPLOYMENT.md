@@ -30,7 +30,7 @@ On STRATO in this guide:
 
 ### Prereqs
 
-From `mercata/contracts`, make sure your `.env` has:
+From `app/contracts`, make sure your `.env` has:
 - `GLOBAL_ADMIN_NAME`
 - `GLOBAL_ADMIN_PASSWORD`
 - `NODE_URL`
@@ -52,7 +52,7 @@ And have these contract addresses ready:
 
 ### Step 1: Deploy a `Proxy` for `StratoNativeBridge`
 
-Deploy `mercata/contracts/concrete/Proxy/Proxy.sol` and record the proxy address.
+Deploy `app/contracts/concrete/Proxy/Proxy.sol` and record the proxy address.
 
 Use:
 - `_initialOwner = ADMIN_REGISTRY`
@@ -62,7 +62,7 @@ The point of this step is just to create the proxy address first.
 
 ### Step 2: Upgrade that proxy to `StratoNativeBridge`
 
-Run from `mercata/contracts`:
+Run from `app/contracts`:
 
 ```bash
 npm run upgrade -- \
@@ -75,7 +75,7 @@ npm run upgrade -- \
 
 ### Step 3: Deploy a `Proxy` for `StratoNativeCustodyVault`
 
-Again deploy `mercata/contracts/concrete/Proxy/Proxy.sol` and record the proxy address.
+Again deploy `app/contracts/concrete/Proxy/Proxy.sol` and record the proxy address.
 
 Use:
 - `_initialOwner = ADMIN_REGISTRY`
@@ -83,7 +83,7 @@ Use:
 
 ### Step 4: Upgrade that proxy to `StratoNativeCustodyVault`
 
-Run from `mercata/contracts`:
+Run from `app/contracts`:
 
 ```bash
 npm run upgrade -- \
@@ -96,7 +96,7 @@ npm run upgrade -- \
 
 ### Step 5: Initialize bridge + vault
 
-Run from `mercata/contracts`:
+Run from `app/contracts`:
 
 ```bash
 npm run initialize:native-bridge -- \
@@ -128,7 +128,7 @@ Important:
 
 Run this after the Sepolia representation token and bridge proxies exist, because this route points at those Sepolia addresses.
 
-Run from `mercata/contracts`:
+Run from `app/contracts`:
 
 ```bash
 npm run configure:native-route -- \
@@ -185,7 +185,7 @@ args:
 
 ### Prereqs
 
-From `mercata/ethereum`, make sure your `.env` has:
+From `app/ethereum`, make sure your `.env` has:
 - `PRIVATE_KEY`
 - `SEPOLIA_RPC_URL` (optional if you want to override the default public RPC)
 - `ETHERSCAN_API_KEY` (optional, only needed for verify)
@@ -209,7 +209,7 @@ And have ready:
 
 ### Step 1: Install and compile
 
-Run from `mercata/ethereum`:
+Run from `app/ethereum`:
 
 ```bash
 npm ci
@@ -218,7 +218,7 @@ npm run compile
 
 ### Step 2: Deploy the Sepolia representation token proxy
 
-Run from `mercata/ethereum`:
+Run from `app/ethereum`:
 
 ```bash
 CONTRACT_NAME=StratoNativeRepresentationToken \
@@ -236,7 +236,7 @@ Record:
 
 ### Step 3: Deploy the Sepolia representation bridge proxy
 
-Run from `mercata/ethereum`:
+Run from `app/ethereum`:
 
 ```bash
 CONTRACT_NAME=StratoNativeRepresentationBridge \
@@ -257,7 +257,7 @@ Record:
 Use the Sepolia Safe to execute the post-deploy admin transactions.
 
 Saved batch file:
-- `mercata/ethereum/deployments/sepolia-native-bridge-safe-batch.json`
+- `app/ethereum/deployments/sepolia-native-bridge-safe-batch.json`
 
 This batch does:
 - on `StratoNativeRepresentationToken`, `grantRole(BRIDGE_ROLE, <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>)`
@@ -343,14 +343,14 @@ After env/config changes, restart the bridge service so it picks up:
 For a new deployment, run these in order. Each item is covered by the detailed sections above and by concrete commands in the runbook below.
 
 1. Collect STRATO and Sepolia admin addresses from `Naming`.
-2. Prepare the STRATO `.env` in `mercata/contracts`.
+2. Prepare the STRATO `.env` in `app/contracts`.
 3. Deploy the STRATO `StratoNativeBridge` proxy.
 4. Upgrade the STRATO bridge proxy to `StratoNativeBridge`.
 5. Deploy the STRATO `StratoNativeCustodyVault` proxy.
 6. Upgrade the STRATO vault proxy to `StratoNativeCustodyVault`.
 7. Initialize the STRATO bridge and vault.
-8. Prepare the Sepolia `.env` in `mercata/ethereum`.
-9. Run `npm ci` and `npm run compile` in `mercata/ethereum`.
+8. Prepare the Sepolia `.env` in `app/ethereum`.
+9. Run `npm ci` and `npm run compile` in `app/ethereum`.
 10. Deploy the Sepolia `StratoNativeRepresentationToken` proxy.
 11. Deploy the Sepolia `StratoNativeRepresentationBridge` proxy.
 12. Verify the Sepolia bridge proxy EIP-712 domain returns `StratoNativeRepresentationBridge` and version `1`.
@@ -368,7 +368,7 @@ The examples below are templates. Keep environment-specific addresses, amounts, 
 
 ### STRATO: Deploy or Update Native Bridge Contracts
 
-Run from `mercata/contracts`.
+Run from `app/contracts`.
 
 If the native bridge and custody vault proxies already exist, upgrade them to the current implementations:
 
@@ -480,7 +480,7 @@ args: <INSTANT_WITHDRAWAL_DELAY_SECONDS>
 
 ### Sepolia: Deploy New Representation Contracts
 
-Run from `mercata/ethereum`.
+Run from `app/ethereum`.
 
 Deploy the representation token proxy:
 

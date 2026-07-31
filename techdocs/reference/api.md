@@ -104,7 +104,7 @@ GET /tokens/v2
       ],
       "images": [
         {
-          "value": "https://fileserver.mercata.blockapps.net/.../eth.jpg"
+          "value": "https://fileserver.strato.nexus/.../eth.jpg"
         }
       ]
     }

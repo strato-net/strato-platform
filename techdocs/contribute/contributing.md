@@ -25,10 +25,10 @@ Read the [Architecture Guide](architecture.md) to understand how components work
 Pick the area you want to work on:
 
 - **Blockchain Core** - Haskell (`strato/`)
-- **Smart Contracts** - Solidity (`mercata/contracts/`)
-- **Backend API** - Node.js/TypeScript (`mercata/backend/`)
-- **Frontend UI** - React/TypeScript (`mercata/ui/`)
-- **Services** - Background services (`mercata/services/`)
+- **Smart Contracts** - Solidity (`app/contracts/`)
+- **Backend API** - Node.js/TypeScript (`app/backend/`)
+- **Frontend UI** - React/TypeScript (`app/ui/`)
+- **Services** - Background services (`app/services/`)
 
 ---
 
@@ -113,9 +113,9 @@ See the [Architecture Guide](architecture.md) for details on each component's st
 make test
 
 # Component-specific
-cd mercata/contracts && npm test
-cd mercata/backend && npm test
-cd mercata/ui && npm test
+cd app/contracts && npm test
+cd app/backend && npm test
+cd app/ui && npm test
 ```
 
 **Test locally:**
