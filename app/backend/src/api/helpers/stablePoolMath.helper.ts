@@ -67,8 +67,11 @@ export function getD(xp: bigint[], amp: bigint): bigint {
   for (let i = 0; i < 256; i++) {
     let dP = d;
     for (const x of xp) {
-      dP = (dP * d) / (x * n);
+      dP = (dP * d) / x;
     }
+    // the contract divides by n^n after the product loop, not inside it —
+    // the floor-division order matters for bit-exactness
+    dP /= n ** n;
     const dPrev = d;
     d = (((ann * s) / A_PRECISION + dP * n) * d) / (((ann - A_PRECISION) * d) / A_PRECISION + (n + 1n) * dP);
     if (d > dPrev ? d - dPrev <= 1n : dPrev - d <= 1n) return d;
