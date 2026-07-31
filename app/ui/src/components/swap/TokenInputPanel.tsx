@@ -203,9 +203,7 @@ export const TokenInputPanel = ({
       {asset && (
         <div className="mt-2 flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
           {showUserBalance && (isFromInput ? (
-            <span className={`text-xs md:text-sm flex flex-wrap items-center gap-1 ${
-              toWei(maxAmountWei) === 0n ? "text-red-600" : "text-muted-foreground"
-            }`}>
+            <span className="text-xs md:text-sm text-muted-foreground flex flex-wrap items-center gap-1">
               <span className="whitespace-nowrap">Your Balance:</span>
               <span className="whitespace-nowrap">
                 <AnimatedNumber
