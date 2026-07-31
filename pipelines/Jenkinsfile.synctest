@@ -110,12 +110,27 @@ def deployAndSync(String network, String metricNamespacePrefix) {
     // Start the node from genesis using strato-up. Uses the network's default
     // public vault and file server, so no local vault/highway deployment is
     // needed.
+    //
+    // NOTE: do NOT lower kafka retention (--kafkaLogRetention*) on this node.
+    // During a from-genesis sync the sequencer runs far ahead of the VM, so
+    // vm-runner's unconsumed vm_tasks backlog is essentially the whole topic;
+    // any retention cap the topic outgrows deletes unconsumed segments and
+    // vm-runner dies with OffsetOutOfRange mid-sync. Shrinking the kafka
+    // payload happens at snapshot time instead: strato-snapshot create prunes
+    // the consumed history behind the committed consumer offsets.
+    //
+    // The smaller segment size below is safe (it deletes nothing): it only
+    // makes the broker roll log files more often, so the snapshot-time prune
+    // can reclaim consumed history at fine granularity -- whole segments are
+    // the deletion unit, and the default 1GiB segments never roll on these
+    // topics.
     writeFile file: "run.sh", text: """#!/bin/bash
       export PATH
       strato-up mynode \\
         --network=${network} \\
         --nodeHost=\$(</host) \\
-        --sslDir='/home/ubuntu/letsencrypt-ssl'
+        --sslDir='/home/ubuntu/letsencrypt-ssl' \\
+        --kafkaLogSegmentBytes=67108864
     """
     sh 'chmod +x run.sh'
     withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {

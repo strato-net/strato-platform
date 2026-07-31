@@ -1,6 +1,6 @@
 # STRATO Management Dashboard (SMD)
 
-Modern rewrite of the SMD on the same stack as the Mercata app: **Vite + React 18 +
+Modern rewrite of the SMD on the same stack as the STRATO App: **Vite + React 18 +
 TypeScript + Tailwind + shadcn/ui**, with **wagmi / viem / RainbowKit** wallet
 connectivity and **TanStack Query** for data.
 

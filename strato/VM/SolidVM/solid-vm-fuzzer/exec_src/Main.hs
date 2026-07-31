@@ -134,7 +134,7 @@ main = do
               Nothing -> do
                 putStrLn $ "Could not parse initial breakpoints: " ++ bps'
                 putStrLn $ "Example: "
-                printJSON . UnconditionalBP $ def & sourcePositionName .~ "mercata/contracts/tests/BaseCodeCollection.test.sol"
+                printJSON . UnconditionalBP $ def & sourcePositionName .~ "app/contracts/tests/BaseCodeCollection.test.sol"
               Just bps -> do
                 void $ addBreakpoints bps dSettings
                 let loop = do

@@ -67,7 +67,7 @@ export interface MultiNodeConfig {
 // Application-layer scenario building blocks
 // ----------------------------------------------------------------------------
 // Two scenarios share these:
-//   - tokenSale  (Scenario 1): canonical Mercata Bridge-In flow.
+//   - tokenSale  (Scenario 1): canonical App Bridge-In flow.
 //                Sign Permit2 + broadcast DepositRouter.deposit on Sepolia,
 //                then POST /api/bridge/requestDepositAction (action=2
 //                AUTO_FORGE). The bridge service finishes the pipeline
