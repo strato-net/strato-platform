@@ -181,28 +181,42 @@ const fetchSwapInputs24h = async (
   return sums;
 };
 
+/** wei balance valued at the oracle price (18-decimal wei), as a plain USD number */
+const usdAmount = (priceMap: Map<string, string>, tokenAddress: string, balance: string): number => {
+  const price = priceMap.get(tokenAddress);
+  if (!price) return 0;
+  return Number((BigInt(balance) * BigInt(price)) / 10n ** 18n) / 1e18;
+};
+
+/**
+ * 24h fee income kept by LPs, in USD. The fee tier is in pips (1e6 denominator);
+ * the protocol cut (packed denominators d0 + (d1 << 4), 0 = off) is deducted
+ * from what LPs keep.
+ */
+const lpFees24hUSD = (raw: RawV3Pool, volume24hUSD: number): number => {
+  const d0 = Number(raw.feeProtocol) % 16;
+  const d1 = Math.floor(Number(raw.feeProtocol) / 16);
+  const lpFraction = 1 - ((d0 > 0 ? 1 / d0 : 0) + (d1 > 0 ? 1 / d1 : 0)) / 2;
+  return volume24hUSD * (Number(raw.fee) / 1e6) * lpFraction;
+};
+
+const volume24hUSDFor = (raw: RawV3Pool, priceMap: Map<string, string>, swapInputs?: SwapInputs24h): number =>
+  swapInputs
+    ? usdAmount(priceMap, raw.token0.address, swapInputs.in0.toString()) +
+      usdAmount(priceMap, raw.token1.address, swapInputs.in1.toString())
+    : 0;
+
 const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>, swapInputs?: SwapInputs24h): PoolV3 => {
   const priceWad = v3.sqrtPriceX96ToPriceWad(BigInt(raw.sqrtPriceX96));
-  const usd = (tokenAddress: string, balance: string): number => {
-    const price = priceMap.get(tokenAddress);
-    if (!price) return 0;
-    return Number((BigInt(balance) * BigInt(price)) / 10n ** 18n) / 1e18;
-  };
+  const usd = (tokenAddress: string, balance: string): number => usdAmount(priceMap, tokenAddress, balance);
   // oracle spot price of the pair (token1 per token0, same orientation as priceWad)
   const price0 = BigInt(priceMap.get(raw.token0.address) ?? "0");
   const price1 = BigInt(priceMap.get(raw.token1.address) ?? "0");
   const oraclePriceWad = price0 > 0n && price1 > 0n ? (price0 * 10n ** 18n) / price1 : 0n;
 
   const totalLiquidityUSD = usd(raw.token0.address, raw.token0Balance) + usd(raw.token1.address, raw.token1Balance);
-  const volume24hUSD = swapInputs
-    ? usd(raw.token0.address, swapInputs.in0.toString()) + usd(raw.token1.address, swapInputs.in1.toString())
-    : 0;
-  // LP fee yield: the fee tier is in pips (1e6 denominator); the protocol cut
-  // (packed denominators d0 + (d1 << 4), 0 = off) is deducted from what LPs keep
-  const d0 = Number(raw.feeProtocol) % 16;
-  const d1 = Math.floor(Number(raw.feeProtocol) / 16);
-  const lpFraction = 1 - ((d0 > 0 ? 1 / d0 : 0) + (d1 > 0 ? 1 / d1 : 0)) / 2;
-  const fees24hUSD = volume24hUSD * (Number(raw.fee) / 1e6) * lpFraction;
+  const volume24hUSD = volume24hUSDFor(raw, priceMap, swapInputs);
+  const fees24hUSD = lpFees24hUSD(raw, volume24hUSD);
   const apy = totalLiquidityUSD > 0 ? Math.max(0, (fees24hUSD / totalLiquidityUSD) * 365 * 100) : 0;
 
   return {
@@ -640,6 +654,16 @@ export const getPositions = async (
     ticksByPool.set(addr, new Map(ticks.map((t) => [t.tick, t])));
   }
 
+  // fee income + prices for the per-position APY estimate
+  const tokenAddresses = [...new Set(rawPools.flatMap((p) => [p.token0.address, p.token1.address]))];
+  const [swapInputs24h, priceMap] = await Promise.all([
+    fetchSwapInputs24h(accessToken, poolAddresses),
+    getOraclePrices(accessToken, {
+      select: "asset:key,price:value::text",
+      key: `in.(${tokenAddresses.join(",")})`,
+    }),
+  ]);
+
   return rows.flatMap((row) => {
     const pool = poolByAddress.get(row.address);
     if (!pool) return [];
@@ -684,6 +708,22 @@ export const getPositions = async (
       pending1 = v3.pendingFees(liquidity, inside1, last1);
     }
 
+    // Estimated fee APY: an in-range position earns the pool's LP fee income in
+    // proportion to its share of the CURRENT in-range liquidity (not of TVL —
+    // that's the pool-level APY, which understates concentrated positions).
+    // Out-of-range positions earn nothing until the price re-enters the range.
+    const inRange = Number(pool.currentTick) >= tickLower && Number(pool.currentTick) < tickUpper;
+    const positionValueUsd =
+      usdAmount(priceMap, pool.token0.address, amount0.toString()) +
+      usdAmount(priceMap, pool.token1.address, amount1.toString());
+    const poolLiquidity = Number(pool.liquidity || "0");
+    let apy = 0;
+    if (inRange && positionValueUsd > 0 && poolLiquidity > 0) {
+      const share = Math.min(1, Number(liquidity) / poolLiquidity);
+      const fees24h = lpFees24hUSD(pool, volume24hUSDFor(pool, priceMap, swapInputs24h.get(row.address)));
+      apy = Math.max(0, ((fees24h * share * 365) / positionValueUsd) * 100);
+    }
+
     return [
       {
         poolAddress: row.address,
@@ -697,9 +737,10 @@ export const getPositions = async (
         tokensOwed1: row.tokensOwed1,
         pendingFees0: pending0.toString(),
         pendingFees1: pending1.toString(),
-        inRange: Number(pool.currentTick) >= tickLower && Number(pool.currentTick) < tickUpper,
+        inRange,
         priceLowerWad: v3.sqrtPriceX96ToPriceWad(v3.getSqrtRatioAtTick(tickLower)).toString(),
         priceUpperWad: v3.sqrtPriceX96ToPriceWad(v3.getSqrtRatioAtTick(tickUpper)).toString(),
+        apy,
       },
     ];
   });

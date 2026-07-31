@@ -403,16 +403,23 @@ const V3MyPositions = ({
                       Range: {formatTickAsPrice(position.tickLower)} – {formatTickAsPrice(position.tickUpper)}{" "}
                       {pool.token1.symbol}/{pool.token0.symbol}
                     </span>
-                    <Badge
-                      variant="outline"
-                      className={`text-[10px] px-1.5 py-0 flex-shrink-0 ${
-                        position.inRange
-                          ? "text-green-600 border-green-600/40"
-                          : "text-yellow-600 border-yellow-600/40"
-                      }`}
-                    >
-                      {position.inRange ? "In range" : "Out of range"}
-                    </Badge>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {(position.apy || 0) > 0 && (
+                        <span className="text-[11px] text-green-600 font-medium whitespace-nowrap">
+                          {position.apy.toFixed(2)}% APY
+                        </span>
+                      )}
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] px-1.5 py-0 flex-shrink-0 ${
+                          position.inRange
+                            ? "text-green-600 border-green-600/40"
+                            : "text-yellow-600 border-yellow-600/40"
+                        }`}
+                      >
+                        {position.inRange ? "In range" : "Out of range"}
+                      </Badge>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
