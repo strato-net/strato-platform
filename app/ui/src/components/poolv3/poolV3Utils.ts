@@ -1,7 +1,7 @@
 /**
  * Client-side helpers for the V3 liquidity UI. Display-precision only: exact
  * integer amounts always come from the backend (/poolv3/amounts-for-liquidity,
- * /poolv3/quote), which mirrors the on-chain math bit-for-bit.
+ * /trade/quote), which mirrors the on-chain math bit-for-bit.
  */
 import { formatUnits } from "ethers";
 

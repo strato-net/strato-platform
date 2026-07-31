@@ -25,11 +25,16 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/oracle/price": "Price Error",
   
   // Swap operations
-  "/swap-pools/tokens": "Token Pair Error",
   "/swap-pools/positions": "LP Positions Error",
   "/swap-pools/liquidity": "Liquidity Operation Error",
   "/swap-pools": "Swap Error",
   "/swap": "Swap Transaction Error",
+
+  // Unified trade operations
+  "/trade/tokens": "Token Pair Error",
+  "/trade/quote": "Trade Quote Error",
+  "/trade/swap": "Trade Transaction Error",
+  "/trade": "Trade Error",
   
   // Bridge operations 
   "/bridge/config": "Bridge Configuration Error",

@@ -47,21 +47,6 @@ router.post("/pools", walletAuth, PoolV3Controller.create);
 
 /**
  * @openapi
- * /poolv3/pools/pair/{tokenAddress1}/{tokenAddress2}:
- *   get:
- *     summary: V3 pools for a token pair (all fee tiers, either token order)
- *     tags: [PoolV3]
- *     parameters:
- *       - { name: tokenAddress1, in: path, required: true, schema: { type: string } }
- *       - { name: tokenAddress2, in: path, required: true, schema: { type: string } }
- *     responses:
- *       200:
- *         description: Matching V3 pools, deepest liquidity first
- */
-router.get("/pools/pair/:tokenAddress1/:tokenAddress2", authHandler.authorizeRequest(true), PoolV3Controller.getByPair);
-
-/**
- * @openapi
  * /poolv3/pools/{poolAddress}:
  *   get:
  *     summary: Fetch a V3 pool by address
@@ -87,51 +72,6 @@ router.get("/pools/:poolAddress", authHandler.authorizeRequest(true), PoolV3Cont
  *         description: Active liquidity per initialized-tick interval, plus current tick/spacing
  */
 router.get("/pools/:poolAddress/liquidity", authHandler.authorizeRequest(true), PoolV3Controller.liquidity);
-
-/**
- * @openapi
- * /poolv3/quote:
- *   get:
- *     summary: Quote a V3 swap by simulating the tick-walking swap loop over indexed state
- *     tags: [PoolV3]
- *     parameters:
- *       - { name: poolAddress, in: query, required: true, schema: { type: string } }
- *       - { name: zeroForOne, in: query, required: true, schema: { type: string, enum: ["true", "false"] } }
- *       - name: amountSpecified
- *         in: query
- *         required: true
- *         description: Positive = exact input, negative = exact output (wei string)
- *         schema: { type: string }
- *     responses:
- *       200:
- *         description: Quote with amounts, fee, post-swap price/tick, price impact
- */
-router.get("/quote", authHandler.authorizeRequest(true), PoolV3Controller.quote);
-
-/**
- * @openapi
- * /poolv3/swap:
- *   post:
- *     summary: Execute a V3 swap (exact input or exact output) via the caller's wallet
- *     tags: [PoolV3]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [poolAddress, zeroForOne, amountSpecified, amountLimit]
- *             properties:
- *               poolAddress: { type: string }
- *               zeroForOne: { type: boolean, description: "true = token0 in / token1 out" }
- *               amountSpecified: { type: string, description: "signed: >0 exact input, <0 exact output" }
- *               amountLimit: { type: string, description: "exact-in: min output; exact-out: max input" }
- *               sqrtPriceLimitX96: { type: string, description: "optional price limit (0 = tick-domain edge)" }
- *     responses:
- *       200:
- *         description: Transaction result
- */
-router.post("/swap", walletAuth, PoolV3Controller.swap);
 
 /**
  * @openapi

@@ -290,6 +290,47 @@ export const getPoolsByPair = async (accessToken: string, tokenA: string, tokenB
     .sort((x, y) => y.totalLiquidityUSD - x.totalLiquidityUSD);
 };
 
+/**
+ * Token discovery for the unified trade surface: the max funded balance per
+ * token across active (not disabled, funded on both sides) V3 pools. With
+ * `pairedWith` set, returns only counterparty tokens of pools containing that
+ * token, valued at their counterparty-side balance.
+ */
+export const getFundedPoolTokenBalances = async (
+  accessToken: string,
+  pairedWith?: string
+): Promise<Map<string, bigint>> => {
+  const paired = pairedWith ? normalizeAddress(pairedWith) : undefined;
+  const { data } = await cirrus.get(accessToken, `/${PoolV3Table}`, {
+    params: {
+      isDisabled: "eq.false",
+      isPaused: "eq.false",
+      select: "address,token0,token1,token0Balance::text,token1Balance::text",
+      ...(paired ? { or: `(token0.eq.${paired},token1.eq.${paired})` } : {}),
+    },
+  });
+
+  const balances = new Map<string, bigint>();
+  const bump = (token: string, balance: bigint) => {
+    if (balance > (balances.get(token) ?? 0n)) balances.set(token, balance);
+  };
+
+  type Row = { address: string; token0: string; token1: string; token0Balance: string; token1Balance: string };
+  for (const row of (data as Row[]) ?? []) {
+    if (config.hiddenSwapPools.has(row.address)) continue;
+    const balance0 = BigInt(row.token0Balance || "0");
+    const balance1 = BigInt(row.token1Balance || "0");
+    if (balance0 <= 0n || balance1 <= 0n) continue;
+    if (paired) {
+      bump(row.token0 === paired ? row.token1 : row.token0, row.token0 === paired ? balance1 : balance0);
+    } else {
+      bump(row.token0, balance0);
+      bump(row.token1, balance1);
+    }
+  }
+  return balances;
+};
+
 /** Minimal token0/token1 lookup for a set of pools (portfolio valuation) */
 export const getPoolTokenPairs = async (
   accessToken: string,

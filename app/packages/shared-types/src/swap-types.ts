@@ -26,6 +26,30 @@ export interface MultiTokenSwapParams {
 }
 
 /**
+ * Exact quote for a StablePool swap, computed server-side by replaying the
+ * contract's StableSwap math over indexed pool state (works for both 2-coin
+ * and multi-token stable pools).
+ */
+export interface StablePoolQuote {
+  poolAddress: string;
+  tokenIn: string;
+  tokenOut: string;
+  exactOut: boolean;
+  /** input consumed, wei string */
+  amountIn: string;
+  /** output produced (after fee), wei string */
+  amountOut: string;
+  /** fee withheld, in output-token wei */
+  feeAmount: string;
+  /** base pool fee in basis points */
+  fee: number;
+  /** price impact in percent (fee-less spot vs execution price) */
+  priceImpact: number;
+  /** fee-less marginal rate at quote time, tokenOut per tokenIn, 1e18 fixed point */
+  spotRateWad?: string;
+}
+
+/**
  * Parameters for adding liquidity to a multi-token pool
  */
 export interface MultiTokenLiquidityParams {
