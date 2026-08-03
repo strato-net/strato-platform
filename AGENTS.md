@@ -21,7 +21,7 @@
 - Cirrus query optimization: `or=()` to batch filters; phased parallel `Promise.all`; `attributes->>` for selective field extraction in enrichment queries (smaller payload), but full `attributes` blob for data queries (nested JSON is more compact than repeated column names); `history@mapping` for historical data; `authorizeRequest(true)` for public endpoints; multiple `or=` params are ANDed — use `and=(or(...),or(...))` to combine; `count()` with extra select fields implies implicit `GROUP BY`; `max()` and `DISTINCT ON` are not supported
 - Cirrus event table: canonical events (`DepositInitiated`, `WithdrawalRequested`, `MetalMinted`) provide one row per transaction with native `limit`/`offset` pagination; status derived from follow-up events (`DepositCompleted`, `WithdrawalCompleted`, etc.) via batch enrichment; outcome (`AutoForged`, `AutoSaved`) included in same enrichment call; mixed-contract filter: `or=(and(address.eq.{bridge}, event_name.in.(...)), and(address.eq.{forge}, event_name.eq.MetalMinted, attributes->>buyer.neq.{bridge}))`; auto-forge `MetalMinted` events (buyer=bridge) must be excluded from direct metal purchases
 - Fund page IS BridgeIn; Buy Metals lives in `BridgeIn.tsx`; Step 3 cards use `ScrollRow` with responsive columns: 5 desktop (≥700px), 4 tablet (≥480px), 3 mobile; pass cards as a flat array—fragment wrapping breaks `React.Children.count`; `tokenCacheRef` caches bridgeable tokens per chainId; `RecentTransactions` shows last five deposits/withdrawals or metal purchases; reserve fixed vertical space for all optional card rows (price/unit, APY, spot+fee) so every card stays equal height; green APY links to earn pages via `ApySource` (swap uses `?pool=poolAddress`); metal effective price = `spot × 10000 / (10000 − feeBps)`; `DepositAction.feeBps` from MetalForge `metalConfigs` Cirrus mapping; rewards `getActivityLink` routes direct-mint and bridge names to `/dashboard/deposits` (Fund)
-- Rewards poller: `mercata/services/rewards-poller/src/config/attributeMapping.json` uses lowercase hex; map Solidity events to `amount`/`user` (e.g. `SaveUSDSTVault` `Deposit`/`Withdraw` use `shares` and `owner`); `attributeMapping.ts` holds `PRICE_CONVERSION_MAP` and USDST-only filters where needed; poller resolves activities from on-chain Rewards config via Cirrus, not hardcoded activity IDs. `Rewards.sol`: `activityType` is fixed at creation—OneTime→Position needs a new Position activity, zero old emission, `setSourceContract` on the old activity to free `(sourceContract, eventName)`, then register the new activity; numeric activity IDs can differ by network. Position withdraw: if withdraw amount exceeds tracked stake, stake floors to zero (no revert)
+- Rewards poller: `app/services/rewards-poller/src/config/attributeMapping.json` uses lowercase hex; map Solidity events to `amount`/`user` (e.g. `SaveUSDSTVault` `Deposit`/`Withdraw` use `shares` and `owner`); `attributeMapping.ts` holds `PRICE_CONVERSION_MAP` and USDST-only filters where needed; poller resolves activities from on-chain Rewards config via Cirrus, not hardcoded activity IDs. `Rewards.sol`: `activityType` is fixed at creation—OneTime→Position needs a new Position activity, zero old emission, `setSourceContract` on the old activity to free `(sourceContract, eventName)`, then register the new activity; numeric activity IDs can differ by network. Position withdraw: if withdraw amount exceeds tracked stake, stake floors to zero (no revert)
 - `UserTokensContext` provides user token balances (auto-fetches from `/tokens/balance` on login); `TokenContext.activeTokens` is admin-only and always `[]` for regular users; refetch `earningAssets` after bridge-in and metals purchases; MercataBridge requires both `asset.enabled` and `Token.status == ACTIVE` for deposits/withdrawals; Token.sol `burn()` is `onlyOwner` (TokenFactory); MetalForge `mintMetal` mints to `msg.sender`
 - Earn APY formulas: base yield = 30d ratio growth `((1+periodReturn)^(365/30)−1)×100` for yield-bearing tokens (`yieldBenchmarks`: wstETH/ETH, rETH/ETH, sUSDS/USDST, syrupUSDC/USDC); swap = fee-only `(volume24h × feeRate × lpShare / TVL) × 365`; vault APY uses cash-flow formula from develop (not NAV/share TWR); weighted base yield (`weighted_swap`) = USD-weighted blend of constituent base yields, applies only to swap pools with yield-bearing tokens; `weighted_vault` removed from scope; `ApySource` union uses `"base"` (renamed from `"yield"`)
 - Default priceOracle is system contract `0000…1002` (same for vaults and system default — no separate query)
@@ -32,19 +32,19 @@
 
 ### Services overview
 
-The primary dev loop involves three services — see `mercata/README.md` for canonical commands:
+The primary dev loop involves three services — see `app/README.md` for canonical commands:
 
 | Service | Dir | Command | Port |
 |---|---|---|---|
-| Backend | `mercata/backend/` | `npm run dev` | 3001 |
-| UI | `mercata/ui/` | `npm run dev` | 8080 |
-| Nginx | `mercata/nginx/` | `docker compose -f docker-compose.nginx-standalone.yml up -d --build` | 80 |
+| Backend | `app/backend/` | `npm run dev` | 3001 |
+| UI | `app/ui/` | `npm run dev` | 8080 |
+| Nginx | `app/nginx/` | `docker compose -f docker-compose.nginx-standalone.yml up -d --build` | 80 |
 
-**Shared types** (`mercata/packages/shared-types/`) are built automatically via `postinstall` hooks in both backend and UI.
+**Shared types** (`app/packages/shared-types/`) are built automatically via `postinstall` hooks in both backend and UI.
 
 ### Required environment variables
 
-Backend requires four OAuth and node env vars (see `mercata/README.md` DEV MODE section for names). These are injected as secrets in the Cloud Agent environment.
+Backend requires four OAuth and node env vars (see `app/README.md` DEV MODE section for names). These are injected as secrets in the Cloud Agent environment.
 
 ### Key caveats
 
@@ -52,5 +52,5 @@ Backend requires four OAuth and node env vars (see `mercata/README.md` DEV MODE 
 - **Docker is required** for nginx. In the Cloud Agent VM (nested container), Docker needs `fuse-overlayfs` storage driver and `iptables-legacy`. The daemon must be started manually: `sudo dockerd &>/tmp/dockerd.log &` then `sudo chmod 666 /var/run/docker.sock`.
 - **Nginx uses `host.docker.internal`** to reach backend (3001) and UI (8080) on the host. The `extra_hosts: host.docker.internal:host-gateway` directive in the compose file handles this.
 - Backend emits non-fatal YAML warnings from Swagger JSDoc annotations at startup — these can be ignored.
-- **Lint**: `cd mercata/ui && npx eslint .` — the existing codebase has pre-existing lint errors; this is normal.
-- **Type-check backend**: `cd mercata/backend && npx tsc --noEmit`
+- **Lint**: `cd app/ui && npx eslint .` — the existing codebase has pre-existing lint errors; this is normal.
+- **Type-check backend**: `cd app/backend && npx tsc --noEmit`

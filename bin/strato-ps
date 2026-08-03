@@ -69,7 +69,9 @@ if [[ "$CONVOKE_RUNNING" == "true" ]]; then
     echo "  Running (PID $CONVOKE_PID)"
     echo "  Processes:"
     for pid in $(pgrep -P "$CONVOKE_PID" 2>/dev/null); do
-        cmd=$(ps -p "$pid" -o args= 2>/dev/null | awk '{print $1}')
+        # Show the script name for interpreter-run services (e.g.
+        # "bash .../strato-logrotate" -> "strato-logrotate"), stripping any path.
+        cmd=$(ps -p "$pid" -o args= 2>/dev/null | awk '{ c=$1; if (c ~ /(^|\/)(bash|sh|dash)$/ && NF > 1) c=$2; sub(/.*\//, "", c); print c }')
         echo "    $cmd ($pid)"
     done
 else

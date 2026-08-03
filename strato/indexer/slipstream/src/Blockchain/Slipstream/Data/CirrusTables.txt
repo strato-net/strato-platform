@@ -10,7 +10,13 @@ Storage
 
 Contract
     address Address
-    creator Text
+    code_hash Keccak256
     contract_name Text
-    Primary address creator contract_name
+    Primary address code_hash contract_name
+    deriving Eq Ord Read Show
+
+Code
+    code_hash Keccak256
+    creator Text
+    Primary code_hash creator
     deriving Eq Ord Read Show

@@ -3,7 +3,7 @@ represent any binding indication or commitment by STRATO and its employees to
 take any action whatsoever, including relating to the structure and/or any
 potential operation of the STRATO protocol or the protocol roadmap. In
 particular: (i) nothing in these projects, requests, or comments is intended to
-create any contractual or other form of legal relationship with STRATO Mercata,
+create any contractual or other form of legal relationship with STRATO Nexus,
 Inc. or third parties who engage with this STRATO Protocol GitHub account
 (including, without limitation, by responding to a conversation or submitting
 comments) (ii) by engaging with any conversation or request, the relevant

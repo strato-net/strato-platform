@@ -80,12 +80,14 @@ local wallet_auth_route_prefixes = {
   "/api/earn/",
   "/api/lend/",
   "/api/lending/",
+  "/api/poolv3/",
   "/api/psm/",
   "/api/refer/",
   "/api/rewards/",
   "/api/staking/",
   "/api/swap-pools/",
   "/api/tokens/",
+  "/api/trade/",
   "/api/user/admin/",
   "/api/vault/"
 }

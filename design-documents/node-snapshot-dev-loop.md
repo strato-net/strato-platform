@@ -159,8 +159,8 @@ Example:
     "apex": "apex:16.15-cda3022-...",
     "postgrest": "postgrest:16.15-cda3022-...",
     "nginx": "nginx:16.15-cda3022-...",
-    "mercataBackend": "mercata-backend:16.15-cda3022-...",
-    "mercataUi": "mercata-ui:16.15-cda3022-..."
+    "appBackend": "app-backend:16.15-cda3022-...",
+    "appUi": "app-ui:16.15-cda3022-..."
   },
   "payload": [
     "ethereumH",
@@ -409,10 +409,10 @@ After that, app iteration should use the existing patch flow:
 ```bash
 make app
 strato-down mynode
-strato-patch-app mynode mercata-backend:<tag> mercata-ui:<tag>
+strato-patch-app mynode app-backend:<tag> app-ui:<tag>
 ```
 
-For pure Mercata UI/backend work, the preferred loop remains dev mode against a shared synced node via `NODE_URL`; snapshots are for work that actually requires a local STRATO node.
+For pure App UI/backend work, the preferred loop remains dev mode against a shared synced node via `NODE_URL`; snapshots are for work that actually requires a local STRATO node.
 
 ## Failure Modes
 
