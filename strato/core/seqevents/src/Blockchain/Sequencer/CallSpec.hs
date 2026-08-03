@@ -16,7 +16,7 @@ import Data.Binary
 import Data.Text (Text)
 import GHC.Generics (Generic)
 
--- | A simulated contract creation for eth_call\/eth_simulateV1\/debug_traceCall.
+-- | A simulated contract creation for eth_call\/strato_simulateV1\/strato_traceCall.
 -- SolidVM is source-based: creation takes the contract name, Solidity source
 -- text and constructor args rather than EVM init bytecode.
 data TxCreateObject = TxCreateObject

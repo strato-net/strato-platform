@@ -1,10 +1,10 @@
-[![STRATO Mercata logo](https://strato.nexus/images/strato.nexus/2025.10.11/strato-logo.png)](https://strato.nexus)
+[![STRATO logo](https://strato.nexus/images/strato.nexus/2025.10.11/strato-logo.png)](https://strato.nexus)
 
 > NOTE: bootstrap-docker is temporary a duplicate of [strato-getting-started repository](https://github.com/blockapps/strato-getting-started), until the strato-platform is open-sourced
 
-# STRATO Mercata - Getting Started
+# STRATO - Getting Started
 
-> A bootstrap script to deploy a STRATO Mercata node
+> A bootstrap script to deploy a STRATO node
 
 ### Prerequisites
 
@@ -15,13 +15,13 @@
   - Associated domain
   - SSL certificate
   - Inbound ports open: 443/tcp, 30303/tcp, 30303/udp
-- STRATO Mercata client credentials (OAuth2 client for node identity)
+- STRATO client credentials (OAuth2 client for node identity)
   - Request the credentials for your domain at https://support.blockapps.net (Request Client Credentials)
 
 ### Usage
 
 - Start a node:
-  - Fetch a `docker-compose.yml` of the latest STRATO Mercata release:
+  - Fetch a `docker-compose.yml` of the latest STRATO release:
     ```
     sudo ./strato --compose
     ```

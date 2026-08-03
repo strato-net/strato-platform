@@ -1,12 +1,14 @@
--- Guards the public /rpc endpoint against the expensive VM methods
--- (the debug_* namespace and eth_simulateV1), which can bog down the VM with
--- simulations. These are only needed via the authenticated-optional bloc
--- simulate endpoint, which reaches the VM by a separate internal path
--- (container-to-container on the RPC port) and never traverses this location.
+-- Guards the public /rpc endpoint against the expensive VM methods (the
+-- strato_* namespace: strato_simulateV1 and the strato_trace* family), which
+-- re-execute transactions in a sandbox and can bog down the VM. These are only
+-- needed via the authenticated-optional bloc simulate endpoint, which reaches
+-- the VM by a separate internal path (container-to-container on the RPC port)
+-- and never traverses this location.
 --
--- Included in the /rpc location only when PUBLIC_DEBUG_RPC_ENABLED != true
--- (see docker-run.sh / #TEMPLATE_MARK_DEBUG_RPC_GUARD). Read-only methods such
--- as eth_call and eth_getBalance are left available.
+-- Included in the /rpc location only when PUBLIC_STRATO_RPC_ENABLED != true
+-- (see docker-run.sh / #TEMPLATE_MARK_STRATO_RPC_GUARD). Read-only methods such
+-- as eth_call, eth_getBalance and the cheap debug_traceBlockByHash (attribution
+-- frames read from stored results, no re-execution) are left available.
 
 local cjson = require "cjson.safe"
 
@@ -15,10 +17,7 @@ local function is_blocked(method)
   if type(method) ~= "string" then
     return false
   end
-  if method:sub(1, 6) == "debug_" then
-    return true
-  end
-  if method == "eth_simulateV1" then
+  if method:sub(1, 7) == "strato_" then
     return true
   end
   return false

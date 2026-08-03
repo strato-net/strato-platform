@@ -24,7 +24,7 @@ import Blockchain.Data.BlockHeader (BlockHeader)
 import Blockchain.DB.CodeDB
 import Blockchain.DB.SolidStorageDB (getSolidStorageKeyVal')
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.CallTrace (CallFrame, TraceLog (..), VmTracer, newVmTracer, takeTraceRoots)
+import Blockchain.Data.VmTrace (CallFrame, TraceLog (..), VmTracer, newVmTracer, takeTraceRoots)
 import Blockchain.Data.ExecResults (ExecResults (..))
 import Blockchain.MemVMContext (MemContextM, VMType (..), evalSandboxedContextM)
 import Blockchain.Sequencer.CallSpec (CallSpec (..), TraceOptions (..), TxCreateObject (..), TxFuncCallObject (..))
@@ -135,7 +135,7 @@ runJsonRpcCommand' c@(JRCCallV2 spec mHeader id) = do
     -- eth_call's contract is ABI-encoded return bytes, which a direct
     -- SolidVM call has no types to produce.
     SpecFuncCall _ ->
-      return $ Error id "functionName call specs are supported by eth_simulateV1 and debug_traceCall only"
+      return $ Error id "functionName call specs are supported by strato_simulateV1 and strato_traceCall only"
 runJsonRpcCommand' c@(JRCTraceCall spec mHeader opts id) = do
   $logInfoS "JRCTraceCall" . T.pack $ format c
   withExecHeader mHeader id $ \header -> do
@@ -157,7 +157,7 @@ runJsonRpcCommand' c@(JRCTraceCall spec mHeader opts id) = do
     case (resp, roots) of
       (Error _ msg, []) -> return $ Error id msg
       _ -> return . SuccessJson id . BL.toStrict . Aeson.encode $ traceToJson truncated roots
-runJsonRpcCommand' c@JRCTraceBlockTxs {} = return $ Error (jrcId c) "debug_traceBlock* is not implemented yet"
+runJsonRpcCommand' c@JRCTraceBlockTxs {} = return $ Error (jrcId c) "strato_traceBlock* is not implemented yet"
 runJsonRpcCommand' c@(JRCSimulate simBlocks mHeader id) = do
   $logInfoS "JRCSimulate" . T.pack $ format c
   -- The whole command runs inside one sandbox, so state accumulates across
@@ -266,7 +266,7 @@ ethCall id blockHeader gas fromAddr toAddr callData = do
   return $ either (Error id) (Success id) eRes
 
 -- | Like ethCall, but also exposes the ExecResults (when execution ran) so
--- callers like eth_simulateV1 can report gas usage and logs per call.
+-- callers like strato_simulateV1 can report gas usage and logs per call.
 ethCallEx :: VMBase m => BlockHeader -> Gas -> Address -> Address -> B.ByteString -> m (Either String B.ByteString, Maybe ExecResults)
 ethCallEx blockHeader gas fromAddr toAddr callData = do
   let selector = B.take 4 callData

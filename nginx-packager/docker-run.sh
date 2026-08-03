@@ -131,12 +131,12 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i '/#TEMPLATE_MARK_JSONRPC/d' /tmp/nginx.conf
   fi
 
-  # Public /rpc exposes the expensive VM methods (debug_*, eth_simulateV1) only
-  # when explicitly opted in; otherwise keep the guard (secure default).
-  if [ "$PUBLIC_DEBUG_RPC_ENABLED" == true ]; then
-    sed -i '/#TEMPLATE_MARK_DEBUG_RPC_GUARD/d' /tmp/nginx.conf
+  # Public /rpc exposes the expensive VM methods (the strato_* simulation/trace
+  # namespace) only when explicitly opted in; otherwise keep the guard (secure default).
+  if [ "$PUBLIC_STRATO_RPC_ENABLED" == true ]; then
+    sed -i '/#TEMPLATE_MARK_STRATO_RPC_GUARD/d' /tmp/nginx.conf
   else
-    sed -i 's/[[:space:]]*#TEMPLATE_MARK_DEBUG_RPC_GUARD//g' /tmp/nginx.conf
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_STRATO_RPC_GUARD//g' /tmp/nginx.conf
   fi
 
   # Remove tracking-links routes unless the tracking service is deployed

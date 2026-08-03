@@ -108,14 +108,14 @@ data JsonRpcCommand
   | -- | eth_call v2: message call or contract creation, sandboxed, optionally
     -- against a historical block header (Nothing = best block).
     JRCCallV2 {jrcSpec :: CallSpec, jrcHeader :: Maybe BlockHeader, jrcId :: String}
-  | -- | debug_traceCall: like JRCCallV2 but returns a call-frame trace.
+  | -- | strato_traceCall: like JRCCallV2 but returns a call-frame trace.
     JRCTraceCall {jrcSpec :: CallSpec, jrcHeader :: Maybe BlockHeader, jrcOpts :: TraceOptions, jrcId :: String}
-  | -- | debug_traceTransaction / debug_traceBlock*: replay the given txs of a
+  | -- | strato_traceTransaction / strato_traceBlock*: replay the given txs of a
     -- block against its parent state, tracing the target tx (or all when
     -- Nothing). The API side ships the header and txs so the VM does not need
     -- SQL access to historical blocks.
     JRCTraceBlockTxs {jrcBlockHeader :: BlockHeader, jrcTxs :: [Transaction], jrcTargetTx :: Maybe Keccak256, jrcOpts :: TraceOptions, jrcId :: String}
-  | -- | eth_simulateV1: blocks of calls executed sequentially in one sandbox.
+  | -- | strato_simulateV1: blocks of calls executed sequentially in one sandbox.
     JRCSimulate {jrcSimBlocks :: [[CallSpec]], jrcHeader :: Maybe BlockHeader, jrcId :: String}
   deriving (Eq, Show, GHCG.Generic)
 

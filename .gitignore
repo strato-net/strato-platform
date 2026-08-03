@@ -62,7 +62,6 @@ docker-compose.notification.yml
 docker-compose.oracle.ecr.yml
 docker-compose.oracle.yml
 
-/app
 /mynode/
 /snapshot-test-node/
 /snapshot-smoke-node/
@@ -136,4 +135,4 @@ __pycache__/
 /docs/end-user/
 .docker-built/
 
-mercata/contracts/.env.happy-eth-withdrawal
+app/contracts/.env.happy-eth-withdrawal

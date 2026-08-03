@@ -19,7 +19,7 @@ library
       Blockchain.Bagger.BaggerState
       Blockchain.Bagger.Transactions
       Blockchain.Data.BlockSummary
-      Blockchain.Data.CallTrace
+      Blockchain.Data.VmTrace
       Blockchain.Data.ExecResults
       Blockchain.DB.BlockSummaryDB
       Blockchain.DB.ModifyStateDB

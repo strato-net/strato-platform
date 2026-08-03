@@ -34,7 +34,7 @@ import Blockchain.DB.ModifyStateDB (pay)
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
-import Blockchain.Data.CallTrace
+import Blockchain.Data.VmTrace
 import Blockchain.Data.ExecResults
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)

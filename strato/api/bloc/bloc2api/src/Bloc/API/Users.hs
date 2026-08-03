@@ -385,7 +385,7 @@ instance ToSchema UploadListContract where
           { uploadlistcontractContractName = "SampleContract",
             uploadlistcontractSrc = mempty,
             uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 1)],
-            _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing,
+            _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing Nothing,
             uploadlistcontractMetadata = Nothing
           }
 
@@ -472,6 +472,7 @@ instance ToSchema SendTransaction where
                     (Just $ Gas 123)
                     (Just $ Wei 345)
                     (Just $ Nonce 9876)
+                    Nothing
                 ),
             sendtransactionMetadata = (Just $ Map.fromList [("purpose", "groceries")])
           }

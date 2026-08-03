@@ -22,6 +22,7 @@ library:
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - blockDB
+    - base16-bytestring
     - bytestring
     - cache
     - clock

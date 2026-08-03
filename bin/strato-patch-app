@@ -2,13 +2,13 @@
 
 set -e
 
-# Usage: strato-patch-app <node-directory> <mercata-backend-image:tag> <mercata-ui-image:tag>
+# Usage: strato-patch-app <node-directory> <app-backend-image:tag> <app-ui-image:tag>
 #
-# Updates the mercata-backend and mercata-ui image tags in the node's
+# Updates the app-backend and app-ui image tags in the node's
 # docker-compose.yml and restarts just those two services in place.
 
 if [[ $# -ne 3 ]]; then
-    echo "Usage: strato-patch-app <node-directory> <mercata-backend-image:tag> <mercata-ui-image:tag>"
+    echo "Usage: strato-patch-app <node-directory> <app-backend-image:tag> <app-ui-image:tag>"
     exit 1
 fi
 
@@ -25,31 +25,31 @@ if [[ ! -f "$NODE_DIR/docker-compose.yml" ]]; then
     exit 1
 fi
 
-if [[ "$BACKEND_IMAGE" != *"mercata-backend:"* ]]; then
-    echo "Error: backend image must be a mercata-backend image (got '$BACKEND_IMAGE')"
+if [[ "$BACKEND_IMAGE" != *"app-backend:"* ]]; then
+    echo "Error: backend image must be a app-backend image (got '$BACKEND_IMAGE')"
     exit 1
 fi
-if [[ "$UI_IMAGE" != *"mercata-ui:"* ]]; then
-    echo "Error: ui image must be a mercata-ui image (got '$UI_IMAGE')"
+if [[ "$UI_IMAGE" != *"app-ui:"* ]]; then
+    echo "Error: ui image must be a app-ui image (got '$UI_IMAGE')"
     exit 1
 fi
 
 cd "$NODE_DIR"
 
-echo "Updating mercata-backend image to: $BACKEND_IMAGE"
-sed "s|image:.*mercata-backend:.*|image: ${BACKEND_IMAGE}|" docker-compose.yml > docker-compose.yml.tmp \
+echo "Updating app-backend image to: $BACKEND_IMAGE"
+sed "s|image:.*app-backend:.*|image: ${BACKEND_IMAGE}|" docker-compose.yml > docker-compose.yml.tmp \
     && mv docker-compose.yml.tmp docker-compose.yml
 
-echo "Updating mercata-ui image to: $UI_IMAGE"
-sed "s|image:.*mercata-ui:.*|image: ${UI_IMAGE}|" docker-compose.yml > docker-compose.yml.tmp \
+echo "Updating app-ui image to: $UI_IMAGE"
+sed "s|image:.*app-ui:.*|image: ${UI_IMAGE}|" docker-compose.yml > docker-compose.yml.tmp \
     && mv docker-compose.yml.tmp docker-compose.yml
 
-RUNNING=$(docker compose -p strato ps --status running -q mercata-backend mercata-ui 2>/dev/null || true)
+RUNNING=$(docker compose -p strato ps --status running -q app-backend app-ui 2>/dev/null || true)
 if [[ -n "$RUNNING" ]]; then
     echo "Now you can restart the app containers on a running node with - make sure to reuse the ENV VARS from your original run script (e.g. run.sh):"
-    echo "<ENV VARS> docker compose -p strato up -d --no-deps mercata-backend mercata-ui"
+    echo "<ENV VARS> docker compose -p strato up -d --no-deps app-backend app-ui"
     echo "Alternatively restart the full node without wiping its data: \`strato-down && ./run.sh\`"
 else
-    echo "mercata-backend and mercata-ui are not running; image tags updated in docker-compose.yml only."
+    echo "app-backend and app-ui are not running; image tags updated in docker-compose.yml only."
     echo "New images will take effect on next 'strato-up' in: $(pwd)"
 fi

@@ -26,7 +26,7 @@ export interface BackendUserPoolConfig {
 
 /**
  * Common base class for application-layer scenarios that authenticate
- * through Keycloak and hit the Mercata backend over HTTPS (e.g. tokenSale,
+ * through Keycloak and hit the App backend over HTTPS (e.g. tokenSale,
  * forgeBuy).
  *
  * Owns:

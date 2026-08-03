@@ -1,0 +1,179 @@
+import { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  ArrowUpDown,
+  Landmark,
+  ArrowLeftRight,
+  Menu,
+  Send,
+  Gift,
+  Activity,
+  Download,
+  BarChart3,
+  Droplets,
+  SlidersHorizontal,
+  Shield,
+  HandCoins,
+  Layers,
+  ArrowDownToLine,
+  X
+} from 'lucide-react';
+import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
+import { useUser } from '@/context/UserContext';
+import { LucideIcon } from 'lucide-react';
+
+interface MoreNavItem {
+  icon: LucideIcon;
+  label: string;
+  path: string;
+  adminOnly?: boolean;
+  badge?: string;
+}
+
+interface MoreNavCategory {
+  label?: string;
+  items: MoreNavItem[];
+}
+
+const PRIMARY_NAV_ITEMS = [
+  { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
+  { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
+  { icon: ArrowLeftRight, label: 'Trade', path: '/dashboard/swap' },
+  { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
+];
+
+const MORE_CATEGORIES: MoreNavCategory[] = [
+  {
+    label: 'TRADE',
+    items: [
+      { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
+      { icon: Send, label: 'Send', path: '/dashboard/transfer' },
+      { icon: Download, label: 'Bridge Out', path: '/dashboard/withdrawals' },
+    ],
+  },
+  {
+    label: 'EARN',
+    items: [
+      { icon: Layers, label: 'Stake', path: '/dashboard/earn-staking' },
+      { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
+    ],
+  },
+  {
+    label: 'PRO',
+    items: [
+      { icon: SlidersHorizontal, label: 'Advanced', path: '/dashboard/advanced' },
+      { icon: Droplets, label: 'V3 Liquidity', path: '/dashboard/v3-liquidity', badge: 'New' },
+      { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
+      { icon: BarChart3, label: 'Analytics', path: '/dashboard/stats' },
+      { icon: Shield, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
+    ],
+  },
+];
+
+const MobileBottomNav = () => {
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const { isAdmin } = useUser();
+
+  const isActive = (path: string) => {
+    if (path === '/dashboard') return pathname === '/dashboard';
+    // Stake (/dashboard/earn-staking) has its own nav item, so Earn must not match it
+    if (path === '/dashboard/earn') return pathname.startsWith(path) && !pathname.startsWith('/dashboard/earn-staking');
+    return pathname.startsWith(path);
+  };
+
+  const isMoreActive = MORE_CATEGORIES.some(cat => cat.items.some(item => isActive(item.path)));
+
+  const handleMoreItemClick = (path: string) => {
+    setIsMoreOpen(false);
+    navigate(path);
+  };
+
+  return (
+    <>
+      {/* Bottom Navigation Bar */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50 md:hidden">
+        <div className="flex items-center justify-around h-16">
+          {PRIMARY_NAV_ITEMS.map(({ icon: Icon, label, path }) => (
+            <Link
+              key={path}
+              to={path}
+              className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${isActive(path)
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-gray-500 dark:text-gray-400'
+                }`}
+            >
+              <Icon size={20} />
+              <span className="text-xs font-medium">{label}</span>
+            </Link>
+          ))}
+
+          {/* More Button */}
+          <button
+            onClick={() => setIsMoreOpen(true)}
+            className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${isMoreActive
+                ? 'text-blue-600 dark:text-blue-400'
+                : 'text-gray-500 dark:text-gray-400'
+              }`}
+          >
+            <Menu size={20} />
+            <span className="text-xs font-medium">More</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* More Drawer */}
+      <Drawer open={isMoreOpen} onOpenChange={setIsMoreOpen}>
+        <DrawerContent className="max-h-[calc(100svh-1rem)] overflow-hidden pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+          {/* Close Button */}
+          <div className="flex justify-end px-4 pt-2">
+            <DrawerClose asChild>
+              <button className="p-1.5 rounded-md hover:bg-muted transition-colors">
+                <X size={18} className="text-muted-foreground" />
+              </button>
+            </DrawerClose>
+          </div>
+
+          {/* Menu Items */}
+          <div className="min-h-0 overflow-y-auto overscroll-contain px-3 pb-3">
+            {MORE_CATEGORIES.map((category, idx) => {
+              const visibleItems = category.items.filter(item => !item.adminOnly || isAdmin);
+              if (visibleItems.length === 0) return null;
+              return (
+                <div key={idx} className={idx > 0 ? 'mt-2' : ''}>
+                  {category.label && (
+                    <div className="px-4 py-1 text-[10px] font-semibold tracking-wider text-gray-400 dark:text-gray-500 uppercase">
+                      {category.label}
+                    </div>
+                  )}
+                  {visibleItems.map(({ icon: Icon, label, path, badge }) => (
+                    <button
+                      key={path}
+                      onClick={() => handleMoreItemClick(path)}
+                      className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-lg transition-colors ${isActive(path)
+                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                          : 'text-foreground hover:bg-muted'
+                        }`}
+                    >
+                      <Icon size={18} />
+                      <span className="text-[13px] font-medium">{label}</span>
+                      {badge && (
+                        <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+                          {badge}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </DrawerContent>
+      </Drawer>
+    </>
+  );
+};
+
+export default MobileBottomNav;

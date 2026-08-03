@@ -156,6 +156,12 @@ class (RLPSerializable t) => TransactionLike t where
     morphTx
     #-}
 
+  -- | Opaque attribution bytes (e.g. an ERC-8021 data suffix) carried by the
+  -- transaction and never interpreted during execution. Defaults to empty so
+  -- existing instances need no changes.
+  txAttribution :: t -> B.ByteString
+  txAttribution _ = B.empty
+
   txSigR :: t -> Integer
   txSigR t = let (r, _, _) = txSignature t in r
 

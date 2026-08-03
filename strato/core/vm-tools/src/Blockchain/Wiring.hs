@@ -63,7 +63,7 @@ import qualified Data.NibbleString as N
 import qualified Data.Text as T
 import Data.Traversable (for)
 import qualified Database.LevelDB as DB
-import Blockchain.Data.CallTrace (VmTracer)
+import Blockchain.Data.VmTrace (VmTracer)
 import Debugger
 import UnliftIO
 

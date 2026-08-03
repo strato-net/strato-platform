@@ -82,7 +82,7 @@ data SimPlan = SimPlan
     simKind :: SimKind
   }
 
--- Per-call output of eth_simulateV1 (see vm-runner's simulateOne).
+-- Per-call output of strato_simulateV1 (see vm-runner's simulateOne).
 data VmCallResult = VmCallResult
   { vcrStatus :: Text,
     vcrGasUsed :: Text,
@@ -121,7 +121,7 @@ postBlocTransactionSimulate ::
   Maybe Text -> -- optional X-USER-ACCESS-TOKEN
   Maybe String -> -- username: route through the user's User wallet contract
   Maybe Text -> -- chainid: rejected, simulation is main-chain only
-  Bool -> -- trace: include a debug_traceCall frame tree (single-tx bodies)
+  Bool -> -- trace: include a strato_traceCall frame tree (single-tx bodies)
   PostBlocTransactionRequest ->
   m [BlocSimulateResult]
 postBlocTransactionSimulate mToken mUsername mChainId trace (PostBlocTransactionRequest mAddr txs' txParams msrcs) = withCodeCollectionCache $ do
@@ -213,7 +213,7 @@ postBlocTransactionSimulate mToken mUsername mChainId trace (PostBlocTransaction
         else
           jsonRpcCall
             url
-            "eth_simulateV1"
+            "strato_simulateV1"
             [ Aeson.object ["blockStateCalls" .= [Aeson.object ["calls" .= specs]]],
               Aeson.String "latest"
             ]
@@ -227,9 +227,9 @@ postBlocTransactionSimulate mToken mUsername mChainId trace (PostBlocTransaction
       if trace
         then case specs of
           [spec] ->
-            jsonRpcCall url "debug_traceCall" [Aeson.toJSON spec, Aeson.String "latest", Aeson.object ["statements" .= False]] >>= \case
+            jsonRpcCall url "strato_traceCall" [Aeson.toJSON spec, Aeson.String "latest", Aeson.object ["statements" .= False]] >>= \case
               Left err -> do
-                $logWarnS "simulate/trace" $ "debug_traceCall failed: " <> err
+                $logWarnS "simulate/trace" $ "strato_traceCall failed: " <> err
                 pure Nothing
               Right v -> pure $ Just v
           _ -> pure Nothing

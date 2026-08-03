@@ -45,6 +45,7 @@ import Bloc.Server.TransactionResult
 import Bloc.Server.Utils
 import BlockApps.Logging
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Base16 as B16
 import Strato.Auth.Client (newAuthEnvWith, runWithUserToken)
 import qualified Strato.Strato23.API.Types as VaultT
 import Strato.Strato23.Client (postSignature, getKey)
@@ -106,6 +107,7 @@ import qualified Data.Set as S
 import Data.Source.Map
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Data.Text.Encoding (encodeUtf8)
 import Data.Time.Clock
 import qualified Data.Vector as V
 import Handlers.AccountInfo
@@ -129,6 +131,7 @@ mergeTxParams (Just inner) (Just outer) =
       (txparamsGasLimit inner <|> txparamsGasLimit outer)
       (txparamsGasPrice inner <|> txparamsGasPrice outer)
       (txparamsNonce inner <|> txparamsNonce outer)
+      (txparamsAttribution inner <|> txparamsAttribution outer)
 mergeTxParams inner outer = inner <|> outer
 
 --------------------------------- SHARED TX MARSHALING ------------------------------------
@@ -1146,10 +1149,24 @@ prepareUnsignedTx gasLimit TransactionHeader {..} =
         TX.r = 0,
         TX.s = 0,
         TX.v = 0,
-        TX.txVersion = 0
+        TX.txVersion = 0,
+        TX.attribution = decodeAttribution (txparamsAttribution transactionheaderTxParams)
       }
   where
     cid = EthConf.chainId $ EthConf.networkConfig ethConf
+
+-- | Decode the optional hex-encoded attribution suffix from the request into raw
+-- bytes. Absent/empty yields no attribution, keeping the transaction byte-identical
+-- to the legacy form. A leading @0x@ is tolerated; invalid hex is a hard error.
+decodeAttribution :: Maybe Text -> ByteString
+decodeAttribution mHex = case mHex of
+  Nothing -> mempty
+  Just t ->
+    let stripped = fromMaybe t (Text.stripPrefix "0x" t)
+    in if Text.null stripped
+         then mempty
+         else either (\e -> error $ "prepareUnsignedTx: invalid attribution hex: " ++ e) id $
+                B16.decode (encodeUtf8 stripped)
 
 preparePostTx ::
   UTCTime ->
@@ -1192,6 +1209,7 @@ preparePostUnsignedRawTx time tx contractName' args =
       Nothing
       Nothing
       (TX.txVersion tx)
+      Nothing
 
 signAndPrepare ::
   (MonadIO m, MonadLogger m, HasBlocEnv m) =>

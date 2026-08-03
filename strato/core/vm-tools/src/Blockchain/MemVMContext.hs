@@ -83,7 +83,7 @@ import Data.Default
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
-import Blockchain.Data.CallTrace (VmTracer)
+import Blockchain.Data.VmTrace (VmTracer)
 import Debugger
 import GHC.Generics
 import UnliftIO

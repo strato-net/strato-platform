@@ -49,6 +49,8 @@ instance Arbitrary TX.Transaction where
         TX.MessageTX
           <$> arbitrary <*> arbitrary <*> arbitrary <*> genText <*> listOf genText
           <*> genText <*> genChainId <*> arbitrary <*> arbitrary <*> genV <*> genTxVersion
+          -- attribution suffix (added on develop): arbitrary bytes, incl. empty
+          <*> (B.pack <$> arbitrary)
       createTx =
         TX.ContractCreationTX
           <$> arbitrary <*> arbitrary <*> genText <*> listOf genText <*> genText

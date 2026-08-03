@@ -300,6 +300,7 @@ instance TransactionLike OutputTx where
   txValue = txValue . otBaseTx
   txTxData = txTxData . otBaseTx
   txTxVersion = txTxVersion . otBaseTx
+  txAttribution = txAttribution . otBaseTx
 
   morphTx t =
     OutputTx

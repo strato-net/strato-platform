@@ -47,7 +47,7 @@ defineFlag "notificationServerUrl" "" "URL of the notification server for market
 
 defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
 defineFlag "jsonrpc" (True :: Bool) "Start the Ethereum JSON-RPC server (port 8545) for wallet integration"
-defineFlag "publicDebugRpc" (False :: Bool) "Expose debug_* and eth_simulateV1 on the public /rpc endpoint (default: blocked; the bloc simulate endpoint is unaffected)"
+defineFlag "publicStratoRpc" (False :: Bool) "Expose the strato_* simulation/trace methods on the public /rpc endpoint (default: blocked; the bloc simulate endpoint is unaffected)"
 defineFlag "localAuth" (False :: Bool) "Use local auth (Kratos/Hydra) instead of external Keycloak"
 defineFlag "sslDir" ("" :: String) "Path to directory containing server.pem and server.key (enables SSL)"
 
@@ -81,4 +81,12 @@ defineFlag "blockstanbul_round_period_s" (120 :: Int) "Maximum seconds that one 
 -- VM config flags
 defineFlag "sqlDiff" (True :: Bool) "Update account state and storage in SQL DB (set false for faster sync)"
 defineFlag "diffPublish" (True :: Bool) "Publish state changes to streaming for indexer"
+
+-- Kafka log retention flags (defaults match Kafka's own defaults / the current
+-- generated config, so behavior is unchanged unless overridden). Nodes whose
+-- state gets snapshotted (e.g. the synctest pipeline) lower these so the raw
+-- kafka log dir shipped in the snapshot payload stays small.
+defineFlag "kafkaLogRetentionHours" (168 :: Int) "Kafka log.retention.hours: delete log segments older than this"
+defineFlag "kafkaLogRetentionBytes" (-1 :: Integer) "Kafka log.retention.bytes: max bytes retained per partition (-1 = unlimited)"
+defineFlag "kafkaLogSegmentBytes" (1073741824 :: Int) "Kafka log.segment.bytes: segment file size; retention only deletes closed segments, so lower this together with the retention flags"
 $(return [])

@@ -73,7 +73,7 @@ import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.SolidVM.Exception
-import Blockchain.Data.CallTrace
+import Blockchain.Data.VmTrace
 import Blockchain.SolidVM.GasInfo
 import Blockchain.Strato.Model.Gas (Gas (..))
 import Blockchain.Strato.Model.Address

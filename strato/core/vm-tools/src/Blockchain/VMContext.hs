@@ -114,7 +114,7 @@ import qualified Data.Text as T
 import qualified Database.LevelDB as DB
 import qualified Database.Persist.Sqlite as Lite
 import qualified Database.Redis as Redis
-import Blockchain.Data.CallTrace (VmTracer)
+import Blockchain.Data.VmTrace (VmTracer)
 import Debugger
 import GHC.Generics
 import SolidVM.Model.Storable

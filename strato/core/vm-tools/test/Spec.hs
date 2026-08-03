@@ -24,7 +24,7 @@
 --import Blockchain.Strato.Model.Secp256k1
 --import Blockchain.VMContext
 
-import Blockchain.Data.CallTrace
+import Blockchain.Data.VmTrace
 import Blockchain.Strato.Model.Address (Address (..))
 import Blockchain.VMOptions ()
 import Control.Monad
@@ -77,7 +77,7 @@ firstCall f = case cfCalls f of
   [] -> fail "expected a child call"
 
 callTraceSpec :: Spec
-callTraceSpec = describe "CallTrace" $ do
+callTraceSpec = describe "VmTrace" $ do
   let a1 = Address 0x100
       a2 = Address 0x200
 

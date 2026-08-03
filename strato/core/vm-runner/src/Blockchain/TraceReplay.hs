@@ -6,7 +6,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 
--- | debug_traceTransaction / debug_traceBlock* execution: replay a block's
+-- | strato_traceTransaction / strato_traceBlock* execution: replay a block's
 -- transactions against its parent state inside a sandbox, tracing the target
 -- transaction (or all of them).
 --
@@ -22,7 +22,7 @@ import BlockApps.Logging
 import Blockchain.BlockChain (addTransaction, recoverProposer)
 import Blockchain.DB.ChainDB (getChainStateRoot, putBlockHeaderInChainDB)
 import Blockchain.Data.BlockHeader (BlockHeader, getBlockGasLimit, parentHash)
-import Blockchain.Data.CallTrace (cfTo, newVmTracer, takeTraceRoots, VmTracer)
+import Blockchain.Data.VmTrace (cfTo, newVmTracer, takeTraceRoots, VmTracer)
 import Blockchain.Data.ExecResults (calculateReturned)
 import Blockchain.Data.TransactionDef (Transaction)
 import qualified Blockchain.Data.TransactionDef as TD
