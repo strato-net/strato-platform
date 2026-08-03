@@ -14,25 +14,6 @@ export function validatePoolV3AddressArgs(args: any) {
   if (error) throw new Error("PoolV3 Address Argument Validation Error: " + error.message);
 }
 
-export function validatePoolV3PairArgs(args: any) {
-  const schema = Joi.object({
-    tokenAddress1: validateAddressField("tokenAddress1"),
-    tokenAddress2: validateAddressField("tokenAddress2"),
-  });
-  const { error } = schema.validate(args);
-  if (error) throw new Error("PoolV3 Pair Argument Validation Error: " + error.message);
-}
-
-export function validatePoolV3QuoteArgs(args: any) {
-  const schema = Joi.object({
-    poolAddress: validateAddressField("poolAddress").required(),
-    zeroForOne: Joi.string().valid("true", "false").required(),
-    amountSpecified: signedNumericStringField("amountSpecified").required(),
-  });
-  const { error } = schema.validate(args);
-  if (error) throw new Error("PoolV3 Quote Argument Validation Error: " + error.message);
-}
-
 export function validatePoolV3AmountsArgs(args: any) {
   // Callers supply exactly one of: liquidity (L -> both token amounts), amount0Desired,
   // or amount1Desired (one token amount + range -> L and the other amount). numericStringField
@@ -49,20 +30,6 @@ export function validatePoolV3AmountsArgs(args: any) {
     .or("liquidity", "amount0Desired", "amount1Desired");
   const { error } = schema.validate(args);
   if (error) throw new Error("PoolV3 Amounts Argument Validation Error: " + error.message);
-}
-
-export function validatePoolV3SwapArgs(args: any) {
-  const schema = Joi.object({
-    poolAddress: validateAddressField("poolAddress").required(),
-    zeroForOne: Joi.boolean().required(),
-    amountSpecified: signedNumericStringField("amountSpecified").required(),
-    amountLimit: numericStringField("amountLimit").required(),
-    // Optional price limit; the service defaults it to "0" (swap to the tick-domain edge),
-    // so it must be omittable AND accept the "0" sentinel (allowZero).
-    sqrtPriceLimitX96: numericStringField("sqrtPriceLimitX96", { allowZero: true }).optional(),
-  });
-  const { error } = schema.validate(args);
-  if (error) throw new Error("PoolV3 Swap Argument Validation Error: " + error.message);
 }
 
 export function validatePoolV3MintArgs(args: any) {

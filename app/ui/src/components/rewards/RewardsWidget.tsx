@@ -27,6 +27,9 @@ interface RewardsWidgetProps {
   availableLPBalance?: string;
   actionLabel?: string;
   swapTokenInAddress?: string;
+  /** render nothing while both the current and projected rates are 0
+   *  (used by the Trade page to avoid an "Earning Now 0 pts/day" banner) */
+  hideWhenZero?: boolean;
 }
 
 // ============================================================================
@@ -218,6 +221,7 @@ export const RewardsWidget = ({
   availableLPBalance,
   actionLabel = isWithdrawal ? "Withdraw" : "Deposit",
   swapTokenInAddress,
+  hideWhenZero = false,
 }: RewardsWidgetProps) => {
   const { getPrice } = useOracleContext();
 
@@ -331,6 +335,8 @@ export const RewardsWidget = ({
   // Don't show if no activities found
   if (filteredActivities.length === 0) return null;
   if (isWithdrawal && newRate === 0n && currentRate === 0n) return null;
+  // nothing earned now and the entered action wouldn't earn anything either
+  if (hideWhenZero && newRate === 0n && currentRate === 0n) return null;
 
   // ─────────────────────────────────────────────────────────────────────────
   // CALCULATE NORMALIZATION BASE (pts/$1/day)

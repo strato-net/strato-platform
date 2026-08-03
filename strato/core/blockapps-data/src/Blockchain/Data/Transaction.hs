@@ -120,10 +120,13 @@ instance TransactionLike Transaction where
   txTxVersion ContractCreationTX {..} = Just txVersion
   txTxVersion EthereumTX {} = Nothing
 
+  txAttribution MessageTX {..} = attribution
+  txAttribution _ = B.empty
+
   morphTx t = case txType t of
     Message
       | Just fn <- txFuncName t ->
-          MessageTX n gl (fromJust $ txDestination t) fn args network cid r s v ver
+          MessageTX n gl (fromJust $ txDestination t) fn args network cid r s v ver (txAttribution t)
       | otherwise ->
           EthereumTX n gp gl (txDestination t) val (fromJust $ txTxData t) cid r s v
     ContractCreation
@@ -151,11 +154,11 @@ codePtrName (SolidVMCode n _) = Just n
 codePtrName _ = Nothing
 
 rawTX2TX :: RawTransaction -> Transaction
-rawTX2TX (RawTransaction _ _ nonce' gl (Just to') (Just fn) Nothing ags net Nothing cid r' s' v' _ _ _ _ _ _ tv) =
-  MessageTX nonce' gl to' fn ags net cid r' s' v' tv
-rawTX2TX (RawTransaction _ _ nonce' gl Nothing Nothing (Just cn) ags net (Just cd) cid r' s' v' _ _ _ _ _ _ tv) =
+rawTX2TX (RawTransaction _ _ nonce' gl (Just to') (Just fn) Nothing ags net Nothing cid r' s' v' _ _ _ _ _ _ tv attr) =
+  MessageTX nonce' gl to' fn ags net cid r' s' v' tv (fromMaybe B.empty attr)
+rawTX2TX (RawTransaction _ _ nonce' gl Nothing Nothing (Just cn) ags net (Just cd) cid r' s' v' _ _ _ _ _ _ tv _) =
   ContractCreationTX nonce' gl cn ags net cd cid r' s' v' tv
-rawTX2TX (RawTransaction _ _ nonce' gl mTo Nothing Nothing [] _ Nothing cid r' s' v' _ _ _ mgp mval mdata _) =
+rawTX2TX (RawTransaction _ _ nonce' gl mTo Nothing Nothing [] _ Nothing cid r' s' v' _ _ _ mgp mval mdata _ _) =
   EthereumTX nonce' (fromMaybe 0 mgp) gl mTo (fromMaybe 0 mval) (fromMaybe B.empty mdata) cid r' s' v'
 rawTX2TX rt = error $ "rawTX2TX: " ++ show rt
 
@@ -163,11 +166,11 @@ txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransacti
 txAndTime2RawTX origin tx blkNum time =
   case tx of
     MessageTX{..} ->
-      RawTransaction time signer nonce gasLimit (Just to) (Just funcName) Nothing args network Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing txVersion
+      RawTransaction time signer nonce gasLimit (Just to) (Just funcName) Nothing args network Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing txVersion (if B.null attribution then Nothing else Just attribution)
     ContractCreationTX{..} ->
-      RawTransaction time signer nonce gasLimit Nothing Nothing (Just contractName) args network (Just code) chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing txVersion
+      RawTransaction time signer nonce gasLimit Nothing Nothing (Just contractName) args network (Just code) chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing txVersion Nothing
     EthereumTX{..} ->
-      RawTransaction time signer nonce gasLimit ethTo Nothing Nothing [] "" Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin (Just gasPrice) (Just value) (Just txData) 0
+      RawTransaction time signer nonce gasLimit ethTo Nothing Nothing [] "" Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin (Just gasPrice) (Just value) (Just txData) 0 Nothing
   where
     signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 
@@ -269,6 +272,12 @@ eip712DomainTypeHash = keccak256ToByteString $ hash ("EIP712Domain(string name,s
 eip712TxTypeHash :: B.ByteString
 eip712TxTypeHash = keccak256ToByteString $ hash ("Transaction(address to,string funcName,string[] args,uint256 nonce,uint256 gasLimit,string network)" :: B.ByteString)
 
+-- | Extended type used only when a transaction carries an attribution suffix.
+-- Absent attribution, signing uses the legacy 'eip712TxTypeHash' above so
+-- existing signers are unaffected.
+eip712TxTypeHashWithAttribution :: B.ByteString
+eip712TxTypeHashWithAttribution = keccak256ToByteString $ hash ("Transaction(address to,string funcName,string[] args,uint256 nonce,uint256 gasLimit,string network,bytes attribution)" :: B.ByteString)
+
 eip712DomainSeparator :: B.ByteString
 eip712DomainSeparator = keccak256ToByteString $ hash $ B.concat
   [ eip712DomainTypeHash
@@ -281,8 +290,8 @@ eip712EncodeStringArray texts = keccak256ToByteString $ hash $ B.concat
   [keccak256ToByteString $ hash $ encodeUtf8 t | t <- texts]
 
 eip712StructHash :: Transaction -> B.ByteString
-eip712StructHash MessageTX{..} = keccak256ToByteString $ hash $ B.concat
-  [ eip712TxTypeHash
+eip712StructHash MessageTX{..} = keccak256ToByteString $ hash $ B.concat $
+  [ if B.null attribution then eip712TxTypeHash else eip712TxTypeHashWithAttribution
   , word256ToBytes (fromIntegral to)
   , keccak256ToByteString $ hash $ encodeUtf8 funcName
   , eip712EncodeStringArray args
@@ -290,6 +299,9 @@ eip712StructHash MessageTX{..} = keccak256ToByteString $ hash $ B.concat
   , word256ToBytes (fromInteger gasLimit)
   , keccak256ToByteString $ hash $ encodeUtf8 network
   ]
+  -- EIP-712 encodes dynamic `bytes` as their keccak256 hash. Only appended when
+  -- present, so empty-attribution txs hash exactly as before.
+  ++ [keccak256ToByteString (hash attribution) | not (B.null attribution)]
 eip712StructHash _ = error "eip712StructHash: only MessageTX supported"
 
 eip712SignHash :: Transaction -> B.ByteString

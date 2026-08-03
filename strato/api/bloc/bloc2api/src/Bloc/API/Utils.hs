@@ -107,7 +107,11 @@ instance ToSchema JwtToken where
 data TxParams = TxParams
   { txparamsGasLimit :: Maybe Gas,
     txparamsGasPrice :: Maybe Wei,
-    txparamsNonce :: Maybe Nonce
+    txparamsNonce :: Maybe Nonce,
+    -- | Optional hex-encoded attribution suffix (e.g. an ERC-8021 data suffix).
+    -- Carried opaquely on the transaction and never interpreted during execution;
+    -- absent for the vast majority of transactions.
+    txparamsAttribution :: Maybe Text
   }
   deriving (Eq, Show, Generic)
 
@@ -122,6 +126,7 @@ instance FromJSON TxParams where
 instance ToSchema TxParams where
   declareNamedSchema _ = do
     wordSchema <- declareSchemaRef (Proxy :: Proxy Word)
+    textSchema <- declareSchemaRef (Proxy :: Proxy Text)
     return $
       NamedSchema
         (Just "Transaction Parameters")
@@ -129,12 +134,13 @@ instance ToSchema TxParams where
             & type_ ?~ OpenApiObject
             & example
               ?~ toJSON
-                (TxParams (Just (Gas 123)) (Just (Wei 345)) (Just (Nonce 9876)))
+                (TxParams (Just (Gas 123)) (Just (Wei 345)) (Just (Nonce 9876)) Nothing)
             & description ?~ "Transaction Parameters"
             & properties
               .~ [ ("gasLimit", wordSchema),
                    ("gasPrice", wordSchema),
-                   ("nonce", wordSchema)
+                   ("nonce", wordSchema),
+                   ("attribution", textSchema)
                  ]
             & required .~ []
         )

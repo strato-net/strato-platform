@@ -19,7 +19,7 @@ module.exports = {
   nodeStatus: async function (req, res, next) {
     try {
       //get node's block number, best block hash, best block parent hash
-      const [lastBlock, bestBlockNumber, activePeerCount] = await Promise.all([
+      const [lastBlock, bestBlockNumber, activePeerCount, validators] = await Promise.all([
         BlockDataRef.findOne({
           where: {
             pow_verified: true,
@@ -50,6 +50,13 @@ module.exports = {
           },
         }).catch((err) => {
           winston.warn(`Unable to fetch active peers count: ${err.message}`);
+          return null;
+        }),
+        // Current validator list, sourced from the same place as the
+        // /eth/v1.2/metadata endpoint: the BestSequencedBlock entry in Redis.
+        // Falls back to null so /status remains usable.
+        redisBlockDB.getValidators().catch((err) => {
+          winston.warn(`Unable to fetch validators: ${err.message}`);
           return null;
         }),
       ]);
@@ -114,6 +121,7 @@ module.exports = {
         timestamp: new Date().toISOString(),
         nodeAddress,
         activePeerCount,
+        validators,
         lastBlock: {
           number: bestBlockNumber !== null ? bestBlockNumber : lastBlock.number,
           hash: lastBlock.hash,

@@ -85,6 +85,9 @@ export interface PoolV3Position {
   /** price bounds as 18-decimal token1-per-token0 wei strings */
   priceLowerWad: string;
   priceUpperWad: string;
+  /** estimated fee yield in percent, annualized from the last 24h of pool fees
+   *  at the position's share of in-range liquidity; 0 while out of range */
+  apy: number;
 }
 
 export interface PoolV3AmountsPreview {
