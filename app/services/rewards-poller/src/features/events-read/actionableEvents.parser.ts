@@ -16,19 +16,28 @@ export const makeEventPairKey = (contract: string, eventName: string): string =>
 export const parseActionableEventsForActivities = (
   actionableEvents: unknown
 ): any[] => {
-  let actionableEventsArray: any[] = [];
+  if (Array.isArray(actionableEvents)) {
+    return actionableEvents;
+  }
+
+  if (actionableEvents && typeof actionableEvents === "object") {
+    return parseIndexedActionableEvents(
+      actionableEvents as IndexedActionableEvents
+    );
+  }
+
   if (typeof actionableEvents === "string") {
     try {
       const parsed = JSON.parse(actionableEvents);
-      actionableEventsArray = Array.isArray(parsed)
+      return Array.isArray(parsed)
         ? parsed
         : parseIndexedActionableEvents((parsed || {}) as IndexedActionableEvents);
     } catch {
-      actionableEventsArray = [];
+      return [];
     }
   }
 
-  return actionableEventsArray;
+  return [];
 };
 
 export const parseActionableEventNames = (actionableEvents: unknown): string[] => {

@@ -1,7 +1,7 @@
 import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import { hiddenSwapPools, yieldBenchmarks, compositeYieldMap, rewards as rewardsAddr, saveUsdstVault as saveUsdstVaultAddr } from "../../config/config";
-import { toUTCTime } from "../helpers/cirrusHelpers";
+import { toUTCTime, getMappingKeyParts, reassembleMappingStructRows } from "../helpers/cirrusHelpers";
 import {
   computeExchangeRateAPY, getYieldWindowBounds, getYieldExchangeRateRowsCached,
   indexYieldHistoryRows, mergeBackfillRows,
@@ -135,7 +135,7 @@ async function fetchPhase1(
       address: `in.(${storageAddrs.join(",")})`,
       select: "address,data->>borrowableAsset,data->>mToken,data->>totalScaledDebt,data->>borrowIndex,data->>reservesAccrued,data->>_managedAssets,data->>_totalSupply,data->>botExecutor,data->>priceOracle,data->>shareToken,data->>assetToken,data->>perSecondSavingsRate",
     }}),
-    cirrus.get(accessToken, "/mapping", { params: { select: "address,collection_name,key->>key,value::text", or: `(${mappingFilters.join(",")})` } }),
+    cirrus.get(accessToken, "/mapping", { params: { select: "address,collection_name,key,value::text", or: `(${mappingFilters.join(",")})` } }),
     cirrus.get(accessToken, `/${constants.Event}`, { params: { select: "address,event_name,attributes,block_timestamp", or: `(and(event_name.eq.Swap,block_timestamp.gte.${twentyFourHoursAgo}),and(address.eq.${constants.safetyModule},event_name.in.(Staked,Redeemed,RewardNotified,ShortfallCovered),block_timestamp.gte.${thirtyDaysAgo}))` } }),
     cirrus.get(accessToken, `/${Pool}`, { params: {
       poolFactory: `eq.${constants.poolFactory}`,
@@ -174,22 +174,30 @@ function parsePhase1(phase1: Phase1Data, vaultAddr: string, rewardsAddr: string,
   const rewardActivityStateById = new Map<string, any>();
   const rewardsAddrNorm = rewardsAddr ? normalizeAddress(rewardsAddr) : "";
 
+  const rewardActivityRows: any[] = [];
   for (const r of phase1.mappingRows ?? []) {
-    if (r.collection_name === "prices") prices.set(r.key, r.value);
+    const keyParts = getMappingKeyParts(r.key);
+    const key1 = keyParts[0] ?? "";
+    if (r.collection_name === "prices") prices.set(key1, r.value);
     else if (r.collection_name === "assetConfigs") lendingCfg = JSON.parse(r.value);
-    else if (r.collection_name === "_balances" && r.key === constants.liquidityPool) liqBalance = r.value;
-    else if (r.collection_name === "_balances" && saveUsdstVault && r.key === saveUsdstVault) saveUsdstBalance = r.value;
+    else if (r.collection_name === "_balances" && key1 === constants.liquidityPool) liqBalance = r.value;
+    else if (r.collection_name === "_balances" && saveUsdstVault && key1 === saveUsdstVault) saveUsdstBalance = r.value;
     else if (r.collection_name === "supportedAssets" && r.value) {
       const addr = r.value.replace(/"/g, "");
       if (addr) vaultAssets.push(addr);
     } else if (rewardsAddrNorm && normalizeAddress(r.address) === rewardsAddrNorm && r.value) {
-      const parsed = parseMappingValue(r.value);
-      if (!parsed) continue;
-      const activityId = String(r.key ?? "");
-      if (!activityId) continue;
-      if (r.collection_name === "activities") rewardActivityCfgById.set(activityId, parsed);
-      else if (r.collection_name === "activityStates") rewardActivityStateById.set(activityId, parsed);
+      if (!key1) continue;
+      // Activity structs are spread over several rows (the actionableEvents
+      // array is stored one element per row); collect and reassemble below.
+      if (r.collection_name === "activities") rewardActivityRows.push(r);
+      else if (r.collection_name === "activityStates" && keyParts.length === 1) {
+        const parsed = parseMappingValue(r.value);
+        if (parsed) rewardActivityStateById.set(key1, parsed);
+      }
     }
+  }
+  for (const [activityId, activity] of reassembleMappingStructRows(rewardActivityRows)) {
+    if (activityId) rewardActivityCfgById.set(activityId, activity);
   }
 
   const filteredVaultAssets = vaultAssets.filter(a => a !== ZERO_ADDRESS);
