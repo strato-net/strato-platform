@@ -11,7 +11,6 @@ import {
   getMappingRowKeyParts,
   getMappingRowKeyList,
   parseMappingRowValue,
-  reassembleStructArrayRows,
   toBigIntOrZero,
 } from "./mappingRow.parser";
 import { normalizeAddressSet, normalizeTrimmedAddressValue } from "./addressNormalization";
@@ -31,17 +30,32 @@ export const getUserEmissionRates = async (
   }
 
   const rewardsAddress = config.rewards.address;
-  const mappingRows = await retryWithBackoff(
-    () => cirrus.get("/mapping", {
-      params: {
-        address: `eq.${rewardsAddress}`,
-        collection_name: "in.(activities,activityStates,userInfo)",
-        select: "collection_name,key,value",
-      },
-    }),
-    "CirrusService-getUserEmissionRates",
-    CIRRUS_RETRY_OPTS
-  );
+  // Activities come from the collection view, which reassembles each struct
+  // (including its actionableEvents array) into a single row; activityStates
+  // and userInfo are plain structs and are still read from /mapping.
+  const [activityRows, mappingRows] = await Promise.all([
+    retryWithBackoff(
+      () => cirrus.get("/BlockApps-Rewards-activities", {
+        params: {
+          address: `eq.${rewardsAddress}`,
+          select: "key,value",
+        },
+      }),
+      "CirrusService-getUserEmissionRates-activities",
+      CIRRUS_RETRY_OPTS
+    ),
+    retryWithBackoff(
+      () => cirrus.get("/mapping", {
+        params: {
+          address: `eq.${rewardsAddress}`,
+          collection_name: "in.(activityStates,userInfo)",
+          select: "collection_name,key,value",
+        },
+      }),
+      "CirrusService-getUserEmissionRates",
+      CIRRUS_RETRY_OPTS
+    ),
+  ]);
 
   const targetUsers = new Set(users.map((u) => u.toLowerCase()));
   const requestedBonusTokens = normalizeAddressSet(bonusTokenAddresses);
@@ -56,19 +70,8 @@ export const getUserEmissionRates = async (
   const activityBreakdownByUser = new Map<string, UserActivityInfo[]>();
 
   if (Array.isArray(mappingRows)) {
-    // Activity structs are spread over several rows (each actionableEvents
-    // element has its own row keyed activityId/actionableEvents/index), so
-    // collect the activities rows and reassemble them before reading fields.
-    const activityRows: any[] = [];
-
     for (const row of mappingRows) {
       const collectionName = String(row.collection_name ?? "");
-
-      if (collectionName === "activities") {
-        activityRows.push(row);
-        continue;
-      }
-
       const { key1, key2 } = getMappingRowKeyParts(row.key);
       const value = parseMappingRowValue(row.value);
 
@@ -91,25 +94,28 @@ export const getUserEmissionRates = async (
         userRows.push({ user, activityId, stake });
       }
     }
+  }
 
-    for (const [activityId, value] of reassembleStructArrayRows(activityRows)) {
-      if (activityId.length > 0) {
-        emissionByActivity.set(activityId, toBigIntOrZero(value.emissionRate));
-        activityNameById.set(activityId, String(value.name ?? ""));
-        const rawType = String(value.activityType ?? "0");
-        activityTypeById.set(activityId, (rawType === "OneTime" || rawType === "1") ? "1" : "0");
-        sourceContractByActivity.set(activityId, normalizeTrimmedAddressValue(value.sourceContract));
-      }
+  for (const row of Array.isArray(activityRows) ? activityRows : []) {
+    const activityId = String(row.key ?? "");
+    const value = parseMappingRowValue(row.value);
 
-      const sourceContract = normalizeTrimmedAddressValue(value.sourceContract);
-      collectDirectPayoutEventsForToken(
-        directPayoutEventsByToken,
-        requestedBonusTokens,
-        sourceContract,
-        value.directPayout,
-        value.actionableEvents
-      );
+    if (activityId.length > 0) {
+      emissionByActivity.set(activityId, toBigIntOrZero(value.emissionRate));
+      activityNameById.set(activityId, String(value.name ?? ""));
+      const rawType = String(value.activityType ?? "0");
+      activityTypeById.set(activityId, (rawType === "OneTime" || rawType === "1") ? "1" : "0");
+      sourceContractByActivity.set(activityId, normalizeTrimmedAddressValue(value.sourceContract));
     }
+
+    const sourceContract = normalizeTrimmedAddressValue(value.sourceContract);
+    collectDirectPayoutEventsForToken(
+      directPayoutEventsByToken,
+      requestedBonusTokens,
+      sourceContract,
+      value.directPayout,
+      value.actionableEvents
+    );
   }
 
   for (const { user, activityId, stake } of userRows) {

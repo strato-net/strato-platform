@@ -25,7 +25,7 @@ import {
 } from "./actionableEvents.parser";
 import {
   isZeroCirrusValue,
-  reassembleStructArrayRows,
+  parseMappingRowValue,
 } from "./mappingRow.parser";
 
 const STRATO_PREFIX = "BlockApps-";
@@ -109,27 +109,26 @@ export const getEventQueryParams = async (): Promise<{
   cursor: EventCursor;
   validPairs: ValidEventPairs;
 }> => {
-  // Each activity is spread over several /mapping rows: the struct row holds
-  // the scalar fields (emissionRate, sourceContract, ...) and each
-  // actionableEvents element lives in its own row, so fetch the whole
-  // collection and reassemble before filtering on emissionRate.
-  const activitiesData = await cirrus.get("/mapping", {
-    params: {
-      address: `eq.${config.rewards.address}`,
-      collection_name: `eq.activities`,
-      select: "key,value",
-    },
-  });
+  // The activities view reassembles each activity struct (including its
+  // actionableEvents array) from the underlying /mapping rows, one row per
+  // activity. Zero emission rates are filtered here since Cirrus renders zero
+  // as either "0" or an all-zero placeholder string.
+  const activitiesData = await cirrus.get(
+    `/${STRATO_PREFIX}Rewards-activities`,
+    {
+      params: {
+        address: `eq.${config.rewards.address}`,
+        select: "key,value",
+      },
+    }
+  );
 
   const contractAddresses = new Set<string>();
   const eventNames = new Set<string>();
   const validPairs: ValidEventPairs = new Set<string>();
 
-  const activities = reassembleStructArrayRows(
-    Array.isArray(activitiesData) ? activitiesData : []
-  );
-
-  for (const item of activities.values()) {
+  for (const row of Array.isArray(activitiesData) ? activitiesData : []) {
+    const item = parseMappingRowValue(row.value);
     if (
       isZeroCirrusValue(item.emissionRate) ||
       !item.sourceContract ||
