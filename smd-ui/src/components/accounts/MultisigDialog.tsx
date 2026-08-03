@@ -807,10 +807,9 @@ function ProposeIssueForm({
 }) {
   const { canSubmit } = useSubmitTransaction();
   const { castVote } = useMultisigActions({ walletAddress });
-  // Two simulations: the proposal tx itself, and the proposal's ultimate
-  // effect (target.func(args) executed as the wallet) once votes pass.
+  // One simulation of the castVoteOnIssue tx; the endpoint automatically nests
+  // the proposal's ultimate effect (target.func(args) executed as the wallet).
   const proposalSim = useSimulation();
-  const effectSim = useSimulation();
 
   const [target, setTarget] = useState("");
   const [showSug, setShowSug] = useState(false);
@@ -879,7 +878,6 @@ function ProposeIssueForm({
     setManualArgs([""]);
     setManualMode(false);
     proposalSim.reset();
-    effectSim.reset();
   };
 
   const submit = async () => {
@@ -904,49 +902,14 @@ function ProposeIssueForm({
     }
   };
 
-  // Named {type,value} args for the effect simulation (ABI mode only).
-  const buildEffectArgs = (): Record<string, unknown> => {
-    const out: Record<string, unknown> = {};
-    for (const a of abiFuncArgs) {
-      const isAddressArg = isPlainAddressType(a.type);
-      const raw = isAddressArg ? abiArgAddrs[a.name] || abiArgs[a.name] : abiArgs[a.name];
-      if (raw === undefined || raw === "") continue;
-      let parsedValue: unknown = raw;
-      if (a.type !== "string" && !isAddressArg) {
-        try {
-          parsedValue = JSON.parse(raw);
-        } catch {
-          parsedValue = raw;
-        }
-      }
-      out[a.name] = a.type ? { type: a.type, value: parsedValue } : parsedValue;
-    }
-    return out;
-  };
-
   const simulate = async () => {
     if (resolvedAddress.length !== 40 || !func) {
       toast.error("Enter a target contract and function first");
       return;
     }
-    // 1. The proposal transaction (will my castVoteOnIssue succeed?).
+    // Simulate the castVoteOnIssue tx; the endpoint nests the effect
+    // (target.func(args) executed as the wallet) in result.effect.
     proposalSim.run("FUNCTION", buildCastVotePayload(walletAddress, func, buildArgs(), resolvedAddress));
-    // 2. The proposal's effect, as if the wallet executed it (needs arg names).
-    if (useAbi) {
-      effectSim.run(
-        "FUNCTION",
-        {
-          contractAddress: resolvedAddress,
-          method: func,
-          value: 0,
-          args: buildEffectArgs(),
-          metadata: {},
-        },
-        { address: walletAddress }
-      );
-    } else {
-      effectSim.reset();
-    }
   };
 
   return (
@@ -1108,20 +1071,15 @@ function ProposeIssueForm({
         on the target contract.
       </p>
 
+      {/* The panel nests the issue's "Effect if executed" (target.func(args) run
+          as the wallet), which the simulate endpoint computes automatically. */}
       <SimulationResultPanel result={proposalSim.result} error={proposalSim.error} title="Proposal tx" />
-      <SimulationResultPanel result={effectSim.result} error={effectSim.error} title="Effect if executed" />
-      {(proposalSim.result || proposalSim.error) && !useAbi ? (
-        <p className="text-xs text-muted-foreground">
-          Effect simulation needs a resolved ABI (pick the function from the contract) to name the
-          arguments.
-        </p>
-      ) : null}
 
       <div className="flex gap-2">
         {proposalSim.canSimulate ? (
           <SimulateButton
             onClick={simulate}
-            pending={proposalSim.pending || effectSim.pending}
+            pending={proposalSim.pending}
             disabled={resolvedAddress.length !== 40 || !func}
           />
         ) : null}

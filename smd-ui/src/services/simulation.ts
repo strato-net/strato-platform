@@ -44,6 +44,13 @@ export interface SimulationResult {
   events: SimulatedEvent[];
   error?: string | null;
   trace?: TraceFrame | TraceFrame[] | null;
+  /**
+   * For a castVoteOnIssue simulation, the independently-simulated effect the
+   * issue would have if the vote reached threshold now (target.func(args) run
+   * as the registry/wallet). The server computes this automatically; nested
+   * results never carry their own effect.
+   */
+  effect?: SimulationResult | null;
 }
 
 /**

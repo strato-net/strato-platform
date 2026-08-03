@@ -36,7 +36,7 @@ import Bloc.Server.Transaction
     walletWrapCreate,
   )
 import BlockApps.Logging
-import BlockApps.Solidity.ArgValue (ArgValue)
+import BlockApps.Solidity.ArgValue (ArgValue (..), splitTypeHint)
 import BlockApps.SolidityVarReader (svmValueToSolidityValues)
 import Blockchain.DB.CodeDB (HasCodeDB)
 import Blockchain.Data.AddressStateDB
@@ -48,11 +48,13 @@ import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Model.SyncState (BestBlock, WorldBestBlock)
 import Blockchain.SyncDB (SyncStatus)
 import Control.Lens ((^.))
+import Control.Applicative ((<|>))
 import Control.Monad (forM, unless, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Types as Aeson
 import Data.Foldable (toList)
 import qualified Data.Map.Strict as M
@@ -79,7 +81,11 @@ data SimKind
 
 data SimPlan = SimPlan
   { simSpec :: CallSpec,
-    simKind :: SimKind
+    simKind :: SimKind,
+    -- | Extra call to simulate independently and attach as the result's
+    -- `effect` (currently: the castVoteOnIssue issue effect). Its own simEffect
+    -- is always Nothing.
+    simEffect :: Maybe SimPlan
   }
 
 -- Per-call output of strato_simulateV1 (see vm-runner's simulateOne).
@@ -174,6 +180,7 @@ postBlocTransactionSimulate mToken mUsername mChainId trace (PostBlocTransaction
               SimPlan
                 (mkFuncCall userContractAddr "createContract" outer (hexGas $ mergeTxParams (contractpayloadTxParams p) txParams))
                 (SimCall userContractAddr "createContract")
+                Nothing
         | otherwise -> do
             (cn, contractSrc, _, ctorLits) <- marshalCreatePayload msrcs p
             pure $
@@ -189,6 +196,7 @@ postBlocTransactionSimulate mToken mUsername mChainId trace (PostBlocTransaction
                       }
                 )
                 (SimCreate cn)
+                Nothing
       BlocFunction p
         | useWallet && userContractAddr /= functionpayloadContractAddress p -> do
             inner <- marshalInnerCallArgs (functionpayloadContractAddress p) (functionpayloadMethod p) (functionpayloadArgs p)
@@ -199,12 +207,21 @@ postBlocTransactionSimulate mToken mUsername mChainId trace (PostBlocTransaction
               SimPlan
                 (mkFuncCall userContractAddr "callContract" outer (hexGas $ mergeTxParams (functionpayloadTxParams p) txParams))
                 (SimCall userContractAddr "callContract")
+                Nothing
         | otherwise -> do
-            args' <- marshalOuterCall (functionpayloadContractAddress p) (functionpayloadMethod p) (functionpayloadArgs p)
+            let gasTxt = hexGas $ mergeTxParams (functionpayloadTxParams p) txParams
+                target = functionpayloadContractAddress p
+                method = functionpayloadMethod p
+            args' <- marshalOuterCall target method (functionpayloadArgs p)
+            -- Simulating castVoteOnIssue(_target,_func,_args)? Also simulate the
+            -- issue's effect: target.func(args) run as the registry/wallet, using
+            -- the same positional _args (which flatten to the tail of args').
+            let mEffect = castVoteEffectPlan target gasTxt method (functionpayloadArgs p) args'
             pure $
               SimPlan
-                (mkFuncCall (functionpayloadContractAddress p) (functionpayloadMethod p) args' (hexGas $ mergeTxParams (functionpayloadTxParams p) txParams))
-                (SimCall (functionpayloadContractAddress p) (functionpayloadMethod p))
+                (mkFuncCall target method args' gasTxt)
+                (SimCall target method)
+                mEffect
 
     let specs = [simSpec pl | Right pl <- plans]
     vmCalls <-
@@ -236,9 +253,17 @@ postBlocTransactionSimulate mToken mUsername mChainId trace (PostBlocTransaction
         else pure Nothing
 
     results <- zipPlans plans vmCalls
-    pure $ case (mTraceVal, results) of
-      (Just tv, [r]) -> [r {blocsimulateTrace = Just tv}]
-      _ -> results
+    let tracedResults = case (mTraceVal, results) of
+          (Just tv, [r]) -> [withTrace tv r]
+          _ -> results
+    -- Attach the castVoteOnIssue effect simulation (if any) to each result. Each
+    -- effect runs in its own fresh sandbox, so it reflects executing the issue
+    -- against current state rather than after this vote.
+    forM (zip plans tracedResults) $ \(ep, r) -> case ep of
+      Right pl | Just eff <- simEffect pl -> do
+        effRes <- runEffectPlan url trace eff
+        pure r {blocsimulateEffect = Just effRes}
+      _ -> pure r
   where
     zipPlans [] _ = pure []
     zipPlans (Left apiErr : rest) vms = (failureResult apiErr :) <$> zipPlans rest vms
@@ -303,7 +328,8 @@ failureResult e =
       blocsimulateData = Nothing,
       blocsimulateEvents = [],
       blocsimulateError = Just $ renderApiError e,
-      blocsimulateTrace = Nothing
+      blocsimulateTrace = Nothing,
+      blocsimulateEffect = Nothing
     }
   where
     renderApiError = \case
@@ -347,5 +373,106 @@ buildResult SimPlan {..} VmCallResult {..} = do
         blocsimulateData = mData,
         blocsimulateEvents = vcrLogs,
         blocsimulateError = vcrError,
-        blocsimulateTrace = Nothing
+        blocsimulateTrace = Nothing,
+        blocsimulateEffect = Nothing
       }
+
+-- | A Failure result carrying just an error message (used when an effect
+-- simulation could not be produced).
+errorResult :: Text -> BlocSimulateResult
+errorResult msg =
+  BlocSimulateResult Failure 0 Nothing Nothing [] (Just msg) Nothing Nothing
+
+-- | The authoritative revert reason from a trace's root frame. strato_simulateV1
+-- returns @erException@, which for a reverting proxy call can be a misleading
+-- secondary exception (e.g. "no contract deployed at 0x..100c" thrown while
+-- unwinding, after the real @require@ already failed). The tracer instead records
+-- the true error on each frame as it unwinds, so the root frame's @error@ is what
+-- the user should see.
+traceRootError :: Aeson.Value -> Maybe Text
+traceRootError (Aeson.Object o) = case KeyMap.lookup "error" o of
+  Just (Aeson.String e) -> Just e
+  _ -> Nothing
+traceRootError (Aeson.Array a) = case toList a of
+  (x : _) -> traceRootError x
+  [] -> Nothing
+traceRootError _ = Nothing
+
+-- | Attach a trace to a result, and — when the call failed — prefer the trace's
+-- root-frame error over strato_simulateV1's (potentially misleading) message.
+withTrace :: Aeson.Value -> BlocSimulateResult -> BlocSimulateResult
+withTrace tv r =
+  r
+    { blocsimulateTrace = Just tv,
+      blocsimulateError =
+        if blocsimulateStatus r == Failure
+          then traceRootError tv <|> blocsimulateError r
+          else blocsimulateError r
+    }
+
+-- | When simulating @castVoteOnIssue(_target, _func, _args)@, the plan for the
+-- issue's ultimate effect: @target.func(args)@ executed as the registry/wallet
+-- the vote runs on (@registryAddr@). SolidVM calls are positional, and the
+-- variadic @_args@ flatten to the tail of the already-marshaled castVoteOnIssue
+-- args, so the effect args are just @drop 2@ of them — no ABI lookup needed.
+castVoteEffectPlan :: Address -> Text -> Text -> Map Text ArgValue -> [Text] -> Maybe SimPlan
+castVoteEffectPlan registryAddr gasTxt method argsMap marshaledArgs
+  | method /= "castVoteOnIssue" = Nothing
+  | otherwise = do
+      targetTxt <- argScalarText =<< M.lookup "_target" argsMap
+      funcName <- argScalarText =<< M.lookup "_func" argsMap
+      targetAddr <- stringAddress . Text.unpack $ fromMaybe targetTxt (Text.stripPrefix "0x" targetTxt)
+      let spec =
+            SpecFuncCall
+              TxFuncCallObject
+                { funcCallFrom = registryAddr,
+                  funcCallTo = targetAddr,
+                  funcCallGas = gasTxt,
+                  funcCallValue = "0x0",
+                  funcCallFunctionName = funcName,
+                  funcCallArgs = drop 2 marshaledArgs
+                }
+      pure $ SimPlan spec (SimCall targetAddr funcName) Nothing
+
+-- | Extract the plain textual value of a (possibly {type,value}-hinted) scalar.
+argScalarText :: ArgValue -> Maybe Text
+argScalarText av0 = case maybe av0 snd (splitTypeHint av0) of
+  ArgString t -> Just t
+  ArgInt i -> Just . Text.pack $ show i
+  ArgBool b -> Just $ if b then "true" else "false"
+  _ -> Nothing
+
+-- | Simulate a plan's effect call independently (fresh sandbox) and shape it as
+-- a nested BlocSimulateResult, with its own trace when requested.
+runEffectPlan ::
+  ( MonadUnliftIO m,
+    MonadLogger m,
+    (Keccak256 `A.Selectable` CC.CodeCollection) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m
+  ) =>
+  String ->
+  Bool ->
+  SimPlan ->
+  m BlocSimulateResult
+runEffectPlan url trace eff = do
+  esim <-
+    jsonRpcCall
+      url
+      "strato_simulateV1"
+      [ Aeson.object ["blockStateCalls" .= [Aeson.object ["calls" .= [simSpec eff]]]],
+        Aeson.String "latest"
+      ]
+  case esim of
+    Left err -> pure $ errorResult ("effect simulation failed: " <> err)
+    Right v -> case Aeson.parseEither parseSimBlocks v of
+      Left perr -> pure $ errorResult ("unexpected effect response: " <> Text.pack perr)
+      Right [] -> pure $ errorResult "empty effect simulation response"
+      Right (callRes : _) -> do
+        base <- buildResult eff callRes
+        if not trace
+          then pure base
+          else
+            jsonRpcCall url "strato_traceCall" [Aeson.toJSON (simSpec eff), Aeson.String "latest", Aeson.object ["statements" .= False]] >>= \case
+              Left _ -> pure base
+              Right tv -> pure (withTrace tv base)

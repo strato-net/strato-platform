@@ -24,13 +24,43 @@ spec = do
                 blocsimulateData = Just . Upload $ UploadContractDetails "C" Nothing,
                 blocsimulateEvents = [SimulatedEvent "deadbeef" "Added" (Map.singleton "amount" "5")],
                 blocsimulateError = Nothing,
-                blocsimulateTrace = Nothing
+                blocsimulateTrace = Nothing,
+                blocsimulateEffect = Nothing
               }
       decode (encode r) `shouldBe` Just r
       case decode (encode r) :: Maybe Aeson.Value of
         Just (Aeson.Object o) -> do
           Aeson.parseMaybe (Aeson..: "status") o `shouldBe` Just Success
           Aeson.parseMaybe (Aeson..: "gasUsed") o `shouldBe` Just (420 :: Integer)
+        other -> expectationFailure $ "expected a JSON object, got " ++ show other
+
+    it "nests the castVoteOnIssue effect under the 'effect' key" $ do
+      let effect =
+            BlocSimulateResult
+              { blocsimulateStatus = Success,
+                blocsimulateGasUsed = 7,
+                blocsimulateResponse = Nothing,
+                blocsimulateData = Just . Call $ [],
+                blocsimulateEvents = [],
+                blocsimulateError = Nothing,
+                blocsimulateTrace = Nothing,
+                blocsimulateEffect = Nothing
+              }
+          r =
+            BlocSimulateResult
+              { blocsimulateStatus = Success,
+                blocsimulateGasUsed = 1,
+                blocsimulateResponse = Nothing,
+                blocsimulateData = Nothing,
+                blocsimulateEvents = [],
+                blocsimulateError = Nothing,
+                blocsimulateTrace = Nothing,
+                blocsimulateEffect = Just effect
+              }
+      decode (encode r) `shouldBe` Just r
+      case decode (encode r) :: Maybe Aeson.Value of
+        Just (Aeson.Object o) ->
+          Aeson.parseMaybe (Aeson..: "effect") o `shouldBe` Just effect
         other -> expectationFailure $ "expected a JSON object, got " ++ show other
 
     it "round-trips a failure with an error message" $ do
@@ -42,7 +72,8 @@ spec = do
                 blocsimulateData = Nothing,
                 blocsimulateEvents = [],
                 blocsimulateError = Just "execution reverted: boom",
-                blocsimulateTrace = Nothing
+                blocsimulateTrace = Nothing,
+                blocsimulateEffect = Nothing
               }
       decode (encode r) `shouldBe` Just r
 

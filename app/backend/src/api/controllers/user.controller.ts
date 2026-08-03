@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getAdmin, isUserAdmin, addAdmin, removeAdmin, castVoteOnIssue, castVoteOnIssueById, dismissIssue, getOpenIssues,
+import { getAdmin, isUserAdmin, addAdmin, removeAdmin, castVoteOnIssue, castVoteOnIssueById, simulateCastVoteOnIssue, dismissIssue, getOpenIssues,
          getExecutedIssues, contractSearch, getContractDetails,
  } from "../services/user.service";
 import { validateUserAddress, validateAddressField } from "../validators/common.validators";
@@ -97,14 +97,32 @@ class UserController {
       validateAddressField(target);
       
       const result = await castVoteOnIssue(accessToken, actorAddress as string, target, func, args);
-      res.status(RestStatus.OK).json({ 
-        message: "Vote cast successfully", 
+      res.status(RestStatus.OK).json({
+        message: "Vote cast successfully",
         target,
         func,
         args,
         status: result.status,
         hash: result.hash,
       });
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  static async simulateCastVoteOnIssue(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: actorAddress } = req;
+      const { target, func, args } = req.body;
+      validateAddressField(target);
+
+      const result = await simulateCastVoteOnIssue(accessToken, actorAddress as string, target, func, args);
+      res.status(RestStatus.OK).json(result);
       next();
     } catch (e) {
       next(e);

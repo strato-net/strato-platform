@@ -27,7 +27,7 @@ export function SimulationResultPanel({ result, error, title }: SimulationResult
       ? result.trace
       : [result.trace];
 
-  return (
+  const panel = (
     <div
       className={
         failed
@@ -83,6 +83,16 @@ export function SimulationResultPanel({ result, error, title }: SimulationResult
           ) : null}
         </div>
       ) : null}
+    </div>
+  );
+
+  // A castVoteOnIssue simulation carries the issue's effect; show it as a
+  // second panel so the voter sees both the vote tx and what it would execute.
+  if (!result?.effect) return panel;
+  return (
+    <div className="space-y-2">
+      {panel}
+      <SimulationResultPanel result={result.effect} title="Effect if executed" />
     </div>
   );
 }

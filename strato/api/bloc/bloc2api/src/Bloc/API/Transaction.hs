@@ -178,7 +178,11 @@ data BlocSimulateResult = BlocSimulateResult
     blocsimulateData :: Maybe BlocTransactionData,
     blocsimulateEvents :: [SimulatedEvent],
     blocsimulateError :: Maybe Text,
-    blocsimulateTrace :: Maybe Value
+    blocsimulateTrace :: Maybe Value,
+    -- | For a `castVoteOnIssue` call, the independently-simulated effect the
+    -- issue would have if the vote reached its threshold now: `target.func(args)`
+    -- executed as the registry/wallet. Nothing for any other call.
+    blocsimulateEffect :: Maybe BlocSimulateResult
   }
   deriving (Eq, Show, Generic)
 
@@ -197,6 +201,8 @@ instance Arbitrary BlocSimulateResult where
       <*> pure Nothing
       <*> arbitrary
       <*> arbitrary
+      <*> pure Nothing
+      -- Non-recursive: keep the generated tree finite.
       <*> pure Nothing
 
 instance ToSample BlocSimulateResult where toSamples _ = noSamples
