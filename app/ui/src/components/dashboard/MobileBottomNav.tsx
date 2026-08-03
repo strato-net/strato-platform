@@ -17,6 +17,7 @@ import {
   HandCoins,
   Layers,
   ArrowDownToLine,
+  Compass,
   X
 } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
@@ -47,6 +48,7 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
   {
     label: 'TRADE',
     items: [
+      { icon: Compass, label: 'Explore', path: '/dashboard/explore' },
       { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
       { icon: Send, label: 'Send', path: '/dashboard/transfer' },
       { icon: Download, label: 'Bridge Out', path: '/dashboard/withdrawals' },

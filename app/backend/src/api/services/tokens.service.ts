@@ -6,7 +6,7 @@ import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { getPool as getLendingRegistry } from "./lending.service";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
-import { getOraclePrices } from "./oracle.service";
+import { getOraclePrices, getTokenPriceMetrics } from "./oracle.service";
 import { getTokenDetails } from "../helpers/cirrusHelpers";
 import * as config from "../../config/config";
 import { listVaultDefs } from "./yieldVault.service";
@@ -602,7 +602,7 @@ export const getTokenStats = async (
     const [tokensResponse, priceData] = await Promise.all([
       cirrus.get(accessToken, `/${Token}`, {
         params: {
-          select: "address,_name,_symbol,_totalSupply::text",
+          select: `address,_name,_symbol,_totalSupply::text,images:${Token}-images(value)`,
           status: `eq.2`,
           _totalSupply: `gt.0`
         }
@@ -622,15 +622,31 @@ export const getTokenStats = async (
 
     const filteredTokens = tokens.filter((token: any) => priceData.has(token.address));
 
+    // Optional enrichment — failure must not break existing stats fields
+    const metricsMap = await getTokenPriceMetrics(
+      accessToken,
+      filteredTokens.map((t: any) => t.address),
+      priceData
+    ).catch(() => new Map());
+
     const tokensWithMarketCap = filteredTokens.map((token: any) => {
       const totalSupply = BigInt(token._totalSupply || "0");
+      const marketCap = calculateMarketCap(priceData.get(token.address), totalSupply);
+      const metrics = metricsMap.get(token.address);
 
       return {
         address: token.address,
         name: token._name,
         symbol: token._symbol,
+        image: token.images?.[0]?.value || null,
         totalSupply: totalSupply.toString(),
-        marketCap: calculateMarketCap(priceData.get(token.address), totalSupply)
+        price: (priceData.get(token.address) || "0").toString(),
+        marketCap,
+        // FDV = price × totalSupply on STRATO (no separate max supply)
+        fdv: marketCap,
+        change1h: metrics?.change1h ?? null,
+        change24h: metrics?.change24h ?? null,
+        sparkline: metrics?.sparkline ?? [],
       };
     });
 
