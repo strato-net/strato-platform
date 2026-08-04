@@ -1,4 +1,5 @@
 import { query } from "../../utils/dbService";
+import * as config from "../../config/config";
 import {
   HistoryParams,
   HistorySnapshot,
@@ -465,9 +466,10 @@ export interface PoolV3Meta {
 
 /**
  * Pre-pass for V3 positions: find the V3 pools the user has (or had) positions in
- * during the window, and resolve each pool's token pair. The join against the
- * PoolV3 table also guarantees we only treat genuine V3 pools as such — other
- * contracts may have a `positions` collection too.
+ * during the window, and resolve each pool's token pair. Only pools from the
+ * configured current poolV3Factory are included — same scope as the Net Balance box.
+ * The join against PoolV3 also skips non-V3 contracts that happen to have a
+ * `positions` collection.
  */
 export async function fetchUserV3PoolMeta(
   startTime: string,
@@ -489,10 +491,17 @@ export async function fetchUserV3PoolMeta(
     );
     if (poolRows.length === 0) return meta;
 
-    const metaRows = await query<{ address: string; token0: string; token1: string }>(
-      `SELECT address, token0, token1 FROM "BlockApps-PoolV3" WHERE address = ANY($1)`,
-      [poolRows.map((r) => r.address)],
-    );
+    const factory = config.poolV3Factory;
+    const metaRows = factory
+      ? await query<{ address: string; token0: string; token1: string }>(
+          `SELECT address, token0, token1 FROM "BlockApps-PoolV3"
+           WHERE address = ANY($1) AND "poolV3Factory" = $2`,
+          [poolRows.map((r) => r.address), factory],
+        )
+      : await query<{ address: string; token0: string; token1: string }>(
+          `SELECT address, token0, token1 FROM "BlockApps-PoolV3" WHERE address = ANY($1)`,
+          [poolRows.map((r) => r.address)],
+        );
     for (const row of metaRows) {
       if (row.token0 && row.token1) {
         meta.set(row.address, { token0: row.token0, token1: row.token1 });

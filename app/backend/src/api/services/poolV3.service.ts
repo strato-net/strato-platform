@@ -251,13 +251,10 @@ const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>, swapInputs?: S
 const fetchRawPools = async (
   accessToken: string,
   filters: Record<string, string> = {},
-  opts: { anyFactory?: boolean } = {},
 ): Promise<RawV3Pool[]> => {
   const { data } = await cirrus.get(accessToken, `/${PoolV3Table}`, {
     params: {
-      // Portfolio valuation must see positions on every factory; discovery/trade
-      // listing stays pinned to the configured current factory.
-      ...(opts.anyFactory ? {} : { poolV3Factory: `eq.${config.poolV3Factory}` }),
+      poolV3Factory: `eq.${config.poolV3Factory}`,
       select: POOL_V3_SELECT_FIELDS.join(","),
       // uninitialized proxies/implementations have price 0
       sqrtPriceX96: "neq.0",
@@ -649,17 +646,9 @@ export const getPositions = async (
 
   // pool + tick state for amount and pending-fee computation
   const poolAddresses = [...new Set(rows.map((r) => r.address))];
-  // anyFactory: user may hold liquidity on pools from older/alternate factories;
-  // filtering to config.poolV3Factory silently dropped those from net-balance.
-  const rawPools = await fetchRawPools(
-    accessToken,
-    { address: `in.(${poolAddresses.join(",")})` },
-    { anyFactory: true },
-  );
+  // Only pools from the configured current factory count toward portfolio value.
+  const rawPools = await fetchRawPools(accessToken, { address: `in.(${poolAddresses.join(",")})` });
   const poolByAddress = new Map(rawPools.map((p) => [p.address, p]));
-  console.log(
-    `[NB-V3] getPositions owner=${owner} rows=${rows.length} poolsLoaded=${rawPools.length}/${poolAddresses.length}`
-  );
   const ticksByPool = new Map<string, Map<number, v3.TickData>>();
   for (const addr of poolAddresses) {
     const ticks = await fetchInitializedTicks(accessToken, addr);

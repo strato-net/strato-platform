@@ -617,9 +617,6 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
 function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index: number): {timestamp: number, data: any} {
   let netBalance: number = 0;
   let netLoan: number = 0;
-  let v3Total = 0;
-  let v3Count = 0;
-  let arbVValue = 0;
 
   const shareTokenNorm = (snapshot.data.vaultConfig?.shareToken || '')
     .toLowerCase()
@@ -687,22 +684,17 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
     } else if (isVaultShare) {
       // Same NAV formula as box getVaultShareTokenPrice — always derive, never oracle.
       const totalSupply = token?.supply || '0';
-      if (totalSupply === '0') {
-        console.log(`[NB-ARBV] idx=${index} skip=no-supply addr=${tokenAddr}`);
-        continue;
-      }
+      if (totalSupply === '0') continue;
       const supportedAssets: string[] = snapshot.data.vaultConfig?.supportedAssets || [];
       const tokByLower = new Map(
         Object.entries(snapshot.data.tokens).map(([k, v]) => [k.toLowerCase(), v])
       );
       let totalEquity = 0n;
-      let assetsWithBal = 0;
       for (const assetAddr of supportedAssets) {
         const assetTok =
           snapshot.data.tokens[assetAddr] || tokByLower.get(assetAddr.toLowerCase());
         const bal = safeBigInt(assetTok?.vaultAssetBalance);
         const assetPrice = safeBigInt(assetTok?.price);
-        if (bal > 0n) assetsWithBal++;
         if (assetPrice > 0n) {
           totalEquity += (bal * assetPrice) / BigInt(1e18);
         }
@@ -710,11 +702,6 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
       if (totalEquity > 0n) {
         tokenPrice = Number((totalEquity * BigInt(1e18)) / safeBigInt(totalSupply));
       } else {
-        console.log(
-          `[NB-ARBV] idx=${index} skip=zero-equity addr=${tokenAddr} ` +
-          `supported=${supportedAssets.length} withBal=${assetsWithBal} ` +
-          `sample=${supportedAssets[0] || ""} supply=${totalSupply}`
-        );
         continue;
       }
     } else if (tokenPrice === 0) {
@@ -756,18 +743,12 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
     }
     const tokenValue = (tokenPrice / 1000000000) * (tokenBalance / 1000000000);
     netBalance += tokenValue;
-    if (isVaultShare) {
-      arbVValue = tokenValue / 1e18;
-      console.log(
-        `[NB-ARBV] idx=${index} addr=${tokenAddr} bal=${tokenBalance} price=${tokenPrice} ` +
-        `value=$${arbVValue.toFixed(2)}`
-      );
-    }
   }
 
   // V3 concentrated-liquidity positions: reconstruct the position's token amounts from
   // the pool's price at this snapshot, then value them at the token prices at this
   // snapshot (same historical-price replay the fungible tokens use).
+  // Only pools in v3PoolMeta count — that set is restricted to config.poolV3Factory.
   const v3Meta = snapshot.data.v3PoolMeta || {};
   for (const pos of Object.values(snapshot.data.v3Positions || {}) as any[]) {
     const meta = v3Meta[pos.poolAddress];
@@ -797,8 +778,6 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
     const price1 = parseFloat(snapshot.data.tokens[meta.token1]?.price) || 0;
     const posValue = (price0 / 1e9) * (Number(a0) / 1e9) + (price1 / 1e9) * (Number(a1) / 1e9);
     netBalance += posValue;
-    v3Total += posValue / 1e18;
-    v3Count++;
   }
 
   // Add staked STRATO value to net balance
@@ -819,13 +798,6 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
   const lendingDebt = borrowIndex > 0n ? scaledDebt * (Number(borrowIndex) / 1e27) : scaledDebt;
 
   netBalance -= netLoan + lendingDebt;
-
-  if (index === 0 || v3Count > 0 || arbVValue > 0) {
-    console.log(
-      `[NB-GRAPH] idx=${index} v3Count=${v3Count} v3=$${v3Total.toFixed(2)} ` +
-      `arbV=$${arbVValue.toFixed(2)} net=$${(netBalance / 1e18).toFixed(2)}`
-    );
-  }
 
   return { timestamp: snapshot.timestamp, data: {netBalance: netBalance / 1e18 }};
 }
@@ -1089,10 +1061,7 @@ export const getPoolPriceHistory = async (
  */
 const getV3PositionsValue = async (accessToken: string, userAddress: string): Promise<number> => {
   const positions = await getV3Positions(accessToken, userAddress);
-  if (positions.length === 0) {
-    console.log(`[NB-V3-BOX] positions=0 value=$0.00`);
-    return 0;
-  }
+  if (positions.length === 0) return 0;
 
   const poolAddresses = [...new Set(positions.map((p) => p.poolAddress))];
   const [pairs, priceMap] = await Promise.all([
@@ -1112,9 +1081,7 @@ const getV3PositionsValue = async (accessToken: string, userAddress: string): Pr
       totalWadWad += amount0 * price0 + amount1 * price1;
     } catch { /* skip malformed rows */ }
   }
-  const value = Number(totalWadWad / 10n ** 18n) / 1e18;
-  console.log(`[NB-V3-BOX] positions=${positions.length} pools=${poolAddresses.length} value=$${value.toFixed(2)}`);
-  return value;
+  return Number(totalWadWad / 10n ** 18n) / 1e18;
 };
 
 export const getNetBalance = async (
@@ -1132,13 +1099,7 @@ export const getNetBalance = async (
   let totalAssetValue = 0;
   if (earningAssetsResult.status === "fulfilled") {
     for (const asset of earningAssetsResult.value) {
-      const value = parseFloat(asset.value || "0");
-      totalAssetValue += value;
-      if ((asset._symbol || "").toLowerCase() === "arbv") {
-        console.log(
-          `[NB-ARBV-BOX] addr=${asset.address} bal=${asset.totalBalance} price=${asset.price} value=$${value.toFixed(2)}`
-        );
-      }
+      totalAssetValue += parseFloat(asset.value || "0");
     }
   }
   if (v3Result.status === "fulfilled") {
