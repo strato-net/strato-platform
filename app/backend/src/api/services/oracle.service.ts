@@ -67,7 +67,12 @@ export const getOraclePrices = async (
   accessToken: string,
   params: Record<string, string> = { select: "asset:key,price:value::text" }
 ): Promise<OraclePriceMap> => {
-  const { data: rawPrices } = await cirrus.get(accessToken, `/${PriceOracle}-prices`, { params });
+  // The prices table holds rows from every deployed PriceOracle. Without pinning to the
+  // system oracle, a stale duplicate's row can win because the Map keeps the last write
+  // per asset. History queries already filter on the same address.
+  const { data: rawPrices } = await cirrus.get(accessToken, `/${PriceOracle}-prices`, {
+    params: { ...params, address: `eq.${constants.priceOracle}` },
+  });
 
   const prices = rawPrices as OraclePriceEntry[];
 
