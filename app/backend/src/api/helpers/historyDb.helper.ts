@@ -210,25 +210,21 @@ export async function fetchUserMappingHistory(
   ];
 
   // Build the _balances path array: liquidity pool + bot executor + carry vault idle assets.
-  // History paths and Vault.botExecutor / carry addrs can differ in case / 0x prefix —
-  // include common forms so vault share equity (arbV) isn't silently $0.
-  const balancePathVariants = (addr: string): string[] => {
-    const stripped = (addr || "").replace(/^0x/i, "");
-    if (!stripped) return [];
-    return [...new Set([
-      `_balances[${addr}]`,
-      `_balances[${stripped}]`,
-      `_balances[${stripped.toLowerCase()}]`,
-    ])];
-  };
+  // Include lowercase form so vault share (arbV) equity isn't missed when casing differs.
   const balancePaths: string[] = [
     '_balances[0000000000000000000000000000000000001004]', // liquidity pool
   ];
+  const pushBalancePath = (addr: string) => {
+    if (!addr) return;
+    balancePaths.push(`_balances[${addr}]`);
+    const lower = addr.toLowerCase();
+    if (lower !== addr) balancePaths.push(`_balances[${lower}]`);
+  };
   if (filters.botExecutor) {
-    balancePaths.push(...balancePathVariants(filters.botExecutor));
+    pushBalancePath(filters.botExecutor);
   }
   for (const addr of filters.carryVaultAddrs) {
-    balancePaths.push(...balancePathVariants(addr));
+    pushBalancePath(addr);
   }
 
   const claimablePath = `claimableAssets[${filters.userAddress}]`;
