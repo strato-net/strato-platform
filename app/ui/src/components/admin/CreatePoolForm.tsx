@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
@@ -9,20 +9,30 @@ import { Loader2, Info, Droplets } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSwapContext } from '@/context/SwapContext';
 import { useTokenContext } from '@/context/TokenContext';
-import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import CreatePoolV3Form from './CreatePoolV3Form';
+
+type PoolType = 'classic' | 'stable' | 'v3';
+
+const POOL_TYPES: { value: PoolType; label: string; description: string }[] = [
+  { value: 'classic', label: 'Constant Product', description: 'Traditional V2 pool (x·y=k)' },
+  { value: 'stable', label: 'Stable', description: 'Stable swap pool for pegged assets' },
+  { value: 'v3', label: 'Concentrated (V3)', description: 'Concentrated-liquidity pool with fee tiers' },
+];
 
 const CreatePoolForm = () => {
+  const [poolType, setPoolType] = useState<PoolType>('classic');
   const { createPool, loading: swapLoading } = useSwapContext();
   const { activeTokens, getActiveTokens, loading: tokenLoading } = useTokenContext();
   const { toast } = useToast();
-  
+
   const loading = swapLoading || tokenLoading;
-  
+
   const form = useForm<CreatePoolParams>({
     defaultValues: {
       tokenA: '',
       tokenB: '',
-      isStable: false,
       // initialLiquidityA: '',
       // initialLiquidityB: '',
       // poolName: '',
@@ -47,7 +57,7 @@ const CreatePoolForm = () => {
       await createPool({
         tokenA: data.tokenA,
         tokenB: data.tokenB,
-        isStable: data.isStable,
+        isStable: poolType === 'stable',
       });
 
       // After creating the pool, add initial liquidity if provided
@@ -65,10 +75,42 @@ const CreatePoolForm = () => {
     }
   };
 
+  const poolTypeSelector = (
+    <div className="space-y-3">
+      <Label>Pool Type</Label>
+      <RadioGroup
+        value={poolType}
+        onValueChange={(value) => setPoolType(value as PoolType)}
+        className="grid grid-cols-1 md:grid-cols-3 gap-4"
+      >
+        {POOL_TYPES.map((type) => (
+          <div key={type.value} className="flex items-start space-x-2">
+            <RadioGroupItem value={type.value} id={`pool-type-${type.value}`} className="mt-1" />
+            <Label htmlFor={`pool-type-${type.value}`} className="font-normal cursor-pointer">
+              <span className="font-medium block">{type.label}</span>
+              <span className="text-sm text-muted-foreground">{type.description}</span>
+            </Label>
+          </div>
+        ))}
+      </RadioGroup>
+    </div>
+  );
+
+  if (poolType === 'v3') {
+    return (
+      <div className="space-y-6">
+        {poolTypeSelector}
+        <CreatePoolV3Form />
+      </div>
+    );
+  }
+
   return (
-    <Form {...form}>
+    <div className="space-y-6">
+      {poolTypeSelector}
+      <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             control={form.control}
             name="tokenA"
@@ -192,23 +234,6 @@ const CreatePoolForm = () => {
             )}
           /> */}
 
-          <FormField
-            control={form.control}
-            name="isStable"
-            rules={{}}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Is Stable Pool</FormLabel>
-                <div className="w-80" />
-                <Switch onCheckedChange={field.onChange} checked={field.value} />
-                <FormDescription>
-                  Toggling this field on will result in a stable swap pool being created,
-                  rather than a traditional pool using the constant product formula.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
         </div>
 
         <Alert>
@@ -252,7 +277,8 @@ const CreatePoolForm = () => {
           </Button>
         </div>
       </form>
-    </Form>
+      </Form>
+    </div>
   );
 };
 
