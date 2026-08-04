@@ -415,11 +415,16 @@ export async function fetchVaultHistoryConfig(
 
   if (!vaultRows.length) return null;
 
+  // value::text on jsonb/text mapping cells often wraps the address in quotes
+  // ("0abc…"); those must be stripped or vaultAssetBalance lookups miss and
+  // arbV/SLP equity prices as $0 on the portfolio graph.
+  const stripAddr = (v: string) => (v || "").replace(/"/g, "").trim();
+
   return {
-    shareToken: vaultRows[0].shareToken || "",
-    botExecutor: vaultRows[0].botExecutor || "",
+    shareToken: stripAddr(vaultRows[0].shareToken || ""),
+    botExecutor: stripAddr(vaultRows[0].botExecutor || ""),
     supportedAssets: assetRows
-      .map((a) => a.value)
+      .map((a) => stripAddr(a.value))
       .filter((addr) => addr && addr !== "0000000000000000000000000000000000000000"),
   };
 }

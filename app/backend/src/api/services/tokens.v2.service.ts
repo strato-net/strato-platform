@@ -712,8 +712,10 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
       } else {
         console.log(
           `[NB-ARBV] idx=${index} skip=zero-equity addr=${tokenAddr} ` +
-          `supported=${supportedAssets.length} withBal=${assetsWithBal} supply=${totalSupply}`
+          `supported=${supportedAssets.length} withBal=${assetsWithBal} ` +
+          `sample=${supportedAssets[0] || ""} supply=${totalSupply}`
         );
+        continue;
       }
     } else if (tokenPrice === 0) {
       const totalSupply = token?.supply || '0';
