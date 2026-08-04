@@ -42,6 +42,13 @@ const isLPToken = (token: Token): boolean => {
   return symbol.endsWith('-LP');
 };
 
+const formatLargeNumber = (num: number): string => {
+  if (num >= 1e9) return `${(num / 1e9).toFixed(2)}B`;
+  if (num >= 1e6) return `${(num / 1e6).toFixed(2)}M`;
+  if (num >= 1e3) return `${(num / 1e3).toFixed(2)}K`;
+  return num.toFixed(2);
+};
+
 const fetchPriceHistory = async (assetAddress: string): Promise<PricePoint[]> => {
   try {
     const response = await api.get<{ data: PriceHistoryApiEntry[] }>(`/oracle/price-history/${assetAddress}`);
@@ -98,29 +105,42 @@ const AssetDetail = () => {
   const [swapPriceData, setSwapPriceData] = useState<SwapPricePoint[]>([]);
   const [swapPriceDataLoading, setSwapPriceDataLoading] = useState(false);
   const [showPriceTooltip, setShowPriceTooltip] = useState(false);
-  const { userAddress } = useUser()
+  const { userAddress, isLoggedIn } = useUser()
   const { activeTokens: assets, inactiveTokens, loading, fetchTokens, allActiveTokens } = useUserTokens()
   const { getToken, earningAssets } = useTokenContext();
-  const [fetchingSingleAsset, setFetchingSingleAsset] = useState(false);
+  const [lookupComplete, setLookupComplete] = useState(false);
 
   const PRICE_WINDOW = 30; // Number of days to show in the price chart
   
   useEffect(() => {
+    if (!isLoggedIn) return;
     fetchTokens()
-  }, [userAddress])
+  }, [userAddress, isLoggedIn])
 
   useEffect(() => {
-    // Helper function to handle asset setup and price fetching
+    setAsset(null);
+    setLookupComplete(false);
+  }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
     const setupAsset = (foundAsset: Token) => {
+      if (cancelled) return;
       setAsset(foundAsset);
+      setLookupComplete(true);
       document.title = `${foundAsset?.token?._name || foundAsset?._name} | Asset Details`;
 
       // Fetch oracle price history if address exists
       if (foundAsset?.address) {
         setPriceDataLoading(true);
         fetchPriceHistory(foundAsset.address)
-          .then(data => setPriceData(data.slice(-(PRICE_WINDOW * 24)))) // Show last N days (24 hours each)
-          .finally(() => setPriceDataLoading(false));
+          .then(data => {
+            if (!cancelled) setPriceData(data.slice(-(PRICE_WINDOW * 24)));
+          })
+          .finally(() => {
+            if (!cancelled) setPriceDataLoading(false);
+          });
 
         // Only fetch swap pool prices for non-LP tokens
         if (isLPToken(foundAsset)) {
@@ -129,8 +149,12 @@ const AssetDetail = () => {
         } else {
           setSwapPriceDataLoading(true);
           fetchSwapPoolPrices(foundAsset.address)
-            .then(data => setSwapPriceData(data))
-            .finally(() => setSwapPriceDataLoading(false));
+            .then(data => {
+              if (!cancelled) setSwapPriceData(data);
+            })
+            .finally(() => {
+              if (!cancelled) setSwapPriceDataLoading(false);
+            });
         }
       }
     };
@@ -143,28 +167,34 @@ const AssetDetail = () => {
 
     if (foundAsset) {
       setupAsset(foundAsset);
-    } else if (id && !fetchingSingleAsset) {
-      setFetchingSingleAsset(true);
+    } else if (id) {
       getToken(id)
         .then((token) => {
-          if (token && token.address) {
+          if (!cancelled && token && token.address) {
             setupAsset(token);
           }
         })
-        .catch()
+        .catch(() => {})
         .finally(() => {
-          setFetchingSingleAsset(false);
+          if (!cancelled) setLookupComplete(true);
         });
+    } else {
+      setLookupComplete(true);
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [id, assets, inactiveTokens, allActiveTokens, getToken]);
 
   if (!asset) {
+    const isLoading = !lookupComplete || loading;
     return (
       <div className="min-h-screen bg-background">
         <DashboardSidebar />
         <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
-          <DashboardHeader title="Asset Not Found" />
-          {loading || fetchingSingleAsset ?
+          <DashboardHeader title={isLoading ? "Loading..." : "Asset Not Found"} />
+          {isLoading ?
             <div className="flex justify-center items-center h-40">
               <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
             </div>
@@ -295,12 +325,39 @@ const AssetDetail = () => {
                       )}
                     </div>
 
+                    {(() => {
+                      const totalSupply = asset?._totalSupply ?? asset?.token?._totalSupply;
+                      const marketCap = parseFloat(asset?.marketCap || '0');
+                      let supplyLabel = '—';
+                      try {
+                        if (totalSupply && totalSupply !== '0') {
+                          supplyLabel = formatLargeNumber(parseFloat(formatUnits(BigInt(totalSupply), 18)));
+                        }
+                      } catch { /* invalid supply */ }
+                      return (
+                        <>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Market Cap:</span>
+                            <span className="font-medium">
+                              {marketCap > 0 ? `$${formatLargeNumber(marketCap)}` : '—'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Total Supply:</span>
+                            <span className="font-medium">{supplyLabel}</span>
+                          </div>
+                        </>
+                      );
+                    })()}
+
+                    {isLoggedIn && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Balance:</span>
                       <span className="font-medium">{formatUnits(BigInt(asset?.balance || "0") + BigInt(asset?.collateralBalance || "0"), 18)}</span>
                     </div>
+                    )}
 
-                    {(() => {
+                    {isLoggedIn && (() => {
                       const ea = earningAssets.find(e => e.address === asset?.address);
                       if (!ea?.rebaseFactor || !ea?.rebasingExternalSymbol) return null;
                       const totalBalance = BigInt(asset?.balance || "0") + BigInt(asset?.collateralBalance || "0");

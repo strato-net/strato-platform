@@ -27,6 +27,7 @@ import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
 import SyncingPage from "./pages/SyncingPage";
 import StratoStats from "./pages/StratoStats";
+import Explore from "./pages/Explore";
 import Rewards from "./pages/Rewards";
 import Claim from "./pages/Claim";
 import CommunityRewardsOnePager from "./pages/CommunityRewardsOnePager";
@@ -288,9 +289,9 @@ const App = () => {
                                                 <Route
                                                   path="/dashboard/deposits/:id"
                                                   element={
-                                                    <ProtectedRoute>
+                                                    <GuestAccessibleRoute>
                                                       <AssetDetail />
-                                                    </ProtectedRoute>
+                                                    </GuestAccessibleRoute>
                                                   }
                                                 />
                                                 <Route
@@ -422,6 +423,15 @@ const App = () => {
                                                   }
                                                 />
       
+                                                <Route
+                                                  path="/dashboard/explore"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <Explore />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+
                                                 <Route
                                                   path="/dashboard/stats"
                                                   element={

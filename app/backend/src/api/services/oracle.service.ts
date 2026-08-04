@@ -76,6 +76,150 @@ export const getOraclePrices = async (
   );
 };
 
+export type TokenPriceMetrics = {
+  change1h: number | null;
+  change24h: number | null;
+  sparkline: number[];
+};
+
+/**
+ * Batch 1h/24h % change + 24h sparkline for many assets.
+ * Fetches PriceUpdated (asset=in.(...)) and BatchPricesUpdated once — does not
+ * call per-asset getPriceHistory, so existing oracle endpoints are untouched.
+ */
+export const getTokenPriceMetrics = async (
+  accessToken: string,
+  assetAddresses: string[],
+  currentPrices: Map<string, string>
+): Promise<Map<string, TokenPriceMetrics>> => {
+  const empty = (): TokenPriceMetrics => ({ change1h: null, change24h: null, sparkline: [] });
+  const result = new Map<string, TokenPriceMetrics>();
+  for (const addr of assetAddresses) result.set(addr, empty());
+  if (assetAddresses.length === 0) return result;
+
+  try {
+    const oracleAddress = await getOracleAddress(accessToken);
+    const now = Date.now();
+    const ONE_HOUR = 60 * 60 * 1000;
+    const ONE_DAY = 24 * ONE_HOUR;
+    const SPARKLINE_POINTS = 24;
+    const startTime = new Date(now - ONE_DAY);
+    const baseParams = {
+      address: `eq.${oracleAddress}`,
+      block_timestamp: `gte.${toUTCTime(startTime)}`,
+      order: "block_timestamp.asc",
+    };
+
+    const assetSet = new Set(assetAddresses);
+    const [singleResponse, batchResponse] = await Promise.all([
+      cirrus
+        .get(accessToken, `/${PriceOracleEvents}`, {
+          params: { ...baseParams, asset: `in.(${assetAddresses.join(",")})` },
+        })
+        .catch(() => ({ data: [] })),
+      cirrus
+        .get(accessToken, `/${PriceOracleBatchUpdateEvents}`, { params: baseParams })
+        .catch(() => ({ data: [] })),
+    ]);
+
+    const toPlainString = (num: number | string): string =>
+      typeof num === "string" ? num : num.toLocaleString("fullwide", { useGrouping: false });
+
+    const eventsByAsset = new Map<string, { ts: number; price: bigint }[]>();
+    for (const addr of assetAddresses) eventsByAsset.set(addr, []);
+
+    for (const event of singleResponse.data || []) {
+      if (!assetSet.has(event.asset)) continue;
+      try {
+        eventsByAsset.get(event.asset)!.push({
+          ts: new Date(event.block_timestamp).getTime(),
+          price: BigInt(toPlainString(event.price)),
+        });
+      } catch { /* skip bad row */ }
+    }
+
+    for (const event of batchResponse.data || []) {
+      try {
+        const assets = typeof event.assets === "string" ? JSON.parse(event.assets) : event.assets;
+        const priceValues =
+          typeof event.priceValues === "string" ? JSON.parse(event.priceValues) : event.priceValues;
+        const ts = new Date(event.block_timestamp).getTime();
+        for (let i = 0; i < assets.length; i++) {
+          const addr = assets[i];
+          if (!assetSet.has(addr)) continue;
+          eventsByAsset.get(addr)!.push({
+            ts,
+            price: BigInt(toPlainString(priceValues[i])),
+          });
+        }
+      } catch { /* skip malformed batch row */ }
+    }
+
+    const priceAtOrBefore = (
+      points: { ts: number; price: bigint }[],
+      targetTs: number
+    ): bigint | null => {
+      let best: bigint | null = null;
+      for (const p of points) {
+        if (p.ts <= targetTs) best = p.price;
+        else break;
+      }
+      return best;
+    };
+
+    const pctChange = (current: bigint, past: bigint): number | null => {
+      if (past === 0n) return null;
+      return Number(((current - past) * 10000n) / past) / 100;
+    };
+
+    for (const addr of assetAddresses) {
+      const points = (eventsByAsset.get(addr) || []).sort((a, b) => a.ts - b.ts);
+      let current: bigint | null = null;
+      try {
+        const raw = currentPrices.get(addr);
+        current = raw ? BigInt(raw) : null;
+      } catch {
+        current = null;
+      }
+      if (!current || current === 0n) continue;
+
+      if (points.length === 0) {
+        const curFloat = Number(current) / 1e18;
+        result.set(addr, {
+          change1h: null,
+          change24h: null,
+          sparkline: Array(SPARKLINE_POINTS).fill(curFloat),
+        });
+        continue;
+      }
+
+      const price1hAgo = priceAtOrBefore(points, now - ONE_HOUR) ?? points[0].price;
+      const price24hAgo = priceAtOrBefore(points, now - ONE_DAY) ?? points[0].price;
+
+      const sparkline: number[] = [];
+      const bucketMs = ONE_DAY / SPARKLINE_POINTS;
+      for (let i = 0; i < SPARKLINE_POINTS; i++) {
+        const t = now - ONE_DAY + (i + 1) * bucketMs;
+        const p =
+          priceAtOrBefore(points, t) ??
+          (i === SPARKLINE_POINTS - 1 ? current : points[0].price);
+        sparkline.push(Number(p) / 1e18);
+      }
+      sparkline[sparkline.length - 1] = Number(current) / 1e18;
+
+      result.set(addr, {
+        change1h: pctChange(current, price1hAgo),
+        change24h: pctChange(current, price24hAgo),
+        sparkline,
+      });
+    }
+  } catch (err) {
+    console.error("[getTokenPriceMetrics] failed:", err);
+  }
+
+  return result;
+};
+
 export const getRebaseFactors = async (
   accessToken: string
 ): Promise<Map<string, string>> => {
