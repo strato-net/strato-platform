@@ -62,7 +62,6 @@ docker-compose.notification.yml
 docker-compose.oracle.ecr.yml
 docker-compose.oracle.yml
 
-/app
 /mynode/
 /snapshot-test-node/
 /snapshot-smoke-node/
