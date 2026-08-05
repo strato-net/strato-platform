@@ -11,3 +11,7 @@ secrets.json
 /deploy/deployment-logs
 /scripts/token-transfer/transfer-logs
 r.log
+
+# YieldVault testnet runtime artifacts
+/yield-vault-*.json
+/deploy/yield-vault-testing/creds.env

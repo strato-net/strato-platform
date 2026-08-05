@@ -223,41 +223,151 @@ const addSaveUsdstTokenPrice = async (
   priceMap.set(vault.address, pricePerShare.toString());
 };
 
+const yieldVaultAddresses = (): string[] =>
+  [config.ethCarryVault, config.wbtcCarryVault, config.usdcYieldVault].filter(
+    (a): a is string => typeof a === "string" && a.replace(/^0x/i, "").length > 0
+  );
+
+type YieldVaultPricingState = {
+  address: string;
+  assetAddress: string;
+  totalShares: bigint;
+  /**
+   * Pricing base the vault actually uses (YieldVault._projectedActiveAssets):
+   * reconciled active assets — which exclude donations sitting above
+   * `accountedAssets` — plus the accrual the reward distributor can fund now.
+   */
+  projectedActiveAssets: bigint;
+};
+
+/**
+ * Share-pricing inputs for one carry/yield vault. The funded-accrual fields come
+ * from `/storage` because they were appended by the proxy upgrade; a vault that
+ * has not been upgraded reports `accrualInitialized` false and prices exactly as
+ * it did before (reconciled = economic assets, no pending accrual).
+ */
+const getYieldVaultPricingState = async (
+  accessToken: string,
+  vaultAddress: string
+): Promise<YieldVaultPricingState | null> => {
+  const [{ data: rows }, { data: storageRows }] = await Promise.all([
+    cirrus.get(accessToken, `/${YieldVault}`, {
+      params: {
+        address: `eq.${vaultAddress}`,
+        select: "address,_asset,deployedAssets::text,_totalSupply::text,totalClaimableAssets::text",
+      },
+    }),
+    cirrus
+      .get(accessToken, "/storage", {
+        params: {
+          address: `eq.${vaultAddress}`,
+          select:
+            "data->>perSecondSavingsRate,data->>lastAccrual,data->>rewardDistributor,data->>accrualInitialized,data->>accountedAssets",
+          limit: "1",
+        },
+      })
+      .catch(() => ({ data: [] as Array<Record<string, any>> })),
+  ]);
+
+  const v = rows?.[0] ? { ...rows[0], ...storageRows?.[0] } : null;
+  if (!v?._asset || !v.address) return null;
+
+  const { data: balRows } = await cirrus.get(accessToken, `/${Token}-_balances`, {
+    params: {
+      address: `eq.${v._asset}`,
+      key: `eq.${vaultAddress}`,
+      select: "value::text",
+    },
+  });
+
+  const idle = BigInt(balRows?.[0]?.value || "0");
+  const deployed = BigInt(v.deployedAssets || "0");
+  const totalAssets = idle + deployed;
+  const totalClaimableAssets = BigInt(v.totalClaimableAssets || "0");
+  const totalShares = BigInt(v._totalSupply || "0");
+
+  const accrualInitialized = String(v.accrualInitialized ?? "").toLowerCase() === "true";
+  const accountedAssets = BigInt(v.accountedAssets || "0");
+  const hasStrayAssets = accrualInitialized && totalAssets > accountedAssets;
+  const reconciledAssets = hasStrayAssets ? accountedAssets : totalAssets;
+  const strayAssets = hasStrayAssets ? totalAssets - accountedAssets : 0n;
+  const reconciledActiveAssets = getActiveAssets(reconciledAssets, totalClaimableAssets);
+
+  const state: YieldVaultPricingState = {
+    address: String(v.address),
+    assetAddress: String(v._asset),
+    totalShares,
+    projectedActiveAssets: reconciledActiveAssets,
+  };
+
+  const perSecondSavingsRate = BigInt(v.perSecondSavingsRate || "0");
+  const lastAccrual = BigInt(v.lastAccrual || "0");
+  const nowSec = BigInt(Math.floor(Date.now() / 1000));
+  if (
+    !accrualInitialized ||
+    totalShares === 0n ||
+    perSecondSavingsRate <= RAY ||
+    nowSec <= lastAccrual ||
+    isZeroAddress(v.rewardDistributor)
+  ) {
+    return state;
+  }
+
+  const growthFactor = rpow(perSecondSavingsRate, nowSec - lastAccrual, RAY);
+  const targetAmount = (reconciledActiveAssets * (growthFactor - RAY)) / RAY;
+  if (targetAmount <= 0n) return state;
+
+  try {
+    const [{ data: distributorBalanceRows }, { data: allowanceRows }] = await Promise.all([
+      cirrus.get(accessToken, `/${Token}-_balances`, {
+        params: {
+          address: `eq.${v._asset}`,
+          key: `eq.${v.rewardDistributor}`,
+          select: "value::text",
+        },
+      }),
+      cirrus.get(accessToken, `/${Token}-_allowances`, {
+        params: {
+          address: `eq.${v._asset}`,
+          key: `eq.${v.rewardDistributor}`,
+          key2: `eq.${v.address}`,
+          select: "value::text",
+          limit: "1",
+        },
+      }),
+    ]);
+
+    const available =
+      normalizeAddress(v.rewardDistributor) === normalizeAddress(v.address)
+        ? BigInt(distributorBalanceRows?.[0]?.value || "0")
+        : BigInt(distributorBalanceRows?.[0]?.value || "0") + strayAssets;
+
+    state.projectedActiveAssets += minBigInt(
+      targetAmount,
+      available,
+      BigInt(allowanceRows?.[0]?.value || "0")
+    );
+  } catch {
+    // leave the price at the reconciled base if the funding reads fail
+  }
+
+  return state;
+};
+
 /** NAV per carry-vault share (underlying base units per share, WAD) for portfolio price × balance math. */
 const addYieldVaultTokenPrices = async (
   accessToken: string,
   priceMap: OraclePriceMap
 ): Promise<void> => {
-  const vaultAddrs = [config.ethCarryVault, config.wbtcCarryVault, config.usdcYieldVault].filter(
-    (a): a is string => typeof a === "string" && a.replace(/^0x/i, "").length > 0
-  );
-  if (!vaultAddrs.length) return;
+  for (const vaultAddress of yieldVaultAddresses()) {
+    const state = await getYieldVaultPricingState(accessToken, vaultAddress);
+    if (!state) continue;
 
-  for (const vaultAddress of vaultAddrs) {
-    const { data: rows } = await cirrus.get(accessToken, `/${YieldVault}`, {
-      params: {
-        address: `eq.${vaultAddress}`,
-        select: "address,_asset,deployedAssets::text,_totalSupply::text,totalClaimableAssets::text",
-      },
-    });
-    const v = rows?.[0];
-    if (!v?._asset || !v.address) continue;
-
-    const { data: balRows } = await cirrus.get(accessToken, `/${Token}-_balances`, {
-      params: {
-        address: `eq.${v._asset}`,
-        key: `eq.${vaultAddress}`,
-        select: "value::text",
-      },
-    });
-
-    const idle = BigInt(balRows?.[0]?.value || "0");
-    const deployed = BigInt(v.deployedAssets || "0");
-    const totalAssets = idle + deployed;
-    const activeAssets = getActiveAssets(totalAssets, BigInt(v.totalClaimableAssets || "0"));
-    const totalShares = BigInt(v._totalSupply || "0");
-    const pricePerShare = totalShares === 0n ? DECIMALS : (activeAssets * DECIMALS) / totalShares;
-    priceMap.set(v.address, pricePerShare.toString());
+    const pricePerShare =
+      state.totalShares === 0n
+        ? DECIMALS
+        : (state.projectedActiveAssets * DECIMALS) / state.totalShares;
+    priceMap.set(state.address, pricePerShare.toString());
   }
 };
 
@@ -275,45 +385,21 @@ export const getCarryVaultUsdPriceMap = async (
   priceMap: OraclePriceMap
 ): Promise<Map<string, string>> => {
   const out = new Map<string, string>();
-  const vaultAddrs = [config.ethCarryVault, config.wbtcCarryVault, config.usdcYieldVault].filter(
-    (a): a is string => typeof a === "string" && a.replace(/^0x/i, "").length > 0
-  );
-  if (!vaultAddrs.length) return out;
 
-  for (const vaultAddress of vaultAddrs) {
-    const { data: rows } = await cirrus.get(accessToken, `/${YieldVault}`, {
-      params: {
-        address: `eq.${vaultAddress}`,
-        select: "address,_asset,deployedAssets::text,_totalSupply::text,totalClaimableAssets::text",
-      },
-    });
-    const v = rows?.[0];
-    if (!v?._asset || !v.address) continue;
+  for (const vaultAddress of yieldVaultAddresses()) {
+    const state = await getYieldVaultPricingState(accessToken, vaultAddress);
+    if (!state || state.totalShares === 0n) continue;
 
-    const { data: balRows } = await cirrus.get(accessToken, `/${Token}-_balances`, {
-      params: {
-        address: `eq.${v._asset}`,
-        key: `eq.${vaultAddress}`,
-        select: "value::text",
-      },
-    });
+    const pricePerShareUnderlying =
+      (state.projectedActiveAssets * DECIMALS) / state.totalShares;
 
-    const idle = BigInt(balRows?.[0]?.value || "0");
-    const deployed = BigInt(v.deployedAssets || "0");
-    const totalAssets = idle + deployed;
-    const activeAssets = getActiveAssets(totalAssets, BigInt(v.totalClaimableAssets || "0"));
-    const totalShares = BigInt(v._totalSupply || "0");
-    if (totalShares === 0n) continue;
-
-    const pricePerShareUnderlying = (activeAssets * DECIMALS) / totalShares;
-
-    const assetKey = String(v._asset).toLowerCase();
-    const assetUsdPriceStr = priceMap.get(assetKey) || priceMap.get(v._asset) || "0";
+    const assetKey = state.assetAddress.toLowerCase();
+    const assetUsdPriceStr = priceMap.get(assetKey) || priceMap.get(state.assetAddress) || "0";
     const assetUsdPriceWad = BigInt(assetUsdPriceStr);
     if (assetUsdPriceWad === 0n) continue;
 
     const pricePerShareUsdWad = (pricePerShareUnderlying * assetUsdPriceWad) / DECIMALS;
-    out.set(String(v.address).toLowerCase(), pricePerShareUsdWad.toString());
+    out.set(state.address.toLowerCase(), pricePerShareUsdWad.toString());
   }
   return out;
 };

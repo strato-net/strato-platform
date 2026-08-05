@@ -393,8 +393,16 @@ async function addCarryVaultApys(
     const addr = normalizeAddress(def.address);
     if (!addr) continue;
 
-    if (info?.deployed && isPositiveApy(info.apy)) {
-      add(addr, { source: "vault", apy: info.apy });
+    const isFundedAccrual = Boolean(info?.accrualInitialized);
+
+    if (info?.deployed) {
+      if (isFundedAccrual) {
+        if (isPositiveApy(info.targetApy)) {
+          add(addr, { source: "vault", apy: info.targetApy, meta: "target" });
+        }
+      } else if (isPositiveApy(info.apy)) {
+        add(addr, { source: "vault", apy: info.apy });
+      }
     }
 
     // Vault-level Base APY = weighted average of per-strategy `baseApyPct`,
@@ -412,7 +420,7 @@ async function addCarryVaultApys(
     // Emitted as `vault_weighted` so the headline tooltip on
     // Dashboard / Earn / Rewards / EarnYieldVault renders Native + Base + Rewards
     // consistently with the main protocol vault.
-    if (info?.deployed && info.strategyHoldings?.length) {
+    if (!isFundedAccrual && info?.deployed && info.strategyHoldings?.length) {
       let assetPriceWad = 0n;
       try { assetPriceWad = BigInt(info.assetPriceWad || "0"); } catch { assetPriceWad = 0n; }
       const assetDecimals = Number.isFinite(info.decimals) ? info.decimals : 18;

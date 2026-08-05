@@ -319,7 +319,11 @@ const Earn = () => {
   const getYieldVaultDisplayApyRaw = (key: string): string | undefined => {
     const info = yieldVaultApyInfos[key];
     if (info) return info.total.toFixed(2);
-    return yieldVaults[key]?.apy;
+    const vault = yieldVaults[key];
+    // Funded-accrual vaults price off the configured savings rate, so the
+    // trailing exchange-rate APY is not a valid fallback for them.
+    if (vault?.accrualInitialized) return vault.targetApy;
+    return vault?.apy;
   };
 
   const saveUsdstDisplayApyRaw = saveUsdstApyInfo?.total.toFixed(2);

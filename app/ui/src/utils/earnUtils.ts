@@ -224,7 +224,11 @@ const buildTokenCompositeInfo = (
   );
 
   const breakdown = [
-    toBreakdownItem("Native APY", native || undefined),
+    // `meta: "target"` marks a funded-accrual vault, where the backend sends the
+    // configured savings rate rather than a trailing exchange-rate measurement.
+    // Presented as "Base APY" — it is the vault's baseline return, and funded
+    // accrual vaults emit no `vault_weighted` entry, so the Base slot is free.
+    toBreakdownItem(native?.meta === "target" ? "Base APY" : "Native APY", native || undefined),
     toBreakdownItem("Base APY", base || undefined),
     toBreakdownItem("Rewards APY", rewards || undefined),
   ].filter((item): item is EarnApyBreakdownItem => item !== null);

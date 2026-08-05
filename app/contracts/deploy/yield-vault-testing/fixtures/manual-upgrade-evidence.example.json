@@ -1,0 +1,470 @@
+{
+  "schemaVersion": 1,
+  "type": "yield-vault-manual-upgrade-evidence",
+  "initialSnapshotFile": "./yield-vault-runbook-initial-snapshot.json",
+  "postInitializationSnapshotFile": "./yield-vault-runbook-post-initialization-snapshot.json",
+  "preSmokeSnapshotFile": "./yield-vault-runbook-pre-smoke-snapshot.json",
+  "governedOnlyOwnerEvidenceTemplate": {
+    "appliesTo": [
+      "pause",
+      "initializeAccrual",
+      "initializeAccrualRepeat",
+      "setRewardDistributor",
+      "setPerSecondSavingsRate",
+      "unpause",
+      "smokeProcessQueue"
+    ],
+    "transactionHash": "REPLACE_WITH_ISSUE_CREATION_SUBMISSION_HASH",
+    "receipt": {
+      "hash": "REPLACE_WITH_ISSUE_CREATION_SUBMISSION_HASH",
+      "status": "Success",
+      "txResult": { "transactionHash": "REPLACE_WITH_ISSUE_CREATION_SUBMISSION_HASH" }
+    },
+    "governanceIssueId": "REPLACE_WITH_EXACT_ISSUE_ID",
+    "governanceIssueCreatedEvent": {
+      "id": "REPLACE_WITH_ISSUE_CREATED_ROW_ID",
+      "event_index": "REPLACE_WITH_ISSUE_CREATED_EVENT_INDEX",
+      "eventName": "IssueCreated",
+      "address": "000000000000000000000000000000000000100c",
+      "transaction_hash": "REPLACE_WITH_ISSUE_CREATION_SUBMISSION_HASH",
+      "block_timestamp": "REPLACE_WITH_CREATION_BLOCK_TIMESTAMP",
+      "block_number": "REPLACE_WITH_CREATION_BLOCK_NUMBER",
+      "attributes": {
+        "issueId": "REPLACE_WITH_EXACT_ISSUE_ID",
+        "target": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+        "func": "REPLACE_WITH_EXACT_FUNCTION",
+        "args": []
+      }
+    },
+    "governanceApproval": {
+      "status": "confirmed",
+      "transactionHash": "REPLACE_WITH_APPROVER_IDENTICAL_CALL_HASH",
+      "approver": {
+        "role": "APPROVER",
+        "username": "REPLACE_WITH_ADMIN_3_USERNAME",
+        "address": "REPLACE_WITH_APPROVER_40_HEX_ADDRESS"
+      },
+      "target": "REPLACE_WITH_SAME_TARGET_AS_ISSUE_CREATED",
+      "func": "REPLACE_WITH_SAME_FUNCTION_AS_ISSUE_CREATED",
+      "args": [],
+      "rawPayloadVerified": true,
+      "receipt": {
+        "hash": "REPLACE_WITH_APPROVER_IDENTICAL_CALL_HASH",
+        "status": "Success",
+        "txResult": { "transactionHash": "REPLACE_WITH_APPROVER_IDENTICAL_CALL_HASH" }
+      }
+    },
+    "governanceExecution": {
+      "transactionHash": "REPLACE_WITH_EXECUTION_TRANSACTION_HASH",
+      "row": {
+        "id": "REPLACE_WITH_ISSUE_EXECUTED_ROW_ID",
+        "event_index": "REPLACE_WITH_ISSUE_EXECUTED_EVENT_INDEX",
+        "eventName": "IssueExecuted",
+        "address": "000000000000000000000000000000000000100c",
+        "transaction_hash": "REPLACE_WITH_EXECUTION_TRANSACTION_HASH",
+        "block_timestamp": "REPLACE_WITH_EXECUTION_BLOCK_TIMESTAMP",
+        "block_number": "REPLACE_WITH_EXECUTION_BLOCK_NUMBER",
+        "attributes": {
+          "issueId": "REPLACE_WITH_EXACT_ISSUE_ID",
+          "target": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+          "func": "REPLACE_WITH_EXACT_FUNCTION",
+          "args": []
+        }
+      }
+    },
+    "governanceExecutionReceipt": {
+      "hash": "REPLACE_WITH_EXECUTION_TRANSACTION_HASH",
+      "status": "Success",
+      "txResult": { "transactionHash": "REPLACE_WITH_EXECUTION_TRANSACTION_HASH" }
+    },
+    "failedRepeatOverride": {
+      "instruction": "For initializeAccrualRepeat omit governanceExecution.row, set governanceApproval.transactionHash and executionTransactionHash to the identical APPROVER initializeAccrual call, and preserve its Failure receipt; no IssueExecuted survives the reverting execution."
+    }
+  },
+  "transactions": {
+    "pause": {
+      "actor": "OWNER",
+      "contractName": "YieldVault",
+      "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+      "method": "pause",
+      "transactionHash": "REPLACE_WITH_PAUSE_TX_HASH",
+      "receipt": {
+        "hash": "REPLACE_WITH_PAUSE_TX_HASH",
+        "status": "Success",
+        "txResult": { "transactionHash": "REPLACE_WITH_PAUSE_TX_HASH" }
+      },
+      "events": [{
+        "id": "REPLACE_WITH_GLOBAL_EVENT_ROW_ID",
+        "event_index": "REPLACE_WITH_EVENT_INDEX",
+        "eventName": "Paused",
+        "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+        "transaction_hash": "REPLACE_WITH_PAUSE_TX_HASH",
+        "block_timestamp": "REPLACE_WITH_BLOCK_TIMESTAMP",
+        "block_number": "REPLACE_WITH_BLOCK_NUMBER",
+        "attributes": { "account": "OWNER" }
+      }]
+    },
+    "initializeAccrual": {
+      "actor": "OWNER",
+      "contractName": "YieldVault",
+      "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+      "method": "initializeAccrual",
+      "transactionHash": "REPLACE_WITH_INITIALIZE_ACCRUAL_TX_HASH",
+      "receipt": {
+        "hash": "REPLACE_WITH_INITIALIZE_ACCRUAL_TX_HASH",
+        "status": "Success",
+        "txResult": { "transactionHash": "REPLACE_WITH_INITIALIZE_ACCRUAL_TX_HASH" }
+      },
+      "events": [{
+        "id": "REPLACE_WITH_GLOBAL_EVENT_ROW_ID",
+        "event_index": "REPLACE_WITH_EVENT_INDEX",
+        "eventName": "AccrualInitialized",
+        "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+        "transaction_hash": "REPLACE_WITH_INITIALIZE_ACCRUAL_TX_HASH",
+        "block_timestamp": "REPLACE_WITH_BLOCK_TIMESTAMP",
+        "block_number": "REPLACE_WITH_BLOCK_NUMBER",
+        "attributes": {
+          "perSecondSavingsRate": "1000000000000000000000000000",
+          "lastAccrual": "REPLACE_WITH_POSITIVE_LAST_ACCRUAL"
+        }
+      }]
+    },
+    "initializeAccrualRepeat": {
+      "actor": "OWNER",
+      "contractName": "YieldVault",
+      "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+      "method": "initializeAccrual",
+      "transactionHash": "REPLACE_WITH_REPEAT_INITIALIZE_TX_HASH",
+      "receipt": {
+        "hash": "REPLACE_WITH_REPEAT_INITIALIZE_TX_HASH",
+        "status": "Failure",
+        "txResult": { "transactionHash": "REPLACE_WITH_REPEAT_INITIALIZE_TX_HASH" }
+      },
+      "events": []
+    },
+    "distributorApproval": {
+      "actor": "REWARD_DISTRIBUTOR",
+      "contractName": "Token",
+      "contractAddress": "REPLACE_WITH_ASSET_ADDRESS",
+      "method": "approve",
+      "arguments": {
+        "spender": "VAULT_PROXY",
+        "value": "30000000000000000000"
+      },
+      "transactionHash": "REPLACE_WITH_DISTRIBUTOR_APPROVAL_TX_HASH",
+      "receipt": {
+        "hash": "REPLACE_WITH_DISTRIBUTOR_APPROVAL_TX_HASH",
+        "status": "Success",
+        "txResult": { "transactionHash": "REPLACE_WITH_DISTRIBUTOR_APPROVAL_TX_HASH" }
+      },
+      "events": [{
+        "id": "REPLACE_WITH_GLOBAL_EVENT_ROW_ID",
+        "event_index": "REPLACE_WITH_EVENT_INDEX",
+        "eventName": "Approval",
+        "contractAddress": "REPLACE_WITH_ASSET_ADDRESS",
+        "transaction_hash": "REPLACE_WITH_DISTRIBUTOR_APPROVAL_TX_HASH",
+        "block_timestamp": "REPLACE_WITH_BLOCK_TIMESTAMP",
+        "block_number": "REPLACE_WITH_BLOCK_NUMBER",
+        "attributes": {
+          "owner": "REWARD_DISTRIBUTOR",
+          "spender": "VAULT_PROXY",
+          "value": "30000000000000000000"
+        }
+      }]
+    },
+    "setRewardDistributor": {
+      "actor": "OWNER",
+      "contractName": "YieldVault",
+      "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+      "method": "setRewardDistributor",
+      "arguments": {
+        "newRewardDistributor": "REWARD_DISTRIBUTOR"
+      },
+      "transactionHash": "REPLACE_WITH_SET_DISTRIBUTOR_TX_HASH",
+      "receipt": {
+        "hash": "REPLACE_WITH_SET_DISTRIBUTOR_TX_HASH",
+        "status": "Success",
+        "txResult": { "transactionHash": "REPLACE_WITH_SET_DISTRIBUTOR_TX_HASH" }
+      },
+      "events": [{
+        "id": "REPLACE_WITH_GLOBAL_EVENT_ROW_ID",
+        "event_index": "REPLACE_WITH_EVENT_INDEX",
+        "eventName": "RewardDistributorUpdated",
+        "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+        "transaction_hash": "REPLACE_WITH_SET_DISTRIBUTOR_TX_HASH",
+        "block_timestamp": "REPLACE_WITH_BLOCK_TIMESTAMP",
+        "block_number": "REPLACE_WITH_BLOCK_NUMBER",
+        "attributes": { "newDistributor": "REWARD_DISTRIBUTOR" }
+      }]
+    },
+    "setPerSecondSavingsRate": {
+      "actor": "OWNER",
+      "contractName": "YieldVault",
+      "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+      "method": "setPerSecondSavingsRate",
+      "arguments": {
+        "newRate": "1000000000000000000000000000"
+      },
+      "transactionHash": "REPLACE_WITH_SET_RATE_TX_HASH",
+      "receipt": {
+        "hash": "REPLACE_WITH_SET_RATE_TX_HASH",
+        "status": "Success",
+        "txResult": { "transactionHash": "REPLACE_WITH_SET_RATE_TX_HASH" }
+      },
+      "events": [{
+        "id": "REPLACE_WITH_GLOBAL_EVENT_ROW_ID",
+        "event_index": "REPLACE_WITH_EVENT_INDEX",
+        "eventName": "PerSecondSavingsRateUpdated",
+        "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+        "transaction_hash": "REPLACE_WITH_SET_RATE_TX_HASH",
+        "block_timestamp": "REPLACE_WITH_BLOCK_TIMESTAMP",
+        "block_number": "REPLACE_WITH_BLOCK_NUMBER",
+        "attributes": { "newRate": "1000000000000000000000000000" }
+      }]
+    },
+    "smokeUserApproval": {
+      "actor": "SMOKE_USER",
+      "contractName": "Token",
+      "contractAddress": "REPLACE_WITH_ASSET_ADDRESS",
+      "method": "approve",
+      "arguments": {
+        "spender": "VAULT_PROXY",
+        "value": "10000000000000000000"
+      },
+      "transactionHash": "REPLACE_WITH_SMOKE_USER_APPROVAL_TX_HASH",
+      "receipt": {
+        "hash": "REPLACE_WITH_SMOKE_USER_APPROVAL_TX_HASH",
+        "status": "Success",
+        "txResult": { "transactionHash": "REPLACE_WITH_SMOKE_USER_APPROVAL_TX_HASH" }
+      },
+      "events": [{
+        "id": "REPLACE_WITH_GLOBAL_EVENT_ROW_ID",
+        "event_index": "REPLACE_WITH_EVENT_INDEX",
+        "eventName": "Approval",
+        "contractAddress": "REPLACE_WITH_ASSET_ADDRESS",
+        "transaction_hash": "REPLACE_WITH_SMOKE_USER_APPROVAL_TX_HASH",
+        "block_timestamp": "REPLACE_WITH_BLOCK_TIMESTAMP",
+        "block_number": "REPLACE_WITH_BLOCK_NUMBER",
+        "attributes": {
+          "owner": "SMOKE_USER",
+          "spender": "VAULT_PROXY",
+          "value": "10000000000000000000"
+        }
+      }]
+    },
+    "unpause": {
+      "actor": "OWNER",
+      "contractName": "YieldVault",
+      "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+      "method": "unpause",
+      "transactionHash": "REPLACE_WITH_UNPAUSE_TX_HASH",
+      "receipt": {
+        "hash": "REPLACE_WITH_UNPAUSE_TX_HASH",
+        "status": "Success",
+        "txResult": { "transactionHash": "REPLACE_WITH_UNPAUSE_TX_HASH" }
+      },
+      "events": [{
+        "id": "REPLACE_WITH_GLOBAL_EVENT_ROW_ID",
+        "event_index": "REPLACE_WITH_EVENT_INDEX",
+        "eventName": "Unpaused",
+        "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+        "transaction_hash": "REPLACE_WITH_UNPAUSE_TX_HASH",
+        "block_timestamp": "REPLACE_WITH_BLOCK_TIMESTAMP",
+        "block_number": "REPLACE_WITH_BLOCK_NUMBER",
+        "attributes": { "account": "OWNER" }
+      }]
+    }
+  },
+  "smokeTransactions": [
+    {
+      "actor": "SMOKE_USER",
+      "contractName": "YieldVault",
+      "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+      "method": "deposit",
+      "arguments": {
+        "assets": "10000000000000000000",
+        "receiver": "SMOKE_USER"
+      },
+      "transactionHash": "REPLACE_WITH_SMOKE_DEPOSIT_TX_HASH",
+      "receipt": {
+        "hash": "REPLACE_WITH_SMOKE_DEPOSIT_TX_HASH",
+        "status": "Success",
+        "txResult": { "transactionHash": "REPLACE_WITH_SMOKE_DEPOSIT_TX_HASH" }
+      },
+      "events": [
+        {
+          "id": "REPLACE_WITH_GLOBAL_EVENT_ROW_ID",
+          "event_index": "REPLACE_WITH_EVENT_INDEX",
+          "eventName": "Deposit",
+          "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+          "transaction_hash": "REPLACE_WITH_SMOKE_DEPOSIT_TX_HASH",
+          "block_timestamp": "REPLACE_WITH_BLOCK_TIMESTAMP",
+          "block_number": "REPLACE_WITH_BLOCK_NUMBER",
+          "attributes": {
+            "caller": "SMOKE_USER",
+            "owner": "SMOKE_USER",
+            "assets": "10000000000000000000",
+            "shares": "REPLACE_WITH_POSITIVE_SHARES"
+          }
+        },
+        {
+          "id": "REPLACE_WITH_GLOBAL_EVENT_ROW_ID",
+          "event_index": "REPLACE_WITH_EVENT_INDEX",
+          "eventName": "Transfer",
+          "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+          "transaction_hash": "REPLACE_WITH_SMOKE_DEPOSIT_TX_HASH",
+          "block_timestamp": "REPLACE_WITH_BLOCK_TIMESTAMP",
+          "block_number": "REPLACE_WITH_BLOCK_NUMBER",
+          "attributes": {
+            "from": "REPLACE_WITH_ZERO_ADDRESS",
+            "to": "SMOKE_USER",
+            "value": "REPLACE_WITH_POSITIVE_SHARES"
+          }
+        }
+      ]
+    },
+    {
+      "actor": "SMOKE_USER",
+      "contractName": "YieldVault",
+      "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+      "method": "redeemOrQueue",
+      "arguments": {
+        "shares": "10000000000000000000",
+        "receiver": "SMOKE_USER",
+        "owner_": "SMOKE_USER"
+      },
+      "transactionHash": "REPLACE_WITH_SMOKE_REDEEM_OR_QUEUE_TX_HASH",
+      "receipt": {
+        "hash": "REPLACE_WITH_SMOKE_REDEEM_OR_QUEUE_TX_HASH",
+        "status": "Success",
+        "txResult": { "transactionHash": "REPLACE_WITH_SMOKE_REDEEM_OR_QUEUE_TX_HASH" }
+      },
+      "events": [
+        {
+          "id": "REPLACE_WITH_GLOBAL_EVENT_ROW_ID",
+          "event_index": "REPLACE_WITH_EVENT_INDEX",
+          "eventName": "WithdrawalRequested",
+          "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+          "transaction_hash": "REPLACE_WITH_SMOKE_REDEEM_OR_QUEUE_TX_HASH",
+          "block_timestamp": "REPLACE_WITH_BLOCK_TIMESTAMP",
+          "block_number": "REPLACE_WITH_BLOCK_NUMBER",
+          "attributes": {
+            "requestId": "REPLACE_WITH_POSITIVE_REQUEST_ID",
+            "owner": "SMOKE_USER",
+            "receiver": "SMOKE_USER",
+            "shares": "10000000000000000000"
+          }
+        },
+        {
+          "id": "REPLACE_WITH_GLOBAL_EVENT_ROW_ID",
+          "event_index": "REPLACE_WITH_EVENT_INDEX",
+          "eventName": "Transfer",
+          "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+          "transaction_hash": "REPLACE_WITH_SMOKE_REDEEM_OR_QUEUE_TX_HASH",
+          "block_timestamp": "REPLACE_WITH_BLOCK_TIMESTAMP",
+          "block_number": "REPLACE_WITH_BLOCK_NUMBER",
+          "attributes": {
+            "from": "SMOKE_USER",
+            "to": "VAULT_PROXY",
+            "value": "10000000000000000000"
+          }
+        }
+      ]
+    },
+    {
+      "actor": "OWNER",
+      "contractName": "YieldVault",
+      "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+      "method": "processQueue",
+      "arguments": {
+        "maxRequests": "3",
+        "maxAssets": "160000000000000000000"
+      },
+      "transactionHash": "REPLACE_WITH_SMOKE_PROCESS_QUEUE_TX_HASH",
+      "receipt": {
+        "hash": "REPLACE_WITH_SMOKE_PROCESS_QUEUE_TX_HASH",
+        "status": "Success",
+        "txResult": { "transactionHash": "REPLACE_WITH_SMOKE_PROCESS_QUEUE_TX_HASH" }
+      },
+      "events": [
+        {
+          "id": "REPLACE_WITH_QUEUE_EVENT_1_ROW_ID",
+          "event_index": "REPLACE_WITH_QUEUE_EVENT_1_INDEX",
+          "eventName": "QueueProcessed",
+          "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+          "transaction_hash": "REPLACE_WITH_SMOKE_PROCESS_QUEUE_TX_HASH",
+          "block_timestamp": "REPLACE_WITH_BLOCK_TIMESTAMP",
+          "block_number": "REPLACE_WITH_BLOCK_NUMBER",
+          "attributes": {
+            "requestId": "REPLACE_WITH_QUEUE_REQUEST_ID_1",
+            "owner": "REPLACE_WITH_REQUEST_OWNER_1",
+            "sharesBurned": "REPLACE_WITH_POSITIVE_SHARES_1",
+            "assetsReserved": "REPLACE_WITH_POSITIVE_ASSETS_1",
+            "fullyProcessed": true
+          }
+        },
+        {
+          "id": "REPLACE_WITH_QUEUE_EVENT_2_ROW_ID",
+          "event_index": "REPLACE_WITH_QUEUE_EVENT_2_INDEX",
+          "eventName": "QueueProcessed",
+          "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+          "transaction_hash": "REPLACE_WITH_SMOKE_PROCESS_QUEUE_TX_HASH",
+          "block_timestamp": "REPLACE_WITH_BLOCK_TIMESTAMP",
+          "block_number": "REPLACE_WITH_BLOCK_NUMBER",
+          "attributes": {
+            "requestId": "REPLACE_WITH_QUEUE_REQUEST_ID_2",
+            "owner": "REPLACE_WITH_REQUEST_OWNER_2",
+            "sharesBurned": "REPLACE_WITH_POSITIVE_SHARES_2",
+            "assetsReserved": "REPLACE_WITH_POSITIVE_ASSETS_2",
+            "fullyProcessed": true
+          }
+        },
+        {
+          "id": "REPLACE_WITH_QUEUE_EVENT_3_ROW_ID",
+          "event_index": "REPLACE_WITH_QUEUE_EVENT_3_INDEX",
+          "eventName": "QueueProcessed",
+          "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+          "transaction_hash": "REPLACE_WITH_SMOKE_PROCESS_QUEUE_TX_HASH",
+          "block_timestamp": "REPLACE_WITH_BLOCK_TIMESTAMP",
+          "block_number": "REPLACE_WITH_BLOCK_NUMBER",
+          "attributes": {
+            "requestId": "REPLACE_WITH_QUEUE_REQUEST_ID_3",
+            "owner": "REPLACE_WITH_REQUEST_OWNER_3",
+            "sharesBurned": "REPLACE_WITH_POSITIVE_SHARES_3",
+            "assetsReserved": "REPLACE_WITH_POSITIVE_ASSETS_3",
+            "fullyProcessed": true
+          }
+        }
+      ]
+    },
+    {
+      "actor": "SMOKE_USER",
+      "contractName": "YieldVault",
+      "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+      "method": "claim",
+      "arguments": {
+        "receiver": "SMOKE_USER"
+      },
+      "transactionHash": "REPLACE_WITH_SMOKE_CLAIM_TX_HASH",
+      "receipt": {
+        "hash": "REPLACE_WITH_SMOKE_CLAIM_TX_HASH",
+        "status": "Success",
+        "txResult": { "transactionHash": "REPLACE_WITH_SMOKE_CLAIM_TX_HASH" }
+      },
+      "events": [{
+        "id": "REPLACE_WITH_GLOBAL_EVENT_ROW_ID",
+        "event_index": "REPLACE_WITH_EVENT_INDEX",
+        "eventName": "WithdrawalClaimed",
+        "contractAddress": "REPLACE_WITH_VAULT_PROXY_ADDRESS",
+        "transaction_hash": "REPLACE_WITH_SMOKE_CLAIM_TX_HASH",
+        "block_timestamp": "REPLACE_WITH_BLOCK_TIMESTAMP",
+        "block_number": "REPLACE_WITH_BLOCK_NUMBER",
+        "attributes": {
+          "owner": "SMOKE_USER",
+          "receiver": "SMOKE_USER",
+          "assets": "REPLACE_WITH_POSITIVE_ASSETS"
+        }
+      }]
+    }
+  ]
+}
