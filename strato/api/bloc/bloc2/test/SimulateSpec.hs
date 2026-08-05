@@ -63,6 +63,49 @@ spec = do
           Aeson.parseMaybe (Aeson..: "effect") o `shouldBe` Just effect
         other -> expectationFailure $ "expected a JSON object, got " ++ show other
 
+    it "round-trips a multi-hop effect chain (nested multisig vote)" $ do
+      -- A vote wrapped through nested multisigs simulates as a chain: each
+      -- intermediate hop is a castVoteOnIssue effect carrying its own effect.
+      let leaf =
+            BlocSimulateResult
+              { blocsimulateStatus = Success,
+                blocsimulateGasUsed = 3,
+                blocsimulateResponse = Nothing,
+                blocsimulateData = Just . Call $ [],
+                blocsimulateEvents = [],
+                blocsimulateError = Nothing,
+                blocsimulateTrace = Nothing,
+                blocsimulateEffect = Nothing
+              }
+          hop =
+            BlocSimulateResult
+              { blocsimulateStatus = Success,
+                blocsimulateGasUsed = 2,
+                blocsimulateResponse = Nothing,
+                blocsimulateData = Nothing,
+                blocsimulateEvents = [],
+                blocsimulateError = Nothing,
+                blocsimulateTrace = Nothing,
+                blocsimulateEffect = Just leaf
+              }
+          r =
+            BlocSimulateResult
+              { blocsimulateStatus = Success,
+                blocsimulateGasUsed = 1,
+                blocsimulateResponse = Nothing,
+                blocsimulateData = Nothing,
+                blocsimulateEvents = [],
+                blocsimulateError = Nothing,
+                blocsimulateTrace = Nothing,
+                blocsimulateEffect = Just hop
+              }
+      decode (encode r) `shouldBe` Just r
+      case decode (encode r) :: Maybe Aeson.Value of
+        Just (Aeson.Object o) ->
+          Aeson.parseMaybe (\ob -> ob Aeson..: "effect" >>= (Aeson..: "effect")) o
+            `shouldBe` Just leaf
+        other -> expectationFailure $ "expected a JSON object, got " ++ show other
+
     it "round-trips a failure with an error message" $ do
       let r =
             BlocSimulateResult
