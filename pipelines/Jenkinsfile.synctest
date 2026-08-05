@@ -90,12 +90,20 @@ pipeline {
   }
 }
 
-// Stop the node and drop the state it leaves behind, WITHOUT touching images.
+// Stop the node and drop the state it leaves behind, WITHOUT touching images
+// or the snapshot staging dir.
+//
 // Safe to call between stages: `docker system prune -f` only collects dangling
 // (untagged) images, so the locally-built component images the next strato-up
 // needs survive. Never add `-a` here -- these images are built locally with
 // content-hash tags and are not pullable from a registry, so removing them
 // mid-run would break the following stages.
+//
+// Likewise never delete snapshot-out/ here: verifySnapshotRestore calls this
+// between creating the archive and restoring from it, so wiping the staging
+// dir would delete the artifact under test. It is cleaned in Prepare (before
+// anything is created), by deployAndSync once the archive is published, and by
+// the post{always} teardown.
 def cleanNodeState() {
   sh '''#!/bin/bash -le
     strato-down mynode || true
@@ -104,7 +112,7 @@ def cleanNodeState() {
     docker system prune -f || true
     docker volume prune -fa || true
     sudo rm -rf mynode || true
-    rm -rf snapshot-out .snapshot-work .snapshot-downloads || true
+    rm -rf .snapshot-work .snapshot-downloads || true
     rm -rf /tmp/tmp.* || true
   '''
 }
@@ -128,6 +136,7 @@ def cleanNodeState() {
 def reclaimDisk() {
   cleanNodeState()
   sh '''#!/bin/bash -le
+    rm -rf snapshot-out || true
     docker system prune -af --volumes || true
     docker builder prune -af || true
     echo "=== disk after reclaim ==="
