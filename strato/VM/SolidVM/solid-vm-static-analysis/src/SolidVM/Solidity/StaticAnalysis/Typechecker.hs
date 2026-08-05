@@ -1534,6 +1534,55 @@ poseidonArgs x = Sum
 poseidon2CompressArgs :: SourceAnnotation Text -> Type'
 poseidon2CompressArgs x = Product (intType' x, intType' x, []) x
 
+-- | Each BLS12-381 builtin has two shapes. The @bytes@ shape matches
+--   EIP-2537's input layout exactly (one bytes argument, the precompile
+--   contents). The integer-multivariate shape lets SolidVM contracts pass
+--   coordinates directly without round-tripping through padded bytes.
+--   Some builtins are fixed-arity in the int form (G1Add takes 4 ints,
+--   G2Add takes 8); MSM and pairing are variadic so a single signature
+--   covers any number of input terms.
+--
+-- | Sum signature: accept either the bytes form, OR a multivariate run of
+--   integers (for the variadic-int form).
+blsBytesOrIntList :: SourceAnnotation Text -> Type'
+blsBytesOrIntList x =
+  Sum
+    $ bytesType' x
+    :| [ Static SVMType.Variadic x,
+         Static (SVMType.Array (SVMType.Int Nothing Nothing) Nothing) x,
+         MultiVariate (intType' x) x
+       ]
+
+-- | Sum signature for the fixed-arity int forms (G1Add: 4 ints; G2Add:
+--   8 ints). The Product covers the int-tuple shape exactly so off-arity
+--   calls fail at typecheck rather than at runtime.
+blsBytesOrIntTuple :: SourceAnnotation Text -> Type' -> Type'
+blsBytesOrIntTuple x intProduct =
+  Sum $ bytesType' x :| [intProduct]
+
+bls12381G1AddArgs :: SourceAnnotation Text -> Type'
+bls12381G1AddArgs x =
+  blsBytesOrIntTuple x (Product (intType' x, intType' x, [intType' x, intType' x]) x)
+
+bls12381G2AddArgs :: SourceAnnotation Text -> Type'
+bls12381G2AddArgs x =
+  blsBytesOrIntTuple
+    x
+    ( Product
+        ( intType' x,
+          intType' x,
+          [intType' x, intType' x, intType' x, intType' x, intType' x, intType' x]
+        )
+        x
+    )
+
+-- | (msg, dst) -> hash_to_curve output. Both args are raw byte strings;
+--   the message is whatever the application is hashing (signing root,
+--   IBE identity, etc.) and the DST is the RFC 9380 §3.1 domain
+--   separation tag.
+bls12381HashToCurveArgs :: SourceAnnotation Text -> Type'
+bls12381HashToCurveArgs x = Product (bytesType' x, bytesType' x, []) x
+
 --This function should have multivariate type that represents any amount of string types
 stringConcatArgs :: SourceAnnotation Text -> Type'
 stringConcatArgs x = MultiVariate (stringType' x) x
@@ -1646,6 +1695,24 @@ getVarType' "modExp" ctx = pure $ Function (modexpArgs ctx) (intType' ctx) ctx [
 getVarType' "ecAdd" ctx = pure $ Function (ecAddArgs ctx) (Product (intType' ctx, intType' ctx, []) ctx) ctx [] [] False
 getVarType' "ecMul" ctx = pure $ Function (ecMulArgs ctx) (Product (intType' ctx, intType' ctx, []) ctx) ctx [] [] False
 getVarType' "ecPairing" ctx = pure $ Function (ecPairingArgs ctx) (boolType' ctx) ctx [] [] False
+-- The return type for *Add and *Msm is intentionally permissive (bytes)
+-- so callers can use it in either form; the actual runtime return is
+-- 'bytes' when called with bytes input and a tuple/STuple when called
+-- with int args. The typechecker can't distinguish those statically
+-- without a more elaborate dispatch, so we keep it as bytes here and
+-- rely on callers to use the form whose return shape matches their
+-- destination variable.
+getVarType' "bls12381G1Add" ctx = pure $ Function (bls12381G1AddArgs ctx) (bytesType' ctx) ctx [] [] False
+getVarType' "bls12381G1Msm" ctx = pure $ Function (blsBytesOrIntList ctx) (bytesType' ctx) ctx [] [] False
+getVarType' "bls12381G2Add" ctx = pure $ Function (bls12381G2AddArgs ctx) (bytesType' ctx) ctx [] [] False
+getVarType' "bls12381G2Msm" ctx = pure $ Function (blsBytesOrIntList ctx) (bytesType' ctx) ctx [] [] False
+getVarType' "bls12381Pairing" ctx = pure $ Function (blsBytesOrIntList ctx) (boolType' ctx) ctx [] [] False
+getVarType' "bls12381MapFpToG1" ctx = pure $ Function (bytesType' ctx) (bytesType' ctx) ctx [] [] False
+getVarType' "bls12381MapFp2ToG2" ctx = pure $ Function (bytesType' ctx) (bytesType' ctx) ctx [] [] False
+getVarType' "bls12381HashToCurveG1" ctx = pure $ Function (bls12381HashToCurveArgs ctx) (bytesType' ctx) ctx [] [] False
+getVarType' "bls12381HashToCurveG2" ctx = pure $ Function (bls12381HashToCurveArgs ctx) (bytesType' ctx) ctx [] [] False
+getVarType' "bls12381DecompressG1" ctx = pure $ Function (bytesType' ctx) (bytesType' ctx) ctx [] [] False
+getVarType' "bls12381DecompressG2" ctx = pure $ Function (bytesType' ctx) (bytesType' ctx) ctx [] [] False
 getVarType' "poseidon" ctx = pure $ Function (poseidonArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "poseidon2" ctx = pure $ Function (poseidonArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "poseidon2Compress" ctx = pure $ Function (poseidon2CompressArgs ctx) (intType' ctx) ctx [] [] False
@@ -2152,7 +2219,12 @@ tcExpr (NumberLiteral x n _) = if n < 0
 tcExpr (DecimalLiteral x _) = pure $ decimalType' x
 tcExpr (StringLiteral x _) = pure $ stringType' x
 tcExpr (AddressLiteral x _) = pure $ addressType' x
-tcExpr (HexaLiteral x _) = pure $ stringType' x
+-- | Hex string literals (@hex"..."@) are evaluated to 'SBytes' at
+--   runtime (see 'expToVar'' in @Blockchain.SolidVM@). Reporting them
+--   as 'string' here causes a type mismatch any time a contract
+--   assigns one to a 'bytes' variable, even though the value really is
+--   bytes. Align the static type with the runtime so the two agree.
+tcExpr (HexaLiteral x _) = pure $ bytesType' x
 tcExpr (InlineBoundsCheck x _ _ a) = intType' x ~> tcExpr a
 tcExpr (TupleExpression x es) =
   productType' x <$> traverse (maybe (pure $ topType' x) tcExpr) es

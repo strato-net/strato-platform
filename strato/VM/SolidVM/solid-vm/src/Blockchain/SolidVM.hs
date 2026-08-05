@@ -2244,6 +2244,54 @@ callBuiltinFunction n args' = do
         _ -> args'
   callBuiltin n args
 
+-- | Pack a flat list of SolidVM ints into G1MSM @(x, y, k)@ triples and
+--   call the pure helper. Errors out if the arg count isn't a multiple of 3.
+bls12381G1MsmFromInts :: MonadSM m => [Value] -> m Value
+bls12381G1MsmFromInts vs = do
+  is <- traverse int vs
+  case chunksOf3 is of
+    Nothing -> invalidArguments "bls12381G1Msm: expected a multiple of 3 integer args (x, y, k per term)" vs
+    Just triples -> do
+      let !(!rx, !ry) = Builtins.bls12381G1MsmInts triples
+      pure . STuple . V.fromList $ Constant <$> [SInteger rx, SInteger ry]
+
+-- | Pack flat ints into G2MSM @(((xc0, xc1), (yc0, yc1)), k)@ entries.
+--   Each term is 5 ints (4 coordinates + 1 scalar).
+bls12381G2MsmFromInts :: MonadSM m => [Value] -> m Value
+bls12381G2MsmFromInts vs = do
+  is <- traverse int vs
+  case chunksOf5 is of
+    Nothing -> invalidArguments "bls12381G2Msm: expected a multiple of 5 integer args (xc0, xc1, yc0, yc1, k per term)" vs
+    Just terms -> do
+      let !((!rxc0, !rxc1), (!ryc0, !ryc1)) = Builtins.bls12381G2MsmInts terms
+      pure . STuple . V.fromList $ Constant <$> [SInteger rxc0, SInteger rxc1, SInteger ryc0, SInteger ryc1]
+
+-- | Pack flat ints into pairing-check @(g1, g2)@ pairs. Each pair is 6
+--   ints: G1 (x, y) + G2 ((xc0, xc1), (yc0, yc1)).
+bls12381PairingFromInts :: MonadSM m => [Value] -> m Value
+bls12381PairingFromInts vs = do
+  is <- traverse int vs
+  case chunksOf6 is of
+    Nothing -> invalidArguments "bls12381Pairing: expected a multiple of 6 integer args (G1.x, G1.y, G2.xc0, G2.xc1, G2.yc0, G2.yc1 per term)" vs
+    Just pairs -> pure . SBool $! Builtins.bls12381PairingInts pairs
+
+chunksOf3 :: [Integer] -> Maybe [(Integer, Integer, Integer)]
+chunksOf3 [] = Just []
+chunksOf3 (a : b : c : rest) = ((a, b, c) :) <$> chunksOf3 rest
+chunksOf3 _ = Nothing
+
+chunksOf5 :: [Integer] -> Maybe [(((Integer, Integer), (Integer, Integer)), Integer)]
+chunksOf5 [] = Just []
+chunksOf5 (a : b : c : d : e : rest) =
+  ((((a, b), (c, d)), e) :) <$> chunksOf5 rest
+chunksOf5 _ = Nothing
+
+chunksOf6 :: [Integer] -> Maybe [((Integer, Integer), ((Integer, Integer), (Integer, Integer)))]
+chunksOf6 [] = Just []
+chunksOf6 (a : b : c : d : e : f : rest) =
+  (((a, b), ((c, d), (e, f))) :) <$> chunksOf6 rest
+chunksOf6 _ = Nothing
+
 callBuiltin :: MonadSM m => SolidString -> [Value] -> m Value
 callBuiltin "variadic" [SVariadic vs] = pure $ SVariadic vs
 callBuiltin "variadic" vs = pure $ SVariadic vs
@@ -2421,6 +2469,73 @@ callBuiltin "ecPairing" [SArray xs] = do
 callBuiltin "ecPairing" xs = do
   ints <- traverse int xs
   pure . SBool $! Builtins.ecPairing ints
+callBuiltin "bls12381G1Add" [SBytes b] =
+  case Builtins.bls12381G1Add b of
+    Left e -> invalidArguments ("bls12381G1Add: " ++ e) b
+    Right out -> pure (SBytes out)
+callBuiltin "bls12381G1Add" [a, b, c, d] = do
+  (x1, y1, x2, y2) <- (,,,) <$> int a <*> int b <*> int c <*> int d
+  let !(!rx, !ry) = Builtins.bls12381G1AddInts (x1, y1) (x2, y2)
+  pure . STuple . V.fromList $ Constant <$> [SInteger rx, SInteger ry]
+callBuiltin "bls12381G1Msm" [SBytes b] =
+  case Builtins.bls12381G1Msm b of
+    Left e -> invalidArguments ("bls12381G1Msm: " ++ e) b
+    Right out -> pure (SBytes out)
+callBuiltin "bls12381G1Msm" [SVariadic xs] = bls12381G1MsmFromInts xs
+callBuiltin "bls12381G1Msm" [SArray xs] = bls12381G1MsmFromInts =<< traverse weakGetVar (V.toList xs)
+callBuiltin "bls12381G1Msm" xs = bls12381G1MsmFromInts xs
+callBuiltin "bls12381G2Add" [SBytes b] =
+  case Builtins.bls12381G2Add b of
+    Left e -> invalidArguments ("bls12381G2Add: " ++ e) b
+    Right out -> pure (SBytes out)
+callBuiltin "bls12381G2Add" [a, b, c, d, e, f, g, h] = do
+  vs <- traverse int [a, b, c, d, e, f, g, h]
+  case vs of
+    [x1c0, x1c1, y1c0, y1c1, x2c0, x2c1, y2c0, y2c1] -> do
+      let !((!rxc0, !rxc1), (!ryc0, !ryc1)) =
+            Builtins.bls12381G2AddInts
+              ((x1c0, x1c1), (y1c0, y1c1))
+              ((x2c0, x2c1), (y2c0, y2c1))
+      pure . STuple . V.fromList $ Constant <$> [SInteger rxc0, SInteger rxc1, SInteger ryc0, SInteger ryc1]
+    _ -> invalidArguments "bls12381G2Add: expected 8 integer args" vs
+callBuiltin "bls12381G2Msm" [SBytes b] =
+  case Builtins.bls12381G2Msm b of
+    Left e -> invalidArguments ("bls12381G2Msm: " ++ e) b
+    Right out -> pure (SBytes out)
+callBuiltin "bls12381G2Msm" [SVariadic xs] = bls12381G2MsmFromInts xs
+callBuiltin "bls12381G2Msm" [SArray xs] = bls12381G2MsmFromInts =<< traverse weakGetVar (V.toList xs)
+callBuiltin "bls12381G2Msm" xs = bls12381G2MsmFromInts xs
+callBuiltin "bls12381Pairing" [SBytes b] =
+  case Builtins.bls12381Pairing b of
+    Left e -> invalidArguments ("bls12381Pairing: " ++ e) b
+    Right ok -> pure (SBool ok)
+callBuiltin "bls12381Pairing" [SVariadic xs] = bls12381PairingFromInts xs
+callBuiltin "bls12381Pairing" [SArray xs] = bls12381PairingFromInts =<< traverse weakGetVar (V.toList xs)
+callBuiltin "bls12381Pairing" xs = bls12381PairingFromInts xs
+callBuiltin "bls12381MapFpToG1" [SBytes b] =
+  case Builtins.mapFpToG1 b of
+    Left e -> invalidArguments ("bls12381MapFpToG1: " ++ e) b
+    Right out -> pure (SBytes out)
+callBuiltin "bls12381MapFp2ToG2" [SBytes b] =
+  case Builtins.mapFp2ToG2 b of
+    Left e -> invalidArguments ("bls12381MapFp2ToG2: " ++ e) b
+    Right out -> pure (SBytes out)
+callBuiltin "bls12381HashToCurveG1" [SBytes msg, SBytes dst] =
+  case Builtins.hashToCurveG1 msg dst of
+    Left e -> invalidArguments ("bls12381HashToCurveG1: " ++ e) [SBytes msg, SBytes dst]
+    Right out -> pure (SBytes out)
+callBuiltin "bls12381HashToCurveG2" [SBytes msg, SBytes dst] =
+  case Builtins.hashToCurveG2 msg dst of
+    Left e -> invalidArguments ("bls12381HashToCurveG2: " ++ e) [SBytes msg, SBytes dst]
+    Right out -> pure (SBytes out)
+callBuiltin "bls12381DecompressG1" [SBytes b] =
+  case Builtins.decompressG1 b of
+    Left e -> invalidArguments ("bls12381DecompressG1: " ++ e) b
+    Right out -> pure (SBytes out)
+callBuiltin "bls12381DecompressG2" [SBytes b] =
+  case Builtins.decompressG2 b of
+    Left e -> invalidArguments ("bls12381DecompressG2: " ++ e) b
+    Right out -> pure (SBytes out)
 callBuiltin "poseidon" [SVariadic xs] = case length xs of
   n | n > 0 && n <= 8 -> SInteger . Builtins.poseidonHash <$> traverse int xs
   _ -> typeError "invalid args passed to poseidon" $ show xs

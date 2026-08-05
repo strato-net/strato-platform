@@ -17,6 +17,12 @@ library
       Blockchain.SolidVM.GasInfo
       Blockchain.SolidVM.Simple
       Blockchain.SolidVM.SM
+      Blockchain.SolidVM.BLS12381
+      Blockchain.SolidVM.BLS12381.Compress
+      Blockchain.SolidVM.BLS12381.HashToCurve
+      Blockchain.SolidVM.BLS12381.HashToCurve.G1
+      Blockchain.SolidVM.BLS12381.HashToCurve.G2
+      Blockchain.SolidVM.BLS12381.HashToCurve.HashToField
   other-modules:
       Blockchain.SolidVM.SetGet
       Blockchain.SolidVM.TraceTools
@@ -47,6 +53,7 @@ library
     , exceptions
     , format
     , lens
+    , memory
     , merkle-patricia-db
     , monad-alter
     , nibblestring
@@ -88,6 +95,7 @@ test-suite solid-vm-spec
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      BLS12381Spec
       BuiltinsSpec
       OptimizerSpec
       SolidVMSpec
@@ -103,6 +111,7 @@ test-suite solid-vm-spec
     , aeson
     , async
     , base
+    , base16-bytestring
     , blockDB
     , blockapps-data
     , blockapps-datadefs
@@ -112,6 +121,7 @@ test-suite solid-vm-spec
     , composable-monads-base
     , containers
     , crypto-api
+    , elliptic-curve
     , ethereum-rlp
     , extra
     , hflags
@@ -122,6 +132,7 @@ test-suite solid-vm-spec
     , merkle-patricia-db
     , monad-alter
     , ordered-containers
+    , pairing
     , raw-strings-qq
     , seqevents
     , solid-vm

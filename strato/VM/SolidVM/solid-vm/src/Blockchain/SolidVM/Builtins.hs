@@ -19,8 +19,47 @@ module Blockchain.SolidVM.Builtins
     poseidonHash,
     poseidon2Hash,
     poseidon2Compress,
+    bls12381G1Add,
+    bls12381G1Msm,
+    bls12381G2Add,
+    bls12381G2Msm,
+    bls12381Pairing,
+    bls12381G1AddInts,
+    bls12381G1MsmInts,
+    bls12381G2AddInts,
+    bls12381G2MsmInts,
+    bls12381PairingInts,
+    mapFpToG1,
+    mapFp2ToG2,
+    hashToCurveG1,
+    hashToCurveG2,
+    decompressG1,
+    decompressG2,
   )
 where
+
+import Blockchain.SolidVM.BLS12381
+  ( bls12381G1Add,
+    bls12381G1AddInts,
+    bls12381G1Msm,
+    bls12381G1MsmInts,
+    bls12381G2Add,
+    bls12381G2AddInts,
+    bls12381G2Msm,
+    bls12381G2MsmInts,
+    bls12381Pairing,
+    bls12381PairingInts,
+  )
+import Blockchain.SolidVM.BLS12381.Compress
+  ( decompressG1,
+    decompressG2,
+  )
+import Blockchain.SolidVM.BLS12381.HashToCurve
+  ( hashToCurveG1,
+    hashToCurveG2,
+    mapFp2ToG2,
+    mapFpToG1,
+  )
 
 import BlockApps.Solidity.ABI.Codec
 import Blockchain.SolidVM.SM
