@@ -3,6 +3,10 @@ module BuiltinsSpec where
 import qualified Blockchain.SolidVM.Builtins as B
 import Blockchain.VM.SolidException (SolidException (..))
 import Control.Exception (evaluate)
+import Data.Curve.Weierstrass.BN254 (Fq, Point (..))
+import Data.Pairing (pairing)
+import Data.Pairing.BN254 (Fq2, G2', GT')
+import GHC.Exts (IsList (fromList))
 import Test.Hspec
 
 -- BN254 base field modulus p and subgroup order r
@@ -12,14 +16,15 @@ p = 2188824287183927522224640574525727508869631115729782366268903789464522620858
 r :: Integer
 r = 21888242871839275222246405745257275088548364400416034343698204186575808495617
 
--- G1 generator, its negation, and its double
-g1, negG1, twoG1 :: (Integer, Integer)
+-- G1 generator, its negation, its double, and the double's negation
+g1, negG1, twoG1, negTwoG1 :: (Integer, Integer)
 g1 = (1, 2)
 negG1 = (1, p - 2)
 twoG1 =
   ( 1368015179489954701390400359078579693043519447331113978918064868415326638035,
     9918110051302171585080402603319702774565515993150576347155970296011118125764
   )
+negTwoG1 = (fst twoG1, p - snd twoG1)
 
 -- G2 generator in Ethereum/ecPairing coordinate order: xIm, xRe, yIm, yRe
 g2Gen :: [Integer]
@@ -105,6 +110,35 @@ spec = do
       evaluate (B.ecPairing ([1, 2] ++ [1, 1, 1, 1])) `shouldThrow` invalidArgs
     it "rejects an on-curve G2 point outside the r-order subgroup" $
       evaluate (B.ecPairing ([1, 2] ++ g2NonSubgroup)) `shouldThrow` invalidArgs
+
+  -- ecPairing accumulates Miller loop outputs and runs one shared final
+  -- exponentiation instead of calling the library's `pairing` per pair.
+  -- These cross-check the two against each other: the optimized path must
+  -- agree with the reference for every arrangement, and in particular the
+  -- locally-defined twist constant xi must match the library's.
+  describe "ecPairing vs. the pairing library (single final exponentiation)" $ do
+    let ref :: [((Integer, Integer), [Integer])] -> Bool
+        ref ps =
+          mconcat [refPairing g1 g2 | (g1, g2) <- ps] == (mempty :: GT')
+        refPairing (x, y) [xi', xr, yi', yr] =
+          pairing
+            (A (fromInteger x :: Fq) (fromInteger y :: Fq))
+            (A (toFq2 xr xi') (toFq2 yr yi') :: G2')
+        refPairing _ _ = error "bad G2 coordinates in test"
+        toFq2 a b = fromList [fromInteger a, fromInteger b] :: Fq2
+        flat ps = concat [[x, y] ++ g2 | ((x, y), g2) <- ps]
+        agrees ps = B.ecPairing (flat ps) `shouldBe` ref ps
+
+    it "agrees on a single pair" $
+      agrees [(g1, g2Gen)]
+    it "agrees on a two-pair identity (the e(G,H)*e(-G,H) case)" $
+      agrees [(g1, g2Gen), (negG1, g2Gen)]
+    it "agrees on a two-pair non-identity" $
+      agrees [(g1, g2Gen), (twoG1, g2Gen)]
+    it "agrees on a four-pair product (Groth16 verify shape)" $
+      agrees [(g1, g2Gen), (twoG1, g2Gen), (negG1, g2Gen), (g1, g2Gen)]
+    it "agrees on a four-pair product that cancels to the identity" $
+      agrees [(g1, g2Gen), (negG1, g2Gen), (twoG1, g2Gen), (negTwoG1, g2Gen)]
 
   -- expected values generated from gnark-crypto v0.20.1
   -- (ecc/bn254/fr/poseidon2, default parameters t=2, rF=6, rP=50)

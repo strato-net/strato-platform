@@ -75,8 +75,8 @@ import Data.Curve.Weierstrass.BN254 (BN254, Fq, Fr, Point(..), add, mul, _q, _r)
 import qualified Data.Curve.Weierstrass.BN254T as BN254T
 import Data.Foldable (fold)
 import Data.Maybe (isNothing)
-import Data.Pairing                 (pairing)
-import Data.Pairing.BN254           (Fq2, G2', GT')
+import Data.Pairing.Ate             (finalExponentiationBN, millerAlgorithmBN)
+import Data.Pairing.BN254           (Fq2, G2', GT', parameterBin, parameterHex)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -231,18 +231,33 @@ ecPairing = doPairing . toTrios
         toTrios [] = []
         toTrios _ = invalidArguments "ecPairing" ("input length must be a multiple of 6" :: String)
         doPairing trios =
-          let acc :: GT'
-              -- a pair containing the point at infinity contributes the
+          let -- a pair containing the point at infinity contributes the
               -- identity, so it is validated but excluded from the product
-              acc = mconcat
-                [ pairing p1 p2
+              millers :: [GT']
+              millers =
+                [ millerAlgorithmBN twistXi parameterBin p1 p2
                 | (c1, c2) <- trios
                 , let p1 = g1Point "ecPairing" c1
                 , let p2 = g2Point "ecPairing" c2
                 , p1 /= O
                 , p2 /= O
                 ]
-           in acc == mempty
+           in -- The final exponentiation is a group homomorphism, so
+              -- FE(a) * FE(b) = FE(a * b): accumulate the Miller loop
+              -- outputs first and exponentiate once, rather than once per
+              -- pair as `pairing` would. A Groth16/PLONK verify passes four
+              -- pairs, and the final exponentiation dominates the cost, so
+              -- this is roughly a 4x saving on every proof verification.
+              null millers || finalExponentiationBN parameterHex (mconcat millers) == mempty
+
+-- | The BN254 twist constant @xi = 9 + u@, defining @Fq6 = Fq2[v]/(v^3 - xi)@.
+-- The pairing library uses this internally but doesn't export it, and
+-- 'millerAlgorithmBN' takes it as a parameter. It's a fixed curve constant,
+-- not an implementation detail — and 'ecPairing' is cross-checked against
+-- the library's own @pairing@ in the test suite, so a divergence would fail
+-- loudly rather than silently producing wrong verification results.
+twistXi :: Fq2
+twistXi = fromList [9, 1]
 
 -- | Poseidon hash - ZK-friendly hash function over BN254 scalar field
 -- Takes a list of integers (field elements) and returns their Poseidon hash

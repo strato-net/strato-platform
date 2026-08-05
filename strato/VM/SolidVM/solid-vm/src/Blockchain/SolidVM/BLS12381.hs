@@ -75,8 +75,8 @@ import qualified Data.Curve.Weierstrass.BLS12381 as G1Curve
 import qualified Data.Curve.Weierstrass.BLS12381T as G2Curve
 import Data.Curve.Weierstrass (Point (..), add, dbl, mul)
 import Data.Foldable (foldl')
-import Data.Pairing (pairing)
-import Data.Pairing.BLS12381 (Fq2)
+import Data.Pairing.Ate (finalExponentiationBLS12, millerAlgorithmBLS12)
+import Data.Pairing.BLS12381 (Fq2, GT', parameterBin, parameterHex)
 import GHC.Exts (IsList (fromList, toList))
 import qualified Data.Word as W
 
@@ -424,10 +424,7 @@ bls12381Pairing input
           ++ ", got " ++ show (B.length input)
   | otherwise = do
       pairs <- decodePairs input
-      let products = [pairing p1 p2 | (p1, p2) <- pairs]
-      -- mconcat over GT' uses the multiplicative identity (1_GT) as mempty,
-      -- so an empty product (filtered by the null check above) returns True.
-      pure $ mconcat products == mempty
+      pure $ pairingProduct pairs
   where
     decodePairs :: B.ByteString -> Either String [(G1, G2)]
     decodePairs bs
@@ -546,5 +543,23 @@ bls12381G2MsmInts =
 --   whether @∏ e(g1ᵢ, g2ᵢ) = 1_GT@. Empty input is the identity (True).
 bls12381PairingInts :: [(G1Coords, G2Coords)] -> Bool
 bls12381PairingInts pairs =
-  let products = [pairing (g1FromInts a) (g2FromInts b) | (a, b) <- pairs]
-   in mconcat products == mempty
+  pairingProduct [(g1FromInts a, g2FromInts b) | (a, b) <- pairs]
+
+-- | Whether @∏ e(G1ᵢ, G2ᵢ) = 1_GT@, computed with a single shared final
+--   exponentiation.
+--
+--   The final exponentiation is a group homomorphism, so
+--   @FE(a) * FE(b) = FE(a * b)@: accumulating the Miller loop outputs and
+--   exponentiating once is equivalent to calling 'pairing' per pair, but
+--   the final exponentiation (the dominant cost) runs once instead of @k@
+--   times. Aggregate-signature checks and KZG openings both pass two or
+--   more pairs, so this is a direct multiple on every verification.
+--
+--   Pairs containing the point at infinity contribute the identity
+--   (@e(O, Q) = 1@) and are dropped; an empty product is the identity, so
+--   the check trivially holds.
+pairingProduct :: [(G1, G2)] -> Bool
+pairingProduct pairs =
+  let millers :: [GT']
+      millers = [millerAlgorithmBLS12 parameterBin p1 p2 | (p1, p2) <- pairs, p1 /= O, p2 /= O]
+   in null millers || finalExponentiationBLS12 parameterHex (mconcat millers) == mempty
