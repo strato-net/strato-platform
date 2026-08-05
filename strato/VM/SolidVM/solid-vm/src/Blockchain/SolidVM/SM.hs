@@ -608,6 +608,8 @@ getVariableOfName name = do
                        "ecMul",
                        "ecPairing",
                        "poseidon",
+                       "poseidon2",
+                       "poseidon2Compress",
                        "payable",
                        "require",
                        "revert",

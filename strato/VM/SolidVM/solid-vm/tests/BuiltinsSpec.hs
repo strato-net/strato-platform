@@ -105,3 +105,29 @@ spec = do
       evaluate (B.ecPairing ([1, 2] ++ [1, 1, 1, 1])) `shouldThrow` invalidArgs
     it "rejects an on-curve G2 point outside the r-order subgroup" $
       evaluate (B.ecPairing ([1, 2] ++ g2NonSubgroup)) `shouldThrow` invalidArgs
+
+  -- expected values generated from gnark-crypto v0.20.1
+  -- (ecc/bn254/fr/poseidon2, default parameters t=2, rF=6, rP=50)
+  describe "poseidon2" $ do
+    it "hashes a single element like gnark's MerkleDamgard hasher" $
+      B.poseidon2Hash [1]
+        `shouldBe` 12157562999385135173166708316607836110878334226144932937475223226141207470306
+    it "hashes two elements" $
+      B.poseidon2Hash [1, 2]
+        `shouldBe` 4443443265955166080716935670700081889283598504231460571509928329665379862364
+    it "hashes four elements" $
+      B.poseidon2Hash [1, 2, 3, 4]
+        `shouldBe` 5402851635480781446751342346210135834226319730389436212287936564310709451361
+    it "hashes ten elements" $
+      B.poseidon2Hash [0 .. 9]
+        `shouldBe` 16191854207462619476933326392729612834530730884080381722066254905795027646701
+    it "compresses (0, 0) like gnark's Compress" $
+      B.poseidon2Compress 0 0
+        `shouldBe` 18622970401557034651033185129330286139447343337105683528700775943440799145467
+    it "compresses (1, 2) with the right-input feed-forward" $
+      B.poseidon2Compress 1 2
+        `shouldBe` 1313337560616139085277676701856612540166622156368305732529371734734451176752
+    it "rejects non-canonical inputs (v >= r)" $
+      evaluate (B.poseidon2Hash [r]) `shouldThrow` invalidArgs
+    it "rejects negative inputs" $
+      evaluate (B.poseidon2Compress (-1) 0) `shouldThrow` invalidArgs

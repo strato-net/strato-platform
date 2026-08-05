@@ -2430,6 +2430,24 @@ callBuiltin "poseidon" [SArray xs] = case V.length xs of
 callBuiltin "poseidon" xs = case length xs of
   n | n > 0 && n <= 8 -> SInteger . Builtins.poseidonHash <$> traverse int xs
   _ -> typeError "invalid args passed to poseidon" $ show xs
+callBuiltin "poseidon2" [SVariadic xs] = case length xs of
+  n | n > 0 -> do
+    ints <- traverse int xs
+    pure . SInteger $! Builtins.poseidon2Hash ints
+  _ -> typeError "invalid args passed to poseidon2" $ show xs
+callBuiltin "poseidon2" [SArray xs] = case V.length xs of
+  n | n > 0 -> do
+    ints <- traverse getInt (V.toList xs)
+    pure . SInteger $! Builtins.poseidon2Hash ints
+  _ -> typeError "invalid args passed to poseidon2" $ show xs
+callBuiltin "poseidon2" xs = case length xs of
+  n | n > 0 -> do
+    ints <- traverse int xs
+    pure . SInteger $! Builtins.poseidon2Hash ints
+  _ -> typeError "invalid args passed to poseidon2" $ show xs
+callBuiltin "poseidon2Compress" [a, b] = do
+  (l, r) <- (,) <$> int a <*> int b
+  pure . SInteger $! Builtins.poseidon2Compress l r
 callBuiltin ("payable") [a] = flip SAddress True <$> getAddressVal a
 callBuiltin "require" (condVar : msg) = do
   cond <- getBoolVal condVar

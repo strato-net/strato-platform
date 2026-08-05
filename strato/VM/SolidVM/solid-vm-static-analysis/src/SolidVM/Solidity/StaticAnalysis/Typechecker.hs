@@ -1531,6 +1531,9 @@ poseidonArgs x = Sum
                  , MultiVariate (intType' x) x
                  ]
 
+poseidon2CompressArgs :: SourceAnnotation Text -> Type'
+poseidon2CompressArgs x = Product (intType' x, intType' x, []) x
+
 --This function should have multivariate type that represents any amount of string types
 stringConcatArgs :: SourceAnnotation Text -> Type'
 stringConcatArgs x = MultiVariate (stringType' x) x
@@ -1644,6 +1647,8 @@ getVarType' "ecAdd" ctx = pure $ Function (ecAddArgs ctx) (Product (intType' ctx
 getVarType' "ecMul" ctx = pure $ Function (ecMulArgs ctx) (Product (intType' ctx, intType' ctx, []) ctx) ctx [] [] False
 getVarType' "ecPairing" ctx = pure $ Function (ecPairingArgs ctx) (boolType' ctx) ctx [] [] False
 getVarType' "poseidon" ctx = pure $ Function (poseidonArgs ctx) (intType' ctx) ctx [] [] False
+getVarType' "poseidon2" ctx = pure $ Function (poseidonArgs ctx) (intType' ctx) ctx [] [] False
+getVarType' "poseidon2Compress" ctx = pure $ Function (poseidon2CompressArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "selfdestruct" ctx = pure $ Function (selfdestructArgs ctx) (boolType' ctx) ctx [] [] False
 getVarType' "require" ctx = pure $ Function (requireArgs ctx) (Unit ctx) ctx [] [] False
 getVarType' "assert" ctx = pure $ Function (assertArgs ctx) (Unit ctx) ctx [] [] False

@@ -17,6 +17,8 @@ module Blockchain.SolidVM.Builtins
     ecMul,
     ecPairing,
     poseidonHash,
+    poseidon2Hash,
+    poseidon2Compress,
   )
 where
 
@@ -27,6 +29,8 @@ import Blockchain.Strato.Model.Address (addressToByteString)
 import Blockchain.VM.SolidException
 import Control.Monad ((<=<))
 import qualified Crypto.Hash.Poseidon as Poseidon
+import Crypto.Hash.Poseidon.Field (fieldPrime)
+import qualified Crypto.Hash.Poseidon2 as Poseidon2
 import Data.Curve                   (Form(Weierstrass), Coordinates(Affine), dbl, def)
 import Data.Curve.Weierstrass.BN254 (BN254, Fq, Fr, Point(..), add, mul, _q, _r)
 import qualified Data.Curve.Weierstrass.BN254T as BN254T
@@ -205,6 +209,27 @@ ecPairing = doPairing . toTrios
 -- Takes a list of integers (field elements) and returns their Poseidon hash
 poseidonHash :: [Integer] -> Integer
 poseidonHash inputs = Poseidon.fromF $ Poseidon.poseidon (map Poseidon.toF inputs)
+
+-- | Poseidon2 hash (gnark-crypto BN254 defaults: t=2, rF=6, rP=50):
+-- Merkle–Damgård over the 2-to-1 compression, matching gnark circuits'
+-- @std/hash/poseidon2@ gadget. Inputs must be canonical field elements —
+-- silently reducing them would hash a different preimage than the caller's
+-- circuit sees.
+poseidon2Hash :: [Integer] -> Integer
+poseidon2Hash = Poseidon.fromF . Poseidon2.hash . map (canonicalF "poseidon2")
+
+-- | The raw gnark Poseidon2 2-to-1 compression (right-input feed-forward),
+-- the node function for Merkle trees in gnark circuits.
+poseidon2Compress :: Integer -> Integer -> Integer
+poseidon2Compress l r =
+  Poseidon.fromF $
+    Poseidon2.compress (canonicalF "poseidon2Compress" l) (canonicalF "poseidon2Compress" r)
+
+canonicalF :: String -> Integer -> Poseidon.F
+canonicalF caller v
+  | v < 0 || v >= fieldPrime =
+      invalidArguments caller $ "input is not a canonical field element in [0, r): " ++ show v
+  | otherwise = Poseidon.toF v
 
 --------------------------------------------------------------------------------
 -- Monadic ABI functions (need MonadSM for variable dereferencing)
