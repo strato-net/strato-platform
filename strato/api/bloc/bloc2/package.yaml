@@ -52,6 +52,8 @@ library:
     - source-tools
     - strato-conf
     - strato-model
+    - aeson
+    - http-client
     - openapi3
     - text
     - time
@@ -67,5 +69,12 @@ tests:
     main: Spec.hs
     ghc-options: -Wall -Werror
     dependencies:
+      - aeson
       - bloc2
+      - bloc2api
+      - containers
+      - evm-solidity
       - hspec
+      - source-tools
+      - strato-model
+      - vector

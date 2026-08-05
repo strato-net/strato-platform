@@ -44,6 +44,7 @@ module Blockchain.SolidVM.SM
     getBlockHashWithNumber,
     getBSum,
     addEvent,
+    renderValueShallow,
     addDelegatecall,
     getUsername,
     addNewCodeCollection,
@@ -72,7 +73,9 @@ import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.SolidVM.Exception
+import Blockchain.Data.VmTrace
 import Blockchain.SolidVM.GasInfo
+import Blockchain.Strato.Model.Gas (Gas (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
@@ -191,6 +194,7 @@ type MonadSM m =
     Mod.Modifiable (Q.Seq Action.Delegatecall) m,
     Mod.Modifiable (OMap.OMap (Text, Keccak256) CodeCollection) m,
     Mod.Modifiable (Maybe DebugSettings) m,
+    Mod.Modifiable (Maybe VmTracer) m,
     MonadUnliftIO m, --todo: remove
     MonadCatch m,
     MonadLogger m
@@ -401,6 +405,13 @@ instance
   where
   get _ = lift $ Mod.get (Mod.Proxy @(Maybe DebugSettings))
   put _ = lift . Mod.put (Mod.Proxy @(Maybe DebugSettings))
+
+instance
+  (Mod.Modifiable (Maybe VmTracer) m) =>
+  Mod.Modifiable (Maybe VmTracer) (SM m)
+  where
+  get _ = lift $ Mod.get (Mod.Proxy @(Maybe VmTracer))
+  put _ = lift . Mod.put (Mod.Proxy @(Maybe VmTracer))
 
 instance MonadUnliftIO m => Mod.Modifiable Env.Sender (SM m) where
   get _ = Env.Sender . Env.sender <$> gets env
@@ -718,12 +729,56 @@ withCallInfo ::
   m a ->
   m a
 withCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff f = do
+  mTracer <- Mod.get (Mod.Proxy @(Maybe VmTracer))
+  for_ mTracer $ \_ -> do
+    stack <- Mod.get (Mod.Proxy @[CallInfo])
+    fromAddr <- case stack of
+      (parent : _) -> pure $ currentAddress parent
+      [] -> (\(Env.Sender sndr) -> sndr) <$> Mod.get (Mod.Proxy @Env.Sender)
+    GasInfo {_gasLeft = Gas gasBefore} <- Mod.get (Mod.Proxy @GasInfo)
+    args <- traverse renderArgShallow (M.toList initialLocalVariables)
+    let callType
+          | labelToText fn == "constructor" = CTCreate
+          | codeAddr /= a = CTDelegateCall
+          | ro = CTStaticCall
+          | otherwise = CTCall
+    traceEnterFrame mTracer callType fromAddr a (labelToText $ c ^. CC.contractName) (labelToText fn) args gasBefore
   addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff
   eRes <- try f
+  for_ mTracer $ \_ -> do
+    GasInfo {_gasLeft = Gas gasAfter} <- Mod.get (Mod.Proxy @GasInfo)
+    traceExitFrame mTracer gasAfter $ case eRes of
+      Left (e :: SomeException) -> Just . T.pack $ show e
+      Right _ -> Nothing
   popCallInfo $ isLeft eRes
   case eRes of
     Left (e :: SomeException) -> throwIO e
     Right res -> pure res
+
+-- | Render one named argument for a trace frame. Only the in-memory value is
+-- read (readIORef); storage is never touched, which would mutate the MP trie.
+renderArgShallow :: MonadIO m => (SolidString, Variable) -> m Text
+renderArgShallow (name, var) = do
+  val <- case var of
+    Constant v -> pure v
+    Variable ref -> readIORef ref
+  pure $ labelToText name <> "=" <> renderValueShallow val
+
+-- | Shallow, pure rendering of a value: scalars verbatim, compounds
+-- summarized without dereferencing nested variables or storage.
+renderValueShallow :: Value -> Text
+renderValueShallow = \case
+  SInteger i -> T.pack (show i)
+  SDecimal d -> T.pack (show d)
+  SString str -> T.pack (show str)
+  SBool b -> if b then "true" else "false"
+  SAddress addr _ -> T.pack (show addr)
+  SEnumVal enumName valName _ -> labelToText enumName <> "." <> labelToText valName
+  SStruct sname _ -> "<struct " <> labelToText sname <> ">"
+  STuple _ -> "<tuple>"
+  SArray _ -> "<array>"
+  SMap _ -> "<mapping>"
+  v -> T.take 100 . T.pack $ show v
 
 addCallInfo ::
   MonadSM m =>
@@ -909,8 +964,15 @@ markDiffForAction owner key' val' = do
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %= ins
 
-addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
-addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
+addEvent :: (MonadIO m, Mod.Modifiable (Q.Seq Event) m, Mod.Modifiable (Maybe VmTracer) m) => Event -> m ()
+addEvent newEvent = do
+  Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
+  mTracer <- Mod.get (Mod.Proxy @(Maybe VmTracer))
+  traceAddLog mTracer $
+    TraceLog
+      (evContractAddress newEvent)
+      (T.pack $ evName newEvent)
+      [(T.pack n, T.pack v) | (n, v, _) <- evArgs newEvent]
 
 addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Keccak256 -> T.Text -> m ()
 addDelegatecall s c n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c n)

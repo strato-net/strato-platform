@@ -44,6 +44,9 @@ import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { useMyTokens, type TokenBalance } from "@/services/tokens";
 import { useContractGroups, useContractInfo, functionArgs } from "@/services/contracts";
+import { useSimulation } from "@/components/simulation/useSimulation";
+import { SimulateButton } from "@/components/simulation/SimulateButton";
+import { SimulationResultPanel } from "@/components/simulation/SimulationResultPanel";
 import type { UserWallet } from "@/services/userWallets";
 import {
   useAdminRegistryLogic,
@@ -52,6 +55,7 @@ import {
   useOpenIssues,
   useExecutedIssues,
   useMultisigActions,
+  buildCastVotePayload,
   votesNeeded,
   strip0x,
   isZeroAddr,
@@ -803,6 +807,9 @@ function ProposeIssueForm({
 }) {
   const { canSubmit } = useSubmitTransaction();
   const { castVote } = useMultisigActions({ walletAddress });
+  // One simulation of the castVoteOnIssue tx; the endpoint automatically nests
+  // the proposal's ultimate effect (target.func(args) executed as the wallet).
+  const proposalSim = useSimulation();
 
   const [target, setTarget] = useState("");
   const [showSug, setShowSug] = useState(false);
@@ -870,6 +877,7 @@ function ProposeIssueForm({
     setAbiArgAddrs({});
     setManualArgs([""]);
     setManualMode(false);
+    proposalSim.reset();
   };
 
   const submit = async () => {
@@ -892,6 +900,16 @@ function ProposeIssueForm({
     } finally {
       setBusy(false);
     }
+  };
+
+  const simulate = async () => {
+    if (resolvedAddress.length !== 40 || !func) {
+      toast.error("Enter a target contract and function first");
+      return;
+    }
+    // Simulate the castVoteOnIssue tx; the endpoint nests the effect
+    // (target.func(args) executed as the wallet) in result.effect.
+    proposalSim.run("FUNCTION", buildCastVotePayload(walletAddress, func, buildArgs(), resolvedAddress));
   };
 
   return (
@@ -1052,13 +1070,27 @@ function ProposeIssueForm({
         Arguments are passed positionally. When the vote passes, the multisig calls the function
         on the target contract.
       </p>
-      <Button
-        onClick={submit}
-        disabled={busy || !canSubmit || resolvedAddress.length !== 40 || !func}
-        className="w-full"
-      >
-        {busy ? "Proposing…" : "Propose issue"}
-      </Button>
+
+      {/* The panel nests the issue's "Effect if executed" (target.func(args) run
+          as the wallet), which the simulate endpoint computes automatically. */}
+      <SimulationResultPanel result={proposalSim.result} error={proposalSim.error} title="Proposal tx" />
+
+      <div className="flex gap-2">
+        {proposalSim.canSimulate ? (
+          <SimulateButton
+            onClick={simulate}
+            pending={proposalSim.pending}
+            disabled={resolvedAddress.length !== 40 || !func}
+          />
+        ) : null}
+        <Button
+          onClick={submit}
+          disabled={busy || !canSubmit || resolvedAddress.length !== 40 || !func}
+          className="flex-1"
+        >
+          {busy ? "Proposing…" : "Propose issue"}
+        </Button>
+      </div>
     </div>
   );
 }

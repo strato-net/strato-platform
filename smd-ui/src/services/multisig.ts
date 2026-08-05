@@ -317,19 +317,42 @@ export interface MultisigActionCtx {
  * owner-gated setup functions (setLogicContract, initialize, transferOwnership) are
  * signed by the connected owner while they still own the wallet.
  */
+/** FUNCTION payload for a governance call on the User wallet contract itself. */
+export function buildWalletCallPayload(
+  walletAddress: string,
+  method: string,
+  args: Record<string, unknown>
+): Record<string, unknown> {
+  return {
+    contractName: "User",
+    contractAddress: walletAddress,
+    value: 0,
+    method,
+    args,
+    metadata: {},
+  };
+}
+
+/** FUNCTION payload for the castVoteOnIssue proposal transaction. */
+export function buildCastVotePayload(
+  walletAddress: string,
+  func: string,
+  args: string[],
+  target?: string
+): Record<string, unknown> {
+  return buildWalletCallPayload(walletAddress, "castVoteOnIssue", {
+    _target: strip0x(target || walletAddress),
+    _func: func,
+    _args: args,
+  });
+}
+
 export function useMultisigActions({ walletAddress }: MultisigActionCtx) {
   const { submit } = useSubmitTransaction();
 
   const callWallet = useCallback(
     (method: string, args: Record<string, unknown>) =>
-      submit("FUNCTION", {
-        contractName: "User",
-        contractAddress: walletAddress,
-        value: 0,
-        method,
-        args,
-        metadata: {},
-      }),
+      submit("FUNCTION", buildWalletCallPayload(walletAddress, method, args)),
     [submit, walletAddress]
   );
 

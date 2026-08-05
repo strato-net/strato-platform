@@ -12,6 +12,7 @@ module Bloc.Server where
 import Bloc.API
 import Bloc.Monad
 import Bloc.Server.Contracts
+import Bloc.Server.Simulate
 import Bloc.Server.Transaction
 import Bloc.Server.TransactionResult
 import Blockchain.DB.CodeDB
@@ -60,6 +61,7 @@ bloc =
     :<|> postBlocTransactionBody
     :<|> postBlocTransactionUnsigned
     :<|> postBlocTransaction
+    :<|> postBlocTransactionSimulate
 
 blocSwagger :: OpenApi
 blocSwagger =
