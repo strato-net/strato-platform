@@ -60,7 +60,7 @@ import Control.Monad (unless, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
-import Control.Monad.Composable.Vault (HasVault, VaultM, runVaultM)
+import Control.Monad.Composable.Vault (HasVault, VaultData, VaultM, runVaultMWith)
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Conduit.TMChan
@@ -179,10 +179,10 @@ instance (MonadIO m, MonadLogger m, Mod.Modifiable BestSequencedBlock m) => Mod.
   put p = lift . Mod.put p
 
 
-runSequencerM :: String -> SequencerConfig -> BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
-runSequencerM vaultUrl' c bc m = do
+runSequencerM :: VaultData -> SequencerConfig -> BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
+runSequencerM vaultEnv c bc m = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  a <- runVaultM vaultUrl' . runResourceT . runStreamMConfigured (kafkaClientId c) $ do
+  a <- runVaultMWith vaultEnv . runResourceT . runStreamMConfigured (kafkaClientId c) $ do
     let dbCS = depBlockDBCacheSize c
         dbPath = depBlockDBPath c
         stxSize = seenTransactionDBSize c

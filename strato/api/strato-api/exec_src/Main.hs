@@ -154,7 +154,7 @@ main = do
 
   -- check that all urls are derivable (or else crash and fail in a flaming disaster)
   let urlMap = fromList
-        [ ("vault", vaultUrl . urlConfig $ ethConf),
+        [ ("vault", Conf.vrVaultUrl . Conf.apiVault . vaultConfig $ ethConf),
           ("oauthDiscovery", T.unpack $ discoveryUrl clientCredentialsConfig),
           ("notificationServer", notificationServerUrl . urlConfig $ ethConf),
           ("fileServer", fileServerUrl . urlConfig $ ethConf),

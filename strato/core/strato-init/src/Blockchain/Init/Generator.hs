@@ -241,6 +241,25 @@ mkFilesAndGenesis nodeDir hasFlags network = do
             else
               error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first."
 
+    -- Per-role credential files for the split-vault setup. Each defaults to the
+    -- node's single identity (secrets/oauth_credentials.yaml), so a node that
+    -- does not opt into the split keeps one key. Provide
+    -- ~/.secrets/strato_sequencer_credentials.yaml and/or
+    -- ~/.secrets/strato_peer_credentials.yaml (external auth mode) to give the
+    -- sequencer and the p2p/discover pair distinct vault identities.
+    liftIO $ do
+      home <- getHomeDirectory
+      let destDefault = "secrets" </> "oauth_credentials.yaml"
+          setupRole srcName dest = do
+            destExists <- doesFileExist dest
+            unless destExists $ do
+              let src = home </> ".secrets" </> srcName
+              srcExists <- doesFileExist src
+              copyFile (if srcExists then src else destDefault) dest
+              void $ chmod roo dest
+      setupRole "strato_sequencer_credentials.yaml" sequencerCredentialsPath
+      setupRole "strato_peer_credentials.yaml" peerCredentialsPath
+
     ethconf <- liftIO genEthConf
 
     let dir = ".ethereumH"

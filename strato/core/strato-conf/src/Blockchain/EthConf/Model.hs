@@ -55,6 +55,7 @@ data EthConf = EthConf
     apiConfig :: ApiConfig,
     contractsConfig :: ContractsConf,
     urlConfig :: UrlConfig,
+    vaultConfig :: VaultConfig,
     networkConfig :: NetworkConf,
     debugConfig :: DebugConfig,
     vmConfig :: VmConf
@@ -67,21 +68,26 @@ kafkaConfig = streamingConfig
 {-# DEPRECATED kafkaConfig "Use streamingConfig instead" #-}
 
 instance FromJSON EthConf where
-  parseJSON = withObject "EthConf" $ \v -> EthConf
-    <$> v .: "sqlConfig"
-    <*> v .: "cirrusConfig"
-    <*> v .: "redisBlockDBConfig"
-    <*> (v .:? "streamingConfig" .!= def <|> v .: "kafkaConfig")
-    <*> v .:? "levelDBConfig" .!= def
-    <*> v .:? "quarryConfig" .!= def
-    <*> v .: "discoveryConfig"
-    <*> v .:? "p2pConfig" .!= def
-    <*> v .: "apiConfig"
-    <*> v .:? "contractsConfig" .!= def
-    <*> v .:? "urlConfig" .!= def
-    <*> v .:? "networkConfig" .!= def
-    <*> v .:? "debugConfig" .!= def
-    <*> v .:? "vmConfig" .!= def
+  parseJSON = withObject "EthConf" $ \v -> do
+    urlCfg <- v .:? "urlConfig" .!= def
+    EthConf
+      <$> v .: "sqlConfig"
+      <*> v .: "cirrusConfig"
+      <*> v .: "redisBlockDBConfig"
+      <*> (v .:? "streamingConfig" .!= def <|> v .: "kafkaConfig")
+      <*> v .:? "levelDBConfig" .!= def
+      <*> v .:? "quarryConfig" .!= def
+      <*> v .: "discoveryConfig"
+      <*> v .:? "p2pConfig" .!= def
+      <*> v .: "apiConfig"
+      <*> v .:? "contractsConfig" .!= def
+      <*> pure urlCfg
+      -- Absent 'vaultConfig' (pre-multi-vault ethconf.yaml) ⇒ derive a
+      -- single-vault config from urlConfig so old nodes behave unchanged.
+      <*> v .:? "vaultConfig" .!= vaultConfigFromUrlConfig urlCfg
+      <*> v .:? "networkConfig" .!= def
+      <*> v .:? "debugConfig" .!= def
+      <*> v .:? "vmConfig" .!= def
 
 instance ToJSON EthConf where
   toJSON = Aeson.genericToJSON Aeson.defaultOptions { Aeson.omitNothingFields = True }
@@ -205,6 +211,66 @@ instance FromJSON UrlConfig where
     <*> v .:  "notificationServerUrl"
     <*> v .:  "repoUrl"
     <*> v .:? "cookieRealm" .!= "localhost"
+
+-- | Per-process vault configuration. Each STRATO process talks to a vault at
+-- 'vrVaultUrl' authenticating with the OAuth client identity in
+-- 'vrCredentialsPath'. 'Nothing' credentials means the process only ever uses
+-- caller-supplied user tokens ('runWithUserToken') and never authenticates with
+-- a node identity of its own — this is the case for strato-api. When
+-- 'vrCredentialsPath' / 'vrTokenCachePath' are 'Nothing' the strato-auth
+-- library falls back to its process-wide defaults (secrets/oauth_credentials.yaml
+-- and secrets/oauth_token); explicit paths are required to give two identities
+-- running in the same container non-colliding token caches.
+data VaultRole = VaultRole
+  { vrVaultUrl        :: String
+  , vrTimeoutSec      :: Int
+  , vrCredentialsPath :: Maybe FilePath
+  , vrTokenCachePath  :: Maybe FilePath
+  }
+  deriving (Show, Eq, Generic)
+
+-- Manual instances so the JSON keys (vaultUrl, …) stay decoupled from the
+-- 'vr'-prefixed Haskell field names and round-trip cleanly.
+instance FromJSON VaultRole where
+  parseJSON = withObject "VaultRole" $ \v -> VaultRole
+    <$> v .:  "vaultUrl"
+    <*> v .:? "vaultTimeoutSec" .!= 12
+    <*> v .:? "credentialsPath"
+    <*> v .:? "tokenCachePath"
+
+instance ToJSON VaultRole where
+  toJSON r = object
+    [ "vaultUrl"        .= vrVaultUrl r
+    , "vaultTimeoutSec" .= vrTimeoutSec r
+    , "credentialsPath" .= vrCredentialsPath r
+    , "tokenCachePath"  .= vrTokenCachePath r
+    ]
+
+-- | The three vault identities a STRATO node uses:
+--   * 'apiVault'       — strato-api / bloc; the public vault, user-token only.
+--   * 'sequencerVault' — strato-sequencer; the local vault, its own identity.
+--   * 'peerVault'      — strato-p2p AND ethereum-discover (shared); local vault,
+--                        a second identity distinct from the sequencer's.
+data VaultConfig = VaultConfig
+  { apiVault       :: VaultRole
+  , sequencerVault :: VaultRole
+  , peerVault      :: VaultRole
+  }
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+
+-- | Derive a 'VaultConfig' from a legacy single-vault 'UrlConfig'. Used when an
+-- ethconf.yaml predates the 'vaultConfig' block: every role points at the one
+-- 'vaultUrl' and falls back to the default credentials/token cache, reproducing
+-- the original single-vault behavior exactly.
+vaultConfigFromUrlConfig :: UrlConfig -> VaultConfig
+vaultConfigFromUrlConfig u =
+  let role = VaultRole
+        { vrVaultUrl = vaultUrl u
+        , vrTimeoutSec = vaultTimeoutSec u
+        , vrCredentialsPath = Nothing
+        , vrTokenCachePath = Nothing
+        }
+  in VaultConfig { apiVault = role, sequencerVault = role, peerVault = role }
 
 data NetworkConf = NetworkConf
   { network :: String
@@ -365,6 +431,7 @@ instance Default EthConf where
     , apiConfig = def
     , contractsConfig = def
     , urlConfig = def
+    , vaultConfig = vaultConfigFromUrlConfig def
     , networkConfig = def
     , debugConfig = def
     , vmConfig = def

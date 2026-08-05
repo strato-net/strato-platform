@@ -103,6 +103,7 @@ executable strato-sequencer
     , strato-model
     , strato-redis-blockdb
     , strato-sequencer
+    , vault-monad
     , wai-middleware-prometheus
     , warp
   default-language: Haskell2010

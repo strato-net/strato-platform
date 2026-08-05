@@ -18,6 +18,7 @@ import Blockchain.Model.SyncState
 import Blockchain.Sequencer
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Monad
+import Control.Monad.Composable.Vault (newVaultAuthEnv)
 import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.SyncDB
@@ -60,8 +61,8 @@ main = do
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
   putStrLn $ "strato-sequencer network: " ++ show (Conf.network (networkConfig ethConf))
   putStrLn $ "strato-sequencer validators: " ++ show validators
-  let vaultUrl' = vaultUrl . urlConfig $ ethConf
-  putStrLn $ "strato-sequencer vault URL: " ++ vaultUrl'
+  let seqVault = sequencerVault (vaultConfig ethConf)
+  putStrLn $ "strato-sequencer vault URL: " ++ vrVaultUrl seqVault
   putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
 
   pkg <- atomically newCablePackage
@@ -97,6 +98,8 @@ main = do
             kafkaClientId = fromString flags_kafkaclientid,
             redisConn = RBDB.RedisConnection conn
           }
-  race_ (runLoggingT (runSequencerM vaultUrl' seqCfg ctx sequencer))
+  vaultEnv <- newVaultAuthEnv (vrTimeoutSec seqVault) (vrVaultUrl seqVault)
+                              (vrCredentialsPath seqVault) (vrTokenCachePath seqVault)
+  race_ (runLoggingT (runSequencerM vaultEnv seqCfg ctx sequencer))
     . run 8050
     $ metricsApp

@@ -37,7 +37,9 @@ defineFlag "nodeHost" ("localhost" :: String) "The external hostname for the nod
 
 defineFlag "svmTrace" (False :: Bool) "Enable verbose logging in SolidVM"
 
-defineFlag "vaultUrl" "https://vault.blockapps.net:8093/strato/v2.3" "URL of the shared vault service"
+defineFlag "vaultUrl" "https://vault.blockapps.net:8093/strato/v2.3" "URL of the public vault service strato-api routes user traffic to (also the fallback for the local vault when --localVaultUrl is empty)"
+
+defineFlag "localVaultUrl" ("" :: String) "URL of the local vault that strato-sequencer and strato-p2p/ethereum-discover authenticate to with node identities. Empty => use --vaultUrl (single-vault), or the bundled local-auth vault when --localAuth is set"
 
 defineFlag "vaultTimeoutSec" (12 :: Int) "HTTP response timeout (seconds) for vault-wrapper signature / key requests"
 

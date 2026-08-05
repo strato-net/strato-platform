@@ -6,6 +6,7 @@ module Strato.Auth.Client
   ( AuthEnv
   , newAuthEnv
   , newAuthEnvWith
+  , newAuthEnvWithCreds
   , runWithAuth
   , runWithUserToken
   ) where
@@ -36,6 +37,14 @@ import System.IO.Unsafe (unsafePerformIO)
 data AuthEnv = AuthEnv
   { aeBaseUrl :: BaseUrl
   , aeManager :: Manager
+  -- | OAuth client identity used by 'runWithAuth'. Lazily defaulted to the
+  -- process-wide 'clientCredentialsConfig' so user-token-only callers
+  -- ('runWithUserToken', e.g. strato-api) never force a (possibly absent)
+  -- default credentials file.
+  , aeCreds :: ClientCredentialsConfig
+  -- | Token cache file backing 'runWithAuth' for this identity. Two identities
+  -- sharing a process MUST use distinct paths.
+  , aeTokenCachePath :: FilePath
   }
 
 -- | Default response timeout (seconds) for AuthEnvs built via 'newAuthEnv'.
@@ -87,20 +96,36 @@ getOrCreateManager url timeoutSec =
         pure (Map.insert (url, timeoutSec) mgr cache, mgr)
 
 -- | Create an authenticated environment for making OAuth-protected calls.
--- Uses the shared per-URL 'Manager' cache and the default timeout.
+-- Uses the shared per-URL 'Manager' cache and the default timeout, plus the
+-- process-wide default credentials and token cache.
 newAuthEnv :: String -> IO AuthEnv
 newAuthEnv = newAuthEnvWith defaultTimeoutSec
 
 -- | Like 'newAuthEnv' but with an explicit HTTP response timeout in seconds.
--- Used by hot-path callers (transaction signing) that should read the
--- configured value from EthConf instead of relying on the default.
+-- Uses the process-wide default credentials ('clientCredentialsConfig') and
+-- token cache ('defaultTokenCachePath'). Suitable for single-identity callers
+-- and for user-token-only callers (the default creds are never forced unless
+-- 'runWithAuth' is used).
 newAuthEnvWith :: Int -> String -> IO AuthEnv
-newAuthEnvWith timeoutSec url = do
+newAuthEnvWith timeoutSec url =
+  newAuthEnvWithCreds' timeoutSec url clientCredentialsConfig defaultTokenCachePath
+
+-- | Like 'newAuthEnvWith' but with an explicit OAuth client identity and token
+-- cache path. Used to give the sequencer and the p2p/discover pair distinct
+-- vault identities (and therefore non-colliding token caches) within one
+-- container.
+newAuthEnvWithCreds :: Int -> String -> ClientCredentialsConfig -> FilePath -> IO AuthEnv
+newAuthEnvWithCreds = newAuthEnvWithCreds'
+
+newAuthEnvWithCreds' :: Int -> String -> ClientCredentialsConfig -> FilePath -> IO AuthEnv
+newAuthEnvWithCreds' timeoutSec url creds tokenCachePath = do
   baseUrl <- parseBaseUrl url
   mgr <- getOrCreateManager url timeoutSec
   pure AuthEnv
     { aeBaseUrl = baseUrl
     , aeManager = mgr
+    , aeCreds = creds
+    , aeTokenCachePath = tokenCachePath
     }
 
 -- | Retry on 'ConnectionError' (i.e. anything thrown as a transport-level
@@ -141,12 +166,12 @@ runWithAuth ae action = withConnectionRetry "Vault request" doRequestWith401Retr
       result <- runOnce ae
       case result of
         Left (FailureResponse _ resp) | responseStatusCode resp == status401 -> do
-          _ <- refreshToken (discoveryUrl clientCredentialsConfig)
+          _ <- refreshToken (aeCreds ae) (aeTokenCachePath ae)
           runOnce ae
         _ -> pure result
 
     runOnce AuthEnv{..} = do
-      token <- getToken (discoveryUrl clientCredentialsConfig)
+      token <- getToken aeCreds aeTokenCachePath
       let addAuth :: Request -> Request
           addAuth = addHeader "Authorization" ("Bearer " <> token)
           env = (mkClientEnv aeManager aeBaseUrl) { makeClientRequest = \url req -> defaultMakeClientRequest url (addAuth req) }

@@ -21,7 +21,7 @@ module Blockchain.Sequencer (
 
 import BlockApps.Logging
 import Blockchain.Blockstanbul
-import Blockchain.EthConf (ethConf, urlConfig, vaultUrl)
+import Blockchain.EthConf (ethConf, vaultConfig, sequencerVault, vrVaultUrl, vrTimeoutSec, vrCredentialsPath, vrTokenCachePath)
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
@@ -44,7 +44,7 @@ import Control.Monad (forever, forM, void, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
-import Control.Monad.Composable.Vault (runVaultM, getPub)
+import Control.Monad.Composable.Vault (runVaultMWith, newVaultAuthEnv, getPub)
 import Data.Foldable
 import Data.Maybe
 import Data.Proxy
@@ -83,10 +83,13 @@ tryResolveSelfAddr = do
   case _selfAddr ctx of
     Just addr -> return (Just addr)
     Nothing -> do
-      let vaultUrl' = vaultUrl . urlConfig $ ethConf
-      result <- liftIO $ E.try @E.SomeException $ runLoggingT $ runVaultM vaultUrl' $ do
-        pubKey <- getPub
-        return $ fromPublicKey pubKey
+      let seqVault = sequencerVault (vaultConfig ethConf)
+      result <- liftIO $ E.try @E.SomeException $ do
+        env <- newVaultAuthEnv (vrTimeoutSec seqVault) (vrVaultUrl seqVault)
+                               (vrCredentialsPath seqVault) (vrTokenCachePath seqVault)
+        runLoggingT $ runVaultMWith env $ do
+          pubKey <- getPub
+          return $ fromPublicKey pubKey
       case result of
         Right addr -> do
           $logInfoS "sequencer" $ "Node identity resolved: " <> T.pack (format addr)
