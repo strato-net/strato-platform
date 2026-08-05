@@ -88,6 +88,7 @@ test-suite solid-vm-spec
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      BuiltinsSpec
       OptimizerSpec
       SolidVMSpec
       Spec

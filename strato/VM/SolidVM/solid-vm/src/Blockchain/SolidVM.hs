@@ -2400,21 +2400,27 @@ callBuiltin "base64encode" [SBytes bs] = pure . SBytes $ B64.encode bs
 callBuiltin "base64encode" [SString s] = pure . SString . BC.unpack . B64.encode . DT.encodeUtf8 $ T.pack s
 callBuiltin "base64urlencode" [SBytes bs] = pure . SBytes . BC.takeWhile (/= '=') $ B64URL.encode bs
 callBuiltin "base64urlencode" [SString s] = pure . SString . BC.unpack . BC.takeWhile (/= '=') . B64URL.encode . DT.encodeUtf8 $ T.pack s
-callBuiltin "modExp" [b, e, m] = SInteger <$> (Builtins.modExp <$> int b <*> int e <*> int m)
+callBuiltin "modExp" [b, e, m] = do
+  (b', e', m') <- (,,) <$> int b <*> int e <*> int m
+  pure . SInteger $! Builtins.modExp b' e' m'
 callBuiltin "ecAdd" [a, b, c, d] = do
   (x1, y1, x2, y2) <- (,,,) <$> int a <*> int b <*> int c <*> int d
-  let (x, y) = Builtins.ecAdd (x1, y1) (x2, y2)
+  -- forced here so validation failures surface as this call's revert
+  let !(!x, !y) = Builtins.ecAdd (x1, y1) (x2, y2)
   pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
 callBuiltin "ecMul" [a, b, c] = do
   (x1, y1, s) <- (,,) <$> int a <*> int b <*> int c
-  let (x, y) = Builtins.ecMul (x1, y1) s
+  let !(!x, !y) = Builtins.ecMul (x1, y1) s
   pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
-callBuiltin "ecPairing" [SVariadic xs] =
-  SBool . Builtins.ecPairing <$> traverse int xs
-callBuiltin "ecPairing" [SArray xs] =
-  SBool . Builtins.ecPairing <$> traverse getInt (V.toList xs)
+callBuiltin "ecPairing" [SVariadic xs] = do
+  ints <- traverse int xs
+  pure . SBool $! Builtins.ecPairing ints
+callBuiltin "ecPairing" [SArray xs] = do
+  ints <- traverse getInt (V.toList xs)
+  pure . SBool $! Builtins.ecPairing ints
 callBuiltin "ecPairing" xs = do
-  SBool . Builtins.ecPairing <$> traverse int xs
+  ints <- traverse int xs
+  pure . SBool $! Builtins.ecPairing ints
 callBuiltin "poseidon" [SVariadic xs] = case length xs of
   n | n > 0 && n <= 8 -> SInteger . Builtins.poseidonHash <$> traverse int xs
   _ -> typeError "invalid args passed to poseidon" $ show xs
