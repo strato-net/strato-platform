@@ -160,10 +160,10 @@ const formatCarryVaultApyDisplayForLive = (
 const YIELD_VAULTS = [
   {
     key: "eth-carry",
-    name: "ETH Carry Vault",
-    subtitle: "ERC-4626 carry vault for ETH deposits",
+    name: "ETH Yield Vault",
+    subtitle: "Earn funded ETH yield plus Reward Points",
     asset: "ETH",
-    badge: "Carry Vault",
+    badge: "Yield Vault",
     iconBg: "bg-indigo-500/15 dark:bg-indigo-400/15",
     iconColor: "text-indigo-600 dark:text-indigo-400",
   },

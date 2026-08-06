@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { formatUnits } from "ethers";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowLeft, CircleDollarSign, Sparkles, TrendingUp, Wallet } from "lucide-react";
+import { ArrowLeft, ChevronDown, CircleDollarSign, Sparkles, TrendingUp, Wallet } from "lucide-react";
 
 // Mirrors backend OFF_CHAIN_DISPLAY_FLOOR_USD: hide the off-chain section when
 // the pooled value is below this so transient slippage/oracle dust doesn't
@@ -42,6 +42,8 @@ import { useEarnContext } from "@/context/EarnContext";
 import { findBestEarnApyInfo } from "@/utils/earnUtils";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
+import { YieldVaultHistoryCharts } from "@/components/earn/YieldVaultHistoryCharts";
+import type { YieldVaultHistoryPoint } from "@/context/YieldVaultContext";
 
 const VAULT_META: Record<string, {
   title: string;
@@ -53,13 +55,13 @@ const VAULT_META: Record<string, {
   strategyDescription: string;
 }> = {
   "eth-carry": {
-    title: "ETH Carry Vault",
-    subtitle: "ERC-4626 carry vault for ETH deposits",
-    badge: "Carry Vault",
+    title: "ETH Yield Vault",
+    subtitle: "Earn funded ETH yield plus Reward Points",
+    badge: "Yield Vault",
     iconBg: "bg-indigo-500/15 dark:bg-indigo-400/15",
     iconColor: "text-indigo-600 dark:text-indigo-400",
     cardBorder: "border-indigo-500/25 dark:border-indigo-400/25 bg-gradient-to-br from-[#f5f3ff] to-[#ede9fe] dark:from-[#1a1533] dark:to-[#1c173a]",
-    strategyDescription: "The vault targets growth in ETH per share. Deposited ETH is wrapped into wstETH to earn staking yield, then used as collateral to borrow USDST. Borrowed stables are deployed into yield-bearing stablecoins (syrupUSDC, sUSDS), and the net carry is periodically converted back into ETH, increasing each share's claim on ETH over time. The vault maintains an idle buffer for withdrawals; large redemptions may queue when capital is deployed.",
+    strategyDescription: "Deposited ETH is put to work across approved yield strategies, including wstETH staking yield. Net strategy returns are converted to ETH, which funds the vault’s configured Base APY. Funded rewards increase the ETH value of each vault share over time. The vault maintains an idle buffer for withdrawals; larger redemptions may queue while capital is deployed.",
   },
   "wbtc-carry": {
     title: "wBTC Carry Vault",
@@ -172,6 +174,8 @@ const EarnYieldVault = () => {
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [actionAmount, setActionAmount] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [history, setHistory] = useState<YieldVaultHistoryPoint[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Redirect to earn page if vault key is unknown.
   useEffect(() => {
@@ -181,6 +185,29 @@ const EarnYieldVault = () => {
   const vaultInfo = getVaultInfo(vaultKey);
   const userInfo = getUserVaultInfo(vaultKey);
   const effectiveInfo = userInfo || vaultInfo;
+  const isFundedVault = Boolean(effectiveInfo?.accrualInitialized);
+
+  const loadHistory = useCallback(async () => {
+    if (!isFundedVault) {
+      setHistory([]);
+      return;
+    }
+    setHistoryLoading(true);
+    try {
+      const { data } = await api.get<YieldVaultHistoryPoint[]>(
+        `/earn/yield-vault/${vaultKey}/history`
+      );
+      setHistory(data);
+    } catch {
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [isFundedVault, vaultKey]);
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
 
   useEffect(() => {
     if (meta) {
@@ -196,8 +223,16 @@ const EarnYieldVault = () => {
   const isDeployed = Boolean(effectiveInfo?.deployed);
   const assetSymbol = effectiveInfo?.assetSymbol || "Asset";
   const shareSymbol = effectiveInfo?.shareSymbol || "Shares";
-  const exchangeRate = formatExchangeRate(effectiveInfo?.exchangeRate || "0", assetSymbol);
-  const tvlDisplay = loadingVaults ? "..." : formatUsdAmount(effectiveInfo?.tvlUsd || "0");
+  const displayedExchangeRate =
+    isFundedVault
+      ? effectiveInfo?.projectedExchangeRate || effectiveInfo?.exchangeRate || "0"
+      : effectiveInfo?.exchangeRate || "0";
+  const displayedTvlUsd =
+    isFundedVault
+      ? effectiveInfo?.projectedTvlUsd || effectiveInfo?.tvlUsd || "0"
+      : effectiveInfo?.tvlUsd || "0";
+  const exchangeRate = formatExchangeRate(displayedExchangeRate, assetSymbol);
+  const tvlDisplay = loadingVaults ? "..." : formatUsdAmount(displayedTvlUsd);
   const bestApyInfo = useMemo(
     () => findBestEarnApyInfo(tokenApys, effectiveInfo?.vaultAddress),
     [effectiveInfo?.vaultAddress, tokenApys]
@@ -211,8 +246,14 @@ const EarnYieldVault = () => {
     return { label: `+${rawTotal.toFixed(2)}%`, className: "text-foreground" };
   })();
   const userShares = userInfo?.userShares || "0";
-  const redeemableAssets = userInfo?.redeemableAssets || "0";
-  const positionUsdWad = userInfo?.positionUsd || "0";
+  const redeemableAssets =
+    isFundedVault
+      ? userInfo?.projectedRedeemableAssets || userInfo?.redeemableAssets || "0"
+      : userInfo?.redeemableAssets || "0";
+  const positionUsdWad =
+    isFundedVault
+      ? userInfo?.projectedPositionUsd || userInfo?.positionUsd || "0"
+      : userInfo?.positionUsd || "0";
   const walletAssets = userInfo?.walletAssets || "0";
   const maxRedeemShares = userInfo?.maxRedeem || "0";
   const maxWithdrawAssets = userInfo?.maxWithdraw || "0";
@@ -300,19 +341,23 @@ const EarnYieldVault = () => {
   const totalClaimableAssetsBig = BigInt(effectiveInfo?.totalClaimableAssets || "0");
   const activeAssetsBig =
     totalAssetsBig > totalClaimableAssetsBig ? totalAssetsBig - totalClaimableAssetsBig : 0n;
+  const depositPricingAssetsBig =
+    isFundedVault
+      ? BigInt(effectiveInfo?.projectedActiveAssets || activeAssetsBig.toString())
+      : activeAssetsBig;
   const totalSharesBig = BigInt(effectiveInfo?.totalShares || "0");
 
   const previewValueWei = useMemo(() => {
     if (amountWei <= 0n) return 0n;
 
     if (actionMode === "deposit") {
-      return previewSharesForAssets(amountWei, activeAssetsBig, totalSharesBig);
+      return previewSharesForAssets(amountWei, depositPricingAssetsBig, totalSharesBig);
     }
     if (actionMode === "redeem") {
       return previewAssetsForShares(amountWei, activeAssetsBig, totalSharesBig);
     }
     return 0n;
-  }, [actionMode, amountWei, activeAssetsBig, totalSharesBig]);
+  }, [actionMode, amountWei, activeAssetsBig, depositPricingAssetsBig, totalSharesBig]);
 
   const instantWithdrawSharesWei = useMemo(() => {
     if (actionMode !== "redeem" || amountWei <= 0n) return 0n;
@@ -347,6 +392,7 @@ const EarnYieldVault = () => {
       refreshVaults(),
       refetchRewardsActivities(),
       refetchUserRewards(),
+      loadHistory(),
     ]);
     window.setTimeout(() => {
       Promise.allSettled([refetchRewardsActivities(), refetchUserRewards()]).catch(
@@ -513,7 +559,7 @@ const EarnYieldVault = () => {
       icon: <CircleDollarSign className="h-4 w-4 text-violet-600 dark:text-violet-400" />,
     },
     {
-      label: "Estimated Rewards/Day",
+      label: "Reward Points / Day",
       value:
         loadingVaults || rewardsActivitiesLoading || rewardsUserLoading
           ? "..."
@@ -522,7 +568,7 @@ const EarnYieldVault = () => {
             : "--",
       hint: carryRewardPointsPerDollarPerDay
         ? `Points you can earn per day at the current rate (${carryRewardPointsPerDollarPerDay} pts/$1/day)`
-        : "Points you can earn per day at the current rate",
+        : "Reward Points you can earn per day at the current rate",
       icon: <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400" />,
     },
   ];
@@ -592,21 +638,21 @@ const EarnYieldVault = () => {
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                        <div className="rounded-lg border border-border/60 bg-background/70 p-3">
+                        <div className={`rounded-lg border border-border/60 bg-background/70 p-3 ${isFundedVault ? "sm:order-2" : ""}`}>
                           <p className="text-muted-foreground">Exchange Rate</p>
                           <p className="mt-1 text-lg font-semibold">{exchangeRate}</p>
                           <p className="text-xs text-muted-foreground mt-1">
                             {assetSymbol} redeemable per {shareSymbol}
                           </p>
                         </div>
-                        <div className="rounded-lg border border-border/60 bg-background/70 p-3">
+                        <div className={`rounded-lg border border-border/60 bg-background/70 p-3 ${isFundedVault ? "sm:order-3" : ""}`}>
                           <p className="text-muted-foreground">TVL</p>
                           <p className="mt-1 text-lg font-semibold">{tvlDisplay}</p>
                           <p className="text-xs text-muted-foreground mt-1">
                             Total value locked in the vault
                           </p>
                         </div>
-                        <div className="rounded-lg border border-border/60 bg-background/70 p-3">
+                        <div className={`rounded-lg border border-border/60 bg-background/70 p-3 ${isFundedVault ? "sm:order-1" : ""}`}>
                           <p className="text-muted-foreground inline-flex items-center gap-1">
                             Best Available APY
                             <BestApyInfoTooltip />
@@ -621,7 +667,9 @@ const EarnYieldVault = () => {
                             </EarnApyTooltip>
                           )}
                           <p className="text-xs text-muted-foreground mt-1">
-                            Estimated annualized total yield, including rewards and native fees
+                            {isFundedVault
+                              ? "Configured Base APY plus Reward Points APY"
+                              : "Estimated annualized total yield, including rewards and native fees"}
                           </p>
                         </div>
                       </div>
@@ -672,6 +720,16 @@ const EarnYieldVault = () => {
                   ))}
                 </section>
 
+                {isFundedVault && (
+                  <YieldVaultHistoryCharts
+                    history={history}
+                    currentExchangeRate={displayedExchangeRate}
+                    currentTvlUsd={displayedTvlUsd}
+                    assetSymbol={assetSymbol}
+                    loading={historyLoading}
+                  />
+                )}
+
                 <section className="space-y-3">
                   <h2 className="text-xl font-semibold">Vault Parameters</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -715,7 +773,32 @@ const EarnYieldVault = () => {
                 </section>
 
                 <section className="space-y-3">
-                  <h2 className="text-xl font-semibold">Strategy Holdings</h2>
+                  <h2 className="text-xl font-semibold">
+                    {isFundedVault ? "How This Vault Earns" : "Strategy"}
+                  </h2>
+                  <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+                    {meta?.strategyDescription}
+                  </p>
+                </section>
+
+                <section className="space-y-3">
+                  <details
+                    key={isFundedVault ? "funded-strategy" : "standard-strategy"}
+                    defaultOpen={!isFundedVault}
+                    className={isFundedVault ? "group rounded-lg border border-border/70 bg-card" : ""}
+                  >
+                    <summary
+                      className={
+                        isFundedVault
+                          ? "flex cursor-pointer list-none items-center justify-between p-4 text-xl font-semibold"
+                          : "hidden"
+                      }
+                    >
+                      Strategy Details
+                      <ChevronDown className="h-5 w-5 transition-transform group-open:rotate-180" />
+                    </summary>
+                    <div className={isFundedVault ? "space-y-3 border-t border-border/70 p-4" : "space-y-3"}>
+                  <h2 className={isFundedVault ? "sr-only" : "text-xl font-semibold"}>Strategy Holdings</h2>
                   {strategyHoldings.length > 0 ? (
                     <div className="grid grid-cols-1 gap-3">
                       {strategyHoldings.map((holding) => (
@@ -864,6 +947,8 @@ const EarnYieldVault = () => {
                       </CardContent>
                     </Card>
                   )}
+                    </div>
+                  </details>
                 </section>
 
                 <section className="space-y-3">
@@ -921,12 +1006,6 @@ const EarnYieldVault = () => {
                   </div>
                 </section>
 
-                <section className="space-y-3">
-                  <h2 className="text-xl font-semibold">Strategy</h2>
-                  <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
-                    {meta?.strategyDescription}
-                  </p>
-                </section>
               </CardContent>
             </Card>
           </div>
