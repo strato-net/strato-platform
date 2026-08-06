@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { formatUnits } from "ethers";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import type { YieldVaultHistoryPoint } from "@/context/YieldVaultContext";
@@ -155,6 +155,7 @@ export const YieldVaultHistoryCharts = ({
   assetSymbol,
   loading,
 }: Props) => {
+  const [view, setView] = useState<"share" | "tvl">("share");
   const exchangeData = useMemo(
     () =>
       appendCurrentPoint(
@@ -184,41 +185,76 @@ export const YieldVaultHistoryCharts = ({
       currency: "USD",
       maximumFractionDigits: 0,
     });
+  const activeData = view === "share" ? exchangeData : tvlData;
+  const activePerformance = getPerformance(activeData, 30);
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold">Vault Performance</h2>
           <p className="text-sm text-muted-foreground">Historical share value and total value locked</p>
         </div>
-        <div className="flex gap-4 text-xs text-muted-foreground">
-          <span>7D {formatPerformance(getPerformance(exchangeData, 7))}</span>
-          <span>30D {formatPerformance(getPerformance(exchangeData, 30))}</span>
-          <span>All {formatPerformance(getPerformance(exchangeData))}</span>
+        <div className="inline-flex w-fit rounded-md bg-muted p-1">
+          <button
+            type="button"
+            onClick={() => setView("share")}
+            className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+              view === "share" ? "bg-background text-foreground" : "text-muted-foreground"
+            }`}
+          >
+            Share Price
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("tvl")}
+            className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+              view === "tvl" ? "bg-background text-foreground" : "text-muted-foreground"
+            }`}
+          >
+            TVL
+          </button>
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="space-y-3">
         <HistoryChart
-          title="Share Value"
-          value={`${parseWad(currentExchangeRate).toFixed(4)} ${assetSymbol}`}
-          subtitle={`Redeemable ${assetSymbol} per vault share`}
-          data={exchangeData}
+          title={view === "share" ? "Share Price" : "TVL"}
+          value={
+            view === "share"
+              ? `${parseWad(currentExchangeRate).toFixed(4)} ${assetSymbol}`
+              : formatUsd(parseWad(currentTvlUsd))
+          }
+          subtitle={
+            view === "share"
+              ? `Redeemable ${assetSymbol} per vault share`
+              : "Total value locked"
+          }
+          data={activeData}
           loading={loading}
-          valueFormatter={(value) => `${value.toFixed(6)} ${assetSymbol}`}
-          tickFormatter={(value) => value.toFixed(4)}
-        />
-        <HistoryChart
-          title="TVL"
-          value={formatUsd(parseWad(currentTvlUsd))}
-          subtitle="Total value locked"
-          data={tvlData}
-          loading={loading}
-          valueFormatter={formatUsd}
+          valueFormatter={
+            view === "share"
+              ? (value) => `${value.toFixed(6)} ${assetSymbol}`
+              : formatUsd
+          }
           tickFormatter={(value) =>
-            Intl.NumberFormat("en-US", { notation: "compact", style: "currency", currency: "USD" }).format(value)
+            view === "share"
+              ? value.toFixed(4)
+              : Intl.NumberFormat("en-US", {
+                  notation: "compact",
+                  style: "currency",
+                  currency: "USD",
+                }).format(value)
           }
         />
+        <div className="flex flex-wrap gap-x-6 gap-y-1 px-1 text-xs text-muted-foreground">
+          <span>30D change {formatPerformance(activePerformance)}</span>
+          <span>
+            Current{" "}
+            {view === "share"
+              ? `${parseWad(currentExchangeRate).toFixed(4)} ${assetSymbol}`
+              : formatUsd(parseWad(currentTvlUsd))}
+          </span>
+        </div>
       </div>
     </section>
   );
