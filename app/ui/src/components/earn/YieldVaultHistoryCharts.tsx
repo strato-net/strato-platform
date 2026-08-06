@@ -200,7 +200,7 @@ export const YieldVaultHistoryCharts = ({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <HistoryChart
           title="Price"
-          value={`${parseWad(currentExchangeRate).toFixed(4)} ${assetSymbol}`}
+          value={`${parseWad(currentExchangeRate).toFixed(6)} ${assetSymbol}`}
           subtitle={`Redeemable ${assetSymbol} per vault share`}
           data={exchangeData}
           loading={loading}

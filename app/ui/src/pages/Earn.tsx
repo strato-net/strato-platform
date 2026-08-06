@@ -161,7 +161,7 @@ const YIELD_VAULTS = [
   {
     key: "eth-carry",
     name: "ETH Yield Vault",
-    subtitle: "Earn funded ETH yield plus Reward Points",
+    subtitle: "Earn ETH yield and Reward Points",
     asset: "ETH",
     badge: "Yield Vault",
     iconBg: "bg-indigo-500/15 dark:bg-indigo-400/15",
