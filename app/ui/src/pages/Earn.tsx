@@ -77,6 +77,7 @@ const formatYieldVaultPositionUsd = (
     userShares?: string;
     redeemableAssets?: string;
     positionUsd?: string;
+    projectedPositionUsd?: string;
     assetPriceWad?: string;
   } | null | undefined,
   vData: { deployed?: boolean } | null | undefined
@@ -85,10 +86,11 @@ const formatYieldVaultPositionUsd = (
   const shares = safeBigInt(uData?.userShares);
   if (shares <= 0n) return `$${formatUsd("0")}`;
   const price = safeBigInt(uData?.assetPriceWad);
-  const pos = safeBigInt(uData?.positionUsd ?? "0");
+  const positionUsd = uData?.projectedPositionUsd || uData?.positionUsd || "0";
+  const pos = safeBigInt(positionUsd);
   const redeemable = safeBigInt(uData?.redeemableAssets ?? "0");
   if (redeemable > 0n && price <= 0n && pos <= 0n) return "--";
-  return `$${formatUsd(uData?.positionUsd || "0")}`;
+  return `$${formatUsd(positionUsd)}`;
 };
 
 const formatTokenAmount = (value: string): string => {

@@ -68,6 +68,7 @@ const HistoryChart = ({
   loading,
   valueFormatter,
   tickFormatter,
+  performance,
 }: {
   title: string;
   value: string;
@@ -76,13 +77,26 @@ const HistoryChart = ({
   loading: boolean;
   valueFormatter: (value: number) => string;
   tickFormatter: (value: number) => string;
+  performance?: { label: string; value: string }[];
 }) => (
   <Card className="border border-border/70">
     <CardContent className="pt-4 space-y-4">
-      <div>
-        <p className="text-xs text-muted-foreground">{title}</p>
-        <p className="mt-1 text-2xl font-semibold">{loading ? "..." : value}</p>
-        <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs text-muted-foreground">{title}</p>
+          <p className="mt-1 text-2xl font-semibold">{loading ? "..." : value}</p>
+          <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+        </div>
+        {performance && (
+          <div className="flex gap-2">
+            {performance.map((item) => (
+              <div key={item.label} className="min-w-16 rounded-md border border-border/60 bg-muted/30 px-2.5 py-1.5 text-right">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{item.label}</p>
+                <p className="text-xs font-semibold text-foreground">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className="h-[220px] w-full">
         {data.length > 1 ? (
@@ -187,15 +201,9 @@ export const YieldVaultHistoryCharts = ({
 
   return (
     <section className="rounded-lg border border-border/70 bg-background/60 p-3 md:p-4 space-y-3">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold">Vault Performance</h2>
-          <p className="text-xs text-muted-foreground">Historical vault price and TVL</p>
-        </div>
-        <div className="flex gap-4 text-xs text-muted-foreground">
-          <span>30D {formatPerformance(getPerformance(exchangeData, 30))}</span>
-          <span>All {formatPerformance(getPerformance(exchangeData))}</span>
-        </div>
+      <div>
+        <h2 className="text-sm font-semibold">Vault Performance</h2>
+        <p className="text-xs text-muted-foreground">Historical vault price and TVL</p>
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <HistoryChart
@@ -206,6 +214,10 @@ export const YieldVaultHistoryCharts = ({
           loading={loading}
           valueFormatter={(value) => `${value.toFixed(6)} ${assetSymbol}`}
           tickFormatter={(value) => value.toFixed(4)}
+          performance={[
+            { label: "30D", value: formatPerformance(getPerformance(exchangeData, 30)) },
+            { label: "All time", value: formatPerformance(getPerformance(exchangeData)) },
+          ]}
         />
         <HistoryChart
           title="TVL"
