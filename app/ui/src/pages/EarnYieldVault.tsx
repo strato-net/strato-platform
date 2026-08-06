@@ -187,11 +187,7 @@ const EarnYieldVault = () => {
   const effectiveInfo = userInfo || vaultInfo;
   const isFundedVault = Boolean(effectiveInfo?.accrualInitialized);
 
-  const loadHistory = useCallback(async () => {
-    if (!isFundedVault) {
-      setHistory([]);
-      return;
-    }
+  const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
       const { data } = await api.get<YieldVaultHistoryPoint[]>(
@@ -203,11 +199,19 @@ const EarnYieldVault = () => {
     } finally {
       setHistoryLoading(false);
     }
-  }, [isFundedVault, vaultKey]);
+  }, [vaultKey]);
 
   useEffect(() => {
-    void loadHistory();
-  }, [loadHistory]);
+    void fetchHistory();
+  }, [fetchHistory]);
+
+  const loadHistory = useCallback(async () => {
+    if (!isFundedVault) {
+      setHistory([]);
+      return;
+    }
+    await fetchHistory();
+  }, [fetchHistory, isFundedVault]);
 
   useEffect(() => {
     if (meta) {
