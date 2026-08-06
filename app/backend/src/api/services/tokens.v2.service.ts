@@ -96,7 +96,9 @@ const buildYieldVaultEarningAsset = (
   const totalBalance = balance;
   let value = "0.00";
   if (userInfo) {
-    const positionUsd = BigInt(userInfo.positionUsd || "0");
+    const positionUsd = BigInt(
+      userInfo.projectedPositionUsd || userInfo.positionUsd || "0"
+    );
     const assetPrice = BigInt(info.assetPriceWad || "0");
     const unit = BigInt(10) ** BigInt(info.decimals || 18);
     const claimableUsd = assetPrice > 0n ? (BigInt(userInfo.claimableAssets || "0") * assetPrice) / unit : 0n;
@@ -119,11 +121,15 @@ const buildYieldVaultEarningAsset = (
     balance,
     images: [],
     attributes: [],
-    price: ((BigInt(info.exchangeRate || "0") * BigInt(info.assetPriceWad || "0")) / BigInt(1e18)).toString(),
+    price: (
+      (BigInt(info.projectedExchangeRate || info.exchangeRate || "0") *
+        BigInt(info.assetPriceWad || "0")) /
+      BigInt(1e18)
+    ).toString(),
     collateralBalance: "0",
     totalBalance,
     value,
-    apy: info.apy || "0",
+    apy: info.accrualInitialized ? info.fundedApy : info.apy || "0",
   };
 };
 

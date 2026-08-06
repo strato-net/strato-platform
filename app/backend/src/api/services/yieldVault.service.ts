@@ -12,12 +12,14 @@ import {
 import { getServiceToken } from "../../utils/authHelper";
 import { getOraclePrices } from "./oracle.service";
 import {
+  computePerSecondRateApy,
   getYieldWindowBounds,
   getYieldExchangeRateRowsCached,
   indexYieldHistoryRows,
   mergeBackfillRows,
   computeExchangeRateAPY,
 } from "../helpers/earnYield.helper";
+import { getHistoryParams } from "../helpers/history.helper";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 import { FunctionInput } from "../../types/types";
 
@@ -103,11 +105,18 @@ export interface YieldVaultInfo {
   deployedAssets: string;
   totalShares: string;
   exchangeRate: string;
+  projectedActiveAssets: string;
+  projectedExchangeRate: string;
   /** Oracle USD price (WAD) per 1 full underlying token. */
   assetPriceWad: string;
   /** Vault TVL in USD (WAD): (idle + deployed underlying) × assetPriceWad / 10^decimals. */
   tvlUsd: string;
+  projectedTvlUsd: string;
   apy: string;
+  accrualInitialized: boolean;
+  fundedApy: string;
+  pendingAccrual: string;
+  pendingAccrualTarget: string;
   paused: boolean;
   minIdleBps: string;
   totalQueuedShares: string;
@@ -116,6 +125,14 @@ export interface YieldVaultInfo {
   maxDeploy: string;
   minIdleRequirement: string;
   deployBlockedReason: string | null;
+}
+
+export interface YieldVaultHistoryPoint {
+  timestamp: number;
+  exchangeRate: string;
+  totalAssets: string;
+  tvlUsd: string;
+  totalShares: string;
 }
 
 export interface YieldVaultPendingWithdrawal {
@@ -221,8 +238,10 @@ export interface YieldVaultUserInfo extends YieldVaultInfo {
   walletAssets: string;
   userShares: string;
   redeemableAssets: string;
+  projectedRedeemableAssets: string;
   /** User NAV in USD (WAD): ERC4626 underlying claim for userShares × oracle / 10^decimals. */
   positionUsd: string;
+  projectedPositionUsd: string;
   maxDeposit: string;
   maxRedeem: string;
   maxWithdraw: string;
@@ -251,6 +270,9 @@ const parseBigIntLike = (value: unknown): bigint => {
   }
 };
 
+const parseBooleanLike = (value: unknown): boolean =>
+  value === true || String(value).trim().toLowerCase() === "true";
+
 const normalizeAddress = (value: string | undefined | null): string =>
   (value || "").toLowerCase().replace(/^0x/, "");
 
@@ -265,6 +287,46 @@ const getActiveAssets = (totalAssets: bigint, totalClaimableAssets: bigint): big
 
 const getFreeIdleAssets = (idleAssets: bigint, totalClaimableAssets: bigint): bigint =>
   idleAssets > totalClaimableAssets ? idleAssets - totalClaimableAssets : 0n;
+
+const minBigInt = (...values: bigint[]): bigint =>
+  values.reduce((min, value) => value < min ? value : min);
+
+const isZeroAddress = (value: string | undefined | null): boolean => {
+  const normalized = normalizeAddress(value);
+  return !normalized || /^0+$/.test(normalized);
+};
+
+const rpowAccrual = (x: bigint, n: bigint, base: bigint): bigint => {
+  if (x === 0n) return n === 0n ? base : 0n;
+
+  let z = n % 2n === 0n ? base : x;
+  const half = base / 2n;
+  for (n /= 2n; n > 0n; n /= 2n) {
+    x = ((x * x) + half) / base;
+    if (n % 2n === 1n) {
+      z = ((z * x) + half) / base;
+    }
+  }
+  return z;
+};
+
+const parseCirrusTimestamp = (value: string | undefined | null): number => {
+  if (!value) return 0;
+  const hasTimezone = /(?:z|[+-]\d{2}:?\d{2})$/i.test(value);
+  const parsed = Date.parse(hasTimezone ? value : `${value}Z`);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const isHistoricalRowActive = (
+  row: { valid_from?: string; valid_to?: string },
+  timestamp: number
+): boolean => {
+  const validFrom = parseCirrusTimestamp(row.valid_from);
+  const validTo = row.valid_to === "infinity"
+    ? Number.MAX_SAFE_INTEGER
+    : parseCirrusTimestamp(row.valid_to);
+  return validFrom <= timestamp && timestamp <= validTo;
+};
 
 const previewRedeemAssets = (shares: bigint, totalAssets: bigint, totalShares: bigint): bigint => {
   if (shares <= 0n) return 0n;
@@ -325,9 +387,16 @@ function emptyInfo(def: YieldVaultDef | null, key: string): YieldVaultInfo {
     deployedAssets: "0",
     totalShares: "0",
     exchangeRate: WAD.toString(),
+    projectedActiveAssets: "0",
+    projectedExchangeRate: WAD.toString(),
     assetPriceWad: "0",
     tvlUsd: "0",
+    projectedTvlUsd: "0",
     apy: "-",
+    accrualInitialized: false,
+    fundedApy: "0.00",
+    pendingAccrual: "0",
+    pendingAccrualTarget: "0",
     paused: false,
     minIdleBps: "0",
     totalQueuedShares: "0",
@@ -345,7 +414,9 @@ function emptyUserInfo(def: YieldVaultDef | null, key: string): YieldVaultUserIn
     walletAssets: "0",
     userShares: "0",
     redeemableAssets: "0",
+    projectedRedeemableAssets: "0",
     positionUsd: "0",
+    projectedPositionUsd: "0",
     maxDeposit: "0",
     maxRedeem: "0",
     maxWithdraw: "0",
@@ -359,14 +430,24 @@ const getVaultState = async (
   serviceToken: string,
   vaultAddress: string
 ): Promise<Record<string, any> | null> => {
-  const { data } = await cirrus.get(serviceToken, `/${YieldVault}`, {
-    params: {
-      address: `eq.${vaultAddress}`,
-      select:
-        "address,_asset,_totalSupply::text,_symbol,_name,_paused,vaultInitialized,deployedAssets::text,_underlyingDecimals,minIdleBps::text,totalQueuedShares::text,totalClaimableAssets::text",
-    },
-  });
-  return data?.[0] || null;
+  const [{ data }, storageResponse] = await Promise.all([
+    cirrus.get(serviceToken, `/${YieldVault}`, {
+      params: {
+        address: `eq.${vaultAddress}`,
+        select:
+          "address,_asset,_totalSupply::text,_symbol,_name,_paused,vaultInitialized,deployedAssets::text,_underlyingDecimals,minIdleBps::text,totalQueuedShares::text,totalClaimableAssets::text",
+      },
+    }),
+    cirrus.get(serviceToken, "/storage", {
+      params: {
+        address: `eq.${vaultAddress}`,
+        select:
+          "data->>accrualInitialized,data->>accrualBaseAssets,data->>perSecondSavingsRate,data->>lastAccrual,data->>rewardDistributor",
+        limit: "1",
+      },
+    }).catch(() => ({ data: [] })),
+  ]);
+  return data?.[0] ? { ...data[0], ...storageResponse.data?.[0] } : null;
 };
 
 const getAssetBalance = async (
@@ -382,6 +463,73 @@ const getAssetBalance = async (
     },
   });
   return data?.[0]?.value || "0";
+};
+
+const getTokenAllowance = async (
+  accessToken: string,
+  tokenAddress: string,
+  ownerAddress: string,
+  spenderAddress: string
+): Promise<string> => {
+  const { data } = await cirrus.get(accessToken, `/${Token}-_allowances`, {
+    params: {
+      address: `eq.${tokenAddress}`,
+      key: `eq.${ownerAddress}`,
+      key2: `eq.${spenderAddress}`,
+      select: "value::text",
+      limit: "1",
+    },
+  });
+  return data?.[0]?.value || "0";
+};
+
+const getPendingAccrual = async (
+  accessToken: string,
+  vaultState: Record<string, any>,
+  vaultAddress: string,
+  assetAddress: string,
+  totalShares: bigint
+): Promise<{ targetAmount: bigint; fundedAmount: bigint }> => {
+  const accrualInitialized = parseBooleanLike(vaultState.accrualInitialized);
+  const accrualBaseAssets = parseBigIntLike(vaultState.accrualBaseAssets);
+  const perSecondSavingsRate = parseBigIntLike(vaultState.perSecondSavingsRate);
+  const lastAccrual = parseBigIntLike(vaultState.lastAccrual);
+  const rewardDistributor = String(vaultState.rewardDistributor || "");
+  const nowSec = BigInt(Math.floor(Date.now() / 1000));
+
+  if (
+    !accrualInitialized ||
+    totalShares <= 0n ||
+    accrualBaseAssets <= 0n ||
+    perSecondSavingsRate <= RAY ||
+    nowSec <= lastAccrual ||
+    isZeroAddress(rewardDistributor)
+  ) {
+    return { targetAmount: 0n, fundedAmount: 0n };
+  }
+
+  const growthFactor = rpowAccrual(perSecondSavingsRate, nowSec - lastAccrual, RAY);
+  const targetAmount = (accrualBaseAssets * (growthFactor - RAY)) / RAY;
+  if (targetAmount <= 0n) {
+    return { targetAmount: 0n, fundedAmount: 0n };
+  }
+
+  try {
+    const [balance, allowance] = await Promise.all([
+      getAssetBalance(accessToken, assetAddress, rewardDistributor),
+      getTokenAllowance(accessToken, assetAddress, rewardDistributor, vaultAddress),
+    ]);
+    return {
+      targetAmount,
+      fundedAmount: minBigInt(
+        targetAmount,
+        parseBigIntLike(balance),
+        parseBigIntLike(allowance)
+      ),
+    };
+  } catch {
+    return { targetAmount, fundedAmount: 0n };
+  }
 };
 
 const getShareBalance = async (
@@ -1372,8 +1520,18 @@ export const getYieldVaultInfo = async (
   const activeAssets = getActiveAssets(totalAssets, totalClaimableAssets);
   const freeIdleAssets = getFreeIdleAssets(idleAssets, totalClaimableAssets);
   const totalShares = parseBigIntLike(vaultState._totalSupply);
+  const accrualInitialized = parseBooleanLike(vaultState.accrualInitialized);
+  const pendingAccrual = await getPendingAccrual(
+    serviceToken,
+    vaultState,
+    def.address,
+    assetAddress,
+    totalShares
+  );
+  const projectedActiveAssets = activeAssets + pendingAccrual.fundedAmount;
   const decimals = Number(vaultState._underlyingDecimals ?? 18);
   const exchangeRate = getExchangeRate(activeAssets, totalShares);
+  const projectedExchangeRate = getExchangeRate(projectedActiveAssets, totalShares);
   const minIdleBps = parseBigIntLike(vaultState.minIdleBps);
   const totalQueuedShares = parseBigIntLike(vaultState.totalQueuedShares);
   const minIdleRequirement =
@@ -1420,8 +1578,18 @@ export const getYieldVaultInfo = async (
     apyCtx
   ).catch(() => [] as YieldVaultStrategyHolding[]);
 
-  const tvlUsd = underlyingUsdWad(idleAssets + deployedAssets, assetPrice, decimals);
-  const apy = await computeApy(serviceToken, def.address, assetAddress, activeAssets, totalShares);
+  const tvlUsd = underlyingUsdWad(totalAssets, assetPrice, decimals);
+  const projectedTvlUsd = underlyingUsdWad(
+    totalAssets + pendingAccrual.fundedAmount,
+    assetPrice,
+    decimals
+  );
+  const apy = accrualInitialized
+    ? "-"
+    : await computeApy(serviceToken, def.address, assetAddress, activeAssets, totalShares);
+  const fundedApy = accrualInitialized
+    ? computePerSecondRateApy(String(vaultState.perSecondSavingsRate || "0"))
+    : "0.00";
 
   return {
     key,
@@ -1438,9 +1606,16 @@ export const getYieldVaultInfo = async (
     deployedAssets: deployedAssets.toString(),
     totalShares: totalShares.toString(),
     exchangeRate: exchangeRate.toString(),
+    projectedActiveAssets: projectedActiveAssets.toString(),
+    projectedExchangeRate: projectedExchangeRate.toString(),
     assetPriceWad: assetPrice.toString(),
     tvlUsd: tvlUsd.toString(),
+    projectedTvlUsd: projectedTvlUsd.toString(),
     apy,
+    accrualInitialized,
+    fundedApy,
+    pendingAccrual: pendingAccrual.fundedAmount.toString(),
+    pendingAccrualTarget: pendingAccrual.targetAmount.toString(),
     paused: Boolean(vaultState._paused),
     minIdleBps: String(vaultState.minIdleBps || "0"),
     totalQueuedShares: String(vaultState.totalQueuedShares || "0"),
@@ -1450,6 +1625,105 @@ export const getYieldVaultInfo = async (
     minIdleRequirement: minIdleRequirement.toString(),
     deployBlockedReason,
   };
+};
+
+export const getYieldVaultHistory = async (
+  _accessToken: string,
+  key: string,
+  duration = "all",
+  end?: string
+): Promise<YieldVaultHistoryPoint[]> => {
+  const def = resolveVaultDef(key);
+  if (!def?.address) return [];
+
+  const serviceToken = await getServiceToken();
+  const vaultState = await getVaultState(serviceToken, def.address);
+  if (!vaultState?.vaultInitialized || !vaultState._asset) return [];
+
+  const assetAddress = String(vaultState._asset);
+  const decimals = Number(vaultState._underlyingDecimals ?? 18);
+  const params = getHistoryParams(duration, end, 90);
+  const startTime = new Date(
+    params.endTimestamp - params.interval * params.numTicks
+  ).toISOString();
+  const endTime = new Date(params.endTimestamp).toISOString();
+
+  const [storageRes, balanceRes, priceRes] = await Promise.all([
+    cirrus.get(serviceToken, "/history@storage", {
+      params: {
+        address: `eq.${def.address}`,
+        valid_from: `lte.${endTime}`,
+        valid_to: `gte.${startTime}`,
+        select: "data,valid_from,valid_to",
+      },
+    }),
+    cirrus.get(serviceToken, "/history@mapping", {
+      params: {
+        address: `eq.${assetAddress}`,
+        collection_name: "eq._balances",
+        "key->>key": `eq.${def.address}`,
+        valid_from: `lte.${endTime}`,
+        valid_to: `gte.${startTime}`,
+        select: "value::text,valid_from,valid_to",
+      },
+    }),
+    cirrus.get(serviceToken, "/history@mapping", {
+      params: {
+        address: `eq.${priceOracle}`,
+        collection_name: "eq.prices",
+        "key->>key": `eq.${assetAddress}`,
+        valid_from: `lte.${endTime}`,
+        valid_to: `gte.${startTime}`,
+        select: "value::text,valid_from,valid_to",
+      },
+    }),
+  ]);
+
+  const storageRows = Array.isArray(storageRes.data) ? storageRes.data : [];
+  const balanceRows = Array.isArray(balanceRes.data) ? balanceRes.data : [];
+  const priceRows = Array.isArray(priceRes.data) ? priceRes.data : [];
+  const points: YieldVaultHistoryPoint[] = [];
+
+  for (let i = 0; i <= params.numTicks; i += 1) {
+    const timestamp =
+      params.endTimestamp - params.interval * (params.numTicks - i);
+    const storage = storageRows.find((row: any) =>
+      isHistoricalRowActive(row, timestamp)
+    );
+    if (!storage?.data) continue;
+
+    const balance = balanceRows.find((row: any) =>
+      isHistoricalRowActive(row, timestamp)
+    );
+    const price = priceRows.find((row: any) =>
+      isHistoricalRowActive(row, timestamp)
+    );
+    const idleAssets = parseBigIntLike(balance?.value);
+    const deployedAssets = parseBigIntLike(storage.data.deployedAssets);
+    const totalAssets = idleAssets + deployedAssets;
+    const activeAssets = getActiveAssets(
+      totalAssets,
+      parseBigIntLike(storage.data.totalClaimableAssets)
+    );
+    const totalShares = parseBigIntLike(storage.data._totalSupply);
+    const exchangeRate = getExchangeRate(activeAssets, totalShares);
+
+    if (totalShares <= 0n || exchangeRate <= 0n) continue;
+
+    points.push({
+      timestamp,
+      exchangeRate: exchangeRate.toString(),
+      totalAssets: totalAssets.toString(),
+      tvlUsd: underlyingUsdWad(
+        totalAssets,
+        parseBigIntLike(price?.value),
+        decimals
+      ).toString(),
+      totalShares: totalShares.toString(),
+    });
+  }
+
+  return points;
 };
 
 export const getYieldVaultUserInfo = async (
@@ -1474,6 +1748,7 @@ export const getYieldVaultUserInfo = async (
   const totalQueuedShares = parseBigIntLike(info.totalQueuedShares);
   const totalClaimableAssets = parseBigIntLike(info.totalClaimableAssets);
   const activeAssets = getActiveAssets(totalAssets, totalClaimableAssets);
+  const projectedActiveAssets = parseBigIntLike(info.projectedActiveAssets);
   const freeIdleAssets = getFreeIdleAssets(idleAssets, totalClaimableAssets);
 
   const [claimableAssetsRaw, activeRequestIdRaw] = await Promise.all([
@@ -1482,6 +1757,11 @@ export const getYieldVaultUserInfo = async (
   ]);
 
   const redeemableAssets = previewRedeemAssets(userShares, activeAssets, totalShares);
+  const projectedRedeemableAssets = previewRedeemAssets(
+    userShares,
+    projectedActiveAssets,
+    totalShares
+  );
   const idleShares = totalQueuedShares > 0n ? 0n : previewRedeemShares(freeIdleAssets, activeAssets, totalShares);
   const maxRedeem = userShares < idleShares ? userShares : idleShares;
   const maxWithdraw = totalQueuedShares > 0n
@@ -1492,6 +1772,11 @@ export const getYieldVaultUserInfo = async (
 
   const assetPrice = parseBigIntLike(info.assetPriceWad);
   const positionUsd = underlyingUsdWad(redeemableAssets, assetPrice, info.decimals);
+  const projectedPositionUsd = underlyingUsdWad(
+    projectedRedeemableAssets,
+    assetPrice,
+    info.decimals
+  );
 
   let pendingWithdrawal: YieldVaultPendingWithdrawal | null = null;
   if (activeRequestId > 0n) {
@@ -1514,7 +1799,9 @@ export const getYieldVaultUserInfo = async (
     walletAssets: walletAssets.toString(),
     userShares: userShares.toString(),
     redeemableAssets: redeemableAssets.toString(),
+    projectedRedeemableAssets: projectedRedeemableAssets.toString(),
     positionUsd: positionUsd.toString(),
+    projectedPositionUsd: projectedPositionUsd.toString(),
     maxDeposit: walletAssets.toString(),
     maxRedeem: maxRedeem.toString(),
     maxWithdraw: maxWithdraw.toString(),
