@@ -181,7 +181,10 @@ data BlocSimulateResult = BlocSimulateResult
     blocsimulateTrace :: Maybe Value,
     -- | For a `castVoteOnIssue` call, the independently-simulated effect the
     -- issue would have if the vote reached its threshold now: `target.func(args)`
-    -- executed as the registry/wallet. Nothing for any other call.
+    -- executed as the registry/wallet. When the effect is itself a
+    -- `castVoteOnIssue` — a vote wrapped through nested multisigs — this chains
+    -- recursively (depth-capped), one result per hop, ending at the ultimate
+    -- action. Nothing for any other call.
     blocsimulateEffect :: Maybe BlocSimulateResult
   }
   deriving (Eq, Show, Generic)

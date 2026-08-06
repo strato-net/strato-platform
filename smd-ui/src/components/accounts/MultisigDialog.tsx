@@ -55,7 +55,9 @@ import {
   useOpenIssues,
   useExecutedIssues,
   useMultisigActions,
-  buildCastVotePayload,
+  useParentMultisigs,
+  buildNestedCastVotePayload,
+  multisigDisplayName,
   votesNeeded,
   strip0x,
   isZeroAddr,
@@ -107,9 +109,47 @@ function describeIssue(func: string, args: string[]): { label: string; canonical
       };
     case "callContract":
       return { label: `Call ${shortenHex(a0, 6, 4)}·${args[1] ?? ""}`, canonical: args };
+    case "castVoteOnIssue": {
+      // A vote wrapped for another multisig: args = [target, func, …inner args].
+      const inner = describeIssue(args[1] ?? "", args.slice(2));
+      return {
+        label: `Vote in ${shortenHex(a0, 6, 4)}: ${inner.label}`,
+        canonical: [strip0x(a0), args[1] ?? "", ...inner.canonical],
+      };
+    }
     default:
       return { label: func || "(unknown)", canonical: args };
   }
+}
+
+/** Short display name for a hop in a nested-vote route. */
+function hopName(w: UserWallet): string {
+  return multisigDisplayName(w) || shortenHex(w.address, 4, 4);
+}
+
+/**
+ * Panel headings for the simulated effect chain of a vote travelling `route`
+ * (ending at the wallet whose issue is voted on): one heading per intermediate
+ * vote hop, then one for the ultimate issue's action. When the issue itself is
+ * a wrapped vote (castVoteOnIssue), each wrapper layer adds another hop.
+ */
+function effectChainTitles(route: UserWallet[], issueFunc?: string, issueArgs?: string[]): string[] {
+  const titles: string[] = [];
+  for (let i = 1; i < route.length; i++) {
+    titles.push(`Vote by ${hopName(route[i - 1])} in ${hopName(route[i])}`);
+  }
+  let prev = hopName(route[route.length - 1]);
+  let f = issueFunc ?? "";
+  let a = issueArgs ?? [];
+  while (f === "castVoteOnIssue" && a.length >= 2) {
+    const next = shortenHex(a[0] ?? "", 4, 4);
+    titles.push(`Vote by ${prev} in ${next}`);
+    prev = next;
+    f = a[1] ?? "";
+    a = a.slice(2);
+  }
+  titles.push(titles.length > 0 ? "Final effect (if every threshold passes)" : "Effect if executed");
+  return titles;
 }
 
 type TokenMeta = { symbol: string; decimals: number };
@@ -167,9 +207,22 @@ function labelForIssue(
 /* Dialog shell                                                                       */
 /* --------------------------------------------------------------------------------- */
 
-export function MultisigDialog({ wallet }: { wallet: UserWallet }) {
+export function MultisigDialog({
+  wallet,
+  route,
+}: {
+  wallet: UserWallet;
+  /**
+   * Nested-membership route ending at `wallet` (from useNestedMultisigs): the
+   * connected account signs route[0] directly and each hop is a signer on the
+   * next. When present, votes in this dialog travel the route as wrapped
+   * castVoteOnIssue issues instead of being cast directly.
+   */
+  route?: UserWallet[];
+}) {
   const [open, setOpen] = useState(false);
   const { isMultisig, fullyEnabled, isLoading } = useIsMultisig(open ? wallet.address : null);
+  const nested = !!route && route.length > 1;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -182,22 +235,35 @@ export function MultisigDialog({ wallet }: { wallet: UserWallet }) {
       <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            Multisig — {wallet.username || "User"}
+            Multisig — {multisigDisplayName(wallet) || "User"}
             {fullyEnabled ? (
               <Badge variant="secondary" className="gap-1">
                 <ShieldCheck className="h-3 w-3" /> Enabled
               </Badge>
             ) : null}
+            {nested ? (
+              <Badge variant="outline" className="gap-1">
+                Nested
+              </Badge>
+            ) : null}
           </DialogTitle>
           <DialogDescription>
-            Turn this User wallet into a Safe-style multisig governed by signer votes.
+            {nested
+              ? `You vote here through your membership chain: you → ${route!
+                  .map(hopName)
+                  .join(" → ")}. Each multisig on the way must pass its own vote.`
+              : "Turn this User wallet into a Safe-style multisig governed by signer votes."}
           </DialogDescription>
         </DialogHeader>
 
         {isLoading ? (
           <p className="py-8 text-center text-sm text-muted-foreground">Loading wallet state…</p>
-        ) : fullyEnabled ? (
-          <EnabledView wallet={wallet} />
+        ) : fullyEnabled || (nested && isMultisig) ? (
+          <EnabledView wallet={wallet} route={nested ? route : undefined} />
+        ) : nested ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            This multisig isn't fully enabled yet, so nested voting is unavailable.
+          </p>
         ) : (
           <EnablePanel wallet={wallet} partiallyEnabled={isMultisig} />
         )}
@@ -361,9 +427,17 @@ function EnablePanel({
 /* Enabled view                                                                       */
 /* --------------------------------------------------------------------------------- */
 
-function EnabledView({ wallet }: { wallet: UserWallet }) {
+function EnabledView({ wallet, route }: { wallet: UserWallet; route?: UserWallet[] }) {
+  // Normalized voting route: always ends at this wallet; a single entry means
+  // the connected account votes here directly.
+  const fullRoute = useMemo(
+    () => (route && route.length > 1 ? route : [wallet]),
+    [route, wallet]
+  );
   return (
-    <Tabs defaultValue="treasury" className="mt-1">
+    <>
+      <MemberOfPanel fullRoute={fullRoute} />
+      <Tabs defaultValue={fullRoute.length > 1 ? "issues" : "treasury"} className="mt-1">
       <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="treasury">Treasury</TabsTrigger>
         <TabsTrigger value="signers">Signers</TabsTrigger>
@@ -371,18 +445,62 @@ function EnabledView({ wallet }: { wallet: UserWallet }) {
         <TabsTrigger value="history">History</TabsTrigger>
       </TabsList>
       <TabsContent value="treasury" className="mt-4">
-        <TreasuryTab wallet={wallet} />
+        <TreasuryTab wallet={wallet} fullRoute={fullRoute} />
       </TabsContent>
       <TabsContent value="signers" className="mt-4">
-        <SignersTab wallet={wallet} />
+        <SignersTab wallet={wallet} fullRoute={fullRoute} />
       </TabsContent>
       <TabsContent value="issues" className="mt-4">
-        <IssuesTab wallet={wallet} />
+        <IssuesTab wallet={wallet} fullRoute={fullRoute} />
       </TabsContent>
       <TabsContent value="history" className="mt-4">
         <HistoryTab wallet={wallet} />
       </TabsContent>
-    </Tabs>
+      </Tabs>
+    </>
+  );
+}
+
+/**
+ * Multisigs this wallet is itself a signer on. Each row opens the parent's
+ * dialog with the membership route extended by one hop, so votes cast there
+ * travel through this wallet (this wallet's vote, not your personal one).
+ */
+function MemberOfPanel({ fullRoute }: { fullRoute: UserWallet[] }) {
+  const wallet = fullRoute[fullRoute.length - 1];
+  const { data: parents = [] } = useParentMultisigs(wallet.address);
+  // Don't offer hops back into the current route (mutual memberships).
+  const usable = parents.filter((p) => !fullRoute.some((w) => eq(w.address, p.address)));
+  if (usable.length === 0) return null;
+  return (
+    <div className="mb-2 rounded-lg border border-border p-3">
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <Users className="h-3.5 w-3.5 text-muted-foreground" />
+        Signer on other multisigs
+      </div>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        This multisig's vote counts in the multisigs below. Open one to vote there through{" "}
+        {hopName(wallet)} — that casts {hopName(wallet)}'s vote, not your personal one.
+      </p>
+      <div className="mt-2 space-y-1.5">
+        {usable.map((p) => (
+          <div
+            key={p.address}
+            className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
+          >
+            <span className="text-sm font-medium">
+              {multisigDisplayName(p) || shortenHex(p.address, 6, 4)}
+            </span>
+            <span className="font-mono text-[11px] text-muted-foreground">
+              {shortenHex(p.address, 6, 4)}
+            </span>
+            <div className="ml-auto">
+              <MultisigDialog wallet={p} route={[...fullRoute, p]} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -390,18 +508,22 @@ function EnabledView({ wallet }: { wallet: UserWallet }) {
 /* Signers tab                                                                        */
 /* --------------------------------------------------------------------------------- */
 
-function SignersTab({ wallet }: { wallet: UserWallet }) {
+function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserWallet[] }) {
   const { userAddress } = useUser();
   const { canSubmit } = useSubmitTransaction();
   const queryClient = useQueryClient();
   const { config } = useIsMultisig(wallet.address);
   const { data: signers = [] } = useSigners(wallet.address);
+  const nested = fullRoute.length > 1;
   const { addSigner, removeSigner, setDefaultThreshold } = useMultisigActions({
     walletAddress: wallet.address,
+    route: fullRoute.map((w) => w.address),
   });
 
   const me = strip0x(userAddress ?? "");
   const iAmSigner = signers.some((s) => eq(s, me));
+  // A nested member proposes/votes through their membership chain.
+  const canVote = iAmSigner || nested;
   const signerCount = signers.length;
   const needed = votesNeeded(signerCount, config.defaultThresholdBps || 6000);
 
@@ -419,8 +541,8 @@ function SignersTab({ wallet }: { wallet: UserWallet }) {
   };
 
   const guard = () => {
-    if (!iAmSigner) {
-      toast.error("Only a signer can propose changes");
+    if (!canVote) {
+      toast.error("Only a signer (or nested member) can propose changes");
       return false;
     }
     return true;
@@ -491,7 +613,16 @@ function SignersTab({ wallet }: { wallet: UserWallet }) {
 
   return (
     <div className="space-y-5">
-      {!iAmSigner ? (
+      {!iAmSigner && nested ? (
+        <Alert>
+          <Users className="h-4 w-4" />
+          <AlertDescription>
+            You aren't a direct signer here. Proposals you make travel through{" "}
+            {fullRoute.slice(0, -1).map(hopName).join(" → ")} and land here once each
+            multisig on the way passes its own vote.
+          </AlertDescription>
+        </Alert>
+      ) : !iAmSigner ? (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
@@ -524,7 +655,7 @@ function SignersTab({ wallet }: { wallet: UserWallet }) {
             size="sm"
             variant="outline"
             onClick={doThreshold}
-            disabled={busy !== "" || !canSubmit || !iAmSigner || selectedM === needed}
+            disabled={busy !== "" || !canSubmit || !canVote || selectedM === needed}
             className="ml-auto"
           >
             {busy === "threshold" ? "Voting…" : "Propose change"}
@@ -554,7 +685,7 @@ function SignersTab({ wallet }: { wallet: UserWallet }) {
                 variant="ghost"
                 size="sm"
                 onClick={() => doRemove(s)}
-                disabled={busy !== "" || !canSubmit || !iAmSigner || signers.length <= 1}
+                disabled={busy !== "" || !canSubmit || !canVote || signers.length <= 1}
                 className="ml-auto text-destructive hover:text-destructive"
               >
                 {busy === s ? "Voting…" : "Remove"}
@@ -582,7 +713,7 @@ function SignersTab({ wallet }: { wallet: UserWallet }) {
             placeholder="0x… address or username"
             className="font-mono text-xs"
           />
-          <Button onClick={doAdd} disabled={busy !== "" || !canSubmit || !iAmSigner || !newSigner.trim()}>
+          <Button onClick={doAdd} disabled={busy !== "" || !canSubmit || !canVote || !newSigner.trim()}>
             {busy === "add" ? "Voting…" : "Propose"}
           </Button>
         </div>
@@ -599,7 +730,7 @@ function SignersTab({ wallet }: { wallet: UserWallet }) {
 /* Issues tab                                                                         */
 /* --------------------------------------------------------------------------------- */
 
-function IssuesTab({ wallet }: { wallet: UserWallet }) {
+function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserWallet[] }) {
   const { userAddress } = useUser();
   const { canSubmit } = useSubmitTransaction();
   const queryClient = useQueryClient();
@@ -607,6 +738,8 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
   const { data: signers = [] } = useSigners(wallet.address);
   const { data: issues = [], isLoading } = useOpenIssues(wallet.address);
   const tokenMeta = useTokenMeta(wallet.address);
+  const nested = fullRoute.length > 1;
+  const routeAddrs = fullRoute.map((w) => w.address);
   const {
     castVote,
     addSigner,
@@ -615,10 +748,17 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
     setDefaultThreshold,
     dismissIssue,
     proposeTransfer,
-  } = useMultisigActions({ walletAddress: wallet.address });
+  } = useMultisigActions({ walletAddress: wallet.address, route: routeAddrs });
+  const issueSim = useSimulation();
+  const [simFor, setSimFor] = useState<string>("");
 
   const me = strip0x(userAddress ?? "");
   const iAmSigner = signers.some((s) => eq(s, me));
+  const canVote = iAmSigner || nested;
+  // The identity whose vote lands on this wallet's issues: you when voting
+  // directly, otherwise the last multisig on the route before this wallet.
+  const voterAddr = nested ? strip0x(fullRoute[fullRoute.length - 2].address) : me;
+  const viaName = nested ? hopName(fullRoute[0]) : "";
   const needed = votesNeeded(signers.length, config.defaultThresholdBps || 6000);
   const [busy, setBusy] = useState<string>("");
   const [proposing, setProposing] = useState(false);
@@ -627,44 +767,67 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
     queryClient.invalidateQueries({ queryKey: ["multisig-open-issues", wallet.address] });
     queryClient.invalidateQueries({ queryKey: ["multisig-signers", wallet.address] });
     queryClient.invalidateQueries({ queryKey: ["multisig-config", wallet.address] });
+    if (nested)
+      queryClient.invalidateQueries({ queryKey: ["multisig-open-issues", fullRoute[0].address] });
   };
 
   const vote = async (issue: OpenIssue) => {
-    if (!iAmSigner) {
-      toast.error("Only a signer can vote");
+    if (!canVote) {
+      toast.error("Only a signer (or nested member) can vote");
       return;
     }
     const { canonical } = describeIssue(issue.func, issue.args);
     setBusy(issue.issueId);
     try {
-      // Re-cast through the same call path that created the issue so the issueId
-      // (keccak of target/func/args) matches and the vote lands on the same issue.
-      switch (issue.func) {
-        case "_addAdmin":
-          await addSigner(issue.args[0] ?? "");
-          break;
-        case "_removeAdmin":
-          await removeSigner(issue.args[0] ?? "");
-          break;
-        case "_swapAdmin":
-          await swapSigner(issue.args[0] ?? "", issue.args[1] ?? "");
-          break;
-        case "setDefaultVotingThresholdBps":
-          await setDefaultThreshold(Number(issue.args[0] ?? 0));
-          break;
-        case "transfer":
-          await proposeTransfer(issue.target, issue.args[0] ?? "", String(issue.args[1] ?? "0"));
-          break;
-        default:
-          await castVote(issue.func, canonical, issue.target);
+      if (nested) {
+        // A nested vote always goes through castVoteOnIssue with the issue's raw
+        // target/func/args, wrapped once per hop; the issueId here still matches
+        // votes cast directly (or via the addAdmin-style wrappers).
+        await castVote(issue.func, canonical, issue.target || undefined);
+      } else {
+        // Re-cast through the same call path that created the issue so the issueId
+        // (keccak of target/func/args) matches and the vote lands on the same issue.
+        switch (issue.func) {
+          case "_addAdmin":
+            await addSigner(issue.args[0] ?? "");
+            break;
+          case "_removeAdmin":
+            await removeSigner(issue.args[0] ?? "");
+            break;
+          case "_swapAdmin":
+            await swapSigner(issue.args[0] ?? "", issue.args[1] ?? "");
+            break;
+          case "setDefaultVotingThresholdBps":
+            await setDefaultThreshold(Number(issue.args[0] ?? 0));
+            break;
+          case "transfer":
+            await proposeTransfer(issue.target, issue.args[0] ?? "", String(issue.args[1] ?? "0"));
+            break;
+          default:
+            await castVote(issue.func, canonical, issue.target);
+        }
       }
-      toast.success("Vote cast");
+      toast.success(
+        nested ? `Vote proposed in ${viaName}` : "Vote cast",
+        nested
+          ? { description: "It lands here once each multisig on the route passes its own vote." }
+          : undefined
+      );
       invalidate();
     } catch (err: any) {
       toast.error("Vote failed", { description: String(err?.message || err) });
     } finally {
       setBusy("");
     }
+  };
+
+  const simulateVote = (issue: OpenIssue) => {
+    const { canonical } = describeIssue(issue.func, issue.args);
+    setSimFor(issue.issueId);
+    issueSim.run(
+      "FUNCTION",
+      buildNestedCastVotePayload(routeAddrs, issue.func, canonical, issue.target || undefined)
+    );
   };
 
   const dismiss = async (issue: OpenIssue) => {
@@ -688,21 +851,28 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
           size="sm"
           variant={proposing ? "secondary" : "outline"}
           onClick={() => setProposing((v) => !v)}
-          disabled={!iAmSigner}
+          disabled={!canVote}
         >
           {proposing ? "Close" : "Propose issue"}
         </Button>
       </div>
 
-      {!iAmSigner ? (
+      {!canVote ? (
         <p className="text-xs text-muted-foreground">
           Only a signer can propose or vote on issues.
+        </p>
+      ) : nested ? (
+        <p className="text-xs text-muted-foreground">
+          You vote here through {fullRoute.slice(0, -1).map(hopName).join(" → ")}: each vote
+          below creates/joins an issue in {viaName} and lands here once every multisig on the
+          route passes its own threshold.
         </p>
       ) : null}
 
       {proposing ? (
         <ProposeIssueForm
           walletAddress={wallet.address}
+          fullRoute={fullRoute}
           onDone={() => {
             invalidate();
             setProposing(false);
@@ -721,7 +891,7 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
           {issues.map((issue) => {
         const label = labelForIssue(issue, tokenMeta, signers.length);
         const count = issue.voters.length;
-        const iVoted = issue.voters.some((v) => eq(v, me));
+        const iVoted = issue.voters.some((v) => eq(v, voterAddr));
         const pct = needed > 0 ? Math.min(100, (count / needed) * 100) : 0;
         // Mirrors the contract's dismissIssue gate: a single vote, cast by the caller.
         const canDismiss = count === 1 && eq(issue.voters[0], me);
@@ -744,6 +914,14 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
+                {issueSim.canSimulate && canVote ? (
+                  <SimulateButton
+                    onClick={() => simulateVote(issue)}
+                    pending={issueSim.pending && simFor === issue.issueId}
+                    disabled={busy !== ""}
+                    label="Simulate"
+                  />
+                ) : null}
                 {iAmSigner ? (
                   <Button
                     size="sm"
@@ -759,14 +937,21 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
                 <Button
                   size="sm"
                   onClick={() => vote(issue)}
-                  disabled={busy !== "" || !canSubmit || !iAmSigner || iVoted}
+                  disabled={busy !== "" || !canSubmit || !canVote || iVoted}
+                  title={
+                    nested
+                      ? `Casts your vote in ${viaName}; it arrives here through the membership chain.`
+                      : undefined
+                  }
                 >
                   {iVoted ? (
                     <span className="inline-flex items-center gap-1">
-                      <Check className="h-3.5 w-3.5" /> Voted
+                      <Check className="h-3.5 w-3.5" /> {nested ? "Chain voted" : "Voted"}
                     </span>
                   ) : busy === issue.issueId ? (
                     "Voting…"
+                  ) : nested ? (
+                    `Vote via ${viaName}`
                   ) : (
                     "Vote"
                   )}
@@ -777,8 +962,19 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
               <Progress value={pct} className="h-1.5" />
               <div className="mt-1 text-xs text-muted-foreground">
                 {count} of {needed} vote{needed === 1 ? "" : "s"}
+                {nested && iVoted ? ` — includes ${hopName(fullRoute[fullRoute.length - 2])}` : ""}
               </div>
             </div>
+            {simFor === issue.issueId ? (
+              <div className="mt-3">
+                <SimulationResultPanel
+                  result={issueSim.result}
+                  error={issueSim.error}
+                  title={nested ? `Your vote tx in ${viaName}` : "Vote tx"}
+                  effectTitles={effectChainTitles(fullRoute, issue.func, issue.args)}
+                />
+              </div>
+            ) : null}
           </div>
         );
       })}
@@ -800,15 +996,19 @@ function IssuesTab({ wallet }: { wallet: UserWallet }) {
  */
 function ProposeIssueForm({
   walletAddress,
+  fullRoute,
   onDone,
 }: {
   walletAddress: string;
+  fullRoute: UserWallet[];
   onDone: () => void;
 }) {
   const { canSubmit } = useSubmitTransaction();
-  const { castVote } = useMultisigActions({ walletAddress });
+  const nested = fullRoute.length > 1;
+  const routeAddrs = fullRoute.map((w) => w.address);
+  const { castVote } = useMultisigActions({ walletAddress, route: routeAddrs });
   // One simulation of the castVoteOnIssue tx; the endpoint automatically nests
-  // the proposal's ultimate effect (target.func(args) executed as the wallet).
+  // the proposal's effects — one per vote hop, then the ultimate action.
   const proposalSim = useSimulation();
 
   const [target, setTarget] = useState("");
@@ -892,7 +1092,11 @@ function ProposeIssueForm({
     setBusy(true);
     try {
       await castVote(func, buildArgs(), resolvedAddress);
-      toast.success("Issue proposed", { description: "Signers can vote on it below." });
+      toast.success("Issue proposed", {
+        description: nested
+          ? `Proposed in ${hopName(fullRoute[0])}; it lands here once each multisig on the route passes its own vote.`
+          : "Signers can vote on it below.",
+      });
       reset();
       onDone();
     } catch (err: any) {
@@ -907,9 +1111,12 @@ function ProposeIssueForm({
       toast.error("Enter a target contract and function first");
       return;
     }
-    // Simulate the castVoteOnIssue tx; the endpoint nests the effect
-    // (target.func(args) executed as the wallet) in result.effect.
-    proposalSim.run("FUNCTION", buildCastVotePayload(walletAddress, func, buildArgs(), resolvedAddress));
+    // Simulate the (possibly route-wrapped) castVoteOnIssue tx; the endpoint
+    // nests one effect per vote hop, ending at target.func(args).
+    proposalSim.run(
+      "FUNCTION",
+      buildNestedCastVotePayload(routeAddrs, func, buildArgs(), resolvedAddress)
+    );
   };
 
   return (
@@ -1071,9 +1278,14 @@ function ProposeIssueForm({
         on the target contract.
       </p>
 
-      {/* The panel nests the issue's "Effect if executed" (target.func(args) run
-          as the wallet), which the simulate endpoint computes automatically. */}
-      <SimulationResultPanel result={proposalSim.result} error={proposalSim.error} title="Proposal tx" />
+      {/* The panel nests the issue's effect chain (one hop per multisig on the
+          route, then the ultimate action), computed by the simulate endpoint. */}
+      <SimulationResultPanel
+        result={proposalSim.result}
+        error={proposalSim.error}
+        title={nested ? `Proposal tx in ${hopName(fullRoute[0])}` : "Proposal tx"}
+        effectTitles={effectChainTitles(fullRoute, func, buildArgs())}
+      />
 
       <div className="flex gap-2">
         {proposalSim.canSimulate ? (
@@ -1168,15 +1380,20 @@ function HistoryTab({ wallet }: { wallet: UserWallet }) {
 /* Treasury tab                                                                       */
 /* --------------------------------------------------------------------------------- */
 
-function TreasuryTab({ wallet }: { wallet: UserWallet }) {
+function TreasuryTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserWallet[] }) {
   const { userAddress } = useUser();
   const { canSubmit } = useSubmitTransaction();
   const queryClient = useQueryClient();
   const { data: signers = [] } = useSigners(wallet.address);
-  const { proposeTransfer } = useMultisigActions({ walletAddress: wallet.address });
+  const nested = fullRoute.length > 1;
+  const { proposeTransfer } = useMultisigActions({
+    walletAddress: wallet.address,
+    route: fullRoute.map((w) => w.address),
+  });
 
   const me = strip0x(userAddress ?? "");
-  const iAmSigner = signers.some((s) => eq(s, me));
+  // Nested members propose transfers through their membership chain.
+  const canVote = signers.some((s) => eq(s, me)) || nested;
 
   const { data: myTokens = [] } = useMyTokens(userAddress); // depositor's balances
   const { data: treasury = [] } = useMyTokens(wallet.address); // multisig's balances
@@ -1224,7 +1441,7 @@ function TreasuryTab({ wallet }: { wallet: UserWallet }) {
       {/* Propose transfer */}
       <ProposeTransferForm
         tokens={treasury}
-        iAmSigner={iAmSigner}
+        iAmSigner={canVote}
         canSubmit={canSubmit}
         onPropose={proposeTransfer}
         onDone={refresh}
