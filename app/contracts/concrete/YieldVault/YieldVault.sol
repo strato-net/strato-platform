@@ -194,10 +194,11 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
     {
         _requireInitialized();
         require(assets > 0, "YieldVault: zero assets");
+        address caller = _msgSender();
         _accrue();
         shares = previewDeposit(assets);
         require(shares > 0, "YieldVault: zero shares");
-        _deposit(_msgSender(), receiver, assets, shares);
+        _deposit(caller, receiver, assets, shares);
         _checkpointAccrualBase();
         return shares;
     }
@@ -211,10 +212,11 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
     {
         _requireInitialized();
         require(shares > 0, "YieldVault: zero shares");
+        address caller = _msgSender();
         _accrue();
         assets = previewMint(shares);
         require(assets > 0, "YieldVault: zero assets");
-        _deposit(_msgSender(), receiver, assets, shares);
+        _deposit(caller, receiver, assets, shares);
         _checkpointAccrualBase();
         return assets;
     }
@@ -227,10 +229,11 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         returns (uint256 shares)
     {
         _requireInitialized();
+        address caller = _msgSender();
         _accrue();
         require(assets <= maxWithdraw(owner_), "ERC4626: withdraw exceeds max");
         shares = previewWithdraw(assets);
-        _withdraw(_msgSender(), receiver, owner_, assets, shares);
+        _withdraw(caller, receiver, owner_, assets, shares);
         _checkpointAccrualBase();
         return shares;
     }
@@ -243,10 +246,11 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         returns (uint256 assets)
     {
         _requireInitialized();
+        address caller = _msgSender();
         _accrue();
         require(shares <= maxRedeem(owner_), "ERC4626: redeem exceeds max");
         assets = previewRedeem(shares);
-        _withdraw(_msgSender(), receiver, owner_, assets, shares);
+        _withdraw(caller, receiver, owner_, assets, shares);
         _checkpointAccrualBase();
         return assets;
     }
@@ -266,18 +270,19 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         require(receiver != address(0), "YieldVault: receiver=0");
         require(shares > 0, "YieldVault: zero shares");
 
+        address caller = _msgSender();
         _accrue();
         uint256 assets = previewRedeem(shares);
         require(assets > 0, "YieldVault: zero assets");
 
         if (_freeIdleForInstantWithdrawals() >= assets) {
-            _withdraw(_msgSender(), receiver, owner_, assets, shares);
+            _withdraw(caller, receiver, owner_, assets, shares);
             _checkpointAccrualBase();
             emit WithdrawalPaidImmediately(owner_, receiver, shares, assets);
             return (assets, 0);
         }
 
-        requestId = _requestRedeem(_msgSender(), shares, receiver, owner_);
+        requestId = _requestRedeem(caller, shares, receiver, owner_);
         return (0, requestId);
     }
 
@@ -542,7 +547,8 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         require(from != address(0), "YieldVault: from=0");
         require(assets > 0, "YieldVault: zero return");
         require(strategyDebt[from] > 0, "YieldVault: no strategy debt");
-        if (!paused()) {
+        bool isPaused = paused();
+        if (!isPaused) {
             _accrue();
         }
 
@@ -553,7 +559,9 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
 
         strategyDebt[from] -= principalRepaid;
         deployedAssets -= principalRepaid;
-        _checkpointAccrualBase();
+        if (!isPaused) {
+            _checkpointAccrualBase();
+        }
 
         emit CapitalReturned(from, assets, principalRepaid, realizedProfit, strategyDebt[from], deployedAssets);
     }
@@ -668,23 +676,50 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
             return 0;
         }
 
-        uint256 available = IERC20(asset()).balanceOf(rewardDistributor);
-        uint256 allowance = IERC20(asset()).allowance(rewardDistributor, address(this));
-        if (available > allowance) available = allowance;
-        if (available > targetAmount) available = targetAmount;
-
-        if (available > 0) {
-            uint256 beforeBalance = _idleBalance();
-            require(
-                IERC20(asset()).transferFrom(rewardDistributor, address(this), available),
-                "YieldVault: accrual transfer failed"
-            );
-            credited = _idleBalance() - beforeBalance;
-            require(credited > 0, "YieldVault: no accrual delta");
-        }
+        credited = _pullAccrualReward(targetAmount);
 
         _checkpointAccrualBase();
         emit Accrued(rewardDistributor, targetAmount, credited);
+        return credited;
+    }
+
+    function _pullAccrualReward(uint256 targetAmount) internal returns (uint256 credited) {
+        // SolidVM corrupts msg.sender after a caught revert, so callers that use
+        // the sender after _accrue must capture it before entering this helper.
+        IERC20 token = IERC20(asset());
+        uint256 available;
+        try token.balanceOf(rewardDistributor) returns (uint256 balance) {
+            available = balance;
+        } catch {
+            return 0;
+        }
+
+        try token.allowance(rewardDistributor, address(this)) returns (uint256 approved) {
+            if (available > approved) available = approved;
+        } catch {
+            return 0;
+        }
+        if (available > targetAmount) available = targetAmount;
+        if (available == 0) return 0;
+
+        uint256 beforeBalance;
+        try token.balanceOf(address(this)) returns (uint256 balance) {
+            beforeBalance = balance;
+        } catch {
+            return 0;
+        }
+
+        try token.transferFrom(rewardDistributor, address(this), available) returns (bool ok) {
+            if (!ok) return 0;
+        } catch {
+            return 0;
+        }
+
+        try token.balanceOf(address(this)) returns (uint256 balance) {
+            if (balance > beforeBalance) credited = balance - beforeBalance;
+        } catch {
+            return 0;
+        }
         return credited;
     }
 

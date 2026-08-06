@@ -1,4 +1,5 @@
 import "../../concrete/BaseCodeCollection.sol";
+import "../../abstract/ERC20/ERC20.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
@@ -14,6 +15,42 @@ contract User {
     function do0(address a, string f) public returns (variadic) {
         variadic result = address(a).call(f);
         return result;
+    }
+}
+
+contract FailingAccrualToken is ERC20 {
+    mapping(address => bool) public blockedBalance;
+    mapping(address => bool) public blockedAllowance;
+    mapping(address => bool) public blockedTransfer;
+    mapping(address => bool) public falseTransfer;
+
+    constructor() ERC20("Failing Accrual Token", "FAIL") {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+
+    function balanceOf(address account) public view override returns (uint256) {
+        require(!blockedBalance[account], "FailingAccrualToken: balance blocked");
+        return super.balanceOf(account);
+    }
+
+    function allowance(address owner_, address spender) public view override returns (uint256) {
+        require(!blockedAllowance[owner_], "FailingAccrualToken: allowance blocked");
+        return super.allowance(owner_, spender);
+    }
+
+    function transferFrom(address from, address to, uint256 value) public override returns (bool) {
+        require(!blockedTransfer[from], "FailingAccrualToken: transfer blocked");
+        if (falseTransfer[from]) return false;
+        return super.transferFrom(from, to, value);
+    }
+
+    function setFailures(address account, bool balance, bool allowance_, bool transfer_, bool false_) external {
+        blockedBalance[account] = balance;
+        blockedAllowance[account] = allowance_;
+        blockedTransfer[account] = transfer_;
+        falseTransfer[account] = false_;
     }
 }
 
@@ -627,6 +664,42 @@ contract Describe_YieldVault is Authorizable {
         require(vault.accrualBaseAssets() == vault.activeAssets(), "donation should enter future accrual base");
     }
 
+    function it_excludes_profit_returned_while_paused_from_the_elapsed_interval() public {
+        User alice = new User();
+        User distributor = new User();
+        User strategy = new User();
+
+        _mintAndDeposit(alice, 100e18);
+        _approveStrategy(address(strategy));
+        vault.deployCapital(address(strategy), 50e18);
+
+        Token(asset).mint(address(distributor), 20e18);
+        distributor.do(asset, "approve", address(vault), INFINITY);
+        _configureFundedAccrual(distributor, MAX_RATE);
+
+        vault.pause();
+        fastForward(MONTH);
+
+        Token(asset).mint(address(strategy), 5e18);
+        strategy.do(asset, "approve", address(vault), INFINITY);
+        vault.returnCapital(address(strategy), 55e18);
+
+        require(vault.totalAssets() == 105e18, "paused profit should increase NAV");
+        require(vault.accrualBaseAssets() == 100e18, "paused profit should not alter elapsed base");
+
+        vault.unpause();
+        (uint target,) = vault.pendingAccrual();
+        require(target > 5e18 && target < 6e18, "elapsed reward should use the pre-profit base");
+
+        uint credited = vault.accrue();
+        require(credited == target, "elapsed reward should settle after unpause");
+        require(vault.accrualBaseAssets() == 105e18 + credited, "profit should enter the future base");
+
+        fastForward(MONTH);
+        (uint futureTarget,) = vault.pendingAccrual();
+        require(futureTarget > 6e18 && futureTarget < 7e18, "future reward should include returned profit");
+    }
+
     function it_does_not_charge_the_first_distributor_for_an_earlier_interval() public {
         User alice = new User();
         User distributor = new User();
@@ -799,6 +872,67 @@ contract Describe_YieldVault is Authorizable {
             "withdraw should price after funded accrual"
         );
         require(IERC20(asset).balanceOf(address(alice)) == 10e18, "withdraw should pay requested assets");
+    }
+
+    function it_keeps_user_operations_live_when_distributor_calls_fail() public {
+        User alice = new User();
+        User distributor = new User();
+        User strategy = new User();
+
+        FailingAccrualToken failingToken = new FailingAccrualToken();
+        vault = new YieldVault(address(this));
+        asset = address(failingToken);
+        vault.initialize(asset, "ETH Carry Vault", "carryETH");
+
+        failingToken.mint(address(alice), 230e18);
+        alice.do(asset, "approve", address(vault), INFINITY);
+        alice.do(address(vault), "deposit(uint256,address)", 200e18, address(alice));
+
+        failingToken.mint(address(distributor), 20e18);
+        distributor.do(asset, "approve", address(vault), INFINITY);
+        _configureFundedAccrual(distributor, MAX_RATE);
+
+        failingToken.setFailures(address(distributor), true, false, false, false);
+        fastForward(86400);
+        alice.do(address(vault), "deposit(uint256,address)", 10e18, address(alice));
+
+        failingToken.setFailures(address(distributor), false, true, false, false);
+        fastForward(86400);
+        alice.do(address(vault), "mint(uint256,address)", 10e18, address(alice));
+
+        failingToken.setFailures(address(distributor), false, false, true, false);
+        fastForward(86400);
+        alice.do(address(vault), "withdraw(uint256,address,address)", 5e18, address(alice), address(alice));
+
+        failingToken.setFailures(address(distributor), false, false, false, true);
+        fastForward(86400);
+        alice.do(address(vault), "redeem(uint256,address,address)", 5e18, address(alice), address(alice));
+
+        failingToken.setFailures(address(distributor), false, false, true, false);
+        fastForward(86400);
+        alice.do(address(vault), "redeemOrQueue(uint256,address,address)", 5e18, address(alice), address(alice));
+        require(vault.activeRequestId(address(alice)) == 0, "liquid redemption should not queue");
+
+        _approveStrategy(address(strategy));
+        vault.deployCapital(address(strategy), 200e18);
+        fastForward(86400);
+        alice.do(address(vault), "redeemOrQueue(uint256,address,address)", 10e18, address(alice), address(alice));
+        require(vault.activeRequestId(address(alice)) != 0, "illiquid redemption should queue");
+
+        strategy.do(asset, "approve", address(vault), INFINITY);
+        vault.returnCapital(address(strategy), 200e18);
+        fastForward(86400);
+        vault.processQueue(1, INFINITY);
+        require(vault.claimableAssets(address(alice)) == 10e18, "queue processing should remain live");
+        alice.do(address(vault), "claim(address)", address(alice));
+
+        failingToken.setFailures(address(distributor), false, false, false, false);
+        (uint target, uint funded) = vault.pendingAccrual();
+        require(target == 0 && funded == 0, "failed intervals should not become backlog");
+
+        fastForward(MONTH);
+        uint credited = vault.accrue();
+        require(credited > 11e18 && credited < 12e18, "accrual should resume after recovery");
     }
 
     function it_blocks_reward_configuration_and_transfers_while_paused() public {
