@@ -407,14 +407,36 @@ export const castVoteOnIssueById = async (
   return callTargetFunction(accessToken, userAddress, contractName, tx.to, tx.funcName, namedArgs);
 };
 
+// Deduplicate issues by issueId, keeping the most recent one based on block_number,
+// then sort by block_number descending (newest first)
+const latestPerIssue = (rows: any[]): any[] => {
+  const issuesMap = new Map();
+  rows.forEach((issue: any) => {
+    const existingIssue = issuesMap.get(issue.issueId);
+    if (!existingIssue ||
+        (issue.block_number && existingIssue.block_number &&
+         Number(issue.block_number) > Number(existingIssue.block_number))) {
+      issuesMap.set(issue.issueId, issue);
+    }
+  });
+  return Array.from(issuesMap.values()).sort((a, b) => {
+    if (a.block_number && b.block_number) {
+      return Number(b.block_number) - Number(a.block_number);
+    }
+    return 0;
+  });
+};
+
 export const getOpenIssues = async (
   accessToken: string,
+  page: number = 1,
+  limit: number = 10
 ): Promise<object> => {
   try {
     const response = await cirrus.get(accessToken, "/" + AdminRegistry, {
       params: {
         address: `eq.${adminRegistry}`,
-        select: `*,admins:${AdminRegistry}-admins(address:value),votes:${AdminRegistry}-votes(block_timestamp,issueId:key,index:key2,voter:value),thresholds:${AdminRegistry}-votingThresholds(target:key,func:key2,threshold:value)`,
+        select: `defaultVotingThresholdBps,admins:${AdminRegistry}-admins(address:value),votes:${AdminRegistry}-votes(issueId:key,voter:value),thresholds:${AdminRegistry}-votingThresholds(target:key,func:key2,threshold:value)`,
         ['votes.value']: 'neq.""',
         ['votes.value->>length']: 'is.null',
       },
@@ -433,36 +455,37 @@ export const getOpenIssues = async (
 
     const issueIds = new Set(votes.map((v: any) => v.issueId));
 
-    const issuesResponse = await cirrus.get(accessToken, "/" + AdminRegistry + "-IssueCreated", {
+    // The whole open set is needed to deduplicate and order before slicing, but it is
+    // fetched without args, which is over 90% of the payload and is only read for the
+    // issues on the requested page
+    const indexResponse = await cirrus.get(accessToken, "/" + AdminRegistry + "-IssueCreated", {
       params: {
-        issueId: `in.(${[...issueIds].join(',')})`
+        issueId: `in.(${[...issueIds].join(',')})`,
+        select: 'issueId,block_number',
       },
     });
 
-    // Deduplicate issues by issueId, keeping the most recent one based on block_number
-    const issuesMap = new Map();
-    (issuesResponse?.data || []).forEach((issue: any) => {
-      const existingIssue = issuesMap.get(issue.issueId);
-      if (!existingIssue || 
-          (issue.block_number && existingIssue.block_number && 
-           Number(issue.block_number) > Number(existingIssue.block_number))) {
-        issuesMap.set(issue.issueId, issue);
-      }
-    });
-    const uniqueIssues = Array.from(issuesMap.values()).sort((a, b) => {
-      // Sort by block_number descending (newest first)
-      if (a.block_number && b.block_number) {
-        return Number(b.block_number) - Number(a.block_number);
-      }
-      return 0;
-    });
+    const orderedIssues = latestPerIssue(indexResponse?.data || []);
+    const pageIssueIds = orderedIssues
+      .slice((page - 1) * limit, page * limit)
+      .map((issue: any) => issue.issueId);
+
+    const issuesResponse = pageIssueIds.length
+      ? await cirrus.get(accessToken, "/" + AdminRegistry + "-IssueCreated", {
+          params: {
+            issueId: `in.(${pageIssueIds.join(',')})`,
+            select: 'issueId,target,func,args,block_number',
+          },
+        })
+      : null;
 
     return { 
       admins, 
       votes, 
       globalThreshold: defaultVotingThresholdBps, 
       thresholds, 
-      issues: uniqueIssues 
+      issues: latestPerIssue(issuesResponse?.data || []),
+      issuesTotal: orderedIssues.length
     };
   } catch (error) {
     return {};

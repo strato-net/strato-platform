@@ -4,7 +4,7 @@ import { getAdmin, isUserAdmin, addAdmin, removeAdmin, createIssue, castVoteOnIs
          getExecutedIssues, contractSearch, getContractDetails,
  } from "../services/user.service";
 import { validateUserAddress, validateAddressField } from "../validators/common.validators";
-import { validateExecutedIssuesQuery } from "../validators/user.validator";
+import { validateIssuesQuery } from "../validators/user.validator";
 
 class UserController {
   static async me(
@@ -162,7 +162,10 @@ class UserController {
   ): Promise<void> {
     try {
       const { accessToken } = req;
-      const issues = await getOpenIssues(accessToken);
+      validateIssuesQuery(req.query);
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
+      const issues = await getOpenIssues(accessToken, page, limit);
       res.status(RestStatus.OK).json(issues);
       next();
     } catch (e) {
@@ -177,7 +180,7 @@ class UserController {
   ): Promise<void> {
     try {
       const { accessToken } = req;
-      validateExecutedIssuesQuery(req.query);
+      validateIssuesQuery(req.query);
       const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
       const result = await getExecutedIssues(accessToken, page, limit);

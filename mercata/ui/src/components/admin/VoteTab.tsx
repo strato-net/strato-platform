@@ -41,8 +41,8 @@ const VoteTab = () => {
   } | null>(null);
 
   useEffect(() => {
-    getOpenIssues();
-  }, []);
+    getOpenIssues(openIssuesPage, ADMIN_VOTE_OPEN_ISSUES_PER_PAGE);
+  }, [openIssuesPage]);
 
   useEffect(() => {
     getExecutedIssues(executedPage, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
@@ -51,6 +51,7 @@ const VoteTab = () => {
   const handleCastVoteOnIssue = async (target: string, func: string, args: string[]) => {
     await castVoteOnIssue(target, func, args);
     // Reset to page 1 to show the recently executed issue
+    setOpenIssuesPage(1);
     setExecutedPage(1);
   };
 
@@ -70,18 +71,40 @@ const VoteTab = () => {
   const handleCastVoteOnIssueById = async (issueId: string) => {
     await castVoteOnIssueById(issueId);
     // Reset to page 1 to show the recently executed issue
+    setOpenIssuesPage(1);
     setExecutedPage(1);
   };
 
   const handleAddAdmin = async (userAddress: string) => {
     await addAdmin(userAddress);
+    setOpenIssuesPage(1);
   };
 
   const handleRemoveAdmin = async (userAddress: string) => {
     await removeAdmin(userAddress);
+    setOpenIssuesPage(1);
   };
 
-  if (openIssuesLoading) {
+  const handleDismissIssue = async (issueId: string) => {
+    await dismissIssue(issueId);
+    setOpenIssuesPage(1);
+  };
+
+  const admins: any[] = (openIssues && openIssues['admins']) || [];
+  const issues: any[] = (openIssues && openIssues['issues']) || [];
+  const votes: any[] = (openIssues && openIssues['votes']) || [];
+  const thresholds: any[] = (openIssues && openIssues['thresholds']) || [];
+  const globalThreshold: number = (openIssues && openIssues['globalThreshold']) || 6000;
+  const issuesTotal: number = (openIssues && openIssues['issuesTotal']) || 0;
+  const executed: object[] = (executedIssues && executedIssues['executed']) || [];
+  const executedTotal: number = (executedIssues && executedIssues['executedTotal']) || 0;
+  const executedTotalPages = Math.ceil(executedTotal / ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
+
+  const openIssuesTotalPages = Math.ceil(issuesTotal / ADMIN_VOTE_OPEN_ISSUES_PER_PAGE);
+  const openIssuesStartIndex = (openIssuesPage - 1) * ADMIN_VOTE_OPEN_ISSUES_PER_PAGE;
+  const openIssuesEndIndex = openIssuesStartIndex + ADMIN_VOTE_OPEN_ISSUES_PER_PAGE;
+
+  if (openIssuesLoading && !Object.keys(openIssues).length) {
     return (
       <Card>
         <CardHeader>
@@ -99,21 +122,6 @@ const VoteTab = () => {
       </Card>
     );
   }
-
-  const admins: any[] = (openIssues && openIssues['admins']) || [];
-  const allIssues: any[] = (openIssues && openIssues['issues']) || [];
-  const votes: any[] = (openIssues && openIssues['votes']) || [];
-  const thresholds: any[] = (openIssues && openIssues['thresholds']) || [];
-  const globalThreshold: number = (openIssues && openIssues['globalThreshold']) || 6000;
-  const executed: object[] = (executedIssues && executedIssues['executed']) || [];
-  const executedTotal: number = (executedIssues && executedIssues['executedTotal']) || 0;
-  const executedTotalPages = Math.ceil(executedTotal / ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
-  
-  // Paginate open issues client-side
-  const openIssuesTotalPages = Math.ceil(allIssues.length / ADMIN_VOTE_OPEN_ISSUES_PER_PAGE);
-  const openIssuesStartIndex = (openIssuesPage - 1) * ADMIN_VOTE_OPEN_ISSUES_PER_PAGE;
-  const openIssuesEndIndex = openIssuesStartIndex + ADMIN_VOTE_OPEN_ISSUES_PER_PAGE;
-  const issues = allIssues.slice(openIssuesStartIndex, openIssuesEndIndex);
 
   return (
     <div className="space-y-6">
@@ -203,9 +211,9 @@ const VoteTab = () => {
         <CardContent className="px-4 md:px-6">
           <div className="mb-3 md:mb-4">
             <span className="text-xs md:text-sm text-muted-foreground">
-              {allIssues.length > 0 ? (
+              {issuesTotal > 0 ? (
                 <>
-                  Showing {openIssuesStartIndex + 1}-{Math.min(openIssuesEndIndex, allIssues.length)} of {allIssues.length} open issues
+                  Showing {openIssuesStartIndex + 1}-{Math.min(openIssuesEndIndex, issuesTotal)} of {issuesTotal} open issues
                 </>
               ) : (
                 <>No open issues</>
@@ -213,13 +221,19 @@ const VoteTab = () => {
             </span>
           </div>
           
-          {issues.length === 0 ? (
+          {issues.length === 0 && !openIssuesLoading ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground text-sm">No open issues found</p>
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto -mx-4 md:mx-0">
+              <div className="overflow-x-auto -mx-4 md:mx-0 relative">
+                {openIssuesLoading && (
+                  <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-10 flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                    <span className="ml-2 text-sm text-muted-foreground">Loading...</span>
+                  </div>
+                )}
                 <Table>
                   <TableHeader>
                     <TableRow className="dark:border-border dark:hover:bg-transparent">
@@ -231,7 +245,7 @@ const VoteTab = () => {
                       <TableHead className="text-xs md:text-sm pr-4 md:pr-4 dark:text-muted-foreground">Vote</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
+                  <TableBody className={openIssuesLoading ? "opacity-50 pointer-events-none" : ""}>
                     {issues.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
@@ -523,7 +537,7 @@ const VoteTab = () => {
         onOpenChange={setVoteModalOpen}
         issue={selectedIssue}
         onCastVote={handleCastVoteOnIssueById}
-        onDismissIssue={dismissIssue}
+        onDismissIssue={handleDismissIssue}
         votes={votes}
         userAddress={userAddress}
       />

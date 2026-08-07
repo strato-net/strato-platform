@@ -20,7 +20,7 @@ interface CastVoteModalProps {
   } | null;
   onCastVote: (issueId: string) => Promise<void> | void;
   onDismissIssue?: (issueId: string) => Promise<void> | void;
-  votes?: Array<{ issueId: string; index: number; voter: string }>;
+  votes?: Array<{ issueId: string; voter: string }>;
   userAddress?: string | null;
 }
 

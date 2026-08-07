@@ -6,7 +6,7 @@ import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useWalletClient } from "wagmi";
 import { api, setAppAuthenticated, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
 import { isAuthenticated, logout as authLogout, redirectToSignedOutLanding, WALLET_CONNECT_REQUEST_EVENT } from "@/lib/auth";
-import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
+import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE, ADMIN_VOTE_OPEN_ISSUES_PER_PAGE } from "@/lib/constants";
 import { readAttribution, clearAttribution } from "@/lib/attribution";
 import { ensureStratoChainInWallet } from "@/lib/stratoChain";
 
@@ -27,7 +27,7 @@ interface UserContextType {
   loading: boolean;
   openIssues: object;
   openIssuesLoading: boolean;
-  getOpenIssues: () => Promise<void>;
+  getOpenIssues: (page?: number, limit?: number) => Promise<void>;
   executedIssues: object;
   executedIssuesLoading: boolean;
   getExecutedIssues: (page?: number, limit?: number) => Promise<void>;
@@ -203,11 +203,16 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const getOpenIssues = async () => {
+  const getOpenIssues = async (page: number = 1, limit: number = ADMIN_VOTE_OPEN_ISSUES_PER_PAGE) => {
     try {
       setOpenIssuesLoading(true);
       try {
-        const response = await api.get('/user/admin/issues');
+        const response = await api.get('/user/admin/issues', {
+          params: {
+            page,
+            limit,
+          },
+        });
         setOpenIssues(response?.data || {});
       } catch (error) {
       }

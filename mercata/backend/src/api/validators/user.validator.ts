@@ -1,7 +1,7 @@
 import Joi from "@hapi/joi";
 import { numericStringField } from "./common.validators";
 
-export function validateExecutedIssuesQuery(query: any) {
+export function validateIssuesQuery(query: any) {
   const schema = Joi.object({
     page: numericStringField("page").optional().default("1").custom((value, helpers) => {
       const num = parseInt(value, 10);
@@ -26,6 +26,6 @@ export function validateExecutedIssuesQuery(query: any) {
   const { error } = schema.validate(query);
 
   if (error) {
-    throw new Error("Executed Issues Query Validation Error: " + error.message);
+    throw new Error("Issues Query Validation Error: " + error.message);
   }
 }

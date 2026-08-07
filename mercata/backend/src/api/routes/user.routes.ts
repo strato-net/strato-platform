@@ -245,8 +245,21 @@ router.post("/admin/dismiss", walletAuth, UserController.dismissIssue);
  * @openapi
  * /user/admin/issues:
  *   get:
- *     summary: List open administrative issues
+ *     summary: List open administrative issues with pagination
  *     tags: [Admin]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Items per page
  *     responses:
  *       200:
  *         description: Governance issue overview
