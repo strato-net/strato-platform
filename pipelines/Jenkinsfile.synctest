@@ -68,17 +68,17 @@ pipeline {
       )
     }
 
-//    failure {
-//      slackSend (
-//          color: 'danger',
-//          message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
-//      )
-//      slackSend(
-//          channel: '#engineering',
-//          color: 'danger',
-//          message: "Sync test build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
-//      )
-//    }
+    failure {
+      slackSend (
+          color: 'danger',
+          message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+      slackSend(
+          channel: '#engineering',
+          color: 'danger',
+          message: "Sync test build failed. The snapshots weren't created! Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+    }
 
     fixed {
       slackSend(
