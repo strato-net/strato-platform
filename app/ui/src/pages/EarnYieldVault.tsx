@@ -724,33 +724,32 @@ const EarnYieldVault = () => {
                           </div>
 
                           {(hasPendingWithdrawal || hasClaimableAssets) && (
-                            <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/70 p-2.5 sm:flex-row sm:items-center sm:justify-between">
-                              <div className="text-xs">
-                                {hasClaimableAssets ? (
-                                  <>
-                                    <p className="font-medium text-foreground">
-                                      {formatTokenAmount(claimableAssets, decimals)} {assetSymbol} ready to claim
-                                    </p>
-                                    <p className="text-muted-foreground">Your processed withdrawal is available.</p>
-                                  </>
-                                ) : (
-                                  <>
-                                    <p className="font-medium text-foreground">Withdrawal processing</p>
-                                    <p className="text-muted-foreground">
-                                      {formatTokenAmount(pendingWithdrawal?.shares || "0", decimals)} {shareSymbol} queued
-                                    </p>
-                                  </>
-                                )}
-                              </div>
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                               {hasClaimableAssets && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={isSubmitting}
-                                  onClick={handleClaim}
-                                >
-                                  Claim {assetSymbol}
-                                </Button>
+                                <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-background/70 p-2.5 text-xs">
+                                  <div>
+                                    <p className="text-muted-foreground">Ready to Claim</p>
+                                    <p className="mt-1 text-base font-semibold text-foreground">
+                                      {formatTokenAmount(claimableAssets, decimals)} {assetSymbol}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isSubmitting}
+                                    onClick={handleClaim}
+                                  >
+                                    Claim
+                                  </Button>
+                                </div>
+                              )}
+                              {hasPendingWithdrawal && (
+                                <div className="rounded-lg border border-border/60 bg-background/70 p-2.5 text-xs">
+                                  <p className="text-muted-foreground">Queued Withdrawal</p>
+                                  <p className="mt-1 text-base font-semibold text-foreground">
+                                    {formatTokenAmount(pendingWithdrawal?.shares || "0", decimals)} {shareSymbol}
+                                  </p>
+                                </div>
                               )}
                             </div>
                           )}

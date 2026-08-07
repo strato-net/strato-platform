@@ -10,7 +10,7 @@ import {
   OFF_CHAIN_EVENT_WINDOW_DAYS,
 } from "../../config/config";
 import { getServiceToken } from "../../utils/authHelper";
-import { getOraclePrices } from "./oracle.service";
+import { fetchPriceEvents, getOraclePrices } from "./oracle.service";
 import {
   computePerSecondRateApy,
   getYieldWindowBounds,
@@ -1648,7 +1648,7 @@ export const getYieldVaultHistory = async (
   ).toISOString();
   const endTime = new Date(params.endTimestamp).toISOString();
 
-  const [storageRes, balanceRes, priceRes] = await Promise.all([
+  const [storageRes, balanceRes, priceRows] = await Promise.all([
     cirrus.get(serviceToken, "/history@storage", {
       params: {
         address: `eq.${def.address}`,
@@ -1667,35 +1667,42 @@ export const getYieldVaultHistory = async (
         select: "value::text,valid_from,valid_to",
       },
     }),
-    cirrus.get(serviceToken, "/history@mapping", {
-      params: {
-        address: `eq.${priceOracle}`,
-        collection_name: "eq.prices",
-        "key->>key": `eq.${assetAddress}`,
-        valid_from: `lte.${endTime}`,
-        valid_to: `gte.${startTime}`,
-        select: "value::text,valid_from,valid_to",
-      },
-    }),
+    fetchPriceEvents(
+      serviceToken,
+      priceOracle,
+      assetAddress,
+      new Date(startTime),
+      "block_timestamp.asc"
+    ),
   ]);
 
   const storageRows = Array.isArray(storageRes.data) ? storageRes.data : [];
   const balanceRows = Array.isArray(balanceRes.data) ? balanceRes.data : [];
-  const priceRows = Array.isArray(priceRes.data) ? priceRes.data : [];
+  const sortedPriceRows = priceRows.sort(
+    (a, b) =>
+      new Date(a.blockTimestamp).getTime() -
+      new Date(b.blockTimestamp).getTime()
+  );
   const points: YieldVaultHistoryPoint[] = [];
+  let priceIndex = 0;
+  let activePrice: (typeof sortedPriceRows)[number] | undefined;
 
   for (let i = 0; i <= params.numTicks; i += 1) {
     const timestamp =
       params.endTimestamp - params.interval * (params.numTicks - i);
+    while (
+      priceIndex < sortedPriceRows.length &&
+      new Date(sortedPriceRows[priceIndex].blockTimestamp).getTime() <= timestamp
+    ) {
+      activePrice = sortedPriceRows[priceIndex];
+      priceIndex += 1;
+    }
     const storage = storageRows.find((row: any) =>
       isHistoricalRowActive(row, timestamp)
     );
     if (!storage?.data) continue;
 
     const balance = balanceRows.find((row: any) =>
-      isHistoricalRowActive(row, timestamp)
-    );
-    const price = priceRows.find((row: any) =>
       isHistoricalRowActive(row, timestamp)
     );
     const idleAssets = parseBigIntLike(balance?.value);
@@ -1716,7 +1723,7 @@ export const getYieldVaultHistory = async (
       totalAssets: totalAssets.toString(),
       tvlUsd: underlyingUsdWad(
         totalAssets,
-        parseBigIntLike(price?.value),
+        parseBigIntLike(activePrice?.price),
         decimals
       ).toString(),
       totalShares: totalShares.toString(),

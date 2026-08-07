@@ -308,7 +308,7 @@ const getOracleAddress = async (accessToken: string): Promise<string> => {
     return registry.priceOracle.address || registry.priceOracle;
 };
 
-const fetchPriceEvents = async (
+export const fetchPriceEvents = async (
   accessToken: string,
   oracleAddress: string,
   assetAddress: string,
@@ -323,20 +323,31 @@ const fetchPriceEvents = async (
 
     // --- Query both tables ---
     const [singleResponse, batchResponse] = await Promise.all([
-      cirrus.get(accessToken, `/${PriceOracleEvents}`, { params: { ...params, asset: `eq.${assetAddress}` } }).catch(err => {
+      cirrus.get(accessToken, `/${PriceOracleEvents}`, {
+        params: {
+          ...params,
+          asset: `eq.${assetAddress}`,
+          select: "id,timestamp,asset,price::text,block_timestamp",
+        },
+      }).catch(err => {
         console.error(`[getPriceHistory] Error querying ${PriceOracleEvents}:`, err);
         return { data: [] };
       }),
       cirrus.get(accessToken, `/${PriceOracleBatchUpdateEvents}`, {
-        params
+        params: {
+          ...params,
+          assets: `cs.["${assetAddress}"]`,
+        },
       }).catch(err => {
         console.error(`[getPriceHistory] Error querying ${PriceOracleBatchUpdateEvents}:`, err);
         return { data: [] };
       })
     ]);
 
-    function toPlainString(num: number): string {
-      return num.toLocaleString("fullwide", { useGrouping: false });
+    function toPlainString(num: number | string): string {
+      return typeof num === "string"
+        ? num
+        : num.toLocaleString("fullwide", { useGrouping: false });
     }
 
     const priceEvents: PriceHistoryEntry[] = [];
@@ -358,7 +369,7 @@ const fetchPriceEvents = async (
     if (Array.isArray(batchResponse.data)) {
       batchResponse.data.forEach((event: any) => {
         const assets = JSON.parse(event.assets);
-        const priceValues = JSON.parse(event.priceValues);
+        const priceValues = String(event.priceValues).match(/\d+/g) ?? [];
         const idx = assets.indexOf(assetAddress);
         if (idx !== -1 && priceValues[idx] !== undefined) {
           priceEvents.push({
