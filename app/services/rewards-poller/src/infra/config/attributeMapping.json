@@ -196,7 +196,11 @@
     },
     "Withdraw": {
       "amount": "shares",
-      "user": "receiver"
+      "user": "owner"
+    },
+    "QueueProcessed": {
+      "amount": "sharesBurned",
+      "user": "owner"
     }
   },
 
@@ -207,7 +211,11 @@
     },
     "Withdraw": {
       "amount": "shares",
-      "user": "receiver"
+      "user": "owner"
+    },
+    "QueueProcessed": {
+      "amount": "sharesBurned",
+      "user": "owner"
     }
   },
 

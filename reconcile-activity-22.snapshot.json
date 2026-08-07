@@ -1,0 +1,445 @@
+{
+  "takenAt": "2026-08-07T17:39:49.689Z",
+  "nodeUrl": "https://app.testnet.strato.nexus",
+  "rewards": "170147f58738c9f46112a874030420b823901f3b",
+  "vault": "ac8ce8b3d4aa4b9a359dad3bb792a563f7f2e2f5",
+  "activityId": "22",
+  "snapshotBlock": 121942,
+  "eventIndexBase": 1000000,
+  "seedIndexOffset": 100000,
+  "maxBatchSize": 100,
+  "activityConfig": {
+    "name": "ETH Carry Vault",
+    "sourceContract": "ac8ce8b3d4aa4b9a359dad3bb792a563f7f2e2f5",
+    "emissionRate": "38580246913580250",
+    "activityType": 0,
+    "minAmount": "0",
+    "actionableEvents": [
+      {
+        "eventName": "Deposit",
+        "actionType": 0
+      },
+      {
+        "eventName": "Withdraw",
+        "actionType": 1
+      }
+    ]
+  },
+  "activityState": {
+    "totalStake": "18243118431494956705",
+    "accRewardPerStake": "44516420550442945326936",
+    "lastUpdateTime": "1786048627"
+  },
+  "vaultState": {
+    "totalSupply": "8440359934928056318",
+    "totalQueuedShares": "0",
+    "paused": false,
+    "queueHead": "0",
+    "nextRequestId": "16"
+  },
+  "stakes": {
+    "13aacfb43ea897c351165fc91aba2434a087b45e": "975609756097560",
+    "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce": "6874840327493509556",
+    "2c257830222677e8bebc07506e6cd907ef3254e9": "92560975609756097",
+    "3ed16d0c779feafb7437b8217ce5a4e108979d0e": "16987929069401622",
+    "4ae00cc4af5ce2b7f4df5ad5a0b0c6698cd58457": "97560975609756097",
+    "69a0bae2777c7acab23dce88ff6a4f6ee313f925": "243884663130361727",
+    "7630b673862a2807583834908f10192e00c58b00": "1951219512195121",
+    "7b1f8cd02cd09ab9510e30fc8e15ff898a639771": "0",
+    "90b2570080b214fda268f9a2e3b0d1b6e6b53ab5": "9756097560975609",
+    "a056d35c3c6323109b847590297d16c93e076c0f": "0",
+    "ac840dd68e2ab32e98c8d7ccd3b9a725139f1aa7": "0",
+    "c401a164d1e544970abe11b5384b283e3f81c8b9": "975609756097560975",
+    "c714b751376045eb67d19ad7329dc0003adfd253": "9024076663924009371",
+    "cb8cd037af91b6f121338cdb7d4d021acbb4dc41": "390243902439024389",
+    "d9f82861fedd51dbab8bc5722f1c16e08faf4995": "417111264910069151",
+    "dbdb07a156d20e8b463dcd381461f8564f3bb6cd": "97559046382239430"
+  },
+  "balances": {
+    "13aacfb43ea897c351165fc91aba2434a087b45e": "975609756097560",
+    "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce": "6067523254322777850",
+    "2c257830222677e8bebc07506e6cd907ef3254e9": "92560975609756097",
+    "3ed16d0c779feafb7437b8217ce5a4e108979d0e": "9756097560975609",
+    "4ae00cc4af5ce2b7f4df5ad5a0b0c6698cd58457": "97560975609756097",
+    "69a0bae2777c7acab23dce88ff6a4f6ee313f925": "243884663130361727",
+    "7630b673862a2807583834908f10192e00c58b00": "0",
+    "7b1f8cd02cd09ab9510e30fc8e15ff898a639771": "0",
+    "90b2570080b214fda268f9a2e3b0d1b6e6b53ab5": "44756097560975609",
+    "ac840dd68e2ab32e98c8d7ccd3b9a725139f1aa7": "0",
+    "ac8ce8b3d4aa4b9a359dad3bb792a563f7f2e2f5": "0",
+    "c401a164d1e544970abe11b5384b283e3f81c8b9": "0",
+    "c714b751376045eb67d19ad7329dc0003adfd253": "975528047646022799",
+    "cb8cd037af91b6f121338cdb7d4d021acbb4dc41": "390243902439024389",
+    "d9f82861fedd51dbab8bc5722f1c16e08faf4995": "417111264910069151",
+    "dbdb07a156d20e8b463dcd381461f8564f3bb6cd": "100459046382239430",
+    "e4f080a6d6e442a8f256cb76b51f3ea4c49659e0": "0"
+  },
+  "queuedSharesByOwner": {},
+  "targets": {
+    "13aacfb43ea897c351165fc91aba2434a087b45e": "975609756097560",
+    "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce": "6067523254322777850",
+    "2c257830222677e8bebc07506e6cd907ef3254e9": "92560975609756097",
+    "3ed16d0c779feafb7437b8217ce5a4e108979d0e": "9756097560975609",
+    "4ae00cc4af5ce2b7f4df5ad5a0b0c6698cd58457": "97560975609756097",
+    "69a0bae2777c7acab23dce88ff6a4f6ee313f925": "243884663130361727",
+    "90b2570080b214fda268f9a2e3b0d1b6e6b53ab5": "44756097560975609",
+    "c714b751376045eb67d19ad7329dc0003adfd253": "975528047646022799",
+    "cb8cd037af91b6f121338cdb7d4d021acbb4dc41": "390243902439024389",
+    "d9f82861fedd51dbab8bc5722f1c16e08faf4995": "417111264910069151",
+    "dbdb07a156d20e8b463dcd381461f8564f3bb6cd": "100459046382239430"
+  },
+  "withdrawPairs": [
+    {
+      "user": "13aacfb43ea897c351165fc91aba2434a087b45e",
+      "blockNumber": 121942,
+      "eventIndex": 1000000
+    },
+    {
+      "user": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce",
+      "blockNumber": 121942,
+      "eventIndex": 1000001
+    },
+    {
+      "user": "2c257830222677e8bebc07506e6cd907ef3254e9",
+      "blockNumber": 121942,
+      "eventIndex": 1000002
+    },
+    {
+      "user": "3ed16d0c779feafb7437b8217ce5a4e108979d0e",
+      "blockNumber": 121942,
+      "eventIndex": 1000003
+    },
+    {
+      "user": "4ae00cc4af5ce2b7f4df5ad5a0b0c6698cd58457",
+      "blockNumber": 121942,
+      "eventIndex": 1000004
+    },
+    {
+      "user": "69a0bae2777c7acab23dce88ff6a4f6ee313f925",
+      "blockNumber": 121942,
+      "eventIndex": 1000005
+    },
+    {
+      "user": "7630b673862a2807583834908f10192e00c58b00",
+      "blockNumber": 121942,
+      "eventIndex": 1000006
+    },
+    {
+      "user": "90b2570080b214fda268f9a2e3b0d1b6e6b53ab5",
+      "blockNumber": 121942,
+      "eventIndex": 1000007
+    },
+    {
+      "user": "c401a164d1e544970abe11b5384b283e3f81c8b9",
+      "blockNumber": 121942,
+      "eventIndex": 1000008
+    },
+    {
+      "user": "c714b751376045eb67d19ad7329dc0003adfd253",
+      "blockNumber": 121942,
+      "eventIndex": 1000009
+    },
+    {
+      "user": "cb8cd037af91b6f121338cdb7d4d021acbb4dc41",
+      "blockNumber": 121942,
+      "eventIndex": 1000010
+    },
+    {
+      "user": "d9f82861fedd51dbab8bc5722f1c16e08faf4995",
+      "blockNumber": 121942,
+      "eventIndex": 1000011
+    },
+    {
+      "user": "dbdb07a156d20e8b463dcd381461f8564f3bb6cd",
+      "blockNumber": 121942,
+      "eventIndex": 1000012
+    }
+  ],
+  "seedPairs": [
+    {
+      "user": "13aacfb43ea897c351165fc91aba2434a087b45e",
+      "blockNumber": 121942,
+      "eventIndex": 1100000
+    },
+    {
+      "user": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce",
+      "blockNumber": 121942,
+      "eventIndex": 1100001
+    },
+    {
+      "user": "2c257830222677e8bebc07506e6cd907ef3254e9",
+      "blockNumber": 121942,
+      "eventIndex": 1100002
+    },
+    {
+      "user": "3ed16d0c779feafb7437b8217ce5a4e108979d0e",
+      "blockNumber": 121942,
+      "eventIndex": 1100003
+    },
+    {
+      "user": "4ae00cc4af5ce2b7f4df5ad5a0b0c6698cd58457",
+      "blockNumber": 121942,
+      "eventIndex": 1100004
+    },
+    {
+      "user": "69a0bae2777c7acab23dce88ff6a4f6ee313f925",
+      "blockNumber": 121942,
+      "eventIndex": 1100005
+    },
+    {
+      "user": "90b2570080b214fda268f9a2e3b0d1b6e6b53ab5",
+      "blockNumber": 121942,
+      "eventIndex": 1100006
+    },
+    {
+      "user": "c714b751376045eb67d19ad7329dc0003adfd253",
+      "blockNumber": 121942,
+      "eventIndex": 1100007
+    },
+    {
+      "user": "cb8cd037af91b6f121338cdb7d4d021acbb4dc41",
+      "blockNumber": 121942,
+      "eventIndex": 1100008
+    },
+    {
+      "user": "d9f82861fedd51dbab8bc5722f1c16e08faf4995",
+      "blockNumber": 121942,
+      "eventIndex": 1100009
+    },
+    {
+      "user": "dbdb07a156d20e8b463dcd381461f8564f3bb6cd",
+      "blockNumber": 121942,
+      "eventIndex": 1100010
+    }
+  ],
+  "unprocessedRealEvents": [
+    {
+      "blockNumber": 52011,
+      "eventIndex": 4,
+      "eventName": "Deposit",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52016,
+      "eventIndex": 5,
+      "eventName": "QueueProcessed",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52020,
+      "eventIndex": 4,
+      "eventName": "Deposit",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52025,
+      "eventIndex": 5,
+      "eventName": "QueueProcessed",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52029,
+      "eventIndex": 5,
+      "eventName": "QueueProcessed",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52042,
+      "eventIndex": 4,
+      "eventName": "Deposit",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52062,
+      "eventIndex": 4,
+      "eventName": "Withdraw",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52080,
+      "eventIndex": 4,
+      "eventName": "Deposit",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52095,
+      "eventIndex": 4,
+      "eventName": "Withdraw",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52103,
+      "eventIndex": 4,
+      "eventName": "Deposit",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52129,
+      "eventIndex": 5,
+      "eventName": "QueueProcessed",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52143,
+      "eventIndex": 4,
+      "eventName": "Deposit",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52149,
+      "eventIndex": 4,
+      "eventName": "Withdraw",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52153,
+      "eventIndex": 4,
+      "eventName": "Deposit",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52160,
+      "eventIndex": 4,
+      "eventName": "Withdraw",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52168,
+      "eventIndex": 4,
+      "eventName": "Deposit",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52169,
+      "eventIndex": 4,
+      "eventName": "Withdraw",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52181,
+      "eventIndex": 4,
+      "eventName": "Deposit",
+      "owner": "90b2570080b214fda268f9a2e3b0d1b6e6b53ab5"
+    },
+    {
+      "blockNumber": 52182,
+      "eventIndex": 4,
+      "eventName": "Withdraw",
+      "owner": "90b2570080b214fda268f9a2e3b0d1b6e6b53ab5"
+    },
+    {
+      "blockNumber": 52252,
+      "eventIndex": 4,
+      "eventName": "Deposit",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52398,
+      "eventIndex": 4,
+      "eventName": "Deposit",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52404,
+      "eventIndex": 4,
+      "eventName": "Deposit",
+      "owner": "90b2570080b214fda268f9a2e3b0d1b6e6b53ab5"
+    },
+    {
+      "blockNumber": 52427,
+      "eventIndex": 5,
+      "eventName": "QueueProcessed",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52427,
+      "eventIndex": 7,
+      "eventName": "QueueProcessed",
+      "owner": "90b2570080b214fda268f9a2e3b0d1b6e6b53ab5"
+    },
+    {
+      "blockNumber": 52513,
+      "eventIndex": 4,
+      "eventName": "Deposit",
+      "owner": "e4f080a6d6e442a8f256cb76b51f3ea4c49659e0"
+    },
+    {
+      "blockNumber": 52514,
+      "eventIndex": 4,
+      "eventName": "Withdraw",
+      "owner": "e4f080a6d6e442a8f256cb76b51f3ea4c49659e0"
+    },
+    {
+      "blockNumber": 52523,
+      "eventIndex": 5,
+      "eventName": "QueueProcessed",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52528,
+      "eventIndex": 4,
+      "eventName": "Deposit",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52560,
+      "eventIndex": 4,
+      "eventName": "Deposit",
+      "owner": "69a0bae2777c7acab23dce88ff6a4f6ee313f925"
+    },
+    {
+      "blockNumber": 52602,
+      "eventIndex": 5,
+      "eventName": "QueueProcessed",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 52602,
+      "eventIndex": 7,
+      "eventName": "QueueProcessed",
+      "owner": "69a0bae2777c7acab23dce88ff6a4f6ee313f925"
+    },
+    {
+      "blockNumber": 66851,
+      "eventIndex": 3,
+      "eventName": "QueueProcessed",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    },
+    {
+      "blockNumber": 66851,
+      "eventIndex": 5,
+      "eventName": "QueueProcessed",
+      "owner": "c401a164d1e544970abe11b5384b283e3f81c8b9"
+    },
+    {
+      "blockNumber": 66851,
+      "eventIndex": 7,
+      "eventName": "QueueProcessed",
+      "owner": "90b2570080b214fda268f9a2e3b0d1b6e6b53ab5"
+    },
+    {
+      "blockNumber": 66851,
+      "eventIndex": 9,
+      "eventName": "QueueProcessed",
+      "owner": "3ed16d0c779feafb7437b8217ce5a4e108979d0e"
+    },
+    {
+      "blockNumber": 66851,
+      "eventIndex": 11,
+      "eventName": "QueueProcessed",
+      "owner": "7630b673862a2807583834908f10192e00c58b00"
+    },
+    {
+      "blockNumber": 121192,
+      "eventIndex": 6,
+      "eventName": "QueueProcessed",
+      "owner": "c714b751376045eb67d19ad7329dc0003adfd253"
+    },
+    {
+      "blockNumber": 121192,
+      "eventIndex": 8,
+      "eventName": "QueueProcessed",
+      "owner": "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce"
+    }
+  ]
+}
