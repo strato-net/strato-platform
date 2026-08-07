@@ -160,16 +160,51 @@ router.get("/:address", authHandler.authorizeRequest(true), TokensController.get
  *         description: Optional status filter
  *         schema:
  *           type: string
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         description: "Number of tokens per page (default: 10, max: 100)"
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *       - name: offset
+ *         in: query
+ *         required: false
+ *         description: "Number of tokens to skip (default: 0)"
+ *         schema:
+ *           type: integer
+ *           minimum: 0
+ *           default: 0
  *     responses:
  *       200:
- *         description: Token list
+ *         description: Paginated token list
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 additionalProperties: true
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     additionalProperties: true
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *                     hasNext:
+ *                       type: boolean
+ *                     hasPrevious:
+ *                       type: boolean
  *   post:
  *     summary: Create a new token (admin)
  *     tags: [Tokens]

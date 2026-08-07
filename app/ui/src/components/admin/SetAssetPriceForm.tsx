@@ -10,7 +10,7 @@ import { Loader2, Info, DollarSign} from 'lucide-react';
 import { AxiosError } from 'axios';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useLendingContext } from '@/context/LendingContext';
-import { useTokenContext } from '@/context/TokenContext';
+import { useTokenContext, TOKENS_LIST_MAX_LIMIT } from '@/context/TokenContext';
 import { formatUnits } from "ethers";
 
 interface ApiErrorResponse {
@@ -34,7 +34,7 @@ const SetAssetPriceForm = () => {
   const selectedToken: Token = Array.isArray(activeTokens) ? activeTokens.find(t => t.address === form.watch('tokenAddress')) : null;
 
   useEffect(() => {
-    getActiveTokens();
+    getActiveTokens(1, TOKENS_LIST_MAX_LIMIT);
   }, [getActiveTokens]);
 
   const onSubmit = async (data: PriceFormValues) => {

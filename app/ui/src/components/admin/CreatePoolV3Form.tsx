@@ -9,7 +9,7 @@ import { PoolV3 } from '@/interface';
 import { Loader2, Info } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSwapContext } from '@/context/SwapContext';
-import { useTokenContext } from '@/context/TokenContext';
+import { useTokenContext, TOKENS_LIST_MAX_LIMIT } from '@/context/TokenContext';
 
 /** Canonical fee tiers enabled on the PoolV3Factory at initialization. */
 const FEE_TIERS = [
@@ -47,7 +47,7 @@ const CreatePoolV3Form = () => {
   }, [fetchV3Pools]);
 
   useEffect(() => {
-    getActiveTokens();
+    getActiveTokens(1, TOKENS_LIST_MAX_LIMIT);
     refreshV3Pools();
   }, [getActiveTokens, refreshV3Pools]);
 

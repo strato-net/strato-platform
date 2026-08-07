@@ -4,7 +4,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx, until } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import * as config from "../../config/config";
-import { getBalance, getTokens, getTokenBalanceForUser } from "./tokens.service";
+import { getBalance, getTokens, getTokenBalanceForUser, asTokenList } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 import {
@@ -561,10 +561,10 @@ export const getPublicCollateralInfo = async (
   // Fetch token metadata only (no user balances)
   let tokenMap = new Map();
   if (assets.length > 0) {
-    const tokens = await getTokens(accessToken, {
+    const tokens = asTokenList(await getTokens(accessToken, {
       address: `in.(${assets.join(",")})`,
       select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,images:${Token}-images(value)`
-    });
+    }));
     tokenMap = new Map(tokens.map((t: any) => [t.address, { address: t.address, balance: "0", token: t }]));
   }
 
@@ -661,11 +661,11 @@ export const liquidityAndBalance = async (
   }
 
   // Fetch token metadata with balances included
-  const tokenData = await getTokens(accessToken, {
+  const tokenData = asTokenList(await getTokens(accessToken, {
     address: `in.(${borrowableAsset},${mToken})`,
     select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
     "balances.key": `in.(${userAddress},${registry.liquidityPool?.address || ''})`
-  });
+  }));
 
   // Extract token data and user balances
   const borrowableToken = tokenData.find(token => token.address === borrowableAsset);
@@ -847,11 +847,11 @@ export const getPublicLiquidityInfo = async (
   }
 
   // Fetch token metadata - only pool balances (no user balances)
-  const tokenData = await getTokens(accessToken, {
+  const tokenData = asTokenList(await getTokens(accessToken, {
     address: `in.(${borrowableAsset},${mToken})`,
     select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
     "balances.key": `eq.${registry.liquidityPool?.address || ''}`
-  });
+  }));
 
   // Extract token data
   const borrowableToken = tokenData.find(token => token.address === borrowableAsset);
@@ -1443,10 +1443,10 @@ export const listLoansForLiquidation = async (
   collateralsArr.forEach((c: any) => tokenSet.add(c.asset));
   let tokenInfoMap = new Map<string, any>();
   try {
-    const tokenRows = await getTokens(accessToken, {
+    const tokenRows = asTokenList(await getTokens(accessToken, {
       address: `in.(${Array.from(tokenSet).join(',')})`,
       select: "address,_symbol,_name"
-    });
+    }));
     tokenInfoMap = new Map<string, any>(tokenRows.map((t: any) => [t.address, t]));
   } catch {}
 
@@ -1623,10 +1623,10 @@ export const getLendingInterestAccrued = async (
   const reserveFactorBps = BigInt(borrowableAssetConfig.reserveFactor || 0);
 
   // Get token symbol
-  const tokenRows = await getTokens(accessToken, {
+  const tokenRows = asTokenList(await getTokens(accessToken, {
     address: `eq.${borrowableAsset}`,
     select: "address,_symbol"
-  });
+  }));
   const symbol = tokenRows?.[0]?._symbol || "UNKNOWN";
 
   // Calculate actual debt and annual rate

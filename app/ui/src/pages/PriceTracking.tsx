@@ -569,11 +569,15 @@ const PriceTracking = () => {
     const fetchAllAssets = async () => {
       setLoadingAssets(true);
       try {
-        // Fetch tokens with status == 2
-        const tokensResponse = await api.get<any[]>('/tokens', {
-          params: { status: 'eq.2' },
+        // Fetch tokens with status == 2 (paginated API; use max limit for full active set)
+        const tokensResponse = await api.get<{ data: any[] }>('/tokens', {
+          params: { status: 'eq.2', limit: '100', offset: '0' },
         });
-        const tokens = Array.isArray(tokensResponse.data) ? tokensResponse.data : (tokensResponse.data?.tokens || []);
+        const tokens = Array.isArray(tokensResponse.data?.data)
+          ? tokensResponse.data.data
+          : Array.isArray(tokensResponse.data)
+            ? tokensResponse.data
+            : [];
 
         // Fetch pools from /swap-pools endpoint
         const poolsResponse = await api.get<any[]>('/swap-pools');

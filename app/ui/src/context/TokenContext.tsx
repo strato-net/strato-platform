@@ -35,6 +35,27 @@ export interface BulkTransferResponse {
   hash?: string;
 }
 
+type TokenPagination = {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+};
+
+const EMPTY_PAGINATION: TokenPagination = {
+  total: 0,
+  page: 1,
+  limit: 10,
+  totalPages: 0,
+  hasNext: false,
+  hasPrevious: false,
+};
+
+/** Max page size for list UIs that need the full active set (dropdowns, trading desk). */
+export const TOKENS_LIST_MAX_LIMIT = 100;
+
 type TokenContextType = {
   tokens: Token[];
   activeTokens: Token[];
@@ -45,8 +66,10 @@ type TokenContextType = {
   borrowingHistory: BalanceSnapshot[];
   loading: boolean;
   error: string | null;
-  getAllTokens: (query?: Record<string, string>) => Promise<void>;
-  getActiveTokens: () => Promise<void>;
+  pagination: TokenPagination;
+  activePagination: TokenPagination;
+  getAllTokens: (page?: number, limit?: number, query?: Record<string, string>) => Promise<void>;
+  getActiveTokens: (page?: number, limit?: number) => Promise<void>;
   getInactiveTokens: (showLoading?: boolean) => Promise<void>;
   getToken: (address: string) => Promise<Token | null>;
   getUserTokensWithBalance: () => Promise<Token[]>;
@@ -99,6 +122,8 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [loadingEarningAssets, setLoadingEarningAssets] = useState(false);
   const [loadingInactiveTokens, setLoadingInactiveTokens] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<TokenPagination>(EMPTY_PAGINATION);
+  const [activePagination, setActivePagination] = useState<TokenPagination>(EMPTY_PAGINATION);
 
   // USDST balance state
   const [usdstBalance, setUsdstBalance] = useState("0");
@@ -122,22 +147,38 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const inactiveTokensAbortControllerRef = useRef<AbortController | null>(null);
   const netBalanceAbortControllerRef = useRef<AbortController | null>(null);
 
-  const getAllTokens = useCallback(async (query: Record<string, string> = {}) => {
+  const getAllTokens = useCallback(async (page = 1, limit = 10, query: Record<string, string> = {}) => {
     setLoading(true);
     try {
-      const res = await api.get<Token[]>('/tokens', { params: query });
-      setTokens(res.data || []);
+      const offset = (page - 1) * limit;
+      const res = await api.get<{ data: Token[]; pagination: TokenPagination }>('/tokens', {
+        params: {
+          ...query,
+          limit: limit.toString(),
+          offset: offset.toString(),
+        },
+      });
+      setTokens(res.data?.data || []);
+      setPagination(res.data?.pagination || { ...EMPTY_PAGINATION, page, limit });
     } catch (err) {
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const getActiveTokens = useCallback(async () => {
+  const getActiveTokens = useCallback(async (page = 1, limit = 10) => {
     setLoading(true);
     try {
-      const res = await api.get<Token[]>('/tokens', { params: { status: 'eq.2' } });
-      setActiveTokens(res.data || []);
+      const offset = (page - 1) * limit;
+      const res = await api.get<{ data: Token[]; pagination: TokenPagination }>('/tokens', {
+        params: {
+          status: 'eq.2',
+          limit: limit.toString(),
+          offset: offset.toString(),
+        },
+      });
+      setActiveTokens(res.data?.data || []);
+      setActivePagination(res.data?.pagination || { ...EMPTY_PAGINATION, page, limit });
     } catch (err) {
     } finally {
       setLoading(false);
@@ -536,6 +577,8 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         borrowingHistory,
         loading,
         error,
+        pagination,
+        activePagination,
         getAllTokens,
         getActiveTokens,
         getInactiveTokens,

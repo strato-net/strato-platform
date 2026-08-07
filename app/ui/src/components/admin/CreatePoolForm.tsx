@@ -8,7 +8,7 @@ import { CreatePoolParams } from '@/interface';
 import { Loader2, Info, Droplets } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSwapContext } from '@/context/SwapContext';
-import { useTokenContext } from '@/context/TokenContext';
+import { useTokenContext, TOKENS_LIST_MAX_LIMIT } from '@/context/TokenContext';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import CreatePoolV3Form from './CreatePoolV3Form';
@@ -40,7 +40,7 @@ const CreatePoolForm = () => {
   });
 
   useEffect(() => {
-    getActiveTokens();
+    getActiveTokens(1, TOKENS_LIST_MAX_LIMIT);
   }, [getActiveTokens]);
 
   const onSubmit = async (data: CreatePoolParams) => {

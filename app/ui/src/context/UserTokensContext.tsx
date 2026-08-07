@@ -84,10 +84,13 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
     setAllActiveLoading(true);
     setError(null);
     try {
-      const response = await api.get(`/tokens?status=eq.2`, { signal });
+      const response = await api.get(`/tokens`, {
+        signal,
+        params: { status: 'eq.2', limit: '100', offset: '0' },
+      });
       // Only update state if not aborted and data has actually changed
       if (signal?.aborted) return;
-      const tokens = response.data || [];
+      const tokens = response.data?.data || [];
       setAllActiveTokens(tokens);
     } catch (err) {
       if (
