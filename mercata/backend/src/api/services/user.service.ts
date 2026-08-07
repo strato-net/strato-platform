@@ -6,7 +6,7 @@ import { StratoPaths } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import JSONBig from "json-bigint";
 import { normalizeLegacyEscapes } from "../helpers/jsonStringParsing.helper";
-const { AdminRegistry, adminRegistry } = constants;
+const { AdminRegistry, adminRegistry, DAY_MS } = constants;
 const JSONBigString = JSONBig({ storeAsString: true });
 const JSONBigNumber = JSONBig();
 
@@ -499,9 +499,18 @@ export const getExecutedIssues = async (
 ): Promise<object> => {
   try {
     const offset = (page - 1) * limit;
+    // Both queries sort/aggregate the whole table unless they are bounded. block_timestamp
+    // is the only usable bound: block_number is stored as text (so range comparisons are
+    // lexicographic) and anchoring on id would need a max(id) lookup that costs as much as
+    // the sort it replaces. Read off constants so the network-specific window applies.
+    const since = new Date(Date.now() - constants.EXECUTED_ISSUES_LOOKBACK_DAYS * DAY_MS)
+      .toISOString()
+      .slice(0, 10);
     const [executedResponse, executedCountResponse] = await Promise.all([
       cirrus.get(accessToken, "/" + AdminRegistry + "-IssueExecuted", {
         params: {
+          select: 'issueId,target,func,args,executor',
+          block_timestamp: `gte.${since}`,
           order: 'block_timestamp.desc',
           limit: limit.toString(),
           offset: offset.toString(),
@@ -510,6 +519,7 @@ export const getExecutedIssues = async (
       cirrus.get(accessToken, "/" + AdminRegistry + "-IssueExecuted", {
         params: {
           select: 'count()',
+          block_timestamp: `gte.${since}`,
         },
       }),
     ]);

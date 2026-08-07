@@ -183,6 +183,18 @@ export const defaultUsdcYieldVaultFor: Record<string, string> = {
   "33056204878082667": "afcfc4d847d59fbc402856fd6934aff6796812b1",// Upquark mainnet
 };
 
+/*
+   How far back the admin "Executed Issues" list looks. IssueExecuted grows with every
+   whitelisted call, not just governance votes, so an unbounded sort/count is proportional
+   to all platform activity ever. Test networks churn far faster than mainnet, so they use
+   a shorter window; unknown networks (dev workspaces) behave like test networks.
+*/
+export const UNKNOWN_NETWORK_EXECUTED_ISSUES_LOOKBACK_DAYS = 3;
+export const defaultExecutedIssuesLookbackDaysFor: Record<string, number> = {
+  "114784819836269": 3,  // Helium testnet
+  "33056204878082667": 30, // Upquark mainnet
+};
+
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
@@ -203,6 +215,7 @@ export let stratoToken: string = '';
 export let stratoStaking: string = '';
 export let validatorRegistry: string = '';
 export let usdcYieldVault: string = '';
+export let executedIssuesLookbackDays: number = UNKNOWN_NETWORK_EXECUTED_ISSUES_LOOKBACK_DAYS;
 
 function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
@@ -314,6 +327,11 @@ export function setUsdcYieldVaultConfig(networkId: string) {
   usdcYieldVault = process.env.USDC_YIELD_VAULT || defaultUsdcYieldVaultFor[networkId] || "";
 }
 
+export function setExecutedIssuesLookbackConfig(networkId: string) {
+  executedIssuesLookbackDays =
+    defaultExecutedIssuesLookbackDaysFor[networkId] || UNKNOWN_NETWORK_EXECUTED_ISSUES_LOOKBACK_DAYS;
+}
+
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
   const { eth } = await import("../utils/mercataApiHelper");
@@ -338,6 +356,7 @@ export async function initNetworkConfig() {
   setCarryVaultConfig(networkId);
   setDirectMintPsmConfig(networkId);
   setUsdcYieldVaultConfig(networkId);
+  setExecutedIssuesLookbackConfig(networkId);
 }
 
 /**

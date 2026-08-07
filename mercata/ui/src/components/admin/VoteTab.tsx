@@ -379,7 +379,7 @@ const VoteTab = () => {
         <CardHeader className="px-4 md:px-6">
           <CardTitle className="text-base md:text-xl dark:text-foreground whitespace-nowrap">Executed Issues</CardTitle>
           <CardDescription className="text-xs md:text-sm dark:text-muted-foreground">
-            Issues that have already been executed
+            Recently executed issues
           </CardDescription>
         </CardHeader>
         <CardContent className="px-4 md:px-6">
