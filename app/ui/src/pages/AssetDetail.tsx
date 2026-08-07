@@ -1,19 +1,24 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChevronLeft, Wallet, ArrowUp, ArrowDown } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ChevronLeft, Loader2 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { useTokenContext } from '@/context/TokenContext';
-import { Token } from '@/interface';
+import { Token, SwapHistoryEntry } from '@/interface';
 import { formatUnits } from 'ethers';
 import { api } from '@/lib/axios';
 import ConsolidatedPriceChart from '@/components/charts/ConsolidatedPriceChart';
 import CopyButton from '@/components/ui/copy';
-import { addCommasToInput, roundToDecimals } from '@/utils/numberUtils';
+import { addCommasToInput, formatWeiAmount, formatHash } from '@/utils/numberUtils';
+import { buildTradeBuyPath, fetchUsdstBuyableAddresses, normTradeAddr } from '@/lib/tradeLinks';
+import { usdstAddress } from '@/lib/constants';
+
+const RECENT_SWAPS_LIMIT = 10;
 
 type PricePoint = {
   date: string;
@@ -37,6 +42,11 @@ interface PriceHistoryApiEntry {
   blockTimestamp: string;
 }
 
+interface TokenSwapHistoryResponse {
+  data: (SwapHistoryEntry & { timestamp: string })[];
+  totalCount: number;
+}
+
 const isLPToken = (token: Token): boolean => {
   const symbol = token?.token?._symbol || token?._symbol || '';
   return symbol.endsWith('-LP');
@@ -48,6 +58,15 @@ const formatLargeNumber = (num: number): string => {
   if (num >= 1e3) return `${(num / 1e3).toFixed(2)}K`;
   return num.toFixed(2);
 };
+
+const formatSwapTimestamp = (timestamp: Date) =>
+  timestamp.toLocaleDateString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 
 const fetchPriceHistory = async (assetAddress: string): Promise<PricePoint[]> => {
   try {
@@ -95,15 +114,30 @@ const fetchSwapPoolPrices = async (assetAddress: string): Promise<SwapPricePoint
   }
 };
 
+const fetchTokenRecentSwaps = async (tokenAddress: string): Promise<(SwapHistoryEntry & { timestamp: Date })[]> => {
+  try {
+    const { data } = await api.get<TokenSwapHistoryResponse>(`/trade/token-history/${tokenAddress}`, {
+      params: { page: 1, limit: RECENT_SWAPS_LIMIT },
+    });
+    return (data?.data ?? []).map((row) => ({ ...row, timestamp: new Date(row.timestamp) }));
+  } catch (error) {
+    console.error('Failed to fetch recent swaps:', error);
+    return [];
+  }
+};
+
 const AssetDetail = () => {
 
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [asset, setAsset] = useState<Token | null>(null);
-  const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [priceData, setPriceData] = useState<PricePoint[]>([]);
   const [priceDataLoading, setPriceDataLoading] = useState(false);
   const [swapPriceData, setSwapPriceData] = useState<SwapPricePoint[]>([]);
   const [swapPriceDataLoading, setSwapPriceDataLoading] = useState(false);
+  const [recentSwaps, setRecentSwaps] = useState<(SwapHistoryEntry & { timestamp: Date })[]>([]);
+  const [recentSwapsLoading, setRecentSwapsLoading] = useState(false);
+  const [canBuy, setCanBuy] = useState(false);
   const [showPriceTooltip, setShowPriceTooltip] = useState(false);
   const { userAddress, isLoggedIn } = useUser()
   const { activeTokens: assets, inactiveTokens, loading, fetchTokens, allActiveTokens } = useUserTokens()
@@ -120,6 +154,28 @@ const AssetDetail = () => {
   useEffect(() => {
     setAsset(null);
     setLookupComplete(false);
+    setRecentSwaps([]);
+    setCanBuy(false);
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    const addr = normTradeAddr(id);
+    if (!addr || addr === normTradeAddr(usdstAddress)) {
+      setCanBuy(false);
+      return;
+    }
+    fetchUsdstBuyableAddresses()
+      .then((set) => {
+        if (!cancelled) setCanBuy(set.has(addr));
+      })
+      .catch(() => {
+        if (!cancelled) setCanBuy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   useEffect(() => {
@@ -156,6 +212,15 @@ const AssetDetail = () => {
               if (!cancelled) setSwapPriceDataLoading(false);
             });
         }
+
+        setRecentSwapsLoading(true);
+        fetchTokenRecentSwaps(foundAsset.address)
+          .then((data) => {
+            if (!cancelled) setRecentSwaps(data);
+          })
+          .finally(() => {
+            if (!cancelled) setRecentSwapsLoading(false);
+          });
       }
     };
 
@@ -390,6 +455,15 @@ const AssetDetail = () => {
                       </span>
                     </div>
                   </div>
+
+                  {canBuy && !isLPToken(asset) && (
+                    <Button
+                      className="w-full mb-4"
+                      onClick={() => navigate(buildTradeBuyPath(asset.address))}
+                    >
+                      Buy with USDST
+                    </Button>
+                  )}
                   {/* {!isWalletConnected ? (
                     <Button
                       onClick={handleConnectWallet}
@@ -444,7 +518,7 @@ const AssetDetail = () => {
               </div>
             </div>
 
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 space-y-6">
                 <ConsolidatedPriceChart
                   spotData={priceData}
                   swapData={swapPriceData}
@@ -458,6 +532,72 @@ const AssetDetail = () => {
                   }
                   isLPToken={isLPToken(asset)}
                 />
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">Recent Swaps</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Latest trades involving {asset?.token?._symbol || asset?._symbol} across all pools
+                    </p>
+                  </CardHeader>
+                  <CardContent className="px-0 pb-0 sm:px-0">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="hover:bg-transparent">
+                            <TableHead className="pl-6">Time</TableHead>
+                            <TableHead>From</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                            <TableHead>To</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                            <TableHead>Pool</TableHead>
+                            <TableHead className="pr-6">Trader</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {recentSwapsLoading ? (
+                            <TableRow>
+                              <TableCell colSpan={7} className="text-center py-10">
+                                <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
+                              </TableCell>
+                            </TableRow>
+                          ) : recentSwaps.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                                No recent swaps for this token
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            recentSwaps.map((swap) => (
+                              <TableRow key={`${swap.poolAddress ?? ''}-${swap.id}`}>
+                                <TableCell className="pl-6 text-sm whitespace-nowrap">
+                                  {formatSwapTimestamp(swap.timestamp)}
+                                </TableCell>
+                                <TableCell className="font-medium text-sm">{swap.tokenIn}</TableCell>
+                                <TableCell className="text-right tabular-nums text-sm">
+                                  {formatWeiAmount(swap.amountIn)}
+                                </TableCell>
+                                <TableCell className="font-medium text-sm">{swap.tokenOut}</TableCell>
+                                <TableCell className="text-right tabular-nums text-sm">
+                                  {formatWeiAmount(swap.amountOut)}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {swap.poolName || 'V2'}
+                                </TableCell>
+                                <TableCell className="pr-6 font-mono text-xs">
+                                  <span className="inline-flex items-center gap-1">
+                                    {formatHash(swap.sender)}
+                                    <CopyButton address={swap.sender} />
+                                  </span>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
             </div>
           </div>
         </main>

@@ -459,6 +459,75 @@ export const fetchPairSwapHistory = async (
 };
 
 /**
+ * Recent V3 swaps involving a single token across every fee-tier pool that lists it
+ * as token0 or token1. Same shape as fetchPairSwapHistory; impliedPrice is raw
+ * output-per-input (no pair orientation).
+ */
+export const fetchTokenSwapHistory = async (
+  accessToken: string,
+  tokenAddress: string,
+  maxRows: number
+): Promise<{ entries: SwapHistoryEntry[]; totalCount: number }> => {
+  const t = normalizeAddress(tokenAddress);
+  const rawPools = await fetchRawPools(accessToken, {
+    or: `(token0.eq.${t},token1.eq.${t})`,
+  });
+  if (rawPools.length === 0) return { entries: [], totalCount: 0 };
+  const poolByAddress = new Map(rawPools.map((p) => [p.address, p]));
+
+  const eventFilters = {
+    address: `in.(${rawPools.map((p) => p.address).join(",")})`,
+  };
+
+  const [eventsResponse, countResponse] = await Promise.all([
+    cirrus.get(accessToken, `/${PoolV3SwapEvent}`, {
+      params: {
+        ...eventFilters,
+        select: POOL_V3_SWAP_HISTORY_SELECT_FIELDS.join(","),
+        order: "block_timestamp.desc",
+        limit: maxRows.toString(),
+      },
+    }),
+    cirrus.get(accessToken, `/${PoolV3SwapEvent}`, {
+      params: { ...eventFilters, select: "count()" },
+    }),
+  ]);
+
+  const swapEvents = eventsResponse.data;
+  const totalCount = countResponse.data?.[0]?.count || 0;
+  if (!Array.isArray(swapEvents)) return { entries: [], totalCount: 0 };
+
+  const entries: SwapHistoryEntry[] = (swapEvents as RawV3SwapEvent[]).flatMap((event) => {
+    const pool = poolByAddress.get(event.address);
+    if (!pool) return [];
+    const amount0 = toBigIntOrUndefined(event.amount0) ?? 0n;
+    const amount1 = toBigIntOrUndefined(event.amount1) ?? 0n;
+    const zeroForOne = amount0 > 0n;
+    const amountIn = zeroForOne ? amount0 : amount1;
+    const amountOut = -(zeroForOne ? amount1 : amount0);
+    const impliedPrice =
+      amountIn > 0n && amountOut > 0n
+        ? (Number((amountOut * 10n ** 18n) / amountIn) / 1e18).toFixed(6)
+        : "0.00";
+    return [{
+      id: event.id,
+      timestamp: new Date(event.block_timestamp),
+      tokenIn: zeroForOne ? pool.token0._symbol : pool.token1._symbol,
+      tokenOut: zeroForOne ? pool.token1._symbol : pool.token0._symbol,
+      amountIn: amountIn.toString(),
+      amountOut: amountOut.toString(),
+      impliedPrice,
+      sender: event.sender,
+      poolAddress: pool.address,
+      poolName: `V3 ${Number(pool.fee) / 10000}%`,
+      fee: Number(pool.fee),
+    }];
+  });
+
+  return { entries, totalCount };
+};
+
+/**
  * Liquidity distribution across the price axis (depth-chart data): walk the pool's
  * initialized ticks in order accumulating liquidityNet — the running sum is the active
  * liquidity everywhere inside [tick_i, tick_i+1). Zero-liquidity gaps are omitted.
