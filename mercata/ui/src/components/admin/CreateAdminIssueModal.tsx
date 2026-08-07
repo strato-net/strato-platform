@@ -125,7 +125,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
         return [false, `Array validation error: ${e instanceof Error ? e.message : String(e)}`];
       }
     }
-    return [true, JSON.stringify(value.trim())];
+    return [true, value.trim()];
   }
 
   const getTypeName = (_type: object): string => {

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getAdmin, isUserAdmin, addAdmin, removeAdmin, castVoteOnIssue, castVoteOnIssueById, dismissIssue, getOpenIssues,
+import { getAdmin, isUserAdmin, addAdmin, removeAdmin, createIssue, castVoteOnIssueById, dismissIssue, getOpenIssues,
          getExecutedIssues, contractSearch, getContractDetails,
  } from "../services/user.service";
 import { validateUserAddress, validateAddressField } from "../validators/common.validators";
@@ -86,7 +86,7 @@ class UserController {
     }
   }
 
-  static async castVoteOnIssue(
+  static async createIssue(
     req: Request,
     res: Response,
     next: NextFunction
@@ -95,10 +95,10 @@ class UserController {
       const { accessToken, address: actorAddress } = req;
       const { target, func, args } = req.body;
       validateAddressField(target);
-      
-      const result = await castVoteOnIssue(accessToken, actorAddress as string, target, func, args);
-      res.status(RestStatus.OK).json({ 
-        message: "Vote cast successfully", 
+
+      const result = await createIssue(accessToken, actorAddress as string, target, func, args);
+      res.status(RestStatus.OK).json({
+        message: "Issue created successfully",
         target,
         func,
         args,

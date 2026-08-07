@@ -5,19 +5,20 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import JSONBig from "json-bigint";
-import { normalizeLegacyEscapes, sanitizeJsonLikeStringArgs } from "../helpers/jsonStringParsing.helper";
+import { normalizeLegacyEscapes } from "../helpers/jsonStringParsing.helper";
 const { AdminRegistry, adminRegistry } = constants;
 const JSONBigString = JSONBig({ storeAsString: true });
+const JSONBigNumber = JSONBig();
 
-export const parseAdminIssueArgs = (argsRaw: any): any => {
-  if (typeof argsRaw !== "string") return argsRaw;
-
-  const normalizedArgsRaw = normalizeLegacyEscapes(argsRaw);
-  try {
-    return JSONBigString.parse(normalizedArgsRaw);
-  } catch {
-    return JSONBigString.parse(sanitizeJsonLikeStringArgs(normalizedArgsRaw));
-  }
+type AbiType = {
+  tag?: string;
+  signed?: boolean;
+  bytes?: number;
+  entry?: AbiType;
+  length?: number;
+  actual?: AbiType;
+  contents?: string;
+  typedef?: string;
 };
 
 export const isUserAdmin = async (
@@ -47,42 +48,6 @@ export const isUserAdmin = async (
     return false;
   }
 }; 
-
-const getVariadicTail = (args: any[], startIndex: number): any[] => {
-  const tail = args.slice(startIndex);
-  return tail.length === 1 && Array.isArray(tail[0]) ? tail[0] : tail;
-};
-
-const getCreateContractArgs = (args: any[]): any[] =>
-  getVariadicTail(args, 2).map((arg) => typeof arg === "string" ? JSON.stringify(arg) : arg);
-
-const castVoteOnCreateContractIssue = async (
-  accessToken: string,
-  userAddress: string,
-  target: string,
-  args: any[],
-): Promise<{ status: string; hash: string }> => {
-  if (args.length < 3) {
-    throw new Error('Invalid createContract issue args');
-  }
-
-  const tx = await buildFunctionTx({
-    contractName: extractContractName(AdminRegistry),
-    contractAddress: target,
-    method: "createContract",
-    args: {
-      contractName: args[0],
-      contractSrc: args[1],
-      args: getCreateContractArgs(args),
-    },
-  }, userAddress, accessToken);
-
-  const { status, hash } = await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, tx)
-  );
-
-  return { status, hash };
-};
 
 export const getAdmin = async (
   accessToken: string
@@ -184,7 +149,9 @@ export const castVoteOnIssue = async (
     }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+      strato.post(accessToken, StratoPaths.transactionParallel, tx, {
+        transformRequest: [(data) => JSONBigNumber.stringify(data)],
+      })
     );
 
     return { status, hash };
@@ -216,102 +183,228 @@ export const dismissIssue = async (
 const sameAddress = (a: string, b: string): boolean =>
   (a || "").toLowerCase().replace(/^0x/, "") === (b || "").toLowerCase().replace(/^0x/, "");
 
-const fetchIssueCreationTxArgs = async (
-  accessToken: string,
-  txHash: string,
-  target: string,
-  func: string,
-): Promise<string[] | null> => {
-  try {
-    const response = await eth.get(accessToken, "/transaction", { params: { hash: txHash } });
-    const tx = Array.isArray(response.data) ? response.data[0] : null;
-    if (!tx || !Array.isArray(tx.args)) return null;
-
-    // Issue created through the admin UI: castVoteOnIssue(_target, _func, ...variadic)
-    if (tx.funcName === "castVoteOnIssue" && sameAddress(tx.to, adminRegistry)) {
-      return tx.args.slice(2);
-    }
-    // Issue created by calling the onlyOwner function directly (Ownable fallback)
-    if (tx.funcName === func && sameAddress(tx.to, target)) {
-      return tx.args;
-    }
-    return null;
-  } catch {
-    return null;
+const solidityTypeName = (type: any): string => {
+  switch (type?.tag) {
+    case "Int":
+      return `${type.signed ? "" : "u"}int${type.bytes ? type.bytes * 8 : ""}`;
+    case "String":
+    case "Bytes":
+    case "Bool":
+    case "Address":
+    case "Account":
+    case "Decimal":
+      return type.tag.toLowerCase() + (type.tag === "Bytes" && type.bytes ? type.bytes : "");
+    case "Array":
+      return `${solidityTypeName(type.entry)}[${type.length ?? ""}]`;
+    case "UnknownLabel":
+      return type.contents || "";
+    case "Struct":
+    case "Enum":
+    case "Error":
+    case "Contract":
+      return type.typedef || "";
+    case "UserDefined":
+      return solidityTypeName(type.actual);
+    case "Variadic":
+      return "variadic";
+    default:
+      return "";
   }
 };
 
-// Replace string-bearing args with values parsed from the original transaction so the
-// re-submitted vote hashes to the same issueId (restores characters Cirrus dropped)
-const restoreArgsFromTx = (args: any[], txArgs: string[] | null): any[] => {
-  if (!txArgs || !Array.isArray(args) || txArgs.length !== args.length) return args;
-  return args.map((arg, i) => {
-    const src = txArgs[i];
-    if (typeof src !== "string" || (src[0] !== '"' && src[0] !== "[")) return arg;
-    try {
-      return JSONBigString.parse(src);
-    } catch {
-      return arg;
+// Ordered [name, Solidity type] pairs for a function's parameters
+const fetchFuncArgs = async (
+  accessToken: string,
+  address: string,
+  func: string,
+): Promise<{ contractName: string; funcArgs: [string, AbiType][] }> => {
+  let details: any = await getContractDetails(accessToken, address);
+  if (details._contractName === "Proxy") {
+    const storage = await eth.get(accessToken, "/storage", {
+      params: { address, key: "logicContract" },
+    });
+    const rawLogicAddress = storage.data?.find((row: any) => row.key === "logicContract")?.value;
+    const logicAddress = rawLogicAddress?.match(/^address\(([0-9a-fA-F]{40})\)$/)?.[1];
+    if (!logicAddress) {
+      throw new Error(`Logic contract not found for proxy ${address}`);
     }
-  });
+    details = await getContractDetails(accessToken, logicAddress);
+  }
+  const funcArgs = details?._functions?.[func]?._funcArgs;
+  if (!Array.isArray(funcArgs)) {
+    throw new Error(`Function ${func} not found on contract ${address}`);
+  }
+  const result: [string, AbiType][] = funcArgs
+    .slice()
+    .sort((a, b) => (a?.[1]?.index ?? 0) - (b?.[1]?.index ?? 0))
+    .map((entry): [string, AbiType] => [entry?.[0] ?? "", entry?.[1]?.type || {}]);
+  const contractName = details._contractName || details.contractName;
+  if (!contractName) {
+    throw new Error(`Contract name not found for ${address}`);
+  }
+  return { contractName, funcArgs: result };
 };
 
-// Cast a vote on an issue by issueId
+// Parse a textual transaction arg back to a raw value (strings/arrays/numbers are
+// JSON-encoded in transaction args); non-JSON text passes through verbatim
+const parseTxArg = (text: string): any => {
+  try {
+    return JSONBigString.parse(normalizeLegacyEscapes(text));
+  } catch {
+    return text;
+  }
+};
+
+const formatArg = (type: AbiType, value: any): any => {
+  const typeName = solidityTypeName(type);
+  if (value === undefined) {
+    throw new Error(`Missing ${typeName || "function"} argument`);
+  }
+
+  switch (type.tag) {
+    case "String":
+      return String(value);
+    case "Int": {
+      const integer = String(value).trim();
+      if (!/^-?\d+$/.test(integer) || (!type.signed && integer.startsWith("-"))) {
+        throw new Error(`Invalid ${typeName}: ${value}`);
+      }
+      return JSONBigNumber.parse(integer);
+    }
+    case "Decimal": {
+      const decimal = String(value).trim();
+      if (!/^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(decimal)) {
+        throw new Error(`Invalid decimal: ${value}`);
+      }
+      return JSONBigNumber.parse(decimal);
+    }
+    case "Bool":
+      if (typeof value === "boolean") return value;
+      if (/^true$/i.test(value)) return true;
+      if (/^false$/i.test(value)) return false;
+      throw new Error(`Invalid bool: ${value}`);
+    case "Address":
+    case "Account":
+    case "Contract": {
+      const address = String(value).trim().toLowerCase().replace(/^0x/, "");
+      if (!/^[0-9a-f]{1,40}$/.test(address)) {
+        throw new Error(`Invalid address: ${value}`);
+      }
+      return `0x${address}`;
+    }
+    case "Bytes": {
+      const bytes = String(value).trim().replace(/^0x/, "");
+      if (!/^(?:[0-9a-fA-F]{2})*$/.test(bytes) || (type.bytes && bytes.length !== type.bytes * 2)) {
+        throw new Error(`Invalid ${typeName}: ${value}`);
+      }
+      return bytes;
+    }
+    case "Array": {
+      if (!Array.isArray(value)) {
+        throw new Error(`Invalid ${typeName}: expected an array`);
+      }
+      if (type.length !== undefined && value.length !== type.length) {
+        throw new Error(`Invalid ${typeName}: expected ${type.length} values`);
+      }
+      return value.map((entry) => formatArg(type.entry || {}, entry));
+    }
+    case "UserDefined":
+      return formatArg(type.actual || {}, value);
+    case "Enum":
+      return /^-?\d+$/.test(String(value).trim())
+        ? JSONBigNumber.parse(String(value).trim())
+        : value;
+    default:
+      return value;
+  }
+};
+
+const hintedArg = (type: AbiType, value: any): any => {
+  const typeName = solidityTypeName(type);
+  const formattedValue = formatArg(type, value);
+
+  return typeName && type.tag !== "Variadic"
+    ? { type: typeName, value: formattedValue }
+    : formattedValue;
+};
+
+// Direct call to target.func(args). When the caller doesn't own the target, the
+// Ownable fallback routes msg.sig/msg.data into AdminRegistry.castVoteOnIssue, so
+// the issueId is keccak256(target, func, args) over the exact call args
+const callTargetFunction = async (
+  accessToken: string,
+  userAddress: string,
+  contractName: string,
+  contractAddress: string,
+  method: string,
+  args: Record<string, any>,
+): Promise<{ status: string; hash: string }> => {
+  const tx = await buildFunctionTx({
+    contractName,
+    contractAddress,
+    method,
+    args,
+  }, userAddress, accessToken);
+
+  return postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx, {
+      transformRequest: [(data) => JSONBigNumber.stringify(data)],
+    })
+  );
+};
+
+// Create an issue by calling the target function directly (SMD-style). The
+// AdminRegistry itself is the exception: it owns itself, so its onlyOwner functions
+// can't reach the Ownable fallback and are proposed via castVoteOnIssue instead
+export const createIssue = async (
+  accessToken: string,
+  userAddress: string,
+  target: string,
+  func: string,
+  args: any[],
+): Promise<{ status: string; hash: string }> => {
+  const { contractName, funcArgs } = await fetchFuncArgs(accessToken, target, func);
+  if (sameAddress(target, adminRegistry)) {
+    const variadicArgs = args.map((arg, i) =>
+      hintedArg(funcArgs[i]?.[1] || {}, arg));
+    return castVoteOnIssue(accessToken, userAddress, target, func, variadicArgs);
+  }
+  const namedArgs = Object.fromEntries(funcArgs.map(([name, type], i) =>
+    [name, hintedArg(type, args[i])]));
+  return callTargetFunction(accessToken, userAddress, contractName, target, func, namedArgs);
+};
+
+// Cast a vote on an existing issue by replaying the exact transaction that created
+// it, so the call hashes to the same issueId instead of opening a new issue
 export const castVoteOnIssueById = async (
   accessToken: string,
   userAddress: string,
   issueId: string,
 ): Promise<{ status: string; hash: string }> => {
-  try {
-    // Find the issue by issueId
-    const issueResponse = await cirrus.get(accessToken, "/" + AdminRegistry + "-IssueCreated", {
-      params: {
-        issueId: `eq.${issueId}`
-      },
-    });
-
-    if (issueResponse.status !== 200) {
-      throw new Error('Failed to fetch issue');
-    }
-
-    if (!issueResponse.data || !Array.isArray(issueResponse.data) || issueResponse.data.length === 0) {
-      throw new Error('Issue not found');
-    }
-
-    const issue = issueResponse.data[0];
-    const { target, func, args: argsRaw } = issue;
-
-    // Parse args keeping large numbers as strings (JSONBig with storeAsString)
-    const args = parseAdminIssueArgs(argsRaw);
-
-    // If func is _addAdmin, call the addAdmin endpoint directly
-    if (func === '_addAdmin') {
-      const adminAddress = Array.isArray(args) ? args[0] : args._admin;
-      if (!adminAddress) {
-        throw new Error('Admin address not found in args');
-      }
-      return await addAdmin(accessToken, userAddress, adminAddress);
-    }
-
-    // If func is _removeAdmin, call the removeAdmin endpoint directly
-    if (func === '_removeAdmin') {
-      const adminAddress = Array.isArray(args) ? args[0] : args._admin;
-      if (!adminAddress) {
-        throw new Error('Admin address not found in args');
-      }
-      return await removeAdmin(accessToken, userAddress, adminAddress);
-    }
-
-    if (func === 'createContract' && Array.isArray(args)) {
-      return await castVoteOnCreateContractIssue(accessToken, userAddress, target, args);
-    }
-
-    const txArgs = await fetchIssueCreationTxArgs(accessToken, issue.transaction_hash, target, func);
-
-    return await castVoteOnIssue(accessToken, userAddress, target, func, restoreArgsFromTx(args, txArgs));
-  } catch (error) {
-    throw error;
+  const issueResponse = await cirrus.get(accessToken, "/" + AdminRegistry + "-IssueCreated", {
+    params: {
+      issueId: `eq.${issueId}`,
+      limit: "1",
+    },
+  });
+  const issue = issueResponse.data?.[0];
+  if (!issue?.transaction_hash) {
+    throw new Error("Issue not found");
   }
+
+  const txResponse = await eth.get(accessToken, "/transaction", { params: { hash: issue.transaction_hash } });
+  const tx = Array.isArray(txResponse.data) ? txResponse.data[0] : null;
+  if (!tx?.funcName || !Array.isArray(tx.args)) {
+    throw new Error("Original issue transaction not found");
+  }
+
+  // Fixed args are decoded once from the original transaction source. Variadic
+  // tails stay verbatim because their element types cannot be recovered from ABI.
+  const { contractName, funcArgs } = await fetchFuncArgs(accessToken, tx.to, tx.funcName);
+  const namedArgs = Object.fromEntries(funcArgs.map(([name, type], i) =>
+    [name, type.tag === "Variadic" ? tx.args.slice(i) : hintedArg(type, parseTxArg(tx.args[i]))]));
+
+  return callTargetFunction(accessToken, userAddress, contractName, tx.to, tx.funcName, namedArgs);
 };
 
 export const getOpenIssues = async (

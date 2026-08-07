@@ -1,9 +1,12 @@
 import axios, { AxiosRequestConfig } from "axios";
 import { createHash } from "crypto";
+import JSONBig from "json-bigint";
 import { bloc, cirrus } from "./mercataApiHelper";
 import { StratoPaths } from "../config/constants";
 import { StratoError } from "../errors";
 import { requestContext } from "./requestContext";
+
+const JSONBigNumber = JSONBig();
 
 export const until = async (
   predicate: (res: any) => boolean,
@@ -31,7 +34,7 @@ export const until = async (
 
 // Helper function to extract error message from SString format
 const extractErrorMessage = (errorData: string): string => {
-  const sStringMatch = errorData.match(/SString "([^"]+)"/);
+  const sStringMatch = errorData.match(/^\s*SString "((?:\\.|[^"])*)"\s*$/);
   if (sStringMatch) {
     return sStringMatch[1];
   }
@@ -95,7 +98,7 @@ const requestConfigWithNonce = (
 
   let data: any;
   try {
-    data = typeof config.data === "string" ? JSON.parse(config.data) : config.data;
+    data = typeof config.data === "string" ? JSONBigNumber.parse(config.data) : config.data;
   } catch {
     return null;
   }
