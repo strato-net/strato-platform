@@ -2224,7 +2224,7 @@ tcExpr (AddressLiteral x _) = pure $ addressType' x
 --   as 'string' here causes a type mismatch any time a contract
 --   assigns one to a 'bytes' variable, even though the value really is
 --   bytes. Align the static type with the runtime so the two agree.
-tcExpr (HexaLiteral x _) = pure $ bytesType' x
+tcExpr (HexaLiteral x _) = pure . Sum $ (bytesType' x) :| [stringType' x]
 tcExpr (InlineBoundsCheck x _ _ a) = intType' x ~> tcExpr a
 tcExpr (TupleExpression x es) =
   productType' x <$> traverse (maybe (pure $ topType' x) tcExpr) es
