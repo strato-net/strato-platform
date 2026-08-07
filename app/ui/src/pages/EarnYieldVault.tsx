@@ -695,7 +695,7 @@ const EarnYieldVault = () => {
 
                           <div className="space-y-2">
                             <p className="text-xs font-medium text-muted-foreground">Your Position</p>
-                            <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                               <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
                                 <p className="text-xs text-muted-foreground">Position Value</p>
                                 <p className="mt-1 text-base font-semibold">{positionValueDisplay}</p>
