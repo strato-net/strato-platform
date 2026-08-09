@@ -98,12 +98,16 @@ class UserController {
 
       const result = await createIssue(accessToken, actorAddress as string, target, func, args);
       res.status(RestStatus.OK).json({
-        message: "Issue created successfully",
+        message: result.governed
+          ? "Issue created successfully"
+          : "Function executed directly: no issue was created and no vote was recorded",
         target,
         func,
         args,
         status: result.status,
         hash: result.hash,
+        issueId: result.issueId,
+        governed: result.governed,
       });
       next();
     } catch (e) {

@@ -1,7 +1,7 @@
 import { bloc, cirrus, eth, strato } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import { buildFunctionTx } from "../../utils/txBuilder";
-import { postAndWaitForTx } from "../../utils/txHelper";
+import { postAndWaitForTx, until } from "../../utils/txHelper";
 import { StratoPaths } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import JSONBig from "json-bigint";
@@ -158,36 +158,6 @@ export const castVoteOnIssue = async (
   } catch (error) {
     throw error;
   }
-};
-
-// Dry-run a castVoteOnIssue vote in the node's VM sandbox (nothing is signed or
-// committed). Returns the vote tx result with the issue's "effect if executed"
-// (target.func(args) run as the AdminRegistry) nested under `effect`, so admins
-// can preview an issue's real impact before voting. Forwarded to the node's bloc
-// simulate endpoint, which the app UI can't reach directly.
-export const simulateCastVoteOnIssue = async (
-  accessToken: string,
-  userAddress: string,
-  target: string,
-  func: string,
-  args: any[],
-): Promise<any> => {
-  const payload = {
-    contractName: extractContractName(AdminRegistry),
-    contractAddress: adminRegistry,
-    method: "castVoteOnIssue",
-    args: { _target: target, _func: func, _args: args },
-    metadata: {},
-  };
-  const body = {
-    txs: [{ payload, type: "FUNCTION" }],
-    address: userAddress.replace(/^0x/, ""),
-  };
-  const response = await bloc.post(accessToken, "/transaction/simulate", body, {
-    params: { trace: true },
-  });
-  const data = response.data;
-  return Array.isArray(data) ? data[0] : data;
 };
 
 // Dismiss an issue (only works if proposer is the only voter)
@@ -383,25 +353,107 @@ const callTargetFunction = async (
   );
 };
 
-// Create an issue by calling the target function directly (SMD-style). The
-// AdminRegistry itself is the exception: it owns itself, so its onlyOwner functions
-// can't reach the Ownable fallback and are proposed via castVoteOnIssue instead
+type ContractCall = {
+  contractName: string;
+  contractAddress: string;
+  method: string;
+  args: Record<string, any>;
+};
+
+// The registry call a vote resolves to, whose args it hashes into the issueId
+const castVoteCall = (target: string, func: string, typedArgs: any[]): ContractCall => ({
+  contractName: extractContractName(AdminRegistry),
+  contractAddress: adminRegistry,
+  method: "castVoteOnIssue",
+  args: { _func: func, _target: target, _args: typedArgs },
+});
+
+// Resolve an issue into the call that creates it, plus its args coerced to the
+// target's declared Solidity types. Creating one normally calls the target function
+// directly (SMD-style): the Ownable fallback hands the registry msg.sig/msg.data,
+// which the VM has already coerced, so applying the same coercion here keeps the
+// issueId aligned across voters. The AdminRegistry is the exception: it owns itself,
+// so its onlyOwner functions can't reach the fallback and go via castVoteOnIssue
+const resolveIssueCall = async (
+  accessToken: string,
+  target: string,
+  func: string,
+  args: any[],
+): Promise<{ call: ContractCall; typedArgs: any[] }> => {
+  const { contractName, funcArgs } = await fetchFuncArgs(accessToken, target, func);
+  if (sameAddress(target, adminRegistry)) {
+    const typedArgs = args.map((arg, i) =>
+      hintedArg(funcArgs[i]?.[1] || {}, arg));
+    return { call: castVoteCall(target, func, typedArgs), typedArgs };
+  }
+  const typedArgs = funcArgs.map(([, type], i) => hintedArg(type, args[i]));
+  const namedArgs = Object.fromEntries(funcArgs.map(([name], i) => [name, typedArgs[i]]));
+  return { call: { contractName, contractAddress: target, method: func, args: namedArgs }, typedArgs };
+};
+
+// Cirrus indexes a block only once it is mined, so the vote's event trails its receipt
+const ISSUE_EVENT_TIMEOUT_MS = 8000;
+
+// The issueId from whichever vote event the transaction emitted, or null if it
+// emitted neither — meaning nothing reached the registry
+const findIssueIdForTx = async (accessToken: string, hash: string): Promise<string | null> => {
+  // The vote already succeeded on chain, so a lookup failure must never fail it
+  const firstRow = (event: string) =>
+    cirrus
+      .get(accessToken, "/" + AdminRegistry + "-" + event, {
+        params: { transaction_hash: `eq.${hash}`, limit: "1" },
+      })
+      .then((res) => res.data?.[0])
+      .catch(() => undefined);
+
+  const fetchIssueId = async (): Promise<string | null> => {
+    const [created, voted] = await Promise.all([firstRow("IssueCreated"), firstRow("IssueVoted")]);
+    return created?.issueId ?? voted?.issueId ?? null;
+  };
+
+  return until((issueId) => issueId !== null, fetchIssueId, ISSUE_EVENT_TIMEOUT_MS);
+};
+
+// An issue only exists if the call reached the registry. A target function without
+// onlyOwner has no fallback to catch the call, so it just executes — report what the
+// transaction actually did rather than assuming a vote was recorded.
 export const createIssue = async (
   accessToken: string,
   userAddress: string,
   target: string,
   func: string,
   args: any[],
-): Promise<{ status: string; hash: string }> => {
-  const { contractName, funcArgs } = await fetchFuncArgs(accessToken, target, func);
-  if (sameAddress(target, adminRegistry)) {
-    const variadicArgs = args.map((arg, i) =>
-      hintedArg(funcArgs[i]?.[1] || {}, arg));
-    return castVoteOnIssue(accessToken, userAddress, target, func, variadicArgs);
-  }
-  const namedArgs = Object.fromEntries(funcArgs.map(([name, type], i) =>
-    [name, hintedArg(type, args[i])]));
-  return callTargetFunction(accessToken, userAddress, contractName, target, func, namedArgs);
+): Promise<{ status: string; hash: string; issueId: string | null; governed: boolean }> => {
+  const { call } = await resolveIssueCall(accessToken, target, func, args);
+  const { status, hash } = await callTargetFunction(
+    accessToken, userAddress, call.contractName, call.contractAddress, call.method, call.args);
+  const issueId = await findIssueIdForTx(accessToken, hash);
+
+  return { status, hash, issueId, governed: issueId !== null };
+};
+
+// Dry-run the issue in the node's VM sandbox (nothing is signed or committed), so
+// admins can preview its real impact before voting. Always simulated as the
+// registry's castVoteOnIssue, since the node derives the issue's `effect` only for
+// that method, using the same typed args the live call sends so both agree on the
+// issueId. Forwarded to the node's bloc simulate endpoint, which the UI can't reach.
+export const simulateCastVoteOnIssue = async (
+  accessToken: string,
+  userAddress: string,
+  target: string,
+  func: string,
+  args: any[],
+): Promise<any> => {
+  const { typedArgs } = await resolveIssueCall(accessToken, target, func, args);
+  const body = {
+    txs: [{ payload: { ...castVoteCall(target, func, typedArgs), metadata: {} }, type: "FUNCTION" }],
+    address: userAddress.replace(/^0x/, ""),
+  };
+  const response = await bloc.post(accessToken, "/transaction/simulate", body, {
+    params: { trace: true },
+  });
+  const data = response.data;
+  return Array.isArray(data) ? data[0] : data;
 };
 
 // Cast a vote on an existing issue by replaying the exact transaction that created
