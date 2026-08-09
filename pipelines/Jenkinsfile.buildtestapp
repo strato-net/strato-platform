@@ -25,7 +25,7 @@ pipeline {
             make app | tee make-app.log
           '''
           // Last line of `make app` is:
-          //   strato-patch-app <node-dir> <OPTIONAL_PREFIX>mercata-backend:<TAG> <OPTIONAL_PREFIX>mercata-ui:<TAG>
+          //   strato-patch-app <node-dir> <OPTIONAL_PREFIX>app-backend:<TAG> <OPTIONAL_PREFIX>app-ui:<TAG>
           // Strip the `strato-patch-app <node-dir>` prefix so we keep just the two image args.
           env.PATCH_APP_IMAGES = sh(
             script: "tail -n 1 make-app.log | sed -E 's/^[[:space:]]*strato-patch-app[[:space:]]+[^[:space:]]+[[:space:]]+//'",

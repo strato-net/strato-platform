@@ -245,8 +245,23 @@ data DebugConfig = DebugConfig
 data VmConf = VmConf
   { sqlDiff :: Bool
   , diffPublish :: Bool
+  -- | Base URL of the node's ethereum-jsonrpc service, used by transaction
+  -- simulation (same container). Default http://localhost:8545.
+  , vmJsonRpcUrl :: String
+  -- | Ceiling on concurrent in-flight simulations; excess are shed (503) so
+  -- simulations can't starve block processing on the shared VM. Default 8.
+  , simMaxConcurrent :: Int
   }
-  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+  deriving (Show, Eq, Generic, ToJSON)
+
+-- Manual FromJSON so existing configs without the simulation fields (or the
+-- whole vmConfig section) continue to parse, defaulting each field.
+instance FromJSON VmConf where
+  parseJSON = withObject "VmConf" $ \v -> VmConf
+    <$> v .:? "sqlDiff" .!= True
+    <*> v .:? "diffPublish" .!= True
+    <*> v .:? "vmJsonRpcUrl" .!= "http://localhost:8545"
+    <*> v .:? "simMaxConcurrent" .!= 8
 
 -- Default instances
 
@@ -321,6 +336,8 @@ instance Default VmConf where
   def = VmConf
     { sqlDiff = True
     , diffPublish = True
+    , vmJsonRpcUrl = "http://localhost:8545"
+    , simMaxConcurrent = 8
     }
 
 instance Default ContractsConf where

@@ -284,6 +284,10 @@ size (StoragePath p) = length p
 last :: StoragePath -> StoragePathPiece
 last (StoragePath p) = Prelude.last p
 
+rawPathPiece :: StoragePathPiece -> (Bool, B.ByteString)
+rawPathPiece (Field f) = (True, f)
+rawPathPiece (Index i) = (False, i)
+
 type StorageDelta = [(StoragePath, BasicValue)]
 
 parseInteger :: Parser Integer

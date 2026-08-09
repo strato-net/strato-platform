@@ -30,7 +30,12 @@ tests:
     main: EventSpec.hs
     ghc-options: -dynamic
     dependencies:
+      - aeson
       - blockDB
+      - bytestring
+      - ethereum-rlp
       - hspec
       - seqevents
+      - strato-model
+      - text
       - QuickCheck

@@ -15,7 +15,9 @@ executable ethereum-jsonrpc
   main-is: Main.hs
   other-modules:
       Binary
+      CallTrace
       Commands
+      EthBlock
       EthLog
       RPC
       Server
@@ -45,6 +47,7 @@ executable ethereum-jsonrpc
     , json-rpc-server
     , milena
     , mtl
+    , random
     , seqevents
     , servant-client
     , solid-vm-model

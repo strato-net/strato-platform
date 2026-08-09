@@ -19,13 +19,28 @@ CSRF (Cross-Site Request Forgery) protection is implemented at the nginx edge us
 
 The following endpoints require CSRF tokens for state-changing operations (POST, PUT, DELETE, PATCH):
 
-- `/api/*` - Mercata backend API
+- `/api/*` - STRATP App API
 - `/apex-api/user` - User management
 - `/apex-api/status` - Status updates
 - `/bloc/v2.2/*` - Blockchain transactions
 - `/strato-api/*` - Blockchain API
 - `/strato/v2.3/transaction` - Transaction submission
 - `/strato/v2.3/key` - Key management
+
+### Self-custody (external wallet) exemptions
+
+Browser requests carrying a valid `X-Wallet-Address` header are exempt on the
+node endpoints used by external-wallet signing flows (guests have no session,
+and these endpoints are signature-authenticated, read-only, or effect-free):
+
+- `/bloc/v2.2/transaction/unsigned` - builds a signable payload (no state change)
+- `/strato-api/eth/v1.2/transaction` - submits a *signed* tx (authenticated by
+  its ECDSA signature; nonce prevents replay)
+- `/bloc/v2.2/transactions/results` - read-only result lookup
+- `/bloc/v2.2/transaction/simulate` - sandboxed dry-run (rate-limited)
+
+This mirrors the `X-Wallet-Address` allow-list already used for the app's
+wallet-auth `/api/...` routes (`wallet_tx_routes` in `csrf.lua`).
 
 ## Frontend Implementation
 

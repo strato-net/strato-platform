@@ -15,10 +15,12 @@ library:
   exposed-modules:
     - Blockchain.BlockChain
     - Blockchain.Event
+    - Blockchain.TraceReplay
     - Executable.EthereumVM
     - Executable.EthereumVM2
   ghc-options: -Wall -O2
   dependencies:
+  - aeson
   - base16-bytestring
   - binary
   - blockapps-data

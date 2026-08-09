@@ -54,7 +54,14 @@ data BlocEnv = BlocEnv
   { stateFetchLimit :: Integer,
     txSizeLimit :: Int,
     gasLimit :: Integer,
-    globalNonceCounter :: Cache Address Nonce
+    globalNonceCounter :: Cache Address Nonce,
+    -- | Base URL of the node's ethereum-jsonrpc service, used for sandboxed
+    -- transaction simulation (same container). From ethconf.yaml vmConfig.
+    vmJsonRpcUrl :: String,
+    -- | Count of in-flight simulations and the ceiling above which new ones are
+    -- shed (503), so simulations can't starve block processing on the shared VM.
+    simInFlight :: TVar Int,
+    simMaxConcurrent :: Int
   }
 
 --------------------------------------------------------------------------------

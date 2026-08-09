@@ -18,11 +18,11 @@ This matches the current internal framing:
 - LP in the metastable stable surface
 - hold `saveUSDST`
 
-The point of `saveUSDST` is not to replace lending or external yieldcoins. It is to give Mercata a simple native savings product for `USDST` and a clean path from bootstrap incentives to fee-funded savings yield.
+The point of `saveUSDST` is not to replace lending or external yieldcoins. It is to give STRATO a simple native savings product for `USDST` and a clean path from bootstrap incentives to fee-funded savings yield.
 
 ## Current Protocol Context
 
-This spec assumes the current Mercata / STRATO product stack has four relevant pieces:
+This spec assumes the current STRATO product stack has four relevant pieces:
 
 1. `USDST`
    - the protocol stablecoin
@@ -417,7 +417,7 @@ That is the cleanest way to create durable hold demand for `USDST` without mixin
 
 ### Existing contract
 
-`SaveUSDSTVault.sol` in `mercata/contracts/concrete/Savings/` already implements the core vault. It is the share token itself (ERC-20), with ERC-4626-shaped deposit / mint / withdraw / redeem and managed-asset accounting.
+`SaveUSDSTVault.sol` in `app/contracts/concrete/Savings/` already implements the core vault. It is the share token itself (ERC-20), with ERC-4626-shaped deposit / mint / withdraw / redeem and managed-asset accounting.
 
 ### Contract interactions at launch
 

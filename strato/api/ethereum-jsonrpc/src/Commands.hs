@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications  #-}
@@ -9,26 +11,30 @@ module Commands
 where
 
 import Binary
+import CallTrace (BlockTrace(..), mkCallFrame)
+import EthBlock (EthBlock(..))
 import EthLog (eventRowToLog, matchesTopics)
-import TransactionReceipt (TransactionReceipt, mkTransactionReceipt)
+import TransactionReceipt (TransactionReceipt, EthHex(..), mkTransactionReceipt, transactionIndex)
 import Strato.Version (stratoVersion)
 import Blockchain.CommunicationConduit (ethVersion)
 import Blockchain.EthConf (runStreamMConfigured, ethConf)
 import qualified Blockchain.EthConf.Model as EthConf
 import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID, contractsConfig, nativeTokenAddress)
-import Blockchain.Data.Block (blockBlockData, blockReceiptTransactions)
+import Blockchain.Data.Block (Block, blockBlockData, blockReceiptTransactions)
 import Blockchain.Data.BlockHeader (BlockHeader (..))
 import Blockchain.Data.DataDefs (AddressStateRef (..), TransactionResult(..))
 import Blockchain.Data.RLP (rlpDecode, rlpDeserialize)
 import Blockchain.Data.Transaction (Transaction(..), transactionHash, txAndTime2RawTX)
 import Blockchain.Data.TXOrigin (TXOrigin(API))
 import Blockchain.Model.JsonBlock (AddressStateRef' (..), Block', RawTransaction'(..), Transaction'(..), bPrimeToB)
+import Blockchain.Sequencer.CallSpec (CallSpec(..), TraceOptions(..), TxCreateObject(..), TxFuncCallObject(..))
 import Blockchain.Sequencer.Event (JsonRpcCommand(..), JsonRpcResponse(..), VmTask(..))
 import Blockchain.Sequencer.Kafka (writeSeqVmTasks)
 import Blockchain.Strato.Model.Address (Address(..), addressToHex)
 import Blockchain.Strato.Model.Keccak256 (Keccak256, hash, keccak256FromHex, keccak256ToByteString, keccak256ToHex)
 import Text.Format (format)
-import Control.Monad (void, when)
+import Control.Exception (SomeException, evaluate, try)
+import Control.Monad (void, when, zipWithM)
 import Control.Monad.IO.Class
 import Control.Monad.Composable.Streaming (consumeFromLatest)
 import Control.Monad.Except
@@ -40,6 +46,7 @@ import qualified Handlers.Transaction as Tx
 import qualified Handlers.BlkLast as BlkLast
 import qualified Handlers.Block as Blocks
 import qualified Handlers.TransactionResult as TxResults
+import System.Random (randomRIO)
 import System.Timeout (timeout)
 import qualified Data.Binary as Bin
 import qualified Data.ByteString as B
@@ -48,11 +55,14 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import Data.Time.Calendar (fromGregorian)
 import Data.Time.Clock (UTCTime(..))
+import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Data.Char (toLower)
+import Data.Word (Word64)
 import Data.List (find)
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Data.Aeson (FromJSON(..), ToJSON(..), Value(..), withObject, (.:?), (.!=))
+import Data.Aeson (FromJSON(..), ToJSON(..), Value(..), decodeStrict, withObject, (.:), (.:?), (.!=), (.=))
+import qualified Data.Aeson as Ae
 import GHC.Generics (Generic)
 import Network.JsonRpc.Server
 import Numeric (showHex)
@@ -125,6 +135,12 @@ methods =
     eth_sendTransaction,
     eth_sendRawTransaction,
     eth_call,
+    strato_simulateV1,
+    strato_traceCall,
+    strato_traceTransaction,
+    strato_traceBlock,
+    strato_traceBlockByHash,
+    strato_traceBlockByNumber,
     eth_estimateGas,
     eth_getBlockByHash,
     eth_getBlockByNumber,
@@ -132,6 +148,7 @@ methods =
     eth_getTransactionByBlockHashAndIndex,
     eth_getTransactionByBlockNumberAndIndex,
     eth_getTransactionReceipt,
+    eth_getBlockReceipts,
     eth_getUncleByBlockHashAndIndex,
     eth_getUncleByBlockNumberAndIndex,
     eth_getCompilers,
@@ -147,7 +164,8 @@ methods =
     eth_getLogs,
     eth_getWork,
     eth_submitWork,
-    eth_submitHashrate
+    eth_submitHashrate,
+    debug_traceBlockByHash
   ]
 
 rpc_modules :: Method Server
@@ -162,6 +180,7 @@ rpc_modules = flip (toMethod "rpc_modules") () $ do
           ("net", "1.0"),
           ("personal", "1.0"),
           ("rpc", "1.0"),
+          ("strato", "1.0"),
           ("txpool", "1.0"),
           ("web3", "1.0")
         ]
@@ -262,10 +281,26 @@ eth_blockNumber = toMethod "eth_blockNumber" f ()
 
 ----------------
 
+-- | Response-topic correlation ids must be unique across concurrent
+-- requests: two clients simulating identical payloads would otherwise match
+-- each other's responses. The prefix is kept for log readability.
+mkRpcId :: MonadIO m => String -> m String
+mkRpcId prefix = do
+  n <- liftIO $ randomRIO (0, maxBound :: Word64)
+  return $ prefix ++ "_" ++ showHex n ""
+
 callVM :: JsonRpcCommand -> IO JsonRpcResponse
-callVM c = do
+callVM = callVM' 30000000
+
+-- | strato_trace* and strato_simulateV1 replay or trace whole executions, so
+-- they get a much longer deadline than plain calls.
+debugCallTimeout :: Int
+debugCallTimeout = 120000000
+
+callVM' :: Int -> JsonRpcCommand -> IO JsonRpcResponse
+callVM' waitMicros c = do
   putStrLn $ "callVM: " ++ show (jrcId c)
-  result <- timeout 30000000 $ runStreamMConfigured "ethereum-jsonrpc" $
+  result <- timeout waitMicros $ runStreamMConfigured "ethereum-jsonrpc" $
     consumeFromLatest "jsonrpcresponse"
       (void $ writeSeqVmTasks [VmJsonRpcCommand c])
       (\responses ->
@@ -300,7 +335,7 @@ eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "b
                 , TxCall.value = "0x0"
                 , TxCall.data_ = HexData calldata
                 }
-              rpcId = "eth_getBalance_" ++ showHex addr ""
+          rpcId <- mkRpcId $ "eth_getBalance_" ++ showHex addr ""
           resp <- liftIO $ callVM $ JRCCall txObj rpcId "latest"
           case resp of
             Success _ result | B.length result == 32 -> do
@@ -346,22 +381,196 @@ eth_getStorageAt = toMethod "eth_getStorageAt" f (Required "address" :+: Require
       throwError $ rpcError (-32601) "eth_getStorageAt not yet implemented"
 
 eth_call :: Method Server
-eth_call = toMethod "eth_call" f (Required "txObject" :+: Required "blockTag" :+: ())
+eth_call = toMethod "eth_call" f (Required "txObject" :+: Optional "blockTag" "latest" :+: ())
   where
-    f :: TxCallObject -> String -> RpcResult Server String
-    f txObj blockTag = do
-      let callData = unHexData $ TxCall.data_ txObj
-          rpcId = "eth_call_" ++ take 16 (BC.unpack $ B16.encode callData)
-      liftIO $ putStrLn $ "eth_call: block=" ++ blockTag ++ " data=" ++ show callData
-      liftIO $ putStrLn $ "eth_call: submitting JRCCall to vm-runner, id=" ++ rpcId
-      resp <- liftIO $ callVM $ JRCCall txObj rpcId blockTag
+    f :: CallSpec -> String -> RpcResult Server String
+    f spec blockTag = do
+      mHeader <- resolveBlockHeader blockTag
+      rpcId <- mkRpcId $ case spec of
+            SpecCall txObj ->
+              "eth_call_" ++ take 16 (BC.unpack $ B16.encode $ unHexData $ TxCall.data_ txObj)
+            SpecCreate createObj ->
+              "eth_create_" ++ take 16 (T.unpack $ createContractName createObj)
+            SpecFuncCall fObj ->
+              "eth_call_" ++ take 16 (T.unpack $ funcCallFunctionName fObj)
+      liftIO $ putStrLn $ "eth_call: block=" ++ blockTag ++ " id=" ++ rpcId
+      resp <- liftIO $ callVM $ JRCCallV2 spec mHeader rpcId
       case resp of
-        Success _ result -> do
-          liftIO $ putStrLn $ "eth_call: vm-runner returned: " ++ show result
-          return $ "0x" ++ BC.unpack (B16.encode result)
+        Success _ result -> return $ "0x" ++ BC.unpack (B16.encode result)
+        SuccessJson _ _ -> throwError $ rpcError (-32603) "unexpected JSON response from VM"
         Error _ msg -> do
           liftIO $ putStrLn $ "eth_call: vm-runner error: " ++ msg
           throwError $ rpcError 3 (T.pack $ "execution reverted: " ++ msg)
+
+-- | Resolve a block tag ("latest"/"pending"/"earliest", a hex number, or a
+-- block hash) to the header the VM should execute against. Nothing means the
+-- VM's current best block.
+resolveBlockHeader :: String -> RpcResult Server (Maybe BlockHeader)
+resolveBlockHeader tag
+  | tag `elem` ["latest", "pending", ""] = return Nothing
+  | length stripped == 64 = fetch $ fetchBlockByHash tag
+  | otherwise = fetch $ fetchBlockByNumber tag
+  where
+    stripped = if take 2 tag == "0x" then drop 2 tag else tag
+    fetch io =
+      liftIO io >>= \case
+        Just blk -> return $ Just $ blockBlockData $ bPrimeToB blk
+        Nothing -> throwError $ rpcError (-32602) (T.pack $ "block not found: " ++ tag)
+
+-- strato_simulateV1 (eth_simulateV1-shaped): blockStateCalls executed
+-- sequentially in one VM sandbox, so later calls see earlier calls' state;
+-- everything is discarded afterwards. stateOverrides, blockOverrides,
+-- validation and traceTransfers are rejected during parameter parsing.
+newtype SimBlockCalls = SimBlockCalls { sbcCalls :: [CallSpec] }
+
+instance FromJSON SimBlockCalls where
+  parseJSON = withObject "blockStateCalls entry" $ \o -> do
+    mSO <- o .:? "stateOverrides"
+    mBO <- o .:? "blockOverrides"
+    case (mSO :: Maybe Value, mBO :: Maybe Value) of
+      (Just _, _) -> fail "strato_simulateV1: stateOverrides is not supported"
+      (_, Just _) -> fail "strato_simulateV1: blockOverrides is not supported"
+      _ -> SimBlockCalls <$> o .:? "calls" .!= []
+
+newtype SimPayload = SimPayload [SimBlockCalls]
+
+instance FromJSON SimPayload where
+  parseJSON = withObject "strato_simulateV1 payload" $ \o -> do
+    validation <- o .:? "validation" .!= False
+    traceTransfers <- o .:? "traceTransfers" .!= False
+    when validation $ fail "strato_simulateV1: validation is not supported"
+    when traceTransfers $ fail "strato_simulateV1: traceTransfers is not supported"
+    SimPayload <$> o .: "blockStateCalls"
+
+strato_simulateV1 :: Method Server
+strato_simulateV1 = toMethod "strato_simulateV1" f (Required "payload" :+: Optional "blockTag" "latest" :+: ())
+  where
+    f :: SimPayload -> String -> RpcResult Server Value
+    f (SimPayload blocks) blockTag = do
+      when (length blocks > 16) . throwError $
+        rpcError (-32602) "strato_simulateV1: too many blockStateCalls entries (max 16)"
+      when (sum (map (length . sbcCalls) blocks) > 64) . throwError $
+        rpcError (-32602) "strato_simulateV1: too many calls (max 64)"
+      mBlk <- liftIO $ fetchBlockByNumber blockTag
+      blk' <- case mBlk of
+        Just b -> return b
+        Nothing -> throwError $ rpcError (-32602) (T.pack $ "block not found: " ++ blockTag)
+      let header = blockBlockData $ bPrimeToB blk'
+          baseNum = getBlockNumber blk'
+          baseTime = floor . utcTimeToPOSIXSeconds $ getBlockTimestamp blk' :: Integer
+          hexIt n = "0x" ++ showHex n ""
+      rpcId <- mkRpcId "strato_simulateV1"
+      resp <- liftIO $ callVM' debugCallTimeout $ JRCSimulate (map sbcCalls blocks) (Just header) rpcId
+      v <- decodeTraceResponse resp
+      case Ae.fromJSON v :: Ae.Result [[Value]] of
+        Ae.Error e -> throwError $ rpcError (-32603) (T.pack $ "bad simulate payload: " ++ e)
+        Ae.Success callResults ->
+          return $ toJSON
+            [ Ae.object
+                [ "number" .= hexIt (baseNum + toInteger i),
+                  "timestamp" .= hexIt (baseTime + toInteger i),
+                  "calls" .= calls
+                ]
+            | (i, calls) <- zip [1 :: Int ..] callResults
+            ]
+
+getBlockTimestamp :: Block' -> UTCTime
+getBlockTimestamp blk = case blockBlockData $ bPrimeToB blk of
+  BlockHeader {timestamp = t} -> t
+  BlockHeaderV2 {timestamp = t} -> t
+
+strato_traceCall :: Method Server
+strato_traceCall = toMethod "strato_traceCall" f (Required "txObject" :+: Optional "blockTag" "latest" :+: Optional "traceConfig" (TraceOptions False) :+: ())
+  where
+    f :: CallSpec -> String -> TraceOptions -> RpcResult Server Value
+    f spec blockTag opts = do
+      mHeader <- resolveBlockHeader blockTag
+      rpcId <- mkRpcId $ case spec of
+            SpecCall txObj ->
+              "strato_traceCall_" ++ take 16 (BC.unpack $ B16.encode $ unHexData $ TxCall.data_ txObj)
+            SpecCreate createObj ->
+              "strato_traceCreate_" ++ take 16 (T.unpack $ createContractName createObj)
+            SpecFuncCall fObj ->
+              "strato_traceCall_" ++ take 16 (T.unpack $ funcCallFunctionName fObj)
+      resp <- liftIO $ callVM' debugCallTimeout $ JRCTraceCall spec mHeader opts rpcId
+      decodeTraceResponse resp
+
+-- | Unwrap a SuccessJson payload from the VM into the JSON-RPC result.
+decodeTraceResponse :: JsonRpcResponse -> RpcResult Server Value
+decodeTraceResponse = \case
+  SuccessJson _ bytes -> case decodeStrict bytes of
+    Just v -> return v
+    Nothing -> throwError $ rpcError (-32603) "invalid trace payload from VM"
+  Error _ msg -> throwError $ rpcError (-32000) (T.pack msg)
+  Success _ _ -> throwError $ rpcError (-32603) "unexpected binary response from VM"
+
+-- | Ship a block's header and transactions to the VM for sandboxed replay,
+-- tracing the target transaction (or every transaction when Nothing).
+traceBlockVia :: String -> Block -> Maybe Keccak256 -> TraceOptions -> RpcResult Server Value
+traceBlockVia idPrefix blk mTarget opts = do
+  let header = blockBlockData blk
+      txs = blockReceiptTransactions blk
+  rpcId <- mkRpcId idPrefix
+  resp <- liftIO $ callVM' debugCallTimeout $ JRCTraceBlockTxs header txs mTarget opts rpcId
+  decodeTraceResponse resp
+
+strato_traceTransaction :: Method Server
+strato_traceTransaction = toMethod "strato_traceTransaction" f (Required "txHash" :+: Optional "traceConfig" (TraceOptions False) :+: ())
+  where
+    f :: Keccak256 -> TraceOptions -> RpcResult Server Value
+    f txHash opts = do
+      response <- liftIO $ runLocal $ TxResults.getTransactionResultClient txHash
+      case response of
+        Right (tr : _) -> do
+          mBlk <- liftIO $ fetchBlockByHash (keccak256ToHex (transactionResultBlockHash tr))
+          case mBlk of
+            Just blk ->
+              traceBlockVia
+                ("strato_traceTransaction_" ++ take 16 (keccak256ToHex txHash))
+                (bPrimeToB blk)
+                (Just txHash)
+                opts
+            Nothing -> throwError $ rpcError (-32602) "block not found for transaction"
+        Right [] -> throwError $ rpcError (-32602) "transaction not found"
+        Left err -> throwError $ rpcError (-32603) (formatClientError err)
+
+strato_traceBlockByHash :: Method Server
+strato_traceBlockByHash = toMethod "strato_traceBlockByHash" f (Required "blockHash" :+: Optional "traceConfig" (TraceOptions False) :+: ())
+  where
+    f :: String -> TraceOptions -> RpcResult Server Value
+    f blockHash opts = do
+      mBlk <- liftIO $ fetchBlockByHash blockHash
+      case mBlk of
+        Just blk -> traceBlockVia ("strato_traceBlockByHash_" ++ take 24 blockHash) (bPrimeToB blk) Nothing opts
+        Nothing -> throwError $ rpcError (-32602) (T.pack $ "block not found: " ++ blockHash)
+
+strato_traceBlockByNumber :: Method Server
+strato_traceBlockByNumber = toMethod "strato_traceBlockByNumber" f (Required "blockNumber" :+: Optional "traceConfig" (TraceOptions False) :+: ())
+  where
+    f :: String -> TraceOptions -> RpcResult Server Value
+    f blockNumber opts = do
+      mBlk <- liftIO $ fetchBlockByNumber blockNumber
+      case mBlk of
+        Just blk -> traceBlockVia ("strato_traceBlockByNumber_" ++ blockNumber) (bPrimeToB blk) Nothing opts
+        Nothing -> throwError $ rpcError (-32602) (T.pack $ "block not found: " ++ blockNumber)
+
+strato_traceBlock :: Method Server
+strato_traceBlock = toMethod "strato_traceBlock" f (Required "rlpBlock" :+: Optional "traceConfig" (TraceOptions False) :+: ())
+  where
+    f :: String -> TraceOptions -> RpcResult Server Value
+    f rlpHex opts = do
+      let hexStr = if take 2 rlpHex == "0x" then drop 2 rlpHex else rlpHex
+      case B16.decode (BC.pack hexStr) of
+        Left e -> throwError $ rpcError (-32602) (T.pack $ "invalid hex: " ++ e)
+        Right bytes -> do
+          -- rlpDeserialize/rlpDecode are partial; force the decode here so a
+          -- malformed block surfaces as an RPC error instead of a crash.
+          eBlk <- liftIO . try @SomeException . evaluate $
+            let blk = rlpDecode (rlpDeserialize bytes) :: Block
+             in length (show blk) `seq` blk
+          case eBlk of
+            Left err -> throwError $ rpcError (-32602) (T.pack $ "invalid RLP block: " ++ show err)
+            Right blk -> traceBlockVia "strato_traceBlock_rlp" blk Nothing opts
 
 -------------------
 
@@ -469,14 +678,22 @@ eth_estimateGas = toMethod "eth_estimateGas" f (Required "txObject" :+: ())
 eth_getBlockByHash :: Method Server
 eth_getBlockByHash = toMethod "eth_getBlockByHash" f (Required "blockHash" :+: Required "fullTransactions" :+: ())
   where
-    f :: String -> Bool -> RpcResult Server (Maybe Block')
-    f blockHash _fullTxs = liftIO $ fetchBlockByHash blockHash
+    f :: String -> Bool -> RpcResult Server (Maybe EthBlock)
+    f blockHash fullTxs = do
+      mBlk <- liftIO $ fetchBlockByHash blockHash
+      return $ toEthBlock fullTxs <$> mBlk
 
 eth_getBlockByNumber :: Method Server
 eth_getBlockByNumber = toMethod "eth_getBlockByNumber" f (Required "blockNumber" :+: Required "fullTransactions" :+: ())
   where
-    f :: String -> Bool -> RpcResult Server (Maybe Block')
-    f blockNumber _fullTxs = liftIO $ fetchBlockByNumber blockNumber
+    f :: String -> Bool -> RpcResult Server (Maybe EthBlock)
+    f blockNumber fullTxs = do
+      mBlk <- liftIO $ fetchBlockByNumber blockNumber
+      return $ toEthBlock fullTxs <$> mBlk
+
+-- | Select the Ethereum block representation based on the @fullTransactions@ flag.
+toEthBlock :: Bool -> Block' -> EthBlock
+toEthBlock fullTxs = (if fullTxs then EthBlockWithFullTxs else EthBlockWithTxHashes) . bPrimeToB
 
 -- TODO: blockHash field in tx response needs the actual block hash, not the tx hash.
 -- STRATO tx JSON doesn't include the block hash, so we'd need an extra lookup.
@@ -539,6 +756,64 @@ eth_getTransactionReceipt = toMethod "eth_getTransactionReceipt" f (Required "tx
       case find (\t -> transactionHash t == transactionResultTransactionHash tr) txs of
         Just tx -> return $ mkTransactionReceipt tr tx blkNum
         Nothing -> throwError $ rpcError (-32603) "Transaction not found in block"
+
+-- | All transaction receipts for a block. The block parameter is a 32-byte
+-- block hash, a hex block number, or a tag (@latest@/@earliest@/@pending@);
+-- returns @null@ when the block is unknown.
+eth_getBlockReceipts :: Method Server
+eth_getBlockReceipts = toMethod "eth_getBlockReceipts" f (Required "block" :+: ())
+  where
+    f :: String -> RpcResult Server (Maybe [TransactionReceipt])
+    f blockParam = do
+      mBlk <- liftIO $ fetchBlockForReceipts blockParam
+      case mBlk of
+        Nothing  -> return Nothing
+        Just blk -> do
+          let blkNum = getBlockNumber blk
+              txs    = blockReceiptTransactions $ bPrimeToB blk
+          Just <$> zipWithM (buildBlockReceipt blkNum) [0 ..] txs
+
+    -- Disambiguate a 32-byte block hash (64 hex chars) from a number/tag.
+    fetchBlockForReceipts :: String -> IO (Maybe Block')
+    fetchBlockForReceipts param
+      | length (dropHexPrefix param) == 64 = fetchBlockByHash param
+      | otherwise                          = fetchBlockByNumber param
+
+    dropHexPrefix ('0':'x':xs) = xs
+    dropHexPrefix ('0':'X':xs) = xs
+    dropHexPrefix xs           = xs
+
+    buildBlockReceipt :: Integer -> Integer -> Transaction -> RpcResult Server TransactionReceipt
+    buildBlockReceipt blkNum idx tx = do
+      response <- liftIO $ runLocal $ TxResults.getTransactionResultClient (transactionHash tx)
+      case response of
+        Right (tr : _) -> return $ (mkTransactionReceipt tr tx blkNum) { transactionIndex = EthHex idx }
+        Right []       -> throwError $ rpcError (-32603) "receipt not found for transaction in block"
+        Left err       -> throwError $ rpcError (-32603) (formatClientError err)
+
+-- | @callTracer@-style trace of every transaction in a block. STRATO runs
+-- SolidVM (no EVM opcodes), so the geth @structLogs@ tracer is impossible; we
+-- return the same @callTracer@ frame regardless of the requested tracer. Each
+-- entry carries the transaction @input@ (calldata, including any ERC-8021
+-- suffix); @calls@ is empty (internal calls are not instrumented). The tracer
+-- options argument is accepted and ignored. Returns @null@ for unknown blocks.
+debug_traceBlockByHash :: Method Server
+debug_traceBlockByHash = toMethod "debug_traceBlockByHash" f (Required "blockHash" :+: Optional "options" Null :+: ())
+  where
+    f :: String -> Value -> RpcResult Server (Maybe [BlockTrace])
+    f blockHash _options = do
+      mBlk <- liftIO $ fetchBlockByHash blockHash
+      case mBlk of
+        Nothing  -> return Nothing
+        Just blk -> Just <$> mapM buildTrace (blockReceiptTransactions $ bPrimeToB blk)
+
+    buildTrace :: Transaction -> RpcResult Server BlockTrace
+    buildTrace tx = do
+      response <- liftIO $ runLocal $ TxResults.getTransactionResultClient (transactionHash tx)
+      case response of
+        Right (tr : _) -> return $ BlockTrace (transactionHash tx) (mkCallFrame tr tx)
+        Right []       -> throwError $ rpcError (-32603) "trace not found for transaction in block"
+        Left err       -> throwError $ rpcError (-32603) (formatClientError err)
 
 eth_getUncleByBlockHashAndIndex :: Method Server
 eth_getUncleByBlockHashAndIndex = toMethod "eth_getUncleByBlockHashAndIndex" f ()

@@ -1,0 +1,200 @@
+import { useUser } from '@/context/UserContext';
+import { useNetwork } from '@/context/NetworkContext';
+import { useTheme } from 'next-themes';
+import { LogOutIcon, Copy, ChevronLeft } from 'lucide-react';
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { useDisconnect } from 'wagmi';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useToast } from '@/hooks/use-toast';
+import { ModeToggle } from '../mode-toggle';
+
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import STRATOICON from '@/assets/icon.png';
+import STRATOICONDARK from '@/assets/dark-theme-strato-compressed-logo.png';
+import LiquidationNotification from '../ui/LiquidationNotification';
+
+interface DashboardHeaderProps {
+  title: string;
+  subtitle?: string;
+}
+
+const GRADIENT_BUTTON_CLASS = "w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90";
+
+const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
+  const { userAddress, userName, logout, isLoggedIn, externalEvmWalletAddress, isExternalEvmWalletConnected } = useUser();
+  const { isTestnet } = useNetwork();
+  const { resolvedTheme } = useTheme();
+  const { disconnect } = useDisconnect();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
+
+  const isPortfolioPage = pathname === '/dashboard';
+  
+  // Handle back navigation - check for 'from' query param for bridge-transactions page
+  const handleBackClick = () => {
+    const fromPage = searchParams.get('from');
+    if ((pathname === '/bridge-transactions' || pathname === '/metal-transactions') && fromPage) {
+      if (fromPage === 'deposits') {
+        navigate('/dashboard/deposits');
+      } else if (fromPage === 'withdrawals') {
+        navigate('/dashboard/withdrawals');
+      } else {
+        navigate('/dashboard');
+      }
+    } else if (pathname === '/dashboard/trading-desk') {
+      // Navigate back to Advanced Swap tab
+      navigate('/dashboard/advanced?tab=swap');
+    } else {
+      navigate('/dashboard');
+    }
+  };
+
+  const truncateAddress = (address: string | null | undefined, front = 6, back = 4) => {
+    if (!address || address.length <= front + back) return address || "N/A";
+    return `${address.slice(0, front)}...${address.slice(-back)}`;
+  };
+
+  const copyAddress = async (address: string | null, label: string) => {
+    if (!address) return;
+    await navigator.clipboard.writeText(address);
+    toast({ title: 'Address copied!', description: `${label} address copied to clipboard`, duration: 2000 });
+  };
+
+  return (
+    <header className="bg-background border-b border-border py-4 px-4 md:px-6 flex items-center justify-between">
+      <div className="flex items-center gap-2 md:gap-3">
+        {/* Back button for non-portfolio pages - redirects based on origin or to Portfolio */}
+        {!isPortfolioPage && (
+          <button 
+            onClick={handleBackClick}
+            className="flex items-center justify-center p-1 hover:bg-muted rounded-md transition-colors"
+          >
+            <ChevronLeft size={20} className="text-muted-foreground" />
+          </button>
+        )}
+        {/* Logo on mobile - tapping redirects to Portfolio */}
+        <button 
+          onClick={() => navigate('/dashboard')}
+          className="md:hidden focus:outline-none"
+        >
+          <img 
+            src={resolvedTheme === 'dark' ? STRATOICONDARK : STRATOICON} 
+            alt="STRATO" 
+            className="h-8" 
+          />
+        </button>
+        <div className="flex flex-col">
+          <h1 className="text-base md:text-xl font-bold whitespace-nowrap">{title}</h1>
+          {subtitle && (
+            <p className="text-xs md:text-sm text-muted-foreground">{subtitle}</p>
+          )}
+        </div>
+        {isTestnet && (
+          <span className="bg-orange-500 text-white px-2 py-1 rounded text-xs font-bold uppercase hidden sm:inline-block">
+            TESTNET
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 md:gap-3">
+        {isLoggedIn && <LiquidationNotification />}
+        <ModeToggle />
+        
+        {userName ? (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-[#1e2a4a] flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity">
+                <span className="text-white text-xs md:text-sm font-semibold">ST</span>
+              </button>
+            </PopoverTrigger>
+
+            <PopoverContent className="w-64 md:w-72 p-3 md:p-4" align="end">
+              <div className="space-y-3 md:space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#1e2a4a] flex items-center justify-center shrink-0">
+                    <span className="text-white text-sm font-semibold">ST</span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">STRATO Wallet</p>
+                    <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-muted-foreground font-mono">
+                      <span className="truncate">{truncateAddress(userAddress, 8, 4)}</span>
+                      <button onClick={() => copyAddress(userAddress, 'User')} className="hover:text-foreground shrink-0">
+                        <Copy size={10} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t pt-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={logout}
+                    className="w-full h-9 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 justify-start gap-2"
+                  >
+                    <LogOutIcon size={16} />
+                    <span className="text-sm font-medium">Logout</span>
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        ) : isLoggedIn && isExternalEvmWalletConnected ? (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-[#f6851b] flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity">
+                <span className="text-white text-xs md:text-sm font-semibold">MM</span>
+              </button>
+            </PopoverTrigger>
+
+            <PopoverContent className="w-64 md:w-72 p-3 md:p-4" align="end">
+              <div className="space-y-3 md:space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#f6851b] flex items-center justify-center shrink-0">
+                    <span className="text-white text-sm font-semibold">MM</span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">External Wallet</p>
+                    <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-muted-foreground font-mono">
+                      <span className="truncate">{truncateAddress(externalEvmWalletAddress, 8, 4)}</span>
+                      <button onClick={() => copyAddress(externalEvmWalletAddress, 'Wallet')} className="hover:text-foreground shrink-0">
+                        <Copy size={10} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t pt-3">
+                  <Button onClick={() => disconnect()} size="sm" className={`${GRADIENT_BUTTON_CLASS} h-8 text-xs`}>
+                    Disconnect Wallet
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        ) : (
+          <ConnectButton.Custom>
+            {({ openConnectModal, mounted, authenticationStatus }) => {
+              if (!mounted || authenticationStatus === 'loading') return null;
+              return (
+                <Button
+                  onClick={openConnectModal}
+                  size="sm"
+                  className="h-8 md:h-9 px-3 md:px-4 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 gap-1.5"
+                >
+                  <span className="text-xs md:text-sm font-medium">Connect Wallet</span>
+                </Button>
+              );
+            }}
+          </ConnectButton.Custom>
+        )}
+      </div>
+    </header>
+  );
+};
+
+export default DashboardHeader;

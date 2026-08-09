@@ -8,7 +8,6 @@ module BlockApps.SolidVMStorageDecoder
   ( decodeSolidVMValues,
     decodeCacheValues,
     decodeCacheValuesForCollections,
-    replayDeltas, -- Testing only
     ReplayFailure (..),
     synthesize, -- Testing only
     TotalStorage
@@ -20,13 +19,15 @@ import BlockApps.Solidity.Value as V
 import Control.DeepSeq
 import Control.Monad.Extra
 import Data.Bifunctor
-import Data.Bitraversable
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import Data.Char
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as I
+import Data.List (unsnoc)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
+import Data.Maybe (mapMaybe)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, decodeUtf8')
 import Data.Text.Encoding.Error (UnicodeException)
@@ -47,23 +48,29 @@ bimapValue f (name', value') = do
   mValue <- valueToSolidityValue value'
   return $ fmap (name,) mValue
 
-decodeCacheValuesWith :: (StoragePath -> BasicValue -> Bool) -> M.Map StoragePath BasicValue -> Either T.Text [(T.Text, Value)]
-decodeCacheValuesWith f hxs = bimap (T.pack . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesWith: %s" . show) id $ do
+-- Flat keys pair each path segment with whether it is a struct/collection Field
+-- (True) or a mapping/array Index (False), so consumers can render paths that
+-- distinguish the two (e.g. activities[24].actionableEvents[0]).
+decodeCacheValuesWith :: (StoragePath -> BasicValue -> Bool) -> M.Map StoragePath BasicValue -> [(NE.NonEmpty (Bool, T.Text), Value)]
+decodeCacheValuesWith f hxs =
   let pathValues' = filter (uncurry f) $ M.toList hxs
-  finalState <- bimap show HM.toList $ synthesize pathValues'
-  mapM (bimapM bsToText return) finalState
+      finalState = HM.toList $ synthesizeFlat pathValues'
+   in first (NE.map (fmap bsToText')) <$> finalState
 
-decodeCacheValues :: M.Map StoragePath BasicValue -> Either T.Text [(T.Text, Value)]
-decodeCacheValues = decodeCacheValuesWith (const . isBasic)
+decodeCacheValues :: M.Map StoragePath BasicValue -> [(T.Text, Value)]
+decodeCacheValues = map (first (snd . NE.head)) . decodeCacheValuesWith (const . isBasic)
   where isBasic (StoragePath ([Field _])) = True
         isBasic (StoragePath [Field _, Field fieldBS]) = C8.unpack fieldBS /= "length"
         isBasic _ = False
 
-decodeCacheValuesForCollections :: M.Map StoragePath BasicValue -> Either T.Text [(T.Text, Value)]
+decodeCacheValuesForCollections :: M.Map StoragePath BasicValue -> [(NE.NonEmpty (Bool, T.Text), Value)]
 decodeCacheValuesForCollections = decodeCacheValuesWith (\_ _ -> True)
 
 bsToText :: B.ByteString -> Either String T.Text
 bsToText = first show . decodeUtf8'
+
+bsToText' :: B.ByteString -> T.Text
+bsToText' = either T.pack id . bsToText
 
 -- Why another time?
 --  - original vToSV can't handle sentinels without introducing a monad
@@ -111,6 +118,8 @@ valueToSolidityValue = \case
 
 type TotalStorage = HM.HashMap B.ByteString V.Value
 
+type FlatTotalStorage = HM.HashMap (NE.NonEmpty (Bool, B.ByteString)) V.Value
+
 data ReplayFailure
   = MissingPath StoragePath
   | TypeMismatch StoragePath BasicValue V.Value
@@ -119,16 +128,6 @@ data ReplayFailure
   | NoPathsProvided
   | UnicodeError B.ByteString UnicodeException
   deriving (Show, Eq, Generic, NFData)
-
-replayDeltas :: StorageDelta -> TotalStorage -> Either ReplayFailure TotalStorage
-replayDeltas [] ts = Right ts
-replayDeltas ((StoragePath (Field f : sp), bv) : rs) ts =
-  case HM.lookup f ts of
-    Just sv -> do
-      ts' <- (\v' -> HM.insert f v' ts) <$> applyDelta (StoragePath sp) bv sv
-      replayDeltas rs ts'
-    Nothing -> replayDeltas rs $ HM.insert f (constructFromNothing' sp bv) ts
-replayDeltas ((p, _) : _) _ = Left $ MissingPath p
 
 applyDelta :: StoragePath -> BasicValue -> V.Value -> Either ReplayFailure V.Value
 applyDelta (StoragePath sp) = applyDelta' sp
@@ -177,6 +176,7 @@ applyDelta' [Field n] bv _ = do
 applyDelta' sp bv (ValueArraySentinel {}) = Right $ constructFromNothing' sp bv
 applyDelta' sp@[Index _] BDefault _ = Right $ constructFromNothing' sp BDefault
 applyDelta' sp@[Index _] _ _ = Right $ constructFromNothing' sp BDefault
+applyDelta' sp@(Index _ : _) bv (SimpleValue _) = Right $ constructFromNothing' sp bv
 -- Handle case where BDefault created a SimpleValue but we now have nested fields
 applyDelta' (Field n : sp) bv (SimpleValue _) = do
   n' <- first (UnicodeError n) $ decodeUtf8' n
@@ -196,6 +196,34 @@ constructFromNothing' [Field "length"] = \case
 constructFromNothing' (Field n : sp) = ValueStruct . M.singleton (decodeUtf8 n) . constructFromNothing' sp
 constructFromNothing' (Index n : sp) =
   ValueMapping . M.singleton (fromIndex n) . constructFromNothing' sp
+
+synthesizeFlat :: [(StoragePath, BasicValue)] -> FlatTotalStorage
+synthesizeFlat spbvs =
+  let byFields = mapMaybe fieldsOnly spbvs
+      basicLists = foldr (\(t, p) m -> HM.alter (Just . maybe [p] (p :)) t m) HM.empty byFields
+   in HM.map (foldr build $ SimpleValue $ ValueAddress 0x0) basicLists
+  where
+    fieldsOnly (StoragePath (Field t : sp), bv) = case unsnoc $ rawPathPiece <$> sp of
+      Nothing -> pure ((True, t) NE.:| [], (Nothing, bv))
+      Just (sp'', p@(isField, u)) ->
+        if isField
+          then if u == "length" && isDefault bv
+                 -- An empty-length write (BDefault, or BInteger 0 / BAddress 0x0
+                 -- from older VM versions) is not an array marker: collapse it
+                 -- into a scalar placeholder on the parent row instead of
+                 -- creating a row for the field itself.
+                 then case unsnoc sp'' of
+                   Nothing -> Nothing
+                   Just (sp''', (isField', u')) -> if isField'
+                     then pure ((True, t) NE.:| sp''', (Just u', bv))
+                     else pure ((True, t) NE.:| sp'', (Nothing, bv))
+                 else pure ((True, t) NE.:| sp'', (Just u, bv))
+          else pure ((True, t) NE.:| (sp'' ++ [p]), (Nothing, bv))
+    fieldsOnly _ = Nothing
+    build (Nothing, BDefault) s = s
+    build (Nothing, bv) _ = fromBasic bv
+    build (Just f, bv) (ValueStruct s) = ValueStruct $ M.insert (bsToText' f) (fromBasic bv) s
+    build (Just f, bv) _ = ValueStruct $ M.singleton (bsToText' f) (fromBasic bv)
 
 synthesize :: [(StoragePath, BasicValue)] -> Either ReplayFailure TotalStorage
 synthesize spbvs = do

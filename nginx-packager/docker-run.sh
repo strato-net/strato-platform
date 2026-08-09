@@ -20,6 +20,10 @@ STATS_ENABLED=${STATS_ENABLED:-true}
 SMD_DEV_MODE=${SMD_DEV_MODE:-false}
 SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP:-172.17.0.1}
 APEX_HOST=${APEX_HOST:-apex:3009}
+# Tracking links run as a standalone stack (docker-compose.tracking.yml);
+# point TRACKING_URL at it and set TRACKING_ENABLED=true to proxy to it.
+TRACKING_URL=${TRACKING_URL:-https://go.strato.nexus}
+TRACKING_ENABLED=${TRACKING_ENABLED:-false}
 DOCS_HOST=${DOCS_HOST:-docs:8080}
 POSTGREST_HOST=${POSTGREST_HOST:-postgrest:3001}
 PROMETHEUS_HOST=${PROMETHEUS_HOST:-prometheus:9090}
@@ -127,6 +131,21 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i '/#TEMPLATE_MARK_JSONRPC/d' /tmp/nginx.conf
   fi
 
+  # Public /rpc exposes the expensive VM methods (the strato_* simulation/trace
+  # namespace) only when explicitly opted in; otherwise keep the guard (secure default).
+  if [ "$PUBLIC_STRATO_RPC_ENABLED" == true ]; then
+    sed -i '/#TEMPLATE_MARK_STRATO_RPC_GUARD/d' /tmp/nginx.conf
+  else
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_STRATO_RPC_GUARD//g' /tmp/nginx.conf
+  fi
+
+  # Remove tracking-links routes unless the tracking service is deployed
+  if [ "$TRACKING_ENABLED" != true ]; then
+    sed -i '/#TEMPLATE_MARK_TRACKING/d' /tmp/nginx.conf
+  else
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_TRACKING//g' /tmp/nginx.conf
+  fi
+
   # Remove Stats lines if running in STATS_ENABLED=false
   if [ "$STATS_ENABLED" != true ] ; then
     sed -i '/#TEMPLATE_MARK_STATS_ENABLED/d' /tmp/nginx.conf
@@ -154,6 +173,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   # Replacing HOST NAME PLACEHOLDERS
   sed -i "s/__APEX_HOST__/$APEX_HOST/g" /tmp/nginx.conf
+  sed -i "s|__TRACKING_URL__|$TRACKING_URL|g" /tmp/nginx.conf
   sed -i "s/__DOCS_HOST__/$DOCS_HOST/g" /tmp/nginx.conf
   sed -i "s/__POSTGREST_HOST__/$POSTGREST_HOST/g" /tmp/nginx.conf
   sed -i "s/__PROMETHEUS_HOST__/$PROMETHEUS_HOST/g" /tmp/nginx.conf
@@ -216,6 +236,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   mv /tmp/vault-openid.lua /usr/local/openresty/nginx/lua/vault-openid.lua
   
   mv /tmp/csrf.lua /usr/local/openresty/nginx/lua/csrf.lua
+  mv /tmp/rpc-guard.lua /usr/local/openresty/nginx/lua/rpc-guard.lua
 fi
 
 echo 'Waiting for apex to be available...'

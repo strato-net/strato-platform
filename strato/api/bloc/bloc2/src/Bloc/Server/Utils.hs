@@ -81,7 +81,7 @@ getBatchBlocTxStatus hashes = do
           _ -> return (Failure, mtxr)
 
 emptyTxParams :: TxParams
-emptyTxParams = TxParams Nothing Nothing Nothing
+emptyTxParams = TxParams Nothing Nothing Nothing Nothing
 
 binRuntimeToCodeHash :: Text.Text -> Keccak256
 binRuntimeToCodeHash = hash . LabeledError.b16Decode "binRuntimeToCodeHash" . Text.encodeUtf8
