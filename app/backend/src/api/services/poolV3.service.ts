@@ -883,13 +883,60 @@ export const swap = async (
   params: PoolV3SwapParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
-  const { poolAddress, zeroForOne, amountSpecified, amountLimit, sqrtPriceLimitX96 } = params;
-  const { token0, token1 } = await fetchPoolTokens(accessToken, poolAddress);
-  const inputToken = zeroForOne ? token0 : token1;
+  const { poolAddress, zeroForOne, amountSpecified, amountLimit } = params;
+  const rawPools = await fetchRawPools(accessToken, { address: `eq.${normalizeAddress(poolAddress)}` });
+  const raw = rawPools[0];
+  if (!raw) throw new Error(`PoolV3 not found: ${poolAddress}`);
+  const inputToken = zeroForOne ? raw.token0.address : raw.token1.address;
 
   const specified = BigInt(amountSpecified);
   // exact input: approve the input amount; exact output: approve the max input (amountLimit)
   const approvalAmount = specified > 0n ? specified.toString() : amountLimit;
+
+  // When the caller doesn't pick a price limit ("0" = contract default), clamp it to the
+  // pool's outermost initialized tick instead of the tick-domain edge. Beyond that tick
+  // liquidity is zero, so the fill is identical either way — but the edge default lets a
+  // draining swap pin the price at ~2^±128 ("infinity"), where no position can ever be in
+  // range and the drained token can never be re-deposited. This is the same layer that
+  // owns the 0-default in canonical Uniswap (SwapRouter); explicit limits pass through.
+  let sqrtPriceLimitX96 = params.sqrtPriceLimitX96;
+  if (!sqrtPriceLimitX96 || sqrtPriceLimitX96 === "0") {
+    const ticks = await fetchInitializedTicks(accessToken, poolAddress);
+    const clamped = v3.clampedPriceLimit(ticks, zeroForOne);
+    if (clamped === null) throw new Error("Pool has no liquidity");
+    if (zeroForOne ? clamped >= BigInt(raw.sqrtPriceX96) : clamped <= BigInt(raw.sqrtPriceX96)) {
+      // would fail the contract's SPL require: every initialized tick is behind the price
+      const outSymbol = zeroForOne ? raw.token1._symbol : raw.token0._symbol;
+      throw new Error(
+        `No ${outSymbol} available: the pool's liquidity is entirely ${zeroForOne ? "above" : "below"} the current price`
+      );
+    }
+    sqrtPriceLimitX96 = clamped.toString();
+
+    // Exact output with no explicit limit means full fill (canonical SwapRouter
+    // semantics): the contract's amountLimit guard is a max-INPUT bound, which a partial
+    // fill passes ever more easily as delivery shrinks — under-delivery of the requested
+    // output can only be rejected here, before submission.
+    if (specified < 0n) {
+      const result = v3.simulateSwap(
+        {
+          sqrtPriceX96: BigInt(raw.sqrtPriceX96),
+          currentTick: Number(raw.currentTick),
+          liquidity: BigInt(raw.liquidity),
+          feePips: BigInt(raw.fee),
+          ticks,
+        },
+        zeroForOne,
+        specified,
+        clamped
+      );
+      if (result.partialFill) {
+        throw new Error(
+          `Insufficient liquidity: the pool can deliver ${result.amountOut} of the ${-specified} requested`
+        );
+      }
+    }
+  }
 
   const tx = await buildFunctionTx(
     [
@@ -902,7 +949,7 @@ export const swap = async (
           recipient: userAddress,
           zeroForOne,
           amountSpecified,
-          sqrtPriceLimitX96: sqrtPriceLimitX96 ?? "0",
+          sqrtPriceLimitX96,
           amountLimit,
           deadline: deadline(),
         },

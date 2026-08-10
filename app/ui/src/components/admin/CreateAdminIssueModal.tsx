@@ -5,10 +5,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plus, X } from 'lucide-react';
+import { Loader2, Plus, X, FlaskConical } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { parseJsonBigInt } from '@/utils/numberUtils';
+import { simulateAdminVote, type SimulationResult } from '@/lib/simulate';
+import SimulationResultPanel from './SimulationResultPanel';
 import * as React from 'react';
 
 type CreateAdminIssueFormValues = {
@@ -33,6 +35,17 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
   const { contractSearch, contractSearchResults, contractSearchResultsLoading,
           getContractDetails, contractDetailsResults, contractDetailsResultsLoading } = useUser();
   const [selectedFunction, setSelectedFunction] = useState('');
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simResult, setSimResult] = useState<SimulationResult | null>(null);
+  const [simError, setSimError] = useState<string>('');
+
+  // Drop any stale simulation when the modal re-opens.
+  useEffect(() => {
+    if (open) {
+      setSimResult(null);
+      setSimError('');
+    }
+  }, [open]);
   const searchObjects = contractSearchResults.reduce((b, a) => {
     if (a['address']) {
       const aa = { ...b[a['address']], ...a } 
@@ -137,20 +150,61 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
     }
   }
 
+  // Validate/coerce the form args to their on-chain form (addresses get a 0x
+  // prefix, ints stay numeric strings, strings get quoted), throwing on the
+  // first bad value. Shared by submit and simulate so both send identical args.
+  const buildValidatedArgs = (values: CreateAdminIssueFormValues): unknown[] =>
+    values.args.map((a, i) => {
+      const [success, v] = validateFunctionArg(functionArgs?.[i]?.[1]?.type || {}, a.value);
+      if (!success) {
+        throw new Error(typeof v === 'string' ? v : 'Invalid argument');
+      }
+      return v;
+    });
+
+  const handleSimulate = async () => {
+    const values = form.getValues();
+    const target = values.target.trim();
+    const func = values.func.trim();
+    if (!target || !func) {
+      toast({
+        title: 'Incomplete',
+        description: 'Enter a target contract and function first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    let args: unknown[];
+    try {
+      args = buildValidatedArgs(values);
+    } catch (err) {
+      toast({
+        title: 'Validation Failed',
+        description: err instanceof Error ? err.message : 'Invalid arguments',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsSimulating(true);
+    setSimResult(null);
+    setSimError('');
+    try {
+      const res = await simulateAdminVote({ target, func, args });
+      setSimResult(res);
+    } catch (err) {
+      setSimError(err instanceof Error ? err.message : 'Simulation failed');
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
   const onSubmit = async (values: CreateAdminIssueFormValues) => {
     // Clean up whitespace and empty args
     const trimmedTarget = values.target.trim();
     const trimmedFunc = values.func.trim();
-    
+
     try {
-      const argsArray = values.args
-        .map((a, i) => {
-          const [success, v] = validateFunctionArg(functionArgs[i][1].type || {}, a.value);
-          if (!success) {
-            throw new Error(typeof v === 'string' ? v : 'Invalid argument');
-          }
-          return v;
-        });
+      const argsArray = buildValidatedArgs(values);
 
       // Build payload with JSON-stringified target/func, and a JSON array for args
       const payload = {
@@ -328,8 +382,24 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
               </div>
             </div>
 
+            {simResult || simError ? (
+              <SimulationResultPanel result={simResult} error={simError} title="Proposal tx" />
+            ) : null}
+
             {/* Actions */}
             <div className="flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSimulate}
+                disabled={isSimulating || isSubmitting}
+              >
+                {isSimulating ? (
+                  <> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Simulating… </>
+                ) : (
+                  <> <FlaskConical className="mr-2 h-4 w-4" /> Simulate </>
+                )}
+              </Button>
               <Button
                 type="button"
                 variant="outline"

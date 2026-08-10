@@ -46,9 +46,13 @@ const PRIMARY_NAV_ITEMS = [
 
 const MORE_CATEGORIES: MoreNavCategory[] = [
   {
-    label: 'TRADE',
     items: [
       { icon: Compass, label: 'Explore', path: '/dashboard/explore' },
+    ],
+  },
+  {
+    label: 'TRADE',
+    items: [
       { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
       { icon: Send, label: 'Send', path: '/dashboard/transfer' },
       { icon: Download, label: 'Bridge Out', path: '/dashboard/withdrawals' },

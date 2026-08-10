@@ -52,6 +52,9 @@ type BlocAPI =
     :<|> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text :> PostBlocTransactionBody
     :<|> PostBlocTransactionUnsigned
     :<|> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text :> PostBlocTransaction
+    -- Simulation: token optional (nginx injects it for sessions; anonymous
+    -- external-wallet users pass an address in the body instead)
+    :<|> Header "X-USER-ACCESS-TOKEN" Text :> PostBlocTransactionSimulate
 
 --Unsure what this will break if anything but remove later
 instance ToSample Text where

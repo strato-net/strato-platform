@@ -4,7 +4,7 @@ pipeline {
   }
   options { disableConcurrentBuilds() }
   triggers {
-    cron('H */4 * * *')
+    cron('H */6 * * *')
   }
   environment {
     PATH = "/home/ubuntu/.local/bin:${env.PATH}"
@@ -68,17 +68,17 @@ pipeline {
       )
     }
 
-//    failure {
-//      slackSend (
-//          color: 'danger',
-//          message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
-//      )
-//      slackSend(
-//          channel: '#engineering',
-//          color: 'danger',
-//          message: "Sync test build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
-//      )
-//    }
+    failure {
+      slackSend (
+          color: 'danger',
+          message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+      slackSend(
+          channel: '#engineering',
+          color: 'danger',
+          message: "Sync test build failed. The snapshots weren't created! Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+    }
 
     fixed {
       slackSend(
@@ -189,7 +189,7 @@ def deployAndSync(String network, String metricNamespacePrefix) {
     // Confirm the node is reachable, then measure sync time.
     lib.checkNodeAvailability(443)
     def timeStart = System.currentTimeMillis()
-    lib.waitLocalNodeIsSynced()
+    lib.waitLocalNodeIsSynced('mynode')
     def syncTimeSec = (System.currentTimeMillis() - timeStart) / 1000
     def syncTimeMin = syncTimeSec / 60
     def blocksTotal = Integer.parseInt(sh(

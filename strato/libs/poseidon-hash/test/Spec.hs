@@ -6,6 +6,7 @@ module Main where
 
 import Test.Hspec
 import Crypto.Hash.Poseidon
+import qualified Crypto.Hash.Poseidon2 as P2
 
 main :: IO ()
 main = hspec $ do
@@ -42,6 +43,44 @@ main = hspec $ do
 
     -- Note: Currently only supports up to 8 inputs (t=2 to t=9)
     -- 16-input test would require generating more constants
+
+  describe "Poseidon2 (gnark-crypto BN254 defaults, t=2 rF=6 rP=50)" $ do
+    -- Test vectors generated from gnark-crypto v0.20.1 ecc/bn254/fr/poseidon2
+
+    it "permutes (0, 0) correctly" $ do
+      let (a, b) = P2.permutation (toF 0, toF 0)
+      (fromF a, fromF b) `shouldBe`
+        ( 5760396826252723620130659814739767625264053726049147948400048226670170422969
+        , 18622970401557034651033185129330286139447343337105683528700775943440799145467 )
+
+    it "permutes (1, 2) correctly" $ do
+      let (a, b) = P2.permutation (toF 1, toF 2)
+      (fromF a, fromF b) `shouldBe`
+        ( 1197409642805673503548047715485910702500396810305169145705533208671921662963
+        , 1313337560616139085277676701856612540166622156368305732529371734734451176750 )
+
+    it "compresses (1, 2) with the right-input feed-forward" $ do
+      fromF (P2.compress (toF 1) (toF 2)) `shouldBe`
+        1313337560616139085277676701856612540166622156368305732529371734734451176752
+
+    it "Merkle-Damgard hashes [1] correctly" $ do
+      fromF (P2.hash [toF 1]) `shouldBe`
+        12157562999385135173166708316607836110878334226144932937475223226141207470306
+
+    it "Merkle-Damgard hashes [1, 2] correctly" $ do
+      fromF (P2.hash [toF 1, toF 2]) `shouldBe`
+        4443443265955166080716935670700081889283598504231460571509928329665379862364
+
+    it "Merkle-Damgard hashes [1, 2, 3, 4] correctly" $ do
+      fromF (P2.hash (map toF [1, 2, 3, 4])) `shouldBe`
+        5402851635480781446751342346210135834226319730389436212287936564310709451361
+
+    it "Merkle-Damgard hashes [0..9] correctly" $ do
+      fromF (P2.hash (map toF [0 .. 9])) `shouldBe`
+        16191854207462619476933326392729612834530730884080381722066254905795027646701
+
+    it "hash of a single block equals compress with zero IV" $ do
+      fromF (P2.hash [toF 42]) `shouldBe` fromF (P2.compress (toF 0) (toF 42))
 
   describe "Field arithmetic" $ do
     it "handles modular reduction" $ do

@@ -24,6 +24,8 @@ library
       Crypto.Hash.Poseidon
       Crypto.Hash.Poseidon.Field
       Crypto.Hash.Poseidon.Constants
+      Crypto.Hash.Poseidon2
+      Crypto.Hash.Poseidon2.Constants
   other-modules:
       Paths_poseidon_hash
   hs-source-dirs:

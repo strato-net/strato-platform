@@ -17,6 +17,7 @@ library
   exposed-modules:
       Blockchain.BlockChain
       Blockchain.Event
+      Blockchain.TraceReplay
       Executable.EthereumVM
       Executable.EthereumVM2
   other-modules:
@@ -31,7 +32,8 @@ library
       src/
   ghc-options: -Wall -O2
   build-depends:
-      base
+      aeson
+    , base
     , base16-bytestring
     , binary
     , blockDB
