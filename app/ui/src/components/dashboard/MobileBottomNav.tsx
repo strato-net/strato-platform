@@ -17,6 +17,7 @@ import {
   HandCoins,
   Layers,
   ArrowDownToLine,
+  Compass,
   X
 } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
@@ -44,6 +45,11 @@ const PRIMARY_NAV_ITEMS = [
 ];
 
 const MORE_CATEGORIES: MoreNavCategory[] = [
+  {
+    items: [
+      { icon: Compass, label: 'Explore', path: '/dashboard/explore' },
+    ],
+  },
   {
     label: 'TRADE',
     items: [

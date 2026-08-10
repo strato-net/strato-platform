@@ -61,6 +61,7 @@ import Blockchain.VMContext
     MemDBs (..),
     currentBlock,
     debugSettings,
+    vmTracer,
     memDBs,
     stateBlockMap,
     stateRoots,
@@ -82,6 +83,7 @@ import Data.Default
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
+import Blockchain.Data.VmTrace (VmTracer)
 import Debugger
 import GHC.Generics
 import UnliftIO
@@ -210,6 +212,10 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (MemContext t) (MemCont
 instance MonadIO m => Mod.Modifiable (Maybe DebugSettings) (MemContextM t m) where
   get _ = gets $ view debugSettings
   put _ ds = modify $ debugSettings .~ ds
+
+instance MonadIO m => Mod.Modifiable (Maybe VmTracer) (MemContextM t m) where
+  get _ = gets $ view vmTracer
+  put _ t = modify $ vmTracer .~ t
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ContextState (MemContextM t m) where
   access _ = get

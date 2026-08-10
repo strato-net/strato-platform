@@ -22,16 +22,14 @@ import BlockApps.Logging
 import qualified Blockchain.Bagger as Bagger
 import qualified Blockchain.Bagger.BaggerState as B
 import Blockchain.BlockChain
-import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Blockstanbul (PreprepareDecision(..))
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.Transaction (getSigVals, whoReallySignedThisTransactionEcrecover)
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Event hiding (selfAddress)
-import Blockchain.JsonRpcCommand
+import Blockchain.TraceReplay (runJsonRpcCommandTraced)
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
@@ -79,7 +77,7 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
       case bbi of
         ContextBestBlockInfo h _ _ -> pure h
         Unspecified -> pure Keccak256.zeroHash
-    resps <- withCurrentBlockHashNoCommit bbHash $ traverse runJsonRpcCommand' rpcCommands
+    resps <- withCurrentBlockHashNoCommit bbHash $ traverse runJsonRpcCommandTraced rpcCommands
     recordSeqEventCount bLen tLen
     pure resps
   yieldMany $! OutJSONRPC <$> rpcResps
@@ -120,16 +118,7 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
                               parentHash = bSumParentHash summ,
                               stateRoot = bSumStateRoot summ
                             }
-            let pHash = proposalHash bHeader
-                mSig = getProposerSeal bHeader  -- Signature is Maybe type
-            proposer <- case mSig of
-                            Just sig -> do
-                                let (r, s, v) = getSigVals sig
-                                    proposerAddress = whoReallySignedThisTransactionEcrecover pHash r s (v - 0x1b)
-                                case proposerAddress of
-                                  Just addr ->  return addr
-                                  Nothing -> error "no proposer"
-                            Nothing -> error "no proposer"
+            proposer <- either error pure $ recoverProposer bHeader
             res <- Bagger.runFromStateRoot
               --account
               mineTransactions

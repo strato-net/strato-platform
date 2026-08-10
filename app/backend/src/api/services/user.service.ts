@@ -193,6 +193,36 @@ export const castVoteOnIssue = async (
   }
 };
 
+// Dry-run a castVoteOnIssue vote in the node's VM sandbox (nothing is signed or
+// committed). Returns the vote tx result with the issue's "effect if executed"
+// (target.func(args) run as the AdminRegistry) nested under `effect`, so admins
+// can preview an issue's real impact before voting. Forwarded to the node's bloc
+// simulate endpoint, which the app UI can't reach directly.
+export const simulateCastVoteOnIssue = async (
+  accessToken: string,
+  userAddress: string,
+  target: string,
+  func: string,
+  args: any[],
+): Promise<any> => {
+  const payload = {
+    contractName: extractContractName(AdminRegistry),
+    contractAddress: adminRegistry,
+    method: "castVoteOnIssue",
+    args: { _target: target, _func: func, _args: args },
+    metadata: {},
+  };
+  const body = {
+    txs: [{ payload, type: "FUNCTION" }],
+    address: userAddress.replace(/^0x/, ""),
+  };
+  const response = await bloc.post(accessToken, "/transaction/simulate", body, {
+    params: { trace: true },
+  });
+  const data = response.data;
+  return Array.isArray(data) ? data[0] : data;
+};
+
 // Dismiss an issue (only works if proposer is the only voter)
 export const dismissIssue = async (
   accessToken: string,

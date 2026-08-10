@@ -19,6 +19,7 @@ library
       Blockchain.Bagger.BaggerState
       Blockchain.Bagger.Transactions
       Blockchain.Data.BlockSummary
+      Blockchain.Data.VmTrace
       Blockchain.Data.ExecResults
       Blockchain.DB.BlockSummaryDB
       Blockchain.DB.ModifyStateDB
@@ -104,5 +105,6 @@ test-suite contextm-test
       base
     , hflags
     , hspec
+    , strato-model
     , vm-tools
   default-language: Haskell2010

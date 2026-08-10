@@ -3,7 +3,7 @@ import {
   Pool, SwapHistoryEntry, SetPoolRatesParams, SwapToken, SwapContextType,
   PoolV3, PoolV3Position, PoolV3AmountsPreview,
   PoolV3MintParams, PoolV3BurnParams, PoolV3CollectParams,
-  PoolV3LiquidityDistribution,
+  PoolV3LiquidityDistribution, PoolV3CreateParams,
 } from '@/interface';
 import {api} from '@/lib/axios';
 
@@ -397,6 +397,15 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   // V3 (CONCENTRATED LIQUIDITY) OPERATIONS
   // ============================================================================
 
+  const createV3Pool = useCallback(async (data: PoolV3CreateParams) => {
+    setLoading(true);
+    try {
+      await api.post('/poolv3/pools', data);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const fetchV3Pools = useCallback(async (): Promise<PoolV3[]> => {
     try {
       const { data } = await api.get<PoolV3[]>('/poolv3/pools');
@@ -582,6 +591,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         toggleDisable,
         pools,
         // V3 (concentrated liquidity)
+        createV3Pool,
         fetchV3Pools,
         getV3PoolByAddress,
         getV3LiquidityDistribution,

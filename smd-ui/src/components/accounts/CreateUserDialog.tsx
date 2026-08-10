@@ -15,6 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
+import { useSimulation } from "@/components/simulation/useSimulation";
+import { SimulateButton } from "@/components/simulation/SimulateButton";
+import { SimulationResultPanel } from "@/components/simulation/SimulationResultPanel";
 import { USER_REGISTRY_ADDRESS } from "@/services/userWallets";
 
 /** Create a new User wallet by calling createUser(string) on the UserRegistry (0x720). */
@@ -23,7 +26,28 @@ export function CreateUserDialog({ disabled }: { disabled?: boolean }) {
   const [username, setUsername] = useState("");
   const [pending, setPending] = useState(false);
   const { submit, canSubmit } = useSubmitTransaction();
+  const sim = useSimulation();
   const queryClient = useQueryClient();
+
+  // createUser uses msg.sender as the new wallet's owner, so this is a plain
+  // function call signed by the connected account — no wallet wrapping needed.
+  const buildPayload = (name: string) => ({
+    contractName: "UserRegistry",
+    contractAddress: USER_REGISTRY_ADDRESS,
+    value: 0,
+    method: "createUser",
+    args: { _username: name },
+    metadata: {},
+  });
+
+  const simulate = () => {
+    const name = username.trim();
+    if (!name) {
+      toast.error("Enter a username");
+      return;
+    }
+    return sim.run("FUNCTION", buildPayload(name));
+  };
 
   const create = async () => {
     const name = username.trim();
@@ -33,16 +57,7 @@ export function CreateUserDialog({ disabled }: { disabled?: boolean }) {
     }
     setPending(true);
     try {
-      // createUser uses msg.sender as the new wallet's owner, so this is a plain
-      // function call signed by the connected account — no wallet wrapping needed.
-      await submit("FUNCTION", {
-        contractName: "UserRegistry",
-        contractAddress: USER_REGISTRY_ADDRESS,
-        value: 0,
-        method: "createUser",
-        args: { _username: name },
-        metadata: {},
-      });
+      await submit("FUNCTION", buildPayload(name));
       toast.success(`Created User wallet "${name}"`);
       setUsername("");
       setOpen(false);
@@ -85,11 +100,15 @@ export function CreateUserDialog({ disabled }: { disabled?: boolean }) {
           {!canSubmit ? (
             <p className="text-xs text-muted-foreground">Connect a wallet to create a user.</p>
           ) : null}
+          <SimulationResultPanel result={sim.result} error={sim.error} />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancel
           </Button>
+          {sim.canSimulate ? (
+            <SimulateButton onClick={simulate} pending={sim.pending} />
+          ) : null}
           <Button onClick={create} disabled={pending || !canSubmit}>
             {pending ? "Creating…" : "Create"}
           </Button>

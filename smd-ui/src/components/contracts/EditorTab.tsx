@@ -31,6 +31,9 @@ import {
   type XabiResult,
 } from "@/services/contracts";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
+import { useSimulation } from "@/components/simulation/useSimulation";
+import { SimulateButton } from "@/components/simulation/SimulateButton";
+import { SimulationResultPanel } from "@/components/simulation/SimulationResultPanel";
 import { usePersistentState } from "@/hooks/usePersistentState";
 import { useUser } from "@/context/UserContext";
 
@@ -59,6 +62,7 @@ const STARTER = `contract SimpleStorage {
 export function EditorTab() {
   const { resolvedTheme } = useTheme();
   const { submit: submitTx, canSubmit } = useSubmitTransaction();
+  const sim = useSimulation();
   const { userAddress, isAppAuthenticated } = useUser();
 
   // Persisted so edits and added files survive tab switches and page reloads.
@@ -184,6 +188,7 @@ export function EditorTab() {
 
   const openCreate = () => {
     setDeployedAddress("");
+    sim.reset();
     setCreateOpen(true);
   };
 
@@ -191,15 +196,8 @@ export function EditorTab() {
   // their User wallet contracts (select it from the Wallet dropdown).
   const canCreate = isAppAuthenticated || (canSubmit && !!walletUsername);
 
-  const doCreate = async () => {
-    if (!selectedContract) {
-      toast.error("Select a contract to create");
-      return;
-    }
-    if (!isAppAuthenticated && !walletUsername) {
-      toast.error("Select one of your User wallets to deploy with an external wallet");
-      return;
-    }
+  // Build the CONTRACT payload once, so Simulate and Create submit identical data.
+  const buildCreatePayload = (): Record<string, unknown> => {
     const args: Record<string, unknown> = {};
     for (const a of argDefs) {
       const raw = argValues[a.name];
@@ -212,18 +210,24 @@ export function EditorTab() {
     }
     const metadata: Record<string, string> = { VM: "SolidVM" };
     if (contractNames.length) metadata.nohistory = contractNames.join(",");
+    return { contract: selectedContract, src: compiledSource, args, metadata };
+  };
 
+  const doCreate = async () => {
+    if (!selectedContract) {
+      toast.error("Select a contract to create");
+      return;
+    }
+    if (!isAppAuthenticated && !walletUsername) {
+      toast.error("Select one of your User wallets to deploy with an external wallet");
+      return;
+    }
     setDeploying(true);
     setDeployedAddress("");
     try {
       const result = await submitTx(
         "CONTRACT",
-        {
-          contract: selectedContract,
-          src: compiledSource,
-          args,
-          metadata,
-        },
+        buildCreatePayload(),
         walletUsername ? { username: walletUsername } : undefined
       );
       const address: string | undefined = result?.data?.contents?.address;
@@ -237,6 +241,14 @@ export function EditorTab() {
     } finally {
       setDeploying(false);
     }
+  };
+
+  const simulateCreate = () => {
+    if (!selectedContract) {
+      toast.error("Select a contract to simulate");
+      return;
+    }
+    return sim.run("CONTRACT", buildCreatePayload(), walletUsername ? { username: walletUsername } : undefined);
   };
 
   return (
@@ -427,6 +439,14 @@ export function EditorTab() {
               </div>
             ) : null}
 
+            <SimulationResultPanel result={sim.result} error={sim.error} />
+            {sim.result?.status === "Success" && !deployedAddress ? (
+              <p className="text-xs text-muted-foreground">
+                The deploy address shown by a simulation is the would-be address; the actual
+                address depends on the account nonce at post time.
+              </p>
+            ) : null}
+
             {!canSubmit ? (
               <p className="text-xs text-muted-foreground">
                 Connect a wallet to create a contract.
@@ -444,6 +464,13 @@ export function EditorTab() {
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
+            {sim.canSimulate ? (
+              <SimulateButton
+                onClick={simulateCreate}
+                pending={sim.pending}
+                disabled={!selectedContract}
+              />
+            ) : null}
             <Button onClick={doCreate} disabled={deploying || !canCreate || !selectedContract}>
               {deploying ? "Creating…" : "Create Contract"}
             </Button>
