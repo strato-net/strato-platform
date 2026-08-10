@@ -33,7 +33,6 @@ pipeline {
     stage('Deploy to Mainnet') {
       steps {
         sh "sudo cp /root/run.sh ./"
-        sh "chmod +x run.sh"
         withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
           sh "./run.sh"
         }
@@ -53,6 +52,10 @@ pipeline {
     //  archiveArtifacts artifacts: 'mynode/logs/**', fingerprint: true, allowEmptyArchive: true
     //}
     success {
+      slackSend (
+          color: 'good',
+          message: "buildtest internal (mainnet) was redeployed from develop. Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) on node ${env.NODE_NAME}"
+      )
       slackSend(
           channel: '#engineering',
           color: 'good',
@@ -60,6 +63,10 @@ pipeline {
       )
     }
     failure {
+      slackSend (
+          color: 'danger',
+          message: "buildtest internal (mainnet) has failed to build or redeploy from develop. Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
+      )
       slackSend(
           channel: '#engineering',
           color: 'danger',
