@@ -2,7 +2,8 @@
 // OpenZeppelin Contracts (last updated v5.1.0) (token/ERC721/ERC721.sol)
 import "./IERC721.sol";
 import "./extensions/IERC721Metadata.sol";
-import "../ERC20/utils/Context.sol"; //SOLIDVM_COMPATIBILITY: shared Context — do not duplicate the contract
+//SOLIDVM_COMPATIBILITY: shared Context — do not duplicate the contract (importer chokes on inline comments after an import)
+import "../ERC20/utils/Context.sol";
 
 /**
  * @dev Implementation of https://eips.ethereum.org/EIPS/eip-721[ERC-721] Non-Fungible Token Standard, including

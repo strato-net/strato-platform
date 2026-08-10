@@ -10,6 +10,7 @@ import TokensController from "./controllers/tokens.controller";
 import userRoutes from "./routes/user.routes";
 import tokensRoutes from "./routes/tokens.routes";
 import tokensV2Routes from "./routes/tokens.v2.routes";
+import nftsRoutes from "./routes/nfts.routes";
 import configRoutes from "./routes/config.routes";
 import oracleRoutes from "./routes/oracle.routes";
 import swapRoutes from "./routes/swap.routes";
@@ -45,6 +46,9 @@ router.use("/tokens/v2", tokensV2Routes);
 
 // ----- Token Routes -----
 router.use("/tokens", tokensRoutes);
+
+// ----- NFT Routes -----
+router.use("/nfts", nftsRoutes);
 
 // ----- Vouchers Route (separate path) -----
 /**

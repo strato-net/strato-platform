@@ -104,7 +104,10 @@ contract record NFT is ERC721URIStorage, Ownable, TokenMetadata, Pausable {
 
     /// @notice Canonical ERC721Burnable semantics: caller must own `tokenId` or be an approved operator.
     /// @dev Body inlined from abstract/ERC721/extensions/ERC721Burnable.sol (D8).
-    function burn(uint256 tokenId) external {
+    /// @dev Pause-gated like transferFrom: while paused only the collection owner may burn (holders cannot).
+    ///      The modifier is applied here on the public entry point, NOT via an _update override — a
+    ///      super-routed _update override would be statically bound to the parent scope and bypassed (D12).
+    function burn(uint256 tokenId) external whenNotPausedOrOwner {
         _update(address(0), tokenId, _msgSender());
     }
 
