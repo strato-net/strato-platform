@@ -133,6 +133,34 @@ router.get("/quote", authHandler.authorizeRequest(true), TradeController.quote);
 router.post("/swap", walletAuth, TradeController.swap);
 
 /**
+ *
+ * /trade/token-history/{tokenAddress}:
+ *   get:
+ *     summary: Recent swaps involving a single token across all pool types
+ *     tags: [Trade]
+ *     parameters:
+ *       - name: tokenAddress
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - name: page
+ *         in: query
+ *         required: false
+ *         schema:
+ *           type: integer
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Paginated merged history; entries carry poolName ("V2" / "Stable" / "V3 0.3%")
+ */
+router.get("/token-history/:tokenAddress", authHandler.authorizeRequest(true), TradeController.tokenHistory);
+
+/**
  * @openapi
  * /trade/history/{tokenAddress1}/{tokenAddress2}:
  *   get:

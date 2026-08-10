@@ -1,15 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileBottomNav from '../components/dashboard/MobileBottomNav';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { api } from '@/lib/axios';
 import { formatUnits, safeBigInt } from '@/utils/numberUtils';
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
+import { buildFundBuyPath, fetchBridgeBuyableAddresses, normBridgeAddr } from '@/lib/bridgeLinks';
+
+type SortKey = 'price' | 'marketCap' | 'totalSupply';
+type SortDir = 'asc' | 'desc';
 
 interface ExploreToken {
   address: string;
@@ -133,6 +139,11 @@ const TokenLogo = ({ image, symbol, size }: { image?: string | null; symbol: str
   );
 };
 
+const SortIcon = ({ active, dir }: { active: boolean; dir: SortDir }) => {
+  if (!active) return <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />;
+  return dir === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />;
+};
+
 const Explore = () => {
   const navigate = useNavigate();
   const { isLoggedIn } = useUser();
@@ -141,6 +152,9 @@ const Explore = () => {
   const [totalMarketCap, setTotalMarketCap] = useState('0');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [buyableAddresses, setBuyableAddresses] = useState<Set<string> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -162,6 +176,20 @@ const Explore = () => {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchBridgeBuyableAddresses()
+      .then((set) => {
+        if (!cancelled) setBuyableAddresses(set);
+      })
+      .catch(() => {
+        if (!cancelled) setBuyableAddresses(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Matches AssetDetail: holdings include tokens locked as collateral
   const balanceByAddress = useMemo(() => {
     const map = new Map<string, bigint>();
@@ -170,6 +198,36 @@ const Explore = () => {
     );
     return map;
   }, [activeTokens, inactiveTokens]);
+
+  const canBuy = (address: string) => !!buyableAddresses?.has(normBridgeAddr(address));
+
+  const goBuy = (e: MouseEvent, address: string) => {
+    e.stopPropagation();
+    navigate(buildFundBuyPath(address));
+  };
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  };
+
+  const sortedTokens = useMemo(() => {
+    if (!sortKey) return tokens;
+    const mult = sortDir === 'asc' ? 1 : -1;
+    return [...tokens].sort((a, b) => {
+      if (sortKey === 'marketCap') {
+        return (parseFloat(a.marketCap || '0') - parseFloat(b.marketCap || '0')) * mult;
+      }
+      const av = safeBigInt(sortKey === 'price' ? a.price : a.totalSupply);
+      const bv = safeBigInt(sortKey === 'price' ? b.price : b.totalSupply);
+      if (av === bv) return 0;
+      return (av < bv ? -1 : 1) * mult;
+    });
+  }, [tokens, sortKey, sortDir]);
 
   const openToken = (address: string) => navigate(`/dashboard/deposits/${address}`);
 
@@ -222,20 +280,50 @@ const Explore = () => {
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="w-12 text-muted-foreground">#</TableHead>
                         <TableHead>Token</TableHead>
-                        <TableHead className="text-right">Price</TableHead>
+                        <TableHead className="text-right">
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 ml-auto hover:text-foreground"
+                            onClick={() => toggleSort('price')}
+                          >
+                            Price
+                            <SortIcon active={sortKey === 'price'} dir={sortDir} />
+                          </button>
+                        </TableHead>
                         <TableHead className="text-right">1H</TableHead>
                         <TableHead className="text-right">1D</TableHead>
-                        <TableHead className="text-right">Market Cap</TableHead>
-                        <TableHead className="text-right">Total Supply</TableHead>
+                        <TableHead className="text-right">
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 ml-auto hover:text-foreground"
+                            onClick={() => toggleSort('marketCap')}
+                          >
+                            Market Cap
+                            <SortIcon active={sortKey === 'marketCap'} dir={sortDir} />
+                          </button>
+                        </TableHead>
+                        <TableHead className="text-right">
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 ml-auto hover:text-foreground"
+                            onClick={() => toggleSort('totalSupply')}
+                          >
+                            Total Supply
+                            <SortIcon active={sortKey === 'totalSupply'} dir={sortDir} />
+                          </button>
+                        </TableHead>
                         {isLoggedIn && <TableHead className="text-right">Your Balance</TableHead>}
                         <TableHead className="text-right w-[120px]">1D chart</TableHead>
+                        <TableHead className="text-right w-[88px] sticky right-0 bg-card border-l">
+                          Buy
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {tokens.map((token, index) => (
+                      {sortedTokens.map((token, index) => (
                         <TableRow
                           key={token.address}
-                          className="cursor-pointer"
+                          className="cursor-pointer group"
                           onClick={() => openToken(token.address)}
                         >
                           <TableCell className="text-muted-foreground">{index + 1}</TableCell>
@@ -267,6 +355,21 @@ const Explore = () => {
                           <TableCell className="text-right">
                             <Sparkline data={token.sparkline} change24h={token.change24h} />
                           </TableCell>
+                          <TableCell className="text-right sticky right-0 bg-card border-l group-hover:bg-muted/50">
+                            {buyableAddresses &&
+                              (canBuy(token.address) ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 px-3"
+                                  onClick={(e) => goBuy(e, token.address)}
+                                >
+                                  Buy
+                                </Button>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              ))}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -274,12 +377,16 @@ const Explore = () => {
                 </div>
 
                 <div className="md:hidden space-y-3">
-                  {tokens.map((token, index) => (
-                    <button
+                  {sortedTokens.map((token, index) => (
+                    <div
                       key={token.address}
-                      onClick={() => openToken(token.address)}
-                      className="w-full text-left rounded-xl border bg-card p-4 active:bg-accent/50 transition-colors"
+                      className="w-full text-left rounded-xl border bg-card p-4"
                     >
+                      <button
+                        type="button"
+                        onClick={() => openToken(token.address)}
+                        className="w-full text-left active:bg-accent/50 transition-colors"
+                      >
                       <div className="flex items-center gap-3">
                         <span className="text-xs text-muted-foreground w-4 shrink-0">{index + 1}</span>
                         <TokenLogo image={token.image} symbol={token.symbol} size="w-9 h-9" />
@@ -320,7 +427,17 @@ const Explore = () => {
                         </div>
                         <Sparkline data={token.sparkline} change24h={token.change24h} width={72} height={28} />
                       </div>
-                    </button>
+                      </button>
+                      {canBuy(token.address) && (
+                        <Button
+                          size="sm"
+                          className="w-full mt-3"
+                          onClick={(e) => goBuy(e, token.address)}
+                        >
+                          Buy
+                        </Button>
+                      )}
+                    </div>
                   ))}
                 </div>
               </>
