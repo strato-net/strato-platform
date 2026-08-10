@@ -8,7 +8,7 @@ import Blockchain.EthConf (ethConf)
 import Blockchain.EthConf.Model (apiConfig, apiPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
-import Blockchain.Init.Options (flags_jsonrpc, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_sslDir)
+import Blockchain.Init.Options (flags_jsonrpc, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
@@ -224,6 +224,7 @@ generateDockerCompose = do
             [ ("STRATO_PORT_API", stratoApiPort)
             , ("STRATO_PORT_VAULT_PROXY", "8013")
             , ("JSONRPC_ENABLED", if flags_jsonrpc then "true" else "false")
+            , ("PUBLIC_STRATO_RPC_ENABLED", if flags_publicStratoRpc then "true" else "false")
             , ("RPC_PORT", rpcPort)
             , ("TRACKING_ENABLED", "true")
             , ("TRACKING_URL", "https://go.strato.nexus")

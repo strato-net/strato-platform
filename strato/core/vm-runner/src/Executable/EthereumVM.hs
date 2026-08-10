@@ -22,14 +22,14 @@ import qualified Blockchain.Bagger as Bagger
 import qualified Blockchain.Bagger.Transactions as Flush
 import Blockchain.BlockDB
 import Blockchain.DB.ChainDB
-import Blockchain.DB.CodeDB
+import Blockchain.DB.CodeDB ()
 import Blockchain.DB.StateDB (setStateDBStateRoot)
-import Blockchain.Data.AddressStateDB
+import Blockchain.Data.AddressStateDB ()
 import Blockchain.Data.GenesisBlock (genesisInfoToBlock)
 import Blockchain.Data.GenesisInfo (stateRoot, getGenesisInfo)
 import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Bootstrap
-import Blockchain.Database.MerklePatricia.NodeData
+import Blockchain.Database.MerklePatricia.NodeData ()
 import Blockchain.EthConf
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Event
@@ -41,9 +41,9 @@ import Blockchain.Sequencer.Kafka
 import Blockchain.StateRootMismatch
 import Blockchain.Strato.Indexer.Kafka (produceIndexEvents)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
-import qualified Blockchain.Strato.Model.Address as Ad
+import Blockchain.Strato.Model.Address ()
 import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.StateRoot
+import Blockchain.Strato.Model.StateRoot ()
 import Blockchain.Strato.RedisBlockDB
 import Blockchain.Strato.StateDiff          (stateDiff')
 import Blockchain.Stream.VMEvent
@@ -54,7 +54,7 @@ import Blockchain.VMMetrics
 import Blockchain.Wiring
 import Conduit hiding (Flush)
 import Control.Monad
-import Control.Monad.Change.Alter
+import Control.Monad.Change.Alter ()
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
 import Data.Conduit.List (mapMaybeM)
@@ -128,7 +128,7 @@ ethereumVM = runResourceT $ do
         $logErrorS "ethereumVM/UnexpectedBlockNumber" . T.pack $ "But actually received: " ++ show _inBlock
     error "STRATO vm-runner encountered errors while verifying a block in the chain. Please review the logs above for more information."
 
-bootstrapIfFirstRun :: (MonadLogger m, HasCodeDB m, (StateRoot `Alters` NodeData) m, HasContext m, Mod.Accessible RedisConnection m, (Ad.Address `Alters` AddressState) m) => m ()
+bootstrapIfFirstRun :: (VMBase m, HasContext m, Mod.Accessible RedisConnection m) => m ()
 bootstrapIfFirstRun = do
   genesisInfo <- getGenesisInfo
   let genesisBlock = genesisInfoToBlock genesisInfo

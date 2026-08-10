@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from 'next-themes';
-import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3, Droplets, SlidersHorizontal, Download, Coins, HandCoins, Layers, ArrowDownToLine } from 'lucide-react';
+import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3, Droplets, SlidersHorizontal, Download, Coins, HandCoins, Layers, ArrowDownToLine, Compass } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
@@ -34,6 +34,7 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
     {
       items: [
         { icon: <LayoutDashboard size={20} />, label: 'Portfolio', path: '/dashboard' },
+        { icon: <Compass size={20} />, label: 'Explore', path: '/dashboard/explore' },
       ],
     },
     {

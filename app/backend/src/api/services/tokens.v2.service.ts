@@ -96,7 +96,9 @@ const buildYieldVaultEarningAsset = (
   const totalBalance = balance;
   let value = "0.00";
   if (userInfo) {
-    const positionUsd = BigInt(userInfo.positionUsd || "0");
+    const positionUsd = BigInt(
+      userInfo.projectedPositionUsd || userInfo.positionUsd || "0"
+    );
     const assetPrice = BigInt(info.assetPriceWad || "0");
     const unit = BigInt(10) ** BigInt(info.decimals || 18);
     const claimableUsd = assetPrice > 0n ? (BigInt(userInfo.claimableAssets || "0") * assetPrice) / unit : 0n;
@@ -119,11 +121,15 @@ const buildYieldVaultEarningAsset = (
     balance,
     images: [],
     attributes: [],
-    price: ((BigInt(info.exchangeRate || "0") * BigInt(info.assetPriceWad || "0")) / BigInt(1e18)).toString(),
+    price: (
+      (BigInt(info.projectedExchangeRate || info.exchangeRate || "0") *
+        BigInt(info.assetPriceWad || "0")) /
+      BigInt(1e18)
+    ).toString(),
     collateralBalance: "0",
     totalBalance,
     value,
-    apy: info.apy || "0",
+    apy: info.accrualInitialized ? info.fundedApy : info.apy || "0",
   };
 };
 
@@ -161,9 +167,13 @@ export const getTokens = async (
   };
 };
 
+// `includeHeldNonActive` is for the net balance calculation only: it widens the query to
+// every status and then keeps non-ACTIVE tokens only where the user actually holds them.
+// The default stays ACTIVE-only so the My Tokens list is unaffected.
 export const getEarningAssets = async (
   accessToken: string,
-  userAddress: string
+  userAddress: string,
+  includeHeldNonActive = false
 ): Promise<EarningAsset[]> => {
   const [tokens, collaterals, cdps, rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap, stakedStrato] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, {
@@ -174,7 +184,7 @@ export const getEarningAssets = async (
           attributes: true,
           balance: true,
         }).join(","),
-        status: "eq.2",
+        ...(includeHeldNonActive ? {} : { status: "eq.2" }),
       },
     }),
     cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
@@ -243,7 +253,12 @@ export const getEarningAssets = async (
       ...(rebaseFactor ? { rebaseFactor } : {}),
       ...(rebasingExternalSymbol ? { rebasingExternalSymbol } : {}),
     };
-  });
+  }).filter(
+    (asset: EarningAsset) =>
+      !includeHeldNonActive ||
+      String(asset.status) === "2" ||
+      BigInt(asset.totalBalance || "0") > 0n
+  );
 
   const saveUsdstAsset = saveUsdstInfo?.deployed
     ? buildSaveUsdstEarningAsset(saveUsdstInfo, saveUsdstUserInfo ?? undefined)
@@ -382,6 +397,9 @@ function updatePortfolioInfoStorage(portfolioInfo: any, newInfo: StorageHistoryE
     };
   } else if (newInfo.data.mToken) {
     return { ...portfolioInfo,
+      // Kept at the top level too: userLoan is stored per-user, not per-mToken, so
+      // processBalanceSnapshot needs the pool's index to unscale the user's debt.
+      lendingBorrowIndex: BigInt(newInfo.data.borrowIndex || '') || 0n,
       tokens: { ...portfolioInfo.tokens,
         [newInfo.data.mToken]: { ...portfolioInfo.tokens[newInfo.data.mToken],
           borrowIndex: BigInt(newInfo.data.borrowIndex || '') || 0n,
@@ -755,7 +773,13 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
     }
   }
 
-  netBalance -= netLoan + parseFloat(snapshot.data.userLoan?.scaledDebt || '0');
+  // userLoan holds scaled debt; actual USDST owed is scaledDebt * borrowIndex / RAY,
+  // the same conversion debtFromScaled applies for the Net Balance box.
+  const scaledDebt = parseFloat(snapshot.data.userLoan?.scaledDebt || '0');
+  const borrowIndex = safeBigInt(snapshot.data.lendingBorrowIndex);
+  const lendingDebt = borrowIndex > 0n ? scaledDebt * (Number(borrowIndex) / 1e27) : scaledDebt;
+
+  netBalance -= netLoan + lendingDebt;
   return { timestamp: snapshot.timestamp, data: {netBalance: netBalance / 1e18 }};
 }
 
@@ -1046,7 +1070,8 @@ export const getNetBalance = async (
   userAddress: string
 ): Promise<{ netBalance: number; totalBorrowed: number; totalAssetValue: number }> => {
   const [earningAssetsResult, loanResult, vaultsResult, v3Result] = await Promise.allSettled([
-    getEarningAssets(accessToken, userAddress),
+    // Held PENDING/LEGACY tokens count towards the balance, matching the history graph.
+    getEarningAssets(accessToken, userAddress, true),
     getLoan(accessToken, userAddress),
     getVaults(accessToken, userAddress),
     getV3PositionsValue(accessToken, userAddress),

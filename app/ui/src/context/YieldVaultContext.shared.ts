@@ -15,9 +15,16 @@ export type YieldVaultInfo = {
   deployedAssets: string;
   totalShares: string;
   exchangeRate: string;
+  projectedActiveAssets: string;
+  projectedExchangeRate: string;
   assetPriceWad: string;
   tvlUsd: string;
+  projectedTvlUsd: string;
   apy: string;
+  accrualInitialized: boolean;
+  fundedApy: string;
+  pendingAccrual: string;
+  pendingAccrualTarget: string;
   paused: boolean;
   minIdleBps: string;
   totalQueuedShares: string;
@@ -58,13 +65,23 @@ export type YieldVaultUserInfo = YieldVaultInfo & {
   walletAssets: string;
   userShares: string;
   redeemableAssets: string;
+  projectedRedeemableAssets: string;
   positionUsd: string;
+  projectedPositionUsd: string;
   maxDeposit: string;
   maxRedeem: string;
   maxWithdraw: string;
   claimableAssets: string;
   activeRequestId: string;
   pendingWithdrawal: YieldVaultPendingWithdrawal | null;
+};
+
+export type YieldVaultHistoryPoint = {
+  timestamp: number;
+  exchangeRate: string;
+  totalAssets: string;
+  tvlUsd: string;
+  totalShares: string;
 };
 
 export type YieldVaultContextType = {
