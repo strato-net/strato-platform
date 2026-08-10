@@ -134,3 +134,9 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Generated rewards reconciliation state
+reconcile-*-activity-*.snapshot.json
+
+# Rewards reconciliation runbook is managed separately
+scripts/RECONCILE_VAULT_REWARDS.md
