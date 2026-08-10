@@ -41,6 +41,7 @@ const NAV_CATEGORIES: NavCategory[] = [
   {
     items: [
       { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
+      { icon: Compass, label: 'Explore', path: '/dashboard/explore' },
     ],
   },
   {
@@ -48,7 +49,6 @@ const NAV_CATEGORIES: NavCategory[] = [
     items: [
       { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
       { icon: ArrowLeftRight, label: 'Trade', path: '/dashboard/swap' },
-      { icon: Compass, label: 'Explore', path: '/dashboard/explore' },
       { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
       { icon: Send, label: 'Send', path: '/dashboard/transfer' },
       { icon: Download, label: 'Bridge Out', path: '/dashboard/withdrawals' },
