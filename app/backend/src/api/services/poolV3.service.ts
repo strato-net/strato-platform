@@ -250,7 +250,7 @@ const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>, swapInputs?: S
 
 const fetchRawPools = async (
   accessToken: string,
-  filters: Record<string, string> = {}
+  filters: Record<string, string> = {},
 ): Promise<RawV3Pool[]> => {
   const { data } = await cirrus.get(accessToken, `/${PoolV3Table}`, {
     params: {
@@ -646,6 +646,7 @@ export const getPositions = async (
 
   // pool + tick state for amount and pending-fee computation
   const poolAddresses = [...new Set(rows.map((r) => r.address))];
+  // Only pools from the configured current factory count toward portfolio value.
   const rawPools = await fetchRawPools(accessToken, { address: `in.(${poolAddresses.join(",")})` });
   const poolByAddress = new Map(rawPools.map((p) => [p.address, p]));
   const ticksByPool = new Map<string, Map<number, v3.TickData>>();
