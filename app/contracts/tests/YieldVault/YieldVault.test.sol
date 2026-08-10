@@ -724,6 +724,45 @@ contract Describe_YieldVault is Authorizable {
         require(credited > 5e18 && credited < 6e18, "new distributor should fund future time");
     }
 
+    function it_keeps_reward_distributors_separate_from_strategies() public {
+        User alice = new User();
+        User account = new User();
+        vault.initializeAccrual();
+        _approveStrategy(address(account));
+
+        bool reverted = false;
+        try vault.setRewardDistributor(address(account)) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "approved strategy should not become distributor");
+
+        vault.setStrategyApproval(address(account), false);
+        vault.setRewardDistributor(address(account));
+
+        reverted = false;
+        try vault.setStrategyApproval(address(account), true) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "distributor should not become approved strategy");
+
+        vault.setRewardDistributor(address(0));
+        vault.setStrategyApproval(address(account), true);
+        require(vault.approvedStrategies(address(account)), "separate strategy should remain configurable");
+
+        _mintAndDeposit(alice, 100e18);
+        vault.deployCapital(address(account), 50e18);
+        vault.setStrategyApproval(address(account), false);
+
+        reverted = false;
+        try vault.setRewardDistributor(address(account)) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "strategy debt should block distributor configuration");
+    }
+
     function it_accrues_only_available_funding_without_backlog() public {
         User alice = new User();
         User distributor = new User();

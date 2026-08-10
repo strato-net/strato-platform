@@ -334,10 +334,7 @@ export const fetchPriceEvents = async (
         return { data: [] };
       }),
       cirrus.get(accessToken, `/${PriceOracleBatchUpdateEvents}`, {
-        params: {
-          ...params,
-          assets: `cs.["${assetAddress}"]`,
-        },
+        params,
       }).catch(err => {
         console.error(`[getPriceHistory] Error querying ${PriceOracleBatchUpdateEvents}:`, err);
         return { data: [] };

@@ -328,6 +328,38 @@ const isHistoricalRowActive = (
   return validFrom <= timestamp && timestamp <= validTo;
 };
 
+const getHistoryRowsAtTimestamps = async (
+  serviceToken: string,
+  path: "/history@storage" | "/history@mapping",
+  baseParams: Record<string, string>,
+  timestamps: number[]
+): Promise<any[]> => {
+  const batches: number[][] = [];
+  for (let i = 0; i < timestamps.length; i += 30) {
+    batches.push(timestamps.slice(i, i + 30));
+  }
+  const responses = await Promise.all(
+    batches.map((batch) =>
+      cirrus.get(serviceToken, path, {
+        params: {
+          ...baseParams,
+          or: `(${batch
+            .map((timestamp) => {
+              const time = new Date(timestamp).toISOString();
+              return `and(valid_from.lte.${time},valid_to.gte.${time})`;
+            })
+            .join(",")})`,
+        },
+      })
+    )
+  );
+  const rows = responses.flatMap(({ data }) => Array.isArray(data) ? data : []);
+  return [...new Map(rows.map((row) => [
+    `${row.valid_from}:${row.valid_to}`,
+    row,
+  ])).values()];
+};
+
 const previewRedeemAssets = (shares: bigint, totalAssets: bigint, totalShares: bigint): bigint => {
   if (shares <= 0n) return 0n;
   if (totalShares <= 0n) return shares;
@@ -1646,27 +1678,32 @@ export const getYieldVaultHistory = async (
   const startTime = new Date(
     params.endTimestamp - params.interval * params.numTicks
   ).toISOString();
-  const endTime = new Date(params.endTimestamp).toISOString();
+  const historyTimestamps = Array.from(
+    { length: params.numTicks + 1 },
+    (_, i) => params.endTimestamp - params.interval * (params.numTicks - i)
+  );
 
-  const [storageRes, balanceRes, priceRows] = await Promise.all([
-    cirrus.get(serviceToken, "/history@storage", {
-      params: {
+  const [storageRows, balanceRows, priceRows] = await Promise.all([
+    getHistoryRowsAtTimestamps(
+      serviceToken,
+      "/history@storage",
+      {
         address: `eq.${def.address}`,
-        valid_from: `lte.${endTime}`,
-        valid_to: `gte.${startTime}`,
         select: "data,valid_from,valid_to",
       },
-    }),
-    cirrus.get(serviceToken, "/history@mapping", {
-      params: {
+      historyTimestamps
+    ),
+    getHistoryRowsAtTimestamps(
+      serviceToken,
+      "/history@mapping",
+      {
         address: `eq.${assetAddress}`,
         collection_name: "eq._balances",
         "key->>key": `eq.${def.address}`,
-        valid_from: `lte.${endTime}`,
-        valid_to: `gte.${startTime}`,
         select: "value::text,valid_from,valid_to",
       },
-    }),
+      historyTimestamps
+    ),
     fetchPriceEvents(
       serviceToken,
       priceOracle,
@@ -1676,8 +1713,6 @@ export const getYieldVaultHistory = async (
     ),
   ]);
 
-  const storageRows = Array.isArray(storageRes.data) ? storageRes.data : [];
-  const balanceRows = Array.isArray(balanceRes.data) ? balanceRes.data : [];
   const sortedPriceRows = priceRows.sort(
     (a, b) =>
       new Date(a.blockTimestamp).getTime() -
@@ -1687,9 +1722,7 @@ export const getYieldVaultHistory = async (
   let priceIndex = 0;
   let activePrice: (typeof sortedPriceRows)[number] | undefined;
 
-  for (let i = 0; i <= params.numTicks; i += 1) {
-    const timestamp =
-      params.endTimestamp - params.interval * (params.numTicks - i);
+  for (const timestamp of historyTimestamps) {
     while (
       priceIndex < sortedPriceRows.length &&
       new Date(sortedPriceRows[priceIndex].blockTimestamp).getTime() <= timestamp

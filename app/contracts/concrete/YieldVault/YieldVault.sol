@@ -472,6 +472,7 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
     function setStrategyApproval(address strategy, bool approved) external onlyOwner {
         _requireInitialized();
         require(strategy != address(0), "YieldVault: strategy=0");
+        require(!approved || strategy != rewardDistributor, "YieldVault: strategy is distributor");
         approvedStrategies[strategy] = approved;
         emit StrategyApprovalUpdated(strategy, approved);
     }
@@ -518,6 +519,8 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         _requireInitialized();
         _requireAccrualInitialized();
         require(newRewardDistributor != address(this), "YieldVault: distributor=vault");
+        require(!approvedStrategies[newRewardDistributor], "YieldVault: distributor is strategy");
+        require(strategyDebt[newRewardDistributor] == 0, "YieldVault: distributor has strategy debt");
 
         address oldRewardDistributor = rewardDistributor;
         credited = _accrue();

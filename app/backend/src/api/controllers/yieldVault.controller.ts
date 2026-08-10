@@ -77,6 +77,10 @@ class YieldVaultController {
       if (!key) return;
       const duration = typeof req.query.duration === "string" ? req.query.duration : "all";
       const end = typeof req.query.end === "string" ? req.query.end : undefined;
+      if (end !== undefined && !Number.isFinite(Date.parse(end))) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid end date" });
+        return;
+      }
       const history = await getYieldVaultHistory(req.accessToken, key, duration, end);
       res.status(RestStatus.OK).json(history);
     } catch (error) {
