@@ -15,8 +15,7 @@ import { api } from '@/lib/axios';
 import ConsolidatedPriceChart from '@/components/charts/ConsolidatedPriceChart';
 import CopyButton from '@/components/ui/copy';
 import { addCommasToInput, formatWeiAmount, formatHash } from '@/utils/numberUtils';
-import { buildTradeBuyPath, fetchUsdstBuyableAddresses, normTradeAddr } from '@/lib/tradeLinks';
-import { usdstAddress } from '@/lib/constants';
+import { buildFundBuyPath, fetchBridgeBuyableAddresses, normBridgeAddr } from '@/lib/bridgeLinks';
 
 const RECENT_SWAPS_LIMIT = 10;
 
@@ -161,12 +160,12 @@ const AssetDetail = () => {
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
-    const addr = normTradeAddr(id);
-    if (!addr || addr === normTradeAddr(usdstAddress)) {
+    const addr = normBridgeAddr(id);
+    if (!addr) {
       setCanBuy(false);
       return;
     }
-    fetchUsdstBuyableAddresses()
+    fetchBridgeBuyableAddresses()
       .then((set) => {
         if (!cancelled) setCanBuy(set.has(addr));
       })
@@ -456,12 +455,12 @@ const AssetDetail = () => {
                     </div>
                   </div>
 
-                  {canBuy && !isLPToken(asset) && (
+                  {asset && canBuy && !isLPToken(asset) && (
                     <Button
                       className="w-full mb-4"
-                      onClick={() => navigate(buildTradeBuyPath(asset.address))}
+                      onClick={() => navigate(buildFundBuyPath(asset.address))}
                     >
-                      Buy with USDST
+                      Buy
                     </Button>
                   )}
                   {/* {!isWalletConnected ? (

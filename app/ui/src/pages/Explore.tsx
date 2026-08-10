@@ -12,8 +12,7 @@ import { api } from '@/lib/axios';
 import { formatUnits, safeBigInt } from '@/utils/numberUtils';
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
-import { buildTradeBuyPath, fetchUsdstBuyableAddresses, normTradeAddr } from '@/lib/tradeLinks';
-import { usdstAddress } from '@/lib/constants';
+import { buildFundBuyPath, fetchBridgeBuyableAddresses, normBridgeAddr } from '@/lib/bridgeLinks';
 
 type SortKey = 'price' | 'marketCap' | 'totalSupply';
 type SortDir = 'asc' | 'desc';
@@ -179,7 +178,7 @@ const Explore = () => {
 
   useEffect(() => {
     let cancelled = false;
-    fetchUsdstBuyableAddresses()
+    fetchBridgeBuyableAddresses()
       .then((set) => {
         if (!cancelled) setBuyableAddresses(set);
       })
@@ -200,15 +199,11 @@ const Explore = () => {
     return map;
   }, [activeTokens, inactiveTokens]);
 
-  const canBuy = (address: string) => {
-    const addr = normTradeAddr(address);
-    if (addr === normTradeAddr(usdstAddress)) return false;
-    return !!buyableAddresses?.has(addr);
-  };
+  const canBuy = (address: string) => !!buyableAddresses?.has(normBridgeAddr(address));
 
   const goBuy = (e: MouseEvent, address: string) => {
     e.stopPropagation();
-    navigate(buildTradeBuyPath(address));
+    navigate(buildFundBuyPath(address));
   };
 
   const toggleSort = (key: SortKey) => {
@@ -439,7 +434,7 @@ const Explore = () => {
                           className="w-full mt-3"
                           onClick={(e) => goBuy(e, token.address)}
                         >
-                          Buy with USDST
+                          Buy
                         </Button>
                       )}
                     </div>

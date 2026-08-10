@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowDownUp, ChevronDown } from "lucide-react";
@@ -25,8 +24,6 @@ import { UserRewardsData } from "@/services/rewardsService";
 const USDST_BALANCE_REFRESH_MS = 10_000;
 const LOW_USDST_THRESHOLD = "0.10";
 
-const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
-
 interface SwapWidgetProps {
   userRewards?: UserRewardsData | null;
   rewardsLoading?: boolean;
@@ -43,7 +40,6 @@ interface SwapWidgetProps {
 const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
   const { state, dispatch } = useTradeForm();
   const { tokenIn, tokenOut, typedValue, independentField, selectedPoolAddress, slippage } = state;
-  const [searchParams] = useSearchParams();
 
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { fetchTokens } = useUserTokens();
@@ -53,19 +49,6 @@ const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   // pool routing is automatic (best rate); the selector is advanced, opt-in UI
   const [showPoolSelector, setShowPoolSelector] = useState(false);
-
-  // Explore "Buy" deep-link: ?from=<addr>&to=<addr> (USDST → token)
-  const deepFrom = useMemo(() => {
-    const raw = searchParams.get("from");
-    return raw ? normAddr(raw) : null;
-  }, [searchParams]);
-  const deepTo = useMemo(() => {
-    const raw = searchParams.get("to");
-    return raw ? normAddr(raw) : null;
-  }, [searchParams]);
-  const deepLinkKey = deepFrom || deepTo ? `${deepFrom ?? ""}:${deepTo ?? ""}` : null;
-  const appliedFromKeyRef = useRef<string | null>(null);
-  const appliedToKeyRef = useRef<string | null>(null);
 
   // ========================================================================
   // TOKEN LISTS + DEFAULT SELECTION
@@ -101,73 +84,20 @@ const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
     [tokens, pairables, tokenOut]
   );
 
-  // Deep-link From once per link (USDST when only `to` is set); else normal defaults
+  // default From: first token the user holds, else USDST, else the first listed
   useEffect(() => {
-    if (tokens.length === 0) return;
-
-    if (deepLinkKey) {
-      if (appliedFromKeyRef.current === deepLinkKey) return;
-      const fromAddr = deepFrom || normAddr(usdstAddress);
-      const fromToken =
-        tokens.find((t) => normAddr(t.address) === fromAddr) ||
-        tokens.find((t) => normAddr(t.address) === normAddr(usdstAddress));
-      if (!fromToken) return;
-      dispatch({ type: "SELECT_TOKEN_IN", token: fromToken });
-      appliedFromKeyRef.current = deepLinkKey;
-      return;
-    }
-
-    if (tokenIn) return;
+    if (tokenIn || tokens.length === 0) return;
     const withBalance = tokens.find((t) => BigInt(t.balance || "0") > 0n);
     const usdst = tokens.find((t) => t.address === usdstAddress);
     dispatch({ type: "SELECT_TOKEN_IN", token: withBalance ?? usdst ?? tokens[0] });
-  }, [tokens, tokenIn, dispatch, deepLinkKey, deepFrom]);
+  }, [tokens, tokenIn, dispatch]);
 
-  // Deep-link To once pairables are ready; else first pairable
+  // default To: keep the current selection while it stays pairable, else the first pairable
   useEffect(() => {
     if (!tokenIn || pairablesQuery.isLoading) return;
-
-    if (deepLinkKey && deepTo) {
-      if (appliedToKeyRef.current === deepLinkKey) {
-        if (tokenOut && toOptions.some((t) => t.address === tokenOut.address)) return;
-        return;
-      }
-      const target = toOptions.find((t) => normAddr(t.address) === deepTo);
-      if (target) {
-        dispatch({ type: "SELECT_TOKEN_OUT", token: target });
-        appliedToKeyRef.current = deepLinkKey;
-        return;
-      }
-      if (pairablesQuery.isFetching || !pairablesQuery.isFetched) return;
-      // not pairable against From — stop waiting and fall through once
-      appliedToKeyRef.current = deepLinkKey;
-    }
-
     if (tokenOut && toOptions.some((t) => t.address === tokenOut.address)) return;
     if (toOptions.length > 0) dispatch({ type: "SELECT_TOKEN_OUT", token: toOptions[0] });
-  }, [
-    tokenIn,
-    tokenOut,
-    toOptions,
-    pairablesQuery.isLoading,
-    pairablesQuery.isFetching,
-    pairablesQuery.isFetched,
-    dispatch,
-    deepLinkKey,
-    deepTo,
-  ]);
-
-  // Wait for deep-link pair so slow trade lists don't flash the wrong To token
-  const deepLinkPending = !!(
-    deepLinkKey &&
-    deepTo &&
-    appliedToKeyRef.current !== deepLinkKey &&
-    (tokensQuery.isLoading ||
-      appliedFromKeyRef.current !== deepLinkKey ||
-      pairablesQuery.isLoading ||
-      pairablesQuery.isFetching ||
-      !pairablesQuery.isFetched)
-  );
+  }, [tokenIn, tokenOut, toOptions, pairablesQuery.isLoading, dispatch]);
 
   // ========================================================================
   // BALANCES & FEES
@@ -305,7 +235,7 @@ const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
         isFromInput={true}
         onMaxClick={handleMaxClick}
         amountError={inputError}
-        loading={poolsLoading || deepLinkPending}
+        loading={poolsLoading}
         showUserBalance={!guestMode}
       />
 
@@ -315,7 +245,6 @@ const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
           variant="outline"
           size="icon"
           className="rounded-full bg-muted hover:bg-muted/80 border-border"
-          disabled={deepLinkPending}
         >
           <ArrowDownUp className="h-4 w-4" />
         </Button>
@@ -333,7 +262,7 @@ const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
         maxAmountWei={displayPool?.tokenOut.poolBalance || "0"}
         isFromInput={false}
         amountError={outputError}
-        loading={poolsLoading || deepLinkPending}
+        loading={poolsLoading}
         showUserBalance={!guestMode}
       />
 
@@ -411,17 +340,15 @@ const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
       <Button
         className="w-full bg-strato-blue hover:bg-strato-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={() => setIsDialogOpen(true)}
-        disabled={guestMode || isSwapDisabled || deepLinkPending}
+        disabled={guestMode || isSwapDisabled}
       >
         {guestMode
           ? "Sign in to trade"
-          : deepLinkPending
-            ? "Loading pair…"
-            : activePool?.isDisabled
-              ? "This pool is disabled"
-              : activePool?.isPaused
-                ? "Pool is paused by admin at this time"
-                : "Trade Assets"}
+          : activePool?.isDisabled
+            ? "This pool is disabled"
+            : activePool?.isPaused
+              ? "Pool is paused by admin at this time"
+              : "Trade Assets"}
       </Button>
 
       <SwapConfirmDialog
