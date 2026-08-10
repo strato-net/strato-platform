@@ -4,6 +4,7 @@ import {
   claimYieldVault,
   deployYieldVaultCapital,
   depositYieldVault,
+  getYieldVaultHistory,
   getYieldVaultInfo,
   getYieldVaultUserInfo,
   reportYieldVaultStrategyLoss,
@@ -65,6 +66,23 @@ class YieldVaultController {
       if (!key) return;
       const info = await getYieldVaultInfo(req.accessToken, key);
       res.status(RestStatus.OK).json(info);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const key = requireVaultKey(req, res);
+      if (!key) return;
+      const duration = typeof req.query.duration === "string" ? req.query.duration : "all";
+      const end = typeof req.query.end === "string" ? req.query.end : undefined;
+      if (end !== undefined && !Number.isFinite(Date.parse(end))) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid end date" });
+        return;
+      }
+      const history = await getYieldVaultHistory(req.accessToken, key, duration, end);
+      res.status(RestStatus.OK).json(history);
     } catch (error) {
       next(error);
     }
