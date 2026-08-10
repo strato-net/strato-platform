@@ -3,9 +3,17 @@ import { type WalletDetailsParams } from "@rainbow-me/rainbowkit";
 import { type Wallet } from "@rainbow-me/rainbowkit";
 import { PENDING_STRATO_WALLET_CONNECT_KEY, redirectToLogin } from "@/lib/auth";
 import { type Address, type EIP1193Provider, type Hex, keccak256, toRlp } from "viem";
-import { getStratoChainId, rpcUrl } from "@/lib/stratoChain";
+import { getStratoChainId, initStratoChain, rpcUrl } from "@/lib/stratoChain";
 
 const EXTERNAL_WALLET_KEY = "bridge-external-wallet";
+
+// RainbowKit shows its RETRY button the instant connect() rejects, with no
+// grace period. When we hand off to the login redirect the connection is still
+// in flight, so we stay pending and let the page unload instead of rejecting.
+const PENDING_UNTIL_UNLOAD = new Promise<never>(() => {});
+
+// Guards against /api/user/me hanging, which would otherwise spin forever.
+const AUTH_CHECK_TIMEOUT_MS = 15_000;
 
 let _suppressReconnect = false;
 
@@ -190,7 +198,13 @@ function stratoConnector(walletDetails: Record<string, unknown> = {}) {
     async setup() {},
 
     async connect({ isReconnecting } = {}) {
-      const chainId = getStratoChainId();
+      let chainId = getStratoChainId();
+      if (!chainId) {
+        // The user can click before window.ENV has been read; init on demand
+        // rather than failing the connect outright.
+        await initStratoChain();
+        chainId = getStratoChainId();
+      }
       if (!chainId) throw new Error("STRATO chain not initialized");
 
       const stored = isReconnecting ? getStoredStratoConnection(config.state) : null;
@@ -203,19 +217,22 @@ function stratoConnector(walletDetails: Record<string, unknown> = {}) {
 
       let data: any;
       try {
-        const res = await fetch("/api/user/me", { credentials: "include" });
+        const res = await fetch("/api/user/me", {
+          credentials: "include",
+          signal: AbortSignal.timeout(AUTH_CHECK_TIMEOUT_MS),
+        });
         if (!res.ok) throw new Error();
         data = await res.json();
       } catch {
         sessionStorage.setItem(PENDING_STRATO_WALLET_CONNECT_KEY, "1");
         redirectToLogin();
-        throw new Error("Authentication required");
+        return PENDING_UNTIL_UNLOAD;
       }
       const addr = normalizeAddress(data.userAddress);
       if (!addr) {
         sessionStorage.setItem(PENDING_STRATO_WALLET_CONNECT_KEY, "1");
         redirectToLogin();
-        throw new Error("Authentication required");
+        return PENDING_UNTIL_UNLOAD;
       }
       currentAddress = addr;
       provider = createStratoProvider(addr, chainId);
