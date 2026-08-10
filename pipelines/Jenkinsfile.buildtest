@@ -2,6 +2,7 @@ pipeline {
   agent {
     label "testnet-build1"
   }
+  options { disableConcurrentBuilds() }
   environment {
     PATH = "~/.local/bin:${env.PATH}"
   }
