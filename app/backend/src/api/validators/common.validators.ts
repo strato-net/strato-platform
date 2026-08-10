@@ -75,6 +75,21 @@ export const numericStringField = (label: string, { allowZero = false } = {}) =>
       "any.required": `"${label}" is required`,
     });
 
+// For integer identifiers (token IDs, etc.) that flow into uint256 contract args.
+// Unlike numericStringField (built for token amounts, which permits decimals), this
+// accepts only a canonical positive integer: no decimals, no sign, no leading zeros.
+export const uintStringField = (label: string) =>
+  Joi.string()
+    .trim()
+    .pattern(/^[1-9]\d*$/)
+    .required()
+    .messages({
+      "string.base": `"${label}" must be a string`,
+      "string.empty": `"${label}" is required`,
+      "string.pattern.base": `"${label}" must be a positive integer (no decimals or leading zeros)`,
+      "any.required": `"${label}" is required`,
+    });
+
 export function validateRawParams(args: any): Record<string, string | undefined> {
   if (!args || typeof args !== "object") {
     return {};

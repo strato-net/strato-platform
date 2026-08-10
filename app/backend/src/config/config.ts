@@ -123,6 +123,11 @@ export const defaultPoolV3FactoryFor: Record<string, string> = {
   "33056204878082667": "5d630126d908b46bcf8d00bc15e591a459375809" // Upquark mainnet
 };
 
+export const defaultNftFactoryFor: Record<string, string> = {
+  "114784819836269": "af432c49803721b242f52ed5fd1b065c9a78e0bb", // Helium testnet
+  "33056204878082667": "", // Upquark mainnet
+};
+
 export const defaultStratoNativeBridgeFor: Record<string, string> = {
   "114784819836269": "49f69252b00235030a4dcd4c7ef17a64ef346258", // Helium testnet
   "33056204878082667": "4d9e9c39180a75091b9c35bbb9064d67c7fdde5a", // Upquark mainnet
@@ -196,6 +201,7 @@ export let referralUrl: string | undefined;
 export let escrow: string = '';
 export let vaultFactory: string = '';
 export let poolV3Factory: string = '';
+export let nftFactory: string = '';
 export let metalForge: string = '';
 export let creditCardTopUp: string = '';
 export let vault: string = '';
@@ -252,6 +258,14 @@ function setPoolV3FactoryConfig(networkId: string) {
     poolV3Factory = process.env.POOL_V3_FACTORY;
   } else {
     poolV3Factory = defaultPoolV3FactoryFor[networkId] || "";
+  }
+}
+
+function setNftFactoryConfig(networkId: string) {
+  if (process.env.NFT_FACTORY) {
+    nftFactory = process.env.NFT_FACTORY;
+  } else {
+    nftFactory = defaultNftFactoryFor[networkId] || "";
   }
 }
 
@@ -343,6 +357,7 @@ export async function initNetworkConfig() {
   setReferralConfig(networkId);
   setVaultFactoryConfig(networkId);
   setPoolV3FactoryConfig(networkId);
+  setNftFactoryConfig(networkId);
   setStratoNativeBridgeConfig(networkId);
   setStratoTokenConfig(networkId);
   setStratoStakingConfig(networkId);
