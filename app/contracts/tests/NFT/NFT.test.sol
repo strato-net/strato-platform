@@ -130,6 +130,30 @@ contract Describe_NFT {
         require(nft.ownerOf(id) == address(user1), "Owner should be unchanged");
     }
 
+    function it_nft_pause_blocks_holder_burn() {
+        uint256 id = nft.mint(address(user1), "ipfs://1");
+        nft.pause();
+
+        bool reverted = false;
+        try { user1.do(address(nft), "burn", id); } catch { reverted = true; }
+        require(reverted, "Holder burn should revert while paused");
+        require(nft.ownerOf(id) == address(user1), "Token should survive a paused burn attempt");
+
+        nft.unpause();
+        user1.do(address(nft), "burn", id);
+        require(nft.balanceOf(address(user1)) == 0, "Burn should work after unpause");
+    }
+
+    function it_nft_owner_can_burn_while_paused() {
+        uint256 id = nft.mint(address(this), "ipfs://1");
+        nft.pause();
+        nft.burn(id); // collection owner holds the token, so this is a valid owner-burn while paused
+        bool reverted = false;
+        try { nft.ownerOf(id); } catch { reverted = true; }
+        require(reverted, "Collection owner should be able to burn its own token while paused");
+        nft.unpause();
+    }
+
     // ============ TRANSFERS & PAUSE ============
 
     function it_nft_holder_can_transfer() {
