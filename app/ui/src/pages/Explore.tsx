@@ -9,9 +9,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/axios';
-import { formatUnits, safeBigInt } from '@/utils/numberUtils';
+import { formatBalance, formatUnits, safeBigInt } from '@/utils/numberUtils';
 import { useUser } from '@/context/UserContext';
-import { useUserTokens } from '@/context/UserTokensContext';
+import { useTokenContext } from '@/context/TokenContext';
 import { buildFundBuyPath, fetchBridgeBuyableAddresses, normBridgeAddr } from '@/lib/bridgeLinks';
 
 type SortKey = 'price' | 'marketCap' | 'totalSupply';
@@ -147,7 +147,7 @@ const SortIcon = ({ active, dir }: { active: boolean; dir: SortDir }) => {
 const Explore = () => {
   const navigate = useNavigate();
   const { isLoggedIn } = useUser();
-  const { activeTokens, inactiveTokens } = useUserTokens();
+  const { earningAssets } = useTokenContext();
   const [tokens, setTokens] = useState<ExploreToken[]>([]);
   const [totalMarketCap, setTotalMarketCap] = useState('0');
   const [loading, setLoading] = useState(true);
@@ -190,14 +190,17 @@ const Explore = () => {
     };
   }, []);
 
-  // Matches AssetDetail: holdings include tokens locked as collateral
+  // Same source and display as Portfolio "My Tokens": earning assets totalBalance
   const balanceByAddress = useMemo(() => {
-    const map = new Map<string, bigint>();
-    [...activeTokens, ...inactiveTokens].forEach((t) =>
-      map.set(t.address, safeBigInt(t.balance) + safeBigInt(t.collateralBalance))
-    );
+    const map = new Map<string, string>();
+    earningAssets.forEach((asset) => map.set(asset.address, asset.totalBalance));
     return map;
-  }, [activeTokens, inactiveTokens]);
+  }, [earningAssets]);
+
+  const balanceLabel = (address: string) => {
+    const total = balanceByAddress.get(address);
+    return !total || total === '0' ? '-' : formatBalance(total, undefined, 18, 1, 4);
+  };
 
   const canBuy = (address: string) => !!buyableAddresses?.has(normBridgeAddr(address));
 
@@ -349,7 +352,7 @@ const Explore = () => {
                           </TableCell>
                           {isLoggedIn && (
                             <TableCell className="text-right tabular-nums">
-                              {formatWeiAsAmount(balanceByAddress.get(token.address))}
+                              {balanceLabel(token.address)}
                             </TableCell>
                           )}
                           <TableCell className="text-right">
@@ -416,7 +419,7 @@ const Explore = () => {
                             <div>
                               <div className="text-muted-foreground">Your Balance</div>
                               <div className="font-medium tabular-nums">
-                                {formatWeiAsAmount(balanceByAddress.get(token.address))}
+                                {balanceLabel(token.address)}
                               </div>
                             </div>
                           )}
