@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { useUser } from '@/context/UserContext';
-import { Loader2, CheckCircle2, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Loader2, CheckCircle2, ChevronsLeft, ChevronsRight, RefreshCw } from 'lucide-react';
 import CopyButton from '../ui/copy';
 import CreateAdminIssueModal from './CreateAdminIssueModal';
 import CastVoteModal from './CastVoteModal';
@@ -23,7 +23,7 @@ import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE, ADMIN_VOTE_OPEN_ISSUES_PER_PAGE } 
 const normalizeAddress = (addr?: string | null): string => (addr || '').toLowerCase().replace(/^0x/, '');
 
 const VoteTab = () => {
-  const { userAddress, openIssuesLoading, openIssues, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues, castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin } = useUser();
+  const { userAddress, openIssuesLoading, openIssuesUpdatedAt, openIssues, getOpenIssues, executedIssues, executedIssuesLoading, executedIssuesUpdatedAt, getExecutedIssues, castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin } = useUser();
   const [createOpen, setCreateOpen] = useState(false);
   const [voteModalOpen, setVoteModalOpen] = useState(false);
   const [addAdminOpen, setAddAdminOpen] = useState(false);
@@ -47,6 +47,12 @@ const VoteTab = () => {
   useEffect(() => {
     getExecutedIssues(executedPage, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
   }, [executedPage]);
+
+  // Refetch every card on the page, keeping the user on their current pages
+  const handleRefresh = () => {
+    getOpenIssues(openIssuesPage, ADMIN_VOTE_OPEN_ISSUES_PER_PAGE);
+    getExecutedIssues(executedPage, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
+  };
 
   const handleCastVoteOnIssue = async (target: string, func: string, args: string[]) => {
     await castVoteOnIssue(target, func, args);
@@ -99,6 +105,7 @@ const VoteTab = () => {
   const executed: object[] = (executedIssues && executedIssues['executed']) || [];
   const executedTotal: number = (executedIssues && executedIssues['executedTotal']) || 0;
   const executedTotalPages = Math.ceil(executedTotal / ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
+  const isRefreshing = openIssuesLoading || executedIssuesLoading;
 
   const openIssuesTotalPages = Math.ceil(issuesTotal / ADMIN_VOTE_OPEN_ISSUES_PER_PAGE);
   const openIssuesStartIndex = (openIssuesPage - 1) * ADMIN_VOTE_OPEN_ISSUES_PER_PAGE;
@@ -125,6 +132,19 @@ const VoteTab = () => {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="text-xs md:text-sm"
+        >
+          <RefreshCw className={`h-3 w-3 md:h-4 md:w-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
       {/* List of Admins */}
       <Card className="dark:bg-card overflow-hidden">
         <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-3 px-4 md:px-6">
@@ -371,6 +391,11 @@ const VoteTab = () => {
               )}
             </>
           )}
+          {openIssuesUpdatedAt && (
+            <div className="mt-3 text-[10px] md:text-xs text-muted-foreground text-right">
+              Last updated {openIssuesUpdatedAt.toLocaleTimeString()}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -524,6 +549,11 @@ const VoteTab = () => {
                 </div>
               )}
             </>
+          )}
+          {executedIssuesUpdatedAt && (
+            <div className="mt-3 text-[10px] md:text-xs text-muted-foreground text-right">
+              Last updated {executedIssuesUpdatedAt.toLocaleTimeString()}
+            </div>
           )}
         </CardContent>
       </Card>

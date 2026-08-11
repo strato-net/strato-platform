@@ -30,9 +30,11 @@ interface UserContextType {
   loading: boolean;
   openIssues: object;
   openIssuesLoading: boolean;
+  openIssuesUpdatedAt: Date | null;
   getOpenIssues: (page?: number, limit?: number) => Promise<void>;
   executedIssues: object;
   executedIssuesLoading: boolean;
+  executedIssuesUpdatedAt: Date | null;
   getExecutedIssues: (page?: number, limit?: number) => Promise<void>;
   contractSearchResults: object[];
   contractSearchResultsLoading: boolean;
@@ -64,8 +66,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [openIssues, setOpenIssues] = useState<object>({})
   const [openIssuesLoading, setOpenIssuesLoading] = useState<boolean>(false);
+  const [openIssuesUpdatedAt, setOpenIssuesUpdatedAt] = useState<Date | null>(null);
   const [executedIssues, setExecutedIssues] = useState<object>({})
   const [executedIssuesLoading, setExecutedIssuesLoading] = useState<boolean>(false);
+  const [executedIssuesUpdatedAt, setExecutedIssuesUpdatedAt] = useState<Date | null>(null);
   const [contractSearchResults, setContractSearchResults] = useState<object[]>([])
   const [contractSearchResultsLoading, setContractSearchResultsLoading] = useState<boolean>(false)
   const [contractDetailsResults, setContractDetailsResults] = useState<object>({});
@@ -215,6 +219,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           },
         });
         setOpenIssues(response?.data || {});
+        setOpenIssuesUpdatedAt(new Date());
       } catch (error) {
       }
     } finally {
@@ -233,6 +238,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           },
         });
         setExecutedIssues(response?.data || {});
+        setExecutedIssuesUpdatedAt(new Date());
       } catch (error) {
       }
     } finally {
@@ -426,10 +432,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     refreshAuth,
     loading,
     openIssuesLoading,
+    openIssuesUpdatedAt,
     openIssues,
     getOpenIssues,
     executedIssues,
     executedIssuesLoading,
+    executedIssuesUpdatedAt,
     getExecutedIssues,
     castVoteOnIssue,
     castVoteOnIssueById,
@@ -444,7 +452,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     contractDetailsResultsLoading,
   }), [userAddress, stratoAddress, externalWalletAddress, isExternalWalletConnected, externalEvmWalletAddress, isExternalEvmWalletConnected, effectiveLoggedIn, isLoggedIn, isAdmin, loading, userName,
     handleLogout,
-    openIssues, openIssuesLoading, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues,
+    openIssues, openIssuesLoading, openIssuesUpdatedAt, getOpenIssues,
+    executedIssues, executedIssuesLoading, executedIssuesUpdatedAt, getExecutedIssues,
     castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin,
     contractSearch, contractSearchResults, contractSearchResultsLoading,
     getContractDetails, contractDetailsResults, contractDetailsResultsLoading,
