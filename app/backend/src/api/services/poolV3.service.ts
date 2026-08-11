@@ -189,6 +189,30 @@ const usdAmount = (priceMap: Map<string, string>, tokenAddress: string, balance:
 };
 
 /**
+ * Pool-local price map for the USD display metrics (TVL, 24h volume, APY): when exactly
+ * one of the pool's tokens has an oracle price, the other's is derived from the pool's
+ * own spot price (derived = spot × paired oracle price), so pairs like MEME/USDT still
+ * show dollar figures instead of half-counted volume and TVL. With neither token priced
+ * there is no dollar anchor and the map is returned unchanged (metrics stay 0).
+ *
+ * Returns a copy: the derived price is only meaningful within this pool and must not
+ * leak into other pools' valuations — nor into oraclePriceWad, whose purpose is to be
+ * an oracle reference INDEPENDENT of the spot price (trade paths compare the two, and
+ * a spot-derived entry would make that comparison vacuously agree).
+ */
+const withPoolDerivedPrices = (priceMap: Map<string, string>, raw: RawV3Pool): Map<string, string> => {
+  const price0 = BigInt(priceMap.get(raw.token0.address) ?? "0");
+  const price1 = BigInt(priceMap.get(raw.token1.address) ?? "0");
+  if ((price0 > 0n) === (price1 > 0n)) return priceMap; // both priced or neither — nothing to derive
+  const priceWad = v3.sqrtPriceX96ToPriceWad(BigInt(raw.sqrtPriceX96)); // token1 per token0
+  if (priceWad === 0n) return priceMap;
+  const derived = new Map(priceMap);
+  if (price1 > 0n) derived.set(raw.token0.address, ((priceWad * price1) / 10n ** 18n).toString());
+  else derived.set(raw.token1.address, ((price0 * 10n ** 18n) / priceWad).toString());
+  return derived;
+};
+
+/**
  * 24h fee income kept by LPs, in USD. The fee tier is in pips (1e6 denominator);
  * the protocol cut (packed denominators d0 + (d1 << 4), 0 = off) is deducted
  * from what LPs keep.
@@ -208,14 +232,16 @@ const volume24hUSDFor = (raw: RawV3Pool, priceMap: Map<string, string>, swapInpu
 
 const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>, swapInputs?: SwapInputs24h): PoolV3 => {
   const priceWad = v3.sqrtPriceX96ToPriceWad(BigInt(raw.sqrtPriceX96));
-  const usd = (tokenAddress: string, balance: string): number => usdAmount(priceMap, tokenAddress, balance);
-  // oracle spot price of the pair (token1 per token0, same orientation as priceWad)
+  const displayPrices = withPoolDerivedPrices(priceMap, raw);
+  const usd = (tokenAddress: string, balance: string): number => usdAmount(displayPrices, tokenAddress, balance);
+  // oracle spot price of the pair (token1 per token0, same orientation as priceWad);
+  // real oracle prices only — never the pool-derived fallback (see withPoolDerivedPrices)
   const price0 = BigInt(priceMap.get(raw.token0.address) ?? "0");
   const price1 = BigInt(priceMap.get(raw.token1.address) ?? "0");
   const oraclePriceWad = price0 > 0n && price1 > 0n ? (price0 * 10n ** 18n) / price1 : 0n;
 
   const totalLiquidityUSD = usd(raw.token0.address, raw.token0Balance) + usd(raw.token1.address, raw.token1Balance);
-  const volume24hUSD = volume24hUSDFor(raw, priceMap, swapInputs);
+  const volume24hUSD = volume24hUSDFor(raw, displayPrices, swapInputs);
   const fees24hUSD = lpFees24hUSD(raw, volume24hUSD);
   const apy = totalLiquidityUSD > 0 ? Math.max(0, (fees24hUSD / totalLiquidityUSD) * 365 * 100) : 0;
 
@@ -782,14 +808,15 @@ export const getPositions = async (
     // that's the pool-level APY, which understates concentrated positions).
     // Out-of-range positions earn nothing until the price re-enters the range.
     const inRange = Number(pool.currentTick) >= tickLower && Number(pool.currentTick) < tickUpper;
+    const displayPrices = withPoolDerivedPrices(priceMap, pool);
     const positionValueUsd =
-      usdAmount(priceMap, pool.token0.address, amount0.toString()) +
-      usdAmount(priceMap, pool.token1.address, amount1.toString());
+      usdAmount(displayPrices, pool.token0.address, amount0.toString()) +
+      usdAmount(displayPrices, pool.token1.address, amount1.toString());
     const poolLiquidity = Number(pool.liquidity || "0");
     let apy = 0;
     if (inRange && positionValueUsd > 0 && poolLiquidity > 0) {
       const share = Math.min(1, Number(liquidity) / poolLiquidity);
-      const fees24h = lpFees24hUSD(pool, volume24hUSDFor(pool, priceMap, swapInputs24h.get(row.address)));
+      const fees24h = lpFees24hUSD(pool, volume24hUSDFor(pool, displayPrices, swapInputs24h.get(row.address)));
       apy = Math.max(0, ((fees24h * share * 365) / positionValueUsd) * 100);
     }
 

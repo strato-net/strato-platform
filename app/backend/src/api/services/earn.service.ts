@@ -364,9 +364,10 @@ function addSaveUsdstApys(add: AddFn, ctx: Phase1Ctx, phase1b: Phase1bData, rewa
 /**
  * Carry-style ERC4626 yield vaults (eth-carry, wbtc-carry).
  *
- * Mirrors the saveUSDST APY pattern but uses `source: "vault"` for the native
- * strategy yield (so `buildTokenCompositeInfo` combines it with the rewards
- * portion the same way the main protocol vault does).
+ * Accrual-enabled vaults publish their configured funded rate as Base APY.
+ * Their strategy yield funds the reward distributor, so it is not added as a
+ * second yield component. Non-accrual vaults retain the existing Native +
+ * weighted Base APY behavior.
  *
  * Native APY comes from getYieldVaultInfo (same calculation the
  * /earn/yield-vault/:key/info endpoint returns), so the Earn page's vault card
@@ -393,7 +394,11 @@ async function addCarryVaultApys(
     const addr = normalizeAddress(def.address);
     if (!addr) continue;
 
-    if (info?.deployed && isPositiveApy(info.apy)) {
+    if (info?.deployed && info.accrualInitialized) {
+      if (isPositiveApy(info.fundedApy)) {
+        add(addr, { source: "vault_weighted", apy: info.fundedApy });
+      }
+    } else if (info?.deployed && isPositiveApy(info.apy)) {
       add(addr, { source: "vault", apy: info.apy });
     }
 
@@ -412,7 +417,7 @@ async function addCarryVaultApys(
     // Emitted as `vault_weighted` so the headline tooltip on
     // Dashboard / Earn / Rewards / EarnYieldVault renders Native + Base + Rewards
     // consistently with the main protocol vault.
-    if (info?.deployed && info.strategyHoldings?.length) {
+    if (info?.deployed && !info.accrualInitialized && info.strategyHoldings?.length) {
       let assetPriceWad = 0n;
       try { assetPriceWad = BigInt(info.assetPriceWad || "0"); } catch { assetPriceWad = 0n; }
       const assetDecimals = Number.isFinite(info.decimals) ? info.decimals : 18;

@@ -2,6 +2,7 @@ pipeline {
   agent {
     label "testnet-build1"
   }
+  options { disableConcurrentBuilds() }
   environment {
     PATH = "~/.local/bin:${env.PATH}"
   }
@@ -74,6 +75,11 @@ pipeline {
 
   post {
     success {
+      slackSend (
+          color: 'good',
+          message: "buildtest.testnet.strato.nexus was redeployed from develop. Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) on node ${env.NODE_NAME}"
+      )
+      
       slackSend(
           channel: '#engineering',
           color: 'good',
@@ -81,6 +87,10 @@ pipeline {
       )
     }
     failure {
+      slackSend (
+          color: 'danger',
+          message: "buildtest.testnet.strato.nexus has failed to build or redeploy from develop. Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
+      )
       slackSend(
           channel: '#engineering',
           color: 'danger',
