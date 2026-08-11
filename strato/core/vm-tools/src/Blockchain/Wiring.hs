@@ -63,6 +63,7 @@ import qualified Data.NibbleString as N
 import qualified Data.Text as T
 import Data.Traversable (for)
 import qualified Database.LevelDB as DB
+import Blockchain.Data.VmTrace (VmTracer)
 import Debugger
 import UnliftIO
 
@@ -131,6 +132,10 @@ instance HasContext m => Mod.Modifiable ContextState m where
 instance HasContext m => Mod.Modifiable (Maybe DebugSettings) m where
   get _ = gets $ view debugSettings
   put _ ds = modify $ debugSettings .~ ds
+
+instance HasContext m => Mod.Modifiable (Maybe VmTracer) m where
+  get _ = gets $ view vmTracer
+  put _ t = modify $ vmTracer .~ t
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ContextState (ReaderT Context m) where
   access _ = get

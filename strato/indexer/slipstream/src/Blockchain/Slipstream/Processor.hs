@@ -105,23 +105,32 @@ rowToInsert row =
    in processedContract newState row
 
 
-rowToCollections :: AggregateAction -> Map.Map (NE.NonEmpty Text) Value
+rowToCollections :: AggregateAction -> Map.Map (NE.NonEmpty (Bool, Text)) Value
 rowToCollections row = case actionStorage row of
   Action.SolidVMDiff mp -> Map.fromList $ SolidVM.decodeCacheValuesForCollections mp
+
+-- Struct fields render with dot notation, mapping/array indexes with brackets:
+-- activities[24].actionableEvents[0]
+renderCollectionPath :: Text -> [(Bool, Text)] -> Text
+renderCollectionPath collection ks = T.concat $ collection : map renderPiece ks
+  where
+    renderPiece (isField, k)
+      | isField = "." <> k
+      | otherwise = "[" <> k <> "]"
 
 processedContractToProcessedCollectionRows :: AggregateAction -> [ProcessedCollectionRow]
 processedContractToProcessedCollectionRows row =
   let state = rowToCollections row
       recordVMs = mapMaybe
-        (\(a NE.:| ks, v) -> case ks of
+        (\((_, a) NE.:| ks, v) -> case ks of
             [] -> Nothing
-            _ -> Just (a, "Mapping", SimpleValue . ValueString <$> ks, v)
+            _ -> Just (a, "Mapping", SimpleValue . ValueString . snd <$> ks, renderCollectionPath a ks, v)
         ) $ Map.toList state
-      processRecord (n, t, ks, v) = processedCollectionRow n t row ks v
+      processRecord (n, t, ks, p, v) = processedCollectionRow n t row ks p v
    in processRecord <$> recordVMs
 
-processedCollectionRow :: Text -> Text -> AggregateAction -> [Value] -> Value ->  ProcessedCollectionRow
-processedCollectionRow collection ttype AggregateAction {..} ks v =
+processedCollectionRow :: Text -> Text -> AggregateAction -> [Value] -> Text -> Value ->  ProcessedCollectionRow
+processedCollectionRow collection ttype AggregateAction {..} ks p v =
   ProcessedCollectionRow
     { address = actionAddress,
       -- codehash = actionCodeHash,
@@ -133,6 +142,7 @@ processedCollectionRow collection ttype AggregateAction {..} ks v =
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,
       collectionDataKeys = ks,
+      collectionDataPath = p,
       collectionDataValue = v
     }
 

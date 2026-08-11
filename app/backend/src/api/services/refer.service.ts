@@ -4,6 +4,7 @@ import { strato, cirrus } from "../../utils/appApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { escrow } from "../../config/config";
 import { extractContractName } from "../../utils/utils";
+import { reassembleMappingStructRows } from "../helpers/cirrusHelpers";
 import { TransactionResponse } from "@strato/shared-types";
 import JSONBig from "json-bigint";
 
@@ -154,7 +155,8 @@ export const getEscrowDeposit = async (
   }
 
   try {
-    // Build query params
+    // Build query params. This returns the deposit's struct row plus one row
+    // per array element (tokens/amounts/recipients), all sharing key->>key.
     const params: Record<string, string> = {
       select: "key,value",
       ['key->>key']: `eq.${ephemeralAddress}`,
@@ -172,14 +174,17 @@ export const getEscrowDeposit = async (
       return null;
     }
 
-    // Return the first deposit found
-    const deposit = data[0];
+    const deposit = reassembleMappingStructRows(data).get(ephemeralAddress);
+    if (!deposit) {
+      return null;
+    }
+
     return {
-      sender: deposit.value?.sender || "",
-      tokens: deposit.value?.tokens || [],
-      amounts: deposit.value?.amounts || [],
-      expiry: deposit.value?.expiry || 0,
-      quantity: deposit.value?.quantity || 1,
+      sender: deposit.sender || "",
+      tokens: normalizeArrayLike(deposit.tokens),
+      amounts: normalizeArrayLike(deposit.amounts),
+      expiry: deposit.expiry || 0,
+      quantity: deposit.quantity || 1,
     };
   } catch (error: any) {
     // If it's a 404 or empty result, return null
@@ -272,11 +277,14 @@ export const getUserReferrals = async (
   }
 
   try {
+    // The sender only lives on each deposit's struct row, while the
+    // tokens/amounts arrays live in their own rows without a sender, so fetch
+    // the whole collection in one query, reassemble the deposits, and filter
+    // by sender here.
     const params: Record<string, string> = {
       select: "key,value",
       address: `eq.${escrowAddress}`,
       collection_name: `eq.deposits`,
-      ['value->>sender']: `eq.${normalizedUserAddress}`,
     };
 
     const response = await cirrus.get(accessToken, `/${EscrowDeposits}`, {
@@ -288,14 +296,16 @@ export const getUserReferrals = async (
       return [];
     }
 
-    return data.map((deposit) => ({
-      ephemeralAddress: deposit.key.key || "",
-      sender: deposit.value?.sender || "",
-      tokens: normalizeArrayLike(deposit.value?.tokens),
-      amounts: normalizeArrayLike(deposit.value?.amounts),
-      expiry: deposit.value?.expiry || 0,
-      quantity: deposit.value?.quantity || 1,
-    })).filter((deposit) => deposit.tokens.length > 0);
+    return [...reassembleMappingStructRows(data).entries()]
+      .filter(([, deposit]) => (deposit.sender || "") === normalizedUserAddress)
+      .map(([ephemeralAddress, deposit]) => ({
+        ephemeralAddress,
+        sender: deposit.sender || "",
+        tokens: normalizeArrayLike(deposit.tokens),
+        amounts: normalizeArrayLike(deposit.amounts),
+        expiry: deposit.expiry || 0,
+        quantity: deposit.quantity || 1,
+      })).filter((deposit) => deposit.tokens.length > 0);
   } catch (error: any) {
     if (error.response?.status === 404 || error.response?.status === 200) {
       return [];
@@ -449,9 +459,11 @@ export const getReferralStatus = async (
     });
 
     const depositData = depositResponse.data;
-    if (Array.isArray(depositData) && depositData.length > 0) {
-      const deposit = depositData[0];
-      const quantity = deposit.value?.quantity || 0;
+    const deposit = Array.isArray(depositData)
+      ? reassembleMappingStructRows(depositData).get(normalizedEphemeralAddress)
+      : undefined;
+    if (deposit) {
+      const quantity = deposit.quantity || 0;
       
       // If quantity is 0, it's fully redeemed
       if (quantity === 0 || quantity === '0000000000000000000000000000000000000000') {

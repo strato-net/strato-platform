@@ -50,6 +50,7 @@ export interface BridgeInEvent {
   stratoRecipient: string;
   stratoToken: string;
   stratoTokenAmount: string; // raw 1e18-scaled integer string
+  externalChainId: number | null;
   externalTxHash: string | null;
   txHash: string | null;
   timestampMs: number;
@@ -62,7 +63,7 @@ const DEPOSIT_TABLES: { bridge: BridgeInEvent["bridge"]; table: string }[] = [
 ];
 
 const DEPOSIT_SELECT =
-  "id,externalSender,externalTxHash,stratoRecipient,stratoToken,stratoTokenAmount::text,block_timestamp,transaction_hash";
+  "id,externalChainId::text,externalSender,externalTxHash,stratoRecipient,stratoToken,stratoTokenAmount::text,block_timestamp,transaction_hash";
 
 const fetchDepositRows = async (
   table: string,
@@ -119,13 +120,15 @@ export const fetchBridgeIns = async (
       const eventKey = `${table}:${row.id ?? `${row.transaction_hash}:${row.stratoRecipient}:${row.stratoTokenAmount}`}`;
       if (seen.has(eventKey)) continue;
       seen.add(eventKey);
+      const chainId = Number(row.externalChainId);
       events.push({
         bridge,
         externalSender: (row.externalSender || "").toLowerCase(),
         stratoRecipient: (row.stratoRecipient || "").toLowerCase(),
         stratoToken: (row.stratoToken || "").toLowerCase(),
         stratoTokenAmount: row.stratoTokenAmount ?? "0",
-        externalTxHash: row.externalTxHash ?? null,
+        externalChainId: Number.isFinite(chainId) && chainId > 0 ? chainId : null,
+        externalTxHash: row.externalTxHash || null,
         txHash: row.transaction_hash ?? null,
         timestampMs,
         eventKey,

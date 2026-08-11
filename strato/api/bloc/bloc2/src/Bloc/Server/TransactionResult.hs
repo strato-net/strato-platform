@@ -21,6 +21,7 @@ module Bloc.Server.TransactionResult
     getBlocTransactionResult',
     forStateT,
     recurseTRDs,
+    getReturnTypes,
     TRD (..),
   )
 where

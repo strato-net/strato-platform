@@ -35,7 +35,7 @@ import {
 import { normalizeError } from "@/lib/bridge/utils";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { buildEarnApyMap } from "@/utils/earnUtils";
-import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits, truncateDecimals } from "@/utils/numberUtils";
+import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits, truncateAddress, truncateDecimals } from "@/utils/numberUtils";
 import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useEarnContext } from "@/context/EarnContext";
@@ -332,7 +332,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const { signTypedDataAsync } = useSignTypedData();
   const { openConnectModal } = useConnectModal();
   const { toast } = useToast();
-  const { userAddress, externalEvmWalletAddress, isExternalEvmWalletConnected, isAppAuthenticated } = useUser();
+  const { userAddress, stratoAddress, externalEvmWalletAddress, isExternalEvmWalletConnected, isAppAuthenticated } = useUser();
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { activeTokens, fetchTokens } = useUserTokens();
   const {
@@ -503,7 +503,11 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const expectedChainId = currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : null;
   const externalSender = externalEvmWalletAddress;
   const externalSenderHex = externalSender ? (externalSender as `0x${string}`) : undefined;
-  const stratoRecipient = userAddress;
+  // Must match the identity the backend resolves for this user, since deposit history
+  // and balances are filtered by it: with a vault session the X-Wallet-Address header is
+  // suppressed and the backend uses the vault address; without one it uses the wallet.
+  const stratoRecipient = isAppAuthenticated ? stratoAddress : externalEvmWalletAddress;
+  const stratoRecipientHex = ensureHexPrefix(stratoRecipient);
   const hasExternalWallet = isConnected && isExternalEvmWalletConnected && !!externalSenderHex;
   const isCorrectNetwork = hasExternalWallet && !!chainId && !!expectedChainId && chainId === expectedChainId;
   const isNativeRedemption = selectedToken?.routeType === "native";
@@ -1461,9 +1465,23 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
 
         {/* STEP 3 */}
         <section className="space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">3</span>
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Receive On STRATO</h3>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">3</span>
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Receive On STRATO</h3>
+            </div>
+            {stratoRecipientHex && (
+              <button
+                type="button"
+                className="text-[11px] text-muted-foreground font-mono hover:text-foreground transition-colors"
+                onClick={() => {
+                  navigator.clipboard.writeText(stratoRecipientHex);
+                  toast({ title: "Copied", description: "STRATO address copied to clipboard", duration: 1500 });
+                }}
+              >
+                {truncateAddress(stratoRecipientHex)}
+              </button>
+            )}
           </div>
 
           <div className="relative">

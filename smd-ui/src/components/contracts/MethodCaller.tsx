@@ -14,6 +14,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
+import { useSimulation } from "@/components/simulation/useSimulation";
+import { SimulateButton } from "@/components/simulation/SimulateButton";
+import { SimulationResultPanel } from "@/components/simulation/SimulationResultPanel";
 import { useUser } from "@/context/UserContext";
 import type { FuncArg } from "@/services/contracts";
 
@@ -41,6 +44,7 @@ export function MethodCaller({
 }: MethodCallerProps) {
   const { userAddress } = useUser();
   const { submit: submitTx, canSubmit } = useSubmitTransaction();
+  const sim = useSimulation();
 
   const [open, setOpen] = useState(false);
   // "" = call directly from the connected account; otherwise route the call through
@@ -54,7 +58,8 @@ export function MethodCaller({
   const [result, setResult] = useState<CallResult | null>(null);
   const [error, setError] = useState<string>("");
 
-  const submit = async () => {
+  // Build the FUNCTION payload once, so Simulate and Call submit identical data.
+  const buildFunctionPayload = (): Record<string, unknown> => {
     const parsed: Record<string, unknown> = {};
     for (const a of args) {
       const isAddressArg = isPlainAddressType(a.type);
@@ -76,20 +81,24 @@ export function MethodCaller({
       // (e.g. "0x64" is an address, not the number 100).
       parsed[a.name] = a.type ? { type: a.type, value: parsedValue } : parsedValue;
     }
+    return {
+      contractName,
+      contractAddress,
+      value: payable && value ? Number(value) : 0,
+      method,
+      args: parsed,
+      metadata: {},
+    };
+  };
+
+  const submit = async () => {
     setPending(true);
     setResult(null);
     setError("");
     try {
       const res = await submitTx(
         "FUNCTION",
-        {
-          contractName,
-          contractAddress,
-          value: payable && value ? Number(value) : 0,
-          method,
-          args: parsed,
-          metadata: {},
-        },
+        buildFunctionPayload(),
         walletUsername ? { username: walletUsername } : undefined
       );
       setResult(res);
@@ -102,6 +111,9 @@ export function MethodCaller({
       setPending(false);
     }
   };
+
+  const simulate = () =>
+    sim.run("FUNCTION", buildFunctionPayload(), walletUsername ? { username: walletUsername } : undefined);
 
   const returned = result?.data?.contents;
 
@@ -231,6 +243,14 @@ export function MethodCaller({
               </pre>
             ) : null}
 
+            <SimulationResultPanel result={sim.result} error={sim.error} />
+
+            {payable && value ? (
+              <p className="text-xs text-muted-foreground">
+                Value is ignored in simulation (SolidVM transactions carry no value).
+              </p>
+            ) : null}
+
             {!canSubmit ? (
               <p className="text-xs text-muted-foreground">
                 Connect a wallet (STRATO or external) to call this method.
@@ -242,6 +262,9 @@ export function MethodCaller({
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
+            {sim.canSimulate ? (
+              <SimulateButton onClick={simulate} pending={sim.pending} disabled={!canSubmit} />
+            ) : null}
             <Button onClick={submit} disabled={pending || !canSubmit}>
               {pending ? "Calling…" : "Call Method"}
             </Button>

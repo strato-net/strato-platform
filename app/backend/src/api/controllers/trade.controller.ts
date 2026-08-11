@@ -7,6 +7,7 @@ import {
   getTradeQuotes,
   executeTradeSwap,
   getTradeHistory,
+  getTradeTokenHistory,
 } from "../services/trade.service";
 import {
   validateTradeTokenArgs,
@@ -92,6 +93,20 @@ class TradeController {
         limit,
         typeof query.sender === "string" ? query.sender : undefined
       );
+      res.status(RestStatus.OK).json(history);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async tokenHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, params, query } = req;
+      validateTradeTokenArgs(params);
+      validateTradeHistoryQuery(query);
+      const page = query.page ? parseInt(query.page as string, 10) : 1;
+      const limit = query.limit ? parseInt(query.limit as string, 10) : 10;
+      const history = await getTradeTokenHistory(accessToken, params.tokenAddress, page, limit);
       res.status(RestStatus.OK).json(history);
     } catch (error) {
       next(error);

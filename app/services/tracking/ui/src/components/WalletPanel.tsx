@@ -1,8 +1,15 @@
 import { format, formatDistanceToNow } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
-import { ACTIVITY_CATEGORY_LABELS, formatUsd, getWallet, shortAddress } from '../api';
+import { ACTIVITY_CATEGORY_LABELS, externalTxLink, formatUsd, getWallet, shortAddress } from '../api';
 import ActivityTiles from './ActivityTiles';
-import { AddressCell, Badge, ExplorerLink, SidePanel, Skeleton } from './primitives';
+import {
+  AddressCell,
+  Badge,
+  ExplorerLink,
+  ExternalExplorerLink,
+  SidePanel,
+  Skeleton,
+} from './primitives';
 
 interface WalletPanelProps {
   linkId: string;
@@ -79,6 +86,15 @@ const WalletPanel = ({ linkId, address, onClose }: WalletPanelProps) => {
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
                       {format(new Date(bridge.at), 'MMM d, yyyy')}
                       {bridge.txHash && <ExplorerLink path={`/tx/${bridge.txHash}`} />}
+                      {(() => {
+                        const external = externalTxLink(bridge);
+                        return external?.url ? (
+                          <ExternalExplorerLink
+                            href={external.url}
+                            title={`View on ${external.explorerName}`}
+                          />
+                        ) : null;
+                      })()}
                     </span>
                   </div>
                 ))}

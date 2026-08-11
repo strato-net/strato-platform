@@ -186,6 +186,45 @@ router.post("/admin/vote", walletAuth, UserController.castVoteOnIssue);
 
 /**
  * @openapi
+ * /user/admin/vote/simulate:
+ *   post:
+ *     summary: Dry-run an administrative vote (no signing or commit)
+ *     description: >
+ *       Simulates casting a vote on an issue and returns the vote tx result with
+ *       the issue's "effect if executed" (target.func(args) run as the
+ *       AdminRegistry) nested under `effect`.
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - target
+ *               - func
+ *               - args
+ *             properties:
+ *               target:
+ *                 type: string
+ *               func:
+ *                 type: string
+ *               args:
+ *                 type: array
+ *                 items: {}
+ *     responses:
+ *       200:
+ *         description: Simulated vote result (with nested effect)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/admin/vote/simulate", walletAuth, UserController.simulateCastVoteOnIssue);
+
+/**
+ * @openapi
  * /user/admin/vote/by-id:
  *   post:
  *     summary: Cast an administrative vote by issue ID
