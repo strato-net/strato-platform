@@ -10,22 +10,27 @@
            registers QueueProcessed as an actionable Withdraw event, marks all
            historical unprocessed vault events as processed (so no cursor replay can
            double-apply them), and re-seeds every current holder's stake from their
-           carryETH balance + unprocessed queued shares.
+           YieldVault share balance + unprocessed queued shares.
 
   Requirements: Node >= 18 (global fetch). No external dependencies.
 
   Environment:
     ENV_FILE          optional env file path (default app/scripts/.env)
     NETWORK           testnet or prod (required)
+    VAULT             eth, wbtc, or usdc (default eth)
+    EMISSION_VAULT    only vault allowed a non-zero rate (default eth)
     NODE_URL          optional profile override
-    ADMIN_TOKEN       optional OAuth bearer token
-    GLOBAL_ADMIN_NAME, GLOBAL_ADMIN_PASSWORD, OAUTH_CLIENT_ID,
-    OAUTH_CLIENT_SECRET, OAUTH_URL, OAUTH_TOTP
-                      alternative credentials used to obtain an OAuth token
+    POLLER_TOKEN      optional rewards-poller OAuth bearer token
+    POLLER_NAME, POLLER_PASSWORD (or BA_USERNAME, BA_PASSWORD)
+                      credentials of the live deployed rewards-poller service
+                      account; the only account this script authenticates as,
+                      and the only one whitelisted for batchHandleAction
+    OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, OAUTH_URL, OAUTH_TOTP
+                      OAuth client the poller account belongs to
     REWARDS_ADDRESS, VAULT_ADDRESS, ACTIVITY_ID
                       optional profile overrides
     SNAPSHOT_FILE     Where snapshot state is stored
-                      (default ./reconcile-activity-<ACTIVITY_ID>.snapshot.json)
+                      (default ./reconcile-<network>-<vault>-activity-<id>.snapshot.json)
     EVENT_INDEX_BASE  First synthetic eventIndex (default 1000000)
     BATCH_SIZE        Actions per batchHandleAction tx (default 50, capped by
                       the contract's maxBatchSize)
@@ -33,23 +38,30 @@
 
   Usage:
     node reconcileVaultRewardsActivity.js <phase> --network <testnet|prod>
+      --vault <eth|wbtc|usdc>
       [--execute] [--confirm-prod] [--batch <number>]
+      [--confirm-poller-stopped]
+
+  This script only ever acts as the rewards-poller service account. Every
+  governed action is performed by admins in SMD, interleaved as marked below.
 
   Phases (in operational order):
+    preflight        Validate target configuration, require emission rate 0, and
+                     confirm the poller is whitelisted for batchHandleAction
     status           Show current drift (per-user stake vs balance+queued)
-    pause            Pause the YieldVault
+    [SMD] Rewards.setEmissionRate(activityId, 0) for every non-zero vault
+    [SMD] YieldVault.pause()
+    (stop and drain the rewards poller before continuing)
     snapshot         Snapshot stakes/balances/queue, reserve + verify synthetic
                      (blockNumber, eventIndex) pairs, write SNAPSHOT_FILE
-    withdraw         Vote on one synthetic Withdraw batch -> totalStake 0
-    set-events       setPositionActivityEvents: Deposit->Deposit,
-                     Withdraw->Withdraw, QueueProcessed->Withdraw
-                     (requires totalStake == 0)
-    mark-historical  Vote on one zero-amount historical marker batch
-    seed             Vote on one synthetic Deposit batch
-    verify           Final invariant check + report
-    unpause          Unpause the YieldVault
-    set-emission     setEmissionRate(ACTIVITY_ID, <rate>)  e.g.
-                     node ... set-emission 38580246913580250 --execute
+    withdraw         One synthetic Withdraw batch (zeroes every tracked stake)
+    [SMD] Rewards.setPositionActivityEvents(activityId, Deposit->Deposit,
+          Withdraw->Withdraw, QueueProcessed->Withdraw) — requires totalStake 0
+    mark-historical  One historical marker batch
+    seed             One synthetic Deposit batch
+    verify           Final invariant check + emission readiness report
+    [SMD] YieldVault.unpause(), then Rewards.setEmissionRate for EMISSION_VAULT
+          once verify passes for every vault
 
   Every mutating phase is a dry run unless --execute is passed.
 */
@@ -102,24 +114,51 @@ const NETWORK_PROFILES = {
   testnet: {
     nodeUrl: "https://node1.testnet.strato.nexus",
     rewards: "170147f58738c9f46112a874030420b823901f3b",
-    vault: "ac8ce8b3d4aa4b9a359dad3bb792a563f7f2e2f5",
-    activityId: "22",
+    vaults: {
+      eth: {
+        address: "ac8ce8b3d4aa4b9a359dad3bb792a563f7f2e2f5",
+        activityId: "22",
+      },
+      wbtc: {
+        address: "97d3b5da244094dd940a173b42240b36eb79dceb",
+        activityId: "23",
+      },
+      usdc: {
+        address: "9c9bcc6e040910c6705d15864067720923bacc82",
+        activityId: "24",
+      },
+    },
   },
   prod: {
     nodeUrl: "https://app.strato.nexus",
     rewards: "4a116cf8cb056036632aef08f7c0df27c720f1c0",
-    vault: "a94905d8bd117e9bfbe57aadffd7abbea760e028",
-    activityId: "27",
+    vaults: {
+      eth: {
+        address: "a94905d8bd117e9bfbe57aadffd7abbea760e028",
+        activityId: "27",
+      },
+      wbtc: {
+        address: "0b5831edcab6f06256a790340426236c31bb463f",
+        activityId: "28",
+      },
+      usdc: {
+        address: "afcfc4d847d59fbc402856fd6934aff6796812b1",
+        activityId: "29",
+      },
+    },
   },
 };
 
 const NETWORK = String(optionValue("--network") || process.env.NETWORK || "").toLowerCase();
 const PROFILE = NETWORK_PROFILES[NETWORK];
+const VAULT_KEY = String(optionValue("--vault") || process.env.VAULT || "eth").toLowerCase();
+const VAULT_PROFILE = PROFILE?.vaults?.[VAULT_KEY];
+const EMISSION_VAULT = String(process.env.EMISSION_VAULT || "eth").toLowerCase();
 const NODE_URL = (process.env.NODE_URL || PROFILE?.nodeUrl || "").replace(/\/+$/, "");
-let adminToken = process.env.ADMIN_TOKEN || "";
+let authToken = process.env.POLLER_TOKEN || "";
 const REWARDS = (process.env.REWARDS_ADDRESS || PROFILE?.rewards || "").toLowerCase().replace(/^0x/, "");
-const VAULT = (process.env.VAULT_ADDRESS || PROFILE?.vault || "").toLowerCase().replace(/^0x/, "");
-const ACTIVITY_ID = process.env.ACTIVITY_ID || PROFILE?.activityId;
+const VAULT = (process.env.VAULT_ADDRESS || VAULT_PROFILE?.address || "").toLowerCase().replace(/^0x/, "");
+const ACTIVITY_ID = process.env.ACTIVITY_ID || VAULT_PROFILE?.activityId;
 const ADMIN_REGISTRY = (process.env.ADMIN_REGISTRY_ADDRESS || "000000000000000000000000000000000000100c")
   .toLowerCase()
   .replace(/^0x/, "");
@@ -127,19 +166,23 @@ const EVENT_INDEX_BASE = Number(process.env.EVENT_INDEX_BASE || 1000000);
 const SEED_INDEX_OFFSET = 100000; // seed pairs live at EVENT_INDEX_BASE + SEED_INDEX_OFFSET + i
 const BATCH_SIZE_ENV = Number(process.env.BATCH_SIZE || 50);
 const SNAPSHOT_FILE =
-  process.env.SNAPSHOT_FILE || `./reconcile-${NETWORK}-activity-${ACTIVITY_ID}.snapshot.json`;
+  process.env.SNAPSHOT_FILE ||
+  `./reconcile-${NETWORK}-${VAULT_KEY}-activity-${ACTIVITY_ID}.snapshot.json`;
 const HAS_TARGET_OVERRIDE =
   Boolean(process.env.NODE_URL && NODE_URL !== PROFILE?.nodeUrl) ||
   Boolean(process.env.REWARDS_ADDRESS && REWARDS !== PROFILE?.rewards) ||
-  Boolean(process.env.VAULT_ADDRESS && VAULT !== PROFILE?.vault) ||
-  Boolean(process.env.ACTIVITY_ID && String(ACTIVITY_ID) !== PROFILE?.activityId) ||
+  Boolean(process.env.VAULT_ADDRESS && VAULT !== VAULT_PROFILE?.address) ||
+  Boolean(process.env.ACTIVITY_ID && String(ACTIVITY_ID) !== VAULT_PROFILE?.activityId) ||
   Boolean(process.env.ADMIN_REGISTRY_ADDRESS);
+const PROD_TARGETS = Object.values(NETWORK_PROFILES.prod.vaults);
 const RESOLVES_TO_PROD =
   NETWORK === "prod" ||
   NODE_URL === NETWORK_PROFILES.prod.nodeUrl ||
   REWARDS === NETWORK_PROFILES.prod.rewards ||
-  VAULT === NETWORK_PROFILES.prod.vault ||
-  String(ACTIVITY_ID) === NETWORK_PROFILES.prod.activityId;
+  PROD_TARGETS.some(
+    (target) =>
+      VAULT === target.address || String(ACTIVITY_ID) === target.activityId
+  );
 
 const GAS = { gasLimit: 32100000000, gasPrice: 1 }; // same as rewards-poller
 const TX_POLL_INTERVAL_MS = 5000;
@@ -151,7 +194,14 @@ const ZERO40 = "0000000000000000000000000000000000000000";
 
 const EXECUTE = args.includes("--execute");
 const CONFIRM_PROD = args.includes("--confirm-prod");
+const CONFIRM_POLLER_STOPPED = args.includes("--confirm-poller-stopped");
 const BATCH_NUMBER = Number(optionValue("--batch") || 1);
+const POLLER_STOPPED_PHASES = new Set([
+  "snapshot",
+  "withdraw",
+  "mark-historical",
+  "seed",
+]);
 
 // ---------------------------------------------------------------------------
 // Small utils
@@ -165,6 +215,39 @@ const chainUint = (v) => {
   if (v === null || v === undefined || v === "") return 0n;
   return BigInt(String(v));
 };
+
+const parseEnumValue = (value, names, label) => {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (value === null || value === undefined || normalized === "") {
+    die(`Missing ${label} value from Cirrus`);
+  }
+  if (Object.prototype.hasOwnProperty.call(names, normalized)) {
+    return names[normalized];
+  }
+  try {
+    const numeric = Number(chainUint(value));
+    if (Object.values(names).includes(numeric)) return numeric;
+  } catch {
+    // Fall through to the explicit error below.
+  }
+  die(`Unknown ${label} value from Cirrus: ${String(value)}`);
+};
+
+const parseActivityType = (value) =>
+  parseEnumValue(value, { position: 0, onetime: 1 }, "activityType");
+
+const parseActionType = (value) =>
+  parseEnumValue(
+    value,
+    { deposit: 0, withdraw: 1, occurred: 2 },
+    "actionType"
+  );
+
+const EXPECTED_POSITION_EVENTS = "Deposit:0,Withdraw:1,QueueProcessed:1";
+const actionableEventsSignature = (config) =>
+  config.actionableEvents
+    .map((event) => `${event.eventName}:${event.actionType}`)
+    .join(",");
 
 const fmt18 = (v) => {
   const n = BigInt(v);
@@ -306,33 +389,27 @@ const headers = () => {
     "User-Agent": "Mozilla/5.0 (reconcileVaultRewardsActivity)",
     "X-Requested-With": "XMLHttpRequest",
   };
-  if (adminToken) h.Authorization = `Bearer ${adminToken}`;
+  if (authToken) h.Authorization = `Bearer ${authToken}`;
   return h;
 };
 
 async function authenticate() {
-  if (adminToken) return;
-  const username =
-    process.env.GLOBAL_ADMIN_NAME ||
-    process.env.STRATO_USERNAME ||
-    process.env.BA_USERNAME;
-  const password =
-    process.env.GLOBAL_ADMIN_PASSWORD ||
-    process.env.STRATO_PASSWORD ||
-    process.env.BA_PASSWORD;
+  if (authToken) return;
+  const username = process.env.POLLER_NAME || process.env.BA_USERNAME;
+  const password = process.env.POLLER_PASSWORD || process.env.BA_PASSWORD;
   const clientId = process.env.OAUTH_CLIENT_ID || process.env.CLIENT_ID;
   const clientSecret = process.env.OAUTH_CLIENT_SECRET || process.env.CLIENT_SECRET;
   const discoveryUrl = process.env.OPENID_DISCOVERY_URL || process.env.OAUTH_URL;
   const missing = [
-    ["GLOBAL_ADMIN_NAME", username],
-    ["GLOBAL_ADMIN_PASSWORD", password],
+    ["POLLER_NAME/BA_USERNAME", username],
+    ["POLLER_PASSWORD/BA_PASSWORD", password],
     ["OAUTH_CLIENT_ID", clientId],
     ["OAUTH_CLIENT_SECRET", clientSecret],
-    ["OPENID_DISCOVERY_URL", discoveryUrl],
+    ["OPENID_DISCOVERY_URL/OAUTH_URL", discoveryUrl],
   ].filter(([, value]) => !value);
   if (missing.length) {
     die(
-      `Authentication requires ADMIN_TOKEN or user credentials. Missing: ` +
+      `Authentication requires POLLER_TOKEN or rewards-poller credentials. Missing: ` +
         missing.map(([name]) => name).join(", ")
     );
   }
@@ -367,7 +444,7 @@ async function authenticate() {
   if (!tokenResponse.ok || !tokenBody.access_token) {
     die(`OAuth login failed: HTTP ${tokenResponse.status}`);
   }
-  adminToken = tokenBody.access_token;
+  authToken = tokenBody.access_token;
 }
 
 async function httpJson(method, url, body) {
@@ -400,18 +477,22 @@ async function getAuthenticatedAddress() {
   return address;
 }
 
-async function verifyAuthenticatedAdmin() {
+async function verifyAuthenticatedPoller() {
   const caller = await getAuthenticatedAddress();
   const rows = await cirrusGetAll("mapping", {
     address: `eq.${ADMIN_REGISTRY}`,
-    collection_name: "eq.adminMap",
-    "key->>key": `eq.${caller}`,
+    collection_name: "eq.whitelist",
+    "key->>key": `eq.${REWARDS}`,
+    "key->>key2": "eq.batchHandleAction",
+    "key->>key3": `eq.${caller}`,
     select: "key,value::text",
   });
-  const row = rows.find((entry) => plainKey(entry, 1));
-  const raw = String(row?.value ?? "").replace(/^"|"$/g, "");
-  if (chainUint(raw) === 0n) {
-    die(`Authenticated caller ${caller} is not an AdminRegistry admin`);
+  const row = rows.find((entry) => plainKey(entry, 3));
+  const allowed = String(row?.value ?? "").replace(/^"|"$/g, "") === "true";
+  if (!allowed) {
+    die(
+      `Authenticated poller ${caller} is not whitelisted for Rewards.batchHandleAction`
+    );
   }
   return caller;
 }
@@ -443,15 +524,8 @@ const functionTx = (contractName, contractAddress, method, callArgs) => ({
   payload: { contractName, contractAddress, method, args: callArgs },
 });
 
-const governanceTx = (target, method, callArgs) =>
-  functionTx("AdminRegistry", ADMIN_REGISTRY, "castVoteOnIssue", {
-    _target: target,
-    _func: method,
-    _args: callArgs,
-  });
-
 async function sendAndWait(txs, label) {
-  if (!adminToken) die(`${label}: authentication is required to send transactions`);
+  if (!authToken) die(`${label}: authentication is required to send transactions`);
   console.log(`  -> posting ${txs.length} tx(s): ${label}`);
   const response = await httpJson(
     "POST",
@@ -484,38 +558,56 @@ async function sendAndWait(txs, label) {
   }
 }
 
-const isTrue = (value) => value === true || value === "true" || value === 1 || value === "1";
+async function waitForGovernanceOutcome(transactionHash) {
+  return waitForCirrus(async () => {
+    const filter = {
+      address: `eq.${ADMIN_REGISTRY}`,
+      transaction_hash: `eq.${transactionHash}`,
+      select: "issueId",
+      limit: "1",
+    };
+    const [executed, created, voted] = await Promise.all([
+      cirrusGet("BlockApps-AdminRegistry-IssueExecuted", filter),
+      cirrusGet("BlockApps-AdminRegistry-IssueCreated", filter),
+      cirrusGet("BlockApps-AdminRegistry-IssueVoted", filter),
+    ]);
+    const executedIssue = Array.isArray(executed) ? executed[0] : undefined;
+    const pendingIssue =
+      (Array.isArray(created) ? created[0] : undefined) ||
+      (Array.isArray(voted) ? voted[0] : undefined);
+    if (executedIssue) {
+      return {
+        ok: true,
+        didExecute: true,
+        issueId: executedIssue.issueId,
+        detail: "IssueExecuted indexed",
+      };
+    }
+    if (pendingIssue) {
+      return {
+        ok: true,
+        didExecute: false,
+        issueId: pendingIssue.issueId,
+        detail: "governance vote indexed",
+      };
+    }
+    return { ok: false, detail: "governance events not indexed yet" };
+  }, `governance outcome for ${transactionHash}`);
+}
 
-async function submitGovernanceVote(target, method, callArgs, label) {
-  const { hashes, results } = await sendAndWait(
-    [governanceTx(target, method, callArgs)],
+async function submitPollerBatch(callArgs, label) {
+  const { hashes } = await sendAndWait(
+    [functionTx("Rewards", REWARDS, "batchHandleAction", callArgs)],
     label
   );
-  const contents =
-    results[0]?.data?.contents ||
-    results[0]?.txResult?.response?.contents ||
-    results[0]?.response?.contents ||
-    [];
-  const didExecute = Array.isArray(contents) && isTrue(contents[0]);
-  const issueId = Array.isArray(contents)
-    ? contents.find(
-        (value, index) =>
-          index > 0 && typeof value === "string" && /^(0x)?[0-9a-f]{64}$/i.test(value)
-      )
-    : undefined;
-
-  console.log(`\nGovernance vote submitted by ${await getAuthenticatedAddress()}`);
-  console.log(`  transaction: ${hashes[0]}`);
-  if (issueId) console.log(`  issue ID:    ${issueId.replace(/^0x/, "")}`);
-  if (!didExecute) {
-    console.log(
-      "  status:      PENDING_VOTES\n" +
-        "Vote on this issue in the Admin UI. Re-run this exact command after execution to verify state."
-    );
-  } else {
-    console.log("  status:      EXECUTED");
+  const transactionHash = hashes[0];
+  const outcome = await waitForGovernanceOutcome(transactionHash);
+  if (!outcome.didExecute) {
+    die(`${label}: poller call unexpectedly created a pending governance issue`);
   }
-  return { didExecute, issueId };
+  console.log(`\nPoller batch executed by ${await getAuthenticatedAddress()}`);
+  console.log(`  transaction: ${transactionHash}`);
+  return { didExecute: true, transactionHash };
 }
 
 // ---------------------------------------------------------------------------
@@ -530,27 +622,27 @@ const plainKey = (row, depth) => {
   return keys.length === depth && expected.every((k) => keys.includes(k));
 };
 
-async function getActivityConfig() {
+async function getActivityConfig(activityId = ACTIVITY_ID) {
   const rows = await cirrusGetAll("mapping", {
     address: `eq.${REWARDS}`,
     collection_name: "eq.activities",
-    "key->>key": `eq.${ACTIVITY_ID}`,
+    "key->>key": `eq.${activityId}`,
     select: "key,value",
   });
   const main = rows.find((r) => plainKey(r, 1));
-  if (!main) die(`Activity ${ACTIVITY_ID} not found on Rewards ${REWARDS}`);
+  if (!main) die(`Activity ${activityId} not found on Rewards ${REWARDS}`);
   const events = rows
     .filter((r) => plainKey(r, 3) && r.key.key2 === "actionableEvents")
     .sort((a, b) => Number(a.key.key3) - Number(b.key.key3))
     .map((r) => ({
       eventName: r.value.eventName,
-      actionType: Number(chainUint(r.value.actionType)),
+      actionType: parseActionType(r.value.actionType),
     }));
   return {
     name: main.value.name,
     sourceContract: String(main.value.sourceContract).toLowerCase(),
     emissionRate: chainUint(main.value.emissionRate).toString(),
-    activityType: Number(chainUint(main.value.activityType)),
+    activityType: parseActivityType(main.value.activityType),
     minAmount: chainUint(main.value.minAmount).toString(),
     actionableEvents: events,
   };
@@ -724,14 +816,13 @@ async function getMaxEventIndexAtBlock(blockNumber) {
   return Array.isArray(rows) && rows.length ? Number(rows[0].event_index) : -1;
 }
 
-async function countRewardsEventsSince(eventName, sinceIso) {
-  const rows = await cirrusGetAll("event", {
+async function getActionFailuresForTransaction(transactionHash) {
+  return cirrusGetAll("BlockApps-Rewards-ActionFailed", {
     address: `eq.${REWARDS}`,
-    event_name: `eq.${eventName}`,
-    block_timestamp: `gte.${sinceIso}`,
-    select: "block_number,event_index,attributes",
+    transaction_hash: `eq.${transactionHash}`,
+    sourceContract: `eq.${VAULT}`,
+    select: "sourceContract,user,eventName,blockNumber,eventIndex,reason",
   });
-  return rows;
 }
 
 // ---------------------------------------------------------------------------
@@ -752,6 +843,7 @@ function loadSnapshot() {
   const snap = JSON.parse(raw);
   if (
     snap.network !== NETWORK ||
+    snap.vaultKey !== VAULT_KEY ||
     snap.rewards !== REWARDS ||
     snap.vault !== VAULT ||
     String(snap.activityId) !== String(ACTIVITY_ID) ||
@@ -759,7 +851,7 @@ function loadSnapshot() {
   ) {
     die(
       `Snapshot file ${SNAPSHOT_FILE} was taken for a different target ` +
-        `(network=${snap.network}, rewards=${snap.rewards}, vault=${snap.vault}, ` +
+        `(network=${snap.network}, vaultKey=${snap.vaultKey}, rewards=${snap.rewards}, vault=${snap.vault}, ` +
         `activity=${snap.activityId}, node=${snap.nodeUrl})`
     );
   }
@@ -804,14 +896,14 @@ function computeTargets(balances, queued) {
 // ---------------------------------------------------------------------------
 
 function buildBatchArgs(batch) {
-  return [
-    batch.map((a) => a.sourceContract),
-    batch.map((a) => a.eventName),
-    batch.map((a) => a.user),
-    batch.map((a) => a.amount),
-    batch.map((a) => a.blockNumber),
-    batch.map((a) => a.eventIndex),
-  ];
+  return {
+    sourceContracts: batch.map((a) => a.sourceContract),
+    eventNames: batch.map((a) => a.eventName),
+    users: batch.map((a) => a.user),
+    amounts: batch.map((a) => a.amount),
+    blockNumbers: batch.map((a) => a.blockNumber),
+    eventIndexes: batch.map((a) => a.eventIndex),
+  };
 }
 
 function selectActionBatch(actions, batchSize, label) {
@@ -832,30 +924,22 @@ function printActions(title, actions) {
   }
 }
 
-async function executeActions(actions, batchSize, label, startedIso) {
+async function executeActions(actions, batchSize, label) {
   const { batch, batchCount } = selectActionBatch(actions, batchSize, label);
   console.log(`\nSelected ${label} batch ${BATCH_NUMBER}/${batchCount} (${batch.length} actions)`);
-  const { didExecute } = await submitGovernanceVote(
-    REWARDS,
-    "batchHandleAction",
+  const { didExecute, transactionHash } = await submitPollerBatch(
     buildBatchArgs(batch),
     `${label} batch ${BATCH_NUMBER}/${batchCount}`
   );
   if (!didExecute) return { didExecute: false, batch, batchCount };
 
   // batchHandleAction swallows per-action failures and emits ActionFailed
-  // instead; give Cirrus a moment to index them before checking. The state
-  // verification that follows each phase is the authoritative gate.
-  await sleep(5000);
-  const failures = await countRewardsEventsSince("ActionFailed", startedIso);
-  const ours = failures.filter((f) => {
-    const attrs = typeof f.attributes === "string" ? JSON.parse(f.attributes) : f.attributes || {};
-    return String(attrs.sourceContract || "").toLowerCase() === VAULT;
-  });
-  if (ours.length) {
+  // instead. Scope the check to the exact execution transaction.
+  const failures = await getActionFailuresForTransaction(transactionHash);
+  if (failures.length) {
     console.error(`\nActionFailed events emitted during ${label}:`);
-    for (const f of ours) console.error(`  ${JSON.stringify(f.attributes)}`);
-    die(`${label}: ${ours.length} action(s) failed on-chain — investigate before continuing`);
+    for (const failure of failures) console.error(`  ${JSON.stringify(failure)}`);
+    die(`${label}: ${failures.length} action(s) failed on-chain — investigate before continuing`);
   }
   return { didExecute: true, batch, batchCount };
 }
@@ -920,20 +1004,21 @@ async function phasePreflight() {
   if (config.sourceContract !== VAULT) {
     die(`Activity ${ACTIVITY_ID} sourceContract is ${config.sourceContract}, not ${VAULT}`);
   }
-  let caller = "not authenticated (read-only)";
-  if (
-    adminToken ||
-    process.env.GLOBAL_ADMIN_NAME ||
-    process.env.STRATO_USERNAME ||
-    process.env.BA_USERNAME
-  ) {
-    await authenticate();
-    caller = await verifyAuthenticatedAdmin();
+  if (config.emissionRate !== "0") {
+    die(
+      `Preflight blocked: ${VAULT_KEY} activity ${ACTIVITY_ID} emissionRate is ` +
+        `${config.emissionRate}. Set it to 0 via Rewards.setEmissionRate in SMD first.`
+    );
   }
+  // Confirm the exact live poller identity is usable and whitelisted before
+  // any reconciliation phase can send a transaction.
+  await authenticate();
+  const caller = await verifyAuthenticatedPoller();
   console.log(
     [
       "Preflight passed:",
       `  network:        ${NETWORK}`,
+      `  vault profile:  ${VAULT_KEY}`,
       `  node:           ${NODE_URL}`,
       `  rewards:        ${REWARDS}`,
       `  vault:          ${VAULT}`,
@@ -943,7 +1028,7 @@ async function phasePreflight() {
       `  total stake:    ${state.totalStake}`,
       `  vault paused:   ${vault.paused}`,
       `  max batch size: ${rewardsScalars.maxBatchSize}`,
-      `  caller:         ${caller}`,
+      `  poller:         ${caller}`,
       `  snapshot:       ${SNAPSHOT_FILE}`,
     ].join("\n")
   );
@@ -995,7 +1080,7 @@ async function phaseSnapshot() {
   if (config.emissionRate !== "0") {
     die(
       `emissionRate is ${config.emissionRate} (${fmt18(config.emissionRate)}/s), not 0. ` +
-        `Execute set-emission 0 before taking the snapshot.`
+        `Set it to 0 via Rewards.setEmissionRate in SMD before taking the snapshot.`
     );
   }
 
@@ -1092,6 +1177,7 @@ async function phaseSnapshot() {
   const snapshot = {
     takenAt: new Date().toISOString(),
     network: NETWORK,
+    vaultKey: VAULT_KEY,
     nodeUrl: NODE_URL,
     rewards: REWARDS,
     vault: VAULT,
@@ -1131,7 +1217,7 @@ async function phaseSnapshot() {
   const { totalStake, totalTarget } = driftReport(stakes, targets);
   console.log(`\nPlan:`);
   console.log(`  1. withdraw:        ${withdrawUsers.length} synthetic Withdraw actions (zero all stakes; settles earned rewards)`);
-  console.log(`  2. set-events:      Deposit->Deposit, Withdraw->Withdraw, QueueProcessed->Withdraw`);
+  console.log(`  2. SMD:             setPositionActivityEvents -> Deposit->Deposit, Withdraw->Withdraw, QueueProcessed->Withdraw`);
   console.log(`  3. mark-historical: mark ${unprocessedReal.length} real event(s) processed with zero-amount synthetics`);
   console.log(`  4. seed:            ${seedUsers.length} synthetic Deposit actions (target total ${fmt18(totalTarget)})`);
   console.log(`  5. verify:          totalStake == totalSupply == ${fmt18(vault.totalSupply)}`);
@@ -1142,7 +1228,6 @@ async function phaseWithdraw() {
   console.log("Phase: withdraw (zero out all tracked stakes)");
   const snap = loadSnapshot();
   await requireReconciliationFrozen();
-  const startedIso = new Date().toISOString();
 
   const actions = snap.withdrawPairs.map((p) => ({
     sourceContract: VAULT,
@@ -1185,7 +1270,7 @@ async function phaseWithdraw() {
     console.log("\nDry run (pass --execute to send).");
     return;
   }
-  const result = await executeActions(actions, snap.batchSize, "withdraw", startedIso);
+  const result = await executeActions(actions, snap.batchSize, "withdraw");
   if (!result.didExecute) return;
 
   await waitForCirrus(async () => {
@@ -1210,57 +1295,9 @@ async function phaseWithdraw() {
   }
 }
 
-async function phaseSetEvents() {
-  console.log("Phase: set-events (register QueueProcessed as a Withdraw trigger)");
-  const snap = loadSnapshot();
-  const [{ config: currentConfig }, state] = await Promise.all([
-    requireReconciliationFrozen(),
-    getActivityState(),
-  ]);
-  if (chainUint(state.totalStake) !== 0n) {
-    die(`totalStake is ${state.totalStake}, not 0 — run the withdraw phase first`);
-  }
-  await requireAllProcessed(snap.withdrawPairs, "Withdraw phase is incomplete");
-  const currentNames = currentConfig.actionableEvents
-    .map((event) => `${event.eventName}:${event.actionType}`)
-    .join(",");
-  if (currentNames === "Deposit:0,Withdraw:1,QueueProcessed:1") {
-    console.log("Actionable events are already configured correctly — nothing to do.");
-    return;
-  }
-
-  const newEvents = [
-    { eventName: "Deposit", actionType: "Deposit" },
-    { eventName: "Withdraw", actionType: "Withdraw" },
-    { eventName: "QueueProcessed", actionType: "Withdraw" },
-  ];
-  console.log("  setPositionActivityEvents args:", JSON.stringify(newEvents));
-
-  if (!EXECUTE) {
-    console.log("\nDry run (pass --execute to send).");
-    return;
-  }
-  const { didExecute } = await submitGovernanceVote(
-    REWARDS,
-    "setPositionActivityEvents",
-    [Number(ACTIVITY_ID), newEvents],
-    "setPositionActivityEvents"
-  );
-  if (!didExecute) return;
-
-  await waitForCirrus(async () => {
-    const config = await getActivityConfig();
-    const names = config.actionableEvents.map((e) => `${e.eventName}:${e.actionType}`).join(",");
-    const ok = names === "Deposit:0,Withdraw:1,QueueProcessed:1";
-    return { ok, detail: `actionableEvents = [${names}]` };
-  }, "actionable events updated to Deposit/Withdraw/QueueProcessed");
-  console.log("\nOK: actionable events are Deposit->Deposit, Withdraw->Withdraw, QueueProcessed->Withdraw.");
-}
-
 async function phaseMarkHistorical() {
   console.log("Phase: mark-historical (idempotency-mark unprocessed real vault events)");
   const snap = loadSnapshot();
-  const startedIso = new Date().toISOString();
 
   const [{ config }, state] = await Promise.all([
     requireReconciliationFrozen(),
@@ -1270,8 +1307,13 @@ async function phaseMarkHistorical() {
     die(`totalStake is ${state.totalStake}, not 0 — run every withdraw batch first`);
   }
   await requireAllProcessed(snap.withdrawPairs, "Withdraw phase is incomplete");
-  const hasQueueProcessed = config.actionableEvents.some((e) => e.eventName === "QueueProcessed");
-  if (!hasQueueProcessed) die("QueueProcessed is not an actionable event yet — run set-events first");
+  const eventSignature = actionableEventsSignature(config);
+  if (eventSignature !== EXPECTED_POSITION_EVENTS) {
+    die(
+      `Actionable events are [${eventSignature}], not [${EXPECTED_POSITION_EVENTS}] — ` +
+        "correct setPositionActivityEvents in SMD before marking historical events"
+    );
+  }
 
   const historical = snap.unprocessedRealEvents || [];
   if (!historical.length) {
@@ -1309,7 +1351,7 @@ async function phaseMarkHistorical() {
     console.log("\nDry run (pass --execute to send).");
     return;
   }
-  const result = await executeActions(actions, snap.batchSize, "mark-historical", startedIso);
+  const result = await executeActions(actions, snap.batchSize, "mark-historical");
   if (!result.didExecute) return;
 
   await waitForCirrus(async () => {
@@ -1333,11 +1375,14 @@ async function phaseMarkHistorical() {
 async function phaseSeed() {
   console.log("Phase: seed (re-create correct positions)");
   const snap = loadSnapshot();
-  const startedIso = new Date().toISOString();
 
   const { config } = await requireReconciliationFrozen();
-  if (!config.actionableEvents.some((e) => e.eventName === "QueueProcessed")) {
-    die("Actionable events not updated yet — run set-events before seed");
+  const eventSignature = actionableEventsSignature(config);
+  if (eventSignature !== EXPECTED_POSITION_EVENTS) {
+    die(
+      `Actionable events are [${eventSignature}], not [${EXPECTED_POSITION_EVENTS}] — ` +
+        "correct setPositionActivityEvents in SMD before seed"
+    );
   }
   await requireAllProcessed(snap.withdrawPairs, "Withdraw phase is incomplete");
   await requireAllProcessed(
@@ -1353,7 +1398,7 @@ async function phaseSeed() {
     getVaultScalars(),
   ]);
   const liveTargets = computeTargets(balances, queued);
-  let targets = snap.targets;
+  const targets = snap.targets;
   const changed = [...new Set([...Object.keys(liveTargets), ...Object.keys(snap.targets)])].filter(
     (u) => chainUint(liveTargets[u] || "0") !== chainUint(snap.targets[u] || "0")
   );
@@ -1364,34 +1409,23 @@ async function phaseSeed() {
     );
   }
 
-  const seedIndexByUser = new Map(snap.seedPairs.map((p) => [p.user, p.eventIndex]));
-  let nextExtraIndex =
-    snap.eventIndexBase + snap.seedIndexOffset + snap.seedPairs.length;
+  const seedPairByUser = new Map(snap.seedPairs.map((pair) => [pair.user, pair]));
 
   const actions = Object.entries(targets)
     .filter(([, t]) => chainUint(t) > 0n)
     .sort(([a], [b]) => (a < b ? -1 : 1))
-    .map(([user, amount]) => ({
-      sourceContract: VAULT,
-      eventName: "Deposit",
-      user,
-      amount,
-      blockNumber: snap.snapshotBlock,
-      eventIndex: seedIndexByUser.get(user) ?? nextExtraIndex++,
-    }));
-
-  // Pairs for users that appeared after the snapshot were never reserved;
-  // make sure they are unused before sending anything.
-  const extraPairs = actions.filter((a) => !seedIndexByUser.has(a.user));
-  if (extraPairs.length) {
-    const collisions = await findProcessedPairs(extraPairs);
-    if (collisions.length) {
-      die(
-        `Unreserved seed pairs already processed: ` +
-          collisions.map((c) => `(${c.blockNumber},${c.eventIndex})`).join(", ")
-      );
-    }
-  }
+    .map(([user, amount]) => {
+      const pair = seedPairByUser.get(user);
+      if (!pair) die(`Snapshot has no reserved seed pair for ${user}`);
+      return {
+        sourceContract: VAULT,
+        eventName: "Deposit",
+        user,
+        amount,
+        blockNumber: pair.blockNumber,
+        eventIndex: pair.eventIndex,
+      };
+    });
 
   if (!actions.length) die("No targets to seed — is the vault empty?");
   const selected = selectActionBatch(actions, snap.batchSize, "seed");
@@ -1449,7 +1483,7 @@ async function phaseSeed() {
     console.log("\nDry run (pass --execute to send).");
     return;
   }
-  const result = await executeActions(actions, snap.batchSize, "seed", startedIso);
+  const result = await executeActions(actions, snap.batchSize, "seed");
   if (!result.didExecute) return;
 
   await waitForCirrus(async () => {
@@ -1485,15 +1519,51 @@ async function phaseVerify() {
     getQueuedSharesByOwner(),
   ]);
   const targets = computeTargets(balances, queued);
-  const { totalStake, totalTarget } = driftReport(stakes, targets);
+  const eventNames = actionableEventsSignature(config);
+  const totalStake = Object.values(stakes).reduce(
+    (sum, stake) => sum + chainUint(stake),
+    0n
+  );
+  const totalTarget = Object.values(targets).reduce(
+    (sum, target) => sum + chainUint(target),
+    0n
+  );
+  const perUserMatches =
+    Object.keys(targets).every(
+      (user) => chainUint(stakes[user] || "0") === chainUint(targets[user])
+    ) &&
+    Object.keys(stakes).every(
+      (user) => chainUint(stakes[user]) === chainUint(targets[user] || "0")
+    );
+  driftReport(stakes, targets);
 
-  const eventNames = config.actionableEvents.map((e) => `${e.eventName}:${e.actionType}`).join(",");
   const checks = [
-    ["actionable events = Deposit:0,Withdraw:1,QueueProcessed:1", eventNames === "Deposit:0,Withdraw:1,QueueProcessed:1", eventNames],
+    [`actionable events = ${EXPECTED_POSITION_EVENTS}`, eventNames === EXPECTED_POSITION_EVENTS, eventNames],
     ["sum(stakes) == activityStates.totalStake", totalStake === chainUint(state.totalStake), `${totalStake} vs ${state.totalStake}`],
     ["totalStake == vault totalSupply", chainUint(state.totalStake) === chainUint(vault.totalSupply), `${state.totalStake} vs ${vault.totalSupply}`],
-    ["per-user stake == balance + queued", Object.keys(targets).every((u) => chainUint(stakes[u] || "0") === chainUint(targets[u])) && Object.keys(stakes).every((u) => chainUint(stakes[u]) === chainUint(targets[u] || "0")), `${fmt18(totalStake - totalTarget)} residual drift`],
+    ["per-user stake == balance + queued", perUserMatches, `${fmt18(totalStake - totalTarget)} residual drift`],
+    [`${VAULT_KEY} emission rate is zero`, chainUint(config.emissionRate) === 0n, config.emissionRate],
   ];
+
+  // Emission readiness: every reconciled activity must still be at zero, and
+  // the selected emission vault additionally confirms the other two are zero.
+  const isEmissionVault = VAULT_KEY === EMISSION_VAULT;
+  if (isEmissionVault) {
+    const others = await Promise.all(
+      Object.entries(PROFILE.vaults)
+        .filter(([vaultKey]) => vaultKey !== EMISSION_VAULT)
+        .map(async ([vaultKey, target]) => ({
+          vaultKey,
+          emissionRate: (await getActivityConfig(target.activityId)).emissionRate,
+        }))
+    );
+    const nonZero = others.filter(({ emissionRate }) => chainUint(emissionRate) !== 0n);
+    checks.push([
+      `only ${EMISSION_VAULT} may emit: other activities are zero`,
+      nonZero.length === 0,
+      nonZero.map(({ vaultKey, emissionRate }) => `${vaultKey}=${emissionRate}`).join(", "),
+    ]);
+  }
 
   console.log("");
   let allOk = true;
@@ -1503,57 +1573,11 @@ async function phaseVerify() {
   }
   if (!allOk) die("Verification FAILED");
   console.log(`\nAll checks passed. Activity ${ACTIVITY_ID} totalStake = ${fmt18(state.totalStake)} = vault totalSupply.`);
-  console.log("Next: deploy the poller with the updated attributeMapping.json, start it, unpause the vault, then enable emissions.");
-}
-
-async function phaseVaultPause(pause) {
-  const method = pause ? "pause" : "unpause";
-  console.log(`Phase: ${method} YieldVault ${VAULT}`);
-  const vault = await getVaultScalars();
-  if (vault.paused === pause) {
-    console.log(`Vault is already ${pause ? "paused" : "unpaused"} — nothing to do.`);
-    return;
-  }
-  if (!EXECUTE) {
-    console.log("Dry run (pass --execute to send).");
-    return;
-  }
-  const { didExecute } = await submitGovernanceVote(VAULT, method, [], method);
-  if (!didExecute) return;
-  await waitForCirrus(async () => {
-    const v = await getVaultScalars();
-    return { ok: v.paused === pause, detail: `_paused=${v.paused}` };
-  }, `vault ${method}d`);
-  console.log(`OK: vault is ${pause ? "paused" : "unpaused"}.`);
-}
-
-async function phaseSetEmission() {
-  const rate = args[1];
-  if (rate === undefined || !/^\d+$/.test(rate)) {
-    die("Usage: set-emission <rate-in-wei-per-second> [--execute]");
-  }
-  console.log(`Phase: set-emission ${rate} (${fmt18(rate)}/s) for activity ${ACTIVITY_ID}`);
-  const config = await getActivityConfig();
-  if (config.emissionRate === rate) {
-    console.log("Emission rate is already set to this value — nothing to do.");
-    return;
-  }
-  if (!EXECUTE) {
-    console.log("Dry run (pass --execute to send).");
-    return;
-  }
-  const { didExecute } = await submitGovernanceVote(
-    REWARDS,
-    "setEmissionRate",
-    [Number(ACTIVITY_ID), rate],
-    "setEmissionRate"
+  console.log(
+    isEmissionVault
+      ? `Activity ${ACTIVITY_ID} is reconciled and cleared for setEmissionRate in SMD.`
+      : `Keep activity ${ACTIVITY_ID} at zero emission (current rate ${config.emissionRate}).`
   );
-  if (!didExecute) return;
-  await waitForCirrus(async () => {
-    const config = await getActivityConfig();
-    return { ok: config.emissionRate === rate, detail: `emissionRate=${config.emissionRate}` };
-  }, "emission rate updated");
-  console.log("OK: emission rate updated.");
 }
 
 // ---------------------------------------------------------------------------
@@ -1562,6 +1586,10 @@ async function phaseSetEmission() {
 
 (async () => {
   if (!PROFILE) die("NETWORK or --network must be testnet or prod");
+  if (!VAULT_PROFILE) die("VAULT or --vault must be eth, wbtc, or usdc");
+  if (!PROFILE.vaults[EMISSION_VAULT]) {
+    die("EMISSION_VAULT must be eth, wbtc, or usdc");
+  }
   if (!NODE_URL) die("NODE_URL env var required");
   if (!REWARDS || REWARDS.length !== 40) die("REWARDS_ADDRESS env var required (40 hex chars, no 0x)");
   if (!VAULT || VAULT.length !== 40) die("VAULT_ADDRESS env var required (40 hex chars, no 0x)");
@@ -1572,23 +1600,28 @@ async function phaseSetEmission() {
   const phases = {
     preflight: phasePreflight,
     status: phaseStatus,
-    pause: () => phaseVaultPause(true),
     snapshot: phaseSnapshot,
     withdraw: phaseWithdraw,
-    "set-events": phaseSetEvents,
     "mark-historical": phaseMarkHistorical,
     seed: phaseSeed,
     verify: phaseVerify,
-    unpause: () => phaseVaultPause(false),
-    "set-emission": phaseSetEmission,
   };
 
   if (!phase || !phases[phase]) {
     console.error(
       `Usage: node ${path.basename(__filename)} <${Object.keys(phases).join("|")}> ` +
-        `--network <testnet|prod> [--execute] [--confirm-prod] [--batch <number>]`
+        `--network <testnet|prod> --vault <eth|wbtc|usdc> ` +
+        `[--execute] [--confirm-prod] [--batch <number>] ` +
+        `[--confirm-poller-stopped]`
     );
     process.exit(1);
+  }
+
+  if (POLLER_STOPPED_PHASES.has(phase) && !CONFIRM_POLLER_STOPPED) {
+    die(
+      `${phase} requires --confirm-poller-stopped after the rewards poller is stopped ` +
+        `and all in-flight batches have drained`
+    );
   }
 
   if (EXECUTE) {
@@ -1596,17 +1629,18 @@ async function phaseSetEmission() {
       die("Production or overridden target execution requires --confirm-prod");
     }
     await authenticate();
-    const caller = await verifyAuthenticatedAdmin();
+    const caller = await verifyAuthenticatedPoller();
     const config = await getActivityConfig();
     if (config.sourceContract !== VAULT) {
       die(`Activity ${ACTIVITY_ID} sourceContract is ${config.sourceContract}, not ${VAULT}`);
     }
-    console.log(`authenticated admin=${caller}`);
+    console.log(`authenticated poller=${caller}`);
   }
 
   console.log(
-    `network=${NETWORK}\nnode=${NODE_URL}\nrewards=${REWARDS}\nvault=${VAULT}\n` +
-      `activity=${ACTIVITY_ID}\nmode=${EXECUTE ? "EXECUTE" : "dry-run"}\n`
+    `network=${NETWORK}\nvaultProfile=${VAULT_KEY}\nnode=${NODE_URL}\nrewards=${REWARDS}\n` +
+      `vault=${VAULT}\nactivity=${ACTIVITY_ID}\n` +
+      `mode=${EXECUTE ? "EXECUTE" : "dry-run"}\n`
   );
   await phases[phase]();
 })().catch((e) => {
