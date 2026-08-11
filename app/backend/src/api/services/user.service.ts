@@ -218,18 +218,7 @@ const fetchFuncArgs = async (
   address: string,
   func: string,
 ): Promise<{ contractName: string; funcArgs: [string, AbiType][] }> => {
-  let details: any = await getContractDetails(accessToken, address);
-  if (details._contractName === "Proxy") {
-    const storage = await eth.get(accessToken, "/storage", {
-      params: { address, key: "logicContract" },
-    });
-    const rawLogicAddress = storage.data?.find((row: any) => row.key === "logicContract")?.value;
-    const logicAddress = rawLogicAddress?.match(/^address\(([0-9a-fA-F]{40})\)$/)?.[1];
-    if (!logicAddress) {
-      throw new Error(`Logic contract not found for proxy ${address}`);
-    }
-    details = await getContractDetails(accessToken, logicAddress);
-  }
+  const details: any = await getContractDetails(accessToken, address);
   const funcArgs = details?._functions?.[func]?._funcArgs;
   if (!Array.isArray(funcArgs)) {
     throw new Error(`Function ${func} not found on contract ${address}`);
@@ -386,8 +375,14 @@ const resolveIssueCall = async (
       hintedArg(funcArgs[i]?.[1] || {}, arg));
     return { call: castVoteCall(target, func, typedArgs), typedArgs };
   }
-  const typedArgs = funcArgs.map(([, type], i) => hintedArg(type, args[i]));
-  const namedArgs = Object.fromEntries(funcArgs.map(([name], i) => [name, typedArgs[i]]));
+  // A variadic parameter takes every remaining arg, so it is flat in the registry's
+  // own variadic _args but one nested argument in a direct call to the target
+  const typedArgs = funcArgs.flatMap(([, type], i) =>
+    type.tag === "Variadic"
+      ? args.slice(i).map((arg) => hintedArg(type, arg))
+      : [hintedArg(type, args[i])]);
+  const namedArgs = Object.fromEntries(funcArgs.map(([name, type], i) =>
+    [name, type.tag === "Variadic" ? typedArgs.slice(i) : typedArgs[i]]));
   return { call: { contractName, contractAddress: target, method: func, args: namedArgs }, typedArgs };
 };
 
