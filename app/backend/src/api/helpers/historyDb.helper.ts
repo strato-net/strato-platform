@@ -1,4 +1,5 @@
 import { query } from "../../utils/dbService";
+import * as config from "../../config/config";
 import {
   HistoryParams,
   HistorySnapshot,
@@ -209,15 +210,22 @@ export async function fetchUserMappingHistory(
     ...(filters.includeV3Positions ? ['positions'] : []),
   ];
 
-  // Build the _balances path array: liquidity pool + bot executor + carry vault idle assets
+  // Build the _balances path array: liquidity pool + bot executor + carry vault idle assets.
+  // Include lowercase form so vault share (arbV) equity isn't missed when casing differs.
   const balancePaths: string[] = [
     '_balances[0000000000000000000000000000000000001004]', // liquidity pool
   ];
+  const pushBalancePath = (addr: string) => {
+    if (!addr) return;
+    balancePaths.push(`_balances[${addr}]`);
+    const lower = addr.toLowerCase();
+    if (lower !== addr) balancePaths.push(`_balances[${lower}]`);
+  };
   if (filters.botExecutor) {
-    balancePaths.push(`_balances[${filters.botExecutor}]`);
+    pushBalancePath(filters.botExecutor);
   }
   for (const addr of filters.carryVaultAddrs) {
-    balancePaths.push(`_balances[${addr}]`);
+    pushBalancePath(addr);
   }
 
   const claimablePath = `claimableAssets[${filters.userAddress}]`;
@@ -408,11 +416,16 @@ export async function fetchVaultHistoryConfig(
 
   if (!vaultRows.length) return null;
 
+  // value::text on jsonb/text mapping cells often wraps the address in quotes
+  // ("0abc…"); those must be stripped or vaultAssetBalance lookups miss and
+  // arbV/SLP equity prices as $0 on the portfolio graph.
+  const stripAddr = (v: string) => (v || "").replace(/"/g, "").trim();
+
   return {
-    shareToken: vaultRows[0].shareToken || "",
-    botExecutor: vaultRows[0].botExecutor || "",
+    shareToken: stripAddr(vaultRows[0].shareToken || ""),
+    botExecutor: stripAddr(vaultRows[0].botExecutor || ""),
     supportedAssets: assetRows
-      .map((a) => a.value)
+      .map((a) => stripAddr(a.value))
       .filter((addr) => addr && addr !== "0000000000000000000000000000000000000000"),
   };
 }
@@ -453,9 +466,10 @@ export interface PoolV3Meta {
 
 /**
  * Pre-pass for V3 positions: find the V3 pools the user has (or had) positions in
- * during the window, and resolve each pool's token pair. The join against the
- * PoolV3 table also guarantees we only treat genuine V3 pools as such — other
- * contracts may have a `positions` collection too.
+ * during the window, and resolve each pool's token pair. Only pools from the
+ * configured current poolV3Factory are included — same scope as the Net Balance box.
+ * The join against PoolV3 also skips non-V3 contracts that happen to have a
+ * `positions` collection.
  */
 export async function fetchUserV3PoolMeta(
   startTime: string,
@@ -477,10 +491,17 @@ export async function fetchUserV3PoolMeta(
     );
     if (poolRows.length === 0) return meta;
 
-    const metaRows = await query<{ address: string; token0: string; token1: string }>(
-      `SELECT address, token0, token1 FROM "BlockApps-PoolV3" WHERE address = ANY($1)`,
-      [poolRows.map((r) => r.address)],
-    );
+    const factory = config.poolV3Factory;
+    const metaRows = factory
+      ? await query<{ address: string; token0: string; token1: string }>(
+          `SELECT address, token0, token1 FROM "BlockApps-PoolV3"
+           WHERE address = ANY($1) AND "poolV3Factory" = $2`,
+          [poolRows.map((r) => r.address), factory],
+        )
+      : await query<{ address: string; token0: string; token1: string }>(
+          `SELECT address, token0, token1 FROM "BlockApps-PoolV3" WHERE address = ANY($1)`,
+          [poolRows.map((r) => r.address)],
+        );
     for (const row of metaRows) {
       if (row.token0 && row.token1) {
         meta.set(row.address, { token0: row.token0, token1: row.token1 });
