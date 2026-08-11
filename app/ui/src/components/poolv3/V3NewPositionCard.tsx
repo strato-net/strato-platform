@@ -21,7 +21,7 @@ import {
 import V3ConfirmDialog, { ConfirmRow } from "./V3ConfirmDialog";
 import V3LiquidityChart from "./V3LiquidityChart";
 
-const MINT_SLIPPAGE_BPS = 100n; // 1% headroom on the amount maxes
+const MINT_SLIPPAGE_BPS = 100n; // 1% downward tolerance on the amount minimums
 
 // One-click range strategies, as percentage bounds relative to the current price.
 // A 0 bound anchors that side of the range at the current tick (one-sided strategies).
@@ -289,15 +289,19 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
   const handleMint = async () => {
     if (!preview || !rangeValid || previewZero) return;
     try {
+      // Positions are minted as NFTs via PositionManagerV3: the desired amounts are the
+      // deposit ceilings (the manager recomputes liquidity from them at the execution
+      // price and never pulls more), the mins guard against an adverse price move.
       const withSlippage = (amount: string) =>
-        ((BigInt(amount) * (10000n + MINT_SLIPPAGE_BPS)) / 10000n).toString();
+        ((BigInt(amount) * (10000n - MINT_SLIPPAGE_BPS)) / 10000n).toString();
       const res = await mintV3({
         poolAddress: pool.address,
         tickLower: preview.tickLower,
         tickUpper: preview.tickUpper,
-        liquidity: preview.liquidity,
-        amount0Max: BigInt(preview.amount0) > 0n ? withSlippage(preview.amount0) : "0",
-        amount1Max: BigInt(preview.amount1) > 0n ? withSlippage(preview.amount1) : "0",
+        amount0Desired: preview.amount0,
+        amount1Desired: preview.amount1,
+        amount0Min: BigInt(preview.amount0) > 0n ? withSlippage(preview.amount0) : "0",
+        amount1Min: BigInt(preview.amount1) > 0n ? withSlippage(preview.amount1) : "0",
       });
       // mint() returns the exact amounts the pool took, which can differ slightly from the preview
       const amounts = poolV3TxAmounts(res);

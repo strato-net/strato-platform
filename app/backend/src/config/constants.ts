@@ -21,6 +21,7 @@ export const constants = (() => {
   const TokenFactory = `${CONTRACT_PREFIX}TokenFactory`;
   const NFT = `${CONTRACT_PREFIX}NFT`;
   const NFTFactory = `${CONTRACT_PREFIX}NFTFactory`;
+  const PositionManagerV3 = `${CONTRACT_PREFIX}PositionManagerV3`;
   const LendingPool = `${CONTRACT_PREFIX}LendingPool`;
   const LiquidityPool = `${CONTRACT_PREFIX}LiquidityPool`;
   const CollateralVault = `${CONTRACT_PREFIX}CollateralVault`;
@@ -139,6 +140,7 @@ export const constants = (() => {
     TokenFactory,
     NFT,
     NFTFactory,
+    PositionManagerV3,
     get nftFactory() { return config.nftFactory; },
     LendingPool,
     LiquidityPool,

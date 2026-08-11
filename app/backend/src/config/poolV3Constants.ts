@@ -21,6 +21,9 @@ export const POOL_V3_CONTRACTS = {
   PoolV3FactoryPools: `${CONTRACT_PREFIX}PoolV3Factory-pools`,
   PoolV3FactoryFeeTiers: `${CONTRACT_PREFIX}PoolV3Factory-feeTiers`,
   PoolV3SwapEvent: `${CONTRACT_PREFIX}PoolV3-Swap`,
+  PositionManagerV3: `${CONTRACT_PREFIX}PositionManagerV3`,
+  PositionManagerV3Positions: `${CONTRACT_PREFIX}PositionManagerV3-positions`,
+  PositionManagerV3Owners: `${CONTRACT_PREFIX}PositionManagerV3-_owners`,
 } as const;
 
 // ============================================================================
@@ -87,6 +90,22 @@ export const POOL_V3_POSITION_SELECT_FIELDS = [
   "tokensOwed0:value->>tokensOwed0",
   "tokensOwed1:value->>tokensOwed1",
   // signed Q128 inside-growth snapshots as of the position's last touch
+  "feeGrowthInside0LastX128:value->>feeGrowthInside0LastX128",
+  "feeGrowthInside1LastX128:value->>feeGrowthInside1LastX128",
+] as const;
+
+/** Managed-position rows (PositionManagerV3.positions: tokenId => ManagedPosition struct) */
+export const POSITION_MANAGER_POSITION_SELECT_FIELDS = [
+  "key", // tokenId
+  // struct value fields live in the `value` JSONB (see tick fields above)
+  "pool:value->>pool",
+  "tickLower:value->>tickLower",
+  "tickUpper:value->>tickUpper",
+  "liquidity:value->>liquidity",
+  "tokensOwed0:value->>tokensOwed0",
+  "tokensOwed1:value->>tokensOwed1",
+  // the manager's per-token snapshots — same delta math against the pool's
+  // feeGrowthInside as a direct position's own snapshots
   "feeGrowthInside0LastX128:value->>feeGrowthInside0LastX128",
   "feeGrowthInside1LastX128:value->>feeGrowthInside1LastX128",
 ] as const;

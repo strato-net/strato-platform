@@ -1,7 +1,6 @@
 import { cirrus, strato } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { NFT_SOURCES, NFTSource } from "../../config/nftSources";
 
@@ -292,28 +291,48 @@ const executeNFTTx = async (
 // Collection creation and minting are performed on-chain directly (admin calls the
 // NFTFactory / NFT contract), so this service exposes only transfer and burn as writes.
 
+// STRATO transactions are dispatched by contract NAME, which differs per source ("NFT"
+// for collections, "PositionManagerV3" for V3 position NFTs). Resolve the source whose
+// collection-level table contains the address; unknown addresses fall back to the
+// default "collection" source so the on-chain call (not this lookup) decides validity.
+const resolveSource = async (accessToken: string, collectionAddress: string): Promise<NFTSource> => {
+  for (const source of NFT_SOURCES) {
+    const res = await cirrus
+      .get(accessToken, `/${source.cirrusPrefix}`, {
+        params: { address: `eq.${collectionAddress}`, select: "address", limit: "1" },
+      })
+      .catch(emptyOnMissingTable);
+    if (((res.data as any[]) || []).length > 0) return source;
+  }
+  return NFT_SOURCES.find((s) => s.kind === "collection")!;
+};
+
 export const transferNFT = async (
   accessToken: string,
   userAddress: string,
   collectionAddress: string,
   body: { to: string; tokenId: string }
-) =>
-  executeNFTTx(accessToken, userAddress, {
-    contractName: extractContractName(NFT),
+) => {
+  const source = await resolveSource(accessToken, normalizeAddr(collectionAddress));
+  return executeNFTTx(accessToken, userAddress, {
+    contractName: source.contractName,
     contractAddress: normalizeAddr(collectionAddress),
     method: "transferFrom",
     args: { from: normalizeAddr(userAddress), to: normalizeAddr(body.to), tokenId: body.tokenId },
   });
+};
 
 export const burnNFT = async (
   accessToken: string,
   userAddress: string,
   collectionAddress: string,
   body: { tokenId: string }
-) =>
-  executeNFTTx(accessToken, userAddress, {
-    contractName: extractContractName(NFT),
+) => {
+  const source = await resolveSource(accessToken, normalizeAddr(collectionAddress));
+  return executeNFTTx(accessToken, userAddress, {
+    contractName: source.contractName,
     contractAddress: normalizeAddr(collectionAddress),
     method: "burn",
     args: { tokenId: body.tokenId },
   });
+};

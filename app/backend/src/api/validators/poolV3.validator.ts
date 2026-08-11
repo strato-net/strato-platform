@@ -37,43 +37,79 @@ export function validatePoolV3MintArgs(args: any) {
     poolAddress: validateAddressField("poolAddress").required(),
     tickLower: tickField.required(),
     tickUpper: tickField.required(),
-    liquidity: numericStringField("liquidity").required(),
-    // A single-sided (out-of-range) position deposits only one token, so the unused side's
-    // max is legitimately "0" — allow zero here (a zero ceiling for a token that isn't
-    // deposited is correct: 0 deposited <= 0 max).
-    amount0Max: numericStringField("amount0Max", { allowZero: true }).required(),
-    amount1Max: numericStringField("amount1Max", { allowZero: true }).required(),
+    // Canonical desired/min parameters (PositionManagerV3 computes liquidity on-chain).
+    // A single-sided (out-of-range) position deposits only one token, so the unused
+    // side's desired amount is legitimately "0" — but not both.
+    amount0Desired: numericStringField("amount0Desired", { allowZero: true }).required(),
+    amount1Desired: numericStringField("amount1Desired", { allowZero: true }).required(),
+    amount0Min: numericStringField("amount0Min", { allowZero: true }).optional(),
+    amount1Min: numericStringField("amount1Min", { allowZero: true }).optional(),
   });
   const { error } = schema.validate(args);
   if (error) throw new Error("PoolV3 Mint Argument Validation Error: " + error.message);
+  if (BigInt(args.amount0Desired) === 0n && BigInt(args.amount1Desired) === 0n) {
+    throw new Error("PoolV3 Mint Argument Validation Error: at least one desired amount must be positive");
+  }
+}
+
+export function validatePoolV3IncreaseArgs(args: any) {
+  const schema = Joi.object({
+    tokenId: numericStringField("tokenId").required(),
+    amount0Desired: numericStringField("amount0Desired", { allowZero: true }).required(),
+    amount1Desired: numericStringField("amount1Desired", { allowZero: true }).required(),
+    amount0Min: numericStringField("amount0Min", { allowZero: true }).optional(),
+    amount1Min: numericStringField("amount1Min", { allowZero: true }).optional(),
+  });
+  const { error } = schema.validate(args);
+  if (error) throw new Error("PoolV3 Increase Argument Validation Error: " + error.message);
+  if (BigInt(args.amount0Desired) === 0n && BigInt(args.amount1Desired) === 0n) {
+    throw new Error("PoolV3 Increase Argument Validation Error: at least one desired amount must be positive");
+  }
 }
 
 export function validatePoolV3BurnArgs(args: any) {
+  // Two addressing modes: `tokenId` (position NFTs, managed by PositionManagerV3) or
+  // poolAddress + ticks (legacy positions held directly on the pool) — exactly one.
   const schema = Joi.object({
-    poolAddress: validateAddressField("poolAddress").required(),
-    tickLower: tickField.required(),
-    tickUpper: tickField.required(),
-    // allowZero: burn(0) is a valid "poke" — it accrues fees into the position's tokensOwed
-    // without removing liquidity. Paired with collect:true this realizes and claims accrued
-    // fees (the periphery collect() pattern), which is how the app surfaces fees given the
-    // indexer can't expose live feeGrowthInside from Cirrus.
-    liquidity: numericStringField("liquidity", { allowZero: true }).required(),
+    tokenId: numericStringField("tokenId").optional(),
+    poolAddress: validateAddressField("poolAddress").optional(),
+    tickLower: tickField.optional(),
+    tickUpper: tickField.optional(),
+    // NFT path: the manager requires liquidity > 0 (collect covers fee claiming).
+    // Legacy path allowZero: burn(0) is a valid "poke" — it accrues fees into the
+    // position's tokensOwed without removing liquidity; paired with collect:true this
+    // realizes and claims accrued fees (the periphery collect() pattern).
+    liquidity: Joi.when("tokenId", {
+      is: Joi.exist(),
+      then: numericStringField("liquidity").required(),
+      otherwise: numericStringField("liquidity", { allowZero: true }).required(),
+    }),
+    amount0Min: numericStringField("amount0Min", { allowZero: true }).optional(),
+    amount1Min: numericStringField("amount1Min", { allowZero: true }).optional(),
     collect: Joi.boolean(),
-  });
+  })
+    .xor("tokenId", "poolAddress")
+    .with("poolAddress", ["tickLower", "tickUpper"])
+    .without("tokenId", ["tickLower", "tickUpper"]);
   const { error } = schema.validate(args);
   if (error) throw new Error("PoolV3 Burn Argument Validation Error: " + error.message);
 }
 
 export function validatePoolV3CollectArgs(args: any) {
+  // Same dual addressing as burn: tokenId (NFT) or poolAddress + ticks (legacy).
   const schema = Joi.object({
-    poolAddress: validateAddressField("poolAddress").required(),
-    tickLower: tickField.required(),
-    tickUpper: tickField.required(),
+    tokenId: numericStringField("tokenId").optional(),
+    poolAddress: validateAddressField("poolAddress").optional(),
+    tickLower: tickField.optional(),
+    tickUpper: tickField.optional(),
     // Both optional: the service defaults each to uint128-max (collect everything owed).
     // allowZero so a caller can explicitly request zero of one side.
     amount0Requested: numericStringField("amount0Requested", { allowZero: true }).optional(),
     amount1Requested: numericStringField("amount1Requested", { allowZero: true }).optional(),
-  });
+  })
+    .xor("tokenId", "poolAddress")
+    .with("poolAddress", ["tickLower", "tickUpper"])
+    .without("tokenId", ["tickLower", "tickUpper"]);
   const { error } = schema.validate(args);
   if (error) throw new Error("PoolV3 Collect Argument Validation Error: " + error.message);
 }

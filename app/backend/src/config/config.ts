@@ -123,6 +123,14 @@ export const defaultPoolV3FactoryFor: Record<string, string> = {
   "33056204878082667": "5d630126d908b46bcf8d00bc15e591a459375809" // Upquark mainnet
 };
 
+// PositionManagerV3 (V3 position NFTs). Deployed once per network behind a Proxy; its
+// address is the owner key of every managed pool position, so it must never change.
+// Populate per network after deployment (or set POSITION_MANAGER_V3).
+export const defaultPositionManagerV3For: Record<string, string> = {
+  "114784819836269": "", // Helium testnet
+  "33056204878082667": "", // Upquark mainnet
+};
+
 export const defaultNftFactoryFor: Record<string, string> = {
   "114784819836269": "af432c49803721b242f52ed5fd1b065c9a78e0bb", // Helium testnet
   "33056204878082667": "", // Upquark mainnet
@@ -213,6 +221,7 @@ export let referralUrl: string | undefined;
 export let escrow: string = '';
 export let vaultFactory: string = '';
 export let poolV3Factory: string = '';
+export let positionManagerV3: string = '';
 export let nftFactory: string = '';
 export let metalForge: string = '';
 export let creditCardTopUp: string = '';
@@ -271,6 +280,14 @@ function setPoolV3FactoryConfig(networkId: string) {
     poolV3Factory = process.env.POOL_V3_FACTORY;
   } else {
     poolV3Factory = defaultPoolV3FactoryFor[networkId] || "";
+  }
+}
+
+function setPositionManagerV3Config(networkId: string) {
+  if (process.env.POSITION_MANAGER_V3) {
+    positionManagerV3 = process.env.POSITION_MANAGER_V3;
+  } else {
+    positionManagerV3 = defaultPositionManagerV3For[networkId] || "";
   }
 }
 
@@ -375,6 +392,7 @@ export async function initNetworkConfig() {
   setReferralConfig(networkId);
   setVaultFactoryConfig(networkId);
   setPoolV3FactoryConfig(networkId);
+  setPositionManagerV3Config(networkId);
   setNftFactoryConfig(networkId);
   setStratoNativeBridgeConfig(networkId);
   setStratoTokenConfig(networkId);
@@ -407,7 +425,7 @@ export async function getInternalAddresses() {
   ];
 
   // Network-specific addresses (set by initNetworkConfig)
-  addresses.push(rewards || '', escrow, vaultFactory);
+  addresses.push(rewards || '', escrow, vaultFactory, positionManagerV3);
   addresses.push(stratoStaking, validatorRegistry);
   addresses.push(saveUsdstVault, usdcYieldVault, ethCarryVault, wbtcCarryVault);
 

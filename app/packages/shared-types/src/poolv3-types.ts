@@ -66,6 +66,11 @@ export interface PoolV3Quote {
 export interface PoolV3Position {
   poolAddress: string;
   owner: string;
+  /** "nft" = held as a PositionManagerV3 NFT (addressed by tokenId); "legacy" = a
+   *  pre-manager position held directly on the pool (addressed by owner + ticks) */
+  kind?: "nft" | "legacy";
+  /** the manager NFT's tokenId (kind "nft" only) */
+  tokenId?: string;
   tickLower: number;
   tickUpper: number;
   /** position liquidity, decimal string */
@@ -110,29 +115,53 @@ export interface PoolV3SwapParams {
   sqrtPriceLimitX96?: string;
 }
 
+/** Mint a position NFT via PositionManagerV3 (canonical desired/min parameters — the
+ *  manager computes liquidity and the exact deposit amounts on-chain) */
 export interface PoolV3MintParams {
   poolAddress: string;
   tickLower: number;
   tickUpper: number;
-  liquidity: string;
-  amount0Max: string;
-  amount1Max: string;
+  /** maximum amounts the caller wishes to deposit (approved to the manager), wei strings */
+  amount0Desired: string;
+  amount1Desired: string;
+  /** minimum amounts that must be deposited (slippage checks), default "0" */
+  amount0Min?: string;
+  amount1Min?: string;
 }
 
+/** Add liquidity to an existing position NFT, keeping its range */
+export interface PoolV3IncreaseParams {
+  tokenId: string;
+  amount0Desired: string;
+  amount1Desired: string;
+  amount0Min?: string;
+  amount1Min?: string;
+}
+
+/** Remove liquidity. NFT positions are addressed by tokenId; legacy (pre-manager)
+ *  positions by poolAddress + ticks — exactly one addressing mode is required. */
 export interface PoolV3BurnParams {
-  poolAddress: string;
-  tickLower: number;
-  tickUpper: number;
-  /** liquidity to remove; "0" is a poke (reverts on empty positions) */
+  /** the position NFT to decrease (NFT path) */
+  tokenId?: string;
+  /** legacy path: the pool + range of a position held directly by the caller */
+  poolAddress?: string;
+  tickLower?: number;
+  tickUpper?: number;
+  /** liquidity to remove; legacy path allows "0" as a poke (reverts on empty positions) */
   liquidity: string;
+  /** minimum principal amounts (slippage checks, NFT path), default "0" */
+  amount0Min?: string;
+  amount1Min?: string;
   /** also collect all owed tokens after the burn */
   collect?: boolean;
 }
 
+/** Collect owed tokens (principal + fees). Same dual addressing as PoolV3BurnParams. */
 export interface PoolV3CollectParams {
-  poolAddress: string;
-  tickLower: number;
-  tickUpper: number;
+  tokenId?: string;
+  poolAddress?: string;
+  tickLower?: number;
+  tickUpper?: number;
   amount0Requested?: string;
   amount1Requested?: string;
 }

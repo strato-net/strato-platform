@@ -13,6 +13,8 @@ export interface NFTSource {
   kind: string;
   /** Cirrus table prefix for the concrete contract, e.g. "BlockApps-NFT". */
   cirrusPrefix: string;
+  /** SolidVM contract name for write transactions (transfer/burn) against this source. */
+  contractName: string;
   /** Select fields for the collection-level table. Keep minimal for bare ERC721 contracts. */
   collectionSelect: string[];
   /** Whether the contract has an ERC721URIStorage `_tokenURIs` child table. */
@@ -23,6 +25,7 @@ export const NFT_SOURCES: NFTSource[] = [
   {
     kind: "collection",
     cirrusPrefix: constants.NFT,
+    contractName: "NFT",
     collectionSelect: [
       "address",
       "_name",
@@ -35,7 +38,14 @@ export const NFT_SOURCES: NFTSource[] = [
     ],
     hasTokenURIs: true,
   },
-  // Phase 4 (V3 position NFTs) adds:
-  // { kind: "poolv3-position", cirrusPrefix: constants.PositionManagerV3,
-  //   collectionSelect: ["address", "_name", "_symbol"], hasTokenURIs: false },
+  {
+    // V3 liquidity-position NFTs (the PositionManagerV3 singleton). Transfer moves the
+    // position; burn only succeeds once the position is emptied (contract-enforced).
+    // Position economics (range, liquidity, fees) surface via /poolv3/positions.
+    kind: "poolv3-position",
+    cirrusPrefix: constants.PositionManagerV3,
+    contractName: "PositionManagerV3",
+    collectionSelect: ["address", "_name", "_symbol"],
+    hasTokenURIs: false,
+  },
 ];

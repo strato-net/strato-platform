@@ -7,6 +7,7 @@ import {
   getAmountsForLiquidity,
   getLiquidityDistribution,
   mint,
+  increaseLiquidity,
   burn,
   collect,
   createPool,
@@ -15,6 +16,7 @@ import {
   validatePoolV3AddressArgs,
   validatePoolV3AmountsArgs,
   validatePoolV3MintArgs,
+  validatePoolV3IncreaseArgs,
   validatePoolV3BurnArgs,
   validatePoolV3CollectArgs,
   validatePoolV3CreateArgs,
@@ -106,6 +108,17 @@ class PoolV3Controller {
       const { accessToken, body, address: userAddress } = req;
       validatePoolV3MintArgs(body);
       const result = await mint(accessToken, body, userAddress);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async increase(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validatePoolV3IncreaseArgs(body);
+      const result = await increaseLiquidity(accessToken, body, userAddress);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

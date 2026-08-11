@@ -85,7 +85,11 @@ router.get("/pools/:poolAddress/liquidity", authHandler.authorizeRequest(true), 
  *       200:
  *         description: Positions with computed amounts and range status
  *   post:
- *     summary: Mint liquidity into a tick range
+ *     summary: Mint a liquidity position NFT (PositionManagerV3)
+ *     description: >-
+ *       New positions are always minted through PositionManagerV3 and represented as
+ *       ERC-721 tokens. The manager computes liquidity from the desired amounts at the
+ *       current price and pulls exactly the pool-computed deposit from the caller.
  *     tags: [PoolV3]
  *     requestBody:
  *       required: true
@@ -93,19 +97,23 @@ router.get("/pools/:poolAddress/liquidity", authHandler.authorizeRequest(true), 
  *         application/json:
  *           schema:
  *             type: object
- *             required: [poolAddress, tickLower, tickUpper, liquidity, amount0Max, amount1Max]
+ *             required: [poolAddress, tickLower, tickUpper, amount0Desired, amount1Desired]
  *             properties:
  *               poolAddress: { type: string }
  *               tickLower: { type: integer }
  *               tickUpper: { type: integer }
- *               liquidity: { type: string }
- *               amount0Max: { type: string, description: "slippage cap on token0 deposit" }
- *               amount1Max: { type: string, description: "slippage cap on token1 deposit" }
+ *               amount0Desired: { type: string, description: "maximum token0 to deposit" }
+ *               amount1Desired: { type: string, description: "maximum token1 to deposit" }
+ *               amount0Min: { type: string, description: "minimum token0 that must be deposited (slippage check), default 0" }
+ *               amount1Min: { type: string, description: "minimum token1 that must be deposited (slippage check), default 0" }
  *     responses:
  *       200:
  *         description: Transaction result
  *   delete:
- *     summary: Burn liquidity from a position (optionally collecting owed tokens)
+ *     summary: Remove liquidity from a position (optionally collecting owed tokens)
+ *     description: >-
+ *       Address the position by `tokenId` (position NFTs) OR by poolAddress + ticks
+ *       (legacy positions held directly on the pool) — exactly one addressing mode.
  *     tags: [PoolV3]
  *     requestBody:
  *       required: true
@@ -113,12 +121,15 @@ router.get("/pools/:poolAddress/liquidity", authHandler.authorizeRequest(true), 
  *         application/json:
  *           schema:
  *             type: object
- *             required: [poolAddress, tickLower, tickUpper, liquidity]
+ *             required: [liquidity]
  *             properties:
- *               poolAddress: { type: string }
- *               tickLower: { type: integer }
- *               tickUpper: { type: integer }
+ *               tokenId: { type: string, description: "position NFT id (NFT path)" }
+ *               poolAddress: { type: string, description: "legacy path" }
+ *               tickLower: { type: integer, description: "legacy path" }
+ *               tickUpper: { type: integer, description: "legacy path" }
  *               liquidity: { type: string }
+ *               amount0Min: { type: string, description: "slippage check (NFT path), default 0" }
+ *               amount1Min: { type: string, description: "slippage check (NFT path), default 0" }
  *               collect: { type: boolean, description: "also collect all owed tokens" }
  *     responses:
  *       200:
@@ -130,9 +141,9 @@ router.delete("/positions", walletAuth, PoolV3Controller.burn);
 
 /**
  * @openapi
- * /poolv3/positions/collect:
+ * /poolv3/positions/increase:
  *   post:
- *     summary: Collect owed tokens (burned principal + fees) from a position
+ *     summary: Add liquidity to an existing position NFT (same range)
  *     tags: [PoolV3]
  *     requestBody:
  *       required: true
@@ -140,11 +151,40 @@ router.delete("/positions", walletAuth, PoolV3Controller.burn);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [poolAddress, tickLower, tickUpper]
+ *             required: [tokenId, amount0Desired, amount1Desired]
  *             properties:
- *               poolAddress: { type: string }
- *               tickLower: { type: integer }
- *               tickUpper: { type: integer }
+ *               tokenId: { type: string }
+ *               amount0Desired: { type: string }
+ *               amount1Desired: { type: string }
+ *               amount0Min: { type: string, description: "slippage check, default 0" }
+ *               amount1Min: { type: string, description: "slippage check, default 0" }
+ *     responses:
+ *       200:
+ *         description: Transaction result
+ */
+router.post("/positions/increase", walletAuth, PoolV3Controller.increase);
+
+/**
+ * @openapi
+ * /poolv3/positions/collect:
+ *   post:
+ *     summary: Collect owed tokens (burned principal + fees) from a position
+ *     description: >-
+ *       Same dual addressing as DELETE /positions — `tokenId` for position NFTs
+ *       (the manager pokes the pool internally), or poolAddress + ticks for legacy
+ *       positions (a poke transaction is prepended when the position has liquidity).
+ *     tags: [PoolV3]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               tokenId: { type: string, description: "position NFT id (NFT path)" }
+ *               poolAddress: { type: string, description: "legacy path" }
+ *               tickLower: { type: integer, description: "legacy path" }
+ *               tickUpper: { type: integer, description: "legacy path" }
  *               amount0Requested: { type: string }
  *               amount1Requested: { type: string }
  *     responses:

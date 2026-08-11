@@ -21,11 +21,14 @@ const TransferNFTModal = ({
   open,
   onOpenChange,
   onTransferred,
+  warning,
 }: {
   item: NFTItem;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onTransferred: () => void;
+  /** kind-specific consequence note (e.g. a position NFT moves its liquidity too) */
+  warning?: string;
 }) => {
   const { transferNFT } = useNFTContext();
   const { toast } = useToast();
@@ -74,6 +77,7 @@ const TransferNFTModal = ({
             Transfers are permanent — the recipient becomes the sole owner of this NFT.
           </DialogDescription>
         </DialogHeader>
+        {warning && <p className="text-yellow-600 text-xs md:text-sm">⚠️ {warning}</p>}
         <div className="space-y-2">
           <Label htmlFor="nft-transfer-to">Recipient address</Label>
           <Input
