@@ -15,11 +15,12 @@
   Requirements: Node >= 18 (global fetch). No external dependencies.
 
   Environment:
+    ENV_FILE          optional env file path (default app/scripts/.env)
     NETWORK           testnet or prod (required)
     NODE_URL          optional profile override
     ADMIN_TOKEN       optional OAuth bearer token
-    STRATO_USERNAME, STRATO_PASSWORD, OAUTH_CLIENT_ID,
-    OAUTH_CLIENT_SECRET, OPENID_DISCOVERY_URL
+    GLOBAL_ADMIN_NAME, GLOBAL_ADMIN_PASSWORD, OAUTH_CLIENT_ID,
+    OAUTH_CLIENT_SECRET, OAUTH_URL, OAUTH_TOTP
                       alternative credentials used to obtain an OAuth token
     REWARDS_ADDRESS, VAULT_ADDRESS, ACTIVITY_ID
                       optional profile overrides
@@ -33,7 +34,6 @@
   Usage:
     node reconcileVaultRewardsActivity.js <phase> --network <testnet|prod>
       [--execute] [--confirm-prod] [--batch <number>]
-      [--allow-unpaused]
 
   Phases (in operational order):
     status           Show current drift (per-user stake vs balance+queued)
@@ -58,6 +58,28 @@
 
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
+
+const loadEnvFile = (filePath) => {
+  if (!fs.existsSync(filePath)) return;
+  for (const rawLine of fs.readFileSync(filePath, "utf-8").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const separator = line.indexOf("=");
+    if (separator < 1) continue;
+    const key = line.slice(0, separator).trim().replace(/^export\s+/, "");
+    let value = line.slice(separator + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (process.env[key] === undefined) process.env[key] = value;
+  }
+};
+
+loadEnvFile(process.env.ENV_FILE || path.join(__dirname, ".env"));
 
 // ---------------------------------------------------------------------------
 // Config
@@ -106,6 +128,18 @@ const SEED_INDEX_OFFSET = 100000; // seed pairs live at EVENT_INDEX_BASE + SEED_
 const BATCH_SIZE_ENV = Number(process.env.BATCH_SIZE || 50);
 const SNAPSHOT_FILE =
   process.env.SNAPSHOT_FILE || `./reconcile-${NETWORK}-activity-${ACTIVITY_ID}.snapshot.json`;
+const HAS_TARGET_OVERRIDE =
+  Boolean(process.env.NODE_URL && NODE_URL !== PROFILE?.nodeUrl) ||
+  Boolean(process.env.REWARDS_ADDRESS && REWARDS !== PROFILE?.rewards) ||
+  Boolean(process.env.VAULT_ADDRESS && VAULT !== PROFILE?.vault) ||
+  Boolean(process.env.ACTIVITY_ID && String(ACTIVITY_ID) !== PROFILE?.activityId) ||
+  Boolean(process.env.ADMIN_REGISTRY_ADDRESS);
+const RESOLVES_TO_PROD =
+  NETWORK === "prod" ||
+  NODE_URL === NETWORK_PROFILES.prod.nodeUrl ||
+  REWARDS === NETWORK_PROFILES.prod.rewards ||
+  VAULT === NETWORK_PROFILES.prod.vault ||
+  String(ACTIVITY_ID) === NETWORK_PROFILES.prod.activityId;
 
 const GAS = { gasLimit: 32100000000, gasPrice: 1 }; // same as rewards-poller
 const TX_POLL_INTERVAL_MS = 5000;
@@ -117,7 +151,6 @@ const ZERO40 = "0000000000000000000000000000000000000000";
 
 const EXECUTE = args.includes("--execute");
 const CONFIRM_PROD = args.includes("--confirm-prod");
-const ALLOW_UNPAUSED = args.includes("--allow-unpaused");
 const BATCH_NUMBER = Number(optionValue("--batch") || 1);
 
 // ---------------------------------------------------------------------------
@@ -279,14 +312,20 @@ const headers = () => {
 
 async function authenticate() {
   if (adminToken) return;
-  const username = process.env.STRATO_USERNAME || process.env.BA_USERNAME;
-  const password = process.env.STRATO_PASSWORD || process.env.BA_PASSWORD;
+  const username =
+    process.env.GLOBAL_ADMIN_NAME ||
+    process.env.STRATO_USERNAME ||
+    process.env.BA_USERNAME;
+  const password =
+    process.env.GLOBAL_ADMIN_PASSWORD ||
+    process.env.STRATO_PASSWORD ||
+    process.env.BA_PASSWORD;
   const clientId = process.env.OAUTH_CLIENT_ID || process.env.CLIENT_ID;
   const clientSecret = process.env.OAUTH_CLIENT_SECRET || process.env.CLIENT_SECRET;
   const discoveryUrl = process.env.OPENID_DISCOVERY_URL || process.env.OAUTH_URL;
   const missing = [
-    ["STRATO_USERNAME", username],
-    ["STRATO_PASSWORD", password],
+    ["GLOBAL_ADMIN_NAME", username],
+    ["GLOBAL_ADMIN_PASSWORD", password],
     ["OAUTH_CLIENT_ID", clientId],
     ["OAUTH_CLIENT_SECRET", clientSecret],
     ["OPENID_DISCOVERY_URL", discoveryUrl],
@@ -307,16 +346,22 @@ async function authenticate() {
   const discovery = await discoveryResponse.json();
   if (!discovery.token_endpoint) die("OAuth discovery document has no token_endpoint");
 
+  const tokenParams = new URLSearchParams({
+    grant_type: "password",
+    client_id: clientId,
+    client_secret: clientSecret,
+    username,
+    password,
+  });
+  const totp = String(process.env.OAUTH_TOTP || "").trim();
+  const scope = String(process.env.OAUTH_SCOPE || "").trim();
+  if (totp) tokenParams.set("totp", totp);
+  if (scope) tokenParams.set("scope", scope);
+
   const tokenResponse = await fetch(discovery.token_endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "password",
-      client_id: clientId,
-      client_secret: clientSecret,
-      username,
-      password,
-    }),
+    body: tokenParams,
   });
   const tokenBody = await tokenResponse.json();
   if (!tokenResponse.ok || !tokenBody.access_token) {
@@ -697,7 +742,14 @@ function loadSnapshot() {
   if (!fs.existsSync(SNAPSHOT_FILE)) {
     die(`Snapshot file ${SNAPSHOT_FILE} not found — run the snapshot phase first`);
   }
-  const snap = JSON.parse(fs.readFileSync(SNAPSHOT_FILE, "utf-8"));
+  const raw = fs.readFileSync(SNAPSHOT_FILE, "utf-8");
+  const digest = crypto.createHash("sha256").update(raw).digest("hex");
+  const expectedDigest = String(process.env.SNAPSHOT_SHA256 || "").toLowerCase();
+  if (expectedDigest && digest !== expectedDigest) {
+    die(`Snapshot SHA-256 mismatch: expected ${expectedDigest}, got ${digest}`);
+  }
+  console.log(`Snapshot SHA-256: ${digest}`);
+  const snap = JSON.parse(raw);
   if (
     snap.network !== NETWORK ||
     snap.rewards !== REWARDS ||
@@ -715,6 +767,23 @@ function loadSnapshot() {
     die(`Snapshot ${SNAPSHOT_FILE} has no valid batchSize — take a new snapshot`);
   }
   return snap;
+}
+
+async function requireReconciliationFrozen() {
+  const [config, vault] = await Promise.all([getActivityConfig(), getVaultScalars()]);
+  if (!vault.paused) die("Vault is not paused — refusing to reconcile mutable state");
+  if (config.emissionRate !== "0") {
+    die(`Emission rate is ${config.emissionRate}, not 0 — refusing to reconcile`);
+  }
+  return { config, vault };
+}
+
+async function requireAllProcessed(pairs, label) {
+  if (!pairs.length) return;
+  const processed = await findProcessedPairs(pairs);
+  if (processed.length !== pairs.length) {
+    die(`${label}: ${processed.length}/${pairs.length} expected event pairs are processed`);
+  }
 }
 
 // Recompute what each user's stake SHOULD be: balance + queued shares.
@@ -854,6 +923,7 @@ async function phasePreflight() {
   let caller = "not authenticated (read-only)";
   if (
     adminToken ||
+    process.env.GLOBAL_ADMIN_NAME ||
     process.env.STRATO_USERNAME ||
     process.env.BA_USERNAME
   ) {
@@ -903,6 +973,9 @@ async function phaseStatus() {
 
 async function phaseSnapshot() {
   console.log("Phase: snapshot");
+  if (fs.existsSync(SNAPSHOT_FILE)) {
+    die(`Snapshot ${SNAPSHOT_FILE} already exists — use it or remove it explicitly`);
+  }
   const [config, state, stakes, balances, vault, queued, rewardsScalars] = await Promise.all([
     getActivityConfig(),
     getActivityState(),
@@ -918,9 +991,7 @@ async function phaseSnapshot() {
     die(`Activity ${ACTIVITY_ID} sourceContract is ${config.sourceContract}, not VAULT_ADDRESS ${VAULT}`);
   }
   if (config.activityType !== 0) die(`Activity ${ACTIVITY_ID} is not a Position activity`);
-  if (!vault.paused && !ALLOW_UNPAUSED) {
-    die("Vault is NOT paused. Pause it first (pause phase), or pass --allow-unpaused to snapshot anyway.");
-  }
+  if (!vault.paused) die("Vault is NOT paused. Pause it before taking the snapshot.");
   if (config.emissionRate !== "0") {
     die(
       `emissionRate is ${config.emissionRate} (${fmt18(config.emissionRate)}/s), not 0. ` +
@@ -1049,8 +1120,13 @@ async function phaseSnapshot() {
       owner: String((p.attributes || {}).owner || "").toLowerCase(),
     })),
   };
-  fs.writeFileSync(SNAPSHOT_FILE, JSON.stringify(snapshot, null, 2));
+  const serializedSnapshot = JSON.stringify(snapshot, null, 2);
+  fs.writeFileSync(SNAPSHOT_FILE, serializedSnapshot);
   console.log(`\nSnapshot written to ${SNAPSHOT_FILE}`);
+  console.log(
+    `Snapshot SHA-256: ${crypto.createHash("sha256").update(serializedSnapshot).digest("hex")}\n` +
+      "Share this exact snapshot file and hash with every script operator."
+  );
 
   const { totalStake, totalTarget } = driftReport(stakes, targets);
   console.log(`\nPlan:`);
@@ -1065,6 +1141,7 @@ async function phaseSnapshot() {
 async function phaseWithdraw() {
   console.log("Phase: withdraw (zero out all tracked stakes)");
   const snap = loadSnapshot();
+  await requireReconciliationFrozen();
   const startedIso = new Date().toISOString();
 
   const actions = snap.withdrawPairs.map((p) => ({
@@ -1135,10 +1212,15 @@ async function phaseWithdraw() {
 
 async function phaseSetEvents() {
   console.log("Phase: set-events (register QueueProcessed as a Withdraw trigger)");
-  const [state, currentConfig] = await Promise.all([getActivityState(), getActivityConfig()]);
+  const snap = loadSnapshot();
+  const [{ config: currentConfig }, state] = await Promise.all([
+    requireReconciliationFrozen(),
+    getActivityState(),
+  ]);
   if (chainUint(state.totalStake) !== 0n) {
     die(`totalStake is ${state.totalStake}, not 0 — run the withdraw phase first`);
   }
+  await requireAllProcessed(snap.withdrawPairs, "Withdraw phase is incomplete");
   const currentNames = currentConfig.actionableEvents
     .map((event) => `${event.eventName}:${event.actionType}`)
     .join(",");
@@ -1180,7 +1262,14 @@ async function phaseMarkHistorical() {
   const snap = loadSnapshot();
   const startedIso = new Date().toISOString();
 
-  const config = await getActivityConfig();
+  const [{ config }, state] = await Promise.all([
+    requireReconciliationFrozen(),
+    getActivityState(),
+  ]);
+  if (chainUint(state.totalStake) !== 0n) {
+    die(`totalStake is ${state.totalStake}, not 0 — run every withdraw batch first`);
+  }
+  await requireAllProcessed(snap.withdrawPairs, "Withdraw phase is incomplete");
   const hasQueueProcessed = config.actionableEvents.some((e) => e.eventName === "QueueProcessed");
   if (!hasQueueProcessed) die("QueueProcessed is not an actionable event yet — run set-events first");
 
@@ -1235,9 +1324,9 @@ async function phaseMarkHistorical() {
   );
 
   // stakes must be untouched by this phase
-  const state = await getActivityState();
-  if (chainUint(state.totalStake) !== 0n) {
-    die(`totalStake changed to ${state.totalStake} during mark-historical — investigate immediately`);
+  const finalState = await getActivityState();
+  if (chainUint(finalState.totalStake) !== 0n) {
+    die(`totalStake changed to ${finalState.totalStake} during mark-historical — investigate immediately`);
   }
 }
 
@@ -1246,10 +1335,15 @@ async function phaseSeed() {
   const snap = loadSnapshot();
   const startedIso = new Date().toISOString();
 
-  const config = await getActivityConfig();
+  const { config } = await requireReconciliationFrozen();
   if (!config.actionableEvents.some((e) => e.eventName === "QueueProcessed")) {
     die("Actionable events not updated yet — run set-events before seed");
   }
+  await requireAllProcessed(snap.withdrawPairs, "Withdraw phase is incomplete");
+  await requireAllProcessed(
+    snap.unprocessedRealEvents || [],
+    "Historical marker phase is incomplete"
+  );
 
   // Freshness check: carryETH transfers are NOT blocked by pause, so balances
   // can have moved since snapshot. Refuse to seed stale targets.
@@ -1301,21 +1395,48 @@ async function phaseSeed() {
 
   if (!actions.length) die("No targets to seed — is the vault empty?");
   const selected = selectActionBatch(actions, snap.batchSize, "seed");
-  const liveStakes = await getStakes();
+  const [liveStakes, activityState, processedSeeds] = await Promise.all([
+    getStakes(),
+    getActivityState(),
+    findProcessedPairs(actions),
+  ]);
+  const processedSeedKeys = new Set(
+    processedSeeds.map((pair) => `${pair.blockNumber}:${pair.eventIndex}`)
+  );
+  const summedStake = Object.values(liveStakes).reduce(
+    (sum, stake) => sum + chainUint(stake),
+    0n
+  );
+  if (summedStake !== chainUint(activityState.totalStake)) {
+    die(`sum(stakes)=${summedStake} does not match totalStake=${activityState.totalStake}`);
+  }
   for (const [user, stake] of Object.entries(liveStakes)) {
     const live = chainUint(stake);
     const target = chainUint(targets[user] || "0");
-    if (live !== 0n && live !== target) {
-      die(`Unexpected partial seed for ${user}: stake=${live}, target=${target}`);
+    if (target === 0n && live !== 0n) {
+      die(`Unexpected non-zero stake for ${user}: ${live}`);
     }
   }
-  if (
-    selected.batch.every(
-      (action) => chainUint(liveStakes[action.user] || "0") === chainUint(action.amount)
-    )
-  ) {
+  for (const action of actions) {
+    const processed = processedSeedKeys.has(`${action.blockNumber}:${action.eventIndex}`);
+    const live = chainUint(liveStakes[action.user] || "0");
+    const expected = processed ? chainUint(action.amount) : 0n;
+    if (live !== expected) {
+      die(
+        `Seed state mismatch for ${action.user}: pair is ${processed ? "" : "not "}processed, ` +
+          `stake=${live}, expected=${expected}`
+      );
+    }
+  }
+  const selectedProcessed = selected.batch.filter((action) =>
+    processedSeedKeys.has(`${action.blockNumber}:${action.eventIndex}`)
+  );
+  if (selectedProcessed.length === selected.batch.length) {
     console.log(`Seed batch ${BATCH_NUMBER}/${selected.batchCount} is already complete.`);
     return;
+  }
+  if (selectedProcessed.length) {
+    die(`Seed batch ${BATCH_NUMBER} is only partially processed — investigate`);
   }
   printActions(`Synthetic Deposit batch ${BATCH_NUMBER}/${selected.batchCount}`, selected.batch);
   const total = actions.reduce((a, x) => a + chainUint(x.amount), 0n);
@@ -1465,14 +1586,14 @@ async function phaseSetEmission() {
   if (!phase || !phases[phase]) {
     console.error(
       `Usage: node ${path.basename(__filename)} <${Object.keys(phases).join("|")}> ` +
-        `--network <testnet|prod> [--execute] [--confirm-prod] [--batch <number>] [--allow-unpaused]`
+        `--network <testnet|prod> [--execute] [--confirm-prod] [--batch <number>]`
     );
     process.exit(1);
   }
 
   if (EXECUTE) {
-    if (NETWORK === "prod" && !CONFIRM_PROD) {
-      die("Production execution requires --confirm-prod");
+    if ((RESOLVES_TO_PROD || HAS_TARGET_OVERRIDE) && !CONFIRM_PROD) {
+      die("Production or overridden target execution requires --confirm-prod");
     }
     await authenticate();
     const caller = await verifyAuthenticatedAdmin();

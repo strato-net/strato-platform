@@ -136,3 +136,6 @@ __pycache__/
 .docker-built/
 
 app/contracts/.env.happy-eth-withdrawal
+
+# Generated rewards reconciliation state
+reconcile-*-activity-*.snapshot.json
