@@ -486,7 +486,13 @@ export const castVoteOnIssueById = async (
   const namedArgs = Object.fromEntries(funcArgs.map(([name, type], i) =>
     [name, type.tag === "Variadic" ? tx.args.slice(i) : hintedArg(type, parseTxArg(tx.args[i]))]));
 
-  return callTargetFunction(accessToken, userAddress, contractName, tx.to, tx.funcName, namedArgs);
+  const result = await callTargetFunction(accessToken, userAddress, contractName, tx.to, tx.funcName, namedArgs);
+
+  // Callers refetch the issue lists from Cirrus as soon as this responds, so let the
+  // vote's events land first — otherwise those lists read back pre-vote state
+  await findIssueIdForTx(accessToken, result.hash);
+
+  return result;
 };
 
 // Deduplicate issues by issueId, keeping the most recent one based on block_number,

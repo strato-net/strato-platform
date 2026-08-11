@@ -197,12 +197,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const castVoteOnIssueById = async (issueId: string) => {
     try {
       await api.post('/user/admin/vote/by-id', { issueId }, { walletAuth: false } as any);
+    } finally {
       await getOpenIssues();
       // Show the recently executed issue
       await getExecutedIssues(1, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
-    } catch (error) {
-      await getOpenIssues();
-      throw error;
     }
   };
 
