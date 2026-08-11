@@ -23,6 +23,7 @@ import {
   getSwapableTokens,
   getSwapableTokenPairs,
   getPairSwapHistory,
+  getTokenSwapHistory,
   getPairPoolCandidates,
   PairPoolCandidate,
 } from "./swapping.service";
@@ -63,6 +64,13 @@ export const getTradeHistory = (
   limit?: number,
   sender?: string
 ): Promise<SwapHistoryResponse> => getPairSwapHistory(accessToken, tokenA, tokenB, page, limit, sender);
+
+export const getTradeTokenHistory = (
+  accessToken: string,
+  tokenAddress: string,
+  page?: number,
+  limit?: number
+): Promise<SwapHistoryResponse> => getTokenSwapHistory(accessToken, tokenAddress, page, limit);
 
 // ============================================================================
 // TOKEN LISTS
