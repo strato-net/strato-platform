@@ -42,7 +42,7 @@ class PoolV3Controller {
       const { accessToken, params } = req;
       validatePoolV3AddressArgs(params);
       const pool = await getPoolByAddress(accessToken, params.poolAddress);
-      if (!pool) throw new Error("PoolV3 not found");
+      if (!pool) throw Object.assign(new Error("PoolV3 not found"), { statusCode: RestStatus.NOT_FOUND });
       res.status(RestStatus.OK).json(pool);
     } catch (error) {
       next(error);
@@ -54,7 +54,7 @@ class PoolV3Controller {
       const { accessToken, params } = req;
       validatePoolV3AddressArgs(params);
       const distribution = await getLiquidityDistribution(accessToken, params.poolAddress);
-      if (!distribution) throw new Error("PoolV3 not found");
+      if (!distribution) throw Object.assign(new Error("PoolV3 not found"), { statusCode: RestStatus.NOT_FOUND });
       res.status(RestStatus.OK).json(distribution);
     } catch (error) {
       next(error);
@@ -75,7 +75,7 @@ class PoolV3Controller {
   static async positions(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { accessToken, address: userAddress, query } = req;
-      if (!userAddress) throw new Error("User address is required");
+      if (!userAddress) throw Object.assign(new Error("User address is required"), { statusCode: RestStatus.UNAUTHORIZED });
       const positions = await getPositions(
         accessToken,
         userAddress,

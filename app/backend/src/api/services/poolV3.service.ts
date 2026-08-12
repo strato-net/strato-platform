@@ -283,10 +283,14 @@ const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>, swapInputs?: S
 const fetchRawPools = async (
   accessToken: string,
   filters: Record<string, string> = {},
+  /** drop the current-factory scope — for EXACT-address lookups only, where historical
+   *  pools (old test factories) must still resolve (e.g. the activity feed enriches
+   *  past events with pool token metadata). Listings must stay factory-scoped. */
+  { anyFactory = false }: { anyFactory?: boolean } = {},
 ): Promise<RawV3Pool[]> => {
   const { data } = await cirrus.get(accessToken, `/${PoolV3Table}`, {
     params: {
-      poolV3Factory: `eq.${config.poolV3Factory}`,
+      ...(anyFactory ? {} : { poolV3Factory: `eq.${config.poolV3Factory}` }),
       select: POOL_V3_SELECT_FIELDS.join(","),
       // uninitialized proxies/implementations have price 0
       sqrtPriceX96: "neq.0",
@@ -318,7 +322,15 @@ export const getPools = async (accessToken: string): Promise<PoolV3[]> => {
 };
 
 export const getPoolByAddress = async (accessToken: string, poolAddress: string): Promise<PoolV3 | null> => {
-  const rawPools = await fetchRawPools(accessToken, { address: `eq.${normalizeAddress(poolAddress)}` });
+  // anyFactory: an exact-address lookup is already precise — it must also resolve pools
+  // from superseded factories so historical references (activity feed rows) render
+  // with their token metadata instead of erroring. New-liquidity/swap flows only ever
+  // see pools via the factory-scoped listings.
+  const rawPools = await fetchRawPools(
+    accessToken,
+    { address: `eq.${normalizeAddress(poolAddress)}` },
+    { anyFactory: true },
+  );
   const pools = await attachPrices(accessToken, rawPools);
   return pools[0] ?? null;
 };
