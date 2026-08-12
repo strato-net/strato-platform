@@ -66,16 +66,21 @@ struct ManagedPosition {
  */
 contract record PositionManagerV3 is ERC721, Ownable {
 
-    // ============ EVENTS (canonical NonfungiblePositionManager shapes) ============
+    // ============ EVENTS (canonical NonfungiblePositionManager shapes, platform-extended) ============
+    // Canonical events carry only tokenId (+recipient on Collect). `sender` (the acting
+    // user) and `pool` are added because at the POOL level every manager-driven action
+    // attributes to the manager itself — these events are the only user-attributed record
+    // of position activity, and the activity feed matches users and resolves the pool's
+    // tokens from them (same precedent as PoolV3's extended event shapes).
 
     /// @notice Emitted when liquidity is added to a token's position (including at mint)
-    event IncreaseLiquidity(uint tokenId, uint liquidity, uint amount0, uint amount1);
+    event IncreaseLiquidity(address sender, uint tokenId, address pool, uint liquidity, uint amount0, uint amount1);
 
     /// @notice Emitted when liquidity is removed from a token's position (amounts become collectable)
-    event DecreaseLiquidity(uint tokenId, uint liquidity, uint amount0, uint amount1);
+    event DecreaseLiquidity(address sender, uint tokenId, address pool, uint liquidity, uint amount0, uint amount1);
 
     /// @notice Emitted when owed tokens are collected for a token's position
-    event Collect(uint tokenId, address recipient, uint amount0, uint amount1);
+    event Collect(address sender, uint tokenId, address pool, address recipient, uint amount0, uint amount1);
 
     // ============ STATE VARIABLES ============
 
@@ -219,7 +224,7 @@ contract record PositionManagerV3 is ERC721, Ownable {
         position.feeGrowthInside0LastX128 = inside0;
         position.feeGrowthInside1LastX128 = inside1;
 
-        emit IncreaseLiquidity(nextTokenId, liquidity, amount0, amount1);
+        emit IncreaseLiquidity(_msgSender(), nextTokenId, pool, liquidity, amount0, amount1);
 
         nextTokenId++;
         tokenId = nextTokenId - 1;
@@ -254,7 +259,7 @@ contract record PositionManagerV3 is ERC721, Ownable {
         _accrueFees(position, inside0, inside1);
         position.liquidity += liquidity;
 
-        emit IncreaseLiquidity(tokenId, liquidity, amount0, amount1);
+        emit IncreaseLiquidity(_msgSender(), tokenId, position.pool, liquidity, amount0, amount1);
         return (liquidity, amount0, amount1);
     }
 
@@ -284,7 +289,7 @@ contract record PositionManagerV3 is ERC721, Ownable {
         position.tokensOwed1 += amount1;
         position.liquidity -= liquidity;
 
-        emit DecreaseLiquidity(tokenId, liquidity, amount0, amount1);
+        emit DecreaseLiquidity(_msgSender(), tokenId, position.pool, liquidity, amount0, amount1);
         return (amount0, amount1);
     }
 
@@ -318,13 +323,17 @@ contract record PositionManagerV3 is ERC721, Ownable {
         (amount0, amount1) =
             poolContract.collect(recipient, position.tickLower, position.tickUpper, amount0Collect, amount1Collect);
 
+        //SOLIDVM_COMPATIBILITY (D10): emitted BEFORE the tokensOwed writes — amountNCollect
+        // re-evaluates its tokensOwed read at every use, so emitting after the subtraction
+        // would log the post-collect remainders (e.g. 0 on a full collect) instead of the
+        // collected amounts
+        emit Collect(_msgSender(), tokenId, position.pool, recipient, amount0Collect, amount1Collect);
+
         // canonical: subtract the requested amounts, not the pool's payout — the shared pool
         // position can be a few wei short of the per-token ledger due to other sharers'
         // rounding, and keeping unclaimable wei on the books would strand them forever
         position.tokensOwed0 -= amount0Collect;
         position.tokensOwed1 -= amount1Collect;
-
-        emit Collect(tokenId, recipient, amount0Collect, amount1Collect);
         return (amount0, amount1);
     }
 
