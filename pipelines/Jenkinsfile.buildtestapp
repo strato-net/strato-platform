@@ -58,6 +58,10 @@ pipeline {
 
   post {
     success {
+      slackSend (
+          color: 'good',
+          message: "buildtest-app.testnet.strato.nexus was updated in place with app version from develop. Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) on node ${env.NODE_NAME}"
+      )
       slackSend(
           channel: '#engineering',
           color: 'good',
@@ -65,6 +69,10 @@ pipeline {
       )
     }
     failure {
+      slackSend (
+          color: 'danger',
+          message: "buildtest-app.testnet.strato.nexus has FAILED to be updated in place with app version from develop. Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
+      )
       slackSend(
           channel: '#engineering',
           color: 'danger',
