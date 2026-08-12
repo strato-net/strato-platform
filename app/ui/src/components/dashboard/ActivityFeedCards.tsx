@@ -129,13 +129,23 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
         }
       }
 
-      // PoolV3 events (Swap/Mint) don't carry token addresses either — resolve token0/token1
-      // from the pool contract (event.address) and attach them onto the events right away,
-      // so the configs' getTokenAddress works in both the collection and routing phases.
+      // V3 events don't carry token addresses either — resolve token0/token1 from the
+      // pool and attach them onto the events right away, so the configs' getTokenAddress
+      // works in both the collection and routing phases. Pool-level events are emitted BY
+      // the pool (event.address); PositionManagerV3 events carry the pool address in
+      // their `pool` attribute instead.
+      const v3PoolAddressOf = (event: { contract_name?: string; address?: string }): string | null => {
+        if (event.contract_name === "PoolV3") return event.address || null;
+        if (event.contract_name === "PositionManagerV3") {
+          const pool = (event as { attributes?: Record<string, unknown> }).attributes?.pool;
+          return typeof pool === "string" && pool ? pool.toLowerCase() : null;
+        }
+        return null;
+      };
       const poolV3Addresses = [...new Set(
         response.events
-          .filter(event => event.contract_name === "PoolV3")
-          .map(event => event.address)
+          .map(v3PoolAddressOf)
+          .filter((address): address is string => !!address)
       )];
       if (poolV3Addresses.length > 0) {
         const poolV3TokenMap = new Map<string, { token0: string; token1: string }>();
@@ -153,8 +163,8 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
           if (result) poolV3TokenMap.set(result.poolAddress, { token0: result.token0, token1: result.token1 });
         });
         response.events.forEach(event => {
-          if (event.contract_name !== "PoolV3") return;
-          const tokens = poolV3TokenMap.get(event.address);
+          const poolAddress = v3PoolAddressOf(event);
+          const tokens = poolAddress ? poolV3TokenMap.get(poolAddress) : undefined;
           if (tokens) {
             Object.assign(event, { token0: tokens.token0, token1: tokens.token1 });
           }
