@@ -97,6 +97,22 @@ export const ExplorerLink = ({ path }: { path: string }) => (
   </a>
 );
 
+// Like ExplorerLink but for arbitrary external explorers (Etherscan,
+// Basescan, …) instead of the STRATO explorer.
+export const ExternalExplorerLink = ({ href, title }: { href: string; title: string }) => (
+  <a
+    href={href}
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label={title}
+    title={title}
+    onClick={(e) => e.stopPropagation()}
+    className="ml-1 text-muted-foreground transition-colors hover:text-foreground"
+  >
+    <ExternalLink size={14} />
+  </a>
+);
+
 export const AddressCell = ({ address }: { address: string | null }) => {
   if (!address) return <span className="text-muted-foreground">—</span>;
   return (

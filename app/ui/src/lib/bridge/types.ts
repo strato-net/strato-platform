@@ -52,6 +52,8 @@ export type BridgeContextType = {
   setSelectedNetwork: (networkName: string) => void;
   setSelectedToken: (token: BridgeToken | null) => void;
   loadNetworksAndTokens: () => Promise<void>;
+  /** Select Bridge In network + route whose stratoToken matches (Explore Buy deep-link). */
+  selectTokenByStratoAddress: (stratoAddress: string) => Promise<boolean>;
   // Bridge transaction functions
   fetchDepositTransactions: (rawParams?: Record<string, string | undefined>, context?: string) => Promise<BridgeTransactionResponse>;
   fetchWithdrawTransactions: (rawParams?: Record<string, string | undefined>, context?: string) => Promise<BridgeTransactionResponse>;

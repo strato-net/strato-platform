@@ -8,6 +8,8 @@ import {
   ACTIVITY_CATEGORY_LABELS,
   ACTIVITY_CATEGORY_ORDER,
   ApiError,
+  BridgeInItem,
+  externalTxLink,
   formatUsd,
   getLink,
   WalletSummary,
@@ -22,10 +24,30 @@ import {
   Card,
   CopyButton,
   ExplorerLink,
+  ExternalExplorerLink,
   Skeleton,
   tdClass,
   thClass,
 } from '../components/primitives';
+
+// Origin-chain transaction with an etherscan/basescan-style link when the
+// chain is recognized; bare hash otherwise, dash when the row predates
+// externalTxHash tracking.
+const ExternalTxCell = ({ bridge }: { bridge: BridgeInItem }) => {
+  const external = externalTxLink(bridge);
+  if (!external) return <span className="text-muted-foreground">—</span>;
+  return (
+    <span className="flex items-center font-mono text-xs">
+      {external.hash.slice(0, 10)}…
+      {external.url && (
+        <ExternalExplorerLink
+          href={external.url}
+          title={`View on ${external.explorerName}`}
+        />
+      )}
+    </span>
+  );
+};
 
 const StatTile = ({ label, value }: { label: string; value: string | number }) => (
   <div className="rounded-lg border border-border p-4">
@@ -202,7 +224,8 @@ const LinkDetailPage = () => {
                       <th className={thClass}>Asset</th>
                       <th className={`${thClass} text-right`}>Amount</th>
                       <th className={`${thClass} text-right`}>Value</th>
-                      <th className={thClass}>Tx</th>
+                      <th className={thClass}>STRATO Tx</th>
+                      <th className={thClass}>External Tx</th>
                       <th className={thClass}>Date</th>
                     </tr>
                   </thead>
@@ -226,6 +249,9 @@ const LinkDetailPage = () => {
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
+                        </td>
+                        <td className={tdClass}>
+                          <ExternalTxCell bridge={bridge} />
                         </td>
                         <td className={`${tdClass} whitespace-nowrap text-muted-foreground`}>
                           {format(new Date(bridge.at), 'MMM d, yyyy HH:mm')}
