@@ -71,6 +71,9 @@ export interface PoolV3Position {
   kind?: "nft" | "legacy";
   /** the manager NFT's tokenId (kind "nft" only) */
   tokenId?: string;
+  /** the PositionManagerV3 (ERC-721 collection) address (kind "nft" only) — the NFT
+   *  detail route is /nfts/{manager}/{tokenId} */
+  manager?: string;
   tickLower: number;
   tickUpper: number;
   /** position liquidity, decimal string */
@@ -121,12 +124,18 @@ export interface PoolV3MintParams {
   poolAddress: string;
   tickLower: number;
   tickUpper: number;
-  /** maximum amounts the caller wishes to deposit (approved to the manager), wei strings */
-  amount0Desired: string;
-  amount1Desired: string;
+  /** maximum amounts the caller wishes to deposit (approved to the manager), wei strings.
+   *  Optional only for the deprecated liquidity shape below — new clients always send both. */
+  amount0Desired?: string;
+  amount1Desired?: string;
   /** minimum amounts that must be deposited (slippage checks), default "0" */
   amount0Min?: string;
   amount1Min?: string;
+  /** @deprecated pre-NFT request shape (exact liquidity + deposit ceilings); the backend
+   *  converts it to desired amounts. Kept for stale SPA bundles/scripts — do not use. */
+  liquidity?: string;
+  amount0Max?: string;
+  amount1Max?: string;
 }
 
 /** Add liquidity to an existing position NFT, keeping its range */

@@ -42,7 +42,15 @@ const NFTsPage = () => {
                   <button
                     key={`${nft.collection.address}-${nft.tokenId}`}
                     type="button"
-                    onClick={() => navigate(`/dashboard/nfts/${nft.collection.address}/${nft.tokenId}`)}
+                    onClick={() =>
+                      navigate(
+                        // canonical position URL carries no manager address; other kinds
+                        // keep the collection-scoped NFT route
+                        nft.kind === "poolv3-position"
+                          ? `/dashboard/v3-liquidity/${nft.tokenId}`
+                          : `/dashboard/nfts/${nft.collection.address}/${nft.tokenId}`
+                      )
+                    }
                     className="bg-card rounded-xl border border-border p-4 text-left hover:bg-muted/50 transition-colors flex flex-col items-center gap-3"
                   >
                     <NFTThumbnail nft={nft} className="w-24 h-24 text-lg" />

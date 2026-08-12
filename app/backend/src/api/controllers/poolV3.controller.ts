@@ -4,6 +4,7 @@ import {
   getPools,
   getPoolByAddress,
   getPositions,
+  getPositionNFTItem,
   getAmountsForLiquidity,
   getLiquidityDistribution,
   mint,
@@ -14,6 +15,7 @@ import {
 } from "../services/poolV3.service";
 import {
   validatePoolV3AddressArgs,
+  validatePoolV3TokenIdParam,
   validatePoolV3AmountsArgs,
   validatePoolV3MintArgs,
   validatePoolV3IncreaseArgs,
@@ -54,6 +56,17 @@ class PoolV3Controller {
       const distribution = await getLiquidityDistribution(accessToken, params.poolAddress);
       if (!distribution) throw new Error("PoolV3 not found");
       res.status(RestStatus.OK).json(distribution);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async positionNFT(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, params } = req;
+      validatePoolV3TokenIdParam(params);
+      const item = await getPositionNFTItem(accessToken, params.tokenId);
+      res.status(RestStatus.OK).json(item);
     } catch (error) {
       next(error);
     }

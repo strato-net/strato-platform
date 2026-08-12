@@ -12,6 +12,7 @@ import { Search } from "lucide-react";
 import { formatTokenAmount, formatTickAsPrice, formatPriceWad, poolV3TxAmounts, describePoolAmounts, priceDomainEdge } from "./poolV3Utils";
 import V3ConfirmDialog, { ConfirmRow } from "./V3ConfirmDialog";
 import V3IncreaseDialog from "./V3IncreaseDialog";
+import TokenPairIcons from "./TokenPairIcons";
 
 type ConfirmableAction = "remove" | "fees" | "collect";
 
@@ -22,6 +23,9 @@ interface V3MyPositionsProps {
   isLoggedIn: boolean;
   onChanged: () => void;
   onBrowsePools: () => void;
+  /** positionKey of a position to focus on arrival (deep link from the dashboard):
+   *  selects its pool, scrolls its card into view and highlights it briefly */
+  focusPositionKey?: string | null;
 }
 
 /** Positions for one pool (pair + fee tier). */
@@ -30,28 +34,6 @@ interface PoolGroup {
   positions: PoolV3Position[];
 }
 
-const TokenPairIcons = ({ token0, token1 }: { token0: PoolV3["token0"]; token1: PoolV3["token1"] }) => (
-  <div className="flex -space-x-1.5">
-    {[token0, token1].map((token) =>
-      token.image ? (
-        <img
-          key={token.address}
-          src={token.image}
-          alt={token.symbol}
-          className="w-6 h-6 rounded-full object-cover border border-border bg-card"
-        />
-      ) : (
-        <div
-          key={token.address}
-          className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-white font-medium bg-strato-blue border border-border"
-        >
-          {token.symbol?.slice(0, 1)}
-        </div>
-      )
-    )}
-  </div>
-);
-
 const V3MyPositions = ({
   positions,
   poolsByAddress,
@@ -59,6 +41,7 @@ const V3MyPositions = ({
   isLoggedIn,
   onChanged,
   onBrowsePools,
+  focusPositionKey,
 }: V3MyPositionsProps) => {
   const { burnV3, collectV3, loading: txLoading } = useSwapContext();
   const { fetchUsdstBalance } = useTokenContext();
@@ -126,7 +109,30 @@ const V3MyPositions = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groups]);
 
+  // Deep-linked position (dashboard row click): once positions are in, select its pool
+  // and mark it for scroll + highlight. Declared AFTER the default-selection effect so
+  // its setSelectedPoolAddress wins the same effects flush. One-shot per page load.
+  const [highlightKey, setHighlightKey] = useState<string | null>(null);
+  const [focusApplied, setFocusApplied] = useState(false);
+  useEffect(() => {
+    if (!focusPositionKey || focusApplied || positions.length === 0) return;
+    const target = positions.find((p) => positionKey(p) === focusPositionKey);
+    if (!target) return;
+    setFocusApplied(true);
+    setSelectedPoolAddress(target.poolAddress);
+    setHighlightKey(focusPositionKey);
+  }, [focusPositionKey, focusApplied, positions]);
+
   const selectedGroup = groups.find((g) => g.pool.address === selectedPoolAddress) ?? null;
+
+  // Scroll the focused card into view once it's rendered, then let the highlight fade.
+  useEffect(() => {
+    if (!highlightKey || !selectedGroup) return;
+    document.getElementById(`v3-position-${highlightKey}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const timer = setTimeout(() => setHighlightKey(null), 2500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightKey, selectedGroup?.pool.address]);
 
   const handleBurn = async (position: PoolV3Position) => {
     const key = positionKey(position);
@@ -410,7 +416,13 @@ const V3MyPositions = ({
               const pool = selectedGroup.pool;
 
               return (
-                <div key={key} className="bg-card shadow-sm rounded-xl border border-border p-4 space-y-3">
+                <div
+                  key={key}
+                  id={`v3-position-${key}`}
+                  className={`bg-card shadow-sm rounded-xl border p-4 space-y-3 transition-colors ${
+                    highlightKey === key ? "border-strato-blue ring-2 ring-strato-blue/40" : "border-border"
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs text-muted-foreground">
                       Range: {formatTickAsPrice(position.tickLower)} – {formatTickAsPrice(position.tickUpper)}{" "}

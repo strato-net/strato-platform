@@ -47,22 +47,32 @@ const V3IncreaseDialog = ({ position, pool, open, onOpenChange, onIncreased }: V
   const inRange = needsToken0 && needsToken1;
   const previewZero = preview !== null && BigInt(preview.liquidity) === 0n;
 
+  const cancelPendingPreview = () => {
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    previewAbortRef.current?.abort();
+  };
+
   useEffect(() => {
     if (!open) return;
+    cancelPendingPreview();
     setAmountInput("");
     setPreview(null);
+    setPreviewLoading(false);
     setAmountField(needsToken0 ? "amount0" : "amount1");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const refreshPreview = useCallback(
     (amount: string, field: "amount0" | "amount1") => {
-      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
-      previewAbortRef.current?.abort();
+      cancelPendingPreview();
+      // Drop the stale preview BEFORE the debounce timer: previewLoading gates the
+      // submit button, so leaving the old preview submittable during the 350ms window
+      // would let a quick click move funds at the previous input's amounts.
+      setPreview(null);
+      setPreviewLoading(true);
       previewTimerRef.current = setTimeout(async () => {
         const controller = new AbortController();
         previewAbortRef.current = controller;
-        setPreviewLoading(true);
         try {
           const wei = safeParseUnits(amount);
           if (wei === 0n) {
@@ -80,7 +90,8 @@ const V3IncreaseDialog = ({ position, pool, open, onOpenChange, onIncreased }: V
         } catch (err) {
           if (err?.name !== "CanceledError" && err?.code !== "ERR_CANCELED") console.error(err);
         } finally {
-          setPreviewLoading(false);
+          // an aborted call was superseded — its successor owns previewLoading now
+          if (!controller.signal.aborted) setPreviewLoading(false);
         }
       }, 350);
     },
@@ -90,7 +101,9 @@ const V3IncreaseDialog = ({ position, pool, open, onOpenChange, onIncreased }: V
   const handleAmountChange = (value: string) => {
     setAmountInput(value);
     if (!value || isNaN(Number(value))) {
+      cancelPendingPreview();
       setPreview(null);
+      setPreviewLoading(false);
       return;
     }
     refreshPreview(value, amountField);

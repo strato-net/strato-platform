@@ -127,7 +127,7 @@ export const defaultPoolV3FactoryFor: Record<string, string> = {
 // address is the owner key of every managed pool position, so it must never change.
 // Populate per network after deployment (or set POSITION_MANAGER_V3).
 export const defaultPositionManagerV3For: Record<string, string> = {
-  "114784819836269": "", // Helium testnet
+  "114784819836269": "1bc216225dd4e164ded916cb88a7c09804a881d1", // Helium testnet
   "33056204878082667": "", // Upquark mainnet
 };
 
@@ -288,6 +288,16 @@ function setPositionManagerV3Config(networkId: string) {
     positionManagerV3 = process.env.POSITION_MANAGER_V3;
   } else {
     positionManagerV3 = defaultPositionManagerV3For[networkId] || "";
+  }
+  if (!positionManagerV3) {
+    // Positions can no longer be minted directly on pools, so an unconfigured manager
+    // means V3 liquidity-position creation 503s for every user — make the deployment
+    // dependency impossible to miss at startup instead of discovering it in production.
+    console.warn(
+      `PositionManagerV3 is not configured for network ${networkId} — V3 position mint/increase ` +
+        `and position-NFT reads are disabled until POSITION_MANAGER_V3 is set (or ` +
+        `defaultPositionManagerV3For is populated after deployment)`
+    );
   }
 }
 

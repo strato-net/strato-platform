@@ -12,9 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useNFTContext } from "@/context/NFTContext";
+import { useUser } from "@/context/UserContext";
+import { validateRecipientAddress } from "@/utils/transferValidation";
 import { NFTItem } from "@strato/shared-types";
-
-const ADDRESS_RE = /^(0x)?[a-fA-F0-9]{40}$/;
 
 const TransferNFTModal = ({
   item,
@@ -31,11 +31,14 @@ const TransferNFTModal = ({
   warning?: string;
 }) => {
   const { transferNFT } = useNFTContext();
+  const { userAddress } = useUser();
   const { toast } = useToast();
   const [to, setTo] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const valid = ADDRESS_RE.test(to.trim());
+  // The app's shared recipient rules (ethers isAddress + no self-transfer): "" means valid
+  const recipientError = to.trim() ? validateRecipientAddress(to.trim(), userAddress) : "";
+  const valid = !!to.trim() && !recipientError;
 
   const handleTransfer = async () => {
     if (!valid) return;
@@ -88,7 +91,7 @@ const TransferNFTModal = ({
             autoComplete="off"
           />
           {to && !valid && (
-            <p className="text-xs text-destructive">Enter a valid 40-character hex address.</p>
+            <p className="text-xs text-destructive">{recipientError || "Invalid address"}</p>
           )}
         </div>
         <DialogFooter>

@@ -229,15 +229,23 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
     applyTicks(tl, tu);
   };
 
+  const cancelPendingPreview = () => {
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    previewAbortRef.current?.abort();
+  };
+
   // Debounced amounts preview via the backend (exact on-chain math)
   const refreshPreview = useCallback(
     (amount: string, field: "amount0" | "amount1", lo: number, hi: number) => {
-      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
-      previewAbortRef.current?.abort();
+      cancelPendingPreview();
+      // Drop the stale preview BEFORE the debounce timer: previewLoading gates the
+      // submit button, so leaving the old preview submittable during the 350ms window
+      // would let a quick click mint at the previous input's amounts.
+      setPreview(null);
+      setPreviewLoading(true);
       previewTimerRef.current = setTimeout(async () => {
         const controller = new AbortController();
         previewAbortRef.current = controller;
-        setPreviewLoading(true);
         try {
           const wei = safeParseUnits(amount);
           if (wei === 0n) {
@@ -255,7 +263,8 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
         } catch (err) {
           if (err?.name !== "CanceledError" && err?.code !== "ERR_CANCELED") console.error(err);
         } finally {
-          setPreviewLoading(false);
+          // an aborted call was superseded — its successor owns previewLoading now
+          if (!controller.signal.aborted) setPreviewLoading(false);
         }
       }, 350);
     },
@@ -265,7 +274,9 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
   const handleAmountChange = (value: string) => {
     setAmountInput(value);
     if (!rangeValid || !value || isNaN(Number(value))) {
+      cancelPendingPreview();
       setPreview(null);
+      setPreviewLoading(false);
       return;
     }
     refreshPreview(value, amountField, tickLower!, tickUpper!);
@@ -281,7 +292,9 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
     if (rangeValid && amountInput && !isNaN(Number(amountInput))) {
       refreshPreview(amountInput, amountField, tickLower!, tickUpper!);
     } else {
+      cancelPendingPreview(); // a pending preview would resolve for the abandoned range
       setPreview(null);
+      setPreviewLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickLower, tickUpper, amountField]);

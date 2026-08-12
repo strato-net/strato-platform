@@ -23,6 +23,7 @@ import DepositsPage from "./pages/DepositsPage";
 import AssetDetail from "./pages/AssetDetail";
 import Advanced from "./pages/Advanced";
 import PoolV3Liquidity from "./pages/PoolV3Liquidity";
+import V3PositionPage from "./pages/V3PositionPage";
 import NFTsPage from "./pages/NFTsPage";
 import NFTDetailPage from "./pages/NFTDetailPage";
 import ActivityFeed from "./pages/ActivityFeed";
@@ -335,6 +336,14 @@ const App = () => {
                                                   element={
                                                     <GuestAccessibleRoute>
                                                       <PoolV3Liquidity />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/v3-liquidity/:tokenId"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <V3PositionPage />
                                                     </GuestAccessibleRoute>
                                                   }
                                                 />

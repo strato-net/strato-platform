@@ -1,5 +1,6 @@
 import Joi from "@hapi/joi";
-import { validateAddressField, numericStringField } from "./common.validators";
+import { StatusCodes } from "http-status-codes";
+import { validateAddressField, numericStringField, uintStringField } from "./common.validators";
 
 const signedNumericStringField = (name: string) =>
   Joi.string()
@@ -8,10 +9,19 @@ const signedNumericStringField = (name: string) =>
 
 const tickField = Joi.number().integer().min(-887272).max(887272);
 
+// Validation failures must surface as 400s with their real message. A bare `new Error`
+// has no status, so errorHandler falls through to 500 and sanitizes the message to a
+// generic string — set statusCode explicitly (matching nfts/common validators).
+const throwValidation = (prefix: string, message: string): never => {
+  const err = new Error(`${prefix}: ${message}`);
+  (err as any).statusCode = StatusCodes.BAD_REQUEST;
+  throw err;
+};
+
 export function validatePoolV3AddressArgs(args: any) {
   const schema = Joi.object({ poolAddress: validateAddressField("poolAddress") });
   const { error } = schema.validate(args);
-  if (error) throw new Error("PoolV3 Address Argument Validation Error: " + error.message);
+  if (error) throwValidation("PoolV3 Address Argument Validation Error", error.message);
 }
 
 export function validatePoolV3AmountsArgs(args: any) {
@@ -29,7 +39,7 @@ export function validatePoolV3AmountsArgs(args: any) {
   })
     .or("liquidity", "amount0Desired", "amount1Desired");
   const { error } = schema.validate(args);
-  if (error) throw new Error("PoolV3 Amounts Argument Validation Error: " + error.message);
+  if (error) throwValidation("PoolV3 Amounts Argument Validation Error", error.message);
 }
 
 export function validatePoolV3MintArgs(args: any) {
@@ -40,30 +50,41 @@ export function validatePoolV3MintArgs(args: any) {
     // Canonical desired/min parameters (PositionManagerV3 computes liquidity on-chain).
     // A single-sided (out-of-range) position deposits only one token, so the unused
     // side's desired amount is legitimately "0" — but not both.
-    amount0Desired: numericStringField("amount0Desired", { allowZero: true }).required(),
-    amount1Desired: numericStringField("amount1Desired", { allowZero: true }).required(),
+    amount0Desired: numericStringField("amount0Desired", { allowZero: true }).optional(),
+    amount1Desired: numericStringField("amount1Desired", { allowZero: true }).optional(),
     amount0Min: numericStringField("amount0Min", { allowZero: true }).optional(),
     amount1Min: numericStringField("amount1Min", { allowZero: true }).optional(),
-  });
+    // Pre-NFT request shape (exact liquidity + deposit ceilings), still spoken by SPA
+    // bundles loaded before the manager rollout and by scripts on the old contract; the
+    // service converts liquidity to desired amounts. Remove once stale clients age out.
+    liquidity: numericStringField("liquidity").optional(),
+    amount0Max: numericStringField("amount0Max", { allowZero: true }).optional(),
+    amount1Max: numericStringField("amount1Max", { allowZero: true }).optional(),
+  })
+    .xor("liquidity", "amount0Desired")
+    .and("amount0Desired", "amount1Desired")
+    .and("liquidity", "amount0Max", "amount1Max");
   const { error } = schema.validate(args);
-  if (error) throw new Error("PoolV3 Mint Argument Validation Error: " + error.message);
-  if (BigInt(args.amount0Desired) === 0n && BigInt(args.amount1Desired) === 0n) {
-    throw new Error("PoolV3 Mint Argument Validation Error: at least one desired amount must be positive");
+  if (error) throwValidation("PoolV3 Mint Argument Validation Error", error.message);
+  // parseFloat, not BigInt: numericStringField admits decimal strings, which BigInt throws on
+  if (args.amount0Desired !== undefined && parseFloat(args.amount0Desired) === 0 && parseFloat(args.amount1Desired) === 0) {
+    throwValidation("PoolV3 Mint Argument Validation Error", "at least one desired amount must be positive");
   }
 }
 
 export function validatePoolV3IncreaseArgs(args: any) {
   const schema = Joi.object({
-    tokenId: numericStringField("tokenId").required(),
+    tokenId: uintStringField("tokenId"),
     amount0Desired: numericStringField("amount0Desired", { allowZero: true }).required(),
     amount1Desired: numericStringField("amount1Desired", { allowZero: true }).required(),
     amount0Min: numericStringField("amount0Min", { allowZero: true }).optional(),
     amount1Min: numericStringField("amount1Min", { allowZero: true }).optional(),
   });
   const { error } = schema.validate(args);
-  if (error) throw new Error("PoolV3 Increase Argument Validation Error: " + error.message);
-  if (BigInt(args.amount0Desired) === 0n && BigInt(args.amount1Desired) === 0n) {
-    throw new Error("PoolV3 Increase Argument Validation Error: at least one desired amount must be positive");
+  if (error) throwValidation("PoolV3 Increase Argument Validation Error", error.message);
+  // parseFloat, not BigInt: numericStringField admits decimal strings, which BigInt throws on
+  if (parseFloat(args.amount0Desired) === 0 && parseFloat(args.amount1Desired) === 0) {
+    throwValidation("PoolV3 Increase Argument Validation Error", "at least one desired amount must be positive");
   }
 }
 
@@ -71,7 +92,7 @@ export function validatePoolV3BurnArgs(args: any) {
   // Two addressing modes: `tokenId` (position NFTs, managed by PositionManagerV3) or
   // poolAddress + ticks (legacy positions held directly on the pool) — exactly one.
   const schema = Joi.object({
-    tokenId: numericStringField("tokenId").optional(),
+    tokenId: uintStringField("tokenId").optional(),
     poolAddress: validateAddressField("poolAddress").optional(),
     tickLower: tickField.optional(),
     tickUpper: tickField.optional(),
@@ -92,13 +113,13 @@ export function validatePoolV3BurnArgs(args: any) {
     .with("poolAddress", ["tickLower", "tickUpper"])
     .without("tokenId", ["tickLower", "tickUpper"]);
   const { error } = schema.validate(args);
-  if (error) throw new Error("PoolV3 Burn Argument Validation Error: " + error.message);
+  if (error) throwValidation("PoolV3 Burn Argument Validation Error", error.message);
 }
 
 export function validatePoolV3CollectArgs(args: any) {
   // Same dual addressing as burn: tokenId (NFT) or poolAddress + ticks (legacy).
   const schema = Joi.object({
-    tokenId: numericStringField("tokenId").optional(),
+    tokenId: uintStringField("tokenId").optional(),
     poolAddress: validateAddressField("poolAddress").optional(),
     tickLower: tickField.optional(),
     tickUpper: tickField.optional(),
@@ -111,7 +132,13 @@ export function validatePoolV3CollectArgs(args: any) {
     .with("poolAddress", ["tickLower", "tickUpper"])
     .without("tokenId", ["tickLower", "tickUpper"]);
   const { error } = schema.validate(args);
-  if (error) throw new Error("PoolV3 Collect Argument Validation Error: " + error.message);
+  if (error) throwValidation("PoolV3 Collect Argument Validation Error", error.message);
+}
+
+export function validatePoolV3TokenIdParam(args: any) {
+  const schema = Joi.object({ tokenId: uintStringField("tokenId") });
+  const { error } = schema.validate(args);
+  if (error) throwValidation("PoolV3 TokenId Validation Error", error.message);
 }
 
 export function validatePoolV3CreateArgs(args: any) {
@@ -126,5 +153,5 @@ export function validatePoolV3CreateArgs(args: any) {
   })
     .or("initialSqrtPriceX96", "price");
   const { error } = schema.validate(args);
-  if (error) throw new Error("PoolV3 Create Argument Validation Error: " + error.message);
+  if (error) throwValidation("PoolV3 Create Argument Validation Error", error.message);
 }

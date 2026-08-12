@@ -90,6 +90,8 @@ router.get("/pools/:poolAddress/liquidity", authHandler.authorizeRequest(true), 
  *       New positions are always minted through PositionManagerV3 and represented as
  *       ERC-721 tokens. The manager computes liquidity from the desired amounts at the
  *       current price and pulls exactly the pool-computed deposit from the caller.
+ *       The deprecated pre-NFT shape (liquidity + amount0Max/amount1Max, no desired
+ *       amounts) is still accepted and converted server-side.
  *     tags: [PoolV3]
  *     requestBody:
  *       required: true
@@ -97,7 +99,7 @@ router.get("/pools/:poolAddress/liquidity", authHandler.authorizeRequest(true), 
  *         application/json:
  *           schema:
  *             type: object
- *             required: [poolAddress, tickLower, tickUpper, amount0Desired, amount1Desired]
+ *             required: [poolAddress, tickLower, tickUpper]
  *             properties:
  *               poolAddress: { type: string }
  *               tickLower: { type: integer }
@@ -106,6 +108,9 @@ router.get("/pools/:poolAddress/liquidity", authHandler.authorizeRequest(true), 
  *               amount1Desired: { type: string, description: "maximum token1 to deposit" }
  *               amount0Min: { type: string, description: "minimum token0 that must be deposited (slippage check), default 0" }
  *               amount1Min: { type: string, description: "minimum token1 that must be deposited (slippage check), default 0" }
+ *               liquidity: { type: string, description: "DEPRECATED pre-NFT shape: exact liquidity to mint (with amount0Max/amount1Max, instead of desired amounts)" }
+ *               amount0Max: { type: string, description: "DEPRECATED pre-NFT shape: token0 deposit ceiling" }
+ *               amount1Max: { type: string, description: "DEPRECATED pre-NFT shape: token1 deposit ceiling" }
  *     responses:
  *       200:
  *         description: Transaction result
@@ -192,6 +197,24 @@ router.post("/positions/increase", walletAuth, PoolV3Controller.increase);
  *         description: Transaction result
  */
 router.post("/positions/collect", walletAuth, PoolV3Controller.collect);
+
+/**
+ * @openapi
+ * /poolv3/position-nfts/{tokenId}:
+ *   get:
+ *     summary: The position NFT for a tokenId (resolved against the network's singleton PositionManagerV3)
+ *     tags: [PoolV3]
+ *     parameters:
+ *       - { name: tokenId, in: path, required: true, schema: { type: string } }
+ *     responses:
+ *       200:
+ *         description: NFT item (kind "poolv3-position") with owner and collection metadata
+ *       404:
+ *         description: No live token with this id (never minted or burned)
+ *       503:
+ *         description: PositionManagerV3 is not configured on this network
+ */
+router.get("/position-nfts/:tokenId", authHandler.authorizeRequest(true), PoolV3Controller.positionNFT);
 
 /**
  * @openapi
