@@ -6,7 +6,7 @@ import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useWalletClient } from "wagmi";
 import { api, setAppAuthenticated, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
 import { isAuthenticated, logout as authLogout, redirectToSignedOutLanding, WALLET_CONNECT_REQUEST_EVENT } from "@/lib/auth";
-import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
+import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE, ADMIN_VOTE_OPEN_ISSUES_PER_PAGE } from "@/lib/constants";
 import { readAttribution, clearAttribution } from "@/lib/attribution";
 import { trackWalletConnected } from "@/lib/tracking";
 import { ensureStratoChainInWallet } from "@/lib/stratoChain";
@@ -30,9 +30,11 @@ interface UserContextType {
   loading: boolean;
   openIssues: object;
   openIssuesLoading: boolean;
-  getOpenIssues: () => Promise<void>;
+  openIssuesUpdatedAt: Date | null;
+  getOpenIssues: (page?: number, limit?: number) => Promise<void>;
   executedIssues: object;
   executedIssuesLoading: boolean;
+  executedIssuesUpdatedAt: Date | null;
   getExecutedIssues: (page?: number, limit?: number) => Promise<void>;
   contractSearchResults: object[];
   contractSearchResultsLoading: boolean;
@@ -64,8 +66,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [openIssues, setOpenIssues] = useState<object>({})
   const [openIssuesLoading, setOpenIssuesLoading] = useState<boolean>(false);
+  const [openIssuesUpdatedAt, setOpenIssuesUpdatedAt] = useState<Date | null>(null);
   const [executedIssues, setExecutedIssues] = useState<object>({})
   const [executedIssuesLoading, setExecutedIssuesLoading] = useState<boolean>(false);
+  const [executedIssuesUpdatedAt, setExecutedIssuesUpdatedAt] = useState<Date | null>(null);
   const [contractSearchResults, setContractSearchResults] = useState<object[]>([])
   const [contractSearchResultsLoading, setContractSearchResultsLoading] = useState<boolean>(false)
   const [contractDetailsResults, setContractDetailsResults] = useState<object>({});
@@ -197,21 +201,25 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const castVoteOnIssueById = async (issueId: string) => {
     try {
       await api.post('/user/admin/vote/by-id', { issueId }, { walletAuth: false } as any);
+    } finally {
       await getOpenIssues();
       // Show the recently executed issue
       await getExecutedIssues(1, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
-    } catch (error) {
-      await getOpenIssues();
-      throw error;
     }
   };
 
-  const getOpenIssues = async () => {
+  const getOpenIssues = async (page: number = 1, limit: number = ADMIN_VOTE_OPEN_ISSUES_PER_PAGE) => {
     try {
       setOpenIssuesLoading(true);
       try {
-        const response = await api.get('/user/admin/issues');
+        const response = await api.get('/user/admin/issues', {
+          params: {
+            page,
+            limit,
+          },
+        });
         setOpenIssues(response?.data || {});
+        setOpenIssuesUpdatedAt(new Date());
       } catch (error) {
       }
     } finally {
@@ -230,6 +238,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           },
         });
         setExecutedIssues(response?.data || {});
+        setExecutedIssuesUpdatedAt(new Date());
       } catch (error) {
       }
     } finally {
@@ -423,10 +432,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     refreshAuth,
     loading,
     openIssuesLoading,
+    openIssuesUpdatedAt,
     openIssues,
     getOpenIssues,
     executedIssues,
     executedIssuesLoading,
+    executedIssuesUpdatedAt,
     getExecutedIssues,
     castVoteOnIssue,
     castVoteOnIssueById,
@@ -441,7 +452,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     contractDetailsResultsLoading,
   }), [userAddress, stratoAddress, externalWalletAddress, isExternalWalletConnected, externalEvmWalletAddress, isExternalEvmWalletConnected, effectiveLoggedIn, isLoggedIn, isAdmin, loading, userName,
     handleLogout,
-    openIssues, openIssuesLoading, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues,
+    openIssues, openIssuesLoading, openIssuesUpdatedAt, getOpenIssues,
+    executedIssues, executedIssuesLoading, executedIssuesUpdatedAt, getExecutedIssues,
     castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin,
     contractSearch, contractSearchResults, contractSearchResultsLoading,
     getContractDetails, contractDetailsResults, contractDetailsResultsLoading,

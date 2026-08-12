@@ -1,10 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getAdmin, isUserAdmin, addAdmin, removeAdmin, castVoteOnIssue, castVoteOnIssueById, simulateCastVoteOnIssue, dismissIssue, getOpenIssues,
+import { getAdmin, isUserAdmin, addAdmin, removeAdmin, createIssue, castVoteOnIssueById, simulateCastVoteOnIssue, dismissIssue, getOpenIssues,
          getExecutedIssues, contractSearch, getContractDetails,
  } from "../services/user.service";
 import { validateUserAddress, validateAddressField } from "../validators/common.validators";
-import { validateExecutedIssuesQuery } from "../validators/user.validator";
+import { validateIssuesQuery } from "../validators/user.validator";
 
 class UserController {
   static async me(
@@ -86,7 +86,7 @@ class UserController {
     }
   }
 
-  static async castVoteOnIssue(
+  static async createIssue(
     req: Request,
     res: Response,
     next: NextFunction
@@ -95,15 +95,19 @@ class UserController {
       const { accessToken, address: actorAddress } = req;
       const { target, func, args } = req.body;
       validateAddressField(target);
-      
-      const result = await castVoteOnIssue(accessToken, actorAddress as string, target, func, args);
+
+      const result = await createIssue(accessToken, actorAddress as string, target, func, args);
       res.status(RestStatus.OK).json({
-        message: "Vote cast successfully",
+        message: result.governed
+          ? "Issue created successfully"
+          : "Function executed directly: no issue was created and no vote was recorded",
         target,
         func,
         args,
         status: result.status,
         hash: result.hash,
+        issueId: result.issueId,
+        governed: result.governed,
       });
       next();
     } catch (e) {
@@ -180,7 +184,10 @@ class UserController {
   ): Promise<void> {
     try {
       const { accessToken } = req;
-      const issues = await getOpenIssues(accessToken);
+      validateIssuesQuery(req.query);
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
+      const issues = await getOpenIssues(accessToken, page, limit);
       res.status(RestStatus.OK).json(issues);
       next();
     } catch (e) {
@@ -195,7 +202,7 @@ class UserController {
   ): Promise<void> {
     try {
       const { accessToken } = req;
-      validateExecutedIssuesQuery(req.query);
+      validateIssuesQuery(req.query);
       const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
       const result = await getExecutedIssues(accessToken, page, limit);

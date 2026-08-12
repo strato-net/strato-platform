@@ -33,6 +33,8 @@ strato/haddock
 strato/hpc
 *~
 bridge_image_tag*
+localbuild/
+mercata/
 
 contract_source
 docker-compose.bridge.ecr.yml
