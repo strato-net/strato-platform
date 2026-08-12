@@ -34,7 +34,10 @@ import {
 } from "../helpers/swapping.helper";
 import * as stable from "../helpers/stablePoolMath.helper";
 import { getOraclePrices } from "./oracle.service";
-import { fetchPairSwapHistory as fetchV3PairSwapHistory } from "./poolV3.service";
+import {
+  fetchPairSwapHistory as fetchV3PairSwapHistory,
+  fetchTokenSwapHistory as fetchV3TokenSwapHistory,
+} from "./poolV3.service";
 import {
   SwapHistoryEntry,
   PoolList,
@@ -502,6 +505,82 @@ export const getPairSwapHistory = async (
     amountIn: event.amountIn,
     amountOut: event.amountOut,
     impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, event.tokenIn === a, event.pool.isStable),
+    sender: event.sender,
+    poolAddress: event.address,
+    poolName: event.pool.isStable ? "Stable" : "V2",
+  }));
+
+  const merged = [...v2Entries, ...v3Result.entries]
+    .sort((x, y) => y.timestamp.getTime() - x.timestamp.getTime())
+    .slice(offset, offset + limit);
+
+  return { data: merged, totalCount: v2Count + v3Result.totalCount };
+};
+
+/**
+ * Recent swaps involving a single token across all V2/stable pools (tokenIn or
+ * tokenOut) and every V3 fee-tier pool that lists it. Newest first; same merge
+ * pagination pattern as getPairSwapHistory. impliedPrice is output-per-input.
+ */
+export const getTokenSwapHistory = async (
+  accessToken: string,
+  tokenAddress: string,
+  page: number = 1,
+  limit: number = 10
+): Promise<SwapHistoryResponse> => {
+  const t = normalizeAddress(tokenAddress);
+  const offset = (page - 1) * limit;
+  const fetchCap = offset + limit;
+
+  const v2Filters = {
+    or: `(tokenIn.eq.${t},tokenOut.eq.${t})`,
+  };
+
+  const [v2EventsResponse, v2CountResponse, v3Result] = await Promise.all([
+    cirrus.get(accessToken, `/${PoolSwap}`, {
+      params: {
+        ...v2Filters,
+        select: swapHistorySelectFields.join(","),
+        order: "block_timestamp.desc",
+        limit: fetchCap.toString(),
+      },
+    }),
+    cirrus.get(accessToken, `/${PoolSwap}`, {
+      params: { ...v2Filters, select: "count()" },
+    }),
+    fetchV3TokenSwapHistory(accessToken, tokenAddress, fetchCap).catch(() => ({
+      entries: [] as SwapHistoryEntry[],
+      totalCount: 0,
+    })),
+  ]);
+
+  const v2Events = Array.isArray(v2EventsResponse.data)
+    ? (v2EventsResponse.data as RawSwapEvent[])
+    : [];
+  const v2Count = v2CountResponse.data?.[0]?.count || 0;
+
+  const symbolAddrs = [...new Set(v2Events.flatMap((e) => [e.tokenIn, e.tokenOut]))];
+  let symbolByAddress = new Map<string, string>();
+  if (symbolAddrs.length > 0) {
+    const symbolsResponse = await cirrus.get(accessToken, `/${constants.Token}`, {
+      params: { address: `in.(${symbolAddrs.join(",")})`, select: "address,_symbol" },
+    });
+    symbolByAddress = new Map(
+      ((symbolsResponse.data as { address: string; _symbol: string }[]) ?? []).map((row) => [
+        row.address,
+        row._symbol,
+      ])
+    );
+  }
+
+  const v2Entries: SwapHistoryEntry[] = v2Events.map((event) => ({
+    id: event.id,
+    timestamp: new Date(event.block_timestamp),
+    tokenIn: symbolByAddress.get(event.tokenIn) ?? event.tokenIn,
+    tokenOut: symbolByAddress.get(event.tokenOut) ?? event.tokenOut,
+    amountIn: event.amountIn,
+    amountOut: event.amountOut,
+    impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, true, event.pool.isStable),
     sender: event.sender,
     poolAddress: event.address,
     poolName: event.pool.isStable ? "Stable" : "V2",

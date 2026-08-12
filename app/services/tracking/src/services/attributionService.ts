@@ -100,6 +100,10 @@ export interface BridgeInItem {
   amount: string;
   amountUsd: number | null;
   txHash: string | null;
+  // Origin transaction on the external chain (Ethereum, Base, …), for
+  // etherscan/basescan-style links alongside the STRATO explorer link
+  externalChainId: number | null;
+  externalTxHash: string | null;
   at: string;
 }
 
@@ -319,6 +323,8 @@ const toBridgeInItem = (snapshot: AttributionSnapshot, b: BridgeInEvent): Bridge
     return price == null ? null : tokenAmount(b.stratoTokenAmount) * price;
   })(),
   txHash: b.txHash,
+  externalChainId: b.externalChainId,
+  externalTxHash: b.externalTxHash,
   at: new Date(b.timestampMs).toISOString(),
 });
 

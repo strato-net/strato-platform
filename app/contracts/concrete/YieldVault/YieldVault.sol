@@ -9,13 +9,17 @@ import "../../abstract/ERC20/utils/Pausable.sol";
 ///         - instant withdraw/redeem when enough unreserved idle exists
 ///         - FIFO async redemption queue otherwise
 ///         - process-then-claim flow for robustness
+///         - checkpointed, distributor-funded savings-rate accrual
 ///
 /// Design goals for this version:
 /// - ship a simple, defensible queue quickly
 /// - avoid pro-rata settlement math
 /// - avoid claim-time live queue pricing
 /// - reserve processed claims so they cannot be redeployed or re-used
+/// - preserve NAV accounting while preventing donations from earning retroactive accrual
 contract record YieldVault is ERC4626, Ownable, Pausable {
+    uint256 public constant MAX_PER_SECOND_SAVINGS_RATE = 1000000021979553151239153027;
+
     struct WithdrawalRequest {
         uint256 shares;
         address receiver;
@@ -44,7 +48,17 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
     mapping(address => uint256) public claimableAssets;
     uint256 public totalClaimableAssets;
 
+    uint256 public perSecondSavingsRate;
+    uint256 public lastAccrual;
+    address public rewardDistributor;
+    bool public accrualInitialized;
+    uint256 public accrualBaseAssets;
+
     event VaultInitialized(address indexed asset, string name, string symbol);
+    event AccrualInitialized(uint256 perSecondSavingsRate, uint256 lastAccrual);
+    event Accrued(address indexed distributor, uint256 targetAmount, uint256 creditedAmount);
+    event PerSecondSavingsRateUpdated(uint256 oldRate, uint256 newRate);
+    event RewardDistributorUpdated(address indexed oldDistributor, address indexed newDistributor);
     event StrategyApprovalUpdated(address indexed strategy, bool approved);
     event MinIdleBpsUpdated(uint256 minIdleBps);
     event CapitalDeployed(address indexed strategy, uint256 assets, uint256 strategyDebt, uint256 totalDeployed);
@@ -97,6 +111,11 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         nextRequestId = 1;
 
         emit VaultInitialized(asset_, name_, symbol_);
+    }
+
+    function initializeAccrual() external onlyOwner {
+        _requireInitialized();
+        _initializeAccrual();
     }
 
     // ---------------------------------------------------------------------
@@ -175,9 +194,12 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
     {
         _requireInitialized();
         require(assets > 0, "YieldVault: zero assets");
+        address caller = _msgSender();
+        _accrue();
         shares = previewDeposit(assets);
         require(shares > 0, "YieldVault: zero shares");
-        _deposit(_msgSender(), receiver, assets, shares);
+        _deposit(caller, receiver, assets, shares);
+        _checkpointAccrualBase();
         return shares;
     }
 
@@ -190,9 +212,12 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
     {
         _requireInitialized();
         require(shares > 0, "YieldVault: zero shares");
+        address caller = _msgSender();
+        _accrue();
         assets = previewMint(shares);
         require(assets > 0, "YieldVault: zero assets");
-        _deposit(_msgSender(), receiver, assets, shares);
+        _deposit(caller, receiver, assets, shares);
+        _checkpointAccrualBase();
         return assets;
     }
 
@@ -204,9 +229,12 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         returns (uint256 shares)
     {
         _requireInitialized();
+        address caller = _msgSender();
+        _accrue();
         require(assets <= maxWithdraw(owner_), "ERC4626: withdraw exceeds max");
         shares = previewWithdraw(assets);
-        _withdraw(_msgSender(), receiver, owner_, assets, shares);
+        _withdraw(caller, receiver, owner_, assets, shares);
+        _checkpointAccrualBase();
         return shares;
     }
 
@@ -218,9 +246,12 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         returns (uint256 assets)
     {
         _requireInitialized();
+        address caller = _msgSender();
+        _accrue();
         require(shares <= maxRedeem(owner_), "ERC4626: redeem exceeds max");
         assets = previewRedeem(shares);
-        _withdraw(_msgSender(), receiver, owner_, assets, shares);
+        _withdraw(caller, receiver, owner_, assets, shares);
+        _checkpointAccrualBase();
         return assets;
     }
 
@@ -239,16 +270,19 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         require(receiver != address(0), "YieldVault: receiver=0");
         require(shares > 0, "YieldVault: zero shares");
 
+        address caller = _msgSender();
+        _accrue();
         uint256 assets = previewRedeem(shares);
         require(assets > 0, "YieldVault: zero assets");
 
         if (_freeIdleForInstantWithdrawals() >= assets) {
-            _withdraw(_msgSender(), receiver, owner_, assets, shares);
+            _withdraw(caller, receiver, owner_, assets, shares);
+            _checkpointAccrualBase();
             emit WithdrawalPaidImmediately(owner_, receiver, shares, assets);
             return (assets, 0);
         }
 
-        requestId = _requestRedeem(_msgSender(), shares, receiver, owner_);
+        requestId = _requestRedeem(caller, shares, receiver, owner_);
         return (0, requestId);
     }
 
@@ -299,6 +333,7 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
     {
         _requireInitialized();
         require(maxRequests > 0, "YieldVault: zero maxRequests");
+        _accrue();
 
         uint256 assetsRemaining = _freeIdleForQueueProcessing();
         if (maxAssets < assetsRemaining) {
@@ -356,6 +391,7 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
             }
         }
 
+        _checkpointAccrualBase();
         return (processedRequests, burnedShares, reservedAssets);
     }
 
@@ -436,6 +472,7 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
     function setStrategyApproval(address strategy, bool approved) external onlyOwner {
         _requireInitialized();
         require(strategy != address(0), "YieldVault: strategy=0");
+        require(!approved || strategy != rewardDistributor, "YieldVault: strategy is distributor");
         approvedStrategies[strategy] = approved;
         emit StrategyApprovalUpdated(strategy, approved);
     }
@@ -445,6 +482,53 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         require(minIdleBps_ <= 10000, "YieldVault: idle bps too high");
         minIdleBps = minIdleBps_;
         emit MinIdleBpsUpdated(minIdleBps_);
+    }
+
+    function accrue() external onlyOwner whenNotPaused nonReentrant returns (uint256 credited) {
+        _requireInitialized();
+        credited = _accrue();
+    }
+
+    function setPerSecondSavingsRate(uint256 newRate)
+        external
+        onlyOwner
+        whenNotPaused
+        nonReentrant
+        returns (uint256 credited)
+    {
+        _requireInitialized();
+        _requireAccrualInitialized();
+        require(newRate >= 1e27, "YieldVault: rate too low");
+        require(newRate <= MAX_PER_SECOND_SAVINGS_RATE, "YieldVault: rate too high");
+        credited = _accrue();
+
+        uint256 oldRate = perSecondSavingsRate;
+        perSecondSavingsRate = newRate;
+        lastAccrual = block.timestamp;
+
+        emit PerSecondSavingsRateUpdated(oldRate, newRate);
+    }
+
+    function setRewardDistributor(address newRewardDistributor)
+        external
+        onlyOwner
+        whenNotPaused
+        nonReentrant
+        returns (uint256 credited)
+    {
+        _requireInitialized();
+        _requireAccrualInitialized();
+        require(newRewardDistributor != address(this), "YieldVault: distributor=vault");
+        require(!approvedStrategies[newRewardDistributor], "YieldVault: distributor is strategy");
+        require(strategyDebt[newRewardDistributor] == 0, "YieldVault: distributor has strategy debt");
+
+        address oldRewardDistributor = rewardDistributor;
+        credited = _accrue();
+        rewardDistributor = newRewardDistributor;
+        lastAccrual = block.timestamp;
+        _checkpointAccrualBase();
+
+        emit RewardDistributorUpdated(oldRewardDistributor, newRewardDistributor);
     }
 
     function deployCapital(address to, uint256 assets) external onlyOwner whenNotPaused nonReentrant {
@@ -466,6 +550,10 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         require(from != address(0), "YieldVault: from=0");
         require(assets > 0, "YieldVault: zero return");
         require(strategyDebt[from] > 0, "YieldVault: no strategy debt");
+        bool isPaused = paused();
+        if (!isPaused) {
+            _accrue();
+        }
 
         require(IERC20(asset()).transferFrom(from, address(this), assets), "YieldVault: return failed");
 
@@ -474,18 +562,23 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
 
         strategyDebt[from] -= principalRepaid;
         deployedAssets -= principalRepaid;
+        if (!isPaused) {
+            _checkpointAccrualBase();
+        }
 
         emit CapitalReturned(from, assets, principalRepaid, realizedProfit, strategyDebt[from], deployedAssets);
     }
 
-    function reportStrategyLoss(address strategy, uint256 loss) external onlyOwner whenNotPaused {
+    function reportStrategyLoss(address strategy, uint256 loss) external onlyOwner whenNotPaused nonReentrant {
         _requireInitialized();
         require(strategy != address(0), "YieldVault: strategy=0");
         require(loss > 0, "YieldVault: zero loss");
         require(loss <= strategyDebt[strategy], "YieldVault: loss exceeds debt");
+        _accrue();
 
         strategyDebt[strategy] -= loss;
         deployedAssets -= loss;
+        _checkpointAccrualBase();
         emit StrategyLossReported(strategy, loss, strategyDebt[strategy], deployedAssets);
     }
 
@@ -519,6 +612,19 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         return (activeAssets() * 1e18) / supply;
     }
 
+    function pendingAccrual() public view returns (uint256 targetAmount, uint256 fundedAmount) {
+        _requireInitialized();
+        return _pendingAccrual();
+    }
+
+    function projectedExchangeRate() external view returns (uint256) {
+        _requireInitialized();
+        uint256 supply = activeSupply();
+        if (supply == 0) return 1e18;
+        (, uint256 fundedAmount) = _pendingAccrual();
+        return ((activeAssets() + fundedAmount) * 1e18) / supply;
+    }
+
     function maxDeploy() public view returns (uint256) {
         if (!vaultInitialized || paused()) return 0;
         if (queueHead != 0) return 0;
@@ -531,6 +637,141 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
 
     function _requireInitialized() internal view {
         require(vaultInitialized, "YieldVault: not initialized");
+    }
+
+    function _requireAccrualInitialized() internal view {
+        require(accrualInitialized, "YieldVault: accrual not initialized");
+    }
+
+    function _initializeAccrual() internal {
+        require(!accrualInitialized, "YieldVault: accrual already initialized");
+        perSecondSavingsRate = 1e27;
+        lastAccrual = block.timestamp;
+        accrualInitialized = true;
+        _checkpointAccrualBase();
+        emit AccrualInitialized(perSecondSavingsRate, lastAccrual);
+    }
+
+    function _accrue() internal returns (uint256 credited) {
+        if (!accrualInitialized) return 0;
+
+        uint256 nowTs = block.timestamp;
+        if (nowTs <= lastAccrual) return 0;
+
+        uint256 elapsed = nowTs - lastAccrual;
+        uint256 baseAssets = accrualBaseAssets;
+        lastAccrual = nowTs;
+
+        if (
+            activeSupply() == 0 ||
+            baseAssets == 0 ||
+            perSecondSavingsRate <= 1e27 ||
+            rewardDistributor == address(0)
+        ) {
+            _checkpointAccrualBase();
+            return 0;
+        }
+
+        uint256 growthFactor = _rpow(perSecondSavingsRate, elapsed, 1e27);
+        uint256 targetAmount = (baseAssets * (growthFactor - 1e27)) / 1e27;
+        if (targetAmount == 0) {
+            _checkpointAccrualBase();
+            return 0;
+        }
+
+        credited = _pullAccrualReward(targetAmount);
+
+        _checkpointAccrualBase();
+        emit Accrued(rewardDistributor, targetAmount, credited);
+        return credited;
+    }
+
+    function _pullAccrualReward(uint256 targetAmount) internal returns (uint256 credited) {
+        // SolidVM corrupts msg.sender after a caught revert, so callers that use
+        // the sender after _accrue must capture it before entering this helper.
+        IERC20 token = IERC20(asset());
+        uint256 available;
+        try token.balanceOf(rewardDistributor) returns (uint256 balance) {
+            available = balance;
+        } catch {
+            return 0;
+        }
+
+        try token.allowance(rewardDistributor, address(this)) returns (uint256 approved) {
+            if (available > approved) available = approved;
+        } catch {
+            return 0;
+        }
+        if (available > targetAmount) available = targetAmount;
+        if (available == 0) return 0;
+
+        uint256 beforeBalance;
+        try token.balanceOf(address(this)) returns (uint256 balance) {
+            beforeBalance = balance;
+        } catch {
+            return 0;
+        }
+
+        try token.transferFrom(rewardDistributor, address(this), available) returns (bool ok) {
+            if (!ok) return 0;
+        } catch {
+            return 0;
+        }
+
+        try token.balanceOf(address(this)) returns (uint256 balance) {
+            if (balance > beforeBalance) credited = balance - beforeBalance;
+        } catch {
+            return 0;
+        }
+        return credited;
+    }
+
+    function _pendingAccrual() internal view returns (uint256 targetAmount, uint256 fundedAmount) {
+        if (
+            !accrualInitialized ||
+            block.timestamp <= lastAccrual ||
+            activeSupply() == 0 ||
+            accrualBaseAssets == 0 ||
+            perSecondSavingsRate <= 1e27 ||
+            rewardDistributor == address(0)
+        ) {
+            return (0, 0);
+        }
+
+        uint256 growthFactor = _rpow(
+            perSecondSavingsRate,
+            block.timestamp - lastAccrual,
+            1e27
+        );
+        targetAmount = (accrualBaseAssets * (growthFactor - 1e27)) / 1e27;
+        if (targetAmount == 0) return (0, 0);
+
+        fundedAmount = IERC20(asset()).balanceOf(rewardDistributor);
+        uint256 allowance = IERC20(asset()).allowance(rewardDistributor, address(this));
+        if (fundedAmount > allowance) fundedAmount = allowance;
+        if (fundedAmount > targetAmount) fundedAmount = targetAmount;
+        return (targetAmount, fundedAmount);
+    }
+
+    function _rpow(uint256 x, uint256 n, uint256 base) internal pure returns (uint256 z) {
+        if (x == 0) return n == 0 ? base : 0;
+        z = (n % 2 == 0) ? base : x;
+        uint256 half = base / 2;
+        for (n /= 2; n > 0; n /= 2) {
+            uint256 xx = x * x;
+            x = (xx + half) / base;
+            if (n % 2 == 1) {
+                uint256 zx = z * x;
+                z = (zx + half) / base;
+            }
+        }
+        return z;
+    }
+
+    function _checkpointAccrualBase() internal {
+        if (accrualInitialized) {
+            accrualBaseAssets = activeAssets();
+        }
     }
 
     function _economicAssets() internal view returns (uint256) {

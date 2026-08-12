@@ -73,8 +73,42 @@ export interface BridgeInItem {
   amount: string;
   amountUsd: number | null;
   txHash: string | null;
+  externalChainId: number | null;
+  externalTxHash: string | null;
   at: string;
 }
+
+// Explorer tx-page prefixes for the external chains the bridge supports
+// (mirrors SUPPORTED_CHAINS in the main app). Unknown chain ids render the
+// hash without a link.
+const EXTERNAL_EXPLORERS: Record<number, { name: string; txPrefix: string }> = {
+  1: { name: 'Etherscan', txPrefix: 'https://etherscan.io/tx/' },
+  11155111: { name: 'Sepolia Etherscan', txPrefix: 'https://sepolia.etherscan.io/tx/' },
+  137: { name: 'Polygonscan', txPrefix: 'https://polygonscan.com/tx/' },
+  80002: { name: 'Amoy Polygonscan', txPrefix: 'https://amoy.polygonscan.com/tx/' },
+  10: { name: 'Optimistic Etherscan', txPrefix: 'https://optimistic.etherscan.io/tx/' },
+  8453: { name: 'Basescan', txPrefix: 'https://basescan.org/tx/' },
+  84532: { name: 'Sepolia Basescan', txPrefix: 'https://sepolia.basescan.org/tx/' },
+  59144: { name: 'Lineascan', txPrefix: 'https://lineascan.build/tx/' },
+  59141: { name: 'Sepolia Lineascan', txPrefix: 'https://sepolia.lineascan.build/tx/' },
+  42161: { name: 'Arbiscan', txPrefix: 'https://arbiscan.io/tx/' },
+  42170: { name: 'Nova Arbiscan', txPrefix: 'https://nova.arbiscan.io/tx/' },
+  56: { name: 'BscScan', txPrefix: 'https://bscscan.com/tx/' },
+  43114: { name: 'Snowtrace', txPrefix: 'https://snowtrace.io/tx/' },
+};
+
+export const externalTxLink = (
+  bridge: Pick<BridgeInItem, 'externalChainId' | 'externalTxHash'>
+): { hash: string; url: string | null; explorerName: string | null } | null => {
+  if (!bridge.externalTxHash) return null;
+  const explorer =
+    bridge.externalChainId != null ? EXTERNAL_EXPLORERS[bridge.externalChainId] : undefined;
+  return {
+    hash: bridge.externalTxHash,
+    url: explorer ? `${explorer.txPrefix}${bridge.externalTxHash}` : null,
+    explorerName: explorer?.name ?? null,
+  };
+};
 
 export interface ActivityItem {
   category: ActivityCategory;
