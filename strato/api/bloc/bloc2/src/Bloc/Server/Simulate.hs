@@ -49,7 +49,7 @@ import Blockchain.Model.SyncState (BestBlock, WorldBestBlock)
 import Blockchain.SyncDB (SyncStatus)
 import Control.Lens ((^.))
 import Control.Applicative ((<|>))
-import Control.Monad (forM, unless, when)
+import Control.Monad (forM, guard, unless, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Data.Aeson ((.=))
@@ -83,8 +83,9 @@ data SimPlan = SimPlan
   { simSpec :: CallSpec,
     simKind :: SimKind,
     -- | Extra call to simulate independently and attach as the result's
-    -- `effect` (currently: the castVoteOnIssue issue effect). Its own simEffect
-    -- is always Nothing.
+    -- `effect` (currently: the castVoteOnIssue issue effect). When the effect
+    -- is itself a castVoteOnIssue — a vote wrapped through nested multisigs —
+    -- this chains recursively, one plan per hop, ending at the ultimate action.
     simEffect :: Maybe SimPlan
   }
 
@@ -410,29 +411,69 @@ withTrace tv r =
           else blocsimulateError r
     }
 
+-- | Cap on how many castVoteOnIssue hops are chained when simulating a vote
+-- wrapped through nested multisigs. Each hop costs one strato_simulateV1 (plus
+-- one strato_traceCall when tracing), so this bounds the work a maliciously
+-- deep wrapping can request.
+maxNestedEffectDepth :: Int
+maxNestedEffectDepth = 5
+
 -- | When simulating @castVoteOnIssue(_target, _func, _args)@, the plan for the
--- issue's ultimate effect: @target.func(args)@ executed as the registry/wallet
--- the vote runs on (@registryAddr@). SolidVM calls are positional, and the
--- variadic @_args@ flatten to the tail of the already-marshaled castVoteOnIssue
--- args, so the effect args are just @drop 2@ of them — no ABI lookup needed.
+-- issue's effect: @target.func(args)@ executed as the registry/wallet the vote
+-- runs on (@registryAddr@). SolidVM calls are positional, and the variadic
+-- @_args@ flatten to the tail of the already-marshaled castVoteOnIssue args,
+-- so the effect args are just @drop 2@ of them — no ABI lookup needed. When
+-- the effect is itself a castVoteOnIssue (a nested-multisig vote), the plan
+-- chains one hop per wrapper level via 'effectChainPlan'.
 castVoteEffectPlan :: Address -> Text -> Text -> Map Text ArgValue -> [Text] -> Maybe SimPlan
 castVoteEffectPlan registryAddr gasTxt method argsMap marshaledArgs
   | method /= "castVoteOnIssue" = Nothing
   | otherwise = do
       targetTxt <- argScalarText =<< M.lookup "_target" argsMap
       funcName <- argScalarText =<< M.lookup "_func" argsMap
-      targetAddr <- stringAddress . Text.unpack $ fromMaybe targetTxt (Text.stripPrefix "0x" targetTxt)
-      let spec =
-            SpecFuncCall
-              TxFuncCallObject
-                { funcCallFrom = registryAddr,
-                  funcCallTo = targetAddr,
-                  funcCallGas = gasTxt,
-                  funcCallValue = "0x0",
-                  funcCallFunctionName = funcName,
-                  funcCallArgs = drop 2 marshaledArgs
-                }
-      pure $ SimPlan spec (SimCall targetAddr funcName) Nothing
+      targetAddr <- parseAddrLit targetTxt
+      pure $
+        effectChainPlan maxNestedEffectDepth registryAddr targetAddr gasTxt funcName (drop 2 marshaledArgs)
+
+-- | One hop of an issue's effect chain: @to.func(args)@ executed as @from@
+-- (the wallet whose vote passed). A castVoteOnIssue effect recurses — @args@
+-- are @[nextTarget, nextFunc, …nextArgs]@ rendered as literals, so the next
+-- hop runs as this hop's wallet against the unwrapped tail — until the
+-- ultimate non-vote action (or the depth cap) is reached.
+effectChainPlan :: Int -> Address -> Address -> Text -> Text -> [Text] -> SimPlan
+effectChainPlan depth fromAddr toAddr gasTxt funcName args =
+  SimPlan spec (SimCall toAddr funcName) mNext
+  where
+    spec =
+      SpecFuncCall
+        TxFuncCallObject
+          { funcCallFrom = fromAddr,
+            funcCallTo = toAddr,
+            funcCallGas = gasTxt,
+            funcCallValue = "0x0",
+            funcCallFunctionName = funcName,
+            funcCallArgs = args
+          }
+    mNext = do
+      guard $ depth > 1 && funcName == "castVoteOnIssue"
+      (tLit, fLit, rest) <- case args of
+        (t : f : r) -> Just (t, f, r)
+        _ -> Nothing
+      nextTarget <- parseAddrLit tLit
+      pure $ effectChainPlan (depth - 1) toAddr nextTarget gasTxt (unquoteLit fLit) rest
+
+-- | The bare text of a marshaled literal: quoted strings lose their quotes
+-- (addresses and strings render as @"…"@ literals), everything else passes
+-- through unchanged.
+unquoteLit :: Text -> Text
+unquoteLit t = fromMaybe t $ Text.stripSuffix "\"" =<< Text.stripPrefix "\"" t
+
+-- | Parse an address from either a bare or quoted, 0x-prefixed or bare-hex
+-- rendering.
+parseAddrLit :: Text -> Maybe Address
+parseAddrLit t =
+  let t' = unquoteLit t
+   in stringAddress . Text.unpack $ fromMaybe t' (Text.stripPrefix "0x" t')
 
 -- | Extract the plain textual value of a (possibly {type,value}-hinted) scalar.
 argScalarText :: ArgValue -> Maybe Text
@@ -443,7 +484,10 @@ argScalarText av0 = case maybe av0 snd (splitTypeHint av0) of
   _ -> Nothing
 
 -- | Simulate a plan's effect call independently (fresh sandbox) and shape it as
--- a nested BlocSimulateResult, with its own trace when requested.
+-- a nested BlocSimulateResult, with its own trace when requested. A chained
+-- effect (nested-multisig vote hops) recurses, so the result mirrors the whole
+-- chain; each hop simulates against current state, i.e. "what happens when this
+-- hop's threshold passes".
 runEffectPlan ::
   ( MonadUnliftIO m,
     MonadLogger m,
@@ -463,16 +507,21 @@ runEffectPlan url trace eff = do
       [ Aeson.object ["blockStateCalls" .= [Aeson.object ["calls" .= [simSpec eff]]]],
         Aeson.String "latest"
       ]
-  case esim of
+  base <- case esim of
     Left err -> pure $ errorResult ("effect simulation failed: " <> err)
     Right v -> case Aeson.parseEither parseSimBlocks v of
       Left perr -> pure $ errorResult ("unexpected effect response: " <> Text.pack perr)
       Right [] -> pure $ errorResult "empty effect simulation response"
       Right (callRes : _) -> do
-        base <- buildResult eff callRes
+        r <- buildResult eff callRes
         if not trace
-          then pure base
+          then pure r
           else
             jsonRpcCall url "strato_traceCall" [Aeson.toJSON (simSpec eff), Aeson.String "latest", Aeson.object ["statements" .= False]] >>= \case
-              Left _ -> pure base
-              Right tv -> pure (withTrace tv base)
+              Left _ -> pure r
+              Right tv -> pure (withTrace tv r)
+  case simEffect eff of
+    Nothing -> pure base
+    Just nextEff -> do
+      nextRes <- runEffectPlan url trace nextEff
+      pure base {blocsimulateEffect = Just nextRes}

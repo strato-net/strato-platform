@@ -243,6 +243,23 @@ local wallet_auth_route_prefixes = {
     "/api/vault/"
 }
 
+-- STRATO node endpoints used by self-custody (external wallet) signing flows,
+-- POSTed directly from the browser by guests with no session (SMD's walletTx):
+--   /transaction/unsigned    only computes a signable payload (no state change)
+--   /eth/v1.2/transaction    submits a SIGNED tx — authenticated by its ECDSA
+--                            signature, replay-protected by the nonce
+--   /transactions/results    read-only lookup by hash
+--   /transaction/simulate    dry-run in a sandbox (rate-limited in nginx)
+-- CSRF adds nothing to these (an attacker cannot forge the signature and the
+-- rest are effect-free), so like wallet_auth_routes they are exempt when the
+-- request carries the X-Wallet-Address marker header.
+local wallet_tx_routes = {
+    ["/bloc/v2.2/transaction/unsigned"] = true,
+    ["/bloc/v2.2/transactions/results"] = true,
+    ["/bloc/v2.2/transaction/simulate"] = true,
+    ["/strato-api/eth/v1.2/transaction"] = true
+}
+
 local wallet_auth_methods = {
     DELETE = true,
     PATCH = true,
@@ -271,7 +288,7 @@ function _M.allow_wallet_auth_request()
     end
 
     local uri = ngx.var.uri
-    local route_allowed = wallet_auth_routes[uri] == true
+    local route_allowed = wallet_auth_routes[uri] == true or wallet_tx_routes[uri] == true
     if not route_allowed then
         for _, prefix in ipairs(wallet_auth_route_prefixes) do
             if uri:sub(1, #prefix) == prefix then

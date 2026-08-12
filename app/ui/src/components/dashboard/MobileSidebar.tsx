@@ -34,6 +34,7 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
     {
       items: [
         { icon: <LayoutDashboard size={20} />, label: 'Portfolio', path: '/dashboard' },
+        { icon: <Compass size={20} />, label: 'Explore', path: '/dashboard/explore' },
       ],
     },
     {
@@ -41,7 +42,6 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
       items: [
         { icon: <ArrowDownToLine size={20} />, label: 'Fund', path: '/dashboard/deposits' },
         { icon: <ArrowRightLeft size={20} />, label: 'Trade', path: '/dashboard/swap' },
-        { icon: <Compass size={20} />, label: 'Explore', path: '/dashboard/explore' },
         { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
         { icon: <Send size={20} />, label: 'Send', path: '/dashboard/transfer' },
         { icon: <Download size={20} />, label: 'Bridge Out', path: '/dashboard/withdrawals' },

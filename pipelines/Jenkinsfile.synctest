@@ -4,7 +4,7 @@ pipeline {
   }
   options { disableConcurrentBuilds() }
   triggers {
-    cron('H */4 * * *')
+    cron('H */6 * * *')
   }
   environment {
     PATH = "/home/ubuntu/.local/bin:${env.PATH}"
@@ -51,14 +51,6 @@ pipeline {
       sh '''#!/bin/bash -le
         strato-down mynode || true
         pkill convoke || true
-        # Node state and snapshot staging are the big workspace consumers
-        # (restored state ~10GB, archive ~3.5GB); do not leave them between runs.
-        docker rm -f $(docker ps -aq) 2>/dev/null || true
-        docker volume prune -fa || true
-        sudo rm -rf mynode || true
-        rm -rf snapshot-out .snapshot-work .snapshot-downloads || true
-        rm -rf /tmp/tmp.* || true
-        df -h / | tail -1
       '''
     }
     success {
@@ -68,17 +60,17 @@ pipeline {
       )
     }
 
-//    failure {
-//      slackSend (
-//          color: 'danger',
-//          message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
-//      )
-//      slackSend(
-//          channel: '#engineering',
-//          color: 'danger',
-//          message: "Sync test build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
-//      )
-//    }
+    failure {
+      slackSend (
+          color: 'danger',
+          message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+      slackSend(
+          channel: '#engineering',
+          color: 'danger',
+          message: "Sync test build failed. The snapshots weren't created! Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+    }
 
     fixed {
       slackSend(
@@ -101,9 +93,8 @@ pipeline {
 //
 // Likewise never delete snapshot-out/ here: verifySnapshotRestore calls this
 // between creating the archive and restoring from it, so wiping the staging
-// dir would delete the artifact under test. It is cleaned in Prepare (before
-// anything is created), by deployAndSync once the archive is published, and by
-// the post{always} teardown.
+// dir would delete the artifact under test. It is cleaned in Prepare before
+// anything is created and by deployAndSync once the archive is published.
 def cleanNodeState() {
   sh '''#!/bin/bash -le
     strato-down mynode || true
@@ -149,7 +140,7 @@ def reclaimDisk() {
 // strato-up (using the network's default public vault and file server), wait
 // for it to become available and sync, push CloudWatch metrics, then create
 // and publish a snapshot. Cleanup is handled by the leading block below (on
-// the next network's run) and by the post{always} teardown.
+// the next network's run) and by the next build's Prepare stage.
 def deployAndSync(String network, String metricNamespacePrefix) {
   script {
     // Clean any prior node state before this network's run.
@@ -189,7 +180,7 @@ def deployAndSync(String network, String metricNamespacePrefix) {
     // Confirm the node is reachable, then measure sync time.
     lib.checkNodeAvailability(443)
     def timeStart = System.currentTimeMillis()
-    lib.waitLocalNodeIsSynced()
+    lib.waitLocalNodeIsSynced('mynode')
     def syncTimeSec = (System.currentTimeMillis() - timeStart) / 1000
     def syncTimeMin = syncTimeSec / 60
     def blocksTotal = Integer.parseInt(sh(
