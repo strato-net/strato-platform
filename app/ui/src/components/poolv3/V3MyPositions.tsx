@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { PoolV3, PoolV3Position } from "@/interface";
 import { useSwapContext } from "@/context/SwapContext";
 import { useTokenContext } from "@/context/TokenContext";
@@ -8,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { ArrowUpRight, Search } from "lucide-react";
 import { formatTokenAmount, formatTickAsPrice, formatPriceWad, poolV3TxAmounts, describePoolAmounts, priceDomainEdge } from "./poolV3Utils";
 import V3ConfirmDialog, { ConfirmRow } from "./V3ConfirmDialog";
 import V3IncreaseDialog from "./V3IncreaseDialog";
@@ -430,9 +431,19 @@ const V3MyPositions = ({
                     </span>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       {position.kind === "nft" && position.tokenId !== undefined ? (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 flex-shrink-0">
-                          NFT #{position.tokenId}
-                        </Badge>
+                        <Link
+                          to={`/dashboard/v3-liquidity/${position.tokenId}`}
+                          title="View the position NFT"
+                          className="flex-shrink-0"
+                        >
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 hover:bg-muted hover:text-strato-blue transition-colors"
+                          >
+                            NFT #{position.tokenId}
+                            <ArrowUpRight className="h-2.5 w-2.5 ml-0.5" />
+                          </Badge>
+                        </Link>
                       ) : (
                         <Badge
                           variant="outline"

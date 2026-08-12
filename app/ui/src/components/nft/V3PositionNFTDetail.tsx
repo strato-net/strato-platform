@@ -19,6 +19,7 @@ import { useNFTContext } from "@/context/NFTContext";
 import { useSwapContext } from "@/context/SwapContext";
 import { PoolV3, PoolV3Position } from "@/interface";
 import { formatTokenAmount, formatTickAsPrice, formatPriceWad } from "@/components/poolv3/poolV3Utils";
+import { formatCurrency } from "@/utils/numberUtils";
 import TokenPairIcons from "@/components/poolv3/TokenPairIcons";
 import TransferNFTModal from "./TransferNFTModal";
 import { NFTDetailRendererProps } from "./detailRenderers";
@@ -173,7 +174,12 @@ const V3PositionNFTDetail = ({ item, onChanged }: NFTDetailRendererProps) => {
       {position && pool && (
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="bg-muted/50 rounded-lg border border-border p-4 space-y-2.5">
-            <p className="text-xs text-muted-foreground">Position value</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">Position value</p>
+              {(position.valueUsd ?? 0) > 0 && (
+                <p className="text-sm font-semibold">≈ ${formatCurrency(position.valueUsd!)}</p>
+              )}
+            </div>
             <TokenAmountRow token={pool.token0} amount={position.amount0} />
             <TokenAmountRow token={pool.token1} amount={position.amount1} />
           </div>

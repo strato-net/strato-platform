@@ -928,6 +928,7 @@ export const getPositions = async (
         inRange,
         priceLowerWad: v3.sqrtPriceX96ToPriceWad(v3.getSqrtRatioAtTick(tickLower)).toString(),
         priceUpperWad: v3.sqrtPriceX96ToPriceWad(v3.getSqrtRatioAtTick(tickUpper)).toString(),
+        valueUsd: positionValueUsd,
         apy,
       },
     ];
