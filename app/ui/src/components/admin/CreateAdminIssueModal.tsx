@@ -138,7 +138,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
         return [false, `Array validation error: ${e instanceof Error ? e.message : String(e)}`];
       }
     }
-    return [true, `"${value.trim().replace("\"","\\\"")}"`];
+    return [true, value.trim()];
   }
 
   const getTypeName = (_type: object): string => {
@@ -354,7 +354,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
                       control={form.control}
                       name={`args.${idx}.value`}
                       rules={{
-                        required: 'Argument is required',
+                        required: abiTypeName === 'string' ? false : 'Argument is required',
                         validate: (v) => {
                           const [success, w] = validateFunctionArg(abiType, v);
                           return success ? true : (typeof w === 'string' ? w : 'Invalid argument');
