@@ -20,6 +20,7 @@ contract SP1HeliosSolidVM {
     mapping(uint => bytes32) public headers;
     mapping(uint => bytes32) public executionStateRoots;
     mapping(uint => bytes32) public syncCommittees;
+    mapping(uint => bool) internal syncCommitteeSet;
     mapping(bytes32 => bytes32) public storageValues;
 
     bytes32 public heliosProgramVkey;
@@ -90,7 +91,9 @@ contract SP1HeliosSolidVM {
         head = initialHead;
         headers[initialHead] = initialHeader;
         executionStateRoots[initialHead] = initialExecutionStateRoot;
-        syncCommittees[getSyncCommitteePeriod(initialHead)] = initialSyncCommitteeHash;
+        uint initialPeriod = getSyncCommitteePeriod(initialHead);
+        syncCommittees[initialPeriod] = initialSyncCommitteeHash;
+        syncCommitteeSet[initialPeriod] = true;
         heliosProgramVkey = initialHeliosProgramVkey;
         verifier = verifierAddress;
         _grantRole(DEFAULT_ADMIN_ROLE_VALUE, initialAdmin);
@@ -310,20 +313,24 @@ contract SP1HeliosSolidVM {
         }
 
         uint newPeriod = getSyncCommitteePeriod(newHead);
-        if (syncCommittees[newPeriod] == bytes32(0)) {
+        if (!syncCommitteeSet[newPeriod]) {
             syncCommittees[newPeriod] = syncCommitteeHash;
+            syncCommitteeSet[newPeriod] = true;
             emit SyncCommitteeUpdate(newPeriod, syncCommitteeHash);
+        } else {
+            require(syncCommittees[newPeriod] == syncCommitteeHash, "Helios current committee already differs");
         }
         if (nextSyncCommitteeHash != bytes32(0)) {
             uint nextPeriod = newPeriod + 1;
-            bytes32 storedNextCommittee = syncCommittees[nextPeriod];
-            require(
-                storedNextCommittee == bytes32(0) || storedNextCommittee == nextSyncCommitteeHash,
-                "Helios next committee already differs"
-            );
-            if (storedNextCommittee == bytes32(0)) {
+            if (!syncCommitteeSet[nextPeriod]) {
                 syncCommittees[nextPeriod] = nextSyncCommitteeHash;
+                syncCommitteeSet[nextPeriod] = true;
                 emit SyncCommitteeUpdate(nextPeriod, nextSyncCommitteeHash);
+            } else {
+                require(
+                    syncCommittees[nextPeriod] == nextSyncCommitteeHash,
+                    "Helios next committee already differs"
+                );
             }
         }
     }

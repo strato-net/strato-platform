@@ -1,0 +1,5 @@
+[profile.default]
+src = "contracts/across"
+test = "test/across"
+out = "out-foundry"
+solc_version = "0.8.30"

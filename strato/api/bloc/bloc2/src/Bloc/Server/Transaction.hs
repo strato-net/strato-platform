@@ -27,6 +27,7 @@ module Bloc.Server.Transaction
     marshalCreatePayload,
     marshalFunctionArgs,
     marshalInnerCallArgs,
+    getSolidityType,
     walletWrapCreate,
     walletWrapCall,
     mergeTxParams,
@@ -1533,7 +1534,11 @@ getSolidityType (ArgArray v) (Xabi.Array typ len) =
   let arrType = case len of
         Just l -> TypeArrayFixed l
         Nothing -> TypeArrayDynamic
-      elType = getSolidityType (V.head v) typ
+      -- The declared ABI element type is authoritative and, unlike JSON
+      -- inference, remains available when the array is empty.
+      elType = case V.uncons v of
+        Just (firstValue, _) -> getSolidityType firstValue typ
+        Nothing -> either (Text.pack >>> Left) Right (xabiTypeToType typ)
    in case elType of
         Right c -> Right (arrType c)
         e -> e

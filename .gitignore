@@ -4,6 +4,7 @@
 .basil-work
 .docker-work
 .stack-work
+.stack-work-across
 .stack-work-profile
 docker-compose.push.yml
 docker-compose.push.ecr.yml
