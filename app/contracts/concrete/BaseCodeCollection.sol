@@ -8,6 +8,10 @@ import "./Tokens/Token.sol";
 import "./Tokens/TokenFactory.sol";
 //import "Tokens/Metadata/TokenMetadata.sol";
 
+//Generic NFT (ERC-721)
+import "./NFTs/NFT.sol";
+import "./NFTs/NFTFactory.sol";
+
 //Admin Registry
 import "Admin/AdminRegistry.sol";
 
