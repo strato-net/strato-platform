@@ -80,6 +80,16 @@ executables:
     ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto 
 
 tests:
+  gas-limit-test:
+    source-dirs: test-gas/
+    main: Main.hs
+    dependencies:
+      - blockapps-data
+      - bytestring
+      - hspec
+      - strato-model
+      - vm-runner
+    ghc-options: -Wall -Werror -dynamic
   ethereum-vm-test:
     source-dirs: test/
     main: Spec.hs

@@ -42,13 +42,13 @@ end
 
 local function get_access_token_issuer_unverified(header)
   local access_token, err1 = get_bearer_access_token_from_header(header)
-  if err or not access_token then
+  if err1 or not access_token then
     ngx.status = 401
-    ngx.say("Wrong Authorization header format. Error: " .. (err or 'unknown error'))
+    ngx.say("Wrong Authorization header format. Error: " .. (err1 or 'unknown error'))
     ngx.exit(ngx.HTTP_UNAUTHORIZED)
     return
   end
-  local enc_hdr, enc_payload, enc_sign = string.match(header, '^(.+)%.(.+)%.(.*)$')
+  local enc_hdr, enc_payload, enc_sign = string.match(access_token, '^(.+)%.(.+)%.(.*)$')
   if not enc_hdr or not enc_payload or not enc_sign then
     ngx.status = 401
     ngx.say("Authorization error: Wrong JWT format")
@@ -94,8 +94,22 @@ if ngx.req.get_headers()["Authorization"] then
     ngx.exit(ngx.HTTP_UNAUTHORIZED)
   end
 
-  local verify_opts = {
+  local discovery_opts = {
     discovery = PROVIDER_DATA['DISCOVERY_URL'],
+    ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
+  }
+  local discovery, discovery_err = openidc.get_discovery_doc(discovery_opts)
+  if discovery_err or not discovery then
+    ngx.status = 401
+    ngx.say("Authorization error: Could not load identity provider discovery data.")
+    ngx.exit(ngx.HTTP_UNAUTHORIZED)
+  end
+  if not isEmpty(PROVIDER_DATA['JWKS_URL']) then
+    discovery.jwks_uri = PROVIDER_DATA['JWKS_URL']
+  end
+
+  local verify_opts = {
+    discovery = discovery,
     ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
     accept_none_alg = false,
     accept_unsupported_alg = false

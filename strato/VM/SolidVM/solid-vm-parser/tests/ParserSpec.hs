@@ -59,6 +59,7 @@ spec = do
             ("x[q]", IndexAccess () (Variable () "x") (Just $ Variable () "q")),
             ("hex'4F9A'", HexaLiteral () "4F9A"),
             ("hex\"4F9A\"", HexaLiteral () "4F9A"),
+            ("hex\"\"", HexaLiteral () ""),
             ( "x[a][b][c]",
               IndexAccess
                 ()

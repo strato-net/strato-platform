@@ -11,11 +11,13 @@ fi
 HTTP_PORT=$(yq '.networkConfig.httpPort' /config/ethconf.yaml)
 NODE_URL=$(yq '.urlConfig.nodeUrl' /config/ethconf.yaml)
 COOKIE_REALM=$(yq '.urlConfig.cookieRealm' /config/ethconf.yaml)
+OAUTH_ISSUER_URL="${OAUTH_ISSUER_URL:-${NODE_URL}/auth}"
 
 echo "Read from ethconf.yaml:"
 echo "  httpPort: ${HTTP_PORT}"
 echo "  nodeUrl: ${NODE_URL}"
 echo "  cookieRealm: ${COOKIE_REALM}"
+echo "  oauthIssuerUrl: ${OAUTH_ISSUER_URL}"
 
 # Read postgres password if available and update DSNs
 if [ -f /run/secrets/postgres_password ]; then
@@ -61,6 +63,7 @@ KRATOS_COOKIE_SECRET_ESCAPED=$(escape_sed_replacement "$KRATOS_COOKIE_SECRET")
 sed -i "s|__HYDRA_SYSTEM_SECRET__|${HYDRA_SYSTEM_SECRET_ESCAPED}|g" /etc/config/hydra.yml
 sed -i "s|__HYDRA_PAIRWISE_SALT__|${HYDRA_PAIRWISE_SALT_ESCAPED}|g" /etc/config/hydra.yml
 sed -i "s|__NODE_URL__|${NODE_URL}|g" /etc/config/hydra.yml
+sed -i "s|__OAUTH_ISSUER_URL__|${OAUTH_ISSUER_URL}|g" /etc/config/hydra.yml
 sed -i "s|__COOKIE_REALM__|${COOKIE_REALM}|g" /etc/config/hydra.yml
 sed -i "s|__KRATOS_COOKIE_SECRET__|${KRATOS_COOKIE_SECRET_ESCAPED}|g" /etc/config/kratos.yml
 sed -i "s|__NODE_URL__|${NODE_URL}|g" /etc/config/kratos.yml

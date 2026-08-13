@@ -42,6 +42,19 @@ library:
       - vm-tools
 
 tests:
+  across-local-test:
+    source-dirs: test-across
+    main: Main.hs
+    other-modules:
+      - AcrossLocalSpec
+    dependencies:
+      - blockapps-data
+      - bytestring
+      - hspec
+      - solid-vm-model
+      - strato-genesis
+      - strato-model
+    ghc-options: -Wall -dynamic
   strato-genesis-test:
     source-dirs: test
     main: Main.hs

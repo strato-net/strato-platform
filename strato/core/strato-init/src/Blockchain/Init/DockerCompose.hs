@@ -8,7 +8,7 @@ import Blockchain.EthConf (ethConf)
 import Blockchain.EthConf.Model (apiConfig, apiPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
-import Blockchain.Init.Options (flags_jsonrpc, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
+import Blockchain.Init.Options (flags_jsonrpc, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_minimalServices, flags_publicStratoRpc, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
@@ -320,9 +320,12 @@ generateDockerCompose = do
         , depends_on = Just $ DependsOnList ["postgres"]
         , extra_hosts = hostGateway
         , environment = Just $ Map.fromList
-            [ ("DSN", "postgres://postgres@postgres:5432/kratos?sslmode=disable")
-            , ("HYDRA_DSN", "postgres://postgres@postgres:5432/hydra?sslmode=disable")
-            ]
+            $ [ ("DSN", "postgres://postgres@postgres:5432/kratos?sslmode=disable")
+              , ("HYDRA_DSN", "postgres://postgres@postgres:5432/hydra?sslmode=disable")
+              ]
+            ++ if flags_minimalServices
+              then [("OAUTH_ISSUER_URL", "http://127.0.0.1:4444")]
+              else []
         , healthcheck = Just Healthcheck
             { test = ["CMD", "curl", "-f", "http://localhost:4444/.well-known/openid-configuration"]
             , interval = Just "5s"
@@ -344,24 +347,53 @@ generateDockerCompose = do
         , logging = noLogging
         }
 
+  -- Lightweight JWT-verifying proxy for the host-side vault wrapper. The full
+  -- stack performs this function in nginx; minimal nodes omit that container,
+  -- so they use the dedicated vault proxy on a loopback-only port instead.
+  let vaultNginx = def
+        { image = "vault-nginx:" ++ stratoVersionTag
+        , depends_on = Just $ DependsOnMap $ Map.fromList
+            [("local-auth", DependsOnCondition "service_healthy")]
+        , extra_hosts = hostGateway
+        , environment = Just $ Map.fromList
+            [ ("INITIAL_OAUTH_DISCOVERY_URL", "http://local-auth:4444/.well-known/openid-configuration")
+            , ("INITIAL_OAUTH_ISSUER", "http://127.0.0.1:4444")
+            , ("INITIAL_OAUTH_JWT_USER_ID_CLAIM", "sub")
+            , ("VAULT_WRAPPER_HOST", localHostname ++ ":8093")
+            , ("WAIT_FOR_VAULT_WRAPPER", "false")
+            , ("ssl", "false")
+            ]
+        , ports = Just ["127.0.0.1:8094:80"]
+        , restart = Just "unless-stopped"
+        }
+
   -- Only include streaming service if a broker image is configured (not embedded like JLog)
   let streamingService = if null (bcImage bc) then [] else [("streaming", streaming)]
   
-  let baseServices =
-            [ ("app-backend", appBackend)
-            , ("app-ui", appUi)
-            , ("smd", smd)
-            , ("apex", apex)
-            , ("redis", redis)
-            , ("postgrest", postgrest)
-            , ("postgres", postgres)
-            , ("nginx", nginx)
-            , ("docs", docs)
-            , ("prometheus", prometheus)
-            ] ++ streamingService
+  let fullServices =
+        [ ("app-backend", appBackend)
+        , ("app-ui", appUi)
+        , ("smd", smd)
+        , ("apex", apex)
+        , ("redis", redis)
+        , ("postgrest", postgrest)
+        , ("postgres", postgres)
+        , ("nginx", nginx)
+        , ("docs", docs)
+        , ("prometheus", prometheus)
+        ] ++ streamingService
+
+      minimalServices =
+        [ ("redis", redis)
+        , ("postgres", postgres)
+        ] ++ streamingService
+
+      baseServices = if flags_minimalServices then minimalServices else fullServices
 
   let allServices = if flags_localAuth
-        then ("local-auth", localAuth) : baseServices
+        then ("local-auth", localAuth)
+          : ((if flags_minimalServices then [("vault-nginx", vaultNginx)] else [])
+          ++ baseServices)
         else baseServices
 
   let composeFile = ComposeFile

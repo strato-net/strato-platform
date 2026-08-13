@@ -17,11 +17,12 @@ import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
 import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_sslDir)
+import Blockchain.Init.Options (flags_acrossValidator, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_minimalServices, flags_nodeHost, flags_setDefaultNode, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
 import Blockchain.Strato.Model.Validator
+import Blockchain.Strato.Model.Address (stringAddress)
 import Conduit
 import Control.Monad
 import Control.Monad.Change.Alter ()
@@ -36,6 +37,7 @@ import System.Process (readProcess)
 import System.Entropy (getEntropy)
 import qualified Data.ByteString as BS
 import Data.Char (toLower)
+import Data.List (isPrefixOf)
 import Turtle (chmod, roo)
 import UnliftIO.Directory
 import System.Posix.Files (setFileMode, ownerModes, groupModes, otherModes)
@@ -75,14 +77,27 @@ createGenesisInfo network =
               , (0x523fef378674d39363aa8b6ac5122e301c528432, 100_000 * HELIUM.oneE18)
               ]
     "lithium" -> HELIUM.lithiumGenesisBlock
+    "across-local" -> HELIUM.acrossLocalGenesisBlock
+    name | "across-local-" `isPrefixOf` name -> HELIUM.acrossLocalGenesisBlock
     _ -> HELIUM.genesisBlock
+
+createGenesisInfoForNode :: String -> GenesisInfo
+createGenesisInfoForNode network
+  | isAcrossProfile && null flags_acrossValidator = createGenesisInfo network
+  | isAcrossProfile =
+      case stringAddress flags_acrossValidator of
+        Just validatorAddress -> HELIUM.acrossGenesisBlock validatorAddress
+        Nothing -> error "--acrossValidator must be a 20-byte hexadecimal address"
+  | not (null flags_acrossValidator) =
+      error "--acrossValidator is only valid for across-local or across-local-* networks"
+  | otherwise = createGenesisInfo network
+  where
+    isAcrossProfile = network == "across-local" || "across-local-" `isPrefixOf` network
 
 createCommandsFile :: IO ()
 createCommandsFile = do
   localAuthCommands <- if flags_localAuth
-    then do
-      pgPassword <- filter (/= '\n') <$> readFile "secrets/postgres_password"
-      return ["blockapps-vault-wrapper-server --pghost localhost --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
+    then return ["blockapps-vault-wrapper-server --pghost 127.0.0.1 --postgresPasswordFile secrets/postgres_password --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
     else return []
 
   let baseCommands =
@@ -202,10 +217,14 @@ mkFilesAndGenesis nodeDir hasFlags network = do
           clientSecret <- case envClientSecret of
             Just cs | not (null cs) -> return cs
             _ -> generatePassword 48
-          let ssl = not $ null flags_sslDir
-              discoveryUrl = if ssl
-                then "https://" ++ localHostname ++ "/auth/.well-known/openid-configuration"
-                else "http://" ++ localHostname ++ ":" ++ show flags_httpPort ++ "/auth/.well-known/openid-configuration"
+          let effectiveNodeHost
+                | flags_nodeHost == "localhost" = localHostname
+                | otherwise = flags_nodeHost
+              ssl = not $ null flags_sslDir
+              discoveryUrl
+                | flags_minimalServices = "http://127.0.0.1:4444/.well-known/openid-configuration"
+                | ssl = "https://" ++ effectiveNodeHost ++ "/auth/.well-known/openid-configuration"
+                | otherwise = "http://" ++ effectiveNodeHost ++ ":" ++ show flags_httpPort ++ "/auth/.well-known/openid-configuration"
               localOauthConfig = unlines
                 [ "discoveryUrl: \"" ++ discoveryUrl ++ "\""
                 , "clientId: \"" ++ clientId ++ "\""
@@ -248,7 +267,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
     liftIO $ putStrLn "  ✓ Generated ethconf.yaml"
 
-    liftIO $ do
+    when flags_setDefaultNode $ liftIO $ do
       cwd <- getCurrentDirectory
       home <- getHomeDirectory
       let stratoDir = home </> ".strato"
@@ -279,7 +298,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
             void $ addCode mempty
             populateMPTFromGenesis genesisInfo
       else do
-        let genesisInfo = normalizeGenesisInfo $ createGenesisInfo network
+        let genesisInfo = normalizeGenesisInfo $ createGenesisInfoForNode network
         runNoLoggingT . runResourceT . runSetupDBM $ do
           void $ addCode mempty
           populateMPTAndWriteGenesis genesisInfo

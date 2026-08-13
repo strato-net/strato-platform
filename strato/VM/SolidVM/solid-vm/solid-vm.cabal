@@ -91,6 +91,18 @@ executable exprs-needed
     , text
   default-language: Haskell2010
 
+test-suite gas-accounting-spec
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  hs-source-dirs:
+      test-gas/
+  build-depends:
+      base
+    , hspec
+    , solid-vm
+    , strato-model
+  default-language: Haskell2010
+
 test-suite solid-vm-spec
   type: exitcode-stdio-1.0
   main-is: Main.hs
@@ -143,6 +155,7 @@ test-suite solid-vm-spec
     , source-tools
     , strato-genesis
     , strato-init
+    , strato-conf
     , strato-model
     , strato-redis-blockdb
     , text
@@ -151,6 +164,18 @@ test-suite solid-vm-spec
     , unliftio
     , utf8-string
     , vm-tools
+  default-language: Haskell2010
+
+test-suite chain-id-spec
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  hs-source-dirs:
+      test-chain-id/
+  build-depends:
+      base
+    , hspec
+    , solid-vm
+    , strato-conf
   default-language: Haskell2010
 
 benchmark codebench

@@ -30,7 +30,11 @@ for _, idp in ipairs(config["identity_providers"]) do
     ngx.log(ngx.STDERR, "Server misconfiguration, error in identity_providers configuration. Error: each identity provider in configuration JSON is expected to have ISSUER, DISCOVERY_URL and USER_ID_CLAIM properties not empty")
     error('Server misconfiguration, error in identity_providers configuration. Error: each identity provider in JSON is expected to have ISSUER, DISCOVERY_URL and USER_ID_CLAIM properties')
   end
-  config["identity_providers_keyed"][idp["ISSUER"]] = { DISCOVERY_URL = idp["DISCOVERY_URL"], USER_ID_CLAIM = idp["USER_ID_CLAIM"] }
+  config["identity_providers_keyed"][idp["ISSUER"]] = {
+    DISCOVERY_URL = idp["DISCOVERY_URL"],
+    JWKS_URL = idp["JWKS_URL"],
+    USER_ID_CLAIM = idp["USER_ID_CLAIM"]
+  }
 end
 
 return config

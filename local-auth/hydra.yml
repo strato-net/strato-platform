@@ -17,7 +17,7 @@ serve:
 
 urls:
   self:
-    issuer: __NODE_URL__/auth
+    issuer: __OAUTH_ISSUER_URL__
   consent: __NODE_URL__/auth/ui/consent
   login: __NODE_URL__/auth/ui/login
   logout: __NODE_URL__/auth/ui/logout

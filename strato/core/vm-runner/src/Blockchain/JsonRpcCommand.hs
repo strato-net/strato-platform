@@ -276,10 +276,10 @@ ethCallEx blockHeader gas fromAddr toAddr callData = do
     Nothing -> do
       $logInfoS "ethCall" . T.pack $ "no function for selector " ++ BC.unpack (B16.encode selector)
       return (Left ("no function for selector 0x" ++ BC.unpack (B16.encode selector)), Nothing)
-    Just (funcName, func) -> do
+    Just (contract, funcName, func) -> do
       let argTypes = funcArgTypes func
           retTypes = funcRetTypes func
-          argTexts = map valueToArgText $ decodeABIArgs argsBytes argTypes
+          argTexts = zipWith (valueToArgTextWithType contract) argTypes $ decodeABIArgsWithContract contract argsBytes argTypes
           prettyArgs = intercalate ", " $ map T.unpack argTexts
           prettyCall = T.unpack (labelToText funcName) ++ "(" ++ prettyArgs ++ ")"
 
@@ -376,7 +376,7 @@ initBestBlockContext = do
 -- Contract resolution: address -> (funcName, func), following proxy if needed
 --------------------------------------------------------------------------------
 
-resolveFunction :: VMBase m => BlockHeader -> Address -> Address -> B.ByteString -> m (Maybe (SolidString, CC.Func))
+resolveFunction :: VMBase m => BlockHeader -> Address -> Address -> B.ByteString -> m (Maybe (CC.Contract, SolidString, CC.Func))
 resolveFunction blockHeader fromAddr addr selector = do
   lookupContract blockHeader fromAddr addr >>= \case
     Nothing -> do
@@ -388,11 +388,11 @@ resolveFunction blockHeader fromAddr addr selector = do
         ++ " funcs=" ++ show (M.keys $ CC._functions contract)
         ++ " storageDefs=" ++ show (M.keys $ contract ^. CC.storageDefs)
       case matchSelector contract selector of
-        Just hit -> return $ Just hit
+        Just (name, func) -> return $ Just (contract, name, func)
         Nothing -> case matchStorageGetter contract selector of
-          Just hit -> do
+          Just (name, func) -> do
             $logInfoS "resolveFunction" "matched storage getter on direct contract"
-            return $ Just hit
+            return $ Just (contract, name, func)
           Nothing -> do
             $logInfoS "resolveFunction" "no direct match, trying proxy"
             followProxy blockHeader fromAddr addr contract >>= \case
@@ -400,13 +400,15 @@ resolveFunction blockHeader fromAddr addr selector = do
                 $logInfoS "resolveFunction" "followProxy returned Nothing"
                 return Nothing
               Just implContract -> do
-                let result = matchSelector implContract selector
-                             <|> matchStorageGetter implContract selector
+                let result = case matchSelector implContract selector
+                                  <|> matchStorageGetter implContract selector of
+                               Just (name, func) -> Just (implContract, name, func)
+                               Nothing -> Nothing
                 $logInfoS "resolveFunction" . T.pack $
                   "impl contract " ++ show (implContract ^. CC.contractName)
                   ++ " funcs=" ++ show (M.keys $ CC._functions implContract)
                   ++ " storageDefs=" ++ show (M.keys $ implContract ^. CC.storageDefs)
-                  ++ " resolved=" ++ show (fmap (labelToText . fst) result)
+                  ++ " resolved=" ++ show (fmap (labelToText . (\(_, name, _) -> name)) result)
                 return result
 
 lookupContract :: VMBase m => BlockHeader -> Address -> Address -> m (Maybe CC.Contract)
@@ -469,8 +471,7 @@ followProxy blockHeader fromAddr proxyAddr contract
 
 matchSelector :: CC.Contract -> B.ByteString -> Maybe (SolidString, CC.Func)
 matchSelector contract selector =
-  let enumSizes = [(labelToText n, length names) | (n, (names, _)) <- M.toList (CC._enums contract)]
-   in matchFunction enumSizes selector (M.toList $ CC._functions contract)
+  matchFunctionWithContract contract selector (M.toList $ CC._functions contract)
 
 matchStorageGetter :: CC.Contract -> B.ByteString -> Maybe (SolidString, CC.Func)
 matchStorageGetter contract selector = go (M.toList $ CC._storageDefs contract)
@@ -478,7 +479,7 @@ matchStorageGetter contract selector = go (M.toList $ CC._storageDefs contract)
     go [] = Nothing
     go ((varName, varDecl) : rest)
       | CC._varVisibility varDecl /= Just Public = go rest
-      | computeSelector varName argTypes == selector = Just (varName, syntheticFunc)
+      | computeSelectorWithContract contract varName argTypes == selector = Just (varName, syntheticFunc)
       | otherwise = go rest
       where
         (argTypes, retType) = getterSignature (CC._varType varDecl)

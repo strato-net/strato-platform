@@ -63,9 +63,13 @@ main = do
       "   :      :   : :  : :  :  : :: : :  :          :: :  : :    :   : :  :   : :  :        :       : :: ::   :   : :"
     ]
   _ <- $initHFlags "Setup Vault Wrapper DBs"
+  postgresPassword <-
+    if null flags_postgresPasswordFile
+      then pure flags_password
+      else filter (`notElem` ['\r', '\n']) <$> readFile flags_postgresPasswordFile
 
   -- Create database if it doesn't exist (postgres should be ready via docker --wait)
-  let adminConnStr = fromString $ "host=" <> flags_pghost <> " port=" <> flags_pgport <> " user=" <> flags_pguser <> " password=" <> flags_password <> " dbname=postgres"
+  let adminConnStr = fromString $ "host=" <> flags_pghost <> " port=" <> flags_pgport <> " user=" <> flags_pguser <> " password=" <> postgresPassword <> " dbname=postgres"
       createDbQuery = "CREATE DATABASE " <> fromString flags_database <> " WITH ENCODING 'UTF8'"
   runNoLoggingT $ withPostgresqlConn adminConnStr $ \backend -> do
     result <- liftIO $ try $ runReaderT (rawExecute createDbQuery []) backend
@@ -78,7 +82,7 @@ main = do
           { connectHost = flags_pghost,
             connectPort = read flags_pgport,
             connectUser = flags_pguser,
-            connectPassword = flags_password,
+            connectPassword = postgresPassword,
             connectDatabase = flags_database
           }
 

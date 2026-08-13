@@ -65,6 +65,25 @@ library
     , vm-tools
   default-language: Haskell2010
 
+test-suite across-local-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      AcrossLocalSpec
+      Paths_strato_genesis
+  hs-source-dirs:
+      test-across
+  ghc-options: -Wall -dynamic
+  build-depends:
+      base
+    , blockapps-data
+    , bytestring
+    , hspec
+    , solid-vm-model
+    , strato-genesis
+    , strato-model
+  default-language: Haskell2010
+
 test-suite strato-genesis-test
   type: exitcode-stdio-1.0
   main-is: Main.hs

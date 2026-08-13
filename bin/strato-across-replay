@@ -1,0 +1,254 @@
+#!/usr/bin/env bash
+
+# Start or stop the host processes needed for an isolated Across/SolidVM replay
+# node. Support services remain containerized; consensus, VM, API, and indexing
+# processes run from the locally built tree. Replays are intentionally
+# sequential because the local compose project and ports are fixed.
+
+set -euo pipefail
+
+usage() {
+  echo "Usage: strato-across-replay NODE_DIR start|supervise|stop|api-url" >&2
+  echo "start/supervise require LOCAL_AUTH_PASSWORD_FILE, LOCAL_AUTH_PRIVATE_KEY_FILE, and ACROSS_VALIDATOR_ADDRESS" >&2
+  exit 1
+}
+
+NODE_DIR="${1:-}"
+ACTION="${2:-}"
+[[ -n "$NODE_DIR" && -n "$ACTION" ]] || usage
+[[ -d "$NODE_DIR" ]] || { echo "Node directory does not exist: $NODE_DIR" >&2; exit 1; }
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+PID_FILE="$NODE_DIR/.across-replay.pids"
+
+api_readiness_url() {
+  local config_file="$NODE_DIR/.ethereumH/ethconf.yaml"
+  [[ -f "$config_file" ]] || {
+    echo "Generated STRATO configuration does not exist: $config_file" >&2
+    return 1
+  }
+
+  local host port probe_host
+  host="$(awk '
+    /^apiConfig:/ { in_api = 1; next }
+    in_api && /^[^[:space:]]/ { exit }
+    in_api && $1 == "apiListenAddress:" { print $2; exit }
+  ' "$config_file")"
+  port="$(awk '
+    /^apiConfig:/ { in_api = 1; next }
+    in_api && /^[^[:space:]]/ { exit }
+    in_api && $1 == "apiPort:" { print $2; exit }
+  ' "$config_file")"
+
+  [[ "$host" =~ ^[0-9A-Fa-f:.]+$ ]] || {
+    echo "Invalid apiListenAddress in $config_file" >&2
+    return 1
+  }
+  [[ "$port" =~ ^[0-9]+$ ]] && (( port >= 1 && port <= 65535 )) || {
+    echo "Invalid apiPort in $config_file" >&2
+    return 1
+  }
+
+  case "$host" in
+    0.0.0.0) probe_host="127.0.0.1" ;;
+    ::) probe_host="[::1]" ;;
+    *:*) probe_host="[$host]" ;;
+    *) probe_host="$host" ;;
+  esac
+  printf 'http://%s:%s/eth/v1.2/block/last/1\n' "$probe_host" "$port"
+}
+
+if [[ "$ACTION" == "api-url" ]]; then
+  api_readiness_url
+  exit 0
+fi
+
+stop_node() {
+  if [[ -f "$PID_FILE" ]]; then
+    while read -r _name pid; do
+      [[ -n "${pid:-}" ]] || continue
+      kill "$pid" 2>/dev/null || true
+    done < "$PID_FILE"
+
+    for _ in $(seq 1 40); do
+      any_running=false
+      while read -r _name pid; do
+        if [[ -n "${pid:-}" ]] && kill -0 "$pid" 2>/dev/null; then
+          any_running=true
+          break
+        fi
+      done < "$PID_FILE"
+      [[ "$any_running" == false ]] && break
+      sleep 0.25
+    done
+
+    # Some STRATO services intentionally defer SIGTERM while unwinding. Do not
+    # discard the only PID inventory and leave listeners behind: after the
+    # graceful ten-second window, force-stop only the exact recorded PIDs.
+    while read -r _name pid; do
+      [[ -n "${pid:-}" ]] || continue
+      kill -KILL "$pid" 2>/dev/null || true
+    done < "$PID_FILE"
+
+    for _ in $(seq 1 20); do
+      any_running=false
+      while read -r _name pid; do
+        if [[ -n "${pid:-}" ]] && kill -0 "$pid" 2>/dev/null; then
+          any_running=true
+          break
+        fi
+      done < "$PID_FILE"
+      [[ "$any_running" == false ]] && break
+      sleep 0.1
+    done
+    rm -f "$PID_FILE"
+  fi
+
+  (cd "$NODE_DIR" && docker compose -p strato down)
+}
+
+if [[ "$ACTION" == "stop" ]]; then
+  stop_node
+  exit 0
+fi
+[[ "$ACTION" == "start" || "$ACTION" == "supervise" ]] || usage
+if [[ "$ACTION" == "supervise" ]]; then
+  trap 'stop_node; exit 0' TERM INT
+fi
+
+: "${LOCAL_AUTH_PASSWORD_FILE:?LOCAL_AUTH_PASSWORD_FILE is required}"
+: "${LOCAL_AUTH_PRIVATE_KEY_FILE:?LOCAL_AUTH_PRIVATE_KEY_FILE is required}"
+: "${ACROSS_VALIDATOR_ADDRESS:?ACROSS_VALIDATOR_ADDRESS is required}"
+
+if [[ -f "$PID_FILE" ]]; then
+  while read -r name pid; do
+    if [[ -n "${pid:-}" ]] && kill -0 "$pid" 2>/dev/null; then
+      echo "Replay process is already running: $name ($pid)" >&2
+      exit 1
+    fi
+  done < "$PID_FILE"
+  rm -f "$PID_FILE"
+fi
+
+for executable in docker blockapps-vault-wrapper-server ethereum-discover \
+  strato-p2p strato-sequencer vm-runner strato-indexer slipstream strato-api \
+  ethereum-jsonrpc strato-vault-import-key curl; do
+  command -v "$executable" >/dev/null 2>&1 || {
+    echo "Required executable not found on PATH: $executable" >&2
+    exit 1
+  }
+done
+
+mkdir -p "$NODE_DIR/logs"
+: > "$PID_FILE"
+
+start_process() {
+  local name="$1"
+  shift
+  (
+    cd "$NODE_DIR"
+    nohup "$@" > "logs/$name.log" 2>&1 </dev/null &
+    echo "$!" > ".${name}.pid"
+  )
+  local pid
+  pid="$(tail -n 1 "$NODE_DIR/.${name}.pid")"
+  rm -f "$NODE_DIR/.${name}.pid"
+  echo "$name $pid" >> "$PID_FILE"
+  sleep 0.4
+  if ! kill -0 "$pid" 2>/dev/null; then
+    echo "Process exited during startup: $name (see $NODE_DIR/logs/$name.log)" >&2
+    stop_node
+    exit 1
+  fi
+}
+
+wait_for_http() {
+  local url="$1"
+  local label="$2"
+  for _ in $(seq 1 120); do
+    curl -fsS "$url" >/dev/null 2>&1 && return 0
+    sleep 0.5
+  done
+  echo "Timed out waiting for $label: $url" >&2
+  stop_node
+  exit 1
+}
+
+wait_for_listener() {
+  local url="$1"
+  local label="$2"
+  for _ in $(seq 1 120); do
+    # A non-2xx response is enough here: the signer returns 400 before the
+    # first key is imported, but that still proves the listener is ready.
+    curl -sS -o /dev/null "$url" 2>/dev/null && return 0
+    sleep 0.5
+  done
+  echo "Timed out waiting for $label: $url" >&2
+  stop_node
+  exit 1
+}
+
+(cd "$NODE_DIR" && docker compose -p strato up -d --pull never)
+
+start_process signer blockapps-vault-wrapper-server \
+  --pghost 127.0.0.1 --postgresPasswordFile secrets/postgres_password --port 8093 \
+  --vaultPasswordFile secrets/vault_password +RTS -T -RTS
+
+wait_for_listener "http://127.0.0.1:8094/strato/v2.3/key" "local signer proxy"
+
+"$REPO_DIR/bin/strato-user-add" "$NODE_DIR" admin --with-nodekey \
+  "--password-file=$LOCAL_AUTH_PASSWORD_FILE" \
+  "--private-key-file=$LOCAL_AUTH_PRIVATE_KEY_FILE" \
+  "--expected-address=$ACROSS_VALIDATOR_ADDRESS"
+
+start_process discovery ethereum-discover +RTS -T -RTS
+for _ in $(seq 1 120); do
+  if (cd "$NODE_DIR" && docker compose -p strato exec -T postgres \
+      psql -U postgres -d eth -Atc "select count(*) from p_peer" >/dev/null 2>&1); then
+    break
+  fi
+  sleep 0.5
+done
+if ! (cd "$NODE_DIR" && docker compose -p strato exec -T postgres \
+    psql -U postgres -d eth -Atc "select count(*) from p_peer" >/dev/null 2>&1); then
+  echo "Timed out waiting for discovery migrations" >&2
+  stop_node
+  exit 1
+fi
+
+start_process p2p strato-p2p +RTS -T -RTS
+start_process sequencer strato-sequencer +RTS -T -N1 -RTS
+start_process vm vm-runner +RTS -T -I2 -N1 -RTS
+start_process indexer strato-indexer
+start_process slipstream slipstream +RTS -T -RTS
+start_process api strato-api +RTS -T -N -maxN4 -RTS
+start_process jsonrpc env ETHEREUM_JSONRPC_HOST=127.0.0.1 ethereum-jsonrpc +RTS -T -RTS
+
+wait_for_http "$(api_readiness_url)" "STRATO API"
+for _ in $(seq 1 120); do
+  if curl -fsS -H 'Content-Type: application/json' \
+      --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
+      http://127.0.0.1:8545 | grep -q '"result"'; then
+    echo "Across replay node is ready: $NODE_DIR"
+    if [[ "$ACTION" == "start" ]]; then
+      exit 0
+    fi
+
+    while true; do
+      while read -r name pid; do
+        if [[ -z "${pid:-}" ]] || ! kill -0 "$pid" 2>/dev/null; then
+          echo "Supervised process exited: $name (${pid:-missing})" >&2
+          stop_node
+          exit 1
+        fi
+      done < "$PID_FILE"
+      sleep 5
+    done
+  fi
+  sleep 0.5
+done
+
+echo "Timed out waiting for Ethereum JSON-RPC" >&2
+stop_node
+exit 1

@@ -1,0 +1,660 @@
+diff --git a/scripts/solidvm-smoke.ts b/scripts/solidvm-smoke.ts
+new file mode 100644
+index 0000000..73ace8e
+--- /dev/null
++++ b/scripts/solidvm-smoke.ts
+@@ -0,0 +1,154 @@
++import fs from "fs";
++import { TransactionClient } from "../src/clients/TransactionClient";
++import { submitTransaction } from "../src/utils/TransactionUtils";
++import { ERC20, SpokePool, ethers, winston } from "../src/utils";
++
++function required(name: string): string {
++  const value = process.env[name];
++  if (!value) throw new Error(`${name} is required`);
++  return value;
++}
++
++async function waitForFilledRelay(
++  provider: ethers.providers.Provider,
++  spokePool: ethers.Contract,
++  transactionHash: string,
++  initialReceipt: ethers.providers.TransactionReceipt
++): Promise<{ receipt: ethers.providers.TransactionReceipt; events: string[] }> {
++  let receipt = initialReceipt;
++  for (let attempt = 0; attempt < 100; attempt += 1) {
++    const events = receipt.logs.flatMap((log) => {
++      try {
++        return [spokePool.interface.parseLog(log).name];
++      } catch {
++        return [];
++      }
++    });
++    if (events.includes("FilledRelay")) return { receipt, events };
++
++    // SolidVM commits the transaction before Slipstream has necessarily
++    // projected its emitted events into Cirrus. Polling the same receipt is
++    // bounded and preserves the normal Ethereum receipt/log interface.
++    await new Promise((resolve) => setTimeout(resolve, 100));
++    receipt = (await provider.getTransactionReceipt(transactionHash)) ?? receipt;
++  }
++  throw new Error("FilledRelay log was not indexed within 10 seconds");
++}
++
++async function main(): Promise<void> {
++  const rpcUrl = required("SOLIDVM_RPC_URL");
++  const spokePoolAddress = required("SOLIDVM_SPOKE_POOL_ADDRESS");
++  const tokenAddress = required("SOLIDVM_OUTPUT_TOKEN_ADDRESS");
++  const mnemonic = fs.readFileSync(required("SOLIDVM_TEST_MNEMONIC_FILE"), "utf8").trim();
++
++  const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
++  const { chainId } = await provider.getNetwork();
++  const relayer = ethers.Wallet.fromMnemonic(mnemonic, "m/44'/60'/0'/0/1").connect(provider);
++  const recipient = ethers.Wallet.fromMnemonic(mnemonic, "m/44'/60'/0'/0/2").address;
++  const relayerAddress = await relayer.getAddress();
++  const logger = winston.createLogger({
++    level: "debug",
++    format: winston.format.json(),
++    transports: [new winston.transports.Console()],
++  });
++  const transactionClient = new TransactionClient(logger);
++  const token = ERC20.connect(tokenAddress, relayer);
++  const spokePool = SpokePool.connect(spokePoolAddress, relayer);
++  const amount = ethers.utils.parseEther("1");
++  const depositId = Number(process.env.SOLIDVM_DEPOSIT_ID ?? "424243");
++  if (!Number.isSafeInteger(depositId) || depositId < 0) throw new Error("SOLIDVM_DEPOSIT_ID must be a non-negative safe integer");
++  const recipientBefore = await token.balanceOf(recipient);
++  const relayerBefore = await token.balanceOf(relayerAddress);
++
++  let approvalResponse: ethers.providers.TransactionResponse | undefined;
++  let approvalReceipt: ethers.providers.TransactionReceipt | undefined;
++  if ((await token.allowance(relayerAddress, spokePoolAddress)).lt(amount)) {
++    approvalResponse = await submitTransaction(
++      {
++        contract: token,
++        chainId,
++        method: "approve",
++        args: [spokePoolAddress, amount],
++        ensureConfirmation: true,
++        message: "Approve SolidVM SpokePool",
++      },
++      transactionClient
++    );
++    approvalReceipt = await approvalResponse.wait();
++  }
++
++  const asBytes32 = (address: string): string => ethers.utils.hexZeroPad(address, 32);
++  const relayData = {
++    depositor: asBytes32(ethers.Wallet.fromMnemonic(mnemonic, "m/44'/60'/0'/0/3").address),
++    recipient: asBytes32(recipient),
++    exclusiveRelayer: ethers.constants.HashZero,
++    inputToken: asBytes32(tokenAddress),
++    outputToken: asBytes32(tokenAddress),
++    inputAmount: amount,
++    outputAmount: amount,
++    originChainId: 1,
++    depositId,
++    fillDeadline: Math.floor(Date.now() / 1000) + 3600,
++    exclusivityDeadline: 0,
++    message: "0x",
++  };
++
++  const fillResponse = await submitTransaction(
++    {
++      contract: spokePool,
++      chainId,
++      method: "fillRelay",
++      args: [relayData, chainId, asBytes32(relayerAddress)],
++      ensureConfirmation: true,
++      message: "Fill synthetic Across relay on SolidVM",
++    },
++    transactionClient
++  );
++  const initialFillReceipt = await fillResponse.wait();
++  const { receipt: fillReceipt, events: parsedLogs } = await waitForFilledRelay(
++    provider,
++    spokePool,
++    fillResponse.hash,
++    initialFillReceipt
++  );
++  const recipientAfter = await token.balanceOf(recipient);
++  const relayerAfter = await token.balanceOf(relayerAddress);
++  if (!recipientAfter.sub(recipientBefore).eq(amount)) throw new Error("recipient did not receive the fill amount");
++
++  process.stdout.write(
++    `${JSON.stringify(
++      {
++        chainId,
++        relayer: relayerAddress,
++        recipient,
++        spokePool: spokePoolAddress,
++        approval: {
++          hash: approvalResponse?.hash ?? null,
++          status: approvalReceipt?.status ?? null,
++          gasUsed: approvalReceipt?.gasUsed.toString() ?? null,
++          reusedExistingAllowance: approvalResponse === undefined,
++        },
++        fill: {
++          depositId,
++          hash: fillResponse.hash,
++          status: fillReceipt.status,
++          gasUsed: fillReceipt.gasUsed.toString(),
++          events: parsedLogs,
++        },
++        balances: {
++          relayerBefore: relayerBefore.toString(),
++          relayerAfter: relayerAfter.toString(),
++          recipientBefore: recipientBefore.toString(),
++          recipientAfter: recipientAfter.toString(),
++        },
++      },
++      null,
++      2
++    )}\n`
++  );
++}
++
++main().catch((error: unknown) => {
++  process.stderr.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
++  process.exitCode = 1;
++});
+diff --git a/src/clients/TransactionClient.ts b/src/clients/TransactionClient.ts
+index 6ab2dc3..08ff189 100644
+--- a/src/clients/TransactionClient.ts
++++ b/src/clients/TransactionClient.ts
+@@ -62,8 +62,14 @@ function isReplacedError(
+   return is(error, ReplacedError);
+ }
+
+-// Define chains that require legacy (type 0) transactions
+-export const LEGACY_TRANSACTION_CHAINS = [CHAIN_IDs.BSC];
++// Define chains that require legacy (type 0) transactions. Private EVM chains
++// can opt in without being added to the public Across chain constants package.
++const configuredLegacyChains = JSON.parse(process.env.LEGACY_TRANSACTION_CHAIN_IDS ?? "[]") as unknown;
++assert(
++  Array.isArray(configuredLegacyChains) && configuredLegacyChains.every(Number.isSafeInteger),
++  "LEGACY_TRANSACTION_CHAIN_IDS must be a JSON array of safe integer chain IDs"
++);
++export const LEGACY_TRANSACTION_CHAINS = [...new Set([CHAIN_IDs.BSC, ...configuredLegacyChains])];
+
+ export interface AugmentedTransaction {
+   contract: Contract;
+diff --git a/src/common/ClientHelper.ts b/src/common/ClientHelper.ts
+index 4510659..91e8452 100644
+--- a/src/common/ClientHelper.ts
++++ b/src/common/ClientHelper.ts
+@@ -19,6 +19,8 @@ import {
+   isEVMSpokePoolClient,
+   getSvmProvider,
+   getBlockFinder,
++  getCustomChainConfig,
++  EvmAddress,
+ } from "../utils";
+ import { getRedisCache } from "../cache/Redis";
+ import {
+@@ -67,6 +69,10 @@ export async function resolveSpokePoolActivationBlock(
+   hubPoolClient: HubPoolClient,
+   blockNumber?: number
+ ): Promise<number> {
++  const customDeploymentBlock = getCustomChainConfig(chainId)?.spokePoolDeploymentBlock;
++  if (isDefined(customDeploymentBlock)) {
++    return customDeploymentBlock;
++  }
+   const spokePoolAddr = hubPoolClient.getSpokePoolForBlock(chainId, blockNumber);
+   const key = `relayer_${chainId}_spokepool_${spokePoolAddr}_activation_block`;
+
+@@ -232,7 +238,10 @@ export async function constructSpokePoolClientsWithStartBlocks(
+     enabledChains.map(async (chainId) => {
+       const registrationBlock = await resolveSpokePoolActivationBlock(chainId, hubPoolClient, toBlockOverride[1]);
+       if (chainIsEvm(chainId)) {
+-        const spokePoolAddr = hubPoolClient.getSpokePoolForBlock(chainId, toBlockOverride[1]);
++        const customAddress = getCustomChainConfig(chainId)?.spokePoolAddress;
++        const spokePoolAddr = isDefined(customAddress)
++          ? EvmAddress.from(customAddress)
++          : hubPoolClient.getSpokePoolForBlock(chainId, toBlockOverride[1]);
+         // TODO: initialize using typechain factory after V3.5 migration.
+         // const spokePoolContract = SpokePool.connect(spokePoolAddr, spokePoolSigners[chainId]);
+         const spokePoolContract = new ethers.Contract(
+diff --git a/src/finalizer/index.ts b/src/finalizer/index.ts
+index 6c63710..d069c4b 100644
+--- a/src/finalizer/index.ts
++++ b/src/finalizer/index.ts
+@@ -34,6 +34,8 @@ import {
+   getProvider,
+   chunk,
+   isPromiseFulfilled,
++  customChainUsesUniversalSpoke,
++  getCustomChainIds,
+ } from "../utils";
+ import { ChainFinalizer, CrossChainMessage, Finalizer, isAugmentedTransaction } from "./types";
+ import {
+@@ -118,7 +120,7 @@ function generateChainConfig(): void {
+       config.finalizeOnL1.push(l1Finalizer);
+     }
+
+-    if (UNIVERSAL_CHAINS.includes(chainId)) {
++    if (UNIVERSAL_CHAINS.includes(chainId) || customChainUsesUniversalSpoke(chainId)) {
+       config.finalizeOnL2.push(heliosL1toL2Finalizer);
+     }
+
+@@ -132,6 +134,18 @@ function generateChainConfig(): void {
+       config.finalizeOnAny.push(oftRetryFinalizer);
+     }
+   });
++
++  // Private chains are intentionally absent from @across-protocol/constants, so
++  // explicitly register their Universal Spoke finalizer from operator config.
++  getCustomChainIds().forEach((chainId) => {
++    const config = (chainFinalizers[chainId] ??= {});
++    config.finalizeOnL1 ??= [];
++    config.finalizeOnL2 ??= [];
++    config.finalizeOnAny ??= [];
++    if (customChainUsesUniversalSpoke(chainId) && !config.finalizeOnL2.includes(heliosL1toL2Finalizer)) {
++      config.finalizeOnL2.push(heliosL1toL2Finalizer);
++    }
++  });
+ }
+
+ /**
+diff --git a/src/finalizer/utils/helios.ts b/src/finalizer/utils/helios.ts
+index a2013c4..22e77e2 100644
+--- a/src/finalizer/utils/helios.ts
++++ b/src/finalizer/utils/helios.ts
+@@ -14,6 +14,7 @@ import {
+   postWithTimeout,
+   isHttpError,
+   isDefined,
++  getHeliosProofApiHeaders,
+ } from "../../utils";
+ import { spreadEventWithBlockNumber } from "../../utils/EventUtils";
+ import { FinalizerPromise, CrossChainMessage } from "../types";
+@@ -285,6 +286,7 @@ async function enrichHeliosActions(
+   if (!apiBaseUrl) {
+     throw new Error("[enrichHeliosActions] HELIOS_PROOF_API_URL environment variable not set.");
+   }
++  const proofApiHeaders = getHeliosProofApiHeaders();
+   const hubPoolStoreAddress = getHubPoolStoreContract(
+     l1SpokePoolClient.chainId,
+     l1SpokePoolClient.spokePool.provider
+@@ -347,7 +349,7 @@ async function enrichHeliosActions(
+     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     let getError: any = null;
+     try {
+-      proofState = await fetchWithTimeout<ProofStateResponse>(getProofUrl);
++      proofState = await fetchWithTimeout<ProofStateResponse>(getProofUrl, {}, proofApiHeaders);
+       logger.debug({ ...logContext, message: "Proof state received", proofId, status: proofState.status });
+       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     } catch (error: any) {
+@@ -360,7 +362,7 @@ async function enrichHeliosActions(
+       if (isNotFoundError) {
+         // NOTFOUND error -> Request proof
+         logger.debug({ ...logContext, message: "Proof not found (404), requesting...", proofId });
+-        await postWithTimeout(`${apiBaseUrl}/v1/api/proofs`, apiRequest);
++        await postWithTimeout(`${apiBaseUrl}/v1/api/proofs`, apiRequest, {}, proofApiHeaders);
+         logger.debug({ ...logContext, message: "Proof requested successfully.", proofId });
+         continue;
+       } else {
+@@ -390,7 +392,7 @@ async function enrichHeliosActions(
+           errorMessage: proofState.error_message,
+         });
+
+-        await postWithTimeout(`${apiBaseUrl}/v1/api/proofs`, apiRequest);
++        await postWithTimeout(`${apiBaseUrl}/v1/api/proofs`, apiRequest, {}, proofApiHeaders);
+         logger.debug({ ...logContext, message: "Errored proof requested again successfully.", proofId });
+         break;
+       }
+diff --git a/src/relayer/RelayerClientHelper.ts b/src/relayer/RelayerClientHelper.ts
+index 0031599..a0e1a93 100644
+--- a/src/relayer/RelayerClientHelper.ts
++++ b/src/relayer/RelayerClientHelper.ts
+@@ -35,6 +35,7 @@ import {
+   EvmAddress,
+   getSvmSignerFromEvmSigner,
+   chainIsSvm,
++  getCustomChainConfig,
+ } from "../utils";
+ import { getRedisCache } from "../cache/Redis";
+ import { RelayerConfig } from "./RelayerConfig";
+@@ -61,7 +62,8 @@ async function indexedSpokePoolClient(
+
+   // Set up Spoke signers and connect them to spoke pool contract objects.
+   const signer = baseSigner.connect(await getProvider(chainId));
+-  const spokePoolAddr = hubPoolClient.getSpokePoolForBlock(chainId);
++  const customAddress = getCustomChainConfig(chainId)?.spokePoolAddress;
++  const spokePoolAddr = customAddress ? EvmAddress.from(customAddress) : hubPoolClient.getSpokePoolForBlock(chainId);
+
+   const blockFinder: undefined = undefined;
+   const redis = await getRedisCache(hubPoolClient.logger);
+diff --git a/src/utils/ContractUtils.ts b/src/utils/ContractUtils.ts
+index 51e44bf..5b372ed 100644
+--- a/src/utils/ContractUtils.ts
++++ b/src/utils/ContractUtils.ts
+@@ -14,6 +14,7 @@ import {
+   isDefined,
+   chainIsTvm,
+   TvmAddress,
++  getCustomChainConfig,
+ } from ".";
+ import { CONTRACT_ADDRESSES, getContractEntry, getContractAbi } from "../common";
+ import { isKeyOf } from "./TypeGuards";
+@@ -44,9 +45,11 @@ export function getEthersCompatibleAddress(chainId: number, address: string): st
+ // Return an ethers contract instance for a deployed contract, imported from the Across-protocol contracts repo.
+ export function getDeployedContract(contractName: string, networkId: number, signer?: Signer): Contract {
+   try {
+-    const deployed = getDeployedAddress(contractName, networkId);
+-    assert(isDefined(deployed), `No deployed address for ${contractName} on ${networkId}`);
+-    const address = getEthersCompatibleAddress(networkId, deployed);
++    const customChain = getCustomChainConfig(networkId);
++    const deployed = contractName === "SpokePool" ? customChain?.spokePoolAddress : undefined;
++    const resolvedDeployment = deployed ?? getDeployedAddress(contractName, networkId);
++    assert(isDefined(resolvedDeployment), `No deployed address for ${contractName} on ${networkId}`);
++    const address = getEthersCompatibleAddress(networkId, resolvedDeployment);
+     // If the contractName is SpokePool then we need to modify it to find the correct contract factory artifact.
+     const abi = getTypechainAbi(contractName);
+     return new Contract(address, abi, signer);
+@@ -81,6 +84,10 @@ export function getPermit2(chainId: number, address?: string): Contract {
+ }
+
+ export function getSpokePoolAddress(chainId: number): Address {
++  const customAddress = getCustomChainConfig(chainId)?.spokePoolAddress;
++  if (isDefined(customAddress)) {
++    return EvmAddress.from(customAddress);
++  }
+   const evmChain = chainIsEvm(chainId);
+   const addr = getDeployedAddress(evmChain ? "SpokePool" : "SvmSpoke", chainId, true);
+   assert(isDefined(addr), `No SpokePool deployment found for chain ${chainId}`);
+@@ -104,6 +111,10 @@ export function getParamType(contractName: string, functionName: string, paramNa
+
+ export function getDeploymentBlockNumber(contractName: string, networkId: number): number {
+   try {
++    const customChain = getCustomChainConfig(networkId);
++    if (contractName === "SpokePool" && isDefined(customChain)) {
++      return customChain.spokePoolDeploymentBlock;
++    }
+     return Number(getDeployedBlockNumber(contractName, networkId));
+   } catch {
+     throw new Error(`Could not find deployment block for contract ${contractName} on ${networkId}`);
+diff --git a/src/utils/CustomChainUtils.ts b/src/utils/CustomChainUtils.ts
+new file mode 100644
+index 0000000..528cafb
+--- /dev/null
++++ b/src/utils/CustomChainUtils.ts
+@@ -0,0 +1,55 @@
++import assert from "assert";
++
++export interface CustomChainConfig {
++  name: string;
++  nativeTokenSymbol: string;
++  family: "evm";
++  spokePoolAddress: string;
++  spokePoolDeploymentBlock: number;
++  universalSpoke: boolean;
++}
++
++function parseCustomChains(): Record<string, Partial<CustomChainConfig>> {
++  const rawConfig = process.env.ACROSS_CUSTOM_CHAINS;
++  return rawConfig === undefined ? {} : (JSON.parse(rawConfig) as Record<string, Partial<CustomChainConfig>>);
++}
++
++export function getCustomChainIds(): number[] {
++  return Object.keys(parseCustomChains()).map((rawChainId) => {
++    const chainId = Number(rawChainId);
++    assert(Number.isSafeInteger(chainId) && chainId > 0, `Invalid custom chain id ${rawChainId}`);
++    return chainId;
++  });
++}
++
++export function getCustomChainConfig(chainId: number): CustomChainConfig | undefined {
++  assert(Number.isSafeInteger(chainId) && chainId > 0, `Invalid custom chain id ${chainId}`);
++  const parsed = parseCustomChains();
++  const config = parsed[chainId.toString()];
++  if (config === undefined) {
++    return undefined;
++  }
++
++  assert(config.family === "evm", `Custom chain ${chainId} must declare family \"evm\"`);
++  assert(typeof config.name === "string" && config.name.length > 0, `Custom chain ${chainId} is missing name`);
++  assert(
++    typeof config.nativeTokenSymbol === "string" && config.nativeTokenSymbol.length > 0,
++    `Custom chain ${chainId} is missing nativeTokenSymbol`
++  );
++  assert(
++    typeof config.spokePoolAddress === "string" && /^0x[0-9a-fA-F]{40}$/.test(config.spokePoolAddress),
++    `Custom chain ${chainId} has an invalid spokePoolAddress`
++  );
++  const deploymentBlock = config.spokePoolDeploymentBlock;
++  assert(
++    Number.isSafeInteger(deploymentBlock) && (deploymentBlock ?? -1) >= 0,
++    `Custom chain ${chainId} has an invalid spokePoolDeploymentBlock`
++  );
++  assert(typeof config.universalSpoke === "boolean", `Custom chain ${chainId} is missing universalSpoke`);
++
++  return config as CustomChainConfig;
++}
++
++export function customChainUsesUniversalSpoke(chainId: number): boolean {
++  return getCustomChainConfig(chainId)?.universalSpoke === true;
++}
+diff --git a/src/utils/NetworkUtils.ts b/src/utils/NetworkUtils.ts
+index 09bf045..5d4ea7c 100644
+--- a/src/utils/NetworkUtils.ts
++++ b/src/utils/NetworkUtils.ts
+@@ -4,8 +4,15 @@ import { Chain, extractChain } from "viem";
+ import * as viemChains from "viem/chains";
+ import { utils as sdkUtils } from "@across-protocol/sdk";
+ import { CUSTOM_VIEM_CHAINS } from "./CustomViemChains";
++import { getCustomChainConfig } from "./CustomChainUtils";
+
+-export const { getNetworkName, getNativeTokenSymbol } = sdkUtils;
++export function getNetworkName(chainId: number | string): string {
++  return getCustomChainConfig(Number(chainId))?.name ?? sdkUtils.getNetworkName(chainId);
++}
++
++export function getNativeTokenSymbol(chainId: number | string): string {
++  return getCustomChainConfig(Number(chainId))?.nativeTokenSymbol ?? sdkUtils.getNativeTokenSymbol(chainId);
++}
+
+ type ViemChainId = (typeof viemChains)[keyof typeof viemChains]["id"];
+
+diff --git a/src/utils/ProofApiAuth.ts b/src/utils/ProofApiAuth.ts
+new file mode 100644
+index 0000000..782ba79
+--- /dev/null
++++ b/src/utils/ProofApiAuth.ts
+@@ -0,0 +1,32 @@
++import assert from "assert";
++import fs from "fs";
++
++/**
++ * Load prover authentication headers from a private file on every finalizer
++ * pass. This keeps credentials out of process arguments/environment dumps and
++ * permits atomic secret rotation without restarting the relayer.
++ */
++export function getHeliosProofApiHeaders(): Record<string, string> {
++  const file = process.env.HELIOS_PROOF_API_HEADERS_FILE;
++  if (!file) return {};
++
++  const linkStatus = fs.lstatSync(file);
++  assert(linkStatus.isFile() && !linkStatus.isSymbolicLink(), "HELIOS_PROOF_API_HEADERS_FILE must be a regular file");
++  assert((linkStatus.mode & 0o077) === 0, "HELIOS_PROOF_API_HEADERS_FILE must not be accessible by group/other");
++
++  const decoded = JSON.parse(fs.readFileSync(file, "utf8")) as unknown;
++  assert(decoded !== null && typeof decoded === "object" && !Array.isArray(decoded), "Proof API headers must be a JSON object");
++  const headers = decoded as Record<string, unknown>;
++  assert(Object.keys(headers).length > 0, "Proof API headers must not be empty");
++  assert(
++    Object.entries(headers).every(
++      ([name, value]) =>
++        /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name) &&
++        typeof value === "string" &&
++        value.length > 0 &&
++        !/[\r\n]/.test(value)
++    ),
++    "Proof API header names and values must be non-empty strings without CR/LF"
++  );
++  return headers as Record<string, string>;
++}
+diff --git a/src/utils/SDKUtils.ts b/src/utils/SDKUtils.ts
+index 5ca5cdb..658b2b9 100644
+--- a/src/utils/SDKUtils.ts
++++ b/src/utils/SDKUtils.ts
+@@ -1,4 +1,5 @@
+ import * as sdk from "@across-protocol/sdk";
++import { getCustomChainConfig } from "./CustomChainUtils";
+
+ // EVMBlockFinder returns _only_ EVMBlock types.
+ export class EVMBlockFinder extends sdk.arch.evm.EVMBlockFinder {}
+@@ -103,7 +104,6 @@ export const {
+   toBytes32,
+   validateFillForDeposit,
+   toAddressType,
+-  chainIsEvm,
+   chainIsSvm,
+   ConvertDecimals,
+   getTokenInfo,
+@@ -125,6 +125,10 @@ export const {
+   HttpError,
+ } = sdk.utils;
+
++export function chainIsEvm(chainId: number): boolean {
++  return getCustomChainConfig(chainId)?.family === "evm" || sdk.utils.chainIsEvm(chainId);
++}
++
+ export type FetchHeaders = sdk.utils.FetchHeaders;
+ export type FetchQueryParams = sdk.utils.FetchQueryParams;
+
+diff --git a/src/utils/index.ts b/src/utils/index.ts
+index 5416e82..8beebc8 100644
+--- a/src/utils/index.ts
++++ b/src/utils/index.ts
+@@ -76,6 +76,8 @@ export * from "./Redis";
+ export * from "./UmaUtils";
+ export * from "./TokenUtils";
+ export * from "./CLIUtils";
++export * from "./CustomChainUtils";
++export * from "./ProofApiAuth";
+ export * from "./BNUtils";
+ export * from "./CCTPUtils";
+ export * from "./BinanceUtils";
+diff --git a/test/CustomChainUtils.ts b/test/CustomChainUtils.ts
+new file mode 100644
+index 0000000..e7b6fa1
+--- /dev/null
++++ b/test/CustomChainUtils.ts
+@@ -0,0 +1,55 @@
++import { expect } from "./utils";
++import {
++  customChainUsesUniversalSpoke,
++  getCustomChainConfig,
++  getCustomChainIds,
++} from "../src/utils/CustomChainUtils";
++import { chainIsEvm } from "../src/utils/SDKUtils";
++import { getNativeTokenSymbol, getNetworkName } from "../src/utils/NetworkUtils";
++import { getDeploymentBlockNumber, getSpokePoolAddress } from "../src/utils/ContractUtils";
++
++describe("CustomChainUtils", function () {
++  const chainId = 229025714941789;
++  const spokePoolAddress = "0x1111111111111111111111111111111111111111";
++  let previousConfig: string | undefined;
++
++  beforeEach(function () {
++    previousConfig = process.env.ACROSS_CUSTOM_CHAINS;
++    process.env.ACROSS_CUSTOM_CHAINS = JSON.stringify({
++      [chainId]: {
++        name: "STRATO",
++        nativeTokenSymbol: "USDST",
++        family: "evm",
++        spokePoolAddress,
++        spokePoolDeploymentBlock: 7,
++        universalSpoke: true,
++      },
++    });
++  });
++
++  afterEach(function () {
++    if (previousConfig === undefined) {
++      delete process.env.ACROSS_CUSTOM_CHAINS;
++    } else {
++      process.env.ACROSS_CUSTOM_CHAINS = previousConfig;
++    }
++  });
++
++  it("resolves private EVM chain metadata without changing public constants", function () {
++    expect(getCustomChainConfig(chainId)).to.deep.equal({
++      name: "STRATO",
++      nativeTokenSymbol: "USDST",
++      family: "evm",
++      spokePoolAddress,
++      spokePoolDeploymentBlock: 7,
++      universalSpoke: true,
++    });
++    expect(getCustomChainIds()).to.deep.equal([chainId]);
++    expect(customChainUsesUniversalSpoke(chainId)).to.equal(true);
++    expect(chainIsEvm(chainId)).to.equal(true);
++    expect(getNetworkName(chainId)).to.equal("STRATO");
++    expect(getNativeTokenSymbol(chainId)).to.equal("USDST");
++    expect(getSpokePoolAddress(chainId).toEvmAddress()).to.equal(spokePoolAddress);
++    expect(getDeploymentBlockNumber("SpokePool", chainId)).to.equal(7);
++  });
++});
+diff --git a/test/ProofApiAuth.ts b/test/ProofApiAuth.ts
+new file mode 100644
+index 0000000..a5a77d1
+--- /dev/null
++++ b/test/ProofApiAuth.ts
+@@ -0,0 +1,55 @@
++import fs from "fs";
++import os from "os";
++import path from "path";
++import { expect } from "chai";
++import { getHeliosProofApiHeaders } from "../src/utils/ProofApiAuth";
++
++describe("ProofApiAuth", function () {
++  let tempDir: string;
++  let previousPath: string | undefined;
++
++  beforeEach(function () {
++    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "across-proof-auth-"));
++    previousPath = process.env.HELIOS_PROOF_API_HEADERS_FILE;
++  });
++
++  afterEach(function () {
++    fs.rmSync(tempDir, { recursive: true, force: true });
++    if (previousPath === undefined) delete process.env.HELIOS_PROOF_API_HEADERS_FILE;
++    else process.env.HELIOS_PROOF_API_HEADERS_FILE = previousPath;
++  });
++
++  it("returns no headers when the optional secret file is not configured", function () {
++    delete process.env.HELIOS_PROOF_API_HEADERS_FILE;
++    expect(getHeliosProofApiHeaders()).to.deep.equal({});
++  });
++
++  it("loads a private JSON header file and observes rotation", function () {
++    const secret = path.join(tempDir, "headers.json");
++    fs.writeFileSync(secret, JSON.stringify({ Authorization: "Bearer first" }), { mode: 0o600 });
++    process.env.HELIOS_PROOF_API_HEADERS_FILE = secret;
++    expect(getHeliosProofApiHeaders()).to.deep.equal({ Authorization: "Bearer first" });
++    fs.writeFileSync(secret, JSON.stringify({ Authorization: "Bearer second" }), { mode: 0o600 });
++    expect(getHeliosProofApiHeaders()).to.deep.equal({ Authorization: "Bearer second" });
++  });
++
++  it("rejects a group-readable or symlinked secret file", function () {
++    const secret = path.join(tempDir, "headers.json");
++    fs.writeFileSync(secret, JSON.stringify({ Authorization: "Bearer secret" }), { mode: 0o640 });
++    process.env.HELIOS_PROOF_API_HEADERS_FILE = secret;
++    expect(() => getHeliosProofApiHeaders()).to.throw("must not be accessible by group/other");
++
++    fs.chmodSync(secret, 0o600);
++    const link = path.join(tempDir, "headers-link.json");
++    fs.symlinkSync(secret, link);
++    process.env.HELIOS_PROOF_API_HEADERS_FILE = link;
++    expect(() => getHeliosProofApiHeaders()).to.throw("must be a regular file");
++  });
++
++  it("rejects header-value injection", function () {
++    const secret = path.join(tempDir, "headers.json");
++    fs.writeFileSync(secret, JSON.stringify({ Authorization: "Bearer ok\r\nX-Injected: yes" }), { mode: 0o600 });
++    process.env.HELIOS_PROOF_API_HEADERS_FILE = secret;
++    expect(() => getHeliosProofApiHeaders()).to.throw("without CR/LF");
++  });
++});

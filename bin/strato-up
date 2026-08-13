@@ -89,18 +89,24 @@ if [[ -f .strato.pid ]]; then
 fi
 
 echo "Starting convoke..."
-# stdout and stderr both go to the log; stderr also goes to the terminal.
-# Both streams go through "tee -a" (append mode) so the two writers share the
-# file's end position and can't overwrite each other's bytes. Truncate first,
-# since the append redirects no longer reset the log on restart.
+# Keep convoke detached from this shell's output streams so it survives callers
+# that close their pipes as soon as strato-up returns (SSH, CI, and API-driven
+# shells). Operators can follow logs/convoke.log separately.
 : > logs/convoke.log
-nohup convoke > >(tee -a logs/convoke.log >/dev/null) 2> >(tee -a logs/convoke.log >&2) &
+nohup convoke >> logs/convoke.log 2>&1 </dev/null &
 CONVOKE_PID=$!
 echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
 
 if grep -q "local-auth:" docker-compose.yml; then
     echo "Ensuring local auth admin and node identity setup..."
-    if ! strato-user-add "$NODE_DIR_ABS" "${LOCAL_AUTH_ADMIN_USERNAME:-admin}" --with-nodekey; then
+    USER_ADD_ARGS=("$NODE_DIR_ABS" "${LOCAL_AUTH_ADMIN_USERNAME:-admin}" --with-nodekey)
+    if [[ -n "${LOCAL_AUTH_PASSWORD_FILE:-}" ]]; then
+        USER_ADD_ARGS+=("--password-file=${LOCAL_AUTH_PASSWORD_FILE}")
+    fi
+    if [[ -n "${LOCAL_AUTH_PRIVATE_KEY_FILE:-}" ]]; then
+        USER_ADD_ARGS+=("--private-key-file=${LOCAL_AUTH_PRIVATE_KEY_FILE}")
+    fi
+    if ! strato-user-add "${USER_ADD_ARGS[@]}"; then
         echo "Error: local auth admin setup failed; stopping STRATO." >&2
         kill "$CONVOKE_PID" 2>/dev/null || true
         rm -f .strato.pid

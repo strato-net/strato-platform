@@ -12,9 +12,9 @@ where
 
 import Binary
 import CallTrace (BlockTrace(..), mkCallFrame)
-import EthBlock (EthBlock(..))
-import EthLog (eventRowToLog, matchesTopics)
-import TransactionReceipt (TransactionReceipt, EthHex(..), mkTransactionReceipt, transactionIndex)
+import EthBlock (EthBlock(..), txToEthValue)
+import qualified EthLog
+import TransactionReceipt (TransactionReceipt, EthHex(..), mkTransactionReceipt, transactionIndex, logs)
 import Strato.Version (stratoVersion)
 import Blockchain.CommunicationConduit (ethVersion)
 import Blockchain.EthConf (runStreamMConfigured, ethConf)
@@ -58,11 +58,13 @@ import Data.Time.Clock (UTCTime(..))
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Data.Char (toLower)
 import Data.Word (Word64)
-import Data.List (find)
+import Data.List (find, findIndex, sortOn)
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Data.Aeson (FromJSON(..), ToJSON(..), Value(..), decodeStrict, withObject, (.:), (.:?), (.!=), (.=))
+import Data.Aeson (FromJSON(..), ToJSON(..), Value(..), decodeStrict, withObject, withText, (.:), (.:?), (.!=), (.=))
+import Data.Aeson.Types (Parser)
 import qualified Data.Aeson as Ae
+import qualified Data.Vector as V
 import GHC.Generics (Generic)
 import Network.JsonRpc.Server
 import Numeric (showHex)
@@ -71,7 +73,7 @@ import Network.HTTP.Client (Manager, newManager, defaultManagerSettings)
 import Network.HTTP.Types.Status (statusCode, statusMessage)
 import Servant.Client (BaseUrl (..), ClientError(..), ClientM, ResponseF(..), Scheme (Http), mkClientEnv, runClientM)
 import System.IO.Unsafe (unsafePerformIO)
-import Control.Monad.Composable.CodeDB (runCodeDBM, queryEvents)
+import Control.Monad.Composable.CodeDB (EventRow(..), runCodeDBM, queryEvents)
 
 type Server = IO
 
@@ -654,7 +656,7 @@ eth_sendTransaction = toMethod "eth_sendTransaction" f ()
 eth_sendRawTransaction :: Method Server
 eth_sendRawTransaction = toMethod "eth_sendRawTransaction" f (Required "data" :+: ())
   where
-    f :: HexData -> RpcResult Server Keccak256
+    f :: HexData -> RpcResult Server String
     f (HexData rawTxBytes) = do
       liftIO $ putStrLn $ "eth_sendRawTransaction received " ++ show (B.length rawTxBytes) ++ " bytes"
       let ethTx = rlpDecode (rlpDeserialize rawTxBytes) :: Transaction
@@ -666,14 +668,51 @@ eth_sendRawTransaction = toMethod "eth_sendRawTransaction" f (Required "data" :+
       case result of
         Right h' -> do
           liftIO $ putStrLn $ "eth_sendRawTransaction strato hash: " ++ format h' ++ " returning eth hash: " ++ format h
-          return h
+          return $ "0x" ++ keccak256ToHex h
         Left err -> throwError $ rpcError (-32603) (formatClientError err)
 
 eth_estimateGas :: Method Server
-eth_estimateGas = toMethod "eth_estimateGas" f (Required "txObject" :+: ())
+eth_estimateGas = toMethod "eth_estimateGas" f (Required "txObject" :+: Optional "blockTag" "latest" :+: ())
   where
-    f :: TxCallObject -> RpcResult Server String
-    f _ = return "0x5208"
+    f :: TxCallObject -> String -> RpcResult Server String
+    f txObj blockTag = do
+      let gasCap = EthConf.gasLimit $ networkConfig ethConf
+          simulated = txObj {TxCall.gas = T.pack $ "0x" ++ showHex gasCap ""}
+      mHeader <- resolveBlockHeader blockTag
+      rpcId <- mkRpcId "eth_estimateGas"
+      resp <- liftIO $ callVM' debugCallTimeout $ JRCSimulate [[SpecCall simulated]] mHeader rpcId
+      case resp of
+        SuccessJson _ bytes -> case Ae.decodeStrict bytes :: Maybe [[EstimateGasResult]] of
+          Just [[EstimateGasResult "0x1" gasUsed _]] ->
+            case parseHexQuantity gasUsed of
+              Just measured -> return $ "0x" ++ showHex (max 21000 measured) ""
+              Nothing -> throwError $ rpcError (-32603) "VM returned invalid gasUsed"
+          Just [[EstimateGasResult _ _ mErr]] ->
+            throwError $ rpcError 3 $ "execution reverted" <> maybe "" (": " <>) mErr
+          _ -> throwError $ rpcError (-32603) "VM returned an invalid estimate response"
+        Error _ msg -> throwError $ rpcError (-32603) (T.pack msg)
+        Success _ _ -> throwError $ rpcError (-32603) "VM returned an invalid estimate response"
+
+data EstimateGasResult = EstimateGasResult T.Text T.Text (Maybe T.Text)
+
+instance FromJSON EstimateGasResult where
+  parseJSON = withObject "EstimateGasResult" $ \o -> do
+    status <- o .: "status"
+    gasUsed <- o .: "gasUsed"
+    mError <- o .:? "error"
+    message <- case mError of
+      Just (Object err) -> err .:? "message"
+      _ -> pure Nothing
+    pure $ EstimateGasResult status gasUsed message
+
+parseHexQuantity :: T.Text -> Maybe Integer
+parseHexQuantity value =
+  case T.stripPrefix "0x" value of
+    Just digits | not (T.null digits) ->
+      case reads ("0x" ++ T.unpack digits) of
+        [(n, "")] -> Just n
+        _ -> Nothing
+    _ -> Nothing
 
 eth_getBlockByHash :: Method Server
 eth_getBlockByHash = toMethod "eth_getBlockByHash" f (Required "blockHash" :+: Required "fullTransactions" :+: ())
@@ -695,13 +734,28 @@ eth_getBlockByNumber = toMethod "eth_getBlockByNumber" f (Required "blockNumber"
 toEthBlock :: Bool -> Block' -> EthBlock
 toEthBlock fullTxs = (if fullTxs then EthBlockWithFullTxs else EthBlockWithTxHashes) . bPrimeToB
 
--- TODO: blockHash field in tx response needs the actual block hash, not the tx hash.
--- STRATO tx JSON doesn't include the block hash, so we'd need an extra lookup.
 eth_getTransactionByHash :: Method Server
 eth_getTransactionByHash = toMethod "eth_getTransactionByHash" f (Required "txHash" :+: ())
   where
-    f :: String -> RpcResult Server String
-    f _txHash = throwError $ rpcError (-32601) "eth_getTransactionByHash not yet implemented - blockHash field needs fix"
+    f :: Keccak256 -> RpcResult Server (Maybe Value)
+    f txHash = do
+      response <- liftIO $ runLocal $ TxResults.getTransactionResultClient txHash
+      case response of
+        Right (tr : _) -> do
+          mBlk <- liftIO $ fetchBlockByHash (keccak256ToHex $ transactionResultBlockHash tr)
+          return $ do
+            blk' <- mBlk
+            let blk = bPrimeToB blk'
+                txs = blockReceiptTransactions blk
+            idx <- findIndex ((== txHash) . transactionHash) txs
+            tx <- if idx < length txs then Just (txs !! idx) else Nothing
+            pure $ txToEthValue
+              (transactionResultBlockHash tr)
+              (getBlockNumber blk')
+              (fromIntegral idx)
+              tx
+        Right [] -> return Nothing
+        Left err -> throwError $ rpcError (-32603) (formatClientError err)
 
 eth_getTransactionByBlockHashAndIndex :: Method Server
 eth_getTransactionByBlockHashAndIndex = toMethod "eth_getTransactionByBlockHashAndIndex" f (Required "blockHash" :+: Required "index" :+: ())
@@ -754,7 +808,9 @@ eth_getTransactionReceipt = toMethod "eth_getTransactionReceipt" f (Required "tx
       let blkNum = maybe 0 getBlockNumber mBlk
           txs = maybe [] (blockReceiptTransactions . bPrimeToB) mBlk
       case find (\t -> transactionHash t == transactionResultTransactionHash tr) txs of
-        Just tx -> return $ mkTransactionReceipt tr tx blkNum
+        Just tx -> do
+          txLogs <- liftIO $ logsForTransaction (transactionResultTransactionHash tr) blkNum
+          return $ (mkTransactionReceipt tr tx blkNum) { logs = txLogs }
         Nothing -> throwError $ rpcError (-32603) "Transaction not found in block"
 
 -- | All transaction receipts for a block. The block parameter is a 32-byte
@@ -787,7 +843,12 @@ eth_getBlockReceipts = toMethod "eth_getBlockReceipts" f (Required "block" :+: (
     buildBlockReceipt blkNum idx tx = do
       response <- liftIO $ runLocal $ TxResults.getTransactionResultClient (transactionHash tx)
       case response of
-        Right (tr : _) -> return $ (mkTransactionReceipt tr tx blkNum) { transactionIndex = EthHex idx }
+        Right (tr : _) -> do
+          txLogs <- liftIO $ logsForTransaction (transactionHash tx) blkNum
+          return $ (mkTransactionReceipt tr tx blkNum)
+            { transactionIndex = EthHex idx
+            , logs = txLogs
+            }
         Right []       -> throwError $ rpcError (-32603) "receipt not found for transaction in block"
         Left err       -> throwError $ rpcError (-32603) (formatClientError err)
 
@@ -890,27 +951,24 @@ eth_getFilterLogs = toMethod "eth_getFilterLogs" f ()
 data LogFilter = LogFilter
   { lfFromBlock :: String
   , lfToBlock   :: String
-  , lfAddress   :: Maybe String
-  , lfTopics    :: [String]
+  , lfAddresses :: Maybe [String]
+  , lfTopics    :: [[String]]
   } deriving (Show, Generic)
 
 maxLogBlockRange :: Integer
 maxLogBlockRange = 10000
 
-maxLogBlock :: Integer
-maxLogBlock = 999999999
-
 maxLogResults :: Int
 maxLogResults = 1000
 
-parseLogBlockNum :: String -> Maybe Integer
-parseLogBlockNum "latest" = Just maxLogBlock
-parseLogBlockNum "pending" = Just maxLogBlock
-parseLogBlockNum block = parseBlockNum block
+resolveLogBlockNum :: Integer -> String -> Maybe Integer
+resolveLogBlockNum latest "latest" = Just latest
+resolveLogBlockNum latest "pending" = Just latest
+resolveLogBlockNum _ block = parseBlockNum block
 
-topic0EventName :: [String] -> Maybe T.Text
+topic0EventName :: [[String]] -> Maybe T.Text
 topic0EventName [] = Nothing
-topic0EventName (topic0 : _)
+topic0EventName ([topic0] : _)
   | null normalized = Nothing
   | otherwise = T.pack <$> lookup normalized standardEventTopics
   where
@@ -918,6 +976,7 @@ topic0EventName (topic0 : _)
     strip0x ('0':'x':xs) = xs
     strip0x ('0':'X':xs) = xs
     strip0x xs = xs
+topic0EventName _ = Nothing
 
 standardEventTopics :: [(String, String)]
 standardEventTopics =
@@ -929,34 +988,81 @@ eventSignatureTopic :: String -> String
 eventSignatureTopic = keccak256ToHex . hash . BC.pack
 
 instance FromJSON LogFilter where
-  parseJSON = withObject "LogFilter" $ \o ->
-    LogFilter
-      <$> o .:? "fromBlock" .!= "latest"
-      <*> o .:? "toBlock"   .!= "latest"
-      <*> o .:? "address"
-      <*> o .:? "topics"    .!= []
+  parseJSON = withObject "LogFilter" $ \o -> do
+    fromBlock <- o .:? "fromBlock" .!= "latest"
+    toBlock <- o .:? "toBlock" .!= "latest"
+    rawAddress <- o .:? "address"
+    addresses <- traverse parseAddresses rawAddress
+    rawTopics <- o .:? "topics" .!= []
+    topics <- traverse parseTopicPosition rawTopics
+    return $ LogFilter fromBlock toBlock addresses topics
+    where
+      parseAddresses :: Value -> Parser [String]
+      parseAddresses (String value) = pure [T.unpack value]
+      parseAddresses (Array values) = traverse parseText $ V.toList values
+      parseAddresses _ = fail "address must be a hex string or an array of hex strings"
+
+      parseTopicPosition :: Value -> Parser [String]
+      parseTopicPosition Null = pure []
+      parseTopicPosition (String value) = pure [T.unpack value]
+      parseTopicPosition (Array values) = traverse parseText $ V.toList values
+      parseTopicPosition _ = fail "each topic must be null, a hex string, or an array of hex strings"
+
+      parseText :: Value -> Parser String
+      parseText = withText "hex string" $ pure . T.unpack
 
 eth_getLogs :: Method Server
 eth_getLogs = toMethod "eth_getLogs" f (Required "filter" :+: ())
   where
     f :: LogFilter -> RpcResult Server [Value]
     f filt = do
-      let fromBlock = maybe 0 id $ parseLogBlockNum (lfFromBlock filt)
-          toBlock   = maybe maxLogBlock id $ parseLogBlockNum (lfToBlock filt)
-          mAddr     = fmap T.pack (lfAddress filt)
+      latestResponse <- liftIO $ runLocal $ BlkLast.getBlkLastClient 1
+      latestBlock <- case latestResponse of
+        Right (blk : _) -> return $ getBlockNumber blk
+        Right [] -> throwError $ rpcError (-32603) "empty block list from server"
+        Left err -> throwError $ rpcError (-32603) $ formatClientError err
+      fromBlock <- maybe
+        (throwError $ rpcError (-32602) "invalid fromBlock in eth_getLogs")
+        return
+        (resolveLogBlockNum latestBlock $ lfFromBlock filt)
+      toBlock <- maybe
+        (throwError $ rpcError (-32602) "invalid toBlock in eth_getLogs")
+        return
+        (resolveLogBlockNum latestBlock $ lfToBlock filt)
+      let -- Cirrus stores contract addresses without Ethereum's optional 0x
+          -- prefix. Normalizing at the RPC boundary keeps ethers/viem address
+          -- filters compatible with the database query.
+          normalizedAddresses = fmap (map $ T.pack . strip0x) $ lfAddresses filt
           mEventName = topic0EventName (lfTopics filt)
       when (toBlock >= fromBlock && toBlock - fromBlock > maxLogBlockRange) $
         throwError $ rpcError (-32602) $
           T.pack $
             "eth_getLogs block range exceeds " ++ show maxLogBlockRange ++ " blocks; use smaller ranges"
-      rows <- runCodeDBM $ queryEvents mAddr fromBlock toBlock mEventName (maxLogResults + 1)
+      rows <- case normalizedAddresses of
+        Nothing -> runCodeDBM $ queryEvents Nothing fromBlock toBlock mEventName (maxLogResults + 1)
+        Just addresses -> fmap (sortOn eventSortKey . concat) . liftIO $
+          mapM (\eventAddress -> runCodeDBM $ queryEvents (Just eventAddress) fromBlock toBlock mEventName (maxLogResults + 1)) addresses
       when (length rows > maxLogResults) $
         throwError $ rpcError (-32602) $
           T.pack $
             "eth_getLogs result exceeds " ++ show maxLogResults ++ " candidate events; use smaller ranges or narrower filters"
-      logs <- runCodeDBM $ mapM eventRowToLog rows
-      let filtered = filter (matchesTopics (lfTopics filt)) logs
+      logs <- runCodeDBM $ mapM EthLog.eventRowToLog rows
+      let filtered = filter (EthLog.matchesTopics (lfTopics filt)) logs
       return $ map toJSON filtered
+    eventSortKey row = (readEventBlock $ erBlockNumber row, erEventIndex row)
+    readEventBlock raw = case reads $ T.unpack raw of
+      [(value, _)] -> value :: Integer
+      _ -> 0
+    strip0x ('0':'x':xs) = xs
+    strip0x ('0':'X':xs) = xs
+    strip0x xs = xs
+
+logsForTransaction :: Keccak256 -> Integer -> IO [Value]
+logsForTransaction txHash blockNum = do
+  rows <- runCodeDBM $ queryEvents Nothing blockNum blockNum Nothing (maxLogResults + 1)
+  logs <- runCodeDBM $ mapM EthLog.eventRowToLog rows
+  let expectedHash = T.pack $ keccak256ToHex txHash
+  return . map toJSON $ filter ((== expectedHash) . EthLog.transactionHash) logs
 
 eth_getWork :: Method Server
 eth_getWork = toMethod "eth_getWork" f ()

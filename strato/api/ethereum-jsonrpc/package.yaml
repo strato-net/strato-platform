@@ -42,5 +42,6 @@ executables:
       - strato-p2p
       - text
       - time
+      - vector
       - wai
       - warp

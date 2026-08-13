@@ -1382,6 +1382,104 @@ lithiumGenesisBlock =
       fundedValidator = NonContract lithiumValidatorAddress 1809251394333065553493296640760748560207343510400633813116524750123642650624
   in baseGenesis { addressInfo = fundedValidator : addressInfo baseGenesis }
 
+-- | Deterministic validator used only by the isolated Across development
+-- network. The corresponding private key is the public, test-only key already
+-- used throughout the STRATO test suite. Never use this profile for a public or
+-- value-bearing network.
+acrossLocalValidatorAddress :: Address
+acrossLocalValidatorAddress = 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+
+-- | First account derived from Foundry's public test mnemonic. This is funded
+-- only in the explicitly disposable Across profile so standard Ethereum tools
+-- and relayer fixtures can submit signed legacy transactions without access to
+-- the validator vault.
+acrossLocalRelayerAddress :: Address
+acrossLocalRelayerAddress = 0x70997970c51812dc3a010c7d01b50e0d17dc79c8
+
+-- | USDST is the network fee currency. This balance covers 10,000 transactions
+-- at the current flat 0.01 USDST fee without granting the relayer a voucher.
+acrossLocalRelayerGasFunding :: Integer
+acrossLocalRelayerGasFunding = 100 * oneE18
+
+acrossLocalValidators :: [Validator]
+acrossLocalValidators = [Validator acrossLocalValidatorAddress]
+
+acrossLocalConfig :: HeliumGenesisBlockConfig
+acrossLocalConfig = HeliumGenesisBlockConfig
+  acrossLocalValidators
+  [acrossLocalValidatorAddress]
+  acrossLocalValidatorAddress
+  []
+  []
+  (acrossLocalValidatorAddress, 100_000 * oneE18)
+  []
+
+-- | Minimal deterministic genesis for local Across compatibility and replay
+-- tests. Keeping its validator distinct from Lithium avoids changing any
+-- existing network profile.
+acrossLocalGenesisBlock :: GenesisInfo
+acrossLocalGenesisBlock = fundAcrossLocalRelayerGenesis $ acrossGenesisBlock acrossLocalValidatorAddress
+
+-- | Build the isolated Across profile around an operator-supplied validator.
+-- The fixed 'acrossLocalGenesisBlock' remains the deterministic replay fixture;
+-- persistent trials should pass a fresh key's address through strato-setup.
+acrossGenesisBlock :: Address -> GenesisInfo
+acrossGenesisBlock validatorAddress =
+  let config =
+        HeliumGenesisBlockConfig
+          [Validator validatorAddress]
+          [validatorAddress]
+          validatorAddress
+          []
+          []
+          (validatorAddress, 100_000 * oneE18)
+          []
+      baseGenesis = genesisBlockTemplate config
+      fundedValidator =
+        NonContract
+          validatorAddress
+          1809251394333065553493296640760748560207343510400633813116524750123642650624
+   in baseGenesis { addressInfo = fundedValidator : addressInfo baseGenesis }
+
+-- | Add the public Foundry relayer only to the explicitly deterministic replay
+-- fixture. Operator-key networks created through @acrossGenesisBlock@ must not
+-- grant fee currency to a publicly known private key.
+fundAcrossLocalRelayerGenesis :: GenesisInfo -> GenesisInfo
+fundAcrossLocalRelayerGenesis baseGenesis =
+  let fundedRelayer = NonContract acrossLocalRelayerAddress (100 * oneE18)
+      fundedContracts = fundAcrossLocalRelayer <$> addressInfo baseGenesis
+   in case fundedContracts of
+        fundedValidator : rest ->
+          baseGenesis { addressInfo = fundedValidator : fundedRelayer : rest }
+        [] -> error "fundAcrossLocalRelayerGenesis: validator account missing"
+
+-- | Credit the disposable relayer in the existing USDST proxy storage while
+-- preserving the supply invariant. The raw NonContract balance above is useful
+-- for state compatibility, but STRATO's fee decider spends USDST.
+fundAcrossLocalRelayer :: AddressInfo -> AddressInfo
+fundAcrossLocalRelayer contract@(SolidVMContractWithStorage address balance code storage)
+  | address == usdstAddress =
+      let balancePath =
+            fromString . BC.unpack $
+              "_balances[" <> addrBS acrossLocalRelayerAddress <> "]"
+          balanceValue = BInteger acrossLocalRelayerGasFunding
+          totalSupplyPath = fromString "_totalSupply"
+          storageWithoutRelayer = filter ((/= balancePath) . fst) storage
+       in case break ((== totalSupplyPath) . fst) storageWithoutRelayer of
+            (before, (path, BInteger amount) : after) ->
+              SolidVMContractWithStorage
+                address
+                balance
+                code
+                ( [(balancePath, balanceValue)]
+                    ++ before
+                    ++ [(path, BInteger $ amount + acrossLocalRelayerGasFunding)]
+                    ++ after
+                )
+            _ -> error "fundAcrossLocalRelayer: USDST _totalSupply missing or invalid"
+  | otherwise = contract
+fundAcrossLocalRelayer contract = contract
+
 descriptions :: M.Map Text Text
 descriptions = M.fromList
   [ ("PAXGST", "PAXGST is a digital asset on STRATO Mercata pegged 1:1 to PAX Gold (PAXG) on Ethereum, enabling holders to bridge their PAXG into Mercata, and access DeFi and staking opportunities."),

@@ -47,7 +47,22 @@ library:
   - openapi3
 
 
-# tests:
+tests:
+  abi-bridge-test:
+    main: Main.hs
+    source-dirs: test-abi/
+    dependencies:
+      - base16-bytestring
+      - bytestring
+      - containers
+      - data-default
+      - evm-solidity
+      - solid-vm-model
+      - source-tools
+      - text
+      - vector
+
+# Legacy tests:
 #   blockapps-solidity-test:
 #     main: Main.hs
 #     source-dirs: test/

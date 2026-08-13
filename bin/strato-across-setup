@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+
+# Create a fresh, isolated one-validator Across/SolidVM node directory. The
+# network suffix and validator address are explicit so a persistent trial never
+# silently inherits the public deterministic replay identity.
+
+set -euo pipefail
+
+usage() {
+  echo "Usage: strato-across-setup NODE_DIR NETWORK_SUFFIX VALIDATOR_ADDRESS" >&2
+  echo "Example: strato-across-setup /srv/strato-across trial-20260813 0x..." >&2
+  exit 1
+}
+
+NODE_DIR="${1:-}"
+NETWORK_SUFFIX="${2:-}"
+VALIDATOR_ADDRESS="${3:-}"
+[[ -n "$NODE_DIR" && -n "$NETWORK_SUFFIX" && -n "$VALIDATOR_ADDRESS" ]] || usage
+
+if [[ -e "$NODE_DIR" ]]; then
+  echo "Refusing to reuse an existing node path: $NODE_DIR" >&2
+  exit 1
+fi
+if [[ ! "$NETWORK_SUFFIX" =~ ^[a-z0-9][a-z0-9-]{0,47}$ ]]; then
+  echo "Network suffix must be 1-48 lowercase letters, digits, or hyphens" >&2
+  exit 1
+fi
+
+VALIDATOR_ADDRESS="${VALIDATOR_ADDRESS#0x}"
+VALIDATOR_ADDRESS="${VALIDATOR_ADDRESS#0X}"
+VALIDATOR_ADDRESS="$(printf '%s' "$VALIDATOR_ADDRESS" | tr '[:upper:]' '[:lower:]')"
+if [[ ! "$VALIDATOR_ADDRESS" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Validator address must contain exactly 40 hexadecimal characters" >&2
+  exit 1
+fi
+
+for executable in strato-setup docker; do
+  command -v "$executable" >/dev/null 2>&1 || {
+    echo "Required executable not found on PATH: $executable" >&2
+    exit 1
+  }
+done
+
+for image in \
+  local-auth:18.1-across-v6-9bd704e-e9b372714976 \
+  vault-nginx:18.1-across-v6-9bd704e \
+  strato-support/postgres:14.18-amd64 \
+  strato-support/redis:3.2-amd64 \
+  strato-support/kafka:3.9.2-amd64; do
+  docker image inspect "$image" >/dev/null 2>&1 || {
+    echo "Required image is not loaded: $image" >&2
+    exit 1
+  }
+done
+
+NETWORK="across-local-$NETWORK_SUFFIX"
+strato-setup "$NODE_DIR" \
+  "--network=$NETWORK" \
+  "--acrossValidator=$VALIDATOR_ADDRESS" \
+  --networkID=-1 \
+  --localAuth \
+  --minimalServices \
+  --jsonrpc \
+  --lazyblocks \
+  --minPeers=0 \
+  --stratoBootnode= \
+  --addBootnodes=false \
+  --setDefaultNode=false \
+  --gasLimit=12000000 \
+  --txSizeLimit=2097152 \
+  --ldbCacheSize=33554432 \
+  --kafkaLogRetentionHours=24 \
+  --kafkaLogRetentionBytes=536870912 \
+  --kafkaLogSegmentBytes=67108864
+
+# strato-setup makes generated configuration immutable, but unattended key
+# provisioning also requires secrets to be inaccessible to group/other.
+chmod 700 "$NODE_DIR/secrets"
+find "$NODE_DIR/secrets" -type f -exec chmod 600 {} +
+
+# The generator intentionally retains the standard upstream tags. The offline
+# bundle uses explicit amd64 aliases so Docker Desktop cannot export a cached
+# arm64 variant under the same multi-arch tag.
+if [[ "$(uname -m)" == "x86_64" ]]; then
+  sed -i \
+    -e 's|image: postgres:14.18|image: strato-support/postgres:14.18-amd64|' \
+    -e 's|image: redis:3.2|image: strato-support/redis:3.2-amd64|' \
+    -e 's|image: apache/kafka:3.9.2|image: strato-support/kafka:3.9.2-amd64|' \
+    "$NODE_DIR/docker-compose.yml"
+else
+  sed -i '' \
+    -e 's|image: postgres:14.18|image: strato-support/postgres:14.18-amd64|' \
+    -e 's|image: redis:3.2|image: strato-support/redis:3.2-amd64|' \
+    -e 's|image: apache/kafka:3.9.2|image: strato-support/kafka:3.9.2-amd64|' \
+    "$NODE_DIR/docker-compose.yml"
+fi
+
+echo "Across node initialized: $NODE_DIR"
+echo "Network: $NETWORK"
+echo "Validator: 0x$VALIDATOR_ADDRESS"
+echo "Review genesis.json, ethconf.yaml, compose bindings, and image digests before start."

@@ -1,0 +1,6 @@
+tag	image_id	platform
+local-auth:18.1-across-v6-9bd704e-e9b372714976	sha256:d6babc5c75a58b839c8147efd65a587f9d81cac776b051ea6be7222a276e2d40	linux/amd64
+vault-nginx:18.1-across-v6-9bd704e	sha256:1de9c71f5fd3202a5c6a224d2e8bf68757f37e70ec40273aa0b77b34f92c2002	linux/amd64
+strato-support/postgres:14.18-amd64	sha256:7990f894e86cdcc85f754736a1a87ecf1adbcbaad7d952c44c0937539660e0f5	linux/amd64
+strato-support/redis:3.2-amd64	sha256:56c726bad587637e1ddafdb6915c062fa0e966224dff6b564428cf20dd710544	linux/amd64
+strato-support/kafka:3.9.2-amd64	sha256:5870fea17ea2e81352925cccf577878b64a202536dbfd6d44d33180f82857d88	linux/amd64

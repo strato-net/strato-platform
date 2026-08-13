@@ -1,0 +1,32 @@
+[Unit]
+Description=Isolated STRATO SolidVM Across validator
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=strato-across
+Group=strato-across
+WorkingDirectory=/srv/strato-across
+EnvironmentFile=/etc/strato-across/runtime.env
+Environment=PATH=/opt/strato-across/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=LD_LIBRARY_PATH=/opt/strato-across/lib
+ExecStart=/opt/strato-across/bin/strato-across-replay /srv/strato-across supervise
+Restart=on-failure
+RestartSec=5
+KillMode=mixed
+TimeoutStartSec=180
+TimeoutStopSec=90
+
+# The VM and database need writable state under /srv only. Secret files are
+# passed by absolute path from the root-owned environment file and validated as
+# non-symlink mode 0600 before use.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/srv/strato-across
+
+[Install]
+WantedBy=multi-user.target

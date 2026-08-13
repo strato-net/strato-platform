@@ -320,6 +320,9 @@ build_common: generate-version-file
 	@install -m 755 bin/strato-user-add $(HOME)/.local/bin/
 	@install -m 755 bin/strato-snapshot $(HOME)/.local/bin/
 	@install -m 755 bin/strato-logrotate $(HOME)/.local/bin/
+	@install -m 755 bin/strato-across-setup $(HOME)/.local/bin/
+	@install -m 755 bin/strato-across-replay $(HOME)/.local/bin/
+	@install -m 755 bin/strato-across-deploy $(HOME)/.local/bin/
 	@mkdir -p $(HOME)/.local/share/strato
 	@install -m 644 strato/tools/airlock/data/english.txt $(HOME)/.local/share/strato/bip39-english.txt
 	@case ":$$PATH:" in \
@@ -362,7 +365,7 @@ build_common_profiled: generate-version-file
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
 build_common_fast: generate-version-file
-	@echo building haskell libraries and creating directories (fast)
+	@echo "building haskell libraries and creating directories (fast)"
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	cd strato && stack build ${NIX_FLAG} \
@@ -542,6 +545,9 @@ uninstall:
 	@rm -f $(HOME)/.local/bin/strato-user-add
 	@rm -f $(HOME)/.local/bin/strato-snapshot
 	@rm -f $(HOME)/.local/bin/strato-logrotate
+	@rm -f $(HOME)/.local/bin/strato-across-setup
+	@rm -f $(HOME)/.local/bin/strato-across-replay
+	@rm -f $(HOME)/.local/bin/strato-across-deploy
 	@rm -f $(HOME)/.local/bin/strato-setup
 	@rm -f $(HOME)/.local/bin/convoke
 	@echo "Done"
