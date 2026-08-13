@@ -4,6 +4,7 @@
  * indexed tick data, and builds/submits PoolV3 transactions. No V2 pool code paths.
  */
 import { cirrus } from "../../utils/appApiHelper";
+import { isMissingTableError } from "../../utils/cirrusErrors";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { executeTransaction } from "../../utils/txHelper";
 import * as config from "../../config/config";
@@ -12,12 +13,14 @@ import {
   POOL_V3_SELECT_FIELDS,
   POOL_V3_TICK_SELECT_FIELDS,
   POOL_V3_POSITION_SELECT_FIELDS,
+  POSITION_MANAGER_POSITION_SELECT_FIELDS,
   POOL_V3_SWAP_HISTORY_SELECT_FIELDS,
   V3_DEADLINE_SECONDS,
 } from "../../config/poolV3Constants";
 import * as v3 from "../helpers/poolV3Math.helper";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 import { getOraclePrices } from "./oracle.service";
+import { getNFTItem } from "./nfts.service";
 import {
   PoolV3,
   PoolV3Token,
@@ -26,6 +29,7 @@ import {
   PoolV3AmountsPreview,
   PoolV3SwapParams,
   PoolV3MintParams,
+  PoolV3IncreaseParams,
   PoolV3BurnParams,
   PoolV3CollectParams,
   PoolV3CreateParams,
@@ -39,6 +43,8 @@ const {
   PoolV3Ticks,
   PoolV3Positions,
   PoolV3SwapEvent,
+  PositionManagerV3Positions,
+  PositionManagerV3Owners,
 } = POOL_V3_CONTRACTS;
 
 const normalizeAddress = (address: string): string => address.toLowerCase().replace(/^0x/, "");
@@ -277,10 +283,14 @@ const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>, swapInputs?: S
 const fetchRawPools = async (
   accessToken: string,
   filters: Record<string, string> = {},
+  /** drop the current-factory scope — for EXACT-address lookups only, where historical
+   *  pools (old test factories) must still resolve (e.g. the activity feed enriches
+   *  past events with pool token metadata). Listings must stay factory-scoped. */
+  { anyFactory = false }: { anyFactory?: boolean } = {},
 ): Promise<RawV3Pool[]> => {
   const { data } = await cirrus.get(accessToken, `/${PoolV3Table}`, {
     params: {
-      poolV3Factory: `eq.${config.poolV3Factory}`,
+      ...(anyFactory ? {} : { poolV3Factory: `eq.${config.poolV3Factory}` }),
       select: POOL_V3_SELECT_FIELDS.join(","),
       // uninitialized proxies/implementations have price 0
       sqrtPriceX96: "neq.0",
@@ -312,7 +322,15 @@ export const getPools = async (accessToken: string): Promise<PoolV3[]> => {
 };
 
 export const getPoolByAddress = async (accessToken: string, poolAddress: string): Promise<PoolV3 | null> => {
-  const rawPools = await fetchRawPools(accessToken, { address: `eq.${normalizeAddress(poolAddress)}` });
+  // anyFactory: an exact-address lookup is already precise — it must also resolve pools
+  // from superseded factories so historical references (activity feed rows) render
+  // with their token metadata instead of erroring. New-liquidity/swap flows only ever
+  // see pools via the factory-scoped listings.
+  const rawPools = await fetchRawPools(
+    accessToken,
+    { address: `eq.${normalizeAddress(poolAddress)}` },
+    { anyFactory: true },
+  );
   const pools = await attachPrices(accessToken, rawPools);
   return pools[0] ?? null;
 };
@@ -705,36 +723,118 @@ export const getQuote = async (
 // POSITIONS
 // ============================================================================
 
+/** A position row plus its addressing mode, normalized to the RawV3Position shape so the
+ *  NFT (manager) and legacy (direct) sources share one enrichment pass */
+interface PositionSourceRow extends RawV3Position {
+  kind: "nft" | "legacy";
+  tokenId?: string;
+  /** the PositionManagerV3 (ERC-721 collection) address, NFT rows only — lets the UI
+   *  link a position row to its NFT detail page */
+  manager?: string;
+}
+
+/** Positions held directly on pools (pre-manager "legacy" positions) */
+const fetchLegacyPositionRows = async (
+  accessToken: string,
+  owner: string,
+  poolAddress?: string
+): Promise<PositionSourceRow[]> => {
+  const params: Record<string, string> = {
+    key: `eq.${owner}`,
+    select: POOL_V3_POSITION_SELECT_FIELDS.join(","),
+  };
+  if (poolAddress) params.address = `eq.${poolAddress}`;
+
+  try {
+    const { data } = await cirrus.get(accessToken, `/${PoolV3Positions}`, { params });
+    return ((data as RawV3Position[]) ?? []).map((row) => ({ ...row, kind: "legacy" as const }));
+  } catch (err) {
+    if (isMissingTableError(err)) return [];
+    throw err;
+  }
+};
+
+/** Positions held as PositionManagerV3 NFTs: the user's tokenIds (from the ERC-721
+ *  _owners table) joined to the manager's ManagedPosition structs. The rows are recast
+ *  to the pool-position shape — the manager's per-token feeGrowthInside snapshots obey
+ *  the same delta math as a direct position's, so enrichment is identical. */
+const fetchManagedPositionRows = async (
+  accessToken: string,
+  owner: string,
+  poolAddress?: string
+): Promise<PositionSourceRow[]> => {
+  if (!config.positionManagerV3) return [];
+  const manager = normalizeAddress(config.positionManagerV3);
+
+  interface RawManagedPosition {
+    key: string; // tokenId
+    pool: string;
+    tickLower: string;
+    tickUpper: string;
+    liquidity: string;
+    tokensOwed0: string;
+    tokensOwed1: string;
+    feeGrowthInside0LastX128: string | null;
+    feeGrowthInside1LastX128: string | null;
+  }
+
+  try {
+    // the _owners value column (a mapping's address value) is JSON-typed — the equality
+    // filter needs a JSON string literal (eq."<addr>")
+    const { data: ownerRows } = await cirrus.get(accessToken, `/${PositionManagerV3Owners}`, {
+      params: {
+        address: `eq.${manager}`,
+        select: "tokenId:key",
+        value: `eq."${owner}"`,
+      },
+    });
+    const tokenIds = [...new Set(((ownerRows as { tokenId: string | number }[]) ?? []).map((r) => String(r.tokenId)))];
+    if (tokenIds.length === 0) return [];
+
+    const { data } = await cirrus.get(accessToken, `/${PositionManagerV3Positions}`, {
+      params: {
+        address: `eq.${manager}`,
+        key: `in.(${tokenIds.join(",")})`,
+        select: POSITION_MANAGER_POSITION_SELECT_FIELDS.join(","),
+      },
+    });
+
+    return ((data as RawManagedPosition[]) ?? [])
+      .filter((row) => row.pool && !/^0+$/.test(row.pool)) // burned positions keep a zeroed struct row
+      .map((row) => ({
+        address: normalizeAddress(row.pool),
+        key: owner,
+        key2: row.tickLower,
+        key3: row.tickUpper,
+        liquidity: row.liquidity,
+        tokensOwed0: row.tokensOwed0,
+        tokensOwed1: row.tokensOwed1,
+        feeGrowthInside0LastX128: row.feeGrowthInside0LastX128,
+        feeGrowthInside1LastX128: row.feeGrowthInside1LastX128,
+        kind: "nft" as const,
+        tokenId: String(row.key),
+        manager,
+      }))
+      .filter((row) => !poolAddress || row.address === poolAddress);
+  } catch (err) {
+    if (isMissingTableError(err)) return [];
+    throw err;
+  }
+};
+
 export const getPositions = async (
   accessToken: string,
   owner: string,
   poolAddress?: string
 ): Promise<PoolV3Position[]> => {
-  const params: Record<string, string> = {
-    key: `eq.${normalizeAddress(owner)}`,
-    select: POOL_V3_POSITION_SELECT_FIELDS.join(","),
-  };
-  if (poolAddress) params.address = `eq.${normalizeAddress(poolAddress)}`;
+  const ownerAddr = normalizeAddress(owner);
+  const poolFilter = poolAddress ? normalizeAddress(poolAddress) : undefined;
+  const [managedRows, legacyRows] = await Promise.all([
+    fetchManagedPositionRows(accessToken, ownerAddr, poolFilter),
+    fetchLegacyPositionRows(accessToken, ownerAddr, poolFilter),
+  ]);
 
-  let data: unknown;
-  try {
-    ({ data } = await cirrus.get(accessToken, `/${PoolV3Positions}`, {
-      params: {
-        ...params,
-      },
-    }));
-  } catch (err) {
-    // The position value columns (liquidity, tokensOwed0/1) are materialized lazily on
-    // first insert; until any position is minted they do not exist and PostgREST returns
-    // 42703 (undefined_column), or 42P01 (undefined_table) if the table is absent
-    // entirely. Either way the owner has no positions. (The key columns key/key2/key3
-    // are created up front, so this only guards the value-column selection.)
-    const code = (err as any)?.response?.data?.code;
-    if (code === "42703" || code === "42P01") return [];
-    throw err;
-  }
-
-  const rows = (data as RawV3Position[]).filter(
+  const rows = [...managedRows, ...legacyRows].filter(
     (r) => BigInt(r.liquidity ?? "0") > 0n || BigInt(r.tokensOwed0 ?? "0") > 0n || BigInt(r.tokensOwed1 ?? "0") > 0n
   );
   if (rows.length === 0) return [];
@@ -825,6 +925,9 @@ export const getPositions = async (
       {
         poolAddress: row.address,
         owner: row.key,
+        kind: row.kind,
+        ...(row.tokenId !== undefined ? { tokenId: row.tokenId } : {}),
+        ...(row.manager !== undefined ? { manager: row.manager } : {}),
         tickLower,
         tickUpper,
         liquidity: row.liquidity,
@@ -837,6 +940,7 @@ export const getPositions = async (
         inRange,
         priceLowerWad: v3.sqrtPriceX96ToPriceWad(v3.getSqrtRatioAtTick(tickLower)).toString(),
         priceUpperWad: v3.sqrtPriceX96ToPriceWad(v3.getSqrtRatioAtTick(tickUpper)).toString(),
+        valueUsd: positionValueUsd,
         apy,
       },
     ];
@@ -989,31 +1093,115 @@ export const swap = async (
   return executeTransaction(accessToken, tx);
 };
 
+const requirePositionManager = (): string => {
+  if (!config.positionManagerV3) {
+    // Deployment-ordering guard: the manager is deployed once per network and configured
+    // afterwards (defaultPositionManagerV3For / POSITION_MANAGER_V3). Until then V3
+    // position writes are unavailable by design — surface that as a 503, not a bug-500.
+    const err = new Error(
+      "V3 position manager is not configured on this network — deploy PositionManagerV3 and set POSITION_MANAGER_V3 (or defaultPositionManagerV3For)"
+    );
+    (err as any).statusCode = 503;
+    throw err;
+  }
+  return config.positionManagerV3;
+};
+
+/** The position NFT for a tokenId, resolved against the network's singleton manager —
+ *  lets the UI address a position as /v3-liquidity/:tokenId with no manager in the URL */
+export const getPositionNFTItem = async (accessToken: string, tokenId: string) => {
+  const manager = requirePositionManager();
+  return getNFTItem(accessToken, manager, tokenId);
+};
+
+const positionManagerTx = (method: string, args: Record<string, unknown>) => ({
+  contractName: "PositionManagerV3",
+  contractAddress: requirePositionManager(),
+  method,
+  args,
+});
+
+/**
+ * Mint a position NFT via PositionManagerV3 (the only mint path — positions created
+ * here are ERC-721 tokens). The manager computes liquidity from the desired amounts
+ * and pulls EXACTLY the pool-computed deposit from the caller, so the approvals are
+ * ceilings, not transfers.
+ */
 export const mint = async (
   accessToken: string,
   params: PoolV3MintParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
-  const { poolAddress, tickLower, tickUpper, liquidity, amount0Max, amount1Max } = params;
+  requirePositionManager();
+  const { poolAddress, tickLower, tickUpper } = params;
+
+  // Back-compat: pre-NFT clients (stale SPA bundles, scripts on the old contract) send
+  // {liquidity, amount0Max, amount1Max}. Convert liquidity to desired amounts with the
+  // same pool math the old direct-mint path used, capped at the client's ceilings so the
+  // manager can never pull more than the caller authorized. Remove once stale bundles age out.
+  let { amount0Desired, amount1Desired } = params;
+  if (amount0Desired === undefined || amount1Desired === undefined) {
+    const minWei = (a: string, b: string) => (BigInt(a) < BigInt(b) ? a : b);
+    const preview = await getAmountsForLiquidity(
+      accessToken, poolAddress, tickLower, tickUpper, BigInt(params.liquidity ?? "0")
+    );
+    amount0Desired = minWei(preview.amount0, params.amount0Max ?? preview.amount0);
+    amount1Desired = minWei(preview.amount1, params.amount1Max ?? preview.amount1);
+  }
+
   const { token0, token1 } = await fetchPoolTokens(accessToken, poolAddress);
 
   const txs = [];
-  if (BigInt(amount0Max) > 0n) txs.push(approvalTx(token0, poolAddress, amount0Max));
-  if (BigInt(amount1Max) > 0n) txs.push(approvalTx(token1, poolAddress, amount1Max));
-  txs.push({
-    contractName: "PoolV3",
-    contractAddress: poolAddress,
-    method: "mint",
-    args: {
-      recipient: userAddress,
+  if (BigInt(amount0Desired) > 0n) txs.push(approvalTx(token0, config.positionManagerV3, amount0Desired));
+  if (BigInt(amount1Desired) > 0n) txs.push(approvalTx(token1, config.positionManagerV3, amount1Desired));
+  txs.push(
+    positionManagerTx("mint", {
+      pool: normalizeAddress(poolAddress),
       tickLower,
       tickUpper,
-      amount: liquidity,
-      amount0Max,
-      amount1Max,
+      amount0Desired,
+      amount1Desired,
+      amount0Min: params.amount0Min ?? "0",
+      amount1Min: params.amount1Min ?? "0",
+      recipient: userAddress,
       deadline: deadline(),
-    },
+    })
+  );
+
+  const tx = await buildFunctionTx(txs, userAddress, accessToken);
+  return executeTransaction(accessToken, tx);
+};
+
+/** Add liquidity to an existing position NFT (same range; fees accrue to the holder) */
+export const increaseLiquidity = async (
+  accessToken: string,
+  params: PoolV3IncreaseParams,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const manager = normalizeAddress(requirePositionManager());
+  const { tokenId, amount0Desired, amount1Desired } = params;
+
+  // resolve the position's pool for the token approvals
+  const { data } = await cirrus.get(accessToken, `/${PositionManagerV3Positions}`, {
+    params: { address: `eq.${manager}`, key: `eq.${tokenId}`, select: "pool:value->>pool" },
   });
+  const pool = data?.[0]?.pool;
+  if (!pool || /^0+$/.test(pool)) throw new Error(`Position not found: tokenId ${tokenId}`);
+  const { token0, token1 } = await fetchPoolTokens(accessToken, pool);
+
+  const txs = [];
+  if (BigInt(amount0Desired) > 0n) txs.push(approvalTx(token0, config.positionManagerV3, amount0Desired));
+  if (BigInt(amount1Desired) > 0n) txs.push(approvalTx(token1, config.positionManagerV3, amount1Desired));
+  txs.push(
+    positionManagerTx("increaseLiquidity", {
+      tokenId,
+      amount0Desired,
+      amount1Desired,
+      amount0Min: params.amount0Min ?? "0",
+      amount1Min: params.amount1Min ?? "0",
+      deadline: deadline(),
+    })
+  );
 
   const tx = await buildFunctionTx(txs, userAddress, accessToken);
   return executeTransaction(accessToken, tx);
@@ -1026,7 +1214,38 @@ export const burn = async (
   params: PoolV3BurnParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
+  // NFT path: the position is addressed by its manager tokenId; ownership/approval is
+  // enforced on-chain by the manager (isAuthorizedForToken)
+  if (params.tokenId !== undefined) {
+    const txs: any[] = [
+      positionManagerTx("decreaseLiquidity", {
+        tokenId: params.tokenId,
+        liquidity: params.liquidity,
+        amount0Min: params.amount0Min ?? "0",
+        amount1Min: params.amount1Min ?? "0",
+        deadline: deadline(),
+      }),
+    ];
+    if (params.collect) {
+      txs.push(
+        positionManagerTx("collect", {
+          tokenId: params.tokenId,
+          recipient: userAddress,
+          amount0Max: MAX_COLLECT,
+          amount1Max: MAX_COLLECT,
+        })
+      );
+    }
+    const tx = await buildFunctionTx(txs, userAddress, accessToken);
+    return executeTransaction(accessToken, tx);
+  }
+
+  // legacy path: positions held directly on the pool (pre-manager)
   const { poolAddress, tickLower, tickUpper, liquidity, collect } = params;
+  if (!poolAddress || tickLower === undefined || tickUpper === undefined) {
+    throw new Error("poolAddress, tickLower and tickUpper are required for legacy positions");
+  }
+  await assertLegacyPosition(accessToken, poolAddress, userAddress, tickLower, tickUpper);
 
   const txs: any[] = [
     {
@@ -1053,6 +1272,43 @@ export const burn = async (
 
   const tx = await buildFunctionTx(txs, userAddress, accessToken);
   return executeTransaction(accessToken, tx);
+};
+
+/** A position addressed by pool + ticks must be a direct (legacy) pool position of the
+ *  caller. NFT positions surface from GET /positions with the same pool/ticks fields, so
+ *  a stale client can plausibly address one the legacy way — but the pool-level position
+ *  belongs to the manager, not the user, so the on-chain call would revert opaquely.
+ *  Fail fast with an actionable error instead. */
+const assertLegacyPosition = async (
+  accessToken: string,
+  poolAddress: string,
+  owner: string,
+  tickLower: number,
+  tickUpper: number
+): Promise<void> => {
+  try {
+    const { data } = await cirrus.get(accessToken, `/${PoolV3Positions}`, {
+      params: {
+        address: `eq.${normalizeAddress(poolAddress)}`,
+        key: `eq.${normalizeAddress(owner)}`,
+        key2: `eq.${tickLower}`,
+        key3: `eq.${tickUpper}`,
+        select: "key",
+      },
+    });
+    if (((data as unknown[]) ?? []).length > 0) return;
+  } catch (err) {
+    if (!isMissingTableError(err)) throw err;
+  }
+  const managed = await fetchManagedPositionRows(accessToken, normalizeAddress(owner), normalizeAddress(poolAddress));
+  const match = managed.find((r) => Number(r.key2) === tickLower && Number(r.key3) === tickUpper);
+  const err = new Error(
+    match
+      ? `This position is held as a position NFT (tokenId ${match.tokenId}) and must be addressed by tokenId — if you're seeing this in the app, refresh to load the latest version`
+      : "No position found for this pool and tick range"
+  );
+  (err as any).statusCode = match ? 400 : 404;
+  throw err;
 };
 
 /** True when the owner's position currently holds liquidity (poke-able). */
@@ -1084,7 +1340,30 @@ export const collect = async (
   params: PoolV3CollectParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
+  // NFT path: PositionManagerV3.collect pokes the pool internally (when the position has
+  // liquidity) before computing the payable amounts, so a single call suffices
+  if (params.tokenId !== undefined) {
+    const tx = await buildFunctionTx(
+      [
+        positionManagerTx("collect", {
+          tokenId: params.tokenId,
+          recipient: userAddress,
+          amount0Max: params.amount0Requested ?? MAX_COLLECT,
+          amount1Max: params.amount1Requested ?? MAX_COLLECT,
+        }),
+      ],
+      userAddress,
+      accessToken
+    );
+    return executeTransaction(accessToken, tx);
+  }
+
+  // legacy path: positions held directly on the pool (pre-manager)
   const { poolAddress, tickLower, tickUpper, amount0Requested, amount1Requested } = params;
+  if (!poolAddress || tickLower === undefined || tickUpper === undefined) {
+    throw new Error("poolAddress, tickLower and tickUpper are required for legacy positions");
+  }
+  await assertLegacyPosition(accessToken, poolAddress, userAddress, tickLower, tickUpper);
 
   // fees accrue to tokensOwed only when the position is touched; poke (burn 0)
   // before collecting so pending fees are realized — canonical periphery behavior.

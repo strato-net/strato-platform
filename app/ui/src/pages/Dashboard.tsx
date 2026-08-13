@@ -5,7 +5,6 @@ import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import V3LiquiditySummary from "../components/dashboard/V3LiquiditySummary";
-import NFTSummary from "../components/dashboard/NFTSummary";
 import { Wallet, Coins, Shield, Loader2, Trophy, Send, Book, ArrowRightLeft, Gem, Mail, Gift } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
@@ -398,12 +397,10 @@ const Dashboard = () => {
             />
           </div>
 
-          {/* V3 concentrated-liquidity holdings — V2 LP tokens appear in the assets
-              list above, but V3 positions aren't tokens; renders only when present */}
+          {/* V3 concentrated-liquidity holdings (NFT and legacy positions) — V2 LP
+              tokens appear in the assets list above, but V3 positions aren't tokens;
+              renders only when present. Non-position NFTs live on the NFTs page. */}
           <V3LiquiditySummary />
-
-          {/* NFTs the user owns, across all registered NFT sources; renders only when present */}
-          <NFTSummary />
         </main>
       </div>
 

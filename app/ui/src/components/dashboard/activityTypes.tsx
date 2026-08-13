@@ -1061,7 +1061,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData | null => {
       const e = event as Event & { token0?: string; token1?: string };
-      const owner = getEventAttribute(event, "owner");
+      // owner on pool-level Burn events; sender on PositionManagerV3 DecreaseLiquidity
+      const owner = getEventAttribute(event, "owner", "sender");
       const amount0 = getEventAttribute(event, "amount0") || "0";
       const amount1 = getEventAttribute(event, "amount1") || "0";
       // a zero-amount burn is the fee-realizing poke that precedes a collect —
@@ -2187,4 +2188,25 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       };
     },
   },
+};
+
+// Position-NFT liquidity activity: actions done through PositionManagerV3. At the POOL
+// level these all attribute to the manager (the backend's filter configs exclude those
+// rows); the manager's platform-extended events carry the acting user (`sender`), the
+// pool address (`pool` — ActivityFeedCards resolves token0/token1 from it), and the same
+// amount fields, so the pool-level renderers apply as-is.
+activityTypes["V3AddLiquidityPosition"] = {
+  ...activityTypes["V3AddLiquidity"],
+  contract_name: "PositionManagerV3",
+  event_name: "IncreaseLiquidity",
+};
+activityTypes["V3RemoveLiquidityPosition"] = {
+  ...activityTypes["V3RemoveLiquidity"],
+  contract_name: "PositionManagerV3",
+  event_name: "DecreaseLiquidity",
+};
+activityTypes["V3CollectPosition"] = {
+  ...activityTypes["V3Collect"],
+  contract_name: "PositionManagerV3",
+  event_name: "Collect",
 };

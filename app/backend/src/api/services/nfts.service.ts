@@ -1,7 +1,7 @@
 import { cirrus, strato } from "../../utils/appApiHelper";
+import { isMissingTableError, emptyOnMissingTable } from "../../utils/cirrusErrors";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { NFT_SOURCES, NFTSource } from "../../config/nftSources";
 
@@ -29,20 +29,6 @@ const normalizeAddr = (address: string): string => address.toLowerCase().replace
 // PostgREST equality filter must pass a valid JSON string literal — `eq."<addr>"`, not
 // `eq.<addr>` (the latter fails with 22P02 "invalid input syntax for type json").
 const jsonEq = (value: string): string => `eq.\"${value}\"`;
-
-// Cirrus/PostgREST reports an unknown table as HTTP 404 with Postgres SQLSTATE 42P01
-// (undefined_table). That's the only error we may swallow as "no data yet" — every other
-// failure (timeout, 5xx, malformed filter) must propagate so it surfaces as a retryable
-// error instead of a misleading empty/404 result.
-const isMissingTableError = (e: any): boolean =>
-  e?.response?.data?.code === "42P01" || e?.response?.status === 404;
-
-// Use as a `.catch` handler on a Cirrus read: yield an empty result only when the table
-// doesn't exist yet; rethrow anything else.
-const emptyOnMissingTable = (e: any): { data: [] } => {
-  if (isMissingTableError(e)) return { data: [] };
-  throw e;
-};
 
 // String mapping values (e.g. tokenURI) come back JSON-encoded from the jsonb value column
 // (an empty string reads as `"\"\""`, a real URI as `"\"ipfs://…\""`). Decode to the bare
@@ -239,15 +225,18 @@ export const getNFTItem = async (
   tokenId: string
 ) => {
   const collectionAddress = normalizeAddr(collectionAddressRaw);
-  const source = NFT_SOURCES.find((s) => s.kind === "collection")!;
+  // Each source keeps its own Cirrus tables (e.g. a position NFT's owner row lives in
+  // BlockApps-PositionManagerV3-_owners, not BlockApps-NFT-_owners), and `kind` picks the
+  // UI's detail renderer — so resolve the source the same way the writes do.
+  const source = await resolveSource(accessToken, collectionAddress);
   const [ownerResponse, approvalResponse, collections, uriMap] = await Promise.all([
     cirrus
-      .get(accessToken, `/${NFT}-_owners`, {
+      .get(accessToken, `/${source.cirrusPrefix}-_owners`, {
         params: { select: "owner:value", address: `eq.${collectionAddress}`, key: `eq.${tokenId}` },
       })
       .catch(emptyOnMissingTable),
     cirrus
-      .get(accessToken, `/${NFT}-_tokenApprovals`, {
+      .get(accessToken, `/${source.cirrusPrefix}-_tokenApprovals`, {
         params: { select: "approved:value", address: `eq.${collectionAddress}`, key: `eq.${tokenId}` },
       })
       .catch(emptyOnMissingTable),
@@ -292,28 +281,48 @@ const executeNFTTx = async (
 // Collection creation and minting are performed on-chain directly (admin calls the
 // NFTFactory / NFT contract), so this service exposes only transfer and burn as writes.
 
+// STRATO transactions are dispatched by contract NAME, which differs per source ("NFT"
+// for collections, "PositionManagerV3" for V3 position NFTs). Resolve the source whose
+// collection-level table contains the address; unknown addresses fall back to the
+// default "collection" source so the on-chain call (not this lookup) decides validity.
+const resolveSource = async (accessToken: string, collectionAddress: string): Promise<NFTSource> => {
+  for (const source of NFT_SOURCES) {
+    const res = await cirrus
+      .get(accessToken, `/${source.cirrusPrefix}`, {
+        params: { address: `eq.${collectionAddress}`, select: "address", limit: "1" },
+      })
+      .catch(emptyOnMissingTable);
+    if (((res.data as any[]) || []).length > 0) return source;
+  }
+  return NFT_SOURCES.find((s) => s.kind === "collection")!;
+};
+
 export const transferNFT = async (
   accessToken: string,
   userAddress: string,
   collectionAddress: string,
   body: { to: string; tokenId: string }
-) =>
-  executeNFTTx(accessToken, userAddress, {
-    contractName: extractContractName(NFT),
+) => {
+  const source = await resolveSource(accessToken, normalizeAddr(collectionAddress));
+  return executeNFTTx(accessToken, userAddress, {
+    contractName: source.contractName,
     contractAddress: normalizeAddr(collectionAddress),
     method: "transferFrom",
     args: { from: normalizeAddr(userAddress), to: normalizeAddr(body.to), tokenId: body.tokenId },
   });
+};
 
 export const burnNFT = async (
   accessToken: string,
   userAddress: string,
   collectionAddress: string,
   body: { tokenId: string }
-) =>
-  executeNFTTx(accessToken, userAddress, {
-    contractName: extractContractName(NFT),
+) => {
+  const source = await resolveSource(accessToken, normalizeAddr(collectionAddress));
+  return executeNFTTx(accessToken, userAddress, {
+    contractName: source.contractName,
     contractAddress: normalizeAddr(collectionAddress),
     method: "burn",
     args: { tokenId: body.tokenId },
   });
+};

@@ -16,6 +16,8 @@ type NFTContextType = {
   loadingOwned: boolean;
   getOwnedNFTs: () => Promise<OwnedNFT[]>;
   getNFTItem: (collectionAddress: string, tokenId: string) => Promise<NFTItem>;
+  /** V3 position NFT by tokenId alone — the backend resolves the singleton manager */
+  getPositionNFTItem: (tokenId: string) => Promise<NFTItem>;
   transferNFT: (payload: TransferNFTParams) => Promise<void>;
   burnNFT: (payload: BurnNFTParams) => Promise<void>;
 };
@@ -53,6 +55,11 @@ export const NFTProvider = ({ children }: { children: ReactNode }) => {
     return data;
   }, []);
 
+  const getPositionNFTItem = useCallback(async (tokenId: string): Promise<NFTItem> => {
+    const { data } = await api.get<NFTItem>(`/poolv3/position-nfts/${tokenId}`);
+    return data;
+  }, []);
+
   const transferNFT = useCallback(
     async ({ collectionAddress, to, tokenId }: TransferNFTParams) => {
       await api.post(`/nfts/${collectionAddress}/transfer`, { to, tokenId });
@@ -76,6 +83,7 @@ export const NFTProvider = ({ children }: { children: ReactNode }) => {
         loadingOwned,
         getOwnedNFTs,
         getNFTItem,
+        getPositionNFTItem,
         transferNFT,
         burnNFT,
       }}

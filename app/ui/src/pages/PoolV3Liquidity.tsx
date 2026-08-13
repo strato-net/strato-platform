@@ -17,6 +17,9 @@ const PoolV3Liquidity = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [tab, setTab] = useState<string>(searchParams.get("tab") === "positions" ? "positions" : "pools");
+  // Deep link from the dashboard summary: focus (select pool, scroll, highlight) one
+  // position on arrival. Captured once — tab switches rewrite the params.
+  const [focusPositionKey] = useState<string | null>(searchParams.get("position"));
   const [pools, setPools] = useState<PoolV3[]>([]);
   const [poolsLoading, setPoolsLoading] = useState(true);
   const [positions, setPositions] = useState<PoolV3Position[]>([]);
@@ -110,6 +113,7 @@ const PoolV3Liquidity = () => {
                   isLoggedIn={isLoggedIn}
                   onChanged={handleChanged}
                   onBrowsePools={() => selectTab("pools")}
+                  focusPositionKey={focusPositionKey}
                 />
               </TabsContent>
             </Tabs>

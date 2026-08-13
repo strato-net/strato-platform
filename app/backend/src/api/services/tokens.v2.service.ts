@@ -11,7 +11,7 @@ import { listVaultDefs, getYieldVaultInfo, getYieldVaultUserInfo } from "./yield
 import { Token, EarningAsset, BalanceSnapshot } from "@strato/shared-types";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
-import { getHistoryDirect, fetchActiveRequestIds, fetchVaultHistoryConfig, fetchUserV3PoolMeta, PoolV3Meta } from "../helpers/historyDb.helper";
+import { getHistoryDirect, fetchActiveRequestIds, fetchVaultHistoryConfig, fetchUserV3PoolMeta, fetchUserV3NftMeta, PoolV3Meta } from "../helpers/historyDb.helper";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
 import { getPositions as getV3Positions, getPoolTokenPairs as getV3PoolTokenPairs } from "./poolV3.service";
 import * as v3Math from "../helpers/poolV3Math.helper";
@@ -488,6 +488,29 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
       };
     }
     case 'positions': {
+      // PositionManagerV3 positions[tokenId] → {pool, tickLower, tickUpper, liquidity,
+      // tokensOwed0/1}: an NFT position's economics. Stored per tokenId and only counted
+      // in the snapshot valuation while the user owns that tokenId (see '_owners').
+      if (portfolioInfo.positionManager && newInfo.address === portfolioInfo.positionManager) {
+        const v = newInfo.value || {};
+        const pool = String(v.pool || '').toLowerCase().replace(/^0x/, '');
+        if (!portfolioInfo.v3PoolMeta?.[pool]) return portfolioInfo;
+        const tickLower = parseInt(String(v.tickLower ?? ''), 10);
+        const tickUpper = parseInt(String(v.tickUpper ?? ''), 10);
+        if (!Number.isFinite(tickLower) || !Number.isFinite(tickUpper)) return portfolioInfo;
+        return { ...portfolioInfo,
+          v3NftPositions: { ...portfolioInfo.v3NftPositions,
+            [String(newInfo.key['key'] ?? '')]: {
+              poolAddress: pool,
+              tickLower,
+              tickUpper,
+              liquidity: String(v.liquidity ?? '0'),
+              tokensOwed0: String(v.tokensOwed0 ?? '0'),
+              tokensOwed1: String(v.tokensOwed1 ?? '0'),
+            }
+          }
+        };
+      }
       // PoolV3 positions[owner][tickLower][tickUpper] → {liquidity, tokensOwed0/1, ...}.
       // Only rows on known V3 pools count — other contracts may have a 'positions' collection too.
       if (!portfolioInfo.v3PoolMeta?.[newInfo.address]) return portfolioInfo;
@@ -505,6 +528,21 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
             tokensOwed0: String(v.tokensOwed0 ?? '0'),
             tokensOwed1: String(v.tokensOwed1 ?? '0'),
           }
+        }
+      };
+    }
+    case '_owners': {
+      // PositionManagerV3 _owners[tokenId] → owner address. A history row is valid only
+      // while that owner holds the token, so the interval semantics of buildSnapshots
+      // make "row present and equal to the user" exactly the user's ownership window —
+      // transfers in/out need no event ordering.
+      if (!portfolioInfo.positionManager || newInfo.address !== portfolioInfo.positionManager) {
+        return portfolioInfo;
+      }
+      const owner = String(newInfo.value ?? '').replace(/"/g, '').toLowerCase().replace(/^0x/, '');
+      return { ...portfolioInfo,
+        nftOwnership: { ...portfolioInfo.nftOwnership,
+          [String(newInfo.key['key'] ?? '')]: owner
         }
       };
     }
@@ -755,8 +793,15 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
   // the pool's price at this snapshot, then value them at the token prices at this
   // snapshot (same historical-price replay the fungible tokens use).
   // Only pools in v3PoolMeta count — that set is restricted to config.poolV3Factory.
+  // NFT positions (held by PositionManagerV3) share the same math, gated on the user
+  // owning the tokenId at this snapshot.
   const v3Meta = snapshot.data.v3PoolMeta || {};
-  for (const pos of Object.values(snapshot.data.v3Positions || {}) as any[]) {
+  const nftOwnership = snapshot.data.nftOwnership || {};
+  const nftUser = snapshot.data.nftUserAddress || '';
+  const ownedNftPositions = Object.entries(snapshot.data.v3NftPositions || {})
+    .filter(([tokenId]) => nftUser && nftOwnership[tokenId] === nftUser)
+    .map(([, pos]) => pos);
+  for (const pos of [...Object.values(snapshot.data.v3Positions || {}), ...ownedNftPositions] as any[]) {
     const meta = v3Meta[pos.poolAddress];
     if (!meta) continue;
     let a0: bigint;
@@ -860,11 +905,14 @@ export const getNetBalanceHistory = async (
   const windowStart = new Date(historyParams.endTimestamp - historyParams.interval * historyParams.numTicks).toISOString();
   const windowEnd = new Date(historyParams.endTimestamp).toISOString();
 
-  const [vaultConfig, activeReqMap, v3PoolMeta] = await Promise.all([
+  const positionManager = (config.positionManagerV3 || '').toLowerCase().replace(/^0x/, '');
+  const [vaultConfig, activeReqMap, nftMeta] = await Promise.all([
     fetchVaultHistoryConfig(config.vault),
     fetchActiveRequestIds(carryVaultAddrs, userAddress).catch(() => new Map<string, string>()),
-    fetchUserV3PoolMeta(windowStart, windowEnd, userAddress),
+    fetchUserV3NftMeta(windowStart, windowEnd, userAddress, positionManager),
   ]);
+  // NFT-position pools come from the manager pre-pass, so pool meta resolves after it
+  const v3PoolMeta = await fetchUserV3PoolMeta(windowStart, windowEnd, userAddress, nftMeta.poolAddrs);
 
   const requestFilters: { address: string; path: string }[] = [];
   for (const [addr, reqId] of activeReqMap) {
@@ -888,6 +936,10 @@ export const getNetBalanceHistory = async (
     v3PoolMeta: v3PoolMetaObj,
     v3Pools: {},
     v3Positions: {},
+    positionManager,
+    nftUserAddress: userAddress.toLowerCase().replace(/^0x/, ''),
+    nftOwnership: {},
+    v3NftPositions: {},
     stratoTokenAddress,
     stakedStrato: 0n, // Total staked STRATO (delegated + unbonding)
   };
@@ -906,6 +958,8 @@ export const getNetBalanceHistory = async (
       requestFilters,
       priceOracle,
       includeV3Positions: poolV3Addrs.length > 0,
+      positionManager,
+      nftTokenIds: nftMeta.tokenIds,
       extraRelevantTokens: v3PairTokens,
       stratoStakingAddress,
       stratoTokenAddress,

@@ -20,6 +20,7 @@ import "./Pools/Pool.sol";
 import "./Pools/PoolFactory.sol";
 import "./Pools/PoolV3Factory.sol";
 import "./Pools/PoolV3.sol";
+import "./Pools/PositionManagerV3.sol";
 import "./Pools/StablePool.sol";
 
 //Metals

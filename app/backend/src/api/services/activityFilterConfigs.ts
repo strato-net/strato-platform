@@ -16,11 +16,19 @@ export const ACTIVITY_FILTER_CONFIGS: Record<string, FilterConfig> = {
   "CDPEngine:USDSTMinted": { type: "single", attribute: "owner" },
   "Pool:Swap": { type: "single", attribute: "sender" },
   "Pool:AddLiquidity": { type: "single", attribute: "provider" },
-  // V3 events carry both the caller (sender/owner) and the recipient; either can be "me"
+  // V3 events carry both the caller (sender/owner) and the recipient; either can be "me".
+  // Positions held as NFTs act through PositionManagerV3, so pool-level Mint/Burn/Collect
+  // attribute to the MANAGER (an internal address): those rows are excluded here and the
+  // user-facing record comes from the manager's own events below. Legacy positions
+  // (owner = the user) keep flowing through the pool-level events.
   "PoolV3:Swap": { type: "or", attributes: ["sender", "recipient"] },
-  "PoolV3:Mint": { type: "or", attributes: ["sender", "owner"] },
-  "PoolV3:Burn": { type: "single", attribute: "owner" },
-  "PoolV3:Collect": { type: "or", attributes: ["owner", "recipient"] },
+  "PoolV3:Mint": { type: "or", attributes: ["sender", "owner"], excludeProtocolAddresses: ["owner"] },
+  "PoolV3:Burn": { type: "single", attribute: "owner", excludeProtocolAddresses: ["owner"] },
+  "PoolV3:Collect": { type: "or", attributes: ["owner", "recipient"], excludeProtocolAddresses: ["owner"] },
+  // Position-NFT activity (PositionManagerV3 events, platform-extended with sender/pool)
+  "PositionManagerV3:IncreaseLiquidity": { type: "single", attribute: "sender" },
+  "PositionManagerV3:DecreaseLiquidity": { type: "single", attribute: "sender" },
+  "PositionManagerV3:Collect": { type: "or", attributes: ["sender", "recipient"] },
   "Rewards:RewardsClaimed": { type: "single", attribute: "user" },
   "StratoStaking:Staked": { type: "single", attribute: "user" },
   "StratoStaking:StakeMoved": { type: "single", attribute: "user" },

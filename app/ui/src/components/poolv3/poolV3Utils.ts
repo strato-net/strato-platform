@@ -94,10 +94,13 @@ export const snapTick = (tick: number, tickSpacing: number): number => {
 };
 
 /**
- * Token amounts returned by a PoolV3 action — mint, burn, and collect all return
- * (amount0, amount1). Reads the LAST transaction's decoded return values from a
- * TransactionResponse: the action tx is always last in its batch (after approvals
- * or the fee-realizing poke) in both the OAuth and wallet signing flows.
+ * Token amounts returned by a V3 action. Every action's return tuple ENDS with
+ * (amount0, amount1) but the leading values differ — pool burn/collect and manager
+ * decreaseLiquidity/collect return exactly (amount0, amount1), while
+ * PositionManagerV3.mint returns (tokenId, liquidity, amount0, amount1) and
+ * increaseLiquidity (liquidity, amount0, amount1) — so read the last TWO values of the
+ * LAST transaction's decoded returns (the action tx is always last in its batch, after
+ * approvals or the fee-realizing poke, in both the OAuth and wallet signing flows).
  * Returns null when unavailable (older backend, pending tx, unexpected shape).
  */
 export const poolV3TxAmounts = (res: unknown): { amount0: bigint; amount1: bigint } | null => {
@@ -106,7 +109,10 @@ export const poolV3TxAmounts = (res: unknown): { amount0: bigint; amount1: bigin
   const last = rv[rv.length - 1];
   if (!Array.isArray(last) || last.length < 2) return null;
   try {
-    return { amount0: BigInt(String(last[0])), amount1: BigInt(String(last[1])) };
+    return {
+      amount0: BigInt(String(last[last.length - 2])),
+      amount1: BigInt(String(last[last.length - 1])),
+    };
   } catch {
     return null;
   }
