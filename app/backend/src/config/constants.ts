@@ -163,6 +163,7 @@ export const constants = (() => {
     DirectMintPSM,
     get directMintPsm() { return config.directMintPsm; },
     get metalForge() { return config.metalForge; },
+    get saveUsdstVault() { return config.saveUsdstVault; },
     get vaultFactory() { return config.vaultFactory; },  // Use getter to get current value after init
     get vault() { return config.vault; },  // Use getter to get current value after init
     priceOracle,

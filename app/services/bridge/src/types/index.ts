@@ -98,6 +98,12 @@ export interface DepositArgs {
   targetStratoToken: string;
 }
 
+export interface ActionDepositArgs extends DepositArgs {
+  action: string;
+  actionToken: string;
+  minFinalOut: string;
+}
+
 export interface ConfirmDepositArgs {
   externalChainId: string | number;
   externalTxHash: string;

@@ -68,6 +68,41 @@ const METAL_BUY_FEE_WEI = safeParseUnits(METAL_BUY_FEE).toString();
 const STEP3_APY_ROW_CLASS = "mt-0.5 flex min-h-[18px] items-center";
 
 const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
+const BPS = 10000n;
+const ACTION_SLIPPAGE_BPS = 100n;
+
+const calcDepositActionAmount = (amount: string, action: DepositAction): bigint => {
+  try {
+    const input = safeParseUnits(amount, 18);
+    const psmFeeBps = BigInt(action.psmFeeBps || "0");
+    if (psmFeeBps >= BPS) return 0n;
+    const usdstOut = input * (BPS - psmFeeBps) / BPS;
+    const outputPrice = BigInt(action.oraclePrice || "0");
+    if (outputPrice <= 0n) return 0n;
+
+    if (action.action === 3) {
+      return usdstOut * WAD / outputPrice;
+    }
+    if (action.action === 2) {
+      const forgeFeeBps = BigInt(action.feeBps || "0");
+      if (forgeFeeBps >= BPS) return 0n;
+      return (usdstOut * (BPS - forgeFeeBps) / BPS) * WAD / outputPrice;
+    }
+    return 0n;
+  } catch {
+    return 0n;
+  }
+};
+
+const combinedActionFeeBps = (action: DepositAction): string => {
+  try {
+    const psmFee = BigInt(action.psmFeeBps || "0");
+    const forgeFee = BigInt(action.feeBps || "0");
+    return (BPS - ((BPS - psmFee) * (BPS - forgeFee) / BPS)).toString();
+  } catch {
+    return action.feeBps || "0";
+  }
+};
 
 const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: string }): string => {
   switch (info.source) {
@@ -308,7 +343,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     setSelectedNetwork,
     selectedToken,
     setSelectedToken,
-    requestDepositAction,
     triggerDepositRefresh,
   } = useBridgeContext();
   const { tokenApys, tokenApysLoaded } = useEarnContext();
@@ -387,17 +421,17 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           token.externalToken?.toLowerCase() === selectedToken.externalToken?.toLowerCase()
         );
     if (routes.length > 0) prevRouteCountRef.current = routes.length;
-    const mintStratoTokens = new Set(
-      routes
-        .filter(r => r.routeType !== "native" && r.isDefaultRoute)
-        .map(r => normAddr(r.stratoToken))
-    );
+    const routeTokens = new Set(routes.map((route) => normAddr(route.stratoToken)));
     const actions = selectedToken.routeType === "native"
       ? []
-      : depositActions.filter(a => a.payToken && mintStratoTokens.has(normAddr(a.payToken)));
+      : depositActions.filter((action) =>
+          action.payToken &&
+          routeTokens.has(normAddr(action.payToken)) &&
+          action.externalChainIds.includes(currentNetwork?.chainId || "")
+        );
     if (routes.length > 0) prevCardsRef.current = { routes, actions };
     return { sourceTokenRoutes: routes.length > 0 ? routes : prevCardsRef.current.routes, matchingActions: routes.length > 0 ? actions : prevCardsRef.current.actions };
-  }, [depositableBridgeTokens, nativeBridgeTokens, selectedToken, depositActions]);
+  }, [depositableBridgeTokens, nativeBridgeTokens, selectedToken, depositActions, currentNetwork?.chainId]);
 
   const getApyInfo = useMemo(() => {
     const m = buildEarnApyMap(tokenApys);
@@ -491,10 +525,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     (token) => BigInt(token.externalToken || "0") === 0n
   );
   const useExternalWalletSigning = hasExternalWallet && !isAppAuthenticated;
-  const visibleMatchingActions = useMemo(
-    () => useExternalWalletSigning ? [] : matchingActions,
-    [matchingActions, useExternalWalletSigning]
-  );
+  const visibleMatchingActions = matchingActions;
 
   const {
     data: nativeBalance,
@@ -596,9 +627,18 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     [selectedToken?.externalDecimals]
   );
 
+  const selectedActionAmount = useMemo(
+    () => selectedAction && amount ? calcDepositActionAmount(amount, selectedAction) : 0n,
+    [amount, selectedAction]
+  );
+  const selectedActionIsAvailable = !selectedAction || (
+    visibleMatchingActions.some((action) => action.id === selectedAction.id) &&
+    normAddr(selectedAction.payToken) === normAddr(selectedToken?.stratoToken || "")
+  );
   const isButtonDisabled = guestMode || isLoading || !amount || !!amountError
     || !selectedToken || !hasExternalWallet || !currentNetwork || !isCorrectNetwork
-    || isBalanceLoading || !isTokenPermitted;
+    || isBalanceLoading || !isTokenPermitted || !selectedActionIsAvailable
+    || (!!selectedAction && selectedActionAmount <= 0n);
 
   // Effects
   useEffect(() => {
@@ -631,12 +671,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     setSelectedNetwork,
     setSelectedToken,
   ]);
-
-  useEffect(() => {
-    if (useExternalWalletSigning && selectedAction) {
-      setSelectedAction(null);
-    }
-  }, [useExternalWalletSigning, selectedAction]);
 
   useEffect(() => {
     if (selectedToken?.routeType === "native") {
@@ -918,6 +952,26 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         amount,
         parseInt(selectedToken.externalDecimals || "18"),
       );
+      const action = selectedAction?.action || 0;
+      if (action && !selectedActionIsAvailable) {
+        throw new Error("This action is not available for the selected route and network.");
+      }
+      if (action !== 0 && action !== 2 && action !== 3) {
+        throw new Error("Unsupported deposit action.");
+      }
+      const actionAmount = selectedAction ? calcDepositActionAmount(amount, selectedAction) : 0n;
+      if (action && actionAmount <= 0n) {
+        throw new Error("Unable to quote the selected deposit action.");
+      }
+      const actionIntent = action && selectedAction
+        ? {
+            action,
+            actionToken: action === 2 ? selectedAction.stratoToken : NATIVE_TOKEN_ADDRESS,
+            minFinalOut: action === 2
+              ? actionAmount * (BPS - ACTION_SLIPPAGE_BPS) / BPS
+              : 0n,
+          }
+        : undefined;
 
       if (selectedToken.routeType === "native") {
         if (!selectedToken.externalBridge) {
@@ -1078,6 +1132,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         account: externalSender,
         chainId: activeChainId,
         permitData,
+        actionIntent,
       });
 
       // Step: Confirm Transaction (for native tokens, this is already set above)
@@ -1100,22 +1155,44 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         if (!permitData) {
           throw new Error("Permit data is required for ERC20 deposits");
         }
-        txHash = await writeContractAsync({
-          address: depositRouter as `0x${string}`,
-          abi: DEPOSIT_ROUTER_ABI,
-          functionName: "deposit",
-          args: [
-            ensureHexPrefix(selectedToken.externalToken),
-            depositAmount,
-            ensureHexPrefix(stratoRecipient),
-            targetStratoToken,
-            permitData.nonce,
-            permitData.deadline,
-            permitData.signature as `0x${string}`,
-          ],
-          chain,
-          account: externalSenderHex,
-        });
+        if (actionIntent) {
+          txHash = await writeContractAsync({
+            address: depositRouter as `0x${string}`,
+            abi: DEPOSIT_ROUTER_ABI,
+            functionName: "depositWithAction",
+            args: [
+              ensureHexPrefix(selectedToken.externalToken),
+              depositAmount,
+              ensureHexPrefix(stratoRecipient),
+              targetStratoToken,
+              actionIntent.action,
+              ensureHexPrefix(actionIntent.actionToken),
+              actionIntent.minFinalOut,
+              permitData.nonce,
+              permitData.deadline,
+              permitData.signature as `0x${string}`,
+            ],
+            chain,
+            account: externalSenderHex,
+          });
+        } else {
+          txHash = await writeContractAsync({
+            address: depositRouter as `0x${string}`,
+            abi: DEPOSIT_ROUTER_ABI,
+            functionName: "deposit",
+            args: [
+              ensureHexPrefix(selectedToken.externalToken),
+              depositAmount,
+              ensureHexPrefix(stratoRecipient),
+              targetStratoToken,
+              permitData.nonce,
+              permitData.deadline,
+              permitData.signature as `0x${string}`,
+            ],
+            chain,
+            account: externalSenderHex,
+          });
+        }
       }
 
       setProgressTxHash(txHash);
@@ -1134,12 +1211,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       const adjustedAmount = (amount18Decimals * WAD / factor).toString();
 
       const existing = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
-      const action = useExternalWalletSigning ? 0 : selectedAction?.action || 0;
       existing.push({
         externalChainId: parseInt(activeChainId),
         externalTxHash: txHash,
-        type: action === 1 ? 'saving' : action === 2 ? 'forge' : 'bridge',
+        type: action === 3 ? 'saving' : action === 2 ? 'forge' : 'bridge',
         finalTokenSymbol: selectedAction?.stratoTokenSymbol,
+        finalAmount: action ? actionAmount.toString() : undefined,
         DepositInfo: {
           externalSender,
           stratoRecipient,
@@ -1154,16 +1231,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       });
       localStorage.setItem('pendingDeposits', JSON.stringify(existing));
       triggerDepositRefresh();
-
-      if (action > 0 && selectedAction) {
-        setCurrentStep("waiting_autosave");
-        await requestDepositAction({
-          externalChainId: activeChainId,
-          externalTxHash: txHash,
-          action,
-          targetToken: action === 2 ? selectedAction.stratoToken : undefined,
-        }, useExternalWalletSigning ? { walletAuth: true } : undefined);
-      }
 
       // Step: Complete
       setCurrentStep("complete");
@@ -1246,7 +1313,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                   <button
                     key={network.chainId}
                     type="button"
-                    onClick={() => setSelectedNetwork(network.chainName)}
+                    onClick={() => {
+                      setSelectedAction(null);
+                      setSelectedNetwork(network.chainName);
+                    }}
                     disabled={guestMode || isLoading}
                     className={`relative h-10 rounded-md text-sm font-medium border-2 transition-colors flex items-center justify-center ${
                       active
@@ -1461,22 +1531,18 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                     );
                   }),
                   ...visibleMatchingActions.map((action) => {
-                    let est = amount || "0";
-                    if (action.action === 2 && action.oraclePrice && amount) {
-                      try {
-                        const price = BigInt(action.oraclePrice);
-                        if (price > 0n) est = truncateDecimals(formatUnits((safeParseUnits(amount, 18) * WAD) / price, 18), 6);
-                      } catch { /* keep */ }
-                    }
+                    const actionAmount = amount ? calcDepositActionAmount(amount, action) : 0n;
+                    const est = actionAmount > 0n ? truncateDecimals(formatUnits(actionAmount, 18), 6) : "0";
                     const isForge = action.action === 2;
+                    const totalFeeBps = isForge ? combinedActionFeeBps(action) : undefined;
                     const forgePrices = isForge
-                      ? metalPriceRowLabels(action.oraclePrice, action.feeBps)
+                      ? metalPriceRowLabels(action.oraclePrice, totalFeeBps)
                       : undefined;
                     const earnPrice = !isForge && action.oraclePrice
                       ? fmtSpotDollarWei(action.oraclePrice)
                       : undefined;
-                    const forgeSpotLabel = forgePrices && action.feeBps
-                      ? `Spot ${forgePrices.spot} \u00B7 ${Number(action.feeBps) / 100}% fee`
+                    const forgeSpotLabel = forgePrices && totalFeeBps
+                      ? `Spot ${forgePrices.spot} \u00B7 ${Number(totalFeeBps) / 100}% fees`
                       : undefined;
                     return (
                       <TokenCard key={action.id}
@@ -1484,8 +1550,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                         image={action.stratoTokenImage} symbol={action.stratoTokenSymbol}
                         estimated={est}
                         onClick={() => {
-                          const mintRoute = sourceTokenRoutes.find(r => !r.isDefaultRoute);
-                          if (mintRoute) setSelectedToken(mintRoute);
+                          const actionRoute = sourceTokenRoutes.find(
+                            (route) => normAddr(route.stratoToken) === normAddr(action.payToken)
+                          );
+                          if (actionRoute) setSelectedToken(actionRoute);
                           setSelectedAction(action);
                         }}
                         disabled={guestMode || isLoading}
@@ -1572,7 +1640,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           currentStep={currentStep}
           txHash={progressTxHash}
           chainId={currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : undefined}
-          isEasySavings={(selectedAction?.action || 0) > 0}
           isNative={progressIsNative}
           isRedemption={progressIsRedemption}
           error={progressError}

@@ -48,6 +48,22 @@ contract DepositRouter is
         bool isPermitted;
     }
 
+    struct ActionIntent {
+        uint8 action;
+        address actionToken;
+        uint256 minFinalOut;
+    }
+
+    struct DepositRequest {
+        address token;
+        uint256 amount;
+        address stratoAddress;
+        address targetStratoToken;
+        uint256 nonce;
+        uint256 deadline;
+        bytes signature;
+    }
+
     // ============ Events ============
     event DepositRouted(
         address indexed token,
@@ -56,6 +72,17 @@ contract DepositRouter is
         address indexed stratoAddress,
         address targetStratoToken,
         uint96 depositId
+    );
+    event DepositRoutedWithAction(
+        address indexed token,
+        uint256 amount,
+        address indexed sender,
+        address indexed stratoAddress,
+        address targetStratoToken,
+        uint96 depositId,
+        uint8 action,
+        address actionToken,
+        uint256 minFinalOut
     );
     event TokenConfigUpdated(
         address indexed token,
@@ -105,55 +132,127 @@ contract DepositRouter is
         uint256 deadline,
         bytes calldata signature
     ) external whenNotPaused nonReentrant {
-        if (amount == 0) revert ZeroAmount();
-        if (token == address(0)) revert UseDepositETH();
-        if (stratoAddress == address(0)) revert InvalidAddress();
-        if (targetStratoToken == address(0)) revert InvalidAddress();
-        if (deadline < block.timestamp) revert PermitExpired();
-
-        TokenConfig storage c = tokenConfig[token];
-        if (amount < c.min) revert BelowMinimum();
-        if (!c.isPermitted) revert NotPermitted();
-        if (!routePermitted[token][targetStratoToken]) revert NotPermitted();
-
-        address safe = gnosisSafe;
-        unchecked {
-            ++depositId;
-        }
-
-        uint256 balanceBefore = IERC20(token).balanceOf(safe);
-
-        IPermit2.PermitTransferFrom memory permit = IPermit2
-            .PermitTransferFrom({
-                permitted: IPermit2.TokenPermissions({
-                    token: token,
-                    amount: amount
-                }),
-                nonce: nonce,
-                deadline: deadline
-            });
-        IPermit2.SignatureTransferDetails memory transferDetails = IPermit2
-            .SignatureTransferDetails({to: safe, requestedAmount: amount});
-        PERMIT2.permitTransferFrom(
-            permit,
-            transferDetails,
-            msg.sender,
-            signature
-        );
-
-        uint256 depositedAmount = IERC20(token).balanceOf(safe) - balanceBefore;
-
-        if (depositedAmount == 0) revert ZeroAmount();
-        if (depositedAmount < amount) revert FeesNotSupported();
+        DepositRequest memory request;
+        request.token = token;
+        request.amount = amount;
+        request.stratoAddress = stratoAddress;
+        request.targetStratoToken = targetStratoToken;
+        request.nonce = nonce;
+        request.deadline = deadline;
+        request.signature = signature;
+        (uint256 depositedAmount, uint96 id) = _processDeposit(request);
 
         emit DepositRouted(
+            request.token,
+            depositedAmount,
+            msg.sender,
+            request.stratoAddress,
+            request.targetStratoToken,
+            id
+        );
+    }
+
+    function depositWithAction(
+        address token,
+        uint256 amount,
+        address stratoAddress,
+        address targetStratoToken,
+        uint8 action,
+        address actionToken,
+        uint256 minFinalOut,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) external whenNotPaused nonReentrant {
+        ActionIntent memory intent;
+        intent.action = action;
+        intent.actionToken = actionToken;
+        intent.minFinalOut = minFinalOut;
+
+        DepositRequest memory request;
+        request.token = token;
+        request.amount = amount;
+        request.stratoAddress = stratoAddress;
+        request.targetStratoToken = targetStratoToken;
+        request.nonce = nonce;
+        request.deadline = deadline;
+        request.signature = signature;
+        (uint256 depositedAmount, uint96 id) = _processDeposit(request);
+
+        _emitDepositWithAction(
+            request.token,
+            depositedAmount,
+            request.stratoAddress,
+            request.targetStratoToken,
+            id,
+            intent
+        );
+    }
+
+    function _emitDepositWithAction(
+        address token,
+        uint256 depositedAmount,
+        address stratoAddress,
+        address targetStratoToken,
+        uint96 id,
+        ActionIntent memory intent
+    ) internal {
+        emit DepositRoutedWithAction(
             token,
             depositedAmount,
             msg.sender,
             stratoAddress,
             targetStratoToken,
-            depositId
+            id,
+            intent.action,
+            intent.actionToken,
+            intent.minFinalOut
         );
+    }
+
+    function _processDeposit(
+        DepositRequest memory request
+    ) internal returns (uint256 depositedAmount, uint96 id) {
+        if (request.amount == 0) revert ZeroAmount();
+        if (request.token == address(0)) revert UseDepositETH();
+        if (request.stratoAddress == address(0)) revert InvalidAddress();
+        if (request.targetStratoToken == address(0)) revert InvalidAddress();
+        if (request.deadline < block.timestamp) revert PermitExpired();
+
+        TokenConfig storage c = tokenConfig[request.token];
+        if (request.amount < c.min) revert BelowMinimum();
+        if (!c.isPermitted) revert NotPermitted();
+        if (!routePermitted[request.token][request.targetStratoToken]) revert NotPermitted();
+
+        address safe = gnosisSafe;
+        unchecked {
+            id = ++depositId;
+        }
+
+        uint256 balanceBefore = IERC20(request.token).balanceOf(safe);
+
+        IPermit2.PermitTransferFrom memory permit = IPermit2
+            .PermitTransferFrom({
+                permitted: IPermit2.TokenPermissions({
+                    token: request.token,
+                    amount: request.amount
+                }),
+                nonce: request.nonce,
+                deadline: request.deadline
+            });
+        IPermit2.SignatureTransferDetails memory transferDetails = IPermit2
+            .SignatureTransferDetails({to: safe, requestedAmount: request.amount});
+        PERMIT2.permitTransferFrom(
+            permit,
+            transferDetails,
+            msg.sender,
+            request.signature
+        );
+
+        depositedAmount = IERC20(request.token).balanceOf(safe) - balanceBefore;
+
+        if (depositedAmount == 0) revert ZeroAmount();
+        if (depositedAmount < request.amount) revert FeesNotSupported();
     }
 
     // using address(0) for ETH
@@ -277,7 +376,7 @@ contract DepositRouter is
     }
 
     function version() external pure virtual returns (string memory) {
-        return "2.0.0";
+        return "3.0.0";
     }
 
     function _authorizeUpgrade(

@@ -82,7 +82,6 @@ export const checkSafeTxStatus = async (
       return "rejected";
     }
 
-    logInfo("SafeService", `Safe transaction status: pending`, { safeTxHash });
     return "pending";
   } catch (e) {
     logError("SafeService", e as Error, {
