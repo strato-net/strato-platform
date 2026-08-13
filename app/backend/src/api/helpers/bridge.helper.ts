@@ -155,7 +155,21 @@ async function fetchTokenSymbols(accessToken: string, addresses: Set<string>): P
   const { data } = await cirrus.get(accessToken, `/${constants.Token}`, {
     params: { select: "address,_symbol,_name", address: `in.(${[...addresses].join(",")})` }
   });
-  return new Map((data || []).map((t: any) => [t.address, { name: t._name || "-", symbol: t._symbol || "-" }]));
+  return new Map((data || []).map((t: any) => [stripHex(t.address), { name: t._name || "-", symbol: t._symbol || "-" }]));
+}
+
+async function fetchStorageTokenSymbols(accessToken: string, addresses: Set<string>): Promise<Map<string, { name: string; symbol: string }>> {
+  if (!addresses.size) return new Map();
+  const { data } = await cirrus.get(accessToken, "/storage", {
+    params: {
+      address: `in.(${[...addresses].join(",")})`,
+      select: "address,data->>_symbol,data->>_name",
+    }
+  });
+  return new Map((data || []).map((t: any) => [
+    stripHex(t.address),
+    { name: t._name || "-", symbol: t._symbol || "-" },
+  ]));
 }
 
 async function fetchExternalMeta(accessToken: string, tokens: Set<string>): Promise<Map<string, { externalName: string; externalSymbol: string }>> {
@@ -206,7 +220,7 @@ async function fetchDepositEvents(accessToken: string, txHashes: string[]): Prom
     params: {
       select: "event_name,attributes",
       address: `eq.${constants.mercataBridge}`,
-      or: "(event_name.eq.AutoForged,event_name.eq.AutoSaved)",
+      event_name: "in.(AutoForged,AutoSaved,AutoForgedViaPSM,AutoSavedUSDST,DepositActionFallback)",
       "attributes->>externalTxHash": `in.(${txHashes.join(",")})`,
     }
   });
@@ -220,15 +234,27 @@ async function fetchDepositEvents(accessToken: string, txHashes: string[]): Prom
 
 function applyDepositOutcome(enriched: any, eventMap: Map<string, any>, stratoMap: Map<string, { name: string; symbol: string }>) {
   const evt = eventMap.get(enriched.externalTxHash);
-  if (evt?.event_name === "AutoForged") {
+  if (evt?.event_name === "AutoForged" || evt?.event_name === "AutoForgedViaPSM") {
     const addr = stripHex(evt.attributes.metalToken || "");
     enriched.depositOutcome = "forge";
     enriched.finalToken = addr;
     enriched.finalTokenSymbol = stratoMap.get(addr)?.symbol || "-";
     enriched.finalAmount = evt.attributes.metalAmount || "0";
+  } else if (evt?.event_name === "AutoSavedUSDST") {
+    const addr = stripHex(evt.attributes.saveToken || "");
+    enriched.depositOutcome = "save";
+    enriched.finalToken = addr;
+    enriched.finalTokenSymbol = stratoMap.get(addr)?.symbol || "-";
+    enriched.finalAmount = evt.attributes.shares || "0";
   } else if (evt?.event_name === "AutoSaved") {
     enriched.depositOutcome = "save";
     enriched.finalAmount = evt.attributes.mTokenAmount || "0";
+  } else if (evt?.event_name === "DepositActionFallback") {
+    const addr = stripHex(evt.attributes.fallbackToken || "");
+    enriched.depositOutcome = "fallback";
+    enriched.finalToken = addr;
+    enriched.finalTokenSymbol = stratoMap.get(addr)?.symbol || "-";
+    enriched.finalAmount = evt.attributes.fallbackAmount || "0";
   } else {
     enriched.depositOutcome = "bridge";
   }
@@ -249,16 +275,22 @@ export async function enrichTransactionData(
     type === "deposit" ? fetchDepositEvents(accessToken, txHashes) : Promise.resolve(new Map<string, any>()),
   ]);
 
-  const metalAddrs = new Set<string>();
+  const outcomeTokenAddrs = new Set<string>();
   for (const [, evt] of eventMap) {
-    if (evt.event_name === "AutoForged" && evt.attributes?.metalToken) {
-      const addr = stripHex(evt.attributes.metalToken);
-      if (!stratoMap.has(addr)) metalAddrs.add(addr);
-    }
+    const token = evt.event_name === "AutoForged" || evt.event_name === "AutoForgedViaPSM"
+      ? evt.attributes?.metalToken
+      : evt.event_name === "AutoSavedUSDST"
+        ? evt.attributes?.saveToken
+        : evt.event_name === "DepositActionFallback"
+          ? evt.attributes?.fallbackToken
+          : undefined;
+    if (!token) continue;
+    const addr = stripHex(token);
+    if (!stratoMap.has(addr)) outcomeTokenAddrs.add(addr);
   }
-  if (metalAddrs.size) {
-    const metalMap = await fetchTokenSymbols(accessToken, metalAddrs);
-    for (const [k, v] of metalMap) stratoMap.set(k, v);
+  if (outcomeTokenAddrs.size) {
+    const outcomeTokenMap = await fetchStorageTokenSymbols(accessToken, outcomeTokenAddrs);
+    for (const [k, v] of outcomeTokenMap) stratoMap.set(k, v);
   }
 
   return results.map((r: any) => {

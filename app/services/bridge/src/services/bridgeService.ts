@@ -6,7 +6,7 @@ import {
 import { JsonRpcProvider } from "ethers";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
-import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, NativeDepositArgs, ConfirmDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
+import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, NativeDepositArgs, ConfirmDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
 import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
 import { mintVouchersForDeposits } from "./voucherService";
@@ -18,6 +18,7 @@ import {
   getNativeMintProposalExecution,
   proposeNativeMint,
 } from "./nativeMintService";
+import { buildActionDepositBatchArgs } from "./depositEventService";
 
 let cachedStratoNetworkId: bigint | null = null;
 const announcedManualNativeWithdrawals = new Map<string, string | null>();
@@ -186,6 +187,68 @@ const recordNativeWithdrawalProposal = async (
   });
 };
 
+const isDuplicateDepositError = (error: unknown): boolean => {
+  const message = (error as Error).message;
+  return (
+    message.includes("MB: dup key") ||
+    message.includes("MB: duplicate deposit")
+  );
+};
+
+const recordStandardDeposit = async (deposit: DepositArgs) => {
+  await execute({
+    contractName: "MercataBridge",
+    contractAddress: config.bridge.address!,
+    method: "deposit",
+    args: {
+      externalChainId: deposit.externalChainId,
+      externalSender: deposit.externalSender,
+      externalToken: deposit.externalToken,
+      externalTokenAmount: deposit.externalTokenAmount,
+      externalTxHash: deposit.externalTxHash,
+      stratoRecipient: deposit.stratoRecipient,
+      targetStratoToken: deposit.targetStratoToken,
+    },
+  });
+};
+
+const recordActionDeposit = async (deposit: ActionDepositArgs) => {
+  await execute({
+    contractName: "MercataBridge",
+    contractAddress: config.bridge.address!,
+    method: "depositWithAction",
+    args: {
+      externalChainId: deposit.externalChainId,
+      externalSender: deposit.externalSender,
+      externalToken: deposit.externalToken,
+      externalTokenAmount: deposit.externalTokenAmount,
+      externalTxHash: deposit.externalTxHash,
+      stratoRecipient: deposit.stratoRecipient,
+      targetStratoToken: deposit.targetStratoToken,
+      action: deposit.action,
+      actionToken: deposit.actionToken,
+      minFinalOut: deposit.minFinalOut,
+    },
+  });
+};
+
+const recoverMixedDuplicateBatch = async <T extends DepositArgs>(
+  deposits: NonEmptyArray<T>,
+  recordOne: (deposit: T) => Promise<void>,
+) => {
+  for (const deposit of deposits) {
+    try {
+      await recordOne(deposit);
+    } catch (error) {
+      if (!isDuplicateDepositError(error)) throw error;
+      logInfo(
+        "BridgeService",
+        `Deposit already recorded: ${deposit.externalTxHash}`,
+      );
+    }
+  }
+};
+
 export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
   const externalChainIds = depositArgs.map((deposit) => deposit.externalChainId);
   const externalSenders = depositArgs.map((deposit) => deposit.externalSender);
@@ -216,21 +279,43 @@ export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
       `Successfully deposited ${depositArgs.length} deposits`,
     );
   } catch (error) {
-    const errorMessage = (error as Error).message;
-    
-    // Check if this is a duplicate key error (expected when multiple servers process same deposits)
-    if (
-      errorMessage.includes("MB: dup key") ||
-      errorMessage.includes("MB: duplicate deposit")
-    ) {
+    if (isDuplicateDepositError(error)) {
       logInfo(
         "BridgeService",
-        `Deposits already processed by another server: ${depositArgs.length} deposits (${externalTxHashes.join(", ")})`,
+        `Standard deposit batch contained an existing deposit; recovering item-by-item`,
       );
-      return; // Gracefully handle duplicate deposits
+      await recoverMixedDuplicateBatch(depositArgs, recordStandardDeposit);
+      return;
     }
-    
-    // Re-throw other errors
+    throw error;
+  }
+};
+
+export const depositBatchWithAction = async (
+  depositArgs: NonEmptyArray<ActionDepositArgs>,
+) => {
+  const args = buildActionDepositBatchArgs(depositArgs);
+
+  try {
+    await execute({
+      contractName: "MercataBridge",
+      contractAddress: config.bridge.address!,
+      method: "depositBatchWithAction",
+      args,
+    });
+    logInfo(
+      "BridgeService",
+      `Successfully recorded ${depositArgs.length} action deposits`,
+    );
+  } catch (error) {
+    if (isDuplicateDepositError(error)) {
+      logInfo(
+        "BridgeService",
+        `Action deposit batch contained an existing deposit; recovering item-by-item`,
+      );
+      await recoverMixedDuplicateBatch(depositArgs, recordActionDeposit);
+      return;
+    }
     throw error;
   }
 };

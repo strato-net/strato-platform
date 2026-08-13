@@ -237,7 +237,8 @@ export async function simulateDeposit({
   targetStratoToken,
     account,
   chainId,
-  permitData
+  permitData,
+  actionIntent,
   }: {
   depositRouter: string;
   isNative: boolean;
@@ -248,6 +249,7 @@ export async function simulateDeposit({
     account: string;
     chainId: string;
   permitData?: { nonce: bigint; deadline: bigint; signature: string };
+  actionIntent?: { action: number; actionToken: string; minFinalOut: bigint };
 }): Promise<void> {
   const client = await getClient(chainId);
   const routerAddress = formatAddress(depositRouter);
@@ -266,20 +268,41 @@ export async function simulateDeposit({
     if (!permitData || !tokenAddress) {
       throw new Error("Permit data and token address are required for ERC20 deposits");
     }
-    await client.simulateContract({
-      address: routerAddress,
-      abi: DEPOSIT_ROUTER_ABI,
-      functionName: "deposit",
-      args: [
-        formatAddress(tokenAddress),
-        amount,
-        formatAddress(userAddress),
-        formatAddress(targetStratoToken),
-        permitData.nonce,
-        permitData.deadline,
-        permitData.signature as `0x${string}`
-      ],
-      account: accountAddress,
-    });
+    if (actionIntent?.action) {
+      await client.simulateContract({
+        address: routerAddress,
+        abi: DEPOSIT_ROUTER_ABI,
+        functionName: "depositWithAction",
+        args: [
+          formatAddress(tokenAddress),
+          amount,
+          formatAddress(userAddress),
+          formatAddress(targetStratoToken),
+          actionIntent.action,
+          formatAddress(actionIntent.actionToken),
+          actionIntent.minFinalOut,
+          permitData.nonce,
+          permitData.deadline,
+          permitData.signature as `0x${string}`
+        ],
+        account: accountAddress,
+      });
+    } else {
+      await client.simulateContract({
+        address: routerAddress,
+        abi: DEPOSIT_ROUTER_ABI,
+        functionName: "deposit",
+        args: [
+          formatAddress(tokenAddress),
+          amount,
+          formatAddress(userAddress),
+          formatAddress(targetStratoToken),
+          permitData.nonce,
+          permitData.deadline,
+          permitData.signature as `0x${string}`
+        ],
+        account: accountAddress,
+      });
+    }
   }
 }

@@ -54,12 +54,15 @@ export type BridgeRouteType = "standard" | "native";
  */
 export interface DepositAction {
   id: string;
-  action: number;                // 1 = AUTO_SAVE, 2 = AUTO_FORGE
-  stratoToken: string;           // output token address (mToken for earn, metal for forge)
+  action: number;                // 2 = AUTO_FORGE, 3 = AUTO_SAVE
+  stratoToken: string;           // final output token (metal or saveUSDST)
   stratoTokenSymbol: string;
   stratoTokenName: string;
   stratoTokenImage?: string;
-  payToken: string;              // STRATO pay token this applies to (join key to match VIA MINT routes)
+  payToken: string;              // bridged route token supplied to the action
+  externalChainIds: string[];    // chains whose DepositRouter major version is at least 3
+  minimumRouterMajorVersion: number;
+  psmFeeBps: string;             // zero for routes that mint USDST directly
   oraclePrice?: string;          // WAD-scaled price for estimated output calc
   /** Metal forge fee in basis points; AUTO_FORGE (action 2) only, from MetalForge metalConfigs */
   feeBps?: string;
@@ -95,7 +98,7 @@ export interface BridgeTransaction {
   externalSymbol?: string;
   externalToken?: string;
   // Deposit action outcome (only for deposits with AUTO_SAVE or AUTO_FORGE)
-  depositOutcome?: "bridge" | "save" | "forge";
+  depositOutcome?: "bridge" | "save" | "forge" | "fallback";
   finalToken?: string;
   finalTokenSymbol?: string;
   finalAmount?: string;
@@ -128,18 +131,6 @@ export interface WithdrawalRequestParams {
   externalToken?: string;
   stratoToken: string;
   stratoTokenAmount: string;
-}
-
-/**
- * Parameters for requesting a post-deposit action (auto-save, auto-forge, etc.)
- * @param action - Deposit action type (1 = AUTO_SAVE, 2 = AUTO_FORGE)
- * @param targetToken - Action-specific target token (e.g. metal token address for AUTO_FORGE, unused for AUTO_SAVE)
- */
-export interface DepositActionRequestParams {
-  externalChainId: string;
-  externalTxHash: string;
-  action: number;
-  targetToken?: string;
 }
 
 /**

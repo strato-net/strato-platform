@@ -1,4 +1,4 @@
-import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, DepositActionRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction } from "@strato/shared-types";
+import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction } from "@strato/shared-types";
 import type { WalletTxProgressHandler } from "@/lib/axios";
 
 export interface BalanceResponse {
@@ -13,10 +13,6 @@ export interface BridgeResponse {
 export interface WithdrawalRequestOptions {
   walletAuth?: boolean;
   walletTxProgress?: WalletTxProgressHandler;
-}
-
-export interface DepositActionRequestOptions {
-  walletAuth?: boolean;
 }
 
 export type NetworkSummary = {
@@ -38,7 +34,6 @@ export type BridgeContextType = {
   targetTransactionTab: BridgeTransactionTab | null;
   setTargetTransactionTab: (tab: BridgeTransactionTab | null) => void;
   requestWithdrawal: (params: WithdrawalRequestParams, options?: WithdrawalRequestOptions) => Promise<BridgeResponse>;
-  requestDepositAction: (params: DepositActionRequestParams, options?: DepositActionRequestOptions) => Promise<TransactionResponse>;
   useBalance: (tokenAddress: string | null) => {
     data: { 
       balance: string; 

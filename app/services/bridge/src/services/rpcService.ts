@@ -22,7 +22,7 @@ export const getChainLogs = async (
   fromBlock: number,
   toBlock: number,
   depositRouter: string,
-  eventSignature: string,
+  eventSignatures: string | string[],
 ): Promise<any[]> => {
   const rpcUrl = getChainRpcUrl(chainId);
 
@@ -37,7 +37,7 @@ export const getChainLogs = async (
       {
         fromBlock: decimalToHex(fromBlock.toString()),
         toBlock: decimalToHex(toBlock.toString()),
-        topics: [eventSignature],
+        topics: [eventSignatures],
         address: formattedAddress,
       },
     ],

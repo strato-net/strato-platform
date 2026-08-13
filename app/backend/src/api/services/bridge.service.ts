@@ -1,7 +1,9 @@
+import axios from "axios";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { strato, cirrus, bridge } from "../../utils/appApiHelper";
+import { strato, cirrus } from "../../utils/appApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
+import { getRpcUpstream } from "../../config/rpc.config";
 import { extractContractName, ensureHexPrefix } from "../../utils/utils";
 import { getTokenMetadata } from "../helpers/cirrusHelpers";
 import { 
@@ -15,12 +17,15 @@ import {
   parseNativeBridgeAssets,
   QUERY_CONFIGS 
 } from "../helpers/bridge.helper";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, DepositActionRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction } from "@strato/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction } from "@strato/shared-types";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
-import { getOraclePrices, getRebaseFactors } from "./oracle.service";
+import { getRebaseFactors } from "./oracle.service";
+import { getPsmMintState, PsmMintState } from "./psm.service";
+import { getSaveUsdstActionState, SaveUsdstActionState } from "./saveUsdst.service";
+import { getConfigs as getMetalForgeConfigs, Config as MetalForgeConfig } from "./metalForge.service";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 
-const { MercataBridge, StratoNativeBridge, Token, LendingPool, LendingRegistry, mercataBridge, DECIMALS } = constants;
+const { MercataBridge, StratoNativeBridge, Token, mercataBridge, DECIMALS, USDST } = constants;
 
 const stripPagingParams = (
   params: Record<string, string | undefined>
@@ -189,25 +194,6 @@ export const requestNativeWithdrawal = async (
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
   );
-};
-
-export const requestDepositAction = async (
-  accessToken: string,
-  {
-    externalChainId,
-    externalTxHash,
-    action,
-    targetToken,
-  }: DepositActionRequestParams,
-  userAddress: string
-) : Promise<TransactionResponse> => {
-  const response = await bridge.post<TransactionResponse>(accessToken, `/request-deposit-action`, {
-    externalChainId,
-    externalTxHash,
-    action,
-    targetToken,
-  });
-  return response.data;
 };
 
 export const getBridgeTransactions = async (
@@ -458,52 +444,254 @@ export const getWithdrawalSummary = async (
   };
 };
 
-export const getDepositActions = async (accessToken: string): Promise<DepositAction[]> => {
-  const key = (r: any) => typeof r.key === "object" ? r.key.key : r.key;
-  const val = (r: any) => typeof r.value === "string" ? JSON.parse(r.value) : r.value ?? {};
+const DEPOSIT_ROUTER_VERSION_SELECTOR = "0x54fd4d50";
+const MIN_ACTION_ROUTER_MAJOR = 3;
+const normalizeCatalogAddress = (value: string | undefined): string =>
+  (value || "").toLowerCase().replace(/^0x/, "");
+const depositActionRouteKey = (
+  externalToken: string | undefined,
+  externalChainId: string,
+  targetStratoToken: string | undefined
+): string => [
+  normalizeCatalogAddress(externalToken),
+  externalChainId,
+  normalizeCatalogAddress(targetStratoToken),
+].join(":");
+const parseDepositActionFlags = (
+  value: unknown
+): { autoForge: boolean; autoSave: boolean } => {
+  let parsed = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      parsed = {};
+    }
+  }
+  const flags = parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : {};
+  return {
+    autoForge: flags.autoForge === true || String(flags.autoForge).toLowerCase() === "true",
+    autoSave: flags.autoSave === true || String(flags.autoSave).toLowerCase() === "true",
+  };
+};
 
-  const [{ data: mappings = [] }, { data: [pool] = [] }, prices, { data: [rateEvt] = [] }] = await Promise.all([
-    constants.metalForge
-      ? cirrus.get(accessToken, "/mapping", {
-          params: { select: "collection_name,key,value::text", collection_name: "in.(metalConfigs,isSupportedPayToken)", address: `eq.${constants.metalForge}` }
-        })
-      : Promise.resolve({ data: [] }),
-    cirrus.get(accessToken, `/${LendingRegistry}`, {
-      params: { address: `eq.${constants.lendingRegistry}`, select: "lendingPool:lendingPool_fkey(borrowableAsset,mToken)" }
-    }),
-    getOraclePrices(accessToken),
-    cirrus.get(accessToken, `/${LendingPool}-ExchangeRateUpdated`, {
-      params: { select: "newRate::text", order: "block_timestamp.desc", limit: "1" }
-    }),
+const decodeAbiString = (value: unknown): string => {
+  if (typeof value !== "string" || !value.startsWith("0x")) return "";
+  const data = value.slice(2);
+  if (data.length < 128) return "";
+
+  try {
+    const offset = Number(BigInt(`0x${data.slice(0, 64)}`)) * 2;
+    const length = Number(BigInt(`0x${data.slice(offset, offset + 64)}`)) * 2;
+    return Buffer.from(data.slice(offset + 64, offset + 64 + length), "hex").toString("utf8");
+  } catch {
+    return "";
+  }
+};
+
+export const getDepositRouterMajor = async (
+  chainId: string,
+  depositRouter: string
+): Promise<number | null> => {
+  const { upstream, fallback } = getRpcUpstream(chainId);
+  for (const rpcUrl of [...new Set([upstream, fallback].filter(Boolean))] as string[]) {
+    try {
+      const { data } = await axios.post(
+        rpcUrl,
+        {
+          jsonrpc: "2.0",
+          method: "eth_call",
+          params: [{
+            to: ensureHexPrefix(depositRouter),
+            data: DEPOSIT_ROUTER_VERSION_SELECTOR,
+          }, "latest"],
+          id: 1,
+        },
+        { timeout: 10_000 }
+      );
+      if (data?.error) continue;
+      const version = decodeAbiString(data?.result);
+      if (!version) continue;
+      const major = Number(version.split(".")[0]);
+      if (Number.isInteger(major)) return major;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+};
+
+export const buildDepositActionCatalog = ({
+  routes,
+  actionChainIds,
+  psmState,
+  saveState,
+  forgeConfigs,
+  bridgeActionConfig,
+  bridgeActionRoutes,
+}: {
+  routes: BridgeToken[];
+  actionChainIds: Set<string>;
+  psmState: PsmMintState | null;
+  saveState: SaveUsdstActionState | null;
+  forgeConfigs: MetalForgeConfig;
+  bridgeActionConfig: { directMintPsm?: string; saveUsdstVault?: string };
+  bridgeActionRoutes: Map<string, { autoForge: boolean; autoSave: boolean }>;
+}): DepositAction[] => {
+  if (!actionChainIds.size) return [];
+
+  const usdst = normalizeCatalogAddress(USDST);
+  const psmReady = Boolean(
+    psmState &&
+    !psmState.mintPaused &&
+    psmState.mintableToken === usdst &&
+    normalizeCatalogAddress(bridgeActionConfig.directMintPsm) === normalizeCatalogAddress(constants.directMintPsm)
+  );
+  const sources = new Map<string, {
+    address: string;
+    forgeChainIds: Set<string>;
+    saveChainIds: Set<string>;
+    psmFeeBps: string;
+  }>();
+
+  for (const route of routes) {
+    const chainId = String(route.externalChainId);
+    if (route.routeType !== "standard" || !route.enabled || !actionChainIds.has(chainId)) continue;
+
+    const address = normalizeCatalogAddress(route.stratoToken);
+    const mintConfig = psmState?.mintConfigs.get(address);
+    if (address !== usdst && (!psmReady || !mintConfig?.isEnabled)) continue;
+    const actionConfig = bridgeActionRoutes.get(
+      depositActionRouteKey(route.externalToken, chainId, route.stratoToken)
+    );
+    if (!actionConfig?.autoForge && !actionConfig?.autoSave) continue;
+
+    const source = sources.get(address) || {
+      address: route.stratoToken,
+      forgeChainIds: new Set<string>(),
+      saveChainIds: new Set<string>(),
+      psmFeeBps: address === usdst ? "0" : mintConfig!.feeBps,
+    };
+    if (actionConfig.autoForge) source.forgeChainIds.add(chainId);
+    if (actionConfig.autoSave) source.saveChainIds.add(chainId);
+    sources.set(address, source);
+  }
+
+  const actions: DepositAction[] = [];
+  const saveEnabled = Boolean(
+    saveState &&
+    !saveState.paused &&
+    normalizeCatalogAddress(saveState.assetAddress) === usdst &&
+    normalizeCatalogAddress(bridgeActionConfig.saveUsdstVault) === normalizeCatalogAddress(saveState.vaultAddress)
+  );
+  const forgeEnabled = forgeConfigs.payTokens.some(
+    ({ address }) => normalizeCatalogAddress(address) === usdst
+  );
+  const enabledMetals = forgeEnabled
+    ? forgeConfigs.metals.filter(
+        (metal) =>
+          metal.isEnabled &&
+          BigInt(metal.price || "0") > 0n &&
+          BigInt(metal.totalMinted || "0") < BigInt(metal.mintCap || "0")
+      )
+    : [];
+
+  for (const source of sources.values()) {
+    const common = {
+      payToken: source.address,
+      minimumRouterMajorVersion: MIN_ACTION_ROUTER_MAJOR,
+      psmFeeBps: source.psmFeeBps,
+    };
+
+    if (saveEnabled && saveState && source.saveChainIds.size) {
+      actions.push({
+        id: `save-${source.address}`,
+        action: 3,
+        stratoToken: saveState.vaultAddress,
+        stratoTokenName: "Save USDST",
+        stratoTokenSymbol: saveState.shareSymbol,
+        oraclePrice: saveState.projectedExchangeRate,
+        externalChainIds: [...source.saveChainIds],
+        ...common,
+      });
+    }
+
+    for (const metal of source.forgeChainIds.size ? enabledMetals : []) {
+      actions.push({
+        id: `forge-${source.address}-${metal.address}`,
+        action: 2,
+        stratoToken: metal.address,
+        stratoTokenName: metal.name,
+        stratoTokenSymbol: metal.symbol,
+        stratoTokenImage: metal.imageUrl,
+        oraclePrice: metal.price,
+        feeBps: metal.feeBps,
+        externalChainIds: [...source.forgeChainIds],
+        ...common,
+      });
+    }
+  }
+
+  return actions;
+};
+
+export const getDepositActions = async (accessToken: string): Promise<DepositAction[]> => {
+  const [
+    routes,
+    networks,
+    psmState,
+    saveState,
+    forgeConfigs,
+    bridgeActionConfig,
+    bridgeActionRouteRows,
+  ] = await Promise.all([
+    getBridgeableTokens(accessToken),
+    getNetworkConfigs(accessToken),
+    constants.directMintPsm ? getPsmMintState(accessToken) : Promise.resolve(null),
+    constants.saveUsdstVault ? getSaveUsdstActionState(accessToken) : Promise.resolve(null),
+    constants.metalForge ? getMetalForgeConfigs(accessToken) : Promise.resolve({ metals: [], payTokens: [] }),
+    cirrus.get(accessToken, "/storage", {
+      params: {
+        address: `eq.${mercataBridge}`,
+        select: "data->>directMintPsm,data->>saveUsdstVault",
+        limit: "1",
+      },
+    }).then(({ data }) => data?.[0] || {}),
+    cirrus.get(accessToken, "/mapping", {
+      params: {
+        address: `eq.${mercataBridge}`,
+        collection_name: "eq.depositActionConfigs",
+        select: "externalToken:key->>key,externalChainId:key->>key2,targetStratoToken:key->>key3,value",
+      },
+    }).then(({ data }) => data || []),
   ]);
 
-  const metals = mappings.filter((r: any) => r.collection_name === "metalConfigs").map((r: any) => ({ addr: key(r), ...val(r) })).filter((m: any) => m.isEnabled === true);
-  const payTokens = mappings.filter((r: any) => r.collection_name === "isSupportedPayToken").filter((r: any) => r.value === true || r.value === "true").map((r: any) => ({ addr: key(r) }));
-  const { borrowableAsset, mToken } = pool?.lendingPool || {};
-  if (mToken) prices.set(mToken, rateEvt?.newRate || (10n ** 18n).toString());
-
-  const allAddrs = [...metals.map((m: any) => m.addr), ...(mToken ? [mToken] : [])];
-  const tokenMap = allAddrs.length ? await getTokenMetadata(accessToken, allAddrs) : new Map();
-
-  const toAction = (id: string, action: number, addr: string, pay: string, feeBps?: string): DepositAction => {
-    const m = tokenMap.get(addr);
-    return {
-      id,
-      action,
-      stratoToken: addr,
-      stratoTokenName: m?.name ?? "",
-      stratoTokenSymbol: m?.symbol ?? "",
-      stratoTokenImage: m?.image,
-      payToken: pay,
-      oraclePrice: prices.get(addr),
-      ...(feeBps != null && feeBps !== "" ? { feeBps: String(feeBps) } : {}),
-    };
-  };
-
-  return [
-    ...(borrowableAsset && mToken ? [toAction(`earn-${borrowableAsset}`, 1, mToken, borrowableAsset)] : []),
-    ...payTokens.flatMap((p: any) =>
-      metals.map((m: any) => toAction(`forge-${p.addr}-${m.addr}`, 2, m.addr, p.addr, m.feeBps)),
-    ),
-  ];
+  const bridgeActionRoutes = new Map<string, { autoForge: boolean; autoSave: boolean }>(
+    bridgeActionRouteRows.map((row: any) => [
+      depositActionRouteKey(row.externalToken, String(row.externalChainId), row.targetStratoToken),
+      parseDepositActionFlags(row.value),
+    ])
+  );
+  const routerMajors = await Promise.all(
+    networks.map(async ({ externalChainId, chainInfo }) => ({
+      chainId: String(externalChainId),
+      major: chainInfo.depositRouter
+        ? await getDepositRouterMajor(String(externalChainId), chainInfo.depositRouter)
+        : null,
+    }))
+  );
+  const actionChainIds = new Set(
+    routerMajors
+      .filter(({ major }) => major != null && major >= MIN_ACTION_ROUTER_MAJOR)
+      .map(({ chainId }) => chainId)
+  );
+  return buildDepositActionCatalog({
+    routes,
+    actionChainIds,
+    psmState,
+    saveState,
+    forgeConfigs,
+    bridgeActionConfig,
+    bridgeActionRoutes,
+  });
 };

@@ -151,13 +151,31 @@ npm start
 ### Bridge In Flow (Ethereum → STRATO)
 
 1. **Deposit Detection**
-   - Alchemy polling monitors Ethereum deposit events
-   - Checks if deposit is already processed
-   - Records deposit on STRATO if new
+   - External-chain polling reads standard and action deposit events in one ordered block range
+   - ABI-decodes the action intent
+   - Deduplicates exact RPC log repeats
+   - Rejects unsupported multi-deposit transactions without advancing the cursor
 
 2. **Processing**
-   - Updates last processed block for chain
-   - Handles batch processing for efficiency
+   - Records standard deposits with `depositBatch`
+   - Records action deposits with `depositBatchWithAction`
+   - Advances the cursor only after both recording paths succeed
+
+### Action Deposit Rollout
+
+Before starting the updated relayer in dev, test, or production:
+
+1. Upgrade and configure `MercataBridge`.
+2. Dry-run the two required relayer whitelist operations:
+```bash
+cd app/contracts/deploy
+node configure-bridge-relayer-actions.js \
+  --bridge-address <bridge-proxy> \
+  --relayer-address <relayer-address>
+```
+3. Repeat with `--execute` as each required admin until governance executes both operations.
+4. Verify the relayer is whitelisted for `depositWithAction` and `depositBatchWithAction`.
+5. Start one relayer instance, validate standard and action deposits, then roll out remaining instances.
 
 ### Key Components
 
