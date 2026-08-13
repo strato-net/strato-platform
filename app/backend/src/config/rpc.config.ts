@@ -9,7 +9,7 @@ const lineaSepoliaChainId = "59141";
 
 const fallbackRpcUpstreams: RpcMapping = {
   [mainnetChainId]: process.env.RPC_URL_MAINNET_FALLBACK || "https://eth.merkle.io",
-  [sepoliaChainId]: process.env.RPC_URL_SEPOLIA_FALLBACK || "https://sepolia.drpc.org",
+  [sepoliaChainId]: process.env.RPC_URL_SEPOLIA_FALLBACK || "https://ethereum-sepolia-rpc.publicnode.com",
   [baseChainId]: process.env.RPC_URL_BASE_FALLBACK || "https://mainnet.base.org",
   [baseSepoliaChainId]: process.env.RPC_URL_BASE_SEPOLIA_FALLBACK || "https://sepolia.base.org",
   [lineaChainId]: process.env.RPC_URL_LINEA_FALLBACK || "https://rpc.linea.build",
