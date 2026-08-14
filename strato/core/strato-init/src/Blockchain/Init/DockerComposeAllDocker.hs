@@ -85,7 +85,8 @@ generateDockerComposeAllDocker = do
         , build = Just "./app/ui"
         , depends_on = Just $ DependsOnList ["app-backend"]
         , environment = Just $ Map.fromList
-            [ ("LUCKY_ORANGE_SITE_ID", "${LUCKY_ORANGE_SITE_ID:-}")
+            [ ("POSTHOG_KEY", "${POSTHOG_KEY:-}")
+            , ("POSTHOG_HOST", "${POSTHOG_HOST:-}")
             , ("GOOGLE_ANALYTICS_ID", "${GOOGLE_ANALYTICS_ID:-}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
