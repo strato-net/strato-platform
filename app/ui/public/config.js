@@ -3,7 +3,6 @@
 window.ENV = {
   CHAIN_ID: null,
   NETWORK_NAME: "",
-  POSTHOG_KEY: "",
-  POSTHOG_HOST: "",
+  LUCKY_ORANGE_SITE_ID: "",
   GOOGLE_ANALYTICS_ID: ""
 };
