@@ -83,6 +83,19 @@ const isUserAddress = (addr: string, userAddress?: string | null): boolean => {
   return !!(userAddress && addr && normalizeAddress(addr) === normalizeAddress(userAddress));
 };
 
+/**
+ * Title and icon for a transfer based on the user's role:
+ * "Receive" when the user is the recipient, "Send" otherwise
+ */
+const transferDirection = (
+  from: string,
+  to: string,
+  userAddress?: string | null
+): Pick<ActivityCardData, "title" | "iconConfig"> =>
+  isUserAddress(to, userAddress) && !isUserAddress(from, userAddress)
+    ? { title: "Receive", iconConfig: { icon: Download, color: "bg-green-500" } }
+    : { title: "Send", iconConfig: { icon: Send, color: "bg-blue-500" } };
+
 const getEventAttribute = (event: Event, ...names: string[]): string => {
   for (const name of names) {
     const value = event.attributes[name];
@@ -202,7 +215,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "Transfer": {
     contract_name: "Token",
     event_name: "Transfer",
-    displayName: "Send",
+    displayName: "Send / Receive",
     iconConfig: { icon: Send, color: "bg-blue-500" },
     getTokenAddress: (event: Event) => [event.address].filter(Boolean),
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
@@ -239,7 +252,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "Send",
+        ...transferDirection(from, to, userAddress),
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -260,7 +273,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "YieldVaultTransfer": {
     contract_name: "YieldVault",
     event_name: "Transfer",
-    displayName: "Send",
+    displayName: "Send / Receive",
     iconConfig: { icon: Send, color: "bg-blue-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const vaultName = tokenSymbols.get(event.address) || tokenSymbols.get(normalizeAddress(event.address));
@@ -292,7 +305,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "Send",
+        ...transferDirection(from, to, userAddress),
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -313,7 +326,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "SaveUSDSTVaultTransfer": {
     contract_name: "SaveUSDSTVault",
     event_name: "Transfer",
-    displayName: "Send",
+    displayName: "Send / Receive",
     iconConfig: { icon: Send, color: "bg-blue-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const from = event.attributes.from || event.attributes.From || "";
@@ -343,7 +356,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "Send",
+        ...transferDirection(from, to, userAddress),
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),

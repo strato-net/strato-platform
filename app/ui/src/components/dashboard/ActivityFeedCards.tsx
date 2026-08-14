@@ -69,7 +69,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
       }));
 
       // Filter by selected activity type if not "all".
-      // Types sharing a display name (e.g. "Send") are queried together as one group.
+      // Types sharing a display name (e.g. "Send / Receive") are queried together as one group.
       if (selectedActivityType !== "all") {
         const selectedConfig = activityTypes[selectedActivityType];
         if (selectedConfig) {
@@ -342,10 +342,10 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
           const cardData = config.handler(event, tokenSymbolsMap, userAddress, tokenImagesMap);
           // Handlers return null for bookkeeping-only events that shouldn't be shown
           if (cardData) {
-            // Add iconConfig from the activity type config
+            // Add iconConfig from the activity type config unless the handler set one
             allCardData.push({
               ...cardData,
-              iconConfig: config.iconConfig,
+              iconConfig: cardData.iconConfig || config.iconConfig,
             });
           }
         }
@@ -375,7 +375,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
   }, []);
 
   // Get activity type display names from config, deduplicated (merged types
-  // like "Send" share a label) and sorted alphabetically
+  // like "Send / Receive" share a label) and sorted alphabetically
   const activityTypeOptions = [
     { value: "all", label: "All types" },
     ...Object.entries(activityTypes)
