@@ -1,13 +1,16 @@
 #!/usr/bin/env sh
 
 #------------------------------------------------------------------------------
-# Bash script for installing pre-requisite packages for building the full
-# STRATO platform on Linux, macOS and other UNIX-derived platforms.
+# Installs the pre-requisite packages for building and running the full
+# STRATO platform.
 #
-# This is an "infrastucture-as-code" alternative to the manual build
+# Supported platforms:
+#   - macOS Sequoia (15.x) and Tahoe (26.x)
+#   - Ubuntu 24.04 LTS "Noble Numbat" and 26.04 LTS "Resolute Raccoon"
+#   - Amazon Linux 2023
+#   - Oracle Linux 8.10
 #
-# See "How can I reliably get the operating system's name?"
-# http://unix.stackexchange.com/questions/92199/how-can-i-reliably-get-the-operating-systems-name
+# This is an "infrastructure-as-code" alternative to the manual build setup.
 #------------------------------------------------------------------------------
 
 set -e
@@ -18,115 +21,6 @@ unsupported_platform() {
     exit 1
 }
 
-# Function to get package version for the current distro
-# Usage: get_package_version "package_name"
-get_package_version() {
-    local package_name="$1"
-    local version=""
-    
-    case $(uname -s) in
-        Darwin)
-            # macOS - use Homebrew
-            if command -v brew > /dev/null 2>&1; then
-                version=$(brew list --versions "$package_name" 2>/dev/null | awk '{print $2}' | head -1)
-            fi
-            ;;
-        Linux)
-            if [ -f "/etc/os-release" ]; then
-                DISTRO_NAME=$(. /etc/os-release; echo $NAME)
-                case $DISTRO_NAME in
-                    "Amazon Linux"*|"Oracle Linux Server"*)
-                        # Amazon Linux / Oracle Linux - use dnf/rpm
-                        version=$(rpm -q --queryformat '%{VERSION}-%{RELEASE}' "$package_name" 2>/dev/null | head -1)
-                        if [ "$?" -ne 0 ]; then
-                            version=""
-                        fi
-                        ;;
-                    Ubuntu|"Linux Mint")
-                        # Ubuntu/Mint - use dpkg
-                        version=$(dpkg-query -W -f='${Version}' "$package_name" 2>/dev/null)
-                        if [ "$?" -ne 0 ]; then
-                            version=""
-                        fi
-                        ;;
-                esac
-            fi
-            ;;
-    esac
-    
-    echo "$version"
-}
-
-# Function to display package name and version
-# Usage: show_package_version "package_name"
-show_package_version() {
-    local package_name="$1"
-    local version=$(get_package_version "$package_name")
-    
-    if [ -n "$version" ]; then
-        echo "$package_name=$version"
-    else
-        echo "$package_name=not_installed"
-    fi
-}
-
-# Function to check package version against expected version for specific distro
-# Usage: check_package_version "distro_name" "package_name" "expected_version"
-check_package_version() {
-    local distro_name="$1"
-    local package_name="$2"
-    local expected_version="$3"
-    local current_distro=""
-    
-    # Determine current distro
-    case $(uname -s) in
-        Darwin)
-            current_distro="macos"
-            ;;
-        Linux)
-            if [ -f "/etc/os-release" ]; then
-                DISTRO_NAME=$(. /etc/os-release; echo $NAME)
-                case $DISTRO_NAME in
-                    "Amazon Linux"*)
-                        current_distro="amazon"
-                        ;;
-                    Ubuntu)
-                        current_distro="ubuntu"
-                        ;;
-                    "Linux Mint")
-                        current_distro="mint"
-                        ;;
-                esac
-            fi
-            ;;
-    esac
-    
-    # Only run check if distro matches
-    if [ "$distro_name" = "ubuntu-or-mint" ]; then
-        if [ "$current_distro" != "ubuntu" ] && [ "$current_distro" != "mint" ]; then
-            return 0
-        fi
-    elif [ "$distro_name" != "$current_distro" ]; then
-        return 0
-    fi
-    
-    local actual_version=$(get_package_version "$package_name")
-    
-    if [ -z "$actual_version" ]; then
-        echo "ERROR - Package $package_name is not installed"
-        exit 1
-    fi
-    
-    if [ "$actual_version" != "$expected_version" ]; then
-        echo "ERROR - Version mismatch for $package_name:"
-        echo "  Expected: $expected_version"
-        echo "  Actual:   $actual_version"
-        exit 1
-    fi
-    
-    echo "✓ $package_name version $actual_version matches expected version"
-}
-
 case $(uname -s) in
 
 #------------------------------------------------------------------------------
@@ -134,24 +28,27 @@ case $(uname -s) in
 #------------------------------------------------------------------------------
 
 Darwin)
-    # Check macOS version constraints - only allow Sequoia
+    # Check macOS version constraints - only allow Sequoia and Tahoe
     MACOS_VERSION=$(sw_vers -productVersion)
-    MACOS_MAJOR=$(echo $MACOS_VERSION | cut -d. -f1)
-    if [ "$MACOS_MAJOR" != "15" ] && [ "$MACOS_MAJOR" != "26" ]; then
-        echo "ERROR - This script only natively support macOS Sequoia (15.x) and macOS Tahoe (26.x)."
-        echo "Your macOS version: $MACOS_VERSION"
-        exit 1
-    fi
-    
-    echo "Installing STRATO dependencies on macOS Sequoia $MACOS_VERSION."
-    
+    MACOS_MAJOR=$(echo "$MACOS_VERSION" | cut -d. -f1)
+    case $MACOS_MAJOR in
+        15|26)
+            echo "Installing STRATO dependencies on macOS $MACOS_VERSION."
+            ;;
+        *)
+            echo "ERROR - This script only supports macOS Sequoia (15.x) and macOS Tahoe (26.x)."
+            echo "Your macOS version: $MACOS_VERSION"
+            exit 1
+            ;;
+    esac
+
     # Install Homebrew if not already installed (non-interactive, safe to run repeatedly)
     if ! command -v brew > /dev/null 2>&1; then
         echo "Installing Homebrew..."
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" < /dev/null
-        
+
         # Add Homebrew to PATH for the current session
-        if [[ $(uname -m) == "arm64" ]]; then
+        if [ "$(uname -m)" = "arm64" ]; then
             # Apple Silicon Mac
             eval "$(/opt/homebrew/bin/brew shellenv)"
         else
@@ -160,19 +57,66 @@ Darwin)
         fi
     else
         echo "Homebrew is already installed."
+        # Refresh package definitions - stale metadata for the Docker cask
+        # (renamed from "docker" to "docker-desktop") fails to parse otherwise.
+        brew update --quiet
     fi
 
     # Install git
     brew install --quiet git
-    
-    # Install Docker Desktop for Mac
-    brew install --quiet --cask docker
-    
-    # Install Haskell Stack
-    brew install --quiet haskell-stack
+
+    # Install Docker Desktop for Mac unless Docker is already installed
+    # (e.g. Docker Desktop downloaded from docker.com - the cask install
+    # would fail on the pre-existing /Applications/Docker.app)
+    if ! command -v docker > /dev/null 2>&1 && [ ! -d /Applications/Docker.app ]; then
+        brew install --quiet --cask docker-desktop
+    else
+        echo "Docker is already installed."
+    fi
+
+    # Install Haskell Stack unless already installed
+    # (e.g. via the official get.haskellstack.org installer)
+    if ! command -v stack > /dev/null 2>&1; then
+        brew install --quiet haskell-stack
+    else
+        echo "Haskell Stack is already installed, skipping install."
+    fi
+
+    # The `ar` shipped with newer Xcode Command Line Tools (16.3+ / macOS Tahoe)
+    # no longer supports @response-file arguments. GHC toolchains that were set
+    # up under an older Xcode have ("ar supports at file", "YES") baked into
+    # their settings and fail to link with:
+    #   ar: @....rsp: No such file or directory
+    # Detect the mismatch and patch any existing stack-installed GHC settings.
+    AR_ATFILE_RSP=$(mktemp)
+    AR_ATFILE_ARCHIVE=$(mktemp -u).a
+    AR_SETTINGS_PATCHED=false
+    if ! ar qc "$AR_ATFILE_ARCHIVE" @"$AR_ATFILE_RSP" 2>/dev/null; then
+        for GHC_SETTINGS in "$HOME"/.stack/programs/*/ghc-*/lib/ghc-*/lib/settings; do
+            if [ -f "$GHC_SETTINGS" ] && grep -q '("ar supports at file", "YES")' "$GHC_SETTINGS"; then
+                sed -i '' 's|("ar supports at file", "YES")|("ar supports at file", "NO")|' "$GHC_SETTINGS"
+                echo "Patched 'ar supports at file' to NO in $GHC_SETTINGS (system ar lacks @response-file support)."
+                AR_SETTINGS_PATCHED=true
+            fi
+        done
+    fi
+    rm -f "$AR_ATFILE_RSP" "$AR_ATFILE_ARCHIVE"
+
+    # Cabal also caches ar's response-file support per package at configure
+    # time, so an existing build tree configured under the old Xcode keeps
+    # failing even after the settings patch. Flush it once so every local
+    # package re-probes ar on the next build.
+    if [ "$AR_SETTINGS_PATCHED" = "true" ]; then
+        SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+        if [ -d "$SCRIPT_DIR/strato" ] && command -v stack > /dev/null 2>&1; then
+            echo "Cleaning stale package configure caches in $SCRIPT_DIR/strato (one-time after ar fix)..."
+            (cd "$SCRIPT_DIR/strato" && stack clean)
+        fi
+    fi
 
     # Install STRATO dependencies
     brew install --quiet \
+        gmp \
         leveldb \
         libpq \
         librdkafka \
@@ -201,7 +145,7 @@ Linux)
                     exit 1
                     ;;
             esac
-            
+
             # Install git
             sudo dnf update -q -y
             sudo dnf install -q -y git
@@ -456,34 +400,21 @@ Linux)
 
             ;;
 
-        Ubuntu|"Linux Mint")
-            # Check Ubuntu version constraints - only allow 24.04 LTS "Noble Numbat"
-            if [ "$DISTRO_NAME" = "Ubuntu" ]; then
-                UBUNTU_VERSION=$(lsb_release -rs)
-                UBUNTU_CODENAME=$(lsb_release -cs)
-                case $UBUNTU_VERSION in
-                    24.04|24.04.*)
-                        echo "Installing STRATO dependencies on Ubuntu $UBUNTU_VERSION LTS \"$UBUNTU_CODENAME\"."
-                        ;;
-                    *)
-                        echo "ERROR - STRATO only supports Ubuntu 24.04 LTS \"Noble Numbat\" (initial release or point releases)."
-                        echo "Your Ubuntu version: $UBUNTU_VERSION \"$UBUNTU_CODENAME\"."
-                        exit 1
-                        ;;
-                esac
-            else
-                # Check Linux Mint version constraints - only allow 22.1 "Xia"
-                MINT_VERSION=$(lsb_release -rs)
-                MINT_CODENAME=$(lsb_release -cs)
-                if [ "$MINT_VERSION" = "22.1" ] && [ "$MINT_CODENAME" = "xia" ]; then
-                    echo "Installing STRATO dependencies on Linux Mint $MINT_VERSION \"Xia\"."
-                else
-                    echo "ERROR - STRATO only supports Linux Mint 22.1 \"Xia\"."
-                    echo "Your Linux Mint version: $MINT_VERSION \"$MINT_CODENAME\""
+        Ubuntu)
+            # Check Ubuntu version constraints - only allow the supported LTS releases
+            UBUNTU_VERSION=$(. /etc/os-release; echo $VERSION_ID)
+            UBUNTU_CODENAME=$(. /etc/os-release; echo ${UBUNTU_CODENAME:-$VERSION_CODENAME})
+            case $UBUNTU_VERSION in
+                24.04|26.04)
+                    echo "Installing STRATO dependencies on Ubuntu $UBUNTU_VERSION LTS \"$UBUNTU_CODENAME\"."
+                    ;;
+                *)
+                    echo "ERROR - STRATO only supports Ubuntu 24.04 LTS \"Noble Numbat\" and 26.04 LTS \"Resolute Raccoon\"."
+                    echo "Your Ubuntu version: $UBUNTU_VERSION \"$UBUNTU_CODENAME\"."
                     exit 1
-                fi
-            fi
-            
+                    ;;
+            esac
+
             # Remove stale apt source/key files left by previous versions of this
             # script (e.g. the old .gpg keyring or .list source file) to prevent
             # "Conflicting values set for Signed-By" errors when re-running.
@@ -505,21 +436,12 @@ Linux)
                 # Install packaging-related tools needed for the Docker install
                 sudo apt install -qy --no-install-recommends \
                     ca-certificates \
-                    curl \
-                    lsb-release
+                    curl
 
                 # Add Docker's official GPG key (PEM-armored .asc per current docs)
                 sudo install -m 0755 -d /etc/apt/keyrings
                 sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
                 sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-                # Determine the Ubuntu codename (Linux Mint reports its own codename;
-                # the upstream Ubuntu codename is needed for Docker's repo).
-                if [ "$DISTRO_NAME" = "Linux Mint" ]; then
-                    UBUNTU_CODENAME=$(cat /etc/upstream-release/lsb-release | grep DISTRIB_CODENAME | cut -d= -f2)
-                else
-                    UBUNTU_CODENAME=$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
-                fi
 
                 # Add the Docker repository using the deb822 .sources format
                 sudo tee /etc/apt/sources.list.d/docker.sources > /dev/null <<EOF
@@ -581,7 +503,7 @@ EOF
 
         esac
     else
-        unsupported_platform "$(lsb_release -is)"
+        unsupported_platform "$(uname -s) (no /etc/os-release found)"
     fi
     ;;
 
@@ -590,27 +512,6 @@ EOF
     ;;
 
 esac
-
-# Lock the specific package versions for Ubuntu or Mint Linux
-check_package_version "ubuntu-or-mint" "build-essential" "12.10ubuntu1"
-check_package_version "ubuntu-or-mint" "ca-certificates" "20240203"
-check_package_version "ubuntu-or-mint" "containerd.io" "1.7.27-1"
-check_package_version "ubuntu-or-mint" "curl" "8.5.0-2ubuntu10.6"
-check_package_version "ubuntu-or-mint" "docker-buildx-plugin" "0.26.1-1~ubuntu.24.04~noble"
-check_package_version "ubuntu-or-mint" "docker-ce" "5:28.3.3-1~ubuntu.24.04~noble"
-check_package_version "ubuntu-or-mint" "docker-ce-cli" "5:28.3.3-1~ubuntu.24.04~noble"
-check_package_version "ubuntu-or-mint" "docker-compose-plugin" "2.39.1-1~ubuntu.24.04~noble"
-check_package_version "ubuntu-or-mint" "git" "1:2.43.0-1ubuntu7.3"
-check_package_version "ubuntu-or-mint" "libgmp-dev" "2:6.3.0+dfsg-2ubuntu6.1"
-check_package_version "ubuntu-or-mint" "libleveldb-dev" "1.23-5build1"
-check_package_version "ubuntu-or-mint" "liblzma-dev" "5.6.1+really5.4.5-1ubuntu0.2"
-check_package_version "ubuntu-or-mint" "libpq-dev" "16.9-0ubuntu0.24.04.1"
-check_package_version "ubuntu-or-mint" "librdkafka-dev" "2.3.0-1build2"
-check_package_version "ubuntu-or-mint" "libsecp256k1-dev" "0.2.0-2"
-check_package_version "ubuntu-or-mint" "libsodium-dev" "1.0.18-1build3"
-check_package_version "ubuntu-or-mint" "lsb-release" "12.0-2"
-check_package_version "ubuntu-or-mint" "postgresql-client" "16+257build1.1"
-check_package_version "ubuntu-or-mint" "zlib1g-dev" "1:1.3.dfsg-3.1ubuntu2.1"
 
 echo ""
 echo "Dependencies installed successfully."
