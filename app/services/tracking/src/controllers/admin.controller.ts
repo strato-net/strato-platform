@@ -1,12 +1,14 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import { AuthorizedRequest, resolveAuthorization } from "../auth";
 import { config } from "../config";
 import { createLink, publicUrlForSlug, updateLink } from "../services/linkService";
 import {
+  getAttributionTouches,
   getLinkDetail,
   getLinkSummaries,
   getWalletDetail,
   invalidateSnapshot,
+  parseAttributionRange,
 } from "../services/attributionService";
 import { isAllowedDestination } from "../utils/destinations";
 import { normalizeAddress } from "../utils/addresses";
@@ -20,6 +22,26 @@ export const me = async (req: AuthorizedRequest, res: Response): Promise<void> =
 // GET /tracking-api/links — summaries with attribution rollups
 export const list = async (_req: AuthorizedRequest, res: Response): Promise<void> => {
   res.json(await getLinkSummaries());
+};
+
+// GET /tracking-api/attribution-touches?from=<ISO>&to=<ISO>
+export const attributionTouches = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const range = parseAttributionRange(req.query.from, req.query.to);
+  if (!range) {
+    res.status(400).json({
+      error: "from and to must be valid timestamps with from earlier than to",
+    });
+    return;
+  }
+  res.json({
+    from: range.from,
+    to: range.to,
+    attributionWindowDays: config.tracking.attributionWindowDays,
+    touches: await getAttributionTouches(range),
+  });
 };
 
 // GET /tracking-api/links/:id

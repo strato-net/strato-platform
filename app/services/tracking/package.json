@@ -6,7 +6,8 @@
   "scripts": {
     "start": "ts-node src/index.ts",
     "dev": "nodemon src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "TS_NODE_PROJECT=tsconfig.test.json node --test -r ts-node/register test/*.test.ts"
   },
   "engines": {
     "node": ">=22.12 <23.0"

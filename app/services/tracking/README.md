@@ -15,6 +15,7 @@ source of truth.
 | `GET /t/:slug` | none | Resolve a link: record `link_opened`, set the `strato_tid` session cookie (90 days, HttpOnly, SameSite=Lax), 302 to the allowlisted destination **on the original host** (relative Location — visitors on any node edge that proxies `/t/` land back on that node) |
 | `POST /tracking-api/engage` | cookie | SPA boot ping; sets `engaged_at` so JS-less bots/email scanners never count as engagement |
 | `POST /tracking-api/wallet-connected` | cookie | Records external wallet and/or STRATO address for the session (deduped) |
+| `GET /tracking-api/attribution-touches?from=<ISO>&to=<ISO>` | `X-Tracking-API-Key` | Read-only wallet/campaign attribution touchpoints whose attribution windows overlap the requested reporting period |
 | `GET /dashboard` | OIDC (SPA login) | The dashboard app (tracking-ui container) |
 | `GET /tracking-api/me` | JWT | `{authorized}` — whether the user may use the dashboard |
 | `GET /tracking-api/links` | JWT + allowlist | Link summaries with attribution rollups |
@@ -44,6 +45,15 @@ never counted under two links. Bridge completion events carry both
 `externalSender` and `stratoRecipient`, so either identifier attributes the
 wallet. Link-level metrics count attributed events only; the per-wallet
 drill-down shows full history.
+
+The reporting endpoint exposes the same eligible, non-bot wallet connections
+without copying chain events into this database. Each row includes the external
+and STRATO wallet addresses, campaign, connection time, and attribution expiry.
+The reporting consumer assigns an event to the most recent connection before
+the event; if connection times tie, the lowest connection ID wins. `from` is
+inclusive and `to` is exclusive. The endpoint requires the
+`TRACKING_REPORT_API_TOKEN` service credential and never accepts that token in
+the URL.
 
 ## Storage
 
@@ -107,6 +117,7 @@ the app edge, which forwards the client IP and proxies here.
 | `PORT` | `3010` | Listen port |
 | `NODE_URL` | required for chain metrics | STRATO node edge for anonymous Cirrus reads, e.g. `https://app.strato.nexus` |
 | `OPENID_DISCOVERY_URL` | from `/run/secrets/oauth_credentials.yaml` | JWKS for dashboard JWT verification |
+| `TRACKING_REPORT_API_TOKEN` | empty | Long random service credential for the read-only attribution reporting endpoint |
 | `POSTGRES_HOST/PORT/USER/PASSWORD` | `postgres/5432/postgres` | DB connection (compose maps to `postgres_*`); point at RDS for remote mode |
 | `POSTGRES_SSL` | empty (plaintext) | `require` (TLS, no verify) or `verify-full` (+ `POSTGRES_SSL_CA` bundle path) |
 | `TRACKING_DB_CREATE` | `true` | Set `false` when the DB user can't create databases (pre-created RDS DB) |

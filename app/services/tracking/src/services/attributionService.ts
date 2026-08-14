@@ -44,6 +44,36 @@ interface Attribution {
   connectionId: string;
 }
 
+interface AttributionTouchRow {
+  connection_id: string;
+  external_wallet_address: string;
+  strato_address: string;
+  connected_at: Date;
+  link_id: string;
+  link_label: string;
+  link_source: string | null;
+}
+
+export interface AttributionRange {
+  from: string;
+  to: string;
+  fromMs: number;
+  toMs: number;
+}
+
+export interface AttributionTouch {
+  connectionId: string;
+  connectedAt: string;
+  expiresAt: string;
+  externalWalletAddress: string | null;
+  stratoAddress: string | null;
+  campaign: {
+    linkId: string;
+    label: string;
+    source: string;
+  };
+}
+
 export type ActivitySummary = Partial<Record<ActivityCategory, number>>;
 
 export interface GeoPoint {
@@ -287,6 +317,66 @@ export const getSnapshot = async (): Promise<AttributionSnapshot> => {
 
 export const invalidateSnapshot = (): void => {
   cachedSnapshot = null;
+};
+
+export const parseAttributionRange = (
+  from: unknown,
+  to: unknown
+): AttributionRange | null => {
+  if (typeof from !== "string" || typeof to !== "string") return null;
+  const fromMs = Date.parse(from);
+  const toMs = Date.parse(to);
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || fromMs >= toMs) return null;
+  return {
+    from: new Date(fromMs).toISOString(),
+    to: new Date(toMs).toISOString(),
+    fromMs,
+    toMs,
+  };
+};
+
+export const attributionTouchFromRow = (
+  row: AttributionTouchRow,
+  attributionWindowDays: number
+): AttributionTouch => {
+  const connectedAt = row.connected_at.getTime();
+  const expiresAt = connectedAt + attributionWindowDays * 24 * 60 * 60 * 1000;
+  return {
+    connectionId: String(row.connection_id),
+    connectedAt: new Date(connectedAt).toISOString(),
+    expiresAt: new Date(expiresAt).toISOString(),
+    externalWalletAddress: row.external_wallet_address || null,
+    stratoAddress: row.strato_address || null,
+    campaign: {
+      linkId: String(row.link_id),
+      label: row.link_label,
+      source: row.link_source ?? "",
+    },
+  };
+};
+
+export const getAttributionTouches = async (
+  range: AttributionRange
+): Promise<AttributionTouch[]> => {
+  const windowDays = config.tracking.attributionWindowDays;
+  const result = await query<AttributionTouchRow>(
+    `SELECT wc.id AS connection_id,
+            wc.external_wallet_address,
+            wc.strato_address,
+            wc.connected_at,
+            tl.id AS link_id,
+            tl.label AS link_label,
+            tl.source AS link_source
+     FROM wallet_connections wc
+     JOIN tracking_sessions ts ON ts.id = wc.session_id
+     JOIN tracking_links tl ON tl.id = wc.link_id
+     WHERE NOT ts.is_bot_or_preview
+       AND wc.connected_at < $2
+       AND wc.connected_at + ($3::double precision * interval '1 day') >= $1
+     ORDER BY wc.connected_at ASC, wc.id ASC`,
+    [new Date(range.fromMs), new Date(range.toMs), windowDays]
+  );
+  return result.rows.map((row) => attributionTouchFromRow(row, windowDays));
 };
 
 const tokenAmount = (raw: string): number => {

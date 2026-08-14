@@ -6,7 +6,7 @@ import bodyParser from "body-parser";
 import { config } from "./config";
 import { logError, logInfo } from "./utils/logger";
 import { bootstrapDb } from "./db/bootstrap";
-import { initOpenIdConfig, requireAuthorized } from "./auth";
+import { initOpenIdConfig, requireAuthorized, requireReportingAuthorized } from "./auth";
 import * as resolver from "./controllers/resolver.controller";
 import * as events from "./controllers/events.controller";
 import * as admin from "./controllers/admin.controller";
@@ -34,6 +34,11 @@ app.post("/tracking-api/wallet-connected", asyncHandler(events.walletConnected))
 // Dashboard API (JWT + allowlist), consumed by the tracking-ui app served at
 // /dashboard on this stack. Chain joins run here against NODE_URL's Cirrus.
 app.get("/tracking-api/me", asyncHandler(admin.me));
+app.get(
+  "/tracking-api/attribution-touches",
+  requireReportingAuthorized,
+  asyncHandler(admin.attributionTouches)
+);
 app.get("/tracking-api/links", requireAuthorized, asyncHandler(admin.list));
 app.post("/tracking-api/links", requireAuthorized, asyncHandler(admin.create));
 app.get("/tracking-api/links/:id", requireAuthorized, asyncHandler(admin.detail));

@@ -61,6 +61,7 @@ export const config = {
     // Keycloak preferred_usernames allowed to use the dashboard. The only
     // gate — there is no on-chain admin fallback here (that would need Cirrus).
     authorizedUsers: parseList(process.env.TRACKING_AUTHORIZED_USERS).map((u) => u.toLowerCase()),
+    reportApiToken: process.env.TRACKING_REPORT_API_TOKEN || "",
   },
   db: {
     host: process.env.postgres_host || "postgres",
@@ -106,5 +107,10 @@ if (!config.auth.openIdDiscoveryUrl) {
 if (config.auth.authorizedUsers.length === 0) {
   console.warn(
     "[Config] TRACKING_AUTHORIZED_USERS is empty — nobody can use the dashboard endpoints"
+  );
+}
+if (!config.auth.reportApiToken) {
+  console.warn(
+    "[Config] TRACKING_REPORT_API_TOKEN is empty — the attribution reporting endpoint is disabled"
   );
 }

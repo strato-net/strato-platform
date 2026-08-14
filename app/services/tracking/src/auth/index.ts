@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from "express";
+import { timingSafeEqual } from "crypto";
 import jwt from "jsonwebtoken";
 import jwksClient from "jwks-rsa";
 import { config } from "../config";
@@ -102,4 +103,32 @@ export const requireAuthorized = async (
     logError("Auth", error, { operation: "requireAuthorized" });
     next(error);
   }
+};
+
+const validReportApiToken = (provided: string | undefined): boolean => {
+  const expected = config.auth.reportApiToken;
+  if (!provided || !expected) return false;
+  const providedBytes = Buffer.from(provided);
+  const expectedBytes = Buffer.from(expected);
+  return (
+    providedBytes.length === expectedBytes.length &&
+    timingSafeEqual(providedBytes, expectedBytes)
+  );
+};
+
+export const requireReportingAuthorized = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (!config.auth.reportApiToken) {
+    res.status(503).json({ error: "Reporting API is not configured" });
+    return;
+  }
+  const token = req.headers["x-tracking-api-key"];
+  if (typeof token !== "string" || !validReportApiToken(token)) {
+    res.status(401).json({ error: "Not authorized" });
+    return;
+  }
+  next();
 };
