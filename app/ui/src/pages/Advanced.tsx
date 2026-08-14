@@ -211,23 +211,25 @@ const Advanced = () => {
           <Card className="mb-2 md:mb-6 bg-transparent border-0 rounded-none shadow-none">
             <CardContent className="p-0 md:pt-4">
               <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TopTab)} className="w-full">
-                <TabsList className="grid w-full grid-cols-5 mb-3 md:mb-4 h-auto gap-0.5 md:gap-1">
-                  <TabsTrigger value="swap" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
-                    Swap Pools
-                  </TabsTrigger>
-                  <TabsTrigger value="vault" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
-                    Diversified Vault
-                  </TabsTrigger>
-                  <TabsTrigger value="psm" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
-                    PSM
-                  </TabsTrigger>
-                  <TabsTrigger value="bad-debt" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
-                    Bad Debt
-                  </TabsTrigger>
-                  <TabsTrigger value="liquidations" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
-                    Liquidations
-                  </TabsTrigger>
-                </TabsList>
+                <div className="w-full overflow-x-auto mb-3 md:mb-4">
+                  <TabsList className="grid w-full grid-cols-5 min-w-[470px] md:min-w-0 h-auto gap-0.5 md:gap-1">
+                    <TabsTrigger value="swap" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                      Swap Pools
+                    </TabsTrigger>
+                    <TabsTrigger value="vault" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                      Diversified Vault
+                    </TabsTrigger>
+                    <TabsTrigger value="psm" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                      PSM
+                    </TabsTrigger>
+                    <TabsTrigger value="bad-debt" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                      Bad Debt
+                    </TabsTrigger>
+                    <TabsTrigger value="liquidations" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                      Liquidations
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
 
                 <TabsContent value="swap">
                   {!isLoggedIn && (
