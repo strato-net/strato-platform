@@ -124,10 +124,16 @@ genEthConf = do
 
   localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
 
-  let ssl = not $ null flags_sslDir
+  let effectiveNodeHost
+        | flags_nodeHost == "localhost" = localHostname
+        | otherwise = flags_nodeHost
+      ssl = not $ null flags_sslDir
       !nodeBaseUrl = (if ssl then "https://" else "http://")
-        ++ localHostname
+        ++ effectiveNodeHost
         ++ if ssl then "" else ":" ++ show flags_httpPort
+      !configuredNodeUrl
+        | Opts.flags_localAuth && flags_minimalServices = "http://127.0.0.1:4444"
+        | otherwise = nodeBaseUrl
 
   -- For local auth mode, skip vault during setup (vault-wrapper starts later)
   if Opts.flags_localAuth
@@ -162,15 +168,17 @@ genEthConf = do
         , mempoolLivenessCutoff = flags_mempoolLivenessCutoff
         }
     , urlConfig = def
-        { nodeUrl = nodeBaseUrl
+        { nodeUrl = configuredNodeUrl
         , vaultUrl = if Opts.flags_localAuth
-            then nodeBaseUrl ++ "/vault/strato/v2.3"
+            then if flags_minimalServices
+              then "http://127.0.0.1:8094/strato/v2.3"
+              else nodeBaseUrl ++ "/vault/strato/v2.3"
             else flags_vaultUrl
         , vaultTimeoutSec = flags_vaultTimeoutSec
         , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
         , notificationServerUrl = flags_notificationServerUrl
         , repoUrl = flags_repoUrl
-        , cookieRealm = localHostname
+        , cookieRealm = if Opts.flags_localAuth && flags_minimalServices then "127.0.0.1" else effectiveNodeHost
         }
     , networkConfig = def
         { network = flags_network

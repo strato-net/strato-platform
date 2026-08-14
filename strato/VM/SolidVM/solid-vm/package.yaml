@@ -86,6 +86,22 @@ executables:
       - text
 
 tests:
+  chain-id-spec:
+    source-dirs: test-chain-id/
+    main: Main.hs
+    dependencies:
+      - hspec
+      - solid-vm
+      - strato-conf
+
+  gas-accounting-spec:
+    source-dirs: test-gas/
+    main: Main.hs
+    dependencies:
+      - hspec
+      - solid-vm
+      - strato-model
+
   solid-vm-spec:
     source-dirs: tests/
     main: Main.hs
@@ -125,6 +141,7 @@ tests:
       - source-tools
       - strato-genesis
       - strato-init
+      - strato-conf
       - strato-model
       - strato-redis-blockdb
       - text

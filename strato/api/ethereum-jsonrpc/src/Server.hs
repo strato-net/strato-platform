@@ -15,6 +15,8 @@ import qualified Data.CaseInsensitive as CI
 import Network.HTTP.Types (status200, status204)
 import Network.Wai
 import Network.Wai.Handler.Warp
+import Data.String (fromString)
+import System.Environment (lookupEnv)
 import System.IO (hSetBuffering, stdout, BufferMode(LineBuffering))
 
 import RPC
@@ -22,11 +24,13 @@ import RPC
 startServer :: IO ()
 startServer = do
   hSetBuffering stdout LineBuffering
+  configuredHost <- lookupEnv "ETHEREUM_JSONRPC_HOST"
   let port = 8545
+      host = maybe "0.0.0.0" id configuredHost
   runStreamMConfigured "ethereum-jsonrpc" $ createTopicAndWait "jsonrpcresponse"
-  putStrLn $ "Listening on port " ++ show port
+  putStrLn $ "Listening on " ++ host ++ ":" ++ show port
   -- debug_* traces and simulations can exceed Warp's 30s default timeout
-  runSettings (setPort port $ setTimeout 150 defaultSettings) app
+  runSettings (setHost (fromString host) $ setPort port $ setTimeout 150 defaultSettings) app
 
 corsHeaders :: [(CI.CI BS.ByteString, BS.ByteString)]
 corsHeaders =

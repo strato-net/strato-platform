@@ -169,6 +169,16 @@ spec = do
       (fromPersistValue $ PersistText codeHashStr)
         `shouldBe` Right (ExternallyOwned $ unsafeCreateKeccak256FromWord256 codeHashWord)
 
+  describe "Keccak256 parsing" $ do
+    let digest = unsafeCreateKeccak256FromWord256 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1
+        bare = "ebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1"
+
+    it "accepts standard 0x-prefixed JSON-RPC hashes" $ do
+      Ae.eitherDecode ("\"0x" <> bare <> "\"") `shouldBe` Right digest
+
+    it "keeps accepting legacy unprefixed hashes" $ do
+      Ae.eitherDecode ("\"" <> bare <> "\"") `shouldBe` Right digest
+
   describe "secp256k1 operations (using secp256k1-haskell)" $ do
     let mPrv = importPrivateKey $ LabeledError.b16Decode "strato-model/Spec.hs" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
         prv = fromMaybe (error "could not import private key") mPrv

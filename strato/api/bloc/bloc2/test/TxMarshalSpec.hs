@@ -5,13 +5,15 @@
 -- posting and simulation rely on.
 module TxMarshalSpec (spec) where
 
-import Bloc.Server.Transaction (walletWrapCall, walletWrapCreate)
+import Bloc.Server.Transaction (getSolidityType, walletWrapCall, walletWrapCreate)
 import BlockApps.Solidity.ArgValue
+import BlockApps.Solidity.Type (SimpleType (..), Type (..))
 import BlockApps.Solidity.Value
 import Blockchain.Strato.Model.Address (Address (..))
 import qualified Data.Map.Strict as M
 import Data.Source.Map (SourceMap (..))
 import qualified Data.Vector as V
+import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import Test.Hspec
 
 spec :: Spec
@@ -53,3 +55,8 @@ spec = do
     it "flattens variadic values into multiple args" $
       valueToTexts (ValueVariadic [SimpleValue $ valueUInt 1, SimpleValue . ValueString $ "x"])
         `shouldBe` ["1", "\"x\""]
+
+  describe "getSolidityType" $
+    it "uses the declared ABI element type for an empty dynamic array" $
+      getSolidityType (ArgArray V.empty) (Xabi.Array (Xabi.Bytes Nothing (Just 32)) Nothing)
+        `shouldBe` Right (TypeArrayDynamic (SimpleType (TypeBytes (Just 32))))

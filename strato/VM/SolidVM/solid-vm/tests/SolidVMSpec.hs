@@ -1259,6 +1259,17 @@ contract qq {
 }|]
       getFields ["ts1", "ts2"] `shouldReturn` [BInteger 0x4000, BInteger 0x4000]
 
+    it "returns the configured EIP-155 chain ID from block.chainid" . runTest $ do
+      runBS
+        [r|
+contract qq {
+ uint id;
+ constructor() {
+   id = block.chainid;
+ }
+}|]
+      getFields ["id"] `shouldReturn` [BInteger SVM.solidVMChainId]
+
     it "can parse one specific assembly block" . runTest $ do
       runBS
         [r|

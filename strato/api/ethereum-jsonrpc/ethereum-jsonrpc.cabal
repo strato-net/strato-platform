@@ -58,6 +58,7 @@ executable ethereum-jsonrpc
     , streaming
     , text
     , time
+    , vector
     , wai
     , warp
   default-language: Haskell2010

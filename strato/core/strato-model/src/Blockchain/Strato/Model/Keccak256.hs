@@ -109,7 +109,8 @@ instance Ae.ToJSON Keccak256 where
 
 instance Ae.FromJSON Keccak256 where
   parseJSON = Ae.withText "Keccak256" $ \t ->
-    case B16.decode $ BC.pack $ T.unpack t of
+    let hex = maybe t id $ T.stripPrefix "0x" t
+    in case B16.decode $ BC.pack $ T.unpack hex of
       Right val -> pure $ Keccak256 val
       _ -> fail $ "error parsing Keccak256: " ++ show t
 
@@ -188,7 +189,8 @@ instance PathPiece SHA where
 instance PathPiece Keccak256 where
   toPathPiece = T.pack . show
   fromPathPiece t =
-    case B16.decode $ BC.pack $ T.unpack t of
+    let hex = maybe t id $ T.stripPrefix "0x" t
+    in case B16.decode $ BC.pack $ T.unpack hex of
       Right x -> Just $ Keccak256 x
       _ -> Nothing
 

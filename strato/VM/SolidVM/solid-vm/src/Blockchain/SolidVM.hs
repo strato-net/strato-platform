@@ -25,6 +25,7 @@ module Blockchain.SolidVM
     create,
     callReturnEnv,
     createReturnEnv,
+    solidVMChainId,
   )
 where
 
@@ -130,6 +131,11 @@ import Text.Read (readEither, readMaybe)
 import Text.Tools
 import UnliftIO hiding (assert)
 
+-- Keep the Solidity builtin and Ethereum JSON-RPC on the same EIP-155 domain.
+-- Exporting this small value also gives the consensus-sensitive mapping an
+-- isolated regression target without pulling in the legacy aggregate suite.
+solidVMChainId :: Integer
+solidVMChainId = Conf.chainId (networkConfig ethConf)
 
 type SolidVMBase m = VMBase m
 
@@ -297,10 +303,11 @@ create' creator newAddress ch cc contractName' valList = do
 
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
+  finalGasInfo <- getGasInfo
   let (newV, remV) = fromDelta . getDeltasFromEvents $ toList finalEvs
   return
     ExecResults
-      { erRemainingTxGas = 0, --Just use up all the allocated gas for now....
+      { erRemainingTxGas = remainingGas finalGasInfo,
         erRefund = 0,
         erReturnVal = Nothing,
         erTrace = [],
@@ -383,11 +390,12 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
 
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
+    finalGasInfo <- getGasInfo
     let (newV, remV) = fromDelta . getDeltasFromEvents $ toList finalEvs
 
     return $
       ExecResults
-        { erRemainingTxGas = 0, --Just use up all the allocated gas for now....
+        { erRemainingTxGas = remainingGas finalGasInfo,
           erRefund = 0,
           erReturnVal = maybeVal,
           erTrace = [],
@@ -1273,7 +1281,10 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
     (SBuiltinVariable "block", "gaslimit") ->
       (Constant . SInteger . BlockHeader.gasLimit . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "chainid") ->
-      return $ Constant $ SInteger (Conf.networkID (networkConfig ethConf))
+      -- Solidity's block.chainid is the EIP-155 transaction-signing domain,
+      -- not STRATO's legacy peer-discovery network ID. The JSON-RPC
+      -- eth_chainId method exposes this same configured chainId value.
+      return $ Constant $ SInteger solidVMChainId
     (SBuiltinVariable "abi", "encode") -> return $ Constant $ SFunction "abiEncode" Nothing
     (SBuiltinVariable "abi", "decode") -> return $ Constant $ SFunction "abiDecode" Nothing
     (SBuiltinVariable "abi", "encodePacked") -> return $ Constant $ SFunction "abiEncodePacked" Nothing

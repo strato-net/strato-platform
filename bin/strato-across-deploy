@@ -1,0 +1,1368 @@
+#!/usr/bin/env python3
+"""Prepare, broadcast, and audit the isolated SolidVM Across deployment.
+
+Preparation is offline and read-only. Broadcasting requires both --broadcast
+and a chain-specific acknowledgment so invoking the tool accidentally cannot
+change a network.
+"""
+
+import argparse
+import hashlib
+import ipaddress
+import json
+import os
+import re
+import stat
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+
+MAX_SAFE_INTEGER = 2**53 - 1
+MAX_SLOT_AGE = 7 * 24 * 60 * 60
+FRESH_CHECKPOINT_AGE = 60 * 60
+ZERO_ADDRESS = "0x" + "00" * 20
+ZERO_ROLE = "0x" + "00" * 32
+STATE_UPDATER_ROLE = "0x7f496d3b3a5b8d5d66b1301ac9407fb7ebb241c9fb60310446582db629b01709"
+VKEY_UPDATER_ROLE = "0x07ecc55c8d82c6f82ef86e34d1905e0f2873c085733fa96f8a6e0316b050d174"
+EXPECTED_PROOF_ROUTE = {
+    "programVkey": "0x0052e51b66660cd62ad4a2b38fe53f4c5a0dbfa4876a2ebc58bb1c0e4945af03",
+    "verifierSelector": "0x4388a21c",
+    "verifierHash": "0x4388a21c687fdd5f218d7e3d13190cac4c5355818d3605fd5fb811df468ee696",
+    "recursionVkeyRoot": "0x002f850ee998974d6cc00e50cd0814b098c05bfade466d28573240d057f25352",
+    "proofBytes": 356,
+}
+EXPECTED_UPSTREAM = {
+    "contractsCommit": "dd9c9beb3f31bd1a282f851453978efaf33c848c",
+    "relayerCommit": "4f19338d78949cd237bbaa65fcefd9aef81edb6b",
+}
+EXPECTED_ETHEREUM = {
+    "chainId": 1,
+    "hubPool": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+    "hubPoolStore": "0x1ace3bbd69b63063f859514eca29c9bdd8310e61",
+}
+EXPECTED_SPOKE = {
+    "quoteTimeBuffer": 3600,
+    "fillDeadlineBuffer": 21600,
+    "adminUpdateBuffer": 86400,
+}
+SELECTORS = {
+    "verifierHash": "0x2a510436",
+    "vkRoot": "0x7cad4e13",
+    "heliosProgramVkey": "0x2f4cddf1",
+    "verifier": "0x2b7ac3f3",
+    "head": "0x8f7dcfa3",
+    "headers": "0x56f90d79",
+    "executionStateRoots": "0x7623ee29",
+    "syncCommittees": "0x7640d76b",
+    "genesisTime": "0xf2882461",
+    "secondsPerSlot": "0x304b9071",
+    "slotsPerEpoch": "0xda30e279",
+    "slotsPerPeriod": "0x2073ee70",
+    "hasRole": "0x91d14854",
+    "getRoleMemberCount": "0xca15c873",
+    "owner": "0x8da5cb5b",
+    "crossDomainAdmin": "0x5285e058",
+    "withdrawalRecipient": "0xb370b7f5",
+    "depositQuoteTimeBuffer": "0x57f6dcb8",
+    "fillDeadlineBuffer": "0x079bd2c7",
+    "numberOfDeposits": "0xa1244c67",
+    "adminUpdateBuffer": "0xc2bb0c55",
+    "helios": "0xe45a4694",
+    "hubPoolStore": "0xbce63c00",
+    "pausedDeposits": "0x6068d6cb",
+    "pausedFills": "0xdda52113",
+}
+
+
+class ConfigError(ValueError):
+    pass
+
+
+class BroadcastRefused(RuntimeError):
+    pass
+
+
+class RemoteError(RuntimeError):
+    pass
+
+
+def _required(obj, key, path):
+    if not isinstance(obj, dict) or key not in obj:
+        raise ConfigError(f"missing {path}.{key}")
+    return obj[key]
+
+
+def _int(value, path, minimum=0, maximum=None):
+    if isinstance(value, bool):
+        raise ConfigError(f"{path} must be an integer")
+    if isinstance(value, str):
+        if not value.isdigit():
+            raise ConfigError(f"{path} must be a decimal integer")
+        value = int(value)
+    if not isinstance(value, int) or value < minimum or (maximum is not None and value > maximum):
+        limit = f" through {maximum}" if maximum is not None else " or greater"
+        raise ConfigError(f"{path} must be {minimum}{limit}")
+    return value
+
+
+def _hex(value, path, byte_length):
+    if not isinstance(value, str) or len(value) != 2 + byte_length * 2 or not value.startswith("0x"):
+        raise ConfigError(f"{path} must be a 0x-prefixed {byte_length}-byte hex value")
+    try:
+        int(value[2:], 16)
+    except ValueError as exc:
+        raise ConfigError(f"{path} contains non-hexadecimal characters") from exc
+    return value.lower()
+
+
+def _address(value, path, allow_zero=False):
+    address = _hex(value, path, 20)
+    if not allow_zero and address == ZERO_ADDRESS:
+        raise ConfigError(f"{path} must not be the zero address")
+    return address
+
+
+def _string(value, path):
+    if not isinstance(value, str) or not value.strip() or "REPLACE_WITH" in value:
+        raise ConfigError(f"{path} must be filled in")
+    return value.strip()
+
+
+def validate_config(config, now=None):
+    """Return a normalized copy or fail before any remote request."""
+    now = int(time.time() if now is None else now)
+    if not isinstance(config, dict) or config.get("schemaVersion") != 1:
+        raise ConfigError("schemaVersion must be 1")
+    normalized = json.loads(json.dumps(config))
+
+    network = _required(normalized, "network", "config")
+    network["name"] = _string(_required(network, "name", "network"), "network.name")
+    chain_id = _int(_required(network, "expectedChainId", "network"), "network.expectedChainId", 1)
+    if chain_id > MAX_SAFE_INTEGER:
+        raise ConfigError("network.expectedChainId must be a JavaScript safe integer for the pinned relayer")
+    network["expectedChainId"] = chain_id
+
+    roles = _required(normalized, "roles", "config")
+    for name in ("deployer", "stateUpdater", "emergencyOwner"):
+        roles[name] = _address(_required(roles, name, "roles"), f"roles.{name}")
+    if len(set(roles.values())) != 3:
+        raise ConfigError("roles.deployer, roles.stateUpdater, and roles.emergencyOwner must be pairwise distinct")
+
+    ethereum = _required(normalized, "ethereum", "config")
+    ethereum["chainId"] = _int(_required(ethereum, "chainId", "ethereum"), "ethereum.chainId", 1)
+    if ethereum["chainId"] != EXPECTED_ETHEREUM["chainId"]:
+        raise ConfigError("ethereum.chainId must be 1 for the pinned Ethereum-rooted Universal Spoke")
+    for name in ("hubPool", "hubPoolStore", "withdrawalRecipient"):
+        ethereum[name] = _address(_required(ethereum, name, "ethereum"), f"ethereum.{name}")
+    if ethereum["hubPool"] != EXPECTED_ETHEREUM["hubPool"]:
+        raise ConfigError("ethereum.hubPool differs from Across v4.1.28 mainnet deployment")
+    if ethereum["hubPoolStore"] != EXPECTED_ETHEREUM["hubPoolStore"]:
+        raise ConfigError("ethereum.hubPoolStore differs from Across v4.1.28 mainnet deployment")
+    if ethereum["withdrawalRecipient"] != ethereum["hubPool"]:
+        raise ConfigError("ethereum.withdrawalRecipient must be the Ethereum HubPool")
+
+    checkpoint = _required(ethereum, "checkpoint", "ethereum")
+    checkpoint["generatedAt"] = _int(
+        _required(checkpoint, "generatedAt", "ethereum.checkpoint"),
+        "ethereum.checkpoint.generatedAt",
+        1,
+    )
+    if checkpoint["generatedAt"] > now + 60:
+        raise ConfigError("ethereum checkpoint generatedAt is in the future")
+    if now - checkpoint["generatedAt"] > FRESH_CHECKPOINT_AGE:
+        raise ConfigError("ethereum checkpoint file is older than one hour")
+    checkpoint["source"] = _string(_required(checkpoint, "source", "ethereum.checkpoint"), "ethereum.checkpoint.source")
+    checkpoint["generatorSha256"] = _hex(
+        _required(checkpoint, "generatorSha256", "ethereum.checkpoint"),
+        "ethereum.checkpoint.generatorSha256",
+        32,
+    )
+    if checkpoint["generatorSha256"] == "0x" + "00" * 32:
+        raise ConfigError("ethereum.checkpoint.generatorSha256 must not be zero")
+    for name in ("executionStateRoot", "header", "syncCommitteeHash"):
+        checkpoint[name] = _hex(_required(checkpoint, name, "ethereum.checkpoint"), f"ethereum.checkpoint.{name}", 32)
+        if checkpoint[name] == "0x" + "00" * 32:
+            raise ConfigError(f"ethereum.checkpoint.{name} must not be zero")
+    for name in ("genesisTime", "head", "secondsPerSlot", "slotsPerEpoch", "slotsPerPeriod"):
+        checkpoint[name] = _int(_required(checkpoint, name, "ethereum.checkpoint"), f"ethereum.checkpoint.{name}", 1)
+    if (checkpoint["genesisTime"], checkpoint["secondsPerSlot"], checkpoint["slotsPerEpoch"], checkpoint["slotsPerPeriod"]) != (
+        1606824023,
+        12,
+        32,
+        8192,
+    ):
+        raise ConfigError("ethereum checkpoint timing constants do not match Ethereum mainnet")
+    head_timestamp = checkpoint["genesisTime"] + checkpoint["head"] * checkpoint["secondsPerSlot"]
+    if head_timestamp > now + checkpoint["secondsPerSlot"]:
+        raise ConfigError("ethereum checkpoint head is in the future")
+    if now - head_timestamp >= MAX_SLOT_AGE:
+        raise ConfigError("ethereum checkpoint head is already outside Helios MAX_SLOT_AGE")
+    if now - head_timestamp > FRESH_CHECKPOINT_AGE:
+        raise ConfigError("ethereum checkpoint head must be finalized within the last hour")
+
+    route = _required(normalized, "proofRoute", "config")
+    for name, expected in EXPECTED_PROOF_ROUTE.items():
+        actual = _required(route, name, "proofRoute")
+        if isinstance(expected, str):
+            byte_length = 4 if name == "verifierSelector" else 32
+            actual = _hex(actual, f"proofRoute.{name}", byte_length)
+        else:
+            actual = _int(actual, f"proofRoute.{name}", 1)
+        route[name] = actual
+        if actual != expected:
+            raise ConfigError(f"proofRoute.{name} differs from the replayed live SP1 v6.1 route")
+
+    spoke = _required(normalized, "spoke", "config")
+    for name, expected in EXPECTED_SPOKE.items():
+        spoke[name] = _int(_required(spoke, name, "spoke"), f"spoke.{name}", 1)
+        if spoke[name] != expected:
+            raise ConfigError(f"spoke.{name} must equal the Across v4.1.28 deployment value {expected}")
+    spoke["initialDepositId"] = _int(_required(spoke, "initialDepositId", "spoke"), "spoke.initialDepositId", 1, 2**32 - 1)
+
+    upstream = _required(normalized, "upstream", "config")
+    for name, expected in EXPECTED_UPSTREAM.items():
+        upstream[name] = _hex("0x" + _string(_required(upstream, name, "upstream"), f"upstream.{name}").removeprefix("0x"), f"upstream.{name}", 20)[2:]
+        if upstream[name] != expected:
+            raise ConfigError(f"upstream.{name} differs from the audited pinned commit")
+
+    return normalized
+
+
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _source_map(contracts_dir, names):
+    sources = {}
+    hashes = {}
+    for name in names:
+        path = Path(contracts_dir) / name
+        if not path.is_file():
+            raise ConfigError(f"missing deployment source: {path}")
+        sources[name] = path.read_text(encoding="utf-8")
+        hashes[name] = sha256_file(path)
+    return sources, hashes
+
+
+def _deploy_request(contract, sources, args):
+    return {
+        "txs": [{"type": "CONTRACT", "payload": {"contract": contract, "src": sources, "args": args}}],
+        "txParams": {"gasLimit": 12_000_000, "gasPrice": 1},
+    }
+
+
+def _function_request(contract_address, method, args):
+    return {
+        "txs": [
+            {
+                "type": "FUNCTION",
+                "payload": {"contractAddress": contract_address, "method": method, "args": args},
+            }
+        ],
+        "txParams": {"gasLimit": 12_000_000, "gasPrice": 1},
+    }
+
+
+def _bloc_bytes(value):
+    """Bloc's typed argument parser expects hex bytes without an 0x prefix."""
+    return value.removeprefix("0x")
+
+
+def build_plan(config, contracts_dir):
+    verifier_sources, verifier_hashes = _source_map(contracts_dir, ["SP1Groth16VerifierV6.sol"])
+    helios_sources, helios_hashes = _source_map(contracts_dir, ["SP1HeliosSolidVM.sol"])
+    spoke_sources, spoke_hashes = _source_map(contracts_dir, ["AcrossV4SpokePool.sol", "AcrossV4UniversalSpoke.sol"])
+    checkpoint = config["ethereum"]["checkpoint"]
+    roles = config["roles"]
+    route = config["proofRoute"]
+    spoke = config["spoke"]
+
+    verifier_request = _deploy_request("SP1Groth16VerifierV6", verifier_sources, {})
+    helios_request = _deploy_request(
+        "SP1HeliosSolidVM",
+        helios_sources,
+        {
+            "genesisTime": checkpoint["genesisTime"],
+            "initialHead": checkpoint["head"],
+            "initialHeader": _bloc_bytes(checkpoint["header"]),
+            "initialExecutionStateRoot": _bloc_bytes(checkpoint["executionStateRoot"]),
+            "initialSyncCommitteeHash": _bloc_bytes(checkpoint["syncCommitteeHash"]),
+            "initialHeliosProgramVkey": _bloc_bytes(route["programVkey"]),
+            "secondsPerSlot": checkpoint["secondsPerSlot"],
+            "slotsPerEpoch": checkpoint["slotsPerEpoch"],
+            "slotsPerPeriod": checkpoint["slotsPerPeriod"],
+            "verifierAddress": "${VERIFIER_ADDRESS}",
+            "initialAdmin": roles["deployer"],
+            "initialStateUpdater": roles["stateUpdater"],
+            "initialVkeyUpdater": ZERO_ADDRESS,
+        },
+    )
+    spoke_request = _deploy_request(
+        "AcrossV4UniversalSpoke",
+        spoke_sources,
+        {
+            "initialEmergencyOwner": roles["emergencyOwner"],
+            "initialCrossDomainAdmin": config["ethereum"]["hubPool"],
+            "initialWithdrawalRecipient": config["ethereum"]["withdrawalRecipient"],
+            "quoteTimeBuffer": spoke["quoteTimeBuffer"],
+            "deadlineBuffer": spoke["fillDeadlineBuffer"],
+            "initialDepositId": spoke["initialDepositId"],
+            "adminUpdateBufferSeconds": spoke["adminUpdateBuffer"],
+            "heliosAddress": "${HELIOS_ADDRESS}",
+            "hubPoolStoreAddress": config["ethereum"]["hubPoolStore"],
+        },
+    )
+    handoff = [
+        _function_request("${HELIOS_ADDRESS}", "grantRole", {"role": _bloc_bytes(ZERO_ROLE), "account": "${SPOKE_ADDRESS}"}),
+        _function_request("${HELIOS_ADDRESS}", "grantRole", {"role": _bloc_bytes(VKEY_UPDATER_ROLE), "account": "${SPOKE_ADDRESS}"}),
+        _function_request(
+            "${HELIOS_ADDRESS}",
+            "renounceRole",
+            {"role": _bloc_bytes(ZERO_ROLE), "account": roles["deployer"]},
+        ),
+    ]
+    source_hashes = {**verifier_hashes, **helios_hashes, **spoke_hashes}
+    return {
+        "schemaVersion": 1,
+        "chainId": config["network"]["expectedChainId"],
+        "networkName": config["network"]["name"],
+        "upstream": config["upstream"],
+        "proofRoute": config["proofRoute"],
+        "checkpoint": config["ethereum"]["checkpoint"],
+        "sourceHashes": source_hashes,
+        "steps": [
+            {
+                "id": "verifier",
+                "dependsOn": [],
+                "sourceFiles": ["SP1Groth16VerifierV6.sol"],
+                "request": verifier_request,
+                "requestTemplate": verifier_request,
+                "postState": ["code present", "VERIFIER_HASH pin", "VK_ROOT pin"],
+            },
+            {
+                "id": "helios",
+                "dependsOn": ["verifier"],
+                "sourceFiles": ["SP1HeliosSolidVM.sol"],
+                "requestTemplate": helios_request,
+                "postState": ["fresh checkpoint", "verifier and program vkey pins", "initial role membership"],
+            },
+            {
+                "id": "spoke",
+                "dependsOn": ["helios"],
+                "sourceFiles": ["AcrossV4SpokePool.sol", "AcrossV4UniversalSpoke.sol"],
+                "requestTemplate": spoke_request,
+                "postState": ["deposits paused", "fills paused", "Ethereum HubPoolStore and role separation"],
+            },
+            {
+                "id": "helios-role-handoff",
+                "dependsOn": ["helios", "spoke"],
+                "requestTemplates": handoff,
+                "postState": ["Spoke sole DEFAULT_ADMIN", "Spoke sole VKEY_UPDATER", "operator sole STATE_UPDATER"],
+            },
+        ],
+        "activationGate": {
+            "broadcastByThisTool": False,
+            "requirements": [
+                "fresh proof from configured SP1 service verifies on deployed Helios",
+                "official relayer/finalizer sees historical calls and logs",
+                "Ethereum governance registers chain, SpokePool, token mappings, and routes",
+                "Ethereum-proved messages configure return routes then unpause fills and deposits",
+            ],
+        },
+    }
+
+
+def _replace(value, replacements):
+    if isinstance(value, str):
+        for key, replacement in replacements.items():
+            value = value.replace("${" + key + "}", replacement)
+        if "${" in value:
+            raise ConfigError(f"unresolved deployment placeholder: {value}")
+        return value
+    if isinstance(value, list):
+        return [_replace(item, replacements) for item in value]
+    if isinstance(value, dict):
+        return {key: _replace(item, replacements) for key, item in value.items()}
+    return value
+
+
+def require_broadcast_ack(chain_id, broadcast, acknowledgment):
+    expected = f"DEPLOY ACROSS TO CHAIN {chain_id}"
+    if not broadcast:
+        raise BroadcastRefused("deployment requires the explicit --broadcast flag")
+    if acknowledgment != expected:
+        raise BroadcastRefused(f'exact acknowledgment required: --ack "{expected}"')
+
+
+def require_proof_ack(chain_id, broadcast, acknowledgment):
+    expected = f"VERIFY ACROSS PROOF ON CHAIN {chain_id}"
+    if not broadcast:
+        raise BroadcastRefused("proof submission requires the explicit --broadcast flag")
+    if acknowledgment != expected:
+        raise BroadcastRefused(f'exact acknowledgment required: --ack "{expected}"')
+
+
+def _write_json(path, value, mode=0o600):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    with open(temporary, "w", encoding="utf-8") as handle:
+        json.dump(value, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+    os.chmod(temporary, mode)
+    os.replace(temporary, path)
+
+
+def _write_text(path, value, mode=0o600):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    with open(temporary, "w", encoding="utf-8") as handle:
+        handle.write(value)
+    os.chmod(temporary, mode)
+    os.replace(temporary, path)
+
+
+def prepare(config, contracts_dir, out_dir, exist_ok=False):
+    plan = build_plan(config, contracts_dir)
+    out_dir = Path(out_dir)
+    if out_dir.exists() and not exist_ok:
+        raise FileExistsError(f"output directory already exists: {out_dir}")
+    out_dir.mkdir(parents=True, exist_ok=exist_ok)
+    if exist_ok and any(out_dir.iterdir()):
+        raise FileExistsError(f"output directory is not empty: {out_dir}")
+    os.chmod(out_dir, 0o700)
+    _write_json(out_dir / "deployment-plan.json", plan)
+    for index, step in enumerate(plan["steps"], 1):
+        if "requestTemplate" in step:
+            _write_json(out_dir / f"{index:02d}-{step['id']}.request-template.json", step["requestTemplate"])
+        if "requestTemplates" in step:
+            _write_json(out_dir / f"{index:02d}-{step['id']}.request-templates.json", step["requestTemplates"])
+    return plan
+
+
+def _read_token(path):
+    path = Path(path)
+    info = path.lstat()
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+        raise BroadcastRefused("token file must be a regular non-symlink file")
+    if stat.S_IMODE(info.st_mode) & 0o077:
+        raise BroadcastRefused("token file must not be readable or writable by group/other (chmod 600)")
+    raw = path.read_text(encoding="utf-8").strip()
+    try:
+        decoded = json.loads(raw)
+        token = decoded["access_token"] if isinstance(decoded, dict) else ""
+    except (json.JSONDecodeError, KeyError):
+        token = raw
+    if not isinstance(token, str) or len(token.split(".")) != 3:
+        raise BroadcastRefused("token file does not contain a JWT access token")
+    return token
+
+
+def _http_json(url, payload=None, headers=None, timeout=30):
+    body = None if payload is None else json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(url, data=body, headers=headers or {}, method="GET" if body is None else "POST")
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as exc:
+        detail = exc.read(4096).decode("utf-8", "replace")
+        raise RemoteError(f"HTTP {exc.code} from {url}: {detail}") from exc
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise RemoteError(f"request failed for {url}: {exc}") from exc
+
+
+def rpc_call(rpc_url, method, params):
+    response = _http_json(
+        rpc_url,
+        {"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+        {"Content-Type": "application/json"},
+    )
+    if not isinstance(response, dict) or "error" in response or "result" not in response:
+        raise RemoteError(f"JSON-RPC {method} failed: {response}")
+    return response["result"]
+
+
+def _api_send(api_url, token, request):
+    response = _http_json(
+        api_url.rstrip("/") + "/transaction/parallel?resolve=true",
+        request,
+        {
+            # Authorization is consumed by the normal nginx/OIDC edge. The
+            # direct Bloc route used by an isolated node requires the trusted
+            # internal header instead, so send both; the edge strips and
+            # regenerates X-USER-ACCESS-TOKEN before proxying.
+            "Authorization": "Bearer " + token,
+            "X-USER-ACCESS-TOKEN": token,
+            "Content-Type": "application/json",
+        },
+        timeout=45,
+    )
+    if not isinstance(response, list) or len(response) != 1 or response[0].get("status") != "Success":
+        raise RemoteError(f"STRATO transaction did not succeed: {response}")
+    return response[0]
+
+
+def _tx_hash(result):
+    value = result.get("hash")
+    if not isinstance(value, str):
+        raise RemoteError(f"STRATO success response omitted transaction hash: {result}")
+    return _hex("0x" + value.removeprefix("0x"), "transaction hash", 32)
+
+
+def _contract_address(result):
+    data = result.get("data") or {}
+    contents = data.get("contents") or {}
+    value = contents.get("contractAddress")
+    if not isinstance(value, str):
+        tx_result = result.get("txResult") or {}
+        created = tx_result.get("contractsCreated") or []
+        value = created[0] if created else None
+    if not isinstance(value, str):
+        raise RemoteError(f"STRATO success response omitted created contract address: {result}")
+    return _address("0x" + value.removeprefix("0x"), "created contract")
+
+
+def _receipt(rpc_url, tx_hash, attempts=40):
+    for _ in range(attempts):
+        receipt = rpc_call(rpc_url, "eth_getTransactionReceipt", [tx_hash])
+        if receipt is not None:
+            if receipt.get("status") != "0x1":
+                raise RemoteError(f"transaction receipt failed: {receipt}")
+            return receipt
+        time.sleep(0.25)
+    raise RemoteError(f"timed out waiting for receipt {tx_hash}")
+
+
+def _deploy(api_url, rpc_url, token, request):
+    result = _api_send(api_url, token, request)
+    tx_hash = _tx_hash(result)
+    address = _contract_address(result)
+    receipt = _receipt(rpc_url, tx_hash)
+    return {
+        "address": address,
+        "transactionHash": tx_hash,
+        "blockHash": receipt["blockHash"],
+        "blockNumber": int(receipt["blockNumber"], 16),
+        "gasUsed": int(receipt["gasUsed"], 16),
+    }
+
+
+def _send_function(api_url, rpc_url, token, request):
+    result = _api_send(api_url, token, request)
+    tx_hash = _tx_hash(result)
+    receipt = _receipt(rpc_url, tx_hash)
+    return {
+        "transactionHash": tx_hash,
+        "blockHash": receipt["blockHash"],
+        "blockNumber": int(receipt["blockNumber"], 16),
+        "gasUsed": int(receipt["gasUsed"], 16),
+    }
+
+
+def _call(rpc_url, address, data):
+    result = rpc_call(rpc_url, "eth_call", [{"to": address, "data": data}, "latest"])
+    if not isinstance(result, str) or not result.startswith("0x") or len(result) < 66:
+        raise RemoteError(f"malformed eth_call result for {address} {data}: {result}")
+    return result
+
+
+def _call_uint(rpc_url, address, selector):
+    return int(_call(rpc_url, address, selector), 16)
+
+
+def _call_bytes32(rpc_url, address, selector):
+    return "0x" + _call(rpc_url, address, selector)[-64:].lower()
+
+
+def _call_address(rpc_url, address, selector):
+    return "0x" + _call(rpc_url, address, selector)[-40:].lower()
+
+
+def _call_bool(rpc_url, address, selector):
+    value = _call_uint(rpc_url, address, selector)
+    if value not in (0, 1):
+        raise RemoteError(f"non-boolean contract result: {value}")
+    return value == 1
+
+
+def _role_data(role, account):
+    return SELECTORS["hasRole"] + role[2:].rjust(64, "0") + account[2:].rjust(64, "0")
+
+
+def _role_count_data(role):
+    return SELECTORS["getRoleMemberCount"] + role[2:].rjust(64, "0")
+
+
+def _uint_data(selector, value):
+    return selector + hex(value)[2:].rjust(64, "0")
+
+
+def _expect(actual, expected, label):
+    if actual != expected:
+        raise RemoteError(f"post-state mismatch for {label}: expected {expected!r}, got {actual!r}")
+    return actual
+
+
+def audit_deployment(config, manifest, rpc_url, contracts_dir=None):
+    chain_id = int(rpc_call(rpc_url, "eth_chainId", []), 16)
+    _expect(chain_id, config["network"]["expectedChainId"], "chain ID")
+    contracts = _required(manifest, "contracts", "manifest")
+    verifier = _address(_required(_required(contracts, "verifier", "manifest.contracts"), "address", "verifier"), "verifier")
+    helios = _address(_required(_required(contracts, "helios", "manifest.contracts"), "address", "helios"), "helios")
+    spoke = _address(_required(_required(contracts, "spoke", "manifest.contracts"), "address", "spoke"), "spoke")
+    for label, address in (("verifier", verifier), ("helios", helios), ("spoke", spoke)):
+        code = rpc_call(rpc_url, "eth_getCode", [address, "latest"])
+        if not isinstance(code, str) or code in ("0x", "0x0", "0x00"):
+            raise RemoteError(f"no deployed code at {label} address {address}")
+
+    route = config["proofRoute"]
+    checkpoint = config["ethereum"]["checkpoint"]
+    roles = config["roles"]
+    spoke_config = config["spoke"]
+    checks = {
+        "verifierHash": _expect(_call_bytes32(rpc_url, verifier, SELECTORS["verifierHash"]), route["verifierHash"], "verifier hash"),
+        "recursionVkeyRoot": _expect(_call_bytes32(rpc_url, verifier, SELECTORS["vkRoot"]), route["recursionVkeyRoot"], "recursion vkey root"),
+        "heliosProgramVkey": _expect(_call_bytes32(rpc_url, helios, SELECTORS["heliosProgramVkey"]), route["programVkey"], "Helios program vkey"),
+        "heliosVerifier": _expect(_call_address(rpc_url, helios, SELECTORS["verifier"]), verifier, "Helios verifier"),
+        "heliosHead": _expect(_call_uint(rpc_url, helios, SELECTORS["head"]), checkpoint["head"], "Helios head"),
+        "initialHeader": _expect(
+            _call_bytes32(rpc_url, helios, _uint_data(SELECTORS["headers"], checkpoint["head"])),
+            checkpoint["header"],
+            "initial Helios header",
+        ),
+        "initialExecutionStateRoot": _expect(
+            _call_bytes32(rpc_url, helios, _uint_data(SELECTORS["executionStateRoots"], checkpoint["head"])),
+            checkpoint["executionStateRoot"],
+            "initial execution state root",
+        ),
+        "initialSyncCommittee": _expect(
+            _call_bytes32(
+                rpc_url,
+                helios,
+                _uint_data(
+                    SELECTORS["syncCommittees"],
+                    checkpoint["head"] // checkpoint["slotsPerPeriod"],
+                ),
+            ),
+            checkpoint["syncCommitteeHash"],
+            "initial sync committee",
+        ),
+        "genesisTime": _expect(_call_uint(rpc_url, helios, SELECTORS["genesisTime"]), checkpoint["genesisTime"], "Helios genesis time"),
+        "secondsPerSlot": _expect(_call_uint(rpc_url, helios, SELECTORS["secondsPerSlot"]), checkpoint["secondsPerSlot"], "Helios seconds per slot"),
+        "slotsPerEpoch": _expect(_call_uint(rpc_url, helios, SELECTORS["slotsPerEpoch"]), checkpoint["slotsPerEpoch"], "Helios slots per epoch"),
+        "slotsPerPeriod": _expect(_call_uint(rpc_url, helios, SELECTORS["slotsPerPeriod"]), checkpoint["slotsPerPeriod"], "Helios slots per period"),
+        "emergencyOwner": _expect(_call_address(rpc_url, spoke, SELECTORS["owner"]), roles["emergencyOwner"], "emergency owner"),
+        "crossDomainAdmin": _expect(_call_address(rpc_url, spoke, SELECTORS["crossDomainAdmin"]), config["ethereum"]["hubPool"], "cross-domain admin"),
+        "withdrawalRecipient": _expect(_call_address(rpc_url, spoke, SELECTORS["withdrawalRecipient"]), config["ethereum"]["withdrawalRecipient"], "withdrawal recipient"),
+        "quoteTimeBuffer": _expect(_call_uint(rpc_url, spoke, SELECTORS["depositQuoteTimeBuffer"]), spoke_config["quoteTimeBuffer"], "quote buffer"),
+        "fillDeadlineBuffer": _expect(_call_uint(rpc_url, spoke, SELECTORS["fillDeadlineBuffer"]), spoke_config["fillDeadlineBuffer"], "fill buffer"),
+        "initialDepositId": _expect(_call_uint(rpc_url, spoke, SELECTORS["numberOfDeposits"]), spoke_config["initialDepositId"], "initial deposit ID"),
+        "adminUpdateBuffer": _expect(_call_uint(rpc_url, spoke, SELECTORS["adminUpdateBuffer"]), spoke_config["adminUpdateBuffer"], "admin update buffer"),
+        "spokeHelios": _expect(_call_address(rpc_url, spoke, SELECTORS["helios"]), helios, "Spoke Helios"),
+        "hubPoolStore": _expect(_call_address(rpc_url, spoke, SELECTORS["hubPoolStore"]), config["ethereum"]["hubPoolStore"], "HubPoolStore"),
+        "depositsPaused": _expect(_call_bool(rpc_url, spoke, SELECTORS["pausedDeposits"]), True, "deposits paused"),
+        "fillsPaused": _expect(_call_bool(rpc_url, spoke, SELECTORS["pausedFills"]), True, "fills paused"),
+        "spokeDefaultAdmin": _expect(_call_bool(rpc_url, helios, _role_data(ZERO_ROLE, spoke)), True, "Spoke DEFAULT_ADMIN_ROLE"),
+        "spokeVkeyUpdater": _expect(_call_bool(rpc_url, helios, _role_data(VKEY_UPDATER_ROLE, spoke)), True, "Spoke VKEY_UPDATER_ROLE"),
+        "operatorStateUpdater": _expect(_call_bool(rpc_url, helios, _role_data(STATE_UPDATER_ROLE, roles["stateUpdater"])), True, "operator STATE_UPDATER_ROLE"),
+        "deployerDefaultAdmin": _expect(_call_bool(rpc_url, helios, _role_data(ZERO_ROLE, roles["deployer"])), False, "deployer DEFAULT_ADMIN_ROLE removal"),
+        "defaultAdminCount": _expect(_call_uint(rpc_url, helios, _role_count_data(ZERO_ROLE)), 1, "DEFAULT_ADMIN_ROLE count"),
+        "vkeyUpdaterCount": _expect(_call_uint(rpc_url, helios, _role_count_data(VKEY_UPDATER_ROLE)), 1, "VKEY_UPDATER_ROLE count"),
+        "stateUpdaterCount": _expect(_call_uint(rpc_url, helios, _role_count_data(STATE_UPDATER_ROLE)), 1, "STATE_UPDATER_ROLE count"),
+    }
+    if contracts_dir is not None:
+        expected_hashes = build_plan(config, contracts_dir)["sourceHashes"]
+        _expect(manifest.get("sourceHashes"), expected_hashes, "source hashes")
+    return {"chainId": chain_id, "checkedAt": int(time.time()), "checks": checks}
+
+
+def _hex_blob(value, path):
+    if not isinstance(value, str):
+        raise ConfigError(f"{path} must be a hexadecimal string")
+    raw = value.removeprefix("0x")
+    if len(raw) % 2:
+        raise ConfigError(f"{path} must contain a whole number of bytes")
+    try:
+        return bytes.fromhex(raw)
+    except ValueError as exc:
+        raise ConfigError(f"{path} contains non-hexadecimal characters") from exc
+
+
+def _proof_calldata(response):
+    if not isinstance(response, dict):
+        raise ConfigError("proof response must be a JSON object")
+    if "status" in response:
+        if response.get("status") != "success":
+            raise ConfigError(f"proof response status is not success: {response.get('status')!r}")
+        response = response.get("update_calldata")
+        if not isinstance(response, dict):
+            raise ConfigError("successful proof response omitted update_calldata")
+    proof = _hex_blob(_required(response, "proof", "proof response"), "proof response.proof")
+    public_values = _hex_blob(
+        _required(response, "public_values", "proof response"),
+        "proof response.public_values",
+    )
+    return proof, public_values
+
+
+def _word(data, offset, path):
+    if offset < 0 or offset + 32 > len(data):
+        raise ConfigError(f"{path} is out of bounds")
+    return int.from_bytes(data[offset : offset + 32], "big")
+
+
+def _bytes32_at(data, offset, path):
+    _word(data, offset, path)
+    return "0x" + data[offset : offset + 32].hex()
+
+
+def validate_proof_response(config, manifest, response, now=None):
+    """Validate a fresh first Helios proof without making a network request."""
+    now = int(time.time() if now is None else now)
+    _expect(manifest.get("chainId"), config["network"]["expectedChainId"], "manifest chain ID")
+    _expect(manifest.get("proofRoute"), config["proofRoute"], "manifest proof route")
+    proof, public_values = _proof_calldata(response)
+    route = config["proofRoute"]
+    checkpoint = config["ethereum"]["checkpoint"]
+
+    if len(proof) != route["proofBytes"]:
+        raise ConfigError(f"proof must contain exactly {route['proofBytes']} bytes")
+    if "0x" + proof[:4].hex() != route["verifierSelector"]:
+        raise ConfigError("proof selector differs from the pinned verifier route")
+    if int.from_bytes(proof[4:36], "big") != 0:
+        raise ConfigError("proof contains a nonzero SP1 exit code")
+    if "0x" + proof[36:68].hex() != route["recursionVkeyRoot"]:
+        raise ConfigError("proof recursion vkey root differs from the pinned route")
+
+    if len(public_values) < 352:
+        raise ConfigError("public_values is shorter than the canonical Helios tuple")
+    if _word(public_values, 0, "tuple offset") != 32:
+        raise ConfigError("public_values has a non-canonical tuple offset")
+    tuple_start = 32
+    execution_root = _bytes32_at(public_values, tuple_start, "execution state root")
+    new_header = _bytes32_at(public_values, tuple_start + 32, "new header")
+    next_committee = _bytes32_at(public_values, tuple_start + 64, "next committee")
+    new_head = _word(public_values, tuple_start + 96, "new head")
+    prev_header = _bytes32_at(public_values, tuple_start + 128, "previous header")
+    prev_head = _word(public_values, tuple_start + 160, "previous head")
+    committee = _bytes32_at(public_values, tuple_start + 192, "sync committee")
+    start_committee = _bytes32_at(public_values, tuple_start + 224, "start committee")
+    slots_offset = _word(public_values, tuple_start + 256, "slots offset")
+    if slots_offset != 288:
+        raise ConfigError("public_values has a non-canonical slots offset")
+    slots_start = tuple_start + slots_offset
+    slot_count = _word(public_values, slots_start, "slots length")
+    if len(public_values) != slots_start + 32 + slot_count * 96:
+        raise ConfigError("public_values has a malformed storage-slot array")
+
+    if prev_head != checkpoint["head"] or prev_header != checkpoint["header"]:
+        raise ConfigError("proof does not extend the deployment checkpoint")
+    if start_committee != checkpoint["syncCommitteeHash"]:
+        raise ConfigError("proof start committee differs from the deployment checkpoint")
+    if new_head <= prev_head:
+        raise ConfigError("proof does not advance the Helios head")
+    new_timestamp = checkpoint["genesisTime"] + new_head * checkpoint["secondsPerSlot"]
+    if new_timestamp > now + checkpoint["secondsPerSlot"]:
+        raise ConfigError("proof target head is in the future")
+    if now - new_timestamp > FRESH_CHECKPOINT_AGE:
+        raise ConfigError("proof target head is more than one hour old")
+
+    slots = []
+    cursor = slots_start + 32
+    for index in range(slot_count):
+        key = _bytes32_at(public_values, cursor, f"slot {index} key")
+        value = _bytes32_at(public_values, cursor + 32, f"slot {index} value")
+        address_word = public_values[cursor + 64 : cursor + 96]
+        if address_word[:12] != bytes(12):
+            raise ConfigError(f"slot {index} contract address is non-canonical")
+        slots.append({"key": key, "value": value, "contractAddress": "0x" + address_word[12:].hex()})
+        cursor += 96
+
+    hub_pool_store = config["ethereum"]["hubPoolStore"]
+    across_slots = [
+        slot
+        for slot in slots
+        if slot["contractAddress"] == hub_pool_store and slot["value"] != "0x" + "00" * 32
+    ]
+    if not across_slots:
+        raise ConfigError("proof must include a nonzero slot from the configured Across HubPoolStore")
+
+    return {
+        "proof": "0x" + proof.hex(),
+        "publicValues": "0x" + public_values.hex(),
+        "proofSha256": hashlib.sha256(proof).hexdigest(),
+        "publicValuesSha256": hashlib.sha256(public_values).hexdigest(),
+        "prevHead": prev_head,
+        "prevHeader": prev_header,
+        "newHead": new_head,
+        "newHeader": new_header,
+        "executionStateRoot": execution_root,
+        "syncCommitteeHash": committee,
+        "nextSyncCommitteeHash": next_committee,
+        "slots": slots,
+        "acrossHubPoolStoreSlots": len(across_slots),
+    }
+
+
+def submit_proof(config, manifest, response, rpc_url, api_url, token_file, out_file, acknowledgment, broadcast):
+    chain_id = config["network"]["expectedChainId"]
+    require_proof_ack(chain_id, broadcast, acknowledgment)
+    out_file = Path(out_file)
+    if out_file.exists():
+        raise FileExistsError(f"proof receipt already exists: {out_file}")
+    proof = validate_proof_response(config, manifest, response)
+    live_chain_id = int(rpc_call(rpc_url, "eth_chainId", []), 16)
+    _expect(live_chain_id, chain_id, "chain ID preflight")
+    helios = _address(manifest["contracts"]["helios"]["address"], "manifest.contracts.helios.address")
+    state_updater = config["roles"]["stateUpdater"]
+    token = _read_token(token_file)
+    token_signer = _token_signer(api_url, token)
+    _expect(token_signer, state_updater, "state-updater token signer")
+    _expect(_call_uint(rpc_url, helios, SELECTORS["head"]), proof["prevHead"], "live Helios previous head")
+    _expect(
+        _call_bytes32(rpc_url, helios, _uint_data(SELECTORS["headers"], proof["prevHead"])),
+        proof["prevHeader"],
+        "live Helios previous header",
+    )
+    request = _function_request(
+        helios,
+        "update",
+        {"proof": _bloc_bytes(proof["proof"]), "publicValues": _bloc_bytes(proof["publicValues"])},
+    )
+    transaction = _send_function(api_url, rpc_url, token, request)
+    checks = {
+        "head": _expect(_call_uint(rpc_url, helios, SELECTORS["head"]), proof["newHead"], "proved Helios head"),
+        "header": _expect(
+            _call_bytes32(rpc_url, helios, _uint_data(SELECTORS["headers"], proof["newHead"])),
+            proof["newHeader"],
+            "proved Helios header",
+        ),
+        "executionStateRoot": _expect(
+            _call_bytes32(rpc_url, helios, _uint_data(SELECTORS["executionStateRoots"], proof["newHead"])),
+            proof["executionStateRoot"],
+            "proved execution state root",
+        ),
+    }
+    for index, slot in enumerate(proof["slots"]):
+        # getStorageSlot(uint256,address,bytes32): static ABI words.
+        calldata = (
+            "0x0829c59f"
+            + hex(proof["newHead"])[2:].rjust(64, "0")
+            + slot["contractAddress"][2:].rjust(64, "0")
+            + slot["key"][2:]
+        )
+        checks[f"slot{index}"] = _expect(
+            _call_bytes32(rpc_url, helios, calldata), slot["value"], f"proved storage slot {index}"
+        )
+    receipt = {
+        "schemaVersion": 1,
+        "chainId": chain_id,
+        "verifiedAt": int(time.time()),
+        "helios": helios,
+        "proofSha256": proof["proofSha256"],
+        "publicValuesSha256": proof["publicValuesSha256"],
+        "prevHead": proof["prevHead"],
+        "newHead": proof["newHead"],
+        "transaction": transaction,
+        "postStateChecks": checks,
+    }
+    _write_json(out_file, receipt)
+    return receipt
+
+
+def _token_signer(api_url, token):
+    """Resolve the authenticated credential's signer through the vault proxy."""
+    parsed = urllib.parse.urlsplit(api_url)
+    if parsed.path.rstrip("/").endswith("/bloc/v2.2"):
+        key_path = parsed.path.rstrip("/")[: -len("/bloc/v2.2")] + "/strato/v2.3/key"
+    else:
+        key_path = "/strato/v2.3/key"
+    key_url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, key_path, "", ""))
+    response = _http_json(
+        key_url,
+        headers={"Authorization": "Bearer " + token, "X-USER-ACCESS-TOKEN": token},
+    )
+    raw_address = _required(response, "address", "vault key response")
+    if not isinstance(raw_address, str):
+        raise RemoteError("vault key response.address must be a string")
+    return _address("0x" + raw_address.removeprefix("0x"), "token signer")
+
+
+def broadcast_deployment(config, contracts_dir, out_dir, api_url, rpc_url, token_file, acknowledgment, broadcast):
+    chain_id = config["network"]["expectedChainId"]
+    require_broadcast_ack(chain_id, broadcast, acknowledgment)
+    live_chain_id = int(rpc_call(rpc_url, "eth_chainId", []), 16)
+    _expect(live_chain_id, chain_id, "chain ID preflight")
+    token = _read_token(token_file)
+    _expect(_token_signer(api_url, token), config["roles"]["deployer"], "deployer token signer")
+    plan = prepare(config, contracts_dir, out_dir, exist_ok=False)
+    replacements = {}
+    records = {}
+    journal = {
+        "schemaVersion": 1,
+        "chainId": chain_id,
+        "startedAt": int(time.time()),
+        "status": "in-progress",
+        "contracts": records,
+        "roleHandoffTransactions": [],
+    }
+    journal_path = Path(out_dir) / "deployment-journal.json"
+    _write_json(journal_path, journal)
+
+    verifier_request = plan["steps"][0]["request"]
+    records["verifier"] = _deploy(api_url, rpc_url, token, verifier_request)
+    _write_json(journal_path, journal)
+    replacements["VERIFIER_ADDRESS"] = records["verifier"]["address"]
+
+    helios_request = _replace(plan["steps"][1]["requestTemplate"], replacements)
+    records["helios"] = _deploy(api_url, rpc_url, token, helios_request)
+    _write_json(journal_path, journal)
+    replacements["HELIOS_ADDRESS"] = records["helios"]["address"]
+
+    spoke_request = _replace(plan["steps"][2]["requestTemplate"], replacements)
+    records["spoke"] = _deploy(api_url, rpc_url, token, spoke_request)
+    _write_json(journal_path, journal)
+    replacements["SPOKE_ADDRESS"] = records["spoke"]["address"]
+
+    handoff_records = []
+    for request_template in plan["steps"][3]["requestTemplates"]:
+        request = _replace(request_template, replacements)
+        handoff_records.append(_send_function(api_url, rpc_url, token, request))
+        journal["roleHandoffTransactions"] = handoff_records
+        _write_json(journal_path, journal)
+
+    manifest = {
+        "schemaVersion": 1,
+        "networkName": config["network"]["name"],
+        "chainId": chain_id,
+        "generatedAt": int(time.time()),
+        "upstream": config["upstream"],
+        "proofRoute": config["proofRoute"],
+        "ethereum": config["ethereum"],
+        "roles": config["roles"],
+        "spokeConfig": config["spoke"],
+        "sourceHashes": plan["sourceHashes"],
+        "contracts": records,
+        "roleHandoffTransactions": handoff_records,
+        "activation": {"depositsPaused": True, "fillsPaused": True, "ethereumGovernanceActivated": False},
+    }
+    audit = audit_deployment(config, manifest, rpc_url, contracts_dir)
+    manifest["postStateAudit"] = audit
+    journal["status"] = "audited"
+    journal["completedAt"] = int(time.time())
+    journal["postStateAudit"] = audit
+    _write_json(journal_path, journal)
+    _write_json(Path(out_dir) / "deployment-manifest.json", manifest)
+    _write_text(Path(out_dir) / "relayer.generated.env", render_relayer_env(manifest))
+    return manifest
+
+
+def render_relayer_env(manifest):
+    chain_id = _int(_required(manifest, "chainId", "manifest"), "manifest.chainId", 1, MAX_SAFE_INTEGER)
+    contracts = _required(manifest, "contracts", "manifest")
+    spoke = _required(contracts, "spoke", "manifest.contracts")
+    address = _address(_required(spoke, "address", "manifest.contracts.spoke"), "manifest.contracts.spoke.address")
+    block = _int(_required(spoke, "blockNumber", "manifest.contracts.spoke"), "manifest.contracts.spoke.blockNumber", 0, MAX_SAFE_INTEGER)
+    custom = {
+        str(chain_id): {
+            "name": "STRATO",
+            "nativeTokenSymbol": "USDST",
+            "family": "evm",
+            "spokePoolAddress": address,
+            "spokePoolDeploymentBlock": block,
+            "universalSpoke": True,
+        }
+    }
+    return "\n".join(
+        [
+            "# Generated non-secret adapter values. Add RPC/prover URLs and credentials through the secret store.",
+            f"STRATO_CHAIN_ID={chain_id}",
+            "ACROSS_CUSTOM_CHAINS='" + json.dumps(custom, separators=(",", ":")) + "'",
+            f"LEGACY_TRANSACTION_CHAIN_IDS='[{chain_id}]'",
+            f"SPOKE_POOL_CHAINS_OVERRIDE='[{chain_id}]'",
+            f"MULTICALL_CHUNK_SIZE_CHAIN_{chain_id}=1",
+            f"MAX_FEE_PER_GAS_OVERRIDE_{chain_id}=0",
+            f"MAX_PRIORITY_FEE_PER_GAS_OVERRIDE_{chain_id}=0",
+            "",
+        ]
+    )
+
+
+def _sha256_hex(value, path):
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", value):
+        raise ConfigError(f"{path} must contain exactly 64 hexadecimal characters")
+    return value.lower()
+
+
+def _public_https_url(value, path):
+    value = _string(value, path)
+    parsed = urllib.parse.urlsplit(value)
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise ConfigError(f"{path} must be an absolute HTTPS URL")
+    if parsed.username is not None or parsed.password is not None or parsed.query or parsed.fragment:
+        raise ConfigError(f"{path} must be a public HTTPS URL without credentials, query parameters, or fragments")
+    hostname = parsed.hostname.lower()
+    if (
+        "." not in hostname
+        or hostname == "localhost"
+        or hostname.endswith((".localhost", ".local", ".example", ".invalid", ".test"))
+    ):
+        raise ConfigError(f"{path} must use a publicly routable hostname")
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        pass
+    else:
+        if not address.is_global:
+            raise ConfigError(f"{path} must use a publicly routable address")
+    return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path or "", "", ""))
+
+
+def _deployment_record(manifest, name, public_name):
+    contracts = _required(manifest, "contracts", "manifest")
+    record = _required(contracts, name, "manifest.contracts")
+    return {
+        "address": _address(_required(record, "address", f"manifest.contracts.{name}"), f"manifest.contracts.{name}.address"),
+        "blockNumber": _int(
+            _required(record, "blockNumber", f"manifest.contracts.{name}"),
+            f"manifest.contracts.{name}.blockNumber",
+            0,
+            MAX_SAFE_INTEGER,
+        ),
+        "transactionHash": _hex(
+            _required(record, "transactionHash", f"manifest.contracts.{name}"),
+            f"manifest.contracts.{name}.transactionHash",
+            32,
+        ),
+        "upstreamName": public_name,
+    }
+
+
+def _onboarding_tokens(tokens):
+    if not isinstance(tokens, list) or not tokens:
+        raise ConfigError("tokens must be a nonempty JSON array")
+    normalized = []
+    symbols = set()
+    strato_addresses = set()
+    ethereum_addresses = set()
+    for index, raw in enumerate(tokens):
+        path = f"tokens[{index}]"
+        symbol = _string(_required(raw, "symbol", path), f"{path}.symbol")
+        if not re.fullmatch(r"[A-Za-z0-9._-]{1,32}", symbol):
+            raise ConfigError(f"{path}.symbol contains unsupported characters")
+        symbol_key = symbol.upper()
+        if symbol_key in symbols:
+            raise ConfigError(f"duplicate token symbol: {symbol}")
+        symbols.add(symbol_key)
+        name = _string(_required(raw, "name", path), f"{path}.name")
+        decimals = _int(_required(raw, "decimals", path), f"{path}.decimals", 0, 255)
+        strato_token = _address(_required(raw, "stratoToken", path), f"{path}.stratoToken")
+        ethereum_token = _address(_required(raw, "ethereumToken", path), f"{path}.ethereumToken")
+        return_bridge = _address(
+            _required(raw, "canonicalReturnBridge", path),
+            f"{path}.canonicalReturnBridge",
+        )
+        if strato_token in strato_addresses:
+            raise ConfigError(f"duplicate STRATO token address: {strato_token}")
+        if ethereum_token in ethereum_addresses:
+            raise ConfigError(f"duplicate Ethereum token address: {ethereum_token}")
+        strato_addresses.add(strato_token)
+        ethereum_addresses.add(ethereum_token)
+        origin = _required(raw, "enabledOrigin", path)
+        destination = _required(raw, "enabledDestination", path)
+        if not isinstance(origin, bool) or not isinstance(destination, bool):
+            raise ConfigError(f"{path} direction flags must be booleans")
+        if not origin and not destination:
+            raise ConfigError(f"{path} must enable at least one transfer direction")
+        normalized.append(
+            {
+                "symbol": symbol,
+                "name": name,
+                "decimals": decimals,
+                "stratoToken": strato_token,
+                "ethereumToken": ethereum_token,
+                "canonicalReturnBridge": return_bridge,
+                "enabledOrigin": origin,
+                "enabledDestination": destination,
+            }
+        )
+    return normalized
+
+
+def build_onboarding_packet(config, manifest, tokens, public_rpc_url, explorer_url, manifest_sha256, bundle_sha256):
+    """Build the non-secret packet needed to register an audited deployment upstream."""
+    chain_id = _int(_required(manifest, "chainId", "manifest"), "manifest.chainId", 1, MAX_SAFE_INTEGER)
+    if chain_id != config["network"]["expectedChainId"]:
+        raise ConfigError("manifest chain ID differs from config.network.expectedChainId")
+    if _required(manifest, "networkName", "manifest") != config["network"]["name"]:
+        raise ConfigError("manifest network name differs from config.network.name")
+    if _required(manifest, "upstream", "manifest") != config["upstream"]:
+        raise ConfigError("manifest upstream pins differ from the validated config")
+    if _required(manifest, "proofRoute", "manifest") != config["proofRoute"]:
+        raise ConfigError("manifest proof route differs from the validated config")
+
+    activation = _required(manifest, "activation", "manifest")
+    if activation.get("depositsPaused") is not True or activation.get("fillsPaused") is not True:
+        raise ConfigError("onboarding packet requires deposits and fills to remain paused")
+    if activation.get("ethereumGovernanceActivated") is not False:
+        raise ConfigError("onboarding packet requires Ethereum governance activation to remain false")
+    audit = _required(manifest, "postStateAudit", "manifest")
+    audit_checks = _required(audit, "checks", "manifest.postStateAudit")
+    if (
+        audit.get("chainId") != chain_id
+        or audit_checks.get("depositsPaused") is not True
+        or audit_checks.get("fillsPaused") is not True
+    ):
+        raise ConfigError("manifest post-state audit does not prove the paused deployment on the expected chain")
+
+    source_hashes = _required(manifest, "sourceHashes", "manifest")
+    expected_sources = (
+        "SP1Groth16VerifierV6.sol",
+        "SP1HeliosSolidVM.sol",
+        "AcrossV4SpokePool.sol",
+        "AcrossV4UniversalSpoke.sol",
+    )
+    normalized_sources = {
+        name: _sha256_hex(_required(source_hashes, name, "manifest.sourceHashes"), f"manifest.sourceHashes.{name}")
+        for name in expected_sources
+    }
+    spoke = _deployment_record(manifest, "spoke", "SpokePool")
+    helios = _deployment_record(manifest, "helios", "SP1Helios")
+    verifier = _deployment_record(manifest, "verifier", "SP1Groth16VerifierV6")
+    normalized_tokens = _onboarding_tokens(tokens)
+
+    return {
+        "schemaVersion": 1,
+        "status": "PRE_ACTIVATION_REVIEW",
+        "chain": {
+            "name": config["network"]["name"],
+            "chainId": chain_id,
+            "family": "EVM_ABI_SOLIDVM",
+            "nativeTokenSymbol": "USDST",
+            "publicRpcUrl": _public_https_url(public_rpc_url, "publicRpcUrl"),
+            "blockExplorerUrl": _public_https_url(explorer_url, "blockExplorerUrl"),
+        },
+        "deployments": {
+            "SpokePool": {key: value for key, value in spoke.items() if key != "upstreamName"},
+            "SP1Helios": {key: value for key, value in helios.items() if key != "upstreamName"},
+            "SP1Groth16VerifierV6": {key: value for key, value in verifier.items() if key != "upstreamName"},
+        },
+        "tokens": normalized_tokens,
+        "ethereumGovernance": {
+            "hubPool": config["ethereum"]["hubPool"],
+            "hubPoolStore": config["ethereum"]["hubPoolStore"],
+            "withdrawalRecipient": config["ethereum"]["withdrawalRecipient"],
+            "requiredActions": [
+                "register the STRATO chain and SpokePool activation block",
+                "register each Ethereum/STRATO token mapping and enabled direction",
+                "register the Universal Spoke finalizer and proved HubPoolStore messages",
+                "configure each audited return bridge route before unpausing",
+            ],
+        },
+        "stratoGovernance": {
+            "emergencyOwner": config["roles"]["emergencyOwner"],
+            "stateUpdater": config["roles"]["stateUpdater"],
+            "heliosDefaultAdmin": spoke["address"],
+            "heliosVkeyUpdater": spoke["address"],
+        },
+        "proofRoute": config["proofRoute"],
+        "sourceHashes": normalized_sources,
+        "upstreamPins": config["upstream"],
+        "evidence": {
+            "deploymentManifestSha256": _sha256_hex(manifest_sha256, "deploymentManifestSha256"),
+            "runtimeBundleSha256": _sha256_hex(bundle_sha256, "runtimeBundleSha256"),
+        },
+        "upstreamChanges": {
+            "contracts": [
+                "add the chain deployment records to broadcast/deployed-addresses.json",
+                "review the SolidVM Universal Spoke, Helios, verifier, source hashes, and governance adapter",
+            ],
+            "constants": [
+                "add the chain ID and public network metadata to src/networks.ts",
+                "add each token's STRATO address to src/tokens.ts",
+            ],
+            "relayer": [
+                "add the provider, legacy-transaction, Universal Spoke finalizer, activation-block, and gas configuration",
+                "retain the pinned private-chain adapter until equivalent upstream support is released",
+            ],
+            "sdk": [
+                "publish chain/token/deployment lookup data and validate historical calls plus canonical deposit/fill events",
+            ],
+            "swapApi": [
+                "enable only the reviewed token directions and return STRATO in the supported-chains and quote APIs",
+            ],
+            "frontend": [
+                "publish chain assets and metadata consumed by Across integrators such as wallets and swap UIs",
+            ],
+        },
+        "activationGate": {
+            "depositsPaused": True,
+            "fillsPaused": True,
+            "mustRemainPausedUntil": [
+                "fresh SP1 proof passes the deployed verifier and post-state audit",
+                "public RPC passes external ethers/viem and bounded-log conformance",
+                "Across governance registration and token routes are effective on Ethereum",
+                "relayer dry-run, custody caps, inventory, monitoring, and emergency controls are approved",
+                "a separately authorized capped-value lifecycle is ready to execute",
+            ],
+        },
+    }
+
+
+def _load_config(path, now=None):
+    with open(path, "r", encoding="utf-8") as handle:
+        return validate_config(json.load(handle), now=now)
+
+
+def _default_contracts_dir():
+    root = Path(__file__).resolve().parents[1]
+    source_tree = root / "app" / "contracts" / "external" / "across"
+    bundle_tree = root / "contracts" / "across"
+    if source_tree.is_dir():
+        return source_tree
+    if bundle_tree.is_dir():
+        return bundle_tree
+    return source_tree
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    prepare_parser = subparsers.add_parser("prepare", help="validate config and emit offline requests; never broadcasts")
+    prepare_parser.add_argument("config")
+    prepare_parser.add_argument("--contracts-dir", default=str(_default_contracts_dir()))
+    prepare_parser.add_argument("--out", required=True)
+
+    deploy_parser = subparsers.add_parser("deploy", help="broadcast deployment after exact chain-specific acknowledgment")
+    deploy_parser.add_argument("config")
+    deploy_parser.add_argument("--contracts-dir", default=str(_default_contracts_dir()))
+    deploy_parser.add_argument("--out", required=True)
+    deploy_parser.add_argument("--api-url", default="http://127.0.0.1:3000/bloc/v2.2")
+    deploy_parser.add_argument("--rpc-url", default="http://127.0.0.1:8545")
+    deploy_parser.add_argument("--token-file", required=True)
+    deploy_parser.add_argument("--broadcast", action="store_true")
+    deploy_parser.add_argument("--ack")
+
+    audit_parser = subparsers.add_parser("audit", help="read-only audit of a deployment manifest")
+    audit_parser.add_argument("config")
+    audit_parser.add_argument("manifest")
+    audit_parser.add_argument("--contracts-dir", default=str(_default_contracts_dir()))
+    audit_parser.add_argument("--rpc-url", default="http://127.0.0.1:8545")
+
+    proof_parser = subparsers.add_parser(
+        "verify-proof",
+        help="validate, submit, and audit a fresh prover response before activation",
+    )
+    proof_parser.add_argument("config")
+    proof_parser.add_argument("manifest")
+    proof_parser.add_argument("proof_response")
+    proof_parser.add_argument("--out", required=True)
+    proof_parser.add_argument("--api-url", default="http://127.0.0.1:3000/bloc/v2.2")
+    proof_parser.add_argument("--rpc-url", default="http://127.0.0.1:8545")
+    proof_parser.add_argument("--token-file", required=True)
+    proof_parser.add_argument("--broadcast", action="store_true")
+    proof_parser.add_argument("--ack")
+
+    env_parser = subparsers.add_parser("relayer-env", help="render non-secret pinned relayer adapter values")
+    env_parser.add_argument("manifest")
+
+    onboarding_parser = subparsers.add_parser(
+        "onboarding-pack",
+        help="emit the non-secret Across upstream registration packet from an audited deployment",
+    )
+    onboarding_parser.add_argument("config")
+    onboarding_parser.add_argument("manifest")
+    onboarding_parser.add_argument("tokens", help="JSON token and canonical-return-route inventory")
+    onboarding_parser.add_argument("--public-rpc-url", required=True)
+    onboarding_parser.add_argument("--explorer-url", required=True)
+    onboarding_parser.add_argument("--bundle", required=True, help="checksum-verified runtime bundle")
+    onboarding_parser.add_argument("--out", required=True)
+
+    args = parser.parse_args(argv)
+    try:
+        if args.command == "prepare":
+            config = _load_config(args.config)
+            plan = prepare(config, args.contracts_dir, args.out)
+            print(f"Prepared {len(plan['steps'])} fail-closed steps in {args.out}; no network request was made.")
+        elif args.command == "deploy":
+            config = _load_config(args.config)
+            manifest = broadcast_deployment(
+                config,
+                args.contracts_dir,
+                args.out,
+                args.api_url,
+                args.rpc_url,
+                args.token_file,
+                args.ack,
+                args.broadcast,
+            )
+            print(json.dumps({name: item["address"] for name, item in manifest["contracts"].items()}, indent=2))
+        elif args.command == "audit":
+            config = _load_config(args.config)
+            with open(args.manifest, "r", encoding="utf-8") as handle:
+                manifest = json.load(handle)
+            print(json.dumps(audit_deployment(config, manifest, args.rpc_url, args.contracts_dir), indent=2, sort_keys=True))
+        elif args.command == "verify-proof":
+            config = _load_config(args.config)
+            with open(args.manifest, "r", encoding="utf-8") as handle:
+                manifest = json.load(handle)
+            with open(args.proof_response, "r", encoding="utf-8") as handle:
+                response = json.load(handle)
+            receipt = submit_proof(
+                config,
+                manifest,
+                response,
+                args.rpc_url,
+                args.api_url,
+                args.token_file,
+                args.out,
+                args.ack,
+                args.broadcast,
+            )
+            print(json.dumps(receipt, indent=2, sort_keys=True))
+        elif args.command == "relayer-env":
+            with open(args.manifest, "r", encoding="utf-8") as handle:
+                print(render_relayer_env(json.load(handle)), end="")
+        elif args.command == "onboarding-pack":
+            with open(args.manifest, "r", encoding="utf-8") as handle:
+                manifest = json.load(handle)
+            generated_at = _int(_required(manifest, "generatedAt", "manifest"), "manifest.generatedAt", 1)
+            if generated_at > int(time.time()) + 60:
+                raise ConfigError("manifest.generatedAt is in the future")
+            # Revalidate checkpoint freshness at the time this audited
+            # deployment was created. A packet assembled later must not fail
+            # merely because its immutable bootstrap checkpoint has aged.
+            config = _load_config(args.config, now=generated_at)
+            with open(args.tokens, "r", encoding="utf-8") as handle:
+                tokens = json.load(handle)
+            packet = build_onboarding_packet(
+                config,
+                manifest,
+                tokens,
+                args.public_rpc_url,
+                args.explorer_url,
+                sha256_file(args.manifest),
+                sha256_file(args.bundle),
+            )
+            out = Path(args.out)
+            if out.exists():
+                raise FileExistsError(f"onboarding packet already exists: {out}")
+            _write_json(out, packet, mode=0o644)
+            print(f"Wrote non-secret pre-activation onboarding packet: {out}")
+        return 0
+    except (ConfigError, BroadcastRefused, RemoteError, OSError, json.JSONDecodeError) as exc:
+        print(f"strato-across-deploy: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

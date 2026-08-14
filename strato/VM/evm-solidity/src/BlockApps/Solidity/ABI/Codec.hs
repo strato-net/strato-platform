@@ -19,6 +19,8 @@ module BlockApps.Solidity.ABI.Codec
     encodeStaticValue,
     isDynamicValue,
     decodeValue,
+    decodeValues,
+    encodeValues,
     abiDecode,
   )
 where
@@ -28,7 +30,7 @@ import Data.Bits (shiftL, shiftR, (.&.), (.|.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Char (isDigit)
-import Data.List (isPrefixOf)
+import Data.List (elemIndices, isPrefixOf)
 import qualified Data.Vector as V
 import SolidVM.Model.Value
 
@@ -96,18 +98,28 @@ data TypeDescriptor
   | TString
   | TBytesN Int
   | TArrayOf TypeDescriptor
-  deriving (Show)
+  | TFixedArray TypeDescriptor Int
+  | TTuple [TypeDescriptor]
+  deriving (Eq, Show)
 
 isDynamicType :: TypeDescriptor -> Bool
 isDynamicType TBytes = True
 isDynamicType TString = True
 isDynamicType (TArrayOf _) = True
+isDynamicType (TFixedArray entry _) = isDynamicType entry
+isDynamicType (TTuple entries) = any isDynamicType entries
 isDynamicType _ = False
 
 parseTypeDescriptor :: String -> Maybe TypeDescriptor
 parseTypeDescriptor s
-  | "[]" `isSuffixOf` s =
-      TArrayOf <$> parseTypeDescriptor (take (length s - 2) s)
+  | Just (base, arrayLength) <- splitArraySuffix s = do
+      entry <- parseTypeDescriptor base
+      case arrayLength of
+        "" -> Just $ TArrayOf entry
+        n | all isDigit n -> Just $ TFixedArray entry (read n)
+        _ -> Nothing
+  | Just inside <- tupleContents s =
+      TTuple <$> traverse parseTypeDescriptor (splitTupleTypes inside)
   | s == "bool" = Just TBool
   | s == "address" = Just TAddress
   | s == "bytes" = Just TBytes
@@ -127,7 +139,34 @@ parseTypeDescriptor s
        in if all isDigit n && not (null n) then Just (TBytesN (read n)) else Nothing
   | otherwise = Nothing
   where
-    isSuffixOf suffix str = drop (length str - length suffix) str == suffix
+    splitArraySuffix str
+      | null str || last str /= ']' = Nothing
+      | otherwise = case elemIndices '[' str of
+          [] -> Nothing
+          indices ->
+            let i = last indices
+             in Just (take i str, take (length str - i - 2) $ drop (i + 1) str)
+    tupleContents ('(' : rest) = case reverse rest of
+      ')' : reversedInside -> Just $ reverse reversedInside
+      _ -> Nothing
+    tupleContents _ = Nothing
+
+-- | Split the members of a canonical tuple type without splitting nested
+-- tuples. Empty tuples are valid in the grammar and decode to no members.
+splitTupleTypes :: String -> [String]
+splitTupleTypes "" = []
+splitTupleTypes input = reverse $ finish $ go (0 :: Int) (0 :: Int) "" [] input
+  where
+    finish (current, result) = reverse current : result
+    go _ _ current result [] = (current, result)
+    go parenDepth arrayDepth current result (c : cs)
+      | c == ',' && parenDepth == 0 && arrayDepth == 0 =
+          go parenDepth arrayDepth "" (reverse current : result) cs
+      | c == '(' = go (parenDepth + 1) arrayDepth (c : current) result cs
+      | c == ')' = go (parenDepth - 1) arrayDepth (c : current) result cs
+      | c == '[' = go parenDepth (arrayDepth + 1) (c : current) result cs
+      | c == ']' = go parenDepth (arrayDepth - 1) (c : current) result cs
+      | otherwise = go parenDepth arrayDepth (c : current) result cs
 
 typeArgToString :: Value -> Maybe String
 typeArgToString (SString s) = Just s
@@ -139,52 +178,146 @@ typeArgToString _ = Nothing
 --------------------------------------------------------------------------------
 
 decodeValue :: TypeDescriptor -> B.ByteString -> Int -> Value
-decodeValue (TUint _bits) bs offset =
+decodeValue td bs offset = decodeAt td bs 0 offset
+
+-- | Decode a complete ABI tuple. Unlike the old @i * 32@ traversal, the head
+-- cursor advances over inline static tuples and fixed arrays by their full
+-- width. Dynamic offsets are interpreted relative to the tuple that owns them.
+decodeValues :: [TypeDescriptor] -> B.ByteString -> [Value]
+decodeValues types bs = decodeSequence types bs 0 0
+
+decodeSequence :: [TypeDescriptor] -> B.ByteString -> Int -> Int -> [Value]
+decodeSequence types bs base start = snd $ foldl step (start, []) types
+  where
+    step (cursor, values) typ =
+      let value = decodeAt typ bs base cursor
+       in (cursor + headWidth typ, values ++ [value])
+
+headWidth :: TypeDescriptor -> Int
+headWidth typ
+  | isDynamicType typ = 32
+headWidth (TTuple entries) = sum $ map headWidth entries
+headWidth (TFixedArray entry len) = len * headWidth entry
+headWidth _ = 32
+
+decodeAt :: TypeDescriptor -> B.ByteString -> Int -> Int -> Value
+decodeAt typ bs base offset
+  | isDynamicType typ =
+      let relativeOffset = wordAt bs offset
+       in decodeBody typ bs (base + relativeOffset)
+decodeAt typ bs _ offset = decodeStatic typ bs offset
+
+decodeStatic :: TypeDescriptor -> B.ByteString -> Int -> Value
+decodeStatic (TUint _bits) bs offset =
   let word = B.take 32 (B.drop offset bs)
    in SInteger (bytesToIntegerBE word)
-decodeValue (TInt bits) bs offset =
+decodeStatic (TInt bits) bs offset =
   let word = B.take 32 (B.drop offset bs)
       raw = bytesToIntegerBE word
       maxPos = 2 ^ (bits - 1) - 1
    in if raw > maxPos
         then SInteger (raw - 2 ^ bits)
         else SInteger raw
-decodeValue TBool bs offset =
+decodeStatic TBool bs offset =
   let word = B.take 32 (B.drop offset bs)
    in SBool (bytesToIntegerBE word /= 0)
-decodeValue TAddress bs offset =
+decodeStatic TAddress bs offset =
   let word = B.take 32 (B.drop offset bs)
       addrBytes = B.drop 12 word
       addrInt = bytesToIntegerBE addrBytes
    in SAddress (fromInteger addrInt) False
-decodeValue (TBytesN n) bs offset =
+decodeStatic (TBytesN n) bs offset =
   let word = B.take 32 (B.drop offset bs)
    in SBytes (B.take n word)
-decodeValue TBytes bs offset =
-  let dataOffset = fromIntegral (bytesToIntegerBE (B.take 32 (B.drop offset bs)))
-      len = fromIntegral (bytesToIntegerBE (B.take 32 (B.drop dataOffset bs)))
-   in SBytes (B.take len (B.drop (dataOffset + 32) bs))
-decodeValue TString bs offset =
-  let dataOffset = fromIntegral (bytesToIntegerBE (B.take 32 (B.drop offset bs)))
-      len = fromIntegral (bytesToIntegerBE (B.take 32 (B.drop dataOffset bs)))
-   in SString (BC.unpack (B.take len (B.drop (dataOffset + 32) bs)))
-decodeValue (TArrayOf elemType) bs offset =
-  let dataOffset = fromIntegral (bytesToIntegerBE (B.take 32 (B.drop offset bs)))
-      len = fromIntegral (bytesToIntegerBE (B.take 32 (B.drop dataOffset bs))) :: Int
-      elemsStart = dataOffset + 32
-      elems = [decodeValue elemType bs (elemsStart + i * 32) | i <- [0 .. len - 1]]
+decodeStatic (TTuple entries) bs offset =
+  STuple . V.fromList . map Constant $ decodeSequence entries bs offset offset
+decodeStatic (TFixedArray entry len) bs offset =
+  SArray . V.fromList . map Constant $ decodeSequence (replicate len entry) bs offset offset
+decodeStatic _ _ _ = SNULL
+
+decodeBody :: TypeDescriptor -> B.ByteString -> Int -> Value
+decodeBody TBytes bs dataOffset =
+  let len = boundedLength bs (wordAt bs dataOffset) (dataOffset + 32)
+   in SBytes (B.take len $ B.drop (dataOffset + 32) bs)
+decodeBody TString bs dataOffset =
+  let len = boundedLength bs (wordAt bs dataOffset) (dataOffset + 32)
+   in SString (BC.unpack $ B.take len $ B.drop (dataOffset + 32) bs)
+decodeBody (TArrayOf elemType) bs dataOffset =
+  let elemsStart = dataOffset + 32
+      maxElements = max 0 ((B.length bs - elemsStart) `div` max 1 (headWidth elemType))
+      len = min maxElements (wordAt bs dataOffset)
+      elems = decodeSequence (replicate len elemType) bs elemsStart elemsStart
    in SArray (V.fromList $ map Constant elems)
+decodeBody (TFixedArray entry len) bs dataOffset =
+  SArray . V.fromList . map Constant $ decodeSequence (replicate len entry) bs dataOffset dataOffset
+decodeBody (TTuple entries) bs dataOffset =
+  STuple . V.fromList . map Constant $ decodeSequence entries bs dataOffset dataOffset
+decodeBody typ bs dataOffset = decodeStatic typ bs dataOffset
+
+wordAt :: B.ByteString -> Int -> Int
+wordAt bs offset
+  | offset < 0 || offset + 32 > B.length bs = 0
+  | otherwise = integerToBoundedInt $ bytesToIntegerBE (B.take 32 $ B.drop offset bs)
+
+integerToBoundedInt :: Integer -> Int
+integerToBoundedInt n
+  | n <= 0 = 0
+  | n > fromIntegral (maxBound :: Int) = maxBound
+  | otherwise = fromIntegral n
+
+boundedLength :: B.ByteString -> Int -> Int -> Int
+boundedLength bs requested start = min requested (max 0 $ B.length bs - start)
+
+--------------------------------------------------------------------------------
+-- ABI encoding
+--------------------------------------------------------------------------------
+
+-- | Encode values as one ABI tuple. This is used for event data and provides
+-- the inverse of 'decodeValues', including nested tuples and arrays.
+encodeValues :: [TypeDescriptor] -> [Value] -> B.ByteString
+encodeValues types values =
+  let pairs = zip types values
+      initialTailOffset = sum $ map (headWidth . fst) pairs
+      step (headParts, tailParts, tailOffset) (typ, value)
+        | isDynamicType typ =
+            let body = encodeBody typ value
+             in (headParts ++ [encodeUint256 $ fromIntegral tailOffset], tailParts ++ [body], tailOffset + B.length body)
+        | otherwise = (headParts ++ [encodeStatic typ value], tailParts, tailOffset)
+      (heads, tails, _) = foldl step ([], [], initialTailOffset) pairs
+   in B.concat $ heads ++ tails
+
+encodeStatic :: TypeDescriptor -> Value -> B.ByteString
+encodeStatic (TUint _) (SInteger n) = encodeUint256 n
+encodeStatic (TInt _) (SInteger n) = encodeInt256 n
+encodeStatic TBool (SBool b) = encodeUint256 $ if b then 1 else 0
+encodeStatic TAddress (SAddress addr _) = padLeft32 $ addressToByteString addr
+encodeStatic (TBytesN n) (SBytes value) = B.take 32 $ B.take n value <> B.replicate 32 0
+encodeStatic (TTuple types) (STuple values) = encodeValues types $ map getConst $ V.toList values
+encodeStatic (TFixedArray entry len) (SArray values) =
+  encodeValues (replicate len entry) $ map getConst $ take len $ V.toList values
+encodeStatic _ SNULL = encodeUint256 0
+encodeStatic _ _ = encodeUint256 0
+
+encodeBody :: TypeDescriptor -> Value -> B.ByteString
+encodeBody TBytes (SBytes value) = encodeUint256 (fromIntegral $ B.length value) <> padRight32 value
+encodeBody TString (SString value) =
+  let bytes = BC.pack value
+   in encodeUint256 (fromIntegral $ B.length bytes) <> padRight32 bytes
+encodeBody (TArrayOf entry) (SArray values) =
+  let vals = map getConst $ V.toList values
+   in encodeUint256 (fromIntegral $ length vals) <> encodeValues (replicate (length vals) entry) vals
+encodeBody (TFixedArray entry len) (SArray values) =
+  encodeValues (replicate len entry) $ map getConst $ take len $ V.toList values
+encodeBody (TTuple types) (STuple values) = encodeValues types $ map getConst $ V.toList values
+encodeBody _ _ = encodeUint256 0
 
 abiDecode :: B.ByteString -> [Value] -> Value
 abiDecode bs typeArgs =
   let typeStrs = map typeArgToString typeArgs
       typeDescs = map (>>= parseTypeDescriptor) typeStrs
-      go [] _ = []
-      go (Just td : tds) headOffset =
-        decodeValue td bs headOffset : go tds (headOffset + 32)
-      go (Nothing : tds) headOffset =
-        SNULL : go tds (headOffset + 32)
-      decoded = go typeDescs 0
+      decoded = case sequence typeDescs of
+        Just validTypes -> decodeValues validTypes bs
+        Nothing -> replicate (length typeDescs) SNULL
    in case decoded of
         [v] -> v
         vs -> STuple (V.fromList $ map Constant vs)

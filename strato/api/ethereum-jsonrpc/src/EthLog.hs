@@ -70,11 +70,11 @@ eventRowToLog row = do
 eventToLog :: CodeCollection -> EventRow -> EthLog
 eventToLog cc row =
   let evName = stringToLabel $ T.unpack (erEventName row)
-      eventDef = case findEventDef cc evName of
+      (eventContract, eventDef) = case findEventDef cc evName of
         Nothing -> error $ "eth_getLogs: event " ++ T.unpack (erEventName row) ++ " not found in CodeCollection for contract " ++ T.unpack (erAddress row)
-        Just e -> e
+        Just hit -> hit
       textAttrs = M.mapMaybe extractText (erAttributes row)
-      (topicBytes, dataBytes) = encodeEventToLog evName eventDef textAttrs
+      (topicBytes, dataBytes) = encodeEventToLog eventContract evName eventDef textAttrs
       blockNum = case reads (T.unpack $ erBlockNumber row) :: [(Integer, String)] of
                    [(n, _)] -> n
                    _        -> 0
@@ -93,13 +93,16 @@ eventToLog cc row =
     extractText (String s) = Just s
     extractText _          = Nothing
 
-matchesTopics :: [String] -> EthLog -> Bool
+-- Each outer entry is one topic position; an empty inner list is a wildcard
+-- and multiple values at a position are Ethereum's OR form.
+matchesTopics :: [[String]] -> EthLog -> Bool
 matchesTopics [] _ = True
 matchesTopics filterTopics l =
   and $ zipWith matchTopic filterTopics (topics l ++ repeat B.empty)
   where
-    matchTopic "" _ = True
-    matchTopic ft logTopic =
+    matchTopic [] _ = True
+    matchTopic alternatives logTopic = any (`matchesTopic` logTopic) alternatives
+    matchesTopic ft logTopic =
       let stripped = if take 2 ft == "0x" then drop 2 ft else ft
       in case B16.decode (BC.pack stripped) of
            Right decoded -> decoded == logTopic

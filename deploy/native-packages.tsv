@@ -1,0 +1,13 @@
+package	version
+libgssapi-krb5-2:amd64	1.19.2-2ubuntu0.4
+libk5crypto3:amd64	1.19.2-2ubuntu0.4
+libkeyutils1:amd64	1.6.1-2ubuntu3
+libkrb5-3:amd64	1.19.2-2ubuntu0.4
+libkrb5support0:amd64	1.19.2-2ubuntu0.4
+libldap-2.5-0:amd64	2.5.18+dfsg-0ubuntu0.22.04.2
+libleveldb1d:amd64	1.23-3build1
+libpq5:amd64	14.23-0ubuntu0.22.04.1
+libsasl2-2:amd64	2.1.27+dfsg2-3ubuntu1.2
+libsecp256k1-0:amd64	0.1~20210825-2
+libsnappy1v5:amd64	1.1.8-1build3
+libsodium23:amd64	1.0.18-1ubuntu0.22.04.1

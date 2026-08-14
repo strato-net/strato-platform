@@ -18,6 +18,8 @@
 module Blockchain.BlockChain
   ( addBlocks,
     addTransaction,
+    transactionExecutionGas,
+    transactionGasUsed,
     recoverProposer,
     verifyBlock,
     mineTransactions,
@@ -26,7 +28,7 @@ module Blockchain.BlockChain
 where
 
 import BlockApps.Logging
-import BlockApps.Solidity.ABI (decodeABIArgs, valueToArgText, funcArgTypes)
+import BlockApps.Solidity.ABI (decodeABIArgsWithContract, valueToArgTextWithType, funcArgTypes)
 import qualified Blockchain.Bagger as Bagger
 import Blockchain.Bagger.Transactions
 import qualified Blockchain.DB.AddressStateDB as NoCache
@@ -402,7 +404,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
     . throwE
     $ TFTXSizeLimitExceeded txSize (toInteger (Conf.txSizeLimit (networkConfig ethConf))) t
 
-  let availableGas = 400_000
+  let availableGas = transactionExecutionGas bt
 
   feeResult <- payFees b availableGas tAddr t proposer
   let combineA f x y = liftA2 f x y <|> x <|> y
@@ -484,8 +486,9 @@ runCodeForTransaction b availableGas tAddr t proposer =
             resolveFunction b tAddr toAddr selector >>= \case
               Nothing -> pure . solidvmErrorResults $ MissingCodeCollection (show toAddr)
                 ("no matching function for selector 0x" ++ concatMap (printf "%02x") (B.unpack selector))
-              Just (fName, func) -> do
-                let argTexts = map valueToArgText $ decodeABIArgs argsBytes (funcArgTypes func)
+              Just (contract, fName, func) -> do
+                let argTypes = funcArgTypes func
+                    argTexts = zipWith (valueToArgTextWithType contract) argTypes $ decodeABIArgsWithContract contract argsBytes argTypes
                     fnStr = T.unpack (labelToText fName)
                 $logInfoS "runCodeForTransaction" $ T.pack $
                   "EthereumTX resolved: " ++ fnStr ++ "(" ++ intercalate ", " (map T.unpack argTexts) ++ ") on " ++ format toAddr
@@ -643,7 +646,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
             Just ex ->
               let fmt = either show show ex
                in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
-      gasUsed = fromInteger $ TD.gasLimit t - gasRemaining
+      gasUsed = fromInteger $ transactionGasUsed t gasRemaining
       etherUsed = gasUsed
 
       beforeAddresses = S.fromList [x | (x, ASModification _) <- M.toList beforeMap]
@@ -680,6 +683,19 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
     else case erAction <$> result of
       Right (Just act) -> extractCodeCollectionAddedMessages act
       _ -> []
+
+-- | The SolidVM meter must use the transaction's declared limit. A historical
+-- 400k constant let execution consume more gas than a signed Ethereum
+-- transaction purchased, which then underflowed receipt gas accounting.
+transactionExecutionGas :: TD.Transaction -> Gas
+transactionExecutionGas = fromInteger . TD.gasLimit
+
+-- | Defensive clamp for indexed/API results. Correctly metered execution has
+-- remaining gas in [0, gasLimit], but malformed legacy results must never
+-- become a uint256-sized underflow in an Ethereum receipt.
+transactionGasUsed :: TD.Transaction -> Integer -> Integer
+transactionGasUsed transaction gasRemaining =
+  max 0 $ TD.gasLimit transaction - gasRemaining
 
 extractCodeCollectionAddedMessages :: Action.Action -> [VMEvent]
 extractCodeCollectionAddedMessages a =

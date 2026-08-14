@@ -84,3 +84,22 @@ library
     , unordered-containers
     , vector
   default-language: Haskell2010
+
+test-suite abi-bridge-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  hs-source-dirs:
+      test-abi/
+  ghc-options: -Wall -Werror
+  build-depends:
+      base
+    , base16-bytestring
+    , bytestring
+    , containers
+    , data-default
+    , evm-solidity
+    , solid-vm-model
+    , source-tools
+    , text
+    , vector
+  default-language: Haskell2010

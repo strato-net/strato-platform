@@ -14,6 +14,7 @@
 -- as a list of full transaction objects.
 module EthBlock
   ( EthBlock(..)
+  , txToEthValue
   ) where
 
 import Blockchain.Data.Block (Block(..))

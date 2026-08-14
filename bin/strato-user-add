@@ -2,8 +2,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 usage() {
-  echo "Usage: strato-user-add NODE_DIR [USERNAME] [--with-nodekey]" >&2
+  echo "Usage: strato-user-add NODE_DIR [USERNAME] [--with-nodekey] [--password-file=PATH] [--private-key-file=PATH] [--expected-address=ADDRESS]" >&2
   exit 1
 }
 
@@ -18,6 +20,28 @@ prompt_hidden() {
   printf "%s" "$value"
 }
 
+require_private_file() {
+  local secret_file="$1"
+  local key_mode
+  if [[ ! -f "$secret_file" ]]; then
+    echo "Error: secret file does not exist: $secret_file" >&2
+    exit 1
+  fi
+  if [[ -L "$secret_file" ]]; then
+    echo "Error: secret file must not be a symbolic link" >&2
+    exit 1
+  fi
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    key_mode="$(stat -f '%Lp' "$secret_file")"
+  else
+    key_mode="$(stat -c '%a' "$secret_file")"
+  fi
+  if (( (8#$key_mode & 8#77) != 0 )); then
+    echo "Error: secret file must not be readable or writable by group/other (chmod 600)" >&2
+    exit 1
+  fi
+}
+
 NODE_DIR="${1:-}"
 if [[ -z "$NODE_DIR" ]]; then
   usage
@@ -30,10 +54,22 @@ if [[ "${1:-}" != "" && "${1:-}" != --* ]]; then
 fi
 
 WITH_NODEKEY=false
+PRIVATE_KEY_FILE=""
+PASSWORD_FILE=""
+EXPECTED_ADDRESS=""
 for arg in "$@"; do
   case "$arg" in
     --with-nodekey)
       WITH_NODEKEY=true
+      ;;
+    --private-key-file=*)
+      PRIVATE_KEY_FILE="${arg#*=}"
+      ;;
+    --password-file=*)
+      PASSWORD_FILE="${arg#*=}"
+      ;;
+    --expected-address=*)
+      EXPECTED_ADDRESS="${arg#*=}"
       ;;
     *)
       usage
@@ -43,6 +79,14 @@ done
 
 if [[ ! "$USERNAME" =~ ^[A-Za-z0-9._@-]+$ ]]; then
   echo "Error: username may only contain letters, numbers, '.', '_', '@', and '-'" >&2
+  exit 1
+fi
+
+EXPECTED_ADDRESS="${EXPECTED_ADDRESS#0x}"
+EXPECTED_ADDRESS="${EXPECTED_ADDRESS#0X}"
+EXPECTED_ADDRESS="$(printf '%s' "$EXPECTED_ADDRESS" | tr '[:upper:]' '[:lower:]')"
+if [[ -n "$EXPECTED_ADDRESS" && ! "$EXPECTED_ADDRESS" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Error: expected address must contain exactly 40 hexadecimal characters" >&2
   exit 1
 fi
 
@@ -159,15 +203,15 @@ sql_escape() {
   printf "%s" "$1" | sed "s/'/''/g"
 }
 
-vault_key_exists() {
+vault_key_address() {
   local username="$1"
   local provider="$2"
-  local username_sql provider_sql count
+  local username_sql provider_sql
   username_sql="$(sql_escape "$username")"
   provider_sql="$(sql_escape "$provider")"
-  count="$("${COMPOSE[@]}" exec -T postgres psql -U postgres -d oauth -Atc \
-    "select count(*) from users where x_user_unique_name = '$username_sql' and x_identity_provider_id = '$provider_sql';" | tr -d '[:space:]')"
-  [[ "$count" != "0" ]]
+  "${COMPOSE[@]}" exec -T postgres psql -U postgres -d oauth -Atc \
+    "select encode(address, 'escape') from users where x_user_unique_name = '$username_sql' and x_identity_provider_id = '$provider_sql' limit 1;" \
+    | tr -d '[:space:]'
 }
 
 identities="$("${COMPOSE[@]}" exec -T local-auth curl -fsS "http://localhost:4434/admin/identities")"
@@ -175,8 +219,14 @@ if IDENTITY_JSON="$identities" python3 -c 'import json, os, sys; username = sys.
   echo "Local auth user already exists: $USERNAME"
 else
   echo "Creating local auth user: $USERNAME"
-  password="$(prompt_hidden "Create password: ")"
-  confirm="$(prompt_hidden "Confirm password: ")"
+  if [[ -n "$PASSWORD_FILE" ]]; then
+    require_private_file "$PASSWORD_FILE"
+    password="$(tr -d '\r\n' < "$PASSWORD_FILE")"
+    confirm="$password"
+  else
+    password="$(prompt_hidden "Create password: ")"
+    confirm="$(prompt_hidden "Confirm password: ")"
+  fi
 
   if [[ "$password" != "$confirm" ]]; then
     echo "Error: passwords do not match" >&2
@@ -196,11 +246,29 @@ fi
 
 user_key_exists=false
 node_key_exists=false
-if vault_key_exists "$USERNAME" "$oauth_provider"; then
+user_key_address="$(vault_key_address "$USERNAME" "$oauth_provider")"
+node_key_address=""
+if [[ -n "$user_key_address" ]]; then
   user_key_exists=true
 fi
-if [[ "$WITH_NODEKEY" == true ]] && vault_key_exists "$oauth_client_id" "$oauth_provider"; then
-  node_key_exists=true
+if [[ "$WITH_NODEKEY" == true ]]; then
+  node_key_address="$(vault_key_address "$oauth_client_id" "$oauth_provider")"
+  if [[ -n "$node_key_address" ]]; then
+    node_key_exists=true
+  fi
+fi
+
+if [[ -n "$EXPECTED_ADDRESS" ]]; then
+  user_key_address_lower="$(printf '%s' "$user_key_address" | tr '[:upper:]' '[:lower:]')"
+  node_key_address_lower="$(printf '%s' "$node_key_address" | tr '[:upper:]' '[:lower:]')"
+  if [[ "$user_key_exists" == true && "$user_key_address_lower" != "$EXPECTED_ADDRESS" ]]; then
+    echo "Error: existing admin key address $user_key_address does not match expected $EXPECTED_ADDRESS" >&2
+    exit 1
+  fi
+  if [[ "$node_key_exists" == true && "$node_key_address_lower" != "$EXPECTED_ADDRESS" ]]; then
+    echo "Error: existing node key address $node_key_address does not match expected $EXPECTED_ADDRESS" >&2
+    exit 1
+  fi
 fi
 
 if [[ "$user_key_exists" == true && ( "$WITH_NODEKEY" == false || "$node_key_exists" == true ) ]]; then
@@ -211,41 +279,58 @@ if [[ "$user_key_exists" == true && ( "$WITH_NODEKEY" == false || "$node_key_exi
   exit 0
 fi
 
-echo ""
-echo "Wallet key setup for: $USERNAME"
-if [[ "$WITH_NODEKEY" == true ]]; then
-  echo "This recovery phrase also restores this node's admin/operator identity."
-fi
-echo "  1. Generate a new recovery phrase"
-echo "  2. Restore from an existing recovery phrase"
-printf "Choose [1/2]: " >&2
-IFS= read -r choice
+private_key=""
+mnemonic=""
+wordlist=""
 
-case "$choice" in
-  1)
-    mnemonic_mode="generate"
-    ;;
-  2)
-    mnemonic_mode="restore"
-    ;;
-  *)
-    echo "Error: expected 1 or 2" >&2
+if [[ -n "$PRIVATE_KEY_FILE" ]]; then
+  require_private_file "$PRIVATE_KEY_FILE"
+  private_key="$(tr -d '[:space:]' < "$PRIVATE_KEY_FILE")"
+  if [[ ! "$private_key" =~ ^[0-9A-Fa-f]{64}$ ]]; then
+    echo "Error: private key file must contain exactly 64 hexadecimal characters" >&2
     exit 1
-    ;;
-esac
+  fi
+  echo "Using private key file for local key provisioning: $PRIVATE_KEY_FILE"
+else
+  echo ""
+  echo "Wallet key setup for: $USERNAME"
+  if [[ "$WITH_NODEKEY" == true ]]; then
+    echo "This recovery phrase also restores this node's admin/operator identity."
+  fi
+  echo "  1. Generate a new recovery phrase"
+  echo "  2. Restore from an existing recovery phrase"
+  printf "Choose [1/2]: " >&2
+  IFS= read -r choice
 
-wordlist="${STRATO_BIP39_WORDLIST:-$HOME/.local/share/strato/bip39-english.txt}"
-if [[ ! -f "$wordlist" ]]; then
-  repo_wordlist="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/strato/tools/airlock/data/english.txt"
-  if [[ -f "$repo_wordlist" ]]; then
-    wordlist="$repo_wordlist"
-  else
-    echo "Error: BIP39 word list not found. Run make or set STRATO_BIP39_WORDLIST." >&2
-    exit 1
+  case "$choice" in
+    1)
+      mnemonic_mode="generate"
+      ;;
+    2)
+      mnemonic_mode="restore"
+      ;;
+    *)
+      echo "Error: expected 1 or 2" >&2
+      exit 1
+      ;;
+  esac
+
+  wordlist="${STRATO_BIP39_WORDLIST:-$HOME/.local/share/strato/bip39-english.txt}"
+  if [[ ! -f "$wordlist" ]]; then
+    repo_wordlist="$(cd "$SCRIPT_DIR/.." && pwd)/strato/tools/airlock/data/english.txt"
+    bundle_wordlist="$(cd "$SCRIPT_DIR/.." && pwd)/share/bip39-english.txt"
+    if [[ -f "$repo_wordlist" ]]; then
+      wordlist="$repo_wordlist"
+    elif [[ -f "$bundle_wordlist" ]]; then
+      wordlist="$bundle_wordlist"
+    else
+      echo "Error: BIP39 word list not found. Run make or set STRATO_BIP39_WORDLIST." >&2
+      exit 1
+    fi
   fi
 fi
 
-if [[ "$mnemonic_mode" == "generate" ]]; then
+if [[ -n "${mnemonic_mode:-}" && "$mnemonic_mode" == "generate" ]]; then
   mnemonic="$(STRATO_BIP39_WORDLIST="$wordlist" python3 - <<'PY'
 import hashlib
 import os
@@ -272,7 +357,7 @@ PY
     exit 1
   fi
   unset confirm_phrase
-else
+elif [[ -n "${mnemonic_mode:-}" ]]; then
   echo "Enter your BIP39 recovery phrase. It will not be saved."
   mnemonic="$(prompt_hidden "Recovery phrase: ")"
 fi
@@ -383,19 +468,22 @@ sys.stdout.write(f"{key:064x}")
 PY
 }
 
-pg_password="$(tr -d '\n' < secrets/postgres_password)"
-
 import_key() {
   local private_key="$1"
   local username="$2"
   local provider="$3"
+  local expected_args=()
+  if [[ -n "$EXPECTED_ADDRESS" ]]; then
+    expected_args+=("--expectedAddress=$EXPECTED_ADDRESS")
+  fi
   printf "%s" "$private_key" | strato-vault-import-key \
-    --pghost localhost \
-    --password "$pg_password" \
+    --pghost 127.0.0.1 \
+    --postgresPasswordFile secrets/postgres_password \
     --database oauth \
     --vaultPasswordFile secrets/vault_password \
     --username "$username" \
-    --oauthProvider "$provider"
+    --oauthProvider "$provider" \
+    "${expected_args[@]}"
 }
 
 extract_imported_address() {
@@ -403,7 +491,9 @@ extract_imported_address() {
 }
 
 if [[ "$user_key_exists" == false ]]; then
-  private_key="$(derive_private_key 0)"
+  if [[ -z "$private_key" ]]; then
+    private_key="$(derive_private_key 0)"
+  fi
   user_import_output="$(import_key "$private_key" "$USERNAME" "$oauth_provider")"
   user_address="$(printf "%s\n" "$user_import_output" | extract_imported_address)"
   if [[ "$WITH_NODEKEY" == true ]]; then
@@ -423,4 +513,4 @@ if [[ "$WITH_NODEKEY" == true && "$node_key_exists" == false ]]; then
   echo "Configured node services to use this operator address."
 fi
 
-unset private_key mnemonic pg_password user_import_output user_address
+unset private_key mnemonic user_import_output user_address

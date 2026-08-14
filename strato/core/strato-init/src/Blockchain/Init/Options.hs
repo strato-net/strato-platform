@@ -56,8 +56,11 @@ defineFlag "dockerMode" ("local" :: String) "Docker compose mode: 'local' for lo
 defineFlag "repoUrl" ("" :: String) "Docker registry URL prefix for images (e.g., 'registry.example.com/org/')"
 
 defineFlag "composeOnly" (False :: Bool) "Only generate docker-compose.yml to stdout and exit (no node setup)"
+defineFlag "setDefaultNode" True "Record this node in ~/.strato/default-node"
 
 defineFlag "includeBuild" (False :: Bool) "Include build directives in generated docker-compose.yml"
+defineFlag "minimalServices" (False :: Bool) "Run only PostgreSQL, Redis, the streaming broker, and optional local auth (for lightweight validator/test nodes)"
+defineFlag "acrossValidator" ("" :: String) "Override the validator/admin address for an isolated across-local* genesis profile"
 
 -- P2P config flags
 defineFlag "maxConn" (1000 :: Int) "Maximum number of P2P client connections"

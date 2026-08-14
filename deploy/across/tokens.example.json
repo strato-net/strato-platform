@@ -1,0 +1,12 @@
+[
+  {
+    "symbol": "USDST",
+    "name": "STRATO USD",
+    "decimals": 18,
+    "stratoToken": "REPLACE_WITH_STRATO_TOKEN_ADDRESS",
+    "ethereumToken": "REPLACE_WITH_ETHEREUM_TOKEN_ADDRESS",
+    "canonicalReturnBridge": "REPLACE_WITH_AUDITED_MERCATA_BRIDGE_ADDRESS",
+    "enabledOrigin": true,
+    "enabledDestination": true
+  }
+]
