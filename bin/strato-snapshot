@@ -1413,8 +1413,12 @@ pg_temp_start() {
   cid="$(docker run "${args[@]}" "$SNAPSHOT_POSTGRES_IMAGE" "${pg_args[@]}" 2>/dev/null)" \
     || die "failed to start temporary postgres container"
   TMP_PG_CONTAINERS+=("$cid")
+  # A generous window: on a fresh restore the initdb of the empty cluster runs
+  # right after the multi-GB snapshot extraction, and on slower filesystems
+  # (e.g. macOS bind mounts, with the page cache still flushing the extracted
+  # state) it can take several minutes to become ready.
   local i
-  for i in $(seq 1 90); do
+  for i in $(seq 1 300); do
     if docker exec "$cid" pg_isready -U postgres >/dev/null 2>&1; then
       printf '%s\n' "$cid"
       return 0
