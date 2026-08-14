@@ -319,11 +319,12 @@ const ScrollRow = ({ children }: { children: React.ReactNode }) => {
 interface BridgeInProps {
   guestMode?: boolean;
   fundingMode?: "bridge" | "metals";
+  initialMetalAddress?: string | null;
   onFundingModeChange?: (mode: "bridge" | "metals") => void;
   onMetalPurchase?: () => void;
 }
 
-const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: externalFundingMode, onFundingModeChange, onMetalPurchase }) => {
+const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: externalFundingMode, initialMetalAddress, onFundingModeChange, onMetalPurchase }) => {
   // Hooks & Context
   const { isConnected, connector } = useAccount();
   const chainId = useChainId();
@@ -392,10 +393,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     metalForgeService.getConfigs().then(cfg => {
       setMetalsConfig(cfg);
       const enabledMetals = cfg.metals.filter(m => m.isEnabled);
-      if (cfg.payTokens.length) setSelectedPayToken(cfg.payTokens[0]);
-      if (enabledMetals.length) setSelectedMetal(enabledMetals[0]);
+      const defaultPayToken = cfg.payTokens.find(token => token.symbol.toUpperCase() === "USDC") || cfg.payTokens[0];
+      const initialMetal = enabledMetals.find(metal => normAddr(metal.address) === normAddr(initialMetalAddress || "")) || enabledMetals[0];
+      if (defaultPayToken) setSelectedPayToken(defaultPayToken);
+      if (initialMetal) setSelectedMetal(initialMetal);
     }).catch(() => {});
-  }, [fundingMode]);
+  }, [fundingMode, initialMetalAddress, metalsConfig]);
 
   // Computed values
   const currentNetwork = useMemo(() => {
