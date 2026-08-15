@@ -59,6 +59,7 @@ test-suite blockstanbul-test
   other-modules:
       AuthenticationSpec
       MessageSpec
+      RoundChangeSpec
       Spec
       StateMachineSpec
       Paths_blockstanbul
@@ -67,9 +68,18 @@ test-suite blockstanbul-test
   ghc-options: -Wall -Werror -dynamic
   build-depends:
       base
+    , blockstanbul
+    , bytestring
     , common-log
+    , containers
     , hflags
     , hspec
+    , labeled-error
+    , lens
+    , mtl
+    , strato-model
+    , transformers
+    , vault-monad
   default-language: Haskell2010
 
 benchmark one-node

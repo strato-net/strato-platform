@@ -42,9 +42,18 @@ tests:
     source-dirs: test/
     ghc-options: -dynamic
     dependencies:
+      - blockstanbul
+      - bytestring
       - common-log
+      - containers
       - hflags
       - hspec
+      - labeled-error
+      - lens
+      - mtl
+      - strato-model
+      - transformers
+      - vault-monad
 
 
 benchmarks:

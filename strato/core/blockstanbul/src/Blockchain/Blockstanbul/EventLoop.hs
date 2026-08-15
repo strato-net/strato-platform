@@ -124,16 +124,32 @@ createRoundChangeMessage vw = do
   nonce' <- bytesToWord256 <$> liftIO (getEntropy 32)
   pure $ RoundChange vw nonce'
 
+-- Originate consensus messages only when this node is configured to vote
+-- and is actually in the current validator set. validatorBehavior is the
+-- kill switch; membership is the real gate. RPC nodes with the default
+-- validatorBehavior=true must not vote.
+mayVote :: StateMachineM m => m Bool
+mayVote = do
+  valB <- use validatorBehavior
+  self <- use selfAddr
+  vals <- use validators
+  pure $ case self of
+    Just addr | valB && Validator addr `S.member` vals -> True
+    _ -> False
+
 roundChange :: (StateMachineM m) => ConduitM InEvent EOutEvent m ()
 roundChange = do
   nextView <- uses view (over round (+ 1))
-  pendingRound .= Just (_round nextView)
-  rawMsg <- createRoundChangeMessage nextView
-  valB <- use validatorBehavior
-  self <- use selfAddr
-  when (isJust self && valB) $ do
-    msg <- signMessage rawMsg
-    yieldR msg
+  let target = _round nextView
+  already <- use pendingRound
+  pendingRound .= Just target
+  -- One signed ROUNDCHANGE per target round. Retransmitting with a new
+  -- nonce breaks P2P rlpHash dedup and is what produced the floods.
+  when (already /= Just target) $
+    whenM mayVote $ do
+      rawMsg <- createRoundChangeMessage nextView
+      msg <- signMessage rawMsg
+      yieldR msg
 
 nextRound :: (StateMachineM m) => NextType -> ConduitM InEvent EOutEvent m ()
 nextRound nt = do
@@ -152,19 +168,19 @@ nextRound nt = do
   proposer .= leader
   proposal .= Nothing
   self <- use selfAddr
-  valB <- use validatorBehavior
-  when (Just leader == fmap Validator self && valB) $ do
-    lock <- use blockLock
-    v <- use view
-    case lock of
-      Nothing -> use myBlock >>= \case
-        Just myBlk | blockHeaderBlockNumber (blockHeader myBlk) == fromIntegral (v ^. sequence) + 1 -> do
-          msg <- signMessage (Preprepare v myBlk)
+  whenM mayVote $
+    when (Just leader == fmap Validator self) $ do
+      lock <- use blockLock
+      v <- use view
+      case lock of
+        Nothing -> use myBlock >>= \case
+          Just myBlk | blockHeaderBlockNumber (blockHeader myBlk) == fromIntegral (v ^. sequence) + 1 -> do
+            msg <- signMessage (Preprepare v myBlk)
+            yieldR msg
+          _ -> pure ()
+        Just lb -> do
+          msg <- signMessage (Preprepare v lb)
           yieldR msg
-        _ -> pure ()
-      Just lb -> do
-        msg <- signMessage (Preprepare v lb)
-        yieldR msg
 
   prepared .= M.empty
   committed .= M.empty
@@ -302,16 +318,13 @@ eventLoop ctx = execStateC ctx $
               Right () -> do
                 hasPreprepared .= True
                 proposal .= Just realSealed
-                valB <- use validatorBehavior
-                when (isJust self && valB) $ do
+                whenM mayVote $ do
                   msg <- signMessage (Preprepare v realSealed)
                   yieldR msg
                   yieldR $ RunPreprepare realSealed
         PreprepareResponse decision -> case decision of
             AcceptPreprepare bh -> do
-              self <- use selfAddr
-              valB <- use validatorBehavior
-              when (isJust self && valB) $ do
+              whenM mayVote $ do
                 msg <- signMessage (Prepare v bh)
                 yieldR msg
             RejectPreprepare -> roundChange
@@ -350,10 +363,8 @@ eventLoop ctx = execStateC ctx $
                     unless wasProposed $ do
                       yieldL $ OMsg auth ppp
                       proposal .= Just pp
-                      self <- use selfAddr
-                      valB <- use validatorBehavior
                       -- run in vm before sending prepare
-                      when (isJust self && valB) . yieldR $ RunPreprepare pp
+                      whenM mayVote . yieldR $ RunPreprepare pp
         IMsg auth ppp@(Prepare v' di) -> when (v <= v') $ do
           preparers <- use prepared
           unless (M.member (Validator $ sender auth) preparers) . yieldL $ OMsg auth ppp
@@ -366,9 +377,7 @@ eventLoop ctx = execStateC ctx $
             hasPrepared .= True
             setLock
             seal <- commitmentSeal di
-            self <- use selfAddr
-            valB <- use validatorBehavior
-            when (isJust self && valB) $ do
+            whenM mayVote $ do
               msg <- signMessage (Commit v di seal)
               yieldR msg
         IMsg auth ccc@(Commit v' di seal) -> when (v <= v') $ do
@@ -390,7 +399,7 @@ eventLoop ctx = execStateC ctx $
                 let blockNo = number . blockBlockData $ blk
                 recordMaxBlockNumber "pbft_commit" blockNo
                 commitBlock $ addCommitmentSeals seals blk
-        IMsg auth (RoundChange vn _) -> when (_round v < _round vn) $ do
+        IMsg auth rc@(RoundChange vn _) -> when (_round v < _round vn) $ do
           let rn = _round vn
           mSigners <- use $ roundChanged . at rn
           case S.member (Validator $ sender auth) <$> mSigners of
@@ -400,13 +409,11 @@ eventLoop ctx = execStateC ctx $
               total <- poolSize
               sentRN <- use pendingRound
               let sameRNCount = maybe 0 S.size . M.lookup rn $ rs
-              rawMsg <- createRoundChangeMessage vn
               when (3 * sameRNCount > total && Just rn > sentRN) $ do
                 pendingRound .= Just rn
                 $logInfoS "blockstanbul/roundchange" "agreed change"
-                valB <- use validatorBehavior
-                self <- use selfAddr
-                when (isJust self && valB) $ do
+                whenM mayVote $ do
+                  rawMsg <- createRoundChangeMessage vn
                   msg <- signMessage rawMsg
                   yieldR msg
               when (3 * sameRNCount > 2 * total) $ do
@@ -414,7 +421,9 @@ eventLoop ctx = execStateC ctx $
                 case next of
                   Nothing -> error "TODO(tim): a round was voted on without existing"
                   Just r -> nextRound (Round r)
-              yieldL $ OMsg auth rawMsg
+              -- Gossip the inbound message unchanged. A new nonce would
+              -- defeat P2P rlpHash dedup and amplify every vote.
+              yieldL $ OMsg auth rc
               return ()
         Timeout r' -> do
           case r' `compare` _round v of

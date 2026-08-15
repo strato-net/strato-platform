@@ -122,7 +122,7 @@ newContext network' (Checkpoint v as) addr valB =
           _lockSender = Nothing,
           _lastParent = Nothing,
           _validatorBehavior = valB,
-          _isValidator = False,
+          _isValidator = maybe False (\a -> Validator a `S.member` valSet) addr,
           _network = network'
         }
 

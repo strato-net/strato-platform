@@ -50,6 +50,7 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.SyncDB
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Validator
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import ClassyPrelude (atomically)
 import Conduit
@@ -66,6 +67,7 @@ import Control.Monad.State
 import Data.Conduit.TMChan
 import Data.IORef
 import Data.Maybe
+import qualified Data.Set as S
 import Data.String
 import qualified Data.Text as T
 import Data.Time.Clock
@@ -251,21 +253,31 @@ createNewTimer rn = do
 
 createNewViewTimer :: MonadBlockstanbul m => Block -> m ()
 createNewViewTimer b = do
-  updateViewTimer
-  vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
-  vCur <- fst <$> liftIO (readIORef vpref)
-  let v = vCur{ _sequence = max 1 $ fromIntegral (number $ blockBlockData b) - 1 }
-  ch <- Mod.access (Mod.Proxy @(TMChan RoundNumber))
-  let act :: AlarmClock UTCTime -> IO ()
-      act this' = do
-        (v', p) <- readIORef vpref
-        when (v >= v' && isNothing p) $ do
-          atomically . writeTMChan ch $ _round v'
-          next <- addUTCTime 5 <$> getCurrentTime
-          setAlarm this' next
-  alarm <- liftIO $ newAlarmClock act
-  next <- addUTCTime 2 <$> liftIO getCurrentTime
-  liftIO $ setAlarm alarm next
+  ctx <- getBlockstanbulContext
+  let voting = case _selfAddr ctx of
+        Just a -> _validatorBehavior ctx && Validator a `S.member` _validators ctx
+        Nothing -> False
+      leading = fmap Validator (_selfAddr ctx) == Just (_proposer ctx)
+  -- Only the current voting proposer should nag "no proposal yet".
+  -- Every node used to arm a new 5s clock per UnannouncedBlock; on an
+  -- RPC node those stacked for the whole stall and each fire emitted a
+  -- ROUNDCHANGE.
+  when (voting && leading) $ do
+    updateViewTimer
+    vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
+    vCur <- fst <$> liftIO (readIORef vpref)
+    let v = vCur{ _sequence = max 1 $ fromIntegral (number $ blockBlockData b) - 1 }
+    ch <- Mod.access (Mod.Proxy @(TMChan RoundNumber))
+    let act :: AlarmClock UTCTime -> IO ()
+        act this' = do
+          (v', p) <- readIORef vpref
+          when (v >= v' && isNothing p) $ do
+            atomically . writeTMChan ch $ _round v'
+            next <- addUTCTime 5 <$> getCurrentTime
+            setAlarm this' next
+    alarm <- liftIO $ newAlarmClock act
+    next <- addUTCTime 2 <$> liftIO getCurrentTime
+    liftIO $ setAlarm alarm next
 
 updateViewTimer :: MonadBlockstanbul m => m ()
 updateViewTimer = do
