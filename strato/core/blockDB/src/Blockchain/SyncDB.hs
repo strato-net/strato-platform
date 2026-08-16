@@ -10,6 +10,9 @@
 module Blockchain.SyncDB
   ( HasSyncDB(..),
     SyncStatus(..),
+    ChiliadAssignOp (..),
+    maxInFlightChiliads,
+    shouldAssignChiliad,
     getBestBlockInfo,
     putBestBlockInfo,
     getBestSequencedBlockInfo,
@@ -281,6 +284,26 @@ getSyncStatus = fmap fromValue . eitherToMaybe <$> REDIS.get syncStatusKey
 putSyncStatus :: RedisCtx m f => Bool -> m (f REDIS.Status)
 putSyncStatus status = REDIS.set syncStatusKey $ toValue status
 
+-- | Concurrent Assigned chiliads. 15 peers each taking a 1000-block
+-- window kept mid-sync live ~1.5–2GiB after the header/ToUnseq knobs.
+maxInFlightChiliads :: Int
+maxInFlightChiliads = 4
+
+data ChiliadAssignOp
+  = -- | Create a new chiliad row (INSERT).
+    InsertNew
+  | -- | Reassign a stale Assigned row; does not raise the Assigned count.
+    StealStaleAssigned
+  | -- | Promote a NotReady row to Assigned; raises the count.
+    PromoteNotReady
+  deriving (Eq, Show)
+
+-- | Steal does not raise Assigned count. Insert/promote do, so they
+-- stop at 'maxInFlightChiliads'.
+shouldAssignChiliad :: ChiliadAssignOp -> Int -> Bool
+shouldAssignChiliad StealStaleAssigned _ = True
+shouldAssignChiliad _ assigned = assigned < maxInFlightChiliads
+
 class HasSyncDB m where
   clearAllSyncTasks :: Host -> m ()
   getCurrentSyncTask :: Host -> m (Maybe SyncTask)
@@ -331,13 +354,17 @@ instance HasSQL m => HasSyncDB m where
                 FROM "sync_task"
                 WHERE "assignment_time" < ?
                   AND "status" != 'Finished'
+                  AND (
+                    "status" = 'Assigned'
+                    OR (SELECT count(*) FROM "sync_task" WHERE "status" = 'Assigned') < ?
+                  )
                 ORDER BY "assignment_time" ASC
                 LIMIT 1
                 FOR UPDATE SKIP LOCKED
             )
             RETURNING
         |]
-        [toPersistValue host, toPersistValue now, toPersistValue oneMinuteAgo]
+        [toPersistValue host, toPersistValue now, toPersistValue oneMinuteAgo, toPersistValue maxInFlightChiliads]
 
     case result of
       oneTask:_ -> return $ Just $ entityVal oneTask
@@ -348,8 +375,9 @@ instance HasSQL m => HasSyncDB m where
             INSERT INTO sync_task (host)
             SELECT ?
             WHERE (select count(*) from "sync_task") < ?
+              AND (select count(*) from "sync_task" where "status" = 'Assigned') < ?
             RETURNING
-          |] [toPersistValue host, toPersistValue $ 1 + highestBlockNum `div` 1000]
+          |] [toPersistValue host, toPersistValue $ 1 + highestBlockNum `div` 1000, toPersistValue maxInFlightChiliads]
 
         case results of
           [v] -> return $ Just $ SQL.entityVal v
