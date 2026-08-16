@@ -63,4 +63,14 @@ ALTER TABLE tracking_sessions
   ADD COLUMN geo_lon     DOUBLE PRECISION;
 `,
   },
+  {
+    // source becomes the general channel (LinkedIn, X, website, …);
+    // full_source keeps the specific detail. Existing free-form values are
+    // detail, not channel, so they seed full_source.
+    name: "003_source_split",
+    sql: `
+ALTER TABLE tracking_links ADD COLUMN full_source TEXT;
+UPDATE tracking_links SET full_source = source;
+`,
+  },
 ];

@@ -12,16 +12,16 @@ source of truth.
 
 | Endpoint | Auth | Purpose |
 |---|---|---|
-| `GET /t/:slug` | none | Resolve a link: record `link_opened`, set the `strato_tid` session cookie (90 days, HttpOnly, SameSite=Lax), 302 to the allowlisted destination **on the original host** (relative Location — visitors on any node edge that proxies `/t/` land back on that node) |
+| `GET /t/:slug` | none | Resolve a link: record `link_opened`, set the `strato_tid` session cookie (90 days, HttpOnly, SameSite=Lax), 302 to the stored destination — a relative path lands **on the original host** (relative Location — visitors on any node edge that proxies `/t/` land back on that node), an absolute http(s) URL goes where it points |
 | `POST /tracking-api/engage` | cookie | SPA boot ping; sets `engaged_at` so JS-less bots/email scanners never count as engagement |
 | `POST /tracking-api/wallet-connected` | cookie | Records external wallet and/or STRATO address for the session (deduped) |
 | `GET /dashboard` | OIDC (SPA login) | The dashboard app (tracking-ui container) |
 | `GET /tracking-api/me` | JWT | `{authorized}` — whether the user may use the dashboard |
 | `GET /tracking-api/links` | JWT + allowlist | Link summaries with attribution rollups |
 | `POST /tracking-api/links` | JWT + allowlist | Create a link (random slug; label/source never appear in the URL) |
-| `GET /tracking-api/links/:id` | JWT + allowlist | Bridge-ins, per-category activity summary, per-wallet summaries, visitor geo points, attributed activity feed |
+| `GET /tracking-api/links/:id` | JWT + allowlist | Bridge-ins, per-category activity summary, per-wallet summaries, visitor geo points, attributed activity feed, per-day history (opens, wallets, bridge/trade value, …) |
 | `GET /tracking-api/links/:id/wallets/:address` | JWT + allowlist | Per-user drill-down: the wallet's full on-chain history (deliberately not attribution-filtered) |
-| `PATCH /tracking-api/links/:id` | JWT + allowlist | Toggle active / edit label+source |
+| `PATCH /tracking-api/links/:id` | JWT + allowlist | Toggle active / edit label, source, full source, destination |
 
 The dashboard app (`ui/`) logs in with OAuth code+PKCE against the Keycloak
 realm (public client, default id `tracking-dashboard` — must be registered in
@@ -112,7 +112,6 @@ the app edge, which forwards the client IP and proxies here.
 | `TRACKING_DB_CREATE` | `true` | Set `false` when the DB user can't create databases (pre-created RDS DB) |
 | `TRACKING_DB_NAME` | `tracking` | Service-owned database |
 | `TRACKING_AUTHORIZED_USERS` | empty | Comma-separated Keycloak usernames (sales/marketing) |
-| `TRACKING_DEST_ALLOWLIST` | `/dashboard/deposits,/dashboard,/dashboard/swap,/dashboard/earn,/dashboard/rewards` | Allowed link destinations |
 | `TRACKING_DEFAULT_DESTINATION` | `/dashboard/deposits` | Bridge In page |
 | `TRACKING_COOKIE_DOMAIN` | empty (host-only) | Set `.strato.nexus` in prod so a future `go.strato.nexus` CNAME shares the cookie |
 | `TRACKING_IPINFO_TOKEN` | empty (offline fallback) | ipinfo.io token for live IP geolocation |

@@ -30,6 +30,13 @@ interface SessionAgg {
   last_opened_at: Date | null;
 }
 
+interface SessionDailyRow {
+  link_id: string;
+  day: string; // YYYY-MM-DD (UTC)
+  opens: string;
+  engaged: string;
+}
+
 interface GeoRow {
   link_id: string;
   geo_lat: number;
@@ -60,6 +67,7 @@ export interface LinkSummary {
   url: string;
   label: string;
   source: string;
+  fullSource: string;
   destination: string;
   creator: string;
   active: boolean;
@@ -107,6 +115,20 @@ export interface BridgeInItem {
   at: string;
 }
 
+// One UTC day of link history; gaps in the span are filled with zero points so
+// per-day histograms don't silently skip quiet days.
+export interface HistoryPoint {
+  date: string; // YYYY-MM-DD (UTC)
+  opens: number;
+  engagedOpens: number;
+  wallets: number;
+  bridgeIns: number;
+  bridgeValueUsd: number;
+  trades: number;
+  tradeValueUsd: number;
+  activity: number;
+}
+
 export interface LinkDetail extends LinkSummary {
   bridgeIns: BridgeInItem[];
   // Attributed-to-this-link events only (the link's own metric)
@@ -114,6 +136,7 @@ export interface LinkDetail extends LinkSummary {
   activitySummary: ActivitySummary;
   walletSummaries: WalletSummary[];
   geoPoints: GeoPoint[];
+  history: HistoryPoint[];
 }
 
 export interface WalletDetail {
@@ -132,6 +155,7 @@ interface AttributionSnapshot {
   links: TrackingLink[];
   connections: ConnectionRow[];
   sessionAggs: Map<string, SessionAgg>;
+  sessionDaily: SessionDailyRow[];
   geoRows: GeoRow[];
   bridgeIns: BridgeInEvent[];
   activityEvents: ActivityEvent[];
@@ -216,6 +240,16 @@ const buildSnapshot = async (): Promise<AttributionSnapshot> => {
   );
   const sessionAggs = new Map(sessionAggsResult.rows.map((r) => [String(r.link_id), r]));
 
+  const sessionDailyResult = await query<SessionDailyRow>(
+    `SELECT link_id,
+            to_char(opened_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day,
+            COUNT(*) FILTER (WHERE NOT is_bot_or_preview) AS opens,
+            COUNT(*) FILTER (WHERE engaged_at IS NOT NULL) AS engaged
+     FROM tracking_sessions
+     GROUP BY link_id, day`
+  );
+  const sessionDaily = sessionDailyResult.rows;
+
   const geoRowsResult = await query<GeoRow>(
     `SELECT link_id, geo_lat, geo_lon, geo_city, geo_country, COUNT(*) AS count
      FROM tracking_sessions
@@ -255,15 +289,18 @@ const buildSnapshot = async (): Promise<AttributionSnapshot> => {
   ]);
 
   const tokenAddresses = [...new Set(bridgeIns.map((b) => b.stratoToken).filter(Boolean))];
+  // Prices are fetched unconditionally: swap events (trade value history) need
+  // them even when no bridge tokens are in play.
   const [tokenSymbols, oraclePrices] = await Promise.all([
     fetchTokenSymbols(tokenAddresses),
-    tokenAddresses.length ? fetchOraclePricesUsd() : Promise.resolve(new Map<string, number>()),
+    fetchOraclePricesUsd(),
   ]);
 
   return {
     links,
     connections,
     sessionAggs,
+    sessionDaily,
     geoRows,
     bridgeIns,
     activityEvents,
@@ -335,6 +372,102 @@ const toActivityItem = (event: ActivityEvent): ActivityItem => ({
   txHash: null, // the unified Cirrus event table has no transaction_hash column
   at: new Date(event.timestampMs).toISOString(),
 });
+
+// Pool.Swap(sender, tokenIn, tokenOut, amountIn, amountOut) — both amounts are
+// raw 1e18-scaled integers. Price the input leg, falling back to the output
+// leg when only one side has an oracle price; null when neither does.
+const swapValueUsd = (snapshot: AttributionSnapshot, event: ActivityEvent): number | null => {
+  const legs: [string | undefined, string | undefined][] = [
+    [event.attributes.tokenIn, event.attributes.amountIn],
+    [event.attributes.tokenOut, event.attributes.amountOut],
+  ];
+  for (const [token, amount] of legs) {
+    if (!token || !amount) continue;
+    const price = snapshot.oraclePrices.get(token.toLowerCase());
+    if (price != null) return tokenAmount(amount) * price;
+  }
+  return null;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MAX_HISTORY_DAYS = 1096; // clamp: a bad timestamp can't yield a decade of buckets
+
+const dayKeyOf = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+
+const zeroPoint = (date: string): HistoryPoint => ({
+  date,
+  opens: 0,
+  engagedOpens: 0,
+  wallets: 0,
+  bridgeIns: 0,
+  bridgeValueUsd: 0,
+  trades: 0,
+  tradeValueUsd: 0,
+  activity: 0,
+});
+
+// Per-day history for one link: sessions from the DB daily rollup, everything
+// else bucketed from the (already attributed) snapshot arrays. USD sums count
+// priced tokens only — a trend line, unlike the headline total, has no way to
+// show "unknown".
+const buildHistory = (
+  snapshot: AttributionSnapshot,
+  link: TrackingLink,
+  identities: WalletIdentity[],
+  attributedBridgeIns: BridgeInEvent[],
+  attributedActivity: ActivityEvent[]
+): HistoryPoint[] => {
+  const linkId = String(link.id);
+  const byDay = new Map<string, HistoryPoint>();
+  const at = (date: string): HistoryPoint => {
+    let point = byDay.get(date);
+    if (!point) {
+      point = zeroPoint(date);
+      byDay.set(date, point);
+    }
+    return point;
+  };
+
+  for (const row of snapshot.sessionDaily) {
+    if (String(row.link_id) !== linkId) continue;
+    const point = at(row.day);
+    point.opens += Number(row.opens);
+    point.engagedOpens += Number(row.engaged);
+  }
+  for (const identity of identities) {
+    at(dayKeyOf(identity.connectedAt.getTime())).wallets += 1;
+  }
+  for (const bridge of attributedBridgeIns) {
+    const point = at(dayKeyOf(bridge.timestampMs));
+    point.bridgeIns += 1;
+    const price = snapshot.oraclePrices.get(bridge.stratoToken);
+    if (price != null) point.bridgeValueUsd += tokenAmount(bridge.stratoTokenAmount) * price;
+  }
+  for (const event of attributedActivity) {
+    const point = at(dayKeyOf(event.timestampMs));
+    point.activity += 1;
+    if (event.category === "swap") {
+      point.trades += 1;
+      const value = swapValueUsd(snapshot, event);
+      if (value != null) point.tradeValueUsd += value;
+    }
+  }
+  if (byDay.size === 0) return [];
+
+  const dataDays = [...byDay.keys()].sort();
+  const startDay =
+    dayKeyOf(link.created_at.getTime()) < dataDays[0]
+      ? dayKeyOf(link.created_at.getTime())
+      : dataDays[0];
+  const endMs = Math.max(Date.now(), Date.parse(dataDays[dataDays.length - 1]));
+
+  const points: HistoryPoint[] = [];
+  for (let ms = Date.parse(startDay); ms <= endMs && points.length < MAX_HISTORY_DAYS; ms += DAY_MS) {
+    const date = dayKeyOf(ms);
+    points.push(byDay.get(date) ?? zeroPoint(date));
+  }
+  return points;
+};
 
 interface WalletIdentity {
   address: string;
@@ -468,6 +601,7 @@ const summarizeLink = (snapshot: AttributionSnapshot, link: TrackingLink): LinkS
     url: publicUrlForSlug(link.slug),
     label: link.label,
     source: link.source ?? "",
+    fullSource: link.full_source ?? "",
     destination: link.destination,
     creator: link.created_by,
     active: link.active,
@@ -501,7 +635,8 @@ export const getLinkDetail = async (linkId: string): Promise<LinkDetail | null> 
     .filter((e) => snapshot.assignments.get(e.eventKey)?.linkId === link.id)
     .sort((a, b) => b.timestampMs - a.timestampMs);
 
-  const walletSummaries = walletIdentitiesForLink(snapshot, String(link.id))
+  const identities = walletIdentitiesForLink(snapshot, String(link.id));
+  const walletSummaries = identities
     .map((identity) => summarizeWallet(snapshot, identity))
     .sort((a, b) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
 
@@ -522,6 +657,7 @@ export const getLinkDetail = async (linkId: string): Promise<LinkDetail | null> 
     activitySummary: countByCategory(attributedActivity, attributedBridgeIns.length),
     walletSummaries,
     geoPoints,
+    history: buildHistory(snapshot, link, identities, attributedBridgeIns, attributedActivity),
   };
 };
 
