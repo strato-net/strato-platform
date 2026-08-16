@@ -18,6 +18,7 @@ library
       Blockchain.Sequencer.Kafka
       Blockchain.Sequencer.Kafka.Metrics
       Blockchain.Sequencer.TxCallObject
+      Blockchain.Sequencer.UnseqProduce
   other-modules:
       Paths_seqevents
   hs-source-dirs:
