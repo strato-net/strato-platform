@@ -45,6 +45,8 @@ const erc20TransferAbi = [
 const ensureHexPrefix = (addr: string): `0x${string}` =>
   (addr.startsWith("0x") ? addr : `0x${addr}`) as `0x${string}`;
 
+const normAddr = (addr?: string): string => (addr || "").toLowerCase().replace(/^0x/, "");
+
 const Transfer = () => {
   const { userAddress, userName, isLoggedIn } = useUser();
   const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance, getTransferableTokens, transferToken, bulkTransferToken } = useTokenContext();
@@ -77,7 +79,7 @@ const Transfer = () => {
     if (!fromAsset) return "0";
     return computeMaxTransferable(
       fromAsset.balance,
-      fromAsset.address === usdstAddress,
+      normAddr(fromAsset.address) === normAddr(usdstAddress),
       voucherBalance,
       usdstBalance,
       safeParseUnits(TRANSFER_FEE, 18).toString(),
