@@ -102,13 +102,6 @@ spec = describe "ROUNDCHANGE emission" $ do
     let gossiped = [n | OMsg a (RoundChange _ n) <- got, sender a == other]
     gossiped `shouldBe` [0xdeadbeef]
 
-  it "binds ROUNDCHANGE signatures to the view, not the nonce" $ do
-    let a = RoundChange (View 21 18) 1
-        b = RoundChange (View 21 18) 2
-        c = RoundChange (View 22 18) 1
-    getHash a `shouldBe` getHash b
-    getHash a `shouldNotBe` getHash c
-
   it "counts one vote when a validator sends two nonces for the same next round" $ do
     let vw = View 21 18
         auth = MsgAuth other (signMsg myPriv (B.replicate 32 0))
@@ -157,25 +150,3 @@ spec = describe "ROUNDCHANGE emission" $ do
       votes <- use $ roundChanged . at 21
       pure $ maybe 0 S.size votes
     nVotes `shouldBe` 2
-
-  it "rejects a ROUNDCHANGE whose signature does not bind the view when auth is on" $ do
-    let inbound = RoundChange (View 21 18) 0x11
-        auth = MsgAuth me (signMsg myPriv (B.replicate 32 0))
-        ctx =
-          baseCtx True (Just other)
-            & validators .~ S.fromList [Validator me, Validator other]
-            & productionAuth .~ True
-    got <- runTest ctx $ sendMessages [IMsg auth inbound]
-    let gossiped = [n | OMsg a (RoundChange _ n) <- got, sender a == me]
-    gossiped `shouldBe` []
-
-  it "accepts a ROUNDCHANGE whose signature binds the view when auth is on" $ do
-    let inbound = RoundChange (View 21 18) 0x11
-        auth = MsgAuth me (signMsg myPriv (getHash inbound))
-        ctx =
-          baseCtx True (Just other)
-            & validators .~ S.fromList [Validator me, Validator other]
-            & productionAuth .~ True
-    got <- runTest ctx $ sendMessages [IMsg auth inbound]
-    let gossiped = [n | OMsg a (RoundChange _ n) <- got, sender a == me]
-    gossiped `shouldBe` [0x11]

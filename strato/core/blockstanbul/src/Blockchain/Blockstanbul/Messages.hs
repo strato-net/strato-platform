@@ -231,17 +231,16 @@ outShortLog loc eoev = do
 instance NFData OutEvent
 
 getHash :: TrustedMessage -> B.ByteString
--- Prepare/Commit still share a digest (the block hash). ROUNDCHANGE must
--- bind the view so one validator signature cannot stamp an arbitrary
--- (round, nonce) pair. The nonce is unsigned on purpose: it is not the
--- identity of the vote.
+-- This is wrong, because this means that the prepare and commits
+-- will have the same signature despite being different messages.
+-- It also needs a code for the message type.
+-- ROUNDCHANGE still uses the historical constant. Binding the view is a
+-- consensus-message hardfork (see #7371); do not change it here.
 getHash = \case
   (Preprepare _ blk) -> keccak256ToByteString . blockHash $ blk
   (Prepare _ di) -> keccak256ToByteString di
   (Commit _ di _) -> keccak256ToByteString di
-  (RoundChange v _) ->
-    keccak256ToByteString . hash $
-      "ROUNDCHANGE" <> rlpSerialize (rlpEncode v)
+  (RoundChange _ _) -> keccak256ToByteString $ hash "TODO(tim): this signature is predictable"
 
 -- Inbound p2p dedup key. ROUNDCHANGE is one vote per (sender, target
 -- round); a new nonce must not mint a new identity. Other messages stay
