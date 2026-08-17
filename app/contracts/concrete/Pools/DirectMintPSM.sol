@@ -14,16 +14,7 @@ contract DirectMintPSM is Ownable {
     struct BurnConfig {
         bool isEnabled;
         uint minReserve;
-        uint burnDelay;
         uint feeBps;
-    }
-
-    struct BurnRequest {
-        uint burnAmount;
-        uint payoutAmount;
-        address redeemToken;
-        address requester;
-        uint requestTime;
     }
 
     address public mintableToken;
@@ -32,16 +23,10 @@ contract DirectMintPSM is Ownable {
     bool public burnPaused;
     mapping(address => MintConfig) public record mintConfigs;
     mapping(address => BurnConfig) public record burnConfigs;
-    mapping(address => uint) public record pendingRedemptions;
-    uint public burnReqCounter; // follows MercataBridge.withdrawalCounter pattern
-    uint constant BURN_REQUEST_GRACE_PERIOD = 7 * 24 * 60 * 60;
-    mapping(uint => BurnRequest) public burnRequests;
 
     event MintConfigSet(address token, bool isEnabled, uint maxBalance, uint feeBps);
-    event BurnConfigSet(address token, bool isEnabled, uint minReserve, uint burnDelay, uint feeBps);
-    event BurnRequested(uint id, uint burnAmount, uint payoutAmount, address redeemToken, address requester, uint requestTime);
-    event BurnCompleted(uint id, uint burnAmount, uint payoutAmount, address redeemToken, address recipient);
-    event BurnCancelled(uint id, uint burnAmount, address redeemToken, address requester);
+    event BurnConfigSet(address token, bool isEnabled, uint minReserve, uint feeBps);
+    event Redeemed(address user, uint burnAmount, uint payoutAmount, address redeemToken);
     event DirectPSMMinted(address user, uint depositAmount, uint mintAmount, address againstToken);
     event FeeCollectorSet(address feeCollector);
     event MintPauseSet(bool isPaused);
@@ -57,7 +42,7 @@ contract DirectMintPSM is Ownable {
 
     constructor(address initialOwner) Ownable(initialOwner) {}
 
-    function initialize(address _mintableToken, address _feeCollector, address[] _eligibleTokens, uint _burnDelay) external onlyOwner {
+    function initialize(address _mintableToken, address _feeCollector, address[] _eligibleTokens) external onlyOwner {
         require(_mintableToken != address(0), "Invalid mintable token");
         require(_feeCollector != address(0), "Invalid fee collector");
         require(_eligibleTokens.length > 0, "Invalid eligible tokens");
@@ -66,7 +51,7 @@ contract DirectMintPSM is Ownable {
         emit FeeCollectorSet(_feeCollector);
         for (uint i = 0; i < _eligibleTokens.length; i++) {
             setMintConfig(_eligibleTokens[i], true, 0, 0);
-            setBurnConfig(_eligibleTokens[i], true, 0, _burnDelay, 0);
+            setBurnConfig(_eligibleTokens[i], true, 0, 0);
         }
     }
 
@@ -151,7 +136,6 @@ contract DirectMintPSM is Ownable {
         address token,
         bool _isEnabled,
         uint _minReserve,
-        uint _burnDelay,
         uint _feeBps
     ) public onlyOwner {
         _requireValidConfigToken(token);
@@ -160,46 +144,37 @@ contract DirectMintPSM is Ownable {
         burnConfigs[token] = BurnConfig(
             _isEnabled,
             _minReserve,
-            _burnDelay,
             _feeBps
         );
 
-        emit BurnConfigSet(token, _isEnabled, _minReserve, _burnDelay, _feeBps);
+        emit BurnConfigSet(token, _isEnabled, _minReserve, _feeBps);
     }
 
     function setBurnEnabled(address token, bool _isEnabled) external onlyOwner {
         _requireValidConfigToken(token);
         burnConfigs[token].isEnabled = _isEnabled;
-        emit BurnConfigSet(token, _isEnabled, burnConfigs[token].minReserve, burnConfigs[token].burnDelay, burnConfigs[token].feeBps);
+        emit BurnConfigSet(token, _isEnabled, burnConfigs[token].minReserve, burnConfigs[token].feeBps);
     }
 
     function setBurnMinReserve(address token, uint _minReserve) external onlyOwner {
         _requireValidConfigToken(token);
         burnConfigs[token].minReserve = _minReserve;
-        emit BurnConfigSet(token, burnConfigs[token].isEnabled, _minReserve, burnConfigs[token].burnDelay, burnConfigs[token].feeBps);
-    }
-
-    function setBurnDelay(address token, uint _burnDelay) external onlyOwner {
-        _requireValidConfigToken(token);
-        burnConfigs[token].burnDelay = _burnDelay;
-        emit BurnConfigSet(token, burnConfigs[token].isEnabled, burnConfigs[token].minReserve, _burnDelay, burnConfigs[token].feeBps);
+        emit BurnConfigSet(token, burnConfigs[token].isEnabled, _minReserve, burnConfigs[token].feeBps);
     }
 
     function setBurnFeeBps(address token, uint _feeBps) external onlyOwner {
         _requireValidConfigToken(token);
         require(_feeBps <= 10000, "Invalid fee bps");
         burnConfigs[token].feeBps = _feeBps;
-        emit BurnConfigSet(token, burnConfigs[token].isEnabled, burnConfigs[token].minReserve, burnConfigs[token].burnDelay, _feeBps);
+        emit BurnConfigSet(token, burnConfigs[token].isEnabled, burnConfigs[token].minReserve, _feeBps);
     }
 
+    /// @dev With no escrow, redeemable liquidity is simply the balance above minReserve.
     function availableRedemptionLiquidity(address token) public view returns (uint) {
         uint balance = IERC20(token).balanceOf(address(this));
-        uint reserved = pendingRedemptions[token];
-        if (balance <= reserved) return 0;
-        uint unreserved = balance - reserved;
         uint minReserve = burnConfigs[token].minReserve;
-        if (unreserved <= minReserve) return 0;
-        return unreserved - minReserve;
+        if (balance <= minReserve) return 0;
+        return balance - minReserve;
     }
 
     function _transfer(address token, address to, uint amount) internal {
@@ -254,117 +229,35 @@ contract DirectMintPSM is Ownable {
         emit DirectPSMMinted(msg.sender, amount, mintAmount, againstToken);
     }
 
-    function _deleteBurnRequest(uint id) internal {
-        delete burnRequests[id].burnAmount;
-        delete burnRequests[id].payoutAmount;
-        delete burnRequests[id].redeemToken;
-        delete burnRequests[id].requester;
-        delete burnRequests[id].requestTime;
-    }
-
-    function requestBurn(uint amount, address redeemToken) external nonReentrant returns (uint) {
-        BurnConfig config = burnConfigs[redeemToken];
-        require(amount > 0, "Amount must be nonzero");
-        require(!burnPaused, "Burning is paused");
-        require(config.isEnabled, "Token burn is disabled");
-        _requireActiveToken(mintableToken);
-        _requireActiveToken(redeemToken);
-        uint payoutAmount = amount - ((amount * config.feeBps) / 10000);
-        require(payoutAmount > 0, "Payout amount must be nonzero");
-        require(availableRedemptionLiquidity(redeemToken) >= amount, "Insufficient liquidity");
-
-        // Escrow mintableToken in this contract's balance
-        _transferFrom(mintableToken, msg.sender, address(this), amount);
-
-        // Reserve payout liquidity for this request
-        pendingRedemptions[redeemToken] += amount;
-
-        // Create burn request
-        burnRequests[++burnReqCounter] = BurnRequest(amount, payoutAmount, redeemToken, msg.sender, block.timestamp);
-        emit BurnRequested(burnReqCounter, amount, payoutAmount, redeemToken, msg.sender, block.timestamp);
-        return burnReqCounter;
-    }
-
-    function completeBurn(uint id) nonReentrant external {
-        // Local copy
-        uint burnAmount = burnRequests[id].burnAmount;
-        uint payoutAmount = burnRequests[id].payoutAmount;
-        address redeemToken = burnRequests[id].redeemToken;
-        address requester = burnRequests[id].requester;
-        uint requestTime = burnRequests[id].requestTime;
-
-        // Ensure eligibility
-        require(burnAmount > 0, "Invalid burn request ID");
+    /// @dev Eligibility for redemption. Check order is load-bearing: the tests
+    ///      assert these exact revert strings.
+    function _requireRedeemable(address redeemToken) internal view {
         require(!burnPaused, "Burning is paused");
         require(burnConfigs[redeemToken].isEnabled, "Token burn is disabled");
         _requireActiveToken(mintableToken);
         _requireActiveToken(redeemToken);
-        require(requester == msg.sender, "Unauthorized");
-        uint burnDelay = burnConfigs[redeemToken].burnDelay;
-        require(burnDelay == 0 || requestTime + burnDelay <= block.timestamp, "Burn delay not passed");
+    }
 
-        // Remove burn request
-        _deleteBurnRequest(id);
+    /// @notice Burn mintableToken and receive redeemToken in a single transaction.
+    function redeem(uint amount, address redeemToken) external nonReentrant returns (uint payoutAmount) {
+        BurnConfig config = burnConfigs[redeemToken];
+        require(amount > 0, "Amount must be nonzero");
+        _requireRedeemable(redeemToken);
+        payoutAmount = amount - ((amount * config.feeBps) / 10000);
+        require(payoutAmount > 0, "Payout amount must be nonzero");
+        require(availableRedemptionLiquidity(redeemToken) >= amount, "Insufficient liquidity");
 
-        // Release reserved payout liquidity
-        pendingRedemptions[redeemToken] -= burnAmount;
+        _transferFrom(mintableToken, msg.sender, address(this), amount);
+        Token(mintableToken).burn(address(this), amount);
 
-        // Burn escrowed mintable token
-        Token(mintableToken).burn(address(this), burnAmount);
-
-        // Check payout token availability
-        uint feeAmount = burnAmount - payoutAmount;
-        require(IERC20(redeemToken).balanceOf(address(this)) >= burnAmount, "Insufficient liquidity");
-
+        // Settle the redeemToken side: fee to the collector, remainder to the redeemer.
+        uint feeAmount = amount - payoutAmount;
         if (feeAmount > 0) {
             _transfer(redeemToken, address(feeCollector), feeAmount);
         }
-        _transfer(redeemToken, requester, payoutAmount);
+        _transfer(redeemToken, msg.sender, payoutAmount);
 
-        emit BurnCompleted(id, burnAmount, payoutAmount, redeemToken, requester);
-    }
-
-    function _cancelBurn(uint id, uint burnAmount, address redeemToken, address requester) internal {
-        // Remove burn request
-        _deleteBurnRequest(id);
-
-        // Release reserved payout liquidity
-        pendingRedemptions[redeemToken] -= burnAmount;
-
-        // Check liquidity
-        require(IERC20(mintableToken).balanceOf(address(this)) >= burnAmount, "Insufficient liquidity");
-
-        // Return escrowed mintable token to the requester
-        _transfer(mintableToken, requester, burnAmount);
-
-        emit BurnCancelled(id, burnAmount, redeemToken, requester);
-    }
-
-    function clearExpiredBurnRequest(uint id) external onlyOwner nonReentrant {
-        // Local copy
-        uint burnAmount = burnRequests[id].burnAmount;
-        address redeemToken = burnRequests[id].redeemToken;
-        address requester = burnRequests[id].requester;
-        uint requestTime = burnRequests[id].requestTime;
-
-        // Validate request
-        require(burnAmount > 0, "Invalid burn request ID");
-        uint burnDelay = burnConfigs[redeemToken].burnDelay;
-        require(requestTime + burnDelay + BURN_REQUEST_GRACE_PERIOD <= block.timestamp, "Burn request not expired");
-
-        _cancelBurn(id, burnAmount, redeemToken, requester);
-    }
-
-    function cancelBurn(uint id) nonReentrant external {
-        // Local copy
-        uint burnAmount = burnRequests[id].burnAmount;
-        address redeemToken = burnRequests[id].redeemToken;
-        address requester = burnRequests[id].requester;
-
-        // Validate request
-        require(burnAmount > 0, "Invalid burn request ID");
-        require(requester == msg.sender, "Unauthorized");
-
-        _cancelBurn(id, burnAmount, redeemToken, requester);
+        emit Redeemed(msg.sender, amount, payoutAmount, redeemToken);
+        return payoutAmount;
     }
 }
