@@ -59,7 +59,7 @@ export const useCDPLiquidationAlert = (): LiquidationAlertState => {
       case 'high':
         return `WARNING: Your ${vaultLabel} health factor is ${hfFormatted}. You are very close to liquidation. Consider adding collateral or repaying debt.`;
       case 'medium':
-        return `Your ${vaultLabel} health factor is ${hfFormatted}. Consider adding collateral to improve your position safety.`;
+        return `Your ${vaultLabel} health factor is ${hfFormatted}. Consider adding collateral or repaying debt to improve your position safety.`;
       default:
         return '';
     }
