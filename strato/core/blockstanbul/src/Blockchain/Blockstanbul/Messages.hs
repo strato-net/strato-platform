@@ -15,6 +15,9 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
+  ( Address,
+    addressToByteString,
+  )
 import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -231,11 +234,24 @@ getHash :: TrustedMessage -> B.ByteString
 -- This is wrong, because this means that the prepare and commits
 -- will have the same signature despite being different messages.
 -- It also needs a code for the message type.
+-- ROUNDCHANGE still uses the historical constant. Binding the view is a
+-- consensus-message hardfork (see #7371); do not change it here.
 getHash = \case
   (Preprepare _ blk) -> keccak256ToByteString . blockHash $ blk
   (Prepare _ di) -> keccak256ToByteString di
   (Commit _ di _) -> keccak256ToByteString di
   (RoundChange _ _) -> keccak256ToByteString $ hash "TODO(tim): this signature is predictable"
+
+-- Inbound p2p dedup key. ROUNDCHANGE is one vote per (sender, target
+-- round); a new nonce must not mint a new identity. Other messages stay
+-- on rlpHash.
+inboundDedupHash :: WireMessage -> Keccak256
+inboundDedupHash (WireMessage (MsgAuth addr _) (RoundChange v _)) =
+  hash $
+    "RC-VOTE"
+      <> addressToByteString addr
+      <> rlpSerialize (rlpEncode (_round v))
+inboundDedupHash wm = rlpHash wm
 
 instance RLPSerializable View where
   rlpEncode (View r s) = RLPArray [rlpEncode r, rlpEncode s]

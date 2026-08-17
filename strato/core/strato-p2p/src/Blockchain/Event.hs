@@ -21,7 +21,8 @@ where
 
 import           BlockApps.Logging
 import           Blockchain.Blockstanbul               (WireMessage,
-                                                        blockstanbulSender)
+                                                        blockstanbulSender,
+                                                        inboundDedupHash)
 import           Blockchain.Context
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockHeader           (BlockHeader)
@@ -274,7 +275,7 @@ handleEvents peer = awaitForever $ \case
       setPeerAddrIfUnset $ blockstanbulSender wm
       peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
       $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
-    let msgHash = rlpHash wm
+    let msgHash = inboundDedupHash wm
     lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerHost peer, msgHash) Proxy
     msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
     if msgExists

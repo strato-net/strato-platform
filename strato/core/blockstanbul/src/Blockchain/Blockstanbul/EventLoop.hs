@@ -399,32 +399,36 @@ eventLoop ctx = execStateC ctx $
                 let blockNo = number . blockBlockData $ blk
                 recordMaxBlockNumber "pbft_commit" blockNo
                 commitBlock $ addCommitmentSeals seals blk
-        IMsg auth rc@(RoundChange vn _) -> when (_round v < _round vn) $ do
+        IMsg auth rc@(RoundChange vn _) -> do
+          -- Only the next round is actionable. Any higher claimed round is
+          -- a map-growth DoS (one Map key per invented round).
           let rn = _round vn
-          mSigners <- use $ roundChanged . at rn
-          case S.member (Validator $ sender auth) <$> mSigners of
-            Just True -> return ()
-            _ -> do
-              rs <- roundChanged <%= M.alter (Just . S.insert (Validator $ sender auth) . fromMaybe S.empty) rn
-              total <- poolSize
-              sentRN <- use pendingRound
-              let sameRNCount = maybe 0 S.size . M.lookup rn $ rs
-              when (3 * sameRNCount > total && Just rn > sentRN) $ do
-                pendingRound .= Just rn
-                $logInfoS "blockstanbul/roundchange" "agreed change"
-                whenM mayVote $ do
-                  rawMsg <- createRoundChangeMessage vn
-                  msg <- signMessage rawMsg
-                  yieldR msg
-              when (3 * sameRNCount > 2 * total) $ do
-                next <- use pendingRound
-                case next of
-                  Nothing -> error "TODO(tim): a round was voted on without existing"
-                  Just r -> nextRound (Round r)
-              -- Gossip the inbound message unchanged. A new nonce would
-              -- defeat P2P rlpHash dedup and amplify every vote.
-              yieldL $ OMsg auth rc
-              return ()
+              cur = _round v
+          when (rn == cur + 1) $ do
+            mSigners <- use $ roundChanged . at rn
+            case S.member (Validator $ sender auth) <$> mSigners of
+              Just True -> return ()
+              _ -> do
+                rs <- roundChanged <%= M.alter (Just . S.insert (Validator $ sender auth) . fromMaybe S.empty) rn
+                total <- poolSize
+                sentRN <- use pendingRound
+                let sameRNCount = maybe 0 S.size . M.lookup rn $ rs
+                when (3 * sameRNCount > total && Just rn > sentRN) $ do
+                  pendingRound .= Just rn
+                  $logInfoS "blockstanbul/roundchange" "agreed change"
+                  whenM mayVote $ do
+                    rawMsg <- createRoundChangeMessage vn
+                    msg <- signMessage rawMsg
+                    yieldR msg
+                when (3 * sameRNCount > 2 * total) $ do
+                  next <- use pendingRound
+                  case next of
+                    Nothing -> error "TODO(tim): a round was voted on without existing"
+                    Just r -> nextRound (Round r)
+                -- Gossip the inbound message unchanged. A new nonce would
+                -- defeat P2P rlpHash dedup and amplify every vote.
+                yieldL $ OMsg auth rc
+                return ()
         Timeout r' -> do
           case r' `compare` _round v of
             LT ->

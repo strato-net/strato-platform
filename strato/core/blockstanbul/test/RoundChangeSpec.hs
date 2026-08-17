@@ -94,10 +94,59 @@ spec = describe "ROUNDCHANGE emission" $ do
 
   it "rebroadcasts an inbound ROUNDCHANGE with the original nonce" $ do
     let auth = MsgAuth other (signMsg myPriv (B.replicate 32 0))
-        inbound = RoundChange (View 24 18) 0xdeadbeef
+        inbound = RoundChange (View 21 18) 0xdeadbeef
         ctx =
           baseCtx True (Just me)
             & validators .~ S.fromList [Validator me, Validator other, Validator third]
     got <- runTest ctx $ sendMessages [IMsg auth inbound]
     let gossiped = [n | OMsg a (RoundChange _ n) <- got, sender a == other]
     gossiped `shouldBe` [0xdeadbeef]
+
+  it "counts one vote when a validator sends two nonces for the same next round" $ do
+    let vw = View 21 18
+        auth = MsgAuth other (signMsg myPriv (B.replicate 32 0))
+        ctx =
+          baseCtx True (Just me)
+            & validators .~ S.fromList [Validator me, Validator other, Validator third]
+    (got, nVotes) <- runTest ctx $ do
+      evs <- sendMessages
+        [ IMsg auth (RoundChange vw 1),
+          IMsg auth (RoundChange vw 2)
+        ]
+      votes <- use $ roundChanged . at 21
+      pure (evs, maybe 0 S.size votes)
+    let gossiped = [n | OMsg a (RoundChange _ n) <- got, sender a == other]
+    gossiped `shouldBe` [1]
+    nVotes `shouldBe` 1
+
+  it "drops a ROUNDCHANGE that is not exactly current+1" $ do
+    let auth = MsgAuth other (signMsg myPriv (B.replicate 32 0))
+        ctx =
+          baseCtx True (Just me)
+            & validators .~ S.fromList [Validator me, Validator other, Validator third]
+    (got, rcMap) <- runTest ctx $ do
+      evs <- sendMessages
+        [ IMsg auth (RoundChange (View 22 18) 1),
+          IMsg auth (RoundChange (View 20 18) 1),
+          IMsg auth (RoundChange (View 1000000 18) 1)
+        ]
+      m <- use roundChanged
+      pure (evs, m)
+    roundChanges got `shouldBe` []
+    rcMap `shouldBe` mempty
+
+  it "counts two different validators for the same next round" $ do
+    let vw = View 21 18
+        authA = MsgAuth other (signMsg myPriv (B.replicate 32 0))
+        authB = MsgAuth third (signMsg myPriv (B.replicate 32 0))
+        ctx =
+          baseCtx True (Just me)
+            & validators .~ S.fromList [Validator me, Validator other, Validator third]
+    nVotes <- runTest ctx $ do
+      _ <- sendMessages
+        [ IMsg authA (RoundChange vw 1),
+          IMsg authB (RoundChange vw 2)
+        ]
+      votes <- use $ roundChanged . at 21
+      pure $ maybe 0 S.size votes
+    nVotes `shouldBe` 2

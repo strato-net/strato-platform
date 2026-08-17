@@ -9,11 +9,10 @@
 module Executable.StratoP2PLoopback (stratoP2PLoopback) where
 
 import BlockApps.Logging
-import Blockchain.Blockstanbul (WireMessage)
+import Blockchain.Blockstanbul (WireMessage, inboundDedupHash)
 import Blockchain.Context
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
-import Blockchain.Strato.Model.Keccak256
 import Conduit
 import qualified Control.Monad.Change.Alter as A
 import qualified Data.Text as T
@@ -37,7 +36,7 @@ stratoP2PLoopback runner = do
     $logInfoS "stratoP2PLoopback" "Reflecting PBFT back to unseq since 2019"
     let toWireMessage = \case
           P2pBlockstanbul wm -> do
-            let msgHash = rlpHash wm
+            let msgHash = inboundDedupHash wm
             msgExists <- A.exists (A.Proxy @(A.Proxy (Inbound WireMessage))) msgHash
             if msgExists
               then do
