@@ -96,8 +96,7 @@ const LENDING_ACTIONS: AlertAction[] = [
 ];
 
 const CDP_ACTIONS: AlertAction[] = [
-  { label: 'Add Collateral', to: '/dashboard/borrow' },
-  { label: 'Repay Debt', to: '/dashboard/borrow' },
+  { label: 'Manage Vault', to: '/dashboard/borrow' },
 ];
 
 interface LiquidationAlertBannerProps {
