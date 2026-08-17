@@ -34,7 +34,7 @@ export const LiquidationAlertBannerView = ({
     return null;
   }
 
-  const { riskLevel, healthFactor, message } = alertState;
+  const { riskLevel, message } = alertState;
   const colorClasses = getRiskLevelColor(riskLevel);
 
   const toggleCollapse = () => {
@@ -70,11 +70,6 @@ export const LiquidationAlertBannerView = ({
         {/* Collapsible Content */}
         {!isCollapsed && (
           <div className="px-4 pb-3 pt-0">
-            {healthFactor !== null && (
-              <p className="text-xs text-muted-foreground mb-3">
-                Current Health Factor: <span className="font-semibold">{healthFactor.toFixed(2)}</span>
-              </p>
-            )}
             <div className="flex flex-wrap gap-2">
               {actions.map((action) => (
                 <Button
