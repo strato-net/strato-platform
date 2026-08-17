@@ -26,6 +26,8 @@ module Blockchain.Blockstanbul
     shortFormat,
     decodeCheckpoint,
     encodeCheckpoint,
+    getHash,
+    inboundDedupHash,
   )
 where
 
