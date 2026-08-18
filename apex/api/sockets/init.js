@@ -27,9 +27,10 @@ const getCoinbaseAggregator = require('./aggregators/getCoinbase');
 const getHealthAggregator = require('./aggregators/getHealthStatus');
 const getShardCountAggregator = require('./aggregators/getChains');
 
-const io = require('socket.io')()
+const { Server } = require('socket.io')
+const io = new Server({ path: '/apex-ws' })
 function init(server) {
-  io.listen(server, { path: '/apex-ws' });
+  io.attach(server);
   io.on('connection', function (socket) {
     // register request to block number
     registerRoomAllocation(socket, LAST_BLOCK_NUMBER, getBlocksAggregator.initialHydrateLastBlock)
@@ -84,7 +85,7 @@ emitter.on(ON_SOCKET_PUBLISH_EVENTS, function (room, data) {
 
 function registerRoomAllocation(socket, room, preloadCb) {
   socket.on(`SUBSCRIBE/${room}`, (data) => {
-    socket.join(`ROOM_${room}`, () => {
+    socket.join(`ROOM_${room}`).then(() => {
       preloadCb(socket)
     })
   })
