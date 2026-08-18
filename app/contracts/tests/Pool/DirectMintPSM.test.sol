@@ -579,4 +579,224 @@ contract Describe_DirectMintPSM {
         require(USDST.balanceOf(address(redeemer)) == 40e18, "Only the redeemed USDST should be burned");
     }
 
+    function _newVault() internal returns (SaveUSDSTVault vault) {
+        _ensureAuthorizableAdmin();
+        vault = SaveUSDSTVault(address(new Proxy(address(new SaveUSDSTVault(address(0xdeadbeef))), address(m.adminRegistry()))));
+        admin.doSuccessfully(address(vault), "initialize", address(USDST), "Save USDST", "saveUSDST");
+    }
+
+    function it_psm_mint_and_save_delivers_shares_instead_of_usdst() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        SaveUSDSTVault vault = _newVault();
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(vault));
+        require(fresh.savingsVault() == address(vault), "PSM should record the savings vault");
+        require(fresh.savingsDepositAvailable(100e18), "Savings deposit should be available");
+
+        User saver = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(saver), 100e18);
+        saver.doSuccessfully(address(USDC), "approve", address(fresh), 100e18);
+        saver.doSuccessfully(address(fresh), "mintAndSave", 100e18, address(USDC));
+
+        // The user ends up holding shares, never the underlying.
+        require(USDST.balanceOf(address(saver)) == 0, "Saver should receive shares, not USDST");
+        require(vault.balanceOf(address(saver)) == 100e18, "Saver should hold 100 saveUSDST");
+
+        // The vault custodies the freshly minted USDST.
+        require(USDST.balanceOf(address(vault)) == 100e18, "Vault should custody the USDST");
+        require(vault.totalAssets() == 100e18, "Vault should account for the deposit");
+
+        // The PSM keeps the collateral and retains nothing else.
+        require(USDC.balanceOf(address(fresh)) == 100e18, "PSM should hold the collateral");
+        require(USDST.balanceOf(address(fresh)) == 0, "PSM should not retain USDST");
+        require(USDST.allowance(address(fresh), address(vault)) == 0, "PSM should leave no standing allowance");
+    }
+
+    function it_psm_mint_and_save_applies_mint_fee_before_depositing() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        SaveUSDSTVault vault = _newVault();
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(vault));
+        admin.doSuccessfully(address(fresh), "setMintFeeBps", address(USDC), 100);
+
+        uint collectorBefore = USDC.balanceOf(address(m.feeCollector()));
+
+        User saver = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(saver), 100e18);
+        saver.doSuccessfully(address(USDC), "approve", address(fresh), 100e18);
+        saver.doSuccessfully(address(fresh), "mintAndSave", 100e18, address(USDC));
+
+        // Only the net amount reaches the vault.
+        require(vault.balanceOf(address(saver)) == 99e18, "Saver should hold shares for the net mint");
+        require(USDST.balanceOf(address(vault)) == 99e18, "Vault should custody only the net USDST");
+        require(USDC.balanceOf(address(m.feeCollector())) == collectorBefore + 1e18, "Mint fee should reach the FeeCollector");
+        require(USDC.balanceOf(address(fresh)) == 99e18, "PSM should keep net backing");
+    }
+
+    function it_psm_mint_and_save_prices_shares_at_the_live_exchange_rate() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        SaveUSDSTVault vault = _newVault();
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(vault));
+
+        User first = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(first), 100e18);
+        first.doSuccessfully(address(USDC), "approve", address(fresh), 100e18);
+        first.doSuccessfully(address(fresh), "mintAndSave", 100e18, address(USDC));
+        require(vault.balanceOf(address(first)) == 100e18, "First saver should mint 1:1");
+
+        // Double the vault's assets, so one share is now worth two USDST.
+        admin.doSuccessfully(address(USDST), "mint", address(vault), 100e18);
+        admin.doSuccessfully(address(vault), "recordRewardTransfer", 100e18);
+        require(vault.totalAssets() == 200e18, "Vault should credit the reward");
+        require(vault.previewDeposit(100e18) == 50e18, "Deposits should now price at 2:1");
+
+        User second = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(second), 100e18);
+        second.doSuccessfully(address(USDC), "approve", address(fresh), 100e18);
+        second.doSuccessfully(address(fresh), "mintAndSave", 100e18, address(USDC));
+
+        require(vault.balanceOf(address(second)) == 50e18, "Second saver should receive rate-adjusted shares");
+        require(vault.balanceOf(address(first)) == 100e18, "First saver's shares should be undiluted");
+        require(USDST.balanceOf(address(fresh)) == 0, "PSM should not retain USDST across deposits");
+    }
+
+    function it_psm_savings_availability_prices_pending_accrual() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        SaveUSDSTVault vault = _newVault();
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(vault));
+
+        User saver = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(saver), 100e18);
+        saver.doSuccessfully(address(USDC), "approve", address(fresh), 100e18);
+        saver.doSuccessfully(address(fresh), "mintAndSave", 100e18, address(USDC));
+
+        User distributor = new User();
+        admin.doSuccessfully(address(USDST), "mint", address(distributor), 100e18);
+        distributor.doSuccessfully(address(USDST), "approve", address(vault), 100e18);
+        admin.doSuccessfully(address(vault), "setRewardDistributor", address(distributor));
+        admin.doSuccessfully(address(vault), "setPerSecondSavingsRate", 1000000021979553151239153027);
+        fastForward(1);
+
+        require(vault.previewDeposit(1) == 1, "Realized preview should still be 1:1");
+        (, uint fundedAmount) = vault.pendingAccrual();
+        require(fundedAmount > 0, "Expected funded pending accrual");
+        require(!fresh.savingsDepositAvailable(1), "Projected zero-share deposit should be unavailable");
+
+        User dustSaver = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(dustSaver), 1);
+        dustSaver.doSuccessfully(address(USDC), "approve", address(fresh), 1);
+        dustSaver.doExpectingFailure(address(fresh), "mintAndSave", "Savings deposit unavailable", 1, address(USDC));
+
+        require(USDC.balanceOf(address(dustSaver)) == 1, "Rejected save should preserve collateral");
+        require(USDC.allowance(address(dustSaver), address(fresh)) == 1, "Rejected save should preserve allowance");
+        require(vault.balanceOf(address(dustSaver)) == 0, "Rejected save should mint no shares");
+    }
+
+    function it_psm_plain_mint_still_delivers_usdst_when_a_vault_is_set() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        SaveUSDSTVault vault = _newVault();
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(vault));
+
+        User minter = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(minter), 50e18);
+        minter.doSuccessfully(address(USDC), "approve", address(fresh), 50e18);
+        minter.doSuccessfully(address(fresh), "mint", 50e18, address(USDC));
+
+        // Configuring a vault must not change the default mint path.
+        require(USDST.balanceOf(address(minter)) == 50e18, "Plain mint should still deliver USDST");
+        require(vault.balanceOf(address(minter)) == 0, "Plain mint should not mint shares");
+        require(vault.totalAssets() == 0, "Plain mint should not touch the vault");
+    }
+
+    function it_psm_mint_and_save_requires_a_configured_vault() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        require(!fresh.savingsDepositAvailable(10e18), "Savings should be unavailable with no vault");
+
+        User saver = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(saver), 20e18);
+        saver.doSuccessfully(address(USDC), "approve", address(fresh), 20e18);
+
+        saver.doExpectingFailure(address(fresh), "mintAndSave", "Savings deposit unavailable", 10e18, address(USDC));
+
+        require(USDC.balanceOf(address(saver)) == 20e18, "Rejected save should not pull collateral");
+        require(USDC.balanceOf(address(fresh)) == 0, "Rejected save should not bank collateral");
+        require(USDST.balanceOf(address(saver)) == 0, "Rejected save should not mint USDST");
+    }
+
+    function it_psm_mint_and_save_reverts_and_rolls_back_when_vault_is_paused() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        SaveUSDSTVault vault = _newVault();
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(vault));
+
+        User saver = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(saver), 20e18);
+        saver.doSuccessfully(address(USDC), "approve", address(fresh), 20e18);
+
+        admin.doSuccessfully(address(vault), "pause");
+        require(!fresh.savingsDepositAvailable(10e18), "Paused vault should report unavailable");
+        saver.doExpectingFailure(address(fresh), "mintAndSave", "Savings deposit unavailable", 10e18, address(USDC));
+
+        // The collateral pull and the USDST mint both unwind with the deposit.
+        require(USDC.balanceOf(address(saver)) == 20e18, "Paused save should not pull collateral");
+        require(USDC.balanceOf(address(fresh)) == 0, "Paused save should not bank collateral");
+        require(USDST.balanceOf(address(fresh)) == 0, "Paused save should not leave USDST in the PSM");
+        require(USDST.balanceOf(address(vault)) == 0, "Paused save should not reach the vault");
+
+        admin.doSuccessfully(address(vault), "unpause");
+        saver.doSuccessfully(address(fresh), "mintAndSave", 10e18, address(USDC));
+        require(vault.balanceOf(address(saver)) == 10e18, "Save should succeed once the vault is unpaused");
+    }
+
+    function it_psm_set_savings_vault_validates_asset_and_can_be_cleared() {
+        DirectMintPSM fresh = _newInitializedPsm();
+
+        // A vault over a different asset is rejected outright.
+        Token OTHER = _createActiveToken("Other Stable", "OTHER", 18);
+        SaveUSDSTVault wrongVault = SaveUSDSTVault(address(new Proxy(address(new SaveUSDSTVault(address(0xdeadbeef))), address(m.adminRegistry()))));
+        admin.doSuccessfully(address(wrongVault), "initialize", address(OTHER), "Other Vault", "saveOTHER");
+        admin.doExpectingFailure(address(fresh), "setSavingsVault", "Vault asset mismatch", address(wrongVault));
+        require(fresh.savingsVault() == address(0), "Rejected vault should not be recorded");
+
+        // The matching vault is accepted, then cleared with the zero address.
+        SaveUSDSTVault vault = _newVault();
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(vault));
+        require(fresh.savingsVault() == address(vault), "Matching vault should be recorded");
+
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(0));
+        require(fresh.savingsVault() == address(0), "Zero address should clear the vault");
+        require(!fresh.savingsDepositAvailable(10e18), "Cleared vault should report unavailable");
+
+        User outsider = new User();
+        outsider.doExpectingFailure(address(fresh), "setSavingsVault", "Only an admin or a whitelisted account can call castVoteOnIssue", address(vault));
+    }
+
+    function it_psm_mint_and_save_respects_mint_controls() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        SaveUSDSTVault vault = _newVault();
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(vault));
+
+        User saver = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(saver), 100e18);
+        saver.doSuccessfully(address(USDC), "approve", address(fresh), 100e18);
+
+        // The savings path shares every gate with the plain mint path.
+        admin.doSuccessfully(address(fresh), "pauseMint");
+        saver.doExpectingFailure(address(fresh), "mintAndSave", "Minting is paused", 10e18, address(USDC));
+        admin.doSuccessfully(address(fresh), "unpauseMint");
+
+        admin.doSuccessfully(address(fresh), "setMintEnabled", address(USDC), false);
+        saver.doExpectingFailure(address(fresh), "mintAndSave", "Minting for this token is disabled", 10e18, address(USDC));
+        admin.doSuccessfully(address(fresh), "setMintEnabled", address(USDC), true);
+
+        admin.doSuccessfully(address(fresh), "setMintMaxBalance", address(USDC), 10e18);
+        saver.doExpectingFailure(address(fresh), "mintAndSave", "Token balance cap exceeded", 20e18, address(USDC));
+        admin.doSuccessfully(address(fresh), "setMintMaxBalance", address(USDC), 0);
+
+        saver.doExpectingFailure(address(fresh), "mintAndSave", "Amount must be nonzero", 0, address(USDC));
+
+        require(vault.totalAssets() == 0, "No rejected save should reach the vault");
+        require(USDC.balanceOf(address(fresh)) == 0, "No rejected save should bank collateral");
+
+        saver.doSuccessfully(address(fresh), "mintAndSave", 20e18, address(USDC));
+        require(vault.balanceOf(address(saver)) == 20e18, "Save should succeed once controls allow it");
+    }
+
 }
