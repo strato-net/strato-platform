@@ -386,7 +386,7 @@ const headers = () => {
   const h = {
     Accept: "application/json",
     "Content-Type": "application/json",
-    "User-Agent": "Mozilla/5.0 (reconcileVaultRewardsActivity)",
+    "User-Agent": "node-fetch/reconcileVaultRewardsActivity",
     "X-Requested-With": "XMLHttpRequest",
   };
   if (authToken) h.Authorization = `Bearer ${authToken}`;
@@ -622,22 +622,47 @@ const plainKey = (row, depth) => {
   return keys.length === depth && expected.every((k) => keys.includes(k));
 };
 
+const latestMappingRow = (rows) =>
+  rows.reduce(
+    (latest, row) =>
+      !latest || chainUint(row.block_number) > chainUint(latest.block_number)
+        ? row
+        : latest,
+    null
+  );
+
 async function getActivityConfig(activityId = ACTIVITY_ID) {
   const rows = await cirrusGetAll("mapping", {
     address: `eq.${REWARDS}`,
     collection_name: "eq.activities",
     "key->>key": `eq.${activityId}`,
-    select: "key,value",
+    select: "key,value,block_number",
   });
-  const main = rows.find((r) => plainKey(r, 1));
+  const main = latestMappingRow(rows.filter((row) => plainKey(row, 1)));
   if (!main) die(`Activity ${activityId} not found on Rewards ${REWARDS}`);
-  const events = rows
-    .filter((r) => plainKey(r, 3) && r.key.key2 === "actionableEvents")
-    .sort((a, b) => Number(a.key.key3) - Number(b.key.key3))
-    .map((r) => ({
-      eventName: r.value.eventName,
-      actionType: parseActionType(r.value.actionType),
-    }));
+  const lengthRow = latestMappingRow(
+    rows.filter(
+      (row) => plainKey(row, 2) && row.key.key2 === "actionableEvents"
+    )
+  );
+  if (!lengthRow) die(`Activity ${activityId} has no actionableEvents length`);
+  const eventCount = Number(chainUint(lengthRow.value.length));
+  const events = Array.from({ length: eventCount }, (_, index) => {
+    const row = latestMappingRow(
+      rows.filter(
+        (candidate) =>
+          plainKey(candidate, 3) &&
+          candidate.key.key2 === "actionableEvents" &&
+          String(candidate.key.key3) === String(index) &&
+          chainUint(candidate.block_number) <= chainUint(lengthRow.block_number)
+      )
+    );
+    if (!row) die(`Activity ${activityId} actionableEvents[${index}] is missing`);
+    return {
+      eventName: row.value.eventName,
+      actionType: parseActionType(row.value.actionType),
+    };
+  });
   return {
     name: main.value.name,
     sourceContract: String(main.value.sourceContract).toLowerCase(),
