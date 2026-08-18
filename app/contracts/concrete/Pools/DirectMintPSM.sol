@@ -1,5 +1,6 @@
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../Admin/FeeCollector.sol";
+import "../Savings/SaveUSDSTVault.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
 
@@ -23,6 +24,7 @@ contract DirectMintPSM is Ownable {
     bool public burnPaused;
     mapping(address => MintConfig) public record mintConfigs;
     mapping(address => BurnConfig) public record burnConfigs;
+    address public savingsVault;
 
     event MintConfigSet(address token, bool isEnabled, uint maxBalance, uint feeBps);
     event BurnConfigSet(address token, bool isEnabled, uint minReserve, uint feeBps);
@@ -31,6 +33,8 @@ contract DirectMintPSM is Ownable {
     event FeeCollectorSet(address feeCollector);
     event MintPauseSet(bool isPaused);
     event BurnPauseSet(bool isPaused);
+    event SavingsVaultSet(address savingsVault);
+    event DirectPSMMintedToSavings(address user, uint depositAmount, uint mintAmount, uint shares, address againstToken);
 
     bool private reentrancyLock;
     modifier nonReentrant() {
@@ -59,6 +63,35 @@ contract DirectMintPSM is Ownable {
         require(_feeCollector != address(0), "Invalid fee collector");
         feeCollector = FeeCollector(_feeCollector);
         emit FeeCollectorSet(_feeCollector);
+    }
+
+    function setSavingsVault(address _savingsVault) external onlyOwner {
+        require(mintableToken != address(0), "PSM not initialized");
+        if (_savingsVault != address(0)) {
+            require(SaveUSDSTVault(_savingsVault).asset() == mintableToken, "Vault asset mismatch");
+        }
+        savingsVault = _savingsVault;
+        emit SavingsVaultSet(_savingsVault);
+    }
+
+    /// @notice Whether minting `mintAmount` can currently be routed into the savings vault.
+    /// @dev Mirrors every precondition SaveUSDSTVault._deposit enforces, so the UI and the
+    ///      contract agree on availability before the user pays for a transaction.
+    function savingsDepositAvailable(uint mintAmount) public view returns (bool) {
+        address vaultAddress = savingsVault;
+        if (vaultAddress == address(0) || mintAmount == 0) return false;
+
+        SaveUSDSTVault vault = SaveUSDSTVault(vaultAddress);
+        if (!vault.vaultInitialized()) return false;
+        if (vault.paused()) return false;
+        if (vault.asset() != mintableToken) return false;
+
+        // No recapitalizing an outstanding share supply at a misleading 1:1 price.
+        if (vault.totalSupply() > 0 && vault.exchangeRate() == 0) return false;
+        // No dust deposits that would round to zero shares.
+        if (vault.previewDeposit(mintAmount) == 0) return false;
+
+        return true;
     }
 
     function pauseMint() external onlyOwner {
@@ -207,7 +240,26 @@ contract DirectMintPSM is Ownable {
                 "Balance mismatch");
     }
 
+    function _mintIntoSavings(address recipient, uint mintAmount) internal returns (uint) {
+        address vaultAddress = savingsVault;
+        require(savingsDepositAvailable(mintAmount), "Savings deposit unavailable");
+
+        Token(mintableToken).mint(address(this), mintAmount);
+        IERC20(mintableToken).approve(vaultAddress, mintAmount);
+        return SaveUSDSTVault(vaultAddress).deposit(mintAmount, recipient);
+    }
+
     function mint(uint amount, address againstToken) external nonReentrant {
+        _mintAgainst(amount, againstToken, false);
+    }
+
+    /// @notice Mint against collateral and deposit the proceeds straight into the savings vault.
+    /// @return shares saveUSDST credited to msg.sender.
+    function mintAndSave(uint amount, address againstToken) external nonReentrant returns (uint shares) {
+        return _mintAgainst(amount, againstToken, true);
+    }
+
+    function _mintAgainst(uint amount, address againstToken, bool toSavings) internal returns (uint shares) {
         MintConfig config = mintConfigs[againstToken];
         require(amount > 0, "Amount must be nonzero");
         require(!mintPaused, "Minting is paused");
@@ -225,8 +277,16 @@ contract DirectMintPSM is Ownable {
         if (feeAmount > 0) {
             _transfer(againstToken, address(feeCollector), feeAmount);
         }
-        Token(mintableToken).mint(msg.sender, mintAmount);
+
+        if (toSavings) {
+            shares = _mintIntoSavings(msg.sender, mintAmount);
+            emit DirectPSMMintedToSavings(msg.sender, amount, mintAmount, shares, againstToken);
+        } else {
+            Token(mintableToken).mint(msg.sender, mintAmount);
+        }
+
         emit DirectPSMMinted(msg.sender, amount, mintAmount, againstToken);
+        return shares;
     }
 
     /// @dev Eligibility for redemption. Check order is load-bearing: the tests
