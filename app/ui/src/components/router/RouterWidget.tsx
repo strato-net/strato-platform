@@ -4,6 +4,7 @@ import { useBalance, useReadContract } from "wagmi";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import RoutePreview from "@/components/router/RoutePreview";
 import { SlippageControl } from "@/components/swap/SlippageControl";
 import { SwapConfirmDialog } from "@/components/swap/SwapConfirmDialog";
@@ -21,7 +22,8 @@ import { useRouteQuote } from "@/hooks/trade/useRouteQuote";
 import { useCompositeRouteQuote } from "@/hooks/trade/useCompositeRouteQuote";
 import { useAutoRouteDeposit } from "@/hooks/trade/useAutoRouteDeposit";
 import { SwapToken, Token } from "@/interface";
-import { BridgeToken } from "@strato/shared-types";
+import { BridgeToken, RouteAction } from "@strato/shared-types";
+import { UserRewardsData } from "@/services/rewardsService";
 import { ERC20_ABI } from "@/lib/bridge/constants";
 import { SWAP_FEE, usdstAddress } from "@/lib/constants";
 import { ensureHexPrefix, formatAmount, formatUnits, safeParseUnits } from "@/utils/numberUtils";
@@ -63,10 +65,11 @@ const displayRate = (numerator: string, denominator: string) => {
 };
 
 interface RouterWidgetProps {
+  userRewards?: UserRewardsData | null;
   guestMode?: boolean;
 }
 
-const RouterWidget = ({ guestMode = false }: RouterWidgetProps) => {
+const RouterWidget = ({ userRewards, guestMode = false }: RouterWidgetProps) => {
   const navigate = useNavigate();
   const { state, dispatch } = useTradeForm();
   const { tokenIn, tokenOut, typedValue, slippage } = state;
@@ -345,6 +348,35 @@ const RouterWidget = ({ guestMode = false }: RouterWidgetProps) => {
   const invertedExchangeRate = activeQuote
     ? displayRate(typedValue, outputAmount)
     : undefined;
+  const rewardedSteps = useMemo(() => {
+    if (sourceMode !== "strato" || !activeQuote || !userRewards) return [];
+    return activeQuote.steps.flatMap((step) => {
+      if (
+        step.action !== RouteAction.SWAP_V2 &&
+        step.action !== RouteAction.SWAP_STABLE
+      ) {
+        return [];
+      }
+      const reward = userRewards.activities.find(
+        ({ activity }) =>
+          normalizeAddress(activity.sourceContract || "") ===
+          normalizeAddress(step.target)
+      );
+      if (!reward) return [];
+      const inputToken = tokens.find(
+        (token) =>
+          normalizeAddress(token.address) === normalizeAddress(step.tokenIn)
+      );
+      return [{
+        activity: reward.activity,
+        inputAmount: formatUnits(
+          step.amountIn,
+          inputToken?.customDecimals ?? 18
+        ),
+        tokenIn: step.tokenIn,
+      }];
+    });
+  }, [activeQuote, sourceMode, tokens, userRewards]);
 
   const effectiveMaxSpendableWei =
     sourceMode === "external" ? externalBalance : maxSpendableWei;
@@ -596,6 +628,18 @@ const RouterWidget = ({ guestMode = false }: RouterWidgetProps) => {
           </EarnApyTooltip>
         ) : null}
       </div>
+      {rewardedSteps.map(({ activity, inputAmount, tokenIn }) => (
+        <RewardsWidget
+          key={activity.activityId}
+          userRewards={userRewards ?? null}
+          activityName={activity.name}
+          activityId={activity.activityId}
+          inputAmount={inputAmount}
+          swapTokenInAddress={tokenIn}
+          actionLabel="Trade"
+          hideWhenZero
+        />
+      ))}
 
       <SwapDetails
         tokenInSymbol={

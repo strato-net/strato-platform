@@ -5,9 +5,11 @@ import RouterWidget from "@/components/router/RouterWidget";
 import { TradeFormProvider } from "@/context/TradeFormContext";
 import { useUser } from "@/context/UserContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const RouterTrade = () => {
   const { isLoggedIn } = useUser();
+  const { userRewards } = useRewardsUserInfo();
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
@@ -25,7 +27,7 @@ const RouterTrade = () => {
                 <div className="flex items-center justify-between mb-4 md:mb-6">
                   <h2 className="text-base md:text-xl font-semibold">Trade your assets</h2>
                 </div>
-                <RouterWidget guestMode={!isLoggedIn} />
+                <RouterWidget userRewards={userRewards} guestMode={!isLoggedIn} />
               </div>
             </div>
           </TradeFormProvider>
