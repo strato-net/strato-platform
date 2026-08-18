@@ -97,6 +97,18 @@ router.get("/quote", authHandler.authorizeRequest(true), TradeController.quote);
 
 /**
  * @openapi
+ * /trade/route/quote:
+ *   get:
+ *     summary: Find and quote the best exact-input route across supported protocol actions
+ *     tags: [Trade]
+ *     responses:
+ *       200:
+ *         description: Executable route steps with slippage floors
+ */
+router.get("/route/quote", authHandler.authorizeRequest(true), TradeController.routeQuote);
+
+/**
+ * @openapi
  * /trade/swap:
  *   post:
  *     summary: Execute a swap on any pool type; the pool address determines the contract call
@@ -131,6 +143,18 @@ router.get("/quote", authHandler.authorizeRequest(true), TradeController.quote);
  *         description: Swap transaction payload
  */
 router.post("/swap", walletAuth, TradeController.swap);
+
+/**
+ * @openapi
+ * /trade/route:
+ *   post:
+ *     summary: Re-quote and execute an exact-input route through TokenRouter
+ *     tags: [Trade]
+ *     responses:
+ *       200:
+ *         description: Route transaction payload
+ */
+router.post("/route", walletAuth, TradeController.route);
 
 /**
  *

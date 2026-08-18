@@ -9,12 +9,15 @@ import {
   getTradeHistory,
   getTradeTokenHistory,
 } from "../services/trade.service";
+import { executeRoute, getRouteQuote } from "../services/route.service";
 import {
   validateTradeTokenArgs,
   validateTradePairArgs,
   validateTradeQuoteArgs,
   validateTradeSwapArgs,
   validateTradeHistoryQuery,
+  validateRouteExecuteArgs,
+  validateRouteQuoteArgs,
 } from "../validators/trade.validator";
 
 class TradeController {
@@ -72,6 +75,34 @@ class TradeController {
       const { accessToken, body, address: userAddress } = req;
       validateTradeSwapArgs(body);
       const result = await executeTradeSwap(accessToken, body, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async routeQuote(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, query } = req;
+      validateRouteQuoteArgs(query);
+      const result = await getRouteQuote(
+        accessToken,
+        query.tokenIn as string,
+        query.tokenOut as string,
+        BigInt(query.amount as string),
+        query.slippageBps === undefined ? undefined : Number(query.slippageBps)
+      );
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async route(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validateRouteExecuteArgs(body);
+      const result = await executeRoute(accessToken, body, userAddress as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
