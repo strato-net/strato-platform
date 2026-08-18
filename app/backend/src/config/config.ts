@@ -201,6 +201,16 @@ export const defaultUsdcYieldVaultFor: Record<string, string> = {
   "33056204878082667": "afcfc4d847d59fbc402856fd6934aff6796812b1",// Upquark mainnet
 };
 
+export const defaultGoldstYieldVaultFor: Record<string, string> = {
+  "114784819836269": "65ab8049ff949e7ed04838723a07bc9b5a7849e2", // Helium testnet - populate after deployment
+  "33056204878082667": "", // Upquark mainnet - populate after deployment
+};
+
+export const defaultSilvstYieldVaultFor: Record<string, string> = {
+  "114784819836269": "7ecc1ab7e15384cf2392b7dad8878239fda78799", // Helium testnet - populate after deployment
+  "33056204878082667": "", // Upquark mainnet - populate after deployment
+};
+
 /*
    How far back the admin "Executed Issues" list looks. IssueExecuted grows with every
    whitelisted call, not just governance votes, so an unbounded sort/count is proportional
@@ -236,6 +246,8 @@ export let stratoToken: string = '';
 export let stratoStaking: string = '';
 export let validatorRegistry: string = '';
 export let usdcYieldVault: string = '';
+export let goldstYieldVault: string = '';
+export let silvstYieldVault: string = '';
 export let executedIssuesLookbackDays: number = UNKNOWN_NETWORK_EXECUTED_ISSUES_LOOKBACK_DAYS;
 
 function setBridgeConfig(networkId: string) {
@@ -382,6 +394,11 @@ export function setUsdcYieldVaultConfig(networkId: string) {
   usdcYieldVault = process.env.USDC_YIELD_VAULT || defaultUsdcYieldVaultFor[networkId] || "";
 }
 
+export function setMetalYieldVaultConfig(networkId: string) {
+  goldstYieldVault = process.env.GOLDST_YIELD_VAULT || defaultGoldstYieldVaultFor[networkId] || "";
+  silvstYieldVault = process.env.SILVST_YIELD_VAULT || defaultSilvstYieldVaultFor[networkId] || "";
+}
+
 export function setExecutedIssuesLookbackConfig(networkId: string) {
   executedIssuesLookbackDays =
     defaultExecutedIssuesLookbackDaysFor[networkId] || UNKNOWN_NETWORK_EXECUTED_ISSUES_LOOKBACK_DAYS;
@@ -414,6 +431,7 @@ export async function initNetworkConfig() {
   setCarryVaultConfig(networkId);
   setDirectMintPsmConfig(networkId);
   setUsdcYieldVaultConfig(networkId);
+  setMetalYieldVaultConfig(networkId);
   setExecutedIssuesLookbackConfig(networkId);
 }
 
@@ -437,7 +455,14 @@ export async function getInternalAddresses() {
   // Network-specific addresses (set by initNetworkConfig)
   addresses.push(rewards || '', escrow, vaultFactory, positionManagerV3);
   addresses.push(stratoStaking, validatorRegistry);
-  addresses.push(saveUsdstVault, usdcYieldVault, ethCarryVault, wbtcCarryVault);
+  addresses.push(
+    saveUsdstVault,
+    usdcYieldVault,
+    ethCarryVault,
+    wbtcCarryVault,
+    goldstYieldVault,
+    silvstYieldVault
+  );
 
   // Lending Registry --> lendingPool, collateralVault, liquidityPool
   const { data: [lending] } = await cirrus.get(accessToken, "/BlockApps-LendingRegistry", {
