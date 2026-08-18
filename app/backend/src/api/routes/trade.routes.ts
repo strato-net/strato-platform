@@ -106,6 +106,7 @@ router.get("/quote", authHandler.authorizeRequest(true), TradeController.quote);
  *         description: Executable route steps with slippage floors
  */
 router.get("/route/quote", authHandler.authorizeRequest(true), TradeController.routeQuote);
+router.get("/bridge-route/quote", authHandler.authorizeRequest(true), TradeController.compositeRouteQuote);
 
 /**
  * @openapi

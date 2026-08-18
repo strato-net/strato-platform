@@ -260,6 +260,45 @@ contract DepositRouter is
         address stratoAddress,
         address targetStratoToken
     ) external payable whenNotPaused nonReentrant {
+        uint96 id = _processETHDeposit(stratoAddress, targetStratoToken);
+
+        emit DepositRouted(
+            address(0),
+            msg.value,
+            msg.sender,
+            stratoAddress,
+            targetStratoToken,
+            id
+        );
+    }
+
+    function depositETHWithAction(
+        address stratoAddress,
+        address targetStratoToken,
+        uint8 action,
+        address actionToken,
+        uint256 minFinalOut
+    ) external payable whenNotPaused nonReentrant {
+        ActionIntent memory intent;
+        intent.action = action;
+        intent.actionToken = actionToken;
+        intent.minFinalOut = minFinalOut;
+
+        uint96 id = _processETHDeposit(stratoAddress, targetStratoToken);
+        _emitDepositWithAction(
+            address(0),
+            msg.value,
+            stratoAddress,
+            targetStratoToken,
+            id,
+            intent
+        );
+    }
+
+    function _processETHDeposit(
+        address stratoAddress,
+        address targetStratoToken
+    ) internal returns (uint96 id) {
         if (msg.value == 0) revert ZeroAmount();
         if (stratoAddress == address(0)) revert InvalidAddress();
         if (targetStratoToken == address(0)) revert InvalidAddress();
@@ -271,20 +310,11 @@ contract DepositRouter is
 
         address safe = gnosisSafe;
         unchecked {
-            ++depositId;
+            id = ++depositId;
         }
 
         (bool success, ) = safe.call{value: msg.value}("");
         if (!success) revert ETHTransferFailed();
-
-        emit DepositRouted(
-            address(0),
-            msg.value,
-            msg.sender,
-            stratoAddress,
-            targetStratoToken,
-            depositId
-        );
     }
 
     function setMinDepositAmount(
@@ -376,7 +406,7 @@ contract DepositRouter is
     }
 
     function version() external pure virtual returns (string memory) {
-        return "3.0.0";
+        return "3.1.0";
     }
 
     function _authorizeUpgrade(

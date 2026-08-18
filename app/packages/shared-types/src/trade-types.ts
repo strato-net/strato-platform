@@ -137,3 +137,34 @@ export interface RouteExecuteParams {
   slippageBps?: number;
   recipient?: string;
 }
+
+/** Ordinals must remain aligned with BridgeTypes.DepositAction. */
+export enum BridgeDepositAction {
+  NONE = 0,
+  AUTO_FORGE = 2,
+  AUTO_SAVE = 3,
+  AUTO_ROUTE = 4,
+}
+
+export interface BridgeRouteLegQuote {
+  bridgeRouteId: string;
+  routeType: "standard";
+  externalChainId: string;
+  externalToken: string;
+  externalSymbol: string;
+  externalDecimals: string;
+  targetStratoToken: string;
+  targetStratoSymbol: string;
+  externalAmount: string;
+  bridgedAmount: string;
+  rebaseFactor?: string;
+}
+
+export interface CompositeRouteQuoteResponse extends RouteQuoteResponse {
+  bridge: BridgeRouteLegQuote;
+  depositAction: {
+    action: BridgeDepositAction.NONE | BridgeDepositAction.AUTO_ROUTE;
+    actionToken: string;
+    minFinalOut: string;
+  };
+}

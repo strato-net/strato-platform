@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDownUp } from "lucide-react";
+import { useBalance, useReadContract } from "wagmi";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import RoutePreview from "@/components/router/RoutePreview";
 import { SlippageControl } from "@/components/swap/SlippageControl";
 import { SwapConfirmDialog } from "@/components/swap/SwapConfirmDialog";
@@ -10,13 +13,20 @@ import { useLendingContext } from "@/context/LendingContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useTradeForm } from "@/context/TradeFormContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useBridgeContext } from "@/context/BridgeContext";
+import { useEarnContext } from "@/context/EarnContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRouteExecute } from "@/hooks/trade/useRouteExecute";
 import { useRouteQuote } from "@/hooks/trade/useRouteQuote";
+import { useCompositeRouteQuote } from "@/hooks/trade/useCompositeRouteQuote";
+import { useAutoRouteDeposit } from "@/hooks/trade/useAutoRouteDeposit";
 import { SwapToken, Token } from "@/interface";
+import { BridgeToken } from "@strato/shared-types";
+import { ERC20_ABI } from "@/lib/bridge/constants";
 import { SWAP_FEE, usdstAddress } from "@/lib/constants";
-import { formatAmount, formatUnits, safeParseUnits } from "@/utils/numberUtils";
+import { ensureHexPrefix, formatAmount, formatUnits, safeParseUnits } from "@/utils/numberUtils";
 import { computeMaxTransferable } from "@/utils/transferValidation";
+import { buildEarnApyMap, pathForApyInfo } from "@/utils/earnUtils";
 
 const normalizeAddress = (address: string) =>
   address.toLowerCase().replace(/^0x/, "");
@@ -33,6 +43,18 @@ const toSwapToken = (token: Token, balance: string): SwapToken => ({
   images: token.images ?? [],
 });
 
+const bridgeTokenToSwapToken = (token: BridgeToken, balance: string): SwapToken => ({
+  address: token.externalToken,
+  _name: token.externalName,
+  _symbol: token.externalSymbol,
+  customDecimals: Number(token.externalDecimals || 18),
+  _totalSupply: "0",
+  balance,
+  price: "0",
+  poolBalance: "0",
+  images: [],
+});
+
 const displayRate = (numerator: string, denominator: string) => {
   const result = Number(numerator) / Number(denominator);
   return Number.isFinite(result) && result > 0
@@ -45,6 +67,7 @@ interface RouterWidgetProps {
 }
 
 const RouterWidget = ({ guestMode = false }: RouterWidgetProps) => {
+  const navigate = useNavigate();
   const { state, dispatch } = useTradeForm();
   const { tokenIn, tokenOut, typedValue, slippage } = state;
   const {
@@ -62,14 +85,30 @@ const RouterWidget = ({ guestMode = false }: RouterWidgetProps) => {
     fetchAllActiveTokens,
   } = useUserTokens();
   const { refreshLoans, refreshCollateral } = useLendingContext();
+  const {
+    availableNetworks,
+    bridgeableTokens,
+    loading: bridgeLoading,
+    selectedNetwork,
+    setSelectedNetwork,
+    loadNetworksAndTokens,
+  } = useBridgeContext();
+  const { tokenApys, tokenApysLoaded } = useEarnContext();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [sourceMode, setSourceMode] = useState<"strato" | "external">("strato");
+  const [externalRouteId, setExternalRouteId] = useState<string>();
+  const autoRouteDeposit = useAutoRouteDeposit();
 
   useEffect(() => {
     const abortController = new AbortController();
     fetchAllActiveTokens(abortController.signal);
     return () => abortController.abort();
   }, [fetchAllActiveTokens]);
+
+  useEffect(() => {
+    if (sourceMode === "external") loadNetworksAndTokens();
+  }, [loadNetworksAndTokens, sourceMode]);
 
   const tokens = useMemo(() => {
     const balances = new Map(
@@ -91,13 +130,93 @@ const RouterWidget = ({ guestMode = false }: RouterWidgetProps) => {
     );
   }, [activeTokens, allActiveTokens, earningAssets]);
 
+  const currentNetwork = availableNetworks.find(
+    (network) => network.chainName === selectedNetwork
+  );
+  const externalRoutes = useMemo(() => {
+    const seen = new Set<string>();
+    return bridgeableTokens.filter((token) => {
+      const address = normalizeAddress(token.externalToken || "");
+      if (
+        token.routeType !== "standard" ||
+        !token.enabled ||
+        !address ||
+        seen.has(address)
+      ) {
+        return false;
+      }
+      seen.add(address);
+      return true;
+    });
+  }, [bridgeableTokens]);
+  const selectedExternalRoute =
+    externalRoutes.find((token) => token.id === externalRouteId) ??
+    externalRoutes[0];
+  const isNativeExternalToken =
+    !!selectedExternalRoute && BigInt(selectedExternalRoute.externalToken || "0") === 0n;
+  const { data: erc20Balance = 0n, isLoading: erc20BalanceLoading } =
+    useReadContract({
+      address: selectedExternalRoute
+        ? ensureHexPrefix(selectedExternalRoute.externalToken)
+        : undefined,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: autoRouteDeposit.connectedAddress
+        ? [ensureHexPrefix(autoRouteDeposit.connectedAddress)]
+        : undefined,
+      chainId: currentNetwork ? Number(currentNetwork.chainId) : undefined,
+      query: {
+        enabled:
+          sourceMode === "external" &&
+          !!selectedExternalRoute &&
+          !isNativeExternalToken &&
+          !!autoRouteDeposit.connectedAddress &&
+          !!currentNetwork,
+      },
+    });
+  const { data: nativeBalance, isLoading: nativeBalanceLoading } = useBalance({
+    address: autoRouteDeposit.connectedAddress
+      ? ensureHexPrefix(autoRouteDeposit.connectedAddress)
+      : undefined,
+    chainId: currentNetwork ? Number(currentNetwork.chainId) : undefined,
+    query: {
+      enabled:
+        sourceMode === "external" &&
+        isNativeExternalToken &&
+        !!autoRouteDeposit.connectedAddress &&
+        !!currentNetwork,
+    },
+  });
+  const externalBalance = isNativeExternalToken
+    ? nativeBalance?.value ?? 0n
+    : erc20Balance;
+  const externalBalanceLoading = isNativeExternalToken
+    ? nativeBalanceLoading
+    : erc20BalanceLoading;
+  const externalTokens = useMemo(
+    () =>
+      externalRoutes.map((token) =>
+        bridgeTokenToSwapToken(
+          token,
+          token.id === selectedExternalRoute?.id ? externalBalance.toString() : "0"
+        )
+      ),
+    [externalBalance, externalRoutes, selectedExternalRoute?.id]
+  );
+  const liveExternalToken = selectedExternalRoute
+    ? bridgeTokenToSwapToken(selectedExternalRoute, externalBalance.toString())
+    : undefined;
+
   const fromOptions = useMemo(
     () => tokens.filter((token) => token.address !== tokenOut?.address),
     [tokens, tokenOut?.address]
   );
   const toOptions = useMemo(
-    () => tokens.filter((token) => token.address !== tokenIn?.address),
-    [tokens, tokenIn?.address]
+    () =>
+      sourceMode === "external"
+        ? tokens
+        : tokens.filter((token) => token.address !== tokenIn?.address),
+    [sourceMode, tokens, tokenIn?.address]
   );
   const liveTokenIn = tokenIn
     ? tokens.find((token) => token.address === tokenIn.address) ?? tokenIn
@@ -105,6 +224,12 @@ const RouterWidget = ({ guestMode = false }: RouterWidgetProps) => {
   const liveTokenOut = tokenOut
     ? tokens.find((token) => token.address === tokenOut.address) ?? tokenOut
     : undefined;
+  const outputApy = useMemo(
+    () => liveTokenOut
+      ? buildEarnApyMap(tokenApys).get(normalizeAddress(liveTokenOut.address))
+      : undefined,
+    [liveTokenOut, tokenApys]
+  );
 
   useEffect(() => {
     if (tokenIn || tokens.length === 0) return;
@@ -120,9 +245,30 @@ const RouterWidget = ({ guestMode = false }: RouterWidgetProps) => {
     dispatch({ type: "SELECT_TOKEN_OUT", token: toOptions[0] });
   }, [dispatch, tokenIn, tokenOut, toOptions]);
 
+  useEffect(() => {
+    if (!selectedExternalRoute) {
+      setExternalRouteId(undefined);
+      return;
+    }
+    if (!externalRouteId || !externalRoutes.some((route) => route.id === externalRouteId)) {
+      setExternalRouteId(selectedExternalRoute.id);
+    }
+  }, [externalRouteId, externalRoutes, selectedExternalRoute]);
+
   const inputAmountWei = useMemo(
-    () => safeParseUnits(typedValue, liveTokenIn?.customDecimals ?? 18),
-    [liveTokenIn?.customDecimals, typedValue]
+    () =>
+      safeParseUnits(
+        typedValue,
+        sourceMode === "external"
+          ? Number(selectedExternalRoute?.externalDecimals || 18)
+          : liveTokenIn?.customDecimals ?? 18
+      ),
+    [
+      liveTokenIn?.customDecimals,
+      selectedExternalRoute?.externalDecimals,
+      sourceMode,
+      typedValue,
+    ]
   );
   const feeWei = safeParseUnits(SWAP_FEE);
   const { maxSpendableWei, maxTransferableError } = useMemo(() => {
@@ -150,19 +296,38 @@ const RouterWidget = ({ guestMode = false }: RouterWidgetProps) => {
     slippage.mode === "manual" ? slippage.value : 0.5;
   const slippageBps = Math.round(slippagePercent * 100);
   const quoteQuery = useRouteQuote({
-    tokenIn: liveTokenIn?.address,
+    tokenIn: sourceMode === "strato" ? liveTokenIn?.address : undefined,
     tokenOut: liveTokenOut?.address,
     amountWei: inputAmountWei > 0n ? inputAmountWei.toString() : undefined,
     slippageBps,
   });
-  const quote = quoteQuery.data;
+  const compositeQuoteQuery = useCompositeRouteQuote({
+    externalChainId:
+      sourceMode === "external" ? currentNetwork?.chainId : undefined,
+    externalToken:
+      sourceMode === "external" ? selectedExternalRoute?.externalToken : undefined,
+    targetStratoToken:
+      sourceMode === "external" ? selectedExternalRoute?.stratoToken : undefined,
+    tokenOut: sourceMode === "external" ? liveTokenOut?.address : undefined,
+    amountWei: inputAmountWei > 0n ? inputAmountWei.toString() : undefined,
+    slippageBps,
+  });
+  const quote =
+    sourceMode === "external" ? compositeQuoteQuery.data : quoteQuery.data;
   const quoteMatches =
     !!quote &&
-    !!liveTokenIn &&
+    !!(sourceMode === "external" ? selectedExternalRoute : liveTokenIn) &&
     !!liveTokenOut &&
-    normalizeAddress(quote.tokenIn) === normalizeAddress(liveTokenIn.address) &&
+    normalizeAddress(quote.tokenIn) ===
+      normalizeAddress(
+        sourceMode === "external"
+          ? selectedExternalRoute!.stratoToken
+          : liveTokenIn!.address
+      ) &&
     normalizeAddress(quote.tokenOut) === normalizeAddress(liveTokenOut.address) &&
-    quote.amountIn === inputAmountWei.toString() &&
+    (sourceMode === "external" && "bridge" in quote
+      ? quote.bridge.externalAmount === inputAmountWei.toString()
+      : quote.amountIn === inputAmountWei.toString()) &&
     quote.slippageBps === slippageBps;
   const activeQuote = quoteMatches ? quote : undefined;
   const outputAmount = activeQuote
@@ -181,96 +346,209 @@ const RouterWidget = ({ guestMode = false }: RouterWidgetProps) => {
     ? displayRate(typedValue, outputAmount)
     : undefined;
 
+  const effectiveMaxSpendableWei =
+    sourceMode === "external" ? externalBalance : maxSpendableWei;
+  const effectiveMaxTransferableError =
+    sourceMode === "external" ? "" : maxTransferableError;
   const insufficientBalance =
-    !guestMode && inputAmountWei > maxSpendableWei;
+    !guestMode && inputAmountWei > effectiveMaxSpendableWei;
   const hasAmount = inputAmountWei > 0n;
-  const quoteLoading = quoteQuery.isFetching && !activeQuote;
+  const activeQuoteQuery =
+    sourceMode === "external" ? compositeQuoteQuery : quoteQuery;
+  const quoteLoading = activeQuoteQuery.isFetching && !activeQuote;
   const routeExecute = useRouteExecute();
   const isTradeDisabled =
-    !liveTokenIn ||
+    !(sourceMode === "external" ? selectedExternalRoute : liveTokenIn) ||
     !liveTokenOut ||
     !hasAmount ||
     insufficientBalance ||
-    !!maxTransferableError ||
+    !!effectiveMaxTransferableError ||
     quoteLoading ||
-    !activeQuote;
+    !activeQuote ||
+    (sourceMode === "external" &&
+      (externalBalanceLoading ||
+        !currentNetwork ||
+        autoRouteDeposit.connectedChainId !== Number(currentNetwork.chainId)));
 
   const warnings: string[] = [];
-  if (maxTransferableError) warnings.push(maxTransferableError);
-  if (hasAmount && quoteQuery.isError && !activeQuote) {
+  if (effectiveMaxTransferableError) warnings.push(effectiveMaxTransferableError);
+  if (hasAmount && activeQuoteQuery.isError && !activeQuote) {
     warnings.push("No executable route is available for this trade.");
+  }
+  if (
+    sourceMode === "external" &&
+    currentNetwork &&
+    autoRouteDeposit.connectedChainId !== Number(currentNetwork.chainId)
+  ) {
+    warnings.push(`Switch your wallet to ${currentNetwork.chainName}.`);
   }
 
   const handleSwitch = () => {
+    if (sourceMode === "external") return;
     dispatch({ type: "SWITCH_TOKENS" });
     dispatch({ type: "RESET_AMOUNTS" });
   };
 
   const handleMaxClick = () => {
-    if (maxSpendableWei <= 0n) return;
+    if (effectiveMaxSpendableWei <= 0n) return;
     dispatch({
       type: "TYPE_AMOUNT",
       field: "input",
       value: formatUnits(
-        maxSpendableWei.toString(),
-        liveTokenIn?.customDecimals ?? 18
+        effectiveMaxSpendableWei.toString(),
+        sourceMode === "external"
+          ? Number(selectedExternalRoute?.externalDecimals || 18)
+          : liveTokenIn?.customDecimals ?? 18
       ),
     });
   };
 
   const handleTrade = async () => {
-    if (!liveTokenIn || !liveTokenOut || !activeQuote) return;
+    if (!liveTokenOut || !activeQuote) return;
     try {
-      await routeExecute.mutateAsync({
-        tokenIn: liveTokenIn.address,
-        tokenOut: liveTokenOut.address,
-        amountIn: inputAmountWei.toString(),
-        minFinalOut: activeQuote.minFinalOut,
-        slippageBps,
-      });
+      if (sourceMode === "external") {
+        if (
+          !selectedExternalRoute ||
+          !currentNetwork ||
+          !("bridge" in activeQuote)
+        ) {
+          return;
+        }
+        await autoRouteDeposit.execute({
+          route: selectedExternalRoute,
+          network: currentNetwork,
+          amount: typedValue,
+          quote: activeQuote,
+          outputSymbol: liveTokenOut._symbol,
+        });
+      } else {
+        if (!liveTokenIn) return;
+        await routeExecute.mutateAsync({
+          tokenIn: liveTokenIn.address,
+          tokenOut: liveTokenOut.address,
+          amountIn: inputAmountWei.toString(),
+          minFinalOut: activeQuote.minFinalOut,
+          slippageBps,
+        });
+      }
       toast({
         title: "Success",
-        description: `Traded ${formatAmount(typedValue)} ${liveTokenIn._symbol} for ${formatAmount(outputAmount)} ${liveTokenOut._symbol}`,
+        description: `${
+          sourceMode === "external" ? "Bridge route submitted" : "Traded"
+        } ${formatAmount(typedValue)} ${
+          sourceMode === "external"
+            ? selectedExternalRoute?.externalSymbol
+            : liveTokenIn?._symbol
+        } for ${formatAmount(outputAmount)} ${liveTokenOut._symbol}`,
         variant: "success",
       });
       dispatch({ type: "RESET_AMOUNTS" });
     } finally {
       setIsDialogOpen(false);
-      await Promise.all([
-        fetchUsdstBalance(),
-        fetchTokens(),
-        getEarningAssets(false),
-        refreshLoans(),
-        refreshCollateral(),
-      ]);
+      if (sourceMode === "strato") {
+        await Promise.all([
+          fetchUsdstBalance(),
+          fetchTokens(),
+          getEarningAssets(false),
+          refreshLoans(),
+          refreshCollateral(),
+        ]);
+      }
     }
   };
 
   const inputError = insufficientBalance ? "Insufficient balance" : undefined;
   const buttonLabel = guestMode
     ? "Sign in to trade"
-    : quoteQuery.isError && hasAmount
+    : activeQuoteQuery.isError && hasAmount
       ? "No route available"
-      : "Trade Assets";
+      : sourceMode === "external"
+        ? "Bridge & Trade"
+        : "Trade Assets";
 
   return (
     <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted p-1">
+        <Button
+          type="button"
+          size="sm"
+          variant={sourceMode === "strato" ? "default" : "ghost"}
+          onClick={() => {
+            setSourceMode("strato");
+            dispatch({ type: "RESET_AMOUNTS" });
+          }}
+        >
+          STRATO
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={sourceMode === "external" ? "default" : "ghost"}
+          onClick={() => {
+            setSourceMode("external");
+            dispatch({ type: "RESET_AMOUNTS" });
+          }}
+        >
+          External Network
+        </Button>
+      </div>
+
+      {sourceMode === "external" && (
+        <label className="block space-y-2 text-sm">
+          <span className="text-muted-foreground">Source network</span>
+          <select
+            className="h-10 w-full rounded-md border border-border bg-background px-3"
+            value={selectedNetwork || ""}
+            onChange={(event) => {
+              setSelectedNetwork(event.target.value);
+              setExternalRouteId(undefined);
+              dispatch({ type: "RESET_AMOUNTS" });
+            }}
+          >
+            {availableNetworks.map((network) => (
+              <option key={network.chainId} value={network.chainName}>
+                {network.chainName}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
       <TokenInputPanel
         label="From"
         amount={typedValue}
         onChange={(value) =>
           dispatch({ type: "TYPE_AMOUNT", field: "input", value })
         }
-        asset={liveTokenIn}
-        onSelect={(token) => dispatch({ type: "SELECT_TOKEN_IN", token })}
-        tokens={fromOptions}
-        userBalanceWei={liveTokenIn?.balance || "0"}
+        asset={sourceMode === "external" ? liveExternalToken : liveTokenIn}
+        onSelect={(token) => {
+          if (sourceMode === "external") {
+            const route = externalRoutes.find(
+              (candidate) =>
+                normalizeAddress(candidate.externalToken) ===
+                normalizeAddress(token.address)
+            );
+            setExternalRouteId(route?.id);
+          } else {
+            dispatch({ type: "SELECT_TOKEN_IN", token });
+          }
+        }}
+        tokens={sourceMode === "external" ? externalTokens : fromOptions}
+        userBalanceWei={
+          sourceMode === "external"
+            ? externalBalance.toString()
+            : liveTokenIn?.balance || "0"
+        }
         poolBalanceWei="0"
-        maxAmountWei={maxSpendableWei.toString()}
+        maxAmountWei={effectiveMaxSpendableWei.toString()}
         isFromInput
         onMaxClick={handleMaxClick}
         amountError={inputError}
-        loading={allActiveLoading}
+        loading={
+          sourceMode === "external"
+            ? bridgeLoading || externalBalanceLoading
+            : allActiveLoading
+        }
         showUserBalance={!guestMode}
         showPoolBalance={false}
       />
@@ -278,6 +556,7 @@ const RouterWidget = ({ guestMode = false }: RouterWidgetProps) => {
       <div className="flex justify-center">
         <Button
           onClick={handleSwitch}
+          disabled={sourceMode === "external"}
           variant="outline"
           size="icon"
           className="rounded-full bg-muted hover:bg-muted/80 border-border"
@@ -302,9 +581,28 @@ const RouterWidget = ({ guestMode = false }: RouterWidgetProps) => {
         showUserBalance={!guestMode}
         showPoolBalance={false}
       />
+      <div className="flex min-h-[18px] items-center">
+        {!tokenApysLoaded ? (
+          <span className="text-[10px] font-medium text-green-500/40 animate-pulse blur-[2px]">…</span>
+        ) : outputApy ? (
+          <EarnApyTooltip info={outputApy} side="top" align="start">
+            <button
+              type="button"
+              className="inline-flex items-center gap-0.5 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-500 hover:bg-green-500/20 transition-colors"
+              onClick={() => navigate(pathForApyInfo(outputApy))}
+            >
+              Earn up to {outputApy.total.toFixed(2)}% →
+            </button>
+          </EarnApyTooltip>
+        ) : null}
+      </div>
 
       <SwapDetails
-        tokenInSymbol={liveTokenIn?._symbol || ""}
+        tokenInSymbol={
+          sourceMode === "external"
+            ? selectedExternalRoute?.externalSymbol || ""
+            : liveTokenIn?._symbol || ""
+        }
         tokenOutSymbol={liveTokenOut?._symbol || ""}
         exchangeRate={exchangeRate}
         invertedExchangeRate={invertedExchangeRate}
@@ -312,12 +610,21 @@ const RouterWidget = ({ guestMode = false }: RouterWidgetProps) => {
         warnings={warnings}
       >
         {activeQuote && (
-          <RoutePreview
-            steps={activeQuote.steps}
-            tokens={tokens}
-            minFinalOut={activeQuote.minFinalOut}
-            outputToken={liveTokenOut}
-          />
+          <>
+            {sourceMode === "external" && "bridge" in activeQuote && (
+              <div className="mb-3 rounded-lg border border-border p-3 text-sm">
+                Bridge {selectedExternalRoute?.externalSymbol} from{" "}
+                {currentNetwork?.chainName} to{" "}
+                {activeQuote.bridge.targetStratoSymbol}
+              </div>
+            )}
+            <RoutePreview
+              steps={activeQuote.steps}
+              tokens={tokens}
+              minFinalOut={activeQuote.minFinalOut}
+              outputToken={liveTokenOut}
+            />
+          </>
         )}
         <SlippageControl
           slippage={slippage}
@@ -341,14 +648,16 @@ const RouterWidget = ({ guestMode = false }: RouterWidgetProps) => {
         onOpenChange={setIsDialogOpen}
         fromAmount={formatAmount(typedValue)}
         toAmount={formatAmount(outputAmount)}
-        fromAsset={liveTokenIn}
+        fromAsset={
+          sourceMode === "external" ? liveExternalToken : liveTokenIn
+        }
         toAsset={liveTokenOut}
         exchangeRate={exchangeRate}
         invertedExchangeRate={invertedExchangeRate}
         isHighPriceImpact={(priceImpact ?? 0) >= 5}
         toAmountMin={formatAmount(minFinalOut)}
         onConfirm={handleTrade}
-        isLoading={routeExecute.isPending}
+        isLoading={routeExecute.isPending || autoRouteDeposit.isPending}
       />
     </div>
   );

@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
-    "test": "npm run build && node --test dist/api/services/bridge.service.test.js dist/api/services/route.service.test.js",
+    "test": "npm run build && node --test dist/api/helpers/bridge.helper.test.js dist/api/services/bridge.service.test.js dist/api/services/bridge-route.service.test.js dist/api/services/route.service.test.js",
     "postinstall": "(if [ \"$npm_config_omit\" != dev ]; then cd ../packages/shared-types && npm install && npm run build; fi)"
   },
   "keywords": [],

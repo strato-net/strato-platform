@@ -136,6 +136,9 @@ export const bloc = createClient(`${config.api.nodeUrl}/bloc/v2.2`, {
 export const eth = createClient(`${config.api.nodeUrl}/strato-api/eth/v1.2`, {
   logPrefix: "Eth",
 });
+export const app = createClient(config.api.appUrl || "", {
+  logPrefix: "App",
+});
 export const fetch = createClient("", {
   authenticated: false,
   logPrefix: "Fetch",
@@ -152,5 +155,6 @@ export default {
   strato,
   bloc,
   eth,
+  app,
   fetch,
 };

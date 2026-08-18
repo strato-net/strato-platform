@@ -18,7 +18,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
   const [totalCount, setTotalCount] = useState(0);
   const [depositStatus, setDepositStatus] = useState<number>(0);
   const [selectedChainId, setSelectedChainId] = useState<number>(0);
-  const [selectedType, setSelectedType] = useState<'bridge' | 'save' | 'forge' | ''>('');
+  const [selectedType, setSelectedType] = useState<'bridge' | 'save' | 'forge' | 'route' | ''>('');
   const [transactions, setTransactions] = useState<DepositTransaction[]>([]);
   const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter((o) => o.value !== 4);
 
@@ -160,12 +160,12 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
       key: "received",
       render: (_: any, record: any) => {
         const outcome = record.depositOutcome;
-        const hasFinal = (outcome === "forge" || outcome === "save" || outcome === "fallback") && record.finalTokenSymbol;
+        const hasFinal = (outcome === "forge" || outcome === "save" || outcome === "route" || outcome === "fallback") && record.finalTokenSymbol;
         const symbol = hasFinal ? record.finalTokenSymbol : record.stratoTokenSymbol || '-';
         const amount = hasFinal && record.finalAmount
           ? formatWeiToDecimalHP(record.finalAmount, 18)
           : formatWeiToDecimalHP(record?.DepositInfo?.stratoTokenAmount || '0', 18);
-        const badge = outcome === "forge" ? "Metal" : outcome === "save" ? "Earn" : outcome === "fallback" ? "Fallback" : null;
+        const badge = outcome === "forge" ? "Metal" : outcome === "save" ? "Earn" : outcome === "route" ? "Trade" : outcome === "fallback" ? "Fallback" : null;
         return (
           <div>
             <span className="text-sm text-foreground">{amount} {symbol}</span>
@@ -237,7 +237,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
             <Select
               value={selectedType || ''}
               onChange={(v) => {
-                setSelectedType(v === '' ? '' : v as 'bridge' | 'save' | 'forge');
+                setSelectedType(v === '' ? '' : v as 'bridge' | 'save' | 'forge' | 'route');
                 setCurrentPage(1);
               }}
               style={{ width: isMobile ? '100%' : 150 }}
@@ -246,6 +246,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
                 { value: 'bridge', label: 'Bridge' },
                 { value: 'save', label: 'Earn' },
                 { value: 'forge', label: 'Metal' },
+                { value: 'route', label: 'Trade' },
               ]}
             />
           </div>

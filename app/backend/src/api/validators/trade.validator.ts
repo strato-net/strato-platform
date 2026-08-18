@@ -73,6 +73,22 @@ export function validateRouteQuoteArgs(args: any) {
   }
 }
 
+export function validateCompositeRouteQuoteArgs(args: any) {
+  const schema = Joi.object({
+    externalChainId: uintStringField("externalChainId"),
+    externalToken: validateAddressField("externalToken").required(),
+    targetStratoToken: validateAddressField("targetStratoToken").required(),
+    tokenOut: validateAddressField("tokenOut").required(),
+    amount: uintStringField("amount"),
+    slippageBps: Joi.number().integer().min(0).max(9999).optional(),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Composite Route Quote Argument Validation Error: " + error.message);
+  }
+}
+
 export function validateRouteExecuteArgs(args: any) {
   const schema = Joi.object({
     tokenIn: validateAddressField("tokenIn").required(),

@@ -8,7 +8,9 @@ import "../../libraries/Bridge/BridgeTypes.sol";
 import "../Lending/LendingRegistry.sol";
 import "../Metals/MetalForge.sol";
 import "../Pools/DirectMintPSM.sol";
+import "../Router/TokenRouter.sol";
 import "../Savings/SaveUSDSTVault.sol";
+import "../../libraries/Router/RouterTypes.sol";
 
 /**
  * @title MercataBridge
@@ -21,6 +23,7 @@ contract record MercataBridge is Ownable {
     /// @notice Enables BridgeTypes library functions for all types
     /// @dev Allows direct access to BridgeTypes utility functions without explicit library calls
     using BridgeTypes for *;
+    using RouterTypes for *;
     using StringUtils for string;
 
     /* ===================================================================== */
@@ -123,6 +126,9 @@ contract record MercataBridge is Ownable {
     /// @notice Emitted when the SaveUSDST vault address is updated
     event SaveUsdstVaultUpdated(address newVault, address oldVault);
 
+    /// @notice Emitted when the TokenRouter address is updated
+    event TokenRouterUpdated(address newRouter, address oldRouter);
+
     event DepositActionAvailabilityUpdated(
         address externalToken,
         uint256 externalChainId,
@@ -162,6 +168,16 @@ contract record MercataBridge is Ownable {
         uint256 metalAmount
     );
 
+    event AutoRouted(
+        uint256 externalChainId,
+        string externalTxHash,
+        address recipient,
+        address sourceToken,
+        uint256 sourceAmount,
+        address finalToken,
+        uint256 finalAmount
+    );
+
     event DepositActionFallback(
         uint256 externalChainId,
         string externalTxHash,
@@ -180,6 +196,8 @@ contract record MercataBridge is Ownable {
     /// @dev Default: 18 decimals for all STRATO tokens
     /// @dev Used for decimal conversion between external tokens and STRATO tokens
     uint256 public DECIMAL_PLACES = 18;
+    uint256 public constant MAX_ROUTE_STEPS = 6;
+    uint256 public constant ROUTE_EXECUTION_DEADLINE = 300;
 
     /// @notice Circuit breaker for deposit operations
     /// @dev When true, all deposit operations are paused
@@ -237,6 +255,7 @@ contract record MercataBridge is Ownable {
     struct DepositActionConfig {
         bool autoForge;
         bool autoSave;
+        bool autoRoute;
     }
 
     /// @notice Deposit-keyed action intent recorded atomically by the relayer
@@ -271,6 +290,13 @@ contract record MercataBridge is Ownable {
     /// @notice Action allowlist for each external-to-STRATO route
     /// @dev Key: (externalToken, externalChainId, targetStratoToken) -> action flags
     mapping(address => mapping(uint256 => mapping(address => DepositActionConfig))) public record depositActionConfigs;
+
+    /// @notice TokenRouter used for AUTO_ROUTE deposits
+    address public tokenRouter;
+
+    /// @notice Executable route steps keyed by external chain, transaction hash, and step index
+    mapping(uint256 => mapping(string => mapping(uint256 => RouteStep))) public record depositRouteSteps;
+    mapping(uint256 => mapping(string => uint256)) public record depositRouteStepCounts;
 
 
     /* ===================================================================== */
@@ -521,6 +547,12 @@ contract record MercataBridge is Ownable {
         saveUsdstVault = newSaveUsdstVault;
     }
 
+    function setTokenRouter(address newTokenRouter) external onlyOwner {
+        require(newTokenRouter != address(0), "MB: zero token router");
+        emit TokenRouterUpdated(newTokenRouter, tokenRouter);
+        tokenRouter = newTokenRouter;
+    }
+
     /**
      * @dev Sets the USDST token address
      * @notice Only the owner can update the USDST address
@@ -593,7 +625,8 @@ contract record MercataBridge is Ownable {
     ) external onlyOwner {
         require(
             action == uint256(DepositAction.AUTO_FORGE) ||
-            action == uint256(DepositAction.AUTO_SAVE),
+            action == uint256(DepositAction.AUTO_SAVE) ||
+            action == uint256(DepositAction.AUTO_ROUTE),
             "MB: invalid action"
         );
         if (enabled) {
@@ -605,8 +638,10 @@ contract record MercataBridge is Ownable {
         DepositActionConfig config = depositActionConfigs[externalToken][externalChainId][targetStratoToken];
         if (action == uint256(DepositAction.AUTO_FORGE)) {
             config.autoForge = enabled;
-        } else {
+        } else if (action == uint256(DepositAction.AUTO_SAVE)) {
             config.autoSave = enabled;
+        } else {
+            config.autoRoute = enabled;
         }
         emit DepositActionAvailabilityUpdated(externalToken, externalChainId, targetStratoToken, action, enabled);
     }
@@ -700,7 +735,85 @@ contract record MercataBridge is Ownable {
         DepositActionConfig config = depositActionConfigs[d.externalToken][externalChainId][d.stratoToken];
         if (action == uint256(DepositAction.AUTO_FORGE)) return config.autoForge;
         if (action == uint256(DepositAction.AUTO_SAVE)) return config.autoSave;
+        if (action == uint256(DepositAction.AUTO_ROUTE)) return config.autoRoute;
         return false;
+    }
+
+    function _validateDepositRoute(
+        address sourceToken,
+        address expectedTokenOut,
+        RouteStep[] steps
+    ) internal pure {
+        require(expectedTokenOut != address(0), "MB: invalid route output");
+        require(steps.length > 0 && steps.length <= MAX_ROUTE_STEPS, "MB: invalid route length");
+        require(steps[0].tokenIn == sourceToken, "MB: route source mismatch");
+        require(steps[steps.length - 1].tokenOut == expectedTokenOut, "MB: route output mismatch");
+        for (uint256 i = 0; i < steps.length; i++) {
+            require(steps[i].action != RouteAction.NONE, "MB: invalid route action");
+            require(steps[i].target != address(0), "MB: invalid route target");
+            require(steps[i].tokenOut != address(0), "MB: invalid route token");
+            if (i > 0) {
+                require(steps[i].tokenIn == steps[i - 1].tokenOut, "MB: route discontinuity");
+            }
+        }
+    }
+
+    function _recordDepositRoute(
+        uint256 externalChainId,
+        string normalizedTxHash,
+        address sourceToken,
+        address expectedTokenOut,
+        uint256 minFinalOut,
+        RouteStep[] steps
+    ) internal {
+        require(minFinalOut > 0, "MB: zero route minimum");
+        _validateDepositRoute(sourceToken, expectedTokenOut, steps);
+        depositActions[externalChainId][normalizedTxHash] = DepositActionIntent(
+            uint256(DepositAction.AUTO_ROUTE),
+            expectedTokenOut,
+            minFinalOut
+        );
+        depositRouteStepCounts[externalChainId][normalizedTxHash] = steps.length;
+        for (uint256 i = 0; i < steps.length; i++) {
+            depositRouteSteps[externalChainId][normalizedTxHash][i] = steps[i];
+        }
+    }
+
+    function _executeDepositRoute(
+        uint256 externalChainId,
+        string normalizedTxHash
+    ) internal {
+        DepositInfo d = deposits[externalChainId][normalizedTxHash];
+        DepositActionIntent intent = depositActions[externalChainId][normalizedTxHash];
+        require(tokenRouter != address(0), "MB: token router not set");
+        uint256 stepCount = depositRouteStepCounts[externalChainId][normalizedTxHash];
+        require(stepCount > 0 && stepCount <= MAX_ROUTE_STEPS, "MB: route missing");
+        RouteStep[] steps = new RouteStep[](stepCount);
+        for (uint256 i = 0; i < stepCount; i++) {
+            steps[i] = depositRouteSteps[externalChainId][normalizedTxHash][i];
+        }
+
+        uint256 sourceAmount = _mintFunds(d.stratoToken, address(this), d.stratoTokenAmount);
+        IERC20(d.stratoToken).approve(tokenRouter, sourceAmount);
+        uint256 finalAmount = TokenRouter(tokenRouter).executeRoute(
+            d.stratoToken,
+            intent.actionToken,
+            sourceAmount,
+            d.stratoRecipient,
+            steps,
+            block.timestamp + ROUTE_EXECUTION_DEADLINE,
+            intent.minFinalOut
+        );
+        require(finalAmount >= intent.minFinalOut, "MB: route under minimum");
+        emit AutoRouted(
+            externalChainId,
+            normalizedTxHash,
+            d.stratoRecipient,
+            d.stratoToken,
+            sourceAmount,
+            intent.actionToken,
+            finalAmount
+        );
     }
 
     function _executeDepositAction(
@@ -710,6 +823,11 @@ contract record MercataBridge is Ownable {
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
         DepositActionIntent intent = depositActions[externalChainId][normalizedTxHash];
         DepositAction action = DepositAction(intent.action);
+
+        if (action == DepositAction.AUTO_ROUTE) {
+            _executeDepositRoute(externalChainId, normalizedTxHash);
+            return;
+        }
 
         uint256 sourceAmount = _mintFunds(d.stratoToken, address(this), d.stratoTokenAmount);
         uint256 usdstOut;
@@ -789,6 +907,11 @@ contract record MercataBridge is Ownable {
         delete depositActions[externalChainId][normalizedTxHash].action;
         delete depositActions[externalChainId][normalizedTxHash].actionToken;
         delete depositActions[externalChainId][normalizedTxHash].minFinalOut;
+        uint256 stepCount = depositRouteStepCounts[externalChainId][normalizedTxHash];
+        for (uint256 i = 0; i < stepCount; i++) {
+            delete depositRouteSteps[externalChainId][normalizedTxHash][i];
+        }
+        delete depositRouteStepCounts[externalChainId][normalizedTxHash];
     }
 
     // ───────────── Deposit & withdrawal related functions ─────────────
@@ -891,6 +1014,37 @@ contract record MercataBridge is Ownable {
                 minFinalOut
             );
         }
+    }
+
+    function depositWithRoute(
+        uint256 externalChainId,
+        address externalSender,
+        address externalToken,
+        uint256 externalTokenAmount,
+        string externalTxHash,
+        address stratoRecipient,
+        address targetStratoToken,
+        address expectedTokenOut,
+        uint256 minFinalOut,
+        RouteStep[] steps
+    ) public onlyOwner whenDepositsOpen {
+        string normalizedTxHash = _recordDeposit(
+            externalChainId,
+            externalSender,
+            externalToken,
+            externalTokenAmount,
+            externalTxHash,
+            stratoRecipient,
+            targetStratoToken
+        );
+        _recordDepositRoute(
+            externalChainId,
+            normalizedTxHash,
+            targetStratoToken,
+            expectedTokenOut,
+            minFinalOut,
+            steps
+        );
     }
 
     /**
@@ -1035,7 +1189,8 @@ contract record MercataBridge is Ownable {
         DepositActionIntent intent = depositActions[externalChainId][normalizedTxHash];
         bool isExecutableAction = (
             intent.action == uint256(DepositAction.AUTO_FORGE) ||
-            intent.action == uint256(DepositAction.AUTO_SAVE)
+            intent.action == uint256(DepositAction.AUTO_SAVE) ||
+            intent.action == uint256(DepositAction.AUTO_ROUTE)
         ) && _isDepositActionEnabled(d, externalChainId, intent.action);
         if (isExecutableAction) {
             try {

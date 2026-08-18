@@ -213,12 +213,32 @@ export const handleCopyToClipboard = async (text: string): Promise<void> => {
   }
 };
 
-export function mergePendingDeposits(apiDeposits: any[]): {
-  remaining: any[];
+export function mergePendingDeposits(apiDeposits: Array<Record<string, unknown>>): {
+  remaining: Array<Record<string, unknown>>;
 } {
-  const pendingRaw = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
-  const apiTxHashes = new Set(apiDeposits.map((tx: any) => tx?.externalTxHash));
-  const remaining = pendingRaw.filter((p: any) => !apiTxHashes.has(p?.externalTxHash));
+  const normalizeHash = (value: unknown) =>
+    typeof value === "string" ? value.toLowerCase().replace(/^0x/, "") : "";
+  let pendingRaw: Array<Record<string, unknown>> = [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
+    if (Array.isArray(parsed)) {
+      pendingRaw = parsed.filter(
+        (value): value is Record<string, unknown> =>
+          value !== null && typeof value === "object" && !Array.isArray(value)
+      );
+    }
+  } catch {
+    pendingRaw = [];
+  }
+  const apiTxHashes = new Set(
+    apiDeposits.map((tx) => normalizeHash(tx.externalTxHash)).filter(Boolean)
+  );
+  const uniquePending = new Map<string, Record<string, unknown>>();
+  for (const pending of pendingRaw) {
+    const hash = normalizeHash(pending.externalTxHash);
+    if (hash && !apiTxHashes.has(hash)) uniquePending.set(hash, pending);
+  }
+  const remaining = [...uniquePending.values()];
   localStorage.setItem('pendingDeposits', JSON.stringify(remaining));
   return { remaining };
 }

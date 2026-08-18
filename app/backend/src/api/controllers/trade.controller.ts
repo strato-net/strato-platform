@@ -10,6 +10,7 @@ import {
   getTradeTokenHistory,
 } from "../services/trade.service";
 import { executeRoute, getRouteQuote } from "../services/route.service";
+import { getCompositeBridgeRouteQuote } from "../services/bridge-route.service";
 import {
   validateTradeTokenArgs,
   validateTradePairArgs,
@@ -18,6 +19,7 @@ import {
   validateTradeHistoryQuery,
   validateRouteExecuteArgs,
   validateRouteQuoteArgs,
+  validateCompositeRouteQuoteArgs,
 } from "../validators/trade.validator";
 
 class TradeController {
@@ -88,6 +90,25 @@ class TradeController {
       const result = await getRouteQuote(
         accessToken,
         query.tokenIn as string,
+        query.tokenOut as string,
+        BigInt(query.amount as string),
+        query.slippageBps === undefined ? undefined : Number(query.slippageBps)
+      );
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async compositeRouteQuote(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, query } = req;
+      validateCompositeRouteQuoteArgs(query);
+      const result = await getCompositeBridgeRouteQuote(
+        accessToken,
+        query.externalChainId as string,
+        query.externalToken as string,
+        query.targetStratoToken as string,
         query.tokenOut as string,
         BigInt(query.amount as string),
         query.slippageBps === undefined ? undefined : Number(query.slippageBps)
