@@ -74,6 +74,16 @@ contract DirectMintPSM is Ownable {
         emit SavingsVaultSet(_savingsVault);
     }
 
+    function _projectedSavingsPricingAssets(SaveUSDSTVault vault) internal view returns (uint pricingAssets) {
+        (, uint fundedAmount) = vault.pendingAccrual();
+        pricingAssets = vault.totalAssets();
+        uint liveBalance = IERC20(mintableToken).balanceOf(address(vault));
+        if (liveBalance < pricingAssets) {
+            pricingAssets = liveBalance;
+        }
+        return pricingAssets + fundedAmount;
+    }
+
     /// @notice Whether minting `mintAmount` can currently be routed into the savings vault.
     /// @dev Mirrors every precondition SaveUSDSTVault._deposit enforces, so the UI and the
     ///      contract agree on availability before the user pays for a transaction.
@@ -86,10 +96,15 @@ contract DirectMintPSM is Ownable {
         if (vault.paused()) return false;
         if (vault.asset() != mintableToken) return false;
 
+        uint supply = vault.totalSupply();
+        if (supply == 0) return true;
+
+        uint pricingAssets = _projectedSavingsPricingAssets(vault);
+
         // No recapitalizing an outstanding share supply at a misleading 1:1 price.
-        if (vault.totalSupply() > 0 && vault.exchangeRate() == 0) return false;
+        if (pricingAssets == 0) return false;
         // No dust deposits that would round to zero shares.
-        if (vault.previewDeposit(mintAmount) == 0) return false;
+        if ((mintAmount * supply) / pricingAssets == 0) return false;
 
         return true;
     }
