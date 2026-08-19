@@ -73,4 +73,13 @@ ALTER TABLE tracking_links ADD COLUMN full_source TEXT;
 UPDATE tracking_links SET full_source = source;
 `,
   },
+  {
+    // The daily snapshot scans today's and yesterday's sessions across ALL
+    // links; the existing index leads with link_id, so it can't serve those
+    // time-only ranges.
+    name: "004_metrics_indexes",
+    sql: `
+CREATE INDEX tracking_sessions_opened_at_idx ON tracking_sessions (opened_at);
+`,
+  },
 ];

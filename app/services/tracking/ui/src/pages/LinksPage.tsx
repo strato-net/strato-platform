@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Pencil, Plus } from 'lucide-react';
 import { absoluteLinkUrl, formatUsd, LinkSummary, listLinks, setLinkActive } from '../api';
 import CreateLinkModal from '../components/CreateLinkModal';
+import DailySnapshotPanel from '../components/DailySnapshotPanel';
 import EditLinkModal from '../components/EditLinkModal';
 import { Button, CopyButton, Skeleton, Switch, tdClass, thClass } from '../components/primitives';
 
@@ -55,6 +56,10 @@ const LinksPage = () => {
           New Tracking Link
         </Button>
       </div>
+
+      <DailySnapshotPanel />
+
+      <h2 className="pt-2 text-sm font-semibold">All links</h2>
 
       {links.isPending ? (
         <div className="space-y-2">
