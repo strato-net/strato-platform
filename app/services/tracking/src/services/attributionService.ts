@@ -326,7 +326,7 @@ export const invalidateSnapshot = (): void => {
   cachedSnapshot = null;
 };
 
-const tokenAmount = (raw: string): number => {
+export const tokenAmount = (raw: string): number => {
   try {
     return Number(BigInt(raw)) / 1e18;
   } catch {
@@ -337,7 +337,7 @@ const tokenAmount = (raw: string): number => {
 // Identity key for counting distinct wallets. External-address-first so a
 // visitor whose MetaMask connect precedes their STRATO login (two rows: one
 // ext-only, one ext+strato) counts as one wallet, not two.
-const walletKeyOf = (conn: ConnectionRow): string =>
+export const walletKeyOf = (conn: ConnectionRow): string =>
   conn.external_wallet_address || conn.strato_address;
 
 export const countByCategory = (

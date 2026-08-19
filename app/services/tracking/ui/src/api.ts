@@ -224,6 +224,41 @@ export interface UserTimeline {
   items: TimelineItem[];
 }
 
+// Today's cross-link snapshot (GET /metrics/daily). Windows are UTC days;
+// deltas compare against the same elapsed window yesterday.
+export interface MetricDelta {
+  value: number;
+  previous: number;
+  changePct: number | null; // null when yesterday's window was empty
+}
+
+export interface DailySnapshotLink {
+  id: string;
+  slug: string;
+  label: string;
+  source: string;
+  opens: number;
+}
+
+export interface DailySnapshot {
+  date: string; // YYYY-MM-DD (UTC)
+  generatedAt: string;
+  hour: number; // current UTC hour: the last (partial) opensByHour bucket
+  linksTotal: number;
+  linksWithOpens: number;
+  opens: MetricDelta;
+  engagedOpens: number;
+  wallets: MetricDelta;
+  bridgedWallets: number;
+  bridgeValueUsd: MetricDelta;
+  bridgeValuePartial: boolean;
+  bridgeIns: number;
+  actions: MetricDelta;
+  actionLinks: number;
+  opensByHour: number[];
+  topLinks: DailySnapshotLink[];
+}
+
 export interface CreateLinkInput {
   label: string;
   source: string;
@@ -288,6 +323,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const getMe = () => apiFetch<{ authorized: boolean }>('/me');
+export const getDailySnapshot = () => apiFetch<DailySnapshot>('/metrics/daily');
 export const listLinks = () => apiFetch<LinkSummary[]>('/links');
 export const getLink = (id: string) => apiFetch<LinkDetail>(`/links/${id}`);
 export const getWallet = (linkId: string, address: string) =>
@@ -311,6 +347,19 @@ const usdFormatter = new Intl.NumberFormat('en-US', {
 
 export const formatUsd = (value: number | null | undefined) =>
   value == null ? '—' : usdFormatter.format(value);
+
+const usdCompactFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});
+
+// Headline-sized USD ($128.4K) for the daily snapshot tiles
+export const formatUsdCompact = (value: number | null | undefined) =>
+  value == null ? '—' : usdCompactFormatter.format(value);
+
+export const formatCount = (value: number) => value.toLocaleString('en-US');
 
 // The service returns link urls as relative paths ("/t/<slug>") because a
 // slug resolves on every host that proxies /t/. For display and copy, render

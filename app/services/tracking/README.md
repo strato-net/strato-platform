@@ -18,6 +18,7 @@ source of truth.
 | `GET /dashboard` | OIDC (SPA login) | The dashboard app (tracking-ui container) |
 | `GET /tracking-api/me` | JWT | `{authorized}` — whether the user may use the dashboard |
 | `GET /tracking-api/links` | JWT + allowlist | Link summaries with attribution rollups |
+| `GET /tracking-api/metrics/daily` | JWT + allowlist | Daily snapshot: today's (UTC) opens/engaged, wallets/bridged, bridged-in USD + transfers, on-chain actions — each against the same elapsed window yesterday — plus a 24-bucket opens-by-hour histogram and the busiest links |
 | `POST /tracking-api/links` | JWT + allowlist | Create a link (random slug; label/source never appear in the URL) |
 | `GET /tracking-api/links/:id` | JWT + allowlist | Bridge-ins, per-category activity summary, per-wallet summaries, visitor geo points, attributed activity feed, per-day history (opens, wallets, bridge/trade value, …) |
 | `GET /tracking-api/links/:id/wallets/:address` | JWT + allowlist | Per-user drill-down: the wallet's full on-chain history (deliberately not attribution-filtered) |
@@ -45,6 +46,22 @@ never counted under two links. Bridge completion events carry both
 `externalSender` and `stratoRecipient`, so either identifier attributes the
 wallet. Link-level metrics count attributed events only; the per-wallet
 drill-down shows full history.
+
+## Daily snapshot
+
+The dashboard's top panel is one aggregation endpoint (`/tracking-api/metrics/daily`)
+over the **UTC day**, matching the per-day history buckets. Session figures
+(opens, engaged, hour buckets, busiest links, "N of M links active") are SQL
+rollups over `tracking_sessions`; wallet and chain figures reuse the cached
+attribution snapshot, so nothing is counted twice and the attribution rules
+are identical to the links table. Each headline metric carries the value from
+the **same elapsed window yesterday** (yesterday 00:00 UTC → yesterday at
+today's time of day) so a half-finished day isn't compared against a whole
+one; with no baseline the change is reported as `null` ("new"). Today's chain
+window runs to the end of the UTC day because block timestamps can sit
+slightly ahead of the service's clock. Bridged-in USD counts priced tokens
+only and sets `bridgeValuePartial` when some token had no oracle price (the
+dashboard renders "$128.4K+").
 
 ## Storage
 
