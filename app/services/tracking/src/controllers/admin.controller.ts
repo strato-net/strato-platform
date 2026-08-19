@@ -8,6 +8,7 @@ import {
   getWalletDetail,
   invalidateSnapshot,
 } from "../services/attributionService";
+import { getDailySnapshot } from "../services/metricsService";
 import { isValidDestination } from "../utils/destinations";
 import { normalizeAddress } from "../utils/addresses";
 
@@ -20,6 +21,11 @@ export const me = async (req: AuthorizedRequest, res: Response): Promise<void> =
 // GET /tracking-api/links — summaries with attribution rollups
 export const list = async (_req: AuthorizedRequest, res: Response): Promise<void> => {
   res.json(await getLinkSummaries());
+};
+
+// GET /tracking-api/metrics/daily — today's cross-link snapshot
+export const dailyMetrics = async (_req: AuthorizedRequest, res: Response): Promise<void> => {
+  res.json(await getDailySnapshot());
 };
 
 // GET /tracking-api/links/:id
