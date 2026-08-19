@@ -1,4 +1,4 @@
-#tracking-version:<VERSION>
+#tracking-version:18.3-d0438ec
 volumes:
   trackingpgdata:
     driver: local
@@ -30,8 +30,7 @@ services:
     - TRACKING_ETHERSCAN_API_KEY=${TRACKING_ETHERSCAN_API_KEY:-}
     - TRACKING_ETHERSCAN_API_URL=${TRACKING_ETHERSCAN_API_URL:-}
     - TRACKING_ETHERSCAN_MAX_TX=${TRACKING_ETHERSCAN_MAX_TX:-}
-    build: ./app/services/tracking
-    image: ${TRACKING_IMAGE:-<REPO_URL>tracking:<VERSION>-<HASH_TRACKING>}
+    image: ${TRACKING_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/tracking:18.3-d0438ec-065be31f241f}
     init: true
     restart: unless-stopped
     logging:
@@ -64,8 +63,7 @@ services:
     - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
     - EXPLORER_URL=${EXPLORER_URL:-}
     - TRACKING_APP_ORIGIN=${TRACKING_APP_ORIGIN:-}
-    build: ./app/services/tracking/ui
-    image: ${TRACKINGUI_IMAGE:-<REPO_URL>tracking-ui:<VERSION>-<HASH_TRACKING_UI>}
+    image: ${TRACKINGUI_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/tracking-ui:18.3-d0438ec-6643cef16282}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -79,8 +77,7 @@ services:
     environment:
     - ssl=${ssl:-true}
     - sslCertFileType=${sslCertFileType:-}
-    build: ./app/services/tracking/nginx
-    image: ${TRACKINGNGINX_IMAGE:-<REPO_URL>tracking-nginx:<VERSION>-<HASH_TRACKING_NGINX>}
+    image: ${TRACKINGNGINX_IMAGE:-406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/tracking-nginx:18.3-d0438ec-c4920dad6f42}
     ports:
     - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
     - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL

@@ -171,6 +171,59 @@ export interface WalletDetail {
   activity: ActivityItem[];
 }
 
+// Per-user activity timeline (GET /users/:address/timeline): off-chain events
+// (opens, engagement, wallet connections) merged with on-chain ones and, when
+// the service has an Etherscan-compatible key, origin-chain transactions.
+export type TimelineKind =
+  | 'link_opened'
+  | 'engaged'
+  | 'wallet_connected'
+  | 'bridge_in'
+  | 'onchain'
+  | 'remote_chain';
+
+export interface TimelineItem {
+  kind: TimelineKind;
+  at: string;
+  title: string;
+  detail: string | null;
+  category: ActivityCategory | null;
+  address: string | null;
+  linkId: string | null;
+  linkLabel: string | null;
+  linkSource: string | null;
+  txHash: string | null;
+  chainId: number | null;
+  chainName: string | null;
+  externalTxHash: string | null;
+  externalTxUrl: string | null;
+  amount: string | null;
+  amountUsd: number | null;
+  attributedLinkId: string | null;
+}
+
+export interface TimelineLink {
+  id: string;
+  slug: string;
+  label: string;
+  source: string;
+  fullSource: string;
+}
+
+export interface UserTimeline {
+  address: string;
+  addresses: string[];
+  externalWalletAddress: string | null;
+  stratoAddress: string | null;
+  connector: string | null;
+  firstSeenAt: string;
+  lastActivityAt: string | null;
+  links: TimelineLink[];
+  activitySummary: ActivitySummary;
+  remoteChainEnabled: boolean;
+  items: TimelineItem[];
+}
+
 export interface CreateLinkInput {
   label: string;
   source: string;
@@ -239,6 +292,8 @@ export const listLinks = () => apiFetch<LinkSummary[]>('/links');
 export const getLink = (id: string) => apiFetch<LinkDetail>(`/links/${id}`);
 export const getWallet = (linkId: string, address: string) =>
   apiFetch<WalletDetail>(`/links/${linkId}/wallets/${address}`);
+export const getUserTimeline = (address: string) =>
+  apiFetch<UserTimeline>(`/users/${address}/timeline`);
 export const createLink = (input: CreateLinkInput) =>
   apiFetch<{ id: string; slug: string; url: string }>('/links', {
     method: 'POST',
@@ -266,6 +321,10 @@ const appOrigin =
     'https://app.strato.nexus') || window.location.origin;
 
 export const absoluteLinkUrl = (url: string) => new URL(url, appOrigin).toString();
+
+// Dashboard route for a wallet's activity timeline (every rendered address
+// links here)
+export const userTimelinePath = (address: string) => `/users/${address}`;
 
 export const shortAddress = (address: string) =>
   address.length > 14 ? `${address.slice(0, 8)}…${address.slice(-6)}` : address;

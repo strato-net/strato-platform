@@ -151,7 +151,7 @@ export interface WalletDetail {
   activity: ActivityItem[];
 }
 
-interface AttributionSnapshot {
+export interface AttributionSnapshot {
   links: TrackingLink[];
   connections: ConnectionRow[];
   sessionAggs: Map<string, SessionAgg>;
@@ -340,7 +340,10 @@ const tokenAmount = (raw: string): number => {
 const walletKeyOf = (conn: ConnectionRow): string =>
   conn.external_wallet_address || conn.strato_address;
 
-const countByCategory = (events: ActivityEvent[], bridgeInCount: number): ActivitySummary => {
+export const countByCategory = (
+  events: ActivityEvent[],
+  bridgeInCount: number
+): ActivitySummary => {
   const summary: ActivitySummary = {};
   if (bridgeInCount > 0) summary.bridge_in = bridgeInCount;
   for (const event of events) {
@@ -349,7 +352,10 @@ const countByCategory = (events: ActivityEvent[], bridgeInCount: number): Activi
   return summary;
 };
 
-const toBridgeInItem = (snapshot: AttributionSnapshot, b: BridgeInEvent): BridgeInItem => ({
+export const toBridgeInItem = (
+  snapshot: AttributionSnapshot,
+  b: BridgeInEvent
+): BridgeInItem => ({
   address: b.stratoRecipient || b.externalSender,
   asset: snapshot.tokenSymbols.get(b.stratoToken) ?? b.stratoToken.slice(0, 8),
   amount: tokenAmount(b.stratoTokenAmount).toLocaleString("en-US", {
