@@ -53,6 +53,7 @@ export interface LinkSummary {
   url: string;
   label: string;
   source: string;
+  fullSource: string;
   destination: string;
   creator: string;
   active: boolean;
@@ -136,12 +137,26 @@ export interface WalletSummary {
   lastActivityAt: string | null;
 }
 
+// One UTC day of link history; the server fills quiet days with zero points.
+export interface HistoryPoint {
+  date: string; // YYYY-MM-DD
+  opens: number;
+  engagedOpens: number;
+  wallets: number;
+  bridgeIns: number;
+  bridgeValueUsd: number;
+  trades: number;
+  tradeValueUsd: number;
+  activity: number;
+}
+
 export interface LinkDetail extends LinkSummary {
   bridgeIns: BridgeInItem[];
   activity: ActivityItem[];
   activitySummary: ActivitySummary;
   walletSummaries: WalletSummary[];
   geoPoints: GeoPoint[];
+  history: HistoryPoint[];
 }
 
 export interface WalletDetail {
@@ -159,9 +174,20 @@ export interface WalletDetail {
 export interface CreateLinkInput {
   label: string;
   source: string;
+  fullSource: string;
   destination: string;
 }
 
+export interface UpdateLinkInput {
+  label?: string;
+  source?: string;
+  fullSource?: string;
+  destination?: string;
+  active?: boolean;
+}
+
+// Common presets for the destination picker; any relative path or absolute
+// http(s) URL is accepted via the "Custom URL" option.
 export const TRACKING_DESTINATIONS = [
   { value: '/dashboard/deposits', label: 'Bridge In (Fund)' },
   { value: '/dashboard', label: 'Portfolio' },
@@ -169,6 +195,17 @@ export const TRACKING_DESTINATIONS = [
   { value: '/dashboard/earn', label: 'Earn' },
   { value: '/dashboard/rewards', label: 'Rewards' },
 ] as const;
+
+export const isValidDestination = (destination: string): boolean => {
+  if (!destination || /\s/.test(destination)) return false;
+  if (destination.startsWith('/')) return !destination.startsWith('//');
+  try {
+    const url = new URL(destination);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -207,8 +244,9 @@ export const createLink = (input: CreateLinkInput) =>
     method: 'POST',
     body: JSON.stringify(input),
   });
-export const setLinkActive = (id: string, active: boolean) =>
-  apiFetch<void>(`/links/${id}`, { method: 'PATCH', body: JSON.stringify({ active }) });
+export const updateLink = (id: string, fields: UpdateLinkInput) =>
+  apiFetch<void>(`/links/${id}`, { method: 'PATCH', body: JSON.stringify(fields) });
+export const setLinkActive = (id: string, active: boolean) => updateLink(id, { active });
 
 const usdFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',

@@ -76,10 +76,6 @@ export const config = {
   },
   tracking: {
     defaultDestination: process.env.TRACKING_DEFAULT_DESTINATION || "/dashboard/deposits",
-    destinationAllowlist: parseList(
-      process.env.TRACKING_DEST_ALLOWLIST ||
-        "/dashboard/deposits,/dashboard,/dashboard/swap,/dashboard/earn,/dashboard/rewards"
-    ),
     // Empty in dev → host-only cookie
     cookieDomain: process.env.TRACKING_COOKIE_DOMAIN || "",
     cookieName: "strato_tid",
