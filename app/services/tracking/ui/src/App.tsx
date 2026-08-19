@@ -8,6 +8,7 @@ import { getMe } from './api';
 import { Button, Skeleton } from './components/primitives';
 import LinksPage from './pages/LinksPage';
 import LinkDetailPage from './pages/LinkDetailPage';
+import UserTimelinePage from './pages/UserTimelinePage';
 
 const queryClient = new QueryClient();
 
@@ -113,6 +114,7 @@ const Shell = ({ user }: { user: User }) => {
           <Routes>
             <Route path="/" element={<LinksPage />} />
             <Route path="/links/:id" element={<LinkDetailPage />} />
+            <Route path="/users/:address" element={<UserTimelinePage />} />
             <Route path="*" element={<LinksPage />} />
           </Routes>
         )}

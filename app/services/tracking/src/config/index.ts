@@ -86,6 +86,14 @@ export const config = {
     attributionWindowDays: Number(process.env.TRACKING_ATTRIBUTION_WINDOW_DAYS || 90),
     cacheTtlSeconds: Number(process.env.TRACKING_CACHE_TTL_SECONDS || 60),
   },
+  // Optional origin-chain enrichment of the user timeline. Etherscan's V2 API
+  // is multichain (one key serves Ethereum, Base, Polygon, … via `chainid`);
+  // without a key the timeline simply omits remote-chain items.
+  etherscan: {
+    apiKey: process.env.TRACKING_ETHERSCAN_API_KEY || "",
+    apiUrl: process.env.TRACKING_ETHERSCAN_API_URL || "https://api.etherscan.io/v2/api",
+    maxTransactions: Number(process.env.TRACKING_ETHERSCAN_MAX_TX || 10),
+  },
 };
 
 if (!config.api.nodeUrl) {

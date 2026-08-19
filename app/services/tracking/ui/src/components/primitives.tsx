@@ -1,5 +1,7 @@
 import { ReactNode, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Check, Copy, ExternalLink, X } from 'lucide-react';
+import { userTimelinePath } from '../api';
 import { explorerUrl } from '../auth';
 
 // Minimal hand-rolled primitives (no component library): enough for an
@@ -113,11 +115,21 @@ export const ExternalExplorerLink = ({ href, title }: { href: string; title: str
   </a>
 );
 
+// The address itself links to the wallet's activity timeline; the icons keep
+// their own targets (clipboard, STRATO explorer). Inside clickable table rows
+// the navigation must not also trigger the row handler.
 export const AddressCell = ({ address }: { address: string | null }) => {
   if (!address) return <span className="text-muted-foreground">—</span>;
   return (
     <span className="flex items-center font-mono text-xs">
-      {address.length > 14 ? `${address.slice(0, 8)}…${address.slice(-6)}` : address}
+      <Link
+        to={userTimelinePath(address)}
+        onClick={(e) => e.stopPropagation()}
+        title="View activity timeline"
+        className="hover:underline"
+      >
+        {address.length > 14 ? `${address.slice(0, 8)}…${address.slice(-6)}` : address}
+      </Link>
       <CopyButton value={address} label="Copy address" />
       <ExplorerLink path={`/address/${address}`} />
     </span>

@@ -22,6 +22,7 @@ source of truth.
 | `POST /tracking-api/links` | JWT + allowlist | Create a link (random slug; label/source never appear in the URL) |
 | `GET /tracking-api/links/:id` | JWT + allowlist | Bridge-ins, per-category activity summary, per-wallet summaries, visitor geo points, attributed activity feed, per-day history (opens, wallets, bridge/trade value, …) |
 | `GET /tracking-api/links/:id/wallets/:address` | JWT + allowlist | Per-user drill-down: the wallet's full on-chain history (deliberately not attribution-filtered) |
+| `GET /tracking-api/users/:address/timeline` | JWT + allowlist | One wallet's activity timeline across every link: opens, engagement, wallet connections, bridge-ins, on-chain events and (optionally) origin-chain transactions |
 | `PATCH /tracking-api/links/:id` | JWT + allowlist | Toggle active / edit label, source, full source, destination |
 
 The dashboard app (`ui/`) logs in with OAuth code+PKCE against the Keycloak
@@ -134,6 +135,9 @@ the app edge, which forwards the client IP and proxies here.
 | `TRACKING_IPINFO_TOKEN` | empty (offline fallback) | ipinfo.io token for live IP geolocation |
 | `TRACKING_ATTRIBUTION_WINDOW_DAYS` | `90` | Attribution window |
 | `TRACKING_CACHE_TTL_SECONDS` | `60` | Dashboard attribution cache |
+| `TRACKING_ETHERSCAN_API_KEY` | empty (disabled) | Etherscan V2 key enabling origin-chain items in the user timeline |
+| `TRACKING_ETHERSCAN_API_URL` | `https://api.etherscan.io/v2/api` | Etherscan-compatible endpoint (multichain via `chainid`) |
+| `TRACKING_ETHERSCAN_MAX_TX` | `10` | Origin-chain transactions fetched per chain + wallet |
 | `ssl` | `false` | Adds `Secure` to the session cookie |
 
 tracking-ui container env (runtime `config.js`): `OIDC_AUTHORITY` (default
@@ -155,6 +159,32 @@ vault deposits/withdrawals, lending, staking, rewards) — the mapping lives in
 to the link (90-day most-recent-connection rule); the per-wallet drill-down
 shows the wallet's full history. Transfer counts include protocol-driven
 transfers (swap legs, vault moves), not just P2P sends.
+
+## User timeline
+
+Clicking any wallet address in the dashboard opens
+`/dashboard/users/<address>` — one chronological story per person, served by
+`GET /tracking-api/users/:address/timeline`:
+
+- **Off-chain** (this service's tables): tracking-link opens (with visitor
+  location and referrer), the SPA engagement ping, and wallet connections —
+  across *every* link the wallet touched, not just one.
+- **On-chain** (the same Cirrus snapshot the link views use): bridge-ins with
+  their STRATO and origin-chain transaction links, plus swaps, CDP, savings,
+  transfers, bridge-outs … Each chain item also reports which link it is
+  attributed to, if any; the timeline itself is deliberately not
+  attribution-filtered (a prospect's pre-link history is sales signal).
+- **Origin chain** (optional): with `TRACKING_ETHERSCAN_API_KEY` set, the
+  external sender's most recent transactions on the chain it bridged from
+  (Etherscan V2 is multichain, so one key covers Ethereum/Base/Polygon/…),
+  which shows how the wallet was funded before it arrived. Results are cached
+  in-process for 5 minutes per chain + address to stay inside the free rate
+  limit; without a key the timeline simply omits these items and the dashboard
+  says so.
+
+The external wallet and the STRATO account are followed through the
+connection rows that carry both, so either address renders the same timeline.
+Read-only: no new tables or columns.
 
 ## IP geolocation
 

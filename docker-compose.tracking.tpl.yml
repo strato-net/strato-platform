@@ -25,6 +25,11 @@ services:
     - TRACKING_COOKIE_DOMAIN=${TRACKING_COOKIE_DOMAIN:-}
     - TRACKING_IPINFO_TOKEN=${TRACKING_IPINFO_TOKEN:-}
     - TRACKING_ATTRIBUTION_WINDOW_DAYS=${TRACKING_ATTRIBUTION_WINDOW_DAYS:-}
+    # Optional: origin-chain enrichment of the user timeline (Etherscan V2
+    # multichain API — one key covers Ethereum, Base, Polygon, …)
+    - TRACKING_ETHERSCAN_API_KEY=${TRACKING_ETHERSCAN_API_KEY:-}
+    - TRACKING_ETHERSCAN_API_URL=${TRACKING_ETHERSCAN_API_URL:-}
+    - TRACKING_ETHERSCAN_MAX_TX=${TRACKING_ETHERSCAN_MAX_TX:-}
     build: ./app/services/tracking
     image: ${TRACKING_IMAGE:-<REPO_URL>tracking:<VERSION>-<HASH_TRACKING>}
     init: true

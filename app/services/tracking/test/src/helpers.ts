@@ -104,6 +104,25 @@ export const resetCirrus = async (): Promise<void> => {
   await fetch(`${MOCKS_URL}/__test/cirrus`, { method: "DELETE" });
 };
 
+// Origin-chain transactions served by the Etherscan V2 look-alike (the
+// service reads them for the user timeline when an API key is configured)
+export const seedEtherscan = async (
+  chainId: number,
+  address: string,
+  rows: object[]
+): Promise<void> => {
+  const res = await fetch(`${MOCKS_URL}/__test/etherscan/${chainId}/${cirrusAddress(address)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(rows),
+  });
+  if (!res.ok) throw new Error(`seedEtherscan failed: ${res.status}`);
+};
+
+export const resetEtherscan = async (): Promise<void> => {
+  await fetch(`${MOCKS_URL}/__test/etherscan`, { method: "DELETE" });
+};
+
 // The service answers /health before the DB and JWKS are initialized, so
 // readiness = an authorized /me (JWKS init runs after bootstrapDb resolves).
 export const waitForReady = async (timeoutMs = 120_000): Promise<void> => {

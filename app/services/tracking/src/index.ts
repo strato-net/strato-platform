@@ -43,6 +43,11 @@ app.get(
   requireAuthorized,
   asyncHandler(admin.walletDetail)
 );
+app.get(
+  "/tracking-api/users/:address/timeline",
+  requireAuthorized,
+  asyncHandler(admin.userTimeline)
+);
 app.patch("/tracking-api/links/:id", requireAuthorized, asyncHandler(admin.update));
 
 app.use(

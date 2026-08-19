@@ -1,6 +1,14 @@
 import { format, formatDistanceToNow } from 'date-fns';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ACTIVITY_CATEGORY_LABELS, externalTxLink, formatUsd, getWallet, shortAddress } from '../api';
+import {
+  ACTIVITY_CATEGORY_LABELS,
+  externalTxLink,
+  formatUsd,
+  getWallet,
+  shortAddress,
+  userTimelinePath,
+} from '../api';
 import ActivityTiles from './ActivityTiles';
 import {
   AddressCell,
@@ -61,6 +69,12 @@ const WalletPanel = ({ linkId, address, onClose }: WalletPanelProps) => {
               Connector: {wallet.data.connector ?? '—'} · First connected{' '}
               {format(new Date(wallet.data.connectedAt), 'MMM d, yyyy')}
             </div>
+            <Link
+              to={userTimelinePath(wallet.data.address)}
+              className="inline-block text-sm underline"
+            >
+              View activity timeline
+            </Link>
           </div>
 
           <div>
