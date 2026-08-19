@@ -119,12 +119,20 @@ export interface ActivityItem {
   at: string;
 }
 
+// One open at a coordinate: when the visitor connected a wallet, `address` is
+// their identity key (and links to their timeline); null when anonymous.
+export interface GeoVisit {
+  at: string;
+  address: string | null;
+}
+
 export interface GeoPoint {
   lat: number;
   lon: number;
   city: string | null;
   country: string | null;
   count: number;
+  visits: GeoVisit[]; // newest first
 }
 
 export interface WalletSummary {
@@ -156,6 +164,8 @@ export interface LinkDetail extends LinkSummary {
   activitySummary: ActivitySummary;
   walletSummaries: WalletSummary[];
   geoPoints: GeoPoint[];
+  // The map only shows the most recent opens when a link has very many
+  geoTruncated: boolean;
   history: HistoryPoint[];
 }
 
