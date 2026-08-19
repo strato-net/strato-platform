@@ -61,6 +61,91 @@ export const Button = ({
   );
 };
 
+// Small square button for icon-only controls (map zoom), where Button's
+// text padding is too generous.
+export const IconButton = ({
+  children,
+  onClick,
+  label,
+  disabled,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  label: string;
+  disabled?: boolean;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    aria-label={label}
+    title={label}
+    className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-card text-foreground shadow-sm transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
+  >
+    {children}
+  </button>
+);
+
+// Dual-handle range slider: two native range inputs overlaid on one track, so
+// keyboard and screen-reader support come for free. The handles can't cross
+// (each drag clamps against the other). Thumb styling lives in index.css
+// (.range-input) because pseudo-elements can't be expressed in Tailwind here.
+export const RangeSlider = ({
+  min,
+  max,
+  step = 1,
+  value,
+  onChange,
+  labelStart,
+  labelEnd,
+  disabled,
+}: {
+  min: number;
+  max: number;
+  step?: number;
+  value: [number, number];
+  onChange: (next: [number, number]) => void;
+  labelStart: string;
+  labelEnd: string;
+  disabled?: boolean;
+}) => {
+  const span = Math.max(1, max - min);
+  const percent = (v: number) => ((Math.min(Math.max(v, min), max) - min) / span) * 100;
+  return (
+    <div className={`relative h-6 w-full ${disabled ? 'opacity-50' : ''}`}>
+      <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-muted" />
+      <div
+        className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-primary"
+        style={{ left: `${percent(value[0])}%`, right: `${100 - percent(value[1])}%` }}
+      />
+      <input
+        type="range"
+        className="range-input"
+        min={min}
+        max={max}
+        step={step}
+        value={value[0]}
+        disabled={disabled}
+        aria-label={`Range start — ${labelStart}`}
+        aria-valuetext={labelStart}
+        onChange={(e) => onChange([Math.min(Number(e.target.value), value[1]), value[1]])}
+      />
+      <input
+        type="range"
+        className="range-input"
+        min={min}
+        max={max}
+        step={step}
+        value={value[1]}
+        disabled={disabled}
+        aria-label={`Range end — ${labelEnd}`}
+        aria-valuetext={labelEnd}
+        onChange={(e) => onChange([value[0], Math.max(Number(e.target.value), value[0])])}
+      />
+    </div>
+  );
+};
+
 export const Skeleton = ({ className = '' }: { className?: string }) => (
   <div className={`animate-pulse rounded-md bg-muted ${className}`} />
 );
