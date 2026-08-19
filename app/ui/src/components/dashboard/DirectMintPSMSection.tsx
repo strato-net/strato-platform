@@ -352,7 +352,7 @@ const DirectMintPSMSection = () => {
                         disabled={!savingsEnabled || isProcessing}
                       />
                       <span>
-                        Deposit straight into Savings
+                        Deposit straight into USDST Savings Vault
                         {savingsApy && ` (${savingsApy} APY)`}
                         <span className="block text-xs text-muted-foreground">
                           {savingsEnabled
