@@ -438,6 +438,7 @@ export async function getInternalAddresses() {
   addresses.push(rewards || '', escrow, vaultFactory, positionManagerV3);
   addresses.push(stratoStaking, validatorRegistry);
   addresses.push(saveUsdstVault, usdcYieldVault, ethCarryVault, wbtcCarryVault);
+  addresses.push(directMintPsm);
 
   // Lending Registry --> lendingPool, collateralVault, liquidityPool
   const { data: [lending] } = await cirrus.get(accessToken, "/BlockApps-LendingRegistry", {
