@@ -6,7 +6,7 @@ import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 import JSONBig from "json-bigint";
 
-const { DirectMintPSM, Token } = constants;
+const { DirectMintPSM, Token, SaveUSDSTVault } = constants;
 const JSONbigString = JSONBig({ storeAsString: true });
 
 const normalizeAddress = (value: string | undefined | null): string =>
@@ -52,6 +52,8 @@ const toBigInt = (value: unknown): bigint => {
 const toBoolean = (value: unknown): boolean =>
   value === true || ["true", "t"].includes(String(value).toLowerCase());
 
+const isZeroAddress = (value: string): boolean => !value || /^0+$/.test(value);
+
 const getPsmAddress = (): string => {
   const addr = constants.directMintPsm;
   if (!addr) throw new Error("DirectMintPSM not configured for this network");
@@ -67,7 +69,6 @@ interface MintConfigInfo {
 interface BurnConfigInfo {
   isEnabled: boolean;
   minReserve: string;
-  burnDelay: string;
   feeBps: string;
 }
 
@@ -87,8 +88,7 @@ const parseBurnConfig = (value: unknown): BurnConfigInfo => {
   return {
     isEnabled: toBoolean(parsed.isEnabled ?? tuple[0]),
     minReserve: toIntegerString(parsed.minReserve ?? tuple[1]),
-    burnDelay: toIntegerString(parsed.burnDelay ?? tuple[2]),
-    feeBps: toIntegerString(parsed.feeBps ?? tuple[3]),
+    feeBps: toIntegerString(parsed.feeBps ?? tuple[2]),
   };
 };
 
@@ -128,25 +128,14 @@ export const getPsmMintState = async (accessToken: string): Promise<PsmMintState
   };
 };
 
-export interface BurnRequestInfo {
-  id: string;
-  amount: string;
-  payoutAmount: string;
-  redeemToken: string;
-  redeemTokenSymbol: string;
-  requester: string;
-  requestTime: string;
-  burnDelay: string;
-  availableAt: string;
-  isAvailable: boolean;
-}
-
 export interface PsmInfo {
   address: string;
   mintableToken: string;
   mintableTokenSymbol: string;
   mintPaused: boolean;
   burnPaused: boolean;
+  savingsVault: string;
+  savingsEnabled: boolean;
   eligibleTokens: Array<{
     address: string;
     symbol: string;
@@ -157,15 +146,63 @@ export interface PsmInfo {
     burnEnabled: boolean;
     maxBalance: string;
     minReserve: string;
-    burnDelay: string;
     mintFeeBps: string;
     burnFeeBps: string;
-    pendingRedemptions: string;
     availableLiquidity: string;
   }>;
-  burnRequests: BurnRequestInfo[];
   userMintableBalance: string;
 }
+
+/**
+ * Mirrors DirectMintPSM.savingsDepositAvailable so the UI can hide the
+ * "mint into savings" option instead of letting the user pay for a revert.
+ * The dust check (deposits that round to zero shares) is left to the contract.
+ */
+const getSavingsEnabled = async (
+  accessToken: string,
+  savingsVault: string,
+  mintableToken: string
+): Promise<boolean> => {
+  if (isZeroAddress(savingsVault) || !mintableToken) return false;
+
+  try {
+    const [vaultResponse, vaultBalanceResponse] = await Promise.all([
+      cirrus.get(accessToken, `/${SaveUSDSTVault}`, {
+        params: {
+          address: `eq.${savingsVault}`,
+          select: "assetToken,vaultInitialized,_paused,_totalSupply::text,_managedAssets::text",
+          limit: "1",
+        },
+      }),
+      cirrus.get(accessToken, `/${Token}-_balances`, {
+        params: {
+          address: `eq.${mintableToken}`,
+          key: `eq.${savingsVault}`,
+          select: "value::text",
+          limit: "1",
+        },
+      }),
+    ]);
+
+    const vault = vaultResponse.data?.[0];
+    if (!vault) return false;
+    if (!toBoolean(vault.vaultInitialized)) return false;
+    if (toBoolean(vault._paused)) return false;
+    if (normalizeAddress(vault.assetToken) !== mintableToken) return false;
+
+    const totalShares = toBigInt(vault._totalSupply);
+    if (totalShares === 0n) return true;
+
+    // Pricing assets are capped by the vault's live balance, as the vault does.
+    const managedAssets = toBigInt(vault._managedAssets);
+    const liveBalance = toBigInt(vaultBalanceResponse.data?.[0]?.value);
+    const pricingAssets = liveBalance < managedAssets ? liveBalance : managedAssets;
+    return pricingAssets > 0n;
+  } catch (error) {
+    console.warn("Failed to resolve PSM savings availability:", error);
+    return false;
+  }
+};
 
 export const getPsmInfo = async (
   accessToken: string,
@@ -178,11 +215,12 @@ export const getPsmInfo = async (
   const psmResponse = await cirrus.get(accessToken, `/${DirectMintPSM}`, {
     params: {
       address: `eq.${psmAddress}`,
-      select: "mintableToken,mintPaused,burnPaused",
+      select: "mintableToken,mintPaused,burnPaused,savingsVault",
     },
   });
   const psm = psmResponse.data?.[0] || {};
   const mintableToken = normalizeAddress(psm.mintableToken);
+  const savingsVault = normalizeAddress(psm.savingsVault);
 
   // 2. Per-token PSM configs
   const [mintConfigResponse, burnConfigResponse] = await Promise.all([
@@ -254,79 +292,23 @@ export const getPsmInfo = async (
     }
   }
 
-  // 5. PSM balances and reserved redemption liquidity for eligible tokens
+  // 5. PSM reserve balances for eligible tokens
   let psmBalances: Record<string, string> = {};
-  let pendingRedemptions: Record<string, string> = {};
   if (eligibleAddresses.length > 0) {
-    const [psmBalResponse, pendingResponse] = await Promise.all([
-      cirrus.get(accessToken, `/${Token}-_balances`, {
-        params: {
-          address: `in.(${eligibleAddresses.join(",")})`,
-          key: `eq.${psmAddress}`,
-          select: "address,value::text",
-        },
-      }),
-      cirrus.get(accessToken, `/${DirectMintPSM}-pendingRedemptions`, {
-        params: {
-          address: `eq.${psmAddress}`,
-          select: "key,value::text",
-        },
-      }),
-    ]);
+    const psmBalResponse = await cirrus.get(accessToken, `/${Token}-_balances`, {
+      params: {
+        address: `in.(${eligibleAddresses.join(",")})`,
+        key: `eq.${psmAddress}`,
+        select: "address,value::text",
+      },
+    });
     for (const b of psmBalResponse.data || []) {
       psmBalances[normalizeAddress(b.address)] = b.value || "0";
     }
-    for (const entry of pendingResponse.data || []) {
-      pendingRedemptions[normalizeAddress(entry.key)] = toIntegerString(entry.value);
-    }
   }
 
-  // 6. Burn requests from the mapping table (zeroed entries = deleted)
-  const burnReqResponse = await cirrus.get(
-    accessToken,
-    `/${DirectMintPSM}-burnRequests`,
-    {
-      params: {
-        address: `eq.${psmAddress}`,
-        select: "key,value::text",
-      },
-    }
-  );
-
-  const currentTime = Math.floor(Date.now() / 1000);
-
-  const burnRequests: BurnRequestInfo[] = (burnReqResponse.data || [])
-    .map((entry: any) => {
-      const val = parseStructValue(entry.value);
-      const tuple = parseTupleValue(entry.value);
-      const amount = toIntegerString(val?.burnAmount ?? tuple[0]);
-      const payoutAmount = toIntegerString(val?.payoutAmount ?? tuple[1]);
-      const redeemAddr = normalizeAddress(val?.redeemToken ?? tuple[2]);
-      const requester = normalizeAddress(val?.requester ?? tuple[3]);
-      const requestTime = toIntegerString(val?.requestTime ?? tuple[4]);
-      const burnDelay = burnConfigs[redeemAddr]?.burnDelay || "0";
-      const availableAt = String((toBigInt(requestTime) + toBigInt(burnDelay)).toString());
-      return {
-        id: String(entry.key),
-        amount,
-        payoutAmount,
-        redeemToken: redeemAddr,
-        redeemTokenSymbol: tokenMeta[redeemAddr]?.symbol || redeemAddr,
-        requester,
-        requestTime,
-        burnDelay,
-        availableAt,
-        isAvailable: currentTime >= parseInt(availableAt),
-      };
-    })
-    .filter(
-      (r: BurnRequestInfo) =>
-        r.requester === normalizedUser && r.amount !== "0" && BigInt(r.amount) > 0n
-    );
-
-  burnRequests.sort(
-    (a, b) => parseInt(b.requestTime) - parseInt(a.requestTime)
-  );
+  // 6. Whether minting can currently be routed into the savings vault
+  const savingsEnabled = await getSavingsEnabled(accessToken, savingsVault, mintableToken);
 
   return {
     address: psmAddress,
@@ -334,6 +316,8 @@ export const getPsmInfo = async (
     mintableTokenSymbol: tokenMeta[mintableToken]?.symbol || "USDST",
     mintPaused: toBoolean(psm.mintPaused),
     burnPaused: toBoolean(psm.burnPaused),
+    savingsVault: isZeroAddress(savingsVault) ? "" : savingsVault,
+    savingsEnabled,
     eligibleTokens: eligibleAddresses.map((addr) => ({
       address: addr,
       symbol: tokenMeta[addr]?.symbol || "",
@@ -344,19 +328,15 @@ export const getPsmInfo = async (
       burnEnabled: burnConfigs[addr]?.isEnabled || false,
       maxBalance: mintConfigs[addr]?.maxBalance || "0",
       minReserve: burnConfigs[addr]?.minReserve || "0",
-      burnDelay: burnConfigs[addr]?.burnDelay || "0",
       mintFeeBps: mintConfigs[addr]?.feeBps || "0",
       burnFeeBps: burnConfigs[addr]?.feeBps || "0",
-      pendingRedemptions: pendingRedemptions[addr] || "0",
+      // With no escrow, redeemable liquidity is simply the balance above minReserve.
       availableLiquidity: (() => {
         const psmBalance = toBigInt(psmBalances[addr]);
-        const pending = toBigInt(pendingRedemptions[addr]);
         const minReserve = toBigInt(burnConfigs[addr]?.minReserve);
-        const unreserved = psmBalance - pending;
-        return unreserved > minReserve ? (unreserved - minReserve).toString() : "0";
+        return psmBalance > minReserve ? (psmBalance - minReserve).toString() : "0";
       })(),
     })),
-    burnRequests,
     userMintableBalance: userBalances[mintableToken] || "0",
   };
 };
@@ -364,7 +344,11 @@ export const getPsmInfo = async (
 export const psmMint = async (
   accessToken: string,
   userAddress: string,
-  { amount, againstToken }: { amount: string; againstToken: string }
+  {
+    amount,
+    againstToken,
+    toSavings,
+  }: { amount: string; againstToken: string; toSavings?: boolean }
 ): Promise<{ status: string; hash: string }> => {
   const psmAddress = getPsmAddress();
 
@@ -378,7 +362,7 @@ export const psmMint = async (
     {
       contractName: extractContractName(DirectMintPSM),
       contractAddress: psmAddress,
-      method: "mint",
+      method: toSavings ? "mintAndSave" : "mint",
       args: { amount, againstToken },
     },
   ];
@@ -389,7 +373,7 @@ export const psmMint = async (
   );
 };
 
-export const psmRequestBurn = async (
+export const psmRedeem = async (
   accessToken: string,
   userAddress: string,
   { amount, redeemToken }: { amount: string; redeemToken: string }
@@ -412,52 +396,12 @@ export const psmRequestBurn = async (
     {
       contractName: extractContractName(DirectMintPSM),
       contractAddress: psmAddress,
-      method: "requestBurn",
+      method: "redeem",
       args: { amount, redeemToken },
     },
   ];
 
   const builtTx = await buildFunctionTx(txs, userAddress, accessToken);
-  return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
-  );
-};
-
-export const psmCompleteBurn = async (
-  accessToken: string,
-  userAddress: string,
-  { id }: { id: string }
-): Promise<{ status: string; hash: string }> => {
-  const psmAddress = getPsmAddress();
-
-  const tx: FunctionInput = {
-    contractName: extractContractName(DirectMintPSM),
-    contractAddress: psmAddress,
-    method: "completeBurn",
-    args: { id },
-  };
-
-  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
-  return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
-  );
-};
-
-export const psmCancelBurn = async (
-  accessToken: string,
-  userAddress: string,
-  { id }: { id: string }
-): Promise<{ status: string; hash: string }> => {
-  const psmAddress = getPsmAddress();
-
-  const tx: FunctionInput = {
-    contractName: extractContractName(DirectMintPSM),
-    contractAddress: psmAddress,
-    method: "cancelBurn",
-    args: { id },
-  };
-
-  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
