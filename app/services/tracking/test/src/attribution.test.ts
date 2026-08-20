@@ -172,6 +172,99 @@ describe("Cirrus attribution joins", () => {
     assert.equal(drill.bridgeIns.length, 2);
   });
 
+  it("matches Cirrus rows whose addresses are stored 0x-prefixed", async () => {
+    const link = await createLink({ label: "0x-prefixed" });
+    const { cookie } = await openLink(link.slug);
+    await sleep(200);
+    const external = randomAddress();
+    const strato = randomAddress();
+    const token = cirrusAddress(randomAddress());
+    await api("/tracking-api/wallet-connected", {
+      method: "POST",
+      cookie,
+      body: { externalWalletAddress: external, stratoAddress: strato },
+    });
+
+    // Every address on the Cirrus side carries the 0x prefix here
+    await seedCirrus(DEPOSITS, [
+      {
+        id: 301,
+        externalChainId: 1,
+        externalSender: `0x${cirrusAddress(external)}`,
+        externalTxHash: "0xext301",
+        stratoRecipient: `0x${cirrusAddress(strato)}`,
+        stratoToken: `0x${token}`,
+        stratoTokenAmount: WEI(3),
+        block_timestamp: isoIn(1000),
+        transaction_hash: "strato301",
+      },
+    ]);
+    await seedCirrus(TOKENS, [{ address: `0x${token}`, _symbol: "PRFX" }]);
+    await seedCirrus(PRICES, [{ key: `0x${token}`, value: WEI(10) }]);
+    await seedCirrus(EVENTS, [
+      {
+        id: 7001,
+        address: "pool000000000000000000000000000000000002",
+        contract_name: "Pool",
+        event_name: "Swap",
+        block_timestamp: isoIn(2000),
+        attributes: { sender: `0x${cirrusAddress(strato)}`, tokenIn: `0x${token}`, amountIn: WEI(1) },
+      },
+    ]);
+
+    const detail = (await (await authed(`/tracking-api/links/${link.id}`)).json()) as any;
+    assert.equal(detail.bridgedWallets, 1);
+    assert.equal(detail.bridgeValueUsd, 30);
+    assert.equal(detail.bridgeIns.length, 1);
+    assert.equal(detail.bridgeIns[0].address, cirrusAddress(strato), "addresses are normalized");
+    assert.equal(detail.bridgeIns[0].asset, "PRFX");
+    assert.deepEqual(detail.activitySummary, { bridge_in: 1, swap: 1 });
+    assert.equal(detail.activity[0].address, cirrusAddress(strato));
+    assert.equal(detail.activatedWallets, 1);
+  });
+
+  it("attributes a bridge-in whose block timestamp sits just before the connection row", async () => {
+    const link = await createLink({ label: "Grace window" });
+    const { cookie } = await openLink(link.slug);
+    await sleep(200);
+    const strato = randomAddress();
+    const token = cirrusAddress(randomAddress());
+    await api("/tracking-api/wallet-connected", { method: "POST", cookie, body: { stratoAddress: strato } });
+
+    await seedCirrus(DEPOSITS, [
+      {
+        id: 401,
+        externalChainId: 1,
+        externalSender: cirrusAddress(randomAddress()),
+        externalTxHash: "0xgrace",
+        stratoRecipient: cirrusAddress(strato),
+        stratoToken: token,
+        stratoTokenAmount: WEI(1),
+        // Mined 5 minutes ago: inside TRACKING_ATTRIBUTION_GRACE_MINUTES
+        block_timestamp: isoIn(-5 * 60 * 1000),
+        transaction_hash: "grace401",
+      },
+      {
+        id: 402,
+        externalChainId: 1,
+        externalSender: cirrusAddress(randomAddress()),
+        externalTxHash: "0xstale",
+        stratoRecipient: cirrusAddress(strato),
+        stratoToken: token,
+        stratoTokenAmount: WEI(1),
+        // Hours before the connection: still outside the grace window
+        block_timestamp: isoIn(-6 * 3600 * 1000),
+        transaction_hash: "stale402",
+      },
+    ]);
+    await seedCirrus(PRICES, [{ key: token, value: WEI(100) }]);
+
+    const detail = (await (await authed(`/tracking-api/links/${link.id}`)).json()) as any;
+    assert.equal(detail.bridgeIns.length, 1);
+    assert.equal(detail.bridgeIns[0].txHash, "grace401");
+    assert.equal(detail.bridgeValueUsd, 100);
+  });
+
   it("assigns an event to the most recent connection so two links never share it", async () => {
     const strato = randomAddress();
     const first = await createLink({ label: "First touch" });

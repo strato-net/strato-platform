@@ -31,7 +31,11 @@ docker compose -f docker-compose.test.yml -p tracking-tests down -v
   `createLink()`, `openLink(slug, ua)` (returns the `strato_tid` cookie),
   `seedCirrus(table, rows)`, `resetCirrus()`, `seedEtherscan(chainId, address,
   txs)` / `resetEtherscan()` (origin-chain rows for the user timeline),
-  `sql()` for DB assertions, `randomAddress()` / `cirrusAddress()`.
+  `sql()` for DB assertions, `randomAddress()` / `cirrusAddress()`,
+  `testIp()` (random public IP for the same-IP beacon fallback) and the
+  `BROWSER_UA` / `BOT_UA` / `IN_APP_BROWSER_UA` / `PREVIEW_UA` user agents.
+  `openLink(slug, ua, headers)` takes extra request headers (e.g.
+  `X-Forwarded-For`).
 - Create fresh links/addresses per test — the DB is shared for the whole run
   and files run in order, but never assume anything about existing rows.
 - The resolver persists sessions fire-and-forget after the 302: poll the row

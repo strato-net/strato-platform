@@ -19,6 +19,7 @@ describe("service bootstrap", () => {
     assert.ok(names.includes("002_session_geo"), `002_session_geo missing from ${names}`);
     assert.ok(names.includes("003_source_split"), `003_source_split missing from ${names}`);
     assert.ok(names.includes("004_metrics_indexes"), `004_metrics_indexes missing from ${names}`);
+    assert.ok(names.includes("005_session_diagnostics"), `005_session_diagnostics missing from ${names}`);
     assert.equal(new Set(names).size, names.length, "duplicate migration rows");
   });
 
@@ -35,5 +36,12 @@ describe("service bootstrap", () => {
 
     const indexes = (await sql<{ indexname: string }>("SELECT indexname FROM pg_indexes WHERE tablename = 'tracking_sessions'")).rows.map((r) => r.indexname);
     assert.ok(indexes.includes("tracking_sessions_opened_at_idx"), `opened_at index missing (migration 004): ${indexes}`);
+    assert.ok(indexes.includes("tracking_sessions_ip_opened_idx"), `ip/opened_at index missing (migration 005): ${indexes}`);
+
+    // Migration 005 diagnostics columns
+    const sessionCols = (await sql<{ column_name: string }>("SELECT column_name FROM information_schema.columns WHERE table_name = 'tracking_sessions'")).rows.map((r) => r.column_name);
+    assert.ok(sessionCols.includes("bot_reason"), `bot_reason column missing (migration 005): ${sessionCols}`);
+    const connectionCols = (await sql<{ column_name: string }>("SELECT column_name FROM information_schema.columns WHERE table_name = 'wallet_connections'")).rows.map((r) => r.column_name);
+    assert.ok(connectionCols.includes("session_source"), `session_source column missing (migration 005): ${connectionCols}`);
   });
 });

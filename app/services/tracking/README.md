@@ -12,9 +12,9 @@ source of truth.
 
 | Endpoint | Auth | Purpose |
 |---|---|---|
-| `GET /t/:slug` | none | Resolve a link: record `link_opened`, set the `strato_tid` session cookie (90 days, HttpOnly, SameSite=Lax), 302 to the stored destination — a relative path lands **on the original host** (relative Location — visitors on any node edge that proxies `/t/` land back on that node), an absolute http(s) URL goes where it points |
-| `POST /tracking-api/engage` | cookie | SPA boot ping; sets `engaged_at` so JS-less bots/email scanners never count as engagement |
-| `POST /tracking-api/wallet-connected` | cookie | Records external wallet and/or STRATO address for the session (deduped) |
+| `GET /t/:slug` | none | Resolve a link: record `link_opened`, set the `strato_tid` session cookie (90 days, HttpOnly, SameSite=Lax), 302 to the stored destination — a relative path lands **on the original host** (relative Location — visitors on any node edge that proxies `/t/` land back on that node), an absolute http(s) URL goes where it points (a **cross-host** destination also carries `?stid=<session id>`) |
+| `POST /tracking-api/engage` | session id | SPA boot ping; sets `engaged_at` so JS-less bots/email scanners never count as engagement |
+| `POST /tracking-api/wallet-connected` | session id | Records external wallet and/or STRATO address for the session (deduped) |
 | `GET /dashboard` | OIDC (SPA login) | The dashboard app (tracking-ui container) |
 | `GET /tracking-api/me` | JWT | `{authorized}` — whether the user may use the dashboard |
 | `GET /tracking-api/links` | JWT + allowlist | Link summaries with attribution rollups |
@@ -36,11 +36,49 @@ Dashboard access = Keycloak `preferred_username` in `TRACKING_AUTHORIZED_USERS`
 (allowlist only — there is no on-chain-admin fallback, so admins who need the
 dashboard must be listed too).
 
+## Session identification
+
+Everything downstream of an open (engagement, wallet connections, and
+therefore every bridge/activity metric) hangs off the session id, so the
+beacons accept it from three carriers, in order:
+
+1. the `strato_tid` cookie (primary),
+2. the `X-Strato-Tid` header,
+3. the `stid` query parameter (or `stid` in the JSON body).
+
+A cookie set by the tracking host is invisible to a destination on another
+host, so the resolver appends `?stid=<session id>` whenever it redirects to a
+different host than the one the visitor requested. As a last resort a
+`wallet-connected` beacon that arrives with no session id at all is bound to
+the newest non-bot open from the **same public IP** within
+`TRACKING_IP_FALLBACK_MINUTES` (default 30, `0` disables); the fallback is
+skipped for private IPs and whenever that window holds opens of more than one
+link, so it can only confirm an unambiguous visitor. `wallet_connections.session_source`
+records which carrier was used (`cookie`/`header`/`query`/`ip`).
+
+## Bot and preview filtering
+
+Only opens classified as human count towards `opens` (and only they get a
+cookie). Named crawlers, email scanners and link-preview fetchers
+(`facebookexternalhit`, `Googlebot`, `curl`, …), `HEAD` requests, prefetches
+and UA-less requests are filtered outright. Generic tokens that a real client
+can also carry (`bot` in a device name, `preview`, `scan`, `whatsapp`,
+`telegram`, …) only filter a visit when nothing else in the UA looks like a
+rendering browser — mobile in-app browsers (WhatsApp/Facebook/Instagram/
+Telegram/X webviews) run our JS and connect wallets, so they must never be
+filtered. `tracking_sessions.bot_reason` records why a visit was filtered (or
+which ambiguous token a real browser overrode), and the link's Summary card
+shows engaged and bot-filtered opens next to the raw count.
+
 ## Attribution
 
 For each chain event: the most recent non-bot tracked wallet connection
 before the event, within `TRACKING_ATTRIBUTION_WINDOW_DAYS` (default 90),
-wins; ties break to the earliest-created connection.
+wins; ties break to the earliest-created connection. Block timestamps and this
+server's clock are independent, so a connection recorded up to
+`TRACKING_ATTRIBUTION_GRACE_MINUTES` (default 30) *after* the event still
+claims it. Addresses are compared normalized (lowercase, no `0x`) on both
+sides, and Cirrus filters carry both spellings.
 Assignment is computed once over all links' connections, so one chain event is
 never counted under two links. Bridge completion events carry both
 `externalSender` and `stratoRecipient`, so either identifier attributes the
@@ -134,6 +172,8 @@ the app edge, which forwards the client IP and proxies here.
 | `TRACKING_COOKIE_DOMAIN` | empty (host-only) | Set `.strato.nexus` in prod so a future `go.strato.nexus` CNAME shares the cookie |
 | `TRACKING_IPINFO_TOKEN` | empty (offline fallback) | ipinfo.io token for live IP geolocation |
 | `TRACKING_ATTRIBUTION_WINDOW_DAYS` | `90` | Attribution window |
+| `TRACKING_ATTRIBUTION_GRACE_MINUTES` | `30` | Grace period for a chain event whose block timestamp sits marginally before the wallet connection |
+| `TRACKING_IP_FALLBACK_MINUTES` | `30` | Window in which a cookieless `wallet-connected` beacon may bind to a recent open from the same public IP (`0` disables) |
 | `TRACKING_CACHE_TTL_SECONDS` | `60` | Dashboard attribution cache |
 | `TRACKING_ETHERSCAN_API_KEY` | empty (disabled) | Etherscan V2 key enabling origin-chain items in the user timeline |
 | `TRACKING_ETHERSCAN_API_URL` | `https://api.etherscan.io/v2/api` | Etherscan-compatible endpoint (multichain via `chainid`) |

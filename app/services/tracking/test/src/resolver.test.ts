@@ -4,6 +4,9 @@ import {
   BOT_UA,
   BROWSER_UA,
   DEFAULT_DESTINATION,
+  IN_APP_BROWSER_UA,
+  PREVIEW_UA,
+  TRACKING_URL,
   api,
   authed,
   createLink,
@@ -91,7 +94,70 @@ describe("GET /t/:slug resolver", () => {
     const link = await createLink({ destination: "/dashboard/swap" });
     assert.equal((await openLink(link.slug)).res.headers.get("location"), "/dashboard/swap");
     await authed(`/tracking-api/links/${link.id}`, { method: "PATCH", body: { destination: "https://docs.strato.nexus/x" } });
-    assert.equal((await openLink(link.slug)).res.headers.get("location"), "https://docs.strato.nexus/x");
+    const location = (await openLink(link.slug)).res.headers.get("location")!;
+    // Cross-host destination: same URL plus the session id (see below)
+    assert.equal(new URL(location).origin + new URL(location).pathname, "https://docs.strato.nexus/x");
+  });
+
+  it("carries the session id in the URL when the destination is on another host", async () => {
+    const link = await createLink({ destination: "https://app.example.com/dashboard/deposits?ref=x" });
+    const { res, sessionId } = await openLink(link.slug);
+    const location = new URL(res.headers.get("location")!);
+    assert.equal(location.host, "app.example.com");
+    assert.equal(location.searchParams.get("ref"), "x", "existing query params are kept");
+    assert.equal(location.searchParams.get("stid"), sessionId, "stid must match the cookie session");
+
+    // Same host as the request: the cookie already covers it, URL untouched
+    const sameHost = await createLink({ destination: `${TRACKING_URL}/dashboard/deposits` });
+    const sameHostRes = await openLink(sameHost.slug);
+    assert.equal(
+      sameHostRes.res.headers.get("location"),
+      `${TRACKING_URL}/dashboard/deposits`
+    );
+
+    // Relative destinations are never rewritten either
+    const relative = await createLink({ destination: "/dashboard/swap" });
+    assert.equal((await openLink(relative.slug)).res.headers.get("location"), "/dashboard/swap");
+
+    // A bot gets neither cookie nor stid
+    const botRes = await openLink(link.slug, BOT_UA);
+    assert.equal(botRes.cookie, null);
+    assert.equal(
+      new URL(botRes.res.headers.get("location")!).searchParams.get("stid"),
+      null
+    );
+  });
+
+  it("counts a mobile in-app browser as a visitor and records the ambiguous token", async () => {
+    const link = await createLink();
+    const { res, cookie, sessionId } = await openLink(link.slug, IN_APP_BROWSER_UA);
+    assert.equal(res.status, 302);
+    assert.ok(cookie, "in-app browsers must get a session cookie");
+    const session = await sessionRow(sessionId!);
+    assert.equal(session.is_bot_or_preview, false);
+    assert.equal(session.bot_reason, "browser-ua:whatsapp");
+  });
+
+  it("still filters the preview fetcher of the same app, and records why", async () => {
+    const link = await createLink();
+    const preview = await openLink(link.slug, PREVIEW_UA);
+    assert.equal(preview.cookie, null);
+    const facebook = await openLink(link.slug, "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)");
+    assert.equal(facebook.cookie, null);
+    const noUa = await api(`/t/${link.slug}`, { headers: { "User-Agent": "" } });
+    assert.equal(noUa.status, 302);
+    await sleep(300);
+
+    const { rows } = await sql(
+      "SELECT bot_reason, is_bot_or_preview FROM tracking_sessions WHERE link_id = $1 ORDER BY opened_at",
+      [link.id]
+    );
+    assert.equal(rows.length, 3);
+    assert.ok(rows.every((row: any) => row.is_bot_or_preview === true));
+    assert.deepEqual(
+      rows.map((row: any) => row.bot_reason).sort(),
+      ["ambiguous-ua:whatsapp", "bot-ua:facebookexternalhit", "no-user-agent"]
+    );
   });
 
   it("stores the forwarded client IP", async () => {

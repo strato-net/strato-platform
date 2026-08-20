@@ -82,4 +82,19 @@ UPDATE tracking_links SET full_source = source;
 CREATE INDEX tracking_sessions_opened_at_idx ON tracking_sessions (opened_at);
 `,
   },
+  {
+    // Diagnosing "why is this link at zero?": bot_reason records WHY a visit
+    // was filtered (or which ambiguous token a real browser overrode), and
+    // session_source records how a wallet connection found its session
+    // (cookie, stid param/header, or the same-IP fallback). The partial index
+    // serves that fallback lookup.
+    name: "005_session_diagnostics",
+    sql: `
+ALTER TABLE tracking_sessions ADD COLUMN bot_reason TEXT;
+ALTER TABLE wallet_connections ADD COLUMN session_source TEXT;
+CREATE INDEX tracking_sessions_ip_opened_idx
+  ON tracking_sessions (ip_address, opened_at DESC)
+  WHERE ip_address IS NOT NULL AND NOT is_bot_or_preview;
+`,
+  },
 ];
