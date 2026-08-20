@@ -611,8 +611,63 @@ const fix822x = (s: string) =>
 const collapseDoubledQuotesToken = (s: string) =>
   s.replace(/:\s*""([^"]+)""/g, ':"$1"').replace(/,\s*""([^"]+)""/g, ',"$1"');
 
-// Parses JSON string: normalizes characters, repairs malformed JSON, then parses with BigInt support
-const parseText = (s: string) => J.parse(jsonrepair(normalize(fix822x(s))));
+const toPlainObjects = (v: unknown): unknown => {
+  if (Array.isArray(v)) return v.map(toPlainObjects);
+  if (v !== null && typeof v === "object") {
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(v as object)) {
+      out[k] = toPlainObjects((v as Record<string, unknown>)[k]);
+    }
+    return out;
+  }
+  return v;
+};
+
+const STRUCT_TYPE_NAME = /(^|[\[{,:]\s*)[A-Za-z_$][\w$]*\s*\{/g;
+
+// The same shape minus JSON's keywords. Solidity reserves true/false/null, so none
+// can name a struct, and on the entry path consuming one turns text the author got
+// wrong into a valid object. The display path keeps the looser form above, which
+// only ever reads real SolidVM output and so cannot meet a keyword here.
+const STRUCT_TYPE_NAME_ENTRY =
+  /(^|[\[{,:]\s*)(?!(?:true|false|null)\s*\{)[A-Za-z_$][\w$]*\s*\{/g;
+
+// Applies `rewrite` only to the runs of text between string literals, so a value's
+// own characters are never touched: their contents can hold the same shapes being
+// rewritten, and changing those would change the value itself. `quotes` lists the
+// delimiters the dialect recognises.
+const rewriteOutsideStrings = (
+  s: string,
+  quotes: string,
+  rewrite: (outside: string) => string
+): string => {
+  let out = "";
+  let outside = "";
+  let quote = "";
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (quote) {
+      out += c;
+      if (c === "\\") out += s[++i] ?? "";
+      else if (c === quote) quote = "";
+      continue;
+    }
+    if (quotes.includes(c)) {
+      out += rewrite(outside) + c;
+      outside = "";
+      quote = c;
+      continue;
+    }
+    outside += c;
+  }
+  return out + rewrite(outside);
+};
+
+const stripStructTypeNames = (s: string) =>
+  rewriteOutsideStrings(s, "\"'", (outside) => outside.replace(STRUCT_TYPE_NAME, "$1{"));
+
+const parseText = (s: string) =>
+  toPlainObjects(J.parse(jsonrepair(stripStructTypeNames(normalize(fix822x(s))))));
 
 /**
  * Parses JSON strings with BigInt support, handling malformed JSON and Unicode issues.
@@ -647,5 +702,84 @@ export const parseJsonBigInt = <T>(
       err: e instanceof Error ? `${e.name}: ${e.message}` : String(e),
     });
     return fallback;
+  }
+};
+
+// Invisible characters an editor or document injects around pasted JSON. Outside a
+// string literal JSON permits only whitespace between tokens, so replacing one with
+// a space either leaves the same tokens or leaves the text invalid — it can never
+// merge two of them. They are folded rather than deleted for exactly that reason:
+// deleting one joins whatever sat on either side, so `[1<ZWSP>2]` would become the
+// fabricated `[12]`. Inside a string literal they belong to the value and survive.
+// Escaped rather than literal so they stay visible to a reviewer.
+const JSON_INVISIBLE = /[\u00A0\u1680\u2000-\u200A\u200B-\u200D\u202F\u205F\u2028\u2029\u3000\uFEFF]/g;
+
+/**
+ * Parses JSON with BigInt support, rejecting anything it cannot read exactly.
+ * Values a user typed must reach the chain as written, so bad input is reported
+ * rather than guessed at — repairing it submits a value nobody entered, and the
+ * issueId a later vote has to match is hashed over whatever was submitted.
+ * parseJsonBigInt stays the reader for values coming back off the chain, where
+ * lenience is warranted.
+ *
+ * @param input - JSON string to parse
+ * @returns Parsed value with BigInt support
+ * @throws on invalid JSON. The reason may be a SyntaxError or, from json-bigint, a
+ * plain object ({ name, message, at, text }), so callers must not assume
+ * `instanceof Error` when reading it.
+ */
+/**
+ * The text of `input` that sits outside its string literals, concatenated. Lets a
+ * caller tell a character used as JSON syntax from the same character occurring
+ * inside a value, which is a distinction only this walker can draw.
+ *
+ * @param input - JSON string to inspect
+ * @returns Every run of text outside a string literal, joined
+ */
+export const jsonTextOutsideStrings = (input: string): string => {
+  let outside = "";
+  rewriteOutsideStrings(input, '"', (chunk) => {
+    outside += chunk;
+    return chunk;
+  });
+  return outside;
+};
+
+export const parseJsonBigIntStrict = (input: string): unknown => {
+  // The only things normalized are constructs that cannot occur inside a JSON
+  // value: invisible layout characters, and the `TypeName{...}` prefix SolidVM
+  // prints for a struct, which is the form an event's args carry on chain and so
+  // the form someone reads out of Cirrus or a block explorer. (The vote screen
+  // itself re-serializes to plain JSON, so a value copied from there needs no
+  // help.) Both are no-ops on valid JSON, so neither can turn one value into
+  // another. Substituted quotes are deliberately not in that set: which plain quote
+  // a curly one meant is a guess, and guessing is what used to change an array's
+  // contents and its length.
+  const text = rewriteOutsideStrings(input, '"', (outside) =>
+    outside
+      .replace(JSON_INVISIBLE, " ")
+      .replace(STRUCT_TYPE_NAME_ENTRY, "$1{")
+  );
+  // json-bigint's own parser is lenient in ways that silently alter a value: a
+  // malformed \u escape becomes NUL rather than an error, raw control characters
+  // pass through, and trailing bytes are ignored. Gate on JSON.parse, which is
+  // spec-compliant, and use json-bigint only to re-read the accepted text at full
+  // integer precision.
+  JSON.parse(text);
+  return toPlainObjects(J.parse(text));
+};
+
+/**
+ * @param value - Parsed argument value of any shape
+ * @returns Display string for the value
+ */
+export const formatArgValue = (value: unknown): string => {
+  if (value === null) return "null";
+  if (value === undefined) return "";
+  if (typeof value !== "object") return String(value);
+  try {
+    return JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? v.toString() : v)) ?? "";
+  } catch {
+    return "[unserializable]";
   }
 };

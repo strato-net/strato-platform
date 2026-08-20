@@ -4,11 +4,12 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx, until } from "../../utils/txHelper";
 import { StratoPaths } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
+import { StratoError } from "../../errors";
 import JSONBig from "json-bigint";
-import { normalizeLegacyEscapes } from "../helpers/jsonStringParsing.helper";
+import { normalizeLegacyEscapes, repairStructuredJson } from "../helpers/jsonStringParsing.helper";
 const { AdminRegistry, adminRegistry, DAY_MS } = constants;
 const JSONBigString = JSONBig({ storeAsString: true });
-const JSONBigNumber = JSONBig();
+const JSONBigNumber = JSONBig({ useNativeBigInt: true });
 
 type AbiType = {
   tag?: string;
@@ -451,13 +452,109 @@ export const simulateCastVoteOnIssue = async (
   return Array.isArray(data) ? data[0] : data;
 };
 
+// Arguments as the node rendered them into the IssueCreated event. They are not
+// strict JSON — structs carry their type name — so fall back to repairing the node's
+// own notation when a plain parse does not yield the argument list
+const parseIssueEventArgs = (raw: unknown): any[] => {
+  if (Array.isArray(raw)) return raw;
+  const text = typeof raw === "string" ? raw : JSONBigString.stringify(raw ?? []);
+  for (const decode of [normalizeLegacyEscapes, repairStructuredJson]) {
+    try {
+      const parsed = JSONBigString.parse(decode(text));
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // try the next decoder
+    }
+  }
+  throw new Error(`Could not read the issue's recorded arguments: ${text}`);
+};
+
+const sameIssueId = (a: string, b: string): boolean =>
+  (a || "").toLowerCase().replace(/^0x/, "") === (b || "").toLowerCase().replace(/^0x/, "");
+
+// A vote that hashes to a different issue has silently opened a new one instead of
+// voting, which is the failure this whole flow exists to prevent. Say so loudly rather
+// than reporting success. Also serves as the wait for the vote's events to land, which
+// callers depend on before refetching the issue lists
+const verifyVoteLandedOn = async (
+  accessToken: string,
+  issueId: string,
+  hash: string,
+): Promise<void> => {
+  const landed = await findIssueIdForTx(accessToken, hash);
+  if (landed && !sameIssueId(landed, issueId)) {
+    throw new Error(
+      `Vote landed on issue ${landed} instead of ${issueId}. A new issue may now be open — ` +
+      `check Open Issues before retrying.`);
+  }
+};
+
+// Whether a second attempt at this vote is safe. The hazard is re-submitting a vote
+// that already succeeded: if the first attempt crossed the threshold, _executeIssue
+// clears the issue, and an identical submission re-opens it as new — resurrecting an
+// already-executed action for someone to vote through again. Refuse the retry unless
+// the chain still shows the issue waiting for this admin's vote, and refuse it on an
+// unreadable index too, since that is not evidence of anything
+const voteStillPending = async (
+  accessToken: string,
+  issue: any,
+  userAddress: string,
+): Promise<boolean> => {
+  const rows = (event: string, params: Record<string, string>) =>
+    cirrus
+      .get(accessToken, "/" + AdminRegistry + "-" + event, { params })
+      .then((res) => (Array.isArray(res.data) ? res.data : []))
+      .catch(() => null);
+
+  const [executed, votes] = await Promise.all([
+    rows("IssueExecuted", { issueId: `eq.${issue.issueId}`, select: "issueId,block_number" }),
+    rows("votes", { key: `eq.${issue.issueId}` }),
+  ]);
+  if (executed === null || votes === null) return false;
+
+  // Only an execution at or after this issue's creation retired *this* issue; the same
+  // arguments may well have been proposed and executed before
+  const createdAt = Number(issue.block_number ?? 0);
+  if (executed.some((row: any) => Number(row.block_number ?? 0) >= createdAt)) return false;
+
+  return !votes.some((row: any) => sameAddress(row.value, userAddress));
+};
+
+// Vote through the registry's own castVoteOnIssue, with the issue's arguments in its
+// variadic slot. The VM infers types there instead of coercing them to the target's
+// declared ones, which is what lets values the node can render but not re-parse — an
+// enum member, rendered as its ordinal — still reach the same issueId. keccak256 hashes
+// an enum as its bare ordinal (rlpEncodeValue: SEnumVal _ _ i -> rlpEncode i), so the id
+// is unchanged, and coerceFromInt restores the member on execution
+const castVoteViaRegistry = async (
+  accessToken: string,
+  userAddress: string,
+  issue: any,
+): Promise<{ status: string; hash: string }> => {
+  const { funcArgs } = await fetchFuncArgs(accessToken, issue.target, issue.func);
+  const typedArgs = parseIssueEventArgs(issue.args)
+    .map((arg, i) => hintedArg(funcArgs[i]?.[1] || {}, arg));
+  const call = castVoteCall(issue.target, issue.func, typedArgs);
+
+  return callTargetFunction(
+    accessToken, userAddress, call.contractName, call.contractAddress, call.method, call.args);
+};
+
 // Cast a vote on an existing issue by replaying the exact transaction that created
-// it, so the call hashes to the same issueId instead of opening a new issue
+// it, so the call hashes to the same issueId instead of opening a new issue.
+//
+// The replay decodes the node's record of the arguments back into the target's declared
+// types, which the node cannot always accept back — a struct array does not survive as
+// strict JSON, and an enum comes back as an ordinal where only its member name parses.
+// When that happens, fall back to the registry's variadic castVoteOnIssue, which infers
+// types instead and reaches the same issueId. The fallback is gated on the chain still
+// showing the vote as pending, so a first attempt that actually succeeded is never
+// submitted twice.
 export const castVoteOnIssueById = async (
   accessToken: string,
   userAddress: string,
   issueId: string,
-): Promise<{ status: string; hash: string }> => {
+): Promise<{ status: string; hash: string; votedVia: "replay" | "registry" }> => {
   const issueResponse = await cirrus.get(accessToken, "/" + AdminRegistry + "-IssueCreated", {
     params: {
       issueId: `eq.${issueId}`,
@@ -469,25 +566,67 @@ export const castVoteOnIssueById = async (
     throw new Error("Issue not found");
   }
 
-  const txResponse = await eth.get(accessToken, "/transaction", { params: { hash: issue.transaction_hash } });
-  const tx = Array.isArray(txResponse.data) ? txResponse.data[0] : null;
-  if (!tx?.funcName || !Array.isArray(tx.args)) {
-    throw new Error("Original issue transaction not found");
+  // Whether the replay got as far as submitting. A decode that fails before this
+  // changed nothing on chain; a failure after it may or may not have
+  let replaySubmitted = false;
+  const replayOriginalTransaction = async (): Promise<{ status: string; hash: string }> => {
+    const txResponse = await eth.get(accessToken, "/transaction", { params: { hash: issue.transaction_hash } });
+    const tx = Array.isArray(txResponse.data) ? txResponse.data[0] : null;
+    if (!tx?.funcName || !Array.isArray(tx.args)) {
+      throw new Error("Original issue transaction not found");
+    }
+
+    // Fixed args are decoded once from the original transaction source. Variadic
+    // tails stay verbatim because their element types cannot be recovered from ABI.
+    const { contractName, funcArgs } = await fetchFuncArgs(accessToken, tx.to, tx.funcName);
+    const namedArgs = Object.fromEntries(funcArgs.map(([name, type], i) =>
+      [name, type.tag === "Variadic" ? tx.args.slice(i) : hintedArg(type, parseTxArg(tx.args[i]))]));
+
+    replaySubmitted = true;
+    return callTargetFunction(accessToken, userAddress, contractName, tx.to, tx.funcName, namedArgs);
+  };
+
+  let replayed: { status: string; hash: string } | null = null;
+  let replayError: any;
+  try {
+    replayed = await replayOriginalTransaction();
+  } catch (error) {
+    replayError = error;
   }
 
-  // Fixed args are decoded once from the original transaction source. Variadic
-  // tails stay verbatim because their element types cannot be recovered from ABI.
-  const { contractName, funcArgs } = await fetchFuncArgs(accessToken, tx.to, tx.funcName);
-  const namedArgs = Object.fromEntries(funcArgs.map(([name, type], i) =>
-    [name, type.tag === "Variadic" ? tx.args.slice(i) : hintedArg(type, parseTxArg(tx.args[i]))]));
+  if (replayed) {
+    // Callers refetch the issue lists from Cirrus as soon as this responds, so let the
+    // vote's events land first — otherwise those lists read back pre-vote state
+    await verifyVoteLandedOn(accessToken, issueId, replayed.hash);
+    return { ...replayed, votedVia: "replay" };
+  }
 
-  const result = await callTargetFunction(accessToken, userAddress, contractName, tx.to, tx.funcName, namedArgs);
+  // Retry only a failure that provably left no vote behind: one raised before the
+  // transaction was submitted, or a transaction the node reported back as Failure,
+  // which SolidVM applies no state for. Anything else — a timeout, a dropped socket, an
+  // unreadable result — leaves the outcome unknown, and Cirrus may not have indexed a
+  // vote that did land, so the chain check below cannot be trusted to catch it either
+  const replayLeftNoVote =
+    !replaySubmitted || (replayError instanceof StratoError && replayError.status === 400);
+  if (!replayLeftNoVote) throw replayError;
 
-  // Callers refetch the issue lists from Cirrus as soon as this responds, so let the
-  // vote's events land first — otherwise those lists read back pre-vote state
-  await findIssueIdForTx(accessToken, result.hash);
+  if (!(await voteStillPending(accessToken, issue, userAddress))) throw replayError;
 
-  return result;
+  console.warn(
+    `Replaying issue ${issueId} failed, voting via the registry instead: ${replayError?.message ?? replayError}`);
+
+  let result: { status: string; hash: string };
+  try {
+    result = await castVoteViaRegistry(accessToken, userAddress, issue);
+  } catch (error: any) {
+    if (error instanceof Error) {
+      error.message = `${error.message} (after replaying the original transaction failed: ${replayError?.message ?? replayError})`;
+    }
+    throw error;
+  }
+
+  await verifyVoteLandedOn(accessToken, issueId, result.hash);
+  return { ...result, votedVia: "registry" };
 };
 
 // Deduplicate issues by issueId, keeping the most recent one based on block_number,
