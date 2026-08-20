@@ -10,6 +10,7 @@ import BlockApps.Solidity.ArgValue
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
 import Blockchain.Strato.Model.Address (Address (..))
+import Data.Either (isLeft)
 import qualified Data.Map.Strict as M
 import Data.Source.Map (SourceMap (..))
 import qualified Data.Vector as V
@@ -95,6 +96,17 @@ spec = do
         `shouldBe` (SimpleType TypeString, ArgString "string(hello)")
     it "still infers ints for bare numeric strings (legacy)" $
       argValueToType (ArgString "123") `shouldBe` (SimpleType typeInt, ArgInt 123)
+
+  describe "numeric-string coercion (client sends big numbers as strings)" $ do
+    it "parses an exact big integer string against TypeInt" $
+      argValueToValue Nothing (SimpleType (TypeInt False (Just 32))) (ArgString "100000000000596833911916682269")
+        `shouldBe` Right (SimpleValue (ValueInt False (Just 32) 100000000000596833911916682269))
+    it "parses a high-precision decimal string against TypeDecimal" $
+      argValueToValue Nothing (SimpleType TypeDecimal) (ArgString "1.00000000000596833911916682269")
+        `shouldBe` Right (SimpleValue (ValueDecimal "1.00000000000596833911916682269"))
+    it "rejects a non-numeric string for TypeDecimal" $
+      argValueToValue Nothing (SimpleType TypeDecimal) (ArgString "not-a-number")
+        `shouldSatisfy` isLeft
     it "round-trips an ambiguous string through re-marshaling" $
       -- inner marshal renders the string arg; the outer variadic re-marshal
       -- (wallet wrapping) must recover the same type and re-emit the cast

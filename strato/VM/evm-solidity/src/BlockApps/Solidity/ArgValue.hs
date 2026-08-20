@@ -342,6 +342,11 @@ argValueToSimpleValue theType argVal = case theType of
   TypeDecimal -> case argVal of
     ArgDecimal i -> Right $ ValueDecimal (Text.encodeUtf8 $ Text.pack $ show i)
     ArgInt i -> Right $ ValueDecimal (Text.encodeUtf8 $ Text.pack $ show i)
+    -- Clients send high-precision decimals as strings (a JSON number would be
+    -- rounded through a double); parse them exactly.
+    ArgString str -> case readMaybe (Text.unpack str) :: Maybe Decimal of
+      Just d -> Right $ ValueDecimal (Text.encodeUtf8 $ Text.pack $ show d)
+      Nothing -> Left $ "argValueToSimpleValue: Could not parse decimal value from string \"" <> str <> "\""
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeDecimal to be an decimal, but got " ++ show o
 
   where

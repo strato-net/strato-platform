@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
+import { parseArgText } from "@/lib/args";
 import { useSimulation } from "@/components/simulation/useSimulation";
 import { SimulateButton } from "@/components/simulation/SimulateButton";
 import { SimulationResultPanel } from "@/components/simulation/SimulationResultPanel";
@@ -75,14 +76,11 @@ export function MethodCaller({
       if (raw === undefined || raw === "") continue;
       // Keep string- and address-typed params verbatim ("123" stays a string;
       // an all-digit address must not become a number); everything else gets a
-      // JSON parse attempt ("123" -> 123, "[1,2]" -> array) with raw fallback.
+      // bigint-safe parse ("42" -> 42, "[1,2]" -> array) with raw fallback —
+      // integers past 2^53 stay exact strings rather than rounded doubles.
       let parsedValue: unknown = raw;
       if (a.type !== "string" && !isAddressArg) {
-        try {
-          parsedValue = JSON.parse(raw);
-        } catch {
-          parsedValue = raw;
-        }
+        parsedValue = parseArgText(raw);
       }
       // Wrap with the declared Solidity type so bloc doesn't have to guess
       // (e.g. "0x64" is an address, not the number 100).
