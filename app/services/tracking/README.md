@@ -20,7 +20,7 @@ source of truth.
 | `GET /tracking-api/links` | JWT + allowlist | Link summaries with attribution rollups |
 | `GET /tracking-api/metrics/daily` | JWT + allowlist | Daily snapshot: today's (UTC) opens/engaged, wallets/bridged, bridged-in USD + transfers, on-chain actions — each against the same elapsed window yesterday — plus a 24-bucket opens-by-hour histogram and the busiest links |
 | `POST /tracking-api/links` | JWT + allowlist | Create a link (random slug; label/source never appear in the URL) |
-| `GET /tracking-api/links/:id` | JWT + allowlist | Bridge-ins, per-category activity summary, per-wallet summaries, visitor geo points, attributed activity feed, per-day history (opens, wallets, bridge/trade value, …) |
+| `GET /tracking-api/links/:id` | JWT + allowlist | Bridge-ins, per-category activity summary, per-wallet summaries, visitor geo points with per-visit timestamps and wallet identity, attributed activity feed, per-day history (opens, wallets, bridge/trade value, …) |
 | `GET /tracking-api/links/:id/wallets/:address` | JWT + allowlist | Per-user drill-down: the wallet's full on-chain history (deliberately not attribution-filtered) |
 | `GET /tracking-api/users/:address/timeline` | JWT + allowlist | One wallet's activity timeline across every link: opens, engagement, wallet connections, bridge-ins, on-chain events and (optionally) origin-chain transactions |
 | `PATCH /tracking-api/links/:id` | JWT + allowlist | Toggle active / edit label, source, full source, destination |
@@ -204,7 +204,19 @@ both nginx layers). Location resolution has two tiers:
 
 Coordinates power the dashboard's visitor map; raw IPs stay in the DB and are
 not returned by the API. Bots never set the session cookie but their sessions
-are stored; the map excludes them. A visitor spoofing `X-Forwarded-For` on a
+are stored; the map excludes them.
+
+The map is interactive: scroll or drag to zoom and pan (plus explicit zoom
+in/out/reset buttons), a dual-handle time-range slider narrows the visible
+opens, and clicking a dot opens that visitor's timeline
+(`/dashboard/users/<address>`) — or, when several visitors share a dot, a
+popover listing them. To make that possible each geo point carries its
+individual visits (`{at, address}`, newest first) instead of a bare count;
+`address` is the session's wallet identity (external address first, STRATO
+otherwise) and is `null` for a visit that never connected a wallet. No IP is
+part of the payload. Only the 5,000 most recent geolocated sessions per link
+are returned; beyond that the response sets `geoTruncated: true` and the map
+says it is showing the most recent opens. A visitor spoofing `X-Forwarded-For` on a
 direct hit to the tracking domain can fake their own dot — acceptable for
 marketing analytics. Sessions recorded before the live lookup was enabled keep
 their original (possibly stale) geo.

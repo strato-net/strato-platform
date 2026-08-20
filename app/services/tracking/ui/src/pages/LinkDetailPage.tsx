@@ -183,14 +183,14 @@ const LinkDetailPage = () => {
 
           <Card
             title="Visitor locations"
-            subtitle="Where this link was opened (excluding bots and previews)."
+            subtitle="Where this link was opened (excluding bots and previews). Scroll or drag to zoom and pan, use the slider to pick a time range, and click a dot for the visitor's timeline."
           >
             {link.data.geoPoints.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No location data yet — locations are recorded when the link is opened.
               </p>
             ) : (
-              <WorldMap points={link.data.geoPoints} />
+              <WorldMap points={link.data.geoPoints} truncated={link.data.geoTruncated} />
             )}
           </Card>
 

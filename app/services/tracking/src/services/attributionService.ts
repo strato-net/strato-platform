@@ -37,13 +37,17 @@ interface SessionDailyRow {
   engaged: string;
 }
 
-interface GeoRow {
+// One geolocated visit (session), not an aggregate: the map needs per-visit
+// timestamps (time-range filtering) and the visitor's wallet identity
+// (click-through to their timeline).
+interface GeoVisitRow {
   link_id: string;
+  opened_at: Date;
   geo_lat: number;
   geo_lon: number;
   geo_city: string | null;
   geo_country: string | null;
-  count: string;
+  address: string | null;
 }
 
 interface Attribution {
@@ -53,12 +57,21 @@ interface Attribution {
 
 export type ActivitySummary = Partial<Record<ActivityCategory, number>>;
 
+// A single open at a coordinate. `address` is the session's wallet identity
+// (external-first, like walletKeyOf) or null for a visitor who never
+// connected a wallet; raw IPs are never exposed.
+export interface GeoVisit {
+  at: string;
+  address: string | null;
+}
+
 export interface GeoPoint {
   lat: number;
   lon: number;
   city: string | null;
   country: string | null;
   count: number;
+  visits: GeoVisit[]; // newest first; count === visits.length
 }
 
 export interface LinkSummary {
@@ -136,6 +149,9 @@ export interface LinkDetail extends LinkSummary {
   activitySummary: ActivitySummary;
   walletSummaries: WalletSummary[];
   geoPoints: GeoPoint[];
+  // True when the link has more geolocated opens than the per-link cap, so
+  // the map only shows the most recent ones
+  geoTruncated: boolean;
   history: HistoryPoint[];
 }
 
@@ -156,7 +172,7 @@ export interface AttributionSnapshot {
   connections: ConnectionRow[];
   sessionAggs: Map<string, SessionAgg>;
   sessionDaily: SessionDailyRow[];
-  geoRows: GeoRow[];
+  geoVisits: GeoVisitRow[];
   bridgeIns: BridgeInEvent[];
   activityEvents: ActivityEvent[];
   // eventKey -> winning (link, connection); one entry per chain event, ever
@@ -218,6 +234,10 @@ const assignEvents = (
   return assignments;
 };
 
+// Cap on the per-visit map payload: a link with more geolocated opens than
+// this only maps its newest ones (surfaced as LinkDetail.geoTruncated).
+const MAX_GEO_VISITS_PER_LINK = 5000;
+
 const buildSnapshot = async (): Promise<AttributionSnapshot> => {
   const links = await listLinks();
 
@@ -250,13 +270,31 @@ const buildSnapshot = async (): Promise<AttributionSnapshot> => {
   );
   const sessionDaily = sessionDailyResult.rows;
 
-  const geoRowsResult = await query<GeoRow>(
-    `SELECT link_id, geo_lat, geo_lon, geo_city, geo_country, COUNT(*) AS count
-     FROM tracking_sessions
-     WHERE NOT is_bot_or_preview AND geo_lat IS NOT NULL AND geo_lon IS NOT NULL
-     GROUP BY link_id, geo_lat, geo_lon, geo_city, geo_country`
+  // Newest MAX_GEO_VISITS_PER_LINK geolocated opens per link, each carrying
+  // the session's first wallet connection (if any) so a map dot can link to
+  // that visitor's timeline.
+  const geoVisitsResult = await query<GeoVisitRow>(
+    `WITH ranked AS (
+       SELECT id, link_id, opened_at, geo_lat, geo_lon, geo_city, geo_country,
+              ROW_NUMBER() OVER (PARTITION BY link_id ORDER BY opened_at DESC, id) AS rn
+       FROM tracking_sessions
+       WHERE NOT is_bot_or_preview AND geo_lat IS NOT NULL AND geo_lon IS NOT NULL
+     )
+     SELECT r.link_id, r.opened_at, r.geo_lat, r.geo_lon, r.geo_city, r.geo_country,
+            COALESCE(NULLIF(wc.external_wallet_address, ''), NULLIF(wc.strato_address, '')) AS address
+     FROM ranked r
+     LEFT JOIN LATERAL (
+       SELECT external_wallet_address, strato_address
+       FROM wallet_connections
+       WHERE session_id = r.id
+       ORDER BY connected_at ASC, id ASC
+       LIMIT 1
+     ) wc ON TRUE
+     WHERE r.rn <= $1
+     ORDER BY r.link_id, r.opened_at DESC`,
+    [MAX_GEO_VISITS_PER_LINK]
   );
-  const geoRows = geoRowsResult.rows;
+  const geoVisits = geoVisitsResult.rows;
 
   const trackedConnections = connections.filter((c) => !c.is_bot_or_preview);
   const stratoAddresses = [
@@ -301,7 +339,7 @@ const buildSnapshot = async (): Promise<AttributionSnapshot> => {
     connections,
     sessionAggs,
     sessionDaily,
-    geoRows,
+    geoVisits,
     bridgeIns,
     activityEvents,
     assignments,
@@ -646,15 +684,31 @@ export const getLinkDetail = async (linkId: string): Promise<LinkDetail | null> 
     .map((identity) => summarizeWallet(snapshot, identity))
     .sort((a, b) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
 
-  const geoPoints: GeoPoint[] = snapshot.geoRows
-    .filter((row) => String(row.link_id) === String(link.id))
-    .map((row) => ({
-      lat: row.geo_lat,
-      lon: row.geo_lon,
-      city: row.geo_city,
-      country: row.geo_country,
-      count: Number(row.count),
-    }));
+  // One point per coordinate, holding its visits newest first (the query
+  // already orders by opened_at DESC). Points are sorted by count so the
+  // payload order is stable.
+  const geoVisitRows = snapshot.geoVisits.filter(
+    (row) => String(row.link_id) === String(link.id)
+  );
+  const geoByCoordinate = new Map<string, GeoPoint>();
+  for (const row of geoVisitRows) {
+    const key = `${row.geo_lat}|${row.geo_lon}|${row.geo_city ?? ""}|${row.geo_country ?? ""}`;
+    let point = geoByCoordinate.get(key);
+    if (!point) {
+      point = {
+        lat: row.geo_lat,
+        lon: row.geo_lon,
+        city: row.geo_city,
+        country: row.geo_country,
+        count: 0,
+        visits: [],
+      };
+      geoByCoordinate.set(key, point);
+    }
+    point.visits.push({ at: row.opened_at.toISOString(), address: row.address || null });
+    point.count = point.visits.length;
+  }
+  const geoPoints: GeoPoint[] = [...geoByCoordinate.values()].sort((a, b) => b.count - a.count);
 
   return {
     ...summary,
@@ -663,6 +717,7 @@ export const getLinkDetail = async (linkId: string): Promise<LinkDetail | null> 
     activitySummary: countByCategory(attributedActivity, attributedBridgeIns.length),
     walletSummaries,
     geoPoints,
+    geoTruncated: geoVisitRows.length >= MAX_GEO_VISITS_PER_LINK,
     history: buildHistory(snapshot, link, identities, attributedBridgeIns, attributedActivity),
   };
 };

@@ -2361,6 +2361,14 @@ gasPoseidonPerInput = 100
 gasModExp :: Gas
 gasModExp = 100
 
+-- | Parametrized Poseidon2: charged per PERMUTATION of the selected
+-- instance. The Goldilocks width-12 permutation is ~740 field
+-- multiplications in the current Integer-backed implementation (~60-100 µs);
+-- BN254 t=2 keeps the poseidon2 schedule (100 + 100 per absorbed input).
+gasPoseidon2GLBase, gasPoseidon2GLPerPerm :: Gas
+gasPoseidon2GLBase = 100
+gasPoseidon2GLPerPerm = 100
+
 gasBlsG1Add, gasBlsG1MsmPerTerm, gasBlsG2Add, gasBlsG2MsmPerTerm :: Gas
 gasBlsG1Add = 4000
 gasBlsG1MsmPerTerm = 2500
@@ -2392,6 +2400,45 @@ chargePerBlock :: MonadSM m => Gas -> Gas -> Int -> B.ByteString -> m ()
 chargePerBlock base perBlock blockSize bs =
   let blocks = (B.length bs + blockSize - 1) `div` blockSize
    in decrementGas $ base + perBlock * fromIntegral blocks
+
+-- | Resolve a parametrized-Poseidon2 params block, rejecting unknown instances.
+poseidon2Instance :: MonadSM m => B.ByteString -> m Builtins.P2Instance
+poseidon2Instance p = case Builtins.parsePoseidon2Params p of
+  Left e -> invalidArguments "poseidon2 params" e
+  Right i -> pure i
+
+poseidon2GasFor :: MonadSM m => Builtins.P2Instance -> Int -> Int -> m ()
+poseidon2GasFor inst nIn nOut = case inst of
+  Builtins.P2BN254 -> decrementGas $ gasPoseidonBase + gasPoseidonPerInput * fromIntegral (max 1 nIn)
+  Builtins.P2Goldilocks12 ->
+    decrementGas $ gasPoseidon2GLBase + gasPoseidon2GLPerPerm * fromIntegral (Builtins.poseidon2Permutations inst nIn nOut)
+
+intsArray :: [Integer] -> Value
+intsArray = SArray . V.fromList . map (Constant . SInteger)
+
+poseidon2PermuteMetered :: MonadSM m => B.ByteString -> [Value] -> m Value
+poseidon2PermuteMetered p xs = do
+  inst <- poseidon2Instance p
+  poseidon2GasFor inst 1 1
+  ints <- traverse int xs
+  pure . intsArray $! Builtins.poseidon2Permute inst ints
+
+poseidon2HashMetered :: MonadSM m => B.ByteString -> [Value] -> Integer -> m Value
+poseidon2HashMetered p xs n = do
+  inst <- poseidon2Instance p
+  let nOut = fromIntegral n
+  poseidon2GasFor inst (length xs) nOut
+  ints <- traverse int xs
+  pure . intsArray $! Builtins.poseidon2ParamHash inst nOut ints
+
+poseidon2HashBytesMetered :: MonadSM m => B.ByteString -> B.ByteString -> Integer -> m Value
+poseidon2HashBytesMetered p d n = do
+  inst <- poseidon2Instance p
+  let nOut = fromIntegral n
+      chunk = if inst == Builtins.P2Goldilocks12 then 7 else 31
+      nIn = (B.length d + chunk - 1) `div` chunk + 1
+  poseidon2GasFor inst nIn nOut
+  pure . intsArray $! Builtins.poseidon2ParamHashBytes inst nOut d
 
 callBuiltin :: MonadSM m => SolidString -> [Value] -> m Value
 callBuiltin "variadic" [SVariadic vs] = pure $ SVariadic vs
@@ -2662,6 +2709,23 @@ callBuiltin "poseidon2Compress" [a, b] = do
   decrementGas $ gasPoseidonBase + gasPoseidonPerInput
   (l, r) <- (,) <$> int a <*> int b
   pure . SInteger $! Builtins.poseidon2Compress l r
+-- Parametrized Poseidon2 (see Builtins.P2Instance): params select a
+-- registered instance; results come back as a uint256[] of canonical elements.
+callBuiltin "poseidon2Permute" [SBytes p, SArray xs] = poseidon2PermuteMetered p =<< traverse weakGetVar (V.toList xs)
+callBuiltin "poseidon2Permute" [SBytes p, SVariadic xs] = poseidon2PermuteMetered p xs
+callBuiltin "poseidon2Permute" (SBytes p : xs) = poseidon2PermuteMetered p xs
+callBuiltin "poseidon2Hash" [SBytes p, SArray xs, n] = do
+  ins <- traverse weakGetVar (V.toList xs)
+  poseidon2HashMetered p ins =<< int n
+callBuiltin "poseidon2Hash" [SBytes p, SVariadic xs, n] = poseidon2HashMetered p xs =<< int n
+callBuiltin "poseidon2HashBytes" [SBytes p, SBytes d, n] = poseidon2HashBytesMetered p d =<< int n
+-- Named wrappers for the Goldilocks instance: 4-element digests.
+callBuiltin "poseidon2gl" [SArray xs] = do
+  ins <- traverse weakGetVar (V.toList xs)
+  poseidon2HashMetered Builtins.poseidon2ParamsGoldilocks ins 4
+callBuiltin "poseidon2gl" [SVariadic xs] = poseidon2HashMetered Builtins.poseidon2ParamsGoldilocks xs 4
+callBuiltin "poseidon2gl" xs = poseidon2HashMetered Builtins.poseidon2ParamsGoldilocks xs 4
+callBuiltin "poseidon2glBytes" [SBytes d] = poseidon2HashBytesMetered Builtins.poseidon2ParamsGoldilocks d 4
 callBuiltin ("payable") [a] = flip SAddress True <$> getAddressVal a
 callBuiltin "require" (condVar : msg) = do
   cond <- getBoolVal condVar

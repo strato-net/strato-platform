@@ -463,6 +463,7 @@ export async function getInternalAddresses() {
     goldstYieldVault,
     silvstYieldVault
   );
+  addresses.push(directMintPsm);
 
   // Lending Registry --> lendingPool, collateralVault, liquidityPool
   const { data: [lending] } = await cirrus.get(accessToken, "/BlockApps-LendingRegistry", {
