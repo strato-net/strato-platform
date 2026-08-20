@@ -100,6 +100,18 @@ export const isZeroCirrusValue = (value: unknown): boolean => {
   return s === "" || /^0+$/.test(s);
 };
 
+export const isPositionActivityType = (value: unknown): boolean => {
+  const activityType = String(value ?? "").trim().toLowerCase();
+  return activityType !== "1" && activityType !== "onetime";
+};
+
+export const shouldTrackActivity = (
+  activityType: unknown,
+  emissionRate: unknown
+): boolean =>
+  isPositionActivityType(activityType) ||
+  !isZeroCirrusValue(emissionRate);
+
 export const toBigIntOrZero = (value: any): bigint => {
   try {
     return BigInt(value);
