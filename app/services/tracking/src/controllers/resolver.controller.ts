@@ -4,7 +4,7 @@ import { config } from "../config";
 import { getLinkBySlug } from "../services/linkService";
 import { recordSessionOpen, updateSessionGeo } from "../services/sessionService";
 import { isBotOrPreview } from "../utils/botDetector";
-import { isAllowedDestination } from "../utils/destinations";
+import { isValidDestination } from "../utils/destinations";
 import {
   isExternalGeoConfigured,
   lookupGeoOffline,
@@ -44,10 +44,10 @@ export const resolve = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Re-validate stored destination in case the allowlist was tightened;
-    // inactive links still record opens but land on the default page.
+    // Re-validate the stored destination (header-injection guard); inactive
+    // links still record opens but land on the default page.
     const destination =
-      link.active && isAllowedDestination(link.destination)
+      link.active && isValidDestination(link.destination)
         ? link.destination
         : config.tracking.defaultDestination;
 

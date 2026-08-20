@@ -2,15 +2,38 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
-import { Plus } from 'lucide-react';
-import { absoluteLinkUrl, formatUsd, listLinks, setLinkActive } from '../api';
+import { Pencil, Plus } from 'lucide-react';
+import { absoluteLinkUrl, formatUsd, LinkSummary, listLinks, setLinkActive } from '../api';
 import CreateLinkModal from '../components/CreateLinkModal';
+import DailySnapshotPanel from '../components/DailySnapshotPanel';
+import EditLinkModal from '../components/EditLinkModal';
 import { Button, CopyButton, Skeleton, Switch, tdClass, thClass } from '../components/primitives';
+
+// Fixed-width columns (table-fixed + colgroup); overflowing text truncates
+// with the full value in the title tooltip.
+const COLUMNS: { label: string; width: number; align?: 'right' }[] = [
+  { label: 'Link', width: 170 },
+  { label: 'Source', width: 110 },
+  { label: 'Full source', width: 150 },
+  { label: 'Creator', width: 120 },
+  { label: 'Opens', width: 70, align: 'right' },
+  { label: 'Wallets', width: 80, align: 'right' },
+  { label: 'Bridged', width: 80, align: 'right' },
+  { label: 'Bridge value', width: 105, align: 'right' },
+  { label: 'Activated', width: 90, align: 'right' },
+  { label: 'Last activity', width: 120 },
+  { label: 'Active', width: 60 },
+  { label: '', width: 44 },
+];
+const TABLE_MIN_WIDTH = COLUMNS.reduce((sum, col) => sum + col.width, 0);
+
+const truncatedTdClass = `${tdClass} truncate`;
 
 const LinksPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<LinkSummary | null>(null);
 
   const links = useQuery({
     queryKey: ['links'],
@@ -34,6 +57,10 @@ const LinksPage = () => {
         </Button>
       </div>
 
+      <DailySnapshotPanel />
+
+      <h2 className="pt-2 text-sm font-semibold">All links</h2>
+
       {links.isPending ? (
         <div className="space-y-2">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -53,19 +80,22 @@ const LinksPage = () => {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full">
+          <table className="w-full table-fixed" style={{ minWidth: TABLE_MIN_WIDTH }}>
+            <colgroup>
+              {COLUMNS.map((col) => (
+                <col key={col.label} style={{ width: col.width }} />
+              ))}
+            </colgroup>
             <thead className="border-b border-border">
               <tr>
-                <th className={thClass}>Link</th>
-                <th className={thClass}>Source</th>
-                <th className={thClass}>Creator</th>
-                <th className={`${thClass} text-right`}>Opens</th>
-                <th className={`${thClass} text-right`}>Wallets</th>
-                <th className={`${thClass} text-right`}>Bridged wallets</th>
-                <th className={`${thClass} text-right`}>Bridge value</th>
-                <th className={`${thClass} text-right`}>Activated wallets</th>
-                <th className={thClass}>Last activity</th>
-                <th className={thClass}>Active</th>
+                {COLUMNS.map((col) => (
+                  <th
+                    key={col.label}
+                    className={`${thClass} ${col.align === 'right' ? 'text-right' : ''}`}
+                  >
+                    {col.label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -75,21 +105,30 @@ const LinksPage = () => {
                   onClick={() => navigate(`/links/${link.id}`)}
                   className={`cursor-pointer hover:bg-muted/50 ${link.active ? '' : 'opacity-60'}`}
                 >
-                  <td className={tdClass}>
+                  <td className={truncatedTdClass}>
                     <div className="flex items-center gap-1">
-                      <span className="font-mono text-xs">/t/{link.slug}</span>
+                      <span className="truncate font-mono text-xs">/t/{link.slug}</span>
                       <CopyButton value={absoluteLinkUrl(link.url)} label="Copy link URL" />
                     </div>
-                    <div className="text-xs text-muted-foreground">{link.label}</div>
+                    <div className="truncate text-xs text-muted-foreground" title={link.label}>
+                      {link.label}
+                    </div>
                   </td>
-                  <td className={tdClass}>{link.source}</td>
-                  <td className={tdClass}>{link.creator}</td>
+                  <td className={truncatedTdClass} title={link.source}>
+                    {link.source}
+                  </td>
+                  <td className={truncatedTdClass} title={link.fullSource}>
+                    {link.fullSource}
+                  </td>
+                  <td className={truncatedTdClass} title={link.creator}>
+                    {link.creator}
+                  </td>
                   <td className={`${tdClass} text-right`}>{link.opens}</td>
                   <td className={`${tdClass} text-right`}>{link.wallets}</td>
                   <td className={`${tdClass} text-right`}>{link.bridgedWallets}</td>
                   <td className={`${tdClass} text-right`}>{formatUsd(link.bridgeValueUsd)}</td>
                   <td className={`${tdClass} text-right`}>{link.activatedWallets}</td>
-                  <td className={`${tdClass} whitespace-nowrap text-muted-foreground`}>
+                  <td className={`${tdClass} truncate text-muted-foreground`}>
                     {link.lastActivityAt
                       ? formatDistanceToNow(new Date(link.lastActivityAt), { addSuffix: true })
                       : '—'}
@@ -101,6 +140,20 @@ const LinksPage = () => {
                       label={link.active ? 'Deactivate link' : 'Activate link'}
                     />
                   </td>
+                  <td className={tdClass}>
+                    <button
+                      type="button"
+                      aria-label="Edit link"
+                      title="Edit link"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditing(link);
+                      }}
+                      className="text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -109,6 +162,7 @@ const LinksPage = () => {
       )}
 
       <CreateLinkModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <EditLinkModal link={editing} onClose={() => setEditing(null)} />
     </div>
   );
 };

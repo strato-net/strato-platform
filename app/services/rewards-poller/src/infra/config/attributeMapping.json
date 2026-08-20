@@ -175,7 +175,7 @@
     },
     "Withdraw": {
       "amount": "shares",
-      "user": "receiver"
+      "user": "owner"
     }
   },
   "ceeb982f671b4ee2b4471e5b49f3126739537f15": {
@@ -185,7 +185,7 @@
     },
     "Withdraw": {
       "amount": "shares",
-      "user": "receiver"
+      "user": "owner"
     }
   },
 
@@ -196,7 +196,11 @@
     },
     "Withdraw": {
       "amount": "shares",
-      "user": "receiver"
+      "user": "owner"
+    },
+    "QueueProcessed": {
+      "amount": "sharesBurned",
+      "user": "owner"
     }
   },
 
@@ -207,7 +211,11 @@
     },
     "Withdraw": {
       "amount": "shares",
-      "user": "receiver"
+      "user": "owner"
+    },
+    "QueueProcessed": {
+      "amount": "sharesBurned",
+      "user": "owner"
     }
   },
 
@@ -218,7 +226,11 @@
     },
     "Withdraw": {
       "amount": "shares",
-      "user": "receiver"
+      "user": "owner"
+    },
+    "QueueProcessed": {
+      "amount": "sharesBurned",
+      "user": "owner"
     }
   },
 
@@ -229,7 +241,11 @@
     },
     "Withdraw": {
       "amount": "shares",
-      "user": "receiver"
+      "user": "owner"
+    },
+    "QueueProcessed": {
+      "amount": "sharesBurned",
+      "user": "owner"
     }
   },
 
@@ -240,7 +256,11 @@
     },
     "Withdraw": {
       "amount": "shares",
-      "user": "receiver"
+      "user": "owner"
+    },
+    "QueueProcessed": {
+      "amount": "sharesBurned",
+      "user": "owner"
     }
   }, 
 
@@ -251,7 +271,11 @@
     },
     "Withdraw": {
       "amount": "shares",
-      "user": "receiver"
+      "user": "owner"
+    },
+    "QueueProcessed": {
+      "amount": "sharesBurned",
+      "user": "owner"
     }
   },
 

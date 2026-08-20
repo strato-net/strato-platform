@@ -1,0 +1,71 @@
+# Integration test stack for the tracking service. Boots the REAL service
+# image against a throwaway Postgres and mocked upstreams (Keycloak JWKS +
+# Cirrus), then runs the black-box suite in test/. Nothing is published on
+# the host, so this runs alongside anything else (Jenkins node, local dev).
+#
+#   docker compose -f docker-compose.test.yml -p tracking-tests up --build \
+#     --abort-on-container-exit --exit-code-from tests
+#   docker compose -f docker-compose.test.yml -p tracking-tests down -v
+services:
+  postgres:
+    image: postgres:14.18
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_PASSWORD=postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  mocks:
+    build: ./test
+    command: ["npm", "run", "mocks"]
+    environment:
+      - MOCKS_PORT=4100
+      - MOCKS_PUBLIC_URL=http://mocks:4100
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4100/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  tracking:
+    build: .
+    environment:
+      - NODE_URL=http://mocks:4100
+      - OPENID_DISCOVERY_URL=http://mocks:4100/.well-known/openid-configuration
+      - ssl=false
+      - postgres_host=postgres
+      - postgres_port=5432
+      - postgres_user=postgres
+      - postgres_password=postgres
+      - POSTGRES_MAINTENANCE_DB=postgres
+      - TRACKING_DB_NAME=tracking
+      - TRACKING_AUTHORIZED_USERS=tester@example.com
+      - TRACKING_CACHE_TTL_SECONDS=0
+      - TRACKING_ATTRIBUTION_WINDOW_DAYS=90
+      # Origin-chain enrichment of the user timeline, pointed at the mocks'
+      # Etherscan V2 look-alike
+      - TRACKING_ETHERSCAN_API_KEY=test-key
+      - TRACKING_ETHERSCAN_API_URL=http://mocks:4100/etherscan/api
+      - TRACKING_ETHERSCAN_MAX_TX=5
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mocks:
+        condition: service_healthy
+
+  tests:
+    build: ./test
+    environment:
+      - TRACKING_URL=http://tracking:3010
+      - MOCKS_URL=http://mocks:4100
+      - AUTHORIZED_USER=tester@example.com
+      - PGHOST=postgres
+      - PGPORT=5432
+      - PGUSER=postgres
+      - PGPASSWORD=postgres
+      - PGDATABASE=tracking
+    depends_on:
+      - tracking
