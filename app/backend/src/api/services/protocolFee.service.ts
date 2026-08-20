@@ -1270,10 +1270,9 @@ const integrateGrossYield = (
  * Pending YieldVault fees = what a sweep would send to the feeCollector right now,
  * per vault: gross benchmark yield on deployed capital minus the depositor savings
  * accrual, over the window since the last observed sweep transfer. Savings include
- * the un-checkpointed accrual since the vault's last Accrued event
- * (pendingAccrualTarget). Stateless approximation of the sweep keeper's math: an
- * accrual window straddling the anchor counts fully as savings, which understates
- * the fee slightly.
+ * the un-checkpointed accrual since the vault's last Accrued event, clipped to the
+ * window. Stateless approximation of the sweep keeper's math: an accrual window
+ * straddling the anchor counts fully as savings, which understates the fee slightly.
  */
 const getYieldVaultPendingFees = async (
   accessToken: string,
@@ -1289,6 +1288,11 @@ const getYieldVaultPendingFees = async (
     try {
       const info = await getYieldVaultInfo(accessToken, def.key);
       if (!info.deployed) return;
+      // The fee spread model only applies where the savings-rate accrual ledger
+      // exists: on non-accrual vaults depositor yield is delivered via
+      // exchange-rate appreciation (realizedProfit on returnCapital), so gross
+      // benchmark yield is not protocol revenue.
+      if (!info.accrualInitialized) return;
 
       const vaultAddress = def.address.toLowerCase();
       const strategies = strategiesByVault.get(vaultAddress) || new Set<string>();
@@ -1318,7 +1322,7 @@ const getYieldVaultPendingFees = async (
           blockNumber: Number(row.block_number || 0)
         }))).catch(() => []);
 
-      const [accruedEvents, deployedEvents, returnedEvents, lossEvents] = await Promise.all([
+      const [accruedEvents, deployedEvents, returnedEvents, lossEvents, storageRows] = await Promise.all([
         cirrus.get(accessToken, `/${YieldVault}-Accrued`, {
           params: {
             address: `eq.${def.address}`,
@@ -1328,12 +1332,49 @@ const getYieldVaultPendingFees = async (
         }).then(({ data }) => data || []).catch(() => []),
         fetchCapitalEvents("CapitalDeployed", "strategy"),
         fetchCapitalEvents("CapitalReturned", "strategy"),
-        fetchCapitalEvents("StrategyLossReported", "strategy")
+        fetchCapitalEvents("StrategyLossReported", "strategy"),
+        cirrus.get(accessToken, "/storage", {
+          params: {
+            address: `eq.${def.address}`,
+            select: "data->>accrualBaseAssets,data->>perSecondSavingsRate,data->>lastAccrual,data->>rewardDistributor",
+            limit: "1"
+          }
+        }).then(({ data }) => data || []).catch(() => [])
       ]);
 
+      const rpow = (x: bigint, n: bigint, base: bigint): bigint => {
+        let z = n % 2n !== 0n ? x : base;
+        let xC = x;
+        for (let nC = n / 2n; nC !== 0n; nC = nC / 2n) {
+          xC = (xC * xC) / base;
+          if (nC % 2n !== 0n) z = (z * xC) / base;
+        }
+        return z;
+      };
+
       // Depositor savings in the window: Accrued checkpoints after the anchor plus
-      // the un-checkpointed accrual since the vault's last Accrued event
-      let savingsAccrual = BigInt(info.pendingAccrualTarget || "0");
+      // the un-checkpointed accrual since the last Accrued event. The latter is
+      // clipped to start no earlier than the anchor — the slice between lastAccrual
+      // and the sweep was settled by that sweep.
+      const RAY = 10n ** 27n;
+      const accrualState = storageRows[0] || {};
+      const accrualBaseAssets = BigInt(String(accrualState.accrualBaseAssets || "0"));
+      const perSecondSavingsRate = BigInt(String(accrualState.perSecondSavingsRate || "0"));
+      const distributor = String(accrualState.rewardDistributor || "").toLowerCase().replace(/^0x/, "");
+      const pendingFrom = Math.max(Number(accrualState.lastAccrual || 0), anchorTs);
+      const totalShares = BigInt(info.totalShares || "0");
+
+      let savingsAccrual = 0n;
+      if (
+        totalShares > 0n &&
+        accrualBaseAssets > 0n &&
+        perSecondSavingsRate > RAY &&
+        nowSec > pendingFrom &&
+        distributor && !/^0+$/.test(distributor)
+      ) {
+        const growth = rpow(perSecondSavingsRate, BigInt(nowSec - pendingFrom), RAY);
+        savingsAccrual = (accrualBaseAssets * (growth - RAY)) / RAY;
+      }
       for (const event of accruedEvents) {
         const ts = parseTimestamp(event.block_timestamp);
         if (ts > latestAccrual) latestAccrual = ts;
@@ -1428,7 +1469,14 @@ export const getYieldVaultProtocolRevenue = async (
           order: "block_timestamp.desc"
         }
       });
-      tokenTransferEvents = data || [];
+      // Strategies also pay the 0.01 USDST tx fee to the feeCollector; those are
+      // gas revenue (already counted by getGasCostRevenue), not fee sweeps
+      const GAS_FEE_WEI = 10000000000000000n;
+      const usdstAddress = constants.USDST.toLowerCase();
+      tokenTransferEvents = (data || []).filter((event: any) =>
+        !(event.address.toLowerCase() === usdstAddress &&
+          BigInt(event.attributes?.value || "0") === GAS_FEE_WEI)
+      );
     }
 
     const pendingPromise = getYieldVaultPendingFees(accessToken, vaultDefs, strategiesByVault, tokenTransferEvents);
