@@ -8,6 +8,7 @@ import { POOL_V3_CONTRACTS } from "../../config/poolV3Constants";
 import { getCDPRegistry } from "./cdp.service";
 import { getPool } from "./lending.service";
 import { getPrice } from "./oracle.service";
+import { getYieldVaultInfo, listVaultDefs } from "./yieldVault.service";
 import * as config from "../../config/config";
 
 const {
@@ -1238,10 +1239,143 @@ export const getMetalForgeProtocolRevenue = async (
   }
 };
 
+const SECONDS_PER_YEAR = 31536000;
+
+/**
+ * Gross benchmark yield: Σ over timeline segments of debt × ((1 + apy)^(dt/year) − 1).
+ * Per-segment simple compounding on principal only — matches the fee-sweep keeper
+ * (app/contracts/deploy/sweep-yield-vault-fees.js): yield-on-yield across segments is
+ * ignored, so the pending fee understates rather than eating the depositor share.
+ */
+const integrateGrossYield = (
+  timeline: Array<{ ts: number; debt: bigint }>,
+  anchorTs: number,
+  endTs: number,
+  apyPct: number
+): bigint => {
+  const DECIMALS = 10n ** 18n;
+  let gross = 0n;
+  for (let i = 0; i < timeline.length; i++) {
+    const start = Math.max(timeline[i].ts, anchorTs);
+    const end = Math.min(i + 1 < timeline.length ? timeline[i + 1].ts : endTs, endTs);
+    if (end <= start || timeline[i].debt <= 0n) continue;
+    const growth = Math.pow(1 + apyPct / 100, (end - start) / SECONDS_PER_YEAR) - 1;
+    if (!Number.isFinite(growth) || growth < 0) continue;
+    gross += (timeline[i].debt * BigInt(Math.round(growth * 1e18))) / DECIMALS;
+  }
+  return gross;
+};
+
+/**
+ * Pending YieldVault fees = what a sweep would send to the feeCollector right now,
+ * per vault: gross benchmark yield on deployed capital minus the depositor savings
+ * accrual, over the window since the last observed sweep transfer. Savings include
+ * the un-checkpointed accrual since the vault's last Accrued event
+ * (pendingAccrualTarget). Stateless approximation of the sweep keeper's math: an
+ * accrual window straddling the anchor counts fully as savings, which understates
+ * the fee slightly.
+ */
+const getYieldVaultPendingFees = async (
+  accessToken: string,
+  vaultDefs: Array<{ key: string; address: string }>,
+  strategiesByVault: Map<string, Set<string>>,
+  transferEvents: any[]
+): Promise<{ pendingRevenue: bigint; lastAccrual: number }> => {
+  const nowSec = Math.floor(Date.now() / 1000);
+  let totalPendingUsd = 0n;
+  let latestAccrual = 0;
+
+  await Promise.all(vaultDefs.map(async (def) => {
+    try {
+      const info = await getYieldVaultInfo(accessToken, def.key);
+      if (!info.deployed) return;
+
+      const vaultAddress = def.address.toLowerCase();
+      const strategies = strategiesByVault.get(vaultAddress) || new Set<string>();
+
+      // Window starts at the vault's most recent sweep transfer; before the first
+      // sweep the whole deployment history is pending.
+      let anchorTs = 0;
+      for (const event of transferEvents) {
+        const from = String(event.attributes?.from || "").toLowerCase();
+        if (!strategies.has(from)) continue;
+        const ts = parseTimestamp(event.block_timestamp);
+        if (ts > anchorTs) anchorTs = ts;
+      }
+
+      // A never-emitted event has no Cirrus table at all — treat as no events
+      const fetchCapitalEvents = (table: string, strategyColumn: string) =>
+        cirrus.get(accessToken, `/${YieldVault}-${table}`, {
+          params: {
+            address: `eq.${def.address}`,
+            select: `${strategyColumn},strategyDebt::text,block_timestamp,block_number`,
+            order: "block_timestamp.asc"
+          }
+        }).then(({ data }) => (data || []).map((row: any) => ({
+          strategy: String(row[strategyColumn] || "").toLowerCase(),
+          debt: BigInt(String(row.strategyDebt || "0")),
+          ts: parseTimestamp(row.block_timestamp),
+          blockNumber: Number(row.block_number || 0)
+        }))).catch(() => []);
+
+      const [accruedEvents, deployedEvents, returnedEvents, lossEvents] = await Promise.all([
+        cirrus.get(accessToken, `/${YieldVault}-Accrued`, {
+          params: {
+            address: `eq.${def.address}`,
+            select: "targetAmount::text,block_timestamp",
+            order: "block_timestamp.asc"
+          }
+        }).then(({ data }) => data || []).catch(() => []),
+        fetchCapitalEvents("CapitalDeployed", "strategy"),
+        fetchCapitalEvents("CapitalReturned", "strategy"),
+        fetchCapitalEvents("StrategyLossReported", "strategy")
+      ]);
+
+      // Depositor savings in the window: Accrued checkpoints after the anchor plus
+      // the un-checkpointed accrual since the vault's last Accrued event
+      let savingsAccrual = BigInt(info.pendingAccrualTarget || "0");
+      for (const event of accruedEvents) {
+        const ts = parseTimestamp(event.block_timestamp);
+        if (ts > latestAccrual) latestAccrual = ts;
+        if (ts > anchorTs) savingsAccrual += BigInt(String(event.targetAmount || "0"));
+      }
+
+      // Piecewise-constant strategyDebt timeline per strategy — every capital event
+      // carries the post-change debt
+      const capitalEvents = [...deployedEvents, ...returnedEvents, ...lossEvents]
+        .sort((a, b) => a.blockNumber - b.blockNumber || a.ts - b.ts);
+      const timelines = new Map<string, Array<{ ts: number; debt: bigint }>>();
+      for (const event of capitalEvents) {
+        if (!timelines.has(event.strategy)) timelines.set(event.strategy, []);
+        timelines.get(event.strategy)!.push(event);
+      }
+
+      let baseAccrual = 0n;
+      for (const holding of info.strategyHoldings) {
+        if (holding.baseApyPct === null) continue;
+        const timeline = timelines.get(String(holding.strategyAddress || "").toLowerCase().replace(/^0x/, ""));
+        if (!timeline) continue;
+        baseAccrual += integrateGrossYield(timeline, anchorTs, nowSec, holding.baseApyPct);
+      }
+
+      const pendingAsset = baseAccrual > savingsAccrual ? baseAccrual - savingsAccrual : 0n;
+      if (pendingAsset <= 0n) return;
+
+      const unit = 10n ** BigInt(info.decimals ?? 18);
+      totalPendingUsd += (pendingAsset * BigInt(info.assetPriceWad || "0")) / unit;
+    } catch (error: any) {
+      console.warn(`Skipping pending fees for yield vault ${def.key}:`, error.message);
+    }
+  }));
+
+  return { pendingRevenue: totalPendingUsd, lastAccrual: latestAccrual };
+};
+
 /**
  * Get protocol revenue from YieldVault strategy fees
  * Revenue = Σ(Transfer events from strategy addresses to feeCollector), converted to USD
  * Strategy addresses are the keys of each vault's strategyDebt mapping.
+ * Pending = fee spread (gross benchmark yield − depositor savings accrual) not yet swept
  */
 export const getYieldVaultProtocolRevenue = async (
   accessToken: string,
@@ -1258,10 +1392,9 @@ export const getYieldVaultProtocolRevenue = async (
       }
     };
 
-    const vaultAddresses = [config.ethCarryVault, config.wbtcCarryVault, config.usdcYieldVault]
-      .filter(Boolean);
+    const vaultDefs = listVaultDefs().filter((def) => def.address);
 
-    if (vaultAddresses.length === 0) return emptyRevenue;
+    if (vaultDefs.length === 0) return emptyRevenue;
 
     const feeCollector = await getSwapFeeCollector(accessToken);
 
@@ -1269,29 +1402,45 @@ export const getYieldVaultProtocolRevenue = async (
     // retired strategies with zero debt may still have historical fee transfers)
     const { data: strategyDebtEntries } = await cirrus.get(accessToken, `/${YieldVault}-strategyDebt`, {
       params: {
-        address: `in.(${vaultAddresses.join(',')})`,
-        select: "key"
+        address: `in.(${vaultDefs.map((def) => def.address).join(',')})`,
+        select: "address,key"
       }
     });
 
-    const strategyAddresses: string[] = [...new Set<string>(
-      (strategyDebtEntries || []).map((entry: any) => String(entry.key).toLowerCase())
-    )];
-
-    if (strategyAddresses.length === 0) return emptyRevenue;
+    const strategiesByVault = new Map<string, Set<string>>();
+    for (const entry of strategyDebtEntries || []) {
+      const vault = String(entry.address).toLowerCase();
+      const strategy = String(entry.key).toLowerCase();
+      if (!strategiesByVault.has(vault)) strategiesByVault.set(vault, new Set());
+      strategiesByVault.get(vault)!.add(strategy);
+    }
+    const strategyAddresses = [...strategiesByVault.values()].flatMap((set) => [...set]);
 
     // Query all Transfer events where 'from' is any strategy and 'to' is feeCollector
-    const { data: tokenTransferEvents } = await cirrus.get(accessToken, `/event`, {
-      params: {
-        event_name: `eq.Transfer`,
-        select: "address,attributes,block_timestamp",
-        "attributes->>from": `in.(${strategyAddresses.join(',')})`,
-        "attributes->>to": `eq.${feeCollector}`,
-        order: "block_timestamp.desc"
-      }
-    });
+    let tokenTransferEvents: any[] = [];
+    if (strategyAddresses.length > 0) {
+      const { data } = await cirrus.get(accessToken, `/event`, {
+        params: {
+          event_name: `eq.Transfer`,
+          select: "address,attributes,block_timestamp",
+          "attributes->>from": `in.(${strategyAddresses.join(',')})`,
+          "attributes->>to": `eq.${feeCollector}`,
+          order: "block_timestamp.desc"
+        }
+      });
+      tokenTransferEvents = data || [];
+    }
 
-    if (!tokenTransferEvents || tokenTransferEvents.length === 0) return emptyRevenue;
+    const pendingPromise = getYieldVaultPendingFees(accessToken, vaultDefs, strategiesByVault, tokenTransferEvents);
+
+    if (tokenTransferEvents.length === 0) {
+      const { pendingRevenue, lastAccrual } = await pendingPromise;
+      return {
+        ...emptyRevenue,
+        pendingRevenue: pendingRevenue.toString(),
+        lastAccrual
+      };
+    }
 
     const timeCutoffs = getTimeCutoffs();
 
@@ -1345,6 +1494,8 @@ export const getYieldVaultProtocolRevenue = async (
     const calculateTotal = (revenueMap: Record<string, bigint>): string =>
       Object.values(revenueMap).reduce((sum, val) => sum + val, 0n).toString();
 
+    const { pendingRevenue, lastAccrual } = await pendingPromise;
+
     return {
       totalRevenue: calculateTotal(periodRevenue.allTime),
       revenueByPeriod: {
@@ -1353,7 +1504,9 @@ export const getYieldVaultProtocolRevenue = async (
         monthly: { total: calculateTotal(periodRevenue.monthly), byAsset: monthlyArray },
         ytd: { total: calculateTotal(periodRevenue.ytd), byAsset: ytdArray },
         allTime: { total: calculateTotal(periodRevenue.allTime), byAsset: allTimeArray }
-      }
+      },
+      pendingRevenue: pendingRevenue.toString(),
+      lastAccrual
     };
   } catch (error: any) {
     console.error("Error fetching yield vault protocol revenue:", {

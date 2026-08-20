@@ -133,6 +133,8 @@ const StratoStats = () => {
   const [gasRevenueByPeriod, setGasRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
 
   const [yieldVaultRevenueByPeriod, setYieldVaultRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
+  const [yieldVaultPendingRevenue, setYieldVaultPendingRevenue] = useState<string>('0');
+  const [yieldVaultLastAccrual, setYieldVaultLastAccrual] = useState<number>(0);
 
   const [aggregatedRevenueByPeriod, setAggregatedRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
 
@@ -218,6 +220,8 @@ const StratoStats = () => {
 
       if (response.data.byProtocol.yieldVault) {
         setYieldVaultRevenueByPeriod(response.data.byProtocol.yieldVault.revenueByPeriod);
+        setYieldVaultPendingRevenue(response.data.byProtocol.yieldVault.pendingRevenue || '0');
+        setYieldVaultLastAccrual(response.data.byProtocol.yieldVault.lastAccrual || 0);
       }
     } catch (err) {
       console.error('Failed to fetch protocol revenue:', err);
@@ -655,6 +659,16 @@ const StratoStats = () => {
                       <p className="text-xs text-muted-foreground">
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} yield vault fees
                       </p>
+                      {!revenueLoading && BigInt(yieldVaultPendingRevenue || '0') > 0n && (
+                        <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                          +${formatLargeNumber(parseFloat(formatUnits(BigInt(yieldVaultPendingRevenue), 18)))} pending
+                          {yieldVaultLastAccrual > 0 && (
+                            <span className="text-muted-foreground">
+                              {' '}(since {Math.round((Date.now() / 1000 - yieldVaultLastAccrual) / 3600)}h ago)
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
