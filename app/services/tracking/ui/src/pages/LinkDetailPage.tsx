@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Pencil } from 'lucide-react';
 import {
   absoluteLinkUrl,
   ACTIVITY_CATEGORY_LABELS,
@@ -15,6 +15,8 @@ import {
   WalletSummary,
 } from '../api';
 import ActivityTiles from '../components/ActivityTiles';
+import EditLinkModal from '../components/EditLinkModal';
+import HistoryChart from '../components/HistoryChart';
 import WalletPanel from '../components/WalletPanel';
 import WorldMap from '../components/WorldMap';
 import {
@@ -81,6 +83,7 @@ const LinkDetailPage = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [selectedWallet, setSelectedWallet] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
 
   const link = useQuery({
     queryKey: ['links', id],
@@ -99,6 +102,12 @@ const LinkDetailPage = () => {
         </Button>
         <h1 className="text-lg font-semibold">{link.data ? link.data.label : 'Tracking Link'}</h1>
         {link.data && !link.data.active && <Badge variant="secondary">Inactive</Badge>}
+        {link.data && (
+          <Button variant="outline" onClick={() => setEditing(true)}>
+            <Pencil size={14} />
+            Edit
+          </Button>
+        )}
       </div>
 
       {link.isPending ? (
@@ -131,6 +140,12 @@ const LinkDetailPage = () => {
                 <span>
                   <span className="text-muted-foreground">Source:</span> {link.data.source}
                 </span>
+                {link.data.fullSource && (
+                  <span>
+                    <span className="text-muted-foreground">Full source:</span>{' '}
+                    {link.data.fullSource}
+                  </span>
+                )}
                 <span>
                   <span className="text-muted-foreground">Creator:</span> {link.data.creator}
                 </span>
@@ -149,20 +164,33 @@ const LinkDetailPage = () => {
             </div>
           </Card>
 
+          <Card
+            title="History"
+            subtitle="Engagement and attributed value over time — per day or cumulative."
+          >
+            {link.data.history.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No history yet — data appears once the link is opened.
+              </p>
+            ) : (
+              <HistoryChart history={link.data.history} />
+            )}
+          </Card>
+
           <Card title="Activity summary" subtitle="On-chain events attributed to this link.">
             <ActivityTiles summary={link.data.activitySummary} />
           </Card>
 
           <Card
             title="Visitor locations"
-            subtitle="Where this link was opened (excluding bots and previews)."
+            subtitle="Where this link was opened (excluding bots and previews). Scroll or drag to zoom and pan, use the slider to pick a time range, and click a dot for the visitor's timeline."
           >
             {link.data.geoPoints.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No location data yet — locations are recorded when the link is opened.
               </p>
             ) : (
-              <WorldMap points={link.data.geoPoints} />
+              <WorldMap points={link.data.geoPoints} truncated={link.data.geoTruncated} />
             )}
           </Card>
 
@@ -293,6 +321,7 @@ const LinkDetailPage = () => {
       {id && (
         <WalletPanel linkId={id} address={selectedWallet} onClose={() => setSelectedWallet(null)} />
       )}
+      <EditLinkModal link={editing ? link.data ?? null : null} onClose={() => setEditing(false)} />
     </div>
   );
 };

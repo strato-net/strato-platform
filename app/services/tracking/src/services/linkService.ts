@@ -5,7 +5,8 @@ export interface TrackingLink {
   id: string;
   slug: string;
   label: string;
-  source: string | null;
+  source: string | null; // general channel: LinkedIn, X, website, …
+  full_source: string | null; // specific detail within the channel
   created_by: string;
   destination: string;
   active: boolean;
@@ -34,16 +35,17 @@ export const publicUrlForSlug = (slug: string): string => `/t/${slug}`;
 export const createLink = async (
   label: string,
   source: string | null,
+  fullSource: string | null,
   destination: string,
   createdBy: string
 ): Promise<TrackingLink> => {
   for (let attempt = 0; ; attempt++) {
     try {
       const result = await query<TrackingLink>(
-        `INSERT INTO tracking_links (slug, label, source, created_by, destination)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO tracking_links (slug, label, source, full_source, created_by, destination)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
-        [generateSlug(), label, source, createdBy, destination]
+        [generateSlug(), label, source, fullSource, createdBy, destination]
       );
       return result.rows[0];
     } catch (error: any) {
@@ -67,7 +69,13 @@ export const getLinkById = async (id: string): Promise<TrackingLink | null> => {
 
 export const updateLink = async (
   id: string,
-  fields: { active?: boolean; label?: string; source?: string }
+  fields: {
+    active?: boolean;
+    label?: string;
+    source?: string;
+    fullSource?: string;
+    destination?: string;
+  }
 ): Promise<TrackingLink | null> => {
   const link = await getLinkById(id);
   if (!link) return null;
@@ -75,11 +83,23 @@ export const updateLink = async (
     `UPDATE tracking_links
      SET active = COALESCE($2, active),
          label = COALESCE($3, label),
-         source = COALESCE($4, source)
+         source = COALESCE($4, source),
+         full_source = COALESCE($5, full_source),
+         destination = COALESCE($6, destination)
      WHERE id = $1
      RETURNING *`,
-    [id, fields.active ?? null, fields.label ?? null, fields.source ?? null]
+    [
+      id,
+      fields.active ?? null,
+      fields.label ?? null,
+      fields.source ?? null,
+      fields.fullSource ?? null,
+      fields.destination ?? null,
+    ]
   );
+  // Destination edits must take effect within the resolver cache TTL, not
+  // whenever the old entry happens to expire.
+  invalidateSlugCache(link.slug);
   return result.rows[0] ?? null;
 };
 
@@ -90,6 +110,10 @@ interface CachedSlugEntry {
 
 const SLUG_CACHE_TTL_MS = 30_000;
 const slugCache = new Map<string, CachedSlugEntry>();
+
+export const invalidateSlugCache = (slug: string): void => {
+  slugCache.delete(slug);
+};
 
 // Resolver hot path: cached slug lookup so repeated opens skip the DB read.
 export const getLinkBySlug = async (
