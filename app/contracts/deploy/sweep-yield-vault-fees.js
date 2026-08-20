@@ -26,10 +26,17 @@
  *     already counted at the previous sweep (stored in the state file).
  *   - baseAccrual integrates strategyDebt over the CapitalDeployed / CapitalReturned /
  *     StrategyLossReported timeline at the benchmark baseApyPct, so mid-window
- *     deploys/returns don't skew the estimate. The first run (no lastSweepTs)
- *     anchors at the strategy's first CapitalDeployed event.
+ *     deploys/returns don't skew the estimate.
+ *
+ * The checkpoint state file must exist before the first run — bootstrap it once by
+ * recording the last settled (manual) sweep as the previous sweep (lastSweepTs,
+ * cumSavingsCounted, its transfer hash; see the design doc "Bootstrap" section).
+ * The script fails closed without it.
  *   - The surplus cap is the only hard solvency invariant: the sweep always leaves
- *     strategyDebt + buffer behind, whatever the target says.
+ *     strategyDebt + buffer behind, whatever the target says. W counts liquid EOA
+ *     wstETH plus debt-free collateral parked in the CDPEngine (CDP_ENGINE env,
+ *     default 0000…1011); only the liquid part is transferable, and any CDP
+ *     scaledDebt trips a skip-and-alert.
  *
  * Exactly-once: a pending intent (amount + new checkpoint values) is written to the
  * state file BEFORE the transfer and committed after it confirms. On startup the
@@ -86,7 +93,7 @@ const VAULT_TABLE = 'BlockApps-YieldVault';
 const STRATEGY_DEBT_TABLE = 'BlockApps-YieldVault-strategyDebt';
 const BALANCES_TABLE = 'BlockApps-Token-_balances';
 const ALLOWANCES_TABLE = 'BlockApps-Token-_allowances';
-const PRICES_TABLE = 'BlockApps-PriceOracle-prices';
+const EXCHANGE_RATES_TABLE = 'BlockApps-PriceOracle-exchangeRates';
 // Event args are typed top-level columns in per-event Cirrus tables. Big uints MUST
 // be selected with ::text — the raw columns come back as JSON numbers and lose
 // precision above 2^53 (~9e15 wei is only 0.009 ETH).
@@ -97,9 +104,25 @@ const STRATEGY_LOSS_TABLE = 'BlockApps-YieldVault-StrategyLossReported';
 const TRANSFER_TABLE = 'BlockApps-Token-Transfer';
 const EVENT_PAGE_SIZE = 1000;
 const DEFAULT_PRICE_ORACLE = '0000000000000000000000000000000000001002';
+// The strategy parks wstETH as debt-free collateral in the CDPEngine; it counts
+// toward the solvency cap but is not liquid (transferFrom can't reach it).
+const CDP_VAULTS_TABLE = 'BlockApps-CDPEngine-vaults';
+const DEFAULT_CDP_ENGINE = '0000000000000000000000000000000000001011';
 
 const normalizeAddr = (value) => String(value || '').toLowerCase().replace(/^0x/, '');
 const isZeroAddr = (value) => !value || /^0+$/.test(normalizeAddr(value));
+// Garbage addresses (e.g. an inline "# comment" swallowed into an env value —
+// dotenv v10 does not strip those) would otherwise just match zero Cirrus rows.
+const requireAddr = (label, value) => {
+  const addr = normalizeAddr(String(value ?? '').trim());
+  if (!/^[0-9a-f]{40}$/.test(addr)) {
+    throw new Error(
+      `${label} is not a 40-hex address: "${String(value ?? '').trim()}" — ` +
+      'check .env (this dotenv version does not support inline # comments)'
+    );
+  }
+  return addr;
+};
 // Cirrus renders block_timestamp as "2026-08-10 20:28:43 UTC" (not ISO 8601).
 const toEpochSec = (ts) => {
   const ms = Date.parse(String(ts).replace(' UTC', 'Z').replace(' ', 'T'));
@@ -156,12 +179,31 @@ function rpow(x, n, base) {
 
 async function cirrus(tokenObj, tableName, params) {
   const baseUrl = config.nodes[0].url.replace(/\/$/, '');
-  const { data } = await axios.get(`${baseUrl}/cirrus/search/${tableName}`, {
-    headers: { Authorization: `Bearer ${tokenObj.token}` },
-    params,
-  });
-  return Array.isArray(data) ? data : [];
+  try {
+    const { data } = await axios.get(`${baseUrl}/cirrus/search/${tableName}`, {
+      headers: { Authorization: `Bearer ${tokenObj.token}` },
+      params,
+    });
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    const status = error.response && error.response.status;
+    const body = error.response && error.response.data;
+    const query = new URLSearchParams(params).toString();
+    const wrapped = new Error(
+      `Cirrus query ${tableName}?${query} failed` +
+      (status ? ` [${status}]: ${JSON.stringify(body)}` : `: ${error.message}`)
+    );
+    wrapped.status = status;
+    wrapped.cirrusBody = body;
+    throw wrapped;
+  }
 }
+
+// Cirrus only creates an event table once that event has fired at least once —
+// a never-emitted event (e.g. StrategyLossReported) has no table at all.
+const isMissingTable = (error) =>
+  (error.status === 400 || error.status === 404) &&
+  /does not exist|42P01|could not find the table/i.test(JSON.stringify(error.cirrusBody || ''));
 
 async function cirrusAll(tokenObj, tableName, params) {
   const rows = [];
@@ -188,7 +230,8 @@ function loadState(vault) {
   const file = stateFilePath(vault);
   if (!fs.existsSync(file)) return {};
   const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
-  if (parsed.nodeUrl && parsed.nodeUrl !== config.nodes[0].url) {
+  const stripSlash = (url) => String(url || '').replace(/\/+$/, '');
+  if (parsed.nodeUrl && stripSlash(parsed.nodeUrl) !== stripSlash(config.nodes[0].url)) {
     throw new Error(
       `State file was written for a different node (${parsed.nodeUrl}); ` +
       'delete it or fix NODE_URL before re-running.'
@@ -276,6 +319,30 @@ async function readTokenBalance(tokenObj, token, holder) {
   return BigInt(rows[0] ? String(rows[0].value || '0') : '0');
 }
 
+// CDPEngine.vaults is user => asset => {collateral, scaledDebt}; Cirrus renders the
+// struct as a JSON object with string fields (no precision loss). A missing row or
+// missing table (network without CDP) means nothing parked.
+async function readCdpVaultCollateral(tokenObj, cdpEngine, owner, asset) {
+  let rows;
+  try {
+    rows = await cirrus(tokenObj, CDP_VAULTS_TABLE, {
+      address: `eq.${cdpEngine}`,
+      key: `eq.${owner}`,
+      key2: `eq.${asset}`,
+      select: 'value',
+    });
+  } catch (error) {
+    if (isMissingTable(error)) return { collateral: 0n, scaledDebt: 0n };
+    throw error;
+  }
+  if (!rows.length) return { collateral: 0n, scaledDebt: 0n };
+  const value = typeof rows[0].value === 'object' ? rows[0].value : JSON.parse(rows[0].value);
+  return {
+    collateral: BigInt(String(value.collateral || '0')),
+    scaledDebt: BigInt(String(value.scaledDebt || '0')),
+  };
+}
+
 async function readTokenAllowance(tokenObj, token, owner, spender) {
   const rows = await cirrus(tokenObj, ALLOWANCES_TABLE, {
     address: `eq.${token}`,
@@ -300,51 +367,60 @@ function sweeperWallet() {
   }
 }
 
-// R = wstETH/ETH as a WAD-scaled rate, from the oracle's WAD-scaled USD prices.
-async function readWstEthRate(tokenObj, oracle, wstEth, ethAsset) {
-  const rows = await cirrus(tokenObj, PRICES_TABLE, {
+// R = the wstETH→ETH REDEMPTION rate (WAD) from the oracle's exchangeRates mapping —
+// the same source the backend's yield benchmarks use (earnYield.helper.ts). Not the
+// ratio of two market USD prices: their independent update timing wobbles the ratio
+// by ±0.5%/day, which dwarfs the strategy's thin solvency margin and flips the
+// surplus sign run to run, while the redemption rate is smooth and monotone.
+async function readWstEthRate(tokenObj, oracle, wstEth) {
+  const rows = await cirrus(tokenObj, EXCHANGE_RATES_TABLE, {
     address: `eq.${oracle}`,
-    key: `in.(${wstEth},${ethAsset})`,
-    select: 'asset:key,price:value::text',
+    key: `eq.${wstEth}`,
+    select: 'value::text,block_timestamp',
   });
-  const prices = new Map(rows.map((r) => [normalizeAddr(r.asset), BigInt(String(r.price || '0'))]));
-  const pWst = prices.get(normalizeAddr(wstEth));
-  const pEth = prices.get(normalizeAddr(ethAsset));
-  if (!pWst || pWst <= 0n) throw new Error(`No oracle price for wstETH ${wstEth}`);
-  if (!pEth || pEth <= 0n) throw new Error(`No oracle price for vault asset ${ethAsset}`);
-  return (pWst * WAD) / pEth;
+  if (!rows.length) throw new Error(`No exchangeRates entry for wstETH ${wstEth} on oracle ${oracle}`);
+  const values = new Set(rows.map((r) => String(r.value || '0')));
+  if (values.size > 1) throw new Error(`Inconsistent exchange-rate rows for ${wstEth}`);
+  const rate = BigInt(String(rows[0].value || '0'));
+  if (rate <= 0n) throw new Error(`Bad wstETH exchange rate: ${rows[0].value}`);
+  const ageDays = (Date.now() / 1000 - toEpochSec(rows[0].block_timestamp)) / 86400;
+  const maxAgeDays = Number(process.env.EXCHANGE_RATE_MAX_AGE_DAYS || '3');
+  if (!(ageDays <= maxAgeDays)) {
+    throw new Error(`wstETH exchange rate is stale (${ageDays.toFixed(1)}d old, max ${maxAgeDays}d) — failing closed`);
+  }
+  return rate;
 }
 
-// Exact depositor entitlement since inception: Σ Accrued.targetAmount over the FULL
-// event history (an accrual window can straddle a sweep boundary, so windowed sums
-// would double-count) plus the pending un-checkpointed accrual from current state.
-async function computeCumSavings(tokenObj, vault, vaultState, nowSec) {
+// The vault's Accrued events are the exact depositor-entitlement ledger; the FULL
+// history is needed (an accrual window can straddle a sweep boundary, so windowed
+// sums would double-count).
+async function fetchAccruedEvents(tokenObj, vault) {
   const rows = await cirrusAll(tokenObj, ACCRUED_TABLE, {
     address: `eq.${vault}`,
     select: 'targetAmount::text',
     order: 'id.asc',
   });
-  let sum = 0n;
-  for (const row of rows) {
-    sum += BigInt(String(row.targetAmount || '0'));
-  }
-  // Pending term mirrors the vault's _pendingAccrual guards (activeSupply() is
-  // totalSupply() in YieldVault.sol:138).
-  const { accrualInitialized, accrualBaseAssets, perSecondSavingsRate, lastAccrual, rewardDistributor, totalSupply } = vaultState;
-  let pending = 0n;
-  if (
-    accrualInitialized &&
-    BigInt(nowSec) > lastAccrual &&
-    totalSupply > 0n &&
-    accrualBaseAssets > 0n &&
-    perSecondSavingsRate > RAY &&
-    !isZeroAddr(rewardDistributor)
-  ) {
-    const growth = rpow(perSecondSavingsRate, BigInt(nowSec) - lastAccrual, RAY);
-    pending = (accrualBaseAssets * (growth - RAY)) / RAY;
-  }
-  return { cumSavings: sum + pending, accruedEventCount: rows.length, pending };
+  return rows.map((row) => BigInt(String(row.targetAmount || '0')));
 }
+
+// Un-checkpointed accrual over [fromTs, toTs] with current base/rate, mirroring the
+// vault's _pendingAccrual guards (activeSupply() is totalSupply(), YieldVault.sol:138).
+function pendingAccrual(vaultState, fromTs, toTs) {
+  const { accrualInitialized, accrualBaseAssets, perSecondSavingsRate, rewardDistributor, totalSupply } = vaultState;
+  if (
+    !accrualInitialized ||
+    toTs <= fromTs ||
+    totalSupply <= 0n ||
+    accrualBaseAssets <= 0n ||
+    perSecondSavingsRate <= RAY ||
+    isZeroAddr(rewardDistributor)
+  ) {
+    return 0n;
+  }
+  const growth = rpow(perSecondSavingsRate, BigInt(toTs - fromTs), RAY);
+  return (accrualBaseAssets * (growth - RAY)) / RAY;
+}
+
 
 // Piecewise-constant strategyDebt timeline from the vault's capital events. Every
 // event carries the post-change strategyDebt, so the timeline is just the sorted
@@ -359,6 +435,12 @@ async function buildDebtTimeline(tokenObj, vault, strategy) {
       [strategyColumn]: `eq.${strategy}`,
       select: 'strategyDebt::text,block_timestamp,block_number',
       order: 'id.asc',
+    }).catch((error) => {
+      if (isMissingTable(error)) {
+        console.log(`  (${table} does not exist — event never emitted on this network; treating as none)`);
+        return [];
+      }
+      throw error;
     });
   const [deployed, returned, losses] = await Promise.all([
     fetchCapitalEvents(CAPITAL_DEPLOYED_TABLE, 'strategy'),
@@ -405,7 +487,13 @@ async function fetchBaseApyPct(cli, vaultKey, strategy) {
       throw new Error('Set BACKEND_URL or pass --base-apy-pct/BASE_APY_PCT');
     }
     const url = `${backendUrl.replace(/\/$/, '')}/earn/yield-vault/${vaultKey}/info`;
-    const { data } = await axios.get(url);
+    let data;
+    try {
+      ({ data } = await axios.get(url));
+    } catch (error) {
+      const status = error.response && error.response.status;
+      throw new Error(`baseApyPct fetch ${url} failed${status ? ` [${status}]` : ''}: ${error.message}`);
+    }
     const holding = (data.strategyHoldings || []).find(
       (h) => normalizeAddr(h.strategyAddress) === strategy
     );
@@ -551,17 +639,25 @@ async function main() {
   const cli = parseArgs();
   const dryRun = Boolean(cli['dry-run']);
   const pollTimeoutMs = Number(cli['poll-timeout'] || '180000');
-  const vault = normalizeAddr(cli.vault || process.env.YIELD_VAULT);
-  const feeCollector = normalizeAddr(cli['fee-collector'] || process.env.FEE_COLLECTOR);
-  const wstEth = normalizeAddr(cli.wsteth || process.env.WSTETH_TOKEN);
+  const vaultRaw = cli.vault || process.env.YIELD_VAULT;
+  const feeCollectorRaw = cli['fee-collector'] || process.env.FEE_COLLECTOR;
+  const wstEthRaw = cli.wsteth || process.env.WSTETH_TOKEN;
   const bufferRaw = cli['buffer-wei'] || process.env.BUFFER_WEI;
   const vaultKey = cli['vault-key'] || process.env.VAULT_KEY || 'eth-carry';
-  const priceOracle = normalizeAddr(process.env.PRICE_ORACLE || DEFAULT_PRICE_ORACLE);
-  if (!vault || !feeCollector || !wstEth || bufferRaw === undefined) {
+  if (!vaultRaw || !feeCollectorRaw || !wstEthRaw || bufferRaw === undefined) {
     printUsage();
     throw new Error('Missing required arguments: --vault, --fee-collector, --wsteth, --buffer-wei');
   }
-  const buffer = BigInt(bufferRaw);
+  const vault = requireAddr('--vault/YIELD_VAULT', vaultRaw);
+  const feeCollector = requireAddr('--fee-collector/FEE_COLLECTOR', feeCollectorRaw);
+  const wstEth = requireAddr('--wsteth/WSTETH_TOKEN', wstEthRaw);
+  const priceOracle = requireAddr('PRICE_ORACLE', process.env.PRICE_ORACLE || DEFAULT_PRICE_ORACLE);
+  let buffer;
+  try {
+    buffer = BigInt(String(bufferRaw).trim());
+  } catch (error) {
+    throw new Error(`--buffer-wei/BUFFER_WEI is not an integer wei amount: "${bufferRaw}"`);
+  }
   if (buffer < 0n) throw new Error('--buffer-wei must be >= 0');
   if (!process.env.SWEEPER_PRIVATE_KEY) {
     throw new Error('Set SWEEPER_PRIVATE_KEY (the RevenueSweeper key signs the transferFrom)');
@@ -576,8 +672,10 @@ async function main() {
   const tokenObj = { token };
 
   const state = loadState(vault);
-  const strategy = normalizeAddr(cli.strategy || process.env.STRATEGY_ADDRESS) ||
-    (await discoverStrategy(tokenObj, vault));
+  const strategyRaw = cli.strategy || process.env.STRATEGY_ADDRESS;
+  const strategy = strategyRaw
+    ? requireAddr('--strategy/STRATEGY_ADDRESS', strategyRaw)
+    : await discoverStrategy(tokenObj, vault);
   console.log(`  strategy=${strategy} sweeper=${sweeper} feeCollector=${feeCollector} wstETH=${wstEth}`);
 
   if (!dryRun) {
@@ -592,14 +690,18 @@ async function main() {
     readVaultState(tokenObj, vault),
     buildDebtTimeline(tokenObj, vault, strategy),
   ]);
-  const [strategyDebt, balanceWst, allowance, rate, savings, baseApyPct] = await Promise.all([
+  const cdpEngine = requireAddr('CDP_ENGINE', process.env.CDP_ENGINE || DEFAULT_CDP_ENGINE);
+  const [strategyDebt, balanceWst, cdpVault, allowance, rate, accruedEvents, baseApyPct] = await Promise.all([
     readStrategyDebt(tokenObj, vault, strategy),
     readTokenBalance(tokenObj, wstEth, strategy),
+    readCdpVaultCollateral(tokenObj, cdpEngine, strategy, wstEth),
     readTokenAllowance(tokenObj, wstEth, strategy, sweeper),
-    readWstEthRate(tokenObj, priceOracle, wstEth, vaultState.asset),
-    computeCumSavings(tokenObj, vault, vaultState, nowSec),
+    readWstEthRate(tokenObj, priceOracle, wstEth),
+    fetchAccruedEvents(tokenObj, vault),
     fetchBaseApyPct(cli, vaultKey, strategy),
   ]);
+  const pendingNow = pendingAccrual(vaultState, Number(vaultState.lastAccrual), nowSec);
+  const cumSavingsNow = accruedEvents.reduce((sum, amount) => sum + amount, 0n) + pendingNow;
 
   if (!timeline.length) throw new Error(`No capital events for strategy ${strategy} — nothing deployed yet`);
   const timelineDebt = timeline[timeline.length - 1].debtWei;
@@ -611,38 +713,48 @@ async function main() {
   }
 
   // --- Amount formula (design doc "Amount formula — spread, capped by surplus") ---
-  const anchorTs = state.lastSweepTs ? Number(state.lastSweepTs) : timeline[0].ts;
-  if (!state.lastSweepTs) {
-    console.log(`  First sweep: anchoring at first CapitalDeployed (${toIso(anchorTs)})`);
+  if (!state.lastSweepTs || state.cumSavingsCounted === undefined) {
+    throw new Error(
+      `No checkpoint in ${path.basename(stateFilePath(vault))} — bootstrap it once before the first run ` +
+      '(design doc "Bootstrap"): set lastSweepTs + cumSavingsCounted to the last settled (manual) sweep, ' +
+      'record its transfer hash in recordedTransferHashes, and set nodeUrl.'
+    );
   }
-  const cumSavingsCounted = BigInt(state.cumSavingsCounted || '0');
-  const savingsAccrual = savings.cumSavings - cumSavingsCounted;
+  const anchorTs = Number(state.lastSweepTs);
+  const cumSavingsCounted = BigInt(state.cumSavingsCounted);
+  const savingsAccrual = cumSavingsNow - cumSavingsCounted;
   if (savingsAccrual < 0n) {
     throw new Error(
-      `cumSavings (${savings.cumSavings}) < cumSavingsCounted (${cumSavingsCounted}) — ` +
+      `cumSavings (${cumSavingsNow}) < cumSavingsCounted (${cumSavingsCounted}) — ` +
       'state file disagrees with chain history; failing closed.'
     );
   }
   const baseAccrual = integrateGrossYield(timeline, anchorTs, nowSec, baseApyPct);
   const targetFee = baseAccrual > savingsAccrual ? baseAccrual - savingsAccrual : 0n;
-  const balanceEth = (balanceWst * rate) / WAD;
-  const surplus = balanceEth - strategyDebt - buffer;
+  // Solvency cap counts liquid + CDP-parked wstETH; the transfer can only move the
+  // liquid part, so the fee is additionally clamped to the EOA balance.
+  const totalWst = balanceWst + cdpVault.collateral;
+  const totalEth = (totalWst * rate) / WAD;
+  const surplus = totalEth - strategyDebt - buffer;
   const feeEth = targetFee < surplus ? targetFee : surplus;
-  const feeWst = feeEth > 0n ? (feeEth * WAD) / rate : 0n;
+  let feeWst = feeEth > 0n ? (feeEth * WAD) / rate : 0n;
   const clamped = surplus >= 0n && targetFee > surplus;
+  const liquidityClamped = feeWst > balanceWst;
+  if (liquidityClamped) feeWst = balanceWst;
 
   console.log('  --- computed values ---');
   console.log(`  window:          ${toIso(anchorTs)} .. ${toIso(nowSec)} (${nowSec - anchorTs}s)`);
   console.log(`  baseApyPct:      ${baseApyPct}%`);
   console.log(`  strategyDebt:    ${fmtEth(strategyDebt)} ETH (timeline: ${timeline.length} capital events)`);
-  console.log(`  savingsAccrual:  ${fmtEth(savingsAccrual)} ETH (${savings.accruedEventCount} Accrued events, pending ${savings.pending})`);
+  console.log(`  savingsAccrual:  ${fmtEth(savingsAccrual)} ETH (${accruedEvents.length} Accrued events, pending ${pendingNow})`);
   console.log(`  baseAccrual:     ${fmtEth(baseAccrual)} ETH`);
   console.log(`  targetFeeETH:    ${fmtEth(targetFee)} ETH`);
-  console.log(`  balance W:       ${fmtEth(balanceWst)} wstETH, rate R=${rate} (WAD), = ${fmtEth(balanceEth)} ETH`);
+  console.log(`  balance W:       liquid ${fmtEth(balanceWst)} + CDP-parked ${fmtEth(cdpVault.collateral)} = ${fmtEth(totalWst)} wstETH`);
+  console.log(`  valuation:       rate R=${rate} (WAD) → ${fmtEth(totalEth)} ETH total`);
   console.log(`  allowance:       ${fmtEth(allowance)} wstETH (strategy → sweeper)`);
   console.log(`  surplusETH:      ${fmtEth(surplus)} ETH (buffer ${buffer})`);
   console.log(`  feeETH:          ${fmtEth(feeEth)} ETH${clamped ? '  [CLAMPED to surplus]' : ''}`);
-  console.log(`  feeWstETH:       ${fmtEth(feeWst)} wstETH`);
+  console.log(`  feeWstETH:       ${fmtEth(feeWst)} wstETH${liquidityClamped ? '  [CLAMPED to liquid balance]' : ''}`);
 
   const finish = (code) => {
     state.lastRunTs = nowSec;
@@ -650,6 +762,14 @@ async function main() {
     process.exit(code);
   };
 
+  if (cdpVault.scaledDebt > 0n) {
+    console.error(
+      `ALERT: strategy CDP vault has outstanding scaledDebt (${cdpVault.scaledDebt}) — ` +
+      'parked collateral is backing debt, not free equity; NOT sweeping until the debt ' +
+      'is cleared or the valuation is extended to net it out.'
+    );
+    finish(2);
+  }
   if (surplus <= 0n) {
     console.error(`ALERT: strategy at/under principal (surplus=${surplus}) — NOT sweeping. Investigate.`);
     finish(2);
@@ -682,25 +802,30 @@ async function main() {
     createdAtIso: toIso(nowSec),
     feeWstWei: feeWst.toString(),
     newLastSweepTs: nowSec,
-    newCumSavingsCounted: savings.cumSavings.toString(),
+    newCumSavingsCounted: cumSavingsNow.toString(),
   };
   saveState(vault, state);
 
-  // The operator's wstETH→ETH conversions drain the same address; re-read right
-  // before sending so a stale start-of-run snapshot can't overdraw the cap.
-  const freshBalance = await readTokenBalance(tokenObj, wstEth, strategy);
+  // The operator's wstETH→ETH conversions and CDP deposits/withdrawals move the
+  // same funds; re-read right before sending so a stale start-of-run snapshot
+  // can't overdraw the cap or the liquid balance.
+  const [freshLiquid, freshVault] = await Promise.all([
+    readTokenBalance(tokenObj, wstEth, strategy),
+    readCdpVaultCollateral(tokenObj, cdpEngine, strategy, wstEth),
+  ]);
   let sendWst = feeWst;
-  if (freshBalance !== balanceWst) {
-    const freshSurplus = (freshBalance * rate) / WAD - strategyDebt - buffer;
-    if (freshSurplus <= 0n) {
-      console.error('ALERT: balance moved during run and surplus is gone — NOT sweeping.');
+  if (freshLiquid !== balanceWst || freshVault.collateral !== cdpVault.collateral || freshVault.scaledDebt > 0n) {
+    const freshSurplus = ((freshLiquid + freshVault.collateral) * rate) / WAD - strategyDebt - buffer;
+    if (freshSurplus <= 0n || freshVault.scaledDebt > 0n) {
+      console.error('ALERT: strategy funds moved during run (surplus gone or CDP debt appeared) — NOT sweeping.');
       delete state.pendingIntent;
       finish(2);
     }
     const freshSurplusWst = (freshSurplus * WAD) / rate;
-    if (freshSurplusWst < sendWst) {
-      console.log(`  Balance moved during run; re-clamping ${sendWst} -> ${freshSurplusWst} wstETH`);
-      sendWst = freshSurplusWst;
+    const freshCap = freshSurplusWst < freshLiquid ? freshSurplusWst : freshLiquid;
+    if (freshCap < sendWst) {
+      console.log(`  Funds moved during run; re-clamping ${sendWst} -> ${freshCap} wstETH`);
+      sendWst = freshCap;
       state.pendingIntent.feeWstWei = sendWst.toString();
       saveState(vault, state);
     }
@@ -712,8 +837,11 @@ async function main() {
   commitIntent(state, state.pendingIntent, txHash);
   saveState(vault, state);
 
-  const afterBalance = await readTokenBalance(tokenObj, wstEth, strategy);
-  const afterEth = (afterBalance * rate) / WAD;
+  const [afterLiquid, afterVault] = await Promise.all([
+    readTokenBalance(tokenObj, wstEth, strategy),
+    readCdpVaultCollateral(tokenObj, cdpEngine, strategy, wstEth),
+  ]);
+  const afterEth = ((afterLiquid + afterVault.collateral) * rate) / WAD;
   if (afterEth < strategyDebt + buffer) {
     console.error(
       `ALERT: post-sweep health check FAILED: W'×R (${afterEth}) < strategyDebt + buffer ` +
