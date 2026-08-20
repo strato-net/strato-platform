@@ -255,6 +255,8 @@ const CARRY_VAULT_ENTRIES: (Omit<YieldVaultDef, "address"> & { getAddress: () =>
   { key: "eth-carry",  name: "ETH Yield Vault",  assetSymbol: "ETH",  shareSymbol: "carryETH",  getAddress: () => config.ethCarryVault },
   { key: "wbtc-carry", name: "wBTC Carry Vault", assetSymbol: "wBTC", shareSymbol: "carryWBTC", getAddress: () => config.wbtcCarryVault },
   { key: "usdc-yield", name: "USDC Yield Vault", assetSymbol: "USDC", shareSymbol: "yieldUSDC", getAddress: () => config.usdcYieldVault },
+  { key: "goldst-yield", name: "GOLDST Yield Vault", assetSymbol: "GOLDST", shareSymbol: "yieldGOLDST", getAddress: () => config.goldstYieldVault },
+  { key: "silvst-yield", name: "SILVST Yield Vault", assetSymbol: "SILVST", shareSymbol: "yieldSILVST", getAddress: () => config.silvstYieldVault },
 ];
 
 const parseBigIntLike = (value: unknown): bigint => {
