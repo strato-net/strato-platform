@@ -8,7 +8,12 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Blockchain.Bootstrap where
+module Blockchain.Bootstrap
+  ( populateStorageDBs,
+    seedDatabases,
+    bootstrapIndexer,
+  )
+where
 
 import BlockApps.Logging
 import Blockchain.BlockDB

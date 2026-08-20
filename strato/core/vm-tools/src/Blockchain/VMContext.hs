@@ -46,8 +46,17 @@ module Blockchain.VMContext
     dbs,
     state,
     stateDiffQueue,
+    mpNodeCache,
+    mpPendingNodes,
+    mpPendingBlockHashRoot,
+    mpFlushInterval,
+    mpFlushCount,
+    hashCache,
+    HasPendingMPNodes (..),
     runTestContextM,
     initContext,
+    initContextWithLevelDBTuning,
+    initReplayContext,
     runContextM,
     runContextM',
     evalContextM,
@@ -106,7 +115,9 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource
 import Data.Binary
+import qualified Data.ByteString as B
 import Data.Default
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Map as M
 import qualified Data.NibbleString as N
 import qualified Data.Set as S
@@ -223,7 +234,16 @@ data QueueEvent
 data Context = Context
   { _dbs :: ContextDBs,
     _state :: IORef ContextState,
-    _stateDiffQueue :: (TQueue QueueEvent)
+    _stateDiffQueue :: (TQueue QueueEvent),
+    -- In-process Merkle Patricia node cache. Lookups hit here before LevelDB.
+    -- Inserts stay in RAM; SR verification uses the same nodes. Persistence is
+    -- durability, not the hash. Timed apply does not need a mid-run disk write.
+    _mpNodeCache :: IORef (HM.HashMap B.ByteString MP.NodeData),
+    _mpPendingNodes :: IORef (HM.HashMap B.ByteString MP.NodeData),
+    _mpPendingBlockHashRoot :: IORef (Maybe B.ByteString),
+    _mpFlushInterval :: !Int,
+    _mpFlushCount :: IORef Int,
+    _hashCache :: IORef (HM.HashMap B.ByteString N.NibbleString)
   }
   deriving (Generic)
 
@@ -231,11 +251,17 @@ makeLenses ''Context
 
 type ContextM = ReaderT Context (ResourceT (LoggingT IO))
 
+class Monad m => HasPendingMPNodes m where
+  flushPendingMPNodes :: m ()
+  finalizePendingMPNodes :: m ()
+  clearPendingMPNodes :: m ()
+
 type VMBase m =
   ( MonadIO m,
     MonadCatch m,
     MonadUnliftIO m,
     MonadLogger m,
+    HasPendingMPNodes m,
     Mod.Modifiable (Maybe DebugSettings) m,
     Mod.Modifiable (Maybe VmTracer) m,
     Mod.Modifiable ContextState m,
@@ -371,11 +397,22 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               _selfAddress = Address 0
             }
       que <- newTQueueIO
+      nodeCache <- newIORef HM.empty
+      pendingNodes <- newIORef HM.empty
+      pendingBlockHashRoot <- newIORef Nothing
+      flushCount <- newIORef 0
+      hCache <- newIORef HM.empty
       let ctx =
             Context
               { _dbs = cdbs,
                 _state = cstate,
-                _stateDiffQueue = que
+                _stateDiffQueue = que,
+                _mpNodeCache = nodeCache,
+                _mpPendingNodes = pendingNodes,
+                _mpPendingBlockHashRoot = pendingBlockHashRoot,
+                _mpFlushInterval = 1,
+                _mpFlushCount = flushCount,
+                _hashCache = hCache
               }
       a <- flip runReaderT ctx $ do
         MP.initializeBlank
@@ -387,14 +424,38 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
 initContext ::
   (MonadUnliftIO m, MonadLoggerIO m, MonadResource m) =>
   m Context
-initContext = do
+initContext = initContextWithLevelDBTuning
+  (Conf.cacheSize $ levelDBConfig ethConf)
+  (DB.writeBufferSize DB.defaultOptions)
+
+initContextWithLevelDBTuning ::
+  (MonadUnliftIO m, MonadLoggerIO m, MonadResource m) =>
+  Int ->
+  Int ->
+  m Context
+initContextWithLevelDBTuning cacheBytes writeBufferBytes = do
+  initContextWithOptions cacheBytes writeBufferBytes 1
+
+initReplayContext ::
+  (MonadUnliftIO m, MonadLoggerIO m, MonadResource m) =>
+  m Context
+initReplayContext = initContextWithOptions
+  (Conf.cacheSize $ levelDBConfig ethConf)
+  (DB.writeBufferSize DB.defaultOptions)
+  256
+
+initContextWithOptions ::
+  (MonadUnliftIO m, MonadLoggerIO m, MonadResource m) =>
+  Int -> Int -> Int -> m Context
+initContextWithOptions cacheBytes writeBufferBytes flushInterval = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
   conn <- createPostgresqlPool connStr 20
   let ldbOptions =
         DB.defaultOptions
           { DB.createIfMissing = True,
-            DB.cacheSize = Conf.cacheSize (levelDBConfig ethConf),
-            DB.blockSize = Conf.blockSize (levelDBConfig ethConf)
+            DB.cacheSize = cacheBytes,
+            DB.blockSize = Conf.blockSize (levelDBConfig ethConf),
+            DB.writeBufferSize = writeBufferBytes
           }
   sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
   hdb <- DB.open (dbDir "h" ++ hashDBPath) ldbOptions
@@ -418,11 +479,22 @@ initContext = do
       def
         & txRunResultsCache .~ cache
   que <- newTQueueIO
+  nodeCache <- newIORef HM.empty
+  pendingNodes <- newIORef HM.empty
+  pendingBlockHashRoot <- newIORef Nothing
+  flushCount <- newIORef 0
+  hCache <- newIORef HM.empty
   pure
     Context
       { _dbs = cdbs,
         _state = cstate,
-        _stateDiffQueue = que
+        _stateDiffQueue = que,
+        _mpNodeCache = nodeCache,
+        _mpPendingNodes = pendingNodes,
+        _mpPendingBlockHashRoot = pendingBlockHashRoot,
+        _mpFlushInterval = flushInterval,
+        _mpFlushCount = flushCount,
+        _hashCache = hCache
       }
 
 runContextM ::

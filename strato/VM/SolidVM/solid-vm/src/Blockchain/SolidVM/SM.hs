@@ -20,6 +20,9 @@ module Blockchain.SolidVM.SM
     SState (..),
     SM,
     MonadSM,
+    MonadGas (..),
+    MonadDebugHot (..),
+    MonadCallStack (..),
     action,
     runSM,
     getCurrentAddress,
@@ -29,6 +32,8 @@ module Blockchain.SolidVM.SM
     withUncheckedCallInfo,
     withLocalVars,
     getCurrentCallInfo,
+    getCallStackDepth,
+    trimCallStackToDepth,
     getCurrentCallInfoIfExists,
     getCurrentContract,
     getCurrentFunctionName,
@@ -165,12 +170,24 @@ data SState = SState
     callStack :: [CallInfo],
     _ssMemDBs :: MemDBs,
     _action :: !Action,
-    _gasInfo :: GasInfo
+    _gasInfo :: GasInfo,
+    ssDebugSettingsValue :: Maybe DebugSettings,
+    ssVmTracerValue :: Maybe VmTracer,
+    ssDbgHot :: !Bool
   }
 
 makeLenses ''SState
 
 type SM m = ReaderT (IORef SState) m
+
+class Monad m => MonadGas m where
+  chargeGasState :: Gas -> m GasInfo
+
+class Monad m => MonadDebugHot m where
+  debugIsHot :: m Bool
+
+class Monad m => MonadCallStack m where
+  popCallInfoState :: m (Maybe CallInfo)
 
 type MonadSM m =
   ( (Address `A.Alters` AddressState) m,
@@ -195,6 +212,9 @@ type MonadSM m =
     Mod.Modifiable (OMap.OMap (Text, Keccak256) CodeCollection) m,
     Mod.Modifiable (Maybe DebugSettings) m,
     Mod.Modifiable (Maybe VmTracer) m,
+    MonadGas m,
+    MonadDebugHot m,
+    MonadCallStack m,
     MonadUnliftIO m, --todo: remove
     MonadCatch m,
     MonadLogger m
@@ -235,12 +255,12 @@ instance
   where
   lookup _ k   = do
     cs <- gets callStack
-    case foldr (<|>) Nothing $ M.lookup k . storageMap <$> cs of
+    case lookupStorageFrames k cs of
       Just v -> pure $ Just v
       Nothing -> genericLookupRawStorageDB k
   lookupWithDefault _ k   = do
     cs <- gets callStack
-    case foldr (<|>) Nothing $ M.lookup k . storageMap <$> cs of
+    case lookupStorageFrames k cs of
       Just v -> pure v
       Nothing -> genericLookupWithDefaultRawStorageDB k
   insert _ k v = do
@@ -288,7 +308,7 @@ instance
   where
   lookup _ a = do
     cs <- gets callStack
-    case foldr (<|>) Nothing $ M.lookup a . stateMap <$> cs of
+    case lookupStateFrames a cs of
       Just (ASModification s) -> pure $ Just s
       Just ASDeleted -> pure $ Just blankAddressState
       Nothing -> getAddressStateMaybe a
@@ -349,6 +369,20 @@ instance
   where
   select = A.lookup
 
+lookupStorageFrames :: RawStorageKey -> [CallInfo] -> Maybe RawStorageValue
+lookupStorageFrames _ [] = Nothing
+lookupStorageFrames key (ci : rest) = case M.lookup key (storageMap ci) of
+  Just value -> Just value
+  Nothing -> lookupStorageFrames key rest
+{-# INLINE lookupStorageFrames #-}
+
+lookupStateFrames :: Address -> [CallInfo] -> Maybe AddressStateModification
+lookupStateFrames _ [] = Nothing
+lookupStateFrames address (ci : rest) = case M.lookup address (stateMap ci) of
+  Just value -> Just value
+  Nothing -> lookupStateFrames address rest
+{-# INLINE lookupStateFrames #-}
+
 instance
   (MonadUnliftIO m, (Maybe Word256 `A.Alters` MP.StateRoot) m) =>
   (Maybe Word256 `A.Alters` MP.StateRoot) (SM m)
@@ -399,19 +433,26 @@ instance MonadUnliftIO m => Mod.Modifiable Env.Environment (SM m) where
   get _   = gets env
   put _ m = modify $ \ss -> ss{ env = m }
 
-instance
-  (Mod.Modifiable (Maybe DebugSettings) m) =>
-  Mod.Modifiable (Maybe DebugSettings) (SM m)
-  where
-  get _ = lift $ Mod.get (Mod.Proxy @(Maybe DebugSettings))
-  put _ = lift . Mod.put (Mod.Proxy @(Maybe DebugSettings))
+instance MonadUnliftIO m => Mod.Modifiable (Maybe DebugSettings) (SM m) where
+  get _ = gets ssDebugSettingsValue
+  put _ d = modify $ \ss ->
+    ss {ssDebugSettingsValue = d, ssDbgHot = isJust d || isJust (ssVmTracerValue ss)}
 
-instance
-  (Mod.Modifiable (Maybe VmTracer) m) =>
-  Mod.Modifiable (Maybe VmTracer) (SM m)
-  where
-  get _ = lift $ Mod.get (Mod.Proxy @(Maybe VmTracer))
-  put _ = lift . Mod.put (Mod.Proxy @(Maybe VmTracer))
+instance MonadUnliftIO m => Mod.Modifiable (Maybe VmTracer) (SM m) where
+  get _ = gets ssVmTracerValue
+  put _ t = modify $ \ss ->
+    ss {ssVmTracerValue = t, ssDbgHot = isJust (ssDebugSettingsValue ss) || isJust t}
+
+instance MonadUnliftIO m => MonadDebugHot (SM m) where
+  debugIsHot = gets ssDbgHot
+  {-# INLINE debugIsHot #-}
+
+instance MonadUnliftIO m => MonadCallStack (SM m) where
+  popCallInfoState = ask >>= \ref -> liftIO $ atomicModifyIORef' ref $ \ss ->
+    case callStack ss of
+      [] -> (ss, Nothing)
+      ci : rest -> (ss {callStack = rest}, Just ci)
+  {-# INLINE popCallInfoState #-}
 
 instance MonadUnliftIO m => Mod.Modifiable Env.Sender (SM m) where
   get _ = Env.Sender . Env.sender <$> gets env
@@ -428,6 +469,17 @@ instance MonadUnliftIO m => Mod.Modifiable MemDBs (SM m) where
 instance MonadUnliftIO m => Mod.Modifiable GasInfo (SM m) where
   get _ = gets _gasInfo
   put _ g = modify $ gasInfo .~ g
+
+instance MonadUnliftIO m => MonadGas (SM m) where
+  chargeGasState !gas = ask >>= \ref -> liftIO $ do
+    ss <- readIORef ref
+    let gi = _gasInfo ss
+        !newLeft = _gasLeft gi - gas
+        !newUsed = _gasUsed gi + gas
+        !gi' = gi {_gasLeft = newLeft, _gasUsed = newUsed}
+    writeIORef ref $! ss {_gasInfo = gi'}
+    pure gi'
+  {-# INLINE chargeGasState #-}
 
 instance MonadUnliftIO m => Mod.Modifiable Action (SM m) where
   get _ = gets _action
@@ -479,7 +531,10 @@ runSM ::
   SM m a ->
   m (Env.Environment, Either SolidException a)
 runSM maybeCode envBefore gi f = do
-  csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
+  contextState <- Mod.get (Mod.Proxy @ContextState)
+  let csMemDBs = _memDBs contextState
+      initialDebugSettings = _debugSettings contextState
+      initialVmTracer = _vmTracer contextState
   GasCap gasCap <- Mod.get (Mod.Proxy @GasCap)
   $logDebugS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
   let !startingState =
@@ -488,7 +543,10 @@ runSM maybeCode envBefore gi f = do
             callStack = [],
             _ssMemDBs = csMemDBs,
             _action = startingAction envBefore,
-            _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap} -- capping the transaction gas limit
+            _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap}, -- capping the transaction gas limit
+            ssDebugSettingsValue = initialDebugSettings,
+            ssVmTracerValue = initialVmTracer,
+            ssDbgHot = isJust initialDebugSettings || isJust initialVmTracer
           }
   startingStateRef <- newIORef startingState
   eVal <- try $ runReaderT f startingStateRef
@@ -504,7 +562,9 @@ runSM maybeCode envBefore gi f = do
       let se = case fromException e of
             Just solidEx -> solidEx
             Nothing -> InternalError "Uncaught internal exception" (show e)
-      $logErrorLS "runSM/error" se
+      case se of
+        Require _ -> $logDebugLS "runSM/error" se
+        _ -> $logErrorLS "runSM/error" se
       if flags_svmDev
         then do
           $logErrorLS "runSM/error_code" maybeCode
@@ -601,66 +661,17 @@ getVariableOfName name = do
       maybeBuiltinFunction =
         toMaybe
           ( name
-              `elem` [ "address",
-                       "account",
-                       "uint",
-                       "int",
-                       "decimal",
-                       "bool",
-                       "byte",
-                       "bytes",
-                       "string",
-                       "variadic",
-                       "log",
-                       "keccak256",
-                       "ripemd160",
-                       "modExp",
-                       "ecAdd",
-                       "ecMul",
-                       "ecPairing",
-                       "bls12381G1Add",
-                       "bls12381G1Msm",
-                       "bls12381G2Add",
-                       "bls12381G2Msm",
-                       "bls12381Pairing",
-                       "bls12381MapFpToG1",
-                       "bls12381MapFp2ToG2",
-                       "bls12381HashToCurveG1",
-                       "bls12381HashToCurveG2",
-                       "bls12381DecompressG1",
-                       "bls12381DecompressG2",
-                       "poseidon",
-                       "poseidon2",
-                       "poseidon2Compress",
-                       "poseidon2Permute",
-                       "poseidon2Hash",
-                       "poseidon2HashBytes",
-                       "poseidon2gl",
-                       "poseidon2glBytes",
-                       "payable",
-                       "require",
-                       "revert",
-                       "assert",
-                       "sha3",
-                       "delegatecall",
-                       "call",
-                       "staticcall",
-                       "derive",
-                       "sha256",
-                       "ecrecover",
-                       "verifyP256",
-                       "base64encode",
-                       "base64urlencode",
-                       "blockhash",
-                       "addmod",
-                       "mulmod",
-                       "selfdestruct",
-                       "suicide",
-                       "bytes32ToString",
-                       "create",
-                       "create2",
-                       "fastForward"
-                     ]
+              `elem` [ "address", "account", "uint", "int", "decimal", "bool", "byte", "bytes",
+                       "string", "variadic", "log", "keccak256", "ripemd160", "modExp", "ecAdd",
+                       "ecMul", "ecPairing", "bls12381G1Add", "bls12381G1Msm", "bls12381G2Add",
+                       "bls12381G2Msm", "bls12381Pairing", "bls12381MapFpToG1", "bls12381MapFp2ToG2",
+                       "bls12381HashToCurveG1", "bls12381HashToCurveG2", "bls12381DecompressG1",
+                       "bls12381DecompressG2", "poseidon", "poseidon2", "poseidon2Compress",
+                       "poseidon2Permute", "poseidon2Hash", "poseidon2HashBytes", "poseidon2gl",
+                       "poseidon2glBytes", "payable", "require", "revert", "assert", "sha3",
+                       "delegatecall", "call", "staticcall", "derive", "sha256", "ecrecover",
+                       "verifyP256", "base64encode", "base64urlencode", "blockhash", "addmod", "mulmod",
+                       "selfdestruct", "suicide", "bytes32ToString", "create", "create2", "fastForward" ]
           )
           $ t "builtin function" $ Constant $ SFunction name Nothing
 
@@ -671,7 +682,7 @@ getVariableOfName name = do
 
       maybeEnum :: Maybe Variable
       maybeEnum =
-        toMaybe (name `elem` M.keys (currentContract currentCallInfo ^. CC.enums) || name `elem` M.keys (codeCollection currentCallInfo ^. CC.flEnums)) $
+        toMaybe (M.member name (currentContract currentCallInfo ^. CC.enums) || M.member name (codeCollection currentCallInfo ^. CC.flEnums)) $
           t "enum" $ Constant $ SEnum name
 
       maybeConstant :: Maybe Variable
@@ -688,12 +699,12 @@ getVariableOfName name = do
 
       maybeStructDef :: Maybe Variable
       maybeStructDef =
-        toMaybe (name `elem` M.keys (currentContract currentCallInfo ^. CC.structs) || name `elem` M.keys (codeCollection currentCallInfo ^. CC.flStructs)) $
+        toMaybe (M.member name (currentContract currentCallInfo ^. CC.structs) || M.member name (codeCollection currentCallInfo ^. CC.flStructs)) $
           t "struct def" $ Constant $ SStructDef name
 
       maybeContract :: Maybe Variable
       maybeContract =
-        toMaybe (name `elem` M.keys (codeCollection currentCallInfo ^. CC.contracts)) $
+        toMaybe (M.member name (codeCollection currentCallInfo ^. CC.contracts)) $
           t "contract" $ Constant $ SContractDef name
 
       maybeStorageItem :: Maybe Variable
@@ -717,21 +728,22 @@ getVariableOfName name = do
           return $ Just $ Constant $ val
   -}
 
-  return . fromMaybe (unknownVariable "getVariableOfName" name) . foldr1 (<|>) $
-    [ maybeLocalValue,
-      maybeStorageItem,
-      maybeContractFunction,
-      maybeFreeFunction,
-      maybeBuiltinFunction,
-      maybeBuiltinVariable,
-      maybeEnum,
-      maybeStructDef,
-      maybeContract,
-      maybeThis,
-      maybeConstant,
-      --, maybeUserDefined
-      unknownVariable "not found" name
-    ]
+  case maybeLocalValue of
+    Just value -> pure value
+    Nothing -> case maybeStorageItem of
+      Just value -> pure value
+      Nothing ->
+        return . fromMaybe (unknownVariable "getVariableOfName" name) $
+          maybeContractFunction
+            <|> maybeFreeFunction
+            <|> maybeBuiltinFunction
+            <|> maybeBuiltinVariable
+            <|> maybeEnum
+            <|> maybeStructDef
+            <|> maybeContract
+            <|> maybeThis
+            <|> maybeConstant
+            <|> unknownVariable "not found" name
 
 withCallInfo ::
   MonadSM m =>
@@ -747,31 +759,42 @@ withCallInfo ::
   m a ->
   m a
 withCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff f = do
-  mTracer <- Mod.get (Mod.Proxy @(Maybe VmTracer))
-  for_ mTracer $ \_ -> do
-    stack <- Mod.get (Mod.Proxy @[CallInfo])
-    fromAddr <- case stack of
-      (parent : _) -> pure $ currentAddress parent
-      [] -> (\(Env.Sender sndr) -> sndr) <$> Mod.get (Mod.Proxy @Env.Sender)
-    GasInfo {_gasLeft = Gas gasBefore} <- Mod.get (Mod.Proxy @GasInfo)
-    args <- traverse renderArgShallow (M.toList initialLocalVariables)
-    let callType
-          | labelToText fn == "constructor" = CTCreate
-          | codeAddr /= a = CTDelegateCall
-          | ro = CTStaticCall
-          | otherwise = CTCall
-    traceEnterFrame mTracer callType fromAddr a (labelToText $ c ^. CC.contractName) (labelToText fn) args gasBefore
-  addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff
-  eRes <- try f
-  for_ mTracer $ \_ -> do
-    GasInfo {_gasLeft = Gas gasAfter} <- Mod.get (Mod.Proxy @GasInfo)
-    traceExitFrame mTracer gasAfter $ case eRes of
-      Left (e :: SomeException) -> Just . T.pack $ show e
-      Right _ -> Nothing
-  popCallInfo $ isLeft eRes
-  case eRes of
-    Left (e :: SomeException) -> throwIO e
-    Right res -> pure res
+  dbgHot <- debugIsHot
+  if not dbgHot
+    then do
+      addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff
+      res <- f
+      popCallInfo False
+      pure res
+    else do
+      mTracer <- Mod.get (Mod.Proxy @(Maybe VmTracer))
+      withInstrumentedCallInfo mTracer
+  where
+    withInstrumentedCallInfo mTracer = do
+      for_ mTracer $ \_ -> do
+        stack <- Mod.get (Mod.Proxy @[CallInfo])
+        fromAddr <- case stack of
+          (parent : _) -> pure $ currentAddress parent
+          [] -> (\(Env.Sender sndr) -> sndr) <$> Mod.get (Mod.Proxy @Env.Sender)
+        GasInfo {_gasLeft = Gas gasBefore} <- Mod.get (Mod.Proxy @GasInfo)
+        args <- traverse renderArgShallow (M.toList initialLocalVariables)
+        let callType
+              | labelToText fn == "constructor" = CTCreate
+              | codeAddr /= a = CTDelegateCall
+              | ro = CTStaticCall
+              | otherwise = CTCall
+        traceEnterFrame mTracer callType fromAddr a (labelToText $ c ^. CC.contractName) (labelToText fn) args gasBefore
+      addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff
+      eRes <- try f
+      for_ mTracer $ \_ -> do
+        GasInfo {_gasLeft = Gas gasAfter} <- Mod.get (Mod.Proxy @GasInfo)
+        traceExitFrame mTracer gasAfter $ case eRes of
+          Left (e :: SomeException) -> Just . T.pack $ show e
+          Right _ -> Nothing
+      popCallInfo $ isLeft eRes
+      case eRes of
+        Left (e :: SomeException) -> throwIO e
+        Right res -> pure res
 
 -- | Render one named argument for a trace frame. Only the in-memory value is
 -- read (readIORef); storage is never touched, which would mutate the MP trie.
@@ -837,18 +860,15 @@ uncheckedCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
 
 popCallInfo :: MonadSM m => Bool -> m ()
 popCallInfo reverted = do
-  cci <- getCurrentCallInfoIfExists
-  Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-    [] -> internalError "popCallInfo was called on an already empty stack" ()
-    (_ : rest) -> pure rest
-
-  unless reverted . for_ cci $ \ci -> do
-    A.insertMany (A.Proxy @RawStorageValue) $ storageMap ci
-    let fromASM ASDeleted = Left ()
-        fromASM (ASModification as) = Right as
-        (deletes, inserts) = M.mapEither fromASM $ stateMap ci
-    A.insertMany (A.Proxy @AddressState) $ inserts
-    A.deleteMany (A.Proxy @AddressState) $ M.keys deletes
+  popCallInfoState >>= \case
+    Nothing -> internalError "popCallInfo was called on an already empty stack" ()
+    Just ci -> unless reverted $ do
+      A.insertMany (A.Proxy @RawStorageValue) $ storageMap ci
+      let fromASM ASDeleted = Left ()
+          fromASM (ASModification as) = Right as
+          (deletes, inserts) = M.mapEither fromASM $ stateMap ci
+      A.insertMany (A.Proxy @AddressState) $ inserts
+      A.deleteMany (A.Proxy @AddressState) $ M.keys deletes
 
 withLocalVars :: MonadSM m => m a -> m a
 withLocalVars = bracket_ pushLocalVars popLocalVars
@@ -897,6 +917,13 @@ getCurrentCallInfo = do
   case cs of
     [] -> internalError "getCurrentCallInfo called with an empty stack" ()
     (currentCallInfo : _) -> return currentCallInfo
+
+getCallStackDepth :: MonadSM m => m Int
+getCallStackDepth = length <$> Mod.get (Mod.Proxy @[CallInfo])
+
+trimCallStackToDepth :: MonadSM m => Int -> m ()
+trimCallStackToDepth depth = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \stack ->
+  pure $ drop (max 0 $ length stack - depth) stack
 
 getCurrentCallInfoIfExists :: MonadSM m => m (Maybe CallInfo)
 getCurrentCallInfoIfExists = listToMaybe <$> Mod.get (Mod.Proxy @[CallInfo])
@@ -972,9 +999,11 @@ getCurrentCodeCollection = do
 initializeAction :: MonadSM m =>
                     Address -> m ()
 initializeAction acct = do
-  let newData = Action.ActionData (Action.SolidVMDiff M.empty)
-  Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
+  act <- Mod.get (Mod.Proxy @Action)
+  unless (OMap.member acct (Action._actionData act)) $ do
+    let newData = Action.ActionData (Action.SolidVMDiff M.empty)
+    Mod.modifyStatefully_ (Mod.Proxy @Action) $
+      Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
 markDiffForAction :: Mod.Modifiable Action m => Address -> MS.StoragePath -> MS.BasicValue -> m ()
 markDiffForAction owner key' val' = do

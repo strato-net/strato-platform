@@ -13,7 +13,10 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Executable.EthereumVM
-  ( ethereumVM
+  ( ethereumVM,
+    bootstrapIfFirstRun,
+    initializeBestBlock,
+    seedDatabases,
   )
 where
 

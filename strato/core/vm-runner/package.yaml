@@ -77,7 +77,39 @@ executables:
       - vm-tools
       - wai-middleware-prometheus
       - warp
-    ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto 
+    ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
+  vm-replay:
+    source-dirs: replay_src
+    main: Replay.hs
+    other-modules: []
+    dependencies:
+      - async
+      - binary
+      - blockapps-init
+      - blockapps-data
+      - blockapps-mpdbs
+      - blockDB
+      - merkle-patricia-db
+      - strato-genesis
+      - bytestring
+      - common-log
+      - composable-monads-base
+      - conduit
+      - ethereum-rlp
+      - hflags
+      - process-monitor
+      - prometheus-client
+      - resourcet
+      - seqevents
+      - strato-conf
+      - strato-model
+      - streaming
+      - time
+      - transformers
+      - unliftio
+      - vm-runner
+      - vm-tools
+    ghc-options: -Wall -O2 -threaded -rtsopts -flate-specialise
 
 tests:
   ethereum-vm-test:
