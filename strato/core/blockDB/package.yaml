@@ -72,3 +72,10 @@ tests:
       - vector
     # We use -O0 here, since GHC takes *very* long to compile so many constants
     ghc-options: -O0 -Wall -rtsopts -fno-warn-unused-do-bind -dynamic
+  blockdb-sync-spec:
+    source-dirs: test
+    main: SyncTaskMain.hs
+    ghc-options: -dynamic
+    dependencies:
+      - blockDB
+      - hspec

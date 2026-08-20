@@ -1,16 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
+import Blockchain.Data.Block (Block (..))
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.RLP (rlpDecode, rlpDeserialize, rlpEncode, rlpSerialize)
 import qualified Blockchain.Data.Transaction as TX
+import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.CallSpec
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.HexData (HexData (..))
 import Blockchain.Sequencer.TxCallObject (TxCallObject (..))
+import Blockchain.Sequencer.UnseqProduce
 import Blockchain.Strato.Model.Address (Address (..))
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import Data.Binary
 import qualified Data.Aeson as Ae
 import qualified Data.Text as T
@@ -147,3 +151,21 @@ spec = parallel $ do
   describe "JsonRpcResponse" $ do
     it "round-trips SuccessJson" $
       binaryFidelity $ SuccessJson "id6" (B.pack [123, 125])
+  describe "forUnseqBlocks incremental produce" $ do
+    it "encodes a 500-block batch one block per produce step" $ do
+      hdr <- generate arbitrary
+      let origin = TO.PeerString "peer-tounseq-test"
+          n = 500
+          blocks = [Block (hdr {number = fromIntegral i}) [] [] | i <- [1 .. n]]
+          expected = map (IEBlock . blockToIngestBlock origin) blocks
+      steps <- forUnseqBlocks origin blocks $ \chunk -> do
+        length chunk `shouldSatisfy` (<= unseqProduceChunkSize)
+        length chunk `shouldNotBe` 0
+        -- shipped produceItems encoding: one Binary payload per event
+        let payloads = map encodeUnseqEvent chunk
+        length payloads `shouldBe` length chunk
+        map (decode . BL.fromStrict) payloads `shouldBe` chunk
+        return chunk
+      length steps `shouldBe` n
+      map length steps `shouldBe` replicate n 1
+      concat steps `shouldBe` expected

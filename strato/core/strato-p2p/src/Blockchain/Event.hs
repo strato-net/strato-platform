@@ -40,6 +40,7 @@ import           Blockchain.Model.SyncState
 import           Blockchain.Model.SyncTask
 import           Blockchain.Model.WrappedBlock
 import           Blockchain.Sequencer.Event
+import           Blockchain.Sequencer.UnseqProduce (forUnseqBlocks)
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
@@ -228,11 +229,13 @@ handleEvents peer = awaitForever $ \case
 
     blocks' <- lift $ recombineBlocksFromCache bodies
 
-    yieldL . ToUnseq $ IEBlock . blockToIngestBlock (Origin.PeerString $ peerString peer) <$> blocks'
+    -- Number first so the [Block] spine can shrink while we produce.
+    -- Do not convert the whole batch to [IEBlock] before Kafka.
+    let origin = Origin.PeerString $ peerString peer
+        !maxBlockNumber = maximum . (0:) $ map (BlockHeader.number . blockBlockData) blocks'
+    _ <- forUnseqBlocks origin blocks' $ \chunk -> yieldL (ToUnseq chunk)
 
     currentSyncTask <- fmap (fromMaybe $ error "no current sync task") $ lift $ getCurrentSyncTask (pPeerHost peer)
-    let maxBlockNumber :: Integer
-        maxBlockNumber = maximum . (0:) $ map (BlockHeader.number . blockBlockData) blocks'
 
     WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
 
