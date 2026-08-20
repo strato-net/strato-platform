@@ -128,12 +128,12 @@ export const defaultPoolV3FactoryFor: Record<string, string> = {
 // Populate per network after deployment (or set POSITION_MANAGER_V3).
 export const defaultPositionManagerV3For: Record<string, string> = {
   "114784819836269": "1bc216225dd4e164ded916cb88a7c09804a881d1", // Helium testnet
-  "33056204878082667": "", // Upquark mainnet
+  "33056204878082667": "ce5d96341ba4fede57d7721c5b0e41d283aa7435", // Upquark mainnet
 };
 
 export const defaultNftFactoryFor: Record<string, string> = {
   "114784819836269": "af432c49803721b242f52ed5fd1b065c9a78e0bb", // Helium testnet
-  "33056204878082667": "", // Upquark mainnet
+  "33056204878082667": "4898738a1213ffa0cbc8eb42f4efa5fc9d781ada", // Upquark mainnet
 };
 
 export const defaultStratoNativeBridgeFor: Record<string, string> = {
