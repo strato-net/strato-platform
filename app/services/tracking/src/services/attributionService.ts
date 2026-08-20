@@ -1,5 +1,6 @@
 import { config } from "../config";
 import { query } from "../db/pool";
+import { toCirrusAddress } from "../utils/addresses";
 import { listLinks, publicUrlForSlug, TrackingLink } from "./linkService";
 import {
   ActivityCategory,
@@ -183,8 +184,10 @@ export interface AttributionSnapshot {
 
 let cachedSnapshot: { snapshot: AttributionSnapshot; expiresAt: number } | null = null;
 
+// Normalized on this side too: chain-side addresses all pass through
+// toCirrusAddress, so a legacy row stored with a 0x prefix must still match.
 const addressesOf = (conn: ConnectionRow): string[] =>
-  [conn.external_wallet_address, conn.strato_address].filter(Boolean);
+  [conn.external_wallet_address, conn.strato_address].filter(Boolean).map(toCirrusAddress);
 
 // Attribution rule: most recent tracked wallet connection before the event,
 // within the attribution window, wins; ties break to the earliest-created
@@ -208,6 +211,10 @@ const assignEvents = (
   }
 
   const windowMs = config.tracking.attributionWindowDays * 24 * 60 * 60 * 1000;
+  // Block timestamps and this server's clock are independent, and a bridge-in
+  // can be mined moments before the app finishes reporting the connection:
+  // allow the connection to sit slightly AFTER the event it explains.
+  const graceMs = Math.max(0, config.tracking.attributionGraceMinutes) * 60 * 1000;
   const assignments = new Map<string, Attribution>();
 
   for (const event of events) {
@@ -216,7 +223,7 @@ const assignEvents = (
     for (const addr of event.addresses) {
       for (const conn of byAddress.get(addr) ?? []) {
         const connectedMs = conn.connected_at.getTime();
-        if (connectedMs > event.timestampMs) break; // sorted ascending
+        if (connectedMs - graceMs > event.timestampMs) break; // sorted ascending
         if (event.timestampMs - connectedMs > windowMs) continue;
         if (
           !winner ||
@@ -427,7 +434,7 @@ const swapValueUsd = (snapshot: AttributionSnapshot, event: ActivityEvent): numb
   ];
   for (const [token, amount] of legs) {
     if (!token || !amount) continue;
-    const price = snapshot.oraclePrices.get(token.toLowerCase());
+    const price = snapshot.oraclePrices.get(toCirrusAddress(token));
     if (price != null) return tokenAmount(amount) * price;
   }
   return null;

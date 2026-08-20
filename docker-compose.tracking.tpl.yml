@@ -25,6 +25,10 @@ services:
     - TRACKING_COOKIE_DOMAIN=${TRACKING_COOKIE_DOMAIN:-}
     - TRACKING_IPINFO_TOKEN=${TRACKING_IPINFO_TOKEN:-}
     - TRACKING_ATTRIBUTION_WINDOW_DAYS=${TRACKING_ATTRIBUTION_WINDOW_DAYS:-}
+    - TRACKING_ATTRIBUTION_GRACE_MINUTES=${TRACKING_ATTRIBUTION_GRACE_MINUTES:-}
+    # Cookieless wallet-connected beacons may bind to a recent open from the
+    # same public IP within this window (0 disables the fallback)
+    - TRACKING_IP_FALLBACK_MINUTES=${TRACKING_IP_FALLBACK_MINUTES:-}
     # Optional: origin-chain enrichment of the user timeline (Etherscan V2
     # multichain API — one key covers Ethereum, Base, Polygon, …)
     - TRACKING_ETHERSCAN_API_KEY=${TRACKING_ETHERSCAN_API_KEY:-}
