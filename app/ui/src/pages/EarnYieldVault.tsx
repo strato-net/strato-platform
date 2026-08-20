@@ -81,6 +81,24 @@ const VAULT_META: Record<string, {
     cardBorder: "border-emerald-500/25 dark:border-emerald-400/25 bg-gradient-to-br from-[#ecfdf5] to-[#d1fae5] dark:from-[#0a2018] dark:to-[#0c2a1f]",
     strategyDescription: "The vault targets growth in USDC per share by routing deposits across approved yield strategies. USDC may be converted into other tokens when needed to access yield, but the vault manages returns back to USDC-denominated value. Yield is harvested, rebalanced, and compounded over time. The vault maintains an idle buffer for withdrawals; large redemptions may queue when capital is deployed.",
   },
+  "goldst-yield": {
+    title: "GOLDST Yield Vault",
+    subtitle: "Deposit GOLDST and earn Reward Points",
+    badge: "Yield Vault",
+    iconBg: "bg-amber-500/15 dark:bg-amber-400/15",
+    iconColor: "text-amber-600 dark:text-amber-400",
+    cardBorder: "border-amber-500/25 dark:border-amber-400/25 bg-gradient-to-br from-[#fffbeb] to-[#fef3c7] dark:from-[#211a08] dark:to-[#2a210a]",
+    strategyDescription: "Deposits remain denominated in GOLDST. This vault does not use a funded Base APY; users earn Reward Points based on their vault-share position. The vault maintains an idle buffer for withdrawals, and redemptions may queue when idle liquidity is unavailable.",
+  },
+  "silvst-yield": {
+    title: "SILVST Yield Vault",
+    subtitle: "Deposit SILVST and earn Reward Points",
+    badge: "Yield Vault",
+    iconBg: "bg-slate-500/15 dark:bg-slate-400/15",
+    iconColor: "text-slate-600 dark:text-slate-400",
+    cardBorder: "border-slate-500/25 dark:border-slate-400/25 bg-gradient-to-br from-[#f8fafc] to-[#e2e8f0] dark:from-[#151a22] dark:to-[#1c222c]",
+    strategyDescription: "Deposits remain denominated in SILVST. This vault does not use a funded Base APY; users earn Reward Points based on their vault-share position. The vault maintains an idle buffer for withdrawals, and redemptions may queue when idle liquidity is unavailable.",
+  },
 };
 
 const formatTokenAmount = (value: string, decimals: number = 18, maxFractionDigits: number = 4): string => {

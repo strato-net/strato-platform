@@ -17,7 +17,7 @@ import CreateAdminIssueModal from './CreateAdminIssueModal';
 import CastVoteModal from './CastVoteModal';
 import AddAdminModal from './AddAdminModal';
 import RemoveAdminModal from './RemoveAdminModal';
-import { parseJsonBigInt } from '@/utils/numberUtils';
+import { formatArgValue, parseJsonBigInt } from '@/utils/numberUtils';
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE, ADMIN_VOTE_OPEN_ISSUES_PER_PAGE } from '@/lib/constants';
 
 const normalizeAddress = (addr?: string | null): string => (addr || '').toLowerCase().replace(/^0x/, '');
@@ -269,7 +269,8 @@ const VoteTab = () => {
                     {issues.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
-                    const issueArgs = parseJsonBigInt(typeof issue.args === 'string' ? issue.args : JSON.stringify(issue.args), { fallback: [] }) as any[];
+                    const parsedArgs = parseJsonBigInt(typeof issue.args === 'string' ? issue.args : JSON.stringify(issue.args), { fallback: [] });
+                    const issueArgs: any[] = Array.isArray(parsedArgs) ? parsedArgs : [];
                     const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || globalThreshold)/100;
                     const votesNeeded = Math.ceil((admins.length * threshold)/100);
                     const hasUserVoted = votes.some((v) => v.issueId === issueId && normalizeAddress(v.voter) === normalizeAddress(userAddress));
@@ -447,7 +448,8 @@ const VoteTab = () => {
                     {executed.map((issue: any, index) => {
                       const issueId = issue.issueId;
                       const address = issue.target;
-                      const issueArgs = parseJsonBigInt(typeof issue.args === 'string' ? issue.args : JSON.stringify(issue.args), { fallback: [] }) as any[];
+                      const parsedArgs = parseJsonBigInt(typeof issue.args === 'string' ? issue.args : JSON.stringify(issue.args), { fallback: [] });
+                      const issueArgs: any[] = Array.isArray(parsedArgs) ? parsedArgs : [];
                       return (
                         <TableRow key={`${issueId}-${index}`} className="dark:border-border dark:hover:bg-muted/50">
                           <TableCell className="font-mono text-xs pl-4 dark:text-foreground">
@@ -480,7 +482,7 @@ const VoteTab = () => {
                             {issue.func}
                           </TableCell>
                           <TableCell className="font-mono text-xs max-w-[200px] truncate dark:text-foreground">
-                            {issueArgs.join(', ')}
+                            {issueArgs.map(formatArgValue).join(', ')}
                           </TableCell>
                           <TableCell className="font-mono text-xs pr-4 dark:text-foreground">
                             <div className="flex items-center space-x-2">
