@@ -27,6 +27,12 @@ contract record StratoNativeBridge is Ownable {
         address stratoToken;
     }
 
+    struct NativeTokenBridgeConfig {
+        bool depositsDisabled;
+        bool withdrawalsDisabled;
+        uint256 maxOutstandingWithdrawal;
+    }
+
     struct NativeDepositInfo {
         BridgeStatus bridgeStatus;
         string depositId;
@@ -66,6 +72,12 @@ contract record StratoNativeBridge is Ownable {
     event CustodyVaultUpdated(address indexed newVault, address indexed oldVault);
     event NativeBridgeOperatorUpdated(address indexed previousBridgeOperator, address indexed newBridgeOperator);
     event NativeBridgeGuardianUpdated(address indexed previousGuardian, address indexed newGuardian);
+    event NativeTokenBridgeConfigUpdated(
+        address indexed stratoToken,
+        bool depositsDisabled,
+        bool withdrawalsDisabled,
+        uint256 maxOutstandingWithdrawal
+    );
     event NativeAssetUpdated(
         bool enabled,
         uint256 externalChainId,
@@ -143,6 +155,7 @@ contract record StratoNativeBridge is Ownable {
     mapping(address => mapping(uint256 => address)) public record stratoTokenByRepresentation;
     mapping(string => NativeDepositInfo) public record deposits;
     mapping(uint256 => NativeWithdrawalInfo) public record withdrawals;
+    mapping(address => NativeTokenBridgeConfig) public record tokenBridgeConfigs;
 
     modifier whenDepositsOpen() {
         require(!depositsPaused, "SNB: deposits paused");
@@ -207,6 +220,28 @@ contract record StratoNativeBridge is Ownable {
         uint256 previousDelaySeconds = INSTANT_WITHDRAWAL_DELAY_SECONDS;
         INSTANT_WITHDRAWAL_DELAY_SECONDS = newDelaySeconds;
         emit InstantWithdrawalDelayUpdated(previousDelaySeconds, newDelaySeconds);
+    }
+
+    function setTokenBridgeConfig(
+        address stratoToken,
+        bool depositsDisabled,
+        bool withdrawalsDisabled,
+        uint256 maxOutstandingWithdrawal
+    ) external onlyOwner {
+        require(stratoToken != address(0), "SNB: invalid strato token");
+
+        tokenBridgeConfigs[stratoToken] = NativeTokenBridgeConfig(
+            depositsDisabled,
+            withdrawalsDisabled,
+            maxOutstandingWithdrawal
+        );
+
+        emit NativeTokenBridgeConfigUpdated(
+            stratoToken,
+            depositsDisabled,
+            withdrawalsDisabled,
+            maxOutstandingWithdrawal
+        );
     }
 
     function setPause(bool _depositsPaused, bool _withdrawalsPaused) external {
@@ -405,11 +440,19 @@ contract record StratoNativeBridge is Ownable {
         NativeAssetConfig asset = assets[stratoToken][externalChainId];
         require(asset.stratoToken != address(0), "SNB: asset missing");
         require(asset.enabled, "SNB: asset disabled");
+        NativeTokenBridgeConfig tokenConfig = tokenBridgeConfigs[stratoToken];
+        require(!tokenConfig.withdrawalsDisabled, "SNB: token withdrawals disabled");
         require(
             asset.maxPerWithdrawal == 0 || stratoTokenAmount <= asset.maxPerWithdrawal,
             "SNB: per-withdrawal cap"
         );
         require(Token(stratoToken).status() == TokenStatus.ACTIVE, "SNB: inactive token");
+        require(
+            tokenConfig.maxOutstandingWithdrawal == 0
+                || StratoNativeCustodyVault(custodyVault).lockedBalance(stratoToken) + stratoTokenAmount
+                    <= tokenConfig.maxOutstandingWithdrawal,
+            "SNB: aggregate withdrawal cap"
+        );
 
         uint256 actualLockedAmount = StratoNativeCustodyVault(custodyVault).lock(
             stratoToken,
@@ -578,6 +621,7 @@ contract record StratoNativeBridge is Ownable {
 
         NativeAssetConfig asset = assets[stratoToken][externalChainId];
         require(asset.enabled, "SNB: asset disabled");
+        require(!tokenBridgeConfigs[stratoToken].depositsDisabled, "SNB: token deposits disabled");
         require(asset.externalBridge == externalBridge, "SNB: wrong external bridge");
         require(asset.representationToken == representationToken, "SNB: wrong representation token");
 

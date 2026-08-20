@@ -33,6 +33,7 @@ export const constants = (() => {
   const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
   const MercataBridge = `${CONTRACT_PREFIX}MercataBridge`;
   const StratoNativeBridge = `${CONTRACT_PREFIX}StratoNativeBridge`;
+  const StratoNativeCustodyVault = `${CONTRACT_PREFIX}StratoNativeCustodyVault`;
   const StratoStaking = `${CONTRACT_PREFIX}StratoStaking`;
   const ValidatorRegistry = `${CONTRACT_PREFIX}ValidatorRegistry`;
   const CreditCardTopUp = `${CONTRACT_PREFIX}CreditCardTopUp`;
@@ -153,6 +154,7 @@ export const constants = (() => {
     AdminRegistry,
     MercataBridge,
     StratoNativeBridge,
+    StratoNativeCustodyVault,
     StratoStaking,
     ValidatorRegistry,
     CreditCardTopUp,
