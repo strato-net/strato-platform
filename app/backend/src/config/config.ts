@@ -202,13 +202,13 @@ export const defaultUsdcYieldVaultFor: Record<string, string> = {
 };
 
 export const defaultGoldstYieldVaultFor: Record<string, string> = {
-  "114784819836269": "65ab8049ff949e7ed04838723a07bc9b5a7849e2", // Helium testnet - populate after deployment
-  "33056204878082667": "", // Upquark mainnet - populate after deployment
+  "114784819836269": "65ab8049ff949e7ed04838723a07bc9b5a7849e2", // Helium testnet
+  "33056204878082667": "ddf7c27f27ac43b25043e100c2076e515526b9ae", // Upquark mainnet
 };
 
 export const defaultSilvstYieldVaultFor: Record<string, string> = {
-  "114784819836269": "7ecc1ab7e15384cf2392b7dad8878239fda78799", // Helium testnet - populate after deployment
-  "33056204878082667": "", // Upquark mainnet - populate after deployment
+  "114784819836269": "7ecc1ab7e15384cf2392b7dad8878239fda78799", // Helium testnet
+  "33056204878082667": "f8884c44d7cfbfb7c6326c515f375f8572f03e2b", // Upquark mainnet
 };
 
 /*
