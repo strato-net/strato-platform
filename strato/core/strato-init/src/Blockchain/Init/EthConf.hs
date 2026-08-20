@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Blockchain.Init.EthConf (genEthConf) where
+module Blockchain.Init.EthConf (genEthConf, preferIPv4Loopback) where
 
 import Blockchain.EthConf
 import Blockchain.Init.Options hiding (flags_localAuth)

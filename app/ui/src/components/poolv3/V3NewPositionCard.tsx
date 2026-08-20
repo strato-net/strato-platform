@@ -21,7 +21,7 @@ import {
 import V3ConfirmDialog, { ConfirmRow } from "./V3ConfirmDialog";
 import V3LiquidityChart from "./V3LiquidityChart";
 
-const MINT_SLIPPAGE_BPS = 100n; // 1% headroom on the amount maxes
+const MINT_SLIPPAGE_BPS = 100n; // 1% downward tolerance on the amount minimums
 
 // One-click range strategies, as percentage bounds relative to the current price.
 // A 0 bound anchors that side of the range at the current tick (one-sided strategies).
@@ -229,15 +229,23 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
     applyTicks(tl, tu);
   };
 
+  const cancelPendingPreview = () => {
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    previewAbortRef.current?.abort();
+  };
+
   // Debounced amounts preview via the backend (exact on-chain math)
   const refreshPreview = useCallback(
     (amount: string, field: "amount0" | "amount1", lo: number, hi: number) => {
-      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
-      previewAbortRef.current?.abort();
+      cancelPendingPreview();
+      // Drop the stale preview BEFORE the debounce timer: previewLoading gates the
+      // submit button, so leaving the old preview submittable during the 350ms window
+      // would let a quick click mint at the previous input's amounts.
+      setPreview(null);
+      setPreviewLoading(true);
       previewTimerRef.current = setTimeout(async () => {
         const controller = new AbortController();
         previewAbortRef.current = controller;
-        setPreviewLoading(true);
         try {
           const wei = safeParseUnits(amount);
           if (wei === 0n) {
@@ -255,7 +263,8 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
         } catch (err) {
           if (err?.name !== "CanceledError" && err?.code !== "ERR_CANCELED") console.error(err);
         } finally {
-          setPreviewLoading(false);
+          // an aborted call was superseded — its successor owns previewLoading now
+          if (!controller.signal.aborted) setPreviewLoading(false);
         }
       }, 350);
     },
@@ -265,7 +274,9 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
   const handleAmountChange = (value: string) => {
     setAmountInput(value);
     if (!rangeValid || !value || isNaN(Number(value))) {
+      cancelPendingPreview();
       setPreview(null);
+      setPreviewLoading(false);
       return;
     }
     refreshPreview(value, amountField, tickLower!, tickUpper!);
@@ -281,7 +292,9 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
     if (rangeValid && amountInput && !isNaN(Number(amountInput))) {
       refreshPreview(amountInput, amountField, tickLower!, tickUpper!);
     } else {
+      cancelPendingPreview(); // a pending preview would resolve for the abandoned range
       setPreview(null);
+      setPreviewLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickLower, tickUpper, amountField]);
@@ -289,15 +302,19 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
   const handleMint = async () => {
     if (!preview || !rangeValid || previewZero) return;
     try {
+      // Positions are minted as NFTs via PositionManagerV3: the desired amounts are the
+      // deposit ceilings (the manager recomputes liquidity from them at the execution
+      // price and never pulls more), the mins guard against an adverse price move.
       const withSlippage = (amount: string) =>
-        ((BigInt(amount) * (10000n + MINT_SLIPPAGE_BPS)) / 10000n).toString();
+        ((BigInt(amount) * (10000n - MINT_SLIPPAGE_BPS)) / 10000n).toString();
       const res = await mintV3({
         poolAddress: pool.address,
         tickLower: preview.tickLower,
         tickUpper: preview.tickUpper,
-        liquidity: preview.liquidity,
-        amount0Max: BigInt(preview.amount0) > 0n ? withSlippage(preview.amount0) : "0",
-        amount1Max: BigInt(preview.amount1) > 0n ? withSlippage(preview.amount1) : "0",
+        amount0Desired: preview.amount0,
+        amount1Desired: preview.amount1,
+        amount0Min: BigInt(preview.amount0) > 0n ? withSlippage(preview.amount0) : "0",
+        amount1Min: BigInt(preview.amount1) > 0n ? withSlippage(preview.amount1) : "0",
       });
       // mint() returns the exact amounts the pool took, which can differ slightly from the preview
       const amounts = poolV3TxAmounts(res);

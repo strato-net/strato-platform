@@ -1534,6 +1534,19 @@ poseidonArgs x = Sum
 poseidon2CompressArgs :: SourceAnnotation Text -> Type'
 poseidon2CompressArgs x = Product (intType' x, intType' x, []) x
 
+-- | Parametrized Poseidon2 (params bytes select a registered instance).
+intArrayType' :: SourceAnnotation Text -> Type'
+intArrayType' = Static (SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
+
+poseidon2PermuteArgs :: SourceAnnotation Text -> Type'
+poseidon2PermuteArgs x = Product (bytesType' x, intArrayType' x, []) x
+
+poseidon2HashArgs :: SourceAnnotation Text -> Type'
+poseidon2HashArgs x = Product (bytesType' x, intArrayType' x, [intType' x]) x
+
+poseidon2HashBytesArgs :: SourceAnnotation Text -> Type'
+poseidon2HashBytesArgs x = Product (bytesType' x, bytesType' x, [intType' x]) x
+
 -- | Each BLS12-381 builtin has two shapes. The @bytes@ shape matches
 --   EIP-2537's input layout exactly (one bytes argument, the precompile
 --   contents). The integer-multivariate shape lets SolidVM contracts pass
@@ -1716,6 +1729,11 @@ getVarType' "bls12381DecompressG2" ctx = pure $ Function (bytesType' ctx) (bytes
 getVarType' "poseidon" ctx = pure $ Function (poseidonArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "poseidon2" ctx = pure $ Function (poseidonArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "poseidon2Compress" ctx = pure $ Function (poseidon2CompressArgs ctx) (intType' ctx) ctx [] [] False
+getVarType' "poseidon2Permute" ctx = pure $ Function (poseidon2PermuteArgs ctx) (intArrayType' ctx) ctx [] [] False
+getVarType' "poseidon2Hash" ctx = pure $ Function (poseidon2HashArgs ctx) (intArrayType' ctx) ctx [] [] False
+getVarType' "poseidon2HashBytes" ctx = pure $ Function (poseidon2HashBytesArgs ctx) (intArrayType' ctx) ctx [] [] False
+getVarType' "poseidon2gl" ctx = pure $ Function (poseidonArgs ctx) (intArrayType' ctx) ctx [] [] False
+getVarType' "poseidon2glBytes" ctx = pure $ Function (bytesType' ctx) (intArrayType' ctx) ctx [] [] False
 getVarType' "selfdestruct" ctx = pure $ Function (selfdestructArgs ctx) (boolType' ctx) ctx [] [] False
 getVarType' "require" ctx = pure $ Function (requireArgs ctx) (Unit ctx) ctx [] [] False
 getVarType' "assert" ctx = pure $ Function (assertArgs ctx) (Unit ctx) ctx [] [] False

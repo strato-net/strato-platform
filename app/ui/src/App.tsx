@@ -23,6 +23,9 @@ import DepositsPage from "./pages/DepositsPage";
 import AssetDetail from "./pages/AssetDetail";
 import Advanced from "./pages/Advanced";
 import PoolV3Liquidity from "./pages/PoolV3Liquidity";
+import V3PositionPage from "./pages/V3PositionPage";
+import NFTsPage from "./pages/NFTsPage";
+import NFTDetailPage from "./pages/NFTDetailPage";
 import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
 import SyncingPage from "./pages/SyncingPage";
@@ -58,6 +61,7 @@ import { stratoWallet } from "@/lib/stratoWallet";
 import { initStratoChain, getStratoChain } from "@/lib/stratoChain";
 import AdminRoute from "./components/AdminRoute";
 import { TokenProvider } from "./context/TokenContext";
+import { NFTProvider } from "./context/NFTContext";
 import { BridgeProvider } from "@/context/BridgeContext";
 import { EarnProvider } from "@/context/EarnContext";
 import { LiquidationProvider } from "./context/LiquidationContext";
@@ -238,6 +242,7 @@ const App = () => {
                   <SwapProvider>
                     <OracleProvider>
                       <TokenProvider>
+                        <NFTProvider>
                         <LiquidationProvider>
                           <SafetyProvider>
                             <LendingProvider>
@@ -311,10 +316,34 @@ const App = () => {
                                                   }
                                                 />
                                                 <Route
+                                                  path="/dashboard/nfts"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <NFTsPage />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/nfts/:collectionAddress/:tokenId"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <NFTDetailPage />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
                                                   path="/dashboard/v3-liquidity"
                                                   element={
                                                     <GuestAccessibleRoute>
                                                       <PoolV3Liquidity />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/v3-liquidity/:tokenId"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <V3PositionPage />
                                                     </GuestAccessibleRoute>
                                                   }
                                                 />
@@ -491,6 +520,7 @@ const App = () => {
                             </LendingProvider>
                           </SafetyProvider>
                         </LiquidationProvider>
+                        </NFTProvider>
                       </TokenProvider>
                     </OracleProvider>
                   </SwapProvider>

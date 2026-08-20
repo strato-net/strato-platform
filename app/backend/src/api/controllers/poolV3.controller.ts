@@ -4,17 +4,21 @@ import {
   getPools,
   getPoolByAddress,
   getPositions,
+  getPositionNFTItem,
   getAmountsForLiquidity,
   getLiquidityDistribution,
   mint,
+  increaseLiquidity,
   burn,
   collect,
   createPool,
 } from "../services/poolV3.service";
 import {
   validatePoolV3AddressArgs,
+  validatePoolV3TokenIdParam,
   validatePoolV3AmountsArgs,
   validatePoolV3MintArgs,
+  validatePoolV3IncreaseArgs,
   validatePoolV3BurnArgs,
   validatePoolV3CollectArgs,
   validatePoolV3CreateArgs,
@@ -38,7 +42,7 @@ class PoolV3Controller {
       const { accessToken, params } = req;
       validatePoolV3AddressArgs(params);
       const pool = await getPoolByAddress(accessToken, params.poolAddress);
-      if (!pool) throw new Error("PoolV3 not found");
+      if (!pool) throw Object.assign(new Error("PoolV3 not found"), { statusCode: RestStatus.NOT_FOUND });
       res.status(RestStatus.OK).json(pool);
     } catch (error) {
       next(error);
@@ -50,8 +54,19 @@ class PoolV3Controller {
       const { accessToken, params } = req;
       validatePoolV3AddressArgs(params);
       const distribution = await getLiquidityDistribution(accessToken, params.poolAddress);
-      if (!distribution) throw new Error("PoolV3 not found");
+      if (!distribution) throw Object.assign(new Error("PoolV3 not found"), { statusCode: RestStatus.NOT_FOUND });
       res.status(RestStatus.OK).json(distribution);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async positionNFT(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, params } = req;
+      validatePoolV3TokenIdParam(params);
+      const item = await getPositionNFTItem(accessToken, params.tokenId);
+      res.status(RestStatus.OK).json(item);
     } catch (error) {
       next(error);
     }
@@ -60,7 +75,7 @@ class PoolV3Controller {
   static async positions(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { accessToken, address: userAddress, query } = req;
-      if (!userAddress) throw new Error("User address is required");
+      if (!userAddress) throw Object.assign(new Error("User address is required"), { statusCode: RestStatus.UNAUTHORIZED });
       const positions = await getPositions(
         accessToken,
         userAddress,
@@ -106,6 +121,17 @@ class PoolV3Controller {
       const { accessToken, body, address: userAddress } = req;
       validatePoolV3MintArgs(body);
       const result = await mint(accessToken, body, userAddress);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async increase(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validatePoolV3IncreaseArgs(body);
+      const result = await increaseLiquidity(accessToken, body, userAddress);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

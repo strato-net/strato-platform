@@ -83,6 +83,19 @@ const isUserAddress = (addr: string, userAddress?: string | null): boolean => {
   return !!(userAddress && addr && normalizeAddress(addr) === normalizeAddress(userAddress));
 };
 
+/**
+ * Title and icon for a transfer based on the user's role:
+ * "Receive" when the user is the recipient, "Send" otherwise
+ */
+const transferDirection = (
+  from: string,
+  to: string,
+  userAddress?: string | null
+): Pick<ActivityCardData, "title" | "iconConfig"> =>
+  isUserAddress(to, userAddress) && !isUserAddress(from, userAddress)
+    ? { title: "Receive", iconConfig: { icon: Download, color: "bg-green-500" } }
+    : { title: "Send", iconConfig: { icon: Send, color: "bg-blue-500" } };
+
 const getEventAttribute = (event: Event, ...names: string[]): string => {
   for (const name of names) {
     const value = event.attributes[name];
@@ -202,7 +215,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "Transfer": {
     contract_name: "Token",
     event_name: "Transfer",
-    displayName: "Send",
+    displayName: "Send / Receive",
     iconConfig: { icon: Send, color: "bg-blue-500" },
     getTokenAddress: (event: Event) => [event.address].filter(Boolean),
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
@@ -239,7 +252,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "Send",
+        ...transferDirection(from, to, userAddress),
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -260,7 +273,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "YieldVaultTransfer": {
     contract_name: "YieldVault",
     event_name: "Transfer",
-    displayName: "Send",
+    displayName: "Send / Receive",
     iconConfig: { icon: Send, color: "bg-blue-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const vaultName = tokenSymbols.get(event.address) || tokenSymbols.get(normalizeAddress(event.address));
@@ -292,7 +305,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "Send",
+        ...transferDirection(from, to, userAddress),
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -313,7 +326,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "SaveUSDSTVaultTransfer": {
     contract_name: "SaveUSDSTVault",
     event_name: "Transfer",
-    displayName: "Send",
+    displayName: "Send / Receive",
     iconConfig: { icon: Send, color: "bg-blue-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const from = event.attributes.from || event.attributes.From || "";
@@ -343,7 +356,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ];
 
       return {
-        title: "Send",
+        ...transferDirection(from, to, userAddress),
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -465,6 +478,126 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           line2: {
             fieldLabels: ["Owner", "Receiver"],
             renderer: "addresses-with-arrow",
+          },
+        },
+      };
+    },
+  },
+  "DirectPSMMint": {
+    contract_name: "DirectMintPSM",
+    event_name: "DirectPSMMinted",
+    displayName: "PSM Mint",
+    iconConfig: { icon: Coins, color: "bg-indigo-500" },
+    getTokenAddress: (event: Event) => {
+      const againstToken = event.attributes.againstToken || event.attributes.against_token;
+      return [usdstAddress, againstToken].filter(Boolean) as string[];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const user = getEventAttribute(event, "user", "User");
+      const againstToken = getEventAttribute(event, "againstToken", "against_token");
+      // depositAmount is the gross collateral pulled in; mintAmount is net of the PSM fee
+      const depositAmount = getEventAttribute(event, "depositAmount", "deposit_amount") || "0";
+      const mintAmount = getEventAttribute(event, "mintAmount", "mint_amount") || "0";
+
+      const collateralSymbol = tokenSymbols.get(againstToken);
+      const usdstSymbol = tokenSymbols.get(usdstAddress) || "USDST";
+
+      const fields: ActivityField[] = [
+        {
+          label: "Deposited",
+          value: formatValue(depositAmount, againstToken),
+          type: "amount",
+          badge: collateralSymbol,
+          image: tokenImages?.get(againstToken),
+          imageFallback: collateralSymbol || againstToken,
+          rawAmount: getFullAmount(depositAmount),
+        },
+        {
+          label: "Minted",
+          value: formatValue(mintAmount, usdstAddress),
+          type: "amount",
+          badge: usdstSymbol,
+          image: tokenImages?.get(usdstAddress),
+          imageFallback: usdstSymbol,
+          rawAmount: getFullAmount(mintAmount),
+        },
+        addressField("By", user, userAddress),
+      ];
+
+      return {
+        title: "PSM Mint",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Deposited", "Minted"],
+            renderer: "amounts-with-arrow",
+          },
+          line2: {
+            fieldLabels: ["By"],
+            renderer: "addresses-with-bullet",
+          },
+        },
+      };
+    },
+  },
+  "DirectPSMRedeem": {
+    contract_name: "DirectMintPSM",
+    event_name: "Redeemed",
+    displayName: "PSM Redeem",
+    iconConfig: { icon: Banknote, color: "bg-indigo-600" },
+    getTokenAddress: (event: Event) => {
+      const redeemToken = event.attributes.redeemToken || event.attributes.redeem_token;
+      return [usdstAddress, redeemToken].filter(Boolean) as string[];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const user = getEventAttribute(event, "user", "User");
+      const redeemToken = getEventAttribute(event, "redeemToken", "redeem_token");
+      // burnAmount is the gross USDST burned; payoutAmount is net of the PSM fee
+      const burnAmount = getEventAttribute(event, "burnAmount", "burn_amount") || "0";
+      const payoutAmount = getEventAttribute(event, "payoutAmount", "payout_amount") || "0";
+
+      const redeemSymbol = tokenSymbols.get(redeemToken);
+      const usdstSymbol = tokenSymbols.get(usdstAddress) || "USDST";
+
+      const fields: ActivityField[] = [
+        {
+          label: "Burned",
+          value: formatValue(burnAmount, usdstAddress),
+          type: "amount",
+          badge: usdstSymbol,
+          image: tokenImages?.get(usdstAddress),
+          imageFallback: usdstSymbol,
+          rawAmount: getFullAmount(burnAmount),
+        },
+        {
+          label: "Received",
+          value: formatValue(payoutAmount, redeemToken),
+          type: "amount",
+          badge: redeemSymbol,
+          image: tokenImages?.get(redeemToken),
+          imageFallback: redeemSymbol || redeemToken,
+          rawAmount: getFullAmount(payoutAmount),
+        },
+        addressField("By", user, userAddress),
+      ];
+
+      return {
+        title: "PSM Redeem",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Burned", "Received"],
+            renderer: "amounts-with-arrow",
+          },
+          line2: {
+            fieldLabels: ["By"],
+            renderer: "addresses-with-bullet",
           },
         },
       };
@@ -1061,7 +1194,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData | null => {
       const e = event as Event & { token0?: string; token1?: string };
-      const owner = getEventAttribute(event, "owner");
+      // owner on pool-level Burn events; sender on PositionManagerV3 DecreaseLiquidity
+      const owner = getEventAttribute(event, "owner", "sender");
       const amount0 = getEventAttribute(event, "amount0") || "0";
       const amount1 = getEventAttribute(event, "amount1") || "0";
       // a zero-amount burn is the fee-realizing poke that precedes a collect —
@@ -2187,4 +2321,25 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       };
     },
   },
+};
+
+// Position-NFT liquidity activity: actions done through PositionManagerV3. At the POOL
+// level these all attribute to the manager (the backend's filter configs exclude those
+// rows); the manager's platform-extended events carry the acting user (`sender`), the
+// pool address (`pool` — ActivityFeedCards resolves token0/token1 from it), and the same
+// amount fields, so the pool-level renderers apply as-is.
+activityTypes["V3AddLiquidityPosition"] = {
+  ...activityTypes["V3AddLiquidity"],
+  contract_name: "PositionManagerV3",
+  event_name: "IncreaseLiquidity",
+};
+activityTypes["V3RemoveLiquidityPosition"] = {
+  ...activityTypes["V3RemoveLiquidity"],
+  contract_name: "PositionManagerV3",
+  event_name: "DecreaseLiquidity",
+};
+activityTypes["V3CollectPosition"] = {
+  ...activityTypes["V3Collect"],
+  contract_name: "PositionManagerV3",
+  event_name: "Collect",
 };

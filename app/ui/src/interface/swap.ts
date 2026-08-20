@@ -11,6 +11,7 @@ import type {
   PoolV3AmountsPreview,
   PoolV3LiquidityDistribution,
   PoolV3MintParams,
+  PoolV3IncreaseParams,
   PoolV3BurnParams,
   PoolV3CollectParams,
   PoolV3CreateParams,
@@ -143,6 +144,7 @@ export interface SwapContextActions {
     signal?: AbortSignal
   ) => Promise<PoolV3AmountsPreview | null>;
   mintV3: (data: PoolV3MintParams) => Promise<void>;
+  increaseV3: (data: PoolV3IncreaseParams) => Promise<void>;
   burnV3: (data: PoolV3BurnParams) => Promise<void>;
   collectV3: (data: PoolV3CollectParams) => Promise<void>;
 }

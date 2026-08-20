@@ -18,7 +18,7 @@ import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import { roundByMagnitude, formatRoundedWithCommas } from "@/services/rewardsService";
 import { formatBalance, safeBigInt } from "@/utils/numberUtils";
 import { Button } from "@/components/ui/button";
-import LiquidationAlertBanner from "@/components/ui/LiquidationAlertBanner";
+import LiquidationAlertBanner, { CDPLiquidationAlertBanner } from "@/components/ui/LiquidationAlertBanner";
 import GuestPromoSection from "@/components/dashboard/GuestPromoSection";
 import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
 import { useNetwork } from "@/context/NetworkContext";
@@ -230,6 +230,7 @@ const Dashboard = () => {
         <main className="p-4 md:p-6 pb-24 md:pb-6">
           <GuestPromoSection variant={!isLoggedIn ? 1 : (!isLoadingNetBalance && totalBalance === 0) ? 2 : 3} userRewards={rewardsUserInfo} />
           {showFullDashboard && <LiquidationAlertBanner />}
+          {showFullDashboard && <CDPLiquidationAlertBanner />}
           {showFullDashboard && (
             <div className={`grid grid-cols-1 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3 md:gap-6 mb-4 md:mb-8`}>
               <AssetSummary
@@ -397,8 +398,9 @@ const Dashboard = () => {
             />
           </div>
 
-          {/* V3 concentrated-liquidity holdings — V2 LP tokens appear in the assets
-              list above, but V3 positions aren't tokens; renders only when present */}
+          {/* V3 concentrated-liquidity holdings (NFT and legacy positions) — V2 LP
+              tokens appear in the assets list above, but V3 positions aren't tokens;
+              renders only when present. Non-position NFTs live on the NFTs page. */}
           <V3LiquiditySummary />
         </main>
       </div>

@@ -8,6 +8,10 @@ import "./Tokens/Token.sol";
 import "./Tokens/TokenFactory.sol";
 //import "Tokens/Metadata/TokenMetadata.sol";
 
+//Generic NFT (ERC-721)
+import "./NFTs/NFT.sol";
+import "./NFTs/NFTFactory.sol";
+
 //Admin Registry
 import "Admin/AdminRegistry.sol";
 
@@ -16,6 +20,7 @@ import "./Pools/Pool.sol";
 import "./Pools/PoolFactory.sol";
 import "./Pools/PoolV3Factory.sol";
 import "./Pools/PoolV3.sol";
+import "./Pools/PositionManagerV3.sol";
 import "./Pools/StablePool.sol";
 
 //Metals

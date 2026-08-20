@@ -14,6 +14,18 @@ const EMPTY: GeoLookup = { country: null, city: null, lat: null, lon: null };
 export const normalizeIp = (ip: string | undefined | null): string | null =>
   ip ? ip.replace(/^::ffff:/i, "").slice(0, 64) : null;
 
+// Private / loopback / link-local ranges: inside the compose network every
+// container shares one of these, so they can never identify a visitor and
+// must not be used by the beacons' same-IP fallback.
+const PRIVATE_IP_RE =
+  /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.|::1$|::$|f[cd][0-9a-f]{2}:|fe80:)/i;
+
+export const isPublicIp = (ip: string | undefined | null): boolean => {
+  const normalized = normalizeIp(ip);
+  if (!normalized) return false;
+  return !PRIVATE_IP_RE.test(normalized);
+};
+
 // Offline lookup from geoip-lite's bundled GeoLite2 snapshot. The snapshot is
 // frozen at package publish time, so reassigned ranges (VPN endpoints
 // especially) can resolve to stale countries — refresh it at image build via

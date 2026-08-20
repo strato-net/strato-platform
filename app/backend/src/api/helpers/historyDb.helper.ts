@@ -125,6 +125,10 @@ export interface NetBalanceMappingFilterParams {
   priceOracle: string;
   /** include the PoolV3 `positions` nested-mapping history (liquidity/tokensOwed per range) */
   includeV3Positions?: boolean;
+  /** PositionManagerV3 address — its positions[tokenId]/_owners[tokenId] history carries the user's NFT positions */
+  positionManager?: string;
+  /** manager tokenIds the user held at any point in the window (from fetchUserV3NftMeta) */
+  nftTokenIds?: string[];
   /** tokens that must be in the pass-2 price query beyond what computeRelevantTokens finds (V3 pool token0/token1) */
   extraRelevantTokens?: string[];
   stratoStakingAddress?: string;
@@ -202,12 +206,16 @@ export async function fetchUserMappingHistory(
   endTime: string,
   filters: NetBalanceMappingFilterParams,
 ): Promise<MappingHistoryElement[]> {
+  const hasNftPositions = !!filters.positionManager && (filters.nftTokenIds?.length ?? 0) > 0;
   const collections = [
     ...USER_MAPPING_COLLECTIONS,
     ...(filters.requestFilters.length > 0 ? ['requests'] : []),
     // PoolV3 positions[owner][tickLower][tickUpper] — the owner in the path is the
-    // user, so the existing `path LIKE %user%` clause selects exactly their rows
-    ...(filters.includeV3Positions ? ['positions'] : []),
+    // user, so the existing `path LIKE %user%` clause selects exactly their rows.
+    // NFT positions live under the manager's positions[tokenId] instead, selected by
+    // the dedicated manager + tokenId clause below (along with _owners for ownership).
+    ...(filters.includeV3Positions || hasNftPositions ? ['positions'] : []),
+    ...(hasNftPositions ? ['_owners'] : []),
   ];
 
   // Build the _balances path array: liquidity pool + bot executor + carry vault idle assets.
@@ -250,11 +258,12 @@ export async function fetchUserMappingHistory(
       AND valid_to >= $2
       AND collection_name = ANY($3)
       AND (
-        (path LIKE $4 AND collection_name NOT IN ('delegatedStake', 'unbondingQueue', 'operators'))
+        (path LIKE $4 AND collection_name NOT IN ('delegatedStake', 'unbondingQueue', 'operators', '_owners'))
         OR path = ANY($5)
         OR (address = ANY($6) AND path = $7)
         OR (address = ANY($8) AND path = ANY($9))
         OR (address = $10 AND collection_name IN ('delegatedStake', 'unbondingQueue', 'operators') AND key->>'key' = $11)
+        OR (address = $12 AND collection_name IN ('positions', '_owners') AND key->>'key' = ANY($13))
       )
   `;
 
@@ -270,6 +279,8 @@ export async function fetchUserMappingHistory(
     requestPaths.length > 0 ? requestPaths : [''],
     stakingAddress,
     filters.userAddress,
+    hasNftPositions ? filters.positionManager : '',
+    hasNftPositions ? filters.nftTokenIds : [''],
   ]);
 }
 
@@ -475,9 +486,13 @@ export async function fetchUserV3PoolMeta(
   startTime: string,
   endTime: string,
   userAddress: string,
+  extraPoolAddrs: string[] = [],
 ): Promise<Map<string, PoolV3Meta>> {
   const meta = new Map<string, PoolV3Meta>();
   try {
+    // Legacy positions: the pool-level positions[owner] path carries the user address.
+    // NFT positions live under the manager's address instead — their pools arrive via
+    // extraPoolAddrs (from fetchUserV3NftMeta).
     const poolRows = await query<{ address: string }>(
       `
       SELECT DISTINCT address
@@ -489,18 +504,19 @@ export async function fetchUserV3PoolMeta(
       `,
       [endTime, startTime, `%${userAddress}%`],
     );
-    if (poolRows.length === 0) return meta;
+    const poolAddrs = [...new Set([...poolRows.map((r) => r.address), ...extraPoolAddrs])];
+    if (poolAddrs.length === 0) return meta;
 
     const factory = config.poolV3Factory;
     const metaRows = factory
       ? await query<{ address: string; token0: string; token1: string }>(
           `SELECT address, token0, token1 FROM "BlockApps-PoolV3"
            WHERE address = ANY($1) AND "poolV3Factory" = $2`,
-          [poolRows.map((r) => r.address), factory],
+          [poolAddrs, factory],
         )
       : await query<{ address: string; token0: string; token1: string }>(
           `SELECT address, token0, token1 FROM "BlockApps-PoolV3" WHERE address = ANY($1)`,
-          [poolRows.map((r) => r.address)],
+          [poolAddrs],
         );
     for (const row of metaRows) {
       if (row.token0 && row.token1) {
@@ -512,6 +528,61 @@ export async function fetchUserV3PoolMeta(
     console.warn("fetchUserV3PoolMeta failed:", err);
   }
   return meta;
+}
+
+/**
+ * Pre-pass for V3 position NFTs: the pool-level position of an NFT is keyed by the
+ * MANAGER (one aggregate row per pool+range shared by every holder), so per-user history
+ * must come from the manager's own tables — `_owners[tokenId]` rows carry ownership as
+ * validity intervals, and `positions[tokenId]` structs carry the economics (including
+ * which pool). Returns the tokenIds the user held at any point in the window, plus every
+ * pool those tokens pointed at (for price/meta wiring).
+ */
+export async function fetchUserV3NftMeta(
+  startTime: string,
+  endTime: string,
+  userAddress: string,
+  positionManager: string,
+): Promise<{ tokenIds: string[]; poolAddrs: string[] }> {
+  if (!positionManager) return { tokenIds: [], poolAddrs: [] };
+  try {
+    // _owners values are JSON-encoded address strings — match via ::text LIKE
+    const tokenRows = await query<{ token_id: string }>(
+      `
+      SELECT DISTINCT key->>'key' AS token_id
+      FROM "history@mapping"
+      WHERE address = $1
+        AND collection_name = '_owners'
+        AND value::text LIKE $4
+        AND valid_from <= $2
+        AND valid_to >= $3
+      `,
+      [positionManager, endTime, startTime, `%${userAddress}%`],
+    );
+    const tokenIds = tokenRows.map((r) => r.token_id).filter(Boolean);
+    if (tokenIds.length === 0) return { tokenIds: [], poolAddrs: [] };
+
+    const poolRows = await query<{ pool: string }>(
+      `
+      SELECT DISTINCT value->>'pool' AS pool
+      FROM "history@mapping"
+      WHERE address = $1
+        AND collection_name = 'positions'
+        AND key->>'key' = ANY($4)
+        AND valid_from <= $2
+        AND valid_to >= $3
+      `,
+      [positionManager, endTime, startTime, tokenIds],
+    );
+    const poolAddrs = poolRows
+      .map((r) => (r.pool || "").toLowerCase().replace(/^0x/, ""))
+      .filter((p) => p && !/^0+$/.test(p));
+    return { tokenIds, poolAddrs };
+  } catch (err) {
+    // manager tables may not exist on chains without the position manager
+    console.warn("fetchUserV3NftMeta failed:", err);
+    return { tokenIds: [], poolAddrs: [] };
+  }
 }
 
 /**

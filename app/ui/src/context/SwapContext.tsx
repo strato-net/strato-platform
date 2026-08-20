@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback,
 import {
   Pool, SwapHistoryEntry, SetPoolRatesParams, SwapToken, SwapContextType,
   PoolV3, PoolV3Position, PoolV3AmountsPreview,
-  PoolV3MintParams, PoolV3BurnParams, PoolV3CollectParams,
+  PoolV3MintParams, PoolV3IncreaseParams, PoolV3BurnParams, PoolV3CollectParams,
   PoolV3LiquidityDistribution, PoolV3CreateParams,
 } from '@/interface';
 import {api} from '@/lib/axios';
@@ -483,6 +483,16 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const increaseV3 = useCallback(async (data: PoolV3IncreaseParams) => {
+    setLoading(true);
+    try {
+      const res = await api.post('/poolv3/positions/increase', data);
+      return res.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const burnV3 = useCallback(async (data: PoolV3BurnParams) => {
     setLoading(true);
     try {
@@ -598,6 +608,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         fetchV3Positions,
         getV3AmountsForLiquidity,
         mintV3,
+        increaseV3,
         burnV3,
         collectV3
       }}

@@ -93,6 +93,12 @@ export type YieldVaultContextType = {
   getUserVaultInfo: (key: string) => YieldVaultUserInfo | null;
 };
 
-export const VAULT_KEYS = ["eth-carry", "wbtc-carry", "usdc-yield"] as const;
+export const VAULT_KEYS = [
+  "eth-carry",
+  "wbtc-carry",
+  "usdc-yield",
+  "goldst-yield",
+  "silvst-yield",
+] as const;
 
 export const YieldVaultContext = createContext<YieldVaultContextType | undefined>(undefined);

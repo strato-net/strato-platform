@@ -8,6 +8,11 @@ export function buildFundBuyPath(tokenAddress: string): string {
   return `/dashboard/deposits?token=${normBridgeAddr(tokenAddress)}`;
 }
 
+/** Fund page deep-link: Buy Metals with a metal pre-selected */
+export function buildFundMetalBuyPath(tokenAddress: string): string {
+  return `/dashboard/deposits?tab=metals&metal=${normBridgeAddr(tokenAddress)}`;
+}
+
 /**
  * STRATO tokens that appear as Bridge In receive routes (enabled, active).
  * Same endpoints the Fund page uses — Buy only where a bridge route exists.

@@ -16,8 +16,9 @@ const DepositsPage = () => {
   const [searchParams] = useSearchParams();
   const tab = searchParams.get('tab');
   const tokenParam = searchParams.get('token');
+  const metalParam = searchParams.get('metal');
   const [fundingMode, setFundingMode] = useState<"bridge" | "metals">(() =>
-    tokenParam ? 'bridge' : tab === 'metals' ? 'metals' : 'bridge'
+    tokenParam ? 'bridge' : tab === 'metals' || metalParam ? 'metals' : 'bridge'
   );
 
   useEffect(() => {
@@ -25,8 +26,8 @@ const DepositsPage = () => {
       setFundingMode('bridge');
       return;
     }
-    if (tab === 'metals') setFundingMode('metals');
-  }, [tab, tokenParam]);
+    if (tab === 'metals' || metalParam) setFundingMode('metals');
+  }, [tab, tokenParam, metalParam]);
 
   const [metalRefreshKey, setMetalRefreshKey] = useState(0);
   const handleMetalPurchase = useCallback(() => setMetalRefreshKey(k => k + 1), []);
@@ -65,7 +66,7 @@ const DepositsPage = () => {
           )}
           <div className="mb-8 grid grid-cols-1 xl:grid-cols-12 gap-6">
             <div className="xl:col-span-7">
-              <BridgeIn guestMode={!isLoggedIn} fundingMode={fundingMode} onFundingModeChange={setFundingMode} onMetalPurchase={handleMetalPurchase} />
+              <BridgeIn guestMode={!isLoggedIn} fundingMode={fundingMode} initialMetalAddress={metalParam} onFundingModeChange={setFundingMode} onMetalPurchase={handleMetalPurchase} />
             </div>
             <div className="xl:col-span-5">
               <RecentTransactions fundingMode={fundingMode} metalRefreshKey={metalRefreshKey} />

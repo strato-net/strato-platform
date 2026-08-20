@@ -12,7 +12,8 @@ import { api } from '@/lib/axios';
 import { formatBalance, formatUnits, safeBigInt } from '@/utils/numberUtils';
 import { useUser } from '@/context/UserContext';
 import { useTokenContext } from '@/context/TokenContext';
-import { buildFundBuyPath, fetchBridgeBuyableAddresses, normBridgeAddr } from '@/lib/bridgeLinks';
+import { metalForgeService } from '@/services/metalForgeService';
+import { buildFundBuyPath, buildFundMetalBuyPath, fetchBridgeBuyableAddresses, normBridgeAddr } from '@/lib/bridgeLinks';
 
 type SortKey = 'price' | 'marketCap' | 'totalSupply';
 type SortDir = 'asc' | 'desc';
@@ -154,7 +155,8 @@ const Explore = () => {
   const [error, setError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('desc');
-  const [buyableAddresses, setBuyableAddresses] = useState<Set<string> | null>(null);
+  const [bridgeBuyableAddresses, setBridgeBuyableAddresses] = useState<Set<string> | null>(null);
+  const [metalBuyableAddresses, setMetalBuyableAddresses] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -178,12 +180,20 @@ const Explore = () => {
 
   useEffect(() => {
     let cancelled = false;
-    fetchBridgeBuyableAddresses()
-      .then((set) => {
-        if (!cancelled) setBuyableAddresses(set);
+    Promise.all([
+      fetchBridgeBuyableAddresses().catch(() => new Set<string>()),
+      metalForgeService.getConfigs()
+        .then((config) => new Set(config.metals.filter((metal) => metal.isEnabled).map((metal) => normBridgeAddr(metal.address))))
+        .catch(() => new Set<string>()),
+    ])
+      .then(([bridgeAddresses, metalAddresses]) => {
+        if (!cancelled) {
+          setBridgeBuyableAddresses(bridgeAddresses);
+          setMetalBuyableAddresses(metalAddresses);
+        }
       })
       .catch(() => {
-        if (!cancelled) setBuyableAddresses(new Set());
+        if (!cancelled) setBridgeBuyableAddresses(new Set());
       });
     return () => {
       cancelled = true;
@@ -202,11 +212,16 @@ const Explore = () => {
     return !total || total === '0' ? '-' : formatBalance(total, undefined, 18, 1, 4);
   };
 
-  const canBuy = (address: string) => !!buyableAddresses?.has(normBridgeAddr(address));
+  const canBuy = (address: string) => {
+    const normalizedAddress = normBridgeAddr(address);
+    return !!bridgeBuyableAddresses?.has(normalizedAddress) || metalBuyableAddresses.has(normalizedAddress);
+  };
 
   const goBuy = (e: MouseEvent, address: string) => {
     e.stopPropagation();
-    navigate(buildFundBuyPath(address));
+    navigate(metalBuyableAddresses.has(normBridgeAddr(address))
+      ? buildFundMetalBuyPath(address)
+      : buildFundBuyPath(address));
   };
 
   const toggleSort = (key: SortKey) => {
@@ -359,7 +374,7 @@ const Explore = () => {
                             <Sparkline data={token.sparkline} change24h={token.change24h} />
                           </TableCell>
                           <TableCell className="text-right sticky right-0 bg-card border-l group-hover:bg-muted/50">
-                            {buyableAddresses &&
+                            {bridgeBuyableAddresses &&
                               (canBuy(token.address) ? (
                                 <Button
                                   size="sm"

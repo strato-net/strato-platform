@@ -17,7 +17,7 @@ import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
 import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_sslDir)
+import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_pghost, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
@@ -82,7 +82,11 @@ createCommandsFile = do
   localAuthCommands <- if flags_localAuth
     then do
       pgPassword <- filter (/= '\n') <$> readFile "secrets/postgres_password"
-      return ["blockapps-vault-wrapper-server --pghost localhost --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
+      -- The vault wrapper runs on the host, so it needs the same IPv4-loopback
+      -- pinning that genEthConf applies to the other local processes: postgres
+      -- publishes on 127.0.0.1 only, but "localhost" resolves to ::1 first on
+      -- macOS. See preferIPv4Loopback.
+      return ["blockapps-vault-wrapper-server --pghost " ++ preferIPv4Loopback flags_pghost ++ " --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
     else return []
 
   let baseCommands =

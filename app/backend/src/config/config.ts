@@ -123,6 +123,19 @@ export const defaultPoolV3FactoryFor: Record<string, string> = {
   "33056204878082667": "5d630126d908b46bcf8d00bc15e591a459375809" // Upquark mainnet
 };
 
+// PositionManagerV3 (V3 position NFTs). Deployed once per network behind a Proxy; its
+// address is the owner key of every managed pool position, so it must never change.
+// Populate per network after deployment (or set POSITION_MANAGER_V3).
+export const defaultPositionManagerV3For: Record<string, string> = {
+  "114784819836269": "1bc216225dd4e164ded916cb88a7c09804a881d1", // Helium testnet
+  "33056204878082667": "ce5d96341ba4fede57d7721c5b0e41d283aa7435", // Upquark mainnet
+};
+
+export const defaultNftFactoryFor: Record<string, string> = {
+  "114784819836269": "af432c49803721b242f52ed5fd1b065c9a78e0bb", // Helium testnet
+  "33056204878082667": "4898738a1213ffa0cbc8eb42f4efa5fc9d781ada", // Upquark mainnet
+};
+
 export const defaultStratoNativeBridgeFor: Record<string, string> = {
   "114784819836269": "49f69252b00235030a4dcd4c7ef17a64ef346258", // Helium testnet
   "33056204878082667": "4d9e9c39180a75091b9c35bbb9064d67c7fdde5a", // Upquark mainnet
@@ -188,6 +201,16 @@ export const defaultUsdcYieldVaultFor: Record<string, string> = {
   "33056204878082667": "afcfc4d847d59fbc402856fd6934aff6796812b1",// Upquark mainnet
 };
 
+export const defaultGoldstYieldVaultFor: Record<string, string> = {
+  "114784819836269": "65ab8049ff949e7ed04838723a07bc9b5a7849e2", // Helium testnet
+  "33056204878082667": "ddf7c27f27ac43b25043e100c2076e515526b9ae", // Upquark mainnet
+};
+
+export const defaultSilvstYieldVaultFor: Record<string, string> = {
+  "114784819836269": "7ecc1ab7e15384cf2392b7dad8878239fda78799", // Helium testnet
+  "33056204878082667": "f8884c44d7cfbfb7c6326c515f375f8572f03e2b", // Upquark mainnet
+};
+
 /*
    How far back the admin "Executed Issues" list looks. IssueExecuted grows with every
    whitelisted call, not just governance votes, so an unbounded sort/count is proportional
@@ -208,6 +231,8 @@ export let referralUrl: string | undefined;
 export let escrow: string = '';
 export let vaultFactory: string = '';
 export let poolV3Factory: string = '';
+export let positionManagerV3: string = '';
+export let nftFactory: string = '';
 export let metalForge: string = '';
 export let creditCardTopUp: string = '';
 export let vault: string = '';
@@ -221,6 +246,8 @@ export let stratoToken: string = '';
 export let stratoStaking: string = '';
 export let validatorRegistry: string = '';
 export let usdcYieldVault: string = '';
+export let goldstYieldVault: string = '';
+export let silvstYieldVault: string = '';
 export let executedIssuesLookbackDays: number = UNKNOWN_NETWORK_EXECUTED_ISSUES_LOOKBACK_DAYS;
 
 function setBridgeConfig(networkId: string) {
@@ -265,6 +292,32 @@ function setPoolV3FactoryConfig(networkId: string) {
     poolV3Factory = process.env.POOL_V3_FACTORY;
   } else {
     poolV3Factory = defaultPoolV3FactoryFor[networkId] || "";
+  }
+}
+
+function setPositionManagerV3Config(networkId: string) {
+  if (process.env.POSITION_MANAGER_V3) {
+    positionManagerV3 = process.env.POSITION_MANAGER_V3;
+  } else {
+    positionManagerV3 = defaultPositionManagerV3For[networkId] || "";
+  }
+  if (!positionManagerV3) {
+    // Positions can no longer be minted directly on pools, so an unconfigured manager
+    // means V3 liquidity-position creation 503s for every user — make the deployment
+    // dependency impossible to miss at startup instead of discovering it in production.
+    console.warn(
+      `PositionManagerV3 is not configured for network ${networkId} — V3 position mint/increase ` +
+        `and position-NFT reads are disabled until POSITION_MANAGER_V3 is set (or ` +
+        `defaultPositionManagerV3For is populated after deployment)`
+    );
+  }
+}
+
+function setNftFactoryConfig(networkId: string) {
+  if (process.env.NFT_FACTORY) {
+    nftFactory = process.env.NFT_FACTORY;
+  } else {
+    nftFactory = defaultNftFactoryFor[networkId] || "";
   }
 }
 
@@ -341,6 +394,11 @@ export function setUsdcYieldVaultConfig(networkId: string) {
   usdcYieldVault = process.env.USDC_YIELD_VAULT || defaultUsdcYieldVaultFor[networkId] || "";
 }
 
+export function setMetalYieldVaultConfig(networkId: string) {
+  goldstYieldVault = process.env.GOLDST_YIELD_VAULT || defaultGoldstYieldVaultFor[networkId] || "";
+  silvstYieldVault = process.env.SILVST_YIELD_VAULT || defaultSilvstYieldVaultFor[networkId] || "";
+}
+
 export function setExecutedIssuesLookbackConfig(networkId: string) {
   executedIssuesLookbackDays =
     defaultExecutedIssuesLookbackDaysFor[networkId] || UNKNOWN_NETWORK_EXECUTED_ISSUES_LOOKBACK_DAYS;
@@ -361,6 +419,8 @@ export async function initNetworkConfig() {
   setReferralConfig(networkId);
   setVaultFactoryConfig(networkId);
   setPoolV3FactoryConfig(networkId);
+  setPositionManagerV3Config(networkId);
+  setNftFactoryConfig(networkId);
   setStratoNativeBridgeConfig(networkId);
   setStratoTokenConfig(networkId);
   setStratoStakingConfig(networkId);
@@ -371,6 +431,7 @@ export async function initNetworkConfig() {
   setCarryVaultConfig(networkId);
   setDirectMintPsmConfig(networkId);
   setUsdcYieldVaultConfig(networkId);
+  setMetalYieldVaultConfig(networkId);
   setExecutedIssuesLookbackConfig(networkId);
 }
 
@@ -392,9 +453,17 @@ export async function getInternalAddresses() {
   ];
 
   // Network-specific addresses (set by initNetworkConfig)
-  addresses.push(rewards || '', escrow, vaultFactory);
+  addresses.push(rewards || '', escrow, vaultFactory, positionManagerV3);
   addresses.push(stratoStaking, validatorRegistry);
-  addresses.push(saveUsdstVault, usdcYieldVault, ethCarryVault, wbtcCarryVault);
+  addresses.push(
+    saveUsdstVault,
+    usdcYieldVault,
+    ethCarryVault,
+    wbtcCarryVault,
+    goldstYieldVault,
+    silvstYieldVault
+  );
+  addresses.push(directMintPsm);
 
   // Lending Registry --> lendingPool, collateralVault, liquidityPool
   const { data: [lending] } = await cirrus.get(accessToken, "/BlockApps-LendingRegistry", {

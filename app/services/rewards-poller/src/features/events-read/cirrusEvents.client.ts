@@ -24,8 +24,8 @@ import {
   parseActionableEventsForActivities,
 } from "./actionableEvents.parser";
 import {
-  isZeroCirrusValue,
   reassembleStructArrayRows,
+  shouldTrackActivity,
 } from "./mappingRow.parser";
 
 const STRATO_PREFIX = "BlockApps-";
@@ -112,7 +112,7 @@ export const getEventQueryParams = async (): Promise<{
   // Each activity is spread over several /mapping rows: the struct row holds
   // the scalar fields (emissionRate, sourceContract, ...) and each
   // actionableEvents element lives in its own row, so fetch the whole
-  // collection and reassemble before filtering on emissionRate.
+  // collection and reassemble before filtering by activity type and emission.
   const activitiesData = await cirrus.get("/mapping", {
     params: {
       address: `eq.${config.rewards.address}`,
@@ -131,7 +131,7 @@ export const getEventQueryParams = async (): Promise<{
 
   for (const item of activities.values()) {
     if (
-      isZeroCirrusValue(item.emissionRate) ||
+      !shouldTrackActivity(item.activityType, item.emissionRate) ||
       !item.sourceContract ||
       !item.actionableEvents
     ) {

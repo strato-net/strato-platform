@@ -76,10 +76,6 @@ export const config = {
   },
   tracking: {
     defaultDestination: process.env.TRACKING_DEFAULT_DESTINATION || "/dashboard/deposits",
-    destinationAllowlist: parseList(
-      process.env.TRACKING_DEST_ALLOWLIST ||
-        "/dashboard/deposits,/dashboard,/dashboard/swap,/dashboard/earn,/dashboard/rewards"
-    ),
     // Empty in dev → host-only cookie
     cookieDomain: process.env.TRACKING_COOKIE_DOMAIN || "",
     cookieName: "strato_tid",
@@ -88,7 +84,22 @@ export const config = {
     // used as fallback; see utils/geo.ts)
     ipinfoToken: process.env.TRACKING_IPINFO_TOKEN || "",
     attributionWindowDays: Number(process.env.TRACKING_ATTRIBUTION_WINDOW_DAYS || 90),
+    // Chain timestamps come from block time and the connection row from this
+    // server's clock: a bridge-in whose block sits marginally BEFORE the
+    // wallet connection still belongs to that connection.
+    attributionGraceMinutes: Number(process.env.TRACKING_ATTRIBUTION_GRACE_MINUTES || 30),
+    // Window in which a cookieless wallet-connected beacon may be bound to a
+    // recent open from the same public IP (0 disables the fallback)
+    ipFallbackMinutes: Number(process.env.TRACKING_IP_FALLBACK_MINUTES || 30),
     cacheTtlSeconds: Number(process.env.TRACKING_CACHE_TTL_SECONDS || 60),
+  },
+  // Optional origin-chain enrichment of the user timeline. Etherscan's V2 API
+  // is multichain (one key serves Ethereum, Base, Polygon, … via `chainid`);
+  // without a key the timeline simply omits remote-chain items.
+  etherscan: {
+    apiKey: process.env.TRACKING_ETHERSCAN_API_KEY || "",
+    apiUrl: process.env.TRACKING_ETHERSCAN_API_URL || "https://api.etherscan.io/v2/api",
+    maxTransactions: Number(process.env.TRACKING_ETHERSCAN_MAX_TX || 10),
   },
 };
 

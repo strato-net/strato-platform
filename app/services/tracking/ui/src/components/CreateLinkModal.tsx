@@ -1,13 +1,21 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { absoluteLinkUrl, createLink, TRACKING_DESTINATIONS } from '../api';
+import {
+  absoluteLinkUrl,
+  createLink,
+  isValidDestination,
+  TRACKING_DESTINATIONS,
+} from '../api';
+import DestinationField from './DestinationField';
 import { Button, CopyButton, inputClass, Modal } from './primitives';
 
 const CreateLinkModal = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
   const queryClient = useQueryClient();
   const [label, setLabel] = useState('');
   const [source, setSource] = useState('');
+  const [fullSource, setFullSource] = useState('');
   const [destination, setDestination] = useState<string>(TRACKING_DESTINATIONS[0].value);
+  const [customDestination, setCustomDestination] = useState(false);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +39,9 @@ const CreateLinkModal = ({ open, onClose }: { open: boolean; onClose: () => void
   const reset = () => {
     setLabel('');
     setSource('');
+    setFullSource('');
     setDestination(TRACKING_DESTINATIONS[0].value);
+    setCustomDestination(false);
     setCreatedUrl(null);
     setError(null);
   };
@@ -48,7 +58,16 @@ const CreateLinkModal = ({ open, onClose }: { open: boolean; onClose: () => void
       setError('Label and source are required');
       return;
     }
-    create.mutate({ label: label.trim(), source: source.trim(), destination });
+    if (!isValidDestination(destination.trim())) {
+      setError('Destination must be a relative path (/…) or an absolute http(s) URL');
+      return;
+    }
+    create.mutate({
+      label: label.trim(),
+      source: source.trim(),
+      fullSource: fullSource.trim(),
+      destination: destination.trim(),
+    });
   };
 
   return (
@@ -95,28 +114,38 @@ const CreateLinkModal = ({ open, onClose }: { open: boolean; onClose: () => void
             <input
               id="link-source"
               className={inputClass}
-              placeholder="e.g. Jeff, DefiLlama, KOL Alice"
+              placeholder="e.g. LinkedIn, X, website"
               value={source}
               onChange={(e) => setSource(e.target.value)}
             />
+            <p className="mt-1 text-xs text-muted-foreground">
+              The general channel this link is shared on.
+            </p>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium" htmlFor="link-destination">
-              Destination
+            <label className="mb-1 block text-sm font-medium" htmlFor="link-full-source">
+              Full source
             </label>
-            <select
-              id="link-destination"
+            <input
+              id="link-full-source"
               className={inputClass}
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-            >
-              {TRACKING_DESTINATIONS.map((dest) => (
-                <option key={dest.value} value={dest.value}>
-                  {dest.label}
-                </option>
-              ))}
-            </select>
+              placeholder="e.g. LinkedIn — Jeff's launch post"
+              value={fullSource}
+              onChange={(e) => setFullSource(e.target.value)}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              The specific placement within the channel (optional).
+            </p>
           </div>
+          <DestinationField
+            destination={destination}
+            onDestinationChange={setDestination}
+            customMode={customDestination}
+            onCustomModeChange={(custom) => {
+              setCustomDestination(custom);
+              if (custom) setDestination('');
+            }}
+          />
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end">
             <Button type="submit" disabled={create.isPending}>
