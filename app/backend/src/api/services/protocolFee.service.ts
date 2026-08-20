@@ -22,6 +22,7 @@ const {
   poolFactory,
   StablePool,
   MetalForge,
+  YieldVault,
 } = constants;
 
 /**
@@ -63,6 +64,7 @@ export interface AggregatedProtocolRevenue {
     poolV3: ProtocolRevenue;
     metalForge: ProtocolRevenue;
     gas: ProtocolRevenue;
+    yieldVault: ProtocolRevenue;
   };
   aggregated: RevenueByPeriod;
 }
@@ -1237,6 +1239,131 @@ export const getMetalForgeProtocolRevenue = async (
 };
 
 /**
+ * Get protocol revenue from YieldVault strategy fees
+ * Revenue = Σ(Transfer events from strategy addresses to feeCollector), converted to USD
+ * Strategy addresses are the keys of each vault's strategyDebt mapping.
+ */
+export const getYieldVaultProtocolRevenue = async (
+  accessToken: string,
+): Promise<ProtocolRevenue> => {
+  try {
+    const emptyRevenue: ProtocolRevenue = {
+      totalRevenue: "0",
+      revenueByPeriod: {
+        daily: { total: "0", byAsset: [] },
+        weekly: { total: "0", byAsset: [] },
+        monthly: { total: "0", byAsset: [] },
+        ytd: { total: "0", byAsset: [] },
+        allTime: { total: "0", byAsset: [] }
+      }
+    };
+
+    const vaultAddresses = [config.ethCarryVault, config.wbtcCarryVault, config.usdcYieldVault]
+      .filter(Boolean);
+
+    if (vaultAddresses.length === 0) return emptyRevenue;
+
+    const feeCollector = await getSwapFeeCollector(accessToken);
+
+    // Get strategy addresses from each vault's strategyDebt mapping (no value filter:
+    // retired strategies with zero debt may still have historical fee transfers)
+    const { data: strategyDebtEntries } = await cirrus.get(accessToken, `/${YieldVault}-strategyDebt`, {
+      params: {
+        address: `in.(${vaultAddresses.join(',')})`,
+        select: "key"
+      }
+    });
+
+    const strategyAddresses: string[] = [...new Set<string>(
+      (strategyDebtEntries || []).map((entry: any) => String(entry.key).toLowerCase())
+    )];
+
+    if (strategyAddresses.length === 0) return emptyRevenue;
+
+    // Query all Transfer events where 'from' is any strategy and 'to' is feeCollector
+    const { data: tokenTransferEvents } = await cirrus.get(accessToken, `/event`, {
+      params: {
+        event_name: `eq.Transfer`,
+        select: "address,attributes,block_timestamp",
+        "attributes->>from": `in.(${strategyAddresses.join(',')})`,
+        "attributes->>to": `eq.${feeCollector}`,
+        order: "block_timestamp.desc"
+      }
+    });
+
+    if (!tokenTransferEvents || tokenTransferEvents.length === 0) return emptyRevenue;
+
+    const timeCutoffs = getTimeCutoffs();
+
+    // Get unique token addresses from events
+    const uniqueTokenAddresses: string[] = [...new Set<string>(tokenTransferEvents.map((event: any) => event.address.toLowerCase()))];
+
+    // Fetch prices for all tokens in parallel
+    const priceMap = new Map<string, bigint>();
+    await Promise.all(
+      uniqueTokenAddresses.map(async (tokenAddress: string) => {
+        try {
+          const priceData = await getPrice(accessToken, tokenAddress) as { asset: string; price: string };
+          priceMap.set(tokenAddress, BigInt(priceData.price || "0"));
+        } catch (error) {
+          console.warn(`Price not found for token ${tokenAddress}, using 0`);
+          priceMap.set(tokenAddress, 0n);
+        }
+      })
+    );
+
+    // Transform events to common format, multiplying value by price
+    // value is in token units (18 decimals), price is in 18 decimals
+    // result = value * price / 1e18 (to avoid double scaling)
+    const DECIMALS = 10n ** 18n;
+    const transformedEvents = tokenTransferEvents.map((event: any) => {
+      const tokenAddress = event.address.toLowerCase();
+      const rawValue = BigInt(event.attributes?.value || "0");
+      const price = priceMap.get(tokenAddress) || 0n;
+      const valueInUsd = (rawValue * price) / DECIMALS;
+
+      return {
+        value: valueInUsd,
+        timestamp: parseTimestamp(event.block_timestamp),
+        asset: tokenAddress // The token that emitted the Transfer event
+      };
+    });
+
+    const periodRevenue = categorizeRevenueByPeriod(transformedEvents, timeCutoffs);
+
+    // Build revenue data with token symbols
+    const tokenSymbolCache = new Map<string, string>();
+    const [allTimeArray, dailyArray, weeklyArray, monthlyArray, ytdArray] = await Promise.all([
+      buildRevenueArray(accessToken, periodRevenue.allTime, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.daily, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.weekly, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.monthly, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.ytd, tokenSymbolCache)
+    ]);
+
+    // Calculate totals
+    const calculateTotal = (revenueMap: Record<string, bigint>): string =>
+      Object.values(revenueMap).reduce((sum, val) => sum + val, 0n).toString();
+
+    return {
+      totalRevenue: calculateTotal(periodRevenue.allTime),
+      revenueByPeriod: {
+        daily: { total: calculateTotal(periodRevenue.daily), byAsset: dailyArray },
+        weekly: { total: calculateTotal(periodRevenue.weekly), byAsset: weeklyArray },
+        monthly: { total: calculateTotal(periodRevenue.monthly), byAsset: monthlyArray },
+        ytd: { total: calculateTotal(periodRevenue.ytd), byAsset: ytdArray },
+        allTime: { total: calculateTotal(periodRevenue.allTime), byAsset: allTimeArray }
+      }
+    };
+  } catch (error: any) {
+    console.error("Error fetching yield vault protocol revenue:", {
+      error: error.response?.data || error.message
+    });
+    throw new Error("Failed to fetch yield vault protocol revenue");
+  }
+};
+
+/**
  * Get aggregated protocol revenue across all protocols
  */
 export const getAggregatedProtocolRevenue = async (
@@ -1245,17 +1372,18 @@ export const getAggregatedProtocolRevenue = async (
 ): Promise<AggregatedProtocolRevenue> => {
   try {
     // Fetch revenue data from all protocols in parallel
-    const [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, poolV3Revenue, metalForgeRevenue, gasRevenue] = await Promise.all([
+    const [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, poolV3Revenue, metalForgeRevenue, gasRevenue, yieldVaultRevenue] = await Promise.all([
       getCDPProtocolRevenue(accessToken, userAddress),
       getLendingProtocolRevenue(accessToken),
       getSwapProtocolRevenue(accessToken),
       getStablePoolProtocolRevenue(accessToken),
       getPoolV3ProtocolRevenue(accessToken),
       getMetalForgeProtocolRevenue(accessToken),
-      getGasCostRevenue(accessToken)
+      getGasCostRevenue(accessToken),
+      getYieldVaultProtocolRevenue(accessToken)
     ]);
 
-    const allProtocols = [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, poolV3Revenue, metalForgeRevenue, gasRevenue];
+    const allProtocols = [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, poolV3Revenue, metalForgeRevenue, gasRevenue, yieldVaultRevenue];
     
     // Helper to aggregate revenues across protocols
     const aggregateRevenues = (...revenues: RevenueByAsset[][]): RevenueByAsset[] => {
@@ -1311,7 +1439,8 @@ export const getAggregatedProtocolRevenue = async (
         stablePool: stablePoolRevenue,
         poolV3: poolV3Revenue,
         metalForge: metalForgeRevenue,
-        gas: gasRevenue
+        gas: gasRevenue,
+        yieldVault: yieldVaultRevenue
       },
       aggregated
     };
@@ -1330,7 +1459,7 @@ export const getProtocolRevenueByPeriod = async (
   accessToken: string,
   userAddress: string,
   period: 'daily' | 'weekly' | 'monthly' | 'ytd' | 'allTime',
-  protocol?: 'cdp' | 'lending' | 'swap' | 'stablePool' | 'poolV3' | 'metalForge' | 'gas'
+  protocol?: 'cdp' | 'lending' | 'swap' | 'stablePool' | 'poolV3' | 'metalForge' | 'gas' | 'yieldVault'
 ): Promise<RevenuePeriod> => {
   try {
     if (protocol) {
@@ -1356,6 +1485,9 @@ export const getProtocolRevenueByPeriod = async (
           break;
         case 'gas':
           revenue = await getGasCostRevenue(accessToken);
+          break;
+        case 'yieldVault':
+          revenue = await getYieldVaultProtocolRevenue(accessToken);
           break;
       }
       return revenue.revenueByPeriod[period];

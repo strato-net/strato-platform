@@ -78,6 +78,7 @@ interface AggregatedRevenueResponse {
     poolV3?: ProtocolRevenueResponse;
     metalForge: ProtocolRevenueResponse;
     gas: ProtocolRevenueResponse;
+    yieldVault?: ProtocolRevenueResponse;
   };
   aggregated: RevenuePeriod;
 }
@@ -130,6 +131,8 @@ const StratoStats = () => {
 
   const [gasTotalRevenue, setGasTotalRevenue] = useState<string>('0');
   const [gasRevenueByPeriod, setGasRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
+
+  const [yieldVaultRevenueByPeriod, setYieldVaultRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
 
   const [aggregatedRevenueByPeriod, setAggregatedRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
 
@@ -212,6 +215,10 @@ const StratoStats = () => {
 
       setGasTotalRevenue(response.data.byProtocol.gas.totalRevenue);
       setGasRevenueByPeriod(response.data.byProtocol.gas.revenueByPeriod);
+
+      if (response.data.byProtocol.yieldVault) {
+        setYieldVaultRevenueByPeriod(response.data.byProtocol.yieldVault.revenueByPeriod);
+      }
     } catch (err) {
       console.error('Failed to fetch protocol revenue:', err);
       setRevenueError('Failed to load protocol revenue');
@@ -629,6 +636,24 @@ const StratoStats = () => {
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} gas fees
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Yield Vault Revenue</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {revenueLoading ? (
+                          <Skeleton className="h-8 w-24" />
+                        ) : (
+                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(yieldVaultRevenueByPeriod[selectedPeriod].total || '0'), 18)))}`
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} yield vault fees
                       </p>
                     </CardContent>
                   </Card>
