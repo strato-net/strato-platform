@@ -27,6 +27,12 @@ import qualified Data.Text as T
 import Text.Tools
 import Prelude hiding (lookup)
 
+-- Two GetBlockHeaders windows. Unbounded remaining ++ of BlockHeaderV2
+-- (validator set + sigs per header) grew to ~1e5 entries and 8-11 GiB RSS
+-- during helium from-genesis; take keeps the oldest waiting headers.
+remainingHeadersCap :: Int
+remainingHeadersCap = 2 * Conf.maxReturnedHeaders (p2pConfig ethConf)
+
 class HasHeaderCache m where
   isBodyRequestActive :: m Bool
   addToHeaderCache :: [BlockHeader] -> m ()
@@ -40,7 +46,16 @@ instance MonadP2P m => HasHeaderCache m where
 
   addToHeaderCache headers = do
     alreadyRequestedRemainingHeaders <- getRemainingBHeaders
-    let !combined = alreadyRequestedRemainingHeaders ++ headers
+    let incoming = length alreadyRequestedRemainingHeaders + length headers
+        !combined = take remainingHeadersCap $ alreadyRequestedRemainingHeaders ++ headers
+    when (incoming > remainingHeadersCap) $
+      $logInfoS "handleEvents/BlockHeaders" $
+        T.pack $
+          "remaining header cache capped at "
+            ++ show remainingHeadersCap
+            ++ " (would have been "
+            ++ show incoming
+            ++ ")"
     length combined `seq` putRemainingBHeaders combined
 
   getBodiesToFetch = do
@@ -52,14 +67,15 @@ instance MonadP2P m => HasHeaderCache m where
         ([], _) -> do
           -- proceed if we are not already requesting bodies
           let (newNeededHeaders, remainingHeaders) = splitNeededHeaders alreadyRequestedRemainingHeaders
+              !trimmed = take remainingHeadersCap remainingHeaders
           putBlockHeaders newNeededHeaders
-          $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putRemainingBHeaders called: inserting " ++ showRanges (map BlockHeader.number remainingHeaders)
-          putRemainingBHeaders remainingHeaders
+          $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putRemainingBHeaders called: inserting " ++ showRanges (map BlockHeader.number trimmed)
+          putRemainingBHeaders trimmed
           $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called: inserting " ++ showRanges (map BlockHeader.number newNeededHeaders)
           return newNeededHeaders
         (first, rest) -> do
           let (newNeededHeaders, remainingHeaders) = splitNeededHeaders first
-              !newRemainingHeaders = remainingHeaders ++ rest
+              !newRemainingHeaders = take remainingHeadersCap $ remainingHeaders ++ rest
           $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putRemainingBHeaders called: range = " ++ showRanges (map BlockHeader.number newRemainingHeaders)
           length newRemainingHeaders `seq` putRemainingBHeaders newRemainingHeaders
           $logInfoS "handleEvents/BlockHeaders" $
