@@ -143,11 +143,14 @@ class UserController {
       const { issueId } = req.body;
       
       const result = await castVoteOnIssueById(accessToken, actorAddress as string, issueId);
-      res.status(RestStatus.OK).json({ 
-        message: "Vote cast successfully", 
+      res.status(RestStatus.OK).json({
+        message: result.votedVia === "registry"
+          ? "Vote cast successfully by voting through the registry: the issue's recorded arguments could not be replayed directly"
+          : "Vote cast successfully",
         issueId,
         status: result.status,
         hash: result.hash,
+        votedVia: result.votedVia,
       });
       next();
     } catch (e) {

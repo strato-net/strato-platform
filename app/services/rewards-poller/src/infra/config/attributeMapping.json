@@ -288,5 +288,34 @@
       "amount": "amount",
       "user": "user"
     }
+  },
+
+  "65ab8049ff949e7ed04838723a07bc9b5a7849e2": {
+    "Deposit": { 
+      "amount": "shares", 
+      "user": "owner" 
+    },
+    "Withdraw": { 
+      "amount": "shares", 
+      "user": "owner" 
+    },
+    "QueueProcessed": { 
+      "amount": "sharesBurned", "user": "owner" 
+    }
+  },
+
+  "7ecc1ab7e15384cf2392b7dad8878239fda78799": {
+    "Deposit": { 
+      "amount": "shares", 
+      "user": "owner" 
+    },
+    "Withdraw": { 
+      "amount": "shares", 
+      "user": "owner" 
+    },
+    "QueueProcessed": { 
+      "amount": "sharesBurned", 
+      "user": "owner" 
+    }
   }
 }
