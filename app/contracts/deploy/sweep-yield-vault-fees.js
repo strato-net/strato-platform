@@ -199,11 +199,27 @@ async function cirrus(tokenObj, tableName, params) {
   }
 }
 
+// Cirrus state tables can hold ghost rows (stale duplicates at older block
+// numbers) for frequently-updated keys. Single-value reads select block_number and
+// keep the newest row, compared numerically client-side — server-side
+// order=block_number.desc would be lexicographic if the column is text.
+const latestRow = (rows) =>
+  rows.reduce(
+    (best, row) => (!best || Number(row.block_number || 0) > Number(best.block_number || 0) ? row : best),
+    null
+  );
+
 // Cirrus only creates an event table once that event has fired at least once —
-// a never-emitted event (e.g. StrategyLossReported) has no table at all.
-const isMissingTable = (error) =>
-  (error.status === 400 || error.status === 404) &&
-  /does not exist|42P01|could not find the table/i.test(JSON.stringify(error.cirrusBody || ''));
+// a never-emitted event (e.g. StrategyLossReported) has no table at all. Match
+// ONLY missing-TABLE signatures (42P01/PGRST205); a generic "does not exist" would
+// also swallow missing-COLUMN errors (42703, e.g. a wrong column name in a query)
+// and silently turn a real query bug into "no events".
+const isMissingTable = (error) => {
+  if (error.status !== 400 && error.status !== 404) return false;
+  const body = error.cirrusBody || {};
+  if (body.code === '42P01' || body.code === 'PGRST205') return true;
+  return /relation .* does not exist|could not find the table/i.test(JSON.stringify(body));
+};
 
 async function cirrusAll(tokenObj, tableName, params) {
   const rows = [];
@@ -253,7 +269,7 @@ async function readVaultState(tokenObj, vault) {
   const [vaultRows, storageRows] = await Promise.all([
     cirrus(tokenObj, VAULT_TABLE, {
       address: `eq.${vault}`,
-      select: 'address,_asset,_totalSupply::text',
+      select: 'address,_asset,_totalSupply::text,block_number',
     }),
     cirrus(tokenObj, 'storage', {
       address: `eq.${vault}`,
@@ -263,10 +279,8 @@ async function readVaultState(tokenObj, vault) {
     }),
   ]);
   if (!vaultRows.length) throw new Error(`Vault ${vault} not found in ${VAULT_TABLE}`);
-  const distinct = new Set(vaultRows.map((r) => JSON.stringify(r)));
-  if (distinct.size > 1) throw new Error(`Inconsistent Cirrus rows for vault ${vault}`);
   if (!storageRows.length) throw new Error(`Vault ${vault} accrual storage not found`);
-  const v = vaultRows[0];
+  const v = latestRow(vaultRows);
   const s = storageRows[0];
   const accrualInitialized =
     s.accrualInitialized === true || String(s.accrualInitialized).toLowerCase() === 'true';
@@ -285,11 +299,10 @@ async function readStrategyDebt(tokenObj, vault, strategy) {
   const rows = await cirrus(tokenObj, STRATEGY_DEBT_TABLE, {
     address: `eq.${vault}`,
     key: `eq.${strategy}`,
-    select: 'value::text',
+    select: 'value::text,block_number',
   });
-  const values = new Set(rows.map((r) => String(r.value || '0')));
-  if (values.size > 1) throw new Error(`Inconsistent strategyDebt rows for ${strategy}`);
-  return BigInt(rows[0] ? String(rows[0].value || '0') : '0');
+  const row = latestRow(rows);
+  return BigInt(row ? String(row.value || '0') : '0');
 }
 
 async function discoverStrategy(tokenObj, vault) {
@@ -312,11 +325,10 @@ async function readTokenBalance(tokenObj, token, holder) {
   const rows = await cirrus(tokenObj, BALANCES_TABLE, {
     address: `eq.${token}`,
     key: `eq.${holder}`,
-    select: 'value::text',
+    select: 'value::text,block_number',
   });
-  const values = new Set(rows.map((r) => String(r.value || '0')));
-  if (values.size > 1) throw new Error(`Inconsistent balance rows for ${holder} on ${token}`);
-  return BigInt(rows[0] ? String(rows[0].value || '0') : '0');
+  const row = latestRow(rows);
+  return BigInt(row ? String(row.value || '0') : '0');
 }
 
 // CDPEngine.vaults is user => asset => {collateral, scaledDebt}; Cirrus renders the
@@ -329,14 +341,15 @@ async function readCdpVaultCollateral(tokenObj, cdpEngine, owner, asset) {
       address: `eq.${cdpEngine}`,
       key: `eq.${owner}`,
       key2: `eq.${asset}`,
-      select: 'value',
+      select: 'value,block_number',
     });
   } catch (error) {
     if (isMissingTable(error)) return { collateral: 0n, scaledDebt: 0n };
     throw error;
   }
   if (!rows.length) return { collateral: 0n, scaledDebt: 0n };
-  const value = typeof rows[0].value === 'object' ? rows[0].value : JSON.parse(rows[0].value);
+  const row = latestRow(rows);
+  const value = typeof row.value === 'object' ? row.value : JSON.parse(row.value);
   return {
     collateral: BigInt(String(value.collateral || '0')),
     scaledDebt: BigInt(String(value.scaledDebt || '0')),
@@ -348,11 +361,10 @@ async function readTokenAllowance(tokenObj, token, owner, spender) {
     address: `eq.${token}`,
     key: `eq.${owner}`,
     key2: `eq.${spender}`,
-    select: 'value::text',
+    select: 'value::text,block_number',
   });
-  const values = new Set(rows.map((r) => String(r.value || '0')));
-  if (values.size > 1) throw new Error(`Inconsistent allowance rows for ${owner}→${spender} on ${token}`);
-  return BigInt(rows[0] ? String(rows[0].value || '0') : '0');
+  const row = latestRow(rows);
+  return BigInt(row ? String(row.value || '0') : '0');
 }
 
 // The key that signs is the account whose allowance is spent — derive the sweeper
@@ -376,14 +388,13 @@ async function readWstEthRate(tokenObj, oracle, wstEth) {
   const rows = await cirrus(tokenObj, EXCHANGE_RATES_TABLE, {
     address: `eq.${oracle}`,
     key: `eq.${wstEth}`,
-    select: 'value::text,block_timestamp',
+    select: 'value::text,block_timestamp,block_number',
   });
   if (!rows.length) throw new Error(`No exchangeRates entry for wstETH ${wstEth} on oracle ${oracle}`);
-  const values = new Set(rows.map((r) => String(r.value || '0')));
-  if (values.size > 1) throw new Error(`Inconsistent exchange-rate rows for ${wstEth}`);
-  const rate = BigInt(String(rows[0].value || '0'));
-  if (rate <= 0n) throw new Error(`Bad wstETH exchange rate: ${rows[0].value}`);
-  const ageDays = (Date.now() / 1000 - toEpochSec(rows[0].block_timestamp)) / 86400;
+  const row = latestRow(rows);
+  const rate = BigInt(String(row.value || '0'));
+  if (rate <= 0n) throw new Error(`Bad wstETH exchange rate: ${row.value}`);
+  const ageDays = (Date.now() / 1000 - toEpochSec(row.block_timestamp)) / 86400;
   const maxAgeDays = Number(process.env.EXCHANGE_RATE_MAX_AGE_DAYS || '3');
   if (!(ageDays <= maxAgeDays)) {
     throw new Error(`wstETH exchange rate is stale (${ageDays.toFixed(1)}d old, max ${maxAgeDays}d) — failing closed`);
@@ -424,15 +435,17 @@ function pendingAccrual(vaultState, fromTs, toTs) {
 
 // Piecewise-constant strategyDebt timeline from the vault's capital events. Every
 // event carries the post-change strategyDebt, so the timeline is just the sorted
-// event sequence. CapitalReturned names its strategy column `from`; the others use
-// `strategy`. Ordering across the three tables inside one block is best-effort —
-// the caller's sanity check (timeline end == strategyDebt mapping) fails closed on
-// any inconsistency.
+// event sequence. All three events declare their strategy parameter as `strategy`
+// (Cirrus names columns after the EVENT DECLARATION parameters, not the variable
+// names at the emit site — returnCapital's local is `from`, but the column is
+// still `strategy`). Ordering across the three tables inside one block is
+// best-effort — the caller's sanity check (timeline end == strategyDebt mapping)
+// fails closed on any inconsistency.
 async function buildDebtTimeline(tokenObj, vault, strategy) {
-  const fetchCapitalEvents = (table, strategyColumn) =>
+  const fetchCapitalEvents = (table) =>
     cirrusAll(tokenObj, table, {
       address: `eq.${vault}`,
-      [strategyColumn]: `eq.${strategy}`,
+      strategy: `eq.${strategy}`,
       select: 'strategyDebt::text,block_timestamp,block_number',
       order: 'id.asc',
     }).catch((error) => {
@@ -443,9 +456,9 @@ async function buildDebtTimeline(tokenObj, vault, strategy) {
       throw error;
     });
   const [deployed, returned, losses] = await Promise.all([
-    fetchCapitalEvents(CAPITAL_DEPLOYED_TABLE, 'strategy'),
-    fetchCapitalEvents(CAPITAL_RETURNED_TABLE, 'from'),
-    fetchCapitalEvents(STRATEGY_LOSS_TABLE, 'strategy'),
+    fetchCapitalEvents(CAPITAL_DEPLOYED_TABLE),
+    fetchCapitalEvents(CAPITAL_RETURNED_TABLE),
+    fetchCapitalEvents(STRATEGY_LOSS_TABLE),
   ]);
   return [...deployed, ...returned, ...losses]
     .map((row) => ({
