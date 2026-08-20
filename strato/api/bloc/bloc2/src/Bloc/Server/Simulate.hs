@@ -37,6 +37,7 @@ import Bloc.Server.Transaction
   )
 import BlockApps.Logging
 import BlockApps.Solidity.ArgValue (ArgValue (..), splitTypeHint)
+import BlockApps.Solidity.Value (splitCastLiteral, unquoteCastInner)
 import BlockApps.SolidityVarReader (svmValueToSolidityValues)
 import Blockchain.DB.CodeDB (HasCodeDB)
 import Blockchain.Data.AddressStateDB
@@ -462,11 +463,14 @@ effectChainPlan depth fromAddr toAddr gasTxt funcName args =
       nextTarget <- parseAddrLit tLit
       pure $ effectChainPlan (depth - 1) toAddr nextTarget gasTxt (unquoteLit fLit) rest
 
--- | The bare text of a marshaled literal: quoted strings lose their quotes
--- (addresses and strings render as @"…"@ literals), everything else passes
--- through unchanged.
+-- | The bare text of a marshaled literal: explicit cast literals
+-- (@string("…")@, @address("hex")@, …) reduce to their inner text, quoted
+-- strings lose their quotes (addresses and strings render as @"…"@ literals),
+-- everything else passes through unchanged.
 unquoteLit :: Text -> Text
-unquoteLit t = fromMaybe t $ Text.stripSuffix "\"" =<< Text.stripPrefix "\"" t
+unquoteLit t = case splitCastLiteral t of
+  Just (_, raw) -> fromMaybe raw (unquoteCastInner raw)
+  Nothing -> fromMaybe t $ Text.stripSuffix "\"" =<< Text.stripPrefix "\"" t
 
 -- | Parse an address from either a bare or quoted, 0x-prefixed or bare-hex
 -- rendering.

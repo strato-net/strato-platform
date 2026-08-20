@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,13 @@ export function MethodCaller({
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<CallResult | null>(null);
   const [error, setError] = useState<string>("");
+
+  // A stale dry-run is misleading once the payload inputs change (or the
+  // dialog is reopened); clear the panel on any edit.
+  const simReset = sim.reset;
+  useEffect(() => {
+    simReset();
+  }, [simReset, values, resolvedAddrs, walletUsername, value, open]);
 
   // Build the FUNCTION payload once, so Simulate and Call submit identical data.
   const buildFunctionPayload = (): Record<string, unknown> => {

@@ -97,6 +97,13 @@ export function EditorTab() {
   const [deploying, setDeploying] = useState(false);
   const [deployedAddress, setDeployedAddress] = useState<string>("");
 
+  // A stale dry-run is misleading once the deploy inputs change (or the dialog
+  // is reopened); clear the panel on any edit.
+  const simReset = sim.reset;
+  useEffect(() => {
+    simReset();
+  }, [simReset, selectedContract, argValues, walletUsername, compiledSource, createOpen]);
+
   const activeFile = files[active] ?? files[0];
   const contractNames = xabi?.src ? Object.keys(xabi.src) : [];
   const argDefs = constructorArgs(xabi, selectedContract);
