@@ -1,4 +1,4 @@
-VERSION=18.3-solidvm-stream-sync-pr1
+VERSION=18.3-solidvm-live-sync-pr2
 HASH_STRATO=7812dc725baa
 HASH_APP_BACKEND=1293b125b6ad
 HASH_APP_UI=3816973c84d9

@@ -146,8 +146,7 @@ addBlocks :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => [OutputBlock
 addBlocks unfiltered = do
   let filtered = filter ((/= 0) . number . obBlockData) unfiltered
       timerToUse = Just vmBlockInsertionMined
-  when (Conf.sqlDiff $ vmConfig ethConf) $
-    unless (null unfiltered) $ yieldMany $ OutIndexEvent . RanBlock <$> unfiltered
+  unless (null unfiltered) $ yieldMany $ OutIndexEvent . RanBlock <$> unfiltered
   bbi <- getContextBestBlockInfo
   $logInfoS "addBlocks" $ T.pack ("Unfiltered count: " ++ show (length unfiltered))
   $logInfoS "addBlocks" $ T.pack ("Filtered count: " ++ show (length filtered))
