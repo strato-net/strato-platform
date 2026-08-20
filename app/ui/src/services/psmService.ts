@@ -13,24 +13,9 @@ export interface EligibleToken {
   burnEnabled: boolean;
   maxBalance: string;
   minReserve: string;
-  burnDelay: string;
   mintFeeBps: string;
   burnFeeBps: string;
-  pendingRedemptions: string;
   availableLiquidity: string;
-}
-
-export interface BurnRequest {
-  id: string;
-  amount: string;
-  payoutAmount: string;
-  redeemToken: string;
-  redeemTokenSymbol: string;
-  requester: string;
-  requestTime: string;
-  burnDelay: string;
-  availableAt: string;
-  isAvailable: boolean;
 }
 
 export interface PsmInfo {
@@ -39,8 +24,9 @@ export interface PsmInfo {
   mintableTokenSymbol: string;
   mintPaused: boolean;
   burnPaused: boolean;
+  savingsVault: string;
+  savingsEnabled: boolean;
   eligibleTokens: EligibleToken[];
-  burnRequests: BurnRequest[];
   userMintableBalance: string;
 }
 
@@ -50,25 +36,19 @@ export const psmService = {
     return response.data;
   },
 
-  async mint(amount: string, againstToken: string) {
+  async mint(amount: string, againstToken: string, toSavings = false) {
     const amountWei = safeParseUnits(amount, DECIMALS).toString();
-    const response = await api.post("/psm/mint", { amount: amountWei, againstToken });
+    const response = await api.post("/psm/mint", {
+      amount: amountWei,
+      againstToken,
+      toSavings,
+    });
     return response.data;
   },
 
-  async requestBurn(amount: string, redeemToken: string) {
+  async redeem(amount: string, redeemToken: string) {
     const amountWei = safeParseUnits(amount, DECIMALS).toString();
-    const response = await api.post("/psm/request-burn", { amount: amountWei, redeemToken });
-    return response.data;
-  },
-
-  async completeBurn(id: string) {
-    const response = await api.post("/psm/complete-burn", { id });
-    return response.data;
-  },
-
-  async cancelBurn(id: string) {
-    const response = await api.post("/psm/cancel-burn", { id });
+    const response = await api.post("/psm/redeem", { amount: amountWei, redeemToken });
     return response.data;
   },
 };

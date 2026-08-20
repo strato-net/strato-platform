@@ -1,12 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import {
-  getPsmInfo,
-  psmMint,
-  psmRequestBurn,
-  psmCompleteBurn,
-  psmCancelBurn,
-} from "../services/psm.service";
+import { getPsmInfo, psmMint, psmRedeem } from "../services/psm.service";
 
 class PsmController {
   static async getInfo(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -22,7 +16,7 @@ class PsmController {
   static async mint(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { accessToken, address: userAddress, body } = req;
-      const { amount, againstToken } = body;
+      const { amount, againstToken, toSavings } = body;
 
       if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid amount" });
@@ -33,14 +27,18 @@ class PsmController {
         return;
       }
 
-      const result = await psmMint(accessToken, userAddress as string, { amount, againstToken });
+      const result = await psmMint(accessToken, userAddress as string, {
+        amount,
+        againstToken,
+        toSavings: Boolean(toSavings),
+      });
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  static async requestBurn(req: Request, res: Response, next: NextFunction): Promise<void> {
+  static async redeem(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { accessToken, address: userAddress, body } = req;
       const { amount, redeemToken } = body;
@@ -54,41 +52,7 @@ class PsmController {
         return;
       }
 
-      const result = await psmRequestBurn(accessToken, userAddress as string, { amount, redeemToken });
-      res.status(RestStatus.OK).json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async completeBurn(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { accessToken, address: userAddress, body } = req;
-      const { id } = body;
-
-      if (!id) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "Missing burn request id" });
-        return;
-      }
-
-      const result = await psmCompleteBurn(accessToken, userAddress as string, { id });
-      res.status(RestStatus.OK).json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async cancelBurn(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { accessToken, address: userAddress, body } = req;
-      const { id } = body;
-
-      if (!id) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "Missing burn request id" });
-        return;
-      }
-
-      const result = await psmCancelBurn(accessToken, userAddress as string, { id });
+      const result = await psmRedeem(accessToken, userAddress as string, { amount, redeemToken });
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

@@ -483,6 +483,126 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       };
     },
   },
+  "DirectPSMMint": {
+    contract_name: "DirectMintPSM",
+    event_name: "DirectPSMMinted",
+    displayName: "PSM Mint",
+    iconConfig: { icon: Coins, color: "bg-indigo-500" },
+    getTokenAddress: (event: Event) => {
+      const againstToken = event.attributes.againstToken || event.attributes.against_token;
+      return [usdstAddress, againstToken].filter(Boolean) as string[];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const user = getEventAttribute(event, "user", "User");
+      const againstToken = getEventAttribute(event, "againstToken", "against_token");
+      // depositAmount is the gross collateral pulled in; mintAmount is net of the PSM fee
+      const depositAmount = getEventAttribute(event, "depositAmount", "deposit_amount") || "0";
+      const mintAmount = getEventAttribute(event, "mintAmount", "mint_amount") || "0";
+
+      const collateralSymbol = tokenSymbols.get(againstToken);
+      const usdstSymbol = tokenSymbols.get(usdstAddress) || "USDST";
+
+      const fields: ActivityField[] = [
+        {
+          label: "Deposited",
+          value: formatValue(depositAmount, againstToken),
+          type: "amount",
+          badge: collateralSymbol,
+          image: tokenImages?.get(againstToken),
+          imageFallback: collateralSymbol || againstToken,
+          rawAmount: getFullAmount(depositAmount),
+        },
+        {
+          label: "Minted",
+          value: formatValue(mintAmount, usdstAddress),
+          type: "amount",
+          badge: usdstSymbol,
+          image: tokenImages?.get(usdstAddress),
+          imageFallback: usdstSymbol,
+          rawAmount: getFullAmount(mintAmount),
+        },
+        addressField("By", user, userAddress),
+      ];
+
+      return {
+        title: "PSM Mint",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Deposited", "Minted"],
+            renderer: "amounts-with-arrow",
+          },
+          line2: {
+            fieldLabels: ["By"],
+            renderer: "addresses-with-bullet",
+          },
+        },
+      };
+    },
+  },
+  "DirectPSMRedeem": {
+    contract_name: "DirectMintPSM",
+    event_name: "Redeemed",
+    displayName: "PSM Redeem",
+    iconConfig: { icon: Banknote, color: "bg-indigo-600" },
+    getTokenAddress: (event: Event) => {
+      const redeemToken = event.attributes.redeemToken || event.attributes.redeem_token;
+      return [usdstAddress, redeemToken].filter(Boolean) as string[];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const user = getEventAttribute(event, "user", "User");
+      const redeemToken = getEventAttribute(event, "redeemToken", "redeem_token");
+      // burnAmount is the gross USDST burned; payoutAmount is net of the PSM fee
+      const burnAmount = getEventAttribute(event, "burnAmount", "burn_amount") || "0";
+      const payoutAmount = getEventAttribute(event, "payoutAmount", "payout_amount") || "0";
+
+      const redeemSymbol = tokenSymbols.get(redeemToken);
+      const usdstSymbol = tokenSymbols.get(usdstAddress) || "USDST";
+
+      const fields: ActivityField[] = [
+        {
+          label: "Burned",
+          value: formatValue(burnAmount, usdstAddress),
+          type: "amount",
+          badge: usdstSymbol,
+          image: tokenImages?.get(usdstAddress),
+          imageFallback: usdstSymbol,
+          rawAmount: getFullAmount(burnAmount),
+        },
+        {
+          label: "Received",
+          value: formatValue(payoutAmount, redeemToken),
+          type: "amount",
+          badge: redeemSymbol,
+          image: tokenImages?.get(redeemToken),
+          imageFallback: redeemSymbol || redeemToken,
+          rawAmount: getFullAmount(payoutAmount),
+        },
+        addressField("By", user, userAddress),
+      ];
+
+      return {
+        title: "PSM Redeem",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Burned", "Received"],
+            renderer: "amounts-with-arrow",
+          },
+          line2: {
+            fieldLabels: ["By"],
+            renderer: "addresses-with-bullet",
+          },
+        },
+      };
+    },
+  },
   "Deposit": {
     contract_name: "MercataBridge",
     event_name: "DepositCompleted",
