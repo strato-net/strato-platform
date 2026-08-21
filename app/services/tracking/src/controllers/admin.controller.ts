@@ -8,6 +8,8 @@ import {
   getWalletDetail,
   invalidateSnapshot,
 } from "../services/attributionService";
+import { getUserTimeline } from "../services/timelineService";
+import { getDailySnapshot } from "../services/metricsService";
 import { isValidDestination } from "../utils/destinations";
 import { normalizeAddress } from "../utils/addresses";
 
@@ -20,6 +22,11 @@ export const me = async (req: AuthorizedRequest, res: Response): Promise<void> =
 // GET /tracking-api/links — summaries with attribution rollups
 export const list = async (_req: AuthorizedRequest, res: Response): Promise<void> => {
   res.json(await getLinkSummaries());
+};
+
+// GET /tracking-api/metrics/daily — today's cross-link snapshot
+export const dailyMetrics = async (_req: AuthorizedRequest, res: Response): Promise<void> => {
+  res.json(await getDailySnapshot());
 };
 
 // GET /tracking-api/links/:id
@@ -45,6 +52,22 @@ export const walletDetail = async (req: AuthorizedRequest, res: Response): Promi
     return;
   }
   res.json(wallet);
+};
+
+// GET /tracking-api/users/:address/timeline — cross-link activity story for
+// one wallet: opens/engagement/connections merged with its on-chain events
+export const userTimeline = async (req: AuthorizedRequest, res: Response): Promise<void> => {
+  const address = normalizeAddress(req.params.address);
+  if (!address) {
+    res.status(400).json({ error: "Invalid wallet address" });
+    return;
+  }
+  const timeline = await getUserTimeline(address);
+  if (!timeline) {
+    res.status(404).json({ error: "No tracked activity for this address" });
+    return;
+  }
+  res.json(timeline);
 };
 
 const DESTINATION_ERROR =

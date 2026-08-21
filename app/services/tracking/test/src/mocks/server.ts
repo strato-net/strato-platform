@@ -163,6 +163,34 @@ const queryTable = (table: string, params: URLSearchParams): Row[] => {
 };
 
 // ---------------------------------------------------------------------------
+// Etherscan V2 look-alike (origin-chain enrichment of the user timeline).
+// Rows are seeded per chain + address and served by
+// GET /etherscan/api?chainid=&module=account&action=txlist&address=&sort=&offset=
+// in Etherscan's { status, message, result } envelope.
+// ---------------------------------------------------------------------------
+const remoteTxs = new Map<string, Row[]>();
+
+const remoteKey = (chainId: string, address: string): string =>
+  `${chainId}:${address.toLowerCase().replace(/^0x/, "")}`;
+
+const etherscanResponse = (params: URLSearchParams): Row => {
+  if (!params.get("apikey")) {
+    return { status: "0", message: "NOTOK", result: "Missing/Invalid API Key" };
+  }
+  const rows = [...(remoteTxs.get(remoteKey(params.get("chainid") ?? "", params.get("address") ?? "")) ?? [])];
+  if (rows.length === 0) {
+    return { status: "0", message: "No transactions found", result: [] };
+  }
+  rows.sort((a, b) =>
+    params.get("sort") === "asc"
+      ? Number(a.timeStamp) - Number(b.timeStamp)
+      : Number(b.timeStamp) - Number(a.timeStamp)
+  );
+  const offset = params.get("offset") ? Number(params.get("offset")) : rows.length;
+  return { status: "1", message: "OK", result: rows.slice(0, offset) };
+};
+
+// ---------------------------------------------------------------------------
 // HTTP plumbing
 // ---------------------------------------------------------------------------
 const readJson = (req: http.IncomingMessage): Promise<any> =>
@@ -224,6 +252,22 @@ const server = http.createServer(async (req, res) => {
         tables.delete(table);
         return send(res, 200, { ok: true });
       }
+    }
+    if (path === "/__test/etherscan" && req.method === "DELETE") {
+      remoteTxs.clear();
+      return send(res, 200, { ok: true });
+    }
+    const etherscanSeed = path.match(/^\/__test\/etherscan\/(\d+)\/([^/]+)$/);
+    if (etherscanSeed && (req.method === "POST" || req.method === "PUT")) {
+      const rows = await readJson(req);
+      if (!Array.isArray(rows)) return send(res, 400, { error: "expected an array of rows" });
+      const key = remoteKey(etherscanSeed[1], etherscanSeed[2]);
+      const existing = req.method === "PUT" ? [] : remoteTxs.get(key) ?? [];
+      remoteTxs.set(key, [...existing, ...rows]);
+      return send(res, 200, { key, rows: remoteTxs.get(key)!.length });
+    }
+    if (path === "/etherscan/api" && req.method === "GET") {
+      return send(res, 200, etherscanResponse(url.searchParams));
     }
     const cirrusMatch = path.match(/^\/cirrus\/search\/(.+)$/);
     if (cirrusMatch && req.method === "GET") {

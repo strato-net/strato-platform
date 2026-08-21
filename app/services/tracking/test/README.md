@@ -17,7 +17,7 @@ docker compose -f docker-compose.test.yml -p tracking-tests down -v
 | Service | Image | Role |
 |---|---|---|
 | `postgres` | `postgres:14.18` | empty DB; the service creates `tracking` and runs its embedded migrations |
-| `mocks` | this dir, `npm run mocks` | OpenID discovery + JWKS + `POST /__test/token` (mints RS256 JWTs the service verifies), and a Cirrus/PostgREST look-alike fed by `POST/PUT /__test/cirrus/<table>` / `DELETE /__test/cirrus` |
+| `mocks` | this dir, `npm run mocks` | OpenID discovery + JWKS + `POST /__test/token` (mints RS256 JWTs the service verifies), and a Cirrus/PostgREST look-alike fed by `POST/PUT /__test/cirrus/<table>` / `DELETE /__test/cirrus`, plus an Etherscan V2 look-alike (`GET /etherscan/api`) fed by `POST/PUT /__test/etherscan/<chainId>/<address>` |
 | `tracking` | `../Dockerfile` (production image) | `NODE_URL` and `OPENID_DISCOVERY_URL` point at `mocks`; `TRACKING_AUTHORIZED_USERS=tester@example.com`; `TRACKING_CACHE_TTL_SECONDS=0` so every dashboard read rebuilds the attribution snapshot |
 | `tests` | this dir, `npm test` | `node --test` over `dist/*.test.js`, files run sequentially |
 
@@ -29,8 +29,13 @@ docker compose -f docker-compose.test.yml -p tracking-tests down -v
 - Use `src/helpers.ts`: `api()` (raw fetch, redirects not followed),
   `authed()` (adds a bearer token for the allowlisted user), `token(user)`,
   `createLink()`, `openLink(slug, ua)` (returns the `strato_tid` cookie),
-  `seedCirrus(table, rows)`, `resetCirrus()`, `sql()` for DB assertions,
-  `randomAddress()` / `cirrusAddress()`.
+  `seedCirrus(table, rows)`, `resetCirrus()`, `seedEtherscan(chainId, address,
+  txs)` / `resetEtherscan()` (origin-chain rows for the user timeline),
+  `sql()` for DB assertions, `randomAddress()` / `cirrusAddress()`,
+  `testIp()` (random public IP for the same-IP beacon fallback) and the
+  `BROWSER_UA` / `BOT_UA` / `IN_APP_BROWSER_UA` / `PREVIEW_UA` user agents.
+  `openLink(slug, ua, headers)` takes extra request headers (e.g.
+  `X-Forwarded-For`).
 - Create fresh links/addresses per test — the DB is shared for the whole run
   and files run in order, but never assume anything about existing rows.
 - The resolver persists sessions fire-and-forget after the 302: poll the row

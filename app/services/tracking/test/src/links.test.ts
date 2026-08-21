@@ -71,6 +71,7 @@ describe("link management API", () => {
     assert.deepEqual(detail.activity, []);
     assert.deepEqual(detail.walletSummaries, []);
     assert.deepEqual(detail.geoPoints, []);
+    assert.equal(detail.geoTruncated, false);
     assert.ok(Array.isArray(detail.history), "history series present");
 
     assert.equal((await authed("/tracking-api/links/999999999")).status, 404);

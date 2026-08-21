@@ -3,7 +3,7 @@ const {ConnectionError} = require("sequelize");
 const winston = require('winston-color');
 const models = require('../models');
 const Promise = require('bluebird');
-const rp = require('request-promise');
+const axios = require('axios');
 const moment = require('moment');
 
 const config = require('../config/app.config');
@@ -70,15 +70,12 @@ async function getVmBlocksValid() {
       throw Error('PROMETHEUS_HOST env var is not set - unable to get prometheus data');
     }
   
-    const options = {
+    const { data: response } = await axios({
         method: 'GET',
         url: `http://${process.env['PROMETHEUS_HOST']}/prometheus/api/v1/query?query=vm_blocks_valid`,
-        followRedirects: false,
+        maxRedirects: 0,
         timeout: config.healthCheck.requestTimeout-100,
-        json: true,
-    };
-
-    const response = await rp(options);
+    });
 
     if (response.data.result.length == 0) {
 
@@ -101,15 +98,12 @@ async function getBaggerPending() {
       throw Error('PROMETHEUS_HOST env var is not set - unable to get prometheus data');
     }
     
-    const options = {
+    const { data: response } = await axios({
         method: 'GET',
         url: `http://${process.env['PROMETHEUS_HOST']}/prometheus/api/v1/query?query=vm_bagger_txs`,
-        followRedirects: false,
+        maxRedirects: 0,
         timeout: config.healthCheck.requestTimeout-100,
-        json: true,
-    };
-
-    const response = await rp(options);
+    });
     if (response.data.result.length == 0) {
         winston.warn(`Metrics will only be generated after the initiation of the first transaction`);
         return 0;

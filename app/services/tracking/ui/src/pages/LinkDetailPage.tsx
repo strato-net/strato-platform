@@ -51,10 +51,19 @@ const ExternalTxCell = ({ bridge }: { bridge: BridgeInItem }) => {
   );
 };
 
-const StatTile = ({ label, value }: { label: string; value: string | number }) => (
+const StatTile = ({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+}) => (
   <div className="rounded-lg border border-border p-4">
     <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
     <div className="mt-1 text-xl font-semibold">{value}</div>
+    {sub && <div className="mt-1 text-xs text-muted-foreground">{sub}</div>}
   </div>
 );
 
@@ -155,7 +164,11 @@ const LinkDetailPage = () => {
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                <StatTile label="Opens" value={link.data.opens} />
+                <StatTile
+                  label="Opens"
+                  value={link.data.opens}
+                  sub={`${link.data.engagedOpens} engaged · ${link.data.botOpens} filtered as bot/preview`}
+                />
                 <StatTile label="Wallets" value={link.data.wallets} />
                 <StatTile label="Bridged" value={link.data.bridgedWallets} />
                 <StatTile label="Bridge value" value={formatUsd(link.data.bridgeValueUsd)} />
@@ -183,14 +196,14 @@ const LinkDetailPage = () => {
 
           <Card
             title="Visitor locations"
-            subtitle="Where this link was opened (excluding bots and previews)."
+            subtitle="Where this link was opened (excluding bots and previews). Scroll or drag to zoom and pan, use the slider to pick a time range, and click a dot for the visitor's timeline."
           >
             {link.data.geoPoints.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No location data yet — locations are recorded when the link is opened.
               </p>
             ) : (
-              <WorldMap points={link.data.geoPoints} />
+              <WorldMap points={link.data.geoPoints} truncated={link.data.geoTruncated} />
             )}
           </Card>
 

@@ -12,6 +12,16 @@ export const DEFAULT_DESTINATION = process.env.TRACKING_DEFAULT_DESTINATION || "
 export const BROWSER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 export const BOT_UA = "curl/8.6.0";
+// Mobile in-app browser (WhatsApp webview): carries an ambiguous token but is
+// a real, JS-running browser — must be counted as a visitor.
+export const IN_APP_BROWSER_UA =
+  "Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 WhatsApp/2.24.6.78 A";
+// The link-preview fetcher of the same app: no browser engine in the UA
+export const PREVIEW_UA = "WhatsApp/2.23.20.0 A";
+
+// Random public (documentation-range) IP so same-IP tests never collide
+export const testIp = (): string =>
+  `198.51.${crypto.randomInt(1, 254)}.${crypto.randomInt(1, 254)}`;
 
 export const db = new Pool({
   host: process.env.PGHOST || "localhost",
@@ -78,11 +88,13 @@ export const createLink = async (
 };
 
 // Opens the link as a browser and returns the session cookie value.
+// `headers` adds request headers (e.g. X-Forwarded-For for the same-IP tests).
 export const openLink = async (
   slug: string,
-  userAgent: string = BROWSER_UA
+  userAgent: string = BROWSER_UA,
+  headers: Record<string, string> = {}
 ): Promise<{ res: Response; cookie: string | null; sessionId: string | null }> => {
-  const res = await api(`/t/${slug}`, { headers: { "User-Agent": userAgent } });
+  const res = await api(`/t/${slug}`, { headers: { "User-Agent": userAgent, ...headers } });
   const setCookie = res.headers.getSetCookie().find((c) => c.startsWith("strato_tid="));
   const cookie = setCookie ? setCookie.split(";")[0] : null;
   return { res, cookie, sessionId: cookie ? cookie.split("=")[1] : null };
@@ -102,6 +114,25 @@ export const seedCirrus = async (table: string, rows: object[], replace = false)
 
 export const resetCirrus = async (): Promise<void> => {
   await fetch(`${MOCKS_URL}/__test/cirrus`, { method: "DELETE" });
+};
+
+// Origin-chain transactions served by the Etherscan V2 look-alike (the
+// service reads them for the user timeline when an API key is configured)
+export const seedEtherscan = async (
+  chainId: number,
+  address: string,
+  rows: object[]
+): Promise<void> => {
+  const res = await fetch(`${MOCKS_URL}/__test/etherscan/${chainId}/${cirrusAddress(address)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(rows),
+  });
+  if (!res.ok) throw new Error(`seedEtherscan failed: ${res.status}`);
+};
+
+export const resetEtherscan = async (): Promise<void> => {
+  await fetch(`${MOCKS_URL}/__test/etherscan`, { method: "DELETE" });
 };
 
 // The service answers /health before the DB and JWKS are initialized, so

@@ -10,11 +10,21 @@ export interface LiquidationAlertState {
   message: string;
 }
 
-const RISK_THRESHOLDS = {
+export const RISK_THRESHOLDS = {
   CRITICAL: 1.0,
   HIGH: 1.2,
   MEDIUM: 1.5,
 } as const;
+
+// Shared risk-level bucketing so lending-pool and CDP alerts stay in sync.
+// Health factor is normalized so that 1.0 == liquidation point for both.
+export const categorizeRiskLevel = (healthFactor: number | null): RiskLevel => {
+  if (healthFactor === null) return 'safe';
+  if (healthFactor < RISK_THRESHOLDS.CRITICAL) return 'critical';
+  if (healthFactor < RISK_THRESHOLDS.HIGH) return 'high';
+  if (healthFactor < RISK_THRESHOLDS.MEDIUM) return 'medium';
+  return 'safe';
+};
 
 export const useLiquidationAlert = (): LiquidationAlertState => {
   const { loans } = useLendingContext();
@@ -27,13 +37,10 @@ export const useLiquidationAlert = (): LiquidationAlertState => {
     return typeof hf === 'number' && isFinite(hf) ? hf : null;
   }, [loans]);
 
-  const riskLevel = useMemo((): RiskLevel => {
-    if (currentHealthFactor === null) return 'safe';
-    if (currentHealthFactor < RISK_THRESHOLDS.CRITICAL) return 'critical';
-    if (currentHealthFactor < RISK_THRESHOLDS.HIGH) return 'high';
-    if (currentHealthFactor < RISK_THRESHOLDS.MEDIUM) return 'medium';
-    return 'safe';
-  }, [currentHealthFactor]);
+  const riskLevel = useMemo(
+    (): RiskLevel => categorizeRiskLevel(currentHealthFactor),
+    [currentHealthFactor]
+  );
 
   const message = useMemo(() => {
     if (currentHealthFactor === null) return '';
