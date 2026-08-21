@@ -27,7 +27,7 @@ upquarkNetworkID :: Integer
 upquarkNetworkID = 33056204878082667
 
 heliumReceiptsRootForkBlock :: Integer
-heliumReceiptsRootForkBlock = 250000
+heliumReceiptsRootForkBlock = 240000
 
 upquarkReceiptsRootForkBlock :: Integer
 upquarkReceiptsRootForkBlock = 250000

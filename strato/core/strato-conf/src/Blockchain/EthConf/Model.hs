@@ -246,7 +246,7 @@ stakingNotScheduled = 2 ^ (62 :: Int)
 defaultStakingActivationBlock :: String -> Maybe Integer
 defaultStakingActivationBlock net
   | net `elem` ["upquark", "lithium", "mercata", "mercata-hydrogen", "uranium"] = Just stakingNotScheduled
-  | take 6 net == "helium" = Just 250000
+  | take 6 net == "helium" = Just 240000
   | otherwise = Nothing
 
 -- | Is stake-weighted proposer selection in force at the given block number?
