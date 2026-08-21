@@ -4,7 +4,7 @@ import { useTheme } from 'next-themes';
 import { LogOutIcon, Copy, ChevronLeft } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { useAccount, useDisconnect } from 'wagmi';
+import { useDisconnect } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
@@ -23,10 +23,9 @@ interface DashboardHeaderProps {
 const GRADIENT_BUTTON_CLASS = "w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90";
 
 const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
-  const { userAddress, userName, logout, isLoggedIn } = useUser();
+  const { userAddress, userName, logout, isLoggedIn, externalEvmWalletAddress, isExternalEvmWalletConnected } = useUser();
   const { isTestnet } = useNetwork();
   const { resolvedTheme } = useTheme();
-  const { address: walletAddress, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -144,7 +143,7 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
               </div>
             </PopoverContent>
           </Popover>
-        ) : isConnected ? (
+        ) : isLoggedIn && isExternalEvmWalletConnected ? (
           <Popover>
             <PopoverTrigger asChild>
               <button className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-[#f6851b] flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity">
@@ -161,8 +160,8 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">External Wallet</p>
                     <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-muted-foreground font-mono">
-                      <span className="truncate">{truncateAddress(walletAddress, 8, 4)}</span>
-                      <button onClick={() => copyAddress(walletAddress, 'Wallet')} className="hover:text-foreground shrink-0">
+                      <span className="truncate">{truncateAddress(externalEvmWalletAddress, 8, 4)}</span>
+                      <button onClick={() => copyAddress(externalEvmWalletAddress, 'Wallet')} className="hover:text-foreground shrink-0">
                         <Copy size={10} />
                       </button>
                     </div>

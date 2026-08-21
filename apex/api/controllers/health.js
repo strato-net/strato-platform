@@ -1,7 +1,7 @@
 const BlockDataRef = require("../models/strato/eth/blockDataRef");
 const Peer = require("../models/strato/eth/peer");
 const winston = require("winston-color");
-const rp = require("request-promise");
+const axios = require("axios");
 const config = require("../config/app.config");
 
 const utils = require("../lib/utils");
@@ -19,7 +19,7 @@ module.exports = {
   nodeStatus: async function (req, res, next) {
     try {
       //get node's block number, best block hash, best block parent hash
-      const [lastBlock, bestBlockNumber, activePeersCount] = await Promise.all([
+      const [lastBlock, bestBlockNumber, activePeerCount, validators] = await Promise.all([
         BlockDataRef.findOne({
           where: {
             pow_verified: true,
@@ -50,6 +50,13 @@ module.exports = {
           },
         }).catch((err) => {
           winston.warn(`Unable to fetch active peers count: ${err.message}`);
+          return null;
+        }),
+        // Current validator list, sourced from the same place as the
+        // /eth/v1.2/metadata endpoint: the BestSequencedBlock entry in Redis.
+        // Falls back to null so /status remains usable.
+        redisBlockDB.getValidators().catch((err) => {
+          winston.warn(`Unable to fetch validators: ${err.message}`);
           return null;
         }),
       ]);
@@ -113,7 +120,8 @@ module.exports = {
         version: process.env.STRATO_VERSION,
         timestamp: new Date().toISOString(),
         nodeAddress,
-        activePeersCount,
+        activePeerCount,
+        validators,
         lastBlock: {
           number: bestBlockNumber !== null ? bestBlockNumber : lastBlock.number,
           hash: lastBlock.hash,
@@ -138,7 +146,7 @@ module.exports = {
         bestBlockNumber,
         pbftData,
         nodeAddress,
-        activePeersCount,
+        activePeerCount,
       ] = await Promise.all([
         utils.getLatestHealth(),
         BlockDataRef.findOne({
@@ -190,7 +198,7 @@ module.exports = {
         version: process.env.STRATO_VERSION,
         timestamp: new Date().toISOString(),
         nodeAddress,
-        activePeersCount,
+        activePeerCount,
         lastBlock: {
           number: bestBlockNumber !== null ? bestBlockNumber : lastBlock.number,
           hash: lastBlock.hash,
@@ -224,12 +232,11 @@ async function getNodeAddress() {
         "PROMETHEUS_HOST env var is not set - unable to get prometheus data"
       );
     }
-    const resp = await rp({
+    const { data: resp } = await axios({
       method: "GET",
       url: `http://${process.env["PROMETHEUS_HOST"]}/prometheus/api/v1/query?query=pbft_node_identity`,
-      followRedirects: false,
+      maxRedirects: 0,
       timeout: config.healthCheck.requestTimeout - 100,
-      json: true,
     });
     return findNodeAddress(resp);
   } catch (err) {
@@ -258,14 +265,12 @@ function getPbftData() {
       "PROMETHEUS_HOST env var is not set - unable to get prometheus data"
     );
   }
-  const options = {
+  return axios({
     method: "GET",
     url: `http://${process.env["PROMETHEUS_HOST"]}/prometheus/api/v1/query?query=pbft_current_view`,
-    followRedirects: false,
+    maxRedirects: 0,
     timeout: config.healthCheck.requestTimeout - 100,
-    json: true,
-  };
-  return rp(options);
+  }).then((res) => res.data);
 }
 
 function findView(obj) {

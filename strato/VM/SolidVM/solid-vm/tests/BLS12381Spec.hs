@@ -40,6 +40,8 @@ import Blockchain.SolidVM.Builtins
     hashToCurveG2,
     mapFpToG1,
   )
+import Blockchain.VM.SolidException (SolidException (..))
+import Control.Exception (evaluate)
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BC
 import Data.Curve.Weierstrass (add, dbl)
@@ -122,6 +124,7 @@ subgroupOrder =
 
 spec :: Spec
 spec = do
+  validationSpec
   describe "bls12381G1Add" $ do
     it "rejects wrong-length input" $
       bls12381G1Add (B.replicate 100 0) `shouldSatisfy` isLeft
@@ -548,6 +551,88 @@ fp2Coords e = case toList e of
 
 -- Pull the (x, y) pair back out of an EIP-2537 G1 byte string for
 -- cross-checking against the *Ints output.
+-- | Input validation required by EIP-2537 and by soundness: canonical
+--   field elements, on-curve points, and -- critically -- subgroup
+--   membership. Both BLS12-381 groups have large cofactors (G1's is
+--   ~2^126, G2's ~2^509), so an on-curve point is very far from being a
+--   subgroup element. Feeding a non-subgroup point to a pairing check can
+--   satisfy a verifier's equation with a forged aggregate signature or
+--   KZG opening, so these rejections are load-bearing.
+--
+--   Non-subgroup vectors generated with py_ecc (see
+--   scratchpad/gen_bls_nonsubgroup.py).
+validationSpec :: Spec
+validationSpec = do
+  let pInt = 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab
+      -- on curve (y^2 = x^3 + 4), not in the r-order subgroup
+      g1BadX = 4
+      g1BadY = 1630892974828014537729259858097113969650871260980656934049590190201941782487224876496582135785777461178964897591404
+      g1Bad = encodeFp g1BadX <> encodeFp g1BadY
+      -- on the twist (y^2 = x^3 + 4(1+u)), not in the r-order subgroup
+      g2BadXc0 = 1
+      g2BadXc1 = 1
+      g2BadYc0 = 3690720871793337241455685075743049883097434000553861439128973496444191283866836383567731089800858963424329464681674
+      g2BadYc1 = 122693191027751655510194168700308213538794246775313976814212532628791625595109057816964505439501482194282347419502
+      g2Bad = encodeFp2 (g2BadXc0, g2BadXc1) <> encodeFp2 (g2BadYc0, g2BadYc1)
+      isLeft = either (const True) (const False)
+
+  describe "F_p canonicity" $ do
+    it "accepts p - 1 as a coordinate value" $
+      -- not on the curve, but it must fail the curve check, not the range check
+      bls12381G1Add (encodeFp (pInt - 1) <> encodeFp 1 <> encodeG1 g1Gen)
+        `shouldSatisfy` either (== "G1 point is not on the curve") (const False)
+    it "rejects p itself (non-canonical, still fits the 48-byte window)" $
+      bls12381G1Add (encodeFp pInt <> encodeFp 1 <> encodeG1 g1Gen)
+        `shouldSatisfy` either (== "F_p element is not canonical (must be < p)") (const False)
+    it "rejects p + 1" $
+      bls12381G1Add (encodeFp (pInt + 1) <> encodeFp 1 <> encodeG1 g1Gen) `shouldSatisfy` isLeft
+
+  describe "G1 subgroup checks" $ do
+    it "the test vector really is on the curve" $
+      -- guards the vector itself: if this ever fails, the rejections below
+      -- would be passing for the wrong reason
+      (g1BadY * g1BadY - g1BadX * g1BadX * g1BadX - 4) `mod` pInt `shouldBe` 0
+    it "G1Add rejects a non-subgroup point" $
+      bls12381G1Add (g1Bad <> encodeG1 g1Gen)
+        `shouldSatisfy` either (== "G1 point is not in the r-order subgroup") (const False)
+    it "G1Msm rejects a non-subgroup point" $
+      bls12381G1Msm (g1Bad <> encodeScalar 1) `shouldSatisfy` isLeft
+    it "Pairing rejects a non-subgroup G1 point" $
+      bls12381Pairing (g1Bad <> encodeG2 g2Gen) `shouldSatisfy` isLeft
+    it "still accepts the generator" $
+      bls12381G1Add (encodeG1 g1Gen <> encodeG1 g1Gen) `shouldSatisfy` either (const False) (const True)
+
+  describe "G2 subgroup checks" $ do
+    it "G2Add rejects a non-subgroup point" $
+      bls12381G2Add (g2Bad <> encodeG2 g2Gen)
+        `shouldSatisfy` either (== "G2 point is not in the r-order subgroup") (const False)
+    it "G2Msm rejects a non-subgroup point" $
+      bls12381G2Msm (g2Bad <> encodeScalar 1) `shouldSatisfy` isLeft
+    it "Pairing rejects a non-subgroup G2 point" $
+      bls12381Pairing (encodeG1 g1Gen <> g2Bad) `shouldSatisfy` isLeft
+    it "still accepts the generator" $
+      bls12381G2Add (encodeG2 g2Gen <> encodeG2 g2Gen) `shouldSatisfy` either (const False) (const True)
+
+  describe "integer-tuple variants enforce the same rules" $ do
+    let throwsInvalid :: IO a -> Expectation
+        throwsInvalid act = act `shouldThrow` \e -> case e of
+          InvalidArguments _ _ -> True
+          _ -> False
+    it "G1AddInts rejects a non-subgroup point" $
+      throwsInvalid . evaluate $ bls12381G1AddInts (g1BadX, g1BadY) (0, 0)
+    it "G1AddInts rejects an off-curve point" $
+      throwsInvalid . evaluate $ bls12381G1AddInts (1, 3) (0, 0)
+    it "G1AddInts rejects a coordinate >= p" $
+      throwsInvalid . evaluate $ bls12381G1AddInts (pInt, 1) (0, 0)
+    it "G1MsmInts rejects a non-subgroup point" $
+      throwsInvalid . evaluate $ bls12381G1MsmInts [(g1BadX, g1BadY, 1)]
+    it "G2AddInts rejects a non-subgroup point" $
+      throwsInvalid . evaluate $
+        bls12381G2AddInts ((g2BadXc0, g2BadXc1), (g2BadYc0, g2BadYc1)) ((0, 0), (0, 0))
+    it "PairingInts rejects a non-subgroup G2 point" $
+      throwsInvalid . evaluate $
+        bls12381PairingInts [((1, 2), ((g2BadXc0, g2BadXc1), (g2BadYc0, g2BadYc1)))]
+
 decodeG1Bytes :: B.ByteString -> (Integer, Integer)
 decodeG1Bytes bs
   | B.length bs /= g1Size || B.all (== 0) bs = (0, 0)

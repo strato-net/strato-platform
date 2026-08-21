@@ -13,17 +13,6 @@ export function validatePoolAddressArgs(args: any) {
   }
 }
 
-export function validateTokenAddressArgs(args: any) {
-  const schema = Joi.object({
-    tokenAddress: validateAddressField("tokenAddress"),
-  });
-
-  const { error } = schema.validate(args);
-  if (error) {
-    throw new Error("Token Address Argument Validation Error:" + error.message);
-  }
-}
-
 export function validateTokenPairArgs(args: any) {
   const schema = Joi.object({
     tokenAddress1: validateAddressField("tokenAddress1"),
@@ -98,20 +87,6 @@ export function validateSwapArgs(args: any) {
   }
 }
 
-export function validateCalculateSwapArgs(args: any) {
-  const schema = Joi.object({
-    poolAddress: validateAddressField("poolAddress"),
-    isAToB: Joi.string().valid("true", "false").required(),
-    amountIn: numericStringField("AmountIn"),
-    reverse: Joi.string().valid("true", "false").optional(),
-  });
-
-  const { error } = schema.validate(args);
-  if (error) {
-    throw new Error("Calculate Swap Argument Validation Error: " + error.message);
-  }
-}
-
 export function validateQueryParams(query: any) {
   const schema = Joi.object().pattern(Joi.string(), Joi.string());
 
@@ -153,21 +128,6 @@ export function validateToggleDisableArgs(args: any) {
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Toggle Disable Argument Validation Error: " + error.message);
-  }
-}
-
-export function validateMultiTokenSwapArgs(args: any) {
-  const schema = Joi.object({
-    poolAddress: validateAddressField("poolAddress"),
-    tokenIn: validateAddressField("tokenIn"),
-    tokenOut: validateAddressField("tokenOut"),
-    amountIn: numericStringField("AmountIn"),
-    minAmountOut: numericStringField("MinAmountOut"),
-  });
-
-  const { error } = schema.validate(args);
-  if (error) {
-    throw new Error("Multi-Token Swap Argument Validation Error: " + error.message);
   }
 }
 

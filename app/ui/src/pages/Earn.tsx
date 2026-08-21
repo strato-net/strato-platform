@@ -77,6 +77,7 @@ const formatYieldVaultPositionUsd = (
     userShares?: string;
     redeemableAssets?: string;
     positionUsd?: string;
+    projectedPositionUsd?: string;
     assetPriceWad?: string;
   } | null | undefined,
   vData: { deployed?: boolean } | null | undefined
@@ -85,10 +86,11 @@ const formatYieldVaultPositionUsd = (
   const shares = safeBigInt(uData?.userShares);
   if (shares <= 0n) return `$${formatUsd("0")}`;
   const price = safeBigInt(uData?.assetPriceWad);
-  const pos = safeBigInt(uData?.positionUsd ?? "0");
+  const positionUsd = uData?.projectedPositionUsd || uData?.positionUsd || "0";
+  const pos = safeBigInt(positionUsd);
   const redeemable = safeBigInt(uData?.redeemableAssets ?? "0");
   if (redeemable > 0n && price <= 0n && pos <= 0n) return "--";
-  return `$${formatUsd(uData?.positionUsd || "0")}`;
+  return `$${formatUsd(positionUsd)}`;
 };
 
 const formatTokenAmount = (value: string): string => {
@@ -160,10 +162,10 @@ const formatCarryVaultApyDisplayForLive = (
 const YIELD_VAULTS = [
   {
     key: "eth-carry",
-    name: "ETH Carry Vault",
-    subtitle: "ERC-4626 carry vault for ETH deposits",
+    name: "ETH Yield Vault",
+    subtitle: "Earn ETH yield and Reward Points",
     asset: "ETH",
-    badge: "Carry Vault",
+    badge: "Yield Vault",
     iconBg: "bg-indigo-500/15 dark:bg-indigo-400/15",
     iconColor: "text-indigo-600 dark:text-indigo-400",
   },
@@ -184,6 +186,24 @@ const YIELD_VAULTS = [
     badge: "Yield Vault",
     iconBg: "bg-emerald-500/15 dark:bg-emerald-400/15",
     iconColor: "text-emerald-600 dark:text-emerald-400",
+  },
+  {
+    key: "goldst-yield",
+    name: "GOLDST Yield Vault",
+    subtitle: "Deposit GOLDST and earn Reward Points",
+    asset: "GOLDST",
+    badge: "Yield Vault",
+    iconBg: "bg-amber-500/15 dark:bg-amber-400/15",
+    iconColor: "text-amber-600 dark:text-amber-400",
+  },
+  {
+    key: "silvst-yield",
+    name: "SILVST Yield Vault",
+    subtitle: "Deposit SILVST and earn Reward Points",
+    asset: "SILVST",
+    badge: "Yield Vault",
+    iconBg: "bg-slate-500/15 dark:bg-slate-400/15",
+    iconColor: "text-slate-600 dark:text-slate-400",
   },
 ] as const;
 

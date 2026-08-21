@@ -42,7 +42,7 @@ import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Core.API
-import Data.Aeson
+import Data.Aeson ()
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.Cache as Cache
@@ -187,13 +187,17 @@ main = do
       nonceCounterTimeout = 10
 
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
+  simCounter <- newTVarIO 0
 
   let env =
         BlocEnv
           { Bloc.Monad.txSizeLimit = Conf.txSizeLimit (networkConfig ethConf),
             Bloc.Monad.gasLimit = Conf.gasLimit (networkConfig ethConf),
             Bloc.Monad.stateFetchLimit = stateFetchLimit',
-            Bloc.Monad.globalNonceCounter = nonceCache
+            Bloc.Monad.globalNonceCounter = nonceCache,
+            Bloc.Monad.vmJsonRpcUrl = Conf.vmJsonRpcUrl (Conf.vmConfig ethConf),
+            Bloc.Monad.simInFlight = simCounter,
+            Bloc.Monad.simMaxConcurrent = Conf.simMaxConcurrent (Conf.vmConfig ethConf)
           }
   let bindHost' = Conf.apiListenAddress (Conf.apiConfig ethConf)
       bindPort = Conf.apiPort (Conf.apiConfig ethConf)
@@ -288,10 +292,5 @@ addOperationIds swagger = swagger & OPENAPI.paths %~ H.mapWithKey addIdsToPathIt
 
 instance HasOpenApi a => HasOpenApi (MultipartForm Mem (MultipartData Mem) :> a) where
   toOpenApi _ = toOpenApi (Proxy :: Proxy a)
-
-instance ToSchema Value where
-  declareNamedSchema _ =
-    return $
-      NamedSchema (Just "JSON Value") mempty
 
 -----------

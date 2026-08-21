@@ -1,10 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getAdmin, isUserAdmin, addAdmin, removeAdmin, castVoteOnIssue, castVoteOnIssueById, dismissIssue, getOpenIssues,
+import { getAdmin, isUserAdmin, addAdmin, removeAdmin, createIssue, castVoteOnIssueById, simulateCastVoteOnIssue, dismissIssue, getOpenIssues,
          getExecutedIssues, contractSearch, getContractDetails,
  } from "../services/user.service";
 import { validateUserAddress, validateAddressField } from "../validators/common.validators";
-import { validateExecutedIssuesQuery } from "../validators/user.validator";
+import { validateIssuesQuery } from "../validators/user.validator";
 
 class UserController {
   static async me(
@@ -86,7 +86,7 @@ class UserController {
     }
   }
 
-  static async castVoteOnIssue(
+  static async createIssue(
     req: Request,
     res: Response,
     next: NextFunction
@@ -95,16 +95,38 @@ class UserController {
       const { accessToken, address: actorAddress } = req;
       const { target, func, args } = req.body;
       validateAddressField(target);
-      
-      const result = await castVoteOnIssue(accessToken, actorAddress as string, target, func, args);
-      res.status(RestStatus.OK).json({ 
-        message: "Vote cast successfully", 
+
+      const result = await createIssue(accessToken, actorAddress as string, target, func, args);
+      res.status(RestStatus.OK).json({
+        message: result.governed
+          ? "Issue created successfully"
+          : "Function executed directly: no issue was created and no vote was recorded",
         target,
         func,
         args,
         status: result.status,
         hash: result.hash,
+        issueId: result.issueId,
+        governed: result.governed,
       });
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  static async simulateCastVoteOnIssue(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: actorAddress } = req;
+      const { target, func, args } = req.body;
+      validateAddressField(target);
+
+      const result = await simulateCastVoteOnIssue(accessToken, actorAddress as string, target, func, args);
+      res.status(RestStatus.OK).json(result);
       next();
     } catch (e) {
       next(e);
@@ -121,11 +143,14 @@ class UserController {
       const { issueId } = req.body;
       
       const result = await castVoteOnIssueById(accessToken, actorAddress as string, issueId);
-      res.status(RestStatus.OK).json({ 
-        message: "Vote cast successfully", 
+      res.status(RestStatus.OK).json({
+        message: result.votedVia === "registry"
+          ? "Vote cast successfully by voting through the registry: the issue's recorded arguments could not be replayed directly"
+          : "Vote cast successfully",
         issueId,
         status: result.status,
         hash: result.hash,
+        votedVia: result.votedVia,
       });
       next();
     } catch (e) {
@@ -162,7 +187,10 @@ class UserController {
   ): Promise<void> {
     try {
       const { accessToken } = req;
-      const issues = await getOpenIssues(accessToken);
+      validateIssuesQuery(req.query);
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
+      const issues = await getOpenIssues(accessToken, page, limit);
       res.status(RestStatus.OK).json(issues);
       next();
     } catch (e) {
@@ -177,7 +205,7 @@ class UserController {
   ): Promise<void> {
     try {
       const { accessToken } = req;
-      validateExecutedIssuesQuery(req.query);
+      validateIssuesQuery(req.query);
       const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
       const result = await getExecutedIssues(accessToken, page, limit);

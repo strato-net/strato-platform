@@ -22,19 +22,6 @@ export const BRIDGE_MODE_LABELS = {
   },
 } as const;
 
-export const BRIDGE_IN_MODE_LABELS = {
-  "easy-savings": {
-    title: "Easy Savings",
-    description: "Access high saving rates by converting stablecoins to USDST and lending",
-    amountLabel: "Amount",
-  },
-  "bridge": {
-    title: "Bridge In Your Tokens",
-    description: "Bridge your tokens from external networks to STRATO",
-    amountLabel: "Amount",
-  },
-} as const;
-
 // Contract ABIs
 export const ERC20_ABI = [
   {
@@ -96,6 +83,24 @@ export const DEPOSIT_ROUTER_ABI = [
       { name: 'signature', type: 'bytes' }
     ],
     name: 'deposit',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [
+      { name: 'token', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'stratoAddress', type: 'address' },
+      { name: 'targetStratoToken', type: 'address' },
+      { name: 'action', type: 'uint8' },
+      { name: 'actionToken', type: 'address' },
+      { name: 'minFinalOut', type: 'uint256' },
+      { name: 'nonce', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'signature', type: 'bytes' }
+    ],
+    name: 'depositWithAction',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function'

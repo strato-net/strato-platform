@@ -17,6 +17,9 @@ docker-compose.highway.push.yml
 docker-compose.highway.push.ecr.yml
 docker-compose.highway.yml
 docker-compose.highway.ecr.yml
+docker-compose.tracking.push.yml
+docker-compose.tracking.push.ecr.yml
+docker-compose.tracking.yml
 docker-compose.vault.push.yml
 docker-compose.vault.push.ecr.yml
 ./docker-compose.vault.yml
@@ -33,6 +36,8 @@ strato/haddock
 strato/hpc
 *~
 bridge_image_tag*
+localbuild/
+mercata/
 
 contract_source
 docker-compose.bridge.ecr.yml
@@ -62,7 +67,6 @@ docker-compose.notification.yml
 docker-compose.oracle.ecr.yml
 docker-compose.oracle.yml
 
-/app
 /mynode/
 /snapshot-test-node/
 /snapshot-smoke-node/
@@ -137,3 +141,6 @@ __pycache__/
 .docker-built/
 
 app/contracts/.env.happy-eth-withdrawal
+
+# Generated rewards reconciliation state
+reconcile-*-activity-*.snapshot.json

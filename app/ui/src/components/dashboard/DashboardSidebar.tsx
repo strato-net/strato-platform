@@ -17,7 +17,8 @@ import {
   LucideIcon,
   HandCoins,
   Layers,
-  ArrowDownToLine
+  ArrowDownToLine,
+  Compass
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
@@ -40,6 +41,7 @@ const NAV_CATEGORIES: NavCategory[] = [
   {
     items: [
       { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
+      { icon: Compass, label: 'Explore', path: '/dashboard/explore' },
     ],
   },
   {

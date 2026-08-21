@@ -92,6 +92,7 @@ RawTransaction
     value Integer Maybe sqltype=numeric(1000,0)
     txData BS.ByteString Maybe
     txVersion Word8
+    attribution BS.ByteString Maybe
     UniqueTXHash txHash
     deriving Eq Generic Read Show
 

@@ -49,6 +49,16 @@ export const getActivityLink = (activityName: string): string | null => {
     return '/dashboard/earn-yield-vault?vault=usdc-yield';
   }
 
+  // GOLDST Yield Vault
+  if (lowerName.includes('goldst yield vault')) {
+    return '/dashboard/earn-yield-vault?vault=goldst-yield';
+  }
+
+  // SILVST Yield Vault
+  if (lowerName.includes('silvst yield vault')) {
+    return '/dashboard/earn-yield-vault?vault=silvst-yield';
+  }
+
   // Diversified Vault activities - goes to the Advanced page, Vault tab
   if (lowerName.includes('vault')) {
     return '/dashboard/advanced?tab=vault';

@@ -1,9 +1,9 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import {
   Pool, SwapHistoryEntry, SetPoolRatesParams, SwapToken, SwapContextType,
-  PoolV3, PoolV3Quote, PoolV3Position, PoolV3AmountsPreview,
-  PoolV3SwapParams, PoolV3MintParams, PoolV3BurnParams, PoolV3CollectParams,
-  PoolV3LiquidityDistribution,
+  PoolV3, PoolV3Position, PoolV3AmountsPreview,
+  PoolV3MintParams, PoolV3IncreaseParams, PoolV3BurnParams, PoolV3CollectParams,
+  PoolV3LiquidityDistribution, PoolV3CreateParams,
 } from '@/interface';
 import {api} from '@/lib/axios';
 
@@ -42,10 +42,6 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const [toAsset, setToAsset] = useState<SwapToken | undefined>();
   const [pool, setPool] = useState<Pool | null>(null);
 
-  // V3 (concentrated liquidity) state
-  const [swapVenue, setSwapVenue] = useState<'v2' | 'v3'>('v2');
-  const [v3PairPools, setV3PairPools] = useState<PoolV3[]>([]);
-  
   // Swap history
   const [swapHistory, setSwapHistory] = useState<SwapHistoryEntry[]>([]);
   const [swapHistoryCount, setSwapHistoryCount] = useState(0);
@@ -85,7 +81,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     setTokensLoading(true);
     setError(null);
     try {
-      const res = await api.get<SwapToken[]>('/swap-pools/tokens');
+      const res = await api.get<SwapToken[]>('/trade/tokens');
       setSwappableTokens(res.data || []);
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch swappable tokens');
@@ -100,7 +96,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     setPairablesLoading(true);
     setError(null);
     try {
-      const res = await api.get<SwapToken[]>(`/swap-pools/tokens/${tokenAddress}`);
+      const res = await api.get<SwapToken[]>(`/trade/tokens/${tokenAddress}/pairs`);
       const tokens = res.data || [];
       setPairableTokens(tokens);
       return tokens;
@@ -319,22 +315,6 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // Multi-token pool operations
-  const swapMultiToken = useCallback(async (data: {
-    poolAddress: string;
-    tokenIn: string;
-    tokenOut: string;
-    amountIn: string;
-    minAmountOut: string;
-  }) => {
-    setLoading(true);
-    try {
-      const res = await api.post("/swap/multi-token", data);
-      return res.data;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   const addLiquidityMultiToken = useCallback(async (data: {
     poolAddress: string;
     amounts: string[];
@@ -417,16 +397,12 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   // V3 (CONCENTRATED LIQUIDITY) OPERATIONS
   // ============================================================================
 
-  const getV3PoolsByPair = useCallback(async (tokenA: string, tokenB: string, signal?: AbortSignal): Promise<PoolV3[]> => {
+  const createV3Pool = useCallback(async (data: PoolV3CreateParams) => {
+    setLoading(true);
     try {
-      const { data } = await api.get<PoolV3[]>(`/poolv3/pools/pair/${tokenA}/${tokenB}`, { signal });
-      const list = data || [];
-      setV3PairPools(list);
-      return list;
-    } catch (err) {
-      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
-      setV3PairPools([]);
-      return [];
+      await api.post('/poolv3/pools', data);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -463,34 +439,6 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     } catch (err) {
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
       return null;
-    }
-  }, []);
-
-  const quoteV3 = useCallback(async (
-    poolAddress: string,
-    zeroForOne: boolean,
-    amountSpecified: string,
-    signal?: AbortSignal
-  ): Promise<PoolV3Quote | null> => {
-    try {
-      const { data } = await api.get<PoolV3Quote>('/poolv3/quote', {
-        params: { poolAddress, zeroForOne: String(zeroForOne), amountSpecified },
-        signal,
-      });
-      return data || null;
-    } catch (err) {
-      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
-      return null;
-    }
-  }, []);
-
-  const swapV3 = useCallback(async (data: PoolV3SwapParams) => {
-    setLoading(true);
-    try {
-      const res = await api.post('/poolv3/swap', data);
-      return res.data;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -535,6 +483,16 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const increaseV3 = useCallback(async (data: PoolV3IncreaseParams) => {
+    setLoading(true);
+    try {
+      const res = await api.post('/poolv3/positions/increase', data);
+      return res.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const burnV3 = useCallback(async (data: PoolV3BurnParams) => {
     setLoading(true);
     try {
@@ -558,13 +516,10 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   // History operations
   const refreshSwapHistory = useCallback(
     async (params?: Record<string, string>) => {
-      // Pair history covers both venues at once (V2 pools + every V3 fee tier, each
-      // row tagged with its pool); the per-pool endpoint remains as a fallback for
-      // callers that only set `pool` (e.g. FixedSwapWidget). The endpoint string
-      // doubles as the staleness key for the in-flight request.
-      const endpoint = fromAsset?.address && toAsset?.address
-        ? `/swap-history/pair/${fromAsset.address}/${toAsset.address}`
-        : (pool?.address ? `/swap-history/${pool.address}` : null);
+      // Per-pool history for callers that set `pool` (e.g. FixedSwapWidget); the
+      // Trade page's pair-wide history lives in useTradeHistory. The endpoint
+      // string doubles as the staleness key for the in-flight request.
+      const endpoint = pool?.address ? `/swap-history/${pool.address}` : null;
       if (!endpoint) return;
 
       historyAbortControllerRef.current?.abort();
@@ -596,7 +551,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     },
-    [pool?.address, fromAsset?.address, toAsset?.address]
+    [pool?.address]
   );
 
   // ============================================================================
@@ -631,7 +586,6 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         addLiquidityDualToken,
         addLiquiditySingleToken,
         removeLiquidity,
-        swapMultiToken,
         addLiquidityMultiToken,
         removeLiquidityMultiToken,
         removeLiquidityMultiTokenOneCoin,
@@ -647,18 +601,14 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         toggleDisable,
         pools,
         // V3 (concentrated liquidity)
-        swapVenue,
-        setSwapVenue,
-        v3PairPools,
-        getV3PoolsByPair,
+        createV3Pool,
         fetchV3Pools,
         getV3PoolByAddress,
         getV3LiquidityDistribution,
-        quoteV3,
-        swapV3,
         fetchV3Positions,
         getV3AmountsForLiquidity,
         mintV3,
+        increaseV3,
         burnV3,
         collectV3
       }}

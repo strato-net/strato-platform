@@ -23,6 +23,7 @@ module Bloc.Client
     postBlocTransactionParallel,
     postBlocTransactionBody,
     postBlocTransactionUnsigned,
+    postBlocTransactionSimulate,
   )
 where
 
@@ -138,6 +139,14 @@ postBlocTransactionBody ::
   PostBlocTransactionRequest ->
   ClientM [BlocTransactionBodyResult]
 postBlocTransactionBody = client (Proxy @PostBlocTransactionBody)
+
+postBlocTransactionSimulate ::
+  Maybe String ->
+  Maybe Text ->
+  Bool ->
+  PostBlocTransactionRequest ->
+  ClientM [BlocSimulateResult]
+postBlocTransactionSimulate = client (Proxy @PostBlocTransactionSimulate)
 
 postBlocTransactionUnsigned ::
   Maybe String ->

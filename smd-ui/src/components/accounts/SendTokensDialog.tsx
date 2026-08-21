@@ -23,6 +23,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
+import { useSimulation } from "@/components/simulation/useSimulation";
+import { SimulateButton } from "@/components/simulation/SimulateButton";
+import { SimulationResultPanel } from "@/components/simulation/SimulationResultPanel";
 import { useMyTokens } from "@/services/tokens";
 import { useMyUserWallets } from "@/services/userWallets";
 import { AddressInput } from "@/components/AddressInput";
@@ -35,6 +38,7 @@ export function SendTokensDialog({ disabled }: { disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const { userAddress } = useUser();
   const { submit } = useSubmitTransaction();
+  const sim = useSimulation();
 
   // Send-from wallet: "direct" (connected account) or a User wallet contract address.
   // Multisig wallets are excluded — sending from one requires a signer vote, not a
@@ -82,14 +86,15 @@ export function SendTokensDialog({ disabled }: { disabled?: boolean }) {
     setError({});
   };
 
-  const onSubmit = async () => {
+  // Validate inputs and build the transfer payload, or null (with errors set).
+  const buildTransferPayload = (): Record<string, unknown> | null => {
     const errs: { to?: string; amount?: string } = {};
     if (!resolvedTo || !isAddress(`0x${resolvedTo}`)) {
       errs.to = "Enter a valid address or pick a user";
     }
     if (!token) {
       toast.error("Select a token");
-      return;
+      return null;
     }
     let raw = 0n;
     try {
@@ -103,21 +108,33 @@ export function SendTokensDialog({ disabled }: { disabled?: boolean }) {
     }
     if (errs.to || errs.amount) {
       setError(errs);
-      return;
+      return null;
     }
+    return {
+      contractName: token.symbol,
+      contractAddress: token.address,
+      value: 0,
+      method: "transfer",
+      args: { to: resolvedTo, value: raw.toString() },
+      metadata: {},
+    };
+  };
+
+  const simulate = () => {
+    const payload = buildTransferPayload();
+    if (!payload) return;
+    return sim.run("FUNCTION", payload, walletUsername ? { username: walletUsername } : undefined);
+  };
+
+  const onSubmit = async () => {
+    const payload = buildTransferPayload();
+    if (!payload || !token) return;
 
     setPending(true);
     try {
       await submit(
         "FUNCTION",
-        {
-          contractName: token.symbol,
-          contractAddress: token.address,
-          value: 0,
-          method: "transfer",
-          args: { to: resolvedTo, value: raw.toString() },
-          metadata: {},
-        },
+        payload,
         walletUsername ? { username: walletUsername } : undefined
       );
       toast.success(`Sent ${amount} ${token.symbol}`);
@@ -233,8 +250,12 @@ export function SendTokensDialog({ disabled }: { disabled?: boolean }) {
             </div>
             {error.amount ? <p className="text-xs text-destructive">{error.amount}</p> : null}
           </div>
+          <SimulationResultPanel result={sim.result} error={sim.error} />
         </div>
         <DialogFooter>
+          {sim.canSimulate ? (
+            <SimulateButton onClick={simulate} pending={sim.pending} disabled={!token} />
+          ) : null}
           <Button onClick={onSubmit} disabled={pending || !token}>
             {pending ? "Sending…" : "Send"}
           </Button>

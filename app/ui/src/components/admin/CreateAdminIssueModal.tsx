@@ -5,10 +5,15 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plus, X } from 'lucide-react';
+import { Loader2, Plus, X, FlaskConical } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
-import { parseJsonBigInt } from '@/utils/numberUtils';
+import { simulateAdminVote, type SimulationResult } from '@/lib/simulate';
+import SimulationResultPanel from './SimulationResultPanel';
+import {
+  buildValidatedAdminIssueArgs,
+  validateAdminIssueArg,
+} from './adminIssueArgs';
 import * as React from 'react';
 
 type CreateAdminIssueFormValues = {
@@ -33,6 +38,17 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
   const { contractSearch, contractSearchResults, contractSearchResultsLoading,
           getContractDetails, contractDetailsResults, contractDetailsResultsLoading } = useUser();
   const [selectedFunction, setSelectedFunction] = useState('');
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simResult, setSimResult] = useState<SimulationResult | null>(null);
+  const [simError, setSimError] = useState<string>('');
+
+  // Drop any stale simulation when the modal re-opens.
+  useEffect(() => {
+    if (open) {
+      setSimResult(null);
+      setSimError('');
+    }
+  }, [open]);
   const searchObjects = contractSearchResults.reduce((b, a) => {
     if (a['address']) {
       const aa = { ...b[a['address']], ...a } 
@@ -69,65 +85,6 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
     }
   }, [functionArgs?.length, replace]);
 
-  const validateFunctionArg = (_type: object, value: string): [boolean, any?] => {
-    const tag = _type['tag']?.toLocaleLowerCase() || 'string'
-    if (tag === 'int') {
-      const val = value.trim();
-      const valNum = Number(val);
-      
-      if (isNaN(valNum) || !Number.isInteger(valNum)) {
-        return [false, `Invalid integer value: ${value}`];
-      }
-      return [true, val];
-    }
-    if (tag === 'bool') {
-      const b = value.toLocaleLowerCase();
-      if (b === 'true' || b === 'false') {
-        return [true, b === 'true'];
-      } else {
-        return [false, `Invalid boolean value: ${value}`];
-      }
-    }
-    if (tag === 'address') {
-      const lowercase = value.toLocaleLowerCase();
-      const isHex = /^(0x)?[0-9A-Fa-f]{1,40}$/.test(lowercase);
-      if (!isHex) {
-        return [false, `Invalid address: ${value}`];
-      }
-      if (lowercase.substring(0,2) !== '0x') {
-        return [true, `0x${lowercase}`];
-      } else {
-        return [true, lowercase];
-      }
-    }
-    if (tag === 'array') {
-      try {
-        const arr = parseJsonBigInt<any[]>(value, { fallback: null });
-        if (arr === null) {
-          return [false, 'Invalid JSON'];
-        }
-        if (!Array.isArray(arr)) {
-          return [false, 'Invalid array'];
-        }
-        return arr.reduce(([success, prev], val) => {
-          if (success) {
-            const [newSuccess, newVal] = validateFunctionArg(_type['entry'], val);
-            if (newSuccess) {
-              return [newSuccess, [...prev, newVal]];
-            } else {
-              return [newSuccess, newVal];
-            }
-          } else {
-            return [success, prev];
-          }
-        }, [true, []]);
-      } catch (e) {
-        return [false, `Array validation error: ${e instanceof Error ? e.message : String(e)}`];
-      }
-    }
-    return [true, `"${value.trim().replace("\"","\\\"")}"`];
-  }
-
   const getTypeName = (_type: object): string => {
     const tagName = _type['tag']?.toLocaleLowerCase() || 'string'
     if (tagName === 'array') {
@@ -137,20 +94,55 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
     }
   }
 
+  // Validate/coerce the form args to their on-chain form (addresses get a 0x
+  // prefix, ints stay numeric strings, strings get quoted), throwing on the
+  // first bad value. Shared by submit and simulate so both send identical args.
+  const buildValidatedArgs = (values: CreateAdminIssueFormValues): unknown[] =>
+    buildValidatedAdminIssueArgs(values.args, functionArgs);
+
+  const handleSimulate = async () => {
+    const values = form.getValues();
+    const target = values.target.trim();
+    const func = values.func.trim();
+    if (!target || !func) {
+      toast({
+        title: 'Incomplete',
+        description: 'Enter a target contract and function first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    let args: unknown[];
+    try {
+      args = buildValidatedArgs(values);
+    } catch (err) {
+      toast({
+        title: 'Validation Failed',
+        description: err instanceof Error ? err.message : 'Invalid arguments',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsSimulating(true);
+    setSimResult(null);
+    setSimError('');
+    try {
+      const res = await simulateAdminVote({ target, func, args });
+      setSimResult(res);
+    } catch (err) {
+      setSimError(err instanceof Error ? err.message : 'Simulation failed');
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
   const onSubmit = async (values: CreateAdminIssueFormValues) => {
     // Clean up whitespace and empty args
     const trimmedTarget = values.target.trim();
     const trimmedFunc = values.func.trim();
-    
+
     try {
-      const argsArray = values.args
-        .map((a, i) => {
-          const [success, v] = validateFunctionArg(functionArgs[i][1].type || {}, a.value);
-          if (!success) {
-            throw new Error(typeof v === 'string' ? v : 'Invalid argument');
-          }
-          return v;
-        });
+      const argsArray = buildValidatedArgs(values);
 
       // Build payload with JSON-stringified target/func, and a JSON array for args
       const payload = {
@@ -204,7 +196,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
               rules={{
                 required: 'Contract address is required',
                 validate: (v) => {
-                  const [success, w] = validateFunctionArg({tag: 'Address'}, v);
+                  const [success, w] = validateAdminIssueArg({tag: 'Address'}, v);
                   return success ? true : (typeof w === 'string' ? w : 'Invalid address');
                 },
               }}
@@ -300,9 +292,9 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
                       control={form.control}
                       name={`args.${idx}.value`}
                       rules={{
-                        required: 'Argument is required',
+                        required: abiTypeName === 'string' ? false : 'Argument is required',
                         validate: (v) => {
-                          const [success, w] = validateFunctionArg(abiType, v);
+                          const [success, w] = validateAdminIssueArg(abiType, v);
                           return success ? true : (typeof w === 'string' ? w : 'Invalid argument');
                         },
                         // add per-type validation here if desired (e.g., address, uint, etc.)
@@ -328,8 +320,24 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
               </div>
             </div>
 
+            {simResult || simError ? (
+              <SimulationResultPanel result={simResult} error={simError} title="Proposal tx" />
+            ) : null}
+
             {/* Actions */}
             <div className="flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSimulate}
+                disabled={isSimulating || isSubmitting}
+              >
+                {isSimulating ? (
+                  <> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Simulating… </>
+                ) : (
+                  <> <FlaskConical className="mr-2 h-4 w-4" /> Simulate </>
+                )}
+              </Button>
               <Button
                 type="button"
                 variant="outline"

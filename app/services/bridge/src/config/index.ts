@@ -1,3 +1,5 @@
+import { id } from "ethers";
+
 // Constants
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 export const STRATO_DECIMALS = 18;
@@ -7,9 +9,16 @@ export const ERC20_ABI = [
   "function transfer(address to, uint256 amount) public returns (bool)",
 ];
 
-// DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId)
-export const DEPOSIT_EVENT_SIGNATURE =
-  "0x55426533b384af6fcfee0e834a6407e3ffc370a0b1b53400c4e6ec92d7f1f750";
+export const STANDARD_DEPOSIT_EVENT_SIGNATURE = id(
+  "DepositRouted(address,uint256,address,address,address,uint96)",
+);
+export const ACTION_DEPOSIT_EVENT_SIGNATURE = id(
+  "DepositRoutedWithAction(address,uint256,address,address,address,uint96,uint8,address,uint256)",
+);
+export const DEPOSIT_EVENT_SIGNATURES = [
+  STANDARD_DEPOSIT_EVENT_SIGNATURE,
+  ACTION_DEPOSIT_EVENT_SIGNATURE,
+];
 
 // RedemptionRequested(address indexed representationToken, uint256 amount, address indexed sender, address indexed stratoRecipient, uint96 redemptionId)
 export const NATIVE_REDEMPTION_EVENT_SIGNATURE =

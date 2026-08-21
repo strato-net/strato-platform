@@ -34,6 +34,7 @@ app.post("/tracking-api/wallet-connected", asyncHandler(events.walletConnected))
 // Dashboard API (JWT + allowlist), consumed by the tracking-ui app served at
 // /dashboard on this stack. Chain joins run here against NODE_URL's Cirrus.
 app.get("/tracking-api/me", asyncHandler(admin.me));
+app.get("/tracking-api/metrics/daily", requireAuthorized, asyncHandler(admin.dailyMetrics));
 app.get("/tracking-api/links", requireAuthorized, asyncHandler(admin.list));
 app.post("/tracking-api/links", requireAuthorized, asyncHandler(admin.create));
 app.get("/tracking-api/links/:id", requireAuthorized, asyncHandler(admin.detail));
@@ -41,6 +42,11 @@ app.get(
   "/tracking-api/links/:id/wallets/:address",
   requireAuthorized,
   asyncHandler(admin.walletDetail)
+);
+app.get(
+  "/tracking-api/users/:address/timeline",
+  requireAuthorized,
+  asyncHandler(admin.userTimeline)
 );
 app.patch("/tracking-api/links/:id", requireAuthorized, asyncHandler(admin.update));
 

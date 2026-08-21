@@ -2,21 +2,17 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
   getPools,
-  getSwapableTokens,
-  getSwapableTokenPairs,
   createPool,
   addLiquidityDualToken,
   addLiquiditySingleToken,
   removeLiquidity,
   swap,
   getSwapHistory,
-  getPairSwapHistory,
   setPoolRates,
   pausePool,
   unpausePool,
   disablePool,
   enablePool,
-  exchangeMultiToken,
   addLiquidityMultiToken,
   removeLiquidityMultiToken,
   removeLiquidityMultiTokenOneCoin,
@@ -24,7 +20,6 @@ import {
 import { getBalance } from "../services/tokens.service";
 import {
   validatePoolAddressArgs,
-  validateTokenAddressArgs,
   validateTokenPairArgs,
   validateCreatePoolsArgs,
   validateAddLiquidityDualTokenArgs,
@@ -36,7 +31,6 @@ import {
   validateSetPoolRatesArgs,
   validateTogglePauseArgs,
   validateToggleDisableArgs,
-  validateMultiTokenSwapArgs,
   validateMultiTokenAddLiquidityArgs,
   validateMultiTokenRemoveLiquidityArgs,
   validateMultiTokenRemoveLiquidityOneArgs,
@@ -199,38 +193,6 @@ class SwappingController {
     }
   }
 
-  static async getSwapableTokens(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, address: userAddress } = req;
-      const tokens = await getSwapableTokens(accessToken, userAddress);
-
-      res.status(RestStatus.OK).json(tokens);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async getSwapableTokenPairs(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, params, address: userAddress } = req;
-      validateTokenAddressArgs(params);
-
-      const tokens = await getSwapableTokenPairs(accessToken, params.tokenAddress, userAddress);
-
-      res.status(RestStatus.OK).json(tokens);
-    } catch (error) {
-      next(error);
-    }
-  }
-
   static async getPoolByTokenPair(
     req: Request,
     res: Response,
@@ -306,37 +268,6 @@ class SwappingController {
     }
   }
 
-  static async getPairSwapHistory(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, params, query } = req;
-      validateTokenPairArgs(params);
-      validateQueryParams(query);
-
-      const page = query.page ? parseInt(query.page as string, 10) : 1;
-      const limit = query.limit ? parseInt(query.limit as string, 10) : 10;
-      const sender = query.sender as string | undefined;
-      if (sender) {
-        const { error } = validateAddressField("sender").validate(sender);
-        if (error) throw new Error("sender Validation Error: " + error.message);
-      }
-      const swapHistory = await getPairSwapHistory(
-        accessToken,
-        params.tokenAddress1,
-        params.tokenAddress2,
-        page,
-        limit,
-        sender
-      );
-      res.status(RestStatus.OK).json(swapHistory);
-    } catch (error) {
-      next(error);
-    }
-  }
-
   // Admin operations
   static async setPoolRates(
     req: Request,
@@ -391,19 +322,6 @@ class SwappingController {
   }
 
   // Multi-token pool operations
-  static async swapMultiToken(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { accessToken, body, address: userAddress } = req;
-      validateMultiTokenSwapArgs(body);
-
-      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
-      const result = await exchangeMultiToken(accessToken, { ...body, deadline }, userAddress as string);
-      res.status(RestStatus.OK).json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
-
   static async addLiquidityMultiToken(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { accessToken, body, params, address: userAddress } = req;

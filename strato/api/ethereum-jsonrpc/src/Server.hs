@@ -25,7 +25,8 @@ startServer = do
   let port = 8545
   runStreamMConfigured "ethereum-jsonrpc" $ createTopicAndWait "jsonrpcresponse"
   putStrLn $ "Listening on port " ++ show port
-  run port app
+  -- debug_* traces and simulations can exceed Warp's 30s default timeout
+  runSettings (setPort port $ setTimeout 150 defaultSettings) app
 
 corsHeaders :: [(CI.CI BS.ByteString, BS.ByteString)]
 corsHeaders =

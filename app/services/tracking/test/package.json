@@ -1,0 +1,24 @@
+{
+  "name": "strato-tracking-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Black-box integration tests for the STRATO tracking service (run via docker-compose.test.yml)",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test --test-concurrency=1 --test-reporter=spec dist/*.test.js",
+    "mocks": "node dist/mocks/server.js"
+  },
+  "engines": {
+    "node": ">=22.12 <23.0"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.15.0",
+    "@types/pg": "^8.11.0",
+    "typescript": "^5.5.3"
+  }
+}

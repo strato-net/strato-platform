@@ -23,6 +23,10 @@ import {
   makeEventPairKey,
   parseActionableEventsForActivities,
 } from "./actionableEvents.parser";
+import {
+  reassembleStructArrayRows,
+  shouldTrackActivity,
+} from "./mappingRow.parser";
 
 const STRATO_PREFIX = "BlockApps-";
 
@@ -105,12 +109,15 @@ export const getEventQueryParams = async (): Promise<{
   cursor: EventCursor;
   validPairs: ValidEventPairs;
 }> => {
+  // Each activity is spread over several /mapping rows: the struct row holds
+  // the scalar fields (emissionRate, sourceContract, ...) and each
+  // actionableEvents element lives in its own row, so fetch the whole
+  // collection and reassemble before filtering by activity type and emission.
   const activitiesData = await cirrus.get("/mapping", {
     params: {
       address: `eq.${config.rewards.address}`,
       collection_name: `eq.activities`,
-      "value->>emissionRate": "neq.0000000000000000000000000000000000000000", // Might break if rate becomes 0 on cirrus
-      select: "value->>sourceContract,value->>actionableEvents",
+      select: "key,value",
     },
   });
 
@@ -118,22 +125,28 @@ export const getEventQueryParams = async (): Promise<{
   const eventNames = new Set<string>();
   const validPairs: ValidEventPairs = new Set<string>();
 
-  if (Array.isArray(activitiesData) && activitiesData.length > 0) {
-    for (const item of activitiesData) {
-      if (!item.sourceContract || !item.actionableEvents) {
-        continue;
-      }
+  const activities = reassembleStructArrayRows(
+    Array.isArray(activitiesData) ? activitiesData : []
+  );
 
-      const actionableEventsArray = parseActionableEventsForActivities(
-        item.actionableEvents
-      );
+  for (const item of activities.values()) {
+    if (
+      !shouldTrackActivity(item.activityType, item.emissionRate) ||
+      !item.sourceContract ||
+      !item.actionableEvents
+    ) {
+      continue;
+    }
 
-      for (const evt of actionableEventsArray) {
-        if (evt?.eventName) {
-          contractAddresses.add(item.sourceContract);
-          eventNames.add(evt.eventName);
-          validPairs.add(makeEventPairKey(item.sourceContract, evt.eventName));
-        }
+    const actionableEventsArray = parseActionableEventsForActivities(
+      item.actionableEvents
+    );
+
+    for (const evt of actionableEventsArray) {
+      if (evt?.eventName) {
+        contractAddresses.add(item.sourceContract);
+        eventNames.add(evt.eventName);
+        validPairs.add(makeEventPairKey(item.sourceContract, evt.eventName));
       }
     }
   }

@@ -64,7 +64,9 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         
         const typeFilter = (outcome: string | undefined, pendingType?: string) => {
           if (!selectedType) return true;
-          const mapped = pendingType === 'saving' ? 'save' : pendingType || outcome || 'bridge';
+          const mapped = pendingType === 'saving'
+            ? 'save'
+            : pendingType || (outcome === 'fallback' ? 'bridge' : outcome) || 'bridge';
           return mapped === selectedType;
         };
 
@@ -158,12 +160,12 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
       key: "received",
       render: (_: any, record: any) => {
         const outcome = record.depositOutcome;
-        const hasFinal = (outcome === "forge" || outcome === "save") && record.finalTokenSymbol;
+        const hasFinal = (outcome === "forge" || outcome === "save" || outcome === "fallback") && record.finalTokenSymbol;
         const symbol = hasFinal ? record.finalTokenSymbol : record.stratoTokenSymbol || '-';
         const amount = hasFinal && record.finalAmount
           ? formatWeiToDecimalHP(record.finalAmount, 18)
           : formatWeiToDecimalHP(record?.DepositInfo?.stratoTokenAmount || '0', 18);
-        const badge = outcome === "forge" ? "Metal" : outcome === "save" ? "Earn" : null;
+        const badge = outcome === "forge" ? "Metal" : outcome === "save" ? "Earn" : outcome === "fallback" ? "Fallback" : null;
         return (
           <div>
             <span className="text-sm text-foreground">{amount} {symbol}</span>

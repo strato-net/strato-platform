@@ -56,6 +56,14 @@ export interface SaveUsdstHistoryPoint {
   totalShares: string;
 }
 
+export interface SaveUsdstActionState {
+  vaultAddress: string;
+  assetAddress: string;
+  shareSymbol: string;
+  projectedExchangeRate: string;
+  paused: boolean;
+}
+
 const emptyInfo = (): SaveUsdstInfo => ({
   configured: Boolean(config.saveUsdstVault),
   deployed: false,
@@ -182,6 +190,21 @@ const requireSaveUsdstVaultAddress = (): string => {
     throw new Error("SAVE_USDST_VAULT is not configured");
   }
   return vaultAddress;
+};
+
+export const getSaveUsdstActionState = async (
+  accessToken: string
+): Promise<SaveUsdstActionState | null> => {
+  const info = await getSaveUsdstInfo(accessToken);
+  if (!info.deployed) return null;
+
+  return {
+    vaultAddress: info.vaultAddress,
+    assetAddress: info.assetAddress,
+    shareSymbol: info.shareSymbol,
+    projectedExchangeRate: info.projectedExchangeRate,
+    paused: info.paused,
+  };
 };
 
 const getAssetBalance = async (

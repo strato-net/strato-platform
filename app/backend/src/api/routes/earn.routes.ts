@@ -32,6 +32,7 @@ router.post("/save-usdst/redeem-all", walletAuth, SaveUsdstController.redeemAll)
 
 router.get("/yield-vault", authHandler.authorizeRequest(true), YieldVaultController.list);
 router.get("/yield-vault/:key/info", authHandler.authorizeRequest(true), YieldVaultController.getInfo);
+router.get("/yield-vault/:key/history", authHandler.authorizeRequest(true), YieldVaultController.getHistory);
 router.get("/yield-vault/:key/user", authHandler.authorizeRequest(), YieldVaultController.getUserInfo);
 router.post("/yield-vault/:key/deposit", walletAuth, YieldVaultController.deposit);
 router.post("/yield-vault/:key/redeem", walletAuth, YieldVaultController.redeem);

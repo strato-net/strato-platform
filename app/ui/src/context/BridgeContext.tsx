@@ -15,9 +15,9 @@ import {
   NetworkSummary,
   BridgeContextType,
   WithdrawalRequestOptions,
-  DepositActionRequestOptions,
 } from "@/lib/bridge/types";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, DepositActionRequestParams, WithdrawalSummaryResponse, DepositAction } from "@strato/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction } from "@strato/shared-types";
+import { normBridgeAddr } from "@/lib/bridgeLinks";
 
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 
@@ -131,6 +131,73 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       await fetchTokensForChain(cfg.chainId);
     },
     [availableNetworks, fetchTokensForChain],
+  );
+
+  const selectTokenByStratoAddress = useCallback(
+    async (stratoAddress: string): Promise<boolean> => {
+      const target = normBridgeAddr(stratoAddress);
+      if (!target) return false;
+
+      const matchIn = (tokens: BridgeToken[]) =>
+        tokens.find((t) => normBridgeAddr(t.stratoToken) === target) ?? null;
+
+      const currentMatch = matchIn(bridgeableTokens);
+      if (currentMatch) {
+        setSelectedToken(currentMatch);
+        return true;
+      }
+
+      let networks = availableNetworks;
+      if (!networksLoaded || networks.length === 0) {
+        try {
+          const { data } = await api.get<NetworkConfig[]>(`/bridge/networkConfigs`);
+          networks = (data || [])
+            .filter((cfg) => cfg?.chainInfo?.enabled)
+            .map((cfg) => ({
+              chainId: cfg.externalChainId.toString(),
+              chainName: cfg.chainInfo.chainName,
+              enabled: cfg.chainInfo.enabled,
+              depositRouter: cfg.chainInfo.depositRouter,
+            }));
+          networks.sort((a, b) => a.chainId.localeCompare(b.chainId));
+          setAvailableNetworks(networks);
+          setNetworksLoaded(true);
+          api
+            .get<DepositAction[]>("/bridge/depositActions")
+            .then(({ data }) => setDepositActions(data || []))
+            .catch(() => setDepositActions([]));
+        } catch (error) {
+          console.error("Failed to load networks for token select:", error);
+          return false;
+        }
+      }
+
+      for (const network of networks) {
+        let tokens = tokenCacheRef.current.get(network.chainId);
+        if (!tokens) {
+          try {
+            const { data } = await api.get<BridgeToken[]>(
+              `/bridge/bridgeableTokens/${network.chainId}`,
+            );
+            tokens = Array.isArray(data) ? data : [];
+            tokenCacheRef.current.set(network.chainId, tokens);
+          } catch {
+            tokens = [];
+          }
+        }
+
+        const match = matchIn(tokens);
+        if (!match) continue;
+
+        setSelectedNetwork(network.chainName);
+        setBridgeableTokens(tokens);
+        setSelectedToken(match);
+        return true;
+      }
+
+      return false;
+    },
+    [availableNetworks, bridgeableTokens, networksLoaded],
   );
 
   // ========== BALANCE FUNCTIONS ==========
@@ -282,19 +349,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
 
-  const requestDepositAction = useCallback(
-    async (params: DepositActionRequestParams, options?: DepositActionRequestOptions): Promise<TransactionResponse> => {
-      setLoading(true);
-      try {
-        const { data } = await api.post<TransactionResponse>(`/bridge/requestDepositAction`, params, options as any);
-        return data;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
-  );
-
   // ========== TRANSACTION FUNCTIONS ==========
   const fetchDepositTransactions = useCallback(
     async (rawParams: Record<string, string | undefined> = {}, context?: string): Promise<BridgeTransactionResponse> => {
@@ -380,11 +434,11 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         targetTransactionTab,
         setTargetTransactionTab,
         requestWithdrawal,
-        requestDepositAction,
         useBalance,
         setSelectedNetwork: handleSetSelectedNetwork,
         setSelectedToken,
         loadNetworksAndTokens,
+        selectTokenByStratoAddress,
         fetchDepositTransactions,
         fetchWithdrawTransactions,
         withdrawalSummary,

@@ -2,21 +2,19 @@ import { Request, Response, NextFunction } from "express";
 import { 
   requestWithdrawal,
   requestNativeWithdrawal as requestNativeWithdrawalService,
-  requestDepositAction,
   getDepositActions,
   getBridgeableTokens,
   getNetworkConfigs,
   getBridgeTransactions,
   getWithdrawalSummary
 } from "../services/bridge.service";
-import { validateRequestWithdrawal, validateDepositAction, validateTransactionType } from "../validators/bridge.validators";
+import { validateRequestWithdrawal, validateTransactionType } from "../validators/bridge.validators";
 import { validateRawParams } from "../validators/common.validators";
 import {
   NetworkConfig,
   BridgeToken,
   BridgeTransactionResponse,
   WithdrawalRequestParams,
-  DepositActionRequestParams,
   TransactionResponse,
   WithdrawalSummaryResponse
 } from "@strato/shared-types";
@@ -68,26 +66,6 @@ class BridgeController {
         userAddress as string
       );
 
-      res.json({
-        success: true,
-        data: result,
-      });
-    } catch (error: any) {
-      next(error);
-    }
-  }
-
-  static async requestDepositAction(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, body, address: userAddress } = req;
-      validateDepositAction(body);
-   
-      const result: TransactionResponse = await requestDepositAction(accessToken, body as DepositActionRequestParams, userAddress as string);
-   
       res.json({
         success: true,
         data: result,

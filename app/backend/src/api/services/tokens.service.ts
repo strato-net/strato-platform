@@ -6,7 +6,7 @@ import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { getPool as getLendingRegistry } from "./lending.service";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
-import { getOraclePrices } from "./oracle.service";
+import { getOraclePrices, getTokenPriceMetrics } from "./oracle.service";
 import { getTokenDetails } from "../helpers/cirrusHelpers";
 import * as config from "../../config/config";
 import { listVaultDefs } from "./yieldVault.service";
@@ -27,6 +27,32 @@ const {
 
 const normalizeAddress = (address?: string | null) =>
   (address || "").toLowerCase().replace(/^0x/, "");
+
+/**
+ * Market cap in USD = (price_wei * totalSupply_wei) / 10^36.
+ * Divided by 10^36 because both values carry 18 decimals.
+ * Returns a decimal string with 2 decimal places.
+ */
+const calculateMarketCap = (
+  price?: string | bigint | null,
+  totalSupply?: string | bigint | null
+): string => {
+  try {
+    const priceWei = BigInt(price || "0");
+    const totalSupplyWei = BigInt(totalSupply || "0");
+    if (priceWei === 0n || totalSupplyWei === 0n) return "0";
+
+    const marketCapWei = priceWei * totalSupplyWei;
+    const wholePart = (marketCapWei / BigInt(10) ** BigInt(36)).toString();
+    const fractionalWei = marketCapWei % (BigInt(10) ** BigInt(36));
+    const fractionalPart = (fractionalWei * BigInt(100) / (BigInt(10) ** BigInt(36))).toString().padStart(2, '0');
+
+    return `${wholePart}.${fractionalPart}`;
+  } catch (error) {
+    console.error(`Error calculating market cap for price=${price} totalSupply=${totalSupply}:`, error);
+    return "0.00";
+  }
+};
 
 const getConfiguredYieldVaultDefs = () =>
   listVaultDefs()
@@ -195,6 +221,7 @@ export const getTokens = async (
     return (response.data as any[]).map((token) => ({
       ...token,
       price: priceMap.get(token.address) || "0",
+      marketCap: calculateMarketCap(priceMap.get(token.address), token._totalSupply),
       balances: (token.balances || []).map((balance: any) => {
         // If this user has collateral for this token, add collateral info
         if (balance.user && token.address) {
@@ -288,6 +315,7 @@ export const getBalance = async (
     ...balanceData.map((t: any) => ({
       ...t,
       price: (rawPrices.get(t.address) || 0n).toString(),
+      marketCap: calculateMarketCap(rawPrices.get(t.address), t.token?._totalSupply),
       collateralBalance: (collateralMap.get(t.address) || 0n).toString(),
     })),
     ...tokensWithCollateralOnly.map((a) => ({
@@ -295,6 +323,7 @@ export const getBalance = async (
       user: address,
       balance: "0",
       price: (rawPrices.get(a) || 0n).toString(),
+      marketCap: calculateMarketCap(rawPrices.get(a), tokenDetails.get(a)?._totalSupply),
       collateralBalance: (collateralMap.get(a) || 0n).toString(),
       token: tokenDetails.get(a),
     })),
@@ -573,7 +602,7 @@ export const getTokenStats = async (
     const [tokensResponse, priceData] = await Promise.all([
       cirrus.get(accessToken, `/${Token}`, {
         params: {
-          select: "address,_name,_symbol,_totalSupply::text",
+          select: `address,_name,_symbol,_totalSupply::text,images:${Token}-images(value)`,
           status: `eq.2`,
           _totalSupply: `gt.0`
         }
@@ -593,37 +622,31 @@ export const getTokenStats = async (
 
     const filteredTokens = tokens.filter((token: any) => priceData.has(token.address));
 
+    // Optional enrichment — failure must not break existing stats fields
+    const metricsMap = await getTokenPriceMetrics(
+      accessToken,
+      filteredTokens.map((t: any) => t.address),
+      priceData
+    ).catch(() => new Map());
+
     const tokensWithMarketCap = filteredTokens.map((token: any) => {
-      const price = BigInt(priceData.get(token.address) || "0");
       const totalSupply = BigInt(token._totalSupply || "0");
-      // Calculate market cap: (price * totalSupply) / 10^36
-      // Both price and totalSupply are in wei (18 decimals)
-      let marketCap = "0";
-      try {
-        if (price !== 0n && totalSupply !== 0n) {
-          // Market cap in USD = (price_wei * totalSupply_wei) / 10^36
-          // We divide by 10^36 because both values have 18 decimals
-          const marketCapWei = price * totalSupply;
-          const marketCapUSD = marketCapWei / BigInt(10) ** BigInt(36);
-          
-          // Convert to decimal string with 2 decimal places
-          const wholePart = marketCapUSD.toString();
-          const fractionalWei = marketCapWei % (BigInt(10) ** BigInt(36));
-          const fractionalPart = (fractionalWei * BigInt(100) / (BigInt(10) ** BigInt(36))).toString().padStart(2, '0');
-          
-          marketCap = `${wholePart}.${fractionalPart}`;
-        }
-      } catch (error) {
-        console.error(`Error calculating market cap for ${token._symbol}:`, error);
-        marketCap = "0.00";
-      }
-      
+      const marketCap = calculateMarketCap(priceData.get(token.address), totalSupply);
+      const metrics = metricsMap.get(token.address);
+
       return {
         address: token.address,
         name: token._name,
         symbol: token._symbol,
+        image: token.images?.[0]?.value || null,
         totalSupply: totalSupply.toString(),
-        marketCap: marketCap
+        price: (priceData.get(token.address) || "0").toString(),
+        marketCap,
+        // FDV = price × totalSupply on STRATO (no separate max supply)
+        fdv: marketCap,
+        change1h: metrics?.change1h ?? null,
+        change24h: metrics?.change24h ?? null,
+        sparkline: metrics?.sparkline ?? [],
       };
     });
 

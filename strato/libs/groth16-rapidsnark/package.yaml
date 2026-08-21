@@ -64,6 +64,9 @@ library:
     - -Wno-unused-parameter
     - -Wno-unused-variable
     - -Dd_m3HasFloat=0
+    # See the -include note under cxx-options below.
+    - -include
+    - stdint.h
   
   # C++ sources from rapidsnark
   cxx-sources:
@@ -113,6 +116,14 @@ library:
     - -fPIC
     - -Wno-address-of-packed-member
     - -Wno-unused-parameter
+    # The vendored rapidsnark/ffiasm/wasm3 sources use uint32_t/uint64_t without
+    # including <cstdint>, relying on it arriving transitively. GCC 13+ pruned
+    # those transitive includes (GCC 15 on Ubuntu 26.04 fails outright with
+    # "'uint32_t' has not been declared"), so force it in for every translation
+    # unit. Done here rather than patching 33 vendored files across three
+    # upstream projects.
+    - -include
+    - cstdint
   
 ghc-options:
   - -Wall

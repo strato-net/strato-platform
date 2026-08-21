@@ -14,10 +14,7 @@ const { bootstrapAuthEnv } = require("./lib/bootstrapAuthEnv");
 bootstrapAuthEnv();
 
 const { ethers } = require("ethers");
-const {
-  initOpenIdConfig,
-  getBAUserToken,
-} = require(path.resolve(__dirname, "../../services/bridge/dist/auth/index.js"));
+const deployAuth = require(path.resolve(__dirname, "../../contracts/deploy/auth.js"));
 const {
   CHAIN_CONFIG,
   normalizeAddress,
@@ -107,6 +104,13 @@ function getImplementationForChain(chainId) {
   if (chainId === 1 || chainId === 11155111) return implEth;
   if (chainId === 8453 || chainId === 84532) return implBase;
   if (chainId === 59144 || chainId === 59141) return implLinea;
+  return "";
+}
+
+function getImplementationEnvForChain(chainId) {
+  if (chainId === 1 || chainId === 11155111) return "ROUTER_IMPL_ETH";
+  if (chainId === 8453 || chainId === 84532) return "ROUTER_IMPL_BASE";
+  if (chainId === 59144 || chainId === 59141) return "ROUTER_IMPL_LINEA";
   return "";
 }
 
@@ -241,8 +245,10 @@ function parseChainRowSafeAddress(row) {
 async function getCirrusAccessToken() {
   const token = String(process.env.ACCESS_TOKEN || "").trim();
   if (token) return token;
-  await initOpenIdConfig();
-  return getBAUserToken();
+  return deployAuth.getUserToken(
+    process.env.GLOBAL_ADMIN_NAME,
+    process.env.GLOBAL_ADMIN_PASSWORD,
+  );
 }
 
 async function fetchBridgeTopology(nodeUrl, token, chains) {
@@ -387,12 +393,11 @@ async function main() {
   const apply = !!args.apply;
   const nodeUrl = process.env.NODE_URL;
   if (!nodeUrl) throw new Error("NODE_URL missing after env profile application");
-  const implEth = normalizeAddress(process.env.ROUTER_IMPL_ETH);
-  const implBase = normalizeAddress(process.env.ROUTER_IMPL_BASE);
-  const implLinea = normalizeAddress(process.env.ROUTER_IMPL_LINEA);
-  if (!implEth) throw new Error("Missing ROUTER_IMPL_ETH in .env");
-  if (!implBase) throw new Error("Missing ROUTER_IMPL_BASE in .env");
-  if (!implLinea) throw new Error("Missing ROUTER_IMPL_LINEA in .env");
+  for (const chainId of chains) {
+    if (!getImplementationForChain(chainId)) {
+      throw new Error(`Missing ${getImplementationEnvForChain(chainId)} in .env`);
+    }
+  }
   const token = await getCirrusAccessToken();
   const topology = await fetchBridgeTopology(
     nodeUrl,

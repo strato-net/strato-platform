@@ -25,11 +25,16 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/oracle/price": "Price Error",
   
   // Swap operations
-  "/swap-pools/tokens": "Token Pair Error",
   "/swap-pools/positions": "LP Positions Error",
   "/swap-pools/liquidity": "Liquidity Operation Error",
   "/swap-pools": "Swap Error",
   "/swap": "Swap Transaction Error",
+
+  // Unified trade operations
+  "/trade/tokens": "Token Pair Error",
+  "/trade/quote": "Trade Quote Error",
+  "/trade/swap": "Trade Transaction Error",
+  "/trade": "Trade Error",
   
   // Bridge operations 
   "/bridge/config": "Bridge Configuration Error",
@@ -40,7 +45,6 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/bridge/balance": "Bridge Balance Error",
   "/bridge/depositStatus": "Deposit Status Error",
   "/bridge/withdrawalStatus": "Withdrawal Status Error",
-  "/bridge/requestDepositAction": "Deposit Action Error",
   
   // User operations
   "/user/me": "User Profile Error",
@@ -51,9 +55,7 @@ export const API_ERROR_TITLES: Record<string, string> = {
   
   // PSM operations
   "/psm/mint": "PSM Mint Error",
-  "/psm/request-burn": "PSM Burn Request Error",
-  "/psm/complete-burn": "PSM Burn Complete Error",
-  "/psm/cancel-burn": "PSM Burn Cancel Error",
+  "/psm/redeem": "PSM Redeem Error",
   "/psm/info": "PSM Info Error",
   "/psm": "PSM Error",
 

@@ -248,16 +248,74 @@ def replaceServerPortsDocker() {
   sh './replace_server_ports_docker.sh docker-compose.highway.yml'
 }
 
-def waitLocalNodeIsSynced() {
+/**
+ * Wait for the local node to report isSynced=true, failing fast if the node's
+ * host processes die while we wait.
+ *
+ * Every caller deploys with strato-up, so the node's services run under convoke
+ * on the host and strato-ps can see them. A from-genesis sync runs for hours,
+ * and if convoke dies mid-sync (vm-runner crash, OOM, unclean shutdown) the
+ * metadata endpoint simply goes quiet -- without the strato-ps check the poll
+ * burns its full ~4h timeout before reporting a generic "failed to sync".
+ *
+ * @param nodeDir  Node directory to pass to strato-ps. Default: empty, which
+ *                 lets strato-ps fall back to ~/.strato/default-node (written
+ *                 by strato-init at node setup).
+ */
+def waitLocalNodeIsSynced(String nodeDir = '') {
   echo "Waiting for local node to be in-sync and healthy..."
-  for (int i = 0; i < 7000; i++) {
-    if (sh(returnStatus: true, script: "sudo docker exec strato-nginx-1 curl 172.17.0.1:3000/eth/v1.2/metadata | grep \\\"isSynced\\\":true") != 0) {
-      sleep 2
-    } else {
+  for (int i = 0; i < 9000; i++) {
+    if (sh(returnStatus: true, script: "sudo docker exec strato-nginx-1 curl 172.17.0.1:3000/eth/v1.2/metadata | grep \\\"isSynced\\\":true") == 0) {
       return true
     }
+    // strato-ps shells out to docker compose and strato-barometer, so it costs
+    // far more than the metadata poll: check every ~30s, not every 2s. Skipping
+    // i=0 also gives convoke a grace period to write .strato.pid, since some
+    // callers land here immediately after strato-up returns.
+    if (i > 0 && i % 15 == 0) {
+      assertStratoIsRunning(nodeDir)
+    }
+    sleep 2
   }
-  error ("STRATO node failed to sync after more than an hour. Check the strato logs in artifacts for more details.")
+  error ("STRATO node failed to sync after within the expected time window of ~5hrs. Check the strato logs in artifacts for more details.")
+}
+
+/**
+ * Fail the build if strato-ps no longer reports the node's host processes as up.
+ * Healthy output contains the two-line block:
+ *
+ *   Convoke:
+ *     Running (PID 12345)
+ *
+ * The trailing detail after "Running" is required, since that is what tells a
+ * live convoke apart from "  Not running".
+ *
+ * Matching happens in shell rather than via a Groovy regex on purpose: a
+ * java.util.regex.Matcher left on the CPS stack across a pipeline step is not
+ * serializable and fails the build.
+ *
+ * @param nodeDir  Node directory to pass to strato-ps (see above).
+ */
+def assertStratoIsRunning(String nodeDir = '') {
+  // Two attempts: strato-ps talks to the docker daemon, which can briefly time
+  // out under the IO load of a sync, and a single blip is not a dead node.
+  for (int attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) {
+      sleep 5
+    }
+    def healthy = sh(returnStatus: true, script: """#!/bin/bash -le
+      strato-ps ${nodeDir} 2>&1 | grep -A1 -x 'Convoke:' | tail -n +2 | grep -Eq '^  Running.+'
+    """) == 0
+    if (healthy) {
+      return
+    }
+  }
+  sh(returnStatus: true, script: """#!/bin/bash -le
+    echo '=== strato-ps ${nodeDir} (unhealthy) ==='
+    strato-ps ${nodeDir} 2>&1 || true
+    docker ps -a || true
+  """)
+  error("strato-ps no longer reports STRATO as running; the node's host processes died before the sync completed.")
 }
 
 /**
