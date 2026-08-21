@@ -245,7 +245,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (Reader
     RBDB.withRedisBlockDB getBestSequencedBlockInfo >>= \case
       Nothing -> do
         BestBlock s n <- Mod.get (Mod.Proxy @BestBlock)
-        return $ BestSequencedBlock s n []
+        return $ BestSequencedBlock s n [] [] 0
       Just bestSequencedBlock -> return bestSequencedBlock
   put _ bestSequencedBlock =
     RBDB.withRedisBlockDB (putBestSequencedBlockInfo bestSequencedBlock) >>= \case

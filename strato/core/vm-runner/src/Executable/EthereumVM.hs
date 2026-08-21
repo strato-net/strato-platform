@@ -115,6 +115,12 @@ ethereumVM = runResourceT $ do
         $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "New validators found from running block:     " ++ show (fst _derived)
         $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "Removed validators found in block header:    " ++ show (snd _inBlock)
         $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "Removed validators found from running block: " ++ show (snd _derived)
+      StakeMismatch BlockDelta{..} -> do
+        $logErrorS "ethereumVM/StakeMismatch" . T.pack $ "There was a stake update mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash
+        $logErrorS "ethereumVM/StakeMismatch" . T.pack $ "Stake updates found in block header:    " ++ show _inBlock
+        $logErrorS "ethereumVM/StakeMismatch" . T.pack $ "Stake updates found from running block: " ++ show _derived
+      RoundMismatch BlockDelta{..} -> do
+        $logErrorS "ethereumVM/RoundMismatch" . T.pack $ "Block #" ++ show bNum ++ ", hash " ++ format bHash ++ " has PBFT round " ++ show _inBlock ++ " behind its parent's round " ++ show _derived
       VersionMismatch BlockDelta{..} -> do
         $logErrorS "ethereumVM/InvalidVersion" . T.pack $ "There was a block header version mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash
         $logErrorS "ethereumVM/InvalidVersion" . T.pack $ "Block header version found in block header:      " ++ show _inBlock

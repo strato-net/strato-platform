@@ -93,5 +93,10 @@ tests:
     ghc-options: -Wall -O2 -dynamic
     dependencies:
       - hspec
+      - QuickCheck
+      - blockapps-data
+      - blockDB
+      - containers
+      - ethereum-rlp
       - strato-model
       - vm-tools

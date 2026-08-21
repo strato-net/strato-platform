@@ -215,6 +215,10 @@ data NetworkConf = NetworkConf
   , gasLimit :: Integer
   , blockPeriodMs :: Int
   , roundPeriodS :: Int
+  -- | Block number from which stake-weighted proposer selection (BlockHeaderV3)
+  -- is in force. 'Nothing' means "from genesis". Every node of a network must
+  -- agree on this value.
+  , stakingActivationBlock :: Maybe Integer
   }
   deriving (Show, Eq, Generic, ToJSON)
 
@@ -228,7 +232,26 @@ instance FromJSON NetworkConf where
       <*> v .:? "txSizeLimit" .!= 2097152
       <*> v .:? "gasLimit" .!= 1000000
       <*> v .:? "blockPeriodMs" .!= 1000
-      <*> v .:? "roundPeriodS" .!= 120
+      <*> v .:? "roundPeriodS" .!= 3600
+      <*> v .:? "stakingActivationBlock" .!= defaultStakingActivationBlock net
+
+-- | Sentinel meaning "staking activation has not been scheduled yet" — used as
+-- the default for networks that already exist so that a node upgrade never
+-- switches consensus rules on its own. Set an explicit height in ethconf.yaml.
+stakingNotScheduled :: Integer
+stakingNotScheduled = 2 ^ (62 :: Int)
+
+-- | Existing live networks default to "not scheduled"; anything else (fresh
+-- dev/test networks) activates from genesis.
+defaultStakingActivationBlock :: String -> Maybe Integer
+defaultStakingActivationBlock net
+  | net `elem` ["upquark", "lithium", "mercata", "mercata-hydrogen", "uranium"] = Just stakingNotScheduled
+  | take 6 net == "helium" = Just 250000
+  | otherwise = Nothing
+
+-- | Is stake-weighted proposer selection in force at the given block number?
+stakingActiveAt :: NetworkConf -> Integer -> Bool
+stakingActiveAt conf height = maybe True (height >=) (stakingActivationBlock conf)
 
 -- EIP-155 chain ID: keccak256(networkName), first 6 bytes (48 bits).
 -- Fits in JS Number.MAX_SAFE_INTEGER with room for v = chainId * 2 + 35.
@@ -366,7 +389,8 @@ instance Default NetworkConf where
     , txSizeLimit = 2097152  -- 2 MiB
     , gasLimit = 1000000
     , blockPeriodMs = 1000   -- minimum delay between blocks
-    , roundPeriodS = 120     -- max seconds one validator is proposer
+    , roundPeriodS = 3600    -- backstop: seconds without progress before a forced round change
+    , stakingActivationBlock = defaultStakingActivationBlock "upquark"
     }
 
 instance Default EthConf where

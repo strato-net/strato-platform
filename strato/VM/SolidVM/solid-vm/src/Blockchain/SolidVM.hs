@@ -109,7 +109,8 @@ import qualified Data.Vector as V
 import Debugger
 import GHC.Exts hiding (breakpoint)
 --import Blockchain.DB.RawStorageDB
---import Blockchain.Data.BlockSummary
+import Blockchain.Data.BlockSummary (BlockSummary (..))
+import Blockchain.Data.ProposalFacts
 --import Blockchain.DB.MemAddressStateDB
 
 import Network.Haskoin.Crypto.BigWord ()
@@ -233,7 +234,8 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
             Env.txHash = txHash',
             Env.src = Just code,
             Env.name = Just contractName,
-            Env.runningTests = isRunningTests
+            Env.runningTests = isRunningTests,
+            Env.prevBlock = Nothing
           }
   let gasInfo' =
         GasInfo
@@ -312,7 +314,8 @@ create' creator newAddress ch cc contractName' valList = do
         erException = Nothing,
         erPragmas = CC._pragmas cc,
         erNewValidators = newV,
-        erRemovedValidators = remV
+        erRemovedValidators = remV,
+        erStakeUpdates = getStakeDeltasFromEvents $ toList finalEvs
       }
 
 call ::
@@ -358,7 +361,8 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
             Env.txHash = txHash',
             Env.src = Nothing,
             Env.name = Nothing,
-            Env.runningTests = isRunningTests
+            Env.runningTests = isRunningTests,
+            Env.prevBlock = Nothing
           }
 
   let gasInfo' =
@@ -399,7 +403,8 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
           erException = Nothing, -- tells me if theres an exception
           erPragmas = [],
           erNewValidators = newV,
-          erRemovedValidators = remV
+          erRemovedValidators = remV,
+          erStakeUpdates = getStakeDeltasFromEvents $ toList finalEvs
         }
 
 call' ::
@@ -1268,6 +1273,9 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       return $ Constant $ SInteger $ round baseTimestamp
     (SBuiltinVariable "block", "number") -> (Constant . SInteger . BlockHeader.number . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "coinbase") -> Constant . flip SAddress False . Env.proposer <$> getEnv
+    (SBuiltinVariable "block", "prevProposer") -> Constant . flip SAddress False . pfProposer <$> getPrevBlockFacts
+    (SBuiltinVariable "block", "prevIntendedProposer") -> Constant . flip SAddress False . pfIntendedProposer <$> getPrevBlockFacts
+    (SBuiltinVariable "block", "prevRound") -> Constant . SInteger . pfRound <$> getPrevBlockFacts
     (SBuiltinVariable "block", "difficulty") ->
       (Constant . SInteger . BlockHeader.difficulty . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "gaslimit") ->
@@ -2717,6 +2725,15 @@ callBuiltin "create2" args@(salt : n : src : argVals) = do
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAddress) False) nca
     Nothing -> internalError "a call to create did not create an address" execResults
+callBuiltin "setBlockContext" [proposer', prevProposer', prevIntended', prevRound'] = do
+  env' <- getEnv
+  unless (Env.runningTests env') $
+    invalidArguments "setBlockContext can only be called during testing" [proposer', prevProposer', prevIntended', prevRound']
+  proposer'' <- getAddressVal proposer'
+  facts <- ProposalFacts <$> getAddressVal prevProposer' <*> getAddressVal prevIntended' <*> int prevRound'
+  Mod.modify_ (Mod.Proxy @Env.Environment) $ \env ->
+    pure $ env { Env.proposer = proposer'', Env.prevBlock = Just facts }
+  return SNULL
 callBuiltin "fastForward" (secs : mBlocks) = do
   seconds <- int secs
   blocks <- case mBlocks of
@@ -3687,3 +3704,15 @@ validateFunctionArguments cc contract' func argVals = checkFunc $ func : CC._fun
               map (\(n, CC.IndexedType _ t _) -> (fromMaybe "" n, t)) $
                 CC._funcArgs theFunc
          in go argMeta argVals
+
+-- | Facts about the parent block, for the @block.prev*@ builtins: an explicit
+-- override (tests) or the parent's block summary; blocks whose parent is
+-- unknown (or predates stake-weighted selection) see no facts.
+getPrevBlockFacts :: MonadSM m => m ProposalFacts
+getPrevBlockFacts = do
+  env' <- getEnv
+  case Env.prevBlock env' of
+    Just facts -> pure facts
+    Nothing ->
+      maybe noProposalFacts bSumProposalFacts
+        <$> A.lookup (A.Proxy @BlockSummary) (BlockHeader.parentHash $ Env.blockHeader env')

@@ -102,7 +102,12 @@ test-suite contextm-test
       test/
   ghc-options: -Wall -O2 -dynamic
   build-depends:
-      base
+      QuickCheck
+    , base
+    , blockDB
+    , blockapps-data
+    , containers
+    , ethereum-rlp
     , hflags
     , hspec
     , strato-model

@@ -264,9 +264,7 @@ eth_accounts = toMethod "eth_accounts" f ()
 ----------------
 
 getBlockNumber :: Block' -> Integer
-getBlockNumber blk = case blockBlockData $ bPrimeToB blk of
-  BlockHeader {number = n} -> n
-  BlockHeaderV2 {number = n} -> n
+getBlockNumber = number . blockBlockData . bPrimeToB
 
 eth_blockNumber :: Method Server
 eth_blockNumber = toMethod "eth_blockNumber" f ()
@@ -475,9 +473,7 @@ strato_simulateV1 = toMethod "strato_simulateV1" f (Required "payload" :+: Optio
             ]
 
 getBlockTimestamp :: Block' -> UTCTime
-getBlockTimestamp blk = case blockBlockData $ bPrimeToB blk of
-  BlockHeader {timestamp = t} -> t
-  BlockHeaderV2 {timestamp = t} -> t
+getBlockTimestamp = timestamp . blockBlockData . bPrimeToB
 
 strato_traceCall :: Method Server
 strato_traceCall = toMethod "strato_traceCall" f (Required "txObject" :+: Optional "blockTag" "latest" :+: Optional "traceConfig" (TraceOptions False) :+: ())

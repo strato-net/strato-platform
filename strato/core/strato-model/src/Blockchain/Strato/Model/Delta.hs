@@ -15,7 +15,10 @@ module Blockchain.Strato.Model.Delta
     fromDelta,
     eqDelta,
     ValidatorDelta,
-    getDeltasFromEvents
+    getDeltasFromEvents,
+    StakeDelta,
+    getStakeDeltasFromEvents,
+    applyStakeDelta
   )
 where
 
@@ -24,8 +27,11 @@ import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Validator
 import Control.DeepSeq
 import Data.Function (on)
-import Data.List (find)
+import Data.List (find, foldl')
+import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 import GHC.Generics
+import Text.Read (readMaybe)
 
 data Delta a b = Delta
   { _added   :: [a] -> [a]
@@ -64,3 +70,24 @@ getDeltasFromEvents = foldr go mempty
           _ -> ds
         extractCommonName = fmap (Validator . read . second) . find (\(x, _, _) -> x == "validator") . evArgs
         second (_, y, _)  = y
+
+-- | Absolute stake weights published by MercataGovernance during a block.
+-- Within a block, the last write for a validator wins.
+type StakeDelta = M.Map Validator Integer
+
+getStakeDeltasFromEvents :: [Event] -> StakeDelta
+getStakeDeltasFromEvents = foldl' go M.empty
+  where go acc e = case (evContractAddress e, evName e) of
+          (0x100, "ValidatorStakeUpdated") -> -- MercataGovernance
+            maybe acc (\(v, st) -> M.insert v st acc) $
+              (,) <$> (Validator <$> arg "validator" e) <*> arg "stake" e
+          _ -> acc
+        arg :: Read a => String -> Event -> Maybe a
+        arg name = (>>= readMaybe . second) . find (\(x, _, _) -> x == name) . evArgs
+        second (_, y, _) = y
+
+-- | Apply a block's stake updates to the stake map in force for that block,
+-- dropping validators that were removed in the same block.
+applyStakeDelta :: [Validator] -> StakeDelta -> M.Map Validator Integer -> M.Map Validator Integer
+applyStakeDelta removed updates current =
+  M.union updates current `M.withoutKeys` S.fromList removed

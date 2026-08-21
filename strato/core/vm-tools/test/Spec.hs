@@ -24,13 +24,26 @@
 --import Blockchain.Strato.Model.Secp256k1
 --import Blockchain.VMContext
 
+import Blockchain.Bagger.Transactions (TxRunResult (..), getStakeDeltasFromResults)
+import Blockchain.Data.BlockHeader
+import Blockchain.Data.BlockSummary
+import Blockchain.Data.ExecResults
+import Blockchain.Data.ProposalFacts
+import Blockchain.Data.RLP
 import Blockchain.Data.VmTrace
+import Blockchain.Model.SyncState (BestSequencedBlock (..))
 import Blockchain.Strato.Model.Address (Address (..))
+import Blockchain.Strato.Model.Delta (getStakeDeltasFromEvents)
+import Blockchain.Strato.Model.Event
+import Blockchain.Strato.Model.Keccak256 (zeroHash)
+import Blockchain.Strato.Model.Validator
 import Blockchain.VMOptions ()
 import Control.Monad
+import qualified Data.Map.Strict as M
 import Executable.EVMFlags ()
 import HFlags
 import Test.Hspec (Spec, describe, hspec, it, shouldBe, shouldSatisfy)
+import Test.QuickCheck (arbitrary, forAll)
 
 --import qualified LabeledError
 
@@ -62,6 +75,59 @@ spec :: Spec
 spec = do
   describe "VMContext" $ pure ()
   callTraceSpec
+  stakingSpec
+
+stakingSpec :: Spec
+stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
+  let rlpRT :: RLPSerializable a => a -> a
+      rlpRT = rlpDecode . rlpDeserialize . rlpSerialize . rlpEncode
+      v1 = Validator 0x1
+      v2 = Validator 0x2
+      stakeEvent addr name args = Event zeroHash zeroHash (Address 0) "MercataGovernance" addr name args
+      updated v st = stakeEvent 0x100 "ValidatorStakeUpdated" [("validator", show v, "address"), ("stake", show st, "uint256")]
+
+  it "round trips version-3 headers through RLP" $
+    forAll genBlockHeaderV3 $ \h -> rlpRT h `shouldBe` h
+
+  it "reads legacy and current BestSequencedBlock encodings" $ do
+    let bsb = BestSequencedBlock zeroHash 7 [v1, v2] [(v1, 10)] 3
+    rlpRT bsb `shouldBe` bsb
+    rlpDecode (RLPArray [rlpEncode zeroHash, rlpEncode (7 :: Integer), rlpEncode [v1, v2]])
+      `shouldBe` BestSequencedBlock zeroHash 7 [v1, v2] [] 0
+
+  it "reads legacy block summaries with no proposal facts" $
+    forAll genBlockHeaderV3 $ \h -> do
+      let bsum = blockHeaderToBSum 1 noProposalFacts h 3
+          legacy = case rlpEncode bsum of
+            RLPArray fields -> RLPArray (take 6 fields)
+            x -> x
+      bSumProposalFacts (rlpRT bsum) `shouldBe` bSumProposalFacts bsum
+      bSumProposalFacts (rlpDecode legacy) `shouldBe` noProposalFacts
+      bSumNumber (rlpDecode legacy) `shouldBe` number h
+
+  it "collects stake updates from governance events only, last write wins" $ do
+    let evs = [ updated (Address 0x1) (5 :: Integer)
+              , stakeEvent 0x101 "ValidatorStakeUpdated" [("validator", show (Address 0x2), "address"), ("stake", "9", "uint256")]
+              , updated (Address 0x1) (7 :: Integer)
+              , stakeEvent 0x100 "ValidatorStakeUpdated" [("validator", "garbage", "address"), ("stake", "9", "uint256")]
+              ]
+    getStakeDeltasFromEvents evs `shouldBe` M.fromList [(v1, 7)]
+
+  it "merges stake updates across transactions, later transaction wins" $ do
+    let er st = (solidvmErrorResults undefined) { erException = Nothing, erStakeUpdates = st }
+        trr st = TxRunResult undefined (Right $ er st) 0 M.empty M.empty []
+        results = [trr (M.fromList [(v1, 1), (v2, 2)]), trr (M.fromList [(v1, 3)])]
+    getStakeDeltasFromResults results `shouldBe` M.fromList [(v1, 3), (v2, 2)]
+
+  it "derives no proposal facts from pre-v3 headers" $
+    forAll arbitrary $ \h -> proposalFactsFromHeader 1 0 (h :: BlockHeader) `shouldBe` noProposalFacts
+
+  it "derives proposal facts from v3 headers" $
+    forAll genBlockHeaderV3 $ \h -> do
+      let facts = proposalFactsFromHeader 1 (getBlockRound h) h
+      pfProposer facts `shouldBe` Address 0 -- unsealed
+      pfRound facts `shouldBe` getBlockRound h
+      Validator (pfIntendedProposer facts) `shouldSatisfy` (`elem` getBlockValidators h)
 
 -- Shorthands for driving the tracer the way the SolidVM hooks do.
 enter :: Maybe VmTracer -> CallType -> Address -> Address -> Integer -> IO ()

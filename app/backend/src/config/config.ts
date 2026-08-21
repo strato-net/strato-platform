@@ -50,6 +50,8 @@ export const mercataBridge = process.env.MERCATA_BRIDGE || "00000000000000000000
 export const poolFactory = process.env.POOL_FACTORY || "000000000000000000000000000000000000100a";
 export const tokenFactory = process.env.TOKEN_FACTORY || "000000000000000000000000000000000000100b";
 export const adminRegistry = process.env.ADMIN_REGISTRY || "000000000000000000000000000000000000100c";
+// Consensus governance (validator set + stake weights), a genesis proxy at 0x100.
+export const mercataGovernance = process.env.MERCATA_GOVERNANCE || "0000000000000000000000000000000000000100";
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
 
