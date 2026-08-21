@@ -12,6 +12,7 @@
 module Executable.EthereumVM2
   ( handleVmTasks,
     writeBlockSummary,
+    processBlocks,
   )
 where
 

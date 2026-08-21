@@ -176,6 +176,15 @@ runExpr exprText = withoutDebugging . withStaticCallInfo $ do
 
 solidVMBreakpoint :: MonadSM m => SourceAnnotation () -> m ()
 solidVMBreakpoint ann = do
+  -- Catch-up / production: no debugger, no tracer. The old path updated
+  -- source pos, walked the call stack, and probed breakpoints on every
+  -- statement. None of that is in the state root.
+  dbgHot <- debugIsHot
+  when dbgHot $ solidVMBreakpointHot ann
+{-# INLINE solidVMBreakpoint #-}
+
+solidVMBreakpointHot :: MonadSM m => SourceAnnotation () -> m ()
+solidVMBreakpointHot ann = do
   let pos = _sourceAnnotationStart ann
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
     [] -> pure []
@@ -378,8 +387,11 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
     let -- maybeSrcLength = M.lookup "srcLength" =<< metadata
         -- !srcLength = maybe 0 (\sl -> read (T.unpack sl) :: Int) maybeSrcLength
         srcLength = 0
-        eArgExps = traverse (runParser parseArg (initialParserStateWithLength srcLength) "" . T.unpack) argsStrings
-        !argExps = either (parseError "call arguments") id eArgExps
+        !argExps =
+          if null argsStrings
+            then []
+            else either (parseError "call arguments") id $
+              traverse (runParser parseArg (initialParserStateWithLength srcLength) "" . T.unpack) argsStrings
     argVals <- argsToVals argExps
 
     maybeVal <-
@@ -416,26 +428,26 @@ call' ::
   ValList ->
   m (Maybe Value)
 call' from to' fnCalltype functionName valList = do
+  currentCall <- getCurrentCallInfoIfExists
   (isExternal, storageAddress, codeAddress) <- case fnCalltype of
     CC.DelegateCall -> return (True, from, to')
     CC.RawCall -> return (True, to', to')
     _ -> (from /= to', to',) <$> do
       if from == to'
-        then do
-          mCallInfo <- getCurrentCallInfoIfExists
-          case mCallInfo of
-            Just callInfo -> pure $ currentCodeAddress callInfo
-            _ -> pure to'
+        then case currentCall of
+          Just callInfo -> pure $ currentCodeAddress callInfo
+          _ -> pure to'
         else pure to'
   let shouldPushSender = bool False (fnCalltype /= CC.DelegateCall) isExternal
+      currentReadOnly = maybe False readOnly currentCall
   (contract, hsh, cc) <- getCodeAndCollection codeAddress
 
-  initializeAction storageAddress
+  unless (maybe False ((storageAddress ==) . currentAddress) currentCall) $
+    initializeAction storageAddress
 
-  let functionsIncludingConstructor =
-        case contract ^. CC.constructor of
-          Nothing -> M.insert "<constructor>" emptyFunction $ contract ^. CC.functions
-          Just c -> M.insert "<constructor>" c $ contract ^. CC.functions
+  let lookupFunction name
+        | name == "<constructor>" = Just $ fromMaybe emptyFunction (contract ^. CC.constructor)
+        | otherwise = M.lookup name (contract ^. CC.functions)
         where
           emptyFunction = CC.Func [] [] Nothing (Just []) Nothing False Nothing M.empty [] dummyAnnotation False []
           dummyAnnotation :: SourceAnnotation ()
@@ -459,12 +471,11 @@ call' from to' fnCalltype functionName valList = do
   let functionName' =
         case fnCalltype of
           CC.DefaultCall -> functionName
-          -- Handles RawCall and DelegateCall function signature parsing
-          _ ->
-            ( case runParser parseExternalCallArgs initialParserState "" functionName of
-                Right (funcTocall, _) -> funcTocall
+          _
+            | '(' `notElem` functionName -> functionName
+            | otherwise -> case runParser parseExternalCallArgs initialParserState "" functionName of
+                Right (funcToCall, _) -> funcToCall
                 _ -> functionName
-            )
       nullifyRefs (ts, v) = case v of
         Just ref@(SReference _) | isExternal -> do
           let retType = case ts of
@@ -482,20 +493,16 @@ call' from to' fnCalltype functionName valList = do
         | shouldResolve = resolveArgRefs from contract cc (CC._funcArgs theFunction) args
         | otherwise     = pure args
 
-  f <- (nullifyRefs =<<) <$> case (M.lookup functionName' functionsIncludingConstructor, fnCalltype) of
+  f <- (nullifyRefs =<<) <$> case (lookupFunction functionName', fnCalltype) of
       -- Standard contract call
       -- (Just theFunction, _)
       (Just theFunction, CC.DefaultCall) -> do
-        mCallInfo <- getCurrentCallInfoIfExists
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
         when (isExternal && isForbidden) $
           unknownFunction "logFunctionCall" (functionName, "asdf2" :: String) -- contract) -- ^. CC.contractName)
-        let ro = case mCallInfo of
-              Nothing -> False
-              Just ci -> readOnly ci
         resolvedValList <- resolveArgs shouldPushSender theFunction valList
         pure . bool id (pushSender from) shouldPushSender $
-          runTheCall storageAddress codeAddress contract functionName' hsh cc theFunction resolvedValList ro False
+          runTheCall storageAddress codeAddress contract functionName' hsh cc theFunction resolvedValList currentReadOnly False
       -- Handles .call() and .delegatecall() logic
       (Just theFunction, _) -> do
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
@@ -503,22 +510,18 @@ call' from to' fnCalltype functionName valList = do
           unknownFunction "logFunctionCall" (functionName, "asdf" :: String) -- contract ^. CC.contractName)
         validateFunctionArguments cc contract theFunction valList >>= \case
           Just (theFunction', valList') -> do
-            mCallInfo <- getCurrentCallInfoIfExists
-            let ro = case mCallInfo of
-                  Nothing -> False
-                  Just ci -> readOnly ci
             resolvedValList <- resolveArgs shouldPushSender theFunction' valList'
+            let validation =
+                  if fnCalltype == CC.DelegateCall && not shouldPushSender
+                    then validatedCallMode theFunction valList'
+                    else NeedsValidation
             pure . bool id (pushSender from) shouldPushSender $
-              runTheCall storageAddress codeAddress contract functionName' hsh cc theFunction' resolvedValList ro False
-          _ -> case M.lookup "fallback" functionsIncludingConstructor of
+              runTheCallValidated validation storageAddress codeAddress contract functionName' hsh cc theFunction' resolvedValList currentReadOnly False
+          _ -> case lookupFunction "fallback" of
             Just fallbackFunc -> do
-              mCallInfo <- getCurrentCallInfoIfExists
-              let ro = case mCallInfo of
-                    Nothing -> False
-                    Just ci -> readOnly ci
               resolvedValList <- resolveArgs shouldPushSender fallbackFunc valList
               pure . bool id (pushSender from) shouldPushSender $
-                runTheCall storageAddress codeAddress contract functionName' hsh cc fallbackFunc resolvedValList ro False
+                runTheCall storageAddress codeAddress contract functionName' hsh cc fallbackFunc resolvedValList currentReadOnly False
             _ -> unknownFunction "logFunctionCall" (functionName, valList) -- contract ^. CC.contractName)
       -- Maybe the function is actually a getter
       _ -> case M.lookup functionName $ contract ^. CC.storageDefs of
@@ -568,24 +571,15 @@ call' from to' fnCalltype functionName valList = do
                 SVMType.Struct _ s -> (<|>) <$> handleStruct s path <*> handleSimple path
                 SVMType.UnknownLabel s -> (<|>) <$> handleStruct s path <*> handleSimple path
                 _ -> handleSimple path
-        _ -> case M.lookup "fallback" functionsIncludingConstructor of
+        _ -> case lookupFunction "fallback" of
           Just fallbackFunc -> do
-            mCallInfo <- getCurrentCallInfoIfExists
-            let ro = case mCallInfo of
-                  Nothing -> False
-                  Just ci -> readOnly ci
             resolvedValList <- resolveArgs shouldPushSender fallbackFunc valList
             pure . bool id (pushSender from) shouldPushSender $
-              runTheCall storageAddress codeAddress contract functionName hsh cc fallbackFunc resolvedValList ro False
+              runTheCall storageAddress codeAddress contract functionName hsh cc fallbackFunc resolvedValList currentReadOnly False
           _ -> unknownFunction "logFunctionCall" (functionName, "asdf5" :: String) -- ^. CC.contractName)
 
-  when (fnCalltype == CC.DelegateCall) $ do
-    (codeHash, codeContractName) <- do
-      ch <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) codeAddress
-      pure $ case ch of
-        SolidVMCode n' h -> (h, n')
-        ExternallyOwned h -> (h, "")
-    addDelegatecall storageAddress codeHash (T.pack codeContractName)
+  when (fnCalltype == CC.DelegateCall) $
+    addDelegatecall storageAddress hsh (labelToText $ contract ^. CC.contractName)
   logFunctionCall valList storageAddress contract functionName f
   where
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
@@ -661,8 +655,22 @@ runModifiersAndStatements mods stmts = withLocalVars $ go mods
 runStatementBlock :: MonadSM m => [CC.Statement] -> m (Maybe Value)
 runStatementBlock = fmap fst . runStatementBlock'
 
+-- Avoid allocating a local-variable scope for blocks that cannot bind locals.
+-- Keep the conservative cases scoped: declarations, for-loop declarations,
+-- and both try/catch forms (whose result/catch binders are added dynamically).
+blockNeedsLocalScope :: [CC.Statement] -> Bool
+blockNeedsLocalScope = any statementNeedsLocalScope
+  where
+    statementNeedsLocalScope (CC.SimpleStatement (CC.VariableDefinition _ _) _) = True
+    statementNeedsLocalScope (CC.ForStatement (Just (CC.VariableDefinition _ _)) _ _ _ _) = True
+    statementNeedsLocalScope (CC.SolidityTryCatchStatement _ _ _ _ _) = True
+    statementNeedsLocalScope (CC.TryCatchStatement _ _ _) = True
+    statementNeedsLocalScope _ = False
+
 runStatementBlock' :: MonadSM m => [CC.Statement] -> m (Maybe Value, [CC.Statement])
-runStatementBlock' = withLocalVars . runStatements
+runStatementBlock' stmts
+  | blockNeedsLocalScope stmts = withLocalVars $ runStatements stmts
+  | otherwise = runStatements stmts
 
 runStatements :: MonadSM m => [CC.Statement] -> m (Maybe Value, [CC.Statement])
 runStatements [] = return (Nothing, [])
@@ -838,11 +846,13 @@ runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsF
   solidVMBreakpoint pos
   -- currentCallInfo <- getCurrentCallInfo
 
+  stackDepth <- getCallStackDepth
   mRes <- EUnsafe.try $ do
     expResultVal <- getVar =<< expToVar tryExpression
     return expResultVal
   case mRes of
     Left (ex :: SolidException) -> do
+      trimCallStackToDepth stackDepth
       res1 <- solidityExceptionHandler catchBlockMap ex
       return res1
     Right aRealVal -> do
@@ -865,11 +875,13 @@ runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsF
               return sfsRes'
 runStatement (CC.TryCatchStatement tryBlock catchBlockMap pos) = do
   solidVMBreakpoint pos
+  stackDepth <- getCallStackDepth
   mRes <- EUnsafe.try $ do
     val <- runStatementBlock tryBlock
     pure $ val
   case mRes of
     Left ex -> do
+      trimCallStackToDepth stackDepth
       res1 <- solidVMExceptionHandler catchBlockMap ex
       return res1
     Right res -> return res
@@ -1086,17 +1098,11 @@ expToVar x = do
 
 decrementGas :: MonadSM m => Gas -> m ()
 decrementGas !gas = do
-  gasInfo' <- Mod.modifyStatefully (Mod.Proxy @GasInfo) $ gasLeft -= gas
-  let !gasUsed' = gas + gasInfo' ^. gasUsed
-  Mod.modifyStatefully_ (Mod.Proxy @GasInfo) $ gasUsed .= gasUsed'
-  let !gasLeft' = gasInfo' ^. gasLeft
-  if (gasLeft') < (Gas 0)
-    then do
-      let msg = "out of gas: " ++ show gasLeft' ++ " < " ++ show gas
-      liftIO $ putStrLn $ C.red $ msg
-      tooMuchGas (getGasValue $ _gasInitialAllotment gasInfo') (getGasValue gasUsed')
-    else do
-      return ()
+  gi' <- chargeGasState gas
+  when (gi' ^. gasLeft < Gas 0) $ do
+    let msg = "out of gas: " ++ show (gi' ^. gasLeft) ++ " < " ++ show gas
+    liftIO $ putStrLn $ C.red msg
+    tooMuchGas (getGasValue $ _gasInitialAllotment gi') (getGasValue $ gi' ^. gasUsed)
 
 expToVar' :: MonadSM m => CC.Expression -> m Variable
 expToVar' (CC.NumberLiteral _ v Nothing) = return . Constant $ SInteger v
@@ -1655,17 +1661,17 @@ expToVar' (CC.FunctionCall _ e args) = do
                 Just func -> if (CC._funcIsFree func)
                   then do
                     validateFunctionArguments cc contract' func argVals >>= \case
-                      Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars ro True
-                      Nothing -> runTheCallWithVars address codeAddr contract' funcName hsh cc func argVals argVars ro True
+                      Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars (validatedCallMode func argVals') ro True
+                      Nothing -> runTheCallWithVars address codeAddr contract' funcName hsh cc func argVals argVars NeedsValidation ro True
                   else do
                     validateFunctionArguments cc contract' func argVals >>= \case
-                      Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars ro False
+                      Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars (validatedCallMode func argVals') ro False
                       Nothing -> case M.lookup funcName $ cc ^. CC.flFuncs of
                         Just ff -> do
                           validateFunctionArguments cc contract' ff argVals >>= \case
-                            Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars ro True
-                            Nothing -> runTheCallWithVars address codeAddr contract' funcName hsh cc func argVals argVars ro False
-                        Nothing -> runTheCallWithVars address codeAddr contract' funcName hsh cc func argVals argVars ro False
+                            Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars (validatedCallMode ff argVals') ro True
+                            Nothing -> runTheCallWithVars address codeAddr contract' funcName hsh cc func argVals argVars NeedsValidation ro False
+                        Nothing -> runTheCallWithVars address codeAddr contract' funcName hsh cc func argVals argVars NeedsValidation ro False
                 Nothing -> unknownFunction "regularFunctionCall/SFunction" funcName
               return . Constant . fromMaybe SNULL $ res
             Constant (SStructDef structName) -> do
@@ -3004,11 +3010,10 @@ resolveArgRefs ::
   ValList ->
   m ValList
 resolveArgRefs src contract cc argDefs args =
-  let argTypes = CC.indexedTypeType . snd <$> argDefs
-      go ts'@[t@SVMType.Variadic] (v : vs') = (:) <$> resolveArgRef src contract cc t v <*> go ts' vs'
-      go (t : ts') (v : vs') = (:) <$> resolveArgRef src contract cc t v <*> go ts' vs'
+  let go ts'@[(_, CC.IndexedType _ t@SVMType.Variadic _)] (v : vs') = (:) <$> resolveArgRef src contract cc t v <*> go ts' vs'
+      go ((_, CC.IndexedType _ t _) : ts') (v : vs') = (:) <$> resolveArgRef src contract cc t v <*> go ts' vs'
       go _ vs' = pure vs'
-   in go argTypes args
+   in go argDefs args
 
 -- Note: this is intentionally nonstrict in `theType`
 addLocalVariable :: MonadSM m => SolidString -> Value -> m ()
@@ -3042,7 +3047,34 @@ runTheCall ::
   Bool ->
   m ([(Maybe SolidString, CC.IndexedType)], Maybe Value)
 runTheCall addr cAddr cont fName h coll func vals r f = (func ^. CC.funcVals,) <$>
-  runTheCallWithVars addr cAddr cont fName h coll func vals [] r f
+  runTheCallWithVars addr cAddr cont fName h coll func vals [] NeedsValidation r f
+
+runTheCallValidated ::
+  MonadSM m =>
+  CallValidation ->
+  Address ->
+  Address ->
+  CC.Contract ->
+  SolidString ->
+  Keccak256 ->
+  CC.CodeCollection ->
+  CC.Func ->
+  ValList ->
+  Bool ->
+  Bool ->
+  m ([(Maybe SolidString, CC.IndexedType)], Maybe Value)
+runTheCallValidated validation addr cAddr cont fName h coll func vals r f = (func ^. CC.funcVals,) <$>
+  runTheCallWithVars addr cAddr cont fName h coll func vals [] validation r f
+
+data CallValidation = NeedsValidation | AlreadyValidated
+
+validatedCallMode :: CC.Func -> ValList -> CallValidation
+validatedCallMode original vals
+  | null (CC._funcOverload original) && not (any isReference vals) = AlreadyValidated
+  | otherwise = NeedsValidation
+  where
+    isReference SReference{} = True
+    isReference _ = False
 
 -- | Like runTheCall but accepts optional Variables for pass-by-reference semantics.
 -- For memory arrays/structs, if a Variable is provided, it's used directly instead
@@ -3058,10 +3090,11 @@ runTheCallWithVars ::
   CC.Func ->
   ValList ->
   [Variable] ->  -- Variables for pass-by-reference (may be shorter than ValList)
+  CallValidation ->
   Bool ->
   Bool ->
   m (Maybe Value)
-runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVals' argVars ro ff = do
+runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVals' argVars validation ro ff = do
   decrementGas 5
   let !returnNamesAndTypes = [(n, t) | (Just n, CC.IndexedType _ t _) <- CC._funcVals theFunction]
       !theModifierNames = map fst $ (CC._funcModifiers theFunction)
@@ -3074,11 +3107,13 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
       Nothing -> if name `elem` contract' ^. CC.parents then return Nothing else missingField "modifier not found" name
   let !theModifiers = catMaybes theModifiers'
 
-  argVals <- validateFunctionArguments cc contract' theFunction argVals' >>= \case
-    Just (_, av) -> pure av
-    Nothing ->
-      let mismatchInfo = formatArgMismatch $ zip argVals' (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction))
-      in typeError ("argument type mismatch in '" ++ funcName ++ "'") mismatchInfo
+  argVals <- case validation of
+    AlreadyValidated -> pure argVals'
+    NeedsValidation -> validateFunctionArguments cc contract' theFunction argVals' >>= \case
+      Just (_, av) -> pure av
+      Nothing ->
+        let mismatchInfo = formatArgMismatch $ zip argVals' (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction))
+        in typeError ("argument type mismatch in '" ++ funcName ++ "'") mismatchInfo
 
   -- Extract args with location info: (name, Maybe Location, value)
   let !argsWithLoc =
@@ -3102,9 +3137,13 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
   -- Helium network ID = 114784819836269
   -- Pass-by-reference for memory arrays/structs is only enabled after fork block on helium
   -- Set to high value until network upgrade is coordinated
-  currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
-  let heliumPassByRefForkBlock = 33918 :: Integer
-  let passByRefEnabled = not (Conf.networkID (networkConfig ethConf) == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
+  passByRefEnabled <-
+    if null argVars
+      then pure False
+      else do
+        currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
+        let heliumPassByRefForkBlock = 33918 :: Integer
+        pure $ not (Conf.networkID (networkConfig ethConf) == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
   localVars1 <-
     forM (zip3 locals argVarsPadded (map snd argLocations ++ repeat Nothing)) $ \((n, v), mVar, mLoc) -> do
       newVar <- case mVar of
@@ -3703,16 +3742,16 @@ validateFunctionArguments cc contract' func argVals = checkFunc $ func : CC._fun
       Nothing -> checkFunc xs
     argValsLength = length argVals
     testMatch :: MonadSM m => CC.Func -> m (Maybe ValList)
-    testMatch tf = mapArgs tf >>= \case
+    testMatch tf = mapArgValues tf >>= \case
       Nothing -> pure Nothing
-      Just argMapping -> sequence <$> traverse marshalValue (snd <$> argMapping) >>= \case
+      Just typedValues -> sequence <$> traverse marshalValue typedValues >>= \case
         Just vals' -> pure $ Just vals'
         Nothing -> pure . bool Nothing (Just argVals) $ testValidVariadic tf
     testValidVariadic :: CC.Func -> Bool
     testValidVariadic tf =
-      case unsnoc (map snd (CC._funcArgs tf)) of
-        Just ([], x) | CC.indexedTypeType x == SVMType.Variadic -> True
-        Just (xs, x) | CC.indexedTypeType x == SVMType.Variadic -> argValsLength >= length xs
+      case unsnoc (CC._funcArgs tf) of
+        Just ([], (_, x)) | CC.indexedTypeType x == SVMType.Variadic -> True
+        Just (xs, (_, x)) | CC.indexedTypeType x == SVMType.Variadic -> argValsLength >= length xs
         _ -> False
     marshalValue :: MonadSM m => (SVMType.Type, Value) -> m (Maybe Value)
     marshalValue (t, v) =
@@ -3752,13 +3791,13 @@ validateFunctionArguments cc contract' func argVals = checkFunc $ func : CC._fun
         (r@(SReference _), _) -> pure $ Just r
         (SNULL, t') -> Just <$> createDefaultValue cc contract' t'
         _ -> pure Nothing
-    mapArgs :: MonadSM m => CC.FuncF a -> m (Maybe [(String, (SVMType.Type, Value))])
-    mapArgs theFunc =
-        let go [(n, SVMType.Variadic)] [SVariadic args] = pure $ Just [(n, (SVMType.Variadic, SVariadic args))]
-            go [(n, SVMType.Variadic)] args = pure $ Just [(n, (SVMType.Variadic, SVariadic args))]
+    mapArgValues :: MonadSM m => CC.FuncF a -> m (Maybe [(SVMType.Type, Value)])
+    mapArgValues theFunc =
+        let go [(_, CC.IndexedType _ SVMType.Variadic _)] [SVariadic args] = pure $ Just [(SVMType.Variadic, SVariadic args)]
+            go [(_, CC.IndexedType _ SVMType.Variadic _)] args = pure $ Just [(SVMType.Variadic, SVariadic args)]
             go nts [SVariadic args] = go nts args
             go nts@(_:_:_) [SArray args] = go nts . V.toList =<< traverse getVar args
-            go ((n,t):nts) (v:args) = (((n, (t, v)):) <$>) <$> go nts args
+            go ((_, CC.IndexedType _ t _):nts) (v:args) = (((t, v):) <$>) <$> go nts args
             go [] [] = pure $ Just []
             go _ _ = pure Nothing
             argMeta =

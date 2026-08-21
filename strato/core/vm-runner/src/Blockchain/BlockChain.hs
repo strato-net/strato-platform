@@ -216,11 +216,11 @@ recoverProposer bd = case getProposerSeal bd of
           Nothing -> Left "could not recover proposer from block seal"
 
 setParentStateRoot ::
-  (MonadFail m, MonadIO m, BSDB.HasBlockSummaryDB m) =>
+  (BSDB.HasBlockSummaryDB m) =>
   OutputBlock ->
   m BlockSummary
 setParentStateRoot OutputBlock {..} = do
-  liftIO $ setTitle $ "Block #" ++ show (number obBlockData)
+  -- setTitle every block is a TTY OSC write on the apply hot path; skip it.
   BSDB.getBSum (parentHash obBlockData)
 
 addBlock :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m [BlockVerificationFailure]
@@ -250,9 +250,12 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
         verifyBlockResult <- verifyBlock (outputBlockToBlock b) (trrs, postRewardSR) bSum
         case verifyBlockResult of
           failures@(_:_) -> do
+            lift clearPendingMPNodes
             lift $ P.incCounter vmBlocksInvalid
             pure $ map (\r -> BlockVerificationFailure (bSumNumber bSum) (bSumParentHash bSum) r) failures
           _ -> do
+            forM_ postRewardSR $ putChainStateRoot Nothing obh
+            lift flushPendingMPNodes
             lift $ P.incCounter vmBlocksValid
             lift $ P.incCounter vmBlocksMined
             lift $ P.incCounter vmBlocksProcessed
@@ -331,10 +334,10 @@ addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = tr
 
   flushMemStorageTxDBToBlockDB
 
-  yield . OutVMEvents =<< sendNewActionMessage b trrs
+  when (Conf.sqlDiff $ vmConfig ethConf) $
+    yield . OutVMEvents =<< sendNewActionMessage b trrs
 
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
-  flushMemAddressStateTxToBlockDB
   flushMemAddressStateTxToBlockDB
   lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
   pure trrs
@@ -378,8 +381,9 @@ addTransactions ::
 addTransactions blockData txs proposer =
   timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
     trrs <- lift $ go (getBlockGasLimit blockData) txs DL.empty
-    mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
-    yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
+    when (Conf.sqlDiff $ vmConfig ethConf) $ do
+      mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
+      yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
     pure trrs
   where
     go :: (VMBase m, MonadMonitor m) =>
