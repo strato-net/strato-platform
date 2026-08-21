@@ -79,7 +79,6 @@ getDeltasFromEvents = foldr go mempty
                 _ -> Nothing
               _ -> Nothing
             Nothing -> Nothing
-        second (_, y, _)  = y
 
 -- | Absolute stake weights published by MercataGovernance during a block.
 -- Within a block, the last write for a validator wins.
@@ -93,8 +92,7 @@ getStakeDeltasFromEvents = foldl' go M.empty
               (,) <$> (Validator <$> arg "validator" e) <*> arg "stake" e
           _ -> acc
         arg :: Read a => String -> Event -> Maybe a
-        arg name = (>>= readMaybe . second) . find (\(x, _, _) -> x == name) . evArgs
-        second (_, y, _) = y
+        arg name = (>>= readMaybe . eventArgValueString) . find ((== name) . eventArgName) . evArgs
 
 -- | Apply a block's stake updates to the stake map in force for that block,
 -- dropping validators that were removed in the same block.

@@ -65,7 +65,7 @@ import Data.Word (Word64)
 import Data.List (find)
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Data.Aeson (FromJSON(..), ToJSON(..), Value(..), decodeStrict, withObject, (.:), (.:?), (.!=), (.=))
+import Data.Aeson (FromJSON(..), Value(..), decodeStrict, withObject, (.:), (.:?), (.!=))
 import qualified Data.Aeson as Ae
 import GHC.Generics (Generic)
 import Network.JsonRpc.Server

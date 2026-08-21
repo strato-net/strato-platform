@@ -33,8 +33,10 @@ import Blockchain.Data.RLP
 import Blockchain.Data.VmTrace
 import Blockchain.Model.SyncState (BestSequencedBlock (..))
 import Blockchain.Strato.Model.Address (Address (..))
-import Blockchain.Strato.Model.Delta (getStakeDeltasFromEvents)
-import Blockchain.Strato.Model.Event
+import SolidVM.Model.Delta (getStakeDeltasFromEvents)
+import SolidVM.Model.Event
+import qualified SolidVM.Model.Type as SVMType
+import SolidVM.Model.Value (Value (..))
 import Blockchain.Strato.Model.Keccak256 (zeroHash)
 import Blockchain.Strato.Model.Validator
 import Blockchain.VMOptions ()
@@ -90,7 +92,9 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
       v1 = Validator 0x1
       v2 = Validator 0x2
       stakeEvent addr name args = Event zeroHash zeroHash (Address 0) "MercataGovernance" addr name args
-      updated v st = stakeEvent 0x100 "ValidatorStakeUpdated" [("validator", show v, "address"), ("stake", show st, "uint256")]
+      addrArg v = ("validator", SNULL, show v, SVMType.Address False)
+      stakeArg st = ("stake", SNULL, show st, SVMType.Int (Just False) Nothing)
+      updated v st = stakeEvent 0x100 "ValidatorStakeUpdated" [addrArg v, stakeArg st]
 
   it "round trips version-3 headers through RLP" $
     forAll genBlockHeaderV3 $ \h -> rlpRT h `shouldBe` h
@@ -113,9 +117,9 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
 
   it "collects stake updates from governance events only, last write wins" $ do
     let evs = [ updated (Address 0x1) (5 :: Integer)
-              , stakeEvent 0x101 "ValidatorStakeUpdated" [("validator", show (Address 0x2), "address"), ("stake", "9", "uint256")]
+              , stakeEvent 0x101 "ValidatorStakeUpdated" [addrArg (Address 0x2), stakeArg (9 :: Integer)]
               , updated (Address 0x1) (7 :: Integer)
-              , stakeEvent 0x100 "ValidatorStakeUpdated" [("validator", "garbage", "address"), ("stake", "9", "uint256")]
+              , stakeEvent 0x100 "ValidatorStakeUpdated" [("validator", SNULL, "garbage", SVMType.Address False), stakeArg (9 :: Integer)]
               ]
     getStakeDeltasFromEvents evs `shouldBe` M.fromList [(v1, 7)]
 

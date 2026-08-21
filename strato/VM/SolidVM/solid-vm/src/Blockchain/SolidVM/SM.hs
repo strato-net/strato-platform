@@ -991,7 +991,7 @@ addEvent newEvent = do
     TraceLog
       (evContractAddress newEvent)
       (T.pack $ evName newEvent)
-      [(T.pack n, T.pack v) | (n, v, _) <- evArgs newEvent]
+      [(T.pack n, T.pack v) | (n, _, v, _) <- evArgs newEvent]
 
 addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Keccak256 -> T.Text -> m ()
 addDelegatecall s c n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c n)

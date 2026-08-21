@@ -44,7 +44,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.Delta (applyStakeDelta)
+import SolidVM.Model.Delta (applyStakeDelta)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.PositiveInteger

@@ -24,7 +24,7 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class (blockHash, blockHeader, blockHeaderBlockNumber, blockHeaderVersion)
-import Blockchain.Strato.Model.Delta (applyStakeDelta)
+import SolidVM.Model.Delta (applyStakeDelta)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.ProposerSelection

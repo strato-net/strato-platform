@@ -43,7 +43,8 @@ makeOutputTx gasLim =
             r = 0,
             s = 0,
             v = 0,
-            txVersion = 0
+            txVersion = 0,
+            attribution = ""
           }
     }
 
@@ -62,7 +63,8 @@ successResults =
       erException = Nothing,
       erPragmas = [],
       erNewValidators = [],
-      erRemovedValidators = []
+      erRemovedValidators = [],
+      erStakeUpdates = M.empty
     }
 
 successTrr :: TxRunResult
@@ -124,7 +126,7 @@ spec = do
       receiptLogs rec `shouldBe` []
 
     it "pre-execution failure → ReceiptFailure with gas = limit" $ do
-      let trr = successTrr {trrResult = Left (TFKnownFailedTX (makeOutputTx 21000))}
+      let trr = successTrr {trrResult = Left (TFNonceMismatch 0 1 (makeOutputTx 21000))}
       rec <- txRunResultToReceipt trr
       receiptStatus rec `shouldBe` ReceiptFailure
       receiptGasUsed rec `shouldBe` 21000

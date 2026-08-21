@@ -31,6 +31,7 @@ library:
   - lens
   - mtl
   - prometheus-client
+  - solid-vm-model
   - strato-model
   - text
   - transformers
