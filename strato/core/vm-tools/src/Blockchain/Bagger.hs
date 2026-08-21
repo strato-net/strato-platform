@@ -285,7 +285,7 @@ makeNewBlock mineTransactions mSelfAddress = do
           let lastHead = B.bestBlockHeader cache
           let promoted = take ((fromInteger (Conf.maxTxsPerBlock (quarryConfig ethConf))) - lastExecLen) $ B.promotedTransactions cache
           let time = B.startTimestamp cache
-          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] time mempty
+          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] time mempty M.empty
           let remGas = B.remainingGas cache
           $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
           withBagger $ do
@@ -580,9 +580,10 @@ buildFromMiningCache = do
   let parentHeader = B.bestBlockHeader cache
   let stateRoot = B.lastExecutedStateRoot cache
   let vDelt = getDeltasFromResults $ B.lastExecutedTxs cache
+  let sDelt = getStakeDeltasFromResults $ B.lastExecutedTxs cache
   let txs = (trrTransaction <$> B.lastExecutedTxs cache) ++ (DL.toList $ B.privateHashes cache)
   let time = B.startTimestamp cache
-  let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs time vDelt
+  let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs time vDelt sDelt
   recordMaxBlockNumber "bagger_build" . number $ nextBlockData
   rewardedBlockData <- buildRewardedBlockHeader nextBlockData
   cacheRunResults rewardedBlockData (B.lastExecutedStateRoot cache, B.remainingGas cache, B.lastExecutedTxs cache)
@@ -601,33 +602,52 @@ buildNextBlockHeader ::
   [OutputTx] ->
   UTCTime ->
   ValidatorDelta ->
+  StakeDelta ->
   BlockHeader
-buildNextBlockHeader parentHeader parentHash stateRoot txs time vd =
+buildNextBlockHeader parentHeader parentHash stateRoot txs time vd sd =
   let parentNum = number parentHeader
       (newV, remV) = fromDelta vd
-      curValidators = case parentHeader of
-        BlockHeaderV2{} -> S.toList $ S.difference
-                                       (S.union
-                                         (getValidatorSet parentHeader)
-                                         (S.fromList $ newValidators parentHeader))
-                                       (S.fromList $ removedValidators parentHeader)
-        BlockHeader{} -> S.toList $ getValidatorSet parentHeader
-   in BlockHeaderV2
-        {
-          parentHash = parentHash,
-          stateRoot = stateRoot,
-          transactionsRoot = V.transactionsVerificationValue (otBaseTx <$> txs),
-          receiptsRoot = V.receiptsVerificationValue (),
-          logsBloom = "0000000000000000000000000000000000000000000000000000000000000000",
-          number = parentNum + 1,
-          timestamp = time,
-          extraData = txsLen2ExtraData (length txs),
-          currentValidators = curValidators,
-          newValidators = newV,
-          removedValidators = remV,
-          proposalSignature = Nothing,
-          signatures = []
-        }
+      (curValidators, curStakes) = case parentHeader of
+        BlockHeader{} -> (S.toList $ getValidatorSet parentHeader, [])
+        _ -> let (vs, st) = nextValidatorsAndStakes parentHeader in (S.toList vs, M.toAscList st)
+      txRoot = V.transactionsVerificationValue (otBaseTx <$> txs)
+      rcptRoot = V.receiptsVerificationValue ()
+      bloom = "0000000000000000000000000000000000000000000000000000000000000000"
+      extra = txsLen2ExtraData (length txs)
+   in if Conf.stakingActiveAt (networkConfig ethConf) (parentNum + 1)
+        then BlockHeaderV3
+          { parentHash = parentHash,
+            stateRoot = stateRoot,
+            transactionsRoot = txRoot,
+            receiptsRoot = rcptRoot,
+            logsBloom = bloom,
+            number = parentNum + 1,
+            timestamp = time,
+            extraData = extra,
+            currentValidators = curValidators,
+            newValidators = newV,
+            removedValidators = remV,
+            proposalRound = 0,
+            currentStakes = curStakes,
+            stakeUpdates = M.toAscList sd,
+            proposalSignature = Nothing,
+            signatures = []
+          }
+        else BlockHeaderV2
+          { parentHash = parentHash,
+            stateRoot = stateRoot,
+            transactionsRoot = txRoot,
+            receiptsRoot = rcptRoot,
+            logsBloom = bloom,
+            number = parentNum + 1,
+            timestamp = time,
+            extraData = extra,
+            currentValidators = curValidators,
+            newValidators = newV,
+            removedValidators = remV,
+            proposalSignature = Nothing,
+            signatures = []
+          }
 
 buildRewardedBlockHeader :: MonadBagger m => BlockHeader -> m BlockHeader
 buildRewardedBlockHeader bd = do

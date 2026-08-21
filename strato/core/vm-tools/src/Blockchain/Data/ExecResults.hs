@@ -12,12 +12,14 @@ where
 import Blockchain.Data.Log
 import Blockchain.Data.Transaction
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Delta (StakeDelta)
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Validator
 import Blockchain.Stream.Action (Action)
 import Blockchain.VM.SolidException
 import Blockchain.VM.VMException
 import Control.DeepSeq
+import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import GHC.Generics
 import SolidVM.Model.Value (Value)
@@ -35,7 +37,8 @@ data ExecResults = ExecResults
     erException :: Maybe (Either SolidException VMException),
     erPragmas :: [(String, String)],
     erNewValidators :: [Validator],
-    erRemovedValidators :: [Validator]
+    erRemovedValidators :: [Validator],
+    erStakeUpdates :: StakeDelta
   }
   deriving (Eq, Show, Generic)
 
@@ -70,5 +73,6 @@ errorResults remainingGas e =
       -- , erNewX509Certs = M.empty
       erPragmas = [],
       erNewValidators = [],
-      erRemovedValidators = []
+      erRemovedValidators = [],
+      erStakeUpdates = M.empty
     }

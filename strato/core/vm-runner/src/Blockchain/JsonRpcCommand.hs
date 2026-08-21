@@ -427,6 +427,7 @@ lookupContract blockHeader fromAddr addr =
               , Env.src = Nothing
               , Env.name = Nothing
               , Env.runningTests = isRunningTests
+              , Env.prevBlock = Nothing
               }
             gi = GasInfo
               { _gasLeft = Gas 1000000

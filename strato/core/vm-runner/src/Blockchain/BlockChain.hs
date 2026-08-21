@@ -42,6 +42,7 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
+import Blockchain.Data.ProposalFacts (ProposalFacts (..))
 import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import Blockchain.Data.Log
@@ -259,8 +260,10 @@ verifyBlock ::
 verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
   validity <- checkValidity parentBSum b
   let vDelt = getDeltasFromResults trrs
+      sDelt = getStakeDeltasFromResults trrs
       blockSR = Just $ stateRoot bh
-      bVd = toDelta (newValidators bh) (removedValidators bh)
+      bVd = toDelta (getBlockNewValidators bh) (getBlockRemovedValidators bh)
+      bSd = M.fromList $ getBlockStakeUpdates bh
       srCheck =  if derivedSR == blockSR
         then Nothing
         else Just . StateRootMismatch $
@@ -269,10 +272,21 @@ verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
       validatorCheck = if eqDelta bVd vDelt
         then Nothing
         else Just . ValidatorMismatch $ BlockDelta (fromDelta bVd) (fromDelta vDelt)
+      stakeCheck = if bSd == sDelt
+        then Nothing
+        else Just . StakeMismatch $ BlockDelta (M.toAscList bSd) (M.toAscList sDelt)
+      -- PBFT rounds persist across heights: a block's round cannot precede its parent's
+      parentRound = pfRound (bSumProposalFacts parentBSum)
+      roundCheck = if getBlockRound bh >= parentRound
+        then Nothing
+        else Just . RoundMismatch $ BlockDelta (getBlockRound bh) parentRound
+      stakingActive = Conf.stakingActiveAt (networkConfig ethConf) (number bh)
+      expectedVersion = if stakingActive then 3 else 2
    in return $ validity ++ case blockHeaderVersion bh of
         1 -> catMaybes [srCheck]
-        2 -> catMaybes [srCheck, validatorCheck]
-        v -> [VersionMismatch $ BlockDelta v 2]
+        2 | not stakingActive -> catMaybes [srCheck, validatorCheck]
+        3 | stakingActive -> catMaybes [srCheck, validatorCheck, stakeCheck, roundCheck]
+        v -> [VersionMismatch $ BlockDelta v expectedVersion]
 
 addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> Address -> ConduitT a VmOutEvent m [TxRunResult]
 addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = transactions} proposer = do

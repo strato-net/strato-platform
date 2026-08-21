@@ -659,7 +659,8 @@ getVariableOfName name = do
                        "bytes32ToString",
                        "create",
                        "create2",
-                       "fastForward"
+                       "fastForward",
+                       "setBlockContext"
                      ]
           )
           $ t "builtin function" $ Constant $ SFunction name Nothing

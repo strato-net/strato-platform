@@ -17,6 +17,7 @@ import qualified Blockchain.Stream.Action as Action
 import Control.DeepSeq
 import Control.Lens.Setter (set)
 import qualified Data.Map as M
+import Data.List (foldl')
 import Data.Time.Clock
 import GHC.Generics
 import Text.Format
@@ -177,3 +178,11 @@ getDeltasFromResults = foldr go mempty
           Right ExecResults{..} ->
             let vd' = toDelta erNewValidators erRemovedValidators
              in (vd' <> v)
+
+-- | Stake updates published during a block; a later transaction's update for
+-- the same validator wins.
+getStakeDeltasFromResults :: [TxRunResult] -> StakeDelta
+getStakeDeltasFromResults = foldl' go M.empty
+  where go acc trr = case trrResult trr of
+          Left _ -> acc
+          Right ExecResults{..} -> M.union erStakeUpdates acc

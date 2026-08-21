@@ -32,6 +32,7 @@ library
       Blockchain.Strato.Model.Nonce
       Blockchain.Strato.Model.Options
       Blockchain.Strato.Model.PositiveInteger
+      Blockchain.Strato.Model.ProposerSelection
       Blockchain.Strato.Model.Query
       Blockchain.Strato.Model.Secp256k1
       Blockchain.Strato.Model.StateRoot
@@ -111,6 +112,7 @@ test-suite strato-model-tests
     , binary
     , blockapps-haskoin
     , bytestring
+    , containers
     , ethereum-rlp
     , hspec
     , labeled-error

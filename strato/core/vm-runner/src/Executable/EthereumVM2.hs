@@ -27,6 +27,7 @@ import Blockchain.DB.BlockSummaryDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
+import Blockchain.Data.ProposalFacts
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Event hiding (selfAddress)
 import Blockchain.TraceReplay (runJsonRpcCommandTraced)
@@ -38,7 +39,7 @@ import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.Model.MicroTime
 import Blockchain.VMContext
 import Blockchain.VMMetrics
-import Blockchain.EthConf (ethConf, quarryConfig)
+import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
 import qualified Blockchain.EthConf.Model as Conf
 import Conduit hiding (Flush)
 import Control.Arrow ((&&&), (***))
@@ -115,6 +116,10 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
                               gasLimit = bSumGasLimit summ
                             }
                             BlockHeaderV2 {} -> bHeader {
+                              parentHash = bSumParentHash summ,
+                              stateRoot = bSumStateRoot summ
+                            }
+                            BlockHeaderV3 {} -> bHeader {
                               parentHash = bSumParentHash summ,
                               stateRoot = bSumStateRoot summ
                             }
@@ -232,9 +237,11 @@ outputTransactions :: [(Timestamp, OutputTx)] -> [VmOutEvent]
 outputTransactions = map $ OutIndexEvent . uncurry IndexTransaction
 
 writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
-writeBlockSummary block =
+writeBlockSummary block = do
   let sha = outputBlockHash block
       header = obBlockData block
       txCnt = fromIntegral $ length (obReceiptTransactions block)
-   in putBSum sha (blockHeaderToBSum header txCnt)
+  -- the parent's facts carry the round this height started at (none for genesis / legacy parents)
+  parentFacts <- maybe noProposalFacts bSumProposalFacts <$> A.lookup (A.Proxy @BlockSummary) (parentHash header)
+  putBSum sha (blockHeaderToBSum (Conf.networkID (networkConfig ethConf)) parentFacts header txCnt)
 
