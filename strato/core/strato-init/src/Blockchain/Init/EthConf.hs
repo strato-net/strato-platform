@@ -197,5 +197,6 @@ deriveFileServerUrl "" "upquark" = "https://fileserver.mercata.blockapps.net/hig
 deriveFileServerUrl "" "mercata" = "https://fileserver.mercata.blockapps.net/highway"
 deriveFileServerUrl "" "uranium" = "https://fileserver.mercata.blockapps.net/highway"
 deriveFileServerUrl "" "lithium" = "https://fileserver.mercata.blockapps.net/highway"
+deriveFileServerUrl "" "beryllium" = "https://fileserver.mercata.blockapps.net/highway"
 deriveFileServerUrl "" _ = ""  -- Unknown networks get empty string
 deriveFileServerUrl url _ = url  -- Explicit URL takes precedence

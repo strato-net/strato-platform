@@ -31,7 +31,7 @@ import Blockchain.Database.MerklePatricia (StateRoot (..))
 import Blockchain.Model.WrappedBlock (OutputBlock (..), OutputTx (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.Delta
+import SolidVM.Model.Delta
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Timing
@@ -40,7 +40,9 @@ import Blockchain.VMContext hiding (state)
 import Blockchain.VMMetrics
 import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
 import qualified Blockchain.EthConf.Model as Conf
+import Blockchain.Forks (isReceiptsRootForkActive)
 import qualified Blockchain.Verification as V
+import Blockchain.Data.Receipt (Receipt)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -285,7 +287,7 @@ makeNewBlock mineTransactions mSelfAddress = do
           let lastHead = B.bestBlockHeader cache
           let promoted = take ((fromInteger (Conf.maxTxsPerBlock (quarryConfig ethConf))) - lastExecLen) $ B.promotedTransactions cache
           let time = B.startTimestamp cache
-          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] time mempty M.empty
+          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] [] time mempty M.empty
           let remGas = B.remainingGas cache
           $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
           withBagger $ do
@@ -583,7 +585,8 @@ buildFromMiningCache = do
   let sDelt = getStakeDeltasFromResults $ B.lastExecutedTxs cache
   let txs = (trrTransaction <$> B.lastExecutedTxs cache) ++ (DL.toList $ B.privateHashes cache)
   let time = B.startTimestamp cache
-  let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs time vDelt sDelt
+  receipts <- traverse txRunResultToReceipt (B.lastExecutedTxs cache)
+  let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs receipts time vDelt sDelt
   recordMaxBlockNumber "bagger_build" . number $ nextBlockData
   rewardedBlockData <- buildRewardedBlockHeader nextBlockData
   cacheRunResults rewardedBlockData (B.lastExecutedStateRoot cache, B.remainingGas cache, B.lastExecutedTxs cache)
@@ -600,18 +603,21 @@ buildNextBlockHeader ::
   Keccak256 ->
   StateRoot ->
   [OutputTx] ->
+  [Receipt] ->
   UTCTime ->
   ValidatorDelta ->
   StakeDelta ->
   BlockHeader
-buildNextBlockHeader parentHeader parentHash stateRoot txs time vd sd =
+buildNextBlockHeader parentHeader parentHash stateRoot txs receipts time vd sd =
   let parentNum = number parentHeader
+      blockNum = parentNum + 1
       (newV, remV) = fromDelta vd
       (curValidators, curStakes) = case parentHeader of
         BlockHeader{} -> (S.toList $ getValidatorSet parentHeader, [])
         _ -> let (vs, st) = nextValidatorsAndStakes parentHeader in (S.toList vs, M.toAscList st)
+      receiptsForRoot = if isReceiptsRootForkActive blockNum then receipts else []
+      rcptRoot = V.receiptsVerificationValue receiptsForRoot
       txRoot = V.transactionsVerificationValue (otBaseTx <$> txs)
-      rcptRoot = V.receiptsVerificationValue ()
       bloom = "0000000000000000000000000000000000000000000000000000000000000000"
       extra = txsLen2ExtraData (length txs)
    in if Conf.stakingActiveAt (networkConfig ethConf) (parentNum + 1)

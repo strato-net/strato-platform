@@ -83,6 +83,7 @@ data BlockVerificationFailureDetails
   | VersionMismatch          (BlockDelta Int)
   | UnclesMismatch           (BlockDelta Keccak256)
   | UnexpectedBlockNumber    (BlockDelta Integer)
+  | ReceiptsRootMismatch     (BlockDelta StateRoot)
   deriving (Eq, Show)
 
 data BlockVerificationFailure = BlockVerificationFailure

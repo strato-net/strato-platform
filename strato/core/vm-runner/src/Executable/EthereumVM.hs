@@ -132,6 +132,10 @@ ethereumVM = runResourceT $ do
       UnexpectedBlockNumber BlockDelta{..} -> do
         $logErrorS "ethereumVM/UnexpectedBlockNumber" . T.pack $ "Expected block number: " ++ show _derived
         $logErrorS "ethereumVM/UnexpectedBlockNumber" . T.pack $ "But actually received: " ++ show _inBlock
+      ReceiptsRootMismatch BlockDelta{..} -> do
+        $logErrorS "ethereumVM/ReceiptsRootMismatch" . T.pack $ "Receipts root mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash
+        $logErrorS "ethereumVM/ReceiptsRootMismatch" . T.pack $ "Receipts root in block header: " ++ format _inBlock
+        $logErrorS "ethereumVM/ReceiptsRootMismatch" . T.pack $ "Derived receipts root:         " ++ format _derived
     error "STRATO vm-runner encountered errors while verifying a block in the chain. Please review the logs above for more information."
 
 bootstrapIfFirstRun :: (VMBase m, HasContext m, Mod.Accessible RedisConnection m) => m ()

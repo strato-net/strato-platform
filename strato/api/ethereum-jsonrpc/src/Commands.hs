@@ -21,9 +21,12 @@ import Blockchain.EthConf (runStreamMConfigured, ethConf)
 import qualified Blockchain.EthConf.Model as EthConf
 import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID, contractsConfig, nativeTokenAddress)
 import Blockchain.Data.Block (Block, blockBlockData, blockReceiptTransactions)
-import Blockchain.Data.BlockHeader (BlockHeader (..))
+import qualified Blockchain.Strato.Model.Class as Class
+import Blockchain.Data.BlockHeader (BlockHeader (..), clearBlockSignatures, getBlockSignatures)
 import Blockchain.Data.DataDefs (AddressStateRef (..), TransactionResult(..))
-import Blockchain.Data.RLP (rlpDecode, rlpDeserialize)
+import Blockchain.Data.RLP (rlpDecode, rlpDeserialize, rlpEncode, rlpSerialize)
+import Blockchain.Strato.Model.Secp256k1 (exportSignature)
+import Data.Aeson (ToJSON(..), (.=), object)
 import Blockchain.Data.Transaction (Transaction(..), transactionHash, txAndTime2RawTX)
 import Blockchain.Data.TXOrigin (TXOrigin(API))
 import Blockchain.Model.JsonBlock (AddressStateRef' (..), Block', RawTransaction'(..), Transaction'(..), bPrimeToB)
@@ -45,6 +48,7 @@ import qualified Handlers.AccountInfo as Accounts
 import qualified Handlers.Transaction as Tx
 import qualified Handlers.BlkLast as BlkLast
 import qualified Handlers.Block as Blocks
+import qualified Handlers.Receipts as Receipts
 import qualified Handlers.TransactionResult as TxResults
 import System.Random (randomRIO)
 import System.Timeout (timeout)
@@ -135,6 +139,8 @@ methods =
     eth_sendTransaction,
     eth_sendRawTransaction,
     eth_call,
+    strato_getFinalizedHeader,
+    strato_getReceiptProof,
     strato_simulateV1,
     strato_traceCall,
     strato_traceTransaction,
@@ -971,3 +977,104 @@ eth_submitHashrate = toMethod "eth_submitHashrate" f ()
   where
     f :: RpcResult Server String
     f = throwError $ rpcError (-32601) "eth_submitHashrate not supported"
+
+-- ============================================================================
+-- STRATO bridge JSON-RPC endpoints (Phase 0 spec §9)
+--
+-- These two methods feed the proof-based bridge withdrawal flow on Ethereum:
+--
+--  * strato_getFinalizedHeader -- provides what the on-chain STRATOLightClient
+--    needs to advance its tip: the canonical RLP-encoded header (with the
+--    signatures field emptied so the bytes match what validators signed) and
+--    the original commit signatures.
+--
+--  * strato_getReceiptProof -- intended to provide the per-transaction MPT
+--    inclusion proof against header.receiptsRoot. The receipts trie is empty
+--    until the receipts-root fork lands (PR 4); until then this returns the
+--    header info but null receipt and empty proof.
+-- ============================================================================
+
+data FinalizedHeaderResponse = FinalizedHeaderResponse
+  { fhrHeaderRLP :: String
+  , fhrSignatures :: [String]
+  }
+
+instance ToJSON FinalizedHeaderResponse where
+  toJSON FinalizedHeaderResponse{..} = object
+    [ "headerRLP" .= fhrHeaderRLP
+    , "signatures" .= fhrSignatures
+    ]
+
+data ReceiptProofResponse = ReceiptProofResponse
+  { rprHeaderRLP :: String
+  , rprSignatures :: [String]
+  , rprReceiptRLP :: Maybe String
+  , rprMptProof :: [String]
+  }
+
+instance ToJSON ReceiptProofResponse where
+  toJSON ReceiptProofResponse{..} = object
+    [ "headerRLP" .= rprHeaderRLP
+    , "signatures" .= rprSignatures
+    , "receiptRLP" .= rprReceiptRLP
+    , "mptProof" .= rprMptProof
+    ]
+
+bytesToHex :: B.ByteString -> String
+bytesToHex bs = "0x" ++ BC.unpack (B16.encode bs)
+
+-- Decompose a fetched block into the canonical-header bytes and the
+-- commit-signature list. Used by both bridge endpoints below.
+headerBytesAndSigs :: BlockHeader -> (String, [String])
+headerBytesAndSigs hdr =
+  let sigs = getBlockSignatures hdr
+      hdrSansSigs = clearBlockSignatures hdr
+      headerBytes = rlpSerialize (rlpEncode hdrSansSigs)
+   in (bytesToHex headerBytes, map (bytesToHex . exportSignature) sigs)
+
+strato_getFinalizedHeader :: Method Server
+strato_getFinalizedHeader =
+  toMethod "strato_getFinalizedHeader" f (Required "blockNumber" :+: ())
+  where
+    f :: String -> RpcResult Server (Maybe FinalizedHeaderResponse)
+    f blockNumber = do
+      mBlk <- liftIO $ fetchBlockByNumber blockNumber
+      return $ case mBlk of
+        Just blk' ->
+          let hdr = blockBlockData (bPrimeToB blk')
+              (rlpHex, sigsHex) = headerBytesAndSigs hdr
+           in Just $ FinalizedHeaderResponse rlpHex sigsHex
+        Nothing -> Nothing
+
+strato_getReceiptProof :: Method Server
+strato_getReceiptProof =
+  toMethod "strato_getReceiptProof" f (Required "blockNumber" :+: Required "txIndex" :+: ())
+  where
+    f :: String -> Int -> RpcResult Server (Maybe ReceiptProofResponse)
+    f blockNumber txIndex = do
+      mBlk <- liftIO $ fetchBlockByNumber blockNumber
+      case mBlk of
+        Nothing -> return Nothing
+        Just blk' -> do
+          let hdr = blockBlockData (bPrimeToB blk')
+              (rlpHex, sigsHex) = headerBytesAndSigs hdr
+          -- Delegate proof generation to the REST endpoint. The receipts trie
+          -- is rebuilt server-side from the receipt_ref table; pre-fork
+          -- blocks return an empty proof (because receipt_ref has nothing
+          -- for them and the rebuilt trie is empty), which the on-chain
+          -- verifier will reject -- as expected pre-fork.
+          let blkHash = Class.blockHash (bPrimeToB blk')
+          response <- liftIO $ runLocal $ Receipts.getReceiptProofByHashClient blkHash txIndex
+          case response of
+            Right pr ->
+              return $ Just $
+                ReceiptProofResponse
+                  rlpHex
+                  sigsHex
+                  (Just (Receipts.rprReceiptRLP pr))
+                  (Receipts.rprMptProof pr)
+            Left _ ->
+              -- Likely a 404 (no receipt at that index, or no block with
+              -- that hash). Fall back to header-only response so callers can
+              -- still drive the light client.
+              return $ Just $ ReceiptProofResponse rlpHex sigsHex Nothing []

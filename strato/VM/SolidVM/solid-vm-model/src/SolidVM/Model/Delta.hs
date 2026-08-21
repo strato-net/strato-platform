@@ -3,13 +3,12 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS -fno-warn-orphans      #-}
 
-module Blockchain.Strato.Model.Delta
+module SolidVM.Model.Delta
   ( Delta (..),
     toDelta,
     fromDelta,
@@ -23,7 +22,6 @@ module Blockchain.Strato.Model.Delta
 where
 
 import Blockchain.Strato.Model.CodePtr ()
-import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Validator
 import Control.DeepSeq
 import Data.Function (on)
@@ -31,6 +29,8 @@ import Data.List (find, foldl')
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import GHC.Generics
+import SolidVM.Model.Event
+import SolidVM.Model.Value (Value (..))
 import Text.Read (readMaybe)
 
 data Delta a b = Delta
@@ -64,11 +64,21 @@ getDeltasFromEvents :: [Event] -> ValidatorDelta
 getDeltasFromEvents = foldr go mempty
   where go e ds@(Delta va vr) = case evContractAddress e of
           0x100 -> case evName e of -- MercataGovernance
-            "ValidatorAdded" -> maybe ds (\v -> (Delta ((v:) . va) vr)) $ extractCommonName e
-            "ValidatorRemoved" -> maybe ds (\v -> (Delta va ((v:) . vr))) $ extractCommonName e
+            "ValidatorAdded" -> maybe ds (\v -> (Delta ((v:) . va) vr)) $ extractValidator e
+            "ValidatorRemoved" -> maybe ds (\v -> (Delta va ((v:) . vr))) $ extractValidator e
             _ -> ds
           _ -> ds
-        extractCommonName = fmap (Validator . read . second) . find (\(x, _, _) -> x == "validator") . evArgs
+        extractValidator e =
+          case find (\arg -> eventArgName arg == "validator") (evArgs e) of
+            Just arg -> case eventArgValue arg of
+              SAddress a _ -> Just (Validator a)
+              -- Fallback for legacy/JSON-derived events whose typed Value was
+              -- lost on parse: re-parse the rendered string form.
+              SNULL -> case reads (eventArgValueString arg) of
+                [(addr, "")] -> Just (Validator addr)
+                _ -> Nothing
+              _ -> Nothing
+            Nothing -> Nothing
         second (_, y, _)  = y
 
 -- | Absolute stake weights published by MercataGovernance during a block.

@@ -12,8 +12,6 @@ where
 import Blockchain.Data.Log
 import Blockchain.Data.Transaction
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Delta (StakeDelta)
-import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Validator
 import Blockchain.Stream.Action (Action)
 import Blockchain.VM.SolidException
@@ -22,6 +20,8 @@ import Control.DeepSeq
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import GHC.Generics
+import SolidVM.Model.Delta (StakeDelta)
+import SolidVM.Model.Event
 import SolidVM.Model.Value (Value)
 
 data ExecResults = ExecResults

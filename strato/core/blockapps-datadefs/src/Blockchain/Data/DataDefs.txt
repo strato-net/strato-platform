@@ -175,3 +175,10 @@ CodeInfoRef
     contractCode String
     contractName String Maybe
     deriving Eq Generic Show
+
+ReceiptRef
+    blockHash Keccak256
+    txIndex Int
+    receiptBytes BS.ByteString
+    UniqueReceiptRefBlockTx blockHash txIndex
+    deriving Eq Generic Show
