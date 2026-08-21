@@ -13,6 +13,7 @@ import { useTokenContext } from '@/context/TokenContext';
 
 /** Canonical fee tiers enabled on the PoolV3Factory at initialization. */
 const FEE_TIERS = [
+  { fee: 100, label: '0.01%' },
   { fee: 500, label: '0.05%' },
   { fee: 3000, label: '0.30%' },
   { fee: 10000, label: '1.00%' },
