@@ -22,6 +22,8 @@ const CARRY_VAULT_SHARE_MAP: Record<string, string> = {
   carryeth: "eth-carry",
   carrywbtc: "wbtc-carry",
   yieldusdc: "usdc-yield",
+  yieldgoldst: "goldst-yield",
+  yieldsilvst: "silvst-yield",
 };
 
 const getCarryVaultKey = (asset: { _symbol?: string; _name?: string } | null | undefined): string | null => {

@@ -11,9 +11,15 @@ introduced with funded rewards.
 | `eth-carry` | ETH Yield Vault | ETH | carryETH |
 | `wbtc-carry` | wBTC Carry Vault | wBTC | carryWBTC |
 | `usdc-yield` | USDC Yield Vault | USDC | yieldUSDC |
+| `goldst-yield` | GOLDST Yield Vault | GOLDST | yieldGOLDST |
+| `silvst-yield` | SILVST Yield Vault | SILVST | yieldSILVST |
 
-All three appear in the `Vault` dropdown of the `Carry Vault Admin` section on the
+All five appear in the `Vault` dropdown of the `Carry Vault Admin` section on the
 `Admin` page.
+
+The GOLDST and SILVST vaults are reward-points vaults. Leave accrual uninitialized:
+do not call `initializeAccrual`, `setRewardDistributor`, or `setPerSecondSavingsRate`.
+Their underlying assets remain denominated in GOLDST and SILVST respectively.
 
 ### Where each control lives
 

@@ -8,9 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Plus, X, FlaskConical } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
-import { parseJsonBigInt } from '@/utils/numberUtils';
 import { simulateAdminVote, type SimulationResult } from '@/lib/simulate';
 import SimulationResultPanel from './SimulationResultPanel';
+import {
+  buildValidatedAdminIssueArgs,
+  validateAdminIssueArg,
+} from './adminIssueArgs';
 import * as React from 'react';
 
 type CreateAdminIssueFormValues = {
@@ -96,65 +99,6 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
     }
   }, [functionArgs?.length, replace]);
 
-  const validateFunctionArg = (_type: object, value: string): [boolean, any?] => {
-    const tag = _type['tag']?.toLocaleLowerCase() || 'string'
-    if (tag === 'int') {
-      const val = value.trim();
-      const valNum = Number(val);
-      
-      if (isNaN(valNum) || !Number.isInteger(valNum)) {
-        return [false, `Invalid integer value: ${value}`];
-      }
-      return [true, val];
-    }
-    if (tag === 'bool') {
-      const b = value.toLocaleLowerCase();
-      if (b === 'true' || b === 'false') {
-        return [true, b === 'true'];
-      } else {
-        return [false, `Invalid boolean value: ${value}`];
-      }
-    }
-    if (tag === 'address') {
-      const lowercase = value.toLocaleLowerCase();
-      const isHex = /^(0x)?[0-9A-Fa-f]{1,40}$/.test(lowercase);
-      if (!isHex) {
-        return [false, `Invalid address: ${value}`];
-      }
-      if (lowercase.substring(0,2) !== '0x') {
-        return [true, `0x${lowercase}`];
-      } else {
-        return [true, lowercase];
-      }
-    }
-    if (tag === 'array') {
-      try {
-        const arr = parseJsonBigInt<any[]>(value, { fallback: null });
-        if (arr === null) {
-          return [false, 'Invalid JSON'];
-        }
-        if (!Array.isArray(arr)) {
-          return [false, 'Invalid array'];
-        }
-        return arr.reduce(([success, prev], val) => {
-          if (success) {
-            const [newSuccess, newVal] = validateFunctionArg(_type['entry'], val);
-            if (newSuccess) {
-              return [newSuccess, [...prev, newVal]];
-            } else {
-              return [newSuccess, newVal];
-            }
-          } else {
-            return [success, prev];
-          }
-        }, [true, []]);
-      } catch (e) {
-        return [false, `Array validation error: ${e instanceof Error ? e.message : String(e)}`];
-      }
-    }
-    return [true, value.trim()];
-  }
-
   const getTypeName = (_type: object): string => {
     const tagName = _type['tag']?.toLocaleLowerCase() || 'string'
     if (tagName === 'array') {
@@ -168,13 +112,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
   // prefix, ints stay numeric strings, strings get quoted), throwing on the
   // first bad value. Shared by submit and simulate so both send identical args.
   const buildValidatedArgs = (values: CreateAdminIssueFormValues): unknown[] =>
-    values.args.map((a, i) => {
-      const [success, v] = validateFunctionArg(functionArgs?.[i]?.[1]?.type || {}, a.value);
-      if (!success) {
-        throw new Error(typeof v === 'string' ? v : 'Invalid argument');
-      }
-      return v;
-    });
+    buildValidatedAdminIssueArgs(values.args, functionArgs);
 
   const handleSimulate = async () => {
     const values = form.getValues();
@@ -272,7 +210,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
               rules={{
                 required: 'Contract address is required',
                 validate: (v) => {
-                  const [success, w] = validateFunctionArg({tag: 'Address'}, v);
+                  const [success, w] = validateAdminIssueArg({tag: 'Address'}, v);
                   return success ? true : (typeof w === 'string' ? w : 'Invalid address');
                 },
               }}
@@ -370,7 +308,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
                       rules={{
                         required: abiTypeName === 'string' ? false : 'Argument is required',
                         validate: (v) => {
-                          const [success, w] = validateFunctionArg(abiType, v);
+                          const [success, w] = validateAdminIssueArg(abiType, v);
                           return success ? true : (typeof w === 'string' ? w : 'Invalid argument');
                         },
                         // add per-type validation here if desired (e.g., address, uint, etc.)

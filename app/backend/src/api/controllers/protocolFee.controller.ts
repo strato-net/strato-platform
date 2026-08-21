@@ -42,9 +42,9 @@ class ProtocolFeeController {
       const { protocol } = req.params;
       const { period } = req.query;
       
-      if (!['cdp', 'lending', 'swap', 'stablePool', 'poolV3', 'metalForge', 'gas'].includes(protocol)) {
+      if (!['cdp', 'lending', 'swap', 'stablePool', 'poolV3', 'metalForge', 'gas', 'yieldVault'].includes(protocol)) {
         res.status(RestStatus.BAD_REQUEST).json({
-          error: "Invalid protocol. Must be one of: cdp, lending, swap, stablePool, poolV3, metalForge, gas"
+          error: "Invalid protocol. Must be one of: cdp, lending, swap, stablePool, poolV3, metalForge, gas, yieldVault"
         });
       }
       
@@ -86,6 +86,9 @@ class ProtocolFeeController {
         case 'gas':
           revenue = await protocolFeeService.getGasCostRevenue(accessToken!);
           break;
+        case 'yieldVault':
+          revenue = await protocolFeeService.getYieldVaultProtocolRevenue(accessToken!);
+          break;
       }
       
       res.status(RestStatus.OK).json(revenue);
@@ -115,9 +118,9 @@ class ProtocolFeeController {
       }
       
       // Validate protocol if specified
-      if (protocol && !['cdp', 'lending', 'swap', 'stablePool', 'poolV3', 'metalForge', 'gas'].includes(protocol as string)) {
+      if (protocol && !['cdp', 'lending', 'swap', 'stablePool', 'poolV3', 'metalForge', 'gas', 'yieldVault'].includes(protocol as string)) {
         res.status(RestStatus.BAD_REQUEST).json({
-          error: "Invalid protocol. Must be one of: cdp, lending, swap, stablePool, poolV3, metalForge, gas"
+          error: "Invalid protocol. Must be one of: cdp, lending, swap, stablePool, poolV3, metalForge, gas, yieldVault"
         });
       }
       

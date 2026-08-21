@@ -13,6 +13,13 @@
 - Tab switches use true crossfades (both panels rendered, opacity toggle); network/data switches should NOT animate -- just swap data in place; skeleton loaders only for genuinely async first-loads, never for cached data; data must be ready before animation starts; hide scrollbars with CSS when users want no visible track, not by forcing `overflow-hidden` if the area must still scroll
 - When adding derived/weighted APY sources or new computations, fold them into existing loops and widen existing Cirrus selects rather than adding extra passes or extra API calls; avoid unnecessary `useEffect` and prefer derived state, event handlers, or `useMemo`; user explicitly dislikes effect-heavy code
 
+## Node lifecycle & test runs (STRICT — no exceptions)
+
+- Stop the node ONLY with `strato-down`; start it ONLY with `strato-up`. Never stop/start/kill/manage individual components (no `convoke`, no `strato-p2p`, no manual process management).
+- ALWAYS fully clear `mynode` between runs (rename to `mynode.backup*` or `rm`). Never restart on top of an existing `mynode`.
+- The only valid restart sequence is: `strato-down` → remove/rename `mynode` → `strato-up`. Confirm the prior node is down before starting a new one.
+- Rationale: partial restarts / reused `mynode` leave half-broken state (e.g. a stray second `strato-p2p`) and make test results untrustworthy; a full teardown is the only way to guarantee a clean, reproducible run.
+
 ## Learned Workspace Facts
 
 - STRATO network IDs exceed JS `Number.MAX_SAFE_INTEGER`; must guard with `Number.isSafeInteger()` before passing to viem/wagmi; MetaMask crashes on oversized chain IDs (`initProvider` → `numberToHex`)

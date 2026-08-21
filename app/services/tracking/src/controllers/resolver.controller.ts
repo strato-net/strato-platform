@@ -3,8 +3,8 @@ import { Request, Response } from "express";
 import { config } from "../config";
 import { getLinkBySlug } from "../services/linkService";
 import { recordSessionOpen, updateSessionGeo } from "../services/sessionService";
-import { isBotOrPreview } from "../utils/botDetector";
-import { isAllowedDestination } from "../utils/destinations";
+import { classifyClient } from "../utils/botDetector";
+import { isValidDestination } from "../utils/destinations";
 import {
   isExternalGeoConfigured,
   lookupGeoOffline,
@@ -26,6 +26,24 @@ const buildCookie = (sessionId: string): string => {
   return parts.join("; ");
 };
 
+// A cookie set by this host is invisible to a destination on ANOTHER host
+// (and to any browser that drops third-party/partitioned cookies), so a
+// cross-host redirect carries the session id in the URL as well: the app's
+// beacons echo it back via ?stid= / X-Strato-Tid. Same-host destinations keep
+// their URL untouched — the cookie already covers them.
+const withSessionId = (destination: string, sessionId: string, req: Request): string => {
+  if (destination.startsWith("/")) return destination;
+  try {
+    const url = new URL(destination);
+    const host = typeof req.headers.host === "string" ? req.headers.host.toLowerCase() : "";
+    if (url.host.toLowerCase() === host) return destination;
+    url.searchParams.set("stid", sessionId);
+    return url.toString();
+  } catch {
+    return destination;
+  }
+};
+
 // Relative Location: the browser resolves it against the host the visitor
 // actually requested, so every node edge that proxies /t/ gets its visitors
 // redirected back to itself — no configured origin, no redirect_uri param.
@@ -44,14 +62,14 @@ export const resolve = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Re-validate stored destination in case the allowlist was tightened;
-    // inactive links still record opens but land on the default page.
+    // Re-validate the stored destination (header-injection guard); inactive
+    // links still record opens but land on the default page.
     const destination =
-      link.active && isAllowedDestination(link.destination)
+      link.active && isValidDestination(link.destination)
         ? link.destination
         : config.tracking.defaultDestination;
 
-    const bot = isBotOrPreview(req);
+    const { bot, reason: botReason } = classifyClient(req);
     const sessionId = crypto.randomUUID();
     // req.ip honors X-Forwarded-For (trust proxy) — both nginx layers forward
     // it. Insert immediately with the offline estimate so the row exists
@@ -66,6 +84,7 @@ export const resolve = async (req: Request, res: Response): Promise<void> => {
         ? req.headers["user-agent"].slice(0, 1024)
         : null,
       bot,
+      botReason,
       { ipAddress: normalizeIp(ip), ...lookupGeoOffline(ip) }
     );
     if (!bot && isExternalGeoConfigured()) {
@@ -77,7 +96,7 @@ export const resolve = async (req: Request, res: Response): Promise<void> => {
     if (!bot) {
       res.setHeader("Set-Cookie", buildCookie(sessionId));
     }
-    redirectTo(res, destination);
+    redirectTo(res, bot ? destination : withSessionId(destination, sessionId, req));
   } catch (error) {
     logError("Resolver", error, { slug: req.params.slug });
     redirectTo(res, config.tracking.defaultDestination);

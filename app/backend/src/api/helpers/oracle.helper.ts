@@ -337,7 +337,13 @@ const addYieldVaultTokenPrices = async (
   accessToken: string,
   priceMap: OraclePriceMap
 ): Promise<void> => {
-  const vaultAddrs = [config.ethCarryVault, config.wbtcCarryVault, config.usdcYieldVault].filter(
+  const vaultAddrs = [
+    config.ethCarryVault,
+    config.wbtcCarryVault,
+    config.usdcYieldVault,
+    config.goldstYieldVault,
+    config.silvstYieldVault,
+  ].filter(
     (a): a is string => typeof a === "string" && a.replace(/^0x/i, "").length > 0
   );
   if (!vaultAddrs.length) return;
@@ -367,7 +373,13 @@ export const getCarryVaultUsdPriceMap = async (
   priceMap: OraclePriceMap
 ): Promise<Map<string, string>> => {
   const out = new Map<string, string>();
-  const vaultAddrs = [config.ethCarryVault, config.wbtcCarryVault, config.usdcYieldVault].filter(
+  const vaultAddrs = [
+    config.ethCarryVault,
+    config.wbtcCarryVault,
+    config.usdcYieldVault,
+    config.goldstYieldVault,
+    config.silvstYieldVault,
+  ].filter(
     (a): a is string => typeof a === "string" && a.replace(/^0x/i, "").length > 0
   );
   if (!vaultAddrs.length) return out;

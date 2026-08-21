@@ -41,6 +41,8 @@ export const ACTIVITY_FILTER_CONFIGS: Record<string, FilterConfig> = {
   "LendingPool:Borrowed": { type: "single", attribute: "user" },
   "LendingPool:Deposited": { type: "single", attribute: "user" },
   "Escrow:Redeemed": { type: "or", attributes: ["sender", "recipient"] },
+  "DirectMintPSM:DirectPSMMinted": { type: "single", attribute: "user" },
+  "DirectMintPSM:Redeemed": { type: "single", attribute: "user" },
   "Vault:Deposited": { type: "single", attribute: "user" },
   "Vault:Withdrawn": { type: "single", attribute: "user" },
   "Vault:WithdrawalPayout": { type: "single", attribute: "user" },
