@@ -36,6 +36,7 @@ import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.Model.MicroTime
+import Blockchain.Strato.Model.Validator
 import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.EthConf (ethConf, quarryConfig)
@@ -48,6 +49,7 @@ import qualified Control.Monad.Change.Modify as Mod
 import Data.Foldable hiding (fold)
 import qualified Data.Map as M
 import Data.Maybe
+import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Traversable (for)
 import Prometheus
@@ -154,7 +156,17 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
         -- traffic (RPC reads, sync, preprepares) drive block production at the
         -- rate of incoming messages.
         promoted = B.promotedTransactions $ B.miningCache bState
-        shouldOutputBlocks = not $ null promoted
+        -- Only a validator can ever get a block it builds accepted, so building
+        -- one anywhere else is wasted work that the consensus layer then has to
+        -- throw away -- and each discarded candidate still arms a round timer
+        -- that fires ROUNDCHANGE at the rest of the network. The validator set
+        -- is recorded in the chain head itself, so no extra state is needed;
+        -- before we know our own identity the address is zero and we build
+        -- nothing, which is what we want until the node is set up.
+        amValidator =
+          Validator mSelfAddress
+            `S.member` Bagger.validatorsForNextBlock (B.bestBlockHeader $ B.miningCache bState)
+        shouldOutputBlocks = amValidator && not (null promoted)
     $logInfoS "evm/loop/newBlock" . T.pack $
       printf
         "Num poolable: %d, num pending: %d, num promoted: %d"
@@ -164,6 +176,7 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
     multilineLog "evm/loop/newBlock" $
       boringBox
         [ CL.yellow "Decision making for block creation:",
+          "amValidator: " ++ formatBool amValidator,
           "promoted: " ++ formatBool (not $ null promoted),
           "shouldOutputBlocks: " ++ formatBool shouldOutputBlocks
         ]

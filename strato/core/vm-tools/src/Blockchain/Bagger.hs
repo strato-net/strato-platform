@@ -34,6 +34,7 @@ import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Validator
 import Blockchain.Timing
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext hiding (state)
@@ -601,6 +602,17 @@ buildFromMiningCache = do
         obBlockData = rewardedBlockData
       }
 
+-- | Who the validators are for the block that would be built on top of this
+-- one, i.e. the parent's set with that block's membership changes applied.
+validatorsForNextBlock :: BlockHeader -> S.Set Validator
+validatorsForNextBlock parentHeader = case parentHeader of
+  BlockHeaderV2{} -> S.difference
+                       (S.union
+                         (getValidatorSet parentHeader)
+                         (S.fromList $ newValidators parentHeader))
+                       (S.fromList $ removedValidators parentHeader)
+  BlockHeader{} -> getValidatorSet parentHeader
+
 buildNextBlockHeader ::
   BlockHeader ->
   Keccak256 ->
@@ -612,13 +624,7 @@ buildNextBlockHeader ::
 buildNextBlockHeader parentHeader parentHash stateRoot txs time vd =
   let parentNum = number parentHeader
       (newV, remV) = fromDelta vd
-      curValidators = case parentHeader of
-        BlockHeaderV2{} -> S.toList $ S.difference
-                                       (S.union
-                                         (getValidatorSet parentHeader)
-                                         (S.fromList $ newValidators parentHeader))
-                                       (S.fromList $ removedValidators parentHeader)
-        BlockHeader{} -> S.toList $ getValidatorSet parentHeader
+      curValidators = S.toList $ validatorsForNextBlock parentHeader
    in BlockHeaderV2
         {
           parentHash = parentHash,
