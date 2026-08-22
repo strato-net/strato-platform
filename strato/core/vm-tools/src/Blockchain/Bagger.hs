@@ -295,7 +295,14 @@ makeNewBlock mineTransactions mSelfAddress = do
               Left e -> do
                 logRAE e
                 case e of
-                  (GasLimitReached rtx urtx nsr nbg) -> return (nsr, nbg, lastExec ++ rtx, urtx)
+                  -- The transactions that did not fit are still in the pending
+                  -- pool and get promoted again on the next best block, so they
+                  -- are not lost by dropping them here. Holding them would keep
+                  -- the promotion cache non-empty until this block commits, which
+                  -- would make it read as "there is work" rather than "work has
+                  -- arrived" -- the same standing-state trigger that let unrelated
+                  -- traffic drive block production.
+                  (GasLimitReached rtx _urtx nsr nbg) -> return (nsr, nbg, lastExec ++ rtx, [])
                   (RecoverableFailure f rtx urtx nsr nbg) -> do
                     txsDroppedCallback [f] []
                     let theRejectedTx = rejectedTx f
