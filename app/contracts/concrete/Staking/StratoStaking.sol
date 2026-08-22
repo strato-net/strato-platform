@@ -89,6 +89,9 @@ contract  StratoStaking is Ownable {
     // Consensus integration. Governance (MercataGovernance, genesis address 0x100)
     // is only called while governanceSyncEnabled; the flag is the ops kill switch.
     address public governance;
+    // Genesis AdminRegistry: staking is whitelisted there to cast
+    // voteToAddValidator / voteToRemoveValidator on governance.
+    address constant ADMIN_REGISTRY = address(0x100c);
     bool public governanceSyncEnabled;
     uint256 public minStake;              // self-bond + delegated stake needed to be a validator
     uint256 public minSelfBond;           // self-bond floor (0 until slashing exists)
@@ -342,7 +345,7 @@ contract  StratoStaking is Ownable {
     function _activate(address operator) internal {
         address validator = validatorOf[operator];
         uint256 weight = _validatorWeight(operators[operator]);
-        IStakingGovernance(governance).addValidatorFromStaking(validator, weight);
+        IAdminRegistry(ADMIN_REGISTRY).castVoteOnIssue(governance, "voteToAddValidator", validator);
         isValidator[operator] = true;
         lastSyncedWeight[operator] = weight;
         validatorCount += 1;
@@ -352,7 +355,13 @@ contract  StratoStaking is Ownable {
     // Governance never drops its last validator; then the operator stays registered.
     function _deactivate(address operator) internal returns (bool) {
         address validator = validatorOf[operator];
-        bool removed = IStakingGovernance(governance).removeValidatorFromStaking(validator);
+        // Governance refuses to drop its last validator; surface that as not-removed.
+        bool removed = true;
+        try {
+            IAdminRegistry(ADMIN_REGISTRY).castVoteOnIssue(governance, "voteToRemoveValidator", validator);
+        } catch {
+            removed = false;
+        }
         if (removed) {
             isValidator[operator] = false;
             lastSyncedWeight[operator] = 0;
@@ -375,7 +384,9 @@ contract  StratoStaking is Ownable {
         }
         uint256 weight = _validatorWeight(operators[operator]);
         if (lastSyncedWeight[operator] != weight) {
-            IStakingGovernance(governance).addValidatorFromStaking(validatorOf[operator], weight);
+            // Weight changes need no governance call: consensus reads the weight
+            // from this event (stakingContractAddress watch); governance only
+            // tracks set membership.
             lastSyncedWeight[operator] = weight;
             emit ValidatorSynced(operator, validatorOf[operator], true, weight);
         }

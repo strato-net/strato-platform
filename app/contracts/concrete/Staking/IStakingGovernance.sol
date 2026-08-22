@@ -8,3 +8,10 @@ interface IStakingGovernance {
     function validatorMap(address validator) external view returns (uint256);
     function stakingContract() external view returns (address);
 }
+
+// Genesis AdminRegistry (0x100c) vote surface: a whitelisted caller's
+// castVoteOnIssue executes the target function immediately (the human vote
+// quorum lives at the registry's admin layer).
+interface IAdminRegistry {
+    function castVoteOnIssue(address _target, string _func, variadic _args) external returns (bool, variadic);
+}
