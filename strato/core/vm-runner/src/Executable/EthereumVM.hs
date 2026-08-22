@@ -41,7 +41,7 @@ import Blockchain.Sequencer.Kafka
 import Blockchain.StateRootMismatch
 import Blockchain.Strato.Indexer.Kafka (produceIndexEvents)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
-import Blockchain.Strato.Model.Address ()
+import Blockchain.Strato.Model.Address (Address (..), fromPublicKey)
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.StateRoot ()
 import Blockchain.Strato.RedisBlockDB
@@ -53,10 +53,12 @@ import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Wiring
 import Conduit hiding (Flush)
+import qualified Control.Exception as E
 import Control.Monad
 import Control.Monad.Change.Alter ()
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
+import Control.Monad.Composable.Vault (getPub, runVaultM)
 import Data.Conduit.List (mapMaybeM)
 import Data.Foldable hiding (fold)
 import Data.List
@@ -82,6 +84,22 @@ ethereumVM = runResourceT $ do
         case maybeSelfAddress of
           Just x -> contextModify' $ \cs@(ContextState{}) -> cs{_selfAddress = x}
           Nothing -> pure ()
+
+        -- The sequencer only emits VmSelfAddress while its own identity is
+        -- unresolved, so a vm-runner started after that point never receives
+        -- one and would keep the default address indefinitely. Resolve it from
+        -- Vault directly instead, retrying on each batch until it is available,
+        -- since the key may not exist yet when the node first comes up.
+        knownSelfAddress <- contextGets _selfAddress
+        when (knownSelfAddress == Address 0) $ do
+          resolved <-
+            liftIO . E.try @E.SomeException . runLoggingT . runVaultM (vaultUrl $ urlConfig ethConf) $
+              fromPublicKey <$> getPub
+          case resolved of
+            Right addr -> do
+              $logInfoS "ethereumVM/selfAddress" . T.pack $ "Node identity resolved from Vault: " ++ format addr
+              contextModify' $ \cs@(ContextState{}) -> cs{_selfAddress = addr}
+            Left _ -> $logDebugS "ethereumVM/selfAddress" "Node identity not available from Vault yet"
 
         -- Handle flush mempool events immediately
         forM_ seqEvents $ \event -> case event of

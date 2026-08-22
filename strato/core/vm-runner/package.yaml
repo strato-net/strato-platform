@@ -58,6 +58,7 @@ library:
   - time
   - transformers
   - unliftio
+  - vault-monad
   - vm-tools
   - ordered-containers
 
