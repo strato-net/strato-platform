@@ -345,7 +345,13 @@ contract  StratoStaking is Ownable {
     function _activate(address operator) internal {
         address validator = validatorOf[operator];
         uint256 weight = _validatorWeight(operators[operator]);
-        IAdminRegistry(ADMIN_REGISTRY).castVoteOnIssue(governance, "voteToAddValidator", validator);
+        // Best-effort: governance rejects votes to add a validator that is
+        // already in the set (e.g. the genesis validators staking for the
+        // first time); membership being already-correct is not a failure.
+        try {
+            IAdminRegistry(ADMIN_REGISTRY).castVoteOnIssue(governance, "voteToAddValidator", validator);
+        } catch {
+        }
         isValidator[operator] = true;
         lastSyncedWeight[operator] = weight;
         validatorCount += 1;
