@@ -2,31 +2,40 @@ import { useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { useLiquidationAlert, getRiskLevelColor } from '@/hooks/useLiquidationAlert';
+import {
+  useLiquidationAlert,
+  getRiskLevelColor,
+  LiquidationAlertState,
+} from '@/hooks/useLiquidationAlert';
+import { useCDPLiquidationAlert } from '@/hooks/useCDPLiquidationAlert';
 
-interface LiquidationAlertBannerProps {
+export interface AlertAction {
+  label: string;
+  to: string;
+}
+
+interface LiquidationAlertBannerViewProps {
+  alertState: LiquidationAlertState;
+  actions: AlertAction[];
   className?: string;
 }
 
-const LiquidationAlertBanner = ({ className = '' }: LiquidationAlertBannerProps) => {
+// Presentational banner — takes the alert state and its action buttons as
+// props so it can be reused by both the lending-pool and CDP alerts.
+export const LiquidationAlertBannerView = ({
+  alertState,
+  actions,
+  className = '',
+}: LiquidationAlertBannerViewProps) => {
   const navigate = useNavigate();
-  const alertState = useLiquidationAlert();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   if (!alertState.shouldShow) {
     return null;
   }
 
-  const { riskLevel, healthFactor, message } = alertState;
+  const { riskLevel, message } = alertState;
   const colorClasses = getRiskLevelColor(riskLevel);
-
-  const handleAddCollateral = () => {
-    navigate('/dashboard/advanced?tab=borrow&subtab=borrow');
-  };
-
-  const handleRepayLoan = () => {
-    navigate('/dashboard/advanced?tab=borrow&subtab=repay');
-  };
 
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed);
@@ -61,33 +70,60 @@ const LiquidationAlertBanner = ({ className = '' }: LiquidationAlertBannerProps)
         {/* Collapsible Content */}
         {!isCollapsed && (
           <div className="px-4 pb-3 pt-0">
-            {healthFactor !== null && (
-              <p className="text-xs text-muted-foreground mb-3">
-                Current Health Factor: <span className="font-semibold">{healthFactor.toFixed(2)}</span>
-              </p>
-            )}
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleAddCollateral}
-                className="text-xs md:text-sm border-current hover:bg-current/10"
-              >
-                Add Collateral
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRepayLoan}
-                className="text-xs md:text-sm border-current hover:bg-current/10"
-              >
-                Repay Loan
-              </Button>
+              {actions.map((action) => (
+                <Button
+                  key={action.label}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(action.to)}
+                  className="text-xs md:text-sm border-current hover:bg-current/10"
+                >
+                  {action.label}
+                </Button>
+              ))}
             </div>
           </div>
         )}
       </div>
     </div>
+  );
+};
+
+const LENDING_ACTIONS: AlertAction[] = [
+  { label: 'Add Collateral', to: '/dashboard/advanced?tab=borrow&subtab=borrow' },
+  { label: 'Repay Loan', to: '/dashboard/advanced?tab=borrow&subtab=repay' },
+];
+
+const CDP_ACTIONS: AlertAction[] = [
+  { label: 'Manage Vault', to: '/dashboard/borrow' },
+];
+
+interface LiquidationAlertBannerProps {
+  className?: string;
+}
+
+// Lending-pool liquidation banner (default export preserves existing usages).
+const LiquidationAlertBanner = ({ className = '' }: LiquidationAlertBannerProps) => {
+  const alertState = useLiquidationAlert();
+  return (
+    <LiquidationAlertBannerView
+      alertState={alertState}
+      actions={LENDING_ACTIONS}
+      className={className}
+    />
+  );
+};
+
+// CDP (vault) liquidation banner — driven by the worst vault health factor.
+export const CDPLiquidationAlertBanner = ({ className = '' }: LiquidationAlertBannerProps) => {
+  const alertState = useCDPLiquidationAlert();
+  return (
+    <LiquidationAlertBannerView
+      alertState={alertState}
+      actions={CDP_ACTIONS}
+      className={className}
+    />
   );
 };
 

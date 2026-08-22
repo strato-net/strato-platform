@@ -55,9 +55,7 @@ export const API_ERROR_TITLES: Record<string, string> = {
   
   // PSM operations
   "/psm/mint": "PSM Mint Error",
-  "/psm/request-burn": "PSM Burn Request Error",
-  "/psm/complete-burn": "PSM Burn Complete Error",
-  "/psm/cancel-burn": "PSM Burn Cancel Error",
+  "/psm/redeem": "PSM Redeem Error",
   "/psm/info": "PSM Info Error",
   "/psm": "PSM Error",
 

@@ -55,10 +55,8 @@ export const SAFETY_REDEEM_FEE = "0.01"; // USDST fee for SafetyModule redeem tr
 export const STAKING_STAKE_FEE = "0.02"; // USDST fee for STRATO staking (approve + stake = 2 calls)
 export const STAKING_ACTION_FEE = "0.01"; // USDST fee for STRATO claim/unstake/withdraw (1 call)
 export const METAL_BUY_FEE = "0.02"; // USDST fee for metal buy (approve + mintMetal = 2 calls)
-export const PSM_MINT_FEE = "0.02"; // USDST fee for PSM mint (approve + mint = 2 calls)
-export const PSM_BURN_REQUEST_FEE = "0.02"; // USDST fee for PSM burn request (approve + requestBurn = 2 calls)
-export const PSM_BURN_COMPLETE_FEE = "0.01"; // USDST fee for PSM burn complete
-export const PSM_BURN_CANCEL_FEE = "0.01"; // USDST fee for PSM burn cancel
+export const PSM_MINT_FEE = "0.02"; // USDST fee for PSM mint / mintAndSave (approve + mint = 2 calls)
+export const PSM_REDEEM_FEE = "0.02"; // USDST fee for PSM redeem (approve + redeem = 2 calls)
 
 // ============================================
 // Withdrawal limits

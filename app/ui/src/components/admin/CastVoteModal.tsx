@@ -5,6 +5,7 @@ import { Loader2, FlaskConical } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import CopyButton from '../ui/copy';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatArgValue } from '@/utils/numberUtils';
 import { simulateAdminVote, type SimulationResult } from '@/lib/simulate';
 import SimulationResultPanel from './SimulationResultPanel';
 
@@ -189,7 +190,7 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
                       <span className="text-sm font-semibold text-muted-foreground min-w-[60px]">
                         Arg {index + 1}:
                       </span>
-                      <code className="text-sm font-mono break-all flex-1">{String(arg)}</code>
+                      <code className="text-sm font-mono break-all flex-1">{formatArgValue(arg)}</code>
                     </div>
                   ))}
                 </div>
