@@ -45,6 +45,7 @@ struct StakingUnbondRequest {
 
 contract  StratoStaking is Ownable {
     event Initialized(address indexed stratoToken, uint256 unbondingSeconds, uint256 baseRewardBps, uint256 maxCommissionBps);
+    event UsdstTokenSet(address indexed usdstToken, uint256 trackedFrom);
     event ValidatorRegistrySet(address indexed validatorRegistry);
     event GovernanceSet(address indexed governance, bool syncEnabled);
     event ValidatorParamsUpdated(uint256 minStake, uint256 minSelfBond, uint256 proposerFeeBps, uint256 maxConsecutiveMisses, uint256 jailCooldown);
@@ -231,6 +232,18 @@ contract  StratoStaking is Ownable {
 
     function operatorCount() external view returns (uint256) {
         return operatorList.length;
+    }
+
+    // USDST joined the fee path after this contract was already live, so a deployment
+    // upgraded in place can never reach it through initialize(). Any balance already
+    // held predates fee attribution and must not be credited to whichever validator
+    // proposes the next block.
+    function setUsdstToken(address _usdstToken) external onlyOwner onlyInitialized {
+        require(address(usdstToken) == address(0), "SS: usdst set");
+        require(_usdstToken != address(0), "SS: usdst=0");
+        usdstToken = IERC20(_usdstToken);
+        trackedUsdst = usdstToken.balanceOf(address(this));
+        emit UsdstTokenSet(_usdstToken, trackedUsdst);
     }
 
     function setValidatorRegistry(address _validatorRegistry) external onlyOwner onlyInitialized {

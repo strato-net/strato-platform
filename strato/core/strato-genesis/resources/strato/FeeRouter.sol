@@ -27,6 +27,22 @@ contract record FeeRouter {
     function _feeCollector() internal view virtual returns (address) { return address(0x100d); }
     function _governance() internal view virtual returns (address) { return address(0x100); } // MercataGovernance
 
+    // Chains whose genesis governance predates staking have no stakingContract() to
+    // ask, so they subclass this with the deployed address. It cannot be storage:
+    // payFees is DELEGATECALLed and SolidVM storage is name-keyed, so any state read
+    // here would resolve against the signer, not the router.
+    function _stakingFallback() internal view virtual returns (address) { return address(0); }
+
+    function _staking() internal view virtual returns (address) {
+        address staking = address(0);
+        try IStakingGovernanceLookup(_governance()).stakingContract() returns (address s) {
+            staking = s;
+        } catch {
+        }
+        if (staking == address(0)) staking = _stakingFallback();
+        return staking;
+    }
+
     function payFees() external {
         uint voucherFee = 1e18;
         uint usdstFee = 1e16; // $0.01
@@ -34,7 +50,6 @@ contract record FeeRouter {
         address voucher = _voucher();
         address USDST = _usdst();
         address feeCollector = _feeCollector();
-        address governance = _governance();
 
         bool paidWithVoucher = true;
         try { // try to use a voucher
@@ -43,11 +58,7 @@ contract record FeeRouter {
             paidWithVoucher = false;
         }
 
-        address staking = address(0);
-        try IStakingGovernanceLookup(governance).stakingContract() returns (address s) {
-            staking = s;
-        } catch {
-        }
+        address staking = _staking();
 
         if (!paidWithVoucher) { // no voucher, pay in USDST
             uint proposerShare = 0;

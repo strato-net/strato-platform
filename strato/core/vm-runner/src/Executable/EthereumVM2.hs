@@ -119,8 +119,13 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
                               parentHash = bSumParentHash summ,
                               stateRoot = bSumStateRoot summ
                             }
+                            -- NOTE: Do NOT override `parentHash` either - block.prevProposer /
+                            -- block.prevIntendedProposer resolve the *parent's* BlockSummary
+                            -- through this field. Pointing it at the grandparent makes any
+                            -- transaction that reads them produce a different state root here
+                            -- than the proposer and the authoritative replay computed, so the
+                            -- proposal is rejected and the round changes forever.
                             BlockHeaderV3 {} -> bHeader {
-                              parentHash = bSumParentHash summ,
                               stateRoot = bSumStateRoot summ
                             }
             proposer <- either error pure $ recoverProposer bHeader

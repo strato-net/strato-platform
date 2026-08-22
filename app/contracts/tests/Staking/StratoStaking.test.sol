@@ -8,6 +8,16 @@ import "../../concrete/Tokens/TokenFactory.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../Util.sol";
 
+// Helium's staking contract was initialized before USDST joined the fee path, so it
+// runs with stratoToken set and usdstToken zero — a state initialize() can no longer
+// produce. Dropping usdstToken reproduces it.
+contract UpgradedInPlaceStaking is StratoStaking {
+    constructor(address initialOwner) StratoStaking(initialOwner) { }
+    function forgetUsdst() public {
+        usdstToken = IERC20(address(0));
+    }
+}
+
 contract Describe_StratoStaking {
     uint256 public INFINITY = 2 ** 256 - 1;
     address constant VALIDATOR_A = address(0xaaaa);
@@ -806,6 +816,40 @@ contract Describe_StratoStaking {
             rejected = true;
         }
         require(rejected, "usdst is not a stray token");
+    }
+
+    function it_sets_usdst_on_a_contract_upgraded_in_place() public {
+        UpgradedInPlaceStaking upgraded = new UpgradedInPlaceStaking(address(this));
+        upgraded.initialize(address(strato), address(usdst), 100, 5000, 1000, 16);
+        upgraded.forgetUsdst();
+        require(address(upgraded.usdstToken()) == address(0), "starts unset, as on helium");
+
+        // Fees that arrived before attribution existed stay out of the first credit.
+        usdst.mint(address(upgraded), 7e18);
+        upgraded.setUsdstToken(address(usdst));
+        require(address(upgraded.usdstToken()) == address(usdst), "usdst wired");
+        require(upgraded.trackedUsdst() == 7e18, "pre-existing balance is not credited to a proposer");
+
+        bool rejected = false;
+        try upgraded.setUsdstToken(address(usdst)) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "usdst cannot be repointed once set");
+    }
+
+    function it_only_lets_the_owner_set_usdst() public {
+        UpgradedInPlaceStaking upgraded = new UpgradedInPlaceStaking(address(this));
+        upgraded.initialize(address(strato), address(usdst), 100, 5000, 1000, 16);
+        upgraded.forgetUsdst();
+
+        bool rejected = false;
+        try user1.do(address(upgraded), "setUsdstToken", address(usdst)) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "non-owner rejected");
+        require(address(upgraded.usdstToken()) == address(0), "still unset");
     }
 
     function it_counts_proposals_and_misses_once_per_block() public {

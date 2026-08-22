@@ -19,6 +19,14 @@ contract record MockStaking {
     }
 }
 
+// Helium's genesis MercataGovernance has no stakingContract() at all, so the lookup
+// fails outright rather than answering zero. payFees has to survive that: a throw
+// here would fail every transaction on the chain.
+contract record LegacyGovernance {
+    uint public validators;
+    function voteToAddValidator(address proposed) public { validators += 1; }
+}
+
 contract record MockVoucher {
     mapping(address => uint) public balances;
     function mint(address to, uint amount) public { balances[to] += amount; }
@@ -37,6 +45,7 @@ contract record FeeRouterHarness is FeeRouter {
     address public usdstAddr;
     address public feeCollectorAddr;
     address public governanceAddr;
+    address public stakingFallbackAddr;
 
     function configure(address v, address u, address f, address g) public {
         voucherAddr = v;
@@ -45,10 +54,13 @@ contract record FeeRouterHarness is FeeRouter {
         governanceAddr = g;
     }
 
+    function setStakingFallback(address s) public { stakingFallbackAddr = s; }
+
     function _voucher() internal view override returns (address) { return voucherAddr; }
     function _usdst() internal view override returns (address) { return usdstAddr; }
     function _feeCollector() internal view override returns (address) { return feeCollectorAddr; }
     function _governance() internal view override returns (address) { return governanceAddr; }
+    function _stakingFallback() internal view override returns (address) { return stakingFallbackAddr; }
 }
 
 contract record Signer is FeeRouterHarness {
@@ -105,6 +117,53 @@ contract Describe_FeeRouter {
         signer.pay(address(router));
         require(usdst.balanceOf(address(staking)) == 5e15 + 1e16, "share capped at 100%");
         require(usdst.balanceOf(address(feeCollector)) == 5e15, "collector unchanged");
+    }
+
+    // Helium's genesis governance predates staking, so it answers stakingContract()
+    // with nothing and the router has to reach staking through the subclassed fallback.
+    function it_falls_back_when_governance_cannot_name_staking() public {
+        signer.setStakingFallback(address(staking));
+        staking.setProposerFeeBps(5000);
+
+        signer.pay(address(router));
+        require(usdst.balanceOf(address(staking)) == 5e15, "staking half via the fallback");
+        require(usdst.balanceOf(address(feeCollector)) == 5e15, "collector half");
+        require(staking.processed() == 1, "processBlock called");
+    }
+
+    function it_survives_governance_without_a_staking_lookup() public {
+        LegacyGovernance legacy = new LegacyGovernance();
+        signer.configure(address(voucher), address(usdst), address(feeCollector), address(legacy));
+        signer.setStakingFallback(address(staking));
+        staking.setProposerFeeBps(1000);
+
+        signer.pay(address(router));
+        require(usdst.balanceOf(address(staking)) == 1e15, "staking share via the fallback");
+        require(usdst.balanceOf(address(feeCollector)) == 9e15, "collector keeps the rest");
+        require(staking.processed() == 1, "processBlock called");
+    }
+
+    // The pre-install state: no fallback either, so the router must degrade to the
+    // legacy behaviour instead of failing the transaction.
+    function it_pays_the_collector_when_nothing_can_name_staking() public {
+        LegacyGovernance legacy = new LegacyGovernance();
+        signer.configure(address(voucher), address(usdst), address(feeCollector), address(legacy));
+
+        signer.pay(address(router));
+        require(usdst.balanceOf(address(feeCollector)) == 1e16, "whole fee to the collector");
+        require(usdst.balanceOf(address(signer)) == 1e18 - 1e16, "signer paid exactly once");
+    }
+
+    function it_prefers_governance_over_the_fallback() public {
+        MockStaking named = new MockStaking();
+        gov.setStakingContract(address(named));
+        named.setProposerFeeBps(5000);
+        signer.setStakingFallback(address(staking));
+
+        signer.pay(address(router));
+        require(usdst.balanceOf(address(named)) == 5e15, "governance's answer wins");
+        require(usdst.balanceOf(address(staking)) == 0, "stale fallback unused");
+        require(staking.processed() == 0, "stale fallback not notified");
     }
 
     function it_still_notifies_staking_on_the_voucher_path() public {

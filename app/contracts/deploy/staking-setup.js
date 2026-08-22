@@ -23,6 +23,10 @@ const FORTY_K = '40000000000000000000000';
 const STEPS = {
   init:      { target: STAKING, func: 'initialize',
                args: [TOKEN, USDST, 86400, 500, 2000, 50] },
+  // This deployment was initialized before USDST joined the fee path, so initialize()
+  // can no longer reach it; setUsdstToken is the in-place route.
+  usdst:     { target: STAKING, func: 'setUsdstToken',
+               args: [{ type: 'address', value: USDST }] },
   setvreg:   { target: STAKING, func: 'setValidatorRegistry', args: [VREG] },
   params:    { target: STAKING, func: 'setValidatorParams',
                args: [TEN_K, 0, 1000, 100, 3600] },
