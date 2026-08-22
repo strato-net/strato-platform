@@ -21,6 +21,7 @@ module SolidVM.Model.Delta
   )
 where
 
+import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.Validator
 import Control.DeepSeq
@@ -84,15 +85,29 @@ getDeltasFromEvents = foldr go mempty
 -- Within a block, the last write for a validator wins.
 type StakeDelta = M.Map Validator Integer
 
-getStakeDeltasFromEvents :: [Event] -> StakeDelta
-getStakeDeltasFromEvents = foldl' go M.empty
-  where go acc e = case (evContractAddress e, evName e) of
-          (0x100, "ValidatorStakeUpdated") -> -- MercataGovernance
-            maybe acc (\(v, st) -> M.insert v st acc) $
-              (,) <$> (Validator <$> arg "validator" e) <*> arg "stake" e
-          _ -> acc
+-- | Stake weights come from the StratoStaking contract's ValidatorSynced
+-- events: (operator, validator, registered, weight). registered=False always
+-- carries weight 0, but we force it anyway so a deactivation can never leave a
+-- stale weight. The watched address is the staking proxy from ethconf
+-- ('stakingContractAddress'); 'Nothing' disables stake extraction.
+getStakeDeltasFromEvents :: Maybe Address -> [Event] -> StakeDelta
+getStakeDeltasFromEvents Nothing = const M.empty
+getStakeDeltasFromEvents (Just stakingAddr) = foldl' go M.empty
+  where go acc e
+          | evContractAddress e == stakingAddr && evName e == "ValidatorSynced" =
+              maybe acc (\(v, st) -> M.insert v st acc) $ do
+                v <- Validator <$> arg "validator" e
+                registered <- boolArg "registered" e
+                st <- if registered then arg "weight" e else Just 0
+                pure (v, st)
+          | otherwise = acc
         arg :: Read a => String -> Event -> Maybe a
         arg name = (>>= readMaybe . eventArgValueString) . find ((== name) . eventArgName) . evArgs
+        -- rendered Bool is "True"/"true" depending on the emitting path
+        boolArg name e = case fmap eventArgValueString . find ((== name) . eventArgName) $ evArgs e of
+          Just str | str `elem` ["True", "true"] -> Just True
+                   | str `elem` ["False", "false"] -> Just False
+          _ -> Nothing
 
 -- | Apply a block's stake updates to the stake map in force for that block,
 -- dropping validators that were removed in the same block.
