@@ -146,17 +146,25 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
     -- todo: which may fail
     bState <- Bagger.getBaggerState
     let pending = B.pending bState
-        hasTxs = (numPoolable > 0) || not (M.null pending)
-        shouldOutputBlocks = hasTxs
+        -- Build only when transactions have become eligible for inclusion since
+        -- the last block was built; otherwise makeNewBlock would rebuild the
+        -- identical candidate. A head change also repopulates this, via the
+        -- demote/promote cycle in processNewBestBlock. A non-empty mempool is a
+        -- standing state rather than an event, so triggering on it let unrelated
+        -- traffic (RPC reads, sync, preprepares) drive block production at the
+        -- rate of incoming messages.
+        promoted = B.promotedTransactions $ B.miningCache bState
+        shouldOutputBlocks = not $ null promoted
     $logInfoS "evm/loop/newBlock" . T.pack $
       printf
-        "Num poolable: %d, num pending: %d"
+        "Num poolable: %d, num pending: %d, num promoted: %d"
         numPoolable
         (M.size pending)
+        (length promoted)
     multilineLog "evm/loop/newBlock" $
       boringBox
         [ CL.yellow "Decision making for block creation:",
-          "hasTxs: " ++ formatBool hasTxs,
+          "promoted: " ++ formatBool (not $ null promoted),
           "shouldOutputBlocks: " ++ formatBool shouldOutputBlocks
         ]
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show numPoolable
