@@ -1102,8 +1102,19 @@ contract  StratoStaking is Ownable {
         if (address(stratoToken) == address(0)) return;
         _syncFees();
         if (lastProcessedBlock != block.number) {
+            // Read the parent's proposal facts before latching. They resolve the
+            // parent's BlockSummary out of node-local storage and are the only part
+            // of this that can throw; the fee path catches that, and a SolidVM catch
+            // does not roll back, so latching first would leave the block marked
+            // processed with nothing counted and no way for a later transaction to
+            // retry. Everything after this point is local writes plus _jail's
+            // already-guarded sync.
+            address actual = block.prevProposer;
+            address intended = block.prevIntendedProposer;
+            // Latch before _processPrevBlock, not after: _jail calls out to the
+            // AdminRegistry, and a reentrant processBlock must not count twice.
             lastProcessedBlock = block.number;
-            _processPrevBlock();
+            _processPrevBlock(actual, intended);
         }
     }
 
@@ -1136,9 +1147,7 @@ contract  StratoStaking is Ownable {
     // consensus-derived but not cryptographically attributable (a round change
     // carries no signed "missed" evidence), so it only costs the block's fees,
     // feeds the dashboard and — optionally — a temporary jail. No tokens move.
-    function _processPrevBlock() internal {
-        address actual = block.prevProposer;
-        address intended = block.prevIntendedProposer;
+    function _processPrevBlock(address actual, address intended) internal {
         if (actual != address(0)) {
             blocksProposed[actual] += 1;
             consecutiveMisses[actual] = 0;
