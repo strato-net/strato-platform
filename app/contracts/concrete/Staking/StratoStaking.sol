@@ -278,7 +278,8 @@ contract  StratoStaking is Ownable {
         uint256 _maxOperatorStakeBps,
         bool _joinsPaused
     ) external onlyOwner onlyInitialized {
-        require(_hardCapActiveValidators > 0 && _hardCapActiveValidators <= hardCapActiveValidators, "SS: hard cap only lowers");
+        // Unset (0) means the cap was never written; only-lowers applies once set.
+        require(_hardCapActiveValidators > 0 && (hardCapActiveValidators == 0 || _hardCapActiveValidators <= hardCapActiveValidators), "SS: hard cap only lowers");
         require(_maxActiveValidators <= _hardCapActiveValidators, "SS: max above hard cap");
         require(_maxSetMutationsPerBlock > 0, "SS: bad mutation cap");
         require(_maxOperatorStakeBps <= BPS_DIVISOR, "SS: bad stake cap");
@@ -330,7 +331,11 @@ contract  StratoStaking is Ownable {
     }
 
     function effectiveCap() public view returns (uint256) {
-        return maxActiveValidators < hardCapActiveValidators ? maxActiveValidators : hardCapActiveValidators;
+        // Zero-valued admission params read as unset (an upgraded proxy has no
+        // storage for fields the old code never wrote); default to a 50-slot set.
+        uint256 h = hardCapActiveValidators == 0 ? 50 : hardCapActiveValidators;
+        uint256 a = maxActiveValidators == 0 ? h : maxActiveValidators;
+        return a < h ? a : h;
     }
 
     function _consumeMutations(uint256 n) internal {
@@ -338,7 +343,8 @@ contract  StratoStaking is Ownable {
             mutationBlock = block.number;
             setMutationsThisBlock = 0;
         }
-        require(setMutationsThisBlock + n <= maxSetMutationsPerBlock, "SS: mutation cap");
+        uint256 mutationCap = maxSetMutationsPerBlock == 0 ? 4 : maxSetMutationsPerBlock;
+        require(setMutationsThisBlock + n <= mutationCap, "SS: mutation cap");
         setMutationsThisBlock += n;
     }
 
