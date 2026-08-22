@@ -219,6 +219,10 @@ data NetworkConf = NetworkConf
   -- is in force. 'Nothing' means "from genesis". Every node of a network must
   -- agree on this value.
   , stakingActivationBlock :: Maybe Integer
+  -- | Contract address whose ValidatorSynced events publish validator stake
+  -- weights for consensus (the StratoStaking proxy; stable across upgrades).
+  -- 'Nothing' disables stake watching. Every node of a network must agree.
+  , stakingContractAddress :: Maybe Address
   }
   deriving (Show, Eq, Generic, ToJSON)
 
@@ -234,6 +238,7 @@ instance FromJSON NetworkConf where
       <*> v .:? "blockPeriodMs" .!= 1000
       <*> v .:? "roundPeriodS" .!= 3600
       <*> v .:? "stakingActivationBlock" .!= defaultStakingActivationBlock net
+      <*> v .:? "stakingContractAddress" .!= defaultStakingContractAddress net
 
 -- | Sentinel meaning "staking activation has not been scheduled yet" — used as
 -- the default for networks that already exist so that a node upgrade never
@@ -247,6 +252,15 @@ defaultStakingActivationBlock :: String -> Maybe Integer
 defaultStakingActivationBlock net
   | net `elem` ["upquark", "lithium", "mercata", "mercata-hydrogen", "uranium"] = Just stakingNotScheduled
   | take 6 net == "helium" = Just 250000
+  | otherwise = Nothing
+
+-- | The StratoStaking proxy per network: events from this address carry the
+-- stake weights consensus consumes. The proxy address survives implementation
+-- upgrades, so it is safe to pin here; ethconf.yaml can override.
+defaultStakingContractAddress :: String -> Maybe Address
+defaultStakingContractAddress net
+  | take 6 net == "helium" = Just 0xd6726e06c3c71a3bad80b5eb6925707a31729b81
+  | net == "upquark" = Just 0xf30a022ce83bed7adeafc286c719388dcc3b3988
   | otherwise = Nothing
 
 -- | Is stake-weighted proposer selection in force at the given block number?
@@ -391,6 +405,7 @@ instance Default NetworkConf where
     , blockPeriodMs = 1000   -- minimum delay between blocks
     , roundPeriodS = 3600    -- backstop: seconds without progress before a forced round change
     , stakingActivationBlock = defaultStakingActivationBlock "upquark"
+    , stakingContractAddress = defaultStakingContractAddress "upquark"
     }
 
 instance Default EthConf where

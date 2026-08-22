@@ -315,7 +315,7 @@ create' creator newAddress ch cc contractName' valList = do
         erPragmas = CC._pragmas cc,
         erNewValidators = newV,
         erRemovedValidators = remV,
-        erStakeUpdates = getStakeDeltasFromEvents $ toList finalEvs
+        erStakeUpdates = getStakeDeltasFromEvents (Conf.stakingContractAddress $ Conf.networkConfig ethConf) $ toList finalEvs
       }
 
 call ::
@@ -404,7 +404,7 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
           erPragmas = [],
           erNewValidators = newV,
           erRemovedValidators = remV,
-          erStakeUpdates = getStakeDeltasFromEvents $ toList finalEvs
+          erStakeUpdates = getStakeDeltasFromEvents (Conf.stakingContractAddress $ Conf.networkConfig ethConf) $ toList finalEvs
         }
 
 call' ::

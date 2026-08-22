@@ -91,10 +91,12 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
       rlpRT = rlpDecode . rlpDeserialize . rlpSerialize . rlpEncode
       v1 = Validator 0x1
       v2 = Validator 0x2
-      stakeEvent addr name args = Event zeroHash zeroHash (Address 0) "MercataGovernance" addr name args
+      stakingAddr = Address 0xd6726e06
+      stakeEvent addr name args = Event zeroHash zeroHash (Address 0) "StratoStaking" addr name args
       addrArg v = ("validator", SNULL, show v, SVMType.Address False)
-      stakeArg st = ("stake", SNULL, show st, SVMType.Int (Just False) Nothing)
-      updated v st = stakeEvent 0x100 "ValidatorStakeUpdated" [addrArg v, stakeArg st]
+      weightArg st = ("weight", SNULL, show st, SVMType.Int (Just False) Nothing)
+      regArg b = ("registered", SNULL, if b then "True" else "False", SVMType.Bool)
+      synced v st = stakeEvent stakingAddr "ValidatorSynced" [addrArg v, regArg True, weightArg st]
 
   it "round trips version-3 headers through RLP" $
     forAll genBlockHeaderV3 $ \h -> rlpRT h `shouldBe` h
@@ -115,13 +117,15 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
       bSumProposalFacts (rlpDecode legacy) `shouldBe` noProposalFacts
       bSumNumber (rlpDecode legacy) `shouldBe` number h
 
-  it "collects stake updates from governance events only, last write wins" $ do
-    let evs = [ updated (Address 0x1) (5 :: Integer)
-              , stakeEvent 0x101 "ValidatorStakeUpdated" [addrArg (Address 0x2), stakeArg (9 :: Integer)]
-              , updated (Address 0x1) (7 :: Integer)
-              , stakeEvent 0x100 "ValidatorStakeUpdated" [("validator", SNULL, "garbage", SVMType.Address False), stakeArg (9 :: Integer)]
+  it "collects ValidatorSynced from the staking contract only, last write wins" $ do
+    let evs = [ synced (Address 0x1) (5 :: Integer)
+              , stakeEvent 0x101 "ValidatorSynced" [addrArg (Address 0x2), regArg True, weightArg (9 :: Integer)]
+              , synced (Address 0x1) (7 :: Integer)
+              , stakeEvent stakingAddr "ValidatorSynced" [("validator", SNULL, "garbage", SVMType.Address False), regArg True, weightArg (9 :: Integer)]
+              , stakeEvent stakingAddr "ValidatorSynced" [addrArg (Address 0x2), regArg False, weightArg (3 :: Integer)]
               ]
-    getStakeDeltasFromEvents evs `shouldBe` M.fromList [(v1, 7)]
+    getStakeDeltasFromEvents (Just stakingAddr) evs `shouldBe` M.fromList [(v1, 7), (v2, 0)]
+    getStakeDeltasFromEvents Nothing evs `shouldBe` M.empty
 
   it "merges stake updates across transactions, later transaction wins" $ do
     let er st = (solidvmErrorResults undefined) { erException = Nothing, erStakeUpdates = st }
