@@ -50,16 +50,22 @@ func BuildWitness(n, signers int, unified bool) (*AggregateCircuit, error) {
 		pks[i].ScalarMultiplication(&g1, &si)
 	}
 
-	// First `signers` members sign.
-	bits := make([]frontend.Variable, n)
+	// First `signers` members sign. Pack the bitfield the way the circuit
+	// unpacks it: BitsPerWord bits per word, least-significant bit first.
+	words := make([]*big.Int, NbBitWords(n))
+	for i := range words {
+		words[i] = new(big.Int)
+	}
 	var accJ bls.G1Jac
 	for i := 0; i < n; i++ {
 		if i < signers {
-			bits[i] = 1
+			words[i/BitsPerWord].SetBit(words[i/BitsPerWord], i%BitsPerWord, 1)
 			accJ.AddMixed(&pks[i])
-		} else {
-			bits[i] = 0
 		}
+	}
+	bits := make([]frontend.Variable, len(words))
+	for i, w := range words {
+		bits[i] = w
 	}
 	var agg bls.G1Affine
 	agg.FromJacobian(&accJ)
@@ -83,8 +89,8 @@ func BuildWitness(n, signers int, unified bool) (*AggregateCircuit, error) {
 	comm.SetBytes(h.Sum(nil))
 
 	w := &AggregateCircuit{
-		Pk:   make([]sw_emulated.AffinePoint[emulated.BLS12381Fp], n),
-		Bits: bits,
+		Pk:         make([]sw_emulated.AffinePoint[emulated.BLS12381Fp], n),
+		BitsPacked: bits,
 		Agg: sw_emulated.AffinePoint[emulated.BLS12381Fp]{
 			X: emulated.ValueOf[emulated.BLS12381Fp](agg.X),
 			Y: emulated.ValueOf[emulated.BLS12381Fp](agg.Y),

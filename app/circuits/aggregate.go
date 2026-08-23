@@ -18,10 +18,19 @@ import (
 // the points are fully determined by the commitment, so membership is a
 // property of the committed data rather than something a prover picks.
 type AggregateCircuit struct {
-	Pk   []sw_emulated.AffinePoint[emulated.BLS12381Fp]
-	Bits []frontend.Variable                          `gnark:",public"`
-	Agg  sw_emulated.AffinePoint[emulated.BLS12381Fp] `gnark:",public"`
-	Comm frontend.Variable                            `gnark:",public"`
+	Pk []sw_emulated.AffinePoint[emulated.BLS12381Fp]
+
+	// BitsPacked is the participation bitfield, 128 bits per word,
+	// least-significant bit first within each word.
+	//
+	// Packed rather than one public variable per bit because the on-chain
+	// verifier does a modular inversion per public input: 512 of them would
+	// add ~130,000 gas to a 400,000 budget. Four words cost 512
+	// bit-decomposition constraints in here, which is nothing, and they map
+	// cleanly onto the 64-byte SSZ bitfield the contract already holds.
+	BitsPacked []frontend.Variable                          `gnark:",public"`
+	Agg        sw_emulated.AffinePoint[emulated.BLS12381Fp] `gnark:",public"`
+	Comm       frontend.Variable                            `gnark:",public"`
 
 	N       int
 	Unified bool // complete addition instead of generator-seeded incomplete
@@ -30,10 +39,26 @@ type AggregateCircuit struct {
 	OnCurve bool // assert each key satisfies the curve equation
 }
 
+// BitsPerWord is how many participation bits each public word carries.
+const BitsPerWord = 128
+
+// NbBitWords is the number of public words an n-member committee needs.
+func NbBitWords(n int) int { return (n + BitsPerWord - 1) / BitsPerWord }
+
 func (c *AggregateCircuit) Define(api frontend.API) error {
 	crv, err := sw_emulated.New[emulated.BLS12381Fp, emulated.BLS12381Fr](api, sw_emulated.GetBLS12381Params())
 	if err != nil {
 		return err
+	}
+
+	// Unpack the bitfield. ToBinary constrains each output to a bit and the
+	// recomposition to the word, so a prover cannot smuggle a non-boolean in.
+	bits := make([]frontend.Variable, 0, NbBitWords(c.N)*BitsPerWord)
+	for _, w := range c.BitsPacked {
+		bits = append(bits, api.ToBinary(w, BitsPerWord)...)
+	}
+	if len(bits) < c.N {
+		return fmt.Errorf("packed bitfield holds %d bits, need %d", len(bits), c.N)
 	}
 	fp, err := emulated.NewField[emulated.BLS12381Fp](api)
 	if err != nil {
@@ -65,7 +90,7 @@ func (c *AggregateCircuit) Define(api frontend.API) error {
 		} else {
 			sum = crv.Add(acc, &c.Pk[i])
 		}
-		acc = crv.Select(c.Bits[i], sum, acc)
+		acc = crv.Select(bits[i], sum, acc)
 	}
 	if !c.Unified {
 		acc = crv.Add(acc, crv.Neg(crv.Generator()))
@@ -118,12 +143,12 @@ func (c *AggregateCircuit) Define(api frontend.API) error {
 
 func NewAggregate(n int, unified, commit, commitY, onCurve bool) *AggregateCircuit {
 	return &AggregateCircuit{
-		Pk:      make([]sw_emulated.AffinePoint[emulated.BLS12381Fp], n),
-		Bits:    make([]frontend.Variable, n),
-		N:       n,
-		Unified: unified,
-		Commit:  commit,
-		CommitY: commitY,
-		OnCurve: onCurve,
+		Pk:         make([]sw_emulated.AffinePoint[emulated.BLS12381Fp], n),
+		BitsPacked: make([]frontend.Variable, NbBitWords(n)),
+		N:          n,
+		Unified:    unified,
+		Commit:     commit,
+		CommitY:    commitY,
+		OnCurve:    onCurve,
 	}
 }

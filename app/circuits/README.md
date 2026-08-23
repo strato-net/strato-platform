@@ -44,9 +44,31 @@ than a new circuit and a new verifying key.
 | + commitment, incomplete add | 664,056 | 1,612,897 |
 | **+ commitment, unified add** | **921,821** | **2,322,257** |
 
-Proving the shipped variant on 10 cores: **33.5s**, native verify 2ms.
-One-time SRS 51s, PLONK setup 6.6s. On-chain verification of a BN254 PLONK
-proof measures at ~92,000 gas against a 400,000 per-transaction budget.
+Proving the shipped variant on 10 cores: **35.8s**, native verify 2ms.
+One-time SRS 54s, PLONK setup 6.7s.
+
+## Verified end to end
+
+A real proof from this circuit verifies on-chain. `cmd/emit` writes the
+artifacts, `plonkgen import` (in the lambdachain rollup) runs a Go reference
+verifier over them and emits a SolidVM fixture, and
+`app/contracts/tests/Plonk/BridgeAggregateProof.test.sol` puts it in front of
+`PlonkVerifier`. Challenges, the vanishing polynomial and PI(zeta) are pinned
+against the reference verifier's intermediates, so a break names its stage
+rather than just reporting that a proof did not verify.
+
+    cd app/circuits && go run ./cmd/emit 512 470 /tmp/e2e
+    cd <lambdachin>/rollup/plonkgen && go run . import         /tmp/e2e BridgeAggregateFixture BridgeAggregateFixture.sol gt.json
+
+**~116,000 gas** to verify, against the 400,000 per-transaction budget. The
+key is a 2^22 domain with 17 public inputs and one Bsb22 commitment -- the
+commitment comes from the emulated field's range checks, via gnark's
+Committer API, and is not optional.
+
+The participation bitfield is packed 128 bits to a public word rather than
+passed a bit at a time, because the verifier does a modular inversion per
+public input: measured at ~820 gas each, 512 of them would have been ~420,000
+and over budget on their own.
 
 ## Three decisions, and why
 
