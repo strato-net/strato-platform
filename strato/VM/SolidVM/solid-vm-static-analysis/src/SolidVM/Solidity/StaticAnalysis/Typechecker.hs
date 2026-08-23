@@ -871,6 +871,9 @@ typecheckMember (Static (SVMType.UnknownLabel "block") x) "difficulty" = pure $ 
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "gaslimit" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "chainid" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "proposer" = pure $ Static (SVMType.Address False) x
+typecheckMember (Static (SVMType.UnknownLabel "block") x) "prevProposer" = pure $ Static (SVMType.Address False) x
+typecheckMember (Static (SVMType.UnknownLabel "block") x) "prevIntendedProposer" = pure $ Static (SVMType.Address False) x
+typecheckMember (Static (SVMType.UnknownLabel "block") x) "prevRound" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "abi") x) "encode" = pure $ Function (Static SVMType.Variadic x) (bytesType' x) x [] [] False
 typecheckMember (Static (SVMType.UnknownLabel "abi") x) "encodePacked" = pure $ Function (Static SVMType.Variadic x) (bytesType' x) x [] [] False
 typecheckMember (Static (SVMType.UnknownLabel "abi") x) "decode" = pure $ Function (bytesType' x) (Static SVMType.Variadic x) x [] [] False
@@ -1671,6 +1674,10 @@ saltCreateArgs x = Product (stringType' x, stringType' x, [stringType' x, Static
 fastForwardArgs :: SourceAnnotation Text -> Type'
 fastForwardArgs x = Sum $ intType' x :| [Product (intType' x, intType' x, []) x]
 
+-- setBlockContext(address proposer, address prevProposer, address prevIntendedProposer, uint prevRound)
+setBlockContextArgs :: SourceAnnotation Text -> Type'
+setBlockContextArgs x = Product (addressType' x, addressType' x, [addressType' x, intType' x]) x
+
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
 getVarType' "this" ctx = pure $ Static (SVMType.Address False) ctx
 getVarType' s@('u' : 'i' : 'n' : 't' : n) ctx = case n of
@@ -1755,6 +1762,11 @@ getVarType' "fastForward" ctx = do
   if test
     then pure $ Function (fastForwardArgs ctx) (Unit ctx) ctx [] [] False
     else pure . bottom $ "fastForward can only be called while running tests" <$ ctx
+getVarType' "setBlockContext" ctx = do
+  test <- asks isRunningTests
+  if test
+    then pure $ Function (setBlockContextArgs ctx) (Unit ctx) ctx [] [] False
+    else pure . bottom $ "setBlockContext can only be called while running tests" <$ ctx
 getVarType' "Util" ctx = pure $ Static (SVMType.UnknownLabel "Util") ctx
 getVarType' "msg" ctx = pure $ Static (SVMType.UnknownLabel "msg") ctx
 getVarType' "tx" ctx = pure $ Static (SVMType.UnknownLabel "tx") ctx

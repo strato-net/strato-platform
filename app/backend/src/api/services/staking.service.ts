@@ -13,6 +13,9 @@ const BPS_DIVISOR = 10000n;
 const YEAR_SECONDS = 365n * 24n * 60n * 60n;
 const MAX_UINT256 = (1n << 256n) - 1n;
 
+// 0 = Missing, 1 = Registered (listed, not in the consensus set), 2 = Active (in the set), 3 = Kicked
+export type StratoOperatorStatus = 0 | 1 | 2 | 3;
+
 export interface StratoOperatorInfo {
   address: string;
   active: boolean;
@@ -22,6 +25,16 @@ export interface StratoOperatorInfo {
   description: string;
   metadataURI: string;
   protocolValidatorId: string;
+  validatorAddress: string;
+  status: StratoOperatorStatus;
+  isValidator: boolean;
+  eligible: boolean;
+  isWaiter: boolean;
+  jailedUntil: string;
+  exitReadyTime: string;
+  blocksProposed: string;
+  missedProposals: string;
+  consecutiveMisses: string;
   commissionBps: string;
   selfBond: string;
   delegatedStake: string;
@@ -29,6 +42,7 @@ export interface StratoOperatorInfo {
   estimatedApy: string;
   userStake: string;
   pendingRewards: string;
+  pendingFees: string;
 }
 
 export interface StratoUnbondingRequestInfo {
@@ -45,6 +59,7 @@ export interface StratoStakingInfo {
   stakingAddress: string;
   validatorRegistryAddress: string;
   stratoTokenAddress: string;
+  usdstTokenAddress: string;
   tokenName: string;
   tokenSymbol: string;
   tokenDecimals: string;
@@ -69,13 +84,35 @@ export interface StratoStakingInfo {
   baseRewardRate: string;
   stakeRewardRate: string;
   estimatedApy: string;
+  // validator set / consensus parameters
+  minStake: string;
+  minSelfBond: string;
+  proposerFeeBps: string;
+  maxConsecutiveMisses: string;
+  jailCooldown: string;
+  maxActiveValidators: string;
+  hardCapActiveValidators: string;
+  evictionMarginBps: string;
+  maxSetMutationsPerBlock: string;
+  exitNoticeSeconds: string;
+  unkickCooldown: string;
+  maxOperatorStakeBps: string;
+  joinsPaused: boolean;
+  governanceSyncEnabled: boolean;
+  validatorCount: string;
+  trackedUsdst: string;
+  unattributedFees: string;
+  totalFeesCredited: string;
   userTotalStake: string;
   userTotalStakeUsd: string;
   claimableRewards: string;
+  claimableFees: string;
   totalEarned: string;
   isOperator: boolean;
   operatorAddress: string;
+  operatorStatus: StratoOperatorStatus;
   operatorClaimableRewards: string;
+  operatorClaimableFees: string;
   operatorPendingBaseRewards: string;
   operatorPendingCommission: string;
   operatorPendingSelfBondRewards: string;
@@ -96,6 +133,16 @@ export type AddStratoOperatorInput = {
   description?: string;
   metadataURI?: string;
   protocolValidatorId?: string;
+  validatorAddress: string;
+};
+
+export type OperatorProfileInput = {
+  commissionBps?: string;
+  name?: string;
+  description?: string;
+  metadataURI?: string;
+  protocolValidatorId?: string;
+  validatorAddress?: string;
 };
 
 const normalizeAddress = (value: unknown): string =>
@@ -147,6 +194,7 @@ const emptyInfo = (): StratoStakingInfo => ({
   stakingAddress: stakingAddress(),
   validatorRegistryAddress: validatorRegistryAddress(),
   stratoTokenAddress: stratoTokenAddress(),
+  usdstTokenAddress: "",
   tokenName: "STRATO",
   tokenSymbol: "STRATO",
   tokenDecimals: "18",
@@ -171,13 +219,34 @@ const emptyInfo = (): StratoStakingInfo => ({
   baseRewardRate: "0",
   stakeRewardRate: "0",
   estimatedApy: "-",
+  minStake: "0",
+  minSelfBond: "0",
+  proposerFeeBps: "0",
+  maxConsecutiveMisses: "0",
+  jailCooldown: "0",
+  maxActiveValidators: "0",
+  hardCapActiveValidators: "0",
+  evictionMarginBps: "0",
+  maxSetMutationsPerBlock: "0",
+  exitNoticeSeconds: "0",
+  unkickCooldown: "0",
+  maxOperatorStakeBps: "0",
+  joinsPaused: true,
+  governanceSyncEnabled: false,
+  validatorCount: "0",
+  trackedUsdst: "0",
+  unattributedFees: "0",
+  totalFeesCredited: "0",
   userTotalStake: "0",
   userTotalStakeUsd: "0",
   claimableRewards: "0",
+  claimableFees: "0",
   totalEarned: "0",
   isOperator: false,
   operatorAddress: "",
+  operatorStatus: 0,
   operatorClaimableRewards: "0",
+  operatorClaimableFees: "0",
   operatorPendingBaseRewards: "0",
   operatorPendingCommission: "0",
   operatorPendingSelfBondRewards: "0",
@@ -242,6 +311,25 @@ const getContractState = async (accessToken: string): Promise<Record<string, any
           "lastUpdateTime::text",
           "baseRewardPerOperatorStored::text",
           "globalStakeRewardPerTokenStored::text",
+          "usdstToken",
+          "governanceSyncEnabled",
+          "minStake::text",
+          "minSelfBond::text",
+          "proposerFeeBps::text",
+          "maxConsecutiveMisses::text",
+          "jailCooldown::text",
+          "maxActiveValidators::text",
+          "hardCapActiveValidators::text",
+          "evictionMarginBps::text",
+          "maxSetMutationsPerBlock::text",
+          "exitNoticeSeconds::text",
+          "unkickCooldown::text",
+          "maxOperatorStakeBps::text",
+          "joinsPaused",
+          "validatorCount::text",
+          "trackedUsdst::text",
+          "unattributedFees::text",
+          "totalFeesCredited::text",
         ].join(","),
       },
     });
@@ -389,6 +477,33 @@ const getValidatorProfiles = async (accessToken: string): Promise<Map<string, Re
   }
 
   return profiles;
+};
+
+// Single-key mappings of the staking contract keyed by an address (operator or
+// validator): isValidator, jailedUntil, exitReadyTime, blocksProposed, ...
+const getAddressMap = async (accessToken: string, table: string): Promise<Map<string, string>> => {
+  const address = stakingAddress();
+  const values = new Map<string, string>();
+  if (!address) return values;
+
+  try {
+    const { data } = await cirrus.get(accessToken, `/${StratoStaking}-${table}`, {
+      params: {
+        address: `eq.${address}`,
+        select: "key,value::text",
+        limit: "500",
+      },
+    });
+
+    for (const row of data || []) {
+      const key = normalizeAddress(row.key);
+      if (key) values.set(key, String(row.value ?? ""));
+    }
+  } catch {
+    return values;
+  }
+
+  return values;
 };
 
 const getUserMap = async (
@@ -701,10 +816,18 @@ export const getStratoStakingInfo = async (
     userDelegatedStake,
     userPendingRewards,
     userRewardPaid,
+    userPendingFees,
+    userFeePaid,
     unbondingRequests,
     validatorProfiles,
     lifetimeClaimedRewards,
     stratoPriceWad,
+    validatorFlags,
+    jailedUntilMap,
+    exitReadyMap,
+    blocksProposedMap,
+    missedProposalsMap,
+    consecutiveMissesMap,
   ] = await Promise.all([
     getTokenInfo(accessToken, tokenAddress),
     getTokenBalance(accessToken, tokenAddress, userAddress),
@@ -712,21 +835,36 @@ export const getStratoStakingInfo = async (
     getUserMap(accessToken, "delegatedStake", userAddress),
     getUserMap(accessToken, "pendingDelegatorRewards", userAddress),
     getUserMap(accessToken, "userRewardPerStakePaid", userAddress),
+    getUserMap(accessToken, "pendingDelegatorFees", userAddress),
+    getUserMap(accessToken, "userFeePerStakePaid", userAddress),
     getUnbondingRequests(accessToken, userAddress),
     getValidatorProfiles(accessToken),
     getLifetimeClaimedRewards(accessToken, userAddress),
     getStratoTokenPriceWad(accessToken),
+    getAddressMap(accessToken, "isValidator"),
+    getAddressMap(accessToken, "jailedUntil"),
+    getAddressMap(accessToken, "exitReadyTime"),
+    getAddressMap(accessToken, "blocksProposed"),
+    getAddressMap(accessToken, "missedProposals"),
+    getAddressMap(accessToken, "consecutiveMisses"),
   ] as const);
+
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  const minStake = parseBigIntLike(state.minStake);
+  const minSelfBond = parseBigIntLike(state.minSelfBond);
 
   let userTotalStake = 0n;
   let claimableRewards = 0n;
+  let claimableFees = 0n;
   let userWeightedApyBps = 0n;
   let bestActiveApyBps = 0n;
   let isOperator = false;
   let connectedOperatorAddress = "";
+  let operatorStatus: StratoOperatorStatus = 0;
   let operatorPendingBaseRewards = 0n;
   let operatorPendingCommission = 0n;
   let operatorPendingSelfBondRewards = 0n;
+  let operatorPendingFees = 0n;
   let currentOperatorCommissionBps = 0n;
   const normalizedUserAddress = normalizeAddress(userAddress);
 
@@ -746,35 +884,62 @@ export const getStratoStakingInfo = async (
       ? (userStake * (projectedIndex - paid)) / WAD
       : 0n;
     const pendingRewards = pendingStored + projectedReward;
+    // Proposer fees (USDST) are pushed per block, so no time projection is needed.
+    const feeIndex = parseBigIntLike(value.feePerStakeStored);
+    const feePaid = userFeePaid.get(operatorAddress) || 0n;
+    const pendingFees = (userPendingFees.get(operatorAddress) || 0n)
+      + (userStake > 0n && feeIndex > feePaid ? (userStake * (feeIndex - feePaid)) / WAD : 0n);
     const apyBps = validatorApyBps(state, commissionBps, currentIndexes.stakeRewardRate);
     const operatorRewards = projectedOperatorRewards(value, currentIndexes);
+
+    const active = parseBoolLike(value.active);
+    const validatorAddress = normalizeAddress(profile.validatorAddress);
+    const isValidator = parseBoolLike(validatorFlags.get(operatorAddress));
+    const jailedUntil = parseBigIntLike(jailedUntilMap.get(operatorAddress));
+    const exitReadyTime = parseBigIntLike(exitReadyMap.get(operatorAddress));
+    const status: StratoOperatorStatus = !active ? 3 : isValidator ? 2 : 1;
+    const eligible = active && Boolean(validatorAddress) && totalStake >= minStake && selfBond >= minSelfBond
+      && now >= jailedUntil && (exitReadyTime === 0n || now < exitReadyTime);
 
     if (operatorAddress && operatorAddress === normalizedUserAddress) {
       isOperator = true;
       connectedOperatorAddress = operatorAddress;
+      operatorStatus = status;
       operatorPendingBaseRewards = operatorRewards.base;
       operatorPendingCommission = operatorRewards.commission;
       operatorPendingSelfBondRewards = operatorRewards.selfBond;
+      operatorPendingFees = parseBigIntLike(value.pendingSelfBondFees) + parseBigIntLike(value.pendingFeeCommission);
       currentOperatorCommissionBps = commissionBps;
     }
 
-    if (parseBoolLike(value.active) && apyBps > bestActiveApyBps) {
+    if (active && apyBps > bestActiveApyBps) {
       bestActiveApyBps = apyBps;
     }
 
     userTotalStake += userStake;
     claimableRewards += pendingRewards;
+    claimableFees += pendingFees;
     userWeightedApyBps += userStake * apyBps;
 
     return {
       address: operatorAddress,
-      active: parseBoolLike(value.active),
+      active,
       registryActive: parseBoolLike(profile.active),
       operator: operatorAddress,
       name: String(profile.name || ""),
       description: String(profile.description || ""),
       metadataURI: String(profile.metadataURI || ""),
       protocolValidatorId: String(profile.protocolValidatorId || ""),
+      validatorAddress,
+      status,
+      isValidator,
+      eligible,
+      isWaiter: eligible && !isValidator,
+      jailedUntil: jailedUntil.toString(),
+      exitReadyTime: exitReadyTime.toString(),
+      blocksProposed: parseBigIntLike(blocksProposedMap.get(validatorAddress)).toString(),
+      missedProposals: parseBigIntLike(missedProposalsMap.get(validatorAddress)).toString(),
+      consecutiveMisses: parseBigIntLike(consecutiveMissesMap.get(validatorAddress)).toString(),
       commissionBps: commissionBps.toString(),
       selfBond: selfBond.toString(),
       delegatedStake: delegatedStake.toString(),
@@ -782,6 +947,7 @@ export const getStratoStakingInfo = async (
       estimatedApy: formatBpsAsPercent(apyBps),
       userStake: userStake.toString(),
       pendingRewards: pendingRewards.toString(),
+      pendingFees: pendingFees.toString(),
     };
   });
 
@@ -799,6 +965,7 @@ export const getStratoStakingInfo = async (
     stakingAddress: stakingAddress(),
     validatorRegistryAddress: validatorRegistryAddress(),
     stratoTokenAddress: tokenAddress,
+    usdstTokenAddress: normalizeAddress(state.usdstToken),
     ...tokenInfo,
     walletBalance,
     totalUserStake: String(state.totalUserStake || "0"),
@@ -823,9 +990,28 @@ export const getStratoStakingInfo = async (
     baseRewardRate: currentIndexes.baseRewardRate.toString(),
     stakeRewardRate: currentIndexes.stakeRewardRate.toString(),
     estimatedApy,
+    minStake: minStake.toString(),
+    minSelfBond: minSelfBond.toString(),
+    proposerFeeBps: String(state.proposerFeeBps || "0"),
+    maxConsecutiveMisses: String(state.maxConsecutiveMisses || "0"),
+    jailCooldown: String(state.jailCooldown || "0"),
+    maxActiveValidators: String(state.maxActiveValidators || "0"),
+    hardCapActiveValidators: String(state.hardCapActiveValidators || "0"),
+    evictionMarginBps: String(state.evictionMarginBps || "0"),
+    maxSetMutationsPerBlock: String(state.maxSetMutationsPerBlock || "0"),
+    exitNoticeSeconds: String(state.exitNoticeSeconds || "0"),
+    unkickCooldown: String(state.unkickCooldown || "0"),
+    maxOperatorStakeBps: String(state.maxOperatorStakeBps || "0"),
+    joinsPaused: parseBoolLike(state.joinsPaused),
+    governanceSyncEnabled: parseBoolLike(state.governanceSyncEnabled),
+    validatorCount: String(state.validatorCount || "0"),
+    trackedUsdst: String(state.trackedUsdst || "0"),
+    unattributedFees: String(state.unattributedFees || "0"),
+    totalFeesCredited: String(state.totalFeesCredited || "0"),
     userTotalStake: userTotalStake.toString(),
     userTotalStakeUsd: stratoPriceWad > 0n ? ((userTotalStake * stratoPriceWad) / WAD).toString() : "0",
     claimableRewards: claimableRewards.toString(),
+    claimableFees: claimableFees.toString(),
     totalEarned: (
       lifetimeClaimedRewards +
       claimableRewards +
@@ -835,7 +1021,9 @@ export const getStratoStakingInfo = async (
     ).toString(),
     isOperator,
     operatorAddress: connectedOperatorAddress,
+    operatorStatus,
     operatorClaimableRewards: (operatorPendingBaseRewards + operatorPendingCommission + operatorPendingSelfBondRewards).toString(),
+    operatorClaimableFees: operatorPendingFees.toString(),
     operatorPendingBaseRewards: operatorPendingBaseRewards.toString(),
     operatorPendingCommission: operatorPendingCommission.toString(),
     operatorPendingSelfBondRewards: operatorPendingSelfBondRewards.toString(),
@@ -1039,6 +1227,143 @@ export const claimStratoOperatorRewards = async (
   });
 };
 
+// USDST proposer fees have their own claim path, separate from STRATO rewards.
+export const claimStratoFeeRewards = async (
+  accessToken: string,
+  userAddress: string,
+  operators?: string[],
+  claimAll = false
+): Promise<{ status: string; hash: string }> => {
+  const staking = requireStakingAddress();
+  let claimOperators = (operators || []).map(normalizeAddress).filter(Boolean);
+  let maxBatchSize = claimOperators.length || 1;
+
+  if (claimAll) {
+    const info = await getStratoStakingInfo(accessToken, userAddress);
+    maxBatchSize = batchSizeFromInfo(info);
+    claimOperators = info.validators
+      .filter((validator) => parseBigIntLike(validator.pendingFees) > 0n)
+      .map((validator) => validator.address);
+  } else if (claimOperators.length) {
+    maxBatchSize = await getMaxBatchSize(accessToken);
+    assertWithinMaxBatchSize(claimOperators.length, maxBatchSize, "Claim operators");
+  }
+
+  if (!claimOperators.length) {
+    throw new Error("No operators selected for fee claim");
+  }
+
+  const batches = chunkByMaxBatchSize(claimOperators, maxBatchSize);
+  return await buildAndPost(accessToken, userAddress, batches.map((claimOperatorsBatch) => ({
+    contractName: extractContractName(StratoStaking),
+    contractAddress: staking,
+    method: "claimFeeRewards",
+    args: {
+      claimOperators: claimOperatorsBatch,
+    },
+  })));
+};
+
+export const claimStratoOperatorFeeRewards = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ status: string; hash: string }> =>
+  buildAndPost(accessToken, userAddress, {
+    contractName: extractContractName(StratoStaking),
+    contractAddress: requireStakingAddress(),
+    method: "claimOperatorFeeRewards",
+    args: {},
+  });
+
+// ---- validator lifecycle (operator / permissionless) ----
+
+// List msg.sender as an operator; joining the consensus set is a separate tryActivate.
+export const registerStratoOperator = async (
+  accessToken: string,
+  userAddress: string,
+  input: OperatorProfileInput
+): Promise<{ status: string; hash: string }> => {
+  const validatorAddress = normalizeAddress(input.validatorAddress);
+  if (!validatorAddress) throw badRequest("validatorAddress is required");
+  if (input.commissionBps === undefined || input.commissionBps === "") throw badRequest("commissionBps is required");
+
+  return await buildAndPost(accessToken, userAddress, {
+    contractName: extractContractName(ValidatorRegistry),
+    contractAddress: requireValidatorRegistryAddress(),
+    method: "register",
+    args: {
+      commissionBps: String(input.commissionBps),
+      name: String(input.name || ""),
+      description: String(input.description || ""),
+      metadataURI: String(input.metadataURI || ""),
+      protocolValidatorId: String(input.protocolValidatorId || ""),
+      validatorAddress,
+    },
+  });
+};
+
+export const updateStratoOperatorProfile = async (
+  accessToken: string,
+  userAddress: string,
+  input: OperatorProfileInput
+): Promise<{ status: string; hash: string }> =>
+  buildAndPost(accessToken, userAddress, {
+    contractName: extractContractName(ValidatorRegistry),
+    contractAddress: requireValidatorRegistryAddress(),
+    method: "updateProfile",
+    args: {
+      operator: normalizeAddress(userAddress),
+      name: String(input.name || ""),
+      description: String(input.description || ""),
+      metadataURI: String(input.metadataURI || ""),
+      protocolValidatorId: String(input.protocolValidatorId || ""),
+    },
+  });
+
+const stakingCall = (method: string, args: Record<string, unknown> = {}): FunctionInput => ({
+  contractName: extractContractName(StratoStaking),
+  contractAddress: requireStakingAddress(),
+  method,
+  args,
+});
+
+// Put an eligible operator (default: the caller) into the consensus set.
+export const activateStratoOperator = async (
+  accessToken: string,
+  userAddress: string,
+  operator?: string
+): Promise<{ status: string; hash: string }> =>
+  buildAndPost(accessToken, userAddress, stakingCall("tryActivate", {
+    operator: normalizeAddress(operator) || normalizeAddress(userAddress),
+  }));
+
+export const reconcileStratoValidatorSet = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ status: string; hash: string }> =>
+  buildAndPost(accessToken, userAddress, stakingCall("reconcileSet"));
+
+export const syncStratoValidator = async (
+  accessToken: string,
+  userAddress: string,
+  operator?: string
+): Promise<{ status: string; hash: string }> =>
+  buildAndPost(accessToken, userAddress, stakingCall("syncValidator", {
+    operator: normalizeAddress(operator) || normalizeAddress(userAddress),
+  }));
+
+export const requestStratoExit = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ status: string; hash: string }> =>
+  buildAndPost(accessToken, userAddress, stakingCall("requestExit"));
+
+export const cancelStratoExit = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ status: string; hash: string }> =>
+  buildAndPost(accessToken, userAddress, stakingCall("cancelExit"));
+
 export const withdrawStratoUnbonded = async (
   accessToken: string,
   userAddress: string,
@@ -1184,6 +1509,7 @@ export const addStratoOperator = async (
     description: String(item.description || ""),
     metadataURI: String(item.metadataURI || ""),
     protocolValidatorId: String(item.protocolValidatorId || ""),
+    validatorAddress: normalizeAddress(item.validatorAddress),
   }));
 
   if (!operators.length || operators.some((item) => !item.operator || item.commissionBps === "")) {
@@ -1200,6 +1526,7 @@ export const addStratoOperator = async (
       operator.description,
       operator.metadataURI,
       operator.protocolValidatorId,
+      operator.validatorAddress,
     ]);
   }
 
@@ -1210,8 +1537,29 @@ export const addStratoOperator = async (
     operators.map(({ description }) => description),
     operators.map(({ metadataURI }) => metadataURI),
     operators.map(({ protocolValidatorId }) => protocolValidatorId),
+    operators.map(({ validatorAddress }) => validatorAddress),
   ]);
 };
+
+export const setStratoValidatorAddress = async (
+  accessToken: string,
+  userAddress: string,
+  operator: string,
+  validatorAddress: string
+): Promise<{ status: string; hash: string }> =>
+  castVoteOnIssue(accessToken, userAddress, requireValidatorRegistryAddress(), "setValidatorAddress", [
+    normalizeAddress(operator),
+    normalizeAddress(validatorAddress),
+  ]);
+
+export const setStratoEmergencyKicker = async (
+  accessToken: string,
+  userAddress: string,
+  kicker: string
+): Promise<{ status: string; hash: string }> =>
+  castVoteOnIssue(accessToken, userAddress, requireValidatorRegistryAddress(), "setEmergencyKicker", [
+    normalizeAddress(kicker),
+  ]);
 
 export const removeStratoOperator = async (
   accessToken: string,
@@ -1262,4 +1610,89 @@ export const setStratoStakingParams = async (
     args.baseRewardBps,
     args.maxCommissionBps,
     args.maxBatchSize,
+  ]);
+
+export const setStratoValidatorParams = async (
+  accessToken: string,
+  userAddress: string,
+  args: {
+    minStake: string;
+    minSelfBond: string;
+    proposerFeeBps: string;
+    maxConsecutiveMisses: string;
+    jailCooldown: string;
+  }
+): Promise<{ status: string; hash: string }> =>
+  castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setValidatorParams", [
+    args.minStake,
+    args.minSelfBond,
+    args.proposerFeeBps,
+    args.maxConsecutiveMisses,
+    args.jailCooldown,
+  ]);
+
+export const setStratoSetParams = async (
+  accessToken: string,
+  userAddress: string,
+  args: {
+    maxActiveValidators: string;
+    hardCapActiveValidators: string;
+    evictionMarginBps: string;
+    maxSetMutationsPerBlock: string;
+    exitNoticeSeconds: string;
+    unkickCooldown: string;
+    maxOperatorStakeBps: string;
+    joinsPaused: boolean;
+  }
+): Promise<{ status: string; hash: string }> =>
+  castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setSetParams", [
+    args.maxActiveValidators,
+    args.hardCapActiveValidators,
+    args.evictionMarginBps,
+    args.maxSetMutationsPerBlock,
+    args.exitNoticeSeconds,
+    args.unkickCooldown,
+    args.maxOperatorStakeBps,
+    args.joinsPaused,
+  ]);
+
+export const setStratoGovernance = async (
+  accessToken: string,
+  userAddress: string,
+  governance: string,
+  syncEnabled: boolean
+): Promise<{ status: string; hash: string }> =>
+  castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setGovernance", [
+    normalizeAddress(governance) || normalizeAddress(constants.mercataGovernance),
+    syncEnabled,
+  ]);
+
+export const recoverStratoUnattributedFees = async (
+  accessToken: string,
+  userAddress: string,
+  to: string,
+  amount: string
+): Promise<{ status: string; hash: string }> =>
+  castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "recoverUnattributedFees", [
+    normalizeAddress(to),
+    amount,
+  ]);
+
+// MercataGovernance (0x100): wire the staking contract and bound the validator set.
+export const setGovernanceStakingContract = async (
+  accessToken: string,
+  userAddress: string,
+  stakingContract?: string
+): Promise<{ status: string; hash: string }> =>
+  castVoteOnIssue(accessToken, userAddress, normalizeAddress(constants.mercataGovernance), "setStakingContract", [
+    normalizeAddress(stakingContract) || requireStakingAddress(),
+  ]);
+
+export const setGovernanceHardCap = async (
+  accessToken: string,
+  userAddress: string,
+  hardCap: string
+): Promise<{ status: string; hash: string }> =>
+  castVoteOnIssue(accessToken, userAddress, normalizeAddress(constants.mercataGovernance), "setHardCapValidators", [
+    hardCap,
   ]);

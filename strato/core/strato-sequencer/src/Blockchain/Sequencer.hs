@@ -48,6 +48,7 @@ import Control.Monad.Composable.Vault (runVaultM, getPub)
 import Data.Foldable
 import Data.Maybe
 import Data.Proxy
+import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time.Clock
@@ -164,9 +165,9 @@ eventHandler = forever $ timeAction seqLoopTiming $ do
   $logDebugS "sequencer/events" . T.pack $ format event
 
   case event of
-    TimerFire roundNumber -> do
+    TimerFire timedOutView -> do
       withLabel seqLoopEvents "timeout" (flip unsafeAddCounter 1)
-      blockstanbulSend [Timeout roundNumber]
+      blockstanbulSend [Timeout timedOutView]
     UnseqEvents unseqEvents -> do
       withLabel seqLoopEvents "unseq" (flip unsafeAddCounter . fromIntegral . length $ unseqEvents)
       timeAction seqSplitEventsTiming $ unseqEventHandler unseqEvents
@@ -262,7 +263,7 @@ blockstanbulSend' msg = do
     resp <- sendAllMessages [msg]
     let blocks = [b | ToCommit b <- resp]
     for_ resp $ \case
-      ResetTimer rn -> createNewTimer rn
+      ResetTimer vw -> createNewTimer vw
       FailedHistoric blk -> A.delete (Proxy @DependentBlockEntry) (blockHash blk) -- First time using `delete`
       _ -> pure ()
     updateViewTimer
@@ -303,6 +304,8 @@ blockstanbulSend' msg = do
               (BDB.blockHeaderHash bh)
               (BDB.blockHeaderBlockNumber bh)
               (S.toList $ _validators ctx)
+              (M.toAscList $ _stakes ctx)
+              (_lastRound ctx)
     pure (p2pevs, vmevs, committedBlocks)
 
   $logDebugS "seq/pbft/send_p2p" . T.pack $ format p2pevs

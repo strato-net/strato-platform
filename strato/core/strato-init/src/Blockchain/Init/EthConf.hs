@@ -181,6 +181,10 @@ genEthConf = do
         , gasLimit = flags_gasLimit
         , blockPeriodMs = flags_blockstanbul_block_period_ms
         , roundPeriodS = flags_blockstanbul_round_period_s
+        , stakingActivationBlock =
+            if flags_stakingActivationBlock < 0
+              then defaultStakingActivationBlock flags_network
+              else Just flags_stakingActivationBlock
         }
     }
 
@@ -193,5 +197,6 @@ deriveFileServerUrl "" "upquark" = "https://fileserver.mercata.blockapps.net/hig
 deriveFileServerUrl "" "mercata" = "https://fileserver.mercata.blockapps.net/highway"
 deriveFileServerUrl "" "uranium" = "https://fileserver.mercata.blockapps.net/highway"
 deriveFileServerUrl "" "lithium" = "https://fileserver.mercata.blockapps.net/highway"
+deriveFileServerUrl "" "beryllium" = "https://fileserver.mercata.blockapps.net/highway"
 deriveFileServerUrl "" _ = ""  -- Unknown networks get empty string
 deriveFileServerUrl url _ = url  -- Explicit URL takes precedence

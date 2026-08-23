@@ -78,7 +78,7 @@ const SimulationResultPanel: React.FC<Props> = ({ result, error, title }) => {
           {showTrace ? (
             <div className="mt-1 max-h-64 overflow-auto">
               {traceRoots.map((frame, i) => (
-                <TraceFrameView key={i} frame={frame} />
+                <TraceFrameView key={i} frame={frame} parentErrored={failed} />
               ))}
             </div>
           ) : null}
@@ -109,24 +109,40 @@ const EventLine: React.FC<{ event: SimulatedEvent }> = ({ event }) => {
   );
 };
 
-const TraceFrameView: React.FC<{ frame: SimulationTraceFrame }> = ({ frame }) => (
-  <div className="pl-3 border-l border-border">
-    <div className="break-all font-mono text-xs">
-      <span className="text-muted-foreground">{frame.type} </span>
-      {frame.contract}.{frame.function}({(frame.args ?? []).join(', ')})
-      <span className="text-muted-foreground"> gas={frame.gasUsed}</span>
-      {frame.output != null ? <span className="text-muted-foreground"> → {frame.output}</span> : null}
-      {frame.error ? <span className="text-red-600"> ✗ {frame.error}</span> : null}
-    </div>
-    {(frame.logs ?? []).map((ev, i) => (
-      <div key={`log-${i}`} className="pl-3 break-all font-mono text-xs text-muted-foreground">
-        emit {ev.name}({Object.entries(ev.args ?? {}).map(([k, v]) => `${k}: ${v}`).join(', ')})
+const TraceFrameView: React.FC<{ frame: SimulationTraceFrame; parentErrored: boolean }> = ({
+  frame,
+  parentErrored,
+}) => {
+  // An error on a frame whose parent completed cleanly was caught and handled
+  // by an enclosing try/catch (e.g. Ownable.onlyOwner falling back to a
+  // multisig vote) — annotate it as caught instead of rendering it like the
+  // transaction's failure.
+  const caught = !!frame.error && !parentErrored;
+  return (
+    <div className="pl-3 border-l border-border">
+      <div className="break-all font-mono text-xs">
+        <span className="text-muted-foreground">{frame.type} </span>
+        {frame.contract}.{frame.function}({(frame.args ?? []).join(', ')})
+        <span className="text-muted-foreground"> gas={frame.gasUsed}</span>
+        {frame.output != null ? <span className="text-muted-foreground"> → {frame.output}</span> : null}
+        {frame.error ? (
+          caught ? (
+            <span className="text-amber-600 dark:text-amber-500"> ⚠ caught &amp; handled: {frame.error}</span>
+          ) : (
+            <span className="text-red-600"> ✗ {frame.error}</span>
+          )
+        ) : null}
       </div>
-    ))}
-    {(frame.calls ?? []).map((child, i) => (
-      <TraceFrameView key={`call-${i}`} frame={child} />
-    ))}
-  </div>
-);
+      {(frame.logs ?? []).map((ev, i) => (
+        <div key={`log-${i}`} className="pl-3 break-all font-mono text-xs text-muted-foreground">
+          emit {ev.name}({Object.entries(ev.args ?? {}).map(([k, v]) => `${k}: ${v}`).join(', ')})
+        </div>
+      ))}
+      {(frame.calls ?? []).map((child, i) => (
+        <TraceFrameView key={`call-${i}`} frame={child} parentErrored={!!frame.error} />
+      ))}
+    </div>
+  );
+};
 
 export default SimulationResultPanel;
