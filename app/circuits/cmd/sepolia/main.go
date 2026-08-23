@@ -75,9 +75,9 @@ func main() {
 	// --- participation bitfield: the first two bytes32 literals in the file
 	//     that sit inside _participationBits ---
 	seg := string(raw)
-	idx := strings.Index(seg, "function _participationBits")
+	idx := strings.Index(seg, "participationBits()")
 	if idx < 0 {
-		panic("no _participationBits in fixture")
+		panic("no participationBits() in fixture")
 	}
 	ms := bitsLine.FindAllStringSubmatch(seg[idx:], 2)
 	if len(ms) != 2 {
