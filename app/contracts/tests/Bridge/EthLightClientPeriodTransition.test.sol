@@ -1058,6 +1058,12 @@ contract Describe_EthLightClientPeriodTransition {
         return pks;
     }
 
+    /// aggregate_pubkey of the period-1243 committee that signs this
+    /// update. Identical to the anchor fixture's — same committee.
+    function _signingAggregate() internal pure returns (bytes) {
+        return hex"a297f349051d1ec7276a464b343d7f68fe8483c2213f84b500fb8bbe4c2aa3fe5584d4416f9a0ee933c9153a80dce92e";
+    }
+
     function _nextAggregate() internal pure returns (bytes32[2]) {
         // next_sync_committee.aggregate_pubkey from the LC update —
         // 48-byte BLS pubkey + 16-byte SSZ right-pad, chunked. Literal-
@@ -1114,6 +1120,10 @@ contract Describe_EthLightClientPeriodTransition {
     function beforeEach() {
         lc = new EthLightClient(address(this));
         lc.bootstrap(uint64(1243), _bootstrapCommittee(), _gvr(), _forkVersion());
+        // Period-1243 aggregate_pubkey (same committee as the anchor
+        // fixture). Lets the rotation verify its signature by absentee
+        // subtraction instead of summing every signer.
+        lc.setCommitteeAggregate(uint64(1243), _signingAggregate());
     }
 
     /**

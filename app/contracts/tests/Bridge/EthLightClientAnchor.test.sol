@@ -626,6 +626,10 @@ contract Describe_EthLightClientAnchor {
             _gvr(),
             _forkVersion()
         );
+        // Real period-1243 aggregate_pubkey. Lets the verifier reach the
+        // subset aggregate by subtracting the 42 non-signers rather than
+        // summing the 470 signers.
+        lc.setCommitteeAggregate(_bootstrapPeriod(), _aggregatePubkey());
     }
 
     /**

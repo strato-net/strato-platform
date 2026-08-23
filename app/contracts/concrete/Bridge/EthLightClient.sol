@@ -208,6 +208,24 @@ contract EthLightClient is Ownable, ILightClient {
     mapping(uint64 => bytes[]) committeePubkeys;
     uint64 public latestPeriod;
 
+    /// The committee's `aggregate_pubkey` per period, stored in EIP-2537
+    /// uncompressed form (128 bytes) so the anchoring path doesn't
+    /// re-decompress it on every call.
+    ///
+    /// This is the sum of all 512 members, which lets
+    /// {BLSVerify.aggregateByAbsence} derive the participating-subset
+    /// aggregate by subtracting the non-signers instead of summing the
+    /// signers. At real participation rates that is an order of magnitude
+    /// less elliptic-curve work, and it is the difference between the
+    /// anchor fitting a transaction's gas budget and not.
+    ///
+    /// Populated automatically by {advanceCommittee} (where the value
+    /// arrives inside a LightClientUpdate and is verified as part of the
+    /// committee's SSZ root), or by {setCommitteeAggregate} for a period
+    /// installed via {bootstrap}. An unset entry is not an error — the
+    /// verifier falls back to summing the signers.
+    mapping(uint64 => bytes) committeeAggregate;
+
     /// Anchored finalized exec headers, keyed by Ethereum block number.
     /// Once anchored, EthBridgeIn (or any other consumer) can call
     /// getReceiptsRoot(blockNumber) and trust the result.
@@ -229,6 +247,9 @@ contract EthLightClient is Ownable, ILightClient {
     event IndicesUpdated(uint256 finalizedRootIndex, uint256 nextSyncCommitteeIndex, uint256 executionPayloadIndex);
     event StateProofIndicesUpdated(uint256 blockRootsContainerGindex, uint256 historicalSummariesContainerGindex);
     event CommitteeAnchored(uint64 period);
+
+    /// @notice The committee `aggregate_pubkey` for `period` was installed.
+    event CommitteeAggregateSet(uint64 period);
     event HeaderAnchored(uint256 blockNumber, bytes32 receiptsRoot, uint64 beaconSlot, uint64 timestamp);
 
     // ─────────────────────────────────────────────────────────────────
@@ -283,6 +304,33 @@ contract EthLightClient is Ownable, ILightClient {
         forkVersion = forkVersion_;
 
         emit Bootstrapped(period, genesisValidatorsRoot_, forkVersion_);
+    }
+
+    /**
+     * @notice Install the `aggregate_pubkey` for a period bootstrapped by
+     *         {bootstrap}.
+     *
+     * @dev    Periods installed by {advanceCommittee} get this for free:
+     *         the update carries the aggregate, and the committee's SSZ
+     *         root — which the aggregate is part of — is verified against
+     *         the beacon state before anything is stored. A bootstrapped
+     *         period has no such proof, so the aggregate is admin-supplied
+     *         on the same trust footing as the pubkeys themselves.
+     *
+     *         Supplying a wrong aggregate cannot forge anything. It makes
+     *         {aggregateByAbsence} produce a subset aggregate that does not
+     *         match the signers, and the BLS pairing then rejects the
+     *         signature. The failure mode is a stuck light client, not a
+     *         false anchor.
+     *
+     * @param period               Period whose committee this aggregates.
+     * @param aggregateCompressed  48-byte IETF compressed G1.
+     */
+    function setCommitteeAggregate(uint64 period, bytes aggregateCompressed) external onlyOwner {
+        require(committeePubkeys[period].length == 512, "EthLightClient: no committee for this period");
+        require(aggregateCompressed.length == 48, "EthLightClient: aggregate must be 48 bytes");
+        committeeAggregate[period] = bls12381DecompressG1(aggregateCompressed);
+        emit CommitteeAggregateSet(period);
     }
 
     /**
@@ -589,11 +637,12 @@ contract EthLightClient is Ownable, ILightClient {
         bytes participationBitsBytes = _chunks2ToBytes(sync.participationBits);
         bytes signatureBytes         = _chunks3ToBytes(sync.signature);
 
-        (bytes computedAggPk, uint256 participantCount) = BLSVerify.aggregateParticipants(
-            committeePubkeys[period],
-            participationBitsBytes
-        );
+        // Count first, so an under-participating update is rejected before
+        // paying for any curve arithmetic.
+        uint256 participantCount = BLSVerify.popcount(participationBitsBytes);
         require(participantCount >= MIN_PARTICIPATION, "EthLightClient: below 2/3 sync committee participation");
+
+        bytes computedAggPk = _aggregateFor(period, participationBitsBytes, participantCount);
 
         bytes32 signingRoot = SSZHashTree.computeSigningRoot(
             SSZHashTree.hashTreeRootBeaconHeader(
@@ -617,6 +666,36 @@ contract EthLightClient is Ownable, ILightClient {
             ),
             "EthLightClient: finality branch verify failed"
         );
+    }
+
+    /**
+     * @dev Build the participating-subset aggregate by whichever route
+     *      touches fewer points: summing the signers, or subtracting the
+     *      non-signers from the committee's full aggregate.
+     *
+     *      Above 50% participation the second route is always the shorter
+     *      one, and the two are arithmetically identical — see
+     *      {BLSVerify.aggregateByAbsence}. Falls back to summing when the
+     *      period has no aggregate installed, so a bootstrapped committee
+     *      still verifies (expensively) until {setCommitteeAggregate}
+     *      runs.
+     */
+    function _aggregateFor(
+        uint64 period,
+        bytes participationBits,
+        uint256 participantCount
+    ) private view returns (bytes) {
+        bytes full = committeeAggregate[period];
+        if (full.length == 128 && (512 - participantCount) < participantCount) {
+            (bytes byAbsence, /* count */) = BLSVerify.aggregateByAbsence(
+                committeePubkeys[period], participationBits, full
+            );
+            return byAbsence;
+        }
+        (bytes bySum, /* count */) = BLSVerify.aggregateParticipants(
+            committeePubkeys[period], participationBits
+        );
+        return bySum;
     }
 
     /**
@@ -702,14 +781,12 @@ contract EthLightClient is Ownable, ILightClient {
         bytes signatureBytes         = _chunks3ToBytes(update.signature);
 
         // ─── 2. Verify BLS signature from the current committee ────
+        uint256 signerCount = BLSVerify.popcount(participationBitsBytes);
         require(
-            BLSVerify.popcount(participationBitsBytes) >= MIN_PARTICIPATION,
+            signerCount >= MIN_PARTICIPATION,
             "EthLightClient: below 2/3 sync committee participation"
         );
-        (bytes computedAggPk, /* count */) = BLSVerify.aggregateParticipants(
-            committeePubkeys[signaturePeriod],
-            participationBitsBytes
-        );
+        bytes computedAggPk = _aggregateFor(signaturePeriod, participationBitsBytes, signerCount);
 
         bytes32 signingRoot = SSZHashTree.computeSigningRoot(
             SSZHashTree.hashTreeRootBeaconHeader(
@@ -736,8 +813,15 @@ contract EthLightClient is Ownable, ILightClient {
 
         // ─── 4. Anchor the next period's pubkeys ───────────────────
         committeePubkeys[newPeriod] = update.nextPubkeys;
+        // The aggregate was just verified as part of committeeRoot above,
+        // so it carries the same guarantee as the pubkeys. Keeping it is
+        // what lets the next period anchor by absentee subtraction.
+        committeeAggregate[newPeriod] = bls12381DecompressG1(
+            _first48(_chunks2ToBytes(update.nextAggregatePubkey))
+        );
         if (newPeriod > latestPeriod) latestPeriod = newPeriod;
         emit CommitteeAnchored(newPeriod);
+        emit CommitteeAggregateSet(newPeriod);
         return newPeriod;
     }
 
@@ -797,6 +881,17 @@ contract EthLightClient is Ownable, ILightClient {
     /// Concatenate `bytes32[2]` (64 bytes) into a flat `bytes`.
     function _chunks2ToBytes(bytes32[2] xs) private pure returns (bytes) {
         return bytes(xs[0]) + bytes(xs[1]);
+    }
+
+    /// Take the leading 48 bytes of a blob. `aggregate_pubkey` arrives as
+    /// `bytes32[2]` because SSZ right-pads the 48-byte key to 64; the pad
+    /// must be dropped before decompression.
+    function _first48(bytes blob) private pure returns (bytes out) {
+        require(blob.length >= 48, "EthLightClient: blob shorter than 48 bytes");
+        out = new bytes(48);
+        for (uint i = 0; i < 48; i = i + 1) {
+            out[i] = blob[i];
+        }
     }
 
     /// Concatenate `bytes32[3]` (96 bytes) into a flat `bytes`.

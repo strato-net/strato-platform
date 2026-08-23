@@ -234,6 +234,118 @@ library BLSVerify {
     // ─────────────────────────────────────────────────────────────────
 
     /**
+     * @notice Scalar (r - 1) for BLS12-381's subgroup order r, big-endian
+     *         in 32 bytes. [r]P is the identity for any P in the r-order
+     *         subgroup, so [r-1]P == -P.
+     *
+     *         We need this because negating a G1 point means computing
+     *         p - y in the base field, and Fp is 381 bits — it does not
+     *         fit in a uint256, and SolidVM gives contracts no 381-bit
+     *         arithmetic. Routing the negation through a one-term MSM is
+     *         the only way to do it with the builtins available.
+     */
+    function _scalarNegOne() internal pure returns (bytes) {
+        return hex"73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000000";
+    }
+
+    /**
+     * @notice Negate a G1 point given in EIP-2537 uncompressed form
+     *         (128 bytes), returning the same form.
+     */
+    function negateG1(bytes pointUncompressed) internal view returns (bytes) {
+        require(pointUncompressed.length == 128, "BLSVerify: expected 128-byte G1");
+        // One MSM term is 160 bytes: the 128-byte point then a 32-byte scalar.
+        return bls12381G1Msm(pointUncompressed + _scalarNegOne());
+    }
+
+    /**
+     * @notice Aggregate the committee members who did NOT sign.
+     *
+     * @dev    The mirror of {aggregateParticipants}. Which one you want
+     *         depends on participation: at 470 of 512 signing, this walks
+     *         42 points instead of 470.
+     *
+     * @return absenteeSum Aggregate of the non-signers, EIP-2537
+     *         uncompressed (128 bytes). Empty when everyone signed.
+     * @return absentCount Number of non-signers.
+     */
+    function aggregateAbsentees(
+        bytes[] pubkeysCompressed,
+        bytes participation
+    ) internal view returns (bytes absenteeSum, uint256 absentCount) {
+        require(pubkeysCompressed.length == 512, "BLSVerify: expected 512 pubkeys");
+        require(participation.length == 64, "BLSVerify: expected 64-byte bitfield");
+
+        bytes acc;
+        bool started = false;
+        absentCount = 0;
+
+        for (uint256 i = 0; i < 512; i = i + 1) {
+            uint256 byteIdx = i / 8;
+            uint256 bitIdx = i % 8;
+            uint8 b = uint8(participation[byteIdx]);
+            if (((b >> bitIdx) & 1) == 0) {
+                bytes pk = bls12381DecompressG1(pubkeysCompressed[i]);
+                if (started) {
+                    acc = bls12381G1Add(acc + pk);
+                } else {
+                    acc = pk;
+                    started = true;
+                }
+                absentCount = absentCount + 1;
+            }
+        }
+
+        absenteeSum = acc;
+    }
+
+    /**
+     * @notice Build the participating-subset aggregate by subtracting the
+     *         absentees from the committee's full aggregate, rather than
+     *         summing the signers.
+     *
+     * @dev    Arithmetically identical to {aggregateParticipants} — the
+     *         sync committee's `aggregate_pubkey` is the sum of all 512
+     *         members (with multiplicity, which is preserved because the
+     *         pubkeys vector carries duplicates the same way), so
+     *
+     *             sum(signers) == aggregate_all - sum(non-signers)
+     *
+     *         Cost scales with the non-signers, so this is the cheaper
+     *         path whenever participation is above half. Callers pick.
+     *
+     * @param fullAggregate The committee's `aggregate_pubkey`, already
+     *        decompressed to EIP-2537 uncompressed form (128 bytes). On
+     *        the anchoring path this comes from
+     *        {EthLightClient.committeeAggregate}, which decompressed it
+     *        once at rotation from a LightClientUpdate whose committee
+     *        SSZ root was verified against the beacon state — so it is
+     *        as trustworthy as the pubkeys themselves.
+     *
+     * @return aggPubkey 128-byte EIP-2537 G1 aggregate of the signers.
+     * @return count Number of signers.
+     */
+    function aggregateByAbsence(
+        bytes[] pubkeysCompressed,
+        bytes participation,
+        bytes fullAggregate
+    ) internal view returns (bytes aggPubkey, uint256 count) {
+        require(fullAggregate.length == 128, "BLSVerify: expected 128-byte aggregate");
+
+        (bytes absenteeSum, uint256 absentCount) =
+            aggregateAbsentees(pubkeysCompressed, participation);
+
+        require(absentCount < 512, "BLSVerify: zero participants");
+        count = 512 - absentCount;
+
+        if (absentCount == 0) {
+            aggPubkey = fullAggregate;
+        } else {
+            aggPubkey = bls12381G1Add(fullAggregate + negateG1(absenteeSum));
+        }
+    }
+
+    /**
      * @notice Count set bits (popcount) in an SSZ-style bitfield.
      */
     function popcount(bytes bitfield) internal pure returns (uint256 n) {
