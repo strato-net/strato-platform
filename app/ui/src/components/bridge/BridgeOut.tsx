@@ -51,7 +51,6 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
 
   const {
     requestWithdrawal: bridgeOutAPI,
-    fetchWithdrawalProofForSeq,
     useBalance,
     bridgeableTokens,
     availableNetworks,
@@ -81,7 +80,6 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
   const [progressError, setProgressError] = useState<string | undefined>();
   // Catch-up display state -- populated only when the user's seq is ahead
   // of the vault and predecessors must be submitted first.
-  const [catchUpInfo, setCatchUpInfo] = useState<{ index: number; total: number; seq: number } | undefined>();
 
   // Computed values
   const modeLabels = BRIDGE_MODE_LABELS[isSaving ? "convert" : "bridge"];
@@ -304,7 +302,6 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
     setProgressHeaderTxHash(undefined);
     setHeaderAlreadyKnown(false);
     setProgressError(undefined);
-    setCatchUpInfo(undefined);
     setCurrentStep("submit_strato");
     setProgressOpen(true);
 
@@ -368,25 +365,11 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
               proof,
               externalChainId: currentNetwork.chainId,
               deployment,
-              fetchProofForSeq: fetchWithdrawalProofForSeq,
               onProgress: (p) => {
                 console.info(`[bridge-out] claim progress:`, p);
                 switch (p.phase) {
                   case "switching-chain":
                     setCurrentStep("switch_chain");
-                    break;
-                  case "catching-up":
-                    setCatchUpInfo({ index: 0, total: p.missing, seq: p.nextSeq });
-                    setCurrentStep("catch_up");
-                    break;
-                  case "fetching-predecessor":
-                  case "anchoring-predecessor":
-                  case "submitting-predecessor":
-                    setCatchUpInfo({ index: p.index, total: p.total, seq: p.seq });
-                    setCurrentStep("catch_up");
-                    break;
-                  case "catch-up-complete":
-                    setCatchUpInfo(undefined);
                     break;
                   case "submitting-header":
                     setHeaderAlreadyKnown(false);
@@ -599,7 +582,6 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         claimTxHash={progressClaimTxHash}
         headerTxHash={progressHeaderTxHash}
         headerAlreadyKnown={headerAlreadyKnown}
-        catchUpInfo={catchUpInfo}
         error={progressError}
         onClose={handleProgressClose}
       />

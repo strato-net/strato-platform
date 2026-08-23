@@ -48,6 +48,7 @@ function encodeHeader(fields) {
     newValidators: [],
     removedValidators: [],
     proposalSignature: null,
+    version: HEADER_VERSION,
     ...fields,
   };
 
@@ -58,8 +59,9 @@ function encodeHeader(fields) {
     ? [f.proposalSignature]
     : "0x";
 
-  return ethers.encodeRlp([
-    toRlpUint(HEADER_VERSION),
+  const version = f.version ?? HEADER_VERSION;
+  const body = [
+    toRlpUint(version),
     f.parentHash,
     f.stateRoot,
     f.transactionsRoot,
@@ -73,7 +75,16 @@ function encodeHeader(fields) {
     f.removedValidators,
     proposalSig,
     [], // signatures field always empty for canonical hash
-  ]);
+  ];
+
+  // V3 appends three stake fields after the V2 tail. The decoder reads none of
+  // them -- they exist here so the field COUNT matches what a live V3 node
+  // emits, which is what the length check keys off.
+  if (version === 3) {
+    body.push([], [], []);
+  }
+
+  return ethers.encodeRlp(body);
 }
 
 function toRlpUint(value) {

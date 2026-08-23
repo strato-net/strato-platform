@@ -117,6 +117,30 @@ describe("STRATOLightClient", function () {
       expect(await client.hasReceiptsRoot(100)).to.be.false;
     });
 
+    it("accepts a V3 header, whose appended stake fields do not move the decoded ones", async function () {
+      // The live chain emits 17-field V3 headers. V3 appends after index 11,
+      // so version, receiptsRoot, number and the validator lists keep their
+      // indices -- but the decoder still has to accept the new length, or
+      // every current block reverts MalformedHeader.
+      const validators = makeValidators(7);
+      const { client, sortedValidators } = await deploy(100, validators);
+
+      const receiptsRoot = "0x" + "cd".repeat(32);
+      const header = encodeHeader({
+        number: 101,
+        currentValidators: sortedValidators,
+        receiptsRoot,
+        version: 3,
+      });
+
+      const sigs = quorumSigners(sortedValidators, validators, header);
+      await expect(client.submitHeader(header, sigs))
+        .to.emit(client, "HeaderSubmitted");
+
+      expect(await client.tip()).to.equal(101n);
+      expect(await client.getReceiptsRoot(101)).to.equal(receiptsRoot);
+    });
+
     it("accepts a header with extra signatures beyond quorum", async function () {
       const validators = makeValidators(7);
       const { client, sortedValidators } = await deploy(100, validators);
@@ -386,12 +410,14 @@ describe("STRATOLightClient", function () {
       await expect(client.submitHeader(header, sigs)).to.be.reverted;
     });
 
-    it("rejects a header with version != 2", async function () {
+    it("rejects a header with an unsupported version", async function () {
       const validators = makeValidators(4);
       const { client, sortedValidators } = await deploy(100, validators);
 
-      // Hand-craft a header with version 1 (legacy V1 layout has different
-      // field count anyway, but the version field check fires first).
+      // Hand-craft a header with version 1. V2 and V3 are supported; anything
+      // else must revert. The decoder reads the version before the length, so
+      // this reports UnsupportedHeaderVersion even though the field count here
+      // happens to be a valid one.
       const badHeader = ethers.encodeRlp([
         "0x01", // version 1
         "0x" + "00".repeat(32),

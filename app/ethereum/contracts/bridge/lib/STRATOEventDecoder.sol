@@ -34,12 +34,20 @@ library STRATOEventDecoder {
 
     // ============ Header ============
 
-    /// @dev Layout: [version, parentHash, stateRoot, transactionsRoot,
-    ///              receiptsRoot, logsBloom, number, timestamp, extraData,
-    ///              currentValidators, newValidators, removedValidators,
-    ///              proposalSignature, signatures]
-    uint256 private constant HEADER_FIELD_COUNT = 14;
-    uint256 private constant HEADER_VERSION = 2;
+    /// @dev V2 layout (14 fields): [version, parentHash, stateRoot,
+    ///              transactionsRoot, receiptsRoot, logsBloom, number,
+    ///              timestamp, extraData, currentValidators, newValidators,
+    ///              removedValidators, proposalSignature, signatures]
+    ///
+    ///      V3 (17 fields) APPENDS its stake fields after index 11 and moves
+    ///      none of the above, so every index this library reads -- version,
+    ///      receiptsRoot, number, and the three validator lists -- is
+    ///      unchanged. Only the length and version checks need to know about
+    ///      it; the decode itself is identical.
+    uint256 private constant HEADER_FIELD_COUNT_V2 = 14;
+    uint256 private constant HEADER_FIELD_COUNT_V3 = 17;
+    uint256 private constant HEADER_VERSION_V2 = 2;
+    uint256 private constant HEADER_VERSION_V3 = 3;
 
     uint256 private constant IDX_VERSION = 0;
     uint256 private constant IDX_RECEIPTS_ROOT = 4;
@@ -57,7 +65,7 @@ library STRATOEventDecoder {
     }
 
     /**
-     * @notice Decode a STRATO V2 block header from its RLP encoding.
+     * @notice Decode a STRATO V2 or V3 block header from its RLP encoding.
      * @param headerRLP The full RLP encoding (header bytes that validators
      *                  signed -- i.e. with the `signatures` field emptied).
      */
@@ -69,9 +77,15 @@ library STRATOEventDecoder {
         RLPReader.RLPItem memory item = headerRLP.toRLPItem();
         if (!item.isList()) revert MalformedHeader();
         RLPReader.RLPItem[] memory fields = item.toList();
-        if (fields.length != HEADER_FIELD_COUNT) revert MalformedHeader();
-
-        if (fields[IDX_VERSION].toUint() != HEADER_VERSION) {
+        // Read the version first so an unrecognised fork reports
+        // UnsupportedHeaderVersion rather than the misleading MalformedHeader.
+        if (fields.length == 0) revert MalformedHeader();
+        uint256 version = fields[IDX_VERSION].toUint();
+        if (version == HEADER_VERSION_V2) {
+            if (fields.length != HEADER_FIELD_COUNT_V2) revert MalformedHeader();
+        } else if (version == HEADER_VERSION_V3) {
+            if (fields.length != HEADER_FIELD_COUNT_V3) revert MalformedHeader();
+        } else {
             revert UnsupportedHeaderVersion();
         }
 

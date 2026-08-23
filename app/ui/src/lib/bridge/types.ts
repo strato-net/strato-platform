@@ -47,16 +47,6 @@ export type BridgeContextType = {
     params: WithdrawalRequestParams,
     options?: WithdrawalRequestOptions,
   ) => Promise<BridgeResponse>;
-  /**
-   * Lookup proof for a specific predecessor seq when the user's own claim
-   * needs to catch up to the vault's nextSeqToProcess. Wired through to the
-   * backend's /bridge/withdrawalProof/byBlock/:chainId/:blockNumber/:seq endpoint.
-   */
-  fetchWithdrawalProofForSeq: (
-    chainId: number,
-    blockNumber: number,
-    seq: number,
-  ) => Promise<WithdrawalProof | undefined>;
   useBalance: (tokenAddress: string | null) => {
     data: { 
       balance: string; 

@@ -330,30 +330,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     []
   );
 
-  /**
-   * Fetch the inclusion proof for a specific (chainId, blockNumber, seq)
-   * Withdrawal event. Used by the on-chain catch-up flow when the user's
-   * own seq is ahead of the vault's nextSeqToProcess and earlier proofs
-   * need to be submitted before their claim can release.
-   */
-  const fetchWithdrawalProofForSeq = useCallback(
-    async (
-      chainId: number,
-      blockNumber: number,
-      seq: number,
-    ): Promise<WithdrawalProof | undefined> => {
-      try {
-        const { data: body } = await api.get<{ success: boolean; data: WithdrawalProof }>(
-          `/bridge/withdrawalProof/byBlock/${chainId}/${blockNumber}/${seq}`,
-        );
-        return body?.success ? body.data : undefined;
-      } catch {
-        return undefined;
-      }
-    },
-    [],
-  );
-
   const requestWithdrawal = useCallback(
     async (
       params: WithdrawalRequestParams,
@@ -524,7 +500,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         targetTransactionTab,
         setTargetTransactionTab,
         requestWithdrawal,
-        fetchWithdrawalProofForSeq,
         useBalance,
         setSelectedNetwork: handleSetSelectedNetwork,
         setSelectedToken,

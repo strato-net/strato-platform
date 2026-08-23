@@ -102,22 +102,20 @@ contract BridgeVault is
         uint256 externalTokenAmount;
     }
 
-    /// @notice Hot-path claims indexed by their STRATO sequence number.
-    ///         Filled by claimWithdrawal when the proof's seq is greater
-    ///         than `nextSeqToProcess`; drained by claimWithdrawal when the
-    ///         missing predecessors arrive, or by `processQueue` when a
-    ///         caller wants to pay gas to clear backlog.
+    /// @notice DEPRECATED. Release is no longer ordered, so nothing is ever
+    ///         queued. Retained only so the storage layout is unchanged
+    ///         across the upgrade that removed sequencing; do not read it.
     mapping(uint256 => QueuedClaim) public queuedClaims;
 
-    /// @notice The next hot-withdrawal sequence number expected by this
-    ///         vault. Starts at 0 (matches `nextWithdrawalSeq[chainId]` on
-    ///         STRATO), advances by 1 each time a claim is released.
+    /// @notice DEPRECATED. Was the next expected hot-withdrawal sequence.
+    ///         Release is no longer ordered, so this never advances and is
+    ///         meaningless -- off-chain callers must not gate on it. Retained
+    ///         only to keep the storage layout stable across the upgrade.
     uint256 public nextSeqToProcess;
 
-    /// @notice Bound on how many queued claims a single claimWithdrawal call
-    ///         will drain after processing its own seq. Caps the worst-case
-    ///         gas cost of a "lucky" claim that catches up a long backlog
-    ///         in one go. Backlog beyond this is drained by `processQueue`.
+    /// @notice DEPRECATED alongside ordering. `claimWithdrawal` no longer
+    ///         drains anything; only the migration-only `processQueue` uses
+    ///         a bound, and it takes one from its caller.
     uint256 public constant MAX_DRAIN_PER_CLAIM = 16;
 
     // ============ Configuration ============
@@ -269,60 +267,46 @@ contract BridgeVault is
         uint256 threshold = instantThreshold[d.externalToken];
         if (d.externalTokenAmount >= threshold) revert AmountAboveInstantThreshold();
 
-        // Seq < cursor means a duplicate of an already-drained slot. Reject
-        // distinctly from NonceAlreadyConsumed to make accidental replays
-        // diagnosable.
-        if (d.seq < nextSeqToProcess) revert SequenceAlreadyProcessed();
-
-        if (d.seq == nextSeqToProcess) {
-            // Aligned with the cursor -- process this one immediately, then
-            // opportunistically pop any predecessors that the queue had been
-            // waiting for. Cap the drain so a "lucky" claimant that catches
-            // up a long backlog can't blow the block gas limit.
-            nonceState[nonce] = NonceState.Claimed;
-            _release(d.externalToken, d.externalRecipient, d.externalTokenAmount);
-            emit WithdrawalClaimed(
-                nonce,
-                d.externalToken,
-                d.externalRecipient,
-                d.externalTokenAmount
-            );
-            unchecked {
-                ++nextSeqToProcess;
-            }
-            emit SequenceAdvanced(nextSeqToProcess);
-            _drainQueue(MAX_DRAIN_PER_CLAIM);
-        } else {
-            // Out of order -- park the proven payload until predecessors
-            // arrive. The proof itself has already been verified, so the
-            // queue is trusted to release without re-checking.
-            nonceState[nonce] = NonceState.Queued;
-            queuedClaims[d.seq] = QueuedClaim({
-                nonce: nonce,
-                externalToken: d.externalToken,
-                externalRecipient: d.externalRecipient,
-                externalTokenAmount: d.externalTokenAmount
-            });
-            emit WithdrawalQueued(
-                nonce,
-                d.seq,
-                d.externalToken,
-                d.externalRecipient,
-                d.externalTokenAmount
-            );
-        }
+        // Release on proof, in whatever order proofs arrive.
+        //
+        // Ordering used to gate release: a claim whose seq ran ahead of the
+        // vault's cursor was parked until its predecessors showed up. That
+        // bought FIFO fairness under scarce liquidity and nothing else --
+        // replay is already prevented by the nonceState check above, and each
+        // claim independently verifies its own receipt proof against a root
+        // the light client has proven. The `prevWithdrawalBlock` chain that
+        // could have made ordering a real completeness guarantee is decoded
+        // but never read.
+        //
+        // What it cost was liveness, permanently. STRATO burns on request, so
+        // the L1 claim is a separate user-paid step; any withdrawal worth less
+        // than claim gas is rationally abandoned, and an abandoned seq froze
+        // every later withdrawal on that chain with no way past it -- funds
+        // proven, queued, and unreleasable. That is ordinary user behaviour,
+        // not an attack, so the trade was not worth making.
+        //
+        // `seq` is still emitted by STRATO and decoded here for accounting.
+        nonceState[nonce] = NonceState.Claimed;
+        _release(d.externalToken, d.externalRecipient, d.externalTokenAmount);
+        emit WithdrawalClaimed(
+            nonce,
+            d.externalToken,
+            d.externalRecipient,
+            d.externalTokenAmount
+        );
     }
 
     /**
-     * @notice Drain up to `maxIters` queued claims starting from
-     *         `nextSeqToProcess`. Anyone may call. Reverts with QueueEmpty
-     *         if the next slot is already empty -- avoids gas waste from a
-     *         caller who didn't realize the queue had nothing to do.
+     * @notice MIGRATION ONLY. Drain up to `maxIters` claims left queued by the
+     *         pre-upgrade, order-gated `claimWithdrawal`.
      *
-     *         The MAX_DRAIN_PER_CLAIM cap on `claimWithdrawal` exists to
-     *         keep the worst-case cost of an organic claim bounded; this
-     *         function exists for callers who want to deliberately spend
-     *         more gas to clear a long backlog.
+     *         Release is no longer ordered and nothing is ever queued now, so
+     *         on a vault upgraded with an empty queue -- or deployed after the
+     *         change -- this always reverts QueueEmpty. It is retained so that
+     *         a vault carrying a backlog across the upgrade can still release
+     *         those already-proven funds instead of stranding them.
+     *
+     *         Anyone may call.
      */
     function processQueue(uint256 maxIters)
         external

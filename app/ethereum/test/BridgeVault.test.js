@@ -410,110 +410,77 @@ describe("BridgeVault", function () {
       return claims;
     }
 
-    it("processes seq=0 in-order: funds release immediately", async function () {
+    it("releases funds immediately on a valid proof", async function () {
       const env = await deploy();
       const [c0] = await stageHotClaims(env, 0, 1, 50n);
 
       const balBefore = await env.token.balanceOf(env.user.address);
       await expect(env.vault.claimWithdrawal(c0.blk, 0, 0, [], "0x"))
-        .to.emit(env.vault, "WithdrawalClaimed")
-        .and.to.emit(env.vault, "SequenceAdvanced")
-        .withArgs(1n);
+        .to.emit(env.vault, "WithdrawalClaimed");
 
       expect(await env.token.balanceOf(env.user.address)).to.equal(balBefore + 50n);
-      expect(await env.vault.nextSeqToProcess()).to.equal(1n);
       expect(await env.vault.nonceState(c0.nonce)).to.equal(1n); // Claimed
     });
 
-    it("queues an out-of-order claim without releasing funds", async function () {
+    it("releases an out-of-order claim immediately instead of queuing it", async function () {
       const env = await deploy();
       const claims = await stageHotClaims(env, 0, 2, 50n);
 
       const balBefore = await env.token.balanceOf(env.user.address);
-      // Submit seq=1 first; vault expects seq=0, so this gets queued.
+      // seq=1 arrives with seq=0 never seen. It must still pay out.
       await expect(env.vault.claimWithdrawal(claims[1].blk, 0, 0, [], "0x"))
-        .to.emit(env.vault, "WithdrawalQueued")
-        .withArgs(claims[1].nonce, 1n, await env.token.getAddress(), env.user.address, 50n);
+        .to.emit(env.vault, "WithdrawalClaimed");
 
-      expect(await env.token.balanceOf(env.user.address)).to.equal(balBefore); // no release
-      expect(await env.vault.nextSeqToProcess()).to.equal(0n); // cursor unchanged
-      expect(await env.vault.nonceState(claims[1].nonce)).to.equal(4n); // Queued
-    });
-
-    it("drains predecessors when the awaited seq finally arrives", async function () {
-      const env = await deploy();
-      const claims = await stageHotClaims(env, 0, 3, 50n);
-
-      // Queue seq=1 and seq=2 first (out of order).
-      await env.vault.claimWithdrawal(claims[1].blk, 0, 0, [], "0x");
-      await env.vault.claimWithdrawal(claims[2].blk, 0, 0, [], "0x");
-      const balBefore = await env.token.balanceOf(env.user.address);
-
-      // Now submit seq=0; the vault should process it AND drain seq=1, seq=2.
-      await env.vault.claimWithdrawal(claims[0].blk, 0, 0, [], "0x");
-
-      expect(await env.token.balanceOf(env.user.address)).to.equal(balBefore + 150n);
-      expect(await env.vault.nextSeqToProcess()).to.equal(3n);
-      for (const c of claims) {
-        expect(await env.vault.nonceState(c.nonce)).to.equal(1n); // Claimed
-      }
-    });
-
-    it("rejects re-submitting an already-processed seq", async function () {
-      const env = await deploy();
-      const [c0] = await stageHotClaims(env, 0, 1, 50n);
-      await env.vault.claimWithdrawal(c0.blk, 0, 0, [], "0x");
-      // Same (block, tx, log) replays into NonceAlreadyConsumed.
-      await expect(env.vault.claimWithdrawal(c0.blk, 0, 0, [], "0x")).to.be.reverted;
-    });
-
-    it("processQueue reverts when next slot is empty", async function () {
-      const env = await deploy();
+      expect(await env.token.balanceOf(env.user.address)).to.equal(balBefore + 50n);
+      expect(await env.vault.nonceState(claims[1].nonce)).to.equal(1n); // Claimed
+      // Nothing was parked.
       await expect(env.vault.processQueue(10)).to.be.revertedWithCustomError(
         env.vault,
         "QueueEmpty",
       );
     });
 
-    it("processQueue drains a backlog up to maxIters", async function () {
+    it("an abandoned earlier withdrawal does not block later ones", async function () {
+      // The reason ordering was dropped. STRATO burns at request time and the
+      // L1 claim is a separate user-paid step, so a withdrawal worth less than
+      // claim gas is rationally abandoned. Under the old order-gated release
+      // that froze every later withdrawal on the chain permanently, with no
+      // admin override. seq=0 here is never claimed.
       const env = await deploy();
-      const claims = await stageHotClaims(env, 0, 5, 50n);
+      const claims = await stageHotClaims(env, 0, 4, 50n);
 
-      // Queue seq=1..4; seq=0 will arrive last.
-      for (let i = 1; i < 5; i++) {
+      const balBefore = await env.token.balanceOf(env.user.address);
+      for (const i of [3, 1, 2]) {
         await env.vault.claimWithdrawal(claims[i].blk, 0, 0, [], "0x");
       }
-      // Submitting seq=0 with MAX_DRAIN_PER_CLAIM=16 would drain all four
-      // queued; to actually exercise processQueue, cap the auto-drain by
-      // shrinking it via a smaller batch. Here we assert the auto-drain
-      // path lands everything in one tx, then re-do with a manually
-      // staggered scenario.
-      await env.vault.claimWithdrawal(claims[0].blk, 0, 0, [], "0x");
-      expect(await env.vault.nextSeqToProcess()).to.equal(5n);
+
+      expect(await env.token.balanceOf(env.user.address)).to.equal(balBefore + 150n);
+      for (const i of [1, 2, 3]) {
+        expect(await env.vault.nonceState(claims[i].nonce)).to.equal(1n); // Claimed
+      }
+      expect(await env.vault.nonceState(claims[0].nonce)).to.equal(0n); // still Unused
     });
 
-    it("processQueue can be called by anyone to clear backlog after auto-drain cap", async function () {
+    it("still rejects a replay of an already-claimed withdrawal", async function () {
       const env = await deploy();
-      // Stage MORE claims than MAX_DRAIN_PER_CLAIM (16) so the cap is hit.
-      const total = 20;
-      const claims = await stageHotClaims(env, 0, total, 50n);
+      const [c0] = await stageHotClaims(env, 0, 1, 50n);
+      await env.vault.claimWithdrawal(c0.blk, 0, 0, [], "0x");
+      // Replay protection is the nonce, independent of any sequencing.
+      await expect(
+        env.vault.claimWithdrawal(c0.blk, 0, 0, [], "0x"),
+      ).to.be.revertedWithCustomError(env.vault, "NonceAlreadyConsumed");
+    });
 
-      // Queue seq=1..19 first.
-      for (let i = 1; i < total; i++) {
+    it("processQueue reverts: nothing is ever queued now", async function () {
+      const env = await deploy();
+      const claims = await stageHotClaims(env, 0, 3, 50n);
+      for (let i = 2; i >= 0; i--) {
         await env.vault.claimWithdrawal(claims[i].blk, 0, 0, [], "0x");
       }
-      // Submit seq=0: processes its own + drains MAX_DRAIN_PER_CLAIM more.
-      await env.vault.claimWithdrawal(claims[0].blk, 0, 0, [], "0x");
-      const cap = await env.vault.MAX_DRAIN_PER_CLAIM();
-      // After organic claim: nextSeq = 1 (own) + cap (drained from queue).
-      expect(await env.vault.nextSeqToProcess()).to.equal(1n + cap);
-
-      // The remaining (total - 1 - cap) claims sit in queue. Drain them.
-      const remaining = BigInt(total) - 1n - cap;
-      const drained = await env.vault.processQueue.staticCall(remaining);
-      expect(drained).to.equal(remaining);
-      await env.vault.processQueue(remaining);
-      expect(await env.vault.nextSeqToProcess()).to.equal(BigInt(total));
+      await expect(env.vault.processQueue(10)).to.be.revertedWithCustomError(
+        env.vault,
+        "QueueEmpty",
+      );
     });
   });
 });

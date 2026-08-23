@@ -25,6 +25,12 @@
  *                         require admin approval via submitProof.
  *   FUND_ETH              Amount of ETH to send to the vault as withdrawal
  *                         liquidity (e.g. "0.1"). Skipped if unset/zero.
+ *   PERMIT_ETH_ROUTE_TO   STRATO token address to permit native-ETH deposits
+ *                         into. WITHOUT THIS THE ROUTER ACCEPTS NOTHING: a
+ *                         fresh DepositRouter permits no tokens, so every
+ *                         depositETH reverts NotPermitted until it is set.
+ *                         Set it here, or run configureDepositRouter.js --
+ *                         but before transferring ownership away.
  *   GENESIS_TX_INDEX      Tx index to use when probing strato_getReceiptProof
  *                         for validator extraction. Defaults to 0.
  *   PERMIT2_ADDRESS       Permit2 contract address. Defaults to the canonical
@@ -71,26 +77,64 @@ async function rpcCall(rpcUrl, method, params) {
 }
 
 /**
- * Pull the V2 header for `genesisBlock` from STRATO and decode `currentValidators`
- * (field index 9). We use strato_getReceiptProof because it returns the canonical
- * header bytes; if that block has no receipts at txIndex 0, the user can override
- * via GENESIS_TX_INDEX.
+ * Fetch the canonical header for `genesisBlock` from a public STRATO node.
+ *
+ * A public node's nginx blocks the WHOLE `strato_*` JSON-RPC namespace (see
+ * nginx-packager/rpc-guard.lua) even though the guard's stated target is only
+ * the expensive VM methods, so strato_getReceiptProof is unavailable there. The
+ * same header is served, unauthenticated, by the REST receipt-proof route -- so
+ * try the RPC first (it works against an unguarded local node) and fall back.
  */
-async function fetchValidatorsAtBlock(rpcUrl, genesisBlock, txIndex) {
-  const result = await rpcCall(rpcUrl, "strato_getReceiptProof", [
-    String(genesisBlock),
-    txIndex,
+async function fetchHeaderRLP(rpcUrl, apiUrl, genesisBlock, txIndex) {
+  try {
+    const result = await rpcCall(rpcUrl, "strato_getReceiptProof", [
+      String(genesisBlock),
+      txIndex,
+    ]);
+    if (result && result.headerRLP) return result.headerRLP;
+  } catch (e) {
+    console.log(`  strato_getReceiptProof unavailable (${e.message.slice(0, 80)}); using REST`);
+  }
+
+  const block = await rpcCall(rpcUrl, "eth_getBlockByNumber", [
+    "0x" + BigInt(genesisBlock).toString(16),
+    false,
   ]);
-  if (!result || !result.headerRLP) {
+  if (!block || !block.hash) {
+    throw new Error(`eth_getBlockByNumber returned no block ${genesisBlock}`);
+  }
+  const blockHash = block.hash.replace(/^0x/, "");
+  const url = `${apiUrl.replace(/\/$/, "")}/receipts/hash/${blockHash}/proof/${txIndex}`;
+  const res = await fetch(url);
+  if (!res.ok) {
     throw new Error(
-      `strato_getReceiptProof returned no header for block ${genesisBlock} txIndex ${txIndex}. ` +
-        `Try a different block number or set GENESIS_TX_INDEX.`,
+      `REST receipt proof ${res.status} for block ${genesisBlock} txIndex ${txIndex}. ` +
+        `Try a different block or set GENESIS_TX_INDEX.`,
     );
   }
-  const fields = ethers.decodeRlp(result.headerRLP);
-  if (fields.length !== 14) {
+  const body = await res.json();
+  const headerRLP = (body && (body.headerRLP || body.data?.headerRLP)) || null;
+  if (!headerRLP) {
     throw new Error(
-      `Expected 14-field V2 header, got ${fields.length}. Is the block pre-fork?`,
+      `REST receipt proof returned no header for block ${genesisBlock} txIndex ${txIndex}.`,
+    );
+  }
+  return headerRLP;
+}
+
+/**
+ * Pull the header for `genesisBlock` and decode `currentValidators` (field 9).
+ *
+ * V2 headers have 14 fields and V3 has 17; V3 appends after index 11, so field
+ * 9 is currentValidators in both.
+ */
+async function fetchValidatorsAtBlock(rpcUrl, apiUrl, genesisBlock, txIndex) {
+  let headerRLP = await fetchHeaderRLP(rpcUrl, apiUrl, genesisBlock, txIndex);
+  if (!headerRLP.startsWith("0x")) headerRLP = "0x" + headerRLP;
+  const fields = ethers.decodeRlp(headerRLP);
+  if (fields.length !== 14 && fields.length !== 17) {
+    throw new Error(
+      `Expected a 14-field V2 or 17-field V3 header, got ${fields.length}. Is the block pre-fork?`,
     );
   }
   const validators = fields[9];
@@ -122,6 +166,12 @@ async function saveDeployment(network, addresses, config) {
 
 async function main() {
   const stratoRpcUrl = requireEnv("STRATO_RPC_URL");
+  // REST base for the receipt-proof fallback. Derived from the RPC URL by
+  // dropping its JSON-RPC path; override with STRATO_API_URL if the node
+  // serves them from different hosts.
+  const stratoApiUrl =
+    process.env.STRATO_API_URL ||
+    stratoRpcUrl.replace(/\/(rpc|eth\/jsonrpc(\/v[0-9.]+)?)\/?$/, "") + "/strato-api/eth/v1.2";
   const stratoBridgeAddr = ensureHex(requireEnv("STRATO_BRIDGE_ADDR"));
   const genesisBlock = parseInt(requireEnv("GENESIS_BLOCK"), 10);
   if (!Number.isFinite(genesisBlock) || genesisBlock <= 0) {
@@ -162,7 +212,7 @@ async function main() {
 
   // ---- Step 1: pull validators from STRATO ----
   console.log("\n[1/5] Fetching validator set from STRATO...");
-  const validators = await fetchValidatorsAtBlock(stratoRpcUrl, genesisBlock, genesisTxIndex);
+  const validators = await fetchValidatorsAtBlock(stratoRpcUrl, stratoApiUrl, genesisBlock, genesisTxIndex);
   // STRATOLightClient.initialize requires strictly ascending order.
   const sortedValidators = [...validators]
     .map((a) => a.toLowerCase())
@@ -235,6 +285,36 @@ async function main() {
     await fund.wait();
     const balance = await ethers.provider.getBalance(vaultAddr);
     console.log(`  Funded vault with ${fundEthString} ETH (balance now ${ethers.formatEther(balance)})`);
+  }
+
+  // ---- Configure the router, or say loudly that it accepts nothing ----
+  //
+  // A freshly deployed DepositRouter permits NO tokens. Wiring a chain at an
+  // unconfigured router makes every depositETH revert NotPermitted, and the
+  // failure is invisible until someone actually tries to deposit -- so either
+  // configure it here or make the gap impossible to miss.
+  const permitStratoToken = process.env.PERMIT_ETH_ROUTE_TO;
+  if (permitStratoToken) {
+    if (!ethers.isAddress(permitStratoToken)) {
+      throw new Error(`PERMIT_ETH_ROUTE_TO is not an address: ${permitStratoToken}`);
+    }
+    const target = ethers.getAddress(permitStratoToken);
+    console.log(`\n[6/6] Permitting native ETH -> ${target} on the router...`);
+    await (await router.setPermitted(ETH_TOKEN, true)).wait();
+    await (await router.setRoutePermitted(ETH_TOKEN, target, true)).wait();
+    const cfg = await router.tokenConfig(ETH_TOKEN);
+    const routeOk = await router.routePermitted(ETH_TOKEN, target);
+    if (!cfg.isPermitted || !routeOk) {
+      throw new Error(`router config did not take: permitted=${cfg.isPermitted} route=${routeOk}`);
+    }
+    console.log("  ETH deposits permitted");
+  } else {
+    console.log("\n[6/6] Router token permissions: NOT CONFIGURED");
+    console.log("  !! This router permits NO tokens. Every deposit will revert");
+    console.log("  !! NotPermitted until setPermitted + setRoutePermitted are called.");
+    console.log("  !! Re-run with PERMIT_ETH_ROUTE_TO=<stratoToken>, or use");
+    console.log("  !! scripts/configureDepositRouter.js -- and do it BEFORE");
+    console.log("  !! transferring ownership away from the deploy key.");
   }
 
   await saveDeployment(network, {

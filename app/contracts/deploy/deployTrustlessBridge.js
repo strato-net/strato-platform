@@ -15,6 +15,7 @@
  *     --env testnet \
  *     --sepolia-deposit-router 0xSEPDEPROUTER \
  *     --base-sepolia-deposit-router 0xBASDEPROUTER \
+ *     [--owner 0xADMIN]   (pin for multi-admin vote replay) \
  *     --apply
  *
  * Defaults to a dry-run (--apply executes). All STRATO writes go
@@ -40,7 +41,12 @@ const axios = require("axios");
 const { rest, util, importer } = require("blockapps-rest");
 const config = require("./config");
 const auth = require("./auth");
-const { callListAndWait } = require("./util");
+const {
+  callListAndWait,
+  cirrusSearch,
+  getCreatedAddress,
+  getIssueId,
+} = require("./util");
 
 // ─────────────────────────────────────────────────────────────────────
 // Constants
@@ -90,6 +96,8 @@ function parseArgs() {
     if (a === "--mainnet-deposit-router") { out.mainnetDepositRouter = argv[++i]; continue; }
     if (a === "--base-deposit-router") { out.baseDepositRouter = argv[++i]; continue; }
     if (a === "--bridge-addr") { out.bridgeAddr = argv[++i]; continue; }
+    if (a === "--owner") { out.owner = argv[++i]; continue; }
+    if (a === "--vote-only") { out.voteOnly = true; continue; }
     throw new Error(`Unknown arg: ${a}`);
   }
   return out;
@@ -237,6 +245,68 @@ async function combineSource(concreteRelPath) {
  * migration. A stale key cannot forge -- proofs against it simply stop
  * verifying.
  */
+/**
+ * Derive the SSZ generalized indices the light client needs, from the branch
+ * depths the beacon API actually returns.
+ *
+ * These MUST be set explicitly after deploy. They default to zero in proxy
+ * storage: the logic contract's declared defaults live in the LOGIC's storage,
+ * and EthLightClient has no initialize() to seed the proxy's. Left at zero,
+ * every anchor entrypoint fails its Merkle-branch check.
+ *
+ * Deriving rather than hardcoding keeps this correct across forks. A fork that
+ * adds BeaconState fields deepens the container and shifts every gindex; the
+ * field offsets below do not move:
+ *
+ *   BeaconState depth d = current_sync_committee_branch.length
+ *     next_sync_committee     field 23 -> 2^d + 23   (55 at d=5, 87 at d=6)
+ *     block_roots             field  5 -> 2^d + 5    (37 at d=5, 69 at d=6)
+ *     historical_summaries    field 27 -> 2^d + 27   (59 at d=5, 91 at d=6)
+ *   finalized_root is field 1 of the Checkpoint at field 20, so one level
+ *   deeper:                             2^(d+1) + 41 (105 at d=5, 169 at d=6)
+ *   execution_payload is field 9 of BeaconBlockBody: 2^execDepth + 9 (25)
+ */
+async function fetchGeneralizedIndices(beaconUrl, finalizedRoot) {
+  const base = beaconUrl.replace(/\/$/, "");
+  const { data: bs } = await axios.get(
+    `${base}/eth/v1/beacon/light_client/bootstrap/${finalizedRoot}`,
+  );
+  const scBranch = bs?.data?.current_sync_committee_branch;
+  if (!Array.isArray(scBranch) || scBranch.length === 0) {
+    throw new Error("beacon: bootstrap has no current_sync_committee_branch; cannot derive indices");
+  }
+  const stateDepth = scBranch.length;
+
+  const { data: fu } = await axios.get(`${base}/eth/v1/beacon/light_client/finality_update`);
+  const finalityBranch = fu?.data?.finality_branch;
+  const execBranch = fu?.data?.finalized_header?.execution_branch;
+  if (!Array.isArray(finalityBranch) || finalityBranch.length === 0) {
+    throw new Error("beacon: finality_update has no finality_branch; cannot derive indices");
+  }
+  if (!Array.isArray(execBranch) || execBranch.length === 0) {
+    throw new Error("beacon: finalized_header has no execution_branch; cannot derive indices");
+  }
+
+  // finalized_root sits one level below the state container. If the beacon node
+  // disagrees, trust its branch length but say so -- a silent mismatch here
+  // surfaces later as an opaque "finality branch verify failed".
+  if (finalityBranch.length !== stateDepth + 1) {
+    console.log(
+      `  ! finality_branch depth ${finalityBranch.length} != stateDepth+1 (${stateDepth + 1}); using the beacon node's`,
+    );
+  }
+
+  const p2 = (n) => 2 ** n;
+  return {
+    finalizedRootIndex: p2(finalityBranch.length) + 41,
+    nextSyncCommitteeIndex: p2(stateDepth) + 23,
+    executionPayloadIndex: p2(execBranch.length) + 9,
+    blockRootsContainerGindex: p2(stateDepth) + 5,
+    historicalSummariesContainerGindex: p2(stateDepth) + 27,
+    stateDepth,
+  };
+}
+
 async function installAggregateVerifier(tokenObj, ownerAddr, ethLcAddr, bootstrap) {
   const proverUrl = (process.env.BRIDGE_PROVER_URL || "").replace(/\/$/, "");
   if (!proverUrl) {
@@ -244,21 +314,28 @@ async function installAggregateVerifier(tokenObj, ownerAddr, ethLcAddr, bootstra
     return undefined;
   }
 
-  const { data: vk } = await axios.get(`${proverUrl}/vk`, { timeout: 30_000 });
-  if (!vk || !Array.isArray(vk.words) || vk.words.length === 0) {
-    throw new Error("prover /vk returned no verifying key (is its setup warm?)");
-  }
-  console.log(`  verifying key: ${vk.words.length} words, id ${vk.verifierId}`);
+  // In vote-only mode the calls below are skipped, so neither the key nor the
+  // digest is ever sent — don't make the second admin's run depend on a
+  // reachable prover just to cast a creation vote.
+  let vk = { words: [], verifierId: "" };
+  let commit = { commitment: "0x0" };
+  if (!VOTE_ONLY) {
+    ({ data: vk } = await axios.get(`${proverUrl}/vk`, { timeout: 30_000 }));
+    if (!vk || !Array.isArray(vk.words) || vk.words.length === 0) {
+      throw new Error("prover /vk returned no verifying key (is its setup warm?)");
+    }
+    console.log(`  verifying key: ${vk.words.length} words, id ${vk.verifierId}`);
 
-  // The digest must be over the committee the light client just bootstrapped,
-  // or every proof for this period is rejected on-chain.
-  const { data: commit } = await axios.post(
-    `${proverUrl}/commitment`,
-    { pubkeys: bootstrap.pubkeys },
-    { timeout: 60_000, maxBodyLength: 8 * 1024 * 1024 },
-  );
-  if (!commit || !commit.commitment) throw new Error("prover /commitment returned nothing");
-  console.log(`  committee digest: ${commit.commitment}`);
+    // The digest must be over the committee the light client just bootstrapped,
+    // or every proof for this period is rejected on-chain.
+    ({ data: commit } = await axios.post(
+      `${proverUrl}/commitment`,
+      { pubkeys: bootstrap.pubkeys },
+      { timeout: 60_000, maxBodyLength: 8 * 1024 * 1024 },
+    ));
+    if (!commit || !commit.commitment) throw new Error("prover /commitment returned nothing");
+    console.log(`  committee digest: ${commit.commitment}`);
+  }
 
   const verifierLogic = await deployContract(
     tokenObj, "PlonkVerifier", "concrete/Plonk/PlonkVerifier.sol",
@@ -272,7 +349,9 @@ async function installAggregateVerifier(tokenObj, ownerAddr, ethLcAddr, bootstra
   // discover it as an opaque 400 mid-deploy.
   const dec = (h) => BigInt(h).toString();
 
-  await callListAndWait([
+  await callListGoverned(
+    "PlonkVerifier.initialize + EthLightClient.setAggregateVerifier",
+    [
     {
       contract: { name: "PlonkVerifier", address: strip0x(verifierAddr) },
       method: "initialize",
@@ -299,6 +378,153 @@ async function installAggregateVerifier(tokenObj, ownerAddr, ethLcAddr, bootstra
   return { verifier: verifierAddr, commitment: commit.commitment, verifierId: vk.verifierId };
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Governance
+// ─────────────────────────────────────────────────────────────────────
+
+// AdminRegistry.castVoteOnIssue returns `(false, issueId)` when a privileged
+// call has not yet met the vote threshold. The transaction still reports
+// status "Success", so a caller that only checks the receipt status will
+// report wiring that never actually happened. An issue id is a 32-byte keccak
+// digest; none of the methods this script calls return bytes32, so a 64-hex
+// response can only be a pending issue.
+// Second-admin mode: submit the contract creations (which cast the deciding
+// vote on the first admin's pending issues) but perform NO state-changing
+// calls. bootstrap()/initialize() are not namespace-gated, so a second full
+// run would re-execute them against freshly fetched beacon data and could
+// overwrite the committee the first run just committed to.
+let VOTE_ONLY = false;
+
+const ISSUE_POLL_MS = 10_000;
+// Grace period BEFORE our own submission in which an IssueExecuted row still
+// counts as ours. The deciding vote often lands a few seconds before our
+// re-proposal does (the other admin is running the same script against the same
+// issue id), so an exact submit-time floor misses the very execution we are
+// waiting for. Keep it tight: a wide window would match an execution from an
+// earlier aborted session, and then the two runs would resolve the same issue id
+// to two different addresses and deadlock on the next step's args.
+const ISSUE_LOOKBACK_MS = 45_000;
+
+// Addresses this process has already handed to a caller.
+//
+// An issue id is keccak256(target, func, args), and two deployments of the SAME
+// contract with the SAME constructor args therefore share one id — EthBridgeIn
+// is deployed twice (L1 and Base flavor) from identical source with identical
+// args. Nothing in the id or the timestamp can distinguish "the instance I just
+// made" from "the instance I made two steps ago", so an executed-issue lookup
+// will happily return the earlier one. That is not a cosmetic mix-up: the two
+// flavors would then share a Proxy, and a single storage slot would back both
+// chains. Every deployContract call must yield a distinct instance, so a lookup
+// that lands on an address already claimed is treated as stale.
+const CLAIMED_ADDRESSES = new Set();
+
+// Cirrus timestamp comparisons must be "YYYY-MM-DD HH:MM:SS". An ISO-8601
+// string (with the T separator and Z suffix) is accepted by PostgREST and then
+// matches NOTHING — it returns an empty result set rather than an error, so a
+// poll built on it spins forever instead of failing loudly.
+function cirrusTs(ms) {
+  return new Date(ms).toISOString().replace("T", " ").replace(/\.\d+Z$/, "");
+}
+const ISSUE_TIMEOUT_MS = 3_600_000;
+const ISSUE_ID_RE = /^[0-9a-fA-F]{64}$/;
+
+async function waitForIssueExecuted(issueId, label, submittedAt) {
+  const since = cirrusTs(Date.parse(submittedAt) - ISSUE_LOOKBACK_MS);
+  const deadline = Date.now() + ISSUE_TIMEOUT_MS;
+  for (;;) {
+    let rows = [];
+    try {
+      rows = await cirrusSearch("BlockApps-AdminRegistry-IssueExecuted", {
+        issueId: `eq.${issueId}`,
+        block_timestamp: `gte.${since}`,
+        order: "block_timestamp.desc",
+        limit: "1",
+      });
+    } catch (e) {
+      // Cirrus hiccup — keep polling rather than abandoning a live vote.
+    }
+    if (Array.isArray(rows) && rows.length > 0) {
+      console.log(`  ✓ ${label}: governance issue executed`);
+      return;
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Timed out waiting for governance issue ${issueId} (${label}) to execute. ` +
+          `Have another admin re-run this exact command to cast the deciding vote.`,
+      );
+    }
+    await new Promise((res) => setTimeout(res, ISSUE_POLL_MS));
+  }
+}
+
+// Resolve the address a create-issue produced.
+//
+// util.pollForCreateIssueExecution cannot be used here: it first waits for an
+// IssueCreated row matching OUR tx hash, and AdminRegistry._createIssue only
+// emits that when votes.length == 0. When we re-propose an issue that already
+// carries the other admin's vote, no event is emitted and that lookup blocks
+// for its full hour before falling back.
+async function waitForCreatedViaIssue(tokenObj, issueId, label, submittedAt) {
+  const since = cirrusTs(Date.parse(submittedAt) - ISSUE_LOOKBACK_MS);
+  const deadline = Date.now() + ISSUE_TIMEOUT_MS;
+  for (;;) {
+    let rows = [];
+    try {
+      rows = await cirrusSearch("BlockApps-AdminRegistry-IssueExecuted", {
+        issueId: `eq.${issueId}`,
+        block_timestamp: `gte.${since}`,
+        order: "block_timestamp.desc",
+        limit: "1",
+      });
+    } catch (e) {
+      // Cirrus hiccup — keep polling rather than abandoning a live vote.
+    }
+    if (Array.isArray(rows) && rows.length > 0) {
+      const txHash = rows[0].transaction_hash;
+      const results = await rest.getBlocResults(tokenObj, [txHash], { config, isAsync: true });
+      const final = Array.isArray(results) ? results[0] : results;
+      const addr = getCreatedAddress(final);
+      if (addr && !CLAIMED_ADDRESSES.has(addr.toLowerCase())) return addr;
+      if (!addr) {
+        throw new Error(
+          `${label}: issue ${issueId} executed but its receipt has no created address: ` +
+            JSON.stringify(final?.txResult),
+        );
+      }
+      // Same issue id, earlier instance — keep waiting for OUR execution.
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Timed out waiting for create-issue ${issueId} (${label}). ` +
+          `Have the other admin run this same command with --vote-only.`,
+      );
+    }
+    await new Promise((res) => setTimeout(res, ISSUE_POLL_MS));
+  }
+}
+
+async function callListGoverned(label, callList, opts = {}) {
+  // `repeatable` marks a call list that is safe for the second admin to submit
+  // too: plain setters, no initialize() guard to trip and no live beacon data
+  // that could differ between the two runs. Those lists need BOTH admins, since
+  // a governed target (MercataBridge) will not execute on one vote.
+  if (VOTE_ONLY && !opts.repeatable) {
+    console.log(`  (vote-only) skipping ${callList.length} call(s): ${label}`);
+    return [];
+  }
+  const submittedAt = new Date().toISOString();
+  const results = await callListAndWait(callList);
+  const list = Array.isArray(results) ? results : [results];
+  for (const r of list) {
+    const value = getIssueId(r);
+    if (typeof value === "string" && ISSUE_ID_RE.test(value)) {
+      console.log(`  … ${label}: needs a governance vote (issue ${value.slice(0, 12)}…)`);
+      await waitForIssueExecuted(value, label, submittedAt);
+    }
+  }
+  return results;
+}
+
 async function deployContract(tokenObj, name, sourceRelPath, args) {
   const source = await combineSource(sourceRelPath);
   const contractArgs = {
@@ -322,6 +548,7 @@ async function deployContract(tokenObj, name, sourceRelPath, args) {
     query: { username: "BlockApps" },
   };
   console.log(`  → deploying ${name} ...`);
+  const submittedAt = new Date().toISOString();
   const submitResp = await rest.createContract(tokenObj, contractArgs, submitOpts);
   const responseArray = Array.isArray(submitResp) ? submitResp : [submitResp];
 
@@ -344,18 +571,25 @@ async function deployContract(tokenObj, name, sourceRelPath, args) {
     const err = final?.txResult?.message || final?.txResult?.response || JSON.stringify(final);
     throw new Error(`${name} deploy failed: ${err}`);
   }
-  // `contractsCreated` is the new contract's address. Different
-  // blockapps-rest versions return it as either a comma-joined string
-  // ("0xabc..." / "abc...") or a single-element array
-  // (["0xabc..."]). Normalize.
-  let created = final?.txResult?.contractsCreated;
-  if (Array.isArray(created)) created = created[0];
-  if (typeof created !== "string" || !created) {
-    throw new Error(
-      `${name} deploy: no contractsCreated string in result: ${JSON.stringify(final?.txResult)}`,
-    );
+  // On a multi-admin node every BlockApps-namespace creation routes through
+  // AdminRegistry.castVoteOnIssue, which returns `(false, issueId)` and creates
+  // NOTHING until the vote threshold is met. So an empty `contractsCreated` is
+  // the normal pending-vote case, not a failure — resolve the address from the
+  // IssueExecuted receipt instead. getCreatedAddress also covers the case where
+  // OUR vote was the deciding one and the issue executed inline.
+  let created = getCreatedAddress(final);
+  if (!created) {
+    const issueId = getIssueId(final);
+    if (!issueId) {
+      throw new Error(
+        `${name} deploy: no contractsCreated string in result: ${JSON.stringify(final?.txResult)}`,
+      );
+    }
+    console.log(`  … ${name} creation needs a governance vote (issue ${issueId.slice(0, 12)}…)`);
+    created = await waitForCreatedViaIssue(tokenObj, issueId, name, submittedAt);
   }
   const addr = ensureHex(created);
+  CLAIMED_ADDRESSES.add(addr.toLowerCase());
   console.log(`  ✓ ${name} @ ${addr}`);
   return addr;
 }
@@ -425,8 +659,21 @@ async function main() {
     return;
   }
 
+  VOTE_ONLY = !!args.voteOnly;
+  if (VOTE_ONLY) {
+    console.log("*** VOTE-ONLY: creations only, no state-changing calls ***");
+    if (!args.owner) {
+      throw new Error("--vote-only requires --owner (must match the primary run, or the issue ids will not match)");
+    }
+  }
   const tokenObj = await getAdminToken();
-  const ownerAddr = tokenObj.userAddress;
+  // On a multi-admin node each BlockApps-namespace creation needs a second
+  // admin to re-run this command and cast the deciding vote. An issue id is
+  // keccak256(target, func, args), so BOTH runs must submit byte-identical
+  // constructor args — and ownerAddr lands in every Proxy's args. Defaulting it
+  // to whoever authenticated would give the two admins two different issues
+  // that each sit at one vote forever, so --owner pins it.
+  const ownerAddr = args.owner ? ensureHex(args.owner) : tokenObj.userAddress;
   if (!ownerAddr || /^0x0+$/.test(ownerAddr)) {
     throw new Error("ownerAddr resolved to zero address — Ownable would reject");
   }
@@ -463,7 +710,9 @@ async function main() {
   //    exactly the right number of hex chars. The beacon API returns
   //    them with the `0x` prefix, so strip and pad before sending.
   console.log("\n[3/7] EthLightClient.bootstrap(...) ...");
-  await callListAndWait([
+  await callListGoverned(
+    "EthLightClient.bootstrap",
+    [
     {
       contract: { name: "EthLightClient", address: strip0x(ethLcAddr) },
       method: "bootstrap",
@@ -476,9 +725,51 @@ async function main() {
       txParams: { gasPrice: config.gasPrice, gasLimit: 32_100_000_000 },
     },
   ]);
-  console.log(`  ✓ bootstrapped period ${bootstrap.period}`);
+  console.log(
+    VOTE_ONLY
+      ? `  (vote-only) period ${bootstrap.period} left to the primary run`
+      : `  ✓ bootstrapped period ${bootstrap.period}`,
+  );
 
   // 3b. Optional: enable the proof path for the period just bootstrapped.
+  // 3a. Generalized indices. Without these every anchor entrypoint fails its
+  //     Merkle-branch check -- they are zero in fresh proxy storage.
+  console.log("\n[3a] Setting SSZ generalized indices...");
+  const gindices = await fetchGeneralizedIndices(profile.beaconUrl, bootstrap.finalizedRoot);
+  console.log(
+    `  BeaconState depth ${gindices.stateDepth}: ` +
+      `finalizedRoot=${gindices.finalizedRootIndex} ` +
+      `nextSyncCommittee=${gindices.nextSyncCommitteeIndex} ` +
+      `executionPayload=${gindices.executionPayloadIndex} ` +
+      `blockRoots=${gindices.blockRootsContainerGindex} ` +
+      `historicalSummaries=${gindices.historicalSummariesContainerGindex}`,
+  );
+  await callListGoverned(
+    "EthLightClient.setIndices + setStateProofIndices",
+    [
+      {
+        contract: { name: "EthLightClient", address: strip0x(ethLcAddr) },
+        method: "setIndices",
+        args: {
+          finalizedRootIndex_: String(gindices.finalizedRootIndex),
+          nextSyncCommitteeIndex_: String(gindices.nextSyncCommitteeIndex),
+          executionPayloadIndex_: String(gindices.executionPayloadIndex),
+        },
+        txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
+      },
+      {
+        contract: { name: "EthLightClient", address: strip0x(ethLcAddr) },
+        method: "setStateProofIndices",
+        args: {
+          blockRootsContainerGindex_: String(gindices.blockRootsContainerGindex),
+          historicalSummariesContainerGindex_: String(gindices.historicalSummariesContainerGindex),
+        },
+        txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
+      },
+    ],
+  );
+  if (!VOTE_ONLY) console.log("  \u2713 indices set");
+
   console.log("\n[3b] Installing the subset-aggregate verifier (optional)...");
   const aggregate = await installAggregateVerifier(tokenObj, ownerAddr, ethLcAddr, bootstrap);
 
@@ -490,7 +781,9 @@ async function main() {
   );
   const l1BridgeIn = await deployProxy(tokenObj, l1BridgeInLogic, ownerAddr);
   console.log(`  EthBridgeIn (L1) proxy: ${l1BridgeIn}`);
-  await callListAndWait([
+  await callListGoverned(
+    "EthBridgeIn (L1).initialize",
+    [
     {
       contract: { name: "EthBridgeIn", address: strip0x(l1BridgeIn) },
       method: "initialize",
@@ -512,7 +805,9 @@ async function main() {
   );
   const baseLcAddr = await deployProxy(tokenObj, baseLcLogic, ownerAddr);
   console.log(`  BaseLightClient proxy: ${baseLcAddr}`);
-  await callListAndWait([
+  await callListGoverned(
+    "BaseLightClient.initialize",
+    [
     {
       contract: { name: "BaseLightClient", address: strip0x(baseLcAddr) },
       method: "initialize",
@@ -533,7 +828,9 @@ async function main() {
   );
   const l2BridgeIn = await deployProxy(tokenObj, l2BridgeInLogic, ownerAddr);
   console.log(`  EthBridgeIn (Base) proxy: ${l2BridgeIn}`);
-  await callListAndWait([
+  await callListGoverned(
+    "EthBridgeIn (Base).initialize",
+    [
     {
       contract: { name: "EthBridgeIn", address: strip0x(l2BridgeIn) },
       method: "initialize",
@@ -550,7 +847,9 @@ async function main() {
   // 7. Wire setMintTarget on each bridge-in + setBridgeIn on MercataBridge.
   //    These all target the PROXY addresses.
   console.log("\n[7/7] Wiring MercataBridge + mint targets...");
-  await callListAndWait([
+  await callListGoverned(
+    "MercataBridge wiring (setMintTarget + setBridgeIn)",
+    [
     {
       contract: { name: "EthBridgeIn", address: strip0x(l1BridgeIn) },
       method: "setMintTarget",
@@ -575,7 +874,9 @@ async function main() {
       args: { srcChainId: profile.l2ChainId, newBridge: l2BridgeIn },
       txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
     },
-  ]);
+  ],
+    { repeatable: true },
+  );
 
   // ─── Done ────────────────────────────────────────────────────────────
   const out = {

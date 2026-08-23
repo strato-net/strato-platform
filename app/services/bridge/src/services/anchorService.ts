@@ -53,6 +53,12 @@ interface FunctionTx {
  *  number of deposit blocks seen, which is small. */
 const handled = new Set<string>();
 
+/** bloc wants `bytes` as raw base16. */
+const strip0x = (h: string): string => h.replace(/^0x/, "");
+
+/** bloc wants `uint256` as a decimal string; the prover emits hex. */
+const toDecimalString = (v: string): string => BigInt(v).toString();
+
 const key = (chainId: string, txHash: string) => `${chainId}:${txHash}`;
 
 /**
@@ -100,8 +106,11 @@ export const anchorDepositBlock = async (
           args: {
             period: plan.period,
             participationBits: chunkBytes32(plan.participationBits, 2),
-            claimedAggregate: proof.aggregate,
-            proof: proof.proof,
+            // bloc does not coerce these. `bytes` wants raw base16 with no 0x,
+            // and `uint256[]` wants decimal -- the prover speaks hex for both,
+            // so an unconverted arg is rejected at submission.
+            claimedAggregate: strip0x(proof.aggregate),
+            proof: proof.proof.map(toDecimalString),
           },
         });
       } catch (e) {
@@ -116,7 +125,19 @@ export const anchorDepositBlock = async (
 
     txs.push(plan.anchorTx);
     logInfo("AnchorService", `anchoring ${chainId}:${txHash} (${txs.length} tx)`);
-    await execute(txs as any);
+
+    // One execute() per tx, NOT one batch.
+    //
+    // Only the first tx in a batch decodes struct arguments correctly. bloc
+    // resolves a struct's field types from the CodeCollection, and for later
+    // txs in the same batch it is not available, so argValueToValue falls back
+    // to INFERRING field types. The bytes32[2] nested in SyncAggregateInput
+    // then arrives as strings and the anchor fails with the badly misleading
+    // "BLSVerify: expected 64-byte bitfield". Batched, the anchor tx sits
+    // after submitAggregateProof and always loses.
+    for (const tx of txs) {
+      await execute(tx as any);
+    }
     handled.add(k);
     return true;
   } catch (e: any) {
