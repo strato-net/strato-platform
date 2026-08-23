@@ -32,12 +32,7 @@ interface WithdrawalProgressModalProps {
   headerTxHash?: string;
   /** True once the light-client tip already covered the proof block, so the submit_header step was skipped. */
   headerAlreadyKnown?: boolean;
-  /**
-   * Per-iteration progress for the catch-up step. `index` is 0 while
-   * walking predecessors backwards (still planning), then 1..total while
-   * submitting them oldest-first. Driven by claimWithdrawalOnExternalChain's
-   * onProgress callback.
-   */
+  /** Error message to surface in place of the step list. */
   error?: string;
   onClose?: () => void;
 }

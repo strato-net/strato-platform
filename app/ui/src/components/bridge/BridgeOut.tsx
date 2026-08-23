@@ -78,8 +78,6 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
   const [progressHeaderTxHash, setProgressHeaderTxHash] = useState<string | undefined>();
   const [headerAlreadyKnown, setHeaderAlreadyKnown] = useState(false);
   const [progressError, setProgressError] = useState<string | undefined>();
-  // Catch-up display state -- populated only when the user's seq is ahead
-  // of the vault and predecessors must be submitted first.
 
   // Computed values
   const modeLabels = BRIDGE_MODE_LABELS[isSaving ? "convert" : "bridge"];
