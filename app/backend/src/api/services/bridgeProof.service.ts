@@ -885,6 +885,28 @@ export async function buildPeriodTransitions(
   });
 }
 
+/**
+ * The 512 compressed pubkeys of the sync committee for `period`.
+ *
+ * A LightClientUpdate for period P-1 carries the committee that serves period
+ * P as `next_sync_committee` -- the same value advanceCommittee anchors -- so
+ * the committee the prover hashes is the one the light client stored.
+ */
+export async function committeeForPeriod(
+  srcChainId: string,
+  period: number,
+): Promise<string[]> {
+  if (period <= 0) throw new Error(`committeeForPeriod: period ${period} has no predecessor update`);
+  const updates = await beaconClientFor(srcChainId).getLightClientUpdates(period - 1, 1);
+  const sc = (updates?.[0] as any)?.next_sync_committee;
+  if (!sc || !Array.isArray(sc.pubkeys) || sc.pubkeys.length !== 512) {
+    throw new Error(
+      `committeeForPeriod: no next_sync_committee (512 pubkeys) in the update for period ${period - 1}`,
+    );
+  }
+  return sc.pubkeys as string[];
+}
+
 /** Raised when the light client is so far behind that catching up
  *  would require more advanceCommittee txs than {MAX_ADVANCE_COMMITTEE_TXS}. */
 export class TooManyMissingPeriodsError extends Error {

@@ -24,6 +24,7 @@
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForAllTxs } from "../../utils/txHelper";
 import { strato, cirrus } from "../../utils/appApiHelper";
+import { proverConfigured, proveAggregate } from "./bridgeProver.service";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName, ensureHexPrefix } from "../../utils/utils";
 import {
@@ -37,6 +38,7 @@ import {
   HistoricalSummariesAnchorInputs,
   PeriodTransitionJSON,
   StateProofAnchorInputs,
+  committeeForPeriod,
 } from "./bridgeProof.service";
 import {
   BaseAnchorChainInputs,
@@ -880,6 +882,84 @@ function beaconChainIdFor(srcChainId: string, flavor: LightClientFlavor): string
  * don't break us — but we still skip the call when the chain is
  * already caught up (no point paying gas).
  */
+/**
+ * Read EthLightClient.committeeCommitment[period]. Unset means the period has
+ * no digest installed, which is what disables the proof path for it.
+ */
+const fetchCommitteeCommitment = async (
+  accessToken: string,
+  lightClient: string,
+  period: bigint,
+): Promise<string | undefined> => {
+  const v = await fetchMappingValue(
+    accessToken,
+    `${EthLightClientName}-committeeCommitment`,
+    lightClient,
+    String(period),
+  );
+  return typeof v === "string" ? v : undefined;
+};
+
+/**
+ * Build a `submitAggregateProof` tx to precede an anchor, if the proof path is
+ * available for this period.
+ *
+ * Deriving the subset aggregate on-chain costs a decompression and an addition
+ * per member: ~4.2M gas summing 470 signers, or ~510k subtracting 42 absentees,
+ * against a 400,000-gas budget. A proof replaces that with ~120k.
+ *
+ * Every reason to skip returns an empty list rather than throwing, and
+ * anchoring then derives the aggregate on-chain as before. That fallback is
+ * why an unreachable or broken prover cannot block a claim — it only makes the
+ * claim more expensive, and at high participation still affordable.
+ */
+async function buildAggregateProofTxIfNeeded(
+  accessToken: string,
+  beaconChainId: string,
+  lightClient: string,
+  sync: { signatureSlot: string; participationBits: string },
+): Promise<Array<{ contractName: string; contractAddress: string; method: string; args: Record<string, any> }>> {
+  if (!proverConfigured()) return [];
+
+  const period = BigInt(sync.signatureSlot) / SLOTS_PER_PERIOD;
+  try {
+    const commitment = await fetchCommitteeCommitment(accessToken, lightClient, period);
+    if (!commitment) return [];
+
+    const pubkeys = await committeeForPeriod(beaconChainId, Number(period));
+    const res = await proveAggregate(pubkeys, ensureHexPrefix(sync.participationBits));
+
+    // If the prover hashed a different committee than the light client holds,
+    // the proof would be rejected on-chain. Catching it here costs one
+    // comparison instead of a transaction and an opaque revert.
+    if (BigInt(res.commitment) !== BigInt(commitment)) {
+      console.warn(
+        `[trustlessBridge] prover committee digest ${res.commitment} does not match the ` +
+          `light client's ${commitment} for period ${period}; anchoring natively`,
+      );
+      return [];
+    }
+
+    return [{
+      contractName: extractContractName(EthLightClientName),
+      contractAddress: lightClient,
+      method: "submitAggregateProof",
+      args: {
+        period: String(period),
+        participationBits: chunkBytes32(sync.participationBits, 2),
+        claimedAggregate: ensureHexPrefix(res.aggregate),
+        proof: res.proof,
+      },
+    }];
+  } catch (err: any) {
+    console.warn(
+      `[trustlessBridge] aggregate proof unavailable for period ${period} ` +
+        `(${err?.message ?? err}); anchoring natively`,
+    );
+    return [];
+  }
+}
+
 async function buildAdvanceCommitteeTxsIfNeeded(
   accessToken: string,
   beaconChainId: string,
@@ -1003,6 +1083,16 @@ export const trustlessClaim = async (
       committeeAdvanceCount = advances.length;
       txInputs.push(...advances);
 
+      // A proof for the subset aggregate, if the period has a committee
+      // digest installed and a prover is reachable. Empty otherwise, and the
+      // anchor derives the aggregate on-chain as before.
+      txInputs.push(...await buildAggregateProofTxIfNeeded(
+        accessToken,
+        beaconChainIdFor(externalChainId, "eth"),
+        cfg.lightClient,
+        anchor.sync,
+      ));
+
       if (anchor.kind === "block_roots") {
         txInputs.push({
           contractName: extractContractName(EthLightClientName),
@@ -1051,6 +1141,12 @@ export const trustlessClaim = async (
         );
         committeeAdvanceCount = advances.length;
         txInputs.push(...advances);
+        txInputs.push(...await buildAggregateProofTxIfNeeded(
+          accessToken,
+          beaconChainIdFor(externalChainId, "base"),
+          cfg.l1LightClient!,
+          baseAnchor.l1Anchor.sync,
+        ));
         txInputs.push({
           contractName: extractContractName(EthLightClientName),
           contractAddress: cfg.l1LightClient!,
@@ -1098,6 +1194,12 @@ export const trustlessClaim = async (
         );
         committeeAdvanceCount = advances.length;
         txInputs.push(...advances);
+        txInputs.push(...await buildAggregateProofTxIfNeeded(
+          accessToken,
+          beaconChainIdFor(externalChainId, "linea"),
+          cfg.l1LightClient!,
+          lineaAnchor.l1Anchor.sync,
+        ));
         txInputs.push({
           contractName: extractContractName(EthLightClientName),
           contractAddress: cfg.l1LightClient!,

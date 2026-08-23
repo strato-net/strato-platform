@@ -223,6 +223,74 @@ async function combineSource(concreteRelPath) {
   return String(combined);
 }
 
+/**
+ * Install the subset-aggregate proof path on an EthLightClient: deploy a
+ * PlonkVerifier, load it with the circuit's verifying key, point the light
+ * client at it, and store the committee digest for the bootstrapped period.
+ *
+ * Optional. Without BRIDGE_PROVER_URL the light client still anchors by
+ * deriving the aggregate on-chain -- cheap enough at high participation,
+ * several times a transaction's budget when participation dips.
+ *
+ * Safe to re-run: the verifying key lives in the verifier's storage, so a
+ * circuit change is a redeploy plus a setAggregateVerifier, not a light-client
+ * migration. A stale key cannot forge -- proofs against it simply stop
+ * verifying.
+ */
+async function installAggregateVerifier(tokenObj, ownerAddr, ethLcAddr, bootstrap) {
+  const proverUrl = (process.env.BRIDGE_PROVER_URL || "").replace(/\/$/, "");
+  if (!proverUrl) {
+    console.log("  BRIDGE_PROVER_URL unset — skipping; anchors will aggregate on-chain.");
+    return undefined;
+  }
+
+  const { data: vk } = await axios.get(`${proverUrl}/vk`, { timeout: 30_000 });
+  if (!vk || !Array.isArray(vk.words) || vk.words.length === 0) {
+    throw new Error("prover /vk returned no verifying key (is its setup warm?)");
+  }
+  console.log(`  verifying key: ${vk.words.length} words, id ${vk.verifierId}`);
+
+  // The digest must be over the committee the light client just bootstrapped,
+  // or every proof for this period is rejected on-chain.
+  const { data: commit } = await axios.post(
+    `${proverUrl}/commitment`,
+    { pubkeys: bootstrap.pubkeys },
+    { timeout: 60_000, maxBodyLength: 8 * 1024 * 1024 },
+  );
+  if (!commit || !commit.commitment) throw new Error("prover /commitment returned nothing");
+  console.log(`  committee digest: ${commit.commitment}`);
+
+  const verifierLogic = await deployContract(
+    tokenObj, "PlonkVerifier", "concrete/Plonk/PlonkVerifier.sol",
+    { owner_: ownerAddr },
+  );
+  const verifierAddr = await deployProxy(tokenObj, verifierLogic, ownerAddr);
+  console.log(`  PlonkVerifier proxy: ${verifierAddr}`);
+
+  await callListAndWait([
+    {
+      contract: { name: "PlonkVerifier", address: strip0x(verifierAddr) },
+      method: "initialize",
+      args: { key: vk.words, id: vk.verifierId },
+      txParams: { gasPrice: config.gasPrice, gasLimit: 32_100_000_000 },
+    },
+    {
+      contract: { name: "EthLightClient", address: strip0x(ethLcAddr) },
+      method: "setAggregateVerifier",
+      args: { v: strip0x(verifierAddr) },
+      txParams: { gasPrice: config.gasPrice, gasLimit: 32_100_000_000 },
+    },
+    {
+      contract: { name: "EthLightClient", address: strip0x(ethLcAddr) },
+      method: "setCommitteeCommitment",
+      args: { period: bootstrap.period, commitment: commit.commitment },
+      txParams: { gasPrice: config.gasPrice, gasLimit: 32_100_000_000 },
+    },
+  ]);
+  console.log(`  ✓ proof path enabled for period ${bootstrap.period}`);
+  return { verifier: verifierAddr, commitment: commit.commitment, verifierId: vk.verifierId };
+}
+
 async function deployContract(tokenObj, name, sourceRelPath, args) {
   const source = await combineSource(sourceRelPath);
   const contractArgs = {
@@ -398,6 +466,10 @@ async function main() {
   ]);
   console.log(`  ✓ bootstrapped period ${bootstrap.period}`);
 
+  // 3b. Optional: enable the proof path for the period just bootstrapped.
+  console.log("\n[3b] Installing the subset-aggregate verifier (optional)...");
+  const aggregate = await installAggregateVerifier(tokenObj, ownerAddr, ethLcAddr, bootstrap);
+
   // 4. Deploy EthBridgeIn for the L1 source chain (logic + proxy + initialize).
   console.log("\n[4/7] Deploying EthBridgeIn (L1 flavor)...");
   const l1BridgeInLogic = await deployContract(
@@ -514,6 +586,7 @@ async function main() {
       forkVersion: bootstrap.forkVersion,
       genesisValidatorsRoot: bootstrap.genesisValidatorsRoot,
     },
+    aggregateProof: aggregate ?? null,
     chains: {
       [profile.l1ChainId]: { bridgeIn: l1BridgeIn, lightClient: ethLcAddr },
       [profile.l2ChainId]: { bridgeIn: l2BridgeIn, lightClient: baseLcAddr },
