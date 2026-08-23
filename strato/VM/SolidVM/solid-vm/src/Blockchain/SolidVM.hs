@@ -34,6 +34,7 @@ import Blockchain.DB.ModifyStateDB (pay)
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
+import Blockchain.Data.VmTrace
 import Blockchain.Data.ExecResults
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
@@ -108,7 +109,8 @@ import qualified Data.Vector as V
 import Debugger
 import GHC.Exts hiding (breakpoint)
 --import Blockchain.DB.RawStorageDB
---import Blockchain.Data.BlockSummary
+import Blockchain.Data.BlockSummary (BlockSummary (..))
+import Blockchain.Data.ProposalFacts
 --import Blockchain.DB.MemAddressStateDB
 
 import Network.Haskoin.Crypto.BigWord ()
@@ -178,6 +180,11 @@ solidVMBreakpoint ann = do
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
     [] -> pure []
     (ci : cis) -> pure $ ci {currentSourcePos = Just pos} : cis
+  mTracer <- Mod.get (Mod.Proxy @(Maybe VmTracer))
+  for_ mTracer $ \_ -> do
+    depth <- length <$> Mod.get (Mod.Proxy @[CallInfo])
+    GasInfo {_gasLeft = Gas gl} <- Mod.get (Mod.Proxy @GasInfo)
+    traceStatement mTracer (T.pack $ _sourcePositionName pos) (_sourcePositionLine pos) (_sourcePositionColumn pos) depth gl
   breakpoint runExpr
 
 -- end debugger-related code
@@ -227,7 +234,8 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
             Env.txHash = txHash',
             Env.src = Just code,
             Env.name = Just contractName,
-            Env.runningTests = isRunningTests
+            Env.runningTests = isRunningTests,
+            Env.prevBlock = Nothing
           }
   let gasInfo' =
         GasInfo
@@ -289,6 +297,8 @@ create' creator newAddress ch cc contractName' valList = do
   -- I'm showing these strings because I like them to be in quotes in the logs :)
   multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName')]
 
+  stakeEventSource <- Conf.stakeEventSourceAt (Conf.networkConfig ethConf) . BlockHeader.number . Env.blockHeader <$> getEnv
+
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
   let (newV, remV) = fromDelta . getDeltasFromEvents $ toList finalEvs
@@ -306,7 +316,8 @@ create' creator newAddress ch cc contractName' valList = do
         erException = Nothing,
         erPragmas = CC._pragmas cc,
         erNewValidators = newV,
-        erRemovedValidators = remV
+        erRemovedValidators = remV,
+        erStakeUpdates = getStakeDeltasFromEvents stakeEventSource $ toList finalEvs
       }
 
 call ::
@@ -352,7 +363,8 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
             Env.txHash = txHash',
             Env.src = Nothing,
             Env.name = Nothing,
-            Env.runningTests = isRunningTests
+            Env.runningTests = isRunningTests,
+            Env.prevBlock = Nothing
           }
 
   let gasInfo' =
@@ -378,6 +390,7 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
     let (newV, remV) = fromDelta . getDeltasFromEvents $ toList finalEvs
+        stakeEventSource = Conf.stakeEventSourceAt (Conf.networkConfig ethConf) (BlockHeader.number blockData)
 
     return $
       ExecResults
@@ -393,7 +406,8 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
           erException = Nothing, -- tells me if theres an exception
           erPragmas = [],
           erNewValidators = newV,
-          erRemovedValidators = remV
+          erRemovedValidators = remV,
+          erStakeUpdates = getStakeDeltasFromEvents stakeEventSource $ toList finalEvs
         }
 
 call' ::
@@ -1260,6 +1274,9 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       return $ Constant $ SInteger $ round baseTimestamp
     (SBuiltinVariable "block", "number") -> (Constant . SInteger . BlockHeader.number . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "coinbase") -> Constant . flip SAddress False . Env.proposer <$> getEnv
+    (SBuiltinVariable "block", "prevProposer") -> Constant . flip SAddress False . pfProposer <$> getPrevBlockFacts
+    (SBuiltinVariable "block", "prevIntendedProposer") -> Constant . flip SAddress False . pfIntendedProposer <$> getPrevBlockFacts
+    (SBuiltinVariable "block", "prevRound") -> Constant . SInteger . pfRound <$> getPrevBlockFacts
     (SBuiltinVariable "block", "difficulty") ->
       (Constant . SInteger . BlockHeader.difficulty . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "gaslimit") ->
@@ -2242,36 +2259,66 @@ callBuiltinFunction n args' = do
         _ -> args'
   callBuiltin n args
 
+-- | Charge for a Poseidon hash, then run it. Cost scales with the number
+-- of field elements absorbed; the arity bound is enforced after charging
+-- so an oversized call still pays for the attempt.
+poseidonMetered :: MonadSM m => Int -> [Value] -> m Value
+poseidonMetered n xs = do
+  decrementGas $ gasPoseidonBase + gasPoseidonPerInput * fromIntegral (max 1 n)
+  if n > 0 && n <= 8
+    then SInteger . Builtins.poseidonHash <$> traverse int xs
+    else typeError "invalid args passed to poseidon" $ show xs
+
+-- | Poseidon2 is Merkle-Damgard over a 2-to-1 compression, so it runs one
+-- permutation per input element and has no arity cap.
+poseidon2Metered :: MonadSM m => Int -> [Value] -> m Value
+poseidon2Metered n xs = do
+  decrementGas $ gasPoseidonBase + gasPoseidonPerInput * fromIntegral (max 1 n)
+  if n > 0
+    then do
+      ints <- traverse int xs
+      pure . SInteger $! Builtins.poseidon2Hash ints
+    else typeError "invalid args passed to poseidon2" $ show xs
+
+-- | Charge for the pairing check, then run it. Six integers per pair.
+ecPairingMetered :: MonadSM m => [Integer] -> m Value
+ecPairingMetered ints = do
+  chargePerTerm gasEcPairingBase gasEcPairingPerPair 6 (length ints)
+  pure . SBool $! Builtins.ecPairing ints
+
 -- | Pack a flat list of SolidVM ints into G1MSM @(x, y, k)@ triples and
 --   call the pure helper. Errors out if the arg count isn't a multiple of 3.
 bls12381G1MsmFromInts :: MonadSM m => [Value] -> m Value
 bls12381G1MsmFromInts vs = do
+  chargePerTerm 0 gasBlsG1MsmPerTerm 3 (length vs)
   is <- traverse int vs
   case chunksOf3 is of
     Nothing -> invalidArguments "bls12381G1Msm: expected a multiple of 3 integer args (x, y, k per term)" vs
     Just triples -> do
-      let (rx, ry) = Builtins.bls12381G1MsmInts triples
+      let !(!rx, !ry) = Builtins.bls12381G1MsmInts triples
       pure . STuple . V.fromList $ Constant <$> [SInteger rx, SInteger ry]
 
 -- | Pack flat ints into G2MSM @(((xc0, xc1), (yc0, yc1)), k)@ entries.
 --   Each term is 5 ints (4 coordinates + 1 scalar).
 bls12381G2MsmFromInts :: MonadSM m => [Value] -> m Value
 bls12381G2MsmFromInts vs = do
+  chargePerTerm 0 gasBlsG2MsmPerTerm 5 (length vs)
   is <- traverse int vs
   case chunksOf5 is of
     Nothing -> invalidArguments "bls12381G2Msm: expected a multiple of 5 integer args (xc0, xc1, yc0, yc1, k per term)" vs
     Just terms -> do
-      let ((rxc0, rxc1), (ryc0, ryc1)) = Builtins.bls12381G2MsmInts terms
+      let !((!rxc0, !rxc1), (!ryc0, !ryc1)) = Builtins.bls12381G2MsmInts terms
       pure . STuple . V.fromList $ Constant <$> [SInteger rxc0, SInteger rxc1, SInteger ryc0, SInteger ryc1]
 
 -- | Pack flat ints into pairing-check @(g1, g2)@ pairs. Each pair is 6
 --   ints: G1 (x, y) + G2 ((xc0, xc1), (yc0, yc1)).
 bls12381PairingFromInts :: MonadSM m => [Value] -> m Value
 bls12381PairingFromInts vs = do
+  chargePerTerm gasBlsPairingBase gasBlsPairingPerPair 6 (length vs)
   is <- traverse int vs
   case chunksOf6 is of
     Nothing -> invalidArguments "bls12381Pairing: expected a multiple of 6 integer args (G1.x, G1.y, G2.xc0, G2.xc1, G2.yc0, G2.yc1 per term)" vs
-    Just pairs -> pure . SBool $ Builtins.bls12381PairingInts pairs
+    Just pairs -> pure . SBool $! Builtins.bls12381PairingInts pairs
 
 chunksOf3 :: [Integer] -> Maybe [(Integer, Integer, Integer)]
 chunksOf3 [] = Just []
@@ -2289,6 +2336,118 @@ chunksOf6 [] = Just []
 chunksOf6 (a : b : c : d : e : f : rest) =
   (((a, b), ((c, d), (e, f))) :) <$> chunksOf6 rest
 chunksOf6 _ = Nothing
+
+-- Gas schedule for the cryptographic builtins.
+--
+-- Unlike the rest of SolidVM's gas -- a coarse counter of statements and
+-- expression nodes -- these operations do unbounded-cost work in a single
+-- node. Left unmetered they were effectively free: a contract could buy
+-- hundreds of milliseconds of pairing arithmetic for 5 gas, stalling block
+-- production (PBFT's round-change cliff is 120s) for the price of a
+-- function call.
+--
+-- The constants below are calibrated so that one gas unit is roughly one
+-- microsecond of measured wall-clock on the current implementations, which
+-- puts the 400k per-transaction budget at a few hundred milliseconds of
+-- crypto. Reassuringly, that calibration lands close to Ethereum's own
+-- schedule for the same primitives: the BN254 pairing works out to
+-- 45000 + 17000k against EIP-197's 45000 + 34000k.
+--
+-- Costs are charged BEFORE the operation runs, sized from the input, so
+-- an oversized input is rejected rather than paid for after the fact.
+-- Because pairing is charged per pair, gas also serves as the input cap:
+-- the budget admits roughly 20 pairs in a single call.
+gasEcAdd, gasEcMul, gasEcPairingBase, gasEcPairingPerPair :: Gas
+gasEcAdd = 50
+gasEcMul = 300
+gasEcPairingBase = 45000 -- the shared final exponentiation
+gasEcPairingPerPair = 17000 -- one Miller loop
+
+gasPoseidonBase, gasPoseidonPerInput :: Gas
+gasPoseidonBase = 100
+gasPoseidonPerInput = 100
+
+gasModExp :: Gas
+gasModExp = 100
+
+-- | Parametrized Poseidon2: charged per PERMUTATION of the selected
+-- instance. The Goldilocks width-12 permutation is ~740 field
+-- multiplications in the current Integer-backed implementation (~60-100 µs);
+-- BN254 t=2 keeps the poseidon2 schedule (100 + 100 per absorbed input).
+gasPoseidon2GLBase, gasPoseidon2GLPerPerm :: Gas
+gasPoseidon2GLBase = 100
+gasPoseidon2GLPerPerm = 100
+
+gasBlsG1Add, gasBlsG1MsmPerTerm, gasBlsG2Add, gasBlsG2MsmPerTerm :: Gas
+gasBlsG1Add = 4000
+gasBlsG1MsmPerTerm = 2500
+gasBlsG2Add = 9000
+gasBlsG2MsmPerTerm = 9000
+
+gasBlsPairingBase, gasBlsPairingPerPair :: Gas
+gasBlsPairingBase = 50000
+gasBlsPairingPerPair = 20000
+
+gasBlsMapFpToG1, gasBlsMapFp2ToG2, gasBlsDecompressG1, gasBlsDecompressG2 :: Gas
+gasBlsMapFpToG1 = 5000
+gasBlsMapFp2ToG2 = 20000
+gasBlsDecompressG1 = 5000
+gasBlsDecompressG2 = 20000
+
+-- | Charge for an operation whose cost scales with the number of input
+-- terms, given the flat count of integer arguments and the arity of one
+-- term. Rounds up so a malformed (non-multiple) input still pays for the
+-- decode attempt that is about to reject it.
+chargePerTerm :: MonadSM m => Gas -> Gas -> Int -> Int -> m ()
+chargePerTerm base perTerm argsPerTerm nArgs =
+  let terms = (nArgs + argsPerTerm - 1) `div` argsPerTerm
+   in decrementGas $ base + perTerm * fromIntegral terms
+
+-- | Charge for a byte-form BLS builtin, sized from the EIP-2537 input
+-- length rather than an argument count.
+chargePerBlock :: MonadSM m => Gas -> Gas -> Int -> B.ByteString -> m ()
+chargePerBlock base perBlock blockSize bs =
+  let blocks = (B.length bs + blockSize - 1) `div` blockSize
+   in decrementGas $ base + perBlock * fromIntegral blocks
+
+-- | Resolve a parametrized-Poseidon2 params block, rejecting unknown instances.
+poseidon2Instance :: MonadSM m => B.ByteString -> m Builtins.P2Instance
+poseidon2Instance p = case Builtins.parsePoseidon2Params p of
+  Left e -> invalidArguments "poseidon2 params" e
+  Right i -> pure i
+
+poseidon2GasFor :: MonadSM m => Builtins.P2Instance -> Int -> Int -> m ()
+poseidon2GasFor inst nIn nOut = case inst of
+  Builtins.P2BN254 -> decrementGas $ gasPoseidonBase + gasPoseidonPerInput * fromIntegral (max 1 nIn)
+  Builtins.P2Goldilocks12 ->
+    decrementGas $ gasPoseidon2GLBase + gasPoseidon2GLPerPerm * fromIntegral (Builtins.poseidon2Permutations inst nIn nOut)
+
+intsArray :: [Integer] -> Value
+intsArray = SArray . V.fromList . map (Constant . SInteger)
+
+poseidon2PermuteMetered :: MonadSM m => B.ByteString -> [Value] -> m Value
+poseidon2PermuteMetered p xs = do
+  inst <- poseidon2Instance p
+  poseidon2GasFor inst 1 1
+  ints <- traverse int xs
+  pure . intsArray $! Builtins.poseidon2Permute inst ints
+
+poseidon2HashMetered :: MonadSM m => B.ByteString -> [Value] -> Integer -> m Value
+poseidon2HashMetered p xs n = do
+  inst <- poseidon2Instance p
+  let nOut = fromIntegral n
+  poseidon2GasFor inst (length xs) nOut
+  ints <- traverse int xs
+  pure . intsArray $! Builtins.poseidon2ParamHash inst nOut ints
+
+poseidon2HashBytesMetered :: MonadSM m => B.ByteString -> B.ByteString -> Integer -> m Value
+poseidon2HashBytesMetered p d n = do
+  inst <- poseidon2Instance p
+  let nOut = fromIntegral n
+      chunk = if inst == Builtins.P2Goldilocks12 then 7 else 31
+      nIn = (B.length d + chunk - 1) `div` chunk + 1
+  poseidon2GasFor inst nIn nOut
+  pure . intsArray $! Builtins.poseidon2ParamHashBytes inst nOut d
 
 callBuiltin :: MonadSM m => SolidString -> [Value] -> m Value
 callBuiltin "variadic" [SVariadic vs] = pure $ SVariadic vs
@@ -2446,21 +2605,24 @@ callBuiltin "base64encode" [SBytes bs] = pure . SBytes $ B64.encode bs
 callBuiltin "base64encode" [SString s] = pure . SString . BC.unpack . B64.encode . DT.encodeUtf8 $ T.pack s
 callBuiltin "base64urlencode" [SBytes bs] = pure . SBytes . BC.takeWhile (/= '=') $ B64URL.encode bs
 callBuiltin "base64urlencode" [SString s] = pure . SString . BC.unpack . BC.takeWhile (/= '=') . B64URL.encode . DT.encodeUtf8 $ T.pack s
-callBuiltin "modExp" [b, e, m] = SInteger <$> (Builtins.modExp <$> int b <*> int e <*> int m)
+callBuiltin "modExp" [b, e, m] = do
+  decrementGas gasModExp
+  (b', e', m') <- (,,) <$> int b <*> int e <*> int m
+  pure . SInteger $! Builtins.modExp b' e' m'
 callBuiltin "ecAdd" [a, b, c, d] = do
+  decrementGas gasEcAdd
   (x1, y1, x2, y2) <- (,,,) <$> int a <*> int b <*> int c <*> int d
-  let (x, y) = Builtins.ecAdd (x1, y1) (x2, y2)
+  -- forced here so validation failures surface as this call's revert
+  let !(!x, !y) = Builtins.ecAdd (x1, y1) (x2, y2)
   pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
 callBuiltin "ecMul" [a, b, c] = do
+  decrementGas gasEcMul
   (x1, y1, s) <- (,,) <$> int a <*> int b <*> int c
-  let (x, y) = Builtins.ecMul (x1, y1) s
+  let !(!x, !y) = Builtins.ecMul (x1, y1) s
   pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
-callBuiltin "ecPairing" [SVariadic xs] =
-  SBool . Builtins.ecPairing <$> traverse int xs
-callBuiltin "ecPairing" [SArray xs] =
-  SBool . Builtins.ecPairing <$> traverse getInt (V.toList xs)
-callBuiltin "ecPairing" xs = do
-  SBool . Builtins.ecPairing <$> traverse int xs
+callBuiltin "ecPairing" [SVariadic xs] = ecPairingMetered =<< traverse int xs
+callBuiltin "ecPairing" [SArray xs] = ecPairingMetered =<< traverse getInt (V.toList xs)
+callBuiltin "ecPairing" xs = ecPairingMetered =<< traverse int xs
 -- ============================================================================
 -- BLS12-381 dispatch
 -- ============================================================================
@@ -2474,102 +2636,118 @@ callBuiltin "ecPairing" xs = do
 -- multi-arg form falls through to a dedicated handler that converts via
 -- 'int' and packs the result into an 'STuple' (mirroring how 'ecAdd' and
 -- friends already work).
-
-callBuiltin "bls12381G1Add" [SBytes b] =
+callBuiltin "bls12381G1Add" [SBytes b] = do
+  decrementGas gasBlsG1Add
   case Builtins.bls12381G1Add b of
     Left e -> invalidArguments ("bls12381G1Add: " ++ e) b
     Right out -> pure (SBytes out)
 callBuiltin "bls12381G1Add" [a, b, c, d] = do
+  decrementGas gasBlsG1Add
   (x1, y1, x2, y2) <- (,,,) <$> int a <*> int b <*> int c <*> int d
-  let (rx, ry) = Builtins.bls12381G1AddInts (x1, y1) (x2, y2)
+  let !(!rx, !ry) = Builtins.bls12381G1AddInts (x1, y1) (x2, y2)
   pure . STuple . V.fromList $ Constant <$> [SInteger rx, SInteger ry]
-
-callBuiltin "bls12381G1Msm" [SBytes b] =
+callBuiltin "bls12381G1Msm" [SBytes b] = do
+  -- 160 bytes per (G1 point, scalar) term
+  chargePerBlock 0 gasBlsG1MsmPerTerm 160 b
   case Builtins.bls12381G1Msm b of
     Left e -> invalidArguments ("bls12381G1Msm: " ++ e) b
     Right out -> pure (SBytes out)
 callBuiltin "bls12381G1Msm" [SVariadic xs] = bls12381G1MsmFromInts xs
 callBuiltin "bls12381G1Msm" [SArray xs] = bls12381G1MsmFromInts =<< traverse weakGetVar (V.toList xs)
 callBuiltin "bls12381G1Msm" xs = bls12381G1MsmFromInts xs
-
-callBuiltin "bls12381G2Add" [SBytes b] =
+callBuiltin "bls12381G2Add" [SBytes b] = do
+  decrementGas gasBlsG2Add
   case Builtins.bls12381G2Add b of
     Left e -> invalidArguments ("bls12381G2Add: " ++ e) b
     Right out -> pure (SBytes out)
 callBuiltin "bls12381G2Add" [a, b, c, d, e, f, g, h] = do
+  decrementGas gasBlsG2Add
   vs <- traverse int [a, b, c, d, e, f, g, h]
   case vs of
     [x1c0, x1c1, y1c0, y1c1, x2c0, x2c1, y2c0, y2c1] -> do
-      let ((rxc0, rxc1), (ryc0, ryc1)) =
+      let !((!rxc0, !rxc1), (!ryc0, !ryc1)) =
             Builtins.bls12381G2AddInts
               ((x1c0, x1c1), (y1c0, y1c1))
               ((x2c0, x2c1), (y2c0, y2c1))
       pure . STuple . V.fromList $ Constant <$> [SInteger rxc0, SInteger rxc1, SInteger ryc0, SInteger ryc1]
     _ -> invalidArguments "bls12381G2Add: expected 8 integer args" vs
-
-callBuiltin "bls12381G2Msm" [SBytes b] =
+callBuiltin "bls12381G2Msm" [SBytes b] = do
+  -- 288 bytes per (G2 point, scalar) term
+  chargePerBlock 0 gasBlsG2MsmPerTerm 288 b
   case Builtins.bls12381G2Msm b of
     Left e -> invalidArguments ("bls12381G2Msm: " ++ e) b
     Right out -> pure (SBytes out)
 callBuiltin "bls12381G2Msm" [SVariadic xs] = bls12381G2MsmFromInts xs
 callBuiltin "bls12381G2Msm" [SArray xs] = bls12381G2MsmFromInts =<< traverse weakGetVar (V.toList xs)
 callBuiltin "bls12381G2Msm" xs = bls12381G2MsmFromInts xs
-
-callBuiltin "bls12381Pairing" [SBytes b] =
+callBuiltin "bls12381Pairing" [SBytes b] = do
+  -- 384 bytes per (G1, G2) pair
+  chargePerBlock gasBlsPairingBase gasBlsPairingPerPair 384 b
   case Builtins.bls12381Pairing b of
     Left e -> invalidArguments ("bls12381Pairing: " ++ e) b
     Right ok -> pure (SBool ok)
 callBuiltin "bls12381Pairing" [SVariadic xs] = bls12381PairingFromInts xs
 callBuiltin "bls12381Pairing" [SArray xs] = bls12381PairingFromInts =<< traverse weakGetVar (V.toList xs)
 callBuiltin "bls12381Pairing" xs = bls12381PairingFromInts xs
-
--- Map-to-curve precompiles (EIP-2537 §BLS12_MAP_FP_TO_G1 and
--- §BLS12_MAP_FP2_TO_G2). Take pre-derived F_p / F_p^2 inputs; useful
--- when the contract already has the field elements.
-callBuiltin "bls12381MapFpToG1" [SBytes b] =
+callBuiltin "bls12381MapFpToG1" [SBytes b] = do
+  decrementGas gasBlsMapFpToG1
   case Builtins.mapFpToG1 b of
     Left e -> invalidArguments ("bls12381MapFpToG1: " ++ e) b
     Right out -> pure (SBytes out)
-callBuiltin "bls12381MapFp2ToG2" [SBytes b] =
+callBuiltin "bls12381MapFp2ToG2" [SBytes b] = do
+  decrementGas gasBlsMapFp2ToG2
   case Builtins.mapFp2ToG2 b of
     Left e -> invalidArguments ("bls12381MapFp2ToG2: " ++ e) b
     Right out -> pure (SBytes out)
-
--- Full hash_to_curve (RFC 9380 §3): expand_message_xmd + hash_to_field
--- + map-to-curve + cofactor clearing in a single call. Saves contracts
--- from re-implementing expand_message_xmd in user-space SHA-256 loops.
--- DST is caller-supplied so the same builtin works for any
--- BLS_SIG_BLS12381*_XMD:SHA-256_*_*_* scheme (Ethereum sync committee,
--- IBE, BLS aggregate, etc.).
-callBuiltin "bls12381HashToCurveG1" [SBytes msg, SBytes dst] =
+-- hash_to_curve runs two map-to-curve passes plus expand_message_xmd over
+-- the message, so it is charged as the map plus a per-message-block term.
+callBuiltin "bls12381HashToCurveG1" [SBytes msg, SBytes dst] = do
+  chargePerBlock (2 * gasBlsMapFpToG1) 100 32 msg
   case Builtins.hashToCurveG1 msg dst of
     Left e -> invalidArguments ("bls12381HashToCurveG1: " ++ e) [SBytes msg, SBytes dst]
     Right out -> pure (SBytes out)
-callBuiltin "bls12381HashToCurveG2" [SBytes msg, SBytes dst] =
+callBuiltin "bls12381HashToCurveG2" [SBytes msg, SBytes dst] = do
+  chargePerBlock (2 * gasBlsMapFp2ToG2) 100 32 msg
   case Builtins.hashToCurveG2 msg dst of
     Left e -> invalidArguments ("bls12381HashToCurveG2: " ++ e) [SBytes msg, SBytes dst]
     Right out -> pure (SBytes out)
-
--- BLS12-381 point decompression (IETF / ZCash format used by Ethereum's
--- beacon chain). Bridges between the wire format (compressed: G1=48,
--- G2=96 bytes) and EIP-2537 uncompressed (G1=128, G2=256 bytes).
-callBuiltin "bls12381DecompressG1" [SBytes b] =
+callBuiltin "bls12381DecompressG1" [SBytes b] = do
+  decrementGas gasBlsDecompressG1
   case Builtins.decompressG1 b of
     Left e -> invalidArguments ("bls12381DecompressG1: " ++ e) b
     Right out -> pure (SBytes out)
-callBuiltin "bls12381DecompressG2" [SBytes b] =
+callBuiltin "bls12381DecompressG2" [SBytes b] = do
+  decrementGas gasBlsDecompressG2
   case Builtins.decompressG2 b of
     Left e -> invalidArguments ("bls12381DecompressG2: " ++ e) b
     Right out -> pure (SBytes out)
-callBuiltin "poseidon" [SVariadic xs] = case length xs of
-  n | n > 0 && n <= 8 -> SInteger . Builtins.poseidonHash <$> traverse int xs
-  _ -> typeError "invalid args passed to poseidon" $ show xs
-callBuiltin "poseidon" [SArray xs] = case V.length xs of
-  n | n > 0 && n <= 8 -> SInteger . Builtins.poseidonHash <$> traverse getInt (V.toList xs)
-  _ -> typeError "invalid args passed to poseidon" $ show xs
-callBuiltin "poseidon" xs = case length xs of
-  n | n > 0 && n <= 8 -> SInteger . Builtins.poseidonHash <$> traverse int xs
-  _ -> typeError "invalid args passed to poseidon" $ show xs
+callBuiltin "poseidon" [SVariadic xs] = poseidonMetered (length xs) xs
+callBuiltin "poseidon" [SArray xs] = poseidonMetered (V.length xs) =<< traverse weakGetVar (V.toList xs)
+callBuiltin "poseidon" xs = poseidonMetered (length xs) xs
+callBuiltin "poseidon2" [SVariadic xs] = poseidon2Metered (length xs) xs
+callBuiltin "poseidon2" [SArray xs] = poseidon2Metered (V.length xs) =<< traverse weakGetVar (V.toList xs)
+callBuiltin "poseidon2" xs = poseidon2Metered (length xs) xs
+callBuiltin "poseidon2Compress" [a, b] = do
+  decrementGas $ gasPoseidonBase + gasPoseidonPerInput
+  (l, r) <- (,) <$> int a <*> int b
+  pure . SInteger $! Builtins.poseidon2Compress l r
+-- Parametrized Poseidon2 (see Builtins.P2Instance): params select a
+-- registered instance; results come back as a uint256[] of canonical elements.
+callBuiltin "poseidon2Permute" [SBytes p, SArray xs] = poseidon2PermuteMetered p =<< traverse weakGetVar (V.toList xs)
+callBuiltin "poseidon2Permute" [SBytes p, SVariadic xs] = poseidon2PermuteMetered p xs
+callBuiltin "poseidon2Permute" (SBytes p : xs) = poseidon2PermuteMetered p xs
+callBuiltin "poseidon2Hash" [SBytes p, SArray xs, n] = do
+  ins <- traverse weakGetVar (V.toList xs)
+  poseidon2HashMetered p ins =<< int n
+callBuiltin "poseidon2Hash" [SBytes p, SVariadic xs, n] = poseidon2HashMetered p xs =<< int n
+callBuiltin "poseidon2HashBytes" [SBytes p, SBytes d, n] = poseidon2HashBytesMetered p d =<< int n
+-- Named wrappers for the Goldilocks instance: 4-element digests.
+callBuiltin "poseidon2gl" [SArray xs] = do
+  ins <- traverse weakGetVar (V.toList xs)
+  poseidon2HashMetered Builtins.poseidon2ParamsGoldilocks ins 4
+callBuiltin "poseidon2gl" [SVariadic xs] = poseidon2HashMetered Builtins.poseidon2ParamsGoldilocks xs 4
+callBuiltin "poseidon2gl" xs = poseidon2HashMetered Builtins.poseidon2ParamsGoldilocks xs 4
+callBuiltin "poseidon2glBytes" [SBytes d] = poseidon2HashBytesMetered Builtins.poseidon2ParamsGoldilocks d 4
 callBuiltin ("payable") [a] = flip SAddress True <$> getAddressVal a
 callBuiltin "require" (condVar : msg) = do
   cond <- getBoolVal condVar
@@ -2625,6 +2803,15 @@ callBuiltin "create2" args@(salt : n : src : argVals) = do
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAddress) False) nca
     Nothing -> internalError "a call to create did not create an address" execResults
+callBuiltin "setBlockContext" [proposer', prevProposer', prevIntended', prevRound'] = do
+  env' <- getEnv
+  unless (Env.runningTests env') $
+    invalidArguments "setBlockContext can only be called during testing" [proposer', prevProposer', prevIntended', prevRound']
+  proposer'' <- getAddressVal proposer'
+  facts <- ProposalFacts <$> getAddressVal prevProposer' <*> getAddressVal prevIntended' <*> int prevRound'
+  Mod.modify_ (Mod.Proxy @Env.Environment) $ \env ->
+    pure $ env { Env.proposer = proposer'', Env.prevBlock = Just facts }
+  return SNULL
 callBuiltin "fastForward" (secs : mBlocks) = do
   seconds <- int secs
   blocks <- case mBlocks of
@@ -3017,6 +3204,10 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
       Just SNULL -> findNamedReturns >>= checkMissingReturn
       Just {} -> pure val
     pure val'
+
+  for_ val' $ \v -> do
+    mTracer <- Mod.get (Mod.Proxy @(Maybe VmTracer))
+    traceSetLastOutput mTracer (renderValueShallow v)
 
   return val'
 
@@ -3591,3 +3782,15 @@ validateFunctionArguments cc contract' func argVals = checkFunc $ func : CC._fun
               map (\(n, CC.IndexedType _ t _) -> (fromMaybe "" n, t)) $
                 CC._funcArgs theFunc
          in go argMeta argVals
+
+-- | Facts about the parent block, for the @block.prev*@ builtins: an explicit
+-- override (tests) or the parent's block summary; blocks whose parent is
+-- unknown (or predates stake-weighted selection) see no facts.
+getPrevBlockFacts :: MonadSM m => m ProposalFacts
+getPrevBlockFacts = do
+  env' <- getEnv
+  case Env.prevBlock env' of
+    Just facts -> pure facts
+    Nothing ->
+      maybe noProposalFacts bSumProposalFacts
+        <$> A.lookup (A.Proxy @BlockSummary) (BlockHeader.parentHash $ Env.blockHeader env')

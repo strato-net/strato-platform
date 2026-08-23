@@ -3,8 +3,10 @@ import {
   writeContract,
   readContract,
   waitForTransactionReceipt,
-  type Config as WagmiConfig,
 } from "wagmi/actions";
+// `Config` is re-exported from wagmi's root entry (via @wagmi/core), not from
+// the actions subpath.
+import type { Config as WagmiConfig } from "wagmi";
 import type { WithdrawalProof } from "@strato/shared-types";
 
 /**

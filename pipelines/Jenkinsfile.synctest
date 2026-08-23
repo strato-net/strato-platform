@@ -4,7 +4,7 @@ pipeline {
   }
   options { disableConcurrentBuilds() }
   triggers {
-    cron('H */4 * * *')
+    cron('H */6 * * *')
   }
   environment {
     PATH = "/home/ubuntu/.local/bin:${env.PATH}"
@@ -18,15 +18,7 @@ pipeline {
         script {
           lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
         }
-        sh '''#!/bin/bash -le
-          rm -rf /tmp/tmp.*
-          strato-down mynode || true
-          pkill convoke || true
-          docker rm -f $(docker ps -aq) || true
-          docker system prune -f || true
-          docker volume prune -fa || true
-          sudo rm -rf mynode || true
-        '''
+        reclaimDisk()
       }
     }
 
@@ -55,11 +47,12 @@ pipeline {
 
   post {
     always {
+      // Deliberately NO node teardown here. The node is left running after the
+      // pipeline finishes (on success or failure) so it can be inspected for
+      // debugging. Cleanup happens at the START of the next run: Prepare's
+      // reclaimDisk -> cleanNodeState, and each deployAndSync/verifySnapshotRestore
+      // begins with cleanNodeState.
       archiveArtifacts artifacts: 'mynode/logs/**', fingerprint: true, allowEmptyArchive: true
-      sh '''#!/bin/bash -le
-        strato-down mynode || true
-        pkill convoke || true
-      '''
     }
     success {
       slackSend (
@@ -68,17 +61,17 @@ pipeline {
       )
     }
 
-//    failure {
-//      slackSend (
-//          color: 'danger',
-//          message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
-//      )
-//      slackSend(
-//          channel: '#engineering',
-//          color: 'danger',
-//          message: "Sync test build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
-//      )
-//    }
+    failure {
+      slackSend (
+          color: 'danger',
+          message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+      slackSend(
+          channel: '#engineering',
+          color: 'danger',
+          message: "Sync test build failed. The snapshots weren't created! Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+    }
 
     fixed {
       slackSend(
@@ -90,32 +83,94 @@ pipeline {
   }
 }
 
+// Stop the node and drop the state it leaves behind, WITHOUT touching images
+// or the snapshot staging dir.
+//
+// Safe to call between stages: `docker system prune -f` only collects dangling
+// (untagged) images, so the locally-built component images the next strato-up
+// needs survive. Never add `-a` here -- these images are built locally with
+// content-hash tags and are not pullable from a registry, so removing them
+// mid-run would break the following stages.
+//
+// Likewise never delete snapshot-out/ here: verifySnapshotRestore calls this
+// between creating the archive and restoring from it, so wiping the staging
+// dir would delete the artifact under test. It is cleaned in Prepare before
+// anything is created and by deployAndSync once the archive is published.
+def cleanNodeState() {
+  sh '''#!/bin/bash -le
+    strato-down mynode || true
+    pkill convoke || true
+    docker rm -f $(docker ps -aq) 2>/dev/null || true
+    docker system prune -f || true
+    docker volume prune -fa || true
+    sudo rm -rf mynode || true
+    rm -rf .snapshot-work .snapshot-downloads || true
+    rm -rf /tmp/tmp.* || true
+  '''
+}
+
+// Full disk reclaim. Only safe in Prepare, i.e. before the Build stage rebuilds
+// what it removes.
+//
+// This job builds ~15 component images per run, each tagged
+// <name>:<VERSION>-<content-hash>, and the Makefile skips a build when that tag
+// already exists. Those images are tagged, so they are never "dangling" and
+// plain `docker system prune -f` never reclaimed them: every 4h run whose code
+// hashes changed left another full set behind, growing container storage without
+// bound (60GB observed). `-a` collects every image not used by a running
+// container, and `builder prune` drops the BuildKit cache, which `system prune`
+// only trims when dangling.
+//
+// Trade-off: each run now rebuilds all component images instead of reusing
+// unchanged ones. That cost is small next to the multi-hour from-genesis syncs
+// this job spends most of its time in, and the Haskell build cache (~/.stack,
+// the genuinely expensive part) lives outside Docker and is untouched.
+def reclaimDisk() {
+  cleanNodeState()
+  sh '''#!/bin/bash -le
+    rm -rf snapshot-out || true
+    docker system prune -af --volumes || true
+    docker builder prune -af || true
+    echo "=== disk after reclaim ==="
+    df -h /
+    docker system df || true
+  '''
+}
+
 // Build-and-strato-up deploy for a single network: start the node with
 // strato-up (using the network's default public vault and file server), wait
 // for it to become available and sync, push CloudWatch metrics, then create
 // and publish a snapshot. Cleanup is handled by the leading block below (on
-// the next network's run) and by the post{always} teardown.
+// the next network's run) and by the next build's Prepare stage.
 def deployAndSync(String network, String metricNamespacePrefix) {
   script {
     // Clean any prior node state before this network's run.
-    sh '''#!/bin/bash -le
-      strato-down mynode || true
-      pkill convoke || true
-      docker rm -f $(docker ps -aq) || true
-      docker system prune -f || true
-      docker volume prune -fa || true
-      sudo rm -rf mynode || true
-    '''
+    cleanNodeState()
 
     // Start the node from genesis using strato-up. Uses the network's default
     // public vault and file server, so no local vault/highway deployment is
     // needed.
+    //
+    // NOTE: do NOT lower kafka retention (--kafkaLogRetention*) on this node.
+    // During a from-genesis sync the sequencer runs far ahead of the VM, so
+    // vm-runner's unconsumed vm_tasks backlog is essentially the whole topic;
+    // any retention cap the topic outgrows deletes unconsumed segments and
+    // vm-runner dies with OffsetOutOfRange mid-sync. Shrinking the kafka
+    // payload happens at snapshot time instead: strato-snapshot create prunes
+    // the consumed history behind the committed consumer offsets.
+    //
+    // The smaller segment size below is safe (it deletes nothing): it only
+    // makes the broker roll log files more often, so the snapshot-time prune
+    // can reclaim consumed history at fine granularity -- whole segments are
+    // the deletion unit, and the default 1GiB segments never roll on these
+    // topics.
     writeFile file: "run.sh", text: """#!/bin/bash
       export PATH
       strato-up mynode \\
         --network=${network} \\
         --nodeHost=\$(</host) \\
-        --sslDir='/home/ubuntu/letsencrypt-ssl'
+        --sslDir='/home/ubuntu/letsencrypt-ssl' \\
+        --kafkaLogSegmentBytes=67108864
     """
     sh 'chmod +x run.sh'
     withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
@@ -126,7 +181,7 @@ def deployAndSync(String network, String metricNamespacePrefix) {
     // Confirm the node is reachable, then measure sync time.
     lib.checkNodeAvailability(443)
     def timeStart = System.currentTimeMillis()
-    lib.waitLocalNodeIsSynced()
+    lib.waitLocalNodeIsSynced('mynode')
     def syncTimeSec = (System.currentTimeMillis() - timeStart) / 1000
     def syncTimeMin = syncTimeSec / 60
     def blocksTotal = Integer.parseInt(sh(
@@ -202,14 +257,7 @@ def deployAndSync(String network, String metricNamespacePrefix) {
 def verifySnapshotRestore(String network, String archivePath, def snapshotBlock) {
   script {
     // Start from a clean node directory.
-    sh '''#!/bin/bash -le
-      strato-down mynode || true
-      pkill convoke || true
-      docker rm -f $(docker ps -aq) || true
-      docker system prune -f || true
-      docker volume prune -fa || true
-      sudo rm -rf mynode || true
-    '''
+    cleanNodeState()
 
     writeFile file: "run-restore.sh", text: """#!/bin/bash
       export PATH
@@ -240,10 +288,8 @@ def verifySnapshotRestore(String network, String archivePath, def snapshotBlock)
       error("Restored node block (${restoredBlock}) is far below the snapshot height (${snapshotBlock}); restore likely failed")
     }
 
-    // Tear the verification node down before moving on.
-    sh '''#!/bin/bash -le
-      strato-down mynode || true
-      pkill convoke || true
-    '''
+    // Deliberately NO teardown here: leave the restored node running for
+    // debugging. The next network's deployAndSync starts with cleanNodeState,
+    // and so does the next build's Prepare stage, so nothing is left dirty.
   }
 }

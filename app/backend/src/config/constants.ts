@@ -1,4 +1,4 @@
-import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher, safetyModule, sToken, priceOracle, liquidityPool, lendingPool } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataGovernance, mercataBridge, cdpRegistry, voucher, safetyModule, sToken, priceOracle, liquidityPool, lendingPool } from "./config";
 import * as config from "./config";
 import {
   SWAP_CONTRACTS,
@@ -19,6 +19,9 @@ export const constants = (() => {
   const CONTRACT_PREFIX = "BlockApps-";
   const Token = `${CONTRACT_PREFIX}Token`;
   const TokenFactory = `${CONTRACT_PREFIX}TokenFactory`;
+  const NFT = `${CONTRACT_PREFIX}NFT`;
+  const NFTFactory = `${CONTRACT_PREFIX}NFTFactory`;
+  const PositionManagerV3 = `${CONTRACT_PREFIX}PositionManagerV3`;
   const LendingPool = `${CONTRACT_PREFIX}LendingPool`;
   const LiquidityPool = `${CONTRACT_PREFIX}LiquidityPool`;
   const CollateralVault = `${CONTRACT_PREFIX}CollateralVault`;
@@ -32,6 +35,7 @@ export const constants = (() => {
   const StratoNativeBridge = `${CONTRACT_PREFIX}StratoNativeBridge`;
   const StratoStaking = `${CONTRACT_PREFIX}StratoStaking`;
   const ValidatorRegistry = `${CONTRACT_PREFIX}ValidatorRegistry`;
+  const MercataGovernance = "MercataGovernance";
   const CreditCardTopUp = `${CONTRACT_PREFIX}CreditCardTopUp`;
   const CDPEngine = `${CONTRACT_PREFIX}CDPEngine`;
   const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
@@ -132,9 +136,14 @@ export const constants = (() => {
     lendingRegistry,
     tokenFactory,
     adminRegistry,
+    mercataGovernance,
     cdpRegistry,
     Token,
     TokenFactory,
+    NFT,
+    NFTFactory,
+    PositionManagerV3,
+    get nftFactory() { return config.nftFactory; },
     LendingPool,
     LiquidityPool,
     CollateralVault,
@@ -148,6 +157,7 @@ export const constants = (() => {
     StratoNativeBridge,
     StratoStaking,
     ValidatorRegistry,
+    MercataGovernance,
     CreditCardTopUp,
     CDPEngine,
     CDPVault,
@@ -163,6 +173,7 @@ export const constants = (() => {
     DirectMintPSM,
     get directMintPsm() { return config.directMintPsm; },
     get metalForge() { return config.metalForge; },
+    get saveUsdstVault() { return config.saveUsdstVault; },
     get vaultFactory() { return config.vaultFactory; },  // Use getter to get current value after init
     get vault() { return config.vault; },  // Use getter to get current value after init
     priceOracle,
@@ -199,6 +210,8 @@ export const constants = (() => {
     USDST: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
     ZERO_ADDRESS: "0000000000000000000000000000000000000000",
     DAY_MS: 24 * 60 * 60 * 1000,
+    // Use getter to get current value after init
+    get EXECUTED_ISSUES_LOOKBACK_DAYS() { return config.executedIssuesLookbackDays; },
     BPS_DIVISOR: 10000,
     voucher,
   };

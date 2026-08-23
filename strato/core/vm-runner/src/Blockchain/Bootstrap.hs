@@ -227,7 +227,7 @@ seedDatabases genesisBlock = do
   $logInfoS "bootstrap" $ T.pack $ "Genesis hash: " ++ format genesisHash'
   $logInfoS "bootstrap" $ T.pack $ "Validators: " ++ show (length validators')
 
-  _ <- withRedisBlockDB $ putBestSequencedBlockInfo $ BestSequencedBlock genesisHash' 0 validators'
+  _ <- withRedisBlockDB $ putBestSequencedBlockInfo $ BestSequencedBlock genesisHash' 0 validators' [] 0
 
   bestBlockResult <- withRedisBlockDB $
     forceBestBlockInfo

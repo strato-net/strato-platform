@@ -26,12 +26,18 @@ import {
   calculateLPFees24h,
   calculatePoolAPY,
   fetchMultiTokenStablePools,
+  fetchStablePoolFees,
+  MultiTokenStablePool,
   buildMultiTokenPoolEntry,
   applyStablePoolFees,
   getUserPoolLiquidityFlowTotals,
 } from "../helpers/swapping.helper";
+import * as stable from "../helpers/stablePoolMath.helper";
 import { getOraclePrices } from "./oracle.service";
-import { fetchPairSwapHistory as fetchV3PairSwapHistory } from "./poolV3.service";
+import {
+  fetchPairSwapHistory as fetchV3PairSwapHistory,
+  fetchTokenSwapHistory as fetchV3TokenSwapHistory,
+} from "./poolV3.service";
 import {
   SwapHistoryEntry,
   PoolList,
@@ -41,6 +47,7 @@ import {
   RemoveLiquidityParams,
   SingleTokenLiquidityParams,
   MultiTokenSwapParams,
+  StablePoolQuote,
   MultiTokenLiquidityParams,
   MultiTokenRemoveLiquidityParams,
   MultiTokenRemoveLiquidityOneParams,
@@ -508,6 +515,373 @@ export const getPairSwapHistory = async (
     .slice(offset, offset + limit);
 
   return { data: merged, totalCount: v2Count + v3Result.totalCount };
+};
+
+/**
+ * Recent swaps involving a single token across all V2/stable pools (tokenIn or
+ * tokenOut) and every V3 fee-tier pool that lists it. Newest first; same merge
+ * pagination pattern as getPairSwapHistory. impliedPrice is output-per-input.
+ */
+export const getTokenSwapHistory = async (
+  accessToken: string,
+  tokenAddress: string,
+  page: number = 1,
+  limit: number = 10
+): Promise<SwapHistoryResponse> => {
+  const t = normalizeAddress(tokenAddress);
+  const offset = (page - 1) * limit;
+  const fetchCap = offset + limit;
+
+  const v2Filters = {
+    or: `(tokenIn.eq.${t},tokenOut.eq.${t})`,
+  };
+
+  const [v2EventsResponse, v2CountResponse, v3Result] = await Promise.all([
+    cirrus.get(accessToken, `/${PoolSwap}`, {
+      params: {
+        ...v2Filters,
+        select: swapHistorySelectFields.join(","),
+        order: "block_timestamp.desc",
+        limit: fetchCap.toString(),
+      },
+    }),
+    cirrus.get(accessToken, `/${PoolSwap}`, {
+      params: { ...v2Filters, select: "count()" },
+    }),
+    fetchV3TokenSwapHistory(accessToken, tokenAddress, fetchCap).catch(() => ({
+      entries: [] as SwapHistoryEntry[],
+      totalCount: 0,
+    })),
+  ]);
+
+  const v2Events = Array.isArray(v2EventsResponse.data)
+    ? (v2EventsResponse.data as RawSwapEvent[])
+    : [];
+  const v2Count = v2CountResponse.data?.[0]?.count || 0;
+
+  const symbolAddrs = [...new Set(v2Events.flatMap((e) => [e.tokenIn, e.tokenOut]))];
+  let symbolByAddress = new Map<string, string>();
+  if (symbolAddrs.length > 0) {
+    const symbolsResponse = await cirrus.get(accessToken, `/${constants.Token}`, {
+      params: { address: `in.(${symbolAddrs.join(",")})`, select: "address,_symbol" },
+    });
+    symbolByAddress = new Map(
+      ((symbolsResponse.data as { address: string; _symbol: string }[]) ?? []).map((row) => [
+        row.address,
+        row._symbol,
+      ])
+    );
+  }
+
+  const v2Entries: SwapHistoryEntry[] = v2Events.map((event) => ({
+    id: event.id,
+    timestamp: new Date(event.block_timestamp),
+    tokenIn: symbolByAddress.get(event.tokenIn) ?? event.tokenIn,
+    tokenOut: symbolByAddress.get(event.tokenOut) ?? event.tokenOut,
+    amountIn: event.amountIn,
+    amountOut: event.amountOut,
+    impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, true, event.pool.isStable),
+    sender: event.sender,
+    poolAddress: event.address,
+    poolName: event.pool.isStable ? "Stable" : "V2",
+  }));
+
+  const merged = [...v2Entries, ...v3Result.entries]
+    .sort((x, y) => y.timestamp.getTime() - x.timestamp.getTime())
+    .slice(offset, offset + limit);
+
+  return { data: merged, totalCount: v2Count + v3Result.totalCount };
+};
+
+// --- Pair Candidates (V2 + stable discovery for the unified trade surface) ---
+
+export interface PairPoolToken {
+  address: string;
+  _name: string;
+  _symbol: string;
+  customDecimals: number | null;
+  status: string;
+}
+
+/** a V2 or 2-coin stable pool that can trade the requested pair, fee resolved */
+export interface PairPoolCandidate {
+  address: string;
+  isStable: boolean;
+  isPaused: boolean;
+  isDisabled: boolean;
+  /** effective fee in bps: stable pools from StablePool.fee, V2 from the pool's
+   *  own rate with the factory rate as fallback (mirrors Pool._swapFeeRate) */
+  feeBps: number;
+  tokenA: PairPoolToken;
+  tokenB: PairPoolToken;
+  tokenABalance: string;
+  tokenBBalance: string;
+  aToBRatio: string;
+  bToARatio: string;
+}
+
+export interface MultiTokenPoolCandidate extends MultiTokenStablePool {
+  feeBps: number;
+}
+
+export interface PairPoolCandidates {
+  /** V2 + 2-coin stable pools (Pool table) */
+  pools: PairPoolCandidate[];
+  /** >2-coin stable pools containing both tokens, funded on both */
+  multiTokenPools: MultiTokenPoolCandidate[];
+}
+
+const ACTIVE_TOKEN_STATUS = "2";
+
+/**
+ * All V2/stable pools that can trade tokenA <-> tokenB: funded, not disabled,
+ * not hidden, ACTIVE tokens, with effective fees resolved. V3 discovery lives
+ * in poolV3.service; trade.service composes the two.
+ */
+export const getPairPoolCandidates = async (
+  accessToken: string,
+  tokenA: string,
+  tokenB: string
+): Promise<PairPoolCandidates> => {
+  const a = normalizeAddress(tokenA);
+  const b = normalizeAddress(tokenB);
+
+  const [pairResult, factoryResult, multiPools] = await Promise.all([
+    cirrus.get(accessToken, `/${PoolTable}`, {
+      params: {
+        poolFactory: "eq." + constants.poolFactory,
+        isDisabled: "eq.false",
+        tokenA: `in.(${a},${b})`,
+        tokenB: `in.(${a},${b})`,
+        select: [
+          "address",
+          "tokenA:tokenA_fkey(address,_name,_symbol,customDecimals,status)",
+          "tokenB:tokenB_fkey(address,_name,_symbol,customDecimals,status)",
+          "tokenABalance::text",
+          "tokenBBalance::text",
+          "swapFeeRate",
+          "aToBRatio::text",
+          "bToARatio::text",
+          "isStable",
+          "isPaused",
+          "isDisabled",
+        ].join(","),
+      },
+    }),
+    cirrus.get(accessToken, `/${PoolFactory}`, {
+      params: { address: "eq." + config.poolFactory, select: "swapFeeRate" },
+    }),
+    fetchMultiTokenStablePools(accessToken),
+  ]);
+
+  const factoryFeeBps = Number((factoryResult.data as { swapFeeRate: number }[])[0]?.swapFeeRate ?? 30);
+
+  type RawRow = Omit<PairPoolCandidate, "feeBps"> & { swapFeeRate: number };
+  const rows = (pairResult.data as RawRow[]).filter(
+    (row) =>
+      !config.hiddenSwapPools.has(row.address) &&
+      row.tokenA?.status === ACTIVE_TOKEN_STATUS &&
+      row.tokenB?.status === ACTIVE_TOKEN_STATUS &&
+      // both requested tokens present (the in.() filter also admits same-token rows)
+      new Set([row.tokenA.address, row.tokenB.address]).size === 2 &&
+      BigInt(row.tokenABalance || "0") > 0n &&
+      BigInt(row.tokenBBalance || "0") > 0n
+  );
+
+  const pairAddresses = new Set(rows.map((row) => row.address));
+  const matchedMultis = multiPools.filter((pool) => {
+    if (pairAddresses.has(pool.address) || config.hiddenSwapPools.has(pool.address)) return false;
+    if (pool.isDisabled) return false;
+    const coinAddresses = pool.coins.map((c) => c.tokenAddress.toLowerCase());
+    if (!coinAddresses.includes(a) || !coinAddresses.includes(b)) return false;
+    return (
+      BigInt(pool.tokenBalances.get(a) || "0") > 0n &&
+      BigInt(pool.tokenBalances.get(b) || "0") > 0n
+    );
+  });
+
+  const stableAddresses = [
+    ...rows.filter((row) => row.isStable).map((row) => row.address),
+    ...matchedMultis.map((pool) => pool.address),
+  ];
+  const stableFeeMap = stableAddresses.length > 0
+    ? await fetchStablePoolFees(accessToken, stableAddresses)
+    : new Map<string, number>();
+
+  return {
+    pools: rows.map((row) => ({
+      ...row,
+      feeBps: row.isStable
+        ? stableFeeMap.get(row.address) ?? factoryFeeBps
+        : row.swapFeeRate || factoryFeeBps,
+    })),
+    multiTokenPools: matchedMultis.map((pool) => ({
+      ...pool,
+      feeBps: stableFeeMap.get(pool.address) ?? factoryFeeBps,
+    })),
+  };
+};
+
+// --- Stable Pool Quotes ---
+
+const ZERO_ADDRESS = "0000000000000000000000000000000000000000";
+
+interface RawStablePoolQuoteRow {
+  address: string;
+  fee: string;
+  offpegFeeMultiplier: string;
+  initialA: string;
+  futureA: string;
+  initialATime: string;
+  futureATime: string;
+  isPaused: boolean;
+  isDisabled: boolean;
+  poolContainsRebasingTokens: boolean;
+  coins: { key: number; value: string }[];
+  tokenBalances: { key: string; value: string }[];
+  adminBalances: { key: string; value: string }[];
+  rateMultipliers: { key: string; value: string }[];
+  rateOracles: { key: string; value: string }[];
+  assetTypes: { key: number; value: string }[];
+}
+
+/**
+ * Exact quote for a StablePool swap (2-coin or multi-token): replays the
+ * contract's __exchange math (getD/getY + dynamic fee) over the indexed pool
+ * state, so the quoted amount is bit-identical to what execution returns for
+ * the same state. amountSpecified > 0 quotes exact input, < 0 exact output.
+ */
+export const getStableQuote = async (
+  accessToken: string,
+  poolAddress: string,
+  tokenIn: string,
+  tokenOut: string,
+  amountSpecified: bigint
+): Promise<StablePoolQuote> => {
+  if (amountSpecified === 0n) throw new Error("Amount cannot be 0");
+
+  const { data } = await cirrus.get(accessToken, `/${StablePoolTable}`, {
+    params: {
+      address: `eq.${normalizeAddress(poolAddress)}`,
+      select: [
+        "address",
+        "fee::text",
+        "offpegFeeMultiplier::text",
+        "initialA::text",
+        "futureA::text",
+        "initialATime::text",
+        "futureATime::text",
+        "isPaused",
+        "isDisabled",
+        "poolContainsRebasingTokens",
+        `coins:${StablePoolTable}-coins(key,value)`,
+        `tokenBalances:${StablePoolTable}-tokenBalances(key,value::text)`,
+        `adminBalances:${StablePoolTable}-adminBalances(key,value::text)`,
+        `rateMultipliers:${StablePoolTable}-rateMultipliers(key,value::text)`,
+        `rateOracles:${StablePoolTable}-rateOracles(key,value)`,
+        `assetTypes:${StablePoolTable}-assetTypes(key,value::text)`,
+      ].join(","),
+    },
+  });
+
+  const raw = (data as RawStablePoolQuoteRow[])[0];
+  if (!raw) throw new Error(`StablePool not found: ${poolAddress}`);
+  if (raw.isPaused || raw.isDisabled) throw new Error("Pool is not active");
+  // rebasing pools price off live ERC20 balances and vault coins (assetType 3)
+  // off a vault exchangeRate call — neither is indexed, so no exact quote
+  if (raw.poolContainsRebasingTokens) throw new Error("Quotes are not supported for rebasing pools");
+  if ((raw.assetTypes ?? []).some((t) => t.value === "3")) throw new Error("Quotes are not supported for pools with vault coins");
+
+  const coins = [...(raw.coins ?? [])].sort((a, b) => a.key - b.key).map((c) => c.value);
+  const i = coins.indexOf(normalizeAddress(tokenIn));
+  const j = coins.indexOf(normalizeAddress(tokenOut));
+  if (i === -1) throw new Error(`Token ${tokenIn} not found in pool coins`);
+  if (j === -1) throw new Error(`Token ${tokenOut} not found in pool coins`);
+  if (i === j) throw new Error("Cannot exchange a coin with itself");
+
+  const byCoin = (rows: { key: string; value: string }[]) =>
+    new Map((rows ?? []).map((r) => [r.key, r.value]));
+  const balanceOf = byCoin(raw.tokenBalances);
+  const adminOf = byCoin(raw.adminBalances);
+  const multiplierOf = byCoin(raw.rateMultipliers);
+  const oracleOf = byCoin(raw.rateOracles);
+
+  // _storedRates: rateMultiplier x oracle price / 1e18, per coin's own oracle
+  const oracleAddresses = [...new Set([...oracleOf.values()].filter((a) => a && a !== ZERO_ADDRESS))];
+  const priceByOracleAndCoin = new Map<string, bigint>();
+  if (oracleAddresses.length > 0) {
+    const { data: priceRows } = await cirrus.get(accessToken, `/${constants.PriceOracle}-prices`, {
+      params: {
+        address: `in.(${oracleAddresses.join(",")})`,
+        key: `in.(${coins.join(",")})`,
+        select: "address,key,value::text",
+      },
+    });
+    for (const row of priceRows as { address: string; key: string; value: string }[]) {
+      priceByOracleAndCoin.set(`${row.address}:${row.key}`, BigInt(row.value));
+    }
+  }
+
+  const rates = coins.map((coin) => {
+    const oracle = oracleOf.get(coin);
+    let oraclePrice = stable.PRECISION;
+    if (oracle && oracle !== ZERO_ADDRESS) {
+      const price = priceByOracleAndCoin.get(`${oracle}:${coin}`) ?? 0n;
+      // getAssetPrice reverts on a missing price, and so would the swap
+      if (price === 0n) throw new Error(`Price not available for token ${coin}`);
+      oraclePrice = price;
+    }
+    return (BigInt(multiplierOf.get(coin) ?? "0") * oraclePrice) / stable.PRECISION;
+  });
+
+  const balances = coins.map((coin) => BigInt(balanceOf.get(coin) ?? "0") - BigInt(adminOf.get(coin) ?? "0"));
+  const state: stable.StablePoolState = {
+    xp: stable.xpMem(rates, balances),
+    rates,
+    amp: stable.getA(
+      BigInt(raw.initialA),
+      BigInt(raw.futureA),
+      BigInt(raw.initialATime),
+      BigInt(raw.futureATime),
+      BigInt(Math.floor(Date.now() / 1000))
+    ),
+    fee: BigInt(raw.fee),
+    offpegFeeMultiplier: BigInt(raw.offpegFeeMultiplier),
+  };
+  if (state.xp.some((x) => x <= 0n)) throw new Error("Pool has no liquidity");
+
+  const exactOut = amountSpecified < 0n;
+  let amountIn: bigint;
+  let result: stable.ExchangeResult;
+  if (exactOut) {
+    const found = stable.simulateExchangeExactOut(state, i, j, -amountSpecified);
+    amountIn = found.dx;
+    result = found;
+  } else {
+    amountIn = amountSpecified;
+    result = stable.simulateExchange(state, i, j, amountIn);
+  }
+  if (result.dy <= 0n) throw new Error("Pool has insufficient liquidity for this trade");
+
+  // price impact: fee-less spot rate vs realized execution rate
+  const spotWad = stable.spotRate(state, i, j);
+  const execWad = (result.dy * 10n ** 18n) / amountIn;
+  const spot = Number(spotWad) / 1e18;
+  const exec = Number(execWad) / 1e18;
+  const priceImpact = spot > 0 ? Math.abs((exec - spot) / spot) * 100 : 0;
+
+  return {
+    poolAddress: raw.address,
+    tokenIn: coins[i],
+    tokenOut: coins[j],
+    exactOut,
+    amountIn: amountIn.toString(),
+    amountOut: result.dy.toString(),
+    feeAmount: result.dyFee.toString(),
+    fee: Number(BigInt(raw.fee)) / 1e6,
+    priceImpact,
+    spotRateWad: spotWad.toString(),
+  };
 };
 
 // ============================================================================

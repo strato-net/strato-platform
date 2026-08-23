@@ -4,6 +4,7 @@
  * indexed tick data, and builds/submits PoolV3 transactions. No V2 pool code paths.
  */
 import { cirrus } from "../../utils/appApiHelper";
+import { isMissingTableError } from "../../utils/cirrusErrors";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { executeTransaction } from "../../utils/txHelper";
 import * as config from "../../config/config";
@@ -12,12 +13,14 @@ import {
   POOL_V3_SELECT_FIELDS,
   POOL_V3_TICK_SELECT_FIELDS,
   POOL_V3_POSITION_SELECT_FIELDS,
+  POSITION_MANAGER_POSITION_SELECT_FIELDS,
   POOL_V3_SWAP_HISTORY_SELECT_FIELDS,
   V3_DEADLINE_SECONDS,
 } from "../../config/poolV3Constants";
 import * as v3 from "../helpers/poolV3Math.helper";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 import { getOraclePrices } from "./oracle.service";
+import { getNFTItem } from "./nfts.service";
 import {
   PoolV3,
   PoolV3Token,
@@ -26,6 +29,7 @@ import {
   PoolV3AmountsPreview,
   PoolV3SwapParams,
   PoolV3MintParams,
+  PoolV3IncreaseParams,
   PoolV3BurnParams,
   PoolV3CollectParams,
   PoolV3CreateParams,
@@ -39,6 +43,8 @@ const {
   PoolV3Ticks,
   PoolV3Positions,
   PoolV3SwapEvent,
+  PositionManagerV3Positions,
+  PositionManagerV3Owners,
 } = POOL_V3_CONTRACTS;
 
 const normalizeAddress = (address: string): string => address.toLowerCase().replace(/^0x/, "");
@@ -181,28 +187,68 @@ const fetchSwapInputs24h = async (
   return sums;
 };
 
+/** wei balance valued at the oracle price (18-decimal wei), as a plain USD number */
+const usdAmount = (priceMap: Map<string, string>, tokenAddress: string, balance: string): number => {
+  const price = priceMap.get(tokenAddress);
+  if (!price) return 0;
+  return Number((BigInt(balance) * BigInt(price)) / 10n ** 18n) / 1e18;
+};
+
+/**
+ * Pool-local price map for the USD display metrics (TVL, 24h volume, APY): when exactly
+ * one of the pool's tokens has an oracle price, the other's is derived from the pool's
+ * own spot price (derived = spot × paired oracle price), so pairs like MEME/USDT still
+ * show dollar figures instead of half-counted volume and TVL. With neither token priced
+ * there is no dollar anchor and the map is returned unchanged (metrics stay 0).
+ *
+ * Returns a copy: the derived price is only meaningful within this pool and must not
+ * leak into other pools' valuations — nor into oraclePriceWad, whose purpose is to be
+ * an oracle reference INDEPENDENT of the spot price (trade paths compare the two, and
+ * a spot-derived entry would make that comparison vacuously agree).
+ */
+const withPoolDerivedPrices = (priceMap: Map<string, string>, raw: RawV3Pool): Map<string, string> => {
+  const price0 = BigInt(priceMap.get(raw.token0.address) ?? "0");
+  const price1 = BigInt(priceMap.get(raw.token1.address) ?? "0");
+  if ((price0 > 0n) === (price1 > 0n)) return priceMap; // both priced or neither — nothing to derive
+  const priceWad = v3.sqrtPriceX96ToPriceWad(BigInt(raw.sqrtPriceX96)); // token1 per token0
+  if (priceWad === 0n) return priceMap;
+  const derived = new Map(priceMap);
+  if (price1 > 0n) derived.set(raw.token0.address, ((priceWad * price1) / 10n ** 18n).toString());
+  else derived.set(raw.token1.address, ((price0 * 10n ** 18n) / priceWad).toString());
+  return derived;
+};
+
+/**
+ * 24h fee income kept by LPs, in USD. The fee tier is in pips (1e6 denominator);
+ * the protocol cut (packed denominators d0 + (d1 << 4), 0 = off) is deducted
+ * from what LPs keep.
+ */
+const lpFees24hUSD = (raw: RawV3Pool, volume24hUSD: number): number => {
+  const d0 = Number(raw.feeProtocol) % 16;
+  const d1 = Math.floor(Number(raw.feeProtocol) / 16);
+  const lpFraction = 1 - ((d0 > 0 ? 1 / d0 : 0) + (d1 > 0 ? 1 / d1 : 0)) / 2;
+  return volume24hUSD * (Number(raw.fee) / 1e6) * lpFraction;
+};
+
+const volume24hUSDFor = (raw: RawV3Pool, priceMap: Map<string, string>, swapInputs?: SwapInputs24h): number =>
+  swapInputs
+    ? usdAmount(priceMap, raw.token0.address, swapInputs.in0.toString()) +
+      usdAmount(priceMap, raw.token1.address, swapInputs.in1.toString())
+    : 0;
+
 const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>, swapInputs?: SwapInputs24h): PoolV3 => {
   const priceWad = v3.sqrtPriceX96ToPriceWad(BigInt(raw.sqrtPriceX96));
-  const usd = (tokenAddress: string, balance: string): number => {
-    const price = priceMap.get(tokenAddress);
-    if (!price) return 0;
-    return Number((BigInt(balance) * BigInt(price)) / 10n ** 18n) / 1e18;
-  };
-  // oracle spot price of the pair (token1 per token0, same orientation as priceWad)
+  const displayPrices = withPoolDerivedPrices(priceMap, raw);
+  const usd = (tokenAddress: string, balance: string): number => usdAmount(displayPrices, tokenAddress, balance);
+  // oracle spot price of the pair (token1 per token0, same orientation as priceWad);
+  // real oracle prices only — never the pool-derived fallback (see withPoolDerivedPrices)
   const price0 = BigInt(priceMap.get(raw.token0.address) ?? "0");
   const price1 = BigInt(priceMap.get(raw.token1.address) ?? "0");
   const oraclePriceWad = price0 > 0n && price1 > 0n ? (price0 * 10n ** 18n) / price1 : 0n;
 
   const totalLiquidityUSD = usd(raw.token0.address, raw.token0Balance) + usd(raw.token1.address, raw.token1Balance);
-  const volume24hUSD = swapInputs
-    ? usd(raw.token0.address, swapInputs.in0.toString()) + usd(raw.token1.address, swapInputs.in1.toString())
-    : 0;
-  // LP fee yield: the fee tier is in pips (1e6 denominator); the protocol cut
-  // (packed denominators d0 + (d1 << 4), 0 = off) is deducted from what LPs keep
-  const d0 = Number(raw.feeProtocol) % 16;
-  const d1 = Math.floor(Number(raw.feeProtocol) / 16);
-  const lpFraction = 1 - ((d0 > 0 ? 1 / d0 : 0) + (d1 > 0 ? 1 / d1 : 0)) / 2;
-  const fees24hUSD = volume24hUSD * (Number(raw.fee) / 1e6) * lpFraction;
+  const volume24hUSD = volume24hUSDFor(raw, displayPrices, swapInputs);
+  const fees24hUSD = lpFees24hUSD(raw, volume24hUSD);
   const apy = totalLiquidityUSD > 0 ? Math.max(0, (fees24hUSD / totalLiquidityUSD) * 365 * 100) : 0;
 
   return {
@@ -236,11 +282,15 @@ const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>, swapInputs?: S
 
 const fetchRawPools = async (
   accessToken: string,
-  filters: Record<string, string> = {}
+  filters: Record<string, string> = {},
+  /** drop the current-factory scope — for EXACT-address lookups only, where historical
+   *  pools (old test factories) must still resolve (e.g. the activity feed enriches
+   *  past events with pool token metadata). Listings must stay factory-scoped. */
+  { anyFactory = false }: { anyFactory?: boolean } = {},
 ): Promise<RawV3Pool[]> => {
   const { data } = await cirrus.get(accessToken, `/${PoolV3Table}`, {
     params: {
-      poolV3Factory: `eq.${config.poolV3Factory}`,
+      ...(anyFactory ? {} : { poolV3Factory: `eq.${config.poolV3Factory}` }),
       select: POOL_V3_SELECT_FIELDS.join(","),
       // uninitialized proxies/implementations have price 0
       sqrtPriceX96: "neq.0",
@@ -272,7 +322,15 @@ export const getPools = async (accessToken: string): Promise<PoolV3[]> => {
 };
 
 export const getPoolByAddress = async (accessToken: string, poolAddress: string): Promise<PoolV3 | null> => {
-  const rawPools = await fetchRawPools(accessToken, { address: `eq.${normalizeAddress(poolAddress)}` });
+  // anyFactory: an exact-address lookup is already precise — it must also resolve pools
+  // from superseded factories so historical references (activity feed rows) render
+  // with their token metadata instead of erroring. New-liquidity/swap flows only ever
+  // see pools via the factory-scoped listings.
+  const rawPools = await fetchRawPools(
+    accessToken,
+    { address: `eq.${normalizeAddress(poolAddress)}` },
+    { anyFactory: true },
+  );
   const pools = await attachPrices(accessToken, rawPools);
   return pools[0] ?? null;
 };
@@ -288,6 +346,47 @@ export const getPoolsByPair = async (accessToken: string, tokenA: string, tokenB
   return pools
     .filter((p) => !p.isDisabled)
     .sort((x, y) => y.totalLiquidityUSD - x.totalLiquidityUSD);
+};
+
+/**
+ * Token discovery for the unified trade surface: the max funded balance per
+ * token across active (not disabled, funded on both sides) V3 pools. With
+ * `pairedWith` set, returns only counterparty tokens of pools containing that
+ * token, valued at their counterparty-side balance.
+ */
+export const getFundedPoolTokenBalances = async (
+  accessToken: string,
+  pairedWith?: string
+): Promise<Map<string, bigint>> => {
+  const paired = pairedWith ? normalizeAddress(pairedWith) : undefined;
+  const { data } = await cirrus.get(accessToken, `/${PoolV3Table}`, {
+    params: {
+      isDisabled: "eq.false",
+      isPaused: "eq.false",
+      select: "address,token0,token1,token0Balance::text,token1Balance::text",
+      ...(paired ? { or: `(token0.eq.${paired},token1.eq.${paired})` } : {}),
+    },
+  });
+
+  const balances = new Map<string, bigint>();
+  const bump = (token: string, balance: bigint) => {
+    if (balance > (balances.get(token) ?? 0n)) balances.set(token, balance);
+  };
+
+  type Row = { address: string; token0: string; token1: string; token0Balance: string; token1Balance: string };
+  for (const row of (data as Row[]) ?? []) {
+    if (config.hiddenSwapPools.has(row.address)) continue;
+    const balance0 = BigInt(row.token0Balance || "0");
+    const balance1 = BigInt(row.token1Balance || "0");
+    if (balance0 <= 0n || balance1 <= 0n) continue;
+    if (paired) {
+      bump(row.token0 === paired ? row.token1 : row.token0, row.token0 === paired ? balance1 : balance0);
+    } else {
+      bump(row.token0, balance0);
+      bump(row.token1, balance1);
+    }
+  }
+  return balances;
 };
 
 /** Minimal token0/token1 lookup for a set of pools (portfolio valuation) */
@@ -384,6 +483,75 @@ export const fetchPairSwapHistory = async (
     const impliedPrice =
       baseAmount > 0n && quoteAmount > 0n
         ? (Number((quoteAmount * 10n ** 18n) / baseAmount) / 1e18).toFixed(6)
+        : "0.00";
+    return [{
+      id: event.id,
+      timestamp: new Date(event.block_timestamp),
+      tokenIn: zeroForOne ? pool.token0._symbol : pool.token1._symbol,
+      tokenOut: zeroForOne ? pool.token1._symbol : pool.token0._symbol,
+      amountIn: amountIn.toString(),
+      amountOut: amountOut.toString(),
+      impliedPrice,
+      sender: event.sender,
+      poolAddress: pool.address,
+      poolName: `V3 ${Number(pool.fee) / 10000}%`,
+      fee: Number(pool.fee),
+    }];
+  });
+
+  return { entries, totalCount };
+};
+
+/**
+ * Recent V3 swaps involving a single token across every fee-tier pool that lists it
+ * as token0 or token1. Same shape as fetchPairSwapHistory; impliedPrice is raw
+ * output-per-input (no pair orientation).
+ */
+export const fetchTokenSwapHistory = async (
+  accessToken: string,
+  tokenAddress: string,
+  maxRows: number
+): Promise<{ entries: SwapHistoryEntry[]; totalCount: number }> => {
+  const t = normalizeAddress(tokenAddress);
+  const rawPools = await fetchRawPools(accessToken, {
+    or: `(token0.eq.${t},token1.eq.${t})`,
+  });
+  if (rawPools.length === 0) return { entries: [], totalCount: 0 };
+  const poolByAddress = new Map(rawPools.map((p) => [p.address, p]));
+
+  const eventFilters = {
+    address: `in.(${rawPools.map((p) => p.address).join(",")})`,
+  };
+
+  const [eventsResponse, countResponse] = await Promise.all([
+    cirrus.get(accessToken, `/${PoolV3SwapEvent}`, {
+      params: {
+        ...eventFilters,
+        select: POOL_V3_SWAP_HISTORY_SELECT_FIELDS.join(","),
+        order: "block_timestamp.desc",
+        limit: maxRows.toString(),
+      },
+    }),
+    cirrus.get(accessToken, `/${PoolV3SwapEvent}`, {
+      params: { ...eventFilters, select: "count()" },
+    }),
+  ]);
+
+  const swapEvents = eventsResponse.data;
+  const totalCount = countResponse.data?.[0]?.count || 0;
+  if (!Array.isArray(swapEvents)) return { entries: [], totalCount: 0 };
+
+  const entries: SwapHistoryEntry[] = (swapEvents as RawV3SwapEvent[]).flatMap((event) => {
+    const pool = poolByAddress.get(event.address);
+    if (!pool) return [];
+    const amount0 = toBigIntOrUndefined(event.amount0) ?? 0n;
+    const amount1 = toBigIntOrUndefined(event.amount1) ?? 0n;
+    const zeroForOne = amount0 > 0n;
+    const amountIn = zeroForOne ? amount0 : amount1;
+    const amountOut = -(zeroForOne ? amount1 : amount0);
+    const impliedPrice =
+      amountIn > 0n && amountOut > 0n
+        ? (Number((amountOut * 10n ** 18n) / amountIn) / 1e18).toFixed(6)
         : "0.00";
     return [{
       id: event.id,
@@ -555,42 +723,125 @@ export const getQuote = async (
 // POSITIONS
 // ============================================================================
 
+/** A position row plus its addressing mode, normalized to the RawV3Position shape so the
+ *  NFT (manager) and legacy (direct) sources share one enrichment pass */
+interface PositionSourceRow extends RawV3Position {
+  kind: "nft" | "legacy";
+  tokenId?: string;
+  /** the PositionManagerV3 (ERC-721 collection) address, NFT rows only — lets the UI
+   *  link a position row to its NFT detail page */
+  manager?: string;
+}
+
+/** Positions held directly on pools (pre-manager "legacy" positions) */
+const fetchLegacyPositionRows = async (
+  accessToken: string,
+  owner: string,
+  poolAddress?: string
+): Promise<PositionSourceRow[]> => {
+  const params: Record<string, string> = {
+    key: `eq.${owner}`,
+    select: POOL_V3_POSITION_SELECT_FIELDS.join(","),
+  };
+  if (poolAddress) params.address = `eq.${poolAddress}`;
+
+  try {
+    const { data } = await cirrus.get(accessToken, `/${PoolV3Positions}`, { params });
+    return ((data as RawV3Position[]) ?? []).map((row) => ({ ...row, kind: "legacy" as const }));
+  } catch (err) {
+    if (isMissingTableError(err)) return [];
+    throw err;
+  }
+};
+
+/** Positions held as PositionManagerV3 NFTs: the user's tokenIds (from the ERC-721
+ *  _owners table) joined to the manager's ManagedPosition structs. The rows are recast
+ *  to the pool-position shape — the manager's per-token feeGrowthInside snapshots obey
+ *  the same delta math as a direct position's, so enrichment is identical. */
+const fetchManagedPositionRows = async (
+  accessToken: string,
+  owner: string,
+  poolAddress?: string
+): Promise<PositionSourceRow[]> => {
+  if (!config.positionManagerV3) return [];
+  const manager = normalizeAddress(config.positionManagerV3);
+
+  interface RawManagedPosition {
+    key: string; // tokenId
+    pool: string;
+    tickLower: string;
+    tickUpper: string;
+    liquidity: string;
+    tokensOwed0: string;
+    tokensOwed1: string;
+    feeGrowthInside0LastX128: string | null;
+    feeGrowthInside1LastX128: string | null;
+  }
+
+  try {
+    // the _owners value column (a mapping's address value) is JSON-typed — the equality
+    // filter needs a JSON string literal (eq."<addr>")
+    const { data: ownerRows } = await cirrus.get(accessToken, `/${PositionManagerV3Owners}`, {
+      params: {
+        address: `eq.${manager}`,
+        select: "tokenId:key",
+        value: `eq."${owner}"`,
+      },
+    });
+    const tokenIds = [...new Set(((ownerRows as { tokenId: string | number }[]) ?? []).map((r) => String(r.tokenId)))];
+    if (tokenIds.length === 0) return [];
+
+    const { data } = await cirrus.get(accessToken, `/${PositionManagerV3Positions}`, {
+      params: {
+        address: `eq.${manager}`,
+        key: `in.(${tokenIds.join(",")})`,
+        select: POSITION_MANAGER_POSITION_SELECT_FIELDS.join(","),
+      },
+    });
+
+    return ((data as RawManagedPosition[]) ?? [])
+      .filter((row) => row.pool && !/^0+$/.test(row.pool)) // burned positions keep a zeroed struct row
+      .map((row) => ({
+        address: normalizeAddress(row.pool),
+        key: owner,
+        key2: row.tickLower,
+        key3: row.tickUpper,
+        liquidity: row.liquidity,
+        tokensOwed0: row.tokensOwed0,
+        tokensOwed1: row.tokensOwed1,
+        feeGrowthInside0LastX128: row.feeGrowthInside0LastX128,
+        feeGrowthInside1LastX128: row.feeGrowthInside1LastX128,
+        kind: "nft" as const,
+        tokenId: String(row.key),
+        manager,
+      }))
+      .filter((row) => !poolAddress || row.address === poolAddress);
+  } catch (err) {
+    if (isMissingTableError(err)) return [];
+    throw err;
+  }
+};
+
 export const getPositions = async (
   accessToken: string,
   owner: string,
   poolAddress?: string
 ): Promise<PoolV3Position[]> => {
-  const params: Record<string, string> = {
-    key: `eq.${normalizeAddress(owner)}`,
-    select: POOL_V3_POSITION_SELECT_FIELDS.join(","),
-  };
-  if (poolAddress) params.address = `eq.${normalizeAddress(poolAddress)}`;
+  const ownerAddr = normalizeAddress(owner);
+  const poolFilter = poolAddress ? normalizeAddress(poolAddress) : undefined;
+  const [managedRows, legacyRows] = await Promise.all([
+    fetchManagedPositionRows(accessToken, ownerAddr, poolFilter),
+    fetchLegacyPositionRows(accessToken, ownerAddr, poolFilter),
+  ]);
 
-  let data: unknown;
-  try {
-    ({ data } = await cirrus.get(accessToken, `/${PoolV3Positions}`, {
-      params: {
-        ...params,
-      },
-    }));
-  } catch (err) {
-    // The position value columns (liquidity, tokensOwed0/1) are materialized lazily on
-    // first insert; until any position is minted they do not exist and PostgREST returns
-    // 42703 (undefined_column), or 42P01 (undefined_table) if the table is absent
-    // entirely. Either way the owner has no positions. (The key columns key/key2/key3
-    // are created up front, so this only guards the value-column selection.)
-    const code = (err as any)?.response?.data?.code;
-    if (code === "42703" || code === "42P01") return [];
-    throw err;
-  }
-
-  const rows = (data as RawV3Position[]).filter(
+  const rows = [...managedRows, ...legacyRows].filter(
     (r) => BigInt(r.liquidity ?? "0") > 0n || BigInt(r.tokensOwed0 ?? "0") > 0n || BigInt(r.tokensOwed1 ?? "0") > 0n
   );
   if (rows.length === 0) return [];
 
   // pool + tick state for amount and pending-fee computation
   const poolAddresses = [...new Set(rows.map((r) => r.address))];
+  // Only pools from the configured current factory count toward portfolio value.
   const rawPools = await fetchRawPools(accessToken, { address: `in.(${poolAddresses.join(",")})` });
   const poolByAddress = new Map(rawPools.map((p) => [p.address, p]));
   const ticksByPool = new Map<string, Map<number, v3.TickData>>();
@@ -598,6 +849,16 @@ export const getPositions = async (
     const ticks = await fetchInitializedTicks(accessToken, addr);
     ticksByPool.set(addr, new Map(ticks.map((t) => [t.tick, t])));
   }
+
+  // fee income + prices for the per-position APY estimate
+  const tokenAddresses = [...new Set(rawPools.flatMap((p) => [p.token0.address, p.token1.address]))];
+  const [swapInputs24h, priceMap] = await Promise.all([
+    fetchSwapInputs24h(accessToken, poolAddresses),
+    getOraclePrices(accessToken, {
+      select: "asset:key,price:value::text",
+      key: `in.(${tokenAddresses.join(",")})`,
+    }),
+  ]);
 
   return rows.flatMap((row) => {
     const pool = poolByAddress.get(row.address);
@@ -643,10 +904,30 @@ export const getPositions = async (
       pending1 = v3.pendingFees(liquidity, inside1, last1);
     }
 
+    // Estimated fee APY: an in-range position earns the pool's LP fee income in
+    // proportion to its share of the CURRENT in-range liquidity (not of TVL —
+    // that's the pool-level APY, which understates concentrated positions).
+    // Out-of-range positions earn nothing until the price re-enters the range.
+    const inRange = Number(pool.currentTick) >= tickLower && Number(pool.currentTick) < tickUpper;
+    const displayPrices = withPoolDerivedPrices(priceMap, pool);
+    const positionValueUsd =
+      usdAmount(displayPrices, pool.token0.address, amount0.toString()) +
+      usdAmount(displayPrices, pool.token1.address, amount1.toString());
+    const poolLiquidity = Number(pool.liquidity || "0");
+    let apy = 0;
+    if (inRange && positionValueUsd > 0 && poolLiquidity > 0) {
+      const share = Math.min(1, Number(liquidity) / poolLiquidity);
+      const fees24h = lpFees24hUSD(pool, volume24hUSDFor(pool, displayPrices, swapInputs24h.get(row.address)));
+      apy = Math.max(0, ((fees24h * share * 365) / positionValueUsd) * 100);
+    }
+
     return [
       {
         poolAddress: row.address,
         owner: row.key,
+        kind: row.kind,
+        ...(row.tokenId !== undefined ? { tokenId: row.tokenId } : {}),
+        ...(row.manager !== undefined ? { manager: row.manager } : {}),
         tickLower,
         tickUpper,
         liquidity: row.liquidity,
@@ -656,9 +937,11 @@ export const getPositions = async (
         tokensOwed1: row.tokensOwed1,
         pendingFees0: pending0.toString(),
         pendingFees1: pending1.toString(),
-        inRange: Number(pool.currentTick) >= tickLower && Number(pool.currentTick) < tickUpper,
+        inRange,
         priceLowerWad: v3.sqrtPriceX96ToPriceWad(v3.getSqrtRatioAtTick(tickLower)).toString(),
         priceUpperWad: v3.sqrtPriceX96ToPriceWad(v3.getSqrtRatioAtTick(tickUpper)).toString(),
+        valueUsd: positionValueUsd,
+        apy,
       },
     ];
   });
@@ -732,13 +1015,60 @@ export const swap = async (
   params: PoolV3SwapParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
-  const { poolAddress, zeroForOne, amountSpecified, amountLimit, sqrtPriceLimitX96 } = params;
-  const { token0, token1 } = await fetchPoolTokens(accessToken, poolAddress);
-  const inputToken = zeroForOne ? token0 : token1;
+  const { poolAddress, zeroForOne, amountSpecified, amountLimit } = params;
+  const rawPools = await fetchRawPools(accessToken, { address: `eq.${normalizeAddress(poolAddress)}` });
+  const raw = rawPools[0];
+  if (!raw) throw new Error(`PoolV3 not found: ${poolAddress}`);
+  const inputToken = zeroForOne ? raw.token0.address : raw.token1.address;
 
   const specified = BigInt(amountSpecified);
   // exact input: approve the input amount; exact output: approve the max input (amountLimit)
   const approvalAmount = specified > 0n ? specified.toString() : amountLimit;
+
+  // When the caller doesn't pick a price limit ("0" = contract default), clamp it to the
+  // pool's outermost initialized tick instead of the tick-domain edge. Beyond that tick
+  // liquidity is zero, so the fill is identical either way — but the edge default lets a
+  // draining swap pin the price at ~2^±128 ("infinity"), where no position can ever be in
+  // range and the drained token can never be re-deposited. This is the same layer that
+  // owns the 0-default in canonical Uniswap (SwapRouter); explicit limits pass through.
+  let sqrtPriceLimitX96 = params.sqrtPriceLimitX96;
+  if (!sqrtPriceLimitX96 || sqrtPriceLimitX96 === "0") {
+    const ticks = await fetchInitializedTicks(accessToken, poolAddress);
+    const clamped = v3.clampedPriceLimit(ticks, zeroForOne);
+    if (clamped === null) throw new Error("Pool has no liquidity");
+    if (zeroForOne ? clamped >= BigInt(raw.sqrtPriceX96) : clamped <= BigInt(raw.sqrtPriceX96)) {
+      // would fail the contract's SPL require: every initialized tick is behind the price
+      const outSymbol = zeroForOne ? raw.token1._symbol : raw.token0._symbol;
+      throw new Error(
+        `No ${outSymbol} available: the pool's liquidity is entirely ${zeroForOne ? "above" : "below"} the current price`
+      );
+    }
+    sqrtPriceLimitX96 = clamped.toString();
+
+    // Exact output with no explicit limit means full fill (canonical SwapRouter
+    // semantics): the contract's amountLimit guard is a max-INPUT bound, which a partial
+    // fill passes ever more easily as delivery shrinks — under-delivery of the requested
+    // output can only be rejected here, before submission.
+    if (specified < 0n) {
+      const result = v3.simulateSwap(
+        {
+          sqrtPriceX96: BigInt(raw.sqrtPriceX96),
+          currentTick: Number(raw.currentTick),
+          liquidity: BigInt(raw.liquidity),
+          feePips: BigInt(raw.fee),
+          ticks,
+        },
+        zeroForOne,
+        specified,
+        clamped
+      );
+      if (result.partialFill) {
+        throw new Error(
+          `Insufficient liquidity: the pool can deliver ${result.amountOut} of the ${-specified} requested`
+        );
+      }
+    }
+  }
 
   const tx = await buildFunctionTx(
     [
@@ -751,7 +1081,7 @@ export const swap = async (
           recipient: userAddress,
           zeroForOne,
           amountSpecified,
-          sqrtPriceLimitX96: sqrtPriceLimitX96 ?? "0",
+          sqrtPriceLimitX96,
           amountLimit,
           deadline: deadline(),
         },
@@ -763,31 +1093,115 @@ export const swap = async (
   return executeTransaction(accessToken, tx);
 };
 
+const requirePositionManager = (): string => {
+  if (!config.positionManagerV3) {
+    // Deployment-ordering guard: the manager is deployed once per network and configured
+    // afterwards (defaultPositionManagerV3For / POSITION_MANAGER_V3). Until then V3
+    // position writes are unavailable by design — surface that as a 503, not a bug-500.
+    const err = new Error(
+      "V3 position manager is not configured on this network — deploy PositionManagerV3 and set POSITION_MANAGER_V3 (or defaultPositionManagerV3For)"
+    );
+    (err as any).statusCode = 503;
+    throw err;
+  }
+  return config.positionManagerV3;
+};
+
+/** The position NFT for a tokenId, resolved against the network's singleton manager —
+ *  lets the UI address a position as /v3-liquidity/:tokenId with no manager in the URL */
+export const getPositionNFTItem = async (accessToken: string, tokenId: string) => {
+  const manager = requirePositionManager();
+  return getNFTItem(accessToken, manager, tokenId);
+};
+
+const positionManagerTx = (method: string, args: Record<string, unknown>) => ({
+  contractName: "PositionManagerV3",
+  contractAddress: requirePositionManager(),
+  method,
+  args,
+});
+
+/**
+ * Mint a position NFT via PositionManagerV3 (the only mint path — positions created
+ * here are ERC-721 tokens). The manager computes liquidity from the desired amounts
+ * and pulls EXACTLY the pool-computed deposit from the caller, so the approvals are
+ * ceilings, not transfers.
+ */
 export const mint = async (
   accessToken: string,
   params: PoolV3MintParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
-  const { poolAddress, tickLower, tickUpper, liquidity, amount0Max, amount1Max } = params;
+  requirePositionManager();
+  const { poolAddress, tickLower, tickUpper } = params;
+
+  // Back-compat: pre-NFT clients (stale SPA bundles, scripts on the old contract) send
+  // {liquidity, amount0Max, amount1Max}. Convert liquidity to desired amounts with the
+  // same pool math the old direct-mint path used, capped at the client's ceilings so the
+  // manager can never pull more than the caller authorized. Remove once stale bundles age out.
+  let { amount0Desired, amount1Desired } = params;
+  if (amount0Desired === undefined || amount1Desired === undefined) {
+    const minWei = (a: string, b: string) => (BigInt(a) < BigInt(b) ? a : b);
+    const preview = await getAmountsForLiquidity(
+      accessToken, poolAddress, tickLower, tickUpper, BigInt(params.liquidity ?? "0")
+    );
+    amount0Desired = minWei(preview.amount0, params.amount0Max ?? preview.amount0);
+    amount1Desired = minWei(preview.amount1, params.amount1Max ?? preview.amount1);
+  }
+
   const { token0, token1 } = await fetchPoolTokens(accessToken, poolAddress);
 
   const txs = [];
-  if (BigInt(amount0Max) > 0n) txs.push(approvalTx(token0, poolAddress, amount0Max));
-  if (BigInt(amount1Max) > 0n) txs.push(approvalTx(token1, poolAddress, amount1Max));
-  txs.push({
-    contractName: "PoolV3",
-    contractAddress: poolAddress,
-    method: "mint",
-    args: {
-      recipient: userAddress,
+  if (BigInt(amount0Desired) > 0n) txs.push(approvalTx(token0, config.positionManagerV3, amount0Desired));
+  if (BigInt(amount1Desired) > 0n) txs.push(approvalTx(token1, config.positionManagerV3, amount1Desired));
+  txs.push(
+    positionManagerTx("mint", {
+      pool: normalizeAddress(poolAddress),
       tickLower,
       tickUpper,
-      amount: liquidity,
-      amount0Max,
-      amount1Max,
+      amount0Desired,
+      amount1Desired,
+      amount0Min: params.amount0Min ?? "0",
+      amount1Min: params.amount1Min ?? "0",
+      recipient: userAddress,
       deadline: deadline(),
-    },
+    })
+  );
+
+  const tx = await buildFunctionTx(txs, userAddress, accessToken);
+  return executeTransaction(accessToken, tx);
+};
+
+/** Add liquidity to an existing position NFT (same range; fees accrue to the holder) */
+export const increaseLiquidity = async (
+  accessToken: string,
+  params: PoolV3IncreaseParams,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const manager = normalizeAddress(requirePositionManager());
+  const { tokenId, amount0Desired, amount1Desired } = params;
+
+  // resolve the position's pool for the token approvals
+  const { data } = await cirrus.get(accessToken, `/${PositionManagerV3Positions}`, {
+    params: { address: `eq.${manager}`, key: `eq.${tokenId}`, select: "pool:value->>pool" },
   });
+  const pool = data?.[0]?.pool;
+  if (!pool || /^0+$/.test(pool)) throw new Error(`Position not found: tokenId ${tokenId}`);
+  const { token0, token1 } = await fetchPoolTokens(accessToken, pool);
+
+  const txs = [];
+  if (BigInt(amount0Desired) > 0n) txs.push(approvalTx(token0, config.positionManagerV3, amount0Desired));
+  if (BigInt(amount1Desired) > 0n) txs.push(approvalTx(token1, config.positionManagerV3, amount1Desired));
+  txs.push(
+    positionManagerTx("increaseLiquidity", {
+      tokenId,
+      amount0Desired,
+      amount1Desired,
+      amount0Min: params.amount0Min ?? "0",
+      amount1Min: params.amount1Min ?? "0",
+      deadline: deadline(),
+    })
+  );
 
   const tx = await buildFunctionTx(txs, userAddress, accessToken);
   return executeTransaction(accessToken, tx);
@@ -800,7 +1214,38 @@ export const burn = async (
   params: PoolV3BurnParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
+  // NFT path: the position is addressed by its manager tokenId; ownership/approval is
+  // enforced on-chain by the manager (isAuthorizedForToken)
+  if (params.tokenId !== undefined) {
+    const txs: any[] = [
+      positionManagerTx("decreaseLiquidity", {
+        tokenId: params.tokenId,
+        liquidity: params.liquidity,
+        amount0Min: params.amount0Min ?? "0",
+        amount1Min: params.amount1Min ?? "0",
+        deadline: deadline(),
+      }),
+    ];
+    if (params.collect) {
+      txs.push(
+        positionManagerTx("collect", {
+          tokenId: params.tokenId,
+          recipient: userAddress,
+          amount0Max: MAX_COLLECT,
+          amount1Max: MAX_COLLECT,
+        })
+      );
+    }
+    const tx = await buildFunctionTx(txs, userAddress, accessToken);
+    return executeTransaction(accessToken, tx);
+  }
+
+  // legacy path: positions held directly on the pool (pre-manager)
   const { poolAddress, tickLower, tickUpper, liquidity, collect } = params;
+  if (!poolAddress || tickLower === undefined || tickUpper === undefined) {
+    throw new Error("poolAddress, tickLower and tickUpper are required for legacy positions");
+  }
+  await assertLegacyPosition(accessToken, poolAddress, userAddress, tickLower, tickUpper);
 
   const txs: any[] = [
     {
@@ -827,6 +1272,43 @@ export const burn = async (
 
   const tx = await buildFunctionTx(txs, userAddress, accessToken);
   return executeTransaction(accessToken, tx);
+};
+
+/** A position addressed by pool + ticks must be a direct (legacy) pool position of the
+ *  caller. NFT positions surface from GET /positions with the same pool/ticks fields, so
+ *  a stale client can plausibly address one the legacy way — but the pool-level position
+ *  belongs to the manager, not the user, so the on-chain call would revert opaquely.
+ *  Fail fast with an actionable error instead. */
+const assertLegacyPosition = async (
+  accessToken: string,
+  poolAddress: string,
+  owner: string,
+  tickLower: number,
+  tickUpper: number
+): Promise<void> => {
+  try {
+    const { data } = await cirrus.get(accessToken, `/${PoolV3Positions}`, {
+      params: {
+        address: `eq.${normalizeAddress(poolAddress)}`,
+        key: `eq.${normalizeAddress(owner)}`,
+        key2: `eq.${tickLower}`,
+        key3: `eq.${tickUpper}`,
+        select: "key",
+      },
+    });
+    if (((data as unknown[]) ?? []).length > 0) return;
+  } catch (err) {
+    if (!isMissingTableError(err)) throw err;
+  }
+  const managed = await fetchManagedPositionRows(accessToken, normalizeAddress(owner), normalizeAddress(poolAddress));
+  const match = managed.find((r) => Number(r.key2) === tickLower && Number(r.key3) === tickUpper);
+  const err = new Error(
+    match
+      ? `This position is held as a position NFT (tokenId ${match.tokenId}) and must be addressed by tokenId — if you're seeing this in the app, refresh to load the latest version`
+      : "No position found for this pool and tick range"
+  );
+  (err as any).statusCode = match ? 400 : 404;
+  throw err;
 };
 
 /** True when the owner's position currently holds liquidity (poke-able). */
@@ -858,7 +1340,30 @@ export const collect = async (
   params: PoolV3CollectParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
+  // NFT path: PositionManagerV3.collect pokes the pool internally (when the position has
+  // liquidity) before computing the payable amounts, so a single call suffices
+  if (params.tokenId !== undefined) {
+    const tx = await buildFunctionTx(
+      [
+        positionManagerTx("collect", {
+          tokenId: params.tokenId,
+          recipient: userAddress,
+          amount0Max: params.amount0Requested ?? MAX_COLLECT,
+          amount1Max: params.amount1Requested ?? MAX_COLLECT,
+        }),
+      ],
+      userAddress,
+      accessToken
+    );
+    return executeTransaction(accessToken, tx);
+  }
+
+  // legacy path: positions held directly on the pool (pre-manager)
   const { poolAddress, tickLower, tickUpper, amount0Requested, amount1Requested } = params;
+  if (!poolAddress || tickLower === undefined || tickUpper === undefined) {
+    throw new Error("poolAddress, tickLower and tickUpper are required for legacy positions");
+  }
+  await assertLegacyPosition(accessToken, poolAddress, userAddress, tickLower, tickUpper);
 
   // fees accrue to tokensOwed only when the position is touched; poke (burn 0)
   // before collecting so pending fees are realized — canonical periphery behavior.

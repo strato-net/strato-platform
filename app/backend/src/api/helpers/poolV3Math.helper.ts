@@ -292,14 +292,63 @@ export interface QuoteResult {
 }
 
 /**
+ * Default swap price limit: the sqrt price of the pool's outermost initialized tick in
+ * the swap direction (lowest tick going down, highest going up), or null when the pool
+ * has no initialized ticks. Every position adds +liquidityNet at its lower tick and
+ * -liquidityNet at its upper, so beyond the outermost ticks global liquidity is zero and
+ * a swap exchanges nothing — the contract's own default limit (the tick-domain edge)
+ * just walks the price through that emptiness and pins it at ~2^±128, where no position
+ * can ever be in range again and the drained token can never be re-deposited. Stopping
+ * at the outermost tick fills the identical amounts but leaves the price at the last
+ * real level, where minting (either token) still works after a drain.
+ */
+export function clampedPriceLimit(ticks: TickData[], zeroForOne: boolean): bigint | null {
+  if (ticks.length === 0) return null;
+  let bound = ticks[0].tick;
+  for (const t of ticks) {
+    if (zeroForOne ? t.tick < bound : t.tick > bound) bound = t.tick;
+  }
+  const ratio = getSqrtRatioAtTick(bound);
+  // a position pinned exactly at MIN/MAX_TICK yields the closed-interval endpoint,
+  // which the contract's SPL require rejects — stay strictly inside, like the contract's
+  // own 0-default does
+  if (ratio <= MIN_SQRT_RATIO) return MIN_SQRT_RATIO + 1n;
+  if (ratio >= MAX_SQRT_RATIO) return MAX_SQRT_RATIO - 1n;
+  return ratio;
+}
+
+/**
  * Simulate PoolV3.swap over indexed tick state. Mirrors the contract's swap loop
  * exactly (Cirrus tick rows replace the on-chain bitmap walk: with all initialized
  * ticks in hand, the next tick in the swap direction is a direct lookup).
  * amountSpecified > 0 = exact input, < 0 = exact output.
+ * sqrtPriceLimitX96 defaults to the clamped limit the swap service submits on-chain
+ * (see clampedPriceLimit), so quoted resting price/tick match the real swap's.
  */
-export function simulateSwap(pool: PoolQuoteState, zeroForOne: boolean, amountSpecified: bigint): QuoteResult {
+export function simulateSwap(
+  pool: PoolQuoteState,
+  zeroForOne: boolean,
+  amountSpecified: bigint,
+  sqrtPriceLimitX96?: bigint
+): QuoteResult {
   if (amountSpecified === 0n) throw new Error("AS");
-  const limit = zeroForOne ? MIN_SQRT_RATIO + 1n : MAX_SQRT_RATIO - 1n;
+  const edge = zeroForOne ? MIN_SQRT_RATIO + 1n : MAX_SQRT_RATIO - 1n;
+  const limit = sqrtPriceLimitX96 ?? clampedPriceLimit(pool.ticks, zeroForOne) ?? edge;
+
+  // A limit not strictly ahead of the current price fails the contract's SPL require —
+  // all initialized ticks sit behind the price, so there is nothing to swap toward.
+  // Report an empty fill (the same shape a pinned pool produces today) instead of
+  // running the loop with an inverted target.
+  if (zeroForOne ? limit >= pool.sqrtPriceX96 : limit <= pool.sqrtPriceX96) {
+    return {
+      amountIn: 0n,
+      amountOut: 0n,
+      feeAmount: 0n,
+      sqrtPriceX96After: pool.sqrtPriceX96,
+      tickAfter: pool.currentTick,
+      partialFill: true,
+    };
+  }
 
   const sortedTicks = [...pool.ticks].sort((a, b) => a.tick - b.tick);
   const exactInput = amountSpecified > 0n;

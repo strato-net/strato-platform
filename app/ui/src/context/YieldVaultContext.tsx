@@ -16,6 +16,7 @@ import {
 
 export type {
   YieldVaultContextType,
+  YieldVaultHistoryPoint,
   YieldVaultInfo,
   YieldVaultPendingWithdrawal,
   YieldVaultUserInfo,

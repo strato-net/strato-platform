@@ -149,7 +149,7 @@ router.get("/admin/contract/details", authHandler.authorizeRequest(), UserContro
  * @openapi
  * /user/admin/vote:
  *   post:
- *     summary: Cast an administrative vote
+ *     summary: Create an admin issue by calling the target function directly
  *     tags: [Admin]
  *     requestBody:
  *       required: true
@@ -167,22 +167,60 @@ router.get("/admin/contract/details", authHandler.authorizeRequest(), UserContro
  *                 description: Contract address to call
  *               func:
  *                 type: string
- *                 description: Function signature being approved
+ *                 description: Function to call on the target contract
  *               args:
  *                 type: array
- *                 description: Encoded function arguments
- *                 items:
- *                   type: string
+ *                 description: Positional raw argument values
+ *                 items: {}
  *     responses:
  *       200:
- *         description: Vote transaction payload
+ *         description: Issue transaction payload
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/vote", walletAuth, UserController.castVoteOnIssue);
+router.post("/admin/vote", walletAuth, UserController.createIssue);
+
+/**
+ * @openapi
+ * /user/admin/vote/simulate:
+ *   post:
+ *     summary: Dry-run an administrative vote (no signing or commit)
+ *     description: >
+ *       Simulates casting a vote on an issue and returns the vote tx result with
+ *       the issue's "effect if executed" (target.func(args) run as the
+ *       AdminRegistry) nested under `effect`.
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - target
+ *               - func
+ *               - args
+ *             properties:
+ *               target:
+ *                 type: string
+ *               func:
+ *                 type: string
+ *               args:
+ *                 type: array
+ *                 items: {}
+ *     responses:
+ *       200:
+ *         description: Simulated vote result (with nested effect)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/admin/vote/simulate", walletAuth, UserController.simulateCastVoteOnIssue);
 
 /**
  * @openapi
@@ -246,8 +284,21 @@ router.post("/admin/dismiss", walletAuth, UserController.dismissIssue);
  * @openapi
  * /user/admin/issues:
  *   get:
- *     summary: List open administrative issues
+ *     summary: List open administrative issues with pagination
  *     tags: [Admin]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Items per page
  *     responses:
  *       200:
  *         description: Governance issue overview

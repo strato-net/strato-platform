@@ -40,6 +40,115 @@ const rpow = (x: bigint, n: bigint, base: bigint): bigint => {
   return z;
 };
 
+type YieldVaultPricingState = {
+  address: string;
+  assetAddress: string;
+  projectedActiveAssets: bigint;
+  totalShares: bigint;
+};
+
+const getYieldVaultPricingState = async (
+  accessToken: string,
+  vaultAddress: string
+): Promise<YieldVaultPricingState | null> => {
+  const [{ data: vaultRows }, storageResponse] = await Promise.all([
+    cirrus.get(accessToken, `/${YieldVault}`, {
+      params: {
+        address: `eq.${vaultAddress}`,
+        select:
+          "address,_asset,deployedAssets::text,_totalSupply::text,totalClaimableAssets::text",
+      },
+    }),
+    cirrus.get(accessToken, "/storage", {
+      params: {
+        address: `eq.${vaultAddress}`,
+        select:
+          "data->>accrualInitialized,data->>accrualBaseAssets,data->>perSecondSavingsRate,data->>lastAccrual,data->>rewardDistributor",
+        limit: "1",
+      },
+    }).catch(() => ({ data: [] })),
+  ]);
+
+  const vault = vaultRows?.[0]
+    ? { ...vaultRows[0], ...storageResponse.data?.[0] }
+    : null;
+  if (!vault?._asset || !vault.address) return null;
+
+  const { data: balanceRows } = await cirrus.get(accessToken, `/${Token}-_balances`, {
+    params: {
+      address: `eq.${vault._asset}`,
+      key: `eq.${vaultAddress}`,
+      select: "value::text",
+    },
+  });
+
+  const totalAssets =
+    BigInt(balanceRows?.[0]?.value || "0") + BigInt(vault.deployedAssets || "0");
+  const activeAssets = getActiveAssets(
+    totalAssets,
+    BigInt(vault.totalClaimableAssets || "0")
+  );
+  const totalShares = BigInt(vault._totalSupply || "0");
+  let projectedActiveAssets = activeAssets;
+
+  const accrualInitialized =
+    vault.accrualInitialized === true ||
+    String(vault.accrualInitialized).toLowerCase() === "true";
+  const accrualBaseAssets = BigInt(vault.accrualBaseAssets || "0");
+  const perSecondSavingsRate = BigInt(vault.perSecondSavingsRate || "0");
+  const lastAccrual = BigInt(vault.lastAccrual || "0");
+  const nowSec = BigInt(Math.floor(Date.now() / 1000));
+
+  if (
+    accrualInitialized &&
+    totalShares > 0n &&
+    accrualBaseAssets > 0n &&
+    perSecondSavingsRate > RAY &&
+    nowSec > lastAccrual &&
+    !isZeroAddress(vault.rewardDistributor)
+  ) {
+    const growthFactor = rpow(perSecondSavingsRate, nowSec - lastAccrual, RAY);
+    const targetAmount = (accrualBaseAssets * (growthFactor - RAY)) / RAY;
+    if (targetAmount > 0n) {
+      try {
+        const [{ data: distributorBalanceRows }, { data: allowanceRows }] =
+          await Promise.all([
+            cirrus.get(accessToken, `/${Token}-_balances`, {
+              params: {
+                address: `eq.${vault._asset}`,
+                key: `eq.${vault.rewardDistributor}`,
+                select: "value::text",
+              },
+            }),
+            cirrus.get(accessToken, `/${Token}-_allowances`, {
+              params: {
+                address: `eq.${vault._asset}`,
+                key: `eq.${vault.rewardDistributor}`,
+                key2: `eq.${vault.address}`,
+                select: "value::text",
+                limit: "1",
+              },
+            }),
+          ]);
+        projectedActiveAssets += minBigInt(
+          targetAmount,
+          BigInt(distributorBalanceRows?.[0]?.value || "0"),
+          BigInt(allowanceRows?.[0]?.value || "0")
+        );
+      } catch {
+        projectedActiveAssets = activeAssets;
+      }
+    }
+  }
+
+  return {
+    address: vault.address,
+    assetAddress: vault._asset,
+    projectedActiveAssets,
+    totalShares,
+  };
+};
+
 const addMTokenPrice = async (
   accessToken: string,
   priceMap: OraclePriceMap
@@ -228,36 +337,25 @@ const addYieldVaultTokenPrices = async (
   accessToken: string,
   priceMap: OraclePriceMap
 ): Promise<void> => {
-  const vaultAddrs = [config.ethCarryVault, config.wbtcCarryVault, config.usdcYieldVault].filter(
+  const vaultAddrs = [
+    config.ethCarryVault,
+    config.wbtcCarryVault,
+    config.usdcYieldVault,
+    config.goldstYieldVault,
+    config.silvstYieldVault,
+  ].filter(
     (a): a is string => typeof a === "string" && a.replace(/^0x/i, "").length > 0
   );
   if (!vaultAddrs.length) return;
 
   for (const vaultAddress of vaultAddrs) {
-    const { data: rows } = await cirrus.get(accessToken, `/${YieldVault}`, {
-      params: {
-        address: `eq.${vaultAddress}`,
-        select: "address,_asset,deployedAssets::text,_totalSupply::text,totalClaimableAssets::text",
-      },
-    });
-    const v = rows?.[0];
-    if (!v?._asset || !v.address) continue;
-
-    const { data: balRows } = await cirrus.get(accessToken, `/${Token}-_balances`, {
-      params: {
-        address: `eq.${v._asset}`,
-        key: `eq.${vaultAddress}`,
-        select: "value::text",
-      },
-    });
-
-    const idle = BigInt(balRows?.[0]?.value || "0");
-    const deployed = BigInt(v.deployedAssets || "0");
-    const totalAssets = idle + deployed;
-    const activeAssets = getActiveAssets(totalAssets, BigInt(v.totalClaimableAssets || "0"));
-    const totalShares = BigInt(v._totalSupply || "0");
-    const pricePerShare = totalShares === 0n ? DECIMALS : (activeAssets * DECIMALS) / totalShares;
-    priceMap.set(v.address, pricePerShare.toString());
+    const vault = await getYieldVaultPricingState(accessToken, vaultAddress);
+    if (!vault) continue;
+    const pricePerShare =
+      vault.totalShares === 0n
+        ? DECIMALS
+        : (vault.projectedActiveAssets * DECIMALS) / vault.totalShares;
+    priceMap.set(vault.address, pricePerShare.toString());
   }
 };
 
@@ -275,45 +373,32 @@ export const getCarryVaultUsdPriceMap = async (
   priceMap: OraclePriceMap
 ): Promise<Map<string, string>> => {
   const out = new Map<string, string>();
-  const vaultAddrs = [config.ethCarryVault, config.wbtcCarryVault, config.usdcYieldVault].filter(
+  const vaultAddrs = [
+    config.ethCarryVault,
+    config.wbtcCarryVault,
+    config.usdcYieldVault,
+    config.goldstYieldVault,
+    config.silvstYieldVault,
+  ].filter(
     (a): a is string => typeof a === "string" && a.replace(/^0x/i, "").length > 0
   );
   if (!vaultAddrs.length) return out;
 
   for (const vaultAddress of vaultAddrs) {
-    const { data: rows } = await cirrus.get(accessToken, `/${YieldVault}`, {
-      params: {
-        address: `eq.${vaultAddress}`,
-        select: "address,_asset,deployedAssets::text,_totalSupply::text,totalClaimableAssets::text",
-      },
-    });
-    const v = rows?.[0];
-    if (!v?._asset || !v.address) continue;
+    const vault = await getYieldVaultPricingState(accessToken, vaultAddress);
+    if (!vault || vault.totalShares === 0n) continue;
 
-    const { data: balRows } = await cirrus.get(accessToken, `/${Token}-_balances`, {
-      params: {
-        address: `eq.${v._asset}`,
-        key: `eq.${vaultAddress}`,
-        select: "value::text",
-      },
-    });
+    const pricePerShareUnderlying =
+      (vault.projectedActiveAssets * DECIMALS) / vault.totalShares;
 
-    const idle = BigInt(balRows?.[0]?.value || "0");
-    const deployed = BigInt(v.deployedAssets || "0");
-    const totalAssets = idle + deployed;
-    const activeAssets = getActiveAssets(totalAssets, BigInt(v.totalClaimableAssets || "0"));
-    const totalShares = BigInt(v._totalSupply || "0");
-    if (totalShares === 0n) continue;
-
-    const pricePerShareUnderlying = (activeAssets * DECIMALS) / totalShares;
-
-    const assetKey = String(v._asset).toLowerCase();
-    const assetUsdPriceStr = priceMap.get(assetKey) || priceMap.get(v._asset) || "0";
+    const assetKey = vault.assetAddress.toLowerCase();
+    const assetUsdPriceStr =
+      priceMap.get(assetKey) || priceMap.get(vault.assetAddress) || "0";
     const assetUsdPriceWad = BigInt(assetUsdPriceStr);
     if (assetUsdPriceWad === 0n) continue;
 
     const pricePerShareUsdWad = (pricePerShareUnderlying * assetUsdPriceWad) / DECIMALS;
-    out.set(String(v.address).toLowerCase(), pricePerShareUsdWad.toString());
+    out.set(vault.address.toLowerCase(), pricePerShareUsdWad.toString());
   }
   return out;
 };

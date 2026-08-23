@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
+import { parseArgText } from "@/lib/args";
+import { useSimulation } from "@/components/simulation/useSimulation";
+import { SimulateButton } from "@/components/simulation/SimulateButton";
+import { SimulationResultPanel } from "@/components/simulation/SimulationResultPanel";
 import { useUser } from "@/context/UserContext";
 import type { FuncArg } from "@/services/contracts";
 
@@ -41,6 +45,7 @@ export function MethodCaller({
 }: MethodCallerProps) {
   const { userAddress } = useUser();
   const { submit: submitTx, canSubmit } = useSubmitTransaction();
+  const sim = useSimulation();
 
   const [open, setOpen] = useState(false);
   // "" = call directly from the connected account; otherwise route the call through
@@ -54,7 +59,15 @@ export function MethodCaller({
   const [result, setResult] = useState<CallResult | null>(null);
   const [error, setError] = useState<string>("");
 
-  const submit = async () => {
+  // A stale dry-run is misleading once the payload inputs change (or the
+  // dialog is reopened); clear the panel on any edit.
+  const simReset = sim.reset;
+  useEffect(() => {
+    simReset();
+  }, [simReset, values, resolvedAddrs, walletUsername, value, open]);
+
+  // Build the FUNCTION payload once, so Simulate and Call submit identical data.
+  const buildFunctionPayload = (): Record<string, unknown> => {
     const parsed: Record<string, unknown> = {};
     for (const a of args) {
       const isAddressArg = isPlainAddressType(a.type);
@@ -63,33 +76,34 @@ export function MethodCaller({
       if (raw === undefined || raw === "") continue;
       // Keep string- and address-typed params verbatim ("123" stays a string;
       // an all-digit address must not become a number); everything else gets a
-      // JSON parse attempt ("123" -> 123, "[1,2]" -> array) with raw fallback.
+      // bigint-safe parse ("42" -> 42, "[1,2]" -> array) with raw fallback —
+      // integers past 2^53 stay exact strings rather than rounded doubles.
       let parsedValue: unknown = raw;
       if (a.type !== "string" && !isAddressArg) {
-        try {
-          parsedValue = JSON.parse(raw);
-        } catch {
-          parsedValue = raw;
-        }
+        parsedValue = parseArgText(raw);
       }
       // Wrap with the declared Solidity type so bloc doesn't have to guess
       // (e.g. "0x64" is an address, not the number 100).
       parsed[a.name] = a.type ? { type: a.type, value: parsedValue } : parsedValue;
     }
+    return {
+      contractName,
+      contractAddress,
+      value: payable && value ? Number(value) : 0,
+      method,
+      args: parsed,
+      metadata: {},
+    };
+  };
+
+  const submit = async () => {
     setPending(true);
     setResult(null);
     setError("");
     try {
       const res = await submitTx(
         "FUNCTION",
-        {
-          contractName,
-          contractAddress,
-          value: payable && value ? Number(value) : 0,
-          method,
-          args: parsed,
-          metadata: {},
-        },
+        buildFunctionPayload(),
         walletUsername ? { username: walletUsername } : undefined
       );
       setResult(res);
@@ -102,6 +116,9 @@ export function MethodCaller({
       setPending(false);
     }
   };
+
+  const simulate = () =>
+    sim.run("FUNCTION", buildFunctionPayload(), walletUsername ? { username: walletUsername } : undefined);
 
   const returned = result?.data?.contents;
 
@@ -231,6 +248,14 @@ export function MethodCaller({
               </pre>
             ) : null}
 
+            <SimulationResultPanel result={sim.result} error={sim.error} />
+
+            {payable && value ? (
+              <p className="text-xs text-muted-foreground">
+                Value is ignored in simulation (SolidVM transactions carry no value).
+              </p>
+            ) : null}
+
             {!canSubmit ? (
               <p className="text-xs text-muted-foreground">
                 Connect a wallet (STRATO or external) to call this method.
@@ -242,6 +267,9 @@ export function MethodCaller({
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
+            {sim.canSimulate ? (
+              <SimulateButton onClick={simulate} pending={sim.pending} disabled={!canSubmit} />
+            ) : null}
             <Button onClick={submit} disabled={pending || !canSubmit}>
               {pending ? "Calling…" : "Call Method"}
             </Button>

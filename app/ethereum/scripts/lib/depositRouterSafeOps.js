@@ -2,10 +2,6 @@ const fs = require("fs");
 const path = require("path");
 const { ethers } = require("ethers");
 
-const bridgeConfigPath = path.resolve(
-  __dirname,
-  "../../../services/bridge/dist/config/index.js",
-);
 const safeProtocolKitPath = path.resolve(
   __dirname,
   "../../../services/bridge/node_modules/@safe-global/protocol-kit",
@@ -15,17 +11,12 @@ const safeApiKitPath = path.resolve(
   "../../../services/bridge/node_modules/@safe-global/api-kit",
 );
 
-if (
-  !fs.existsSync(bridgeConfigPath) ||
-  !fs.existsSync(safeProtocolKitPath) ||
-  !fs.existsSync(safeApiKitPath)
-) {
+if (!fs.existsSync(safeProtocolKitPath) || !fs.existsSync(safeApiKitPath)) {
   throw new Error(
     "Safe dependencies not found. Run `cd app/services/bridge && npm install && npm run build` from the repo root first.",
   );
 }
 
-const { config: bridgeConfig } = require(bridgeConfigPath);
 const SafeProtocolKitModule = require(safeProtocolKitPath);
 const SafeApiKitModule = require(safeApiKitPath);
 const SafeProtocolKit = SafeProtocolKitModule.default || SafeProtocolKitModule;
@@ -111,10 +102,7 @@ function loadDepositRouterArtifact() {
 }
 
 function getSafeSignerPrivateKey() {
-  const pk = normalizePrivateKey(
-    process.env.SAFE_PROPOSER_PRIVATE_KEY ||
-      bridgeConfig?.safe?.safeProposerPrivateKey,
-  );
+  const pk = normalizePrivateKey(process.env.SAFE_PROPOSER_PRIVATE_KEY);
   if (!pk) {
     throw new Error("Missing SAFE_PROPOSER_PRIVATE_KEY for Safe proposal");
   }
@@ -122,22 +110,17 @@ function getSafeSignerPrivateKey() {
 }
 
 function getSafeApiKey() {
-  return process.env.SAFE_API_KEY || bridgeConfig?.safe?.apiKey || "";
+  return process.env.SAFE_API_KEY || "";
 }
 
 function getSafeProposerAddress() {
-  const configured =
-    process.env.SAFE_PROPOSER_ADDRESS || bridgeConfig?.safe?.safeProposerAddress;
+  const configured = process.env.SAFE_PROPOSER_ADDRESS;
   if (configured) {
     const normalized = normalizeAddress(configured);
     if (!normalized) {
       throw new Error("Invalid SAFE_PROPOSER_ADDRESS");
     }
     return normalized;
-  }
-  const bridgePk = bridgeConfig?.safe?.safeProposerPrivateKey;
-  if (bridgePk) {
-    return new ethers.Wallet(normalizePrivateKey(bridgePk)).address;
   }
   return new ethers.Wallet(getSafeSignerPrivateKey()).address;
 }

@@ -42,6 +42,7 @@ module Blockchain.VMContext
     runningTests,
     txRunResultsCache,
     debugSettings,
+    vmTracer,
     dbs,
     state,
     stateDiffQueue,
@@ -113,6 +114,7 @@ import qualified Data.Text as T
 import qualified Database.LevelDB as DB
 import qualified Database.Persist.Sqlite as Lite
 import qualified Database.Redis as Redis
+import Blockchain.Data.VmTrace (VmTracer)
 import Debugger
 import GHC.Generics
 import SolidVM.Model.Storable
@@ -192,6 +194,7 @@ data ContextState = ContextState
     _runningTests :: !Bool,
     _txRunResultsCache :: TRC.Cache,
     _debugSettings :: !(Maybe DebugSettings),
+    _vmTracer :: !(Maybe VmTracer),
     _selfAddress :: !Address
   }
   deriving (Generic, NFData)
@@ -208,6 +211,7 @@ instance Default ContextState where
         _runningTests = False,
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
         _debugSettings = Nothing,
+        _vmTracer = Nothing,
         _selfAddress = Address 0
       }
 
@@ -233,6 +237,7 @@ type VMBase m =
     MonadUnliftIO m,
     MonadLogger m,
     Mod.Modifiable (Maybe DebugSettings) m,
+    Mod.Modifiable (Maybe VmTracer) m,
     Mod.Modifiable ContextState m,
     Mod.Accessible ContextState m,
     Mod.Modifiable MemDBs m,
@@ -362,6 +367,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               _runningTests = True,
               _txRunResultsCache = cache,
               _debugSettings = Nothing,
+              _vmTracer = Nothing,
               _selfAddress = Address 0
             }
       que <- newTQueueIO

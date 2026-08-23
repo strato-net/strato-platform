@@ -13,6 +13,7 @@ export interface Token {
   attributes?: Array<{ key: string; value: string }>;
   balances?: Array<{ user: string; balance: string; collateralBalance?: string }>;
   price?: number | string;
+  marketCap?: string;
   
   // Legacy fields for backward compatibility
   block_hash?: string;
@@ -31,6 +32,7 @@ export interface Token {
     address?: string;
     images?: {value: string}[];
     _owner?: string;
+    _totalSupply?: string;
     description?: string;
     status?: string;
   },

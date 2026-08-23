@@ -9,7 +9,9 @@ import {
 } from "./directPayout.resolver";
 import {
   getMappingRowKeyParts,
+  getMappingRowKeyList,
   parseMappingRowValue,
+  reassembleStructArrayRows,
   toBigIntOrZero,
 } from "./mappingRow.parser";
 import { normalizeAddressSet, normalizeTrimmedAddressValue } from "./addressNormalization";
@@ -54,33 +56,24 @@ export const getUserEmissionRates = async (
   const activityBreakdownByUser = new Map<string, UserActivityInfo[]>();
 
   if (Array.isArray(mappingRows)) {
+    // Activity structs are spread over several rows (each actionableEvents
+    // element has its own row keyed activityId/actionableEvents/index), so
+    // collect the activities rows and reassemble them before reading fields.
+    const activityRows: any[] = [];
+
     for (const row of mappingRows) {
       const collectionName = String(row.collection_name ?? "");
-      const { key1, key2 } = getMappingRowKeyParts(row.key);
-      const value = parseMappingRowValue(row.value);
 
       if (collectionName === "activities") {
-        if (key1.length > 0) {
-          emissionByActivity.set(key1, toBigIntOrZero(value.emissionRate));
-          activityNameById.set(key1, String(value.name ?? ""));
-          const rawType = String(value.activityType ?? "0");
-          activityTypeById.set(key1, (rawType === "OneTime" || rawType === "1") ? "1" : "0");
-          sourceContractByActivity.set(key1, normalizeTrimmedAddressValue(value.sourceContract));
-        }
-
-        const sourceContract = normalizeTrimmedAddressValue(value.sourceContract);
-        collectDirectPayoutEventsForToken(
-          directPayoutEventsByToken,
-          requestedBonusTokens,
-          sourceContract,
-          value.directPayout,
-          value.actionableEvents
-        );
+        activityRows.push(row);
         continue;
       }
 
+      const { key1, key2 } = getMappingRowKeyParts(row.key);
+      const value = parseMappingRowValue(row.value);
+
       if (collectionName === "activityStates") {
-        if (key1.length > 0) {
+        if (key1.length > 0 && getMappingRowKeyList(row.key).length === 1) {
           totalStakeByActivity.set(key1, toBigIntOrZero(value.totalStake));
         }
         continue;
@@ -97,6 +90,25 @@ export const getUserEmissionRates = async (
         if (stake <= 0n) continue;
         userRows.push({ user, activityId, stake });
       }
+    }
+
+    for (const [activityId, value] of reassembleStructArrayRows(activityRows)) {
+      if (activityId.length > 0) {
+        emissionByActivity.set(activityId, toBigIntOrZero(value.emissionRate));
+        activityNameById.set(activityId, String(value.name ?? ""));
+        const rawType = String(value.activityType ?? "0");
+        activityTypeById.set(activityId, (rawType === "OneTime" || rawType === "1") ? "1" : "0");
+        sourceContractByActivity.set(activityId, normalizeTrimmedAddressValue(value.sourceContract));
+      }
+
+      const sourceContract = normalizeTrimmedAddressValue(value.sourceContract);
+      collectDirectPayoutEventsForToken(
+        directPayoutEventsByToken,
+        requestedBonusTokens,
+        sourceContract,
+        value.directPayout,
+        value.actionableEvents
+      );
     }
   }
 

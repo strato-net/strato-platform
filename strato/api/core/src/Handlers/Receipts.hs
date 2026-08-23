@@ -407,7 +407,12 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => GetReceipts (SQLM m) where
             E.from $ \v -> do
               E.where_ $ v E.^. CommitmentSignatureRefBlockDataRefId E.==. E.val bdrId
               return v
+        stakes <- fmap (map E.entityVal) . sqlQuery $
+          E.select $
+            E.from $ \v -> do
+              E.where_ $ v E.^. BlockStakeRefBlockDataRefId E.==. E.val bdrId
+              return v
         -- The proof handler doesn't use blockReceiptTransactions; pass [].
         let block :: Block
-            block = blockDataRefToBlock bdr vs vd ps ss []
+            block = blockDataRefToBlock bdr vs vd ps ss stakes []
         pure . Just $ blockBlockData block

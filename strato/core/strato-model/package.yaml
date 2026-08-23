@@ -81,6 +81,7 @@ tests:
       - text
       - hspec
       - QuickCheck
+      - containers
 
 
 benchmarks:

@@ -10,6 +10,8 @@ import "../../libraries/Bridge/BridgeTypes.sol";
 import "../../concrete/Lending/LendingRegistry.sol";
 import "../../concrete/BaseCodeCollection.sol";
 import "../../concrete/Metals/MetalForge.sol";
+import "../../concrete/Pools/DirectMintPSM.sol";
+import "../../concrete/Savings/SaveUSDSTVault.sol";
 
 
 contract TestERC20 is ERC20, Ownable {
@@ -69,6 +71,8 @@ contract Describe_MercataBridge is Authorizable {
     PriceOracle oracle;
     FeeCollector feeCollector;
     TestERC20 goldToken;
+    DirectMintPSM directMintPsm;
+    SaveUSDSTVault saveUsdstVault;
     User user1;
     User user2;
     User relayer;
@@ -109,6 +113,8 @@ contract Describe_MercataBridge is Authorizable {
         adminRegistry.addWhitelist(address(bridge), "setLastProcessedBlock", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "deposit", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "depositBatch", address(relayer));
+        adminRegistry.addWhitelist(address(bridge), "depositWithAction", address(relayer));
+        adminRegistry.addWhitelist(address(bridge), "depositBatchWithAction", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "confirmDeposit", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "confirmDepositBatch", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "reviewDeposit", address(relayer));
@@ -191,6 +197,20 @@ contract Describe_MercataBridge is Authorizable {
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(goldToken), "mint", address(metalForge));
 
         bridge.setMetalForge(address(metalForge));
+
+        directMintPsm = new DirectMintPSM(address(this));
+        directMintPsm.initialize(address(usdstToken), address(feeCollector), [address(testToken)]);
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(usdstToken), "mint", address(directMintPsm));
+
+        saveUsdstVault = new SaveUSDSTVault(address(this));
+        saveUsdstVault.initialize(address(usdstToken), "Save USDST", "saveUSDST");
+
+        bridge.setDirectMintPsm(address(directMintPsm));
+        bridge.setSaveUsdstVault(address(saveUsdstVault));
+        bridge.setDepositAction(address(0x5555), externalChainId, address(testToken), uint(DepositAction.AUTO_FORGE), true);
+        bridge.setDepositAction(address(0x5555), externalChainId, address(testToken), uint(DepositAction.AUTO_SAVE), true);
+        bridge.setDepositAction(address(0x6666), externalChainId, address(usdstToken), uint(DepositAction.AUTO_FORGE), true);
+        bridge.setDepositAction(address(0x6666), externalChainId, address(usdstToken), uint(DepositAction.AUTO_SAVE), true);
     }
 
     // ============ CONSTRUCTOR TESTS ============
@@ -365,6 +385,22 @@ contract Describe_MercataBridge is Authorizable {
             reverted = true;
         }
         require(reverted, "Should revert setPause by non-owner");
+
+        reverted = false;
+        try {
+            user1.do(
+                address(bridge),
+                "setDepositAction",
+                address(0x6666),
+                externalChainId,
+                address(usdstToken),
+                uint(DepositAction.AUTO_SAVE),
+                false
+            );
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert setDepositAction by non-owner");
     }
 
     // ============ DEPOSIT FLOW TESTS ============
@@ -452,6 +488,40 @@ contract Describe_MercataBridge is Authorizable {
         (,,,,, address stratoToken2,,) = bridge.deposits(externalChainId, txHashes[1].normalizeHex());
         require(stratoToken1 == address(testToken), "First deposit token should be set");
         require(stratoToken2 == address(usdstToken), "Second deposit token should be set");
+    }
+
+    function it_bridge_batch_records_action_fields() {
+        uint256[] memory chainIds = [externalChainId];
+        address[] memory senders = [externalSender];
+        address[] memory tokens = [address(0x6666)];
+        uint256[] memory amounts = [uint256(1000e18)];
+        string[] memory txHashes = ["0xabcd1234"];
+        address[] memory recipients = [externalRecipient];
+        address[] memory targetStratoTokens = [address(usdstToken)];
+        uint256[] memory actions = [uint256(2)];
+        address[] memory actionTokens = [address(goldToken)];
+        uint256[] memory minFinalOuts = [uint256(123)];
+
+        relayer.do(
+            address(bridge),
+            "depositBatchWithAction",
+            chainIds,
+            senders,
+            tokens,
+            amounts,
+            txHashes,
+            recipients,
+            targetStratoTokens,
+            actions,
+            actionTokens,
+            minFinalOuts
+        );
+
+        (uint256 action, address actionToken, uint256 minFinalOut) =
+            bridge.depositActions(externalChainId, txHashes[0].normalizeHex());
+        require(action == 2, "Action should be recorded");
+        require(actionToken == address(goldToken), "Action token should be recorded");
+        require(minFinalOut == 123, "Minimum output should be recorded");
     }
 
     function it_bridge_can_handle_batch_confirm_deposits() {
@@ -1666,69 +1736,103 @@ contract Describe_MercataBridge is Authorizable {
         require(recordedExternalAmount4 == expectedExternalAmount4, "USDC precision loss rounding down failed");
     }
 
-    function it_bridge_autosave_and_withdrawal_successful() {
+    function it_bridge_direct_usdst_autosave_successful() {
         uint256 amount = 1000e18;
         address recipient = address(new User());
-        string memory txHash = keccak256("example transaction hash");
+        string memory txHash = keccak256("direct usdst autosave");
 
-        // First initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
-
-        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(1), address(0));
-
-        // Confirm the deposit with auto save
+        relayer.do(
+            address(bridge),
+            "depositWithAction",
+            externalChainId,
+            externalSender,
+            address(0x6666),
+            amount,
+            txHash,
+            recipient,
+            address(usdstToken),
+            uint(3),
+            address(0),
+            uint(0)
+        );
         relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
 
-        // Verify deposit was completed
         (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
         require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
-        require(IERC20(address(mUSDST)).balanceOf(recipient) == amount, "Tokens should be minted");
-
-        User(recipient).do(address(mercata.lendingPool()), "withdrawLiquidityAll");
-        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "mUSDST should be exchangable");
+        require(IERC20(address(saveUsdstVault)).balanceOf(recipient) == amount, "Recipient should receive saveUSDST");
+        require(IERC20(address(usdstToken)).balanceOf(address(saveUsdstVault)) == amount, "Vault should receive USDST");
+        require(IERC20(address(usdstToken)).balanceOf(address(directMintPsm)) == 0, "Direct USDST should skip PSM");
     }
 
-    function it_bridge_autosave_before_deposit_initialized_succeeds() {
+    function it_bridge_disabled_action_falls_back_without_disabling_other_actions() {
         uint256 amount = 1000e18;
         address recipient = address(new User());
-        string memory txHash = keccak256("example transaction hash");
+        string memory txHash = keccak256("disabled autosave");
+        bridge.setDepositAction(address(0x6666), externalChainId, address(usdstToken), uint(DepositAction.AUTO_SAVE), false);
 
-        // autoSave request before the bridge service picks up the deposit
-        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(1), address(0));
-
-        // First initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
-
-        // Confirm the deposit with auto save
+        relayer.do(
+            address(bridge),
+            "depositWithAction",
+            externalChainId,
+            externalSender,
+            address(0x6666),
+            amount,
+            txHash,
+            recipient,
+            address(usdstToken),
+            uint(DepositAction.AUTO_SAVE),
+            address(0),
+            uint(0)
+        );
         relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
 
-        // Verify deposit was completed
-        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
-        require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
-        require(IERC20(address(mUSDST)).balanceOf(recipient) == amount, "Tokens should be minted");
-
-        User(recipient).do(address(mercata.lendingPool()), "withdrawLiquidityAll");
-        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "mUSDST should be exchangable");
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Disabled action should return USDST");
+        require(IERC20(address(saveUsdstVault)).balanceOf(recipient) == 0, "Disabled action should not mint shares");
+        (bool autoForgeEnabled, bool autoSaveEnabled) =
+            bridge.depositActionConfigs(address(0x6666), externalChainId, address(usdstToken));
+        require(autoForgeEnabled, "AUTO_FORGE should remain enabled");
+        require(!autoSaveEnabled, "AUTO_SAVE should be disabled");
     }
 
-    function it_bridge_autosave_reversion_causes_mint_to_recipient() {
+    function it_bridge_non_usdst_autosave_uses_psm() {
         uint256 amount = 1000e18;
         address recipient = address(new User());
-        string memory txHash = keccak256("example transaction hash");
+        string memory txHash = keccak256("non usdst autosave");
 
-        // First initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
-
-        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(1), address(0));
-
-        // Confirm the deposit with auto save, which will fail due to disabled minting of mUSDST
-        adminRegistry.castVoteOnIssue(address(adminRegistry), "removeWhitelist", address(mUSDST), "mint", address(mercata.liquidityPool()));
+        relayer.do(
+            address(bridge),
+            "depositWithAction",
+            externalChainId,
+            externalSender,
+            address(0x5555),
+            amount,
+            txHash,
+            recipient,
+            address(testToken),
+            uint(3),
+            address(0xBAD),
+            uint(0)
+        );
         relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
 
-        // Verify deposit was completed — falls back to minting USDST directly
         (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
         require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
-        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Tokens should be minted");
+        require(IERC20(address(saveUsdstVault)).balanceOf(recipient) == amount, "Recipient should receive saveUSDST");
+        require(IERC20(address(testToken)).balanceOf(address(directMintPsm)) == amount, "PSM should receive source token");
+        require(IERC20(address(usdstToken)).balanceOf(address(saveUsdstVault)) == amount, "Vault should receive PSM output");
+    }
+
+    function it_bridge_legacy_autosave_request_is_ignored() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("legacy autosave ignored");
+
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
+        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(1), address(0));
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Legacy request should settle as normal deposit");
+        require(IERC20(address(saveUsdstVault)).balanceOf(recipient) == 0, "Legacy request must not use new save product");
     }
 
     // ============ AUTO FORGE TESTS ============
@@ -1738,45 +1842,78 @@ contract Describe_MercataBridge is Authorizable {
         address recipient = address(new User());
         string memory txHash = keccak256("autoforge transaction hash");
 
-        // Initiate deposit of USDST
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
-
-        // Request auto-forge into gold (action=2)
-        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(2), address(goldToken));
-
-        // Confirm the deposit — should auto-forge USDST into GOLDST
+        uint256 expectedGold = (amount * 1e18) / 2000e18;
+        relayer.do(
+            address(bridge),
+            "depositWithAction",
+            externalChainId,
+            externalSender,
+            address(0x6666),
+            amount,
+            txHash,
+            recipient,
+            address(usdstToken),
+            uint(2),
+            address(goldToken),
+            expectedGold
+        );
         relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
 
-        // Verify deposit was completed
         (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
         require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
-
-        // With gold price at 2000e18 and 0% fee: 1000 USDST should yield 0.5 GOLDST
-        uint256 expectedGold = (amount * 1e18) / 2000e18;
         require(IERC20(address(goldToken)).balanceOf(recipient) == expectedGold, "Recipient should have received GOLDST");
         require(IERC20(address(usdstToken)).balanceOf(recipient) == 0, "Recipient should not have USDST");
     }
 
-    function it_bridge_autoforge_before_deposit_initialized_succeeds() {
+    function it_bridge_unknown_action_falls_back() {
         uint256 amount = 1000e18;
         address recipient = address(new User());
-        string memory txHash = keccak256("autoforge early transaction hash");
+        string memory txHash = keccak256("unknown action");
 
-        // Request auto-forge before deposit is initiated
-        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(2), address(goldToken));
-
-        // Initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
-
-        // Confirm the deposit
+        relayer.do(
+            address(bridge),
+            "depositWithAction",
+            externalChainId,
+            externalSender,
+            address(0x6666),
+            amount,
+            txHash,
+            recipient,
+            address(usdstToken),
+            uint(255),
+            address(goldToken),
+            uint(0)
+        );
         relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
 
-        // Verify deposit was completed
-        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
-        require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Unknown action should fall back");
+        (uint256 action,,) = bridge.depositActions(externalChainId, txHash.normalizeHex());
+        require(action == 0, "Completed action intent should be deleted");
+    }
 
-        uint256 expectedGold = (amount * 1e18) / 2000e18;
-        require(IERC20(address(goldToken)).balanceOf(recipient) == expectedGold, "Recipient should have received GOLDST");
+    function it_bridge_deprecated_action_falls_back() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("deprecated action");
+
+        relayer.do(
+            address(bridge),
+            "depositWithAction",
+            externalChainId,
+            externalSender,
+            address(0x6666),
+            amount,
+            txHash,
+            recipient,
+            address(usdstToken),
+            uint(1),
+            address(0),
+            uint(0)
+        );
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Deprecated action should fall back");
+        require(IERC20(address(saveUsdstVault)).balanceOf(recipient) == 0, "Deprecated action must not autosave");
     }
 
     function it_bridge_autoforge_reversion_causes_mint_to_recipient() {
@@ -1784,23 +1921,173 @@ contract Describe_MercataBridge is Authorizable {
         address recipient = address(new User());
         string memory txHash = keccak256("autoforge revert transaction hash");
 
-        // Initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
+        uint256 usdstBefore = IERC20(address(usdstToken)).balanceOf(address(bridge));
+        uint256 allowanceBefore = IERC20(address(usdstToken)).allowance(address(bridge), address(metalForge));
+        relayer.do(
+            address(bridge),
+            "depositWithAction",
+            externalChainId,
+            externalSender,
+            address(0x6666),
+            amount,
+            txHash,
+            recipient,
+            address(usdstToken),
+            uint(2),
+            address(goldToken),
+            uint(0)
+        );
 
-        // Request auto-forge
-        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(2), address(goldToken));
-
-        // Break MetalForge by removing gold mint whitelist
         adminRegistry.castVoteOnIssue(address(adminRegistry), "removeWhitelist", address(goldToken), "mint", address(metalForge));
-
-        // Confirm the deposit — auto-forge will fail, should fall back to minting USDST
         relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
 
-        // Verify deposit was completed — falls back to minting USDST directly
         (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
         require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
         require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Recipient should have received USDST as fallback");
         require(IERC20(address(goldToken)).balanceOf(recipient) == 0, "Recipient should not have GOLDST");
+        require(IERC20(address(usdstToken)).balanceOf(address(bridge)) == usdstBefore, "Fallback should restore bridge USDST");
+        require(IERC20(address(usdstToken)).allowance(address(bridge), address(metalForge)) == allowanceBefore, "Fallback should restore allowance");
+    }
+
+    function it_bridge_autoforge_slippage_falls_back() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("autoforge slippage fallback");
+        uint256 expectedGold = (amount * 1e18) / 2000e18;
+
+        relayer.do(
+            address(bridge),
+            "depositWithAction",
+            externalChainId,
+            externalSender,
+            address(0x6666),
+            amount,
+            txHash,
+            recipient,
+            address(usdstToken),
+            uint(2),
+            address(goldToken),
+            expectedGold + 1
+        );
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Slippage failure should return USDST");
+        require(IERC20(address(goldToken)).balanceOf(recipient) == 0, "No metal should survive slippage fallback");
+    }
+
+    function it_bridge_psm_cap_fallback_restores_balances_and_allowance() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("psm cap fallback");
+        directMintPsm.setMintMaxBalance(address(testToken), amount - 1);
+
+        uint256 sourceBefore = IERC20(address(testToken)).balanceOf(address(bridge));
+        uint256 usdstBefore = IERC20(address(usdstToken)).balanceOf(address(bridge));
+        uint256 allowanceBefore = IERC20(address(testToken)).allowance(address(bridge), address(directMintPsm));
+
+        relayer.do(
+            address(bridge),
+            "depositWithAction",
+            externalChainId,
+            externalSender,
+            address(0x5555),
+            amount,
+            txHash,
+            recipient,
+            address(testToken),
+            uint(3),
+            address(0),
+            uint(0)
+        );
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        require(IERC20(address(testToken)).balanceOf(recipient) == amount, "PSM failure should return source token");
+        require(IERC20(address(testToken)).balanceOf(address(bridge)) == sourceBefore, "Source balance should be restored");
+        require(IERC20(address(usdstToken)).balanceOf(address(bridge)) == usdstBefore, "USDST balance should be restored");
+        require(IERC20(address(testToken)).allowance(address(bridge), address(directMintPsm)) == allowanceBefore, "PSM allowance should be restored");
+    }
+
+    function it_bridge_paused_vault_fallback_restores_balances_and_allowance() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("paused vault fallback");
+        saveUsdstVault.pause();
+
+        uint256 usdstBefore = IERC20(address(usdstToken)).balanceOf(address(bridge));
+        uint256 allowanceBefore = IERC20(address(usdstToken)).allowance(address(bridge), address(saveUsdstVault));
+
+        relayer.do(
+            address(bridge),
+            "depositWithAction",
+            externalChainId,
+            externalSender,
+            address(0x6666),
+            amount,
+            txHash,
+            recipient,
+            address(usdstToken),
+            uint(3),
+            address(0),
+            uint(0)
+        );
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Vault failure should return USDST");
+        require(IERC20(address(usdstToken)).balanceOf(address(bridge)) == usdstBefore, "USDST balance should be restored");
+        require(IERC20(address(usdstToken)).allowance(address(bridge), address(saveUsdstVault)) == allowanceBefore, "Vault allowance should be restored");
+        require(IERC20(address(saveUsdstVault)).balanceOf(recipient) == 0, "No shares should survive fallback");
+    }
+
+    function it_bridge_action_survives_review_and_executes_on_confirm() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("reviewed autosave");
+
+        relayer.do(
+            address(bridge),
+            "depositWithAction",
+            externalChainId,
+            externalSender,
+            address(0x6666),
+            amount,
+            txHash,
+            recipient,
+            address(usdstToken),
+            uint(3),
+            address(0),
+            uint(0)
+        );
+        relayer.do(address(bridge), "reviewDeposit", externalChainId, txHash);
+        (uint256 action,,) = bridge.depositActions(externalChainId, txHash.normalizeHex());
+        require(action == 3, "Review should retain action intent");
+
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+        require(IERC20(address(saveUsdstVault)).balanceOf(recipient) == amount, "Reviewed action should execute");
+    }
+
+    function it_bridge_abort_deletes_action_intent() {
+        uint256 amount = 1000e18;
+        string memory txHash = keccak256("aborted autosave");
+
+        relayer.do(
+            address(bridge),
+            "depositWithAction",
+            externalChainId,
+            externalSender,
+            address(0x6666),
+            amount,
+            txHash,
+            externalRecipient,
+            address(usdstToken),
+            uint(3),
+            address(0),
+            uint(0)
+        );
+        relayer.do(address(bridge), "reviewDeposit", externalChainId, txHash);
+        bridge.abortDeposit(externalChainId, txHash);
+
+        (uint256 action,,) = bridge.depositActions(externalChainId, txHash.normalizeHex());
+        require(action == 0, "Abort should delete action intent");
     }
 
     // ========================================================================

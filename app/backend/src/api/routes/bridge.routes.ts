@@ -450,58 +450,9 @@ router.post("/requestNativeWithdrawal", walletAuth, BridgeController.requestNati
 
 /**
  * @openapi
- * /bridge/requestDepositAction:
- *   post:
- *     summary: "Request a post-deposit action (auto-save to lending pool, auto-forge metal, etc.)"
- *     tags: [Bridge]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - externalChainId
- *               - externalTxHash
- *               - action
- *             properties:
- *               externalChainId:
- *                 type: string
- *                 description: External chain identifier (numeric string)
- *               externalTxHash:
- *                 type: string
- *                 description: External transaction hash
- *               action:
- *                 type: number
- *                 description: "Deposit action type (1 = AUTO_SAVE, 2 = AUTO_FORGE)"
- *               targetToken:
- *                 type: string
- *                 description: "Action-specific target token address (e.g. metal token for AUTO_FORGE, omit for AUTO_SAVE)"
- *     responses:
- *       200:
- *         description: Deposit action request submitted
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
- *                   properties:
- *                     status:
- *                       type: string
- *                     hash:
- *                       type: string
- */
-router.post("/requestDepositAction", walletAuth, BridgeController.requestDepositAction);
-
-/**
- * @openapi
  * /bridge/depositActions:
  *   get:
- *     summary: "List available post-deposit actions (earn, forge metal) with oracle prices"
+ *     summary: "List available one-click save and forge actions for action-capable deposit routers"
  *     tags: [Bridge]
  *     responses:
  *       200:
@@ -519,15 +470,20 @@ router.post("/requestDepositAction", walletAuth, BridgeController.requestDeposit
  *                     type: string
  *                   stratoTokenSymbol:
  *                     type: string
- *                   depositAction:
+ *                   action:
  *                     type: number
- *                     description: "1 = AUTO_SAVE, 2 = AUTO_FORGE"
- *                   routeType:
- *                     type: string
- *                     description: "earn | forge"
+ *                     description: "2 = AUTO_FORGE, 3 = AUTO_SAVE"
  *                   oraclePrice:
  *                     type: string
  *                     description: WAD-scaled oracle price for the output token
+ *                   psmFeeBps:
+ *                     type: string
+ *                     description: PSM fee applied to the bridged route token; zero for direct USDST
+ *                   externalChainIds:
+ *                     type: array
+ *                     items:
+ *                       type: string
+ *                     description: External chains whose DepositRouter supports one-click actions
  */
 router.get("/depositActions", authHandler.authorizeRequest(), BridgeController.getDepositActions);
 

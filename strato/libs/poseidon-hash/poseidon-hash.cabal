@@ -24,6 +24,10 @@ library
       Crypto.Hash.Poseidon
       Crypto.Hash.Poseidon.Field
       Crypto.Hash.Poseidon.Constants
+      Crypto.Hash.Poseidon2
+      Crypto.Hash.Poseidon2.Constants
+      Crypto.Hash.Poseidon2Goldilocks
+      Crypto.Hash.Poseidon2Goldilocks.Constants
   other-modules:
       Paths_poseidon_hash
   hs-source-dirs:
@@ -31,6 +35,7 @@ library
   ghc-options: -Wall -O2
   build-depends:
       base >=4.14 && <5
+    , bytestring
     , vector >=0.12 && <0.14
   default-language: Haskell2010
 
@@ -56,6 +61,7 @@ test-suite poseidon-hash-test
   ghc-options: -Wall -O2 -Wall
   build-depends:
       base >=4.14 && <5
+    , bytestring
     , hspec >=2.7 && <2.12
     , poseidon-hash
   default-language: Haskell2010

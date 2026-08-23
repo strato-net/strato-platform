@@ -8,7 +8,6 @@ export type DepositStep =
   | "sign_permit"
   | "confirm_tx"
   | "waiting_tx"
-  | "waiting_autosave"
   | "complete"
   | "error";
 
@@ -17,7 +16,6 @@ interface DepositProgressModalProps {
   currentStep: DepositStep;
   txHash?: string;
   chainId?: number;
-  isEasySavings?: boolean;
   isNative?: boolean;
   isRedemption?: boolean;
   error?: string;
@@ -29,7 +27,6 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
   currentStep,
   txHash,
   chainId,
-  isEasySavings = false,
   isNative = true,
   isRedemption = false,
   error,
@@ -39,37 +36,26 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
   const lastActiveStepRef = useRef<number>(-1);
 
   const getSteps = () => {
-    if (isEasySavings) {
-      return [
-        { key: "approve", label: "Approve Token", description: "Approve token spending" },
-        { key: "sign_permit", label: "Sign Permit", description: "Sign permit message in your wallet" },
-        { key: "confirm_tx", label: "Confirm Transaction", description: "Confirm transaction in your wallet" },
-        { key: "waiting_tx", label: "Waiting for Transaction", description: "Transaction is being processed on-chain" },
-        { key: "waiting_autosave", label: "Waiting for Autosave", description: "Depositing to Easy Savings..." },
-        { key: "complete", label: "Processing Deposit", description: "All set! STRATO is processing your deposit (1-2 min). You can close this modal anytime." },
-      ];
-    } else {
-      // For Bridge In, include approve and sign_permit steps only if it's not native (ERC20 token)
-      const steps = [];
-      if (!isNative) {
-        steps.push(
-          { key: "approve", label: "Approve Token", description: "Approve token spending" },
-          { key: "sign_permit", label: "Sign Permit", description: "Sign permit message in your wallet" }
-        );
-      }
+    // For Bridge In, include approve and sign_permit steps only if it's not native (ERC20 token)
+    const steps = [];
+    if (!isNative) {
       steps.push(
-        { key: "confirm_tx", label: "Confirm Transaction", description: "Confirm transaction in your wallet" },
-        { key: "waiting_tx", label: "Waiting for Transaction", description: "Transaction is being processed on-chain" },
-        {
-          key: "complete",
-          label: isRedemption ? "Processing Redemption" : "Processing Deposit",
-          description: isRedemption
-            ? "All set! STRATO is processing your redemption (1-2 min). You can close this modal anytime."
-            : "All set! STRATO is processing your deposit (1-2 min). You can close this modal anytime."
-        }
+        { key: "approve", label: "Approve Token", description: "Approve token spending" },
+        { key: "sign_permit", label: "Sign Permit", description: "Sign permit message in your wallet" }
       );
-      return steps;
     }
+    steps.push(
+      { key: "confirm_tx", label: "Confirm Transaction", description: "Confirm transaction in your wallet" },
+      { key: "waiting_tx", label: "Waiting for Transaction", description: "Transaction is being processed on-chain" },
+      {
+        key: "complete",
+        label: isRedemption ? "Processing Redemption" : "Processing Deposit",
+        description: isRedemption
+          ? "All set! STRATO is processing your redemption (1-2 min). You can close this modal anytime."
+          : "All set! STRATO is processing your deposit (1-2 min). You can close this modal anytime."
+      }
+    );
+    return steps;
   };
 
   const steps = getSteps();

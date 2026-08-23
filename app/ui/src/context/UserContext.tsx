@@ -6,10 +6,12 @@ import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useWalletClient } from "wagmi";
 import { api, setAppAuthenticated, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
 import { isAuthenticated, logout as authLogout, redirectToSignedOutLanding, WALLET_CONNECT_REQUEST_EVENT } from "@/lib/auth";
-import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
+import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE, ADMIN_VOTE_OPEN_ISSUES_PER_PAGE } from "@/lib/constants";
 import { readAttribution, clearAttribution } from "@/lib/attribution";
 import { trackWalletConnected } from "@/lib/tracking";
 import { ensureStratoChainInWallet } from "@/lib/stratoChain";
+import { clearExternalWalletActive } from "@/lib/stratoWallet";
+import { ensureHexPrefix } from "@/utils/numberUtils";
 
 interface UserContextType {
   userAddress: string | null;
@@ -35,9 +37,11 @@ interface UserContextType {
   walletSignerReady: boolean;
   openIssues: object;
   openIssuesLoading: boolean;
-  getOpenIssues: () => Promise<void>;
+  openIssuesUpdatedAt: Date | null;
+  getOpenIssues: (page?: number, limit?: number) => Promise<void>;
   executedIssues: object;
   executedIssuesLoading: boolean;
+  executedIssuesUpdatedAt: Date | null;
   getExecutedIssues: (page?: number, limit?: number) => Promise<void>;
   contractSearchResults: object[];
   contractSearchResultsLoading: boolean;
@@ -69,8 +73,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [openIssues, setOpenIssues] = useState<object>({})
   const [openIssuesLoading, setOpenIssuesLoading] = useState<boolean>(false);
+  const [openIssuesUpdatedAt, setOpenIssuesUpdatedAt] = useState<Date | null>(null);
   const [executedIssues, setExecutedIssues] = useState<object>({})
   const [executedIssuesLoading, setExecutedIssuesLoading] = useState<boolean>(false);
+  const [executedIssuesUpdatedAt, setExecutedIssuesUpdatedAt] = useState<Date | null>(null);
   const [contractSearchResults, setContractSearchResults] = useState<object[]>([])
   const [contractSearchResultsLoading, setContractSearchResultsLoading] = useState<boolean>(false)
   const [contractDetailsResults, setContractDetailsResults] = useState<object>({});
@@ -203,21 +209,25 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const castVoteOnIssueById = async (issueId: string) => {
     try {
       await api.post('/user/admin/vote/by-id', { issueId }, { walletAuth: false } as any);
+    } finally {
       await getOpenIssues();
       // Show the recently executed issue
       await getExecutedIssues(1, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
-    } catch (error) {
-      await getOpenIssues();
-      throw error;
     }
   };
 
-  const getOpenIssues = async () => {
+  const getOpenIssues = async (page: number = 1, limit: number = ADMIN_VOTE_OPEN_ISSUES_PER_PAGE) => {
     try {
       setOpenIssuesLoading(true);
       try {
-        const response = await api.get('/user/admin/issues');
+        const response = await api.get('/user/admin/issues', {
+          params: {
+            page,
+            limit,
+          },
+        });
         setOpenIssues(response?.data || {});
+        setOpenIssuesUpdatedAt(new Date());
       } catch (error) {
       }
     } finally {
@@ -236,6 +246,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           },
         });
         setExecutedIssues(response?.data || {});
+        setExecutedIssuesUpdatedAt(new Date());
       } catch (error) {
       }
     } finally {
@@ -289,10 +300,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const externalEvmWalletAddress = !isStratoConnector(account.connector) ? externalWalletAddress : null;
   const isExternalEvmWalletConnected = !!externalEvmWalletAddress;
   const shouldUseExternalWallet = !sessionExpiryLogoutStartedRef.current && !loading && !isLoggedIn && isExternalWalletConnected;
-  // Uniform address source: the connected wagmi account (both the STRATO/vault
-  // connector and external EVM wallets publish their address there), falling back
-  // to the vault-derived address only for the brief window before wagmi hydrates.
-  const userAddress = externalWalletAddress ?? stratoAddress;
+  // The vault identity wins whenever a vault session exists: the backend suppresses the
+  // X-Wallet-Address header and resolves data for the vault address, so the UI must not
+  // display or filter by an external wallet connected on the Fund page. Guests fall back
+  // to the wagmi account. The vault address arrives without a 0x prefix, unlike wagmi's.
+  const stratoAddressHex = ensureHexPrefix(stratoAddress) ?? null;
+  const userAddress = isLoggedIn ? stratoAddressHex : externalWalletAddress ?? stratoAddressHex;
   const effectiveLoggedIn = isLoggedIn || shouldUseExternalWallet;
 
   useEffect(() => {
@@ -337,6 +350,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
         const d = unsignedTx.data;
         return walletClient.signTypedData({
+          account: walletClient.account,
           domain: {
             name: "STRATO",
             version: "1",
@@ -376,6 +390,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const handleLogout = useCallback(() => {
+    // Mark the logout before any state clears, so the render between setUserName(null) and
+    // wagmi's async disconnect does not treat the still-connected wallet as a guest login.
+    sessionExpiryLogoutStartedRef.current = true;
+    // Without this the flag outlives the session and blocks STRATO auto-reconnect on the
+    // next login in this browser.
+    clearExternalWalletActive();
     try {
       disconnect();
     } catch {
@@ -423,10 +443,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     loading,
     walletSignerReady,
     openIssuesLoading,
+    openIssuesUpdatedAt,
     openIssues,
     getOpenIssues,
     executedIssues,
     executedIssuesLoading,
+    executedIssuesUpdatedAt,
     getExecutedIssues,
     castVoteOnIssue,
     castVoteOnIssueById,
@@ -445,7 +467,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     externalEvmWalletAddress, isExternalEvmWalletConnected,
     effectiveLoggedIn, isLoggedIn, isAdmin, loading, userName, walletSignerReady,
     handleLogout,
-    openIssues, openIssuesLoading, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues,
+    openIssues, openIssuesLoading, openIssuesUpdatedAt, getOpenIssues,
+    executedIssues, executedIssuesLoading, executedIssuesUpdatedAt, getExecutedIssues,
     castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin,
     contractSearch, contractSearchResults, contractSearchResultsLoading,
     getContractDetails, contractDetailsResults, contractDetailsResultsLoading,

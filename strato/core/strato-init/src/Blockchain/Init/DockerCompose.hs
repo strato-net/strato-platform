@@ -8,7 +8,7 @@ import Blockchain.EthConf (ethConf)
 import Blockchain.EthConf.Model (apiConfig, apiPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
-import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_sslDir)
+import Blockchain.Init.Options (flags_jsonrpc, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
@@ -91,7 +91,8 @@ generateDockerCompose = do
         , depends_on = Just $ DependsOnList ["app-backend"]
         , volumes = Just ["./logs:/logs", "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
         , environment = Just $ Map.fromList
-            [ ("LUCKY_ORANGE_SITE_ID", "${LUCKY_ORANGE_SITE_ID:-}")
+            [ ("POSTHOG_KEY", "${POSTHOG_KEY:-}")
+            , ("POSTHOG_HOST", "${POSTHOG_HOST:-}")
             , ("GOOGLE_ANALYTICS_ID", "${GOOGLE_ANALYTICS_ID:-}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
@@ -224,6 +225,7 @@ generateDockerCompose = do
             [ ("STRATO_PORT_API", stratoApiPort)
             , ("STRATO_PORT_VAULT_PROXY", "8013")
             , ("JSONRPC_ENABLED", if flags_jsonrpc then "true" else "false")
+            , ("PUBLIC_STRATO_RPC_ENABLED", if flags_publicStratoRpc then "true" else "false")
             , ("RPC_PORT", rpcPort)
             , ("TRACKING_ENABLED", "true")
             , ("TRACKING_URL", "https://go.strato.nexus")
@@ -266,12 +268,24 @@ generateDockerCompose = do
         , logging = noLogging
         }
 
-  -- Message broker service (configured via streaming package)
+  -- Message broker service (configured via streaming package). The retention
+  -- flags are only meaningful for the Kafka backend, so they are merged in
+  -- (left-biased union) only when the broker environment is Kafka's.
+  -- The flags are used during the network snapshot creation to avoid including the old consumed logs and
+  -- keep the snapshot size smaller.
   let bc = brokerConfig
+      kafkaRetentionEnv = Map.fromList
+        [ ("KAFKA_LOG_RETENTION_HOURS", show flags_kafkaLogRetentionHours)
+        , ("KAFKA_LOG_RETENTION_BYTES", show flags_kafkaLogRetentionBytes)
+        , ("KAFKA_LOG_SEGMENT_BYTES", show flags_kafkaLogSegmentBytes)
+        ]
+      applyKafkaRetention env
+        | Map.member "KAFKA_LOG_DIRS" env = Map.union kafkaRetentionEnv env
+        | otherwise = env
       streaming = def
         { image = bcImage bc
         , user = if bcNeedsUserGid bc then Just userGid else Nothing
-        , environment = bcEnvironment bc
+        , environment = applyKafkaRetention <$> bcEnvironment bc
         , entrypoint = bcEntrypoint bc
         , command = bcCommand bc
         , restart = Just "unless-stopped"

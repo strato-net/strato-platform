@@ -10,10 +10,12 @@ import TokensController from "./controllers/tokens.controller";
 import userRoutes from "./routes/user.routes";
 import tokensRoutes from "./routes/tokens.routes";
 import tokensV2Routes from "./routes/tokens.v2.routes";
+import nftsRoutes from "./routes/nfts.routes";
 import configRoutes from "./routes/config.routes";
 import oracleRoutes from "./routes/oracle.routes";
 import swapRoutes from "./routes/swap.routes";
 import poolV3Routes from "./routes/poolV3.routes";
+import tradeRoutes from "./routes/trade.routes";
 import lendingRoutes from "./routes/lending.routes";
 import eventsRoutes from "./routes/events.routes";
 import bridgeRoutes from "./routes/bridge.routes";
@@ -44,6 +46,9 @@ router.use("/tokens/v2", tokensV2Routes);
 
 // ----- Token Routes -----
 router.use("/tokens", tokensRoutes);
+
+// ----- NFT Routes -----
+router.use("/nfts", nftsRoutes);
 
 // ----- Vouchers Route (separate path) -----
 /**
@@ -76,6 +81,9 @@ router.use(swapRoutes);
 
 // ----- PoolV3 (Concentrated Liquidity) Routes -----
 router.use("/poolv3", poolV3Routes);
+
+// ----- Unified Trade Routes (all pool types) -----
+router.use("/trade", tradeRoutes);
 
 // ----- Lending Routes -----
 router.use("/lending", lendingRoutes);

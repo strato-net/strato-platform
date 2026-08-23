@@ -564,6 +564,20 @@ contract record PoolV3 is Ownable {
         return (pos.liquidity, pos.tokensOwed0, pos.tokensOwed1);
     }
 
+    /// @notice Read a position's fee-growth-inside snapshots (as of its last update)
+    /// @dev For contracts that hold one pool position on behalf of many parties (the
+    ///      position manager): after any pool call that runs Position.update, these
+    ///      snapshots let the caller apportion fee growth to its own sub-positions with
+    ///      the same delta math Position.update uses. Signed values, matching V3Position
+    function getPositionFeeGrowthInside(
+        address positionOwner,
+        int tickLower,
+        int tickUpper
+    ) external view returns (int feeGrowthInside0LastX128, int feeGrowthInside1LastX128) {
+        V3Position storage pos = positions[positionOwner][tickLower][tickUpper];
+        return (pos.feeGrowthInside0LastX128, pos.feeGrowthInside1LastX128);
+    }
+
     struct ModifyPositionParams {
         // the address that owns the position
         address owner;

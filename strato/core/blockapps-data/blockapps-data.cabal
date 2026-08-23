@@ -27,6 +27,7 @@ library
       Blockchain.Data.Extra
       Blockchain.Data.Log
       Blockchain.Data.LogDB
+      Blockchain.Data.ProposalFacts
       Blockchain.Data.RawTransaction
       Blockchain.Data.Receipt
       Blockchain.Data.ReceiptRef

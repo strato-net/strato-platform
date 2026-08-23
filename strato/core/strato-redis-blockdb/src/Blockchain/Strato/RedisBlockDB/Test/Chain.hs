@@ -30,7 +30,7 @@ makeGenesisBlock = do
       --                 receiptTransactions=[],
       --                 blockDataUncles=[]
       }
-    BlockHeaderV2{} -> error "makeGenesisBlock: encountered BlockHeaderV2"
+    _ -> error "makeGenesisBlock: encountered a post-V1 BlockHeader"
 
 buildChain :: BlockHeader -> Int -> Int -> IO [BlockHeader]
 buildChain seed depth maxSiblings = do
@@ -49,7 +49,7 @@ makeNextBlock block = do
       difficulty=diff,
       number=nextNumber
       }
-    BlockHeaderV2{} -> error "makeNextBlockIncorrectly: BlockHeaderV2 encountered"
+    _ -> error "makeNextBlockIncorrectly: post-V1 BlockHeader encountered"
 
 makeNextBlockIncorrectly :: BlockHeader -> IO BlockHeader
 makeNextBlockIncorrectly block = do
@@ -63,7 +63,7 @@ makeNextBlockIncorrectly block = do
       difficulty=diff,
       number=nextNumber
       }
-    BlockHeaderV2{} -> error "makeNextBlockIncorrectly: BlockHeaderV2 encountered"
+    _ -> error "makeNextBlockIncorrectly: post-V1 BlockHeader encountered"
 
 extendChain :: Int -> [BlockHeader] -> IO [BlockHeader]
 extendChain n blocks | n <= 0 = return blocks
@@ -113,7 +113,7 @@ buildY seed depth maxSiblings = do
         difficulty=nextDifficulty',
         number=nextNumber
         }
-      BlockHeaderV2{} -> error "buildTree: BlockHeaderV2 encountered"
+      _ -> error "buildTree: post-V1 BlockHeader encountered"
     ) siblings
   expanded <- forM withUpdates $ \sibling -> do
     grandchildren <- buildY sibling (depth - 1) maxSiblings
@@ -135,7 +135,7 @@ buildTree seed depth maxSiblings = do
         difficulty=nextDifficulty',
         number=nextNumber
         }
-      BlockHeaderV2{} -> error "buildTree: BlockHeaderV2 encountered"
+      _ -> error "buildTree: post-V1 BlockHeader encountered"
     ) siblings
 
   expanded <- forM (zip withUpdates ([1 ..] :: [Int])) $ \(sibling, i) -> do

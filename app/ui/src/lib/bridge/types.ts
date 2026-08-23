@@ -1,4 +1,4 @@
-import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, DepositActionRequestParams, TransactionResponse, WithdrawalSummaryResponse, WithdrawalTransactionResponse, WithdrawalProof, DepositAction } from "@strato/shared-types";
+import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, WithdrawalSummaryResponse, WithdrawalTransactionResponse, WithdrawalProof, DepositAction } from "@strato/shared-types";
 import type { WalletTxProgressHandler } from "@/lib/axios";
 
 export interface BalanceResponse {
@@ -19,10 +19,6 @@ export interface WithdrawalRequestOptions {
    * BridgeContext starts fetching the inclusion proof.
    */
   onProgress?: (phase: "submit_strato" | "fetch_proof") => void;
-}
-
-export interface DepositActionRequestOptions {
-  walletAuth?: boolean;
 }
 
 export type NetworkSummary = {
@@ -61,7 +57,6 @@ export type BridgeContextType = {
     blockNumber: number,
     seq: number,
   ) => Promise<WithdrawalProof | undefined>;
-  requestDepositAction: (params: DepositActionRequestParams, options?: DepositActionRequestOptions) => Promise<TransactionResponse>;
   useBalance: (tokenAddress: string | null) => {
     data: { 
       balance: string; 
@@ -75,6 +70,8 @@ export type BridgeContextType = {
   setSelectedNetwork: (networkName: string) => void;
   setSelectedToken: (token: BridgeToken | null) => void;
   loadNetworksAndTokens: () => Promise<void>;
+  /** Select Bridge In network + route whose stratoToken matches (Explore Buy deep-link). */
+  selectTokenByStratoAddress: (stratoAddress: string) => Promise<boolean>;
   // Bridge transaction functions
   fetchDepositTransactions: (rawParams?: Record<string, string | undefined>, context?: string) => Promise<BridgeTransactionResponse>;
   fetchWithdrawTransactions: (rawParams?: Record<string, string | undefined>, context?: string) => Promise<BridgeTransactionResponse>;

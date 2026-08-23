@@ -1,4 +1,4 @@
-def cleanOldWorkspaces(Integer olderThanNumDays = 4, String diskRoot = '/', Boolean hasNodeYarn = false) {
+def cleanOldWorkspaces(Integer olderThanNumDays = 3, String diskRoot = '/', Boolean hasNodeYarn = false) {
 
   script {
     def diskspaceAvailableBefore = sh(

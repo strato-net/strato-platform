@@ -47,21 +47,6 @@ router.post("/pools", walletAuth, PoolV3Controller.create);
 
 /**
  * @openapi
- * /poolv3/pools/pair/{tokenAddress1}/{tokenAddress2}:
- *   get:
- *     summary: V3 pools for a token pair (all fee tiers, either token order)
- *     tags: [PoolV3]
- *     parameters:
- *       - { name: tokenAddress1, in: path, required: true, schema: { type: string } }
- *       - { name: tokenAddress2, in: path, required: true, schema: { type: string } }
- *     responses:
- *       200:
- *         description: Matching V3 pools, deepest liquidity first
- */
-router.get("/pools/pair/:tokenAddress1/:tokenAddress2", authHandler.authorizeRequest(true), PoolV3Controller.getByPair);
-
-/**
- * @openapi
  * /poolv3/pools/{poolAddress}:
  *   get:
  *     summary: Fetch a V3 pool by address
@@ -90,51 +75,6 @@ router.get("/pools/:poolAddress/liquidity", authHandler.authorizeRequest(true), 
 
 /**
  * @openapi
- * /poolv3/quote:
- *   get:
- *     summary: Quote a V3 swap by simulating the tick-walking swap loop over indexed state
- *     tags: [PoolV3]
- *     parameters:
- *       - { name: poolAddress, in: query, required: true, schema: { type: string } }
- *       - { name: zeroForOne, in: query, required: true, schema: { type: string, enum: ["true", "false"] } }
- *       - name: amountSpecified
- *         in: query
- *         required: true
- *         description: Positive = exact input, negative = exact output (wei string)
- *         schema: { type: string }
- *     responses:
- *       200:
- *         description: Quote with amounts, fee, post-swap price/tick, price impact
- */
-router.get("/quote", authHandler.authorizeRequest(true), PoolV3Controller.quote);
-
-/**
- * @openapi
- * /poolv3/swap:
- *   post:
- *     summary: Execute a V3 swap (exact input or exact output) via the caller's wallet
- *     tags: [PoolV3]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [poolAddress, zeroForOne, amountSpecified, amountLimit]
- *             properties:
- *               poolAddress: { type: string }
- *               zeroForOne: { type: boolean, description: "true = token0 in / token1 out" }
- *               amountSpecified: { type: string, description: "signed: >0 exact input, <0 exact output" }
- *               amountLimit: { type: string, description: "exact-in: min output; exact-out: max input" }
- *               sqrtPriceLimitX96: { type: string, description: "optional price limit (0 = tick-domain edge)" }
- *     responses:
- *       200:
- *         description: Transaction result
- */
-router.post("/swap", walletAuth, PoolV3Controller.swap);
-
-/**
- * @openapi
  * /poolv3/positions:
  *   get:
  *     summary: List the caller's V3 positions (optionally filtered by pool)
@@ -145,54 +85,13 @@ router.post("/swap", walletAuth, PoolV3Controller.swap);
  *       200:
  *         description: Positions with computed amounts and range status
  *   post:
- *     summary: Mint liquidity into a tick range
- *     tags: [PoolV3]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [poolAddress, tickLower, tickUpper, liquidity, amount0Max, amount1Max]
- *             properties:
- *               poolAddress: { type: string }
- *               tickLower: { type: integer }
- *               tickUpper: { type: integer }
- *               liquidity: { type: string }
- *               amount0Max: { type: string, description: "slippage cap on token0 deposit" }
- *               amount1Max: { type: string, description: "slippage cap on token1 deposit" }
- *     responses:
- *       200:
- *         description: Transaction result
- *   delete:
- *     summary: Burn liquidity from a position (optionally collecting owed tokens)
- *     tags: [PoolV3]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [poolAddress, tickLower, tickUpper, liquidity]
- *             properties:
- *               poolAddress: { type: string }
- *               tickLower: { type: integer }
- *               tickUpper: { type: integer }
- *               liquidity: { type: string }
- *               collect: { type: boolean, description: "also collect all owed tokens" }
- *     responses:
- *       200:
- *         description: Transaction result
- */
-router.get("/positions", authHandler.authorizeRequest(), PoolV3Controller.positions);
-router.post("/positions", walletAuth, PoolV3Controller.mint);
-router.delete("/positions", walletAuth, PoolV3Controller.burn);
-
-/**
- * @openapi
- * /poolv3/positions/collect:
- *   post:
- *     summary: Collect owed tokens (burned principal + fees) from a position
+ *     summary: Mint a liquidity position NFT (PositionManagerV3)
+ *     description: >-
+ *       New positions are always minted through PositionManagerV3 and represented as
+ *       ERC-721 tokens. The manager computes liquidity from the desired amounts at the
+ *       current price and pulls exactly the pool-computed deposit from the caller.
+ *       The deprecated pre-NFT shape (liquidity + amount0Max/amount1Max, no desired
+ *       amounts) is still accepted and converted server-side.
  *     tags: [PoolV3]
  *     requestBody:
  *       required: true
@@ -205,6 +104,92 @@ router.delete("/positions", walletAuth, PoolV3Controller.burn);
  *               poolAddress: { type: string }
  *               tickLower: { type: integer }
  *               tickUpper: { type: integer }
+ *               amount0Desired: { type: string, description: "maximum token0 to deposit" }
+ *               amount1Desired: { type: string, description: "maximum token1 to deposit" }
+ *               amount0Min: { type: string, description: "minimum token0 that must be deposited (slippage check), default 0" }
+ *               amount1Min: { type: string, description: "minimum token1 that must be deposited (slippage check), default 0" }
+ *               liquidity: { type: string, description: "DEPRECATED pre-NFT shape: exact liquidity to mint (with amount0Max/amount1Max, instead of desired amounts)" }
+ *               amount0Max: { type: string, description: "DEPRECATED pre-NFT shape: token0 deposit ceiling" }
+ *               amount1Max: { type: string, description: "DEPRECATED pre-NFT shape: token1 deposit ceiling" }
+ *     responses:
+ *       200:
+ *         description: Transaction result
+ *   delete:
+ *     summary: Remove liquidity from a position (optionally collecting owed tokens)
+ *     description: >-
+ *       Address the position by `tokenId` (position NFTs) OR by poolAddress + ticks
+ *       (legacy positions held directly on the pool) — exactly one addressing mode.
+ *     tags: [PoolV3]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [liquidity]
+ *             properties:
+ *               tokenId: { type: string, description: "position NFT id (NFT path)" }
+ *               poolAddress: { type: string, description: "legacy path" }
+ *               tickLower: { type: integer, description: "legacy path" }
+ *               tickUpper: { type: integer, description: "legacy path" }
+ *               liquidity: { type: string }
+ *               amount0Min: { type: string, description: "slippage check (NFT path), default 0" }
+ *               amount1Min: { type: string, description: "slippage check (NFT path), default 0" }
+ *               collect: { type: boolean, description: "also collect all owed tokens" }
+ *     responses:
+ *       200:
+ *         description: Transaction result
+ */
+router.get("/positions", authHandler.authorizeRequest(), PoolV3Controller.positions);
+router.post("/positions", walletAuth, PoolV3Controller.mint);
+router.delete("/positions", walletAuth, PoolV3Controller.burn);
+
+/**
+ * @openapi
+ * /poolv3/positions/increase:
+ *   post:
+ *     summary: Add liquidity to an existing position NFT (same range)
+ *     tags: [PoolV3]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [tokenId, amount0Desired, amount1Desired]
+ *             properties:
+ *               tokenId: { type: string }
+ *               amount0Desired: { type: string }
+ *               amount1Desired: { type: string }
+ *               amount0Min: { type: string, description: "slippage check, default 0" }
+ *               amount1Min: { type: string, description: "slippage check, default 0" }
+ *     responses:
+ *       200:
+ *         description: Transaction result
+ */
+router.post("/positions/increase", walletAuth, PoolV3Controller.increase);
+
+/**
+ * @openapi
+ * /poolv3/positions/collect:
+ *   post:
+ *     summary: Collect owed tokens (burned principal + fees) from a position
+ *     description: >-
+ *       Same dual addressing as DELETE /positions — `tokenId` for position NFTs
+ *       (the manager pokes the pool internally), or poolAddress + ticks for legacy
+ *       positions (a poke transaction is prepended when the position has liquidity).
+ *     tags: [PoolV3]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               tokenId: { type: string, description: "position NFT id (NFT path)" }
+ *               poolAddress: { type: string, description: "legacy path" }
+ *               tickLower: { type: integer, description: "legacy path" }
+ *               tickUpper: { type: integer, description: "legacy path" }
  *               amount0Requested: { type: string }
  *               amount1Requested: { type: string }
  *     responses:
@@ -212,6 +197,24 @@ router.delete("/positions", walletAuth, PoolV3Controller.burn);
  *         description: Transaction result
  */
 router.post("/positions/collect", walletAuth, PoolV3Controller.collect);
+
+/**
+ * @openapi
+ * /poolv3/position-nfts/{tokenId}:
+ *   get:
+ *     summary: The position NFT for a tokenId (resolved against the network's singleton PositionManagerV3)
+ *     tags: [PoolV3]
+ *     parameters:
+ *       - { name: tokenId, in: path, required: true, schema: { type: string } }
+ *     responses:
+ *       200:
+ *         description: NFT item (kind "poolv3-position") with owner and collection metadata
+ *       404:
+ *         description: No live token with this id (never minted or burned)
+ *       503:
+ *         description: PositionManagerV3 is not configured on this network
+ */
+router.get("/position-nfts/:tokenId", authHandler.authorizeRequest(true), PoolV3Controller.positionNFT);
 
 /**
  * @openapi

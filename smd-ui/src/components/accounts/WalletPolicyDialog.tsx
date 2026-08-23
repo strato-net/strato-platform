@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Shield, Plus, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,6 +24,9 @@ import { Separator } from "@/components/ui/separator";
 import { CopyButton } from "@/components/CopyButton";
 import { AddressInput } from "@/components/AddressInput";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
+import { useSimulation } from "@/components/simulation/useSimulation";
+import { SimulateButton } from "@/components/simulation/SimulateButton";
+import { SimulationResultPanel } from "@/components/simulation/SimulationResultPanel";
 import { useContractState, compileContract } from "@/services/contracts";
 import {
   generatePolicySource,
@@ -41,6 +44,7 @@ function isZero(addr?: string): boolean {
 export function WalletPolicyDialog({ wallet }: { wallet: UserWallet }) {
   const [open, setOpen] = useState(false);
   const { submit, canSubmit, isAppAuthenticated } = useSubmitTransaction();
+  const sim = useSimulation();
   const queryClient = useQueryClient();
 
   const { data: state } = useContractState(open ? "User" : null, open ? wallet.address : null);
@@ -75,6 +79,13 @@ export function WalletPolicyDialog({ wallet }: { wallet: UserWallet }) {
       }),
     [template, contractName, handler, addresses, defaultAction]
   );
+
+  // A stale dry-run is misleading once the policy inputs change (or the dialog
+  // is reopened); clear the panel on any edit.
+  const simReset = sim.reset;
+  useEffect(() => {
+    simReset();
+  }, [simReset, source, contractName, open]);
 
   const callSetLogic = async (logicAddress: string) => {
     // setLogicContract is onlyOwner; the connected account owns the wallet, so call
@@ -118,6 +129,22 @@ export function WalletPolicyDialog({ wallet }: { wallet: UserWallet }) {
     } finally {
       setSettingRaw(false);
     }
+  };
+
+  // Simulate only the policy contract deploy; the follow-up setLogicContract
+  // can't be simulated here because its argument is the not-yet-real address.
+  const simulate = async () => {
+    try {
+      await compileContract(contractName, source);
+    } catch (err: any) {
+      toast.error("Compile failed", { description: String(err?.message || err) });
+      return;
+    }
+    return sim.run(
+      "CONTRACT",
+      { contract: contractName, src: source, args: {}, metadata: { VM: "SolidVM" } },
+      isAppAuthenticated ? undefined : { username: wallet.username }
+    );
   };
 
   const deployAndSet = async () => {
@@ -305,9 +332,16 @@ export function WalletPolicyDialog({ wallet }: { wallet: UserWallet }) {
               ) : null}
             </div>
 
-            <Button onClick={deployAndSet} disabled={busy || !canSubmit} className="w-full">
-              {busy ? "Deploying…" : "Deploy & set logic"}
-            </Button>
+            <SimulationResultPanel result={sim.result} error={sim.error} title="Policy deploy" />
+
+            <div className="flex gap-2">
+              {sim.canSimulate ? (
+                <SimulateButton onClick={simulate} pending={sim.pending} />
+              ) : null}
+              <Button onClick={deployAndSet} disabled={busy || !canSubmit} className="flex-1">
+                {busy ? "Deploying…" : "Deploy & set logic"}
+              </Button>
+            </div>
             {!canSubmit ? (
               <p className="text-xs text-muted-foreground">Connect a wallet to update the policy.</p>
             ) : null}

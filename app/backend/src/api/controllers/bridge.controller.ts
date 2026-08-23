@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import {
   requestWithdrawal,
   requestNativeWithdrawal as requestNativeWithdrawalService,
-  requestDepositAction,
   getDepositActions,
   getBridgeableTokens,
   getNetworkConfigs,
@@ -63,14 +62,13 @@ function notFinalizedBody(error: NotFinalizedYetError) {
     },
   };
 }
-import { validateRequestWithdrawal, validateDepositAction, validateTransactionType } from "../validators/bridge.validators";
+import { validateRequestWithdrawal, validateTransactionType } from "../validators/bridge.validators";
 import { validateRawParams } from "../validators/common.validators";
 import {
   NetworkConfig,
   BridgeToken,
   BridgeTransactionResponse,
   WithdrawalRequestParams,
-  DepositActionRequestParams,
   TransactionResponse,
   WithdrawalTransactionResponse,
   WithdrawalSummaryResponse,
@@ -673,26 +671,6 @@ class BridgeController {
         res.status(503).json({ error: error.message, code: "TRUSTLESS_DISABLED" });
         return;
       }
-      next(error);
-    }
-  }
-
-  static async requestDepositAction(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, body, address: userAddress } = req;
-      validateDepositAction(body);
-   
-      const result: TransactionResponse = await requestDepositAction(accessToken, body as DepositActionRequestParams, userAddress as string);
-   
-      res.json({
-        success: true,
-        data: result,
-      });
-    } catch (error: any) {
       next(error);
     }
   }

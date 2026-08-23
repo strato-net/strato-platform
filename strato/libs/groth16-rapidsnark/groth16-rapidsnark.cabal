@@ -121,8 +121,8 @@ library
   hs-source-dirs:
       src
   ghc-options: -Wall
-  cc-options: -std=c99 -O2 -fPIC -Wno-unused-parameter -Wno-unused-variable -Dd_m3HasFloat=0
-  cxx-options: -std=c++17 -O2 -fPIC -Wno-address-of-packed-member -Wno-unused-parameter
+  cc-options: -std=c99 -O2 -fPIC -Wno-unused-parameter -Wno-unused-variable -Dd_m3HasFloat=0 -include stdint.h
+  cxx-options: -std=c++17 -O2 -fPIC -Wno-address-of-packed-member -Wno-unused-parameter -include cstdint
   include-dirs:
       vendor/rapidsnark/src
       vendor/rapidsnark/build

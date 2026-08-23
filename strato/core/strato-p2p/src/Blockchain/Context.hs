@@ -245,7 +245,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (Reader
     RBDB.withRedisBlockDB getBestSequencedBlockInfo >>= \case
       Nothing -> do
         BestBlock s n <- Mod.get (Mod.Proxy @BestBlock)
-        return $ BestSequencedBlock s n []
+        return $ BestSequencedBlock s n [] [] 0
       Just bestSequencedBlock -> return bestSequencedBlock
   put _ bestSequencedBlock =
     RBDB.withRedisBlockDB (putBestSequencedBlockInfo bestSequencedBlock) >>= \case
@@ -336,7 +336,12 @@ instance MonadIO m => Mod.Modifiable [BlockHeader] (ReaderT Config m) where
     (bHeaders, lastUpdateTS) <- blockHeaders <$> Mod.get (Proxy @Context)
     now <- liftIO getCurrentTime
     let diffTime = now `diffUTCTime` lastUpdateTS
-    if diffTime > fromIntegral (Conf.connectionTimeout (p2pConfig ethConf))
+    -- The in-flight body-request set gates ALL body fetching node-wide
+    -- (isBodyRequestActive), so a request wedged on an unresponsive peer must
+    -- self-heal quickly. This was previously gated on connectionTimeout
+    -- (default 3600s), letting one bad peer freeze block downloads for an
+    -- hour; 60s is comfortably above any honest body-response round trip.
+    if diffTime > 60
       then do
         -- stale cache; override it
         Mod.put (Proxy @[BlockHeader]) []

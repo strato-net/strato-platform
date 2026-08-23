@@ -88,7 +88,7 @@ type MonadBlockstanbul m =
   ( MonadIO m,
     HasBlockstanbulContext m,
     Mod.Accessible (IORef (View, Maybe Block)) m,
-    Mod.Accessible (TMChan RoundNumber) m,
+    Mod.Accessible (TMChan View) m,
     Mod.Accessible BlockPeriod m,
     Mod.Accessible RoundPeriod m,
     Mod.Modifiable BestSequencedBlock m,
@@ -106,7 +106,7 @@ data SequencerConfig = SequencerConfig
     seenTransactionDBSize :: Int,
     blockstanbulBlockPeriod :: BlockPeriod,
     blockstanbulRoundPeriod :: RoundPeriod,
-    blockstanbulTimeouts :: TMChan RoundNumber,
+    blockstanbulTimeouts :: TMChan View,
     cablePackage :: CablePackage,
     maxEventsPerIter :: Int,
     maxUsPerIter :: Int,
@@ -140,7 +140,7 @@ instance Monad m => Mod.Modifiable SeenTransactionDB (StateT SequencerContext m)
 instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (View, Maybe Block)) (StateT SequencerContext m) where
   access _ = use latestViewAndProposal
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (TMChan RoundNumber) (ReaderT SequencerConfig m) where
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (TMChan View) (ReaderT SequencerConfig m) where
   access _ = asks blockstanbulTimeouts
 
 instance {-# OVERLAPPING #-} Monad m => Mod.Accessible BlockPeriod (ReaderT SequencerConfig m) where
@@ -167,7 +167,7 @@ instance Monad m => HasBlockstanbulContext (StateT SequencerContext m) where
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT SequencerConfig m) where
   get _ =
     RBDB.withRedisBlockDB getBestSequencedBlockInfo <&> \case
-      Nothing -> BestSequencedBlock (unsafeCreateKeccak256FromWord256 0) (-1) []
+      Nothing -> BestSequencedBlock (unsafeCreateKeccak256FromWord256 0) (-1) [] [] 0
       Just v -> v
   put _ bestSequencedBlock =
     RBDB.withRedisBlockDB (putBestSequencedBlockInfo bestSequencedBlock) >>= \case
@@ -224,25 +224,28 @@ createFirstTimer ::
   m ()
 createFirstTimer = do
   v <- Mod.access (Mod.Proxy @View)
-  createNewTimer . _round $ v
+  createNewTimer v
 
+-- | Arm the round timer for the given view. It keeps re-firing every round
+-- period until the global view has moved past it (a later round at the same
+-- height, or a later height).
 createNewTimer ::
   MonadBlockstanbul m =>
-  RoundNumber ->
+  View ->
   m ()
-createNewTimer rn = do
-  rnref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
-  liftIO $ atomicModifyIORef' rnref (\(View r s, mb) -> ((View (max rn r) s, mb), ()))
-  ch <- Mod.access (Mod.Proxy @(TMChan RoundNumber))
+createNewTimer vw = do
+  vref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
+  liftIO $ atomicModifyIORef' vref (\(cur, mb) -> ((max vw cur, mb), ()))
+  ch <- Mod.access (Mod.Proxy @(TMChan View))
   dt <- unRoundPeriod <$> Mod.access (Mod.Proxy @(RoundPeriod))
   let act :: AlarmClock UTCTime -> IO ()
       act this' = do
-        atomically $ writeTMChan ch rn
-        globalRN <- readIORef rnref
+        atomically $ writeTMChan ch vw
+        globalView <- fst <$> readIORef vref
         -- The first RoundChange for this message may have not
         -- been seen, so we keep firing at the same interval
-        -- until an alarm lands and the round changes
-        unless (_round (fst globalRN) > rn) $ do
+        -- until an alarm lands and the view changes
+        unless (globalView > vw) $ do
           next <- addUTCTime dt <$> getCurrentTime
           setAlarm this' next
   alarm <- liftIO $ newAlarmClock act
@@ -255,12 +258,12 @@ createNewViewTimer b = do
   vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
   vCur <- fst <$> liftIO (readIORef vpref)
   let v = vCur{ _sequence = max 1 $ fromIntegral (number $ blockBlockData b) - 1 }
-  ch <- Mod.access (Mod.Proxy @(TMChan RoundNumber))
+  ch <- Mod.access (Mod.Proxy @(TMChan View))
   let act :: AlarmClock UTCTime -> IO ()
       act this' = do
         (v', p) <- readIORef vpref
         when (v >= v' && isNothing p) $ do
-          atomically . writeTMChan ch $ _round v'
+          atomically . writeTMChan ch $ v'
           next <- addUTCTime 5 <$> getCurrentTime
           setAlarm this' next
   alarm <- liftIO $ newAlarmClock act

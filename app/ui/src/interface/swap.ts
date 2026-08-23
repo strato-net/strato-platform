@@ -7,14 +7,14 @@ import type {
   Pool,
   SwapToken,
   PoolV3,
-  PoolV3Quote,
   PoolV3Position,
   PoolV3AmountsPreview,
   PoolV3LiquidityDistribution,
-  PoolV3SwapParams,
   PoolV3MintParams,
+  PoolV3IncreaseParams,
   PoolV3BurnParams,
   PoolV3CollectParams,
+  PoolV3CreateParams,
 } from '@strato/shared-types';
 
 export * from '@strato/shared-types';
@@ -46,10 +46,6 @@ export interface SwapContextState {
   fromAsset: SwapToken | undefined;
   toAsset: SwapToken | undefined;
   pool: Pool | null;
-  
-  // V3 (concentrated liquidity) state
-  swapVenue: 'v2' | 'v3';
-  v3PairPools: PoolV3[];
   
   // Swap history
   swapHistory: SwapHistoryEntry[];
@@ -104,13 +100,6 @@ export interface SwapContextActions {
   }) => Promise<void>;
 
   // Multi-token pool operations
-  swapMultiToken: (data: {
-    poolAddress: string;
-    tokenIn: string;
-    tokenOut: string;
-    amountIn: string;
-    minAmountOut: string;
-  }) => Promise<void>;
   addLiquidityMultiToken: (data: {
     poolAddress: string;
     amounts: string[];
@@ -142,13 +131,10 @@ export interface SwapContextActions {
   refreshSwapHistory: (params?: Record<string, string>) => Promise<void>;
 
   // V3 (concentrated liquidity) operations
-  setSwapVenue: (venue: 'v2' | 'v3') => void;
-  getV3PoolsByPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<PoolV3[]>;
+  createV3Pool: (data: PoolV3CreateParams) => Promise<void>;
   fetchV3Pools: () => Promise<PoolV3[]>;
   getV3PoolByAddress: (address: string) => Promise<PoolV3 | null>;
   getV3LiquidityDistribution: (poolAddress: string, signal?: AbortSignal) => Promise<PoolV3LiquidityDistribution | null>;
-  quoteV3: (poolAddress: string, zeroForOne: boolean, amountSpecified: string, signal?: AbortSignal) => Promise<PoolV3Quote | null>;
-  swapV3: (data: PoolV3SwapParams) => Promise<void>;
   fetchV3Positions: (poolAddress?: string) => Promise<PoolV3Position[]>;
   getV3AmountsForLiquidity: (
     poolAddress: string,
@@ -158,6 +144,7 @@ export interface SwapContextActions {
     signal?: AbortSignal
   ) => Promise<PoolV3AmountsPreview | null>;
   mintV3: (data: PoolV3MintParams) => Promise<void>;
+  increaseV3: (data: PoolV3IncreaseParams) => Promise<void>;
   burnV3: (data: PoolV3BurnParams) => Promise<void>;
   collectV3: (data: PoolV3CollectParams) => Promise<void>;
 }

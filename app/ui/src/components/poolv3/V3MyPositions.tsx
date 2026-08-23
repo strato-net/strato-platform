@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { PoolV3, PoolV3Position } from "@/interface";
 import { useSwapContext } from "@/context/SwapContext";
 import { useTokenContext } from "@/context/TokenContext";
@@ -8,9 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { ArrowUpRight, Search } from "lucide-react";
 import { formatTokenAmount, formatTickAsPrice, formatPriceWad, poolV3TxAmounts, describePoolAmounts, priceDomainEdge } from "./poolV3Utils";
 import V3ConfirmDialog, { ConfirmRow } from "./V3ConfirmDialog";
+import V3IncreaseDialog from "./V3IncreaseDialog";
+import TokenPairIcons from "./TokenPairIcons";
 
 type ConfirmableAction = "remove" | "fees" | "collect";
 
@@ -21,6 +24,9 @@ interface V3MyPositionsProps {
   isLoggedIn: boolean;
   onChanged: () => void;
   onBrowsePools: () => void;
+  /** positionKey of a position to focus on arrival (deep link from the dashboard):
+   *  selects its pool, scrolls its card into view and highlights it briefly */
+  focusPositionKey?: string | null;
 }
 
 /** Positions for one pool (pair + fee tier). */
@@ -29,28 +35,6 @@ interface PoolGroup {
   positions: PoolV3Position[];
 }
 
-const TokenPairIcons = ({ token0, token1 }: { token0: PoolV3["token0"]; token1: PoolV3["token1"] }) => (
-  <div className="flex -space-x-1.5">
-    {[token0, token1].map((token) =>
-      token.image ? (
-        <img
-          key={token.address}
-          src={token.image}
-          alt={token.symbol}
-          className="w-6 h-6 rounded-full object-cover border border-border bg-card"
-        />
-      ) : (
-        <div
-          key={token.address}
-          className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-white font-medium bg-strato-blue border border-border"
-        >
-          {token.symbol?.slice(0, 1)}
-        </div>
-      )
-    )}
-  </div>
-);
-
 const V3MyPositions = ({
   positions,
   poolsByAddress,
@@ -58,6 +42,7 @@ const V3MyPositions = ({
   isLoggedIn,
   onChanged,
   onBrowsePools,
+  focusPositionKey,
 }: V3MyPositionsProps) => {
   const { burnV3, collectV3, loading: txLoading } = useSwapContext();
   const { fetchUsdstBalance } = useTokenContext();
@@ -77,8 +62,22 @@ const V3MyPositions = ({
   const [selectedPoolAddress, setSelectedPoolAddress] = useState<string | null>(null);
   // Action awaiting user confirmation — every fund-moving button goes through the dialog
   const [confirm, setConfirm] = useState<{ action: ConfirmableAction; position: PoolV3Position } | null>(null);
+  // Position NFT receiving more liquidity (opens the increase dialog; NFT positions only)
+  const [increaseFor, setIncreaseFor] = useState<PoolV3Position | null>(null);
 
-  const positionKey = (p: PoolV3Position) => `${p.poolAddress}:${p.tickLower}:${p.tickUpper}`;
+  // NFT positions are unique by tokenId (several NFTs can share one pool + range);
+  // legacy (pre-manager) positions are unique by pool + range for their owner.
+  const positionKey = (p: PoolV3Position) =>
+    p.kind === "nft" && p.tokenId !== undefined
+      ? `nft:${p.tokenId}`
+      : `${p.poolAddress}:${p.tickLower}:${p.tickUpper}`;
+
+  // Request body addressing the position the way the backend expects it (see
+  // PoolV3BurnParams): NFT positions by tokenId, legacy ones by pool + ticks.
+  const positionRef = (p: PoolV3Position) =>
+    p.kind === "nft" && p.tokenId !== undefined
+      ? { tokenId: p.tokenId }
+      : { poolAddress: p.poolAddress, tickLower: p.tickLower, tickUpper: p.tickUpper };
 
   // Group positions by pool, deepest-liquidity pool first.
   const groups = useMemo<PoolGroup[]>(() => {
@@ -111,7 +110,30 @@ const V3MyPositions = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groups]);
 
+  // Deep-linked position (dashboard row click): once positions are in, select its pool
+  // and mark it for scroll + highlight. Declared AFTER the default-selection effect so
+  // its setSelectedPoolAddress wins the same effects flush. One-shot per page load.
+  const [highlightKey, setHighlightKey] = useState<string | null>(null);
+  const [focusApplied, setFocusApplied] = useState(false);
+  useEffect(() => {
+    if (!focusPositionKey || focusApplied || positions.length === 0) return;
+    const target = positions.find((p) => positionKey(p) === focusPositionKey);
+    if (!target) return;
+    setFocusApplied(true);
+    setSelectedPoolAddress(target.poolAddress);
+    setHighlightKey(focusPositionKey);
+  }, [focusPositionKey, focusApplied, positions]);
+
   const selectedGroup = groups.find((g) => g.pool.address === selectedPoolAddress) ?? null;
+
+  // Scroll the focused card into view once it's rendered, then let the highlight fade.
+  useEffect(() => {
+    if (!highlightKey || !selectedGroup) return;
+    document.getElementById(`v3-position-${highlightKey}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const timer = setTimeout(() => setHighlightKey(null), 2500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightKey, selectedGroup?.pool.address]);
 
   const handleBurn = async (position: PoolV3Position) => {
     const key = positionKey(position);
@@ -120,9 +142,7 @@ const V3MyPositions = ({
     if (liquidity === 0n) return;
     try {
       const res = await burnV3({
-        poolAddress: position.poolAddress,
-        tickLower: position.tickLower,
-        tickUpper: position.tickUpper,
+        ...positionRef(position),
         liquidity: liquidity.toString(),
         collect: true,
       });
@@ -149,11 +169,7 @@ const V3MyPositions = ({
 
   const handleCollect = async (position: PoolV3Position) => {
     try {
-      const res = await collectV3({
-        poolAddress: position.poolAddress,
-        tickLower: position.tickLower,
-        tickUpper: position.tickUpper,
-      });
+      const res = await collectV3(positionRef(position));
       const pool = poolsByAddress.get(position.poolAddress);
       const amounts = poolV3TxAmounts(res);
       const received = pool && amounts ? describePoolAmounts(pool, amounts) : null;
@@ -176,18 +192,22 @@ const V3MyPositions = ({
     }
   };
 
-  // Realize + claim accrued fees without removing liquidity: burn(0) pokes the position so
-  // fees land in the (Cirrus-readable) tokensOwed, and collect:true pays them — one atomic tx.
-  // This is how fees are surfaced given the indexer can't expose live fee growth.
+  // Realize + claim accrued fees without removing liquidity. NFT positions: the manager's
+  // collect() pokes the pool internally, so one call does both. Legacy positions: burn(0)
+  // pokes the position so fees land in the (Cirrus-readable) tokensOwed, and collect:true
+  // pays them — one atomic tx.
   const handleCollectFees = async (position: PoolV3Position) => {
     try {
-      const res = await burnV3({
-        poolAddress: position.poolAddress,
-        tickLower: position.tickLower,
-        tickUpper: position.tickUpper,
-        liquidity: "0",
-        collect: true,
-      });
+      const res =
+        position.kind === "nft" && position.tokenId !== undefined
+          ? await collectV3({ tokenId: position.tokenId })
+          : await burnV3({
+              poolAddress: position.poolAddress,
+              tickLower: position.tickLower,
+              tickUpper: position.tickUpper,
+              liquidity: "0",
+              collect: true,
+            });
       const pool = poolsByAddress.get(position.poolAddress);
       const amounts = poolV3TxAmounts(res);
       const received = pool && amounts ? describePoolAmounts(pool, amounts) : null;
@@ -397,22 +417,58 @@ const V3MyPositions = ({
               const pool = selectedGroup.pool;
 
               return (
-                <div key={key} className="bg-card shadow-sm rounded-xl border border-border p-4 space-y-3">
+                <div
+                  key={key}
+                  id={`v3-position-${key}`}
+                  className={`bg-card shadow-sm rounded-xl border p-4 space-y-3 transition-colors ${
+                    highlightKey === key ? "border-strato-blue ring-2 ring-strato-blue/40" : "border-border"
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs text-muted-foreground">
                       Range: {formatTickAsPrice(position.tickLower)} – {formatTickAsPrice(position.tickUpper)}{" "}
                       {pool.token1.symbol}/{pool.token0.symbol}
                     </span>
-                    <Badge
-                      variant="outline"
-                      className={`text-[10px] px-1.5 py-0 flex-shrink-0 ${
-                        position.inRange
-                          ? "text-green-600 border-green-600/40"
-                          : "text-yellow-600 border-yellow-600/40"
-                      }`}
-                    >
-                      {position.inRange ? "In range" : "Out of range"}
-                    </Badge>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {position.kind === "nft" && position.tokenId !== undefined ? (
+                        <Link
+                          to={`/dashboard/v3-liquidity/${position.tokenId}`}
+                          title="View the position NFT"
+                          className="flex-shrink-0"
+                        >
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 hover:bg-muted hover:text-strato-blue transition-colors"
+                          >
+                            NFT #{position.tokenId}
+                            <ArrowUpRight className="h-2.5 w-2.5 ml-0.5" />
+                          </Badge>
+                        </Link>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] px-1.5 py-0 flex-shrink-0 text-muted-foreground"
+                          title="Created before position NFTs; still fully manageable here"
+                        >
+                          Legacy
+                        </Badge>
+                      )}
+                      {(position.apy || 0) > 0 && (
+                        <span className="text-[11px] text-green-600 font-medium whitespace-nowrap">
+                          {position.apy.toFixed(2)}% APY
+                        </span>
+                      )}
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] px-1.5 py-0 flex-shrink-0 ${
+                          position.inRange
+                            ? "text-green-600 border-green-600/40"
+                            : "text-yellow-600 border-yellow-600/40"
+                        }`}
+                      >
+                        {position.inRange ? "In range" : "Out of range"}
+                      </Badge>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
@@ -466,6 +522,17 @@ const V3MyPositions = ({
                         Remove {percent}%
                       </Button>
                     )}
+                    {position.kind === "nft" && position.tokenId !== undefined && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        disabled={txLoading || pool.isDisabled || pool.isPaused}
+                        onClick={() => setIncreaseFor(position)}
+                      >
+                        Increase
+                      </Button>
+                    )}
                     {hasLiquidity && (
                       <Button
                         variant="outline"
@@ -512,6 +579,16 @@ const V3MyPositions = ({
         onConfirm={confirmedRun}
         loading={txLoading}
       />
+
+      {increaseFor && poolsByAddress.get(increaseFor.poolAddress) && (
+        <V3IncreaseDialog
+          position={increaseFor}
+          pool={poolsByAddress.get(increaseFor.poolAddress)!}
+          open={!!increaseFor}
+          onOpenChange={(open) => { if (!open) setIncreaseFor(null); }}
+          onIncreased={refreshAfterTx}
+        />
+      )}
     </div>
   );
 };

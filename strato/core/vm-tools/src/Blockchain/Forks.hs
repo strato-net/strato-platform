@@ -7,14 +7,18 @@
 -- old behavior holds for blocks strictly less than the fork block; new behavior
 -- takes effect at and after.
 --
+-- Helium's staking forks share a single height (see heliumStakingForkBlock):
+-- they ship in one binary, so they cannot be rolled back independently, and
+-- their failure modes are already distinct (StakeMismatch vs
+-- ReceiptsRootMismatch). One flag day is easier to run than two.
+--
 -- Existing inline fork constants in the SolidVM tree (heliumPassByRefForkBlock,
 -- heliumToBasicForkBlock) predate this module and continue to live alongside
 -- their use sites. New consensus forks should be added here so they're easy to
 -- find and audit.
 module Blockchain.Forks
-  ( heliumNetworkID,
-    receiptsRootForkBlock,
-    isReceiptsRootForkActive,
+  ( isReceiptsRootForkActive,
+    isBlockRewardReceiptForkActive
   )
 where
 
@@ -22,25 +26,44 @@ import Blockchain.EthConf (ethConf)
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.EthConf.Model (networkConfig)
 
--- | Helium (Mercata) mainnet network identifier.
 heliumNetworkID :: Integer
 heliumNetworkID = 114784819836269
 
--- | Block height at which the receipts-trie root becomes consensus-critical
--- on Helium. Before this height the header carries the empty-trie sentinel
--- (legacy behavior); at and after it the root is computed from the actual
--- receipts of the executed transactions.
---
--- TODO: pick the real fork block once validator coordination is scheduled.
--- The current value is a far-future placeholder.
-receiptsRootForkBlock :: Integer
-receiptsRootForkBlock = 1000000
+upquarkNetworkID :: Integer
+upquarkNetworkID = 33056204878082667
 
--- | Is the receipts-root fork active for the given block number?
---
--- Helium nodes follow the legacy behavior up to but not including the fork
--- block, then switch to the new behavior. All other networks use the new
--- behavior unconditionally — there's no legacy data to preserve there.
+heliumReceiptsRootForkBlock :: Integer
+heliumReceiptsRootForkBlock = 250000
+
+upquarkReceiptsRootForkBlock :: Integer
+upquarkReceiptsRootForkBlock = 250000
+
 isReceiptsRootForkActive :: Integer -> Bool
 isReceiptsRootForkActive blockNum =
-  not (Conf.networkID (networkConfig ethConf) == heliumNetworkID && blockNum < receiptsRootForkBlock)
+  let net = Conf.networkID $ networkConfig ethConf
+   in not $ (net == upquarkNetworkID && blockNum < upquarkReceiptsRootForkBlock)
+         || (net == heliumNetworkID  && blockNum < heliumReceiptsRootForkBlock)
+
+-- | Block from which the block-reward call's events are folded into the block's
+-- first receipt, so BlockRewardsPaid is visible to receipts and the indexer.
+--
+-- It needs a height because receipts roots are live in the header: adding a log
+-- moves the root, so proposer and verifier have to start doing it at the same
+-- block. Helium has already produced reward-paying blocks whose receipts omit
+-- the event, so it gets its own switch height. Every other network switches when
+-- staking activates — which is before it can ever pay a block reward, so no
+-- network but helium has a window to reconcile.
+--
+-- Shared with the stake-event switch (stakingEventsFromGovernanceBlock in
+-- strato-conf); keep the two in step.
+heliumStakingForkBlock :: Integer
+heliumStakingForkBlock = 300000
+
+isBlockRewardReceiptForkActive :: Integer -> Bool
+isBlockRewardReceiptForkActive blockNum =
+  let conf = networkConfig ethConf
+      switchAt
+        | Conf.networkID conf == heliumNetworkID = heliumStakingForkBlock
+        -- 'Nothing' means staking is live from genesis, so the fork is too.
+        | otherwise = maybe 0 id (Conf.stakingActivationBlock conf)
+   in blockNum >= switchAt

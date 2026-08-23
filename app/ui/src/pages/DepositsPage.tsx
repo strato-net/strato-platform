@@ -8,19 +8,27 @@ import BridgeIn from '@/components/bridge/BridgeIn';
 import RecentTransactions from '@/components/bridge/RecentTransactions';
 import { useBridgeContext } from '@/context/BridgeContext';
 import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
+import { normBridgeAddr } from '@/lib/bridgeLinks';
 
 const DepositsPage = () => {
   const { isLoggedIn, loading, isAppAuthenticated, externalWalletAddress } = useUser();
-  const { loadNetworksAndTokens } = useBridgeContext();
+  const { loadNetworksAndTokens, selectTokenByStratoAddress } = useBridgeContext();
   const [searchParams] = useSearchParams();
   const tab = searchParams.get('tab');
+  const tokenParam = searchParams.get('token');
+  const metalParam = searchParams.get('metal');
   const [fundingMode, setFundingMode] = useState<"bridge" | "metals">(() =>
-    tab === 'metals' ? 'metals' : 'bridge'
+    tokenParam ? 'bridge' : tab === 'metals' || metalParam ? 'metals' : 'bridge'
   );
 
   useEffect(() => {
-    if (tab === 'metals') setFundingMode('metals');
-  }, [tab]);
+    if (tokenParam) {
+      setFundingMode('bridge');
+      return;
+    }
+    if (tab === 'metals' || metalParam) setFundingMode('metals');
+  }, [tab, tokenParam, metalParam]);
+
   const [metalRefreshKey, setMetalRefreshKey] = useState(0);
   const handleMetalPurchase = useCallback(() => setMetalRefreshKey(k => k + 1), []);
 
@@ -32,6 +40,19 @@ const DepositsPage = () => {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, isLoggedIn, isAppAuthenticated, externalWalletAddress]);
+
+  // Explore Buy deep-link: preselect Bridge In receive token (works for guests too)
+  useEffect(() => {
+    const addr = normBridgeAddr(tokenParam || '');
+    if (!addr) return;
+    let cancelled = false;
+    selectTokenByStratoAddress(addr).catch((error) => {
+      if (!cancelled) console.error('Failed to select bridge token:', error);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [tokenParam, selectTokenByStratoAddress]);
 
   return (
     <div className="h-screen bg-background overflow-hidden pb-16 md:pb-0">
@@ -45,7 +66,7 @@ const DepositsPage = () => {
           )}
           <div className="mb-8 grid grid-cols-1 xl:grid-cols-12 gap-6">
             <div className="xl:col-span-7">
-              <BridgeIn guestMode={!isLoggedIn} fundingMode={fundingMode} onFundingModeChange={setFundingMode} onMetalPurchase={handleMetalPurchase} />
+              <BridgeIn guestMode={!isLoggedIn} fundingMode={fundingMode} initialMetalAddress={metalParam} onFundingModeChange={setFundingMode} onMetalPurchase={handleMetalPurchase} />
             </div>
             <div className="xl:col-span-5">
               <RecentTransactions fundingMode={fundingMode} metalRefreshKey={metalRefreshKey} />

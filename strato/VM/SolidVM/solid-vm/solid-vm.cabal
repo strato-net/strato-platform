@@ -96,6 +96,7 @@ test-suite solid-vm-spec
   main-is: Main.hs
   other-modules:
       BLS12381Spec
+      BuiltinsSpec
       OptimizerSpec
       SolidVMSpec
       Spec

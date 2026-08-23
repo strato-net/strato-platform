@@ -66,6 +66,14 @@ class (RLPSerializable h, HasIstanbulExtra h) => BlockHeaderLike h where
   blockHeaderSignatures :: h -> [Signature]
   blockHeaderVersion :: h -> Int
 
+  -- Version 3 (stake-weighted proposer selection); defaults for older shapes.
+  blockHeaderRound :: h -> Integer
+  blockHeaderRound _ = 0
+  blockHeaderStakes :: h -> [(Validator, Integer)]
+  blockHeaderStakes _ = []
+  blockHeaderStakeUpdates :: h -> [(Validator, Integer)]
+  blockHeaderStakeUpdates _ = []
+
   morphBlockHeader :: (BlockHeaderLike h2) => h2 -> h
   {-# MINIMAL
     blockHeaderBlockNumber,
@@ -155,6 +163,12 @@ class (RLPSerializable t) => TransactionLike t where
     txTxVersion,
     morphTx
     #-}
+
+  -- | Opaque attribution bytes (e.g. an ERC-8021 data suffix) carried by the
+  -- transaction and never interpreted during execution. Defaults to empty so
+  -- existing instances need no changes.
+  txAttribution :: t -> B.ByteString
+  txAttribution _ = B.empty
 
   txSigR :: t -> Integer
   txSigR t = let (r, _, _) = txSignature t in r

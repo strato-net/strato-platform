@@ -17,9 +17,12 @@ module Blockchain.Sequencer.Event (
 
 import qualified Blockchain.Blockstanbul as PBFT
 import qualified Blockchain.Data.Block as BDB
+import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.TXOrigin as TO
+import Blockchain.Data.TransactionDef (Transaction)
 import Blockchain.Database.MerklePatricia.NodeData (NodeData)
 import Blockchain.Model.WrappedBlock (OutputBlock(..), OutputTx(..), IngestBlock(..), IngestTx(..))
+import Blockchain.Sequencer.CallSpec (CallSpec(..), TraceOptions(..))
 import Blockchain.Sequencer.HexData (HexData(..))
 import Blockchain.Sequencer.TxCallObject (TxCallObject(..))
 import qualified Blockchain.Strato.Model.Address as A
@@ -35,12 +38,12 @@ import qualified GHC.Generics as GHCG
 import Text.Format
 
 data SeqLoopEvent
-  = TimerFire PBFT.RoundNumber
+  = TimerFire PBFT.View
   | UnseqEvents [IngestEvent]
   deriving (Eq, Show, GHCG.Generic)
 
 instance Format SeqLoopEvent where
-  format (TimerFire rn) = "TimerFire " ++ format rn
+  format (TimerFire v) = "TimerFire " ++ format v
   format (UnseqEvents ev) = "UnseqEvents " ++ format ev
 
 class ShowConstructor a where
@@ -102,7 +105,19 @@ data JsonRpcCommand
   | JRCGetTransactionCount {jrcAddress :: A.Address, jrcId :: String, jrcBlockString :: String}
   | JRCGetStorageAt {jrcAddress :: A.Address, jrcKey :: BS.ByteString, jrcId :: String, jrcBlockString :: String}
   | JRCCall {jrcCallObj :: TxCallObject, jrcId :: String, jrcBlockString :: String}
-  deriving (Eq, Read, Show, GHCG.Generic, Data)
+  | -- | eth_call v2: message call or contract creation, sandboxed, optionally
+    -- against a historical block header (Nothing = best block).
+    JRCCallV2 {jrcSpec :: CallSpec, jrcHeader :: Maybe BlockHeader, jrcId :: String}
+  | -- | strato_traceCall: like JRCCallV2 but returns a call-frame trace.
+    JRCTraceCall {jrcSpec :: CallSpec, jrcHeader :: Maybe BlockHeader, jrcOpts :: TraceOptions, jrcId :: String}
+  | -- | strato_traceTransaction / strato_traceBlock*: replay the given txs of a
+    -- block against its parent state, tracing the target tx (or all when
+    -- Nothing). The API side ships the header and txs so the VM does not need
+    -- SQL access to historical blocks.
+    JRCTraceBlockTxs {jrcBlockHeader :: BlockHeader, jrcTxs :: [Transaction], jrcTargetTx :: Maybe Keccak256, jrcOpts :: TraceOptions, jrcId :: String}
+  | -- | strato_simulateV1: blocks of calls executed sequentially in one sandbox.
+    JRCSimulate {jrcSimBlocks :: [[CallSpec]], jrcHeader :: Maybe BlockHeader, jrcId :: String}
+  deriving (Eq, Show, GHCG.Generic)
 
 instance Format JsonRpcCommand where
   format JRCGetBalance {jrcAddress = addr, jrcId = rid} =
@@ -117,10 +132,20 @@ instance Format JsonRpcCommand where
     let dataHex = format $ unHexData (data_ obj)
         toStr = maybe "none" format (to obj)
     in "JRCCall id=" ++ rid ++ " to=" ++ toStr ++ " data=" ++ dataHex ++ " block=" ++ blk
-  
+  format JRCCallV2 {jrcSpec = spec, jrcId = rid} =
+    "JRCCallV2 id=" ++ rid ++ " spec=" ++ show spec
+  format JRCTraceCall {jrcSpec = spec, jrcId = rid} =
+    "JRCTraceCall id=" ++ rid ++ " spec=" ++ show spec
+  format JRCTraceBlockTxs {jrcTxs = txs, jrcTargetTx = mTarget, jrcId = rid} =
+    "JRCTraceBlockTxs id=" ++ rid ++ " txs=" ++ show (length txs) ++ " target=" ++ maybe "all" format mTarget
+  format JRCSimulate {jrcSimBlocks = blks, jrcId = rid} =
+    "JRCSimulate id=" ++ rid ++ " blocks=" ++ show (map length blks)
+
 data JsonRpcResponse
   = Success { responseId :: String, returnData :: BS.ByteString }
   | Error   { responseId :: String, errorMessage :: String }
+  | -- | A JSON payload (aeson-encoded bytes): traces, simulation results.
+    SuccessJson { responseId :: String, returnJson :: BS.ByteString }
   deriving (Eq, Show, GHCG.Generic, Data)
 
 instance Binary JsonRpcResponse
@@ -128,6 +153,7 @@ instance Binary JsonRpcResponse
 instance Format JsonRpcResponse where
   format (Success rid _) = "JsonRpcResponse.Success id=" ++ rid
   format (Error rid msg) = "JsonRpcResponse.Error id=" ++ rid ++ " msg=" ++ msg
+  format (SuccessJson rid _) = "JsonRpcResponse.SuccessJson id=" ++ rid
 
 data P2pEvent
   = P2pTx OutputTx

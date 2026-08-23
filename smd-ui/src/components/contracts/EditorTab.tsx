@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import "@/lib/monaco";
+import { parseArgText } from "@/lib/args";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { Plus, FolderInput, Download, X, FilePlus2 } from "lucide-react";
@@ -31,6 +32,9 @@ import {
   type XabiResult,
 } from "@/services/contracts";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
+import { useSimulation } from "@/components/simulation/useSimulation";
+import { SimulateButton } from "@/components/simulation/SimulateButton";
+import { SimulationResultPanel } from "@/components/simulation/SimulationResultPanel";
 import { usePersistentState } from "@/hooks/usePersistentState";
 import { useUser } from "@/context/UserContext";
 
@@ -59,6 +63,7 @@ const STARTER = `contract SimpleStorage {
 export function EditorTab() {
   const { resolvedTheme } = useTheme();
   const { submit: submitTx, canSubmit } = useSubmitTransaction();
+  const sim = useSimulation();
   const { userAddress, isAppAuthenticated } = useUser();
 
   // Persisted so edits and added files survive tab switches and page reloads.
@@ -92,6 +97,13 @@ export function EditorTab() {
   const [argValues, setArgValues] = useState<Record<string, string>>({});
   const [deploying, setDeploying] = useState(false);
   const [deployedAddress, setDeployedAddress] = useState<string>("");
+
+  // A stale dry-run is misleading once the deploy inputs change (or the dialog
+  // is reopened); clear the panel on any edit.
+  const simReset = sim.reset;
+  useEffect(() => {
+    simReset();
+  }, [simReset, selectedContract, argValues, walletUsername, compiledSource, createOpen]);
 
   const activeFile = files[active] ?? files[0];
   const contractNames = xabi?.src ? Object.keys(xabi.src) : [];
@@ -184,12 +196,28 @@ export function EditorTab() {
 
   const openCreate = () => {
     setDeployedAddress("");
+    sim.reset();
     setCreateOpen(true);
   };
 
   // STRATO wallets can deploy directly; external wallets must route through one of
   // their User wallet contracts (select it from the Wallet dropdown).
   const canCreate = isAppAuthenticated || (canSubmit && !!walletUsername);
+
+  // Build the CONTRACT payload once, so Simulate and Create submit identical data.
+  const buildCreatePayload = (): Record<string, unknown> => {
+    const args: Record<string, unknown> = {};
+    for (const a of argDefs) {
+      const raw = argValues[a.name];
+      if (raw === undefined || raw === "") continue;
+      // Bigint-safe parse: integers past 2^53 stay exact strings rather than
+      // rounded doubles; the node parses them against the declared ctor type.
+      args[a.name] = parseArgText(raw);
+    }
+    const metadata: Record<string, string> = { VM: "SolidVM" };
+    if (contractNames.length) metadata.nohistory = contractNames.join(",");
+    return { contract: selectedContract, src: compiledSource, args, metadata };
+  };
 
   const doCreate = async () => {
     if (!selectedContract) {
@@ -200,30 +228,12 @@ export function EditorTab() {
       toast.error("Select one of your User wallets to deploy with an external wallet");
       return;
     }
-    const args: Record<string, unknown> = {};
-    for (const a of argDefs) {
-      const raw = argValues[a.name];
-      if (raw === undefined || raw === "") continue;
-      try {
-        args[a.name] = JSON.parse(raw);
-      } catch {
-        args[a.name] = raw;
-      }
-    }
-    const metadata: Record<string, string> = { VM: "SolidVM" };
-    if (contractNames.length) metadata.nohistory = contractNames.join(",");
-
     setDeploying(true);
     setDeployedAddress("");
     try {
       const result = await submitTx(
         "CONTRACT",
-        {
-          contract: selectedContract,
-          src: compiledSource,
-          args,
-          metadata,
-        },
+        buildCreatePayload(),
         walletUsername ? { username: walletUsername } : undefined
       );
       const address: string | undefined = result?.data?.contents?.address;
@@ -237,6 +247,14 @@ export function EditorTab() {
     } finally {
       setDeploying(false);
     }
+  };
+
+  const simulateCreate = () => {
+    if (!selectedContract) {
+      toast.error("Select a contract to simulate");
+      return;
+    }
+    return sim.run("CONTRACT", buildCreatePayload(), walletUsername ? { username: walletUsername } : undefined);
   };
 
   return (
@@ -427,6 +445,14 @@ export function EditorTab() {
               </div>
             ) : null}
 
+            <SimulationResultPanel result={sim.result} error={sim.error} />
+            {sim.result?.status === "Success" && !deployedAddress ? (
+              <p className="text-xs text-muted-foreground">
+                The deploy address shown by a simulation is the would-be address; the actual
+                address depends on the account nonce at post time.
+              </p>
+            ) : null}
+
             {!canSubmit ? (
               <p className="text-xs text-muted-foreground">
                 Connect a wallet to create a contract.
@@ -444,6 +470,13 @@ export function EditorTab() {
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
+            {sim.canSimulate ? (
+              <SimulateButton
+                onClick={simulateCreate}
+                pending={sim.pending}
+                disabled={!selectedContract}
+              />
+            ) : null}
             <Button onClick={doCreate} disabled={deploying || !canCreate || !selectedContract}>
               {deploying ? "Creating…" : "Create Contract"}
             </Button>

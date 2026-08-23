@@ -48,19 +48,22 @@ bimapValue f (name', value') = do
   mValue <- valueToSolidityValue value'
   return $ fmap (name,) mValue
 
-decodeCacheValuesWith :: (StoragePath -> BasicValue -> Bool) -> M.Map StoragePath BasicValue -> [(NE.NonEmpty T.Text, Value)]
+-- Flat keys pair each path segment with whether it is a struct/collection Field
+-- (True) or a mapping/array Index (False), so consumers can render paths that
+-- distinguish the two (e.g. activities[24].actionableEvents[0]).
+decodeCacheValuesWith :: (StoragePath -> BasicValue -> Bool) -> M.Map StoragePath BasicValue -> [(NE.NonEmpty (Bool, T.Text), Value)]
 decodeCacheValuesWith f hxs =
   let pathValues' = filter (uncurry f) $ M.toList hxs
       finalState = HM.toList $ synthesizeFlat pathValues'
-   in first (NE.map bsToText') <$> finalState
+   in first (NE.map (fmap bsToText')) <$> finalState
 
 decodeCacheValues :: M.Map StoragePath BasicValue -> [(T.Text, Value)]
-decodeCacheValues = map (first NE.head) . decodeCacheValuesWith (const . isBasic)
+decodeCacheValues = map (first (snd . NE.head)) . decodeCacheValuesWith (const . isBasic)
   where isBasic (StoragePath ([Field _])) = True
         isBasic (StoragePath [Field _, Field fieldBS]) = C8.unpack fieldBS /= "length"
         isBasic _ = False
 
-decodeCacheValuesForCollections :: M.Map StoragePath BasicValue -> [(NE.NonEmpty T.Text, Value)]
+decodeCacheValuesForCollections :: M.Map StoragePath BasicValue -> [(NE.NonEmpty (Bool, T.Text), Value)]
 decodeCacheValuesForCollections = decodeCacheValuesWith (\_ _ -> True)
 
 bsToText :: B.ByteString -> Either String T.Text
@@ -115,7 +118,7 @@ valueToSolidityValue = \case
 
 type TotalStorage = HM.HashMap B.ByteString V.Value
 
-type FlatTotalStorage = HM.HashMap (NE.NonEmpty B.ByteString) V.Value
+type FlatTotalStorage = HM.HashMap (NE.NonEmpty (Bool, B.ByteString)) V.Value
 
 data ReplayFailure
   = MissingPath StoragePath
@@ -200,13 +203,22 @@ synthesizeFlat spbvs =
       basicLists = foldr (\(t, p) m -> HM.alter (Just . maybe [p] (p :)) t m) HM.empty byFields
    in HM.map (foldr build $ SimpleValue $ ValueAddress 0x0) basicLists
   where
-    fieldsOnly (StoragePath (Field t : sp), bv) = pure $ case unsnoc $ rawPathPiece <$> sp of
-      Nothing -> (t NE.:| [], (Nothing, bv))
-      Just (sp'', (isField, u)) ->
-        let sp' = snd <$> sp''
-         in if isField
-              then (t NE.:| sp', (Just u, bv))
-              else (t NE.:| (sp' ++ [u]), (Nothing, bv))
+    fieldsOnly (StoragePath (Field t : sp), bv) = case unsnoc $ rawPathPiece <$> sp of
+      Nothing -> pure ((True, t) NE.:| [], (Nothing, bv))
+      Just (sp'', p@(isField, u)) ->
+        if isField
+          then if u == "length" && isDefault bv
+                 -- An empty-length write (BDefault, or BInteger 0 / BAddress 0x0
+                 -- from older VM versions) is not an array marker: collapse it
+                 -- into a scalar placeholder on the parent row instead of
+                 -- creating a row for the field itself.
+                 then case unsnoc sp'' of
+                   Nothing -> Nothing
+                   Just (sp''', (isField', u')) -> if isField'
+                     then pure ((True, t) NE.:| sp''', (Just u', bv))
+                     else pure ((True, t) NE.:| sp'', (Nothing, bv))
+                 else pure ((True, t) NE.:| sp'', (Just u, bv))
+          else pure ((True, t) NE.:| (sp'' ++ [p]), (Nothing, bv))
     fieldsOnly _ = Nothing
     build (Nothing, BDefault) s = s
     build (Nothing, bv) _ = fromBasic bv

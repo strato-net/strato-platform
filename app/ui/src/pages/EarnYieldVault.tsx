@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { formatUnits } from "ethers";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowLeft, CircleDollarSign, Sparkles, TrendingUp, Wallet } from "lucide-react";
+import { ArrowLeft, ChevronDown, CircleDollarSign, Sparkles, TrendingUp, Wallet } from "lucide-react";
 
 // Mirrors backend OFF_CHAIN_DISPLAY_FLOOR_USD: hide the off-chain section when
 // the pooled value is below this so transient slippage/oracle dust doesn't
@@ -42,6 +42,8 @@ import { useEarnContext } from "@/context/EarnContext";
 import { findBestEarnApyInfo } from "@/utils/earnUtils";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
+import { YieldVaultHistoryCharts } from "@/components/earn/YieldVaultHistoryCharts";
+import type { YieldVaultHistoryPoint } from "@/context/YieldVaultContext";
 
 const VAULT_META: Record<string, {
   title: string;
@@ -53,13 +55,13 @@ const VAULT_META: Record<string, {
   strategyDescription: string;
 }> = {
   "eth-carry": {
-    title: "ETH Carry Vault",
-    subtitle: "ERC-4626 carry vault for ETH deposits",
-    badge: "Carry Vault",
+    title: "ETH Yield Vault",
+    subtitle: "Earn ETH yield and Reward Points",
+    badge: "Yield Vault",
     iconBg: "bg-indigo-500/15 dark:bg-indigo-400/15",
     iconColor: "text-indigo-600 dark:text-indigo-400",
-    cardBorder: "border-indigo-500/25 dark:border-indigo-400/25 bg-gradient-to-br from-[#f5f3ff] to-[#ede9fe] dark:from-[#1a1533] dark:to-[#1c173a]",
-    strategyDescription: "The vault targets growth in ETH per share. Deposited ETH is wrapped into wstETH to earn staking yield, then used as collateral to borrow USDST. Borrowed stables are deployed into yield-bearing stablecoins (syrupUSDC, sUSDS), and the net carry is periodically converted back into ETH, increasing each share's claim on ETH over time. The vault maintains an idle buffer for withdrawals; large redemptions may queue when capital is deployed.",
+    cardBorder: "border-blue-500/25 dark:border-blue-400/25 bg-gradient-to-br from-[#f8fbff] to-[#edf3ff] dark:from-[#0f1a33] dark:to-[#111c3a]",
+    strategyDescription: "Deposited ETH is put to work across approved yield strategies, including wstETH staking yield. Net strategy returns are converted to ETH, which funds the vault’s configured Base APY. Funded rewards increase the ETH value of each vault share over time. The vault maintains an idle buffer for withdrawals; larger redemptions may queue while capital is deployed.",
   },
   "wbtc-carry": {
     title: "wBTC Carry Vault",
@@ -78,6 +80,24 @@ const VAULT_META: Record<string, {
     iconColor: "text-emerald-600 dark:text-emerald-400",
     cardBorder: "border-emerald-500/25 dark:border-emerald-400/25 bg-gradient-to-br from-[#ecfdf5] to-[#d1fae5] dark:from-[#0a2018] dark:to-[#0c2a1f]",
     strategyDescription: "The vault targets growth in USDC per share by routing deposits across approved yield strategies. USDC may be converted into other tokens when needed to access yield, but the vault manages returns back to USDC-denominated value. Yield is harvested, rebalanced, and compounded over time. The vault maintains an idle buffer for withdrawals; large redemptions may queue when capital is deployed.",
+  },
+  "goldst-yield": {
+    title: "GOLDST Yield Vault",
+    subtitle: "Deposit GOLDST and earn Reward Points",
+    badge: "Yield Vault",
+    iconBg: "bg-amber-500/15 dark:bg-amber-400/15",
+    iconColor: "text-amber-600 dark:text-amber-400",
+    cardBorder: "border-amber-500/25 dark:border-amber-400/25 bg-gradient-to-br from-[#fffbeb] to-[#fef3c7] dark:from-[#211a08] dark:to-[#2a210a]",
+    strategyDescription: "Deposits remain denominated in GOLDST. This vault does not use a funded Base APY; users earn Reward Points based on their vault-share position. The vault maintains an idle buffer for withdrawals, and redemptions may queue when idle liquidity is unavailable.",
+  },
+  "silvst-yield": {
+    title: "SILVST Yield Vault",
+    subtitle: "Deposit SILVST and earn Reward Points",
+    badge: "Yield Vault",
+    iconBg: "bg-slate-500/15 dark:bg-slate-400/15",
+    iconColor: "text-slate-600 dark:text-slate-400",
+    cardBorder: "border-slate-500/25 dark:border-slate-400/25 bg-gradient-to-br from-[#f8fafc] to-[#e2e8f0] dark:from-[#151a22] dark:to-[#1c222c]",
+    strategyDescription: "Deposits remain denominated in SILVST. This vault does not use a funded Base APY; users earn Reward Points based on their vault-share position. The vault maintains an idle buffer for withdrawals, and redemptions may queue when idle liquidity is unavailable.",
   },
 };
 
@@ -98,7 +118,7 @@ const formatExchangeRate = (exchangeRate: string, assetSymbol: string): string =
   try {
     const num = Number(formatUnits(exchangeRate || "0", 18));
     if (!Number.isFinite(num)) return "-";
-    return `${num.toFixed(4)} ${assetSymbol}`;
+    return `${num.toFixed(6)} ${assetSymbol}`;
   } catch {
     return "-";
   }
@@ -172,6 +192,8 @@ const EarnYieldVault = () => {
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [actionAmount, setActionAmount] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [history, setHistory] = useState<YieldVaultHistoryPoint[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Redirect to earn page if vault key is unknown.
   useEffect(() => {
@@ -181,6 +203,33 @@ const EarnYieldVault = () => {
   const vaultInfo = getVaultInfo(vaultKey);
   const userInfo = getUserVaultInfo(vaultKey);
   const effectiveInfo = userInfo || vaultInfo;
+  const isFundedVault = Boolean(effectiveInfo?.accrualInitialized);
+
+  const fetchHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const { data } = await api.get<YieldVaultHistoryPoint[]>(
+        `/earn/yield-vault/${vaultKey}/history`
+      );
+      setHistory(data);
+    } catch {
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [vaultKey]);
+
+  useEffect(() => {
+    void fetchHistory();
+  }, [fetchHistory]);
+
+  const loadHistory = useCallback(async () => {
+    if (!isFundedVault) {
+      setHistory([]);
+      return;
+    }
+    await fetchHistory();
+  }, [fetchHistory, isFundedVault]);
 
   useEffect(() => {
     if (meta) {
@@ -196,8 +245,16 @@ const EarnYieldVault = () => {
   const isDeployed = Boolean(effectiveInfo?.deployed);
   const assetSymbol = effectiveInfo?.assetSymbol || "Asset";
   const shareSymbol = effectiveInfo?.shareSymbol || "Shares";
-  const exchangeRate = formatExchangeRate(effectiveInfo?.exchangeRate || "0", assetSymbol);
-  const tvlDisplay = loadingVaults ? "..." : formatUsdAmount(effectiveInfo?.tvlUsd || "0");
+  const displayedExchangeRate =
+    isFundedVault
+      ? effectiveInfo?.projectedExchangeRate || effectiveInfo?.exchangeRate || "0"
+      : effectiveInfo?.exchangeRate || "0";
+  const displayedTvlUsd =
+    isFundedVault
+      ? effectiveInfo?.projectedTvlUsd || effectiveInfo?.tvlUsd || "0"
+      : effectiveInfo?.tvlUsd || "0";
+  const exchangeRate = formatExchangeRate(displayedExchangeRate, assetSymbol);
+  const tvlDisplay = loadingVaults ? "..." : formatUsdAmount(displayedTvlUsd);
   const bestApyInfo = useMemo(
     () => findBestEarnApyInfo(tokenApys, effectiveInfo?.vaultAddress),
     [effectiveInfo?.vaultAddress, tokenApys]
@@ -211,8 +268,14 @@ const EarnYieldVault = () => {
     return { label: `+${rawTotal.toFixed(2)}%`, className: "text-foreground" };
   })();
   const userShares = userInfo?.userShares || "0";
-  const redeemableAssets = userInfo?.redeemableAssets || "0";
-  const positionUsdWad = userInfo?.positionUsd || "0";
+  const redeemableAssets =
+    isFundedVault
+      ? userInfo?.projectedRedeemableAssets || userInfo?.redeemableAssets || "0"
+      : userInfo?.redeemableAssets || "0";
+  const positionUsdWad =
+    isFundedVault
+      ? userInfo?.projectedPositionUsd || userInfo?.positionUsd || "0"
+      : userInfo?.positionUsd || "0";
   const walletAssets = userInfo?.walletAssets || "0";
   const maxRedeemShares = userInfo?.maxRedeem || "0";
   const maxWithdrawAssets = userInfo?.maxWithdraw || "0";
@@ -300,19 +363,23 @@ const EarnYieldVault = () => {
   const totalClaimableAssetsBig = BigInt(effectiveInfo?.totalClaimableAssets || "0");
   const activeAssetsBig =
     totalAssetsBig > totalClaimableAssetsBig ? totalAssetsBig - totalClaimableAssetsBig : 0n;
+  const depositPricingAssetsBig =
+    isFundedVault
+      ? BigInt(effectiveInfo?.projectedActiveAssets || activeAssetsBig.toString())
+      : activeAssetsBig;
   const totalSharesBig = BigInt(effectiveInfo?.totalShares || "0");
 
   const previewValueWei = useMemo(() => {
     if (amountWei <= 0n) return 0n;
 
     if (actionMode === "deposit") {
-      return previewSharesForAssets(amountWei, activeAssetsBig, totalSharesBig);
+      return previewSharesForAssets(amountWei, depositPricingAssetsBig, totalSharesBig);
     }
     if (actionMode === "redeem") {
       return previewAssetsForShares(amountWei, activeAssetsBig, totalSharesBig);
     }
     return 0n;
-  }, [actionMode, amountWei, activeAssetsBig, totalSharesBig]);
+  }, [actionMode, amountWei, activeAssetsBig, depositPricingAssetsBig, totalSharesBig]);
 
   const instantWithdrawSharesWei = useMemo(() => {
     if (actionMode !== "redeem" || amountWei <= 0n) return 0n;
@@ -347,6 +414,7 @@ const EarnYieldVault = () => {
       refreshVaults(),
       refetchRewardsActivities(),
       refetchUserRewards(),
+      loadHistory(),
     ]);
     window.setTimeout(() => {
       Promise.allSettled([refetchRewardsActivities(), refetchUserRewards()]).catch(
@@ -481,6 +549,24 @@ const EarnYieldVault = () => {
     );
   }
 
+  const positionValueDisplay = loadingVaults
+    ? "..."
+    : isLoggedIn
+      ? (() => {
+          const sharesBn = BigInt(userShares || "0");
+          const priceBn = BigInt(userInfo?.assetPriceWad || "0");
+          if (sharesBn <= 0n) return "--";
+          if (priceBn <= 0n && BigInt(positionUsdWad || "0") <= 0n) return "--";
+          return formatUsdAmount(positionUsdWad);
+        })()
+      : "--";
+  const rewardPointsDisplay =
+    loadingVaults || rewardsActivitiesLoading || rewardsUserLoading
+      ? "..."
+      : isLoggedIn
+        ? `${carryRewardPointsPerDay} points/day`
+        : "--";
+
   const metrics = [
     {
       label: `${assetSymbol} Balance`,
@@ -496,24 +582,15 @@ const EarnYieldVault = () => {
     },
     {
       label: "Position Value",
-      value: loadingVaults
-        ? "..."
-        : isLoggedIn
-          ? (() => {
-            const sharesBn = BigInt(userShares || "0");
-            const priceBn = BigInt(userInfo?.assetPriceWad || "0");
-            const usdPart = formatUsdAmount(positionUsdWad);
-            if (sharesBn <= 0n) return "--";
-            if (priceBn <= 0n && BigInt(positionUsdWad || "0") <= 0n) return "--";
-            const underlyingHint = `${formatTokenAmount(redeemableAssets, decimals)} ${assetSymbol}`;
-            return `${usdPart} (${underlyingHint})`;
-          })()
-          : "--",
+      value:
+        positionValueDisplay === "--" || positionValueDisplay === "..."
+          ? positionValueDisplay
+          : `${positionValueDisplay} (${formatTokenAmount(redeemableAssets, decimals)} ${assetSymbol})`,
       hint: "NAV: share claim × exchange ratio × oracle price",
       icon: <CircleDollarSign className="h-4 w-4 text-violet-600 dark:text-violet-400" />,
     },
     {
-      label: "Estimated Rewards/Day",
+      label: "Reward Points / Day",
       value:
         loadingVaults || rewardsActivitiesLoading || rewardsUserLoading
           ? "..."
@@ -522,7 +599,7 @@ const EarnYieldVault = () => {
             : "--",
       hint: carryRewardPointsPerDollarPerDay
         ? `Points you can earn per day at the current rate (${carryRewardPointsPerDollarPerDay} pts/$1/day)`
-        : "Points you can earn per day at the current rate",
+        : "Reward Points you can earn per day at the current rate",
       icon: <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400" />,
     },
   ];
@@ -572,109 +649,253 @@ const EarnYieldVault = () => {
                   </div>
 
                   <Card className={`border ${meta?.cardBorder ?? ""}`}>
-                    <CardContent className="pt-5 space-y-5">
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-12 h-12 rounded-full ${meta.iconBg} flex items-center justify-center`}
-                          >
-                            <TrendingUp className={`h-6 w-6 ${meta.iconColor}`} />
+                    <CardContent className={isFundedVault ? "p-4 md:p-5" : "pt-5 space-y-5"}>
+                      {isFundedVault ? (
+                        <div className="space-y-3">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`w-9 h-9 rounded-full ${meta.iconBg} flex items-center justify-center`}
+                              >
+                                <TrendingUp className={`h-4 w-4 ${meta.iconColor}`} />
+                              </div>
+                              <div>
+                                <h1 className="text-xl md:text-2xl font-semibold tracking-tight">
+                                  {meta.title}
+                                </h1>
+                                <p className="text-xs text-muted-foreground">{meta.subtitle}</p>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 sm:min-w-[300px]">
+                              <Button
+                                className="h-9"
+                                onClick={() => handleActionRequest("deposit")}
+                                disabled={depositDisabled}
+                              >
+                                Deposit {assetSymbol}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="h-9"
+                                onClick={() => handleActionRequest("redeem")}
+                                disabled={redeemDisabled}
+                              >
+                                Withdraw
+                              </Button>
+                            </div>
                           </div>
-                          <div>
-                            <h1 className="text-2xl md:text-4xl font-semibold tracking-tight">
-                              {meta.title}
-                            </h1>
-                            <p className="text-sm md:text-base text-muted-foreground">
-                              {meta.subtitle}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                        <div className="rounded-lg border border-border/60 bg-background/70 p-3">
-                          <p className="text-muted-foreground">Exchange Rate</p>
-                          <p className="mt-1 text-lg font-semibold">{exchangeRate}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {assetSymbol} redeemable per {shareSymbol}
-                          </p>
-                        </div>
-                        <div className="rounded-lg border border-border/60 bg-background/70 p-3">
-                          <p className="text-muted-foreground">TVL</p>
-                          <p className="mt-1 text-lg font-semibold">{tvlDisplay}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Total value locked in the vault
-                          </p>
-                        </div>
-                        <div className="rounded-lg border border-border/60 bg-background/70 p-3">
-                          <p className="text-muted-foreground inline-flex items-center gap-1">
-                            Best Available APY
-                            <BestApyInfoTooltip />
-                          </p>
-                          {loadingVaults || rewardsActivitiesLoading ? (
-                            <p className="mt-1 text-lg font-semibold">...</p>
-                          ) : (
-                            <EarnApyTooltip info={bestApyInfo}>
-                              <p className={`mt-1 text-lg font-semibold cursor-default ${bestApyDisplay.className}`}>
-                                {bestApyDisplay.label}
+                          <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+                            <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
+                              <p className="text-muted-foreground">Current Price</p>
+                              <p className="mt-1 text-base font-semibold">{exchangeRate}</p>
+                            </div>
+                            <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
+                              <p className="text-muted-foreground">TVL</p>
+                              <p className="mt-1 text-base font-semibold">{tvlDisplay}</p>
+                            </div>
+                            <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
+                              <p className="inline-flex items-center gap-1 text-muted-foreground">
+                                Best Available APY
+                                <BestApyInfoTooltip />
                               </p>
-                            </EarnApyTooltip>
-                          )}
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Estimated annualized total yield, including rewards and native fees
-                          </p>
-                        </div>
-                      </div>
+                              {loadingVaults || rewardsActivitiesLoading ? (
+                                <p className="mt-1 text-base font-semibold">...</p>
+                              ) : (
+                                <EarnApyTooltip info={bestApyInfo}>
+                                  <p className={`mt-1 text-base font-semibold cursor-default ${bestApyDisplay.className}`}>
+                                    {bestApyDisplay.label}
+                                  </p>
+                                </EarnApyTooltip>
+                              )}
+                            </div>
+                          </div>
 
-                      <div className="flex flex-col sm:flex-row gap-3">
-                        <Button
-                          className="sm:min-w-[180px]"
-                          onClick={() => handleActionRequest("deposit")}
-                          disabled={depositDisabled}
-                        >
-                          Deposit {assetSymbol}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="sm:min-w-[180px]"
-                          onClick={() => handleActionRequest("redeem")}
-                          disabled={redeemDisabled}
-                        >
-                          Withdraw {shareSymbol}
-                        </Button>
-                      </div>
-                      {!isDeployed && (
-                        <p className="text-xs text-muted-foreground">
-                          This vault is not deployed on this network yet.
-                        </p>
-                      )}
-                      {hasPendingWithdrawal && (
-                        <p className="text-xs text-muted-foreground">
-                          You already have a queued withdrawal. Claim it once processed, or wait for the queue to clear before starting another withdrawal.
-                        </p>
+                          <div className="space-y-2">
+                            <p className="text-xs font-medium text-muted-foreground">Your Position</p>
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                              <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
+                                <p className="text-xs text-muted-foreground">Position Value</p>
+                                <p className="mt-1 text-base font-semibold">{positionValueDisplay}</p>
+                              </div>
+                              <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
+                                <p className="text-xs text-muted-foreground">Redeemable</p>
+                                <p className="mt-1 text-base font-semibold">
+                                  {isLoggedIn ? formatTokenAmount(redeemableAssets, decimals) : "--"}{" "}
+                                  {isLoggedIn ? assetSymbol : ""}
+                                </p>
+                              </div>
+                              <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
+                                <p className="text-xs text-muted-foreground">Your {shareSymbol}</p>
+                                <p className="mt-1 text-base font-semibold">
+                                  {isLoggedIn ? formatTokenAmount(userShares, decimals) : "--"}
+                                </p>
+                              </div>
+                              <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
+                                <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                  Reward Points / Day
+                                  <Sparkles className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                                </p>
+                                <p className="mt-1 text-base font-semibold">{rewardPointsDisplay}</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {(hasPendingWithdrawal || hasClaimableAssets) && (
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              {hasClaimableAssets && (
+                                <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-background/70 p-2.5 text-xs">
+                                  <div>
+                                    <p className="text-muted-foreground">Ready to Claim</p>
+                                    <p className="mt-1 text-base font-semibold text-foreground">
+                                      {formatTokenAmount(claimableAssets, decimals)} {assetSymbol}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isSubmitting}
+                                    onClick={handleClaim}
+                                  >
+                                    Claim
+                                  </Button>
+                                </div>
+                              )}
+                              {hasPendingWithdrawal && (
+                                <div className="rounded-lg border border-border/60 bg-background/70 p-2.5 text-xs">
+                                  <p className="text-muted-foreground">Queued Withdrawal</p>
+                                  <p className="mt-1 text-base font-semibold text-foreground">
+                                    {formatTokenAmount(pendingWithdrawal?.shares || "0", decimals)} {shareSymbol}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {!isDeployed && (
+                            <p className="text-xs text-muted-foreground">
+                              This vault is not deployed on this network yet.
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`w-12 h-12 rounded-full ${meta.iconBg} flex items-center justify-center`}
+                              >
+                                <TrendingUp className={`h-6 w-6 ${meta.iconColor}`} />
+                              </div>
+                              <div>
+                                <h1 className="text-2xl md:text-4xl font-semibold tracking-tight">
+                                  {meta.title}
+                                </h1>
+                                <p className="text-sm md:text-base text-muted-foreground">
+                                  {meta.subtitle}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                            <div className="rounded-lg border border-border/60 bg-background/70 p-3">
+                              <p className="text-muted-foreground">Exchange Rate</p>
+                              <p className="mt-1 text-lg font-semibold">{exchangeRate}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {assetSymbol} redeemable per {shareSymbol}
+                              </p>
+                            </div>
+                            <div className="rounded-lg border border-border/60 bg-background/70 p-3">
+                              <p className="text-muted-foreground">TVL</p>
+                              <p className="mt-1 text-lg font-semibold">{tvlDisplay}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Total value locked in the vault
+                              </p>
+                            </div>
+                            <div className="rounded-lg border border-border/60 bg-background/70 p-3">
+                              <p className="text-muted-foreground inline-flex items-center gap-1">
+                                Best Available APY
+                                <BestApyInfoTooltip />
+                              </p>
+                              {loadingVaults || rewardsActivitiesLoading ? (
+                                <p className="mt-1 text-lg font-semibold">...</p>
+                              ) : (
+                                <EarnApyTooltip info={bestApyInfo}>
+                                  <p className={`mt-1 text-lg font-semibold cursor-default ${bestApyDisplay.className}`}>
+                                    {bestApyDisplay.label}
+                                  </p>
+                                </EarnApyTooltip>
+                              )}
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Estimated annualized total yield, including rewards and native fees
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row gap-3">
+                            <Button
+                              className="sm:min-w-[180px]"
+                              onClick={() => handleActionRequest("deposit")}
+                              disabled={depositDisabled}
+                            >
+                              Deposit {assetSymbol}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="sm:min-w-[180px]"
+                              onClick={() => handleActionRequest("redeem")}
+                              disabled={redeemDisabled}
+                            >
+                              Withdraw {shareSymbol}
+                            </Button>
+                          </div>
+                          {!isDeployed && (
+                            <p className="text-xs text-muted-foreground">
+                              This vault is not deployed on this network yet.
+                            </p>
+                          )}
+                          {hasPendingWithdrawal && (
+                            <p className="text-xs text-muted-foreground">
+                              You already have a queued withdrawal. Claim it once processed, or wait for the queue to clear before starting another withdrawal.
+                            </p>
+                          )}
+                        </>
                       )}
                     </CardContent>
                   </Card>
                 </section>
 
-                <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-                  {metrics.map((metric) => (
-                    <Card key={metric.label} className="border border-border/70">
-                      <CardContent className="pt-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-muted-foreground">{metric.label}</p>
-                          {metric.icon}
-                        </div>
-                        <p className="text-2xl font-semibold leading-none">{metric.value}</p>
-                        <p className="text-xs text-muted-foreground">{metric.hint}</p>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </section>
+                {!isFundedVault && (
+                  <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                    {metrics.map((metric) => (
+                      <Card key={metric.label} className="border border-border/70">
+                        <CardContent className="pt-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs text-muted-foreground">{metric.label}</p>
+                            {metric.icon}
+                          </div>
+                          <p className="text-2xl font-semibold leading-none">{metric.value}</p>
+                          <p className="text-xs text-muted-foreground">{metric.hint}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </section>
+                )}
 
-                <section className="space-y-3">
-                  <h2 className="text-xl font-semibold">Vault Parameters</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                {isFundedVault && (
+                  <YieldVaultHistoryCharts
+                    history={history}
+                    currentExchangeRate={displayedExchangeRate}
+                    currentTvlUsd={displayedTvlUsd}
+                    assetSymbol={assetSymbol}
+                    loading={historyLoading}
+                  />
+                )}
+
+                {!isFundedVault && (
+                  <section className="space-y-3">
+                    <h2 className="text-xl font-semibold">Vault Parameters</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                     <Card className="border border-border/70">
                       <CardContent className="pt-4 space-y-2">
                         <p className="text-xs text-muted-foreground">Vault Address</p>
@@ -711,11 +932,67 @@ const EarnYieldVault = () => {
                         </p>
                       </CardContent>
                     </Card>
-                  </div>
+                    </div>
+                  </section>
+                )}
+
+                <section className="space-y-3">
+                  <h2 className="text-xl font-semibold">
+                    {isFundedVault ? "How This Vault Earns" : "Strategy"}
+                  </h2>
+                  <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+                    {meta?.strategyDescription}
+                  </p>
                 </section>
 
                 <section className="space-y-3">
-                  <h2 className="text-xl font-semibold">Strategy Holdings</h2>
+                  <details
+                    key={isFundedVault ? "funded-strategy" : "standard-strategy"}
+                    defaultOpen={!isFundedVault}
+                    className={isFundedVault ? "group rounded-lg border border-border/70 bg-card" : ""}
+                  >
+                    <summary
+                      className={
+                        isFundedVault
+                          ? "flex cursor-pointer list-none items-center justify-between p-4 text-xl font-semibold"
+                          : "hidden"
+                      }
+                    >
+                      Vault &amp; Strategy Details
+                      <ChevronDown className="h-5 w-5 transition-transform group-open:rotate-180" />
+                    </summary>
+                    <div className={isFundedVault ? "space-y-3 border-t border-border/70 p-4" : "space-y-3"}>
+                  {isFundedVault && (
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-4 border-b border-border/60 pb-4 text-sm lg:grid-cols-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Vault Address</p>
+                        <div className="mt-1 flex items-center gap-1">
+                          <p className="font-medium">{formatAddress(effectiveInfo?.vaultAddress || "")}</p>
+                          <CopyButton address={effectiveInfo?.vaultAddress || ""} />
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Idle Assets</p>
+                        <p className="mt-1 font-medium">
+                          {formatTokenAmount(effectiveInfo?.idleAssets || "0", decimals)} {assetSymbol}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Deployed Assets</p>
+                        <p className="mt-1 font-medium">
+                          {formatTokenAmount(effectiveInfo?.deployedAssets || "0", decimals)} {assetSymbol}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Reserve / Queue</p>
+                        <p className="mt-1 font-medium">
+                          {formatBps(effectiveInfo?.minIdleBps || "0")} ·{" "}
+                          {BigInt(effectiveInfo?.totalQueuedShares || "0") > 0n ? "Open" : "Clear"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  <h2 className={isFundedVault ? "sr-only" : "text-xl font-semibold"}>Strategy Holdings</h2>
                   {strategyHoldings.length > 0 ? (
                     <div className="grid grid-cols-1 gap-3">
                       {strategyHoldings.map((holding) => (
@@ -864,11 +1141,14 @@ const EarnYieldVault = () => {
                       </CardContent>
                     </Card>
                   )}
+                    </div>
+                  </details>
                 </section>
 
-                <section className="space-y-3">
-                  <h2 className="text-xl font-semibold">Withdrawal Status</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {!isFundedVault && (
+                  <section className="space-y-3">
+                    <h2 className="text-xl font-semibold">Withdrawal Status</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <Card className="border border-border/70">
                       <CardContent className="pt-4 space-y-2">
                         <p className="text-xs text-muted-foreground">Withdrawable Instantly</p>
@@ -918,15 +1198,10 @@ const EarnYieldVault = () => {
                         </Button>
                       </CardContent>
                     </Card>
-                  </div>
-                </section>
+                    </div>
+                  </section>
+                )}
 
-                <section className="space-y-3">
-                  <h2 className="text-xl font-semibold">Strategy</h2>
-                  <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
-                    {meta?.strategyDescription}
-                  </p>
-                </section>
               </CardContent>
             </Card>
           </div>

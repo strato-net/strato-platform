@@ -2,10 +2,6 @@ import OAuthUtil from "./oauth";
 import { config } from "../config";
 import { logError } from "../utils/logger";
 import { strato } from "../utils/api";
-import { Request } from "express";
-import axios from "axios";
-import jwt from "jsonwebtoken";
-import jwksClient from "jwks-rsa";
 
 
 // Validation function to check config at runtime
@@ -55,34 +51,6 @@ const TOKEN_LIFETIME_THRESHOLD_SECONDS = 10;
 let oauthInitialized = false;
 let oauthInstance: any = null;
 
-// JWKS client for token verification
-let jwksUri: string | undefined;
-let jwksClientInstance: jwksClient.JwksClient | undefined;
-
-/**
- * Fetches JWKS URI from the OpenID Connect discovery document
- */
-async function fetchJwksUri(openIdDiscoveryUrl: string | undefined): Promise<string> {
-  try {
-    if (!openIdDiscoveryUrl) {
-      throw new Error("OpenID Discovery URL is not defined");
-    }
-
-    const discoveryResponse = await axios.get(openIdDiscoveryUrl);
-    const { jwks_uri } = discoveryResponse.data;
-
-    if (!jwks_uri) {
-      throw new Error("JWKS URI not found in OpenID discovery document");
-    }
-
-    console.log("[Auth] Successfully fetched JWKS URI");
-    return jwks_uri;
-  } catch (error) {
-    console.error("[Auth] Failed to fetch OpenID discovery data:", error);
-    throw new Error("Failed to fetch OpenID discovery data");
-  }
-}
-
 export const initOpenIdConfig = async () => {
   // If already initialized, return immediately
   if (oauthInitialized) {
@@ -101,14 +69,6 @@ export const initOpenIdConfig = async () => {
 
     // Initialize OAuth client
     oauthInstance = await OAuthUtil.init(getOAuthConfig());
-
-    // Fetch JWKS URI for token verification
-    jwksUri = await fetchJwksUri(config.auth.openIdDiscoveryUrl);
-    jwksClientInstance = jwksClient({
-      jwksUri: jwksUri,
-      cache: true,
-      cacheMaxAge: 600000, // 10 minutes
-    });
 
     oauthInitialized = true;
 
@@ -222,89 +182,3 @@ export const getBAUserAddress = async (): Promise<string> => {
 
   return addressPromise;
 };
-
-/**
- * Get signing key from JWKS
- */
-function getKey(header: jwt.JwtHeader, callback: jwt.SigningKeyCallback) {
-  if (!jwksClientInstance) {
-    return callback(new Error("JWKS client not initialized"));
-  }
-
-  jwksClientInstance.getSigningKey(header.kid, (err, key) => {
-    if (err) {
-      return callback(err);
-    }
-    const signingKey = key?.getPublicKey();
-    callback(null, signingKey);
-  });
-}
-
-/**
- * Verify access token signature using JWKS
- */
-export async function verifyAccessTokenSignature(token: string): Promise<jwt.JwtPayload> {
-  if (!jwksClientInstance) {
-    throw new Error("JWKS client not initialized. Call initOpenIdConfig() first");
-  }
-
-  return new Promise((resolve, reject) => {
-    jwt.verify(token, getKey, {
-      algorithms: ['RS256'],
-    }, (err, decoded) => {
-      if (err) {
-        reject(new Error(`Token verification failed: ${err.message}`));
-      } else {
-        resolve(decoded as jwt.JwtPayload);
-      }
-    });
-  });
-}
-
-/**
- * Get the token from the header (x-user-access-token if it's present, or authorization header if not)
- * @param req - The request object
- * @returns The token from the header
- */
-export function getTokenFromHeader(req: Request): string | null {
-  // Handle header from nginx
-  const headerToken = req.headers["x-user-access-token"] as string | undefined;
-  if (headerToken) return headerToken;
-
-  // Handle header from local development mode
-  const auth = req.headers["authorization"];
-
-  if (typeof auth === "string") {
-    const [bearer, token] = auth.split(" ");
-    if (bearer === "Bearer" && token) return token;
-  }
-  return null;
-}
-
-/**
- * Try to get the STRATO address for a user token.
- * @returns the address, or null if none exists yet.
- * @throws on strato API failures or null address response.
- */
-export async function getUserKey(token: string): Promise<string> {
-  try {
-    const response = await axios.get(
-      `${config.api.nodeUrl}/strato/v2.3/key`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        timeout: 60000,
-      }
-    );
-    if (!response.data.address) {
-      throw new Error("No address returned from STRATO API");
-    }
-    return response.data.address;
-  } catch (err: any) {
-    console.error("Error getting user key:", err);
-    throw new Error("Address retrieval failed");
-  }
-}

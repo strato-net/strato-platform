@@ -18,7 +18,7 @@ import {
   type TrustlessClaimResult,
 } from "@/lib/bridge/trustlessClaim";
 import type { WalletTxProgressEvent } from "@/lib/axios";
-import type { BridgeToken } from "@mercata/shared-types";
+import type { BridgeToken } from "@strato/shared-types";
 
 /**
  * Trustless deposit-claim modal. Two phases:
@@ -158,6 +158,10 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
 
   // ─── Claim state (phase 2) ───────────────────────────────────────
   const [claimingTxHash, setClaimingTxHash] = useState<string | undefined>();
+  /** The row currently being claimed. Retry replays it verbatim — the
+   *  tx hash alone isn't enough because the claim needs the row's
+   *  routeType to pick the standard vs native path. */
+  const [claimingDeposit, setClaimingDeposit] = useState<PendingDeposit | undefined>();
   const [step, setStep] = useState<TrustlessClaimStep | "idle">("idle");
   const [error, setError] = useState<string | undefined>();
   const [waiting, setWaiting] = useState<
@@ -204,6 +208,7 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
     setWaiting(undefined);
     setResult(undefined);
     setClaimingTxHash(undefined);
+    setClaimingDeposit(undefined);
     setChainsError(undefined);
     fetchConfiguredChains()
       .then((c) => setChains(c))
@@ -368,6 +373,7 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
     if (!selectedChainId) return;
     setPhase("claim");
     setClaimingTxHash(deposit.txHash);
+    setClaimingDeposit(deposit);
     setStep("idle");
     setError(undefined);
     setWaiting(undefined);
@@ -430,21 +436,8 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
   };
 
   const onRetry = async () => {
-    if (!claimingTxHash || !selectedChainId) return;
-    const stub: PendingDeposit = {
-      txHash: claimingTxHash as `0x${string}`,
-      blockNumber: "0",
-      timestamp: "0",
-      logIndex: "0",
-      ethToken: "0x0000000000000000000000000000000000000000",
-      ethSender: "0x0000000000000000000000000000000000000000",
-      stratoRecipient: "0x0000000000000000000000000000000000000000",
-      targetStratoToken: "0x0000000000000000000000000000000000000000",
-      amount: "0",
-      depositId: "0",
-      depositKey: "0x0000000000000000000000000000000000000000000000000000000000000000",
-    };
-    return onClickDeposit(stub);
+    if (!claimingDeposit || !selectedChainId) return;
+    return onClickDeposit(claimingDeposit);
   };
 
   const onBackToPicker = () => {
@@ -454,6 +447,7 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
     setWaiting(undefined);
     setResult(undefined);
     setClaimingTxHash(undefined);
+    setClaimingDeposit(undefined);
   };
 
   const refreshDeposits = async () => {

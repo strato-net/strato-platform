@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Blockchain.Init.EthConf (genEthConf) where
+module Blockchain.Init.EthConf (genEthConf, preferIPv4Loopback) where
 
 import Blockchain.EthConf
 import Blockchain.Init.Options hiding (flags_localAuth)
@@ -181,6 +181,10 @@ genEthConf = do
         , gasLimit = flags_gasLimit
         , blockPeriodMs = flags_blockstanbul_block_period_ms
         , roundPeriodS = flags_blockstanbul_round_period_s
+        , stakingActivationBlock =
+            if flags_stakingActivationBlock < 0
+              then defaultStakingActivationBlock flags_network
+              else Just flags_stakingActivationBlock
         }
     }
 

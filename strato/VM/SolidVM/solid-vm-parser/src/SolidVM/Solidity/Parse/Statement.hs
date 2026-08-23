@@ -506,6 +506,56 @@ accountLiteral = do
   void $ char '>'
   pure acct
 
+-- | Explicit type-cast literal forms for transaction args: string("…"),
+-- address("hex"), uint(5), int(-5), bool(true), decimal("1.5"), bytes("00ff").
+-- A plain quoted literal's type depends on its content ("123" parses as the
+-- address 0x123), so a marshaler that knows the intended type emits the cast
+-- form instead; string("123") is always the three-character string. Plain
+-- literals keep their existing inference, so old-format args are unaffected.
+castLiteral :: SolidityParser Expression
+castLiteral =
+  asum
+    [ cast "string" StringLiteral stringLiteral,
+      cast "address" AddressLiteral addressContent,
+      cast "uint" (\a n -> NumberLiteral a n Nothing) integer,
+      cast "int" (\a n -> NumberLiteral a n Nothing) integer,
+      cast "bool" BoolLiteral boolContent,
+      cast "decimal" (\a d -> DecimalLiteral a (WrappedDecimal d)) decimalContent,
+      cast "bytes" HexaLiteral bytesContent
+    ]
+  where
+    cast name f p = try $ do
+      ~(a, v) <- withPosition $ reserved name >> parens p
+      pure $ f a v
+    addressContent = do
+      s <- stringLiteral <|> lexeme rawHex
+      case readMaybe s of
+        Just addr -> pure addr
+        Nothing -> fail $ "address(...): could not parse address from " ++ show s
+    rawHex :: SolidityParser String
+    rawHex = (++) <$> option "" (try $ string "0x") <*> many1 hexDigit
+    boolContent = (False <$ reserved "false") <|> (True <$ reserved "true")
+    decimalContent =
+      asum
+        [ try $ do
+            num <- lexeme integer
+            period <- string "."
+            fraction <- many1 digit
+            skipMany space
+            pure (read (show num ++ period ++ fraction) :: Decimal),
+          do
+            s <- stringLiteral
+            case readMaybe s of
+              Just d -> pure d
+              Nothing -> fail $ "decimal(...): could not parse decimal from " ++ show s,
+          fromInteger <$> integer
+        ]
+    bytesContent = do
+      s <- stringLiteral
+      when (not (all (`elem` ("0123456789abcdefABCDEF" :: String)) s) || odd (Prelude.length s)) $
+        fail "bytes(...): expected an even-length hex string"
+      pure s
+
 literal :: SolidityParser Expression
 literal =
   asum
@@ -523,6 +573,7 @@ literal =
         ~(a, (n, u)) <- withPosition $ (,) <$> integer <*> optionMaybe numberUnit
         pure $ NumberLiteral a n u,
       myHexParser,
+      castLiteral,
       do
         (a, str) <- withPosition stringLiteral
         pure $ case readMaybe str of

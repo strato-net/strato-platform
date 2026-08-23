@@ -265,6 +265,46 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
     _ -> [])
 slipstreamQueryText _ CreateView{..} =
   let baseColumnSet = Set.fromList $ sourceTableColumns ++ contractTableColumns ++ codeTableColumns
+      mappingKeyCount = length . concatMap fst $ filter ((== "key") . snd) viewColumns
+      mappingKeyName i = if i == 1 then "key" else "key" <> T.pack (show (i :: Int))
+      -- Array fields of struct values are stored as separate rows in the source
+      -- (mapping) table: one row per element, keyed by the parent's keys plus the
+      -- field name and the element index; the parent row only holds a scalar
+      -- placeholder. Reassemble the array with a correlated subquery. Rows written
+      -- by the old decoder stored the whole array inline as an indexed object, so
+      -- fall back to jsonb_obj_to_array for those.
+      arrayFieldColumn dataColumn c =
+        let fieldKey = mappingKeyName (mappingKeyCount + 1)
+            idxKey = mappingKeyName (mappingKeyCount + 2)
+            deeperKey = mappingKeyName (mappingKeyCount + 3)
+         in T.concat $
+              [ "CASE WHEN jsonb_typeof(s."
+              , wrapEscapeDouble dataColumn
+              , "->'"
+              , c
+              , "') = 'object' THEN jsonb_obj_to_array(s."
+              , wrapEscapeDouble dataColumn
+              , "->'"
+              , c
+              , "') ELSE COALESCE((SELECT jsonb_agg(e.\"value\" ORDER BY (e.\"key\"->>'"
+              , idxKey
+              , "')::numeric) FROM "
+              , tableNameToDoubleQuoteText sourceTableName
+              , " e WHERE e.address = s.address AND e.collection_name = s.collection_name"
+              ]
+           ++ [ T.concat [" AND e.\"key\"->>'", k, "' = s.\"key\"->>'", k, "'"]
+              | k <- mappingKeyName <$> [1 .. mappingKeyCount]
+              ]
+           ++ [ " AND e.\"key\"->>'"
+              , fieldKey
+              , "' = '"
+              , c
+              , "' AND jsonb_exists(e.\"key\", '"
+              , idxKey
+              , "') AND NOT jsonb_exists(e.\"key\", '"
+              , deeperKey
+              , "')), '[]'::jsonb) END"
+              ]
    in T.concat $
         [ "DROP VIEW IF EXISTS "
         , tableNameToDoubleQuoteText viewName
@@ -341,18 +381,7 @@ slipstreamQueryText _ CreateView{..} =
             . T.intercalate ", " $ concatMap (\(c, t) ->
             [ wrapEscapeSingle $ if c `Set.member` baseColumnSet then "arg_" <> c else c
             , case t of
-                SqlJsonbArray -> T.concat
-                  [ "CASE WHEN jsonb_exists(s."
-                  , wrapEscapeDouble dataColumn
-                  , ", '"
-                  , c
-                  , "') THEN jsonb_obj_to_array(s."
-                  , wrapEscapeDouble dataColumn
-                  , "->'"
-                  , c
-                  , "')"
-                  , " ELSE '[]'::jsonb END"
-                  ]
+                SqlJsonbArray -> arrayFieldColumn dataColumn c
                 _ -> T.concat
                   [ "to_jsonb(CASE WHEN jsonb_exists(s."
                   , wrapEscapeDouble dataColumn
@@ -520,6 +549,7 @@ data ProcessedCollectionRow = ProcessedCollectionRow
     blockTimestamp :: UTCTime,
     blockNumber :: Integer,
     collectionDataKeys :: [V.Value],
+    collectionDataPath :: Text,
     collectionDataValue :: V.Value
   }
   deriving (Show)
@@ -646,6 +676,9 @@ createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, val
   let tableName = collectionTableName creator n collectionName
       keySqlTypes = fromMaybe SqlText . solidityTypeToSQLType False (Just c) cc <$> keyTypes
       keyNames = keyColumnNames keySqlTypes
+      keyCount = length keyNames
+      lastKeyName = if keyCount <= 1 then "key" else "key" <> tshow keyCount
+      nextKeyName = "key" <> tshow (keyCount + 1)
       mStructName = case valueType of
         SVMType.UnknownLabel structName -> Just structName
         SVMType.Struct _ structName -> Just structName
@@ -674,6 +707,11 @@ createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, val
     , ([Right "value"], Just "IS", "NOT NULL")
     , ([Right "value", Left "::text"], Just "NOT IN", "('\"\"', '0', 'false')")
     , ([Left "jsonb_typeof(", Right "value", Left ")"], Just "IS", "NOT NULL")
+    -- Only rows whose key object has exactly this collection's key arity are
+    -- top-level entries; rows with more keys hold nested array elements/lengths
+    -- and rows with fewer keys hold array-length markers.
+    , ([Left $ "jsonb_exists(s.\"key\", '" <> lastKeyName <> "')"], Just "", "")
+    , ([Left $ "NOT jsonb_exists(s.\"key\", '" <> nextKeyName <> "')"], Just "", "")
     ]
     (Just $ ["s.address", "s.path", "x.creator", "c.contract_name"])
   let addressFK = ForeignKeyInfo (tableNameToText $ indexTableName creator n) tableName (indexTableName creator n) False "address" SqlText
@@ -851,12 +889,7 @@ insertCollectionTableQuery rows =
               . Map.fromList
               $ (\(t,k) -> (ValueString t, k))
               <$> keyColumnNames (collectionDataKeys m)
-            , SimpleValue . ValueString $ T.concat
-                [ collection_name m
-                , "["
-                , T.intercalate "][" $ fromMaybe "NULL" . valueToSQLText' False <$> collectionDataKeys m
-                , "]"
-                ]
+            , SimpleValue . ValueString $ collectionDataPath m
             , val
             ]
        in (m, isObject,) $ Just <$> keyValuePairs
@@ -1010,6 +1043,7 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
       blockTimestamp = eventBlockTimestamp ae,
       blockNumber = eventBlockNumber ae,
       collectionDataKeys = [index],
+      collectionDataPath = "", -- event_array inserts do not use the path column
       collectionDataValue = value
     }
 

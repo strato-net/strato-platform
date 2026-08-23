@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, FlaskConical } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import CopyButton from '../ui/copy';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatArgValue } from '@/utils/numberUtils';
+import { simulateAdminVote, type SimulationResult } from '@/lib/simulate';
+import SimulationResultPanel from './SimulationResultPanel';
 
 interface CastVoteModalProps {
   open: boolean;
@@ -20,7 +23,7 @@ interface CastVoteModalProps {
   } | null;
   onCastVote: (issueId: string) => Promise<void> | void;
   onDismissIssue?: (issueId: string) => Promise<void> | void;
-  votes?: Array<{ issueId: string; index: number; voter: string }>;
+  votes?: Array<{ issueId: string; voter: string }>;
   userAddress?: string | null;
 }
 
@@ -38,6 +41,36 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDismissing, setIsDismissing] = useState(false);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simResult, setSimResult] = useState<SimulationResult | null>(null);
+  const [simError, setSimError] = useState<string>('');
+
+  // Clear the previous simulation whenever the modal opens on a new issue.
+  useEffect(() => {
+    if (open) {
+      setSimResult(null);
+      setSimError('');
+    }
+  }, [open, issue?.issueId]);
+
+  const handleSimulate = async () => {
+    if (!issue) return;
+    setIsSimulating(true);
+    setSimResult(null);
+    setSimError('');
+    try {
+      const res = await simulateAdminVote({
+        target: issue.target,
+        func: issue.func,
+        args: issue.args,
+      });
+      setSimResult(res);
+    } catch (err) {
+      setSimError(err instanceof Error ? err.message : 'Simulation failed');
+    } finally {
+      setIsSimulating(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!issue) return;
@@ -157,7 +190,7 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
                       <span className="text-sm font-semibold text-muted-foreground min-w-[60px]">
                         Arg {index + 1}:
                       </span>
-                      <code className="text-sm font-mono break-all flex-1">{String(arg)}</code>
+                      <code className="text-sm font-mono break-all flex-1">{formatArgValue(arg)}</code>
                     </div>
                   ))}
                 </div>
@@ -182,6 +215,10 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
               <div className="text-2xl font-bold text-strato-blue">{issue.threshold}%</div>
             </div>
           </div>
+
+          {simResult || simError ? (
+            <SimulationResultPanel result={simResult} error={simError} title="Vote transaction" />
+          ) : null}
         </div>
 
         {/* Actions */}
@@ -218,6 +255,24 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
             </TooltipProvider>
           </div>
           <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleSimulate}
+              disabled={isSimulating || isSubmitting || isDismissing}
+            >
+              {isSimulating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Simulating...
+                </>
+              ) : (
+                <>
+                  <FlaskConical className="mr-2 h-4 w-4" />
+                  Simulate
+                </>
+              )}
+            </Button>
             <Button
               type="button"
               variant="outline"

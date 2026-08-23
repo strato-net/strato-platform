@@ -14,18 +14,25 @@ module SolidVM.Model.Delta
     fromDelta,
     eqDelta,
     ValidatorDelta,
-    getDeltasFromEvents
+    getDeltasFromEvents,
+    StakeDelta,
+    getStakeDeltasFromEvents,
+    applyStakeDelta
   )
 where
 
+import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.Validator
 import Control.DeepSeq
 import Data.Function (on)
-import Data.List (find)
+import Data.List (find, foldl')
+import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 import GHC.Generics
 import SolidVM.Model.Event
 import SolidVM.Model.Value (Value (..))
+import Text.Read (readMaybe)
 
 data Delta a b = Delta
   { _added   :: [a] -> [a]
@@ -73,3 +80,48 @@ getDeltasFromEvents = foldr go mempty
                 _ -> Nothing
               _ -> Nothing
             Nothing -> Nothing
+
+-- | Absolute stake weights published by MercataGovernance during a block.
+-- Within a block, the last write for a validator wins.
+type StakeDelta = M.Map Validator Integer
+
+-- | Stake weights are read from exactly one contract per block, chosen by
+-- 'stakeEventSourceAt'; 'Nothing' disables stake extraction. Two publishers exist
+-- and they emit different shapes, so the event name picks the parse:
+--
+--   * StratoStaking  ValidatorSynced(operator, validator, registered, weight)
+--     — registered=False always carries weight 0, but we force it anyway so a
+--     deactivation can never leave a stale weight.
+--   * MercataGovernance  ValidatorStakeUpdated(validator, stake)
+--
+-- Accepting both regardless of which address is watched keeps the fork itself
+-- trivial: only the watched address changes at the switch height, and a
+-- publisher that is not being watched simply contributes nothing.
+getStakeDeltasFromEvents :: Maybe Address -> [Event] -> StakeDelta
+getStakeDeltasFromEvents Nothing = const M.empty
+getStakeDeltasFromEvents (Just watchedAddr) = foldl' go M.empty
+  where go acc e
+          | evContractAddress e /= watchedAddr = acc
+          | evName e == "ValidatorSynced" =
+              maybe acc (\(v, st) -> M.insert v st acc) $ do
+                v <- Validator <$> arg "validator" e
+                registered <- boolArg "registered" e
+                st <- if registered then arg "weight" e else Just 0
+                pure (v, st)
+          | evName e == "ValidatorStakeUpdated" =
+              maybe acc (\(v, st) -> M.insert v st acc) $
+                (,) <$> (Validator <$> arg "validator" e) <*> arg "stake" e
+          | otherwise = acc
+        arg :: Read a => String -> Event -> Maybe a
+        arg name = (>>= readMaybe . eventArgValueString) . find ((== name) . eventArgName) . evArgs
+        -- rendered Bool is "True"/"true" depending on the emitting path
+        boolArg name e = case fmap eventArgValueString . find ((== name) . eventArgName) $ evArgs e of
+          Just str | str `elem` ["True", "true"] -> Just True
+                   | str `elem` ["False", "false"] -> Just False
+          _ -> Nothing
+
+-- | Apply a block's stake updates to the stake map in force for that block,
+-- dropping validators that were removed in the same block.
+applyStakeDelta :: [Validator] -> StakeDelta -> M.Map Validator Integer -> M.Map Validator Integer
+applyStakeDelta removed updates current =
+  M.union updates current `M.withoutKeys` S.fromList removed

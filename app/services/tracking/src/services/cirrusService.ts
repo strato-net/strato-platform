@@ -1,5 +1,6 @@
 import axios from "axios";
 import { config } from "../config";
+import { toCirrusAddress } from "../utils/addresses";
 import { logError } from "../utils/logger";
 
 // Anonymous PostgREST reads via the node's edge (GETs on /cirrus/search/ allow
@@ -21,6 +22,17 @@ const chunk = <T>(items: T[], size: number): T[][] => {
 
 const inList = (values: string[]): string =>
   `in.(${values.map((v) => `"${v}"`).join(",")})`;
+
+// Cirrus is expected to store bare lowercase hex, but contract attributes and
+// older rows can be 0x-prefixed. Filter on BOTH spellings so a differently
+// stored address never silently drops a wallet's events.
+const addressInList = (addresses: string[]): string =>
+  inList([...new Set(addresses.flatMap((a) => [a, `0x${a}`]))]);
+
+// Deduplicated, normalized (lowercase, no 0x) addresses; empties dropped
+const normalizeAddresses = (addresses: string[]): string[] => [
+  ...new Set(addresses.map((a) => toCirrusAddress(a || "")).filter(Boolean)),
+];
 
 // Cirrus timestamps arrive in varying shapes depending on the column type and
 // PostgREST version: ISO strings with/without zone, space-separated
@@ -50,6 +62,7 @@ export interface BridgeInEvent {
   stratoRecipient: string;
   stratoToken: string;
   stratoTokenAmount: string; // raw 1e18-scaled integer string
+  externalChainId: number | null;
   externalTxHash: string | null;
   txHash: string | null;
   timestampMs: number;
@@ -62,7 +75,7 @@ const DEPOSIT_TABLES: { bridge: BridgeInEvent["bridge"]; table: string }[] = [
 ];
 
 const DEPOSIT_SELECT =
-  "id,externalSender,externalTxHash,stratoRecipient,stratoToken,stratoTokenAmount::text,block_timestamp,transaction_hash";
+  "id,externalChainId::text,externalSender,externalTxHash,stratoRecipient,stratoToken,stratoTokenAmount::text,block_timestamp,transaction_hash";
 
 const fetchDepositRows = async (
   table: string,
@@ -74,7 +87,7 @@ const fetchDepositRows = async (
     try {
       const { data } = await cirrus.get(`/${table}`, {
         params: {
-          [column]: inList(group),
+          [column]: addressInList(group),
           select: DEPOSIT_SELECT,
           order: "block_timestamp.asc",
           limit: "10000",
@@ -93,9 +106,11 @@ const fetchDepositRows = async (
 // the external sender and the STRATO recipient, so a wallet tracked by either
 // identifier is attributable.
 export const fetchBridgeIns = async (
-  stratoAddresses: string[],
-  externalAddresses: string[]
+  rawStratoAddresses: string[],
+  rawExternalAddresses: string[]
 ): Promise<BridgeInEvent[]> => {
+  const stratoAddresses = normalizeAddresses(rawStratoAddresses);
+  const externalAddresses = normalizeAddresses(rawExternalAddresses);
   const seen = new Set<string>();
   const events: BridgeInEvent[] = [];
   for (const { bridge, table } of DEPOSIT_TABLES) {
@@ -119,13 +134,15 @@ export const fetchBridgeIns = async (
       const eventKey = `${table}:${row.id ?? `${row.transaction_hash}:${row.stratoRecipient}:${row.stratoTokenAmount}`}`;
       if (seen.has(eventKey)) continue;
       seen.add(eventKey);
+      const chainId = Number(row.externalChainId);
       events.push({
         bridge,
-        externalSender: (row.externalSender || "").toLowerCase(),
-        stratoRecipient: (row.stratoRecipient || "").toLowerCase(),
-        stratoToken: (row.stratoToken || "").toLowerCase(),
+        externalSender: toCirrusAddress(row.externalSender || ""),
+        stratoRecipient: toCirrusAddress(row.stratoRecipient || ""),
+        stratoToken: toCirrusAddress(row.stratoToken || ""),
         stratoTokenAmount: row.stratoTokenAmount ?? "0",
-        externalTxHash: row.externalTxHash ?? null,
+        externalChainId: Number.isFinite(chainId) && chainId > 0 ? chainId : null,
+        externalTxHash: row.externalTxHash || null,
         txHash: row.transaction_hash ?? null,
         timestampMs,
         eventKey,
@@ -198,7 +215,10 @@ const ACTIVITY_PAIRS: {
 
 // Post-bridge activity for the given STRATO addresses, from the unified event
 // table (note: it has no transaction_hash column, so activity rows carry none).
-export const fetchActivityEvents = async (stratoAddresses: string[]): Promise<ActivityEvent[]> => {
+export const fetchActivityEvents = async (
+  rawStratoAddresses: string[]
+): Promise<ActivityEvent[]> => {
+  const stratoAddresses = normalizeAddresses(rawStratoAddresses);
   if (stratoAddresses.length === 0) return [];
   const events: ActivityEvent[] = [];
   for (const pair of ACTIVITY_PAIRS) {
@@ -210,7 +230,7 @@ export const fetchActivityEvents = async (stratoAddresses: string[]): Promise<Ac
               "id,address,block_timestamp,event_name,attributes,storage!inner(contract!inner(contract_name))",
             "storage.contract.contract_name": `eq.${pair.contract}`,
             event_name: `eq.${pair.event}`,
-            [`attributes->>${pair.userAttr}`]: inList(group),
+            [`attributes->>${pair.userAttr}`]: addressInList(group),
             order: "block_timestamp.asc",
             limit: "5000",
           },
@@ -234,7 +254,7 @@ export const fetchActivityEvents = async (stratoAddresses: string[]): Promise<Ac
             contractName: pair.contract,
             eventName: pair.event,
             category: pair.category,
-            userAddress: (row.attributes?.[pair.userAttr] || "").toLowerCase(),
+            userAddress: toCirrusAddress(row.attributes?.[pair.userAttr] || ""),
             timestampMs,
             attributes: row.attributes ?? {},
             // Category in the key so a Transfer counted as sent-by-A and
@@ -255,17 +275,20 @@ export const fetchActivityEvents = async (stratoAddresses: string[]): Promise<Ac
 };
 
 // Token address (lowercase, no 0x) -> symbol
-export const fetchTokenSymbols = async (tokenAddresses: string[]): Promise<Map<string, string>> => {
+export const fetchTokenSymbols = async (
+  rawTokenAddresses: string[]
+): Promise<Map<string, string>> => {
   const symbols = new Map<string, string>();
+  const tokenAddresses = normalizeAddresses(rawTokenAddresses);
   if (tokenAddresses.length === 0) return symbols;
   for (const group of chunk(tokenAddresses, ADDRESS_CHUNK)) {
     try {
       const { data } = await cirrus.get(`/${PREFIX}Token`, {
-        params: { address: inList(group), select: "address,_symbol" },
+        params: { address: addressInList(group), select: "address,_symbol" },
       });
       if (!Array.isArray(data)) continue;
       for (const row of data) {
-        if (row.address && row._symbol) symbols.set(row.address.toLowerCase(), row._symbol);
+        if (row.address && row._symbol) symbols.set(toCirrusAddress(row.address), row._symbol);
       }
     } catch (error) {
       logError("Cirrus", error, { operation: "fetchTokenSymbols" });
@@ -285,7 +308,7 @@ export const fetchOraclePricesUsd = async (): Promise<Map<string, number>> => {
       for (const row of data) {
         if (!row.asset || !row.price) continue;
         try {
-          prices.set(row.asset.toLowerCase(), Number(BigInt(row.price)) / 1e18);
+          prices.set(toCirrusAddress(row.asset), Number(BigInt(row.price)) / 1e18);
         } catch {
           // non-integer price value; skip
         }

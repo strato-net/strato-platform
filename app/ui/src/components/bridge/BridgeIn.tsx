@@ -35,7 +35,7 @@ import {
 import { normalizeError } from "@/lib/bridge/utils";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { buildEarnApyMap } from "@/utils/earnUtils";
-import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits, truncateDecimals } from "@/utils/numberUtils";
+import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits, truncateAddress, truncateDecimals } from "@/utils/numberUtils";
 import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useEarnContext } from "@/context/EarnContext";
@@ -43,6 +43,7 @@ import { useUser } from "@/context/UserContext";
 import { useNetwork } from "@/context/NetworkContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useOracleContext } from "@/context/OracleContext";
 import BridgeWalletStatus from "./BridgeWalletStatus";
 import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
 import PercentageButtons from "@/components/ui/PercentageButtons";
@@ -69,6 +70,41 @@ const METAL_BUY_FEE_WEI = safeParseUnits(METAL_BUY_FEE).toString();
 const STEP3_APY_ROW_CLASS = "mt-0.5 flex min-h-[18px] items-center";
 
 const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
+const BPS = 10000n;
+const ACTION_SLIPPAGE_BPS = 100n;
+
+const calcDepositActionAmount = (amount: string, action: DepositAction): bigint => {
+  try {
+    const input = safeParseUnits(amount, 18);
+    const psmFeeBps = BigInt(action.psmFeeBps || "0");
+    if (psmFeeBps >= BPS) return 0n;
+    const usdstOut = input * (BPS - psmFeeBps) / BPS;
+    const outputPrice = BigInt(action.oraclePrice || "0");
+    if (outputPrice <= 0n) return 0n;
+
+    if (action.action === 3) {
+      return usdstOut * WAD / outputPrice;
+    }
+    if (action.action === 2) {
+      const forgeFeeBps = BigInt(action.feeBps || "0");
+      if (forgeFeeBps >= BPS) return 0n;
+      return (usdstOut * (BPS - forgeFeeBps) / BPS) * WAD / outputPrice;
+    }
+    return 0n;
+  } catch {
+    return 0n;
+  }
+};
+
+const combinedActionFeeBps = (action: DepositAction): string => {
+  try {
+    const psmFee = BigInt(action.psmFeeBps || "0");
+    const forgeFee = BigInt(action.feeBps || "0");
+    return (BPS - ((BPS - psmFee) * (BPS - forgeFee) / BPS)).toString();
+  } catch {
+    return action.feeBps || "0";
+  }
+};
 
 const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: string }): string => {
   switch (info.source) {
@@ -136,6 +172,19 @@ const metalPriceRowLabels = (oracleWei: string | undefined, feeBps: string | und
   return { spot: spot ?? "—", effective: eff ?? "—" };
 };
 
+/** Total USD (formatted) for a decimal token amount at a WAD-scaled USD unit price. */
+const fmtTotalDollarWei = (amountStr: string, priceWei: string | null | undefined): string | undefined => {
+  if (!priceWei) return undefined;
+  try {
+    const price = BigInt(priceWei);
+    const amt = safeParseUnits(amountStr || "0", 18);
+    if (price <= 0n || amt <= 0n) return undefined;
+    return fmtSpotDollarWei(((amt * price) / WAD).toString()) ?? undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 const getMetalBuyStepLabel = (functionName: string | undefined, paySymbol: string, metalSymbol: string): string => {
   if (functionName === "approve") return `Approve ${paySymbol}`;
   if (functionName === "mintMetal") return `Mint ${metalSymbol}`;
@@ -187,6 +236,7 @@ const CardSkeleton = ({ id }: { id: string }) => (
       </div>
     </div>
     <div className="h-[1rem] w-20 bg-muted rounded" />
+    <div className="h-[14px] w-16 bg-muted/40 rounded mt-0.5" />
     <div className={STEP3_APY_ROW_CLASS}>
       <div className="h-5 w-24 bg-muted/40 rounded-full" />
     </div>
@@ -194,8 +244,9 @@ const CardSkeleton = ({ id }: { id: string }) => (
   </div>
 );
 
-const TokenCard = ({ active, image, symbol, estimated, onClick, disabled, apyBadge, effectivePrice, spotLabel }: {
+const TokenCard = ({ active, image, symbol, estimated, estimatedUsd, onClick, disabled, apyBadge, effectivePrice, spotLabel }: {
   active: boolean; image?: string; symbol: string; estimated: string;
+  estimatedUsd?: string;
   onClick: () => void; disabled: boolean;
   apyBadge: React.ReactNode;
   effectivePrice?: string;
@@ -216,6 +267,7 @@ const TokenCard = ({ active, image, symbol, estimated, onClick, disabled, apyBad
       </div>
     </div>
     <p className="text-xs text-muted-foreground">{"\u2248"} {estimated} {symbol}</p>
+    <p className="min-h-[14px] text-[11px] font-medium text-foreground/80 leading-tight">{estimatedUsd ? `\u2248 ${estimatedUsd}` : "\u00a0"}</p>
     {apyBadge}
     <p className="min-h-[14px] text-[10px] text-muted-foreground mt-0.5">{spotLabel || "\u00A0"}</p>
   </button>
@@ -285,11 +337,12 @@ const ScrollRow = ({ children }: { children: React.ReactNode }) => {
 interface BridgeInProps {
   guestMode?: boolean;
   fundingMode?: "bridge" | "metals";
+  initialMetalAddress?: string | null;
   onFundingModeChange?: (mode: "bridge" | "metals") => void;
   onMetalPurchase?: () => void;
 }
 
-const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: externalFundingMode, onFundingModeChange, onMetalPurchase }) => {
+const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: externalFundingMode, initialMetalAddress, onFundingModeChange, onMetalPurchase }) => {
   // Hooks & Context
   const { isConnected, connector } = useAccount();
   const chainId = useChainId();
@@ -298,7 +351,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const { signTypedDataAsync } = useSignTypedData();
   const { openConnectModal } = useConnectModal();
   const { toast } = useToast();
-  const { userAddress, externalEvmWalletAddress, isExternalEvmWalletConnected, isAppAuthenticated } = useUser();
+  const { userAddress, stratoAddress, externalEvmWalletAddress, isExternalEvmWalletConnected, isAppAuthenticated } = useUser();
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { activeTokens, fetchTokens } = useUserTokens();
   const {
@@ -309,12 +362,19 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     setSelectedNetwork,
     selectedToken,
     setSelectedToken,
-    requestDepositAction,
     triggerDepositRefresh,
   } = useBridgeContext();
   const { tokenApys, tokenApysLoaded } = useEarnContext();
   const { contactEnabled } = useNetwork();
+  const { prices: oraclePrices } = useOracleContext();
   const navigate = useNavigate();
+
+  // WAD-scaled USD price for a STRATO token address, tolerant of 0x-prefix differences.
+  const oraclePriceOf = useCallback((addr?: string): string | null => {
+    if (!addr) return null;
+    const bare = addr.toLowerCase().replace(/^0x/, "");
+    return oraclePrices[bare] ?? oraclePrices[`0x${bare}`] ?? null;
+  }, [oraclePrices]);
 
   // State -- fundingMode can be controlled externally or managed internally
   const [internalMode, setInternalMode] = useState<"bridge" | "metals">("bridge");
@@ -360,10 +420,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     metalForgeService.getConfigs().then(cfg => {
       setMetalsConfig(cfg);
       const enabledMetals = cfg.metals.filter(m => m.isEnabled);
-      if (cfg.payTokens.length) setSelectedPayToken(cfg.payTokens[0]);
-      if (enabledMetals.length) setSelectedMetal(enabledMetals[0]);
+      const defaultPayToken = cfg.payTokens.find(token => token.symbol.toUpperCase() === "USDC") || cfg.payTokens[0];
+      const initialMetal = enabledMetals.find(metal => normAddr(metal.address) === normAddr(initialMetalAddress || "")) || enabledMetals[0];
+      if (defaultPayToken) setSelectedPayToken(defaultPayToken);
+      if (initialMetal) setSelectedMetal(initialMetal);
     }).catch(() => {});
-  }, [fundingMode]);
+  }, [fundingMode, initialMetalAddress, metalsConfig]);
 
   // Computed values
   const currentNetwork = useMemo(() => {
@@ -380,6 +442,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     [bridgeableTokens]
   );
 
+  // USD value of the amount being bridged in, shown under the "You Send" input.
+  const sendUsd = fmtTotalDollarWei(amount, oraclePriceOf(selectedToken?.stratoToken));
+
   const { sourceTokenRoutes, matchingActions } = useMemo(() => {
     if (!selectedToken) return { sourceTokenRoutes: prevCardsRef.current.routes, matchingActions: prevCardsRef.current.actions };
     const routes = selectedToken.routeType === "native"
@@ -389,17 +454,17 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           token.externalToken?.toLowerCase() === selectedToken.externalToken?.toLowerCase()
         );
     if (routes.length > 0) prevRouteCountRef.current = routes.length;
-    const mintStratoTokens = new Set(
-      routes
-        .filter(r => r.routeType !== "native" && r.isDefaultRoute)
-        .map(r => normAddr(r.stratoToken))
-    );
+    const routeTokens = new Set(routes.map((route) => normAddr(route.stratoToken)));
     const actions = selectedToken.routeType === "native"
       ? []
-      : depositActions.filter(a => a.payToken && mintStratoTokens.has(normAddr(a.payToken)));
+      : depositActions.filter((action) =>
+          action.payToken &&
+          routeTokens.has(normAddr(action.payToken)) &&
+          action.externalChainIds.includes(currentNetwork?.chainId || "")
+        );
     if (routes.length > 0) prevCardsRef.current = { routes, actions };
     return { sourceTokenRoutes: routes.length > 0 ? routes : prevCardsRef.current.routes, matchingActions: routes.length > 0 ? actions : prevCardsRef.current.actions };
-  }, [depositableBridgeTokens, nativeBridgeTokens, selectedToken, depositActions]);
+  }, [depositableBridgeTokens, nativeBridgeTokens, selectedToken, depositActions, currentNetwork?.chainId]);
 
   const getApyInfo = useMemo(() => {
     const m = buildEarnApyMap(tokenApys);
@@ -471,7 +536,11 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const expectedChainId = currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : null;
   const externalSender = externalEvmWalletAddress;
   const externalSenderHex = externalSender ? (externalSender as `0x${string}`) : undefined;
-  const stratoRecipient = userAddress;
+  // Must match the identity the backend resolves for this user, since deposit history
+  // and balances are filtered by it: with a vault session the X-Wallet-Address header is
+  // suppressed and the backend uses the vault address; without one it uses the wallet.
+  const stratoRecipient = isAppAuthenticated ? stratoAddress : externalEvmWalletAddress;
+  const stratoRecipientHex = ensureHexPrefix(stratoRecipient);
   const hasExternalWallet = isConnected && isExternalEvmWalletConnected && !!externalSenderHex;
   const isCorrectNetwork = hasExternalWallet && !!chainId && !!expectedChainId && chainId === expectedChainId;
   const isNativeRedemption = selectedToken?.routeType === "native";
@@ -489,10 +558,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     (token) => BigInt(token.externalToken || "0") === 0n
   );
   const useExternalWalletSigning = hasExternalWallet && !isAppAuthenticated;
-  const visibleMatchingActions = useMemo(
-    () => useExternalWalletSigning ? [] : matchingActions,
-    [matchingActions, useExternalWalletSigning]
-  );
+  const visibleMatchingActions = matchingActions;
 
   const {
     data: nativeBalance,
@@ -594,9 +660,18 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     [selectedToken?.externalDecimals]
   );
 
+  const selectedActionAmount = useMemo(
+    () => selectedAction && amount ? calcDepositActionAmount(amount, selectedAction) : 0n,
+    [amount, selectedAction]
+  );
+  const selectedActionIsAvailable = !selectedAction || (
+    visibleMatchingActions.some((action) => action.id === selectedAction.id) &&
+    normAddr(selectedAction.payToken) === normAddr(selectedToken?.stratoToken || "")
+  );
   const isButtonDisabled = guestMode || isLoading || !amount || !!amountError
     || !selectedToken || !hasExternalWallet || !currentNetwork || !isCorrectNetwork
-    || isBalanceLoading || !isTokenPermitted;
+    || isBalanceLoading || !isTokenPermitted || !selectedActionIsAvailable
+    || (!!selectedAction && selectedActionAmount <= 0n);
 
   // Effects
   useEffect(() => {
@@ -629,12 +704,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     setSelectedNetwork,
     setSelectedToken,
   ]);
-
-  useEffect(() => {
-    if (useExternalWalletSigning && selectedAction) {
-      setSelectedAction(null);
-    }
-  }, [useExternalWalletSigning, selectedAction]);
 
   useEffect(() => {
     if (selectedToken?.routeType === "native") {
@@ -916,6 +985,26 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         amount,
         parseInt(selectedToken.externalDecimals || "18"),
       );
+      const action = selectedAction?.action || 0;
+      if (action && !selectedActionIsAvailable) {
+        throw new Error("This action is not available for the selected route and network.");
+      }
+      if (action !== 0 && action !== 2 && action !== 3) {
+        throw new Error("Unsupported deposit action.");
+      }
+      const actionAmount = selectedAction ? calcDepositActionAmount(amount, selectedAction) : 0n;
+      if (action && actionAmount <= 0n) {
+        throw new Error("Unable to quote the selected deposit action.");
+      }
+      const actionIntent = action && selectedAction
+        ? {
+            action,
+            actionToken: action === 2 ? selectedAction.stratoToken : NATIVE_TOKEN_ADDRESS,
+            minFinalOut: action === 2
+              ? actionAmount * (BPS - ACTION_SLIPPAGE_BPS) / BPS
+              : 0n,
+          }
+        : undefined;
 
       if (selectedToken.routeType === "native") {
         if (!selectedToken.externalBridge) {
@@ -1076,6 +1165,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         account: externalSender,
         chainId: activeChainId,
         permitData,
+        actionIntent,
       });
 
       // Step: Confirm Transaction (for native tokens, this is already set above)
@@ -1098,22 +1188,44 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         if (!permitData) {
           throw new Error("Permit data is required for ERC20 deposits");
         }
-        txHash = await writeContractAsync({
-          address: depositRouter as `0x${string}`,
-          abi: DEPOSIT_ROUTER_ABI,
-          functionName: "deposit",
-          args: [
-            ensureHexPrefix(selectedToken.externalToken),
-            depositAmount,
-            ensureHexPrefix(stratoRecipient),
-            targetStratoToken,
-            permitData.nonce,
-            permitData.deadline,
-            permitData.signature as `0x${string}`,
-          ],
-          chain,
-          account: externalSenderHex,
-        });
+        if (actionIntent) {
+          txHash = await writeContractAsync({
+            address: depositRouter as `0x${string}`,
+            abi: DEPOSIT_ROUTER_ABI,
+            functionName: "depositWithAction",
+            args: [
+              ensureHexPrefix(selectedToken.externalToken),
+              depositAmount,
+              ensureHexPrefix(stratoRecipient),
+              targetStratoToken,
+              actionIntent.action,
+              ensureHexPrefix(actionIntent.actionToken),
+              actionIntent.minFinalOut,
+              permitData.nonce,
+              permitData.deadline,
+              permitData.signature as `0x${string}`,
+            ],
+            chain,
+            account: externalSenderHex,
+          });
+        } else {
+          txHash = await writeContractAsync({
+            address: depositRouter as `0x${string}`,
+            abi: DEPOSIT_ROUTER_ABI,
+            functionName: "deposit",
+            args: [
+              ensureHexPrefix(selectedToken.externalToken),
+              depositAmount,
+              ensureHexPrefix(stratoRecipient),
+              targetStratoToken,
+              permitData.nonce,
+              permitData.deadline,
+              permitData.signature as `0x${string}`,
+            ],
+            chain,
+            account: externalSenderHex,
+          });
+        }
       }
 
       setProgressTxHash(txHash);
@@ -1132,12 +1244,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       const adjustedAmount = (amount18Decimals * WAD / factor).toString();
 
       const existing = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
-      const action = useExternalWalletSigning ? 0 : selectedAction?.action || 0;
       existing.push({
         externalChainId: parseInt(activeChainId),
         externalTxHash: txHash,
-        type: action === 1 ? 'saving' : action === 2 ? 'forge' : 'bridge',
+        type: action === 3 ? 'saving' : action === 2 ? 'forge' : 'bridge',
         finalTokenSymbol: selectedAction?.stratoTokenSymbol,
+        finalAmount: action ? actionAmount.toString() : undefined,
         DepositInfo: {
           externalSender,
           stratoRecipient,
@@ -1152,16 +1264,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       });
       localStorage.setItem('pendingDeposits', JSON.stringify(existing));
       triggerDepositRefresh();
-
-      if (action > 0 && selectedAction) {
-        setCurrentStep("waiting_autosave");
-        await requestDepositAction({
-          externalChainId: activeChainId,
-          externalTxHash: txHash,
-          action,
-          targetToken: action === 2 ? selectedAction.stratoToken : undefined,
-        }, useExternalWalletSigning ? { walletAuth: true } : undefined);
-      }
 
       // Step: Complete
       setCurrentStep("complete");
@@ -1244,7 +1346,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                   <button
                     key={network.chainId}
                     type="button"
-                    onClick={() => setSelectedNetwork(network.chainName)}
+                    onClick={() => {
+                      setSelectedAction(null);
+                      setSelectedNetwork(network.chainName);
+                    }}
                     disabled={guestMode || isLoading}
                     className={`relative h-10 rounded-md text-sm font-medium border-2 transition-colors flex items-center justify-center ${
                       active
@@ -1374,6 +1479,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                     value={amount} onChange={(e) => handleAmountChange(e.target.value)}
                     disabled={guestMode || !hasExternalWallet || isLoading} />
                 </div>
+                {sendUsd && <p className="text-right text-xs text-muted-foreground pt-0.5">{"≈"} {sendUsd}</p>}
                 {amountError && <p className="text-xs text-red-500">{amountError}</p>}
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-xs text-muted-foreground">
@@ -1393,9 +1499,23 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
 
         {/* STEP 3 */}
         <section className="space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">3</span>
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Receive On STRATO</h3>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">3</span>
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Receive On STRATO</h3>
+            </div>
+            {stratoRecipientHex && (
+              <button
+                type="button"
+                className="text-[11px] text-muted-foreground font-mono hover:text-foreground transition-colors"
+                onClick={() => {
+                  navigator.clipboard.writeText(stratoRecipientHex);
+                  toast({ title: "Copied", description: "STRATO address copied to clipboard", duration: 1500 });
+                }}
+              >
+                {truncateAddress(stratoRecipientHex)}
+              </button>
+            )}
           </div>
 
           <div className="relative">
@@ -1405,12 +1525,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                   ? Array.from({ length: 2 }).map((_, i) => <CardSkeleton key={`ms-${i}`} id={`ms-${i}`} />)
                   : metalsConfig.metals.filter(m => m.isEnabled).map((metal) => {
                       const metalWei = amount && selectedPayToken ? calcMetalAmount(amount, metal, selectedPayToken) : 0n;
+                      const estMetal = metalWei > 0n ? truncateDecimals(formatUnits(metalWei, 18), 6) : "0";
                       const prices = metalPriceRowLabels(metal.price, metal.feeBps);
                       return (
                         <TokenCard key={metal.address}
                           active={selectedMetal?.address === metal.address}
                           image={metal.imageUrl} symbol={metal.symbol}
-                          estimated={metalWei > 0n ? truncateDecimals(formatUnits(metalWei, 18), 6) : "0"}
+                          estimated={estMetal}
+                          estimatedUsd={fmtTotalDollarWei(estMetal, metal.price)}
                           onClick={() => setSelectedMetal(metal)}
                           disabled={guestMode || isLoading}
                           effectivePrice={prices.effective}
@@ -1433,43 +1555,45 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                         if (factor > 0n) est = truncateDecimals(formatUnits((safeParseUnits(amount, 18) * WAD) / factor, 18), 6);
                       } catch { /* keep original */ }
                     }
+                    const rtPrice = oraclePriceOf(rt.stratoToken);
                     return (
                       <TokenCard key={rt.id}
                         active={rt.id === selectedToken?.id && !selectedAction}
                         image={rt.stratoTokenImage} symbol={rt.stratoTokenSymbol}
                         estimated={est}
+                        estimatedUsd={fmtTotalDollarWei(est, rtPrice)}
                         onClick={() => { setSelectedToken(rt); setSelectedAction(null); }}
                         disabled={guestMode || isLoading}
+                        effectivePrice={fmtSpotDollarWei(rtPrice ?? "") ?? undefined}
                         apyBadge={<ApyLine addr={rt.stratoToken} />}
                       />
                     );
                   }),
                   ...visibleMatchingActions.map((action) => {
-                    let est = amount || "0";
-                    if (action.action === 2 && action.oraclePrice && amount) {
-                      try {
-                        const price = BigInt(action.oraclePrice);
-                        if (price > 0n) est = truncateDecimals(formatUnits((safeParseUnits(amount, 18) * WAD) / price, 18), 6);
-                      } catch { /* keep */ }
-                    }
+                    const actionAmount = amount ? calcDepositActionAmount(amount, action) : 0n;
+                    const est = actionAmount > 0n ? truncateDecimals(formatUnits(actionAmount, 18), 6) : "0";
                     const isForge = action.action === 2;
+                    const totalFeeBps = isForge ? combinedActionFeeBps(action) : undefined;
                     const forgePrices = isForge
-                      ? metalPriceRowLabels(action.oraclePrice, action.feeBps)
+                      ? metalPriceRowLabels(action.oraclePrice, totalFeeBps)
                       : undefined;
                     const earnPrice = !isForge && action.oraclePrice
                       ? fmtSpotDollarWei(action.oraclePrice)
                       : undefined;
-                    const forgeSpotLabel = forgePrices && action.feeBps
-                      ? `Spot ${forgePrices.spot} \u00B7 ${Number(action.feeBps) / 100}% fee`
+                    const forgeSpotLabel = forgePrices && totalFeeBps
+                      ? `Spot ${forgePrices.spot} \u00B7 ${Number(totalFeeBps) / 100}% fees`
                       : undefined;
                     return (
                       <TokenCard key={action.id}
                         active={selectedAction?.id === action.id}
                         image={action.stratoTokenImage} symbol={action.stratoTokenSymbol}
                         estimated={est}
+                        estimatedUsd={fmtTotalDollarWei(est, action.oraclePrice)}
                         onClick={() => {
-                          const mintRoute = sourceTokenRoutes.find(r => !r.isDefaultRoute);
-                          if (mintRoute) setSelectedToken(mintRoute);
+                          const actionRoute = sourceTokenRoutes.find(
+                            (route) => normAddr(route.stratoToken) === normAddr(action.payToken)
+                          );
+                          if (actionRoute) setSelectedToken(actionRoute);
                           setSelectedAction(action);
                         }}
                         disabled={guestMode || isLoading}
@@ -1567,7 +1691,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           currentStep={currentStep}
           txHash={progressTxHash}
           chainId={currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : undefined}
-          isEasySavings={(selectedAction?.action || 0) > 0}
           isNative={progressIsNative}
           isRedemption={progressIsRedemption}
           error={progressError}

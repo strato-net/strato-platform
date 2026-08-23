@@ -1,7 +1,7 @@
 const winston = require("winston-color");
 const models = require("../models");
 const Promise = require("bluebird");
-const rp = require("request-promise");
+const axios = require("axios");
 const moment = require("moment");
 
 const config = require("../config/app.config");
@@ -99,15 +99,12 @@ async function updateNetworkHealthStatus(status, statusMessage) {
 }
 
 async function getMonitorUrl() {
-  const options = {
+  const { data: resp } = await axios({
     method: "GET",
     url: `http://${process.env['STRATO_HOSTNAME']}:${process.env['STRATO_PORT_API']}/eth/v1.2/metadata`,
-    followRedirects: false,
+    maxRedirects: 0,
     timeout: config.healthCheck.requestTimeout - 100,
-    json: true,
-  };
-
-  const resp = await rp(options);
+  });
   return resp.urls.monitor;
 }
 
@@ -115,14 +112,13 @@ async function getNetworkStatus() {
   if (!MONITOR_URL) {
     throw Error("MONITOR_URL is not set.");
   }
-  const options = {
+  const { data } = await axios({
     method: "GET",
     url: `${MONITOR_URL}/health`,
-    followRedirects: false,
+    maxRedirects: 0,
     timeout: config.networkHealthCheck.requestTimeout - 100,
-    json: true,
-  };
-  return rp(options);
+  });
+  return data;
 }
 
 module.exports = {

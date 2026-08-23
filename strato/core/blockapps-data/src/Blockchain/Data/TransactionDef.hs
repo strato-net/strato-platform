@@ -51,7 +51,10 @@ data Transaction
         r :: Integer,
         s :: Integer,
         v :: Word8,
-        txVersion :: Word8
+        txVersion :: Word8,
+        -- | Opaque attribution suffix (e.g. an ERC-8021 data suffix). Never
+        -- interpreted during execution; empty for the vast majority of txs.
+        attribution :: B.ByteString
       }
   | ContractCreationTX
       { nonce :: Integer,
@@ -208,6 +211,17 @@ instance RLPSerializable Transaction where
           _ -> error "rlpDecode Transaction: unexpected partial decode result"
     where
       partial = partialRLPDecode $ RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7]
+  -- 11 fields: STRATO legacy MessageTX carrying a trailing attribution suffix
+  rlpDecode (RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, attr, vVal, rVal, sVal]) =
+    case partialRLPDecode $ RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, attr] of
+          p@MessageTX {} ->
+            p
+              { v = fromInteger $ rlpDecode vVal,
+                r = rlpDecode rVal,
+                s = rlpDecode sVal,
+                txVersion = 0
+              }
+          _ -> error "rlpDecode Transaction: unexpected partial decode result"
   -- 9 fields: Ethereum legacy format
   rlpDecode (RLPArray [n, gp, gl, toAddr, val, dat, vVal, rVal, sVal]) =
     let rawV = rlpDecode vVal :: Integer
@@ -241,6 +255,16 @@ instance RLPSerializable Transaction where
                         txVersion = typeByte
                       }
                   p@ContractCreationTX {} ->
+                    p { v = fromInteger $ rlpDecode vVal,
+                        r = rlpDecode rVal,
+                        s = rlpDecode sVal,
+                        txVersion = typeByte
+                      }
+                  _ -> error "rlpDecode Transaction: unexpected partial decode for typed TX"
+            -- 11-item inner: typed MessageTX carrying a trailing attribution suffix
+            RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, attr, vVal, rVal, sVal] ->
+              case partialRLPDecode $ RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, attr] of
+                  p@MessageTX {} ->
                     p { v = fromInteger $ rlpDecode vVal,
                         r = rlpDecode rVal,
                         s = rlpDecode sVal,
@@ -318,7 +342,24 @@ partialRLPDecode (RLPArray [RLPScalar 2, n, gl, toAddr, fn, ags, net]) =
       r = error "r not initialized in partialRLPDecode",
       s = error "s not initialized in partialRLPDecode",
       v = error "v not initialized in partialRLPDecode",
-      txVersion = 0
+      txVersion = 0,
+      attribution = B.empty
+    }
+-- 8-item MessageTX: legacy form plus a trailing attribution suffix.
+partialRLPDecode (RLPArray [RLPScalar 2, n, gl, toAddr, fn, ags, net, attr]) =
+  MessageTX
+    { nonce = rlpDecode n,
+      gasLimit = rlpDecode gl,
+      to = rlpDecode toAddr,
+      funcName = rlpDecode fn,
+      args = rlpDecode ags,
+      network = rlpDecode net,
+      chainId = Nothing,
+      r = error "r not initialized in partialRLPDecode",
+      s = error "s not initialized in partialRLPDecode",
+      v = error "v not initialized in partialRLPDecode",
+      txVersion = 0,
+      attribution = rlpDecode attr
     }
 partialRLPDecode x = error ("rlp object has wrong format in call to partialRLPDecode: " ++ show x)
 
@@ -333,6 +374,10 @@ partialRLPEncode MessageTX {..} =
       rlpEncode args,
       rlpEncode network
     ]
+    -- Attribution is an optional trailing item: when empty (the common case)
+    -- the encoding is byte-identical to the legacy 7-item form, so existing
+    -- hashes and signatures are unchanged.
+    ++ [rlpEncode attribution | not (B.null attribution)]
 partialRLPEncode ContractCreationTX {..} =
   RLPArray $
     [ rlpEncode (1::Integer),

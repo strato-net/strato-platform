@@ -69,13 +69,14 @@ where
 
 import Data.Bits (shiftL)
 import qualified Data.ByteString as B
-import Data.Curve (Coordinates (Affine), Form (Weierstrass))
+import Blockchain.VM.SolidException (invalidArguments)
+import Data.Curve (Coordinates (Affine), Form (Weierstrass), mul')
 import qualified Data.Curve.Weierstrass.BLS12381 as G1Curve
 import qualified Data.Curve.Weierstrass.BLS12381T as G2Curve
 import Data.Curve.Weierstrass (Point (..), add, dbl, mul)
 import Data.Foldable (foldl')
-import Data.Pairing (pairing)
-import Data.Pairing.BLS12381 (Fq2)
+import Data.Pairing.Ate (finalExponentiationBLS12, millerAlgorithmBLS12)
+import Data.Pairing.BLS12381 (Fq2, GT', parameterBin, parameterHex)
 import GHC.Exts (IsList (fromList, toList))
 import qualified Data.Word as W
 
@@ -144,16 +145,30 @@ integerToBE n i
 -- F_p / F_p^2 codecs
 -- ============================================================================
 
+-- | The BLS12-381 base field modulus @p@ and subgroup order @r@.
+bnP :: Integer
+bnP = toInteger G1Curve._q
+
+bnR :: Integer
+bnR = toInteger G1Curve._r
+
 -- | Decode a 64-byte F_p element. Validates the 16-byte zero prefix that
---   EIP-2537 mandates (any leading non-zero byte indicates an attempt to
---   pass a value larger than the field).
+--   EIP-2537 mandates, and that the value is canonical (@< p@). The zero
+--   prefix alone bounds the value to 384 bits while @p@ is only 381, so
+--   without the second check a range of non-canonical encodings would be
+--   silently reduced mod p by 'fromInteger' -- two distinct byte strings
+--   mapping to one field element, which breaks the byte-exact EIP-2537
+--   contract and admits malleable signature/proof encodings.
 decodeFp :: B.ByteString -> Either String Integer
 decodeFp bs
   | B.length bs /= fpSize =
       Left $ "F_p element wrong length: expected " ++ show fpSize ++ ", got " ++ show (B.length bs)
   | not (B.all (== 0) (B.take 16 bs)) =
       Left "F_p element has non-zero high bytes (must be in 16 zero-byte padding)"
-  | otherwise = Right (beToInteger bs)
+  | v >= bnP = Left "F_p element is not canonical (must be < p)"
+  | otherwise = Right v
+  where
+    v = beToInteger bs
 
 -- | Encode an F_p element as 64 bytes (16-byte zero prefix + 48 bytes of value).
 encodeFp :: Integer -> B.ByteString
@@ -222,9 +237,12 @@ decodeG1 bs
       let p = A (fromInteger x :: G1Curve.Fq) (fromInteger y :: G1Curve.Fq)
       -- Reject off-curve points explicitly so misuse is a loud error
       -- rather than a silent pairing-equation hole.
-      if onCurveG1 p
-        then Right p
-        else Left "G1 point is not on the curve"
+      if not (onCurveG1 p)
+        then Left "G1 point is not on the curve"
+        else
+          if not (inSubgroupG1 p)
+            then Left "G1 point is not in the r-order subgroup"
+            else Right p
 
 -- | Curve-membership check for G1. Encodes the affine equation y^2 = x^3 + b.
 --   We compare in the field rather than relying on the library's typeclass
@@ -232,6 +250,21 @@ decodeG1 bs
 onCurveG1 :: G1 -> Bool
 onCurveG1 O = True
 onCurveG1 (A x y) = y * y == x * x * x + G1Curve._b
+
+-- | Subgroup membership for G1: @[r]P == O@.
+--
+--   Unlike BN254, BLS12-381's G1 has a large cofactor
+--   (h ≈ 2^126), so an on-curve point need not be in the r-order
+--   subgroup. EIP-2537 mandates this check on every MSM and pairing
+--   input: pairing a non-subgroup point can satisfy a verifier's pairing
+--   equation with a forged aggregate signature or KZG opening.
+--
+--   This is the straightforward @[r]P@ test. Faster endomorphism-based
+--   checks exist (Bowe / Scott) and are worth revisiting alongside the
+--   pairing final-exponentiation work if subgroup checks show up hot.
+inSubgroupG1 :: G1 -> Bool
+inSubgroupG1 O = True
+inSubgroupG1 p = mul' p bnR == O
 
 -- | Encode a G1 point as 128 bytes (x || y). Point at infinity becomes
 --   the all-zero string.
@@ -255,15 +288,24 @@ decodeG2 bs
       (xc0, xc1) <- decodeFp2 (B.take fp2Size bs)
       (yc0, yc1) <- decodeFp2 (B.drop fp2Size bs)
       let p = A (mkFp2 xc0 xc1) (mkFp2 yc0 yc1)
-      if onCurveG2 p
-        then Right p
-        else Left "G2 point is not on the curve"
+      if not (onCurveG2 p)
+        then Left "G2 point is not on the curve"
+        else
+          if not (inSubgroupG2 p)
+            then Left "G2 point is not in the r-order subgroup"
+            else Right p
 
 -- | Curve-membership check for G2. The twist's b coefficient lives in
 --   F_p^2; same equation as G1 but with the extension-field arithmetic.
 onCurveG2 :: G2 -> Bool
 onCurveG2 O = True
 onCurveG2 (A x y) = y * y == x * x * x + G2Curve._b
+
+-- | Subgroup membership for G2: @[r]P == O@. The twist's cofactor is
+--   ~509 bits, so on-curve is very far from sufficient here.
+inSubgroupG2 :: G2 -> Bool
+inSubgroupG2 O = True
+inSubgroupG2 p = mul' p bnR == O
 
 -- | Encode a G2 point as 256 bytes.
 encodeG2 :: G2 -> B.ByteString
@@ -382,10 +424,7 @@ bls12381Pairing input
           ++ ", got " ++ show (B.length input)
   | otherwise = do
       pairs <- decodePairs input
-      let products = [pairing p1 p2 | (p1, p2) <- pairs]
-      -- mconcat over GT' uses the multiplicative identity (1_GT) as mempty,
-      -- so an empty product (filtered by the null check above) returns True.
-      pure $ mconcat products == mempty
+      pure $ pairingProduct pairs
   where
     decodePairs :: B.ByteString -> Either String [(G1, G2)]
     decodePairs bs
@@ -419,9 +458,28 @@ type G2Coords = (Fp2Coords, Fp2Coords)
 
 -- ---- Integer <-> point conversions ----
 
+-- | The integer-tuple entry points get the same validation as the byte
+--   decoders -- canonical coordinates, on-curve, and in the r-order
+--   subgroup. They are the shape SolidVM contracts reach for most often,
+--   so leaving them unchecked would route around every guarantee the
+--   bytes API provides. Failures throw 'invalidArguments' (rather than
+--   returning 'Either') to match the BN254 'ecAdd' / 'ecMul' convention:
+--   an invalid point reverts the transaction.
+outOfRange :: Integer -> Bool
+outOfRange c = c < 0 || c >= bnP
+
 g1FromInts :: G1Coords -> G1
 g1FromInts (0, 0) = O
-g1FromInts (x, y) = A (fromInteger x :: G1Curve.Fq) (fromInteger y :: G1Curve.Fq)
+g1FromInts (x, y)
+  | outOfRange x || outOfRange y =
+      invalidArguments "bls12381" $ "G1 coordinate out of range [0, p): " ++ show (x, y)
+  | not (onCurveG1 p) =
+      invalidArguments "bls12381" $ "G1 point is not on the curve: " ++ show (x, y)
+  | not (inSubgroupG1 p) =
+      invalidArguments "bls12381" $ "G1 point is not in the r-order subgroup: " ++ show (x, y)
+  | otherwise = p
+  where
+    p = A (fromInteger x :: G1Curve.Fq) (fromInteger y :: G1Curve.Fq)
 
 g1ToInts :: G1 -> G1Coords
 g1ToInts O = (0, 0)
@@ -429,7 +487,16 @@ g1ToInts (A x y) = (toInteger x, toInteger y)
 
 g2FromInts :: G2Coords -> G2
 g2FromInts ((0, 0), (0, 0)) = O
-g2FromInts ((xc0, xc1), (yc0, yc1)) = A (mkFp2 xc0 xc1) (mkFp2 yc0 yc1)
+g2FromInts coords@((xc0, xc1), (yc0, yc1))
+  | any outOfRange [xc0, xc1, yc0, yc1] =
+      invalidArguments "bls12381" $ "G2 coordinate out of range [0, p): " ++ show coords
+  | not (onCurveG2 p) =
+      invalidArguments "bls12381" $ "G2 point is not on the twist curve: " ++ show coords
+  | not (inSubgroupG2 p) =
+      invalidArguments "bls12381" $ "G2 point is not in the r-order subgroup: " ++ show coords
+  | otherwise = p
+  where
+    p = A (mkFp2 xc0 xc1) (mkFp2 yc0 yc1)
 
 g2ToInts :: G2 -> G2Coords
 g2ToInts O = ((0, 0), (0, 0))
@@ -476,5 +543,23 @@ bls12381G2MsmInts =
 --   whether @∏ e(g1ᵢ, g2ᵢ) = 1_GT@. Empty input is the identity (True).
 bls12381PairingInts :: [(G1Coords, G2Coords)] -> Bool
 bls12381PairingInts pairs =
-  let products = [pairing (g1FromInts a) (g2FromInts b) | (a, b) <- pairs]
-   in mconcat products == mempty
+  pairingProduct [(g1FromInts a, g2FromInts b) | (a, b) <- pairs]
+
+-- | Whether @∏ e(G1ᵢ, G2ᵢ) = 1_GT@, computed with a single shared final
+--   exponentiation.
+--
+--   The final exponentiation is a group homomorphism, so
+--   @FE(a) * FE(b) = FE(a * b)@: accumulating the Miller loop outputs and
+--   exponentiating once is equivalent to calling 'pairing' per pair, but
+--   the final exponentiation (the dominant cost) runs once instead of @k@
+--   times. Aggregate-signature checks and KZG openings both pass two or
+--   more pairs, so this is a direct multiple on every verification.
+--
+--   Pairs containing the point at infinity contribute the identity
+--   (@e(O, Q) = 1@) and are dropped; an empty product is the identity, so
+--   the check trivially holds.
+pairingProduct :: [(G1, G2)] -> Bool
+pairingProduct pairs =
+  let millers :: [GT']
+      millers = [millerAlgorithmBLS12 parameterBin p1 p2 | (p1, p2) <- pairs, p1 /= O, p2 /= O]
+   in null millers || finalExponentiationBLS12 parameterHex (mconcat millers) == mempty

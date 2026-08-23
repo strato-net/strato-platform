@@ -16,10 +16,12 @@ where
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
+import Control.Applicative ((<|>))
 import Control.DeepSeq
 import Data.Aeson hiding (Value)
 import Data.Binary
 import GHC.Generics
+import SolidVM.Model.SolidString (stringToLabel)
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Model.Value (Value (..))
 import Test.QuickCheck
@@ -103,7 +105,18 @@ instance FromJSON Event where
       <*> o .: "eventContractName"
       <*> o .: "eventContractAddress"
       <*> o .: "eventName"
-      <*> o .: "eventArgs"
+      <*> (o .: "eventArgs" >>= mapM parseEventArg)
+    where
+      -- Accept both the current 4-element arg form [name, value, rendered, type]
+      -- and the legacy 3-element form [name, rendered, typeString] written by
+      -- older nodes (e.g. events in an existing genesis.json). The legacy form
+      -- carries no typed Value, so it degrades to SNULL + UnknownLabel; string
+      -- consumers keep working and typed consumers fall back on the rendered
+      -- form, mirroring the SNULL fallback in SolidVM.Model.Delta.
+      parseEventArg v = parseJSON v <|> parseLegacyArg v
+      parseLegacyArg v = do
+        (n, s, t) <- parseJSON v
+        pure (n, SNULL, s, SVMType.UnknownLabel (stringToLabel t))
   parseJSON o = error $ "parseJSON Event: Expected object, got:" ++ show o
 
 instance NFData Event

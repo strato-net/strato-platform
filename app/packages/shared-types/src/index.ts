@@ -24,3 +24,9 @@ export * from './earn-types';
 
 // Export all PoolV3 (concentrated liquidity) types
 export * from './poolv3-types';
+
+// Export all unified trade types
+export * from './trade-types';
+
+// Export all NFT (ERC-721) types
+export * from './nft-types';

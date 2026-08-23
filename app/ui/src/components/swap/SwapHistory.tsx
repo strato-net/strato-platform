@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Copy, Loader2 } from 'lucide-react';
-import { useSwapContext } from '@/context/SwapContext';
+import { useTradeForm } from '@/context/TradeFormContext';
+import { useTradeHistory } from '@/hooks/trade/useTradeHistory';
 import { useUser } from '@/context/UserContext';
+import { SwapHistoryEntry } from '@/interface';
 import { formatWeiAmount, formatHash } from '@/utils/numberUtils';
 
 // ============================================================================
@@ -69,7 +71,7 @@ const SenderCell = ({ sender, copiedHash, onCopy }: { sender: string; copiedHash
   </TableCell>
 );
 
-const SwapRow = ({ swap, copiedHash, onCopy }: { swap: any; copiedHash: string | null; onCopy: (text: string) => void }) => (
+const SwapRow = ({ swap, copiedHash, onCopy }: { swap: SwapHistoryEntry & { timestamp: Date }; copiedHash: string | null; onCopy: (text: string) => void }) => (
   <TableRow key={swap.id}>
     <TableCell className="text-sm">
       {formatTimestamp(swap.timestamp)}
@@ -96,35 +98,35 @@ const SwapRow = ({ swap, copiedHash, onCopy }: { swap: any; copiedHash: string |
   </TableRow>
 );
 
-const PaginationInfo = ({ currentPage, itemsPerPage, swapHistoryCount, swapHistoryLength }: {
+const PaginationInfo = ({ currentPage, itemsPerPage, totalCount, pageLength }: {
   currentPage: number;
   itemsPerPage: number;
-  swapHistoryCount: number;
-  swapHistoryLength: number;
+  totalCount: number;
+  pageLength: number;
 }) => {
   const start = (currentPage - 1) * itemsPerPage + 1;
-  const end = Math.min(currentPage * itemsPerPage, swapHistoryCount);
-  
+  const end = Math.min(currentPage * itemsPerPage, totalCount);
+
   return (
     <div className="text-sm text-muted-foreground">
-      {start === 1 && end === swapHistoryCount ? (
-        `Showing ${swapHistoryLength} trade${swapHistoryLength !== 1 ? 's' : ''}`
+      {start === 1 && end === totalCount ? (
+        `Showing ${pageLength} trade${pageLength !== 1 ? 's' : ''}`
       ) : (
-        `Showing ${start} to ${end} of ${swapHistoryCount} trades`
+        `Showing ${start} to ${end} of ${totalCount} trades`
       )}
     </div>
   );
 };
 
-const PaginationControls = ({ 
-  currentPage, 
-  totalPages, 
-  swapHistoryLoading, 
-  onPageChange 
+const PaginationControls = ({
+  currentPage,
+  totalPages,
+  loading,
+  onPageChange
 }: {
   currentPage: number;
   totalPages: number;
-  swapHistoryLoading: boolean;
+  loading: boolean;
   onPageChange: (page: number) => void;
 }) => {
   if (totalPages <= 1) return null;
@@ -135,19 +137,19 @@ const PaginationControls = ({
         variant="outline"
         size="sm"
         onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-        disabled={currentPage === 1 || swapHistoryLoading}
+        disabled={currentPage === 1 || loading}
       >
         Previous
       </Button>
       <span className="text-sm text-muted-foreground">
         Page {currentPage} of {totalPages}
-        {swapHistoryLoading && <span className="ml-2 text-blue-500">Loading...</span>}
+        {loading && <span className="ml-2 text-blue-500">Loading...</span>}
       </span>
       <Button
         variant="outline"
         size="sm"
         onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-        disabled={currentPage === totalPages || swapHistoryLoading}
+        disabled={currentPage === totalPages || loading}
       >
         Next
       </Button>
@@ -157,55 +159,40 @@ const PaginationControls = ({
 
 // ============================================================================
 // MAIN SWAP HISTORY COMPONENT
+// History spans every pool type for the selected pair (each row tagged with
+// its pool); prices are normalized to toAsset-per-fromAsset.
 // ============================================================================
 const SwapHistory: React.FC = () => {
-  // ========================================================================
-  // CONTEXT & HOOKS
-  // ========================================================================
-  const { refreshSwapHistory, pool, poolLoading, swapHistory, swapHistoryCount, swapHistoryLoading, fromAsset, toAsset } = useSwapContext();
+  const { state } = useTradeForm();
+  const { tokenIn, tokenOut } = state;
   const { userAddress } = useUser();
-  const tableRef = useRef<HTMLDivElement>(null);
 
-  // Mirror SwapContext's endpoint resolution: with a pair selected the history spans
-  // both venues (V2 pools + every V3 fee tier, each row tagged with its pool) and
-  // prices are normalized to toAsset-per-fromAsset (the requested pair order).
-  const hasPair = !!(fromAsset?.address && toAsset?.address);
-  const hasActivePool = hasPair || !!pool?.address;
-  const priceLabel = hasPair
-    ? `${toAsset?._symbol}/${fromAsset?._symbol}`
-    : `${pool?.tokenB?._symbol}/${pool?.tokenA?._symbol}`;
-  const columnCount = 8;
-
-  // ========================================================================
-  // STATE
-  // ========================================================================
   const [currentPage, setCurrentPage] = useState(1);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const [showMySwapsOnly, setShowMySwapsOnly] = useState(false);
 
-  // ========================================================================
-  // COMPUTED VALUES
-  // ========================================================================
-  const totalPages = Math.ceil(swapHistoryCount / ITEMS_PER_PAGE);
-  const isInitialLoad = swapHistoryLoading && swapHistory.length === 0;
-
-  // ========================================================================
-  // EFFECTS
-  // ========================================================================
+  // new pair or filter -> back to the first page
   useEffect(() => {
     setCurrentPage(1);
-    if (hasActivePool) {
-      refreshSwapHistory({
-        limit: ITEMS_PER_PAGE.toString(),
-        page: "1",
-        ...(showMySwapsOnly && userAddress ? { sender: userAddress } : {}),
-      });
-    }
-  }, [hasActivePool, refreshSwapHistory, showMySwapsOnly, userAddress]);
+  }, [tokenIn?.address, tokenOut?.address, showMySwapsOnly]);
 
-  // ========================================================================
-  // EVENT HANDLERS
-  // ========================================================================
+  const historyQuery = useTradeHistory({
+    tokenIn: tokenIn?.address,
+    tokenOut: tokenOut?.address,
+    page: currentPage,
+    limit: ITEMS_PER_PAGE,
+    sender: showMySwapsOnly && userAddress ? userAddress : undefined,
+  });
+
+  const hasPair = !!(tokenIn?.address && tokenOut?.address);
+  const entries = historyQuery.data?.entries ?? [];
+  const totalCount = historyQuery.data?.totalCount ?? 0;
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+  const loading = historyQuery.isFetching;
+  const isInitialLoad = historyQuery.isLoading;
+  const priceLabel = `${tokenOut?._symbol ?? ""}/${tokenIn?._symbol ?? ""}`;
+  const columnCount = 8;
+
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -216,20 +203,6 @@ const SwapHistory: React.FC = () => {
     }
   };
 
-  const handlePageChange = (newPage: number) => {
-    if (!hasActivePool) return;
-    
-    setCurrentPage(newPage);
-    refreshSwapHistory({
-      limit: ITEMS_PER_PAGE.toString(),
-      page: newPage.toString(),
-      ...(showMySwapsOnly && userAddress ? { sender: userAddress } : {}),
-    });
-  };
-
-  // ========================================================================
-  // RENDER
-  // ========================================================================
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -239,16 +212,16 @@ const SwapHistory: React.FC = () => {
             variant={showMySwapsOnly ? "default" : "outline"}
             size="sm"
             onClick={() => setShowMySwapsOnly(!showMySwapsOnly)}
-            disabled={!hasActivePool || swapHistoryLoading}
+            disabled={!hasPair || loading}
           >
-            {swapHistoryLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             {showMySwapsOnly ? "Showing My Trades" : "Show My Trades"}
           </Button>
         )}
       </div>
 
-      {hasActivePool ? (
-        <div ref={tableRef} className="bg-card rounded-lg border border-border">
+      {hasPair ? (
+        <div className="bg-card rounded-lg border border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -262,11 +235,11 @@ const SwapHistory: React.FC = () => {
                 <TableHead className="w-[100px]">Sender</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody className={`transition-opacity duration-200 ${swapHistoryLoading ? "opacity-50 pointer-events-none" : ""}`}>
+            <TableBody className={`transition-opacity duration-200 ${loading ? "opacity-50 pointer-events-none" : ""}`}>
               {isInitialLoad ? (
                 <LoadingRow colSpan={columnCount} />
-              ) : swapHistory.length > 0 ? (
-                swapHistory.map((swap) => (
+              ) : entries.length > 0 ? (
+                entries.map((swap) => (
                   <SwapRow
                     key={swap.id}
                     swap={swap}
@@ -284,21 +257,21 @@ const SwapHistory: React.FC = () => {
             <PaginationInfo
               currentPage={currentPage}
               itemsPerPage={ITEMS_PER_PAGE}
-              swapHistoryCount={swapHistoryCount}
-              swapHistoryLength={swapHistory.length}
+              totalCount={totalCount}
+              pageLength={entries.length}
             />
             <PaginationControls
               currentPage={currentPage}
               totalPages={totalPages}
-              swapHistoryLoading={swapHistoryLoading}
-              onPageChange={handlePageChange}
+              loading={loading}
+              onPageChange={setCurrentPage}
             />
           </div>
         </div>
       ) : (
         <div className="bg-muted/50 rounded-lg p-6 text-center">
           <p className="text-muted-foreground">
-            {poolLoading ? "Loading pool data..." : "Please select both token pairs to view trade history"}
+            Please select both token pairs to view trade history
           </p>
         </div>
       )}
