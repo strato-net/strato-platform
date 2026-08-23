@@ -85,21 +85,32 @@ getDeltasFromEvents = foldr go mempty
 -- Within a block, the last write for a validator wins.
 type StakeDelta = M.Map Validator Integer
 
--- | Stake weights come from the StratoStaking contract's ValidatorSynced
--- events: (operator, validator, registered, weight). registered=False always
--- carries weight 0, but we force it anyway so a deactivation can never leave a
--- stale weight. The watched address is the staking proxy from ethconf
--- ('stakingContractAddress'); 'Nothing' disables stake extraction.
+-- | Stake weights are read from exactly one contract per block, chosen by
+-- 'stakeEventSourceAt'; 'Nothing' disables stake extraction. Two publishers exist
+-- and they emit different shapes, so the event name picks the parse:
+--
+--   * StratoStaking  ValidatorSynced(operator, validator, registered, weight)
+--     — registered=False always carries weight 0, but we force it anyway so a
+--     deactivation can never leave a stale weight.
+--   * MercataGovernance  ValidatorStakeUpdated(validator, stake)
+--
+-- Accepting both regardless of which address is watched keeps the fork itself
+-- trivial: only the watched address changes at the switch height, and a
+-- publisher that is not being watched simply contributes nothing.
 getStakeDeltasFromEvents :: Maybe Address -> [Event] -> StakeDelta
 getStakeDeltasFromEvents Nothing = const M.empty
-getStakeDeltasFromEvents (Just stakingAddr) = foldl' go M.empty
+getStakeDeltasFromEvents (Just watchedAddr) = foldl' go M.empty
   where go acc e
-          | evContractAddress e == stakingAddr && evName e == "ValidatorSynced" =
+          | evContractAddress e /= watchedAddr = acc
+          | evName e == "ValidatorSynced" =
               maybe acc (\(v, st) -> M.insert v st acc) $ do
                 v <- Validator <$> arg "validator" e
                 registered <- boolArg "registered" e
                 st <- if registered then arg "weight" e else Just 0
                 pure (v, st)
+          | evName e == "ValidatorStakeUpdated" =
+              maybe acc (\(v, st) -> M.insert v st acc) $
+                (,) <$> (Validator <$> arg "validator" e) <*> arg "stake" e
           | otherwise = acc
         arg :: Read a => String -> Event -> Maybe a
         arg name = (>>= readMaybe . eventArgValueString) . find ((== name) . eventArgName) . evArgs

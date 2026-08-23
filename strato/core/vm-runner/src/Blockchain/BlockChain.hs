@@ -53,7 +53,7 @@ import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
-import Blockchain.Forks (isReceiptsRootForkActive)
+import Blockchain.Forks (isBlockRewardReceiptForkActive, isReceiptsRootForkActive)
 import qualified Blockchain.Verification as V
 import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
@@ -64,6 +64,7 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import SolidVM.Model.Delta
 import SolidVM.Model.Event
+import SolidVM.Model.Value (Value (SAddress))
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
@@ -377,7 +378,8 @@ addTransactions ::
   ConduitT a VmOutEvent m [TxRunResult]
 addTransactions blockData txs proposer =
   timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
-    trrs <- lift $ go (getBlockGasLimit blockData) txs DL.empty
+    rewardResult <- lift $ payBlockRewards blockData proposer
+    trrs <- attachBlockRewards blockData rewardResult <$> lift (go (getBlockGasLimit blockData) txs DL.empty)
     mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
     yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
     pure trrs
@@ -408,7 +410,16 @@ addTransactions blockData txs proposer =
       go remainingBlockGas rest (trrs `DL.snoc` trr)
 
 mineTransactions :: (VMBase m, MonadMonitor m) => Bagger.MineTransactions m
-mineTransactions bd remGas otxs mSelfAddress = mineTransactions' bd remGas DL.empty otxs mSelfAddress
+mineTransactions bd remGas otxs mSelfAddress payRewards = do
+  -- Must mirror addTransactions, or the block the proposer builds and the block
+  -- the verifier replays end at different state roots. Bagger builds a block
+  -- incrementally and only sets payRewards on the run that starts it, so this
+  -- happens exactly once per block on this side too.
+  rewardResult <- if payRewards then payBlockRewards bd mSelfAddress else pure Nothing
+  res <- mineTransactions' bd remGas DL.empty otxs mSelfAddress
+  -- Same fold as addTransactions: the run that pays the rewards is the run that
+  -- carries the block's first transaction, so both sides attach to the same one.
+  pure res {Bagger.tmrRanTxs = attachBlockRewards bd rewardResult (Bagger.tmrRanTxs res)}
 
 mineTransactions' :: (VMBase m, MonadMonitor m) => BlockHeader -> Integer -> DL.DList TxRunResult -> [OutputTx] -> Address-> m Bagger.TxMiningResult
 mineTransactions' _ remGas ran [] _ = return $ Bagger.TxMiningResult Nothing (DL.toList ran) [] remGas
@@ -612,8 +623,69 @@ payFees b availableGas tAddr t proposer = do
       (Just DelegateCall)
   
   case erException feeResult of
-    Nothing -> pure feeResult 
+    Nothing -> pure feeResult
     Just _ -> throwE $ TFInsufficientFunds 10_000_000_000_000_000 0 t
+
+-- | Give the installed fee contract a chance to pay block rewards once per
+-- block, before any of the block's transactions run. The implementation is
+-- whatever DeciderState (0xDEC1DE02) currently points at, so this follows
+-- updatePayFeeContract without needing a node change. A contract that defines
+-- no payBlockRewards — or one whose call throws — leaves the block untouched.
+--
+-- Both the mining and the validation path call this, and they do not call it
+-- the same number of times: Bagger mines incrementally, replaying only newly
+-- promoted transactions against the previous state root, so a block can reach
+-- this several times while being built but exactly once while being verified.
+-- The contract must therefore latch on block.number and make repeat calls
+-- no-ops, the way StratoStaking.processBlock already does. Without that latch
+-- the proposer and the verifier derive different state roots and no block can
+-- ever commit.
+-- Returns the reward call's results so the caller can fold its events into the
+-- block's receipts; 'Nothing' when no rewards were paid.
+payBlockRewards ::
+  VMBase m =>
+  BlockHeader ->
+  Address ->
+  m (Maybe ExecResults)
+payBlockRewards b proposer = do
+  let bHash = blockHeaderHash b
+      availableGas = 400_000
+      callIt addr fn =
+        SolidVM.call b addr proposer proposer availableGas proposer bHash fn [] Nothing
+  implResult <- callIt (Address 0xDEC1DE02) "getImplContract"
+  case (erException implResult, erReturnVal implResult) of
+    (Just e, _) -> do
+      $logInfoS "payBlockRewards" . T.pack $
+        "could not read the fee contract, skipping block rewards: " ++ show e
+      pure Nothing
+    (Nothing, Just (SAddress impl _)) | impl /= Address 0 -> do
+      rewardResult <- callIt impl "payBlockRewards"
+      case erException rewardResult of
+        Just e -> do
+          $logInfoS "payBlockRewards" . T.pack $
+            "no block rewards paid by " ++ format impl ++ ": " ++ show e
+          pure Nothing
+        Nothing -> pure $ Just rewardResult
+    _ -> pure Nothing
+
+-- | Fold the block-reward call's events into the block's first receipt.
+--
+-- The reward runs outside any transaction, so without this its events reach
+-- neither the receipts nor the indexer — the payout is only visible as a balance
+-- change. Attaching them to the first transaction mirrors what payFees already
+-- does with its own fee events, and keeps receipts a per-transaction list.
+--
+-- Gated: receipts roots are live in the header, so this moves the root and
+-- proposer and verifier must switch at the same block.
+attachBlockRewards :: BlockHeader -> Maybe ExecResults -> [TxRunResult] -> [TxRunResult]
+attachBlockRewards bd (Just rewardResult) (trr : rest)
+  | isBlockRewardReceiptForkActive (number bd),
+    Right er <- trrResult trr =
+      let merged = er { erEvents = erEvents rewardResult ++ erEvents er,
+                        erLogs = erLogs rewardResult ++ erLogs er
+                      }
+       in trr {trrResult = Right merged} : rest
+attachBlockRewards _ _ trrs = trrs
 
 ----------------
 {-

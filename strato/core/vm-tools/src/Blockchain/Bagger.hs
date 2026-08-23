@@ -81,7 +81,12 @@ data TxMiningResult = TxMiningResult
   }
   deriving (Show)
 
-type MineTransactions m = BlockHeader -> Integer -> [OutputTx] -> Address -> m TxMiningResult
+-- | The final 'Bool' says whether this run should pay the block's rewards. It is
+-- True exactly once per block: on the first run against a given parent, and on
+-- any run that replays a whole block from its parent state root. Deciding it
+-- here rather than in the fee contract is what keeps "rewards are paid once" a
+-- platform guarantee instead of something a deployed contract has to get right.
+type MineTransactions m = BlockHeader -> Integer -> [OutputTx] -> Address -> Bool -> m TxMiningResult
 
 
 getBaggerState :: Mod.Modifiable B.BaggerState m => m B.BaggerState
@@ -90,12 +95,12 @@ getBaggerState = Mod.get (Mod.Proxy @B.BaggerState)
 putBaggerState :: Mod.Modifiable B.BaggerState m => B.BaggerState -> m ()
 putBaggerState = Mod.put (Mod.Proxy @B.BaggerState)
 
-runFromStateRoot :: MonadBagger m => MineTransactions m -> Integer -> BlockHeader -> [OutputTx] -> Address -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
-runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress= do
+runFromStateRoot :: MonadBagger m => MineTransactions m -> Integer -> BlockHeader -> [OutputTx] -> Address -> Bool -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
+runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress payBlockRewards' = do
   A.insert (A.Proxy @StateRoot) (Nothing :: Maybe Word256) (stateRoot theBlockHeader)
   (TxMiningResult res ranTxs unranTxs newGas) <-
     timeit "mineTransactions bagger" (Just vmBlockInsertionMined) $
-      mineTransactions theBlockHeader remainingGas txs mSelfAddress
+      mineTransactions theBlockHeader remainingGas txs mSelfAddress payBlockRewards'
   flushMemStorageTxDBToBlockDB
   timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
   flushMemAddressStateTxToBlockDB
@@ -252,7 +257,9 @@ processNewBestBlock bh bd txShas = do
             B.lastExecutedTxs = [],
             B.promotedTransactions = [],
             B.privateHashes = hashMap,
-            B.startTimestamp = time
+            B.startTimestamp = time,
+            -- New best block, so the next height's rewards have not been paid.
+            B.blockRewardsPaid = False
           }
   $logInfoS "Bagger.processNewBestBlock" . T.pack $ show (length hashMap) ++ " private hashses in Bagger cache"
   putBaggerState $ state {B.seen = S.empty, B.miningCache = newMiningCache}
@@ -290,8 +297,11 @@ makeNewBlock mineTransactions mSelfAddress = do
           let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] [] time mempty M.empty
           let remGas = B.remainingGas cache
           $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
+          -- Only the first incremental run of a block pays its rewards; the
+          -- flag is cleared in processNewBestBlock when the height advances.
+          let payRewards = not $ B.blockRewardsPaid cache
           withBagger $ do
-            !run <- runFromStateRoot mineTransactions remGas tempBlockHeader promoted mSelfAddress
+            !run <- runFromStateRoot mineTransactions remGas tempBlockHeader promoted mSelfAddress payRewards
             (newSR, newGas, newExec, newUnexec) <- case run of
               Right (newSR', newRR', newGas') -> return (newSR', newGas', lastExec ++ newRR', [])
               Left e -> do
@@ -310,7 +320,8 @@ makeNewBlock mineTransactions mSelfAddress = do
                     { B.lastExecutedStateRoot = newSR,
                       B.remainingGas = newGas,
                       B.lastExecutedTxs = newExec,
-                      B.promotedTransactions = newUnexec
+                      B.promotedTransactions = newUnexec,
+                      B.blockRewardsPaid = B.blockRewardsPaid cache || payRewards
                     }
             $logDebugS "Bagger.makeNewBlock" . T.pack $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
             updateBaggerState (\s -> s {B.miningCache = newMiningCache})

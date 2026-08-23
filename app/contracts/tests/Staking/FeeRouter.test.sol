@@ -11,7 +11,9 @@ contract record MockStaking {
     uint public proposerFeeBps;
     uint public processed;
     bool public revertOnProcess;
+    address public stratoToken;
     function setProposerFeeBps(uint bps) public { proposerFeeBps = bps; }
+    function setStratoToken(address t) public { stratoToken = t; }
     function setRevertOnProcess(bool r) public { revertOnProcess = r; }
     function processBlock() external {
         require(!revertOnProcess, "MockStaking: boom");
@@ -70,6 +72,8 @@ contract record Signer is FeeRouterHarness {
 }
 
 contract Describe_FeeRouter {
+    address constant PROPOSER = address(0xaaaa);
+
     TokenFactory factory;
     Token usdst;
     MockGovernance gov;
@@ -121,6 +125,57 @@ contract Describe_FeeRouter {
 
     // Helium's genesis governance predates staking, so it answers stakingContract()
     // with nothing and the router has to reach staking through the subclassed fallback.
+    // Point the router itself (not just the signer) at the mocks, since
+    // payBlockRewards is a plain call and resolves against the router's storage.
+    function _fundedRouter() internal returns (Token) {
+        Token strato = Token(factory.createTokenWithInitialOwner(
+            "STRATO", "STRATO Token", new string[](0), new string[](0), new string[](0), "STRATO", 0, 18, address(this)));
+        strato.setStatus(2);
+        staking.setStratoToken(address(strato));
+        gov.setStakingContract(address(staking));
+        router.configure(address(voucher), address(usdst), address(feeCollector), address(gov));
+        // Off block 0 first: the latch's zero default is indistinguishable from
+        // "already rewarded" there, which only ever coincides with genesis.
+        fastForward(1, 1);
+        setBlockContext(PROPOSER, address(0), address(0), 0);
+        return strato;
+    }
+
+    function it_pays_the_proposer_a_flat_block_reward() public {
+        Token strato = _fundedRouter();
+        strato.mint(address(router), 1e18);
+
+        router.payBlockRewards();
+        require(strato.balanceOf(PROPOSER) == 1e16, "proposer paid 0.01 STRATO");
+        require(strato.balanceOf(address(router)) == 1e18 - 1e16, "paid out of the router's balance");
+    }
+
+    // The platform pays once per block on its own, but the latch has to hold too:
+    // if a repeat call ever paid twice, the proposer and the verifier would derive
+    // different state roots and the chain would stop committing.
+    function it_pays_block_rewards_at_most_once_per_block() public {
+        Token strato = _fundedRouter();
+        strato.mint(address(router), 1e18);
+
+        router.payBlockRewards();
+        router.payBlockRewards();
+        router.payBlockRewards();
+        require(strato.balanceOf(PROPOSER) == 1e16, "repeat calls in one block pay nothing");
+
+        fastForward(1, 1);
+        router.payBlockRewards();
+        require(strato.balanceOf(PROPOSER) == 2e16, "the next block pays again");
+    }
+
+    // A router that has run dry must not take the chain down with it.
+    function it_survives_an_unfunded_router() public {
+        Token strato = _fundedRouter();
+
+        router.payBlockRewards();
+        require(strato.balanceOf(PROPOSER) == 0, "nothing paid");
+        require(router.lastRewardedBlock() == block.number, "still latched, so it is not retried");
+    }
+
     function it_falls_back_when_governance_cannot_name_staking() public {
         signer.setStakingFallback(address(staking));
         staking.setProposerFeeBps(5000);

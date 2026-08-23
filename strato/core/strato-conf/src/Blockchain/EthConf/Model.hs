@@ -223,6 +223,12 @@ data NetworkConf = NetworkConf
   -- weights for consensus (the StratoStaking proxy; stable across upgrades).
   -- 'Nothing' disables stake watching. Every node of a network must agree.
   , stakingContractAddress :: Maybe Address
+  -- | Block number from which stake weights are read from MercataGovernance
+  -- (0x100) again instead of stakingContractAddress. 0x100 is a Proxy, so its
+  -- logic can be upgraded to a governance that republishes weights; the switch
+  -- needs a height because helium already ran with the staking contract as the
+  -- source. 'Nothing' means "never switch". Every node of a network must agree.
+  , stakingEventsFromGovernanceBlock :: Maybe Integer
   }
   deriving (Show, Eq, Generic, ToJSON)
 
@@ -239,6 +245,7 @@ instance FromJSON NetworkConf where
       <*> v .:? "roundPeriodS" .!= 3600
       <*> v .:? "stakingActivationBlock" .!= defaultStakingActivationBlock net
       <*> v .:? "stakingContractAddress" .!= defaultStakingContractAddress net
+      <*> v .:? "stakingEventsFromGovernanceBlock" .!= defaultStakingEventsFromGovernanceBlock net
 
 -- | Sentinel meaning "staking activation has not been scheduled yet" — used as
 -- the default for networks that already exist so that a node upgrade never
@@ -263,9 +270,32 @@ defaultStakingContractAddress net
   | net == "upquark" = Just 0xf30a022ce83bed7adeafc286c719388dcc3b3988
   | otherwise = Nothing
 
+-- | MercataGovernance, the genesis Proxy at 0x100.
+governanceAddress :: Address
+governanceAddress = 0x100
+
+-- | Helium ran from its staking activation with the staking contract as the
+-- stake-weight source, so moving back to governance needs a height of its own.
+-- A network that has not activated staking yet has nothing to migrate: it
+-- switches at activation and never reads the staking contract's events at all.
+-- Shares helium's height with the block-reward receipt fork
+-- (heliumStakingForkBlock in Blockchain.Forks); keep the two in step.
+defaultStakingEventsFromGovernanceBlock :: String -> Maybe Integer
+defaultStakingEventsFromGovernanceBlock net
+  | take 6 net == "helium" = Just 300000
+  | otherwise = defaultStakingActivationBlock net
+
 -- | Is stake-weighted proposer selection in force at the given block number?
 stakingActiveAt :: NetworkConf -> Integer -> Bool
 stakingActiveAt conf height = maybe True (height >=) (stakingActivationBlock conf)
+
+-- | Whose events carry validator stake weights at this height. Both the proposer
+-- (which stamps stakeUpdates into the header) and the verifier (which re-derives
+-- them) go through this, so the source flips on both sides at the same block.
+stakeEventSourceAt :: NetworkConf -> Integer -> Maybe Address
+stakeEventSourceAt conf height
+  | maybe False (height >=) (stakingEventsFromGovernanceBlock conf) = Just governanceAddress
+  | otherwise = stakingContractAddress conf
 
 -- EIP-155 chain ID: keccak256(networkName), first 6 bytes (48 bits).
 -- Fits in JS Number.MAX_SAFE_INTEGER with room for v = chainId * 2 + 35.
@@ -406,6 +436,7 @@ instance Default NetworkConf where
     , roundPeriodS = 3600    -- backstop: seconds without progress before a forced round change
     , stakingActivationBlock = defaultStakingActivationBlock "upquark"
     , stakingContractAddress = defaultStakingContractAddress "upquark"
+    , stakingEventsFromGovernanceBlock = defaultStakingEventsFromGovernanceBlock "upquark"
     }
 
 instance Default EthConf where

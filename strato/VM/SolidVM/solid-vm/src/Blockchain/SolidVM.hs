@@ -297,6 +297,8 @@ create' creator newAddress ch cc contractName' valList = do
   -- I'm showing these strings because I like them to be in quotes in the logs :)
   multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName')]
 
+  stakeEventSource <- Conf.stakeEventSourceAt (Conf.networkConfig ethConf) . BlockHeader.number . Env.blockHeader <$> getEnv
+
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
   let (newV, remV) = fromDelta . getDeltasFromEvents $ toList finalEvs
@@ -315,7 +317,7 @@ create' creator newAddress ch cc contractName' valList = do
         erPragmas = CC._pragmas cc,
         erNewValidators = newV,
         erRemovedValidators = remV,
-        erStakeUpdates = getStakeDeltasFromEvents (Conf.stakingContractAddress $ Conf.networkConfig ethConf) $ toList finalEvs
+        erStakeUpdates = getStakeDeltasFromEvents stakeEventSource $ toList finalEvs
       }
 
 call ::
@@ -388,6 +390,7 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
     let (newV, remV) = fromDelta . getDeltasFromEvents $ toList finalEvs
+        stakeEventSource = Conf.stakeEventSourceAt (Conf.networkConfig ethConf) (BlockHeader.number blockData)
 
     return $
       ExecResults
@@ -404,7 +407,7 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
           erPragmas = [],
           erNewValidators = newV,
           erRemovedValidators = remV,
-          erStakeUpdates = getStakeDeltasFromEvents (Conf.stakingContractAddress $ Conf.networkConfig ethConf) $ toList finalEvs
+          erStakeUpdates = getStakeDeltasFromEvents stakeEventSource $ toList finalEvs
         }
 
 call' ::

@@ -9,6 +9,7 @@ interface IStakingGovernanceLookup {
 interface IStakingFeeHook {
     function proposerFeeBps() external view returns (uint);
     function processBlock() external;
+    function stratoToken() external view returns (address);
 }
 
 // Transaction fee implementation for Decider (0xDEC1DE), installed with
@@ -41,6 +42,54 @@ contract record FeeRouter {
         }
         if (staking == address(0)) staking = _stakingFallback();
         return staking;
+    }
+
+    // Block-number latch for payBlockRewards. Unlike payFees this is a plain call,
+    // so address(this) is the router and this really is the router's own storage.
+    uint256 public lastRewardedBlock;
+
+    // Flat reward per block, paid to the proposer out of this contract's own
+    // STRATO balance. Fund the router to switch it on: an unfunded router pays
+    // nothing rather than stalling the chain.
+    uint256 constant BLOCK_REWARD = 1e16; // 0.01 STRATO
+
+    event BlockRewardsPaid(uint256 indexed blockNumber, address indexed proposer, uint256 amount);
+
+    // Block reward hook: the platform calls this once per block, before any of the
+    // block's transactions, on whatever DeciderState currently points at.
+    //
+    // The platform decides once-per-block on its own (Bagger clears a flag when
+    // the height advances), so this latch is a second line of defence rather than
+    // the thing that makes rewards single. It costs nothing and it cannot misfire:
+    // it lives in contract state, so any replay from the parent state root sees it
+    // reset. Latching first also stops a reentrant call from paying twice.
+    function payBlockRewards() external {
+        if (lastRewardedBlock == block.number) return;
+        lastRewardedBlock = block.number;
+
+        address proposer = block.proposer;
+        if (proposer == address(0)) return;
+
+        // Pay in whatever token staking accounts in, so this needs no second
+        // hardcoded address and stays correct on every chain.
+        address staking = _staking();
+        if (staking == address(0)) return;
+        address strato = address(0);
+        try IStakingFeeHook(staking).stratoToken() returns (address t) {
+            strato = t;
+        } catch {
+        }
+        if (strato == address(0)) return;
+
+        // Must never revert: this runs inside block execution on every node, so a
+        // router that has run dry has to be survivable.
+        bool paid = false;
+        try {
+            ERC20_Template(strato).transfer(proposer, BLOCK_REWARD);
+            paid = true;
+        } catch {
+        }
+        if (paid) emit BlockRewardsPaid(block.number, proposer, BLOCK_REWARD);
     }
 
     function payFees() external {

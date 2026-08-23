@@ -136,6 +136,9 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
               bHeader'
               otxs
               proposer
+              -- Replays the whole block from the parent state root, so this run
+              -- is the one that pays its rewards.
+              True
             case res of
               Right (sr, trrs, _) -> do
                 $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot we got: " <> format sr

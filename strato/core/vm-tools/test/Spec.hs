@@ -31,6 +31,7 @@ import Blockchain.Data.ExecResults
 import Blockchain.Data.ProposalFacts
 import Blockchain.Data.RLP
 import Blockchain.Data.VmTrace
+import Blockchain.Forks (isBlockRewardReceiptForkActive)
 import Blockchain.Model.SyncState (BestSequencedBlock (..))
 import Blockchain.Strato.Model.Address (Address (..))
 import SolidVM.Model.Delta (getStakeDeltasFromEvents)
@@ -126,6 +127,29 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
               ]
     getStakeDeltasFromEvents (Just stakingAddr) evs `shouldBe` M.fromList [(v1, 7), (v2, 0)]
     getStakeDeltasFromEvents Nothing evs `shouldBe` M.empty
+
+  -- The test config is the default (upquark-shaped, staking not scheduled), so
+  -- the block-reward receipt fork must track the staking activation height
+  -- rather than switching on its own. Only helium carries a bespoke height.
+  it "ties the block-reward receipt fork to staking activation off helium" $ do
+    let stakingNotScheduled = 2 ^ (62 :: Int) :: Integer
+    isBlockRewardReceiptForkActive 0 `shouldBe` False
+    isBlockRewardReceiptForkActive 320000 `shouldBe` False
+    isBlockRewardReceiptForkActive (stakingNotScheduled - 1) `shouldBe` False
+    isBlockRewardReceiptForkActive stakingNotScheduled `shouldBe` True
+
+  it "reads ValidatorStakeUpdated once the source is governance" $ do
+    let govAddr = Address 0x100
+        stakeArg st = ("stake", SNULL, show st, SVMType.Int (Just False) Nothing)
+        published v st = stakeEvent govAddr "ValidatorStakeUpdated" [addrArg v, stakeArg st]
+        evs = [ published (Address 0x1) (11 :: Integer)
+              , synced (Address 0x2) (4 :: Integer)          -- staking is no longer watched
+              , published (Address 0x1) (13 :: Integer)      -- last write wins
+              , published (Address 0x2) (0 :: Integer)
+              ]
+    getStakeDeltasFromEvents (Just govAddr) evs `shouldBe` M.fromList [(v1, 13), (v2, 0)]
+    -- and the switch really is exclusive: watching staking ignores governance
+    getStakeDeltasFromEvents (Just stakingAddr) evs `shouldBe` M.fromList [(v2, 4)]
 
   it "merges stake updates across transactions, later transaction wins" $ do
     let er st = (solidvmErrorResults undefined) { erException = Nothing, erStakeUpdates = st }
