@@ -267,14 +267,22 @@ async function installAggregateVerifier(tokenObj, ownerAddr, ethLcAddr, bootstra
   const verifierAddr = await deployProxy(tokenObj, verifierLogic, ownerAddr);
   console.log(`  PlonkVerifier proxy: ${verifierAddr}`);
 
+  // uint256 args go over the wire as decimal. The prover speaks hex, and
+  // bloc's ABI marshaller does not convert -- so do it here rather than
+  // discover it as an opaque 400 mid-deploy.
+  const dec = (h) => BigInt(h).toString();
+
   await callListAndWait([
     {
       contract: { name: "PlonkVerifier", address: strip0x(verifierAddr) },
       method: "initialize",
-      args: { key: vk.words, id: vk.verifierId },
+      args: { key: vk.words.map(dec), id: vk.verifierId },
       txParams: { gasPrice: config.gasPrice, gasLimit: 32_100_000_000 },
     },
     {
+      // `address`, not a PlonkVerifier reference: bloc resolves a
+      // contract-typed parameter against the callee's type definitions and
+      // fails, which makes a typed setter uncallable from here.
       contract: { name: "EthLightClient", address: strip0x(ethLcAddr) },
       method: "setAggregateVerifier",
       args: { v: strip0x(verifierAddr) },
@@ -283,7 +291,7 @@ async function installAggregateVerifier(tokenObj, ownerAddr, ethLcAddr, bootstra
     {
       contract: { name: "EthLightClient", address: strip0x(ethLcAddr) },
       method: "setCommitteeCommitment",
-      args: { period: bootstrap.period, commitment: commit.commitment },
+      args: { period: bootstrap.period, commitment: dec(commit.commitment) },
       txParams: { gasPrice: config.gasPrice, gasLimit: 32_100_000_000 },
     },
   ]);

@@ -52,7 +52,7 @@ contract Describe_ProofAnchoredSepolia is Describe_EthLightClientAnchor {
     function _wire() internal {
         verifier = new PlonkVerifier();
         verifier.initialize(_vkArray(), "bridge-sync-committee-aggregate");
-        lc.setAggregateVerifier(verifier);
+        lc.setAggregateVerifier(address(verifier));
         // Installed directly rather than built in ~9 chunked transactions.
         // CommitteeCommitment.test.sol pins the chunked build against the
         // same digest.
@@ -132,7 +132,7 @@ contract Describe_ProofAnchoredSepolia is Describe_EthLightClientAnchor {
     function it_refuses_a_proof_with_no_commitment_installed() {
         verifier = new PlonkVerifier();
         verifier.initialize(_vkArray(), "bridge-sync-committee-aggregate");
-        lc.setAggregateVerifier(verifier);
+        lc.setAggregateVerifier(address(verifier));
         bool reverted = false;
         try {
             lc.submitAggregateProof(

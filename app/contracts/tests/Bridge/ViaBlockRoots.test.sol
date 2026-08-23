@@ -176,7 +176,7 @@ contract Describe_ViaBlockRoots is Describe_EthLightClientAnchor {
             k[i] = BlockRootsProofFixture.vkWord(i);
         }
         v.initialize(k, "bridge-sync-committee-aggregate");
-        brc.setAggregateVerifier(v);
+        brc.setAggregateVerifier(address(v));
         brc.setCommitteeCommitment(
             _bootstrapPeriod(),
             0x092ae0caf9288970aaad9df4e9a5dac059e109c5937e6f05a1af0c1a93e83e72

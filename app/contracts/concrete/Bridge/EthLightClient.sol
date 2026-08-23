@@ -248,7 +248,13 @@ contract EthLightClient is Ownable, ILightClient {
 
     /// Verifier for subset-aggregate proofs. Unset disables the proof path
     /// entirely.
-    PlonkVerifier public aggregateVerifier;
+    ///
+    /// @dev Stored as a plain address rather than a typed reference, the same
+    ///      way MercataBridge holds its bridgeIns. A contract-typed argument
+    ///      cannot be marshalled through bloc's JSON-RPC ABI -- it resolves
+    ///      the type name against the callee's definitions and fails -- so a
+    ///      typed setter is not callable from a deploy script at all.
+    address public aggregateVerifier;
 
     /// Aggregates proven by {submitAggregateProof}, keyed by
     /// (period, participation bitfield). The anchor path reads this before
@@ -716,9 +722,9 @@ contract EthLightClient is Ownable, ILightClient {
      * @notice Point the light client at a verifier for subset-aggregate
      *         proofs. Unset (or set to zero) leaves only the native path.
      */
-    function setAggregateVerifier(PlonkVerifier v) external onlyOwner {
+    function setAggregateVerifier(address v) external onlyOwner {
         aggregateVerifier = v;
-        emit AggregateVerifierSet(address(v));
+        emit AggregateVerifierSet(v);
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -868,14 +874,14 @@ contract EthLightClient is Ownable, ILightClient {
         bytes claimedAggregate,
         uint256[] proof
     ) external {
-        require(address(aggregateVerifier) != address(0), "EthLightClient: no aggregate verifier");
+        require(aggregateVerifier != address(0), "EthLightClient: no aggregate verifier");
         uint256 commitment = committeeCommitment[period];
         require(commitment != 0, "EthLightClient: no committee commitment for period");
         require(claimedAggregate.length == 128, "EthLightClient: aggregate must be 128 bytes");
 
         bytes bits = _chunks2ToBytes(participationBits);
         require(
-            aggregateVerifier.verifyProof(
+            PlonkVerifier(aggregateVerifier).verifyProof(
                 proof, _aggregatePublicInputs(bits, claimedAggregate, commitment)
             ),
             "EthLightClient: aggregate proof rejected"
