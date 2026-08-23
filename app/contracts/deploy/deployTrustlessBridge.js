@@ -316,6 +316,10 @@ async function deployContract(tokenObj, name, sourceRelPath, args) {
     history: name,
     cacheNonce: true,
     isAsync: true,
+    // Without this the contract deploys fine but Cirrus never indexes it, so
+    // every BlockApps-<Name> table 404s and the backend and relayer cannot
+    // read any of its state. Same as deploy/contract.js.
+    query: { username: "BlockApps" },
   };
   console.log(`  → deploying ${name} ...`);
   const submitResp = await rest.createContract(tokenObj, contractArgs, submitOpts);
