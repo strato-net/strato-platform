@@ -131,11 +131,30 @@ several, or run your own.
 | `GET /vk` | `PlonkVerifier.initialize`'s 32 words |
 | `GET /health` | ready, constraint count |
 
+### The SRS
+
+A KZG SRS is universal, not per-circuit -- that is the point of PLONK over
+Groth16. Any BN254 powers-of-tau ceremony works as long as it is big enough:
+this circuit's domain is 2^22, so it needs **2^22 + 3 = 4,194,307** G1 powers,
+i.e. a ceremony of power 22 or more. The rollup's power-23 ceremony
+(`<lambdachin>/rollup/srs.bin`) covers it with room to spare, and is what the
+ceremony fixture in `app/contracts/tests/Plonk` was proved against.
+
+`-test-srs` generates an unsafe one instead. That is fine for development, but
+its verifying key differs from a ceremony's, so proofs made under it verify
+only against a contract initialised with the matching test key.
+
 Setup is cached to disk, keyed by the circuit and the SRS it came from, so a
 circuit edit or a different ceremony misses rather than silently loading a key
-whose proofs the deployed verifier would reject. Measured with the test SRS:
-**1m10s cold, 9s warm** (268 MB of proving key). A real ceremony makes the
-cold path far slower, which is the whole reason the cache exists.
+whose proofs the deployed verifier would reject. Measured:
+
+| | cold | warm |
+|---|---:|---:|
+| test SRS | 1m10s | 9s |
+| power-23 ceremony SRS | 5m15s | 10s |
+
+268 MB of proving key either way. Proving is unaffected by which SRS backs it
+-- ~35s in both cases -- so the cache is what keeps a restart cheap.
 
 Proving is serialized -- concurrent runs thrash memory rather than
 parallelise. Measured 33.8s per proof over HTTP.
