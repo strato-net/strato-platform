@@ -403,12 +403,24 @@ contract  StratoStaking is Ownable {
             return;
         }
         uint256 weight = _validatorWeight(operators[operator]);
+
+        // Publish unconditionally. lastSyncedWeight is only this contract's guess
+        // at what governance holds, and a guess is exactly how governance ended up
+        // holding no stakes at all: the pre-upgrade logic maintained the cache
+        // without ever calling governance, so the cache reported "already synced"
+        // forever after. Governance is the authority on what governance knows, and
+        // setValidatorStake drops a no-op without emitting, so republishing costs
+        // one call and never a spurious ValidatorStakeUpdated.
+        //
+        // addValidatorFromStaking rather than updateValidatorStake: the latter
+        // reverts when governance does not already list the validator, which would
+        // propagate out of stake() and unstake() and break staking for users. The
+        // former reconciles that case instead of failing on it.
+        IStakingGovernance(governance).addValidatorFromStaking(validatorOf[operator], weight);
+
+        // ValidatorSynced stays change-gated: consensus consumes it as a delta
+        // before the switch height, so its emission pattern must not change.
         if (lastSyncedWeight[operator] != weight) {
-            // Republish through governance: consensus reads the weight from
-            // 0x100's ValidatorStakeUpdated. ValidatorSynced is still emitted
-            // alongside it — it is what consensus reads before the switch height,
-            // and what the dashboards read either side of it.
-            IStakingGovernance(governance).updateValidatorStake(validatorOf[operator], weight);
             lastSyncedWeight[operator] = weight;
             emit ValidatorSynced(operator, validatorOf[operator], true, weight);
         }

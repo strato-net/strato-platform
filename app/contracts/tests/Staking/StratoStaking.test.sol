@@ -680,6 +680,29 @@ contract Describe_StratoStaking {
         require(gov.validatorStake(VALIDATOR_A) == 1300e18, "weight follows unstake");
     }
 
+    // The pre-upgrade contract maintained lastSyncedWeight without ever calling
+    // governance, so the cache reported "already synced" while governance held
+    // nothing — and kept reporting it, suppressing every later publish. Pointing
+    // at a fresh governance reproduces that exact shape: local cache correct,
+    // governance empty. A resync has to republish anyway.
+    function it_republishes_stakes_to_a_governance_that_knows_nothing() public {
+        _bondBoth();
+        uint256 weightA = gov.validatorStake(VALIDATOR_A);
+        uint256 weightB = gov.validatorStake(VALIDATOR_B);
+        require(weightA == 1000e18 && weightB == 2000e18, "published to the original governance");
+
+        MercataGovernance fresh = new MercataGovernance(address(this));
+        fresh.setStakingContract(address(staking));
+        require(fresh.validatorStake(VALIDATOR_A) == 0, "fresh governance knows nothing");
+        require(staking.lastSyncedWeight(address(operatorA)) == weightA, "local cache still claims synced");
+
+        staking.setGovernance(address(fresh), true);
+
+        require(fresh.validatorStake(VALIDATOR_A) == weightA, "republished despite the cache");
+        require(fresh.validatorStake(VALIDATOR_B) == weightB, "both validators republished");
+        require(fresh.isValidator(VALIDATOR_A), "membership reconciled too");
+    }
+
     function it_removes_and_readds_validators_around_the_threshold() public {
         _bondBoth();
         require(gov.validatorCount() == 2, "two validators");
