@@ -16,7 +16,9 @@ import (
 
 // packX mirrors the in-circuit packing: 6 little-endian 64-bit limbs of the
 // BLS12-381 X coordinate folded into two BN254 field elements.
-func packCoord(c *fp.Element) (bnfr.Element, bnfr.Element) {
+// PackCoord folds a BLS12-381 coordinate's six little-endian 64-bit limbs
+// into two BN254 field elements, exactly as the circuit does.
+func PackCoord(c *fp.Element) (bnfr.Element, bnfr.Element) {
 	var xi big.Int
 	c.BigInt(&xi)
 	limb := func(k int) *big.Int {
@@ -77,8 +79,8 @@ func BuildWitness(n, signers int, unified bool) (*AggregateCircuit, error) {
 		return err
 	}
 	for i := 0; i < n; i++ {
-		xlo, xhi := packCoord(&pks[i].X)
-		ylo, yhi := packCoord(&pks[i].Y)
+		xlo, xhi := PackCoord(&pks[i].X)
+		ylo, yhi := PackCoord(&pks[i].Y)
 		for _, e := range []bnfr.Element{xlo, xhi, ylo, yhi} {
 			if err := wr(e); err != nil {
 				return nil, err

@@ -82,6 +82,19 @@ contract Describe_Poseidon2Interop {
         );
     }
 
+    /// EthLightClient.buildCommitteeCommitment absorbs a chunk of the
+    /// committee per transaction, folding poseidon2Compress over a carried
+    /// state. That is only the same digest as one poseidon2(x...) call if the
+    /// MD chaining is exactly compress-from-zero, so pin the equivalence.
+    function it_chunked_absorption_equals_a_single_hash() {
+        uint256 state = 0;
+        state = poseidon2Compress(state, 1);
+        state = poseidon2Compress(state, 2);
+        state = poseidon2Compress(state, 3);
+        state = poseidon2Compress(state, 4);
+        require(state == poseidon2(1, 2, 3, 4), "chunked absorption diverges from poseidon2()");
+    }
+
     /// Wide, unstructured limbs — the shape the committee commitment actually
     /// absorbs, since each pubkey coordinate packs into ~192-bit halves.
     function it_md_hash_of_wide_limbs_matches_gnark() {

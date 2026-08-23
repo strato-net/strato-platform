@@ -1,4 +1,5 @@
 import "../../libraries/Bridge/BLSVerify.sol";
+import "../../concrete/Plonk/PlonkVerifier.sol";
 import "../../libraries/Bridge/ILightClient.sol";
 import "../../libraries/Bridge/SSZHashTree.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
@@ -226,6 +227,37 @@ contract EthLightClient is Ownable, ILightClient {
     /// verifier falls back to summing the signers.
     mapping(uint64 => bytes) committeeAggregate;
 
+    /// Poseidon2 commitment over a period's committee, in exactly the form
+    /// the aggregation circuit re-derives: per member, in committee order,
+    /// the affine X then Y, each as two 192-bit halves (high half first
+    /// within the pair the circuit writes as xlo, xhi, ylo, yhi).
+    ///
+    /// Zero until {buildCommitteeCommitment} has walked the whole committee.
+    /// Zero is also what disables the proof path for that period, which
+    /// leaves the native aggregation as the fallback.
+    mapping(uint64 => uint256) public committeeCommitment;
+
+    /// Partial state of a commitment build. The digest is a Merkle-Damgard
+    /// fold, so it can be absorbed a chunk at a time and resumed: `state` is
+    /// the running digest and `next` the committee index still to absorb.
+    struct CommitmentBuild {
+        uint256 state;
+        uint256 next;
+    }
+    mapping(uint64 => CommitmentBuild) public commitmentBuild;
+
+    /// Verifier for subset-aggregate proofs. Unset disables the proof path
+    /// entirely.
+    PlonkVerifier public aggregateVerifier;
+
+    /// Aggregates proven by {submitAggregateProof}, keyed by
+    /// (period, participation bitfield). The anchor path reads this before
+    /// falling back to deriving the aggregate on-chain, which keeps the
+    /// proof a separate transaction from the anchor -- they already travel
+    /// as one signed batch -- and leaves all three anchor entry points and
+    /// their ABI untouched.
+    mapping(bytes32 => bytes) verifiedAggregate;
+
     /// Anchored finalized exec headers, keyed by Ethereum block number.
     /// Once anchored, EthBridgeIn (or any other consumer) can call
     /// getReceiptsRoot(blockNumber) and trust the result.
@@ -250,6 +282,18 @@ contract EthLightClient is Ownable, ILightClient {
 
     /// @notice The committee `aggregate_pubkey` for `period` was installed.
     event CommitteeAggregateSet(uint64 period);
+
+    /// @notice A commitment build absorbed up to (but not including) `next`.
+    event CommitteeCommitmentProgress(uint64 period, uint256 next);
+
+    /// @notice The committee commitment for `period` is complete.
+    event CommitteeCommitmentSet(uint64 period, uint256 commitment);
+
+    /// @notice The subset-aggregate verifier was changed.
+    event AggregateVerifierSet(address verifier);
+
+    /// @notice A subset aggregate was proven for (period, participation).
+    event AggregateProven(uint64 period, bytes32 key);
     event HeaderAnchored(uint256 blockNumber, bytes32 receiptsRoot, uint64 beaconSlot, uint64 timestamp);
 
     // ─────────────────────────────────────────────────────────────────
@@ -669,6 +713,180 @@ contract EthLightClient is Ownable, ILightClient {
     }
 
     /**
+     * @notice Point the light client at a verifier for subset-aggregate
+     *         proofs. Unset (or set to zero) leaves only the native path.
+     */
+    function setAggregateVerifier(PlonkVerifier v) external onlyOwner {
+        aggregateVerifier = v;
+        emit AggregateVerifierSet(address(v));
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Committee commitment
+    // ─────────────────────────────────────────────────────────────────
+
+    /// @dev Big-endian byte range of `blob` as an integer.
+    function _beUint(bytes blob, uint256 start, uint256 len) private pure returns (uint256 v) {
+        v = 0;
+        for (uint256 i = 0; i < len; i = i + 1) {
+            v = v * 256 + uint256(uint8(blob[start + i]));
+        }
+    }
+
+    /**
+     * @notice Absorb up to `count` more committee members into `period`'s
+     *         commitment, resuming wherever the last call stopped.
+     *
+     * @dev Chunked because it costs a decompression per member -- 512 of
+     *      them is several times a transaction's gas budget. The digest is a
+     *      Merkle-Damgard fold over poseidon2Compress, and SolidVM's
+     *      `poseidon2(x...)` is the same fold from a zero IV, so absorbing in
+     *      chunks and hashing in one call agree by construction. That
+     *      equivalence is asserted in tests/General/poseidon2Interop.test.sol.
+     *
+     *      Permissionless: it reads only committee data already anchored, and
+     *      the digest is fully determined by it. The worst a caller can do is
+     *      pay for progress someone else wanted.
+     *
+     * @param period Sync-committee period to build the commitment for.
+     * @param count  How many members to absorb in this call. Callers size this
+     *               to the gas budget; ~60 fits a 400,000-gas transaction.
+     */
+    function buildCommitteeCommitment(uint64 period, uint256 count) external {
+        require(committeePubkeys[period].length == 512, "EthLightClient: no committee for this period");
+        require(committeeCommitment[period] == 0, "EthLightClient: commitment already built");
+        require(count > 0, "EthLightClient: zero count");
+
+        uint256 i = commitmentBuild[period].next;
+        uint256 state = commitmentBuild[period].state;
+        uint256 end = i + count;
+        if (end > 512) end = 512;
+
+        while (i < end) {
+            // 128-byte EIP-2537 G1: X at [16,64), Y at [80,128), each a
+            // 48-byte big-endian value behind 16 bytes of zero padding.
+            bytes p = bls12381DecompressG1(committeePubkeys[period][i]);
+            // The circuit packs each coordinate's six 64-bit limbs into two
+            // 192-bit halves, so the low half is the coordinate's last 24
+            // bytes and the high half its first 24.
+            state = poseidon2Compress(state, _beUint(p, 40, 24));   // x low
+            state = poseidon2Compress(state, _beUint(p, 16, 24));   // x high
+            state = poseidon2Compress(state, _beUint(p, 104, 24));  // y low
+            state = poseidon2Compress(state, _beUint(p, 80, 24));   // y high
+            i = i + 1;
+        }
+
+        commitmentBuild[period].state = state;
+        commitmentBuild[period].next = i;
+
+        if (i == 512) {
+            committeeCommitment[period] = state;
+            emit CommitteeCommitmentSet(period, state);
+        } else {
+            emit CommitteeCommitmentProgress(period, i);
+        }
+    }
+
+    /**
+     * @notice Install a period's committee commitment directly, skipping the
+     *         chunked build.
+     *
+     * @dev Same footing as {bootstrap} and {setCommitteeAggregate}: a
+     *      bootstrapped committee is admin-supplied to begin with, so
+     *      admin-supplying its digest adds no trust. It also saves the ~9
+     *      transactions {buildCommitteeCommitment} would take.
+     *
+     *      A wrong commitment cannot forge anything. It makes every proof
+     *      against that period fail to verify, because the prover's committee
+     *      would not hash to it. The failure mode is a period that cannot use
+     *      the proof path, which falls back to native aggregation.
+     */
+    function setCommitteeCommitment(uint64 period, uint256 commitment) external onlyOwner {
+        require(committeePubkeys[period].length == 512, "EthLightClient: no committee for this period");
+        require(commitment != 0, "EthLightClient: zero commitment");
+        committeeCommitment[period] = commitment;
+        emit CommitteeCommitmentSet(period, commitment);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Subset-aggregate proofs
+    // ─────────────────────────────────────────────────────────────────
+
+    /// @dev Key under which a proven aggregate is cached.
+    function _aggKey(uint64 period, bytes participationBits) private pure returns (bytes32) {
+        return bytes32(keccak256(bytes(bytes32(uint256(period))) + participationBits));
+    }
+
+    /**
+     * @dev The circuit's public inputs, in gnark's witness order: the
+     *      participation bitfield packed 128 bits to a word (least
+     *      significant bit first), then the claimed aggregate's X and Y as
+     *      six 64-bit little-endian limbs each, then the committee
+     *      commitment. Seventeen in total.
+     */
+    function _aggregatePublicInputs(
+        bytes participationBits,
+        bytes claimedAggregate,
+        uint256 commitment
+    ) private pure returns (uint256[]) {
+        uint256[] memory pi = new uint256[](17);
+
+        // The bitfield is little-endian by byte and by bit within a byte, so
+        // word w covers bytes [16w, 16w+16) with byte 16w least significant.
+        for (uint256 w = 0; w < 4; w = w + 1) {
+            uint256 acc = 0;
+            for (uint256 b = 0; b < 16; b = b + 1) {
+                acc = acc + uint256(uint8(participationBits[w * 16 + b])) * (256 ** b);
+            }
+            pi[w] = acc;
+        }
+
+        // Limb k of a coordinate is its bytes [end-8(k+1), end-8k).
+        for (uint256 k = 0; k < 6; k = k + 1) {
+            pi[4 + k] = _beUint(claimedAggregate, 64 - 8 * (k + 1), 8);
+            pi[10 + k] = _beUint(claimedAggregate, 128 - 8 * (k + 1), 8);
+        }
+
+        pi[16] = commitment;
+        return pi;
+    }
+
+    /**
+     * @notice Verify a proof that `claimedAggregate` is the sum of the
+     *         committee members `participationBits` selects, and cache it for
+     *         a subsequent anchor.
+     *
+     * @dev Kept separate from anchoring so the three anchor entry points keep
+     *      their signatures; the two travel as one signed batch anyway. The
+     *      cache is safe to leave permissionless because an entry can only be
+     *      written against a verifying proof, and a wrong aggregate cannot be
+     *      proven.
+     */
+    function submitAggregateProof(
+        uint64 period,
+        bytes32[2] participationBits,
+        bytes claimedAggregate,
+        uint256[] proof
+    ) external {
+        require(address(aggregateVerifier) != address(0), "EthLightClient: no aggregate verifier");
+        uint256 commitment = committeeCommitment[period];
+        require(commitment != 0, "EthLightClient: no committee commitment for period");
+        require(claimedAggregate.length == 128, "EthLightClient: aggregate must be 128 bytes");
+
+        bytes bits = _chunks2ToBytes(participationBits);
+        require(
+            aggregateVerifier.verifyProof(
+                proof, _aggregatePublicInputs(bits, claimedAggregate, commitment)
+            ),
+            "EthLightClient: aggregate proof rejected"
+        );
+
+        bytes32 key = _aggKey(period, bits);
+        verifiedAggregate[key] = claimedAggregate;
+        emit AggregateProven(period, key);
+    }
+
+    /**
      * @dev Build the participating-subset aggregate by whichever route
      *      touches fewer points: summing the signers, or subtracting the
      *      non-signers from the committee's full aggregate.
@@ -685,6 +903,13 @@ contract EthLightClient is Ownable, ILightClient {
         bytes participationBits,
         uint256 participantCount
     ) private view returns (bytes) {
+        // A proof, if one was submitted for exactly this committee and
+        // bitfield, replaces the aggregation entirely.
+        bytes proven = verifiedAggregate[_aggKey(period, participationBits)];
+        if (proven.length == 128) {
+            return proven;
+        }
+
         bytes full = committeeAggregate[period];
         if (full.length == 128 && (512 - participantCount) < participantCount) {
             (bytes byAbsence, /* count */) = BLSVerify.aggregateByAbsence(
