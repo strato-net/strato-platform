@@ -112,10 +112,42 @@ asserted on the SolidVM side in
 `app/contracts/tests/General/poseidon2Interop.test.sol`, including at the
 field boundary. Both sides currently agree bit-for-bit.
 
+## The prover service
+
+`proverd` turns a committee and a participation bitfield into what
+`EthLightClient.submitAggregateProof` takes. It holds no keys and is not
+trusted: the aggregate it returns is public input to the proof, and the light
+client still puts it through the BLS pairing against the real sync-committee
+signature. A prover that lies produces something the chain rejects. Run
+several, or run your own.
+
+    proverd -test-srs -addr :8547                        # development
+    proverd -srs /etc/strato/srs.bin -cache /var/lib/proverd -warm
+
+| endpoint | |
+|---|---|
+| `POST /prove` | `{pubkeys[512], participationBits}` → aggregate, commitment, proof words, public inputs |
+| `POST /commitment` | the committee digest alone, for `setCommitteeCommitment` before any proof exists |
+| `GET /vk` | `PlonkVerifier.initialize`'s 32 words |
+| `GET /health` | ready, constraint count |
+
+Setup is cached to disk, keyed by the circuit and the SRS it came from, so a
+circuit edit or a different ceremony misses rather than silently loading a key
+whose proofs the deployed verifier would reject. Measured with the test SRS:
+**1m10s cold, 9s warm** (268 MB of proving key). A real ceremony makes the
+cold path far slower, which is the whole reason the cache exists.
+
+Proving is serialized -- concurrent runs thrash memory rather than
+parallelise. Measured 33.8s per proof over HTTP.
+
 ## Layout
 
     aggregate.go            the circuit
     witness.go              witness construction from a synthetic committee
     aggregate_test.go       satisfiability, tamper rejection, add-mode guard
+    prover/                 setup caching, proving, serialization
+    cmd/proverd             the service
     cmd/probe               constraint counts and proving benchmark
     cmd/fixtures            Poseidon2 vectors for the SolidVM interop test
+    cmd/commitment          committee digest for a SolidVM committee fixture
+    cmd/emit, cmd/sepolia   proof artifacts for the on-chain fixtures
