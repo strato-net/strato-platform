@@ -333,6 +333,7 @@ router.get("/configuredChains", walletAuth, BridgeController.getConfiguredChains
  *         description: Trustless path disabled
  */
 router.get("/finalizedHead/:chainId", walletAuth, BridgeController.getFinalizedHead);
+router.get("/anchorPlan/:chainId/:txHash", walletAuth, BridgeController.getAnchorPlan);
 
 /**
  * @openapi

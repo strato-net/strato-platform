@@ -890,7 +890,7 @@ export async function buildPeriodTransitions(
  *
  * A LightClientUpdate for period P-1 carries the committee that serves period
  * P as `next_sync_committee` -- the same value advanceCommittee anchors -- so
- * the committee the prover hashes is the one the light client stored.
+ * this is the committee the light client holds.
  */
 export async function committeeForPeriod(
   srcChainId: string,

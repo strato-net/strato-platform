@@ -69,6 +69,10 @@ const config = {
     bridgeOutInterval: 1 * 60 * 1000, // 1 minute (was 3 minutes)
     withdrawalInterval: 1 * 60 * 1000, // 1 minute (was 10 seconds)
     ethereumDepositInterval: 1 * 60 * 1000, // 1 minute (was 2 minutes)
+    // Each anchor costs a ~35s proof, and a deposit is not anchorable
+    // until its block finalizes (~13 min on Sepolia), so polling faster
+    // than this only produces retries.
+    anchorInterval: 5 * 60 * 1000,
   },
   balance: {
     gasFeeUSDST: BigInt(process.env.GAS_FEE_USDST || '1') * BigInt(1e16),

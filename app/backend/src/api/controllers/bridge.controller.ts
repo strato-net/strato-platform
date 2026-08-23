@@ -34,6 +34,7 @@ import {
   NoRedemptionLogError,
 } from "../services/nativeRedemptionProof.service";
 import {
+  buildAnchorPlan,
   listConfiguredChains,
   loadTrustlessConfig,
   trustlessClaim,
@@ -416,6 +417,48 @@ class BridgeController {
       }
       if (typeof error?.message === "string" && error.message.includes("not supported")) {
         res.status(400).json({ error: error.message, code: "UNSUPPORTED_CHAIN" });
+        return;
+      }
+      next(error);
+    }
+  }
+
+  /**
+   * GET /bridge/anchorPlan/:chainId/:txHash
+   *
+   * Everything needed to anchor the block holding a deposit, without
+   * submitting it. Built for the relayer, which anchors deposit blocks ahead
+   * of anyone claiming them; the aggregate proof is the caller's business.
+   */
+  static async getAnchorPlan(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const { chainId, txHash } = req.params;
+      if (!chainId || !txHash) {
+        res.status(400).json({ error: "chainId and txHash are required" });
+        return;
+      }
+      const plan = await buildAnchorPlan(accessToken, chainId, txHash);
+      res.json({ success: true, data: plan });
+    } catch (error: any) {
+      if (error instanceof NotFinalizedYetError) {
+        res.status(425).json(notFinalizedBody(error));
+        return;
+      }
+      if (error instanceof DepositTooOldError) {
+        res.status(409).json({ error: error.message, code: "DEPOSIT_TOO_OLD" });
+        return;
+      }
+      if (error instanceof TooManyMissingPeriodsError) {
+        res.status(409).json({ error: error.message, code: "LIGHT_CLIENT_FAR_BEHIND" });
+        return;
+      }
+      if (typeof error?.message === "string" && /trustless path disabled/.test(error.message)) {
+        res.status(503).json({ error: error.message, code: "TRUSTLESS_DISABLED" });
         return;
       }
       next(error);

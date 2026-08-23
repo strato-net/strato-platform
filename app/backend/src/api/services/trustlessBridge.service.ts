@@ -24,7 +24,6 @@
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForAllTxs } from "../../utils/txHelper";
 import { strato, cirrus } from "../../utils/appApiHelper";
-import { proverConfigured, proveAggregate } from "./bridgeProver.service";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName, ensureHexPrefix } from "../../utils/utils";
 import {
@@ -882,84 +881,6 @@ function beaconChainIdFor(srcChainId: string, flavor: LightClientFlavor): string
  * don't break us — but we still skip the call when the chain is
  * already caught up (no point paying gas).
  */
-/**
- * Read EthLightClient.committeeCommitment[period]. Unset means the period has
- * no digest installed, which is what disables the proof path for it.
- */
-const fetchCommitteeCommitment = async (
-  accessToken: string,
-  lightClient: string,
-  period: bigint,
-): Promise<string | undefined> => {
-  const v = await fetchMappingValue(
-    accessToken,
-    `${EthLightClientName}-committeeCommitment`,
-    lightClient,
-    String(period),
-  );
-  return typeof v === "string" ? v : undefined;
-};
-
-/**
- * Build a `submitAggregateProof` tx to precede an anchor, if the proof path is
- * available for this period.
- *
- * Deriving the subset aggregate on-chain costs a decompression and an addition
- * per member: ~4.2M gas summing 470 signers, or ~510k subtracting 42 absentees,
- * against a 400,000-gas budget. A proof replaces that with ~120k.
- *
- * Every reason to skip returns an empty list rather than throwing, and
- * anchoring then derives the aggregate on-chain as before. That fallback is
- * why an unreachable or broken prover cannot block a claim — it only makes the
- * claim more expensive, and at high participation still affordable.
- */
-async function buildAggregateProofTxIfNeeded(
-  accessToken: string,
-  beaconChainId: string,
-  lightClient: string,
-  sync: { signatureSlot: string; participationBits: string },
-): Promise<Array<{ contractName: string; contractAddress: string; method: string; args: Record<string, any> }>> {
-  if (!proverConfigured()) return [];
-
-  const period = BigInt(sync.signatureSlot) / SLOTS_PER_PERIOD;
-  try {
-    const commitment = await fetchCommitteeCommitment(accessToken, lightClient, period);
-    if (!commitment) return [];
-
-    const pubkeys = await committeeForPeriod(beaconChainId, Number(period));
-    const res = await proveAggregate(pubkeys, ensureHexPrefix(sync.participationBits));
-
-    // If the prover hashed a different committee than the light client holds,
-    // the proof would be rejected on-chain. Catching it here costs one
-    // comparison instead of a transaction and an opaque revert.
-    if (BigInt(res.commitment) !== BigInt(commitment)) {
-      console.warn(
-        `[trustlessBridge] prover committee digest ${res.commitment} does not match the ` +
-          `light client's ${commitment} for period ${period}; anchoring natively`,
-      );
-      return [];
-    }
-
-    return [{
-      contractName: extractContractName(EthLightClientName),
-      contractAddress: lightClient,
-      method: "submitAggregateProof",
-      args: {
-        period: String(period),
-        participationBits: chunkBytes32(sync.participationBits, 2),
-        claimedAggregate: ensureHexPrefix(res.aggregate),
-        proof: res.proof,
-      },
-    }];
-  } catch (err: any) {
-    console.warn(
-      `[trustlessBridge] aggregate proof unavailable for period ${period} ` +
-        `(${err?.message ?? err}); anchoring natively`,
-    );
-    return [];
-  }
-}
-
 async function buildAdvanceCommitteeTxsIfNeeded(
   accessToken: string,
   beaconChainId: string,
@@ -1026,6 +947,73 @@ async function buildClaimInputsForRoute(
 // Main entry
 // ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Everything needed to anchor the block containing `externalTxHash`, without
+ * submitting anything.
+ *
+ * Built for the relayer, which anchors deposit blocks ahead of any user
+ * claiming them. It returns inclusion-proof material and beacon data only --
+ * the aggregate proof, and any knowledge of proving at all, belongs to the
+ * caller.
+ *
+ * `alreadyAnchored` short-circuits the common case: once a block is on the
+ * light client, one anchor serves every claim in it.
+ */
+export const buildAnchorPlan = async (
+  accessToken: string,
+  externalChainId: string,
+  externalTxHash: string,
+): Promise<{
+  alreadyAnchored: boolean;
+  lightClient: string;
+  period?: string;
+  signatureSlot?: string;
+  participationBits?: string;
+  committeePubkeys?: string[];
+  advanceTxs?: Array<{ contractName: string; contractAddress: string; method: string; args: Record<string, any> }>;
+  anchorTx?: { contractName: string; contractAddress: string; method: string; args: Record<string, any> };
+}> => {
+  const cfg = await loadTrustlessConfig(accessToken, externalChainId, "standard");
+  if (cfg.flavor !== "eth") {
+    throw new Error(`buildAnchorPlan: only the eth flavor is supported, got ${cfg.flavor}`);
+  }
+
+  const claim = await buildClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig);
+  const anchored = await fetchEthLightClientAnchor(accessToken, cfg.lightClient, claim.blockNumber);
+  if (anchored) {
+    return { alreadyAnchored: true, lightClient: cfg.lightClient };
+  }
+
+  const anchor = await buildAnchorInputsViaStateProof(externalChainId, externalTxHash);
+  const beaconChainId = beaconChainIdFor(externalChainId, "eth");
+  const advanceTxs = await buildAdvanceCommitteeTxsIfNeeded(
+    accessToken, beaconChainId, cfg.lightClient, anchor.sync.signatureSlot,
+  );
+
+  const period = BigInt(anchor.sync.signatureSlot) / SLOTS_PER_PERIOD;
+  const committeePubkeys = await committeeForPeriod(beaconChainId, Number(period));
+
+  return {
+    alreadyAnchored: false,
+    lightClient: cfg.lightClient,
+    period: String(period),
+    signatureSlot: anchor.sync.signatureSlot,
+    participationBits: ensureHexPrefix(anchor.sync.participationBits),
+    committeePubkeys,
+    advanceTxs,
+    anchorTx: {
+      contractName: extractContractName(EthLightClientName),
+      contractAddress: cfg.lightClient,
+      method: anchor.kind === "block_roots"
+        ? "anchorBlockHeaderViaBlockRoots"
+        : "anchorBlockHeaderViaHistoricalSummaries",
+      args: anchor.kind === "block_roots"
+        ? buildEthAnchorViaBlockRootsArgs(anchor)
+        : buildEthAnchorViaHistoricalSummariesArgs(anchor),
+    },
+  };
+};
+
 export const trustlessClaim = async (
   accessToken: string,
   { externalChainId, externalTxHash, routeType, assignment }: TrustlessClaimParams,
@@ -1083,16 +1071,6 @@ export const trustlessClaim = async (
       committeeAdvanceCount = advances.length;
       txInputs.push(...advances);
 
-      // A proof for the subset aggregate, if the period has a committee
-      // digest installed and a prover is reachable. Empty otherwise, and the
-      // anchor derives the aggregate on-chain as before.
-      txInputs.push(...await buildAggregateProofTxIfNeeded(
-        accessToken,
-        beaconChainIdFor(externalChainId, "eth"),
-        cfg.lightClient,
-        anchor.sync,
-      ));
-
       if (anchor.kind === "block_roots") {
         txInputs.push({
           contractName: extractContractName(EthLightClientName),
@@ -1141,12 +1119,6 @@ export const trustlessClaim = async (
         );
         committeeAdvanceCount = advances.length;
         txInputs.push(...advances);
-        txInputs.push(...await buildAggregateProofTxIfNeeded(
-          accessToken,
-          beaconChainIdFor(externalChainId, "base"),
-          cfg.l1LightClient!,
-          baseAnchor.l1Anchor.sync,
-        ));
         txInputs.push({
           contractName: extractContractName(EthLightClientName),
           contractAddress: cfg.l1LightClient!,
@@ -1194,12 +1166,6 @@ export const trustlessClaim = async (
         );
         committeeAdvanceCount = advances.length;
         txInputs.push(...advances);
-        txInputs.push(...await buildAggregateProofTxIfNeeded(
-          accessToken,
-          beaconChainIdFor(externalChainId, "linea"),
-          cfg.l1LightClient!,
-          lineaAnchor.l1Anchor.sync,
-        ));
         txInputs.push({
           contractName: extractContractName(EthLightClientName),
           contractAddress: cfg.l1LightClient!,

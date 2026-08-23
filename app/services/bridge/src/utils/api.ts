@@ -136,6 +136,13 @@ export const bloc = createClient(`${config.api.nodeUrl}/bloc/v2.2`, {
 export const eth = createClient(`${config.api.nodeUrl}/strato-api/eth/v1.2`, {
   logPrefix: "Eth",
 });
+
+/** The app backend, for the inclusion-proof material behind an anchor. It
+ *  knows nothing about proving; that is this service's job. */
+export const backend = createClient(
+  `${(process.env.BACKEND_URL || "http://localhost:3002").replace(/\/$/, "")}/api`,
+  { logPrefix: "Backend" },
+);
 export const fetch = createClient("", {
   authenticated: false,
   logPrefix: "Fetch",
