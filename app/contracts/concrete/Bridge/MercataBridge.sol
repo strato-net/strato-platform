@@ -5,6 +5,7 @@ import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
 import "../Admin/AdminRegistry.sol";
 import "../../libraries/Bridge/BridgeTypes.sol";
+import "../../libraries/Bridge/IBridgeMintTarget.sol";
 import "../Lending/LendingRegistry.sol";
 import "../Metals/MetalForge.sol";
 import "../Pools/DirectMintPSM.sol";
@@ -17,7 +18,7 @@ import "../Savings/SaveUSDSTVault.sol";
  * @notice Implements the core logic for cross-chain token bridging
  * @notice Supports multiple external chains and token configurations
  */
-contract record MercataBridge is Ownable {
+contract record MercataBridge is Ownable, IBridgeMintTarget {
     /// @notice Enables BridgeTypes library functions for all types
     /// @dev Allows direct access to BridgeTypes utility functions without explicit library calls
     using BridgeTypes for *;
@@ -62,6 +63,23 @@ contract record MercataBridge is Ownable {
     /// @param stratoTokenAmount The source STRATO route-token amount
     event DepositCompleted(uint256 externalChainId, address externalSender, string externalTxHash, address stratoRecipient, address stratoToken, uint256 stratoTokenAmount);
 
+    /// @notice Emitted when EthBridgeIn invokes creditTrustlessDeposit and
+    ///         the credit succeeds. Mirrors {DepositCompleted} but
+    ///         carries the bridge-in's depositKey instead of a Eth-side
+    ///         tx hash, since the trustless path doesn't carry one.
+    event TrustlessDepositCredited(
+        bytes32 indexed depositKey,
+        uint256 srcChainId,
+        address ethToken,
+        address ethSender,
+        address indexed stratoRecipient,
+        address indexed stratoToken,
+        uint256 amount
+    );
+
+    /// @notice Per-chain trustless bridge-in caller updated.
+    event BridgeInUpdated(uint256 indexed srcChainId, address oldBridge, address newBridge);
+
     /// @notice Emitted when a deposit is initiated
     /// @param externalChainId The external chain identifier where the deposit occurred
     /// @param externalSender The address that sent the transaction on the external chain
@@ -83,7 +101,7 @@ contract record MercataBridge is Ownable {
     /// @notice Emitted when a withdrawal is pending custody transaction
     event WithdrawalPending(string custodyTxHash, uint256 withdrawalId);
 
-    /// @notice Emitted when a user requests a withdrawal
+    /// @notice Emitted when a user requests a withdrawal (legacy admin-mediated flow).
     /// @param dest The external recipient address on the destination chain
     /// @param destChainId The external chain identifier where tokens should be sent
     /// @param externalTokenAmount The amount of external tokens to be sent
@@ -93,9 +111,41 @@ contract record MercataBridge is Ownable {
     /// @param withdrawalId The unique withdrawal identifier
     event WithdrawalRequested(address dest, uint256 destChainId, uint256 externalTokenAmount, uint256 stratoTokenAmount, address token, address user, uint256 withdrawalId, bool useHotWallet);
 
+    // ───────────── Proof-based withdrawal events (Phase 0 §7.1) ─────────────
+
+    /// @notice Emitted for small (instant) withdrawals -- tokens are burned
+    ///         immediately and the user can claim on the external chain
+    ///         by submitting a Merkle proof of this event to the BridgeVault.
+    /// @param nonce The unique withdrawal identifier (== withdrawalId)
+    /// @param externalChainId Destination chain
+    /// @param externalToken Destination token contract
+    /// @param externalRecipient Destination address
+    /// @param externalTokenAmount Amount in external-token decimals
+    /// @param stratoSender The STRATO address that initiated
+    /// @param stratoToken STRATO token that was burned
+    /// @param stratoTokenAmount STRATO-token amount burned
+    /// @param prevWithdrawalBlock STRATO block number that contained the previous Withdrawal event
+    ///        for this externalChainId (0 if this is the first hot withdrawal on the chain).
+    ///        Lets the BridgeVault catch up missing predecessors by walking the chain backwards.
+    /// @param seq Per-chain monotonically-increasing hot-withdrawal sequence number.
+    ///        BridgeVault releases funds in seq order; out-of-order proofs queue without reverting.
+    event Withdrawal(uint256 nonce, uint256 externalChainId, address externalToken, address externalRecipient, uint256 externalTokenAmount, address stratoSender, address stratoToken, uint256 stratoTokenAmount, uint256 prevWithdrawalBlock, uint256 seq);
+
+    /// @notice Emitted for large withdrawals -- tokens are escrowed (locked
+    ///         in this contract, NOT yet burned) pending admin approval on
+    ///         the external chain. If the external admin rejects, an admin
+    ///         on STRATO can later call `refundEscrow(nonce)` to return the
+    ///         escrow to `stratoSender`.
+    event WithdrawalRequestedV2(uint256 nonce, uint256 externalChainId, address externalToken, address externalRecipient, uint256 externalTokenAmount, address stratoSender, address stratoToken, uint256 stratoTokenAmount);
+
+    /// @notice Emitted when an escrowed large-withdrawal is refunded back to
+    ///         the original sender (either by admin attestation of an
+    ///         external rejection, or by the user after the abort delay).
+    event EscrowRefunded(uint256 nonce);
+
     // ───────────── Registry related events ─────────────
     /// @notice Emitted when chain configuration is updated
-    event ChainUpdated(string chainName, address custody, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router, address hotWallet);
+    event ChainUpdated(string chainName, address custody, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router, address hotWallet, address bridgeVault, address stratoLightClient);
 
     /// @notice Emitted when the last processed block is updated for a chain
     event LastProcessedBlockUpdated(uint256 externalChainId, uint256 lastProcessedBlock);
@@ -209,6 +259,26 @@ contract record MercataBridge is Ownable {
     /// @dev When true, all withdrawal operations are paused
     bool public withdrawalsPaused;
 
+    /// @notice Per-source-chain trustless deposit verifier. The address
+    ///         registered for `srcChainId` is the only caller permitted
+    ///         to invoke {creditTrustlessDeposit} with that chain id.
+    ///         Setting an entry to address(0) disables the trustless
+    ///         path for that chain. Different source chains use
+    ///         different verifier deployments because each one wraps
+    ///         a chain-specific light client (EthLightClient for
+    ///         Ethereum, BaseLightClient for Base, etc.) — the
+    ///         verifier contract type itself is the same EthBridgeIn
+    ///         template, parameterized at construction time.
+    /// @dev    Stored as plain addresses rather than typed references
+    ///         so MercataBridge doesn't have a build-time dependency
+    ///         on the bridge-in contract.
+    mapping(uint256 => address) public bridgeIns;
+
+    /// @notice Per-deposit dedup for trustless claims. Keyed on the
+    ///         same depositKey EthBridgeIn dedups on, so even if one
+    ///         side is swapped out the other still rejects double-credits.
+    mapping(bytes32 => bool) public processedTrustlessDeposits;
+
     /// @notice Time delay before users can abort stuck withdrawals
     /// @dev Default: 172800 seconds (48 hours)
     uint256 public WITHDRAWAL_ABORT_DELAY = 172800;
@@ -250,6 +320,22 @@ contract record MercataBridge is Ownable {
     /// @notice Auto-incrementing counter for withdrawal IDs
     /// @dev Ensures unique withdrawal identifiers for each request
     uint256 public withdrawalCounter;
+
+    /// @notice Per-external-chain monotonically-increasing sequence number for hot
+    ///         (instant) Withdrawal events. The BridgeVault on the external chain
+    ///         consumes claims strictly in this order; gaps in submission are
+    ///         tolerated (the vault queues out-of-order proofs) but the
+    ///         on-chain sequence space itself is gap-free.
+    /// @dev Key: externalChainId (uint256) -> Value: next seq to assign (starts at 0)
+    mapping(uint256 => uint256) public nextWithdrawalSeq;
+
+    /// @notice Per-external-chain block number that contained the most recent
+    ///         hot Withdrawal event. Emitted on the next Withdrawal as
+    ///         `prevWithdrawalBlock` so off-chain tooling (and the vault's
+    ///         catch-up flow) can walk the chain of events backwards to
+    ///         locate any predecessor proofs that haven't been submitted yet.
+    /// @dev Key: externalChainId (uint256) -> Value: STRATO block number (0 if none yet)
+    mapping(uint256 => uint256) public lastWithdrawalBlock;
 
     // ───────────── Registry related state variables ─────────────
     /// @notice Registry of external chains and their configuration
@@ -416,23 +502,29 @@ contract record MercataBridge is Ownable {
 
     /**
      * @dev Sets chain configuration for bridge operations
-     * @notice Configures external chain parameters including custody and router addresses
+     * @notice Configures external chain parameters including custody, router, and
+     *         proof-bridge contract addresses (BridgeVault + STRATOLightClient).
      * @param chainName The human-readable name of the external chain
      * @param custody The custody contract address on the external chain
      * @param enabled Whether the chain is enabled for bridge operations
      * @param externalChainId The unique identifier for the external chain
      * @param lastProcessedBlock The last processed block number for this chain
      * @param router The router contract address for deposits
+     * @param bridgeVault BridgeVault contract on the external chain (proof-based withdrawals); pass 0 to leave unconfigured
+     * @param stratoLightClient STRATOLightClient on the external chain (header verification); pass 0 to leave unconfigured
      */
     function setChain(
-        string chainName, address custody, address hotWallet, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router
+        string chainName, address custody, address hotWallet, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router, address bridgeVault, address stratoLightClient
     ) external onlyOwner {
         require(chainName.length > 0, "MB: invalid chain name");
         require(custody != address(0), "MB: zero custody address");
         require(externalChainId > 0, "MB: invalid external chain id");
         require(router != address(0), "MB: zero router address");
-        chains[externalChainId] = ChainInfo(chainName, custody, hotWallet, router, enabled, lastProcessedBlock);
-        emit ChainUpdated(chainName, custody, enabled, externalChainId, lastProcessedBlock, router, hotWallet);
+        chains[externalChainId] = ChainInfo(
+            chainName, custody, hotWallet, router, enabled, lastProcessedBlock,
+            bridgeVault, stratoLightClient
+        );
+        emit ChainUpdated(chainName, custody, enabled, externalChainId, lastProcessedBlock, router, hotWallet, bridgeVault, stratoLightClient);
     }
 
     /**
@@ -530,6 +622,84 @@ contract record MercataBridge is Ownable {
         require(newUSDSTAddress != address(0), "MB: zero USDST address");
         emit USDSTAddressUpdated(newUSDSTAddress, USDST_ADDRESS);
         USDST_ADDRESS = newUSDSTAddress;
+    }
+
+    /**
+     * @dev Authorize the per-chain bridge-in caller for the trustless
+     *      deposit path. Only the address registered for `srcChainId`
+     *      may invoke {creditTrustlessDeposit} with that chain id.
+     *      Setting an entry to address(0) disables the trustless path
+     *      for that chain (deposits then fall back to the legacy
+     *      relayer-attested {confirmDeposit}).
+     *
+     *      Each source chain gets its own bridge-in deployment because
+     *      each one wraps a chain-specific light client (EthLightClient
+     *      for Ethereum, BaseLightClient for Base, etc.). The caller
+     *      authorization here is what binds (chain → verifier).
+     */
+    function setBridgeIn(uint256 srcChainId, address newBridge) external onlyOwner {
+        require(srcChainId != 0, "MB: zero srcChainId");
+        address old = bridgeIns[srcChainId];
+        bridgeIns[srcChainId] = newBridge;
+        emit BridgeInUpdated(srcChainId, old, newBridge);
+    }
+
+    /**
+     * @notice IBridgeMintTarget hook called by a per-chain EthBridgeIn
+     *         after a successfully verified deposit claim. Mints
+     *         `amount` of `stratoToken` to `stratoRecipient`.
+     *
+     *         Authorization: only the bridge-in registered for
+     *         `srcChainId` (via {setBridgeIn}) may call.
+     *         Idempotency: dedups on `depositKey` (the same key the
+     *         bridge-in dedups on; double-keyed for defense-in-depth).
+     *         Route allowlist: reuses {_requireRouteEnabled} so the
+     *         existing per-asset route configuration also gates
+     *         trustless deposits.
+     */
+    function creditTrustlessDeposit(
+        bytes32 depositKey,
+        uint256 srcChainId,
+        address ethToken,
+        address ethSender,
+        address stratoRecipient,
+        address stratoToken,
+        uint256 amount
+    ) external override whenDepositsOpen {
+        address registered = bridgeIns[srcChainId];
+        require(registered != address(0), "MB: trustless path disabled for chain");
+        require(msg.sender == registered, "MB: caller not bridgeIn for chain");
+        require(stratoRecipient != address(0), "MB: zero recipient");
+        require(stratoToken != address(0), "MB: zero strato token");
+        require(amount > 0, "MB: zero amount");
+
+        require(!processedTrustlessDeposits[depositKey], "MB: already credited");
+        processedTrustlessDeposits[depositKey] = true;
+
+        // Reuse the existing route allowlist. Trustless claims still
+        // need an admin-enabled (chainId, ethToken, stratoToken) route.
+        _requireRouteEnabled(ethToken, srcChainId, stratoToken);
+
+        uint256 actualMinted = _mintFunds(stratoToken, stratoRecipient, amount);
+        require(actualMinted > 0, "MB: no tokens minted");
+
+        emit TrustlessDepositCredited(
+            depositKey, srcChainId, ethToken, ethSender, stratoRecipient, stratoToken, amount
+        );
+        // Also emit the canonical {DepositCompleted} so downstream consumers
+        // (UI deposit history, accounting feeds) count this exactly like a
+        // relayer-credited deposit. The trustless path doesn't have a real
+        // L1 tx hash to surface, so we encode the depositKey as a "0x…"
+        // hex string for the externalTxHash slot — uniquely identifies the
+        // claim and round-trips back to the bytes32 via standard hex parsing.
+        emit DepositCompleted(
+            srcChainId,
+            ethSender,
+            "0x" + string(BytesUtils.b16encode(bytes(depositKey))),
+            stratoRecipient,
+            stratoToken,
+            amount
+        );
     }
 
     /**
@@ -1241,6 +1411,7 @@ contract record MercataBridge is Ownable {
         uint256 id, string custodyTxHash
     ) public onlyOwner whenWithdrawalsOpen {
         require(id > 0, "MB: invalid withdrawal id");
+        require(!isProofBased[id], "MB: use proof-based flow");
         require(custodyTxHash.length > 0, "MB: invalid custody tx hash");
 
         WithdrawalInfo w = withdrawals[id];
@@ -1287,6 +1458,7 @@ contract record MercataBridge is Ownable {
         uint256 id
     ) public onlyOwner whenWithdrawalsOpen {
         require(id > 0, "MB: invalid withdrawal id");
+        require(!isProofBased[id], "MB: use proof-based flow");
 
         WithdrawalInfo w = withdrawals[id];
         require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
@@ -1330,6 +1502,7 @@ contract record MercataBridge is Ownable {
         uint256 id
     ) public {
         require(id > 0, "MB: invalid withdrawal id");
+        require(!isProofBased[id], "MB: use userAbortEscrowProof / refundEscrowProof");
 
         WithdrawalInfo w = withdrawals[id];
         uint256 currentTimestamp = block.timestamp;
@@ -1368,5 +1541,178 @@ contract record MercataBridge is Ownable {
         for (uint256 i = 0; i < n; i++) {
             abortWithdrawal(ids[i]);
         }
+    }
+
+    // ───────────── Proof-based withdrawal flow (Phase 0 §7) ─────────────
+    //
+    // The proof-based flow replaces the legacy
+    // requestWithdrawal / confirmWithdrawal / finaliseWithdrawal sequence
+    // with a single tiered entry point:
+    //
+    //   * Small (< hotWithdrawalThresholds[chainId][token]):
+    //     burn-on-request. Tokens are escrowed and immediately burned in the
+    //     same transaction. Emits `Withdrawal(...)`. The user (or anyone)
+    //     can claim on the external chain by submitting a Merkle proof of
+    //     the event to the BridgeVault.
+    //
+    //   * Large (>= threshold): escrow-on-request. Tokens are escrowed but
+    //     NOT burned. Emits `WithdrawalRequestedV2(...)`. After the external
+    //     admin approves on the destination chain, the BridgeVault releases
+    //     funds; the escrow on this side stays locked (effectively burned by
+    //     governance). If the external admin REJECTS, an admin on STRATO
+    //     calls `refundEscrowProof` to return the escrow to `stratoSender`.
+    //     Users can also self-refund via `userAbortEscrowProof` after the
+    //     existing 48h delay if neither approval nor rejection has been
+    //     observed.
+    //
+    // The new flow lives alongside the legacy one during transition.
+    // `isProofBased[id]` tags which flow a given withdrawal belongs to so
+    // legacy admins can't accidentally `confirmWithdrawal` a proof-based
+    // request and vice versa. Once the proof-based path is exercised on
+    // mainnet, the legacy functions can be deprecated and then removed.
+
+    /// @notice Tags withdrawal IDs that use the proof-based flow. Legacy
+    ///         admin functions check this to avoid stepping on each other.
+    mapping(uint256 => bool) public record isProofBased;
+
+    /**
+     * @dev Initiates a proof-based withdrawal. Dispatches on the per-asset
+     *      threshold: below threshold -> burn-on-request + emit `Withdrawal`;
+     *      at-or-above -> escrow + emit `WithdrawalRequestedV2`.
+     *
+     *      Decimal handling and registry/route checks mirror the legacy
+     *      `requestWithdrawal` so the user-facing contract is symmetric.
+     */
+    function requestWithdrawalProof(
+        uint256 externalChainId,
+        address externalRecipient,
+        address externalToken,
+        address stratoToken,
+        uint256 stratoTokenAmount
+    ) external whenWithdrawalsOpen returns (uint256 id) {
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(externalRecipient != address(0), "MB: invalid external recipient");
+        require(stratoToken != address(0), "MB: invalid strato token");
+        require(stratoTokenAmount > 0, "MB: invalid strato token amount");
+        require(chains[externalChainId].enabled, "MB: chain not enabled");
+
+        AssetInfo a = assets[externalToken][externalChainId];
+        _requireRouteEnabled(externalToken, externalChainId, stratoToken);
+        require(TokenFactory(tokenFactory).isTokenActive(stratoToken), "MB: inactive token");
+
+        // Round STRATO amount down to a whole external-token unit, same as
+        // the legacy flow. Any dust stays with the user.
+        uint256 externalTokenAmount = stratoTokenAmount / (10 ** (DECIMAL_PLACES - a.externalDecimals));
+        require(externalTokenAmount > 0, "MB: not enough external tokens");
+
+        stratoTokenAmount = externalTokenAmount * (10 ** (DECIMAL_PLACES - a.externalDecimals));
+        require(a.maxPerWithdrawal == 0 || stratoTokenAmount <= a.maxPerWithdrawal, "MB: per-withdrawal cap");
+
+        // Always escrow first. For small withdrawals we burn the escrow in
+        // the same call below.
+        stratoTokenAmount = _escrowFunds(stratoToken, msg.sender, stratoTokenAmount);
+        require(stratoTokenAmount > 0, "MB: no tokens escrowed");
+
+        externalTokenAmount = stratoTokenAmount / (10 ** (DECIMAL_PLACES - a.externalDecimals));
+        require(externalTokenAmount > 0, "MB: invalid external token amount");
+
+        id = ++withdrawalCounter;
+        isProofBased[id] = true;
+
+        uint256 threshold = hotWithdrawalThresholds[externalChainId][externalToken];
+        bool isInstant = threshold > 0 && externalTokenAmount < threshold;
+
+        if (isInstant) {
+            // Small: burn immediately and mark COMPLETED.
+            uint256 burned = _burnFunds(stratoToken, stratoTokenAmount);
+            require(burned > 0, "MB: no tokens burned");
+
+            withdrawals[id] = WithdrawalInfo(
+                BridgeStatus.COMPLETED, "", externalChainId, externalRecipient, externalToken,
+                externalTokenAmount, block.timestamp, msg.sender, stratoToken, stratoTokenAmount,
+                block.timestamp, true
+            );
+
+            // Snapshot the linked-list metadata BEFORE incrementing -- the
+            // emitted event records its predecessor and its own seq number.
+            uint256 prevBlock = lastWithdrawalBlock[externalChainId];
+            uint256 seq = nextWithdrawalSeq[externalChainId];
+            nextWithdrawalSeq[externalChainId] = seq + 1;
+            lastWithdrawalBlock[externalChainId] = block.number;
+
+            emit Withdrawal(
+                id, externalChainId, externalToken, externalRecipient,
+                externalTokenAmount, msg.sender, stratoToken, stratoTokenAmount,
+                prevBlock, seq
+            );
+        } else {
+            // Large: keep escrow, status INITIATED.
+            withdrawals[id] = WithdrawalInfo(
+                BridgeStatus.INITIATED, "", externalChainId, externalRecipient, externalToken,
+                externalTokenAmount, block.timestamp, msg.sender, stratoToken, stratoTokenAmount,
+                block.timestamp, false
+            );
+
+            emit WithdrawalRequestedV2(
+                id, externalChainId, externalToken, externalRecipient,
+                externalTokenAmount, msg.sender, stratoToken, stratoTokenAmount
+            );
+        }
+    }
+
+    /**
+     * @dev User-initiated escrow refund for a proof-based large withdrawal.
+     *      Mirrors the user branch of the legacy `abortWithdrawal`: only the
+     *      original sender can call, only after the abort delay, only while
+     *      the escrow is still in INITIATED state.
+     */
+    function userAbortEscrowProof(uint256 id) external {
+        require(id > 0, "MB: invalid withdrawal id");
+        require(isProofBased[id], "MB: not a proof-based withdrawal");
+
+        WithdrawalInfo w = withdrawals[id];
+        require(msg.sender == w.stratoSender, "MB: not sender");
+        require(w.bridgeStatus == BridgeStatus.INITIATED, "MB: not abortable");
+        require(block.timestamp >= w.requestedAt + WITHDRAWAL_ABORT_DELAY, "MB: wait abort delay");
+
+        w.bridgeStatus = BridgeStatus.ABORTED;
+        w.timestamp = block.timestamp;
+
+        uint256 refunded = _refundFunds(w.stratoToken, w.stratoSender, w.stratoTokenAmount);
+        require(refunded > 0, "MB: no tokens refunded");
+
+        emit EscrowRefunded(id);
+    }
+
+    /**
+     * @dev Admin-mediated escrow refund after the external chain rejects the
+     *      large withdrawal. Admin attests off-chain to having seen the
+     *      `WithdrawalRejected` event on the destination vault. In a future
+     *      phase this will be replaced with an on-chain proof of rejection
+     *      (deposit-direction proof system, Phase 0 §10 item 2), eliminating
+     *      this trust footprint entirely.
+     *
+     *      Worst case under compromise: a malicious STRATO admin can refund
+     *      escrows that haven't been rejected on the external chain. That is
+     *      a denial-of-service, not a fund drain -- the bridge supply is
+     *      conserved (escrowed funds returned to original sender).
+     */
+    function refundEscrowProof(uint256 id) public {
+        require(id > 0, "MB: invalid withdrawal id");
+        require(isProofBased[id], "MB: not a proof-based withdrawal");
+
+        AdminRegistry admin = AdminRegistry(owner());
+        require(admin.whitelist(address(this), "refundEscrowProof", msg.sender), "MB: not admin");
+
+        WithdrawalInfo w = withdrawals[id];
+        require(w.bridgeStatus == BridgeStatus.INITIATED, "MB: not refundable");
+
+        w.bridgeStatus = BridgeStatus.ABORTED;
+        w.timestamp = block.timestamp;
+
+        uint256 refunded = _refundFunds(w.stratoToken, w.stratoSender, w.stratoTokenAmount);
+        require(refunded > 0, "MB: no tokens refunded");
+
+        emit EscrowRefunded(id);
     }
 }

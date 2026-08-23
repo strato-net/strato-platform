@@ -1,6 +1,7 @@
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/utils/StringUtils.sol";
 import "../../libraries/Bridge/BridgeTypes.sol";
+import "../../libraries/Bridge/INativeRedemptionTarget.sol";
 import "../Admin/AdminRegistry.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
@@ -11,7 +12,7 @@ import "./StratoNativeCustodyVault.sol";
  * @notice Separate bridge lifecycle for STRATO-native assets.
  * @notice Keeps native lock/unlock liabilities isolated from the existing MercataBridge flow.
  */
-contract record StratoNativeBridge is Ownable {
+contract record StratoNativeBridge is Ownable, INativeRedemptionTarget {
     using BridgeTypes for *;
     using StringUtils for string;
 
@@ -144,6 +145,51 @@ contract record StratoNativeBridge is Ownable {
     mapping(string => NativeDepositInfo) public record deposits;
     mapping(uint256 => NativeWithdrawalInfo) public record withdrawals;
 
+    /// @notice Per-source-chain trustless redemption verifier. The
+    ///         address registered for `externalChainId` is the only
+    ///         caller permitted to invoke {creditNativeRedemptionWithProof}
+    ///         with that chain id. Setting an entry to address(0)
+    ///         disables the trustless path for that chain.
+    ///
+    ///         Each entry is a {StratoNativeBridgeIn} deployment whose
+    ///         wrapped light client verifies the source chain's blocks
+    ///         (EthLightClient for Sepolia/mainnet, BaseLightClient for
+    ///         Base, LineaLightClient for Linea, BscLightClient for BSC).
+    ///         The verifier contract template is the same per chain;
+    ///         it's the wrapped light client that differs.
+    mapping(uint256 => address) public nativeBridgeIns;
+
+    /// @notice Per-claim dedup for trustless redemptions, keyed on the
+    ///         same {depositKey} StratoNativeBridgeIn dedups on. Stored
+    ///         here too so either side of the bridge could be redeployed
+    ///         without losing replay protection — both must agree before
+    ///         a credit succeeds.
+    mapping(bytes32 => bool) public processedTrustlessRedemptions;
+
+    event NativeBridgeInUpdated(
+        uint256 indexed externalChainId,
+        address oldBridgeIn,
+        address newBridgeIn
+    );
+
+    /// @notice Emitted when a redemption is credited via the trustless
+    ///         path. Mirrors {MercataBridge.TrustlessDepositCredited}
+    ///         for the native flow. The canonical {NativeDepositCompleted}
+    ///         is also emitted so indexers / accounting consumers count
+    ///         this exactly like an operator-credited redemption.
+    event NativeRedemptionTrustlesslyCredited(
+        bytes32 indexed depositKey,
+        string depositId,
+        uint256 externalChainId,
+        address externalBridge,
+        uint256 externalRedemptionId,
+        address externalSender,
+        address representationToken,
+        address stratoRecipient,
+        address stratoToken,
+        uint256 stratoTokenAmount
+    );
+
     modifier whenDepositsOpen() {
         require(!depositsPaused, "SNB: deposits paused");
         _;
@@ -245,6 +291,20 @@ contract record StratoNativeBridge is Ownable {
         require(newVault != address(0), "SNB: zero vault");
         emit CustodyVaultUpdated(newVault, custodyVault);
         custodyVault = newVault;
+    }
+
+    /**
+     * @notice Register the {StratoNativeBridgeIn} deployment authorized
+     *         to invoke {creditNativeRedemptionWithProof} for an
+     *         external chain. Pass `address(0)` to disable the trustless
+     *         path for that chain (the operator-driven recordDeposit
+     *         flow keeps working either way).
+     */
+    function setNativeBridgeIn(uint256 externalChainId, address newBridgeIn) external onlyOwner {
+        require(externalChainId > 0, "SNB: invalid external chain id");
+        address old = nativeBridgeIns[externalChainId];
+        nativeBridgeIns[externalChainId] = newBridgeIn;
+        emit NativeBridgeInUpdated(externalChainId, old, newBridgeIn);
     }
 
     function getDepositId(
@@ -607,6 +667,145 @@ contract record StratoNativeBridge is Ownable {
             stratoRecipient,
             stratoToken,
             stratoTokenAmount
+        );
+    }
+
+    /**
+     * @notice Trustless redemption credit. Called by the registered
+     *         {StratoNativeBridgeIn} for `externalChainId` after it has
+     *         MPT-verified a {StratoNativeRepresentationBridge.RedemptionRequested}
+     *         log against a light-client-anchored receipts root.
+     *
+     *         Collapses the operator's three-step
+     *         (recordDeposit → reviewDeposit → confirmDeposit) flow
+     *         into a single atomic call: the MPT proof IS the review.
+     *         On success, the strato token is unlocked from custody
+     *         to {stratoRecipient} immediately.
+     *
+     *         Idempotency: dedups on `depositKey` (the same key
+     *         StratoNativeBridgeIn dedups on; double-keyed for
+     *         defense-in-depth since either side could be redeployed).
+     *
+     *         Coexistence: writes to the same {deposits} mapping as
+     *         the operator path so the UI / accounting / query layer
+     *         doesn't have to distinguish. The {externalTxHash} field
+     *         gets a `"0x<hex(depositKey)>"` surrogate since the
+     *         trustless path doesn't have a relayer-supplied tx hash —
+     *         same convention {MercataBridge.creditTrustlessDeposit}
+     *         uses for the standard flow.
+     *
+     * @dev    `externalBridge` is the {StratoNativeRepresentationBridge}
+     *         address — that is, the log emitter the bridge-in just
+     *         MPT-verified. We re-validate it against the configured
+     *         asset.externalBridge so a misconfigured bridge-in (one
+     *         pointing at the wrong rep bridge) can't credit deposits
+     *         using stale asset registrations.
+     */
+    function creditNativeRedemptionWithProof(
+        bytes32 depositKey,
+        uint256 externalChainId,
+        address externalBridge,
+        uint256 externalRedemptionId,
+        address externalSender,
+        address representationToken,
+        address stratoRecipient,
+        uint256 stratoTokenAmount
+    ) external override whenDepositsOpen {
+        // 1. Caller must be the registered bridge-in for this chain.
+        address registered = nativeBridgeIns[externalChainId];
+        require(registered != address(0), "SNB: trustless path disabled for chain");
+        require(msg.sender == registered, "SNB: caller not bridgeIn for chain");
+
+        // 2. Input sanity (mirrors recordDeposit's checks).
+        require(externalChainId > 0, "SNB: invalid external chain id");
+        require(externalBridge != address(0), "SNB: invalid external bridge");
+        require(externalRedemptionId > 0, "SNB: invalid redemption id");
+        require(externalSender != address(0), "SNB: invalid external sender");
+        require(representationToken != address(0), "SNB: invalid representation token");
+        require(stratoRecipient != address(0), "SNB: invalid strato recipient");
+        require(stratoTokenAmount > 0, "SNB: invalid strato token amount");
+        require(custodyVault != address(0), "SNB: vault not set");
+
+        // 3. Trustless dedup. Defense in depth — StratoNativeBridgeIn
+        //    already dedups on the same key.
+        require(!processedTrustlessRedemptions[depositKey], "SNB: already credited");
+        processedTrustlessRedemptions[depositKey] = true;
+
+        // 4. Resolve & validate asset config.
+        address stratoToken = stratoTokenByRepresentation[representationToken][externalChainId];
+        require(stratoToken != address(0), "SNB: asset missing");
+
+        NativeAssetConfig asset = assets[stratoToken][externalChainId];
+        require(asset.enabled, "SNB: asset disabled");
+        require(asset.externalBridge == externalBridge, "SNB: wrong external bridge");
+        require(asset.representationToken == representationToken, "SNB: wrong representation token");
+
+        // 5. Coexistence with operator path: claim the same depositId
+        //    slot so concurrent operator-driven credits are rejected
+        //    cleanly. (The operator path requires status == NONE;
+        //    we set it straight to COMPLETED below.)
+        string depositId = getDepositId(
+            externalChainId,
+            externalBridge,
+            externalRedemptionId
+        );
+        NativeDepositInfo existing = deposits[depositId];
+        require(existing.bridgeStatus == BridgeStatus.NONE, "SNB: duplicate deposit");
+
+        // 6. Synthesize an externalTxHash surrogate from the depositKey
+        //    so UI / event indexers don't need to special-case the
+        //    trustless flow. Round-trippable: `bytes32(parseHex(surrogate.slice(2)))`.
+        string txHashSurrogate = "0x" + string(BytesUtils.b16encode(bytes(depositKey)));
+
+        deposits[depositId] = NativeDepositInfo(
+            BridgeStatus.COMPLETED,
+            depositId,
+            externalBridge,
+            externalSender,
+            txHashSurrogate,
+            externalChainId,
+            externalRedemptionId,
+            representationToken,
+            block.timestamp,
+            stratoRecipient,
+            stratoToken,
+            stratoTokenAmount,
+            block.timestamp
+        );
+
+        // 7. Release funds from custody.
+        uint256 actualUnlockedAmount = StratoNativeCustodyVault(custodyVault).unlock(
+            stratoToken,
+            stratoRecipient,
+            stratoTokenAmount
+        );
+        require(actualUnlockedAmount > 0, "SNB: no tokens unlocked");
+
+        // 8. Emit both the trustless-specific event (for indexers that
+        //    distinguish flows) and the canonical NativeDepositCompleted
+        //    (so existing consumers count this uniformly).
+        emit NativeRedemptionTrustlesslyCredited(
+            depositKey,
+            depositId,
+            externalChainId,
+            externalBridge,
+            externalRedemptionId,
+            externalSender,
+            representationToken,
+            stratoRecipient,
+            stratoToken,
+            actualUnlockedAmount
+        );
+        emit NativeDepositCompleted(
+            depositId,
+            externalChainId,
+            externalBridge,
+            externalRedemptionId,
+            externalSender,
+            txHashSurrogate,
+            stratoRecipient,
+            stratoToken,
+            actualUnlockedAmount
         );
     }
 

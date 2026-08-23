@@ -29,7 +29,12 @@
     "node": ">=22.12 <23.0"
   },
   "dependencies": {
+    "@chainsafe/ssz": "^1.4.0",
+    "@ethereumjs/rlp": "^5.0.2",
+    "@ethereumjs/trie": "^6.2.1",
     "@hapi/joi": "^17.1.1",
+    "@lodestar/types": "^1.42.0",
+    "@noble/hashes": "^1.8.0",
     "@sendgrid/mail": "^8.1.6",
     "@strato/shared-types": "file:../packages/shared-types",
     "@types/json-bigint": "^1.0.4",

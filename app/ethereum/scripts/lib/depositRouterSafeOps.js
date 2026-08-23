@@ -200,6 +200,53 @@ async function proposeBatch(chainId, transactions, options) {
   return { safeTxHash, nonce, safeAddress, proposerAddress };
 }
 
+function getEoaPrivateKey() {
+  const pk = normalizePrivateKey(
+    process.env.DEPOSIT_ROUTER_OWNER_PRIVATE_KEY || process.env.PRIVATE_KEY,
+  );
+  if (!pk) {
+    throw new Error(
+      "Missing DEPOSIT_ROUTER_OWNER_PRIVATE_KEY (or PRIVATE_KEY) for EOA send",
+    );
+  }
+  return pk;
+}
+
+async function sendBatchEoa(chainId, transactions, options) {
+  const opts = options && typeof options === "object" ? options : {};
+  if (!Array.isArray(transactions) || transactions.length === 0) {
+    throw new Error("sendBatchEoa: no transactions provided");
+  }
+  const provider = new ethers.JsonRpcProvider(getRpcUrl(Number(chainId)));
+  const wallet = new ethers.Wallet(getEoaPrivateKey(), provider);
+  const senderAddress = normalizeAddress(wallet.address);
+
+  if (opts.expectedSender) {
+    const expected = normalizeAddress(opts.expectedSender);
+    if (expected && expected !== senderAddress) {
+      throw new Error(
+        `EOA address ${senderAddress} does not match expected sender ${expected}`,
+      );
+    }
+  }
+
+  const results = [];
+  for (const tx of transactions) {
+    const sent = await wallet.sendTransaction({
+      to: tx.to,
+      data: tx.data,
+      value: tx.value || "0",
+    });
+    const receipt = await sent.wait();
+    results.push({
+      hash: sent.hash,
+      blockNumber: receipt?.blockNumber ?? null,
+      status: receipt?.status ?? null,
+    });
+  }
+  return { sender: senderAddress, results };
+}
+
 function chunkArray(values, size) {
   if (size <= 0) return [values];
   const chunks = [];
@@ -226,6 +273,7 @@ module.exports = {
   loadDepositRouterArtifact,
   encodeCall,
   proposeBatch,
+  sendBatchEoa,
   chunkArray,
   writeOutput,
 };

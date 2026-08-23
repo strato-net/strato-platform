@@ -11,7 +11,7 @@ const PROFILE_ALIASES = {
 
 const DEFAULTS = {
   [PROFILE_TESTNET]: {
-    NODE_URL: "https://node1.testnet.strato.nexus",
+    NODE_URL: "http://localhost:8081",
     DEFAULT_CHAINS: "11155111,84532",
   },
   [PROFILE_PROD]: {
@@ -26,6 +26,8 @@ const CHAIN_RPC_ENV_MAP = {
   CHAIN_1_RPC_URL: "MAINNET_RPC_URL",
   CHAIN_8453_RPC_URL: "BASE_RPC_URL",
   CHAIN_59144_RPC_URL: "LINEA_RPC_URL",
+  CHAIN_56_RPC_URL: "BSC_RPC_URL",
+  CHAIN_97_RPC_URL: "BSC_TESTNET_RPC_URL",
 };
 
 function normalizeProfile(value) {
@@ -59,9 +61,11 @@ function applyEnvProfile(profile) {
     SEPOLIA_RPC_URL: `https://eth-sepolia.g.alchemy.com/v2/${alchemyKey}`,
     BASE_SEPOLIA_RPC_URL: `https://base-sepolia.g.alchemy.com/v2/${alchemyKey}`,
     LINEA_SEPOLIA_RPC_URL: `https://linea-sepolia.g.alchemy.com/v2/${alchemyKey}`,
+    BSC_TESTNET_RPC_URL: `https://bnb-testnet.g.alchemy.com/v2/${alchemyKey}`,
     MAINNET_RPC_URL: `https://eth-mainnet.g.alchemy.com/v2/${alchemyKey}`,
     BASE_RPC_URL: `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`,
     LINEA_RPC_URL: `https://linea-mainnet.g.alchemy.com/v2/${alchemyKey}`,
+    BSC_RPC_URL: `https://bnb-mainnet.g.alchemy.com/v2/${alchemyKey}`,
   };
 
   for (const [key, fallback] of Object.entries(rpcDefaults)) {

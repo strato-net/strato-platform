@@ -5,7 +5,9 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import BridgeConfirmationModal from "./BridgeConfirmationModal";
-import { useAccount } from "wagmi";
+import WithdrawalProgressModal, { WithdrawalStep } from "./WithdrawalProgressModal";
+import { useAccount, useConfig } from "wagmi";
+import { claimWithdrawalOnExternalChain, deploymentFromChainInfo } from "@/lib/bridge/proofClaim";
 import { useBridgeContext } from "@/context/BridgeContext";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import { formatBalance, formatUnits, safeParseUnits } from "@/utils/numberUtils";
@@ -37,9 +39,15 @@ interface BridgeOutProps {
 const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = false }) => {
   // Hooks & Context
   const { isConnected } = useAccount();
+  const wagmiConfig = useConfig();
   const { toast } = useToast();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
-  const { externalEvmWalletAddress, isExternalEvmWalletConnected, isAppAuthenticated } = useUser();
+  const {
+    externalEvmWalletAddress,
+    isExternalEvmWalletConnected,
+    isAppAuthenticated,
+    walletSignerReady,
+  } = useUser();
 
   const {
     requestWithdrawal: bridgeOutAPI,
@@ -60,6 +68,16 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
   const [amountError, setAmountError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [feeError, setFeeError] = useState("");
+  // Withdrawal progress modal state. The progress modal opens as soon as the
+  // user confirms in BridgeConfirmationModal and ticks through every visible
+  // step of the proof flow (STRATO submit → proof → chain switch → header →
+  // claim) so the user can see exactly where they are.
+  const [progressOpen, setProgressOpen] = useState(false);
+  const [currentStep, setCurrentStep] = useState<WithdrawalStep>("submit_strato");
+  const [progressClaimTxHash, setProgressClaimTxHash] = useState<string | undefined>();
+  const [progressHeaderTxHash, setProgressHeaderTxHash] = useState<string | undefined>();
+  const [headerAlreadyKnown, setHeaderAlreadyKnown] = useState(false);
+  const [progressError, setProgressError] = useState<string | undefined>();
 
   // Computed values
   const modeLabels = BRIDGE_MODE_LABELS[isSaving ? "convert" : "bridge"];
@@ -157,6 +175,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       !selectedToken ||
       !hasExternalRecipient ||
       !currentNetwork ||
+      !walletSignerReady ||
       isBalanceLoading,
     [
       guestMode,
@@ -165,6 +184,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       selectedToken,
       hasExternalRecipient,
       currentNetwork,
+      walletSignerReady,
       isBalanceLoading,
     ]
   );
@@ -275,13 +295,13 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
     const stratoTokenAmount = safeParseUnits(amount || "0", DECIMAL).toString();
 
     setIsLoading(true);
-
-    if (!isSaving) {
-      toast({
-        title: "Preparing transaction...",
-        description: "Please wait while we prepare your transaction",
-      });
-    }
+    // Reset and open the step-by-step progress modal.
+    setProgressClaimTxHash(undefined);
+    setProgressHeaderTxHash(undefined);
+    setHeaderAlreadyKnown(false);
+    setProgressError(undefined);
+    setCurrentStep("submit_strato");
+    setProgressOpen(true);
 
     try {
       const externalToken = !selectedToken.externalToken
@@ -298,17 +318,99 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
           stratoToken: selectedToken.stratoToken,
           stratoTokenAmount,
         },
-        useExternalWalletSigning ? { walletAuth: true } : undefined
+        {
+          ...(useExternalWalletSigning ? { walletAuth: true } : {}),
+          onProgress: (phase) => setCurrentStep(phase),
+        },
       );
 
       if (!res?.success) {
         throw new Error("Failed to request withdrawal");
       }
 
-      toast({
-        title: "Bridge out requested",
-        description: `Your bridge out request is pending approval. The approved amount of ${selectedToken.externalSymbol} will be transferred to ${externalRecipient}.`,
-      });
+      const proof = res.data?.proof;
+      console.info(
+        `[bridge-out] proof status:`,
+        proof
+          ? { eventName: proof.eventName, blockNumber: proof.blockNumber, txIndex: proof.txIndex, logIndex: proof.logIndex }
+          : "(none)",
+        `currentNetwork:`,
+        {
+          chainId: currentNetwork.chainId,
+          bridgeVault: currentNetwork.bridgeVault,
+          stratoLightClient: currentNetwork.stratoLightClient,
+        },
+      );
+      if (proof && proof.eventName === "Withdrawal") {
+        // Hot path: STRATO emitted Withdrawal => the vault can release
+        // funds atomically once the proof verifies. Drive the claim through
+        // the user's wallet on the external chain.
+        const deployment = deploymentFromChainInfo({
+          bridgeVault: currentNetwork.bridgeVault,
+          stratoLightClient: currentNetwork.stratoLightClient,
+        });
+        console.info(`[bridge-out] hot-path deployment resolved:`, deployment);
+        if (!deployment) {
+          setProgressError(
+            `No proof-bridge contracts configured on-chain for ${selectedNetwork || currentNetwork.chainId}. ` +
+              `Ask an admin to set bridgeVault / stratoLightClient via setChain to enable automatic claims.`,
+          );
+          setCurrentStep("error");
+        } else {
+          try {
+            await claimWithdrawalOnExternalChain({
+              wagmiConfig,
+              proof,
+              externalChainId: currentNetwork.chainId,
+              deployment,
+              onProgress: (p) => {
+                console.info(`[bridge-out] claim progress:`, p);
+                switch (p.phase) {
+                  case "switching-chain":
+                    setCurrentStep("switch_chain");
+                    break;
+                  case "submitting-header":
+                    setHeaderAlreadyKnown(false);
+                    setCurrentStep("submit_header");
+                    break;
+                  case "header-submitted":
+                    setProgressHeaderTxHash(p.txHash);
+                    break;
+                  case "header-already-known":
+                    setHeaderAlreadyKnown(true);
+                    setCurrentStep("submit_header");
+                    break;
+                  case "claiming":
+                    setCurrentStep("claim_external");
+                    break;
+                  case "claimed":
+                    setProgressClaimTxHash(p.txHash);
+                    setCurrentStep("complete");
+                    break;
+                }
+              },
+            });
+          } catch (claimErr: any) {
+            setProgressError(
+              claimErr?.shortMessage || claimErr?.message || "Could not complete the claim.",
+            );
+            setCurrentStep("error");
+          }
+        }
+      } else if (proof && proof.eventName === "WithdrawalRequestedV2") {
+        // Cold path: STRATO emitted WithdrawalRequestedV2 (above the
+        // instant-release threshold). The proof exists, but the vault won't
+        // release funds without admin approval.
+        setCurrentStep("complete_pending");
+      } else {
+        // No proof returned. Most likely the proof endpoint hadn't indexed
+        // the freshly-mined block yet; the request itself succeeded on
+        // STRATO. The withdrawals listing page will update once the proof
+        // is available and the user can finish the claim from there later.
+        // Reuse the cold-path "pending" state since the user-visible UX is
+        // the same: the withdrawal is recorded, claim hasn't happened yet.
+        setCurrentStep("complete_pending");
+      }
 
       setAmount("");
 
@@ -318,10 +420,22 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         fetchWithdrawalSummary(false),
       ]);
       triggerWithdrawalRefresh();
+    } catch (err: any) {
+      // Catches anything that throws BEFORE we entered the on-chain claim
+      // try/catch -- e.g. bridgeOutAPI rejecting (user-rejected sign,
+      // /rpc/submit failure, request validation). Surface inside the modal
+      // so the user sees what went wrong instead of a frozen UI.
+      setProgressError(err?.shortMessage || err?.message || "Withdrawal failed.");
+      setCurrentStep("error");
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleProgressClose = useCallback(() => {
+    setProgressOpen(false);
+    setProgressError(undefined);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -430,7 +544,11 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         disabled={isButtonDisabled}
         className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
-        {isLoading ? "Processing..." : "Bridge Out"}
+        {isLoading
+          ? "Processing..."
+          : isConnected && !walletSignerReady
+          ? "Connecting wallet..."
+          : "Bridge Out"}
         </Button>
 
       <AdvancedOptionsDropdown
@@ -452,6 +570,18 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         toNetwork={selectedNetwork || "Not selected"}
         amount={amount}
         selectedToken={selectedToken}
+      />
+
+      <WithdrawalProgressModal
+        open={progressOpen}
+        currentStep={currentStep}
+        chainId={currentNetwork ? Number(currentNetwork.chainId) : undefined}
+        chainName={selectedNetwork || undefined}
+        claimTxHash={progressClaimTxHash}
+        headerTxHash={progressHeaderTxHash}
+        headerAlreadyKnown={headerAlreadyKnown}
+        error={progressError}
+        onClose={handleProgressClose}
       />
     </div>
   );

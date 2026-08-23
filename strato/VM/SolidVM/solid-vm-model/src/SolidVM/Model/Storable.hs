@@ -22,9 +22,7 @@ import Data.Bool (bool)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.UTF8 as UTF8
-import qualified Data.ByteString.Unsafe as BU
 import Data.Char
 import Data.Hashable
 import Data.Maybe
@@ -36,8 +34,6 @@ import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, decodeUtf8', encodeUtf8)
 import qualified Database.Esqueleto.Internal.Internal as E
 import Database.Persist.Sql
-import Foreign.Ptr
-import Foreign.Storable
 import GHC.Generics
 import SolidVM.Model.SolidString
 import System.IO.Unsafe
@@ -348,55 +344,57 @@ parseField = do
 parsePath :: B.ByteString -> Either String StoragePath
 parsePath = fmap StoragePath . parseOnly pathParser
 
+-- | Escape a mapping-index payload so the resulting bytes are safe to
+--   round-trip through the storage table's `key` column. The column
+--   is a Postgres TEXT (UTF-8); any non-ASCII / non-printable byte
+--   would be lossy across the Haskell `String` ↔ `Text` ↔ wire path
+--   that PersistField StoragePath uses.
+--
+--   Output alphabet is pure ASCII printable characters (0x20..0x7E),
+--   minus the closing-bracket terminator. Encoding rules:
+--
+--     * 0x5C  ('\\')                  → "\\\\"
+--     * 0x5D  (']')                   → "\\]"
+--     * 0x20..0x7E (printable ASCII)  → byte itself
+--     * everything else               → "\\x" ++ two-hex-digit byte
+--
+--   The new "\\xHH" form is forward-compatible because the old
+--   escapeKey only ever emitted "\\\\" or "\\]" — no existing key
+--   contains a literal "\\x" sequence.
 escapeKey :: B.ByteString -> B.ByteString
-escapeKey srcBS = unsafePerformIO $ do
-  let len = B.length srcBS
-  BI.createAndTrim (2 * len) $ \dst ->
-    BU.unsafeUseAsCString srcBS $ \src' -> do
-      let src = castPtr src'
-          copyAndEscape :: Int -> Int -> IO Int
-          copyAndEscape !dstOff !srcOff =
-            if srcOff >= len
-              then return dstOff
-              else do
-                ch <- peekByteOff src srcOff :: IO Word8
-                if ch /= 0x5c && ch /= 0x5d
-                  then do
-                    pokeByteOff dst dstOff ch
-                    copyAndEscape (dstOff + 1) (srcOff + 1)
-                  else do
-                    pokeByteOff dst dstOff (0x5c :: Word8)
-                    pokeByteOff dst (dstOff + 1) ch
-                    copyAndEscape (dstOff + 2) (srcOff + 1)
-      copyAndEscape 0 0
+escapeKey = B.concatMap escapeByte
+  where
+    escapeByte :: Word8 -> B.ByteString
+    escapeByte 0x5C = B.pack [0x5C, 0x5C]                 -- \   -> \\
+    escapeByte 0x5D = B.pack [0x5C, 0x5D]                 -- ]   -> \]
+    escapeByte b
+      | b >= 0x20 && b <= 0x7E = B.singleton b            -- printable ASCII
+      | otherwise              = B.pack [0x5C, 0x78] <> B16.encode (B.singleton b)
+                                                          -- non-ASCII -> \xHH
 
+-- | Inverse of {escapeKey}. Recognises the legacy "\\\\" / "\\]"
+--   escapes and the new "\\xHH" hex escape; any other "\\X" sequence
+--   collapses to literal X (matches the prior implementation's
+--   behaviour for bytes that happened to be paired with a stray
+--   backslash).
 unescapeKey :: B.ByteString -> B.ByteString
-unescapeKey srcBS = unsafePerformIO $ do
-  let len = B.length srcBS
-  BI.createAndTrim len $ \dst ->
-    BU.unsafeUseAsCString srcBS $ \src' -> do
-      let src = castPtr src'
-          copyAndUnescape :: Int -> Int -> IO Int
-          copyAndUnescape !dstOff !srcOff =
-            if len - srcOff > 1
-              then do
-                ch <- peekByteOff src srcOff :: IO Word8
-                if ch == 0x5c
-                  then do
-                    ch' <- peekByteOff src (srcOff + 1) :: IO Word8
-                    pokeByteOff dst dstOff ch'
-                    copyAndUnescape (dstOff + 1) (srcOff + 2)
-                  else do
-                    pokeByteOff dst dstOff ch
-                    copyAndUnescape (dstOff + 1) (srcOff + 1)
-              else
-                if len - srcOff == 1
-                  then do
-                    ch <- peekByteOff src srcOff :: IO Word8
-                    pokeByteOff dst dstOff ch
-                    copyAndUnescape (dstOff + 1) (srcOff + 1)
-                  else return dstOff
-      copyAndUnescape 0 0
+unescapeKey = go
+  where
+    go :: B.ByteString -> B.ByteString
+    go bs = case B.uncons bs of
+      Nothing -> B.empty
+      Just (0x5C, rest) -> case B.uncons rest of
+        -- Trailing lone backslash — keep verbatim. (Mirrors the
+        -- previous unsafe-IO implementation's "len - srcOff == 1"
+        -- branch.)
+        Nothing -> B.singleton 0x5C
+        Just (0x78, rest1)                                 -- "\xHH"
+          | B.length rest1 >= 2,
+            (hex, rest2) <- B.splitAt 2 rest1,
+            Right b <- B16.decode hex
+            -> b <> go rest2
+        Just (c, rest1) -> B.singleton c <> go rest1       -- "\X" -> X
+      Just (c, rest) -> B.singleton c <> go rest
 
 unparsePath :: StoragePath -> B.ByteString
 unparsePath (StoragePath []) = B.empty

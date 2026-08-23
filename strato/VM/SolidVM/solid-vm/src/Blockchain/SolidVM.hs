@@ -598,6 +598,7 @@ call' from to' fnCalltype functionName valList = do
         SString s -> Just $ MS.Index $ DT.encodeUtf8 $ T.pack s
         SAddress a _ -> Just $ MS.Index $ BC.pack $ show a
         SBool b -> Just $ MS.Index $ bool "false" "true" b
+        SBytes bs -> Just $ MS.Index bs  -- bytes32 keys (matches expToPath)
         _ -> Nothing
 
 callWithResult :: MonadSM m => Address -> Address -> CC.FunctionCallType -> SolidString -> ValList -> m (Maybe Value)
@@ -2622,6 +2623,19 @@ callBuiltin "ecMul" [a, b, c] = do
 callBuiltin "ecPairing" [SVariadic xs] = ecPairingMetered =<< traverse int xs
 callBuiltin "ecPairing" [SArray xs] = ecPairingMetered =<< traverse getInt (V.toList xs)
 callBuiltin "ecPairing" xs = ecPairingMetered =<< traverse int xs
+-- ============================================================================
+-- BLS12-381 dispatch
+-- ============================================================================
+--
+-- Each builtin has two argument shapes:
+--   1. A single 'bytes' value, encoding inputs in EIP-2537 byte layout.
+--   2. A flat list of integers/tuples (G1Add: [x1,y1,x2,y2]; G1Msm:
+--      variadic [x1,y1,k1, ..., xN,yN,kN]; pairing: variadic
+--      [x,y, x2c0,x2c1,y2c0,y2c1, ...]; etc.).
+-- The bytes form is matched first via a single 'SBytes' pattern; the
+-- multi-arg form falls through to a dedicated handler that converts via
+-- 'int' and packs the result into an 'STuple' (mirroring how 'ecAdd' and
+-- friends already work).
 callBuiltin "bls12381G1Add" [SBytes b] = do
   decrementGas gasBlsG1Add
   case Builtins.bls12381G1Add b of
@@ -2758,7 +2772,7 @@ callBuiltin "create" args@(cName : src : argVals) = do
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   isRunningTests <- Env.runningTests <$> getEnv
-  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 $ T.pack contractSrc
+  (hsh, cc) <- codeCollectionFromSource isRunningTests True . DT.encodeUtf8 $ T.pack contractSrc
   addNewCodeCollection hsh cc
   newAddress <- getNewAddress creator
   execResults <- create' creator newAddress hsh cc contractName' argVals
@@ -2782,7 +2796,7 @@ callBuiltin "create2" args@(salt : n : src : argVals) = do
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   isRunningTests <- Env.runningTests <$> getEnv
-  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 $ T.pack contractSrc
+  (hsh, cc) <- codeCollectionFromSource isRunningTests True . DT.encodeUtf8 $ T.pack contractSrc
   addNewCodeCollection hsh cc
   newAddress <- getNewAddressWithSalt creator salt hsh $ n:argVals
   execResults <- create' creator newAddress hsh cc contractName' argVals

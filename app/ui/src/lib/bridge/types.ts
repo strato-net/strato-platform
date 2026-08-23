@@ -1,4 +1,4 @@
-import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction } from "@strato/shared-types";
+import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, WithdrawalSummaryResponse, WithdrawalTransactionResponse, WithdrawalProof, DepositAction } from "@strato/shared-types";
 import type { WalletTxProgressHandler } from "@/lib/axios";
 
 export interface BalanceResponse {
@@ -7,12 +7,18 @@ export interface BalanceResponse {
 
 export interface BridgeResponse {
   success: boolean;
-  data?: TransactionResponse;
+  data?: WithdrawalTransactionResponse;
 }
 
 export interface WithdrawalRequestOptions {
   walletAuth?: boolean;
   walletTxProgress?: WalletTxProgressHandler;
+  /**
+   * Coarse-grained progress for the proof-based bridge-out flow:
+   * fires when the STRATO request is submitted and again when the
+   * BridgeContext starts fetching the inclusion proof.
+   */
+  onProgress?: (phase: "submit_strato" | "fetch_proof") => void;
 }
 
 export type NetworkSummary = {
@@ -20,6 +26,10 @@ export type NetworkSummary = {
   chainName: string;
   enabled: boolean;
   depositRouter: string;
+  /** Proof-bridge contract addresses on the external chain. Zero address
+   *  when the chain hasn't been configured for proof-based withdrawals yet. */
+  bridgeVault: string;
+  stratoLightClient: string;
 };
 
 export type BridgeContextType = {
@@ -33,7 +43,10 @@ export type BridgeContextType = {
   // Navigation state for bridge transactions
   targetTransactionTab: BridgeTransactionTab | null;
   setTargetTransactionTab: (tab: BridgeTransactionTab | null) => void;
-  requestWithdrawal: (params: WithdrawalRequestParams, options?: WithdrawalRequestOptions) => Promise<BridgeResponse>;
+  requestWithdrawal: (
+    params: WithdrawalRequestParams,
+    options?: WithdrawalRequestOptions,
+  ) => Promise<BridgeResponse>;
   useBalance: (tokenAddress: string | null) => {
     data: { 
       balance: string; 

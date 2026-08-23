@@ -105,8 +105,27 @@ async function pollTxResult(
 async function signAndSubmitUnsignedTxs(
   unsignedTxs: any[],
   onProgress?: WalletTxProgressHandler
-): Promise<{ status: string; hash: string; returnValues?: (unknown[] | null)[] }> {
-  if (!_walletSignFn) throw new Error("No wallet signer available");
+): Promise<{
+  status: string;
+  hash: string;
+  /** All on-chain hashes for the batch, in submission order. Lets callers
+   *  pick the meaningful tx (e.g. the second in an approve+action pair). */
+  hashes: string[];
+  /** Per-tx status objects from /api/rpc/results, in the same order as `hashes`. */
+  results: any[];
+  returnValues?: (unknown[] | null)[];
+}> {
+  if (!_walletSignFn) {
+    // Most common cause: the user clicked submit before wagmi finished
+    // resolving the wallet client (account.isConnected fired but
+    // useWalletClient() hadn't returned yet). UserContext gates on
+    // walletSignerReady to prevent this; surface a clear error if we
+    // somehow get here anyway.
+    throw new Error(
+      "Wallet signer not ready. Reconnect your wallet and try again, " +
+        "or wait a moment for the wallet client to initialize.",
+    );
+  }
 
   const hashes: string[] = [];
   for (let index = 0; index < unsignedTxs.length; index++) {
@@ -125,7 +144,7 @@ async function signAndSubmitUnsignedTxs(
       const hash = typeof submittedHash.data === "string" ? submittedHash.data : tx.hash;
       hashes.push(hash);
       onProgress?.({ index, total: unsignedTxs.length, status: "submitted", functionName, hash });
-    } catch (error) {
+    } catch (error: any) {
       onProgress?.({
         index,
         total: unsignedTxs.length,
@@ -134,7 +153,11 @@ async function signAndSubmitUnsignedTxs(
         hash: tx.hash,
         error: error instanceof Error ? error.message : "Transaction failed",
       });
-      throw error;
+      // User rejection is the typical case here -- give focused per-tx
+      // context (which tx in the batch failed, and why) so the visible
+      // toast/log surfaces useful diagnostics.
+      const msg = error?.shortMessage || error?.message || String(error);
+      throw new Error(`Wallet signature failed for tx ${index + 1} of ${unsignedTxs.length}: ${msg}`);
     }
   }
 
@@ -159,7 +182,7 @@ async function signAndSubmitUnsignedTxs(
       status: "submitted",
       hash: hashes[pendingIndex],
     });
-    return { status: "Pending", hash: hashes[0] };
+    return { status: "Pending", hash: hashes[0], hashes, results };
   }
   results.forEach((result: any, index: number) => {
     onProgress?.({
@@ -170,9 +193,17 @@ async function signAndSubmitUnsignedTxs(
       error: result?.status === "Failure" ? result.txResult?.message || result.message : undefined,
     });
   });
+  // Return the LAST tx as the "primary" status/hash. For the approve+action
+  // pattern (e.g. approve then requestWithdrawalProof), the action is what
+  // the caller cares about; approve is just a setup step. Callers who
+  // need every hash (e.g. the bridge withdrawal flow walking the batch
+  // for a proof lookup) read `hashes` directly.
+  const lastIdx = hashes.length - 1;
   return {
-    status: results[0]?.status || "Success",
-    hash: hashes[0],
+    status: results[lastIdx]?.status || "Success",
+    hash: hashes[lastIdx],
+    hashes,
+    results,
     // decoded per-tx return values, same shape the OAuth flow gets from the backend
     returnValues: results.map((r: { data?: { tag?: string; contents?: unknown[] } }) =>
       r?.data?.tag === "Call" && Array.isArray(r.data.contents) ? r.data.contents : null
@@ -246,9 +277,31 @@ function extractApiErrorMessage(error: any): string {
 api.interceptors.response.use(
   async (response) => {
     if (response.data?._unsigned && response.data?._unsignedTxs) {
+      // Visible breadcrumb so we can confirm the interceptor is reached;
+      // if you don't see this in the console for an external-signing
+      // response, the new axios.ts module isn't loaded (Vite cache).
+      console.info(
+        `[unsigned-tx] intercepted ${response.data._unsignedTxs.length} unsigned tx(s); ` +
+          `wallet signer ${_walletSignFn ? "ready" : "MISSING"}`,
+      );
       const onProgress = (response.config as any).walletTxProgress as WalletTxProgressHandler | undefined;
-      const result = await signAndSubmitUnsignedTxs(response.data._unsignedTxs, onProgress);
-      response.data = { ...response.data, ...result, _unsigned: undefined, _unsignedTxs: undefined };
+      try {
+        const result = await signAndSubmitUnsignedTxs(response.data._unsignedTxs, onProgress);
+        response.data = { ...response.data, ...result, _unsigned: undefined, _unsignedTxs: undefined };
+      } catch (err: any) {
+        // signAndSubmitUnsignedTxs throws for: missing wallet signer, user
+        // rejection, /rpc/submit failure, or tx revert. Without this
+        // surface, the caller's promise just rejects silently and the page
+        // looks frozen. Toast + console log makes the failure visible.
+        const msg = err?.message || String(err) || "Unknown signing error";
+        console.error("[unsigned-tx] sign/submit failed:", err);
+        toast({
+          title: "Could not submit STRATO transaction",
+          description: msg,
+          variant: "destructive",
+        });
+        throw err;
+      }
     }
     return response;
   },

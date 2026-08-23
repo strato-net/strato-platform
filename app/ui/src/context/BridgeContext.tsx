@@ -16,7 +16,7 @@ import {
   BridgeContextType,
   WithdrawalRequestOptions,
 } from "@/lib/bridge/types";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction } from "@strato/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, WithdrawalSummaryResponse, WithdrawalTransactionResponse, WithdrawalProof, DepositAction } from "@strato/shared-types";
 import { normBridgeAddr } from "@/lib/bridgeLinks";
 
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
@@ -94,6 +94,8 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
           chainName: cfg.chainInfo.chainName,
           enabled: cfg.chainInfo.enabled,
           depositRouter: cfg.chainInfo.depositRouter,
+          bridgeVault: cfg.chainInfo.bridgeVault,
+          stratoLightClient: cfg.chainInfo.stratoLightClient,
         }));
 
       networks.sort((a, b) => a.chainId.localeCompare(b.chainId));
@@ -158,6 +160,8 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
               chainName: cfg.chainInfo.chainName,
               enabled: cfg.chainInfo.enabled,
               depositRouter: cfg.chainInfo.depositRouter,
+              bridgeVault: cfg.chainInfo.bridgeVault,
+              stratoLightClient: cfg.chainInfo.stratoLightClient,
             }));
           networks.sort((a, b) => a.chainId.localeCompare(b.chainId));
           setAvailableNetworks(networks);
@@ -329,19 +333,81 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   const requestWithdrawal = useCallback(
     async (
       params: WithdrawalRequestParams,
-      options?: WithdrawalRequestOptions
+      options?: WithdrawalRequestOptions,
     ): Promise<BridgeResponse> => {
       setLoading(true);
+      const { walletAuth, walletTxProgress, onProgress } = options ?? {};
+      // Forward the wallet-signing fields onto the axios request config so
+      // the request-level interceptor can pick them up; strip onProgress,
+      // which is for *us* (coarse phase events for the bridge-out flow).
+      const axiosConfig =
+        walletAuth !== undefined || walletTxProgress !== undefined
+          ? ({ walletAuth, walletTxProgress } as any)
+          : undefined;
+      onProgress?.("submit_strato");
       try {
+        // Two response shapes are possible here:
+        //
+        //   (sync / backend-signed)
+        //     { success, data: { status, hash, proof? } }
+        //
+        //   (external-signing -- backend returned unsigned envelopes, the
+        //    axios interceptor signed+submitted them and merged the result
+        //    onto the top level)
+        //     { success, data: { status: "unsigned", hash: <approveHash> },
+        //       status: "Success", hash: <lastHash>, hashes: [...] }
+        //
+        // In the external-signing case `data.proof` is missing because the
+        // backend returned early before the txs landed; fetch it now from
+        // the dedicated endpoint using the requestWithdrawalProof tx hash
+        // (always the last entry in `hashes`).
         const endpoint = params.routeType === "native"
           ? "/bridge/requestNativeWithdrawal"
           : "/bridge/requestWithdrawal";
-        const { data } = await api.post<TransactionResponse>(
-          endpoint,
-          params,
-          options as any
-        );
-        return { success: true, data };
+        const { data: body } = await api.post<{
+          success: boolean;
+          data: WithdrawalTransactionResponse;
+          hashes?: string[];
+        }>(endpoint, params, axiosConfig);
+
+        if (Array.isArray(body?.hashes) && body.hashes.length > 0) {
+          const proofTxHash = body.hashes[body.hashes.length - 1];
+          onProgress?.("fetch_proof");
+          console.info(
+            `[bridge] external-signed batch landed; fetching proof for last tx ${proofTxHash}`,
+          );
+          let proof: WithdrawalTransactionResponse["proof"];
+          try {
+            const { data: proofResp } = await api.get<{
+              success: boolean;
+              data: NonNullable<WithdrawalTransactionResponse["proof"]>;
+            }>(`/bridge/withdrawalProof/${proofTxHash}`);
+            if (proofResp?.success) proof = proofResp.data;
+            console.info(
+              `[bridge] proof fetch ${proof ? "succeeded" : "returned no proof"}`,
+              proof
+                ? {
+                    eventName: proof.eventName,
+                    blockNumber: proof.blockNumber,
+                    txIndex: proof.txIndex,
+                    logIndex: proof.logIndex,
+                  }
+                : proofResp,
+            );
+          } catch (err: any) {
+            // Proof not ready yet -- block may still be propagating, or the
+            // tx didn't emit a Withdrawal event (large/cold-path). Either
+            // way, fall through with proof undefined and let the caller's
+            // pending-approval branch handle it.
+            console.warn("[bridge] proof fetch failed:", err?.message ?? err);
+          }
+          return {
+            success: !!body?.success,
+            data: { status: "Success", hash: proofTxHash, proof },
+          };
+        }
+
+        return { success: !!body?.success, data: body?.data };
       } finally {
         setLoading(false);
       }

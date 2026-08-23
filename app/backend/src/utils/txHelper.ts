@@ -42,6 +42,17 @@ const extractErrorMessage = (errorData: string): string => {
   return errorData;
 };
 
+/**
+ * STRATO's `/transaction/unsigned` endpoint returns the same nonce for every
+ * tx in a batch -- fine for the parallel-execution model where they share a
+ * slot, but wrong for the external-signing flow where each tx is signed and
+ * submitted as an independent single transaction. Walk the array and bump
+ * each subsequent tx's nonce so the wallet signs over distinct values and
+ * STRATO accepts them in sequence.
+ *
+ * Returns a new array with bumped nonces; original entries are not mutated
+ * so callers can compare before/after if needed.
+ */
 const withSequentialUnsignedNonces = (results: any[]): any[] => {
   const firstNonce = results[0]?.data?.nonce;
   if (firstNonce === undefined || firstNonce === null) return results;
@@ -311,6 +322,106 @@ export const postAndWaitForTx = async (
 
   return withTxQueue(txQueueKey(accessToken), () =>
     postAndWaitForTxUnlocked(accessToken, stratoPostFn, timeout)
+  );
+};
+
+/**
+ * Variant of {@link postAndWaitForTxUnlocked} that returns the full per-tx
+ * result array (one entry per tx in the submitted batch), preserving
+ * submission order. Mirrors the unlocked single-tx variant exactly --
+ * same low-nonce retry, same external-signing handling -- only the
+ * return shape differs.
+ */
+const postAndWaitForAllTxsUnlocked = async (
+  accessToken: string,
+  stratoPostFn: () => Promise<any>,
+  timeout: number = 35000
+): Promise<any[]> => {
+  try {
+    const store = requestContext.getStore();
+    const allowLowNonceRetry = !store?.externalSigning;
+    const maxResultRetries = allowLowNonceRetry ? 2 : 0;
+    let postFn = stratoPostFn;
+
+    for (let attempt = 0; ; attempt++) {
+      const response = await submitWithLowNonceRetry(postFn, allowLowNonceRetry);
+
+      if (response.status !== 200) {
+        throw new StratoError(`Strato error: ${response.statusText}`, 500);
+      }
+
+      const results = response.data;
+      if (!Array.isArray(results) || !results.length) {
+        throw new StratoError("Invalid or empty transaction results", 400);
+      }
+
+      if (store?.externalSigning && results[0]?.data !== undefined && results[0]?.status === undefined) {
+        const unsignedTxs = withSequentialUnsignedNonces(results);
+        store.unsignedTxs = unsignedTxs;
+        return unsignedTxs;
+      }
+
+      const txHashes = results.map(result => {
+        if (!result?.hash) throw new StratoError("Invalid transaction result", 400);
+        return result.hash;
+      });
+
+      const finalResults = isTerminalResult(results) ? results : await until(
+        isTerminalResult,
+        async () => (await bloc.post(accessToken, StratoPaths.result, txHashes)).data,
+        timeout
+      );
+
+      const failed = failedTx(finalResults);
+      if (failed) {
+        const message = failed.txResult?.message || failed.error || failed.message || failed;
+        const retryNonce = attempt < maxResultRetries ? lowNonceExpected(message) : null;
+        const nextConfig = retryNonce !== null
+          ? requestConfigWithNonce(response.config, retryNonce)
+          : null;
+
+        if (nextConfig) {
+          console.warn(`Retrying STRATO transaction after low nonce result with nonce ${retryNonce}`);
+          postFn = () => axios.request(nextConfig);
+          await wait(1000);
+          continue;
+        }
+
+        throw new StratoError(txFailureMessage(failed), 400);
+      }
+
+      return finalResults;
+    }
+  } catch (error: any) {
+    if (error instanceof StratoError) throw error;
+    if (error.response?.data && typeof error.response.data === "string") {
+      throw new StratoError(extractErrorMessage(error.response.data), 400);
+    }
+    throw error;
+  }
+};
+
+/**
+ * Variant of {@link postAndWaitForTx} that returns the full per-tx result
+ * array (one entry per tx in the submitted batch), preserving submission
+ * order. Use this when the caller needs more than just the first tx's
+ * status/hash -- e.g. the bridge withdrawal flow reads block info from
+ * the second tx (the requestWithdrawalProof call) in an approve+action
+ * batch. Routes through the same per-account queue as `postAndWaitForTx`
+ * to preserve serialization guarantees.
+ */
+export const postAndWaitForAllTxs = async (
+  accessToken: string,
+  stratoPostFn: () => Promise<any>,
+  timeout: number = 35000
+): Promise<any[]> => {
+  const store = requestContext.getStore();
+  if (store?.externalSigning) {
+    return postAndWaitForAllTxsUnlocked(accessToken, stratoPostFn, timeout);
+  }
+
+  return withTxQueue(txQueueKey(accessToken), () =>
+    postAndWaitForAllTxsUnlocked(accessToken, stratoPostFn, timeout)
   );
 };
 

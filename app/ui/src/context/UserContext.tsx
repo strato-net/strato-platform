@@ -28,6 +28,13 @@ interface UserContextType {
   logout: () => void;
   refreshAuth: () => void;
   loading: boolean;
+  /**
+   * True once the wagmi wallet client is resolved and the axios STRATO-tx
+   * signer is installed. Components that submit STRATO transactions in
+   * external-signing mode must wait for this to be true; otherwise the
+   * /api/rpc/submit interceptor will throw "No wallet signer available".
+   */
+  walletSignerReady: boolean;
   openIssues: object;
   openIssuesLoading: boolean;
   openIssuesUpdatedAt: Date | null;
@@ -74,6 +81,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [contractSearchResultsLoading, setContractSearchResultsLoading] = useState<boolean>(false)
   const [contractDetailsResults, setContractDetailsResults] = useState<object>({});
   const [contractDetailsResultsLoading, setContractDetailsResultsLoading] = useState<boolean>(false);
+  const [walletSignerReady, setWalletSignerReady] = useState<boolean>(false);
   const sessionExpiryLogoutStartedRef = useRef(false);
   // Tracks whether a non-STRATO (external EVM) wallet is connected, readable from
   // inside the polled auth check without a stale closure. Such a wallet is its own
@@ -368,8 +376,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           },
         });
       });
+      setWalletSignerReady(true);
     } else {
       setWalletSigner(null);
+      setWalletSignerReady(false);
     }
   }, [account.isConnected, account.address, walletClient]);
 
@@ -431,6 +441,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     logout: handleLogout,
     refreshAuth,
     loading,
+    walletSignerReady,
     openIssuesLoading,
     openIssuesUpdatedAt,
     openIssues,
@@ -450,7 +461,11 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     getContractDetails,
     contractDetailsResults,
     contractDetailsResultsLoading,
-  }), [userAddress, stratoAddress, externalWalletAddress, isExternalWalletConnected, externalEvmWalletAddress, isExternalEvmWalletConnected, effectiveLoggedIn, isLoggedIn, isAdmin, loading, userName,
+  }), [
+    userAddress, stratoAddress,
+    externalWalletAddress, isExternalWalletConnected,
+    externalEvmWalletAddress, isExternalEvmWalletConnected,
+    effectiveLoggedIn, isLoggedIn, isAdmin, loading, userName, walletSignerReady,
     handleLogout,
     openIssues, openIssuesLoading, openIssuesUpdatedAt, getOpenIssues,
     executedIssues, executedIssuesLoading, executedIssuesUpdatedAt, getExecutedIssues,

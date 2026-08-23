@@ -1,0 +1,345 @@
+/**
+ * Frontend orchestrator for the trustless bridge-in claim flow.
+ *
+ * Mirrors the OUT-side {@link proofClaim.claimWithdrawalOnExternalChain}
+ * but inverted: STRATO is the destination chain, so the entire batch
+ * (anchorBlockHeader + claim) lands via the standard backend tx
+ * pipeline rather than wagmi.writeContract. The wallet still signs
+ * each tx — the backend interceptor surfaces unsigned envelopes when
+ * the user is wallet-authenticated.
+ *
+ * For the LP fast-finality path, callers can pre-sign a
+ * ClaimAssignment via {@link signAssignment} and pass it into
+ * claimTrustlessDeposit; the on-chain claim then redirects credit
+ * to assignment.newRecipient.
+ */
+import { api } from "@/lib/axios";
+import type { WalletTxProgressEvent } from "@/lib/axios";
+
+/**
+ * The per-phase signal the modal listens to. Compare to
+ * `WithdrawalStep` in WithdrawalProgressModal — the trustless flow is
+ * a strict subset because there's no chain-switch and no catch-up.
+ *
+ * The same step set serves both Eth and Base/Cannon paths; the modal
+ * relabels copy per `flavor` to surface flow-specific work (parent
+ * walk, dispute-game search, etc.) under the build_proof phase.
+ */
+export type TrustlessClaimStep =
+  | "build_proof"        // Backend assembles anchor + claim inputs
+  | "submit_strato"      // User wallet signs and submits the STRATO batch
+  | "complete"
+  | "error";
+
+/** Tag returned by /bridge/trustlessConfig — drives UI labelling. */
+export type LightClientFlavor = "eth" | "base" | "linea" | "bsc";
+
+/**
+ * Which side of the bridge a claim targets:
+ *   - "standard" → external→STRATO mint of wrapped tokens via MercataBridge.
+ *   - "native"   → external→STRATO unlock of native tokens (USDST, GOLDST,
+ *                  etc.) that were previously bridged out via
+ *                  StratoNativeBridge. The user is redeeming a
+ *                  representation token they burned on the source chain.
+ */
+export type BridgeRouteType = "standard" | "native";
+
+export interface ClaimAssignmentInput {
+  depositKey: `0x${string}`;
+  newRecipient: `0x${string}`;
+  deadline: string | number | bigint;
+  v: number;
+  r: `0x${string}`;
+  s: `0x${string}`;
+}
+
+export interface TrustlessClaimRequest {
+  externalChainId: string | number;
+  externalTxHash: string;
+  /** Which bridge route to claim under. Defaults to "standard". */
+  routeType?: BridgeRouteType;
+  /** EIP-712 assignment for the LP fast-finality path. Standard route
+   *  only — native redemptions don't support assignment in v1. */
+  assignment?: ClaimAssignmentInput;
+  walletAuth?: any;
+  walletTxProgress?: (e: WalletTxProgressEvent) => void;
+  onProgress?: (step: TrustlessClaimStep) => void;
+}
+
+export interface TrustlessClaimResult {
+  status?: string;
+  hashes: string[];
+  /** Backend skipped the source-chain anchor tx (block already on-chain). */
+  anchorSkipped: boolean;
+  /** Backend skipped the L1 anchor tx (Cannon flow only; L1 already anchored). */
+  l1AnchorSkipped: boolean;
+  /** Number of `advanceCommittee` txs prepended to the batch (sync-
+   *  committee chain catchup). 0 in the steady state. */
+  committeeAdvanceCount: number;
+  blockNumber: string;
+  flavor: LightClientFlavor;
+  /** Which route handled the claim — echoed back so the UI can render
+   *  flow-specific copy. */
+  routeType: BridgeRouteType;
+}
+
+export interface TrustlessConfig {
+  flavor: LightClientFlavor;
+  routeType: BridgeRouteType;
+  bridgeIn: `0x${string}`;
+  lightClient: `0x${string}`;
+  depositRoutedSig: `0x${string}`;
+  /** Base / Linea flavors only: the wrapped L1 EthLightClient. */
+  l1LightClient?: `0x${string}`;
+}
+
+/** One row of {@link fetchConfiguredChains}. A chain configured for
+ *  both standard and native shows up twice (once per route). */
+export interface ConfiguredChain {
+  chainId: string;
+  name: string;
+  flavor: LightClientFlavor;
+  routeType: BridgeRouteType;
+  bridgeIn: `0x${string}`;
+  lightClient: `0x${string}`;
+  depositRoutedSig: `0x${string}`;
+  l1LightClient?: `0x${string}`;
+}
+
+/** Latest finalized head exposed by /bridge/finalizedHead/:chainId. */
+export interface FinalizedHead {
+  blockNumber: string;
+  timestamp: string;
+  flavor: LightClientFlavor;
+}
+
+/** One row of /bridge/pendingDeposits/:chainId. The endpoint returns
+ *  both standard and native rows merged together when both routes are
+ *  configured for the chain. */
+export interface PendingDeposit {
+  txHash: `0x${string}`;
+  blockNumber: string;
+  timestamp: string;
+  logIndex: string;
+  /** Which bridge route this row claims under. */
+  routeType: BridgeRouteType;
+  /** Standard route: source-chain ERC-20 being deposited.
+   *  Native route:   source-chain representation token being burned. */
+  ethToken: `0x${string}`;
+  /** Source-chain wallet that initiated the deposit/burn. */
+  ethSender: `0x${string}`;
+  stratoRecipient: `0x${string}`;
+  /** STRATO token credited on success. Standard → minted; native →
+   *  unlocked from custody. Empty string for native rows in v1 (the UI
+   *  can resolve via StratoNativeBridge.stratoTokenByRepresentation if
+   *  it needs the symbol). */
+  targetStratoToken: `0x${string}` | "";
+  amount: string;
+  /** Standard route → uint96 depositId.
+   *  Native route   → uint96 redemptionId. */
+  depositId: string;
+  depositKey: `0x${string}`;
+}
+
+/**
+ * Enumerate the source chains the trustless path is currently
+ * configured for. Drives the chain-selector buttons; an empty result
+ * means the modal should hide itself.
+ */
+export async function fetchConfiguredChains(): Promise<ConfiguredChain[]> {
+  const { data: body } = await api.get<{ success: boolean; data: ConfiguredChain[] }>(
+    "/bridge/configuredChains",
+  );
+  return body?.data ?? [];
+}
+
+/**
+ * Fetch the latest finalized-head cutoff for a chain. UI polls this
+ * to flip "Waiting for finality" → "Ready to claim" badges per row.
+ */
+export async function fetchFinalizedHead(
+  chainId: string | number,
+): Promise<FinalizedHead | undefined> {
+  try {
+    const { data: body } = await api.get<{ success: boolean; data: FinalizedHead }>(
+      `/bridge/finalizedHead/${chainId}`,
+    );
+    return body?.data;
+  } catch (err: any) {
+    const status = err?.response?.status;
+    if (status === 503 || status === 400) return undefined;
+    throw err;
+  }
+}
+
+/**
+ * List unclaimed DepositRouted logs across `wallets` on `chainId`.
+ * Returns [] (rather than throwing) when the chain isn't enabled.
+ */
+export async function fetchPendingDeposits(
+  chainId: string | number,
+  wallets: string[],
+): Promise<PendingDeposit[]> {
+  if (wallets.length === 0) return [];
+  try {
+    const { data: body } = await api.get<{ success: boolean; data: PendingDeposit[] }>(
+      `/bridge/pendingDeposits/${chainId}`,
+      { params: { wallets } },
+    );
+    return body?.data ?? [];
+  } catch (err: any) {
+    const status = err?.response?.status;
+    if (status === 503 || status === 400) return [];
+    throw err;
+  }
+}
+
+/**
+ * Fetch the per-source-chain bridge-in deployment metadata. Returns
+ * undefined when the trustless path is disabled (503) or the chain
+ * isn't supported (400) so the UI can hide the entry point gracefully.
+ */
+export async function fetchTrustlessConfig(
+  chainId: string | number,
+): Promise<TrustlessConfig | undefined> {
+  try {
+    const { data } = await api.get<{ success: boolean; data: TrustlessConfig }>(
+      `/bridge/trustlessConfig/${chainId}`,
+    );
+    return data?.data;
+  } catch (err: any) {
+    const status = err?.response?.status;
+    if (status === 503 || status === 400) return undefined;
+    throw err;
+  }
+}
+
+/**
+ * Submit a trustless bridge-in claim. The backend builds the proof
+ * and packages a 1- or 2-tx STRATO batch; this function just walks
+ * the user through phase progress and returns the resulting hashes.
+ *
+ * Errors map back to the same semantic codes the controller emits
+ * (NOT_FINALIZED_YET, DEPOSIT_TOO_OLD, NO_DEPOSIT_LOG, TRUSTLESS_DISABLED)
+ * via the `code` field on the response payload, which we re-throw.
+ */
+export async function claimTrustlessDeposit({
+  externalChainId,
+  externalTxHash,
+  routeType,
+  assignment,
+  walletAuth,
+  walletTxProgress,
+  onProgress,
+}: TrustlessClaimRequest): Promise<TrustlessClaimResult> {
+  const axiosConfig =
+    walletAuth !== undefined || walletTxProgress !== undefined
+      ? ({ walletAuth, walletTxProgress } as any)
+      : undefined;
+
+  onProgress?.("build_proof");
+  // Sliding through into "submit_strato" happens once the backend's
+  // proof builder finishes and the unsigned envelopes show up on the
+  // axios interceptor; surfaced via walletTxProgress for finer phases.
+  // For the coarse top-level signal, we transition immediately after
+  // the POST starts since the proof-building latency is dominated by
+  // beacon-API I/O and short relative to wallet signing.
+  let phase: "build_proof" | "submit_strato" | "complete" | "error" = "build_proof";
+  const reportProgress = (next: typeof phase) => {
+    phase = next;
+    onProgress?.(next);
+  };
+  // The setTimeout below is a macrotask, so it runs AFTER any
+  // microtask-resolved promise rejection. Without this guard a
+  // fast-failing POST would land at step="error" inside the catch,
+  // then the deferred submit_strato would clobber it — leaving the
+  // modal stuck on the spinner with no visible error message.
+  setTimeout(() => {
+    if (phase === "build_proof") reportProgress("submit_strato");
+  }, 0);
+
+  try {
+    const { data: body } = await api.post<{
+      success: boolean;
+      data: TrustlessClaimResult;
+    }>(
+      "/bridge/trustlessClaim",
+      {
+        externalChainId: String(externalChainId),
+        externalTxHash,
+        routeType,
+        assignment: assignment
+          ? {
+              ...assignment,
+              deadline: String(assignment.deadline),
+            }
+          : undefined,
+      },
+      axiosConfig,
+    );
+
+    if (!body?.success || !body.data) {
+      throw new Error("trustlessClaim returned no data");
+    }
+    reportProgress("complete");
+    return body.data;
+  } catch (err: any) {
+    reportProgress("error");
+    throw err;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// EIP-712 helper — for the LP fast-finality path. Lets a depositor sign
+// a ClaimAssignment that an LP can then submit on their behalf to claim
+// before finality, taking a fee.
+//
+// Domain matches the on-chain DOMAIN_SEPARATOR in EthBridgeIn:
+//   keccak256("EthBridgeIn:v1")
+// (v1 elides chainId + verifyingContract — see assignment hardening
+//  TODO in EthBridgeIn.sol).
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * EIP-712 typed-data shape for ClaimAssignment. Pass to
+ * `signTypedDataAsync` (wagmi/viem) on the depositor's wallet.
+ */
+export const CLAIM_ASSIGNMENT_TYPES = {
+  ClaimAssignment: [
+    { name: "depositKey", type: "bytes32" },
+    { name: "newRecipient", type: "address" },
+    { name: "deadline", type: "uint256" },
+  ],
+} as const;
+
+/**
+ * The v1 domain is intentionally minimal — the contract's
+ * DOMAIN_SEPARATOR is `keccak256("EthBridgeIn:v1")`, so we use a
+ * domain with only `name`+`version` and let viem hash it the same
+ * way. When the contract upgrades to a fully EIP-712 domain
+ * (chainId + verifyingContract) update this to match.
+ */
+export const CLAIM_ASSIGNMENT_DOMAIN = {
+  name: "EthBridgeIn",
+  version: "v1",
+} as const;
+
+export interface UnsignedClaimAssignment {
+  depositKey: `0x${string}`;
+  newRecipient: `0x${string}`;
+  deadline: bigint;
+}
+
+/**
+ * Convenience: split a 65-byte signature into the (v, r, s) tuple the
+ * contract expects. Viem returns signatures as `0x{r||s||v}` hex.
+ */
+export function splitSignature(sig: `0x${string}`): { v: number; r: `0x${string}`; s: `0x${string}` } {
+  const stripped = sig.replace(/^0x/, "");
+  if (stripped.length !== 130) throw new Error(`bad sig length: ${stripped.length}`);
+  const r = ("0x" + stripped.slice(0, 64)) as `0x${string}`;
+  const s = ("0x" + stripped.slice(64, 128)) as `0x${string}`;
+  let v = parseInt(stripped.slice(128, 130), 16);
+  if (v < 27) v += 27;
+  return { v, r, s };
+}

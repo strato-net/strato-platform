@@ -50,6 +50,7 @@ tests:
       - BasicValueStringTest
       - StorageTest
     dependencies:
+      - QuickCheck
       - bytestring
       - ethereum-rlp
       - format

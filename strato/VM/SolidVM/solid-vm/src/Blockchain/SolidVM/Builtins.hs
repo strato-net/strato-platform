@@ -28,6 +28,14 @@ module Blockchain.SolidVM.Builtins
     poseidon2ParamHash,
     poseidon2ParamHashBytes,
     poseidon2Permutations,
+
+    -- * BLS12-381 (EIP-2537 parity)
+    --
+    --   Two parallel APIs: the @bytes@-shaped builtins below match
+    --   EIP-2537's input layout exactly so callers porting EVM code can
+    --   feed precompile bytes through verbatim. The @*Ints@ siblings
+    --   take field elements as raw integers/tuples for SolidVM-native
+    --   ergonomics.
     bls12381G1Add,
     bls12381G1Msm,
     bls12381G2Add,
@@ -38,10 +46,36 @@ module Blockchain.SolidVM.Builtins
     bls12381G2AddInts,
     bls12381G2MsmInts,
     bls12381PairingInts,
+
+    -- * Map-to-curve (EIP-2537 §BLS12_MAP_FP_TO_G1, §BLS12_MAP_FP2_TO_G2)
+    --
+    --   Take pre-derived F_p / F_p^2 inputs. Useful when the contract
+    --   already has the field elements and just needs the map step.
     mapFpToG1,
     mapFp2ToG2,
+
+    -- * Full hash-to-curve (RFC 9380 §3 / §6.6.3)
+    --
+    --   These compose 'expand_message_xmd' (SHA-256) +
+    --   'hash_to_field' + map-to-curve + cofactor clearing into a
+    --   single call. Suite mappings:
+    --
+    --     hashToCurveG1 = BLS12381G1_XMD:SHA-256_SSWU_RO_
+    --     hashToCurveG2 = BLS12381G2_XMD:SHA-256_SSWU_RO_
+    --
+    --   For Ethereum sync-committee BLS verification, callers pass
+    --   the signing root as @msg@ and
+    --   @"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"@ as @dst@.
     hashToCurveG1,
     hashToCurveG2,
+
+    -- * Point compression / decompression (IETF / ZCash format)
+    --
+    --   Beacon-chain APIs return BLS points in their compressed form
+    --   (G1: 48 bytes, G2: 96 bytes). EIP-2537 / SolidVM precompiles
+    --   consume the uncompressed forms (G1: 128 bytes, G2: 256 bytes).
+    --   These bridge the two so contracts can take what the wire
+    --   provides and feed it into 'bls12381Pairing' directly.
     decompressG1,
     decompressG2,
   )

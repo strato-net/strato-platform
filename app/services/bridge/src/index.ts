@@ -9,6 +9,7 @@ import { validateBridgeConfig } from "./utils/configValidator";
 import { startMultiChainDepositPolling } from "./polling/alchemyPolling";
 import { startNativeRedemptionPolling } from "./polling/nativeRedemptionPolling";
 import { initializeStratoPolling } from "./polling/stratoPolling";
+import { startAnchorPolling } from "./polling/anchorPolling";
 import { initOpenIdConfig} from "./auth";
 import { healthMonitor } from "./utils/healthMonitor";
 
@@ -61,6 +62,9 @@ app.listen(port, async () => {
     startMultiChainDepositPolling();
     startNativeRedemptionPolling();
     await initializeStratoPolling();
+    // Anchors deposit blocks ahead of anyone claiming them, so a claim is
+    // one transaction instead of an anchor batch. No-ops without PROVER_URL.
+    startAnchorPolling();
 
     logInfo(
       "BridgeService",

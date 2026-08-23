@@ -63,6 +63,355 @@ router.post("/requestWithdrawal", walletAuth, BridgeController.requestWithdrawal
 
 /**
  * @openapi
+ * /bridge/withdrawalProof/{txHash}:
+ *   get:
+ *     summary: "Fetch the inclusion proof for a previously-submitted requestWithdrawalProof tx"
+ *     tags: [Bridge]
+ *     parameters:
+ *       - in: path
+ *         name: txHash
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: WithdrawalProof bytes ready to drive an external-chain claim
+ *       404:
+ *         description: No proof available (tx not finalized, no Withdrawal log, or pre-fork)
+ */
+router.get("/withdrawalProof/:txHash", authHandler.authorizeRequest(), BridgeController.getWithdrawalProof);
+
+/**
+ * @openapi
+ * /bridge/withdrawalProof/byBlock/{chainId}/{blockNumber}/{seq}:
+ *   get:
+ *     summary: "Lookup a Withdrawal proof by (chainId, block, seq) for the catch-up flow"
+ *     tags: [Bridge]
+ *     parameters:
+ *       - in: path
+ *         name: chainId
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: blockNumber
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: seq
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: WithdrawalProof for the requested seq
+ *       404:
+ *         description: No matching Withdrawal log in that block
+ */
+router.get(
+  "/withdrawalProof/byBlock/:chainId/:blockNumber/:seq",
+  authHandler.authorizeRequest(),
+  BridgeController.getWithdrawalProofForSeq,
+);
+
+/**
+ * @openapi
+ * /bridge/anchorInputs/{chainId}/{txHash}:
+ *   get:
+ *     summary: "Build EthLightClient.anchorBlockHeader inputs for a deposit"
+ *     description: >
+ *       Trustless bridge-in step 1. Resolves the deposit's block on the source
+ *       chain, fetches the live LightClientFinalityUpdate, and assembles the
+ *       header / sync-aggregate / EPH / executionBranch JSON the user wallet
+ *       submits to EthLightClient.anchorBlockHeader on STRATO.
+ *     tags: [Bridge]
+ *     parameters:
+ *       - in: path
+ *         name: chainId
+ *         required: true
+ *         description: Source chain identifier (numeric string, e.g. "11155111" for Sepolia)
+ *         schema: { type: string }
+ *       - in: path
+ *         name: txHash
+ *         required: true
+ *         description: Deposit transaction hash on the source chain
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: AnchorInputs ready to submit
+ *       425:
+ *         description: Deposit not yet finalized; UI should retry after finality lag
+ *       409:
+ *         description: Deposit older than the live finalized head (parent-chain anchoring not yet supported)
+ */
+router.get(
+  "/anchorInputs/:chainId/:txHash",
+  authHandler.authorizeRequest(),
+  BridgeController.getAnchorInputs,
+);
+
+/**
+ * @openapi
+ * /bridge/baseAnchorInputs/{chainId}/{txHash}:
+ *   get:
+ *     summary: "Build BaseLightClient.anchorBaseBlockViaCannon inputs (OP-Stack Cannon path)"
+ *     description: >
+ *       Trustless bridge-in step 1 for Base. Locates a DisputeGameCreated
+ *       event on L1 whose rootClaim matches the deposit block's outputRoot,
+ *       and returns the receipts-MPT proof + Base header RLP +
+ *       withdrawalStorageRoot the user submits to anchorBaseBlockViaCannon
+ *       on STRATO. Also bundles the L1 anchor inputs the frontend uses
+ *       to first anchor the L1 block on EthLightClient.
+ *     tags: [Bridge]
+ *     parameters:
+ *       - in: path
+ *         name: chainId
+ *         required: true
+ *         description: Source L2 chain id (8453 = Base mainnet, 84532 = Base Sepolia)
+ *         schema: { type: string }
+ *       - in: path
+ *         name: txHash
+ *         required: true
+ *         description: Deposit tx hash on the source L2
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: BaseAnchorInputs ready to submit
+ *       400:
+ *         description: Unsupported L2 chain
+ *       409:
+ *         description: Deposit older than the live finalized L1 head
+ *       425:
+ *         description: No matching DisputeGameCreated yet (or L1 not finalized)
+ */
+router.get(
+  "/baseAnchorInputs/:chainId/:txHash",
+  authHandler.authorizeRequest(),
+  BridgeController.getBaseAnchorInputs,
+);
+
+/**
+ * @openapi
+ * /bridge/baseAnchorChainInputs/{chainId}/{txHash}:
+ *   get:
+ *     summary: "Build BaseLightClient.anchorBaseBlockChainViaCannon inputs"
+ *     description: >
+ *       Trustless bridge-in for Base (Cannon, parent-chain). Locates a
+ *       DisputeGameCreated whose claimed L2 block covers the deposit
+ *       block, fetches Base headers from the anchor down to the
+ *       deposit, and returns the bundle the user submits to
+ *       anchorBaseBlockChainViaCannon. Use this when no DGC matches
+ *       the deposit block exactly (typical for fresh deposits) —
+ *       which is most of the time.
+ *     tags: [Bridge]
+ *     parameters:
+ *       - in: path
+ *         name: chainId
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: txHash
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: BaseAnchorChainInputs ready to submit
+ *       400:
+ *         description: Unsupported L2 chain
+ *       409:
+ *         description: Deposit older than the live finalized L1 head
+ *       425:
+ *         description: No covering dispute game (or L1 not finalized)
+ */
+router.get(
+  "/baseAnchorChainInputs/:chainId/:txHash",
+  authHandler.authorizeRequest(),
+  BridgeController.getBaseAnchorChainInputs,
+);
+
+/**
+ * @openapi
+ * /bridge/claimInputs/{chainId}/{txHash}:
+ *   get:
+ *     summary: "Build EthBridgeIn.claim inputs (MPT receipts proof) for a deposit"
+ *     description: >
+ *       Trustless bridge-in step 2. Reconstructs the deposit block's receipts
+ *       trie, locates the DepositRouted log identified by `depositRoutedSig`,
+ *       and returns the receiptValueBytes + MPT proof the user wallet submits
+ *       to EthBridgeIn.claim on STRATO. Caller must have already anchored the
+ *       block via /bridge/anchorInputs + on-chain anchorBlockHeader.
+ *     tags: [Bridge]
+ *     parameters:
+ *       - in: path
+ *         name: chainId
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: txHash
+ *         required: true
+ *         schema: { type: string }
+ *       - in: query
+ *         name: depositRoutedSig
+ *         required: true
+ *         description: keccak256 of the DepositRouted event signature, as hex
+ *         schema: { type: string, pattern: "^0x[0-9a-fA-F]{64}$" }
+ *     responses:
+ *       200:
+ *         description: ClaimInputs ready to submit
+ *       404:
+ *         description: No DepositRouted log found in the receipt
+ */
+router.get(
+  "/claimInputs/:chainId/:txHash",
+  authHandler.authorizeRequest(),
+  BridgeController.getClaimInputs,
+);
+
+/**
+ * @openapi
+ * /bridge/trustlessConfig/{chainId}:
+ *   get:
+ *     summary: "On-chain deployment metadata for the trustless bridge-in path"
+ *     description: >
+ *       Returns per-source-chain deployment metadata: bridge-in
+ *       address, light-client address, DepositRouted event sig hash,
+ *       and (for OP-Stack/Cannon chains) the L1 EthLightClient the
+ *       BaseLightClient wraps. Read live from cirrus.
+ *     tags: [Bridge]
+ *     parameters:
+ *       - in: path
+ *         name: chainId
+ *         required: true
+ *         description: Source chain identifier (1 = Ethereum, 11155111 = Sepolia, 8453 = Base, 84532 = Base Sepolia)
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Trustless deployment config
+ *       400:
+ *         description: chainId not supported by trustless path
+ *       503:
+ *         description: Trustless path disabled for that chain (no bridge-in registered)
+ */
+router.get("/trustlessConfig/:chainId", walletAuth, BridgeController.getTrustlessConfig);
+
+/**
+ * @openapi
+ * /bridge/configuredChains:
+ *   get:
+ *     summary: "List source chains registered for the trustless bridge-in path"
+ *     description: >
+ *       Returns every chainId with a non-zero MercataBridge.bridgeIns[chainId]
+ *       entry, hydrated with its bridgeIn / lightClient / depositRoutedSig
+ *       (and l1LightClient for Base flavor). Drives the chain-selector
+ *       buttons on the claim modal.
+ *     tags: [Bridge]
+ *     responses:
+ *       200:
+ *         description: Configured chains
+ */
+router.get("/configuredChains", walletAuth, BridgeController.getConfiguredChains);
+
+/**
+ * @openapi
+ * /bridge/finalizedHead/{chainId}:
+ *   get:
+ *     summary: "Latest beacon-finalized EL block on the source chain"
+ *     description: >
+ *       Returns {blockNumber, timestamp, flavor}. UI polls this
+ *       every few seconds to determine which pending deposits are
+ *       ready to claim (deposit.blockNumber ≤ blockNumber).
+ *     tags: [Bridge]
+ *     parameters:
+ *       - in: path
+ *         name: chainId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Finalized head
+ *       400:
+ *         description: chainId not supported
+ *       503:
+ *         description: Trustless path disabled
+ */
+router.get("/finalizedHead/:chainId", walletAuth, BridgeController.getFinalizedHead);
+router.get("/anchorPlan/:chainId/:txHash", walletAuth, BridgeController.getAnchorPlan);
+
+/**
+ * @openapi
+ * /bridge/pendingDeposits/{chainId}:
+ *   get:
+ *     summary: "Unclaimed DepositRouted logs for the user's wallets"
+ *     description: >
+ *       Scans recent DepositRouted events from the chain's depositRouter
+ *       filtered to logs whose stratoRecipient ∈ wallets, drops entries
+ *       already in EthBridgeIn.processed, and returns the remainder
+ *       newest-first.
+ *     tags: [Bridge]
+ *     parameters:
+ *       - in: path
+ *         name: chainId
+ *         required: true
+ *         schema: { type: string }
+ *       - in: query
+ *         name: wallets
+ *         required: true
+ *         description: One or more recipient wallet addresses (repeat or comma-separated)
+ *         schema:
+ *           type: array
+ *           items: { type: string }
+ *     responses:
+ *       200:
+ *         description: Pending deposits for the requested wallets
+ *       400:
+ *         description: Missing wallets or unsupported chain
+ *       503:
+ *         description: Trustless path disabled
+ */
+router.get("/pendingDeposits/:chainId", walletAuth, BridgeController.getPendingDeposits);
+
+/**
+ * @openapi
+ * /bridge/trustlessClaim:
+ *   post:
+ *     summary: "Submit a trustless bridge-in claim (anchor + claim batch)"
+ *     description: >
+ *       End-to-end orchestrator for the trustless bridge-in flow.
+ *       Builds the proof inputs, optionally skips anchorBlockHeader
+ *       when the block is already on-chain, and submits the resulting
+ *       STRATO tx batch via the standard wallet-signing pipeline.
+ *             required: [externalChainId, externalTxHash]
+ *             properties:
+ *               externalChainId:
+ *                 type: string
+ *                 description: Source chain identifier (numeric string, e.g. "11155111")
+ *               externalTxHash:
+ *                 type: string
+ *                 description: Deposit transaction hash on the source chain
+ *               assignment:
+ *                 type: object
+ *                 description: Optional ClaimAssignment for the LP fast-finality path
+ *                 properties:
+ *                   depositKey: { type: string }
+ *                   newRecipient: { type: string }
+ *                   deadline: { type: string }
+ *                   v: { type: integer }
+ *                   r: { type: string }
+ *                   s: { type: string }
+ *     responses:
+ *       200:
+ *         description: Claim submitted (or unsigned envelopes ready for wallet signing)
+ *       404:
+ *         description: No DepositRouted log found in the receipt
+ *       409:
+ *         description: Deposit older than the live finalized head
+ *       425:
+ *         description: Deposit not yet finalized; UI should retry
+ *       503:
+ *         description: Trustless path disabled
+ */
+router.post("/trustlessClaim", walletAuth, BridgeController.trustlessClaim);
+
+/**
+ * @openapi
  * /bridge/requestNativeWithdrawal:
  *   post:
  *     summary: Submit a native bridge withdrawal request

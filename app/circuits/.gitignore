@@ -1,0 +1,9 @@
+# go build drops binaries here when given no -o
+/sepolia
+/proverd
+/probe
+/emit
+/commitment
+/blockroots
+# setup cache (hundreds of MB of proving key)
+/cache/

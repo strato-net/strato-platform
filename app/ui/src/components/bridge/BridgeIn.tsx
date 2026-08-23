@@ -56,6 +56,7 @@ import {
 } from "@/components/ui/select";
 import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 import MetalBuyProgressModal, { type MetalBuyStep } from "./MetalBuyProgressModal";
+import TrustlessClaimModal from "./TrustlessClaimModal";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowDownToLine, Gem, CheckCircle2, ChevronLeft, ChevronRight, AlertTriangle, Mail } from "lucide-react";
@@ -408,6 +409,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const [metalSteps, setMetalSteps] = useState<MetalBuyStep[]>([]);
   const [metalProgressError, setMetalProgressError] = useState<string>();
   const [metalsFeeError, setMetalsFeeError] = useState("");
+  const [trustlessClaimOpen, setTrustlessClaimOpen] = useState(false);
 
   const prevRouteCountRef = React.useRef<number>(1);
   const prevCardsRef = React.useRef<{ routes: typeof bridgeableTokens; actions: typeof depositActions }>({ routes: [], actions: [] });
@@ -1643,6 +1645,17 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               Need to withdraw? <span className="font-semibold">Withdraw {"\u2192"}</span>
             </Link>
           </div>
+          <div className={`overflow-hidden transition-all duration-300 ease-in-out text-right ${
+            fundingMode === "bridge" ? "max-h-[30px] opacity-100" : "max-h-0 opacity-0"
+          }`}>
+            <button
+              type="button"
+              onClick={() => setTrustlessClaimOpen(true)}
+              className="text-xs text-blue-500 hover:text-blue-400"
+            >
+              Existing deposit not credited? <span className="font-semibold">Claim trustlessly {"\u2192"}</span>
+            </button>
+          </div>
           <div
             className={`overflow-hidden transition-all duration-300 ease-in-out ${
               fundingMode === "metals" && contactEnabled ? "max-h-[120px] opacity-100" : "max-h-0 opacity-0"
@@ -1702,6 +1715,11 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         {contactEnabled && (
           <ContactInquiryModal open={contactModalOpen} onOpenChange={setContactModalOpen} />
         )}
+        <TrustlessClaimModal
+          open={trustlessClaimOpen}
+          onClose={() => setTrustlessClaimOpen(false)}
+          initialChainId={currentNetwork?.chainId}
+        />
       </div>
     );
 };

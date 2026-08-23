@@ -339,14 +339,18 @@ postBlocTransactionBody token (PostBlocTransactionRequest mAddr txList txParams 
       forStateT Map.empty txsWithParams $
         \MethodCall{..} -> do
           mContract <- use $ at methodcallContractAddress
+          -- Cache (contract, codeCollection) together: subsequent txs to
+          -- the same contract in this batch need the CC so file-level
+          -- struct definitions stay visible to argValueToValue. Caching
+          -- only the contract used to drop CC on cache hit, which made
+          -- nested struct field types fall through to TypeString.
           (contract, mCodeCollection) <- case mContract of
-            Just x -> pure (x, Nothing)  -- Already cached, no code collection
+            Just (c, cc) -> pure (c, Just cc)
             Nothing -> do
-              -- Try to get contract with code collection for file-level structs
               mContractCC <- lift $ getContractWithCodeCollectionByAddress methodcallContractAddress methodcallMethodName
               case mContractCC of
                 Just (c, cc) -> do
-                  _ <- at methodcallContractAddress <?= c
+                  _ <- at methodcallContractAddress <?= (c, cc)
                   pure (c, Just cc)
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (format methodcallContractAddress)
           case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
@@ -417,13 +421,13 @@ postBlocTransactionUnsigned mUsername (PostBlocTransactionRequest mAddr txList t
           \MethodCall{..} -> do
             mCached <- use $ at methodcallContractAddress
             (contract, mCodeCollection) <- case mCached of
-              Just x -> pure (x, Nothing)
+              Just (c, cc) -> pure (c, Just cc)
               Nothing -> do
                 mContractCC <- lift $ getContractWithCodeCollectionByAddress methodcallContractAddress methodcallMethodName
                 case mContractCC of
                   Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (format methodcallContractAddress)
                   Just (c, cc) -> do
-                    _ <- at methodcallContractAddress <?= c
+                    _ <- at methodcallContractAddress <?= (c, cc)
                     pure (c, Just cc)
             case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
               Just _ -> pure ()
@@ -1029,14 +1033,17 @@ postUsersContractMethodList' cacheNonce token FunctionListParameters {..} = do
       txsFuncNames <- forStateT Map.empty txsWithParams $
         \(MethodCall {..}) -> do
           mCached <- use $ at methodcallContractAddress
+          -- Cache (contract, codeCollection) together so repeat
+          -- methodcalls keep file-level struct defs visible — see
+          -- FUNCTION-case comment in postBlocTransactionResult.
           (contract, mCodeCollection) <- case mCached of
-            Just x -> pure (x, Nothing)
+            Just (c, cc) -> pure (c, Just cc)
             Nothing -> do
               mContractCC <- lift $ getContractWithCodeCollectionByAddress methodcallContractAddress methodcallMethodName
               case mContractCC of
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show methodcallContractAddress)
                 Just (c, cc) -> do
-                  _ <- at methodcallContractAddress <?= c
+                  _ <- at methodcallContractAddress <?= (c, cc)
                   pure (c, Just cc)
           case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
             Just _ -> pure ()
