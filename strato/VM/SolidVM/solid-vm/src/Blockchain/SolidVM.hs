@@ -3803,10 +3803,7 @@ validateFunctionArguments cc contract' func argVals = checkFunc $ func : CC._fun
             go ((_, CC.IndexedType _ t _):nts) (v:args) = (((t, v):) <$>) <$> go nts args
             go [] [] = pure $ Just []
             go _ _ = pure Nothing
-            argMeta =
-              map (\(n, CC.IndexedType _ t _) -> (fromMaybe "" n, t)) $
-                CC._funcArgs theFunc
-         in go argMeta argVals
+         in go (CC._funcArgs theFunc) argVals
 
 -- | Facts about the parent block, for the @block.prev*@ builtins: an explicit
 -- override (tests) or the parent's block summary; blocks whose parent is
