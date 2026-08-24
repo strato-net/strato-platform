@@ -400,10 +400,35 @@ blockDataRefToBlock :: BlockDataRef ->
                        [ValidatorDeltaRef] ->
                        [ProposalSignatureRef] ->
                        [CommitmentSignatureRef] ->
+                       [BlockStakeRef] ->
                        [Transaction] ->
                        Block
-blockDataRefToBlock bdr vs vd ps sigs txs = case vs of
-  [] -> -- this is a v1 block
+blockDataRefToBlock bdr vs vd ps sigs stakes txs = case blockDataRefVersion bdr of
+  3 ->
+    Block
+      { blockBlockData =
+          BlockHeaderV3
+            { parentHash = blockDataRefParentHash bdr,
+              stateRoot = blockDataRefStateRoot bdr,
+              transactionsRoot = blockDataRefTransactionsRoot bdr,
+              receiptsRoot = blockDataRefReceiptsRoot bdr,
+              logsBloom = blockDataRefLogBloom bdr,
+              number = blockDataRefNumber bdr,
+              timestamp = blockDataRefTimestamp bdr,
+              extraData = blockDataRefExtraData bdr,
+              currentValidators = bvr2v <$> vs,
+              newValidators = mapMaybe (vdr2v True) vd,
+              removedValidators = mapMaybe (vdr2v False) vd,
+              proposalRound = fromMaybe 0 $ blockDataRefProposalRound bdr,
+              currentStakes = mapMaybe (bsr2s False) stakes,
+              stakeUpdates = mapMaybe (bsr2s True) stakes,
+              proposalSignature = join . listToMaybe $ psr2s <$> ps,
+              signatures = mapMaybe csr2s sigs
+            },
+        blockReceiptTransactions = txs,
+        blockBlockUncles = []
+      }
+  v | v == 1 || (v == 0 && null vs) -> -- this is a v1 block (0: legacy rows without a version)
     Block
       { blockBlockData =
           BlockHeader
@@ -490,9 +515,49 @@ instance ToJSON BlockHeader' where
         "signatures" .= signatures
       ]
 
+  toJSON (BlockHeader' (BlockHeaderV3{..})) =
+    object
+      [ "kind" .= ("BlockData" :: String),
+        "parentHash" .= parentHash,
+        "stateRoot" .= stateRoot,
+        "transactionsRoot" .= transactionsRoot,
+        "receiptsRoot" .= receiptsRoot,
+        "number" .= number,
+        "timestamp" .= timestamp,
+        "extraData" .= extraData,
+        "currentValidators" .= currentValidators,
+        "newValidators" .= newValidators,
+        "removedValidators" .= removedValidators,
+        "round" .= proposalRound,
+        "currentStakes" .= currentStakes,
+        "stakeUpdates" .= stakeUpdates,
+        "proposalSignature" .= proposalSignature,
+        "signatures" .= signatures
+      ]
+
 instance FromJSON BlockHeader' where
-  parseJSON = withObject "BlockData'" $ \v ->
-    BlockHeader'
+  parseJSON = withObject "BlockData'" $ \v -> do
+    mRound <- v .:? "round"
+    BlockHeader' <$> case mRound of
+      Just r ->
+        BlockHeaderV3
+          <$> v .: "parentHash"
+          <*> v .: "stateRoot"
+          <*> v .: "transactionsRoot"
+          <*> v .: "receiptsRoot"
+          <*> v .:? "logBloom" .!= B.replicate 64 0x30
+          <*> v .: "number"
+          <*> v .: "timestamp"
+          <*> v .: "extraData"
+          <*> v .: "currentValidators"
+          <*> v .: "newValidators"
+          <*> v .: "removedValidators"
+          <*> pure r
+          <*> v .:? "currentStakes" .!= []
+          <*> v .:? "stakeUpdates" .!= []
+          <*> v .: "proposalSignature"
+          <*> v .: "signatures"
+      Nothing ->
     {-
       <$> ( BlockHeaderV2
               <$> v .: "parentHash"
@@ -511,21 +576,20 @@ instance FromJSON BlockHeader' where
               <*> v .: "mixHash"
               <*> v .: "nonce"
       -}        
-      <$> ( BlockHeaderV2
-              <$> v .: "parentHash"
-              <*> v .: "stateRoot"
-              <*> v .: "transactionsRoot"
-              <*> v .: "receiptsRoot"
-              <*> v .:? "logBloom" .!= B.replicate 64 0x30 -- this is what log blooms currently get set to
-              <*> v .: "number"
-              <*> v .: "timestamp"
-              <*> v .: "extraData"
-              <*> v .: "currentValidators"
-              <*> v .: "newValidators"
-              <*> v .: "removedValidators"
-              <*> v .: "proposalSignature"
-              <*> v .: "signatures"
-          )
+        BlockHeaderV2
+          <$> v .: "parentHash"
+          <*> v .: "stateRoot"
+          <*> v .: "transactionsRoot"
+          <*> v .: "receiptsRoot"
+          <*> v .:? "logBloom" .!= B.replicate 64 0x30 -- this is what log blooms currently get set to
+          <*> v .: "number"
+          <*> v .: "timestamp"
+          <*> v .: "extraData"
+          <*> v .: "currentValidators"
+          <*> v .: "newValidators"
+          <*> v .: "removedValidators"
+          <*> v .: "proposalSignature"
+          <*> v .: "signatures"
 
 instance FromJSON Block' where
   parseJSON = withObject "Block'" $ \v -> do
@@ -543,7 +607,7 @@ bdPrimeToBd (BlockHeader' bd) = bd
 newtype BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 
 instance ToJSON BlockDataRef' where
-  toJSON (BlockDataRef' (BlockDataRef ph uh cc sr tr rr _ d num gl gu ts ed non mh h pow isConf v)) =
+  toJSON (BlockDataRef' (BlockDataRef ph uh cc sr tr rr _ d num gl gu ts ed non mh h pow isConf v _)) =
     object
       [ "parentHash" .= ph,
         "unclesHash" .= uh,
@@ -570,6 +634,10 @@ bdrToBdrPrime = BlockDataRef'
 -}
 bvr2v :: BlockValidatorRef -> Validator
 bvr2v (BlockValidatorRef _ cn) = cn
+
+bsr2s :: Bool -> BlockStakeRef -> Maybe (Validator, Integer)
+bsr2s isUpd (BlockStakeRef _ v st isUpd') | isUpd == isUpd' = Just (v, st)
+bsr2s _ _ = Nothing
 
 vdr2v :: Bool -> ValidatorDeltaRef -> Maybe Validator
 vdr2v d' (ValidatorDeltaRef _ cn d) | d' == d = Just cn

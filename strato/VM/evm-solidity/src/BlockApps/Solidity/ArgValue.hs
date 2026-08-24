@@ -26,7 +26,7 @@ import qualified Data.ByteString.Lazy as BSL
 import Data.Decimal
 import Data.Either
 import qualified Data.Map.Strict as Map
-import Data.Maybe (isJust)
+import Data.Maybe (fromMaybe, isJust)
 import Data.OpenApi hiding (value)
 import Data.Scientific
 import Data.Text (Text)
@@ -151,7 +151,8 @@ argValueToType v'
 argValueToType v@(ArgInt _) = (SimpleType typeInt, v)
 argValueToType v@(ArgBool _) = (SimpleType TypeBool, v)
 argValueToType v@(ArgString s') = maybe (SimpleType TypeString, v) id $
-  let s = Text.unpack s'
+  castArgType s' <|>
+  (let s = Text.unpack s'
    in case s of
         '0':'x':_ -> ((SimpleType TypeAddress, v) <$ ((readMaybe s) :: Maybe Address))
                  <|> ((SimpleType typeInt,) . ArgInt <$> ((readMaybe s) :: Maybe Integer))
@@ -161,10 +162,36 @@ argValueToType v@(ArgString s') = maybe (SimpleType TypeString, v) id $
         -- Try to parse strings that look like JSON objects
         '{':_     -> (argValueToType <$> A.decode (BSL.fromStrict $ Text.encodeUtf8 s'))
         _         -> ((SimpleType typeInt,) . ArgInt <$> ((readMaybe s) :: Maybe Integer))
-                 <|> ((SimpleType TypeAddress, v) <$ ((readMaybe s) :: Maybe Address))
+                 <|> ((SimpleType TypeAddress, v) <$ ((readMaybe s) :: Maybe Address)))
 argValueToType v@(ArgDecimal _) = (SimpleType TypeDecimal, v)
 argValueToType v@(ArgArray vs) = (TypeArrayDynamic $ fst $ argValueToType $ V.head vs, v)
 argValueToType v@(ArgObject _) = (TypeStruct "", v)
+
+-- | An explicit cast literal (string("…"), address("hex"), uint(5), …) names
+-- its own type, so no shape inference is needed. These appear when
+-- already-rendered literals are re-marshaled (wallet-wrapped calls,
+-- castVoteOnIssue args); an unparseable inner value falls back to inference.
+castArgType :: Text -> Maybe (Type, ArgValue)
+castArgType t = do
+  (castType, raw) <- splitCastLiteral t
+  -- Quoted forms unquote+unescape; bare forms pass through. The string cast
+  -- REQUIRES a quoted inner (mirroring the VM's parser), so an ordinary string
+  -- value that merely looks like "string(hello)" is never unwrapped.
+  let mQuoted = unquoteCastInner raw
+      inner = fromMaybe raw mQuoted
+      s = Text.unpack inner
+  case castType of
+    "string" -> (\q -> (SimpleType TypeString, ArgString q)) <$> mQuoted
+    "address" -> (SimpleType TypeAddress, ArgString inner) <$ (readMaybe s :: Maybe Address)
+    "uint" -> (SimpleType typeUInt,) . ArgInt <$> readMaybe s
+    "int" -> (SimpleType typeInt,) . ArgInt <$> readMaybe s
+    "bool" -> case Text.toLower inner of
+      "true" -> Just (SimpleType TypeBool, ArgBool True)
+      "false" -> Just (SimpleType TypeBool, ArgBool False)
+      _ -> Nothing
+    "decimal" -> (SimpleType TypeDecimal,) . ArgDecimal <$> readMaybe s
+    "bytes" -> (SimpleType (TypeBytes Nothing),) . ArgString <$> mQuoted
+    _ -> Nothing
 
 isSimple :: Type -> Bool
 isSimple (SimpleType _) = True
@@ -315,6 +342,11 @@ argValueToSimpleValue theType argVal = case theType of
   TypeDecimal -> case argVal of
     ArgDecimal i -> Right $ ValueDecimal (Text.encodeUtf8 $ Text.pack $ show i)
     ArgInt i -> Right $ ValueDecimal (Text.encodeUtf8 $ Text.pack $ show i)
+    -- Clients send high-precision decimals as strings (a JSON number would be
+    -- rounded through a double); parse them exactly.
+    ArgString str -> case readMaybe (Text.unpack str) :: Maybe Decimal of
+      Just d -> Right $ ValueDecimal (Text.encodeUtf8 $ Text.pack $ show d)
+      Nothing -> Left $ "argValueToSimpleValue: Could not parse decimal value from string \"" <> str <> "\""
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeDecimal to be an decimal, but got " ++ show o
 
   where

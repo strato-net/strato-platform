@@ -21,6 +21,7 @@ module Core.API
   , module Handlers.BlkLast
   , module Handlers.Block
   , module Handlers.Metadata
+  , module Handlers.Receipts
   , module Handlers.Stats
   , module Handlers.Storage
   , module Handlers.Transaction
@@ -49,6 +50,8 @@ import           Handlers.Metadata                 hiding (API, server)
 import qualified Handlers.Metadata                 as Metadata
 import qualified Handlers.Peers                    as Peers
 import qualified Handlers.QueuedTransactions       as QueuedTransactions
+import           Handlers.Receipts                 hiding (API, server)
+import qualified Handlers.Receipts                 as Receipts
 import           Handlers.Stats                    hiding (API, server)
 import qualified Handlers.Stats                    as Stats
 import           Handlers.Storage                  hiding (API, server)
@@ -72,6 +75,7 @@ type CoreAPI =
            :<|> Metadata.API
            :<|> Peers.API
            :<|> QueuedTransactions.API
+           :<|> Receipts.API
            :<|> Stats.API
            :<|> Storage.API
            :<|> Transaction.API
@@ -87,6 +91,7 @@ type MonadCoreAPI m =
     Accessible [RawTransaction] m,
     Accessible Stats.TransactionCount m,
     BlkLast.GetLastBlocks m,
+    Receipts.GetReceipts m,
     TxLast.GetLastTransactions m,
     Selectable Account.AccountsFilterParams [AddressStateRef] m,
     Selectable Account.ProxyFilterParams [(AddressStateRef, String)] m,
@@ -107,6 +112,7 @@ coreApiServer =
     :<|> Metadata.server
     :<|> Peers.server
     :<|> QueuedTransactions.server
+    :<|> Receipts.server
     :<|> Stats.server
     :<|> Storage.server
     :<|> Transaction.server (Conf.txSizeLimit (networkConfig ethConf))

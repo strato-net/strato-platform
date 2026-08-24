@@ -63,7 +63,7 @@ import qualified Blockchain.Slipstream.Events               as E
 import           Blockchain.Slipstream.QueryFormatHelper
 import           Blockchain.Slipstream.SolidityValue
 import           Blockchain.Strato.Model.Address
-import qualified Blockchain.Strato.Model.Event   as Action
+import qualified SolidVM.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Stream.Action        (Delegatecall(..))
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8')
@@ -73,6 +73,7 @@ import qualified SolidVM.Model.CodeCollection.VarDef as VarDef
 import           SolidVM.Model.SolidString
 import           SolidVM.Model.Storable
 import qualified SolidVM.Model.Type              as SVMType
+import qualified SolidVM.Model.Value             as SVMValue
 import           Text.Printf
 import           Text.ShortDescription
 import qualified Data.Text.Encoding as TE
@@ -1046,9 +1047,11 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
       collectionDataValue = value
     }
 
-getArraysFromEvents :: [(String, String, String)] -> (String, [(Value, Value)])
+getArraysFromEvents :: [(String, SVMValue.Value, String, SVMType.Type)] -> (String, [(Value, Value)])
 getArraysFromEvents evArgs = do
-  let li = [(a, b) | (a, b, c) <- evArgs, c == "Array"]
+  let li = [(name, valStr) | (name, _, valStr, t) <- evArgs, isArrayType t]
+      isArrayType (SVMType.Array _ _) = True
+      isArrayType _ = False
   case li of
     [] -> ("", [])
     (arrayName, arrayStr):_ ->
@@ -1089,7 +1092,7 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
       eventIdx = eventIndex agEv
 
       attributesMap = ValueMapping $
-        Map.fromList [(ValueString $ T.pack name, SimpleValue . ValueString $ T.pack value) | (name, value, _) <- Action.evArgs ev]
+        Map.fromList [(ValueString $ T.pack name, SimpleValue . ValueString $ T.pack valStr) | (name, _, valStr, _) <- Action.evArgs ev]
 
       columns =
         baseEventColumns ++

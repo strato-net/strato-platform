@@ -46,7 +46,7 @@ import Blockchain.Strato.Model.Class (blockHeaderHash)
 import Blockchain.Strato.Model.Code (Code (..))
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.Gas (Gas (..))
-import Blockchain.Strato.Model.Event (Event (..))
+import SolidVM.Model.Event (Event (..))
 import Blockchain.Strato.Model.Keccak256 (hash)
 import Blockchain.VMContext (ContextBestBlockInfo (..), CurrentBlockHash (..), VMBase, getContextBestBlockInfo, getNewAddress, checkIfRunningTests)
 import Control.Lens ((^.))
@@ -191,7 +191,7 @@ simulateOne header spec = do
         [ TraceLog
             (evContractAddress ev)
             (T.pack $ evName ev)
-            [(T.pack n, T.pack v) | (n, v, _) <- evArgs ev]
+            [(T.pack n, T.pack v) | (n, _, v, _) <- evArgs ev]
           | ev <- maybe [] erEvents mEr
         ]
       hex n = "0x" ++ showHex n ""
@@ -427,6 +427,7 @@ lookupContract blockHeader fromAddr addr =
               , Env.src = Nothing
               , Env.name = Nothing
               , Env.runningTests = isRunningTests
+              , Env.prevBlock = Nothing
               }
             gi = GasInfo
               { _gasLeft = Gas 1000000

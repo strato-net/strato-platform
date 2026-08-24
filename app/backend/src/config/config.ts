@@ -50,6 +50,8 @@ export const mercataBridge = process.env.MERCATA_BRIDGE || "00000000000000000000
 export const poolFactory = process.env.POOL_FACTORY || "000000000000000000000000000000000000100a";
 export const tokenFactory = process.env.TOKEN_FACTORY || "000000000000000000000000000000000000100b";
 export const adminRegistry = process.env.ADMIN_REGISTRY || "000000000000000000000000000000000000100c";
+// Consensus governance (validator set + stake weights), a genesis proxy at 0x100.
+export const mercataGovernance = process.env.MERCATA_GOVERNANCE || "0000000000000000000000000000000000000100";
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
 
@@ -128,12 +130,12 @@ export const defaultPoolV3FactoryFor: Record<string, string> = {
 // Populate per network after deployment (or set POSITION_MANAGER_V3).
 export const defaultPositionManagerV3For: Record<string, string> = {
   "114784819836269": "1bc216225dd4e164ded916cb88a7c09804a881d1", // Helium testnet
-  "33056204878082667": "", // Upquark mainnet
+  "33056204878082667": "ce5d96341ba4fede57d7721c5b0e41d283aa7435", // Upquark mainnet
 };
 
 export const defaultNftFactoryFor: Record<string, string> = {
   "114784819836269": "af432c49803721b242f52ed5fd1b065c9a78e0bb", // Helium testnet
-  "33056204878082667": "", // Upquark mainnet
+  "33056204878082667": "4898738a1213ffa0cbc8eb42f4efa5fc9d781ada", // Upquark mainnet
 };
 
 export const defaultStratoNativeBridgeFor: Record<string, string> = {
@@ -202,13 +204,13 @@ export const defaultUsdcYieldVaultFor: Record<string, string> = {
 };
 
 export const defaultGoldstYieldVaultFor: Record<string, string> = {
-  "114784819836269": "65ab8049ff949e7ed04838723a07bc9b5a7849e2", // Helium testnet - populate after deployment
-  "33056204878082667": "", // Upquark mainnet - populate after deployment
+  "114784819836269": "65ab8049ff949e7ed04838723a07bc9b5a7849e2", // Helium testnet
+  "33056204878082667": "ddf7c27f27ac43b25043e100c2076e515526b9ae", // Upquark mainnet
 };
 
 export const defaultSilvstYieldVaultFor: Record<string, string> = {
-  "114784819836269": "7ecc1ab7e15384cf2392b7dad8878239fda78799", // Helium testnet - populate after deployment
-  "33056204878082667": "", // Upquark mainnet - populate after deployment
+  "114784819836269": "7ecc1ab7e15384cf2392b7dad8878239fda78799", // Helium testnet
+  "33056204878082667": "f8884c44d7cfbfb7c6326c515f375f8572f03e2b", // Upquark mainnet
 };
 
 /*

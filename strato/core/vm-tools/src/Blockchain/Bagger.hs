@@ -31,7 +31,7 @@ import Blockchain.Database.MerklePatricia (StateRoot (..))
 import Blockchain.Model.WrappedBlock (OutputBlock (..), OutputTx (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.Delta
+import SolidVM.Model.Delta
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Timing
@@ -40,7 +40,9 @@ import Blockchain.VMContext hiding (state)
 import Blockchain.VMMetrics
 import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
 import qualified Blockchain.EthConf.Model as Conf
+import Blockchain.Forks (isReceiptsRootForkActive)
 import qualified Blockchain.Verification as V
+import Blockchain.Data.Receipt (Receipt)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -79,7 +81,12 @@ data TxMiningResult = TxMiningResult
   }
   deriving (Show)
 
-type MineTransactions m = BlockHeader -> Integer -> [OutputTx] -> Address -> m TxMiningResult
+-- | The final 'Bool' says whether this run should pay the block's rewards. It is
+-- True exactly once per block: on the first run against a given parent, and on
+-- any run that replays a whole block from its parent state root. Deciding it
+-- here rather than in the fee contract is what keeps "rewards are paid once" a
+-- platform guarantee instead of something a deployed contract has to get right.
+type MineTransactions m = BlockHeader -> Integer -> [OutputTx] -> Address -> Bool -> m TxMiningResult
 
 
 getBaggerState :: Mod.Modifiable B.BaggerState m => m B.BaggerState
@@ -88,12 +95,12 @@ getBaggerState = Mod.get (Mod.Proxy @B.BaggerState)
 putBaggerState :: Mod.Modifiable B.BaggerState m => B.BaggerState -> m ()
 putBaggerState = Mod.put (Mod.Proxy @B.BaggerState)
 
-runFromStateRoot :: MonadBagger m => MineTransactions m -> Integer -> BlockHeader -> [OutputTx] -> Address -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
-runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress= do
+runFromStateRoot :: MonadBagger m => MineTransactions m -> Integer -> BlockHeader -> [OutputTx] -> Address -> Bool -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
+runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress payBlockRewards' = do
   A.insert (A.Proxy @StateRoot) (Nothing :: Maybe Word256) (stateRoot theBlockHeader)
   (TxMiningResult res ranTxs unranTxs newGas) <-
     timeit "mineTransactions bagger" (Just vmBlockInsertionMined) $
-      mineTransactions theBlockHeader remainingGas txs mSelfAddress
+      mineTransactions theBlockHeader remainingGas txs mSelfAddress payBlockRewards'
   flushMemStorageTxDBToBlockDB
   timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
   flushMemAddressStateTxToBlockDB
@@ -250,7 +257,9 @@ processNewBestBlock bh bd txShas = do
             B.lastExecutedTxs = [],
             B.promotedTransactions = [],
             B.privateHashes = hashMap,
-            B.startTimestamp = time
+            B.startTimestamp = time,
+            -- New best block, so the next height's rewards have not been paid.
+            B.blockRewardsPaid = False
           }
   $logInfoS "Bagger.processNewBestBlock" . T.pack $ show (length hashMap) ++ " private hashses in Bagger cache"
   putBaggerState $ state {B.seen = S.empty, B.miningCache = newMiningCache}
@@ -285,11 +294,14 @@ makeNewBlock mineTransactions mSelfAddress = do
           let lastHead = B.bestBlockHeader cache
           let promoted = take ((fromInteger (Conf.maxTxsPerBlock (quarryConfig ethConf))) - lastExecLen) $ B.promotedTransactions cache
           let time = B.startTimestamp cache
-          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] time mempty
+          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] [] time mempty M.empty
           let remGas = B.remainingGas cache
           $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
+          -- Only the first incremental run of a block pays its rewards; the
+          -- flag is cleared in processNewBestBlock when the height advances.
+          let payRewards = not $ B.blockRewardsPaid cache
           withBagger $ do
-            !run <- runFromStateRoot mineTransactions remGas tempBlockHeader promoted mSelfAddress
+            !run <- runFromStateRoot mineTransactions remGas tempBlockHeader promoted mSelfAddress payRewards
             (newSR, newGas, newExec, newUnexec) <- case run of
               Right (newSR', newRR', newGas') -> return (newSR', newGas', lastExec ++ newRR', [])
               Left e -> do
@@ -308,7 +320,8 @@ makeNewBlock mineTransactions mSelfAddress = do
                     { B.lastExecutedStateRoot = newSR,
                       B.remainingGas = newGas,
                       B.lastExecutedTxs = newExec,
-                      B.promotedTransactions = newUnexec
+                      B.promotedTransactions = newUnexec,
+                      B.blockRewardsPaid = B.blockRewardsPaid cache || payRewards
                     }
             $logDebugS "Bagger.makeNewBlock" . T.pack $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
             updateBaggerState (\s -> s {B.miningCache = newMiningCache})
@@ -580,9 +593,11 @@ buildFromMiningCache = do
   let parentHeader = B.bestBlockHeader cache
   let stateRoot = B.lastExecutedStateRoot cache
   let vDelt = getDeltasFromResults $ B.lastExecutedTxs cache
+  let sDelt = getStakeDeltasFromResults $ B.lastExecutedTxs cache
   let txs = (trrTransaction <$> B.lastExecutedTxs cache) ++ (DL.toList $ B.privateHashes cache)
   let time = B.startTimestamp cache
-  let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs time vDelt
+  receipts <- traverse txRunResultToReceipt (B.lastExecutedTxs cache)
+  let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs receipts time vDelt sDelt
   recordMaxBlockNumber "bagger_build" . number $ nextBlockData
   rewardedBlockData <- buildRewardedBlockHeader nextBlockData
   cacheRunResults rewardedBlockData (B.lastExecutedStateRoot cache, B.remainingGas cache, B.lastExecutedTxs cache)
@@ -599,35 +614,57 @@ buildNextBlockHeader ::
   Keccak256 ->
   StateRoot ->
   [OutputTx] ->
+  [Receipt] ->
   UTCTime ->
   ValidatorDelta ->
+  StakeDelta ->
   BlockHeader
-buildNextBlockHeader parentHeader parentHash stateRoot txs time vd =
+buildNextBlockHeader parentHeader parentHash stateRoot txs receipts time vd sd =
   let parentNum = number parentHeader
+      blockNum = parentNum + 1
       (newV, remV) = fromDelta vd
-      curValidators = case parentHeader of
-        BlockHeaderV2{} -> S.toList $ S.difference
-                                       (S.union
-                                         (getValidatorSet parentHeader)
-                                         (S.fromList $ newValidators parentHeader))
-                                       (S.fromList $ removedValidators parentHeader)
-        BlockHeader{} -> S.toList $ getValidatorSet parentHeader
-   in BlockHeaderV2
-        {
-          parentHash = parentHash,
-          stateRoot = stateRoot,
-          transactionsRoot = V.transactionsVerificationValue (otBaseTx <$> txs),
-          receiptsRoot = V.receiptsVerificationValue (),
-          logsBloom = "0000000000000000000000000000000000000000000000000000000000000000",
-          number = parentNum + 1,
-          timestamp = time,
-          extraData = txsLen2ExtraData (length txs),
-          currentValidators = curValidators,
-          newValidators = newV,
-          removedValidators = remV,
-          proposalSignature = Nothing,
-          signatures = []
-        }
+      (curValidators, curStakes) = case parentHeader of
+        BlockHeader{} -> (S.toList $ getValidatorSet parentHeader, [])
+        _ -> let (vs, st) = nextValidatorsAndStakes parentHeader in (S.toList vs, M.toAscList st)
+      receiptsForRoot = if isReceiptsRootForkActive blockNum then receipts else []
+      rcptRoot = V.receiptsVerificationValue receiptsForRoot
+      txRoot = V.transactionsVerificationValue (otBaseTx <$> txs)
+      bloom = "0000000000000000000000000000000000000000000000000000000000000000"
+      extra = txsLen2ExtraData (length txs)
+   in if Conf.stakingActiveAt (networkConfig ethConf) (parentNum + 1)
+        then BlockHeaderV3
+          { parentHash = parentHash,
+            stateRoot = stateRoot,
+            transactionsRoot = txRoot,
+            receiptsRoot = rcptRoot,
+            logsBloom = bloom,
+            number = parentNum + 1,
+            timestamp = time,
+            extraData = extra,
+            currentValidators = curValidators,
+            newValidators = newV,
+            removedValidators = remV,
+            proposalRound = 0,
+            currentStakes = curStakes,
+            stakeUpdates = M.toAscList sd,
+            proposalSignature = Nothing,
+            signatures = []
+          }
+        else BlockHeaderV2
+          { parentHash = parentHash,
+            stateRoot = stateRoot,
+            transactionsRoot = txRoot,
+            receiptsRoot = rcptRoot,
+            logsBloom = bloom,
+            number = parentNum + 1,
+            timestamp = time,
+            extraData = extra,
+            currentValidators = curValidators,
+            newValidators = newV,
+            removedValidators = remV,
+            proposalSignature = Nothing,
+            signatures = []
+          }
 
 buildRewardedBlockHeader :: MonadBagger m => BlockHeader -> m BlockHeader
 buildRewardedBlockHeader bd = do

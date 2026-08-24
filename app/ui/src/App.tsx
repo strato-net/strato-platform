@@ -12,6 +12,7 @@ import {
 } from "@rainbow-me/rainbowkit";
 import { createConfig, http } from "wagmi";
 import "@rainbow-me/rainbowkit/styles.css";
+import { robinhood, robinhoodTestnet } from "@/lib/bridge/constants";
 import { UserProvider } from "@/context/UserContext";
 import { UserTokensProvider } from "@/context/UserTokensContext";
 import { OracleProvider } from "@/context/OracleContext";
@@ -165,8 +166,8 @@ const App = () => {
       const networkName = (window as { ENV?: { NETWORK_NAME?: string } }).ENV?.NETWORK_NAME || "";
       const isProduction = networkName === "upquark";
       const baseChains = isProduction
-        ? [mainnet, polygon, base, linea]
-        : [sepolia, baseSepolia, lineaSepolia];
+        ? [mainnet, polygon, base, linea, robinhood]
+        : [sepolia, baseSepolia, lineaSepolia, robinhoodTestnet];
       const proxiedChainIds: Set<number> = new Set(baseChains.filter(c => c.id !== polygon.id).map(c => c.id));
       const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(

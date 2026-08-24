@@ -84,7 +84,7 @@ import Blockchain.Strato.Model.Gas (Gas (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.Event
+import SolidVM.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.Action (Action)
@@ -661,17 +661,67 @@ getVariableOfName name = do
       maybeBuiltinFunction =
         toMaybe
           ( name
-              `elem` [ "address", "account", "uint", "int", "decimal", "bool", "byte", "bytes",
-                       "string", "variadic", "log", "keccak256", "ripemd160", "modExp", "ecAdd",
-                       "ecMul", "ecPairing", "bls12381G1Add", "bls12381G1Msm", "bls12381G2Add",
-                       "bls12381G2Msm", "bls12381Pairing", "bls12381MapFpToG1", "bls12381MapFp2ToG2",
-                       "bls12381HashToCurveG1", "bls12381HashToCurveG2", "bls12381DecompressG1",
-                       "bls12381DecompressG2", "poseidon", "poseidon2", "poseidon2Compress",
-                       "poseidon2Permute", "poseidon2Hash", "poseidon2HashBytes", "poseidon2gl",
-                       "poseidon2glBytes", "payable", "require", "revert", "assert", "sha3",
-                       "delegatecall", "call", "staticcall", "derive", "sha256", "ecrecover",
-                       "verifyP256", "base64encode", "base64urlencode", "blockhash", "addmod", "mulmod",
-                       "selfdestruct", "suicide", "bytes32ToString", "create", "create2", "fastForward" ]
+              `elem` [ "address",
+                       "account",
+                       "uint",
+                       "int",
+                       "decimal",
+                       "bool",
+                       "byte",
+                       "bytes",
+                       "string",
+                       "variadic",
+                       "log",
+                       "keccak256",
+                       "ripemd160",
+                       "modExp",
+                       "ecAdd",
+                       "ecMul",
+                       "ecPairing",
+                       "bls12381G1Add",
+                       "bls12381G1Msm",
+                       "bls12381G2Add",
+                       "bls12381G2Msm",
+                       "bls12381Pairing",
+                       "bls12381MapFpToG1",
+                       "bls12381MapFp2ToG2",
+                       "bls12381HashToCurveG1",
+                       "bls12381HashToCurveG2",
+                       "bls12381DecompressG1",
+                       "bls12381DecompressG2",
+                       "poseidon",
+                       "poseidon2",
+                       "poseidon2Compress",
+                       "poseidon2Permute",
+                       "poseidon2Hash",
+                       "poseidon2HashBytes",
+                       "poseidon2gl",
+                       "poseidon2glBytes",
+                       "payable",
+                       "require",
+                       "revert",
+                       "assert",
+                       "sha3",
+                       "delegatecall",
+                       "call",
+                       "staticcall",
+                       "derive",
+                       "sha256",
+                       "ecrecover",
+                       "verifyP256",
+                       "base64encode",
+                       "base64urlencode",
+                       "blockhash",
+                       "addmod",
+                       "mulmod",
+                       "selfdestruct",
+                       "suicide",
+                       "bytes32ToString",
+                       "create",
+                       "create2",
+                       "fastForward",
+                       "setBlockContext"
+                     ]
           )
           $ t "builtin function" $ Constant $ SFunction name Nothing
 
@@ -1019,7 +1069,7 @@ addEvent newEvent = do
     TraceLog
       (evContractAddress newEvent)
       (T.pack $ evName newEvent)
-      [(T.pack n, T.pack v) | (n, v, _) <- evArgs newEvent]
+      [(T.pack n, T.pack v) | (n, _, v, _) <- evArgs newEvent]
 
 addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Keccak256 -> T.Text -> m ()
 addDelegatecall s c n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c n)
