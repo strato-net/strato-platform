@@ -1,0 +1,123 @@
+import { Banknote, Coins, HandCoins } from "lucide-react";
+import { EXTERNAL_LINKS } from "@/config/externalLinks";
+import { buildFooterColumns, FULL_APP_LINK } from "./footerColumns";
+import type { ProductLandingConfig } from "./types";
+
+export const borrow: ProductLandingConfig = {
+  slug: "borrow",
+  documentTitle: "STRATO Borrow | Access USDST Without Selling Your Assets | STRATO",
+  accent: "blue",
+  appPath: "/dashboard/borrow",
+
+  hero: {
+    icon: HandCoins,
+    eyebrow: "STRATO Borrow",
+    headline: "Access USDST Without Selling Your Assets.",
+    subhead:
+      "Use supported gold, silver or crypto as collateral. Borrow USDST while keeping exposure to the assets you already own.",
+  },
+
+  stats: [
+    { value: "Keep", label: "Your asset exposure" },
+    { value: "USDST", label: "Ready to use onchain" },
+    { value: "3", label: "Steps to borrow" },
+  ],
+
+  steps: [
+    {
+      index: "01",
+      tag: "Start here",
+      title: "Connect Wallet",
+      body: "Connect your wallet and keep full control of your position.",
+      cta: "Connect Wallet",
+    },
+    {
+      index: "02",
+      tag: "Next",
+      title: "Add Collateral",
+      body: "Choose a supported asset and the amount you want to use.",
+      cta: "Choose Collateral",
+    },
+    {
+      index: "03",
+      tag: "Final",
+      title: "Borrow USDST",
+      body: "Choose an amount, review your safety buffer and confirm.",
+      cta: "Borrow USDST",
+    },
+  ],
+
+  highlight: {
+    eyebrow: "Collateral in. USDST out.",
+    title: "Keep Your Exposure. Unlock USDST.",
+    body: "Your collateral stays in the position while your USDST is free to use across STRATO.",
+    flow: {
+      fromLabel: "You provide",
+      from: "Collateral",
+      toLabel: "You receive",
+      to: "USDST",
+    },
+    chips: ["Gold & Silver", "ETH & BTC", "Selected Stablecoins"],
+  },
+
+  assurances: {
+    items: [
+      "Borrow without selling",
+      "Repay on your schedule",
+      "Withdraw collateral after repayment",
+    ],
+    disclaimer:
+      "Collateral remains locked while debt is outstanding and borrowing costs accrue. If your safety buffer falls too low, collateral may be liquidated. Rates and risk parameters vary by asset.",
+  },
+
+  bands: [
+    {
+      tone: "navy",
+      eyebrow: "One number to watch",
+      title: "Know When Your Position Needs Attention.",
+      body: "Your safety buffer changes with the value of your collateral. If it falls, add collateral or repay USDST to strengthen the position.",
+      link: { label: "Understand Borrowing Risk", href: `${EXTERNAL_LINKS.docs}/borrowing` },
+      aside: {
+        kind: "status",
+        title: "Position Status",
+        state: "Healthy",
+        scale: ["At risk", "Watch", "Healthy"],
+        note: "More collateral or less debt creates a larger safety buffer.",
+      },
+    },
+  ],
+
+  explainers: [
+    {
+      icon: Coins,
+      tag: "Your collateral",
+      title: "Your Asset Backs The Position.",
+      body: "You keep its price exposure while it is locked as collateral. Repay the USDST and accrued costs before withdrawing it.",
+      link: { label: "View Supported Assets", href: "/dashboard/borrow" },
+    },
+    {
+      icon: Banknote,
+      tag: "Your asset",
+      title: "Use USDST Across STRATO.",
+      body: "Hold it, swap it, deposit it into a vault or provide liquidity. The borrowed USDST stays available in your wallet.",
+      link: { label: "Explore USDST", href: `${EXTERNAL_LINKS.docs}/usdst` },
+    },
+  ],
+
+  ctaBanner: {
+    eyebrow: "STRATO Borrow",
+    title: "Keep Your Assets. Access USDST.",
+    body: "Start with a supported asset and choose a comfortable safety buffer.",
+  },
+
+  footerColumns: buildFooterColumns(
+    [
+      { label: "Open Borrow", href: "/dashboard/borrow" },
+      FULL_APP_LINK,
+    ],
+    [
+      { label: "Borrow Guide", href: `${EXTERNAL_LINKS.docs}/borrowing` },
+      { label: "Docs", href: EXTERNAL_LINKS.docs },
+    ],
+  ),
+};
