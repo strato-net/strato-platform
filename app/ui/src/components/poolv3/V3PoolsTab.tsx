@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { formatPriceWad, priceDomainEdge } from "./poolV3Utils";
 import V3NewPositionCard from "./V3NewPositionCard";
+import V3PoolStatusBanner from "./V3PoolStatusBanner";
 
 interface V3PoolsTabProps {
   pools: PoolV3[];
@@ -80,7 +81,9 @@ const V3PoolsTab = ({ pools, loading, onMinted }: V3PoolsTabProps) => {
   const [pairKey, setPairKey] = useState<string | null>(null);
   const [poolAddress, setPoolAddress] = useState<string | null>(null);
 
-  const groups = useMemo(() => groupByPair(pools), [pools]);
+  // Disabled pools are hidden from the browser entirely — you can't add liquidity
+  // to them, so they shouldn't appear as pairs or fee tiers at all.
+  const groups = useMemo(() => groupByPair(pools.filter((p) => !p.isDisabled)), [pools]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -187,11 +190,13 @@ const V3PoolsTab = ({ pools, loading, onMinted }: V3PoolsTabProps) => {
                   >
                     <div className="flex items-center justify-between gap-1">
                       <span className="text-sm font-medium">{pool.fee / 10000}%</span>
-                      {(pool.apy || 0) > 0 && (
+                      {pool.isPaused ? (
+                        <span className="text-[11px] text-yellow-600 font-medium whitespace-nowrap">Paused</span>
+                      ) : (pool.apy || 0) > 0 ? (
                         <span className="text-[11px] text-green-600 font-medium whitespace-nowrap">
                           {pool.apy.toFixed(2)}% APY
                         </span>
-                      )}
+                      ) : null}
                     </div>
                     <div className="text-[11px] text-muted-foreground">
                       {formatUsd(pool.totalLiquidityUSD)} TVL
@@ -219,6 +224,9 @@ const V3PoolsTab = ({ pools, loading, onMinted }: V3PoolsTabProps) => {
                 )}
               </div>
             </div>
+
+            {/* Paused pools stay browsable but can't take new liquidity — say so up front. */}
+            <V3PoolStatusBanner pool={selectedPool} />
 
             {/* keyed by pool so the form fully resets when the tier changes */}
             <V3NewPositionCard key={selectedPool.address} pool={selectedPool} onMinted={onMinted} />
