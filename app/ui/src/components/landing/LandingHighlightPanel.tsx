@@ -110,7 +110,7 @@ const LandingHighlightPanel = ({ highlight, accent }: LandingHighlightPanelProps
                         key={src}
                         src={src}
                         alt=""
-                        className={`h-5 w-5 ${i > 0 ? "-ml-1.5" : ""}`}
+                        className={`h-5 w-5 ${i > 0 ? "-ml-1.5" : "relative z-10"}`}
                       />
                     ))}
                   </span>

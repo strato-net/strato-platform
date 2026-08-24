@@ -22,7 +22,8 @@ const LandingHero = ({ hero, accent }: LandingHeroProps) => {
               key={src}
               src={src}
               alt=""
-              className={`h-16 w-16 drop-shadow-sm ${i > 0 ? "-ml-4" : ""}`}
+              // First image (GOLDST in gold/USDST pairs) stacks on top, as in the mockups.
+              className={`h-16 w-16 drop-shadow-sm ${i > 0 ? "-ml-4" : "relative z-10"}`}
             />
           ))}
         </div>

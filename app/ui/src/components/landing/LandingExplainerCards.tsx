@@ -20,12 +20,17 @@ const LandingExplainerCards = ({ cards, accent }: LandingExplainerCardsProps) =>
             return (
               <Tile key={card.title} className="p-8">
                 <div className="flex items-center gap-3">
-                  {card.image ? (
-                    <img
-                      src={card.image}
-                      alt=""
-                      className="h-9 w-9 rounded-full border border-border object-cover"
-                    />
+                  {card.images?.length ? (
+                    <span className="flex shrink-0">
+                      {card.images.map((src, i) => (
+                        <img
+                          key={src}
+                          src={src}
+                          alt=""
+                          className={`h-9 w-9 ${i > 0 ? "-ml-3" : "relative z-10"}`}
+                        />
+                      ))}
+                    </span>
                   ) : Icon ? (
                     <span
                       className={`flex h-9 w-9 items-center justify-center rounded-full ${tone.badge}`}

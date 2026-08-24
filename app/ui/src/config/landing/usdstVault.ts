@@ -71,7 +71,7 @@ export const usdstVault: ProductLandingConfig = {
 
   explainers: [
     {
-      image: usdstImage,
+      images: [usdstImage],
       tag: "USDST",
       title: "USDST, Built To Do More.",
       body: "Hold it. Trade it. Put it to work. USDST moves across STRATO—from everyday transactions to onchain yield.",

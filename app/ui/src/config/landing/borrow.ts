@@ -92,14 +92,14 @@ export const borrow: ProductLandingConfig = {
 
   explainers: [
     {
-      image: goldstImage,
+      images: [goldstImage],
       tag: "Your collateral",
       title: "Your Asset Backs The Position.",
       body: "You keep its price exposure while it is locked as collateral. Repay the USDST and accrued costs before withdrawing it.",
       link: { label: "View Supported Assets", href: "/dashboard/borrow" },
     },
     {
-      image: usdstImage,
+      images: [usdstImage],
       tag: "Your asset",
       title: "Use USDST Across STRATO.",
       body: "Hold it, swap it, deposit it into a vault or provide liquidity. The borrowed USDST stays available in your wallet.",

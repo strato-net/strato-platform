@@ -77,7 +77,7 @@ export const liquidity: ProductLandingConfig = {
 
   explainers: [
     {
-      image: goldstImage,
+      images: [goldstImage, usdstImage],
       tag: "Your strategy",
       title: "Choose Where Your Liquidity Works.",
       body: "Concentrate liquidity around the prices where you want it active. A tighter range can use capital more efficiently, but may need more attention.",

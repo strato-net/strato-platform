@@ -124,7 +124,7 @@ export const staking: ProductLandingConfig = {
       link: { label: "Explore Validators", href: "/dashboard/earn-staking" },
     },
     {
-      image: stratoImage,
+      images: [stratoImage],
       tag: "Staking rewards",
       title: "Track And Claim Your Rewards.",
       body: "Your staked amount, total rewards and claimable STRATO stay visible in one place. Every staking reward you receive is paid in STRATO.",

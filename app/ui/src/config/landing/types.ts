@@ -75,8 +75,8 @@ export interface LandingBand {
 
 export interface LandingExplainer {
   icon?: LucideIcon;
-  /** Token/product image rendered in the chip instead of a Lucide icon. */
-  image?: string;
+  /** Token/product images (1 or 2, overlapped) rendered instead of a Lucide icon. */
+  images?: string[];
   tag: string;
   title: string;
   body: string;

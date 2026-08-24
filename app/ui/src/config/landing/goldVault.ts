@@ -73,7 +73,7 @@ export const goldVault: ProductLandingConfig = {
     {
       // Live GOLDST token image from mainnet asset metadata
       // (BlockApps-Token-images @ cdc93d30182125e05eec985b631c7c61b3f63ff0).
-      image: goldstImage,
+      images: [goldstImage],
       tag: "GOLDST",
       title: "Real Gold. Onchain.",
       body: "Own tokenized, vaulted physical gold. Trade it, transfer it or put it to work across STRATO without giving up your gold exposure.",
