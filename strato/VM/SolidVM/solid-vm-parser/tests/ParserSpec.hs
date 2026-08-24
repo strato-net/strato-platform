@@ -3,6 +3,7 @@
 
 module ParserSpec where
 
+import qualified Blockchain.Strato.Model.Address as Addr
 import Control.Monad
 import Data.Either (isLeft)
 import Data.Source.Annotation as SA
@@ -105,6 +106,38 @@ spec = do
             ]
       forM_ fcases $ \(input, want) -> do
         assertEqual input (Right want) (parseExpr input)
+
+  describe "Arg literal parsing (parseArg)" $ do
+    let parseA = fmap (fmap (const ())) . runParser parseArg initialParserState ""
+        cases =
+          [ ("42", NumberLiteral () 42 Nothing),
+            ([r|"hello"|], StringLiteral () "hello"),
+            -- Legacy inference: a quoted string that reads as an address is an address
+            ([r|"123"|], AddressLiteral () (Addr.Address 0x123)),
+            ([r|"00000000000000000000000000000000deadbeef"|], AddressLiteral () (Addr.Address 0xdeadbeef)),
+            -- Explicit casts pin the type regardless of content shape
+            ([r|string("123")|], StringLiteral () "123"),
+            ([r|string("00000000000000000000000000000000deadbeef")|], StringLiteral () "00000000000000000000000000000000deadbeef"),
+            ([r|string("hello")|], StringLiteral () "hello"),
+            ([r|address("123")|], AddressLiteral () (Addr.Address 0x123)),
+            ([r|address("00000000000000000000000000000000deadbeef")|], AddressLiteral () (Addr.Address 0xdeadbeef)),
+            ("address(0xdeadbeef)", AddressLiteral () (Addr.Address 0xdeadbeef)),
+            ("uint(5)", NumberLiteral () 5 Nothing),
+            ("int(-5)", NumberLiteral () (-5) Nothing),
+            ("bool(true)", BoolLiteral () True),
+            ("bool(false)", BoolLiteral () False),
+            ("decimal(1.5)", DecimalLiteral () (WrappedDecimal 1.5)),
+            ([r|decimal("1.5")|], DecimalLiteral () (WrappedDecimal 1.5)),
+            ([r|bytes("00ff")|], HexaLiteral () "00ff"),
+            -- Casts nest inside array literals
+            ([r|[string("123"),uint(7)]|], ArrayExpression () [StringLiteral () "123", NumberLiteral () 7 Nothing])
+          ]
+    forM_ cases $ \(input, want) -> do
+      it ("can parse " ++ show input) $ parseA input `shouldBe` Right want
+    it "rejects an unterminated cast" $
+      parseA [r|string("123"|] `shouldSatisfy` isLeft
+    it "rejects odd-length bytes content" $
+      parseA [r|bytes("0ff")|] `shouldSatisfy` isLeft
 
   {-
   ------------------------------------------------------------------------------------------------------------------------------------------------

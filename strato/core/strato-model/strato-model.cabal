@@ -21,8 +21,6 @@ library
       Blockchain.Strato.Model.Class
       Blockchain.Strato.Model.Code
       Blockchain.Strato.Model.CodePtr
-      Blockchain.Strato.Model.Delta
-      Blockchain.Strato.Model.Event
       Blockchain.Strato.Model.ExtendedWord
       Blockchain.Strato.Model.Gas
       Blockchain.Strato.Model.Host
@@ -32,6 +30,7 @@ library
       Blockchain.Strato.Model.Nonce
       Blockchain.Strato.Model.Options
       Blockchain.Strato.Model.PositiveInteger
+      Blockchain.Strato.Model.ProposerSelection
       Blockchain.Strato.Model.Query
       Blockchain.Strato.Model.Secp256k1
       Blockchain.Strato.Model.StateRoot
@@ -111,6 +110,7 @@ test-suite strato-model-tests
     , binary
     , blockapps-haskoin
     , bytestring
+    , containers
     , ethereum-rlp
     , hspec
     , labeled-error

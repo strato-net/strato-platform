@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Shield, Plus, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -79,6 +79,13 @@ export function WalletPolicyDialog({ wallet }: { wallet: UserWallet }) {
       }),
     [template, contractName, handler, addresses, defaultAction]
   );
+
+  // A stale dry-run is misleading once the policy inputs change (or the dialog
+  // is reopened); clear the panel on any edit.
+  const simReset = sim.reset;
+  useEffect(() => {
+    simReset();
+  }, [simReset, source, contractName, open]);
 
   const callSetLogic = async (logicAddress: string) => {
     // setLogicContract is onlyOwner; the connected account owns the wallet, so call

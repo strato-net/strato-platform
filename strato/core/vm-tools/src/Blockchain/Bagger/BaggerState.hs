@@ -36,7 +36,14 @@ data MiningCache = MiningCache
     lastExecutedTxs :: [TxRunResult],
     promotedTransactions :: [OutputTx],
     privateHashes :: DL.DList OutputTx,
-    startTimestamp :: UTCTime
+    startTimestamp :: UTCTime,
+    -- | Whether the block currently being built has already had its block
+    -- rewards paid. A block is built incrementally — makeNewBlock runs only the
+    -- newly promoted transactions against the previous state root and can be
+    -- called many times — so this is what keeps rewards to once per block
+    -- without relying on the fee contract to deduplicate. Reset whenever the
+    -- cache moves to a new best block, i.e. when the height advances.
+    blockRewardsPaid :: Bool
   }
   deriving (Show, Generic)
 
@@ -110,7 +117,8 @@ defaultMiningCache =
       lastExecutedTxs = [],
       promotedTransactions = [],
       privateHashes = DL.empty,
-      startTimestamp = posixSecondsToUTCTime 0
+      startTimestamp = posixSecondsToUTCTime 0,
+      blockRewardsPaid = False
     }
 
 addToATL :: OutputTx -> ATL -> (Maybe OutputTx, OutputTx, ATL)

@@ -76,7 +76,8 @@ defineFlag "mempoolLivenessCutoff" (60 :: Integer) "Max age of a transaction in 
 
 -- Consensus timing flags
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
-defineFlag "blockstanbul_round_period_s" (120 :: Int) "Maximum seconds that one validator will remain the proposer"
+defineFlag "blockstanbul_round_period_s" (3600 :: Int) "Seconds without progress before a forced PBFT round change (a missed proposal is detected within seconds regardless)"
+defineFlag "stakingActivationBlock" (-1 :: Integer) "Block number from which stake-weighted proposer selection is in force (-1 = network default: from genesis for new networks, unscheduled for existing ones)"
 
 -- VM config flags
 defineFlag "sqlDiff" (True :: Bool) "Update account state and storage in SQL DB (set false for faster sync)"

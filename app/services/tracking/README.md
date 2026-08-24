@@ -101,6 +101,14 @@ slightly ahead of the service's clock. Bridged-in USD counts priced tokens
 only and sets `bridgeValuePartial` when some token had no oracle price (the
 dashboard renders "$128.4K+").
 
+## Links table
+
+`GET /tracking-api/links` returns every link (lifetime totals, newest first) in
+one unpaginated array; the "All links" table filters and sorts it in the
+browser. The search box matches slug, URL, label, source, full source and
+creator; each data column header cycles ascending → descending → back to the
+server order, with blanks and missing values always sorted last.
+
 ## Storage
 
 Owns the `tracking` Postgres database: `tracking_links`, `tracking_sessions`,

@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Copy, ExternalLink, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronsUpDown, Copy, ExternalLink, X } from 'lucide-react';
 import { userTimelinePath } from '../api';
 import { explorerUrl } from '../auth';
 
@@ -327,3 +327,49 @@ export const inputClass =
 export const thClass =
   'px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground';
 export const tdClass = 'px-3 py-2 text-sm';
+
+export type SortDirection = 'asc' | 'desc';
+
+// Clickable table header: the caller cycles ascending → descending → unsorted.
+// The sorted column keeps its arrow, the others only hint at one on hover.
+export const SortHeader = ({
+  label,
+  active,
+  direction,
+  align,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  direction: SortDirection;
+  align?: 'right';
+  onClick: () => void;
+}) => (
+  <th
+    className={`${thClass} ${align === 'right' ? 'text-right' : ''}`}
+    aria-sort={active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+  >
+    <button
+      type="button"
+      onClick={onClick}
+      title={`Sort by ${label}`}
+      className={`group inline-flex max-w-full items-center gap-1 transition-colors hover:text-foreground ${
+        active ? 'text-foreground' : ''
+      } ${align === 'right' ? 'flex-row-reverse' : ''}`}
+    >
+      <span className="truncate">{label}</span>
+      {active ? (
+        direction === 'asc' ? (
+          <ArrowUp size={12} className="shrink-0" />
+        ) : (
+          <ArrowDown size={12} className="shrink-0" />
+        )
+      ) : (
+        <ChevronsUpDown
+          size={12}
+          className="shrink-0 opacity-0 transition-opacity group-hover:opacity-60"
+        />
+      )}
+    </button>
+  </th>
+);

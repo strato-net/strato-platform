@@ -23,9 +23,11 @@ import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Class (blockHash, blockHeader, blockHeaderBlockNumber)
+import Blockchain.Strato.Model.Class (blockHash, blockHeader, blockHeaderBlockNumber, blockHeaderVersion)
+import SolidVM.Model.Delta (applyStakeDelta)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.ProposerSelection
 import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Lens hiding (view)
@@ -135,20 +137,67 @@ roundChange = do
     msg <- signMessage rawMsg
     yieldR msg
 
+-- | Stamp the consensus data this node is responsible for (the validator set,
+-- and — once staking is active — the round and the stake weights in force) and
+-- seal the block as its proposer.
+stampAndSeal :: StateMachineM m => Block -> m Block
+stampAndSeal blk = do
+  vs <- use validators
+  st <- use stakes
+  v <- use view
+  active <- gets stakingActiveNow
+  let stampHeader h
+        | active = setBlockStakes (M.toAscList st) $ setBlockRound (fromIntegral $ _round v) h
+        | otherwise = h
+      unsealed = addValidators (S.toList vs) $ scrubConsensus blk
+      stamped = unsealed {blockBlockData = stampHeader (blockBlockData unsealed)}
+  pseal <- proposerSeal stamped
+  pure $ addProposerSeal pseal stamped
+
+-- | Consensus checks on a proposed block's header that only apply once staking
+-- is active: it must be a version-3 header whose round lies between the parent's
+-- round and the proposing view's round (rounds persist across heights), whose
+-- validator set and stake weights match ours, and whose seal was produced by
+-- the proposer selected for that round.
+checkProposalHeader :: BlockstanbulContext -> View -> Block -> Either T.Text ()
+checkProposalHeader ctx v' pp
+  | not (stakingActiveNow ctx) = Right ()
+  | blockHeaderVersion hdr /= 3 =
+      Left . T.pack $ printf "Rejecting proposal; block header version %d, expected 3" (blockHeaderVersion hdr)
+  | hr > fromIntegral (_round v') =
+      Left . T.pack $ printf "Rejecting proposal; header round %d is ahead of view round %d" hr (toInteger $ _round v')
+  | hr < _lastRound ctx =
+      Left . T.pack $ printf "Rejecting proposal; header round %d is behind the parent's round %d" hr (_lastRound ctx)
+  | S.fromList (getBlockValidators hdr) /= _validators ctx =
+      Left "Rejecting proposal; block validator set does not match ours"
+  | M.fromList (getBlockStakes hdr) /= _stakes ctx =
+      Left "Rejecting proposal; block stake weights do not match ours"
+  | Just expected /= mSigner =
+      Left . T.pack $ "Rejecting proposal; seal signer " ++ maybe "<none>" format mSigner
+        ++ " is not the proposer selected for round " ++ show hr ++ ": " ++ format expected
+  | otherwise = Right ()
+  where
+    hdr = blockBlockData pp
+    hr = getBlockRound hdr
+    mSigner = Validator <$> (verifyProposerSeal pp =<< getProposerSeal pp)
+    expected = selectProposer (_chainId ctx) (nextHeight ctx) (_validators ctx) (_stakes ctx) (_lastRound ctx) hr
+
 nextRound :: (StateMachineM m) => NextType -> ConduitM InEvent EOutEvent m ()
 nextRound nt = do
   case nt of
     Sequence s -> view . sequence .= s
-    Round r -> do
-      view . round .= r
-      yieldR $ ResetTimer r
+    Round r -> view . round .= r
+  -- The timer is keyed by view, so it must be re-armed at every new height as
+  -- well as at every new round (rounds persist across heights and only advance
+  -- on timeouts).
+  use view >>= yieldR . ResetTimer
   use view >>= recordView
   vals <- use validators
   $logDebugS "nextRound/validators" . T.pack $ shortDescription (S.toList vals)
   thisR <- use $ view . round
   when (S.null vals) . liftIO $
     die "All participants voted out, consensus is stuck."
-  let leader = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals
+  leader <- gets computeLeader
   proposer .= leader
   proposal .= Nothing
   self <- use selfAddr
@@ -159,10 +208,14 @@ nextRound nt = do
     case lock of
       Nothing -> use myBlock >>= \case
         Just myBlk | blockHeaderBlockNumber (blockHeader myBlk) == fromIntegral (v ^. sequence) + 1 -> do
-          msg <- signMessage (Preprepare v myBlk)
+          -- our candidate was sealed for an earlier round; restamp and reseal it
+          blk <- lift $ stampAndSeal myBlk
+          myBlock ?= blk
+          msg <- signMessage (Preprepare v blk)
           yieldR msg
         _ -> pure ()
       Just lb -> do
+        -- a locked block is re-proposed unchanged (its hash must not change)
         msg <- signMessage (Preprepare v lb)
         yieldR msg
 
@@ -180,9 +233,11 @@ nextRound nt = do
 applyValidatorChanges :: MonadState BlockstanbulContext m =>
                          BlockHeader -> m ()
 applyValidatorChanges BlockHeader{} = pure ()
-applyValidatorChanges BlockHeaderV2{..} = do
-  validators %= (S.union $ S.fromList newValidators)
-  validators %= (flip S.difference $ S.fromList removedValidators)
+applyValidatorChanges hdr = do
+  let removed = getBlockRemovedValidators hdr
+  validators %= (S.union . S.fromList $ getBlockNewValidators hdr)
+  validators %= (flip S.difference $ S.fromList removed)
+  stakes %= applyStakeDelta removed (M.fromList $ getBlockStakeUpdates hdr)
 
 commitBlock :: StateMachineM m =>
                Block -> ConduitM InEvent EOutEvent m ()
@@ -194,12 +249,45 @@ commitBlock blk = do
   $logInfoS "blockstanbul" . T.pack $
     printf "Committed block #%d (%s)" blockNo (shortDescription hsh)
   lastParent .= Just hsh
+  lastRound .= getBlockRound (blockBlockData blk)
   clearLock
   myBlock .= Nothing
   whenM (use hasPreprepared) $
     recordProposal
   s <- use $ view . sequence
   nextRound . Sequence $ s + 1
+
+handleUnannouncedBlock :: StateMachineM m => Block -> ConduitM InEvent EOutEvent m ()
+handleUnannouncedBlock blk' = do
+  when flags_test_mode_bypass_blockstanbul $
+    lift (stampAndSeal blk') >>= commitBlock
+  ppl <- use proposal
+  leader <- use proposer
+  self <- use selfAddr
+  sealedBlk <- lift $ stampAndSeal blk'
+  myBlock ?= sealedBlk
+  when (isNothing ppl && Just leader == fmap Validator self) $ do
+    v <- use view
+    mLocked <- use blockLock
+    let realSealed = fromMaybe sealedBlk mLocked
+    wantParent <- use lastParent
+    seqNo <- use (view . sequence)
+    case assertChainConsistency seqNo wantParent realSealed of
+      Left err -> do
+        $logWarnS "blockstanbul" $ "Retrying to build block: " <> err
+        when (isJust mLocked) $ do
+          -- TODO(tim): It may make sense to crash here, but it's also possible that
+          -- peers will be able to commit the lock and historic replay of it
+          -- could absolve us.
+          $logErrorS "blockstanbul" "Lock has wrong block number; cannot commit"
+      Right () -> do
+        hasPreprepared .= True
+        proposal .= Just realSealed
+        valB <- use validatorBehavior
+        when (isJust self && valB) $ do
+          msg <- signMessage (Preprepare v realSealed)
+          yieldR msg
+          yieldR $ RunPreprepare realSealed
 
 eventLoop ::
   ( MonadIO m,
@@ -254,8 +342,13 @@ eventLoop ctx = execStateC ctx $
         PreviousBlock blk -> do
            -- nodes here will be syncing and looking to verify each block in the chain
           realValidators <- use validators
+          realStakes <- use stakes
+          activation <- use stakingActivation
+          chainId' <- use chainId
+          lastRound' <- use lastRound
           seqNo <- use $ view . sequence
-          eNextSeqNo <- lift $ lift $ runExceptT $ replayHistoricBlock realValidators seqNo blk
+          eNextSeqNo <- lift $ lift $ runExceptT $
+            replayHistoricBlock realValidators realStakes activation chainId' lastRound' seqNo blk
           let blockNo = number . blockBlockData $ blk
           recordMaxBlockNumber "pbft_previousblock" blockNo
           case eNextSeqNo of
@@ -272,41 +365,13 @@ eventLoop ctx = execStateC ctx $
         UnannouncedBlock blk' -> do
           -- this is for sending out a new block,
           -- may be a good candidtate for sending newCerts
-          let blk = scrubConsensus blk'
-          when flags_test_mode_bypass_blockstanbul $ do
-            vs <- use validators
-            let blockWithVs = addValidators (S.toList vs) blk
-            pseal <- proposerSeal blockWithVs
-            commitBlock $ addProposerSeal pseal blockWithVs
-          ppl <- use proposal
-          leader <- use proposer
-          self <- use selfAddr
-          vs <- use validators
-          let blockWithVs = addValidators (S.toList vs) blk
-          pseal <- proposerSeal blockWithVs
-          let sealedBlk = addProposerSeal pseal blockWithVs
-          myBlock ?= sealedBlk
-          when (isNothing ppl && Just leader == fmap Validator self) $ do
-            mLocked <- use blockLock
-            let realSealed = fromMaybe sealedBlk mLocked
-            wantParent <- use lastParent
-            seqNo <- use (view . sequence)
-            case assertChainConsistency seqNo wantParent realSealed of
-              Left err -> do
-                $logWarnS "blockstanbul" $ "Retrying to build block: " <> err
-                when (isJust mLocked) $ do
-                  -- TODO(tim): It may make sense to crash here, but it's also possible that
-                  -- peers will be able to commit the lock and historic replay of it
-                  -- could absolve us.
-                  $logErrorS "blockstanbul" "Lock has wrong block number; cannot commit"
-              Right () -> do
-                hasPreprepared .= True
-                proposal .= Just realSealed
-                valB <- use validatorBehavior
-                when (isJust self && valB) $ do
-                  msg <- signMessage (Preprepare v realSealed)
-                  yieldR msg
-                  yieldR $ RunPreprepare realSealed
+          active <- gets stakingActiveNow
+          let hdrVersion = blockHeaderVersion (blockBlockData blk')
+          if active && hdrVersion /= 3
+            then $logErrorS "blockstanbul" . T.pack $
+              "Ignoring unannounced block with header version " ++ show hdrVersion
+                ++ "; staking is active but the block was not built as version 3 (check stakingActivationBlock)"
+            else handleUnannouncedBlock blk'
         PreprepareResponse decision -> case decision of
             AcceptPreprepare bh -> do
               self <- use selfAddr
@@ -340,7 +405,8 @@ eventLoop ctx = execStateC ctx $
                 roundChange
               | otherwise -> do
                 wantParent <- use lastParent
-                case assertChainConsistency (_sequence v) wantParent pp of
+                curCtx <- get
+                case assertChainConsistency (_sequence v) wantParent pp >> checkProposalHeader curCtx v' pp of
                   Left err -> do
                     $logWarnS "blockstanbul/ppl" $ "Rejecting proposal: " <> err
                     $logInfoS "blockstanbul/roundchange" "chain inconsistency"
@@ -358,11 +424,11 @@ eventLoop ctx = execStateC ctx $
           preparers <- use prepared
           unless (M.member (Validator $ sender auth) preparers) . yieldL $ OMsg auth ppp
           ps <- prepared <%= M.insert (Validator $ sender auth) di
-          total <- poolSize
-          let sameVoteCount = M.size . M.filter (== di) $ ps
+          weights <- gets currentVoteWeights
+          let quorum = hasSupermajority weights . M.keysSet . M.filter (== di) $ ps
           sameHash <- hasSameHash di
           hasSent <- use hasPrepared
-          when (3 * sameVoteCount > 2 * total && sameHash && not hasSent) $ do
+          when (quorum && sameHash && not hasSent) $ do
             hasPrepared .= True
             setLock
             seal <- commitmentSeal di
@@ -375,12 +441,12 @@ eventLoop ctx = execStateC ctx $
           committors <- use committed
           unless (M.member (Validator $ sender auth) committors) . yieldL $ OMsg auth ccc
           cs <- committed <%= M.insert (Validator $ sender auth) (di, seal)
-          total <- poolSize
-          let sameVoteCount = M.size . M.filter ((== di) . fst) $ cs
+          weights <- gets currentVoteWeights
+          let quorum = hasSupermajority weights . M.keysSet . M.filter ((== di) . fst) $ cs
           sameHash <- hasSameHash di
           -- TODO(tim): Is it necessary to check that we have prepared?
           hasSent <- use hasCommitted
-          when (3 * sameVoteCount > 2 * total && sameHash && not hasSent) $ do
+          when (quorum && sameHash && not hasSent) $ do
             hasCommitted .= True
             ppl <- use proposal
             case ppl of
@@ -390,42 +456,50 @@ eventLoop ctx = execStateC ctx $
                 let blockNo = number . blockBlockData $ blk
                 recordMaxBlockNumber "pbft_commit" blockNo
                 commitBlock $ addCommitmentSeals seals blk
-        IMsg auth (RoundChange vn _) -> when (_round v < _round vn) $ do
-          let rn = _round vn
-          mSigners <- use $ roundChanged . at rn
-          case S.member (Validator $ sender auth) <$> mSigners of
-            Just True -> return ()
-            _ -> do
-              rs <- roundChanged <%= M.alter (Just . S.insert (Validator $ sender auth) . fromMaybe S.empty) rn
-              total <- poolSize
-              sentRN <- use pendingRound
-              let sameRNCount = maybe 0 S.size . M.lookup rn $ rs
-              rawMsg <- createRoundChangeMessage vn
-              when (3 * sameRNCount > total && Just rn > sentRN) $ do
-                pendingRound .= Just rn
-                $logInfoS "blockstanbul/roundchange" "agreed change"
-                valB <- use validatorBehavior
-                self <- use selfAddr
-                when (isJust self && valB) $ do
-                  msg <- signMessage rawMsg
-                  yieldR msg
-              when (3 * sameRNCount > 2 * total) $ do
-                next <- use pendingRound
-                case next of
-                  Nothing -> error "TODO(tim): a round was voted on without existing"
-                  Just r -> nextRound (Round r)
-              yieldL $ OMsg auth rawMsg
-              return ()
-        Timeout r' -> do
-          case r' `compare` _round v of
+        IMsg auth (RoundChange vn _) -> do
+          let intSeq = fromIntegral . _sequence
+          when (_sequence v < _sequence vn) $
+            yieldR $ GapFound (intSeq v) (intSeq vn) (sender auth)
+          when (_sequence v == _sequence vn && _round v < _round vn) $ do
+            let rn = _round vn
+            mSigners <- use $ roundChanged . at rn
+            case S.member (Validator $ sender auth) <$> mSigners of
+              Just True -> return ()
+              _ -> do
+                rs <- roundChanged <%= M.alter (Just . S.insert (Validator $ sender auth) . fromMaybe S.empty) rn
+                weights <- gets currentVoteWeights
+                sentRN <- use pendingRound
+                let voters = fromMaybe S.empty $ M.lookup rn rs
+                rawMsg <- createRoundChangeMessage vn
+                when (hasMinority weights voters && Just rn > sentRN) $ do
+                  pendingRound .= Just rn
+                  $logInfoS "blockstanbul/roundchange" "agreed change"
+                  valB <- use validatorBehavior
+                  self <- use selfAddr
+                  when (isJust self && valB) $ do
+                    msg <- signMessage rawMsg
+                    yieldR msg
+                when (hasSupermajority weights voters) $ do
+                  next <- use pendingRound
+                  case next of
+                    Nothing -> error "TODO(tim): a round was voted on without existing"
+                    Just r -> nextRound (Round r)
+                yieldL $ OMsg auth rawMsg
+                return ()
+        Timeout tv -> case _sequence tv `compare` _sequence v of
+          LT -> $logInfoS "blockstanbul" . T.pack $
+            printf "Ignoring stale timeout for %s (now %s)" (format tv) (format v)
+          GT -> $logWarnS "blockstanbul" . T.pack $
+            printf "Ignoring timeout for a future sequence %s (now %s)" (format tv) (format v)
+          EQ -> case _round tv `compare` _round v of
             LT ->
-              let msg = printf "Ignoring stale timeout for %v (now %v)" r' (_round v)
+              let msg = printf "Ignoring stale timeout for %v (now %v)" (_round tv) (_round v)
                in $logInfoS "blockstanbul" . T.pack $ msg
             EQ -> do
-              $logWarnS "blockstanbul" . T.pack $ printf "Round %v timed out" r'
+              $logWarnS "blockstanbul" . T.pack $ printf "Round %v timed out" (_round tv)
               $logInfoS "blockstanbul/roundchange" "timeout"
               roundChange
-            GT -> error $ printf "We're in a time loop: %v was received at now=%v" r' (_round v)
+            GT -> error $ printf "We're in a time loop: %v was received at now=%v" (_round tv) (_round v)
 
 loopback :: EOutEvent -> Maybe InEvent
 loopback (Right (OMsg a m)) = Just $ IMsg a m
