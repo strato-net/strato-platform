@@ -44,6 +44,22 @@ module.exports = {
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       gasPrice: "auto",
     },
+    robinhoodTestnet: {
+      url:
+        process.env.ROBINHOOD_TESTNET_RPC_URL ||
+        "https://rpc.testnet.chain.robinhood.com",
+      chainId: 46630,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: "auto",
+    },
+    robinhood: {
+      url:
+        process.env.ROBINHOOD_RPC_URL ||
+        "https://rpc.mainnet.chain.robinhood.com",
+      chainId: 4663,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: "auto",
+    },
     localhost: {
       url: "http://127.0.0.1:8545",
     },

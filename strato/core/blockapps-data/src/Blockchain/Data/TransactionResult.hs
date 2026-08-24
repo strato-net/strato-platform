@@ -19,9 +19,7 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow ((&&&))
 import Control.DeepSeq
-import qualified Data.Aeson as Aeson
 import Data.Binary
-import qualified Data.ByteString.Lazy as BSL
 import Data.Function (on)
 import Data.OpenApi hiding (Format, format)
 import qualified Database.Persist.Postgresql as SQL
@@ -31,13 +29,7 @@ import SolidVM.Model.Value (Value(..))
 import Test.QuickCheck
 import Text.Format
 
-instance Binary Value where
-  put = Data.Binary.put . Aeson.encode
-  get = do
-    bs <- Data.Binary.get @BSL.ByteString
-    case Aeson.eitherDecode bs of
-      Left err -> fail err
-      Right v -> return v
+-- Binary Value now lives in SolidVM.Model.Value alongside the type itself.
 
 instance Arbitrary Value where
   arbitrary = pure $ SInteger 0

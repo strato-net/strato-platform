@@ -31,6 +31,7 @@ library:
   - lens
   - mtl
   - prometheus-client
+  - solid-vm-model
   - strato-model
   - text
   - transformers
@@ -42,9 +43,20 @@ tests:
     source-dirs: test/
     ghc-options: -dynamic
     dependencies:
+      - blockapps-data
+      - blockstanbul
+      - bytestring
       - common-log
+      - conduit
+      - containers
       - hflags
       - hspec
+      - labeled-error
+      - lens
+      - mtl
+      - strato-model
+      - time
+      - vault-monad
 
 
 benchmarks:

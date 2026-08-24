@@ -21,13 +21,14 @@ export const recordSessionOpen = (
   referrer: string | null,
   userAgent: string | null,
   isBotOrPreview: boolean,
+  botReason: string | null,
   geo: SessionGeo
 ): void => {
   query(
     `INSERT INTO tracking_sessions
-       (id, link_id, referrer, user_agent, is_bot_or_preview,
+       (id, link_id, referrer, user_agent, is_bot_or_preview, bot_reason,
         ip_address, geo_country, geo_city, geo_lat, geo_lon)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      ON CONFLICT (id) DO NOTHING`,
     [
       sessionId,
@@ -35,6 +36,7 @@ export const recordSessionOpen = (
       referrer,
       userAgent,
       isBotOrPreview,
+      botReason,
       geo.ipAddress,
       geo.country,
       geo.city,
@@ -64,11 +66,39 @@ export const markEngaged = async (sessionId: string): Promise<void> => {
   );
 };
 
+// Last-resort binding for a wallet-connected beacon that arrived without any
+// session id (cookie dropped by an in-app browser, cross-host redirect, ITP):
+// the newest non-bot open from the SAME public IP within a short window.
+// Guarded — private/unknown IPs are never matched, and when the window holds
+// opens of DIFFERENT links from that IP the beacon is dropped rather than
+// guessed, so the fallback can only ever confirm an unambiguous visitor.
+export const findSessionByRecentIp = async (
+  ipAddress: string | null,
+  windowMinutes: number
+): Promise<string | null> => {
+  if (!ipAddress || windowMinutes <= 0) return null;
+  const { rows } = await query<{ id: string; link_id: string }>(
+    `SELECT id, link_id
+     FROM tracking_sessions
+     WHERE ip_address = $1
+       AND NOT is_bot_or_preview
+       AND opened_at > now() - ($2 * INTERVAL '1 minute')
+     ORDER BY opened_at DESC, id DESC
+     LIMIT 10`,
+    [ipAddress, windowMinutes]
+  );
+  if (rows.length === 0) return null;
+  const linkId = String(rows[0].link_id);
+  if (rows.some((row) => String(row.link_id) !== linkId)) return null; // ambiguous
+  return rows[0].id;
+};
+
 export const recordWalletConnection = async (
   sessionId: string,
   externalWalletAddress: string | null,
   stratoAddress: string | null,
-  connector: string | null
+  connector: string | null,
+  sessionSource: string
 ): Promise<void> => {
   const session = await query<{ link_id: string }>(
     "SELECT link_id FROM tracking_sessions WHERE id = $1",
@@ -77,9 +107,17 @@ export const recordWalletConnection = async (
   const linkId = session.rows[0]?.link_id;
   if (!linkId) return; // unknown/expired session: silently no-op
   await query(
-    `INSERT INTO wallet_connections (session_id, link_id, external_wallet_address, strato_address, connector)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO wallet_connections
+       (session_id, link_id, external_wallet_address, strato_address, connector, session_source)
+     VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT ON CONSTRAINT wallet_connections_dedup DO NOTHING`,
-    [sessionId, linkId, externalWalletAddress ?? "", stratoAddress ?? "", connector]
+    [
+      sessionId,
+      linkId,
+      externalWalletAddress ?? "",
+      stratoAddress ?? "",
+      connector,
+      sessionSource,
+    ]
   );
 };

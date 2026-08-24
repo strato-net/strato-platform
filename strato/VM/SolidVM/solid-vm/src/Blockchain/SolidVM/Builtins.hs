@@ -19,6 +19,15 @@ module Blockchain.SolidVM.Builtins
     poseidonHash,
     poseidon2Hash,
     poseidon2Compress,
+    -- * Parametrized Poseidon2 (EIP-5988-shaped params, registry of vetted instances)
+    P2Instance (..),
+    parsePoseidon2Params,
+    poseidon2ParamsGoldilocks,
+    poseidon2ParamsBN254,
+    poseidon2Permute,
+    poseidon2ParamHash,
+    poseidon2ParamHashBytes,
+    poseidon2Permutations,
     bls12381G1Add,
     bls12381G1Msm,
     bls12381G2Add,
@@ -70,6 +79,9 @@ import Control.Monad ((<=<))
 import qualified Crypto.Hash.Poseidon as Poseidon
 import Crypto.Hash.Poseidon.Field (fieldPrime)
 import qualified Crypto.Hash.Poseidon2 as Poseidon2
+import qualified Crypto.Hash.Poseidon2Goldilocks as P2GL
+import Data.Bits (shiftL, shiftR, (.|.))
+import Data.Word (Word64)
 import Data.Curve                   (Form(Weierstrass), Coordinates(Affine), dbl, def)
 import Data.Curve.Weierstrass.BN254 (BN254, Fq, Fr, Point(..), add, mul, _q, _r)
 import qualified Data.Curve.Weierstrass.BN254T as BN254T
@@ -278,6 +290,110 @@ poseidon2Compress :: Integer -> Integer -> Integer
 poseidon2Compress l r =
   Poseidon.fromF $
     Poseidon2.compress (canonicalF "poseidon2Compress" l) (canonicalF "poseidon2Compress" r)
+
+--------------------------------------------------------------------------------
+-- Parametrized Poseidon2
+--------------------------------------------------------------------------------
+
+-- | A vetted Poseidon2 instance. Instances are SELECTED by a parameter
+-- block, never derived from it: the deployed Poseidon2s people need to
+-- interoperate with (gnark-crypto's BN254, plonky2/Plonky3's Goldilocks,
+-- ...) each fix their round constants by a different procedure, so a
+-- precompile that derived constants from (p, t, alpha, rounds) would match
+-- none of them. The parameter block follows EIP-5988's shape so a future
+-- Ethereum precompile can be shimmed onto the same dispatch:
+--
+-- @
+--   [variant: 1 B = 2 (Poseidon2)][p: 32 B big-endian][t: 1 B][alpha: 1 B]
+--   [R_F: 1 B][R_P: 1 B][mode: 1 B]                              (38 bytes)
+-- @
+--
+-- mode 1 = Merkle–Damgård over the 2-to-1 compression (t = 2 instances,
+-- output 1 element); mode 0 = plonky2-style sponge (absorb t-4 per
+-- permutation by overwrite, no padding, squeeze n outputs).
+data P2Instance
+  = P2BN254 -- ^ gnark-crypto defaults: t=2, alpha=5, R_F=6, R_P=50, MD mode
+  | P2Goldilocks12 -- ^ plonky2/Plonky3: t=12, alpha=7, R_F=8, R_P=22, sponge (rate 8)
+  deriving (Eq, Show)
+
+goldilocksPrimeInteger :: Integer
+goldilocksPrimeInteger = toInteger P2GL.goldilocksPrime
+
+encodeP2Params :: Integer -> Int -> Int -> Int -> Int -> Int -> B.ByteString
+encodeP2Params p t alpha rF rP mode =
+  B.pack $ [2] ++ be32 p ++ map fromIntegral [t, alpha, rF, rP, mode]
+  where
+    be32 v = [fromIntegral ((v `shiftR` (8 * i)) `mod` 256) | i <- [31, 30 .. 0]]
+
+-- | The parameter blocks of the registered instances (what a contract passes).
+poseidon2ParamsBN254, poseidon2ParamsGoldilocks :: B.ByteString
+poseidon2ParamsBN254 = encodeP2Params fieldPrime 2 5 6 50 1
+poseidon2ParamsGoldilocks = encodeP2Params goldilocksPrimeInteger 12 7 8 22 0
+
+parsePoseidon2Params :: B.ByteString -> Either String P2Instance
+parsePoseidon2Params b
+  | B.length b /= 38 = Left "poseidon2 params must be 38 bytes: variant|p(32)|t|alpha|R_F|R_P|mode"
+  | b == poseidon2ParamsBN254 = Right P2BN254
+  | b == poseidon2ParamsGoldilocks = Right P2Goldilocks12
+  | otherwise = Left "unregistered poseidon2 instance (known: BN254 t=2/5/6/50 MD, Goldilocks t=12/7/8/22 sponge)"
+
+instanceWidth :: P2Instance -> Int
+instanceWidth P2BN254 = 2
+instanceWidth P2Goldilocks12 = 12
+
+canonicalGL :: String -> Integer -> Word64
+canonicalGL caller v
+  | v < 0 || v >= goldilocksPrimeInteger =
+      invalidArguments caller $ "input is not a canonical Goldilocks element: " ++ show v
+  | otherwise = fromInteger v
+
+-- | The raw permutation on a full state (t elements).
+poseidon2Permute :: P2Instance -> [Integer] -> [Integer]
+poseidon2Permute inst st
+  | length st /= instanceWidth inst =
+      invalidArguments "poseidon2Permute" $ "state must have " ++ show (instanceWidth inst) ++ " elements"
+poseidon2Permute P2BN254 [a, b] =
+  let (x, y) = Poseidon2.permutation (canonicalF "poseidon2Permute" a, canonicalF "poseidon2Permute" b)
+   in [Poseidon.fromF x, Poseidon.fromF y]
+poseidon2Permute P2Goldilocks12 st = map toInteger . P2GL.permutation $ map (canonicalGL "poseidon2Permute") st
+poseidon2Permute _ st = invalidArguments "poseidon2Permute" $ show st
+
+-- | Hash inputs to n outputs in the instance's mode.
+poseidon2ParamHash :: P2Instance -> Int -> [Integer] -> [Integer]
+poseidon2ParamHash P2BN254 n xs
+  | n /= 1 = invalidArguments "poseidon2Hash" ("the BN254 MD instance produces exactly one output" :: String)
+  | otherwise = [poseidon2Hash xs]
+poseidon2ParamHash P2Goldilocks12 n xs
+  | n < 1 || n > 12 = invalidArguments "poseidon2Hash" ("output count must be in [1, 12]" :: String)
+  | otherwise = map toInteger . P2GL.hashNToM n $ map (canonicalGL "poseidon2Hash") xs
+
+-- | Hash a byte string: pack it into canonical elements — little-endian
+-- chunks of floor((bits(p) - 1) / 8) bytes (Goldilocks: 7, BN254: 31), the
+-- last zero-padded — followed by ONE element holding the byte length (so
+-- payloads that differ only in trailing zeros commit differently), then
+-- hash as 'poseidon2ParamHash'. For Goldilocks this is exactly the STRATO
+-- rollup's DA commitment (rollup/perp3 DACommit).
+poseidon2ParamHashBytes :: P2Instance -> Int -> B.ByteString -> [Integer]
+poseidon2ParamHashBytes P2Goldilocks12 n bs = map toInteger $ P2GL.hashBytes n bs
+poseidon2ParamHashBytes P2BN254 n bs = poseidon2ParamHash P2BN254 n (packLE 31 bs ++ [toInteger (B.length bs)])
+
+packLE :: Int -> B.ByteString -> [Integer]
+packLE k bs
+  | B.null bs = []
+  | otherwise =
+      let (c, rest) = B.splitAt k bs
+       in foldr (\w acc -> (acc `shiftL` 8) .|. toInteger w) 0 (B.unpack c) : packLE k rest
+
+-- | How many permutations a hash of @n@ inputs with @m@ outputs performs
+-- (the gas driver): sponge absorbs t-4 per permutation and squeezes t-4 per
+-- permutation; MD does one compression per input.
+poseidon2Permutations :: P2Instance -> Int -> Int -> Int
+poseidon2Permutations P2BN254 nIn _ = max 1 nIn
+poseidon2Permutations P2Goldilocks12 nIn nOut =
+  let rate = 8
+      absorb = max 1 ((nIn + rate - 1) `div` rate)
+      squeeze = max 0 ((nOut - 1) `div` rate)
+   in absorb + squeeze
 
 canonicalF :: String -> Integer -> Poseidon.F
 canonicalF caller v

@@ -13,6 +13,8 @@ const getSafeChainIdentifier = (chainId: number | string): string => {
     11155111: "sep",
     59144: "linea",
     84532: "basesep",
+    4663: "robinhood",
+    46630: "robinhood-testnet",
   };
   return chainMap[chainIdNum] || `chain-${chainIdNum}`;
 };

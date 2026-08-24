@@ -5,6 +5,8 @@
   "scripts": {
     "compile": "hardhat compile",
     "deployWithProxy:sepolia": "npx hardhat run scripts/deployWithProxy.js --network sepolia",
+    "deployWithProxy:robinhoodTestnet": "npx hardhat run scripts/deployWithProxy.js --network robinhoodTestnet",
+    "deployWithProxy:robinhood": "npx hardhat run scripts/deployWithProxy.js --network robinhood",
     "deployWithProxy:mainnet": "npx hardhat run scripts/deployWithProxy.js --network mainnet",
     "deployImpl:sepolia": "npx hardhat run scripts/deployImplementationOnly.js --network sepolia",
     "deployImpl:mainnet": "npx hardhat run scripts/deployImplementationOnly.js --network mainnet",

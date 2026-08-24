@@ -43,6 +43,7 @@ import { useUser } from "@/context/UserContext";
 import { useNetwork } from "@/context/NetworkContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useOracleContext } from "@/context/OracleContext";
 import BridgeWalletStatus from "./BridgeWalletStatus";
 import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
 import PercentageButtons from "@/components/ui/PercentageButtons";
@@ -152,6 +153,19 @@ const metalPriceRowLabels = (oracleWei: string | undefined, feeBps: string | und
   return { spot: spot ?? "—", effective: eff ?? "—" };
 };
 
+/** Total USD (formatted) for a decimal token amount at a WAD-scaled USD unit price. */
+const fmtTotalDollarWei = (amountStr: string, priceWei: string | null | undefined): string | undefined => {
+  if (!priceWei) return undefined;
+  try {
+    const price = BigInt(priceWei);
+    const amt = safeParseUnits(amountStr || "0", 18);
+    if (price <= 0n || amt <= 0n) return undefined;
+    return fmtSpotDollarWei(((amt * price) / WAD).toString()) ?? undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 const getMetalBuyStepLabel = (functionName: string | undefined, paySymbol: string, metalSymbol: string): string => {
   if (functionName === "approve") return `Approve ${paySymbol}`;
   if (functionName === "mintMetal") return `Mint ${metalSymbol}`;
@@ -203,6 +217,7 @@ const CardSkeleton = ({ id }: { id: string }) => (
       </div>
     </div>
     <div className="h-[1rem] w-20 bg-muted rounded" />
+    <div className="h-[14px] w-16 bg-muted/40 rounded mt-0.5" />
     <div className={STEP3_APY_ROW_CLASS}>
       <div className="h-5 w-24 bg-muted/40 rounded-full" />
     </div>
@@ -210,8 +225,9 @@ const CardSkeleton = ({ id }: { id: string }) => (
   </div>
 );
 
-const TokenCard = ({ active, image, symbol, estimated, onClick, disabled, apyBadge, effectivePrice, spotLabel }: {
+const TokenCard = ({ active, image, symbol, estimated, estimatedUsd, onClick, disabled, apyBadge, effectivePrice, spotLabel }: {
   active: boolean; image?: string; symbol: string; estimated: string;
+  estimatedUsd?: string;
   onClick: () => void; disabled: boolean;
   apyBadge: React.ReactNode;
   effectivePrice?: string;
@@ -232,6 +248,7 @@ const TokenCard = ({ active, image, symbol, estimated, onClick, disabled, apyBad
       </div>
     </div>
     <p className="text-xs text-muted-foreground">{"\u2248"} {estimated} {symbol}</p>
+    <p className="min-h-[14px] text-[11px] font-medium text-foreground/80 leading-tight">{estimatedUsd ? `\u2248 ${estimatedUsd}` : "\u00a0"}</p>
     {apyBadge}
     <p className="min-h-[14px] text-[10px] text-muted-foreground mt-0.5">{spotLabel || "\u00A0"}</p>
   </button>
@@ -330,7 +347,15 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   } = useBridgeContext();
   const { tokenApys, tokenApysLoaded } = useEarnContext();
   const { contactEnabled } = useNetwork();
+  const { prices: oraclePrices } = useOracleContext();
   const navigate = useNavigate();
+
+  // WAD-scaled USD price for a STRATO token address, tolerant of 0x-prefix differences.
+  const oraclePriceOf = useCallback((addr?: string): string | null => {
+    if (!addr) return null;
+    const bare = addr.toLowerCase().replace(/^0x/, "");
+    return oraclePrices[bare] ?? oraclePrices[`0x${bare}`] ?? null;
+  }, [oraclePrices]);
 
   // State -- fundingMode can be controlled externally or managed internally
   const [internalMode, setInternalMode] = useState<"bridge" | "metals">("bridge");
@@ -396,6 +421,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     () => bridgeableTokens.filter((token) => token.routeType === "native" && !token.depositsPaused),
     [bridgeableTokens]
   );
+
+  // USD value of the amount being bridged in, shown under the "You Send" input.
+  const sendUsd = fmtTotalDollarWei(amount, oraclePriceOf(selectedToken?.stratoToken));
 
   const { sourceTokenRoutes, matchingActions } = useMemo(() => {
     if (!selectedToken) return { sourceTokenRoutes: prevCardsRef.current.routes, matchingActions: prevCardsRef.current.actions };
@@ -1431,6 +1459,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                     value={amount} onChange={(e) => handleAmountChange(e.target.value)}
                     disabled={guestMode || !hasExternalWallet || isLoading} />
                 </div>
+                {sendUsd && <p className="text-right text-xs text-muted-foreground pt-0.5">{"≈"} {sendUsd}</p>}
                 {amountError && <p className="text-xs text-red-500">{amountError}</p>}
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-xs text-muted-foreground">
@@ -1476,12 +1505,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                   ? Array.from({ length: 2 }).map((_, i) => <CardSkeleton key={`ms-${i}`} id={`ms-${i}`} />)
                   : metalsConfig.metals.filter(m => m.isEnabled).map((metal) => {
                       const metalWei = amount && selectedPayToken ? calcMetalAmount(amount, metal, selectedPayToken) : 0n;
+                      const estMetal = metalWei > 0n ? truncateDecimals(formatUnits(metalWei, 18), 6) : "0";
                       const prices = metalPriceRowLabels(metal.price, metal.feeBps);
                       return (
                         <TokenCard key={metal.address}
                           active={selectedMetal?.address === metal.address}
                           image={metal.imageUrl} symbol={metal.symbol}
-                          estimated={metalWei > 0n ? truncateDecimals(formatUnits(metalWei, 18), 6) : "0"}
+                          estimated={estMetal}
+                          estimatedUsd={fmtTotalDollarWei(estMetal, metal.price)}
                           onClick={() => setSelectedMetal(metal)}
                           disabled={guestMode || isLoading}
                           effectivePrice={prices.effective}
@@ -1504,13 +1535,16 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                         if (factor > 0n) est = truncateDecimals(formatUnits((safeParseUnits(amount, 18) * WAD) / factor, 18), 6);
                       } catch { /* keep original */ }
                     }
+                    const rtPrice = oraclePriceOf(rt.stratoToken);
                     return (
                       <TokenCard key={rt.id}
                         active={rt.id === selectedToken?.id && !selectedAction}
                         image={rt.stratoTokenImage} symbol={rt.stratoTokenSymbol}
                         estimated={est}
+                        estimatedUsd={fmtTotalDollarWei(est, rtPrice)}
                         onClick={() => { setSelectedToken(rt); setSelectedAction(null); }}
                         disabled={guestMode || isLoading}
+                        effectivePrice={fmtSpotDollarWei(rtPrice ?? "") ?? undefined}
                         apyBadge={<ApyLine addr={rt.stratoToken} />}
                       />
                     );
@@ -1534,6 +1568,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                         active={selectedAction?.id === action.id}
                         image={action.stratoTokenImage} symbol={action.stratoTokenSymbol}
                         estimated={est}
+                        estimatedUsd={fmtTotalDollarWei(est, action.oraclePrice)}
                         onClick={() => {
                           const actionRoute = sourceTokenRoutes.find(
                             (route) => normAddr(route.stratoToken) === normAddr(action.payToken)

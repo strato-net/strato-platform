@@ -2,7 +2,7 @@ const winston = require("winston-color");
 const models = require("../models");
 const BlockDataRef = require("../models/strato/eth/blockDataRef");
 const Promise = require("bluebird");
-const rp = require("request-promise");
+const axios = require("axios");
 const moment = require("moment");
 const si = require("systeminformation");
 const config = require("../config/app.config");
@@ -66,14 +66,12 @@ function getPrometheusMetrics() {
       "PROMETHEUS_HOST env var is not set - unable to get prometheus data"
     );
   }
-  const options = {
+  return axios({
     method: "GET",
     url: `http://${process.env["PROMETHEUS_HOST"]}/prometheus/api/v1/query?query=health_check`,
-    followRedirects: false,
+    maxRedirects: 0,
     timeout: config.healthCheck.requestTimeout - 100,
-    json: true,
-  };
-  return rp(options);
+  }).then((res) => res.data);
 }
 
 async function checkNodeSyncStallStatus(syncStat) {
@@ -163,16 +161,14 @@ async function checkNodeSyncStallStatus(syncStat) {
 }
 
 async function getStratoMetadata() {
-  const options = {
-    method: "GET",
-    url: `http://${process.env['STRATO_HOSTNAME']}:${process.env['STRATO_PORT_API']}/eth/v1.2/metadata`,
-    followRedirects: false,
-    timeout: config.healthCheck.requestTimeout - 100,
-    json: true,
-  };
-
   try {
-    return await rp(options);
+    const { data } = await axios({
+      method: "GET",
+      url: `http://${process.env['STRATO_HOSTNAME']}:${process.env['STRATO_PORT_API']}/eth/v1.2/metadata`,
+      maxRedirects: 0,
+      timeout: config.healthCheck.requestTimeout - 100,
+    });
+    return data;
   } catch (error) {
     winston.error('Error fetching Strato metadata:', error);
     return {}; // Return a default value in case of error

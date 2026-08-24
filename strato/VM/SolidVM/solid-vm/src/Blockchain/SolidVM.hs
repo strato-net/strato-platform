@@ -54,8 +54,8 @@ import SolidVM.Solidity.StaticAnalysis.Typechecker (showType)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.Delta
-import Blockchain.Strato.Model.Event
+import SolidVM.Model.Delta
+import SolidVM.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
@@ -109,7 +109,8 @@ import qualified Data.Vector as V
 import Debugger
 import GHC.Exts hiding (breakpoint)
 --import Blockchain.DB.RawStorageDB
---import Blockchain.Data.BlockSummary
+import Blockchain.Data.BlockSummary (BlockSummary (..))
+import Blockchain.Data.ProposalFacts
 --import Blockchain.DB.MemAddressStateDB
 
 import Network.Haskoin.Crypto.BigWord ()
@@ -233,7 +234,8 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
             Env.txHash = txHash',
             Env.src = Just code,
             Env.name = Just contractName,
-            Env.runningTests = isRunningTests
+            Env.runningTests = isRunningTests,
+            Env.prevBlock = Nothing
           }
   let gasInfo' =
         GasInfo
@@ -295,6 +297,8 @@ create' creator newAddress ch cc contractName' valList = do
   -- I'm showing these strings because I like them to be in quotes in the logs :)
   multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName')]
 
+  stakeEventSource <- Conf.stakeEventSourceAt (Conf.networkConfig ethConf) . BlockHeader.number . Env.blockHeader <$> getEnv
+
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
   let (newV, remV) = fromDelta . getDeltasFromEvents $ toList finalEvs
@@ -312,7 +316,8 @@ create' creator newAddress ch cc contractName' valList = do
         erException = Nothing,
         erPragmas = CC._pragmas cc,
         erNewValidators = newV,
-        erRemovedValidators = remV
+        erRemovedValidators = remV,
+        erStakeUpdates = getStakeDeltasFromEvents stakeEventSource $ toList finalEvs
       }
 
 call ::
@@ -358,7 +363,8 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
             Env.txHash = txHash',
             Env.src = Nothing,
             Env.name = Nothing,
-            Env.runningTests = isRunningTests
+            Env.runningTests = isRunningTests,
+            Env.prevBlock = Nothing
           }
 
   let gasInfo' =
@@ -384,6 +390,7 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
     let (newV, remV) = fromDelta . getDeltasFromEvents $ toList finalEvs
+        stakeEventSource = Conf.stakeEventSourceAt (Conf.networkConfig ethConf) (BlockHeader.number blockData)
 
     return $
       ExecResults
@@ -399,7 +406,8 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
           erException = Nothing, -- tells me if theres an exception
           erPragmas = [],
           erNewValidators = newV,
-          erRemovedValidators = remV
+          erRemovedValidators = remV,
+          erStakeUpdates = getStakeDeltasFromEvents stakeEventSource $ toList finalEvs
         }
 
 call' ::
@@ -980,13 +988,10 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
           -- pair up field names with values one-by-one (no type checking tho, lol)
           -- let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
 
-          let evArgs = zipWith (\(CC.EventLog name _ (CC.IndexedType _ idxType _)) value ->
-                        (T.unpack name, value, if isTypeArray idxType then "Array" else "Other"))
-                     (CC._eventLogs ev) expStrs
-                where
-                  isTypeArray :: SVMType.Type -> Bool
-                  isTypeArray (SVMType.Array _ _) = True
-                  isTypeArray _ = False
+          let evArgs = zipWith3
+                        (\(CC.EventLog name _ (CC.IndexedType _ idxType _)) value valStr ->
+                          (T.unpack name, value, valStr, idxType))
+                        (CC._eventLogs ev) expVals expStrs
 
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
           tHash <- Env.txHash <$> getEnv
@@ -1268,6 +1273,9 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       return $ Constant $ SInteger $ round baseTimestamp
     (SBuiltinVariable "block", "number") -> (Constant . SInteger . BlockHeader.number . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "coinbase") -> Constant . flip SAddress False . Env.proposer <$> getEnv
+    (SBuiltinVariable "block", "prevProposer") -> Constant . flip SAddress False . pfProposer <$> getPrevBlockFacts
+    (SBuiltinVariable "block", "prevIntendedProposer") -> Constant . flip SAddress False . pfIntendedProposer <$> getPrevBlockFacts
+    (SBuiltinVariable "block", "prevRound") -> Constant . SInteger . pfRound <$> getPrevBlockFacts
     (SBuiltinVariable "block", "difficulty") ->
       (Constant . SInteger . BlockHeader.difficulty . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "gaslimit") ->
@@ -2361,6 +2369,14 @@ gasPoseidonPerInput = 100
 gasModExp :: Gas
 gasModExp = 100
 
+-- | Parametrized Poseidon2: charged per PERMUTATION of the selected
+-- instance. The Goldilocks width-12 permutation is ~740 field
+-- multiplications in the current Integer-backed implementation (~60-100 µs);
+-- BN254 t=2 keeps the poseidon2 schedule (100 + 100 per absorbed input).
+gasPoseidon2GLBase, gasPoseidon2GLPerPerm :: Gas
+gasPoseidon2GLBase = 100
+gasPoseidon2GLPerPerm = 100
+
 gasBlsG1Add, gasBlsG1MsmPerTerm, gasBlsG2Add, gasBlsG2MsmPerTerm :: Gas
 gasBlsG1Add = 4000
 gasBlsG1MsmPerTerm = 2500
@@ -2392,6 +2408,45 @@ chargePerBlock :: MonadSM m => Gas -> Gas -> Int -> B.ByteString -> m ()
 chargePerBlock base perBlock blockSize bs =
   let blocks = (B.length bs + blockSize - 1) `div` blockSize
    in decrementGas $ base + perBlock * fromIntegral blocks
+
+-- | Resolve a parametrized-Poseidon2 params block, rejecting unknown instances.
+poseidon2Instance :: MonadSM m => B.ByteString -> m Builtins.P2Instance
+poseidon2Instance p = case Builtins.parsePoseidon2Params p of
+  Left e -> invalidArguments "poseidon2 params" e
+  Right i -> pure i
+
+poseidon2GasFor :: MonadSM m => Builtins.P2Instance -> Int -> Int -> m ()
+poseidon2GasFor inst nIn nOut = case inst of
+  Builtins.P2BN254 -> decrementGas $ gasPoseidonBase + gasPoseidonPerInput * fromIntegral (max 1 nIn)
+  Builtins.P2Goldilocks12 ->
+    decrementGas $ gasPoseidon2GLBase + gasPoseidon2GLPerPerm * fromIntegral (Builtins.poseidon2Permutations inst nIn nOut)
+
+intsArray :: [Integer] -> Value
+intsArray = SArray . V.fromList . map (Constant . SInteger)
+
+poseidon2PermuteMetered :: MonadSM m => B.ByteString -> [Value] -> m Value
+poseidon2PermuteMetered p xs = do
+  inst <- poseidon2Instance p
+  poseidon2GasFor inst 1 1
+  ints <- traverse int xs
+  pure . intsArray $! Builtins.poseidon2Permute inst ints
+
+poseidon2HashMetered :: MonadSM m => B.ByteString -> [Value] -> Integer -> m Value
+poseidon2HashMetered p xs n = do
+  inst <- poseidon2Instance p
+  let nOut = fromIntegral n
+  poseidon2GasFor inst (length xs) nOut
+  ints <- traverse int xs
+  pure . intsArray $! Builtins.poseidon2ParamHash inst nOut ints
+
+poseidon2HashBytesMetered :: MonadSM m => B.ByteString -> B.ByteString -> Integer -> m Value
+poseidon2HashBytesMetered p d n = do
+  inst <- poseidon2Instance p
+  let nOut = fromIntegral n
+      chunk = if inst == Builtins.P2Goldilocks12 then 7 else 31
+      nIn = (B.length d + chunk - 1) `div` chunk + 1
+  poseidon2GasFor inst nIn nOut
+  pure . intsArray $! Builtins.poseidon2ParamHashBytes inst nOut d
 
 callBuiltin :: MonadSM m => SolidString -> [Value] -> m Value
 callBuiltin "variadic" [SVariadic vs] = pure $ SVariadic vs
@@ -2662,6 +2717,23 @@ callBuiltin "poseidon2Compress" [a, b] = do
   decrementGas $ gasPoseidonBase + gasPoseidonPerInput
   (l, r) <- (,) <$> int a <*> int b
   pure . SInteger $! Builtins.poseidon2Compress l r
+-- Parametrized Poseidon2 (see Builtins.P2Instance): params select a
+-- registered instance; results come back as a uint256[] of canonical elements.
+callBuiltin "poseidon2Permute" [SBytes p, SArray xs] = poseidon2PermuteMetered p =<< traverse weakGetVar (V.toList xs)
+callBuiltin "poseidon2Permute" [SBytes p, SVariadic xs] = poseidon2PermuteMetered p xs
+callBuiltin "poseidon2Permute" (SBytes p : xs) = poseidon2PermuteMetered p xs
+callBuiltin "poseidon2Hash" [SBytes p, SArray xs, n] = do
+  ins <- traverse weakGetVar (V.toList xs)
+  poseidon2HashMetered p ins =<< int n
+callBuiltin "poseidon2Hash" [SBytes p, SVariadic xs, n] = poseidon2HashMetered p xs =<< int n
+callBuiltin "poseidon2HashBytes" [SBytes p, SBytes d, n] = poseidon2HashBytesMetered p d =<< int n
+-- Named wrappers for the Goldilocks instance: 4-element digests.
+callBuiltin "poseidon2gl" [SArray xs] = do
+  ins <- traverse weakGetVar (V.toList xs)
+  poseidon2HashMetered Builtins.poseidon2ParamsGoldilocks ins 4
+callBuiltin "poseidon2gl" [SVariadic xs] = poseidon2HashMetered Builtins.poseidon2ParamsGoldilocks xs 4
+callBuiltin "poseidon2gl" xs = poseidon2HashMetered Builtins.poseidon2ParamsGoldilocks xs 4
+callBuiltin "poseidon2glBytes" [SBytes d] = poseidon2HashBytesMetered Builtins.poseidon2ParamsGoldilocks d 4
 callBuiltin ("payable") [a] = flip SAddress True <$> getAddressVal a
 callBuiltin "require" (condVar : msg) = do
   cond <- getBoolVal condVar
@@ -2717,6 +2789,15 @@ callBuiltin "create2" args@(salt : n : src : argVals) = do
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAddress) False) nca
     Nothing -> internalError "a call to create did not create an address" execResults
+callBuiltin "setBlockContext" [proposer', prevProposer', prevIntended', prevRound'] = do
+  env' <- getEnv
+  unless (Env.runningTests env') $
+    invalidArguments "setBlockContext can only be called during testing" [proposer', prevProposer', prevIntended', prevRound']
+  proposer'' <- getAddressVal proposer'
+  facts <- ProposalFacts <$> getAddressVal prevProposer' <*> getAddressVal prevIntended' <*> int prevRound'
+  Mod.modify_ (Mod.Proxy @Env.Environment) $ \env ->
+    pure $ env { Env.proposer = proposer'', Env.prevBlock = Just facts }
+  return SNULL
 callBuiltin "fastForward" (secs : mBlocks) = do
   seconds <- int secs
   blocks <- case mBlocks of
@@ -3687,3 +3768,15 @@ validateFunctionArguments cc contract' func argVals = checkFunc $ func : CC._fun
               map (\(n, CC.IndexedType _ t _) -> (fromMaybe "" n, t)) $
                 CC._funcArgs theFunc
          in go argMeta argVals
+
+-- | Facts about the parent block, for the @block.prev*@ builtins: an explicit
+-- override (tests) or the parent's block summary; blocks whose parent is
+-- unknown (or predates stake-weighted selection) see no facts.
+getPrevBlockFacts :: MonadSM m => m ProposalFacts
+getPrevBlockFacts = do
+  env' <- getEnv
+  case Env.prevBlock env' of
+    Just facts -> pure facts
+    Nothing ->
+      maybe noProposalFacts bSumProposalFacts
+        <$> A.lookup (A.Proxy @BlockSummary) (BlockHeader.parentHash $ Env.blockHeader env')

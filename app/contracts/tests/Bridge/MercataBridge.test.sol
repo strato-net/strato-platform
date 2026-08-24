@@ -206,7 +206,7 @@ contract Describe_MercataBridge is Authorizable {
         bridge.setMetalForge(address(metalForge));
 
         directMintPsm = new DirectMintPSM(address(this));
-        directMintPsm.initialize(address(usdstToken), address(feeCollector), [address(testToken)], 0);
+        directMintPsm.initialize(address(usdstToken), address(feeCollector), [address(testToken)]);
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(usdstToken), "mint", address(directMintPsm));
 
         saveUsdstVault = new SaveUSDSTVault(address(this));

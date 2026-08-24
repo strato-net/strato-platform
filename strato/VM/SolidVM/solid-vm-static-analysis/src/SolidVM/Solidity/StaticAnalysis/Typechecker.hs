@@ -871,6 +871,9 @@ typecheckMember (Static (SVMType.UnknownLabel "block") x) "difficulty" = pure $ 
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "gaslimit" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "chainid" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "proposer" = pure $ Static (SVMType.Address False) x
+typecheckMember (Static (SVMType.UnknownLabel "block") x) "prevProposer" = pure $ Static (SVMType.Address False) x
+typecheckMember (Static (SVMType.UnknownLabel "block") x) "prevIntendedProposer" = pure $ Static (SVMType.Address False) x
+typecheckMember (Static (SVMType.UnknownLabel "block") x) "prevRound" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "abi") x) "encode" = pure $ Function (Static SVMType.Variadic x) (bytesType' x) x [] [] False
 typecheckMember (Static (SVMType.UnknownLabel "abi") x) "encodePacked" = pure $ Function (Static SVMType.Variadic x) (bytesType' x) x [] [] False
 typecheckMember (Static (SVMType.UnknownLabel "abi") x) "decode" = pure $ Function (bytesType' x) (Static SVMType.Variadic x) x [] [] False
@@ -1534,6 +1537,19 @@ poseidonArgs x = Sum
 poseidon2CompressArgs :: SourceAnnotation Text -> Type'
 poseidon2CompressArgs x = Product (intType' x, intType' x, []) x
 
+-- | Parametrized Poseidon2 (params bytes select a registered instance).
+intArrayType' :: SourceAnnotation Text -> Type'
+intArrayType' = Static (SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
+
+poseidon2PermuteArgs :: SourceAnnotation Text -> Type'
+poseidon2PermuteArgs x = Product (bytesType' x, intArrayType' x, []) x
+
+poseidon2HashArgs :: SourceAnnotation Text -> Type'
+poseidon2HashArgs x = Product (bytesType' x, intArrayType' x, [intType' x]) x
+
+poseidon2HashBytesArgs :: SourceAnnotation Text -> Type'
+poseidon2HashBytesArgs x = Product (bytesType' x, bytesType' x, [intType' x]) x
+
 -- | Each BLS12-381 builtin has two shapes. The @bytes@ shape matches
 --   EIP-2537's input layout exactly (one bytes argument, the precompile
 --   contents). The integer-multivariate shape lets SolidVM contracts pass
@@ -1658,6 +1674,10 @@ saltCreateArgs x = Product (stringType' x, stringType' x, [stringType' x, Static
 fastForwardArgs :: SourceAnnotation Text -> Type'
 fastForwardArgs x = Sum $ intType' x :| [Product (intType' x, intType' x, []) x]
 
+-- setBlockContext(address proposer, address prevProposer, address prevIntendedProposer, uint prevRound)
+setBlockContextArgs :: SourceAnnotation Text -> Type'
+setBlockContextArgs x = Product (addressType' x, addressType' x, [addressType' x, intType' x]) x
+
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
 getVarType' "this" ctx = pure $ Static (SVMType.Address False) ctx
 getVarType' s@('u' : 'i' : 'n' : 't' : n) ctx = case n of
@@ -1716,6 +1736,11 @@ getVarType' "bls12381DecompressG2" ctx = pure $ Function (bytesType' ctx) (bytes
 getVarType' "poseidon" ctx = pure $ Function (poseidonArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "poseidon2" ctx = pure $ Function (poseidonArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "poseidon2Compress" ctx = pure $ Function (poseidon2CompressArgs ctx) (intType' ctx) ctx [] [] False
+getVarType' "poseidon2Permute" ctx = pure $ Function (poseidon2PermuteArgs ctx) (intArrayType' ctx) ctx [] [] False
+getVarType' "poseidon2Hash" ctx = pure $ Function (poseidon2HashArgs ctx) (intArrayType' ctx) ctx [] [] False
+getVarType' "poseidon2HashBytes" ctx = pure $ Function (poseidon2HashBytesArgs ctx) (intArrayType' ctx) ctx [] [] False
+getVarType' "poseidon2gl" ctx = pure $ Function (poseidonArgs ctx) (intArrayType' ctx) ctx [] [] False
+getVarType' "poseidon2glBytes" ctx = pure $ Function (bytesType' ctx) (intArrayType' ctx) ctx [] [] False
 getVarType' "selfdestruct" ctx = pure $ Function (selfdestructArgs ctx) (boolType' ctx) ctx [] [] False
 getVarType' "require" ctx = pure $ Function (requireArgs ctx) (Unit ctx) ctx [] [] False
 getVarType' "assert" ctx = pure $ Function (assertArgs ctx) (Unit ctx) ctx [] [] False
@@ -1737,6 +1762,11 @@ getVarType' "fastForward" ctx = do
   if test
     then pure $ Function (fastForwardArgs ctx) (Unit ctx) ctx [] [] False
     else pure . bottom $ "fastForward can only be called while running tests" <$ ctx
+getVarType' "setBlockContext" ctx = do
+  test <- asks isRunningTests
+  if test
+    then pure $ Function (setBlockContextArgs ctx) (Unit ctx) ctx [] [] False
+    else pure . bottom $ "setBlockContext can only be called while running tests" <$ ctx
 getVarType' "Util" ctx = pure $ Static (SVMType.UnknownLabel "Util") ctx
 getVarType' "msg" ctx = pure $ Static (SVMType.UnknownLabel "msg") ctx
 getVarType' "tx" ctx = pure $ Static (SVMType.UnknownLabel "tx") ctx

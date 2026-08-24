@@ -264,7 +264,7 @@ def replaceServerPortsDocker() {
  */
 def waitLocalNodeIsSynced(String nodeDir = '') {
   echo "Waiting for local node to be in-sync and healthy..."
-  for (int i = 0; i < 7000; i++) {
+  for (int i = 0; i < 9000; i++) {
     if (sh(returnStatus: true, script: "sudo docker exec strato-nginx-1 curl 172.17.0.1:3000/eth/v1.2/metadata | grep \\\"isSynced\\\":true") == 0) {
       return true
     }
@@ -277,7 +277,7 @@ def waitLocalNodeIsSynced(String nodeDir = '') {
     }
     sleep 2
   }
-  error ("STRATO node failed to sync after more than an hour. Check the strato logs in artifacts for more details.")
+  error ("STRATO node failed to sync after within the expected time window of ~5hrs. Check the strato logs in artifacts for more details.")
 }
 
 /**

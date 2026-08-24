@@ -18,7 +18,16 @@ import {
   Permit2Types
 } from './types';
 
-const PROXIED_CHAIN_IDS = new Set(["1", "11155111", "8453", "84532", "59144", "59141"]);
+const PROXIED_CHAIN_IDS = new Set([
+  "1",
+  "11155111",
+  "8453",
+  "84532",
+  "59144",
+  "59141",
+  "4663",
+  "46630",
+]);
 
 async function getClient(chainId: string) {
   const transport = PROXIED_CHAIN_IDS.has(chainId)

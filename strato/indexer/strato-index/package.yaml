@@ -18,6 +18,7 @@ library:
   - blockapps-datadefs
   - blockapps-mpdbs
   - blockDB
+  - bytestring
   - common-log
   - containers
   - format

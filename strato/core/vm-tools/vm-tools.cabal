@@ -23,6 +23,7 @@ library
       Blockchain.Data.ExecResults
       Blockchain.DB.BlockSummaryDB
       Blockchain.DB.ModifyStateDB
+      Blockchain.Forks
       Blockchain.StateRootMismatch
       Blockchain.Stream.Action
       Blockchain.Stream.VMEvent
@@ -97,14 +98,28 @@ test-suite contextm-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      CrossLangFixtureSpec
+      ReceiptSpec
+      TypedArgConversionSpec
       Paths_vm_tools
   hs-source-dirs:
       test/
   ghc-options: -Wall -O2 -dynamic
   build-depends:
-      base
+      QuickCheck
+    , base
+    , base16-bytestring
+    , blockDB
+    , blockapps-data
+    , blockapps-datadefs
+    , bytestring
+    , containers
+    , ethereum-rlp
     , hflags
     , hspec
+    , merkle-patricia-db
+    , solid-vm-model
     , strato-model
+    , vector
     , vm-tools
   default-language: Haskell2010

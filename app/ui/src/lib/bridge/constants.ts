@@ -225,8 +225,42 @@ export const SUPPORTED_CHAINS = {
   ARBITRUM: 42161,
   ARBITRUM_NOVA: 42170,
   BSC: 56,
-  AVALANCHE: 43114
+  AVALANCHE: 43114,
+  ROBINHOOD: 4663,
+  ROBINHOOD_TESTNET: 46630,
 } as const;
+
+/** Robinhood Chain mainnet — not in viem/chains; used by wagmi + resolveViemChain */
+export const robinhood = defineChain({
+  id: SUPPORTED_CHAINS.ROBINHOOD,
+  name: "Robinhood Chain",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: {
+    default: { http: ["https://rpc.mainnet.chain.robinhood.com"] },
+  },
+  blockExplorers: {
+    default: {
+      name: "Explorer",
+      url: "https://robinhoodchain.blockscout.com",
+    },
+  },
+});
+
+/** Robinhood Chain Testnet — not in viem/chains; used by wagmi + resolveViemChain */
+export const robinhoodTestnet = defineChain({
+  id: SUPPORTED_CHAINS.ROBINHOOD_TESTNET,
+  name: "Robinhood Chain Testnet",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: {
+    default: { http: ["https://rpc.testnet.chain.robinhood.com"] },
+  },
+  blockExplorers: {
+    default: {
+      name: "Explorer",
+      url: "https://explorer.testnet.chain.robinhood.com",
+    },
+  },
+});
 
 const chainCache = new Map<number, Chain>();
 
@@ -259,20 +293,22 @@ async function loadBuiltInChain(id: number): Promise<Chain | null> {
     const chains = await import('viem/chains');
     
     switch (id) {
-      case SUPPORTED_CHAINS.MAINNET:       return chains.mainnet;
-      case SUPPORTED_CHAINS.SEPOLIA:       return chains.sepolia;
-      case SUPPORTED_CHAINS.POLYGON:       return chains.polygon;
-      case SUPPORTED_CHAINS.POLYGON_AMOY:  return chains.polygonAmoy;
-      case SUPPORTED_CHAINS.OPTIMISM:      return chains.optimism;
-      case SUPPORTED_CHAINS.BASE:          return chains.base;
-      case SUPPORTED_CHAINS.BASE_SEPOLIA:  return chains.baseSepolia;
-      case SUPPORTED_CHAINS.LINEA:         return chains.linea;
-      case SUPPORTED_CHAINS.LINEA_SEPOLIA: return chains.lineaSepolia;
-      case SUPPORTED_CHAINS.ARBITRUM:      return chains.arbitrum;
-      case SUPPORTED_CHAINS.ARBITRUM_NOVA: return chains.arbitrumNova;
-      case SUPPORTED_CHAINS.BSC:           return chains.bsc;
-      case SUPPORTED_CHAINS.AVALANCHE:     return chains.avalanche;
-      default:                             return null;
+      case SUPPORTED_CHAINS.MAINNET:            return chains.mainnet;
+      case SUPPORTED_CHAINS.SEPOLIA:            return chains.sepolia;
+      case SUPPORTED_CHAINS.POLYGON:            return chains.polygon;
+      case SUPPORTED_CHAINS.POLYGON_AMOY:       return chains.polygonAmoy;
+      case SUPPORTED_CHAINS.OPTIMISM:           return chains.optimism;
+      case SUPPORTED_CHAINS.BASE:               return chains.base;
+      case SUPPORTED_CHAINS.BASE_SEPOLIA:       return chains.baseSepolia;
+      case SUPPORTED_CHAINS.LINEA:              return chains.linea;
+      case SUPPORTED_CHAINS.LINEA_SEPOLIA:      return chains.lineaSepolia;
+      case SUPPORTED_CHAINS.ARBITRUM:           return chains.arbitrum;
+      case SUPPORTED_CHAINS.ARBITRUM_NOVA:      return chains.arbitrumNova;
+      case SUPPORTED_CHAINS.BSC:                return chains.bsc;
+      case SUPPORTED_CHAINS.AVALANCHE:          return chains.avalanche;
+      case SUPPORTED_CHAINS.ROBINHOOD:           return robinhood;
+      case SUPPORTED_CHAINS.ROBINHOOD_TESTNET:  return robinhoodTestnet;
+      default:                                  return null;
     }
   } catch {
     return null;
