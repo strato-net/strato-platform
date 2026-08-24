@@ -83,6 +83,10 @@
     "XAUT": {
       "targetAssetAddress": "47de839c03a3b014c0cc4f3b9352979a5038f910"
     },
+    "SPY": {
+      "targetAssetAddress": "3132c60e0fc30e58c03181a3d9c56904a37099f1",
+      "comment": "Robinhood SPY bridge token (testnet). Update targetAssetAddress after recreating on stable testnet / prod."
+    },
     "SPYX": {
       "targetAssetAddress": "00000000000000000000000000000000deadbeef",
       "submit": false,

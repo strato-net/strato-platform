@@ -252,7 +252,13 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
         case verifyBlockResult of
           failures@(_:_) -> do
             lift $ P.incCounter vmBlocksInvalid
-            pure $ map (\r -> BlockVerificationFailure (bSumNumber bSum) (bSumParentHash bSum) r) failures
+            -- Identify the block that failed, not its parent. 'bSum' summarizes
+            -- the *parent* (setParentStateRoot looks it up by parentHash), so
+            -- bSumNumber/bSumParentHash name the parent and the grandparent.
+            -- These values are what the mismatch logs print and what the
+            -- StateRootMismatch handler passes to stateDiff', so getting them
+            -- wrong sends whoever is debugging to the wrong block.
+            pure $ map (BlockVerificationFailure (number bd) obh) failures
           _ -> do
             lift $ P.incCounter vmBlocksValid
             lift $ P.incCounter vmBlocksMined
