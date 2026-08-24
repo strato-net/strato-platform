@@ -42,9 +42,16 @@ export interface LandingHighlight {
   /** Stacked rows to the right of the feature, e.g. native vs rewards APY. */
   metrics?: LandingMetric[];
   /** "You provide X -> you receive Y" diagram used by the borrow page. */
-  flow?: { fromLabel: string; from: string; toLabel: string; to: string };
+  flow?: {
+    fromLabel: string;
+    from: string;
+    fromImage?: string;
+    toLabel: string;
+    to: string;
+    toImage?: string;
+  };
   /** Pill row under the panel (pool pairs, supported collateral). */
-  chips?: string[];
+  chips?: (string | LandingChip)[];
 }
 
 export interface LandingAssurances {
@@ -67,7 +74,9 @@ export interface LandingBand {
 }
 
 export interface LandingExplainer {
-  icon: LucideIcon;
+  icon?: LucideIcon;
+  /** Token/product image rendered in the chip instead of a Lucide icon. */
+  image?: string;
   tag: string;
   title: string;
   body: string;
@@ -79,13 +88,27 @@ export interface FooterColumn {
   links: { label: string; href: string }[];
 }
 
+/** A pill under the highlight panel; paired token images render as in the mockups. */
+export interface LandingChip {
+  label: string;
+  images?: string[];
+}
+
 export interface ProductLandingConfig {
   slug: string;
   documentTitle: string;
   accent: LandingAccent;
   /** Dashboard route the CTAs open once a wallet is connected. */
   appPath: string;
-  hero: { icon: LucideIcon; eyebrow: string; headline: string; subhead: string };
+  hero: {
+    /** Lucide fallback, rendered inside the brand ring. */
+    icon?: LucideIcon;
+    /** Token/product images (1 or 2, overlapped) that replace the icon+ring. */
+    images?: string[];
+    eyebrow: string;
+    headline: string;
+    subhead: string;
+  };
   stats: LandingStat[];
   steps: LandingStep[];
   highlight: LandingHighlight;

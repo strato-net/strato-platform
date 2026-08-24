@@ -1,4 +1,8 @@
-import { Layers, Percent, Waves } from "lucide-react";
+import { Percent } from "lucide-react";
+import goldstImage from "@/assets/landing/goldst.png";
+import usdcImage from "@/assets/landing/usdc.png";
+import usdstImage from "@/assets/landing/usdst.png";
+import usdtImage from "@/assets/landing/usdt.png";
 import { EXTERNAL_LINKS } from "@/config/externalLinks";
 import { buildFooterColumns, FULL_APP_LINK } from "./footerColumns";
 import type { ProductLandingConfig } from "./types";
@@ -10,7 +14,7 @@ export const liquidity: ProductLandingConfig = {
   appPath: "/dashboard/v3-liquidity",
 
   hero: {
-    icon: Waves,
+    images: [goldstImage, usdstImage],
     eyebrow: "STRATO V3 Liquidity",
     headline: "Put Your Assets To Work. Earn Trading Fees.",
     subhead:
@@ -57,7 +61,12 @@ export const liquidity: ProductLandingConfig = {
       variant: "text",
       note: "From swaps inside your active range",
     },
-    chips: ["USDC / USDST", "GOLDST / USDST", "USDT / USDST", "+2 more pools"],
+    chips: [
+      { label: "USDC / USDST", images: [usdcImage, usdstImage] },
+      { label: "GOLDST / USDST", images: [goldstImage, usdstImage] },
+      { label: "USDT / USDST", images: [usdtImage, usdstImage] },
+      "+2 more pools",
+    ],
   },
 
   assurances: {
@@ -68,7 +77,7 @@ export const liquidity: ProductLandingConfig = {
 
   explainers: [
     {
-      icon: Layers,
+      image: goldstImage,
       tag: "Your strategy",
       title: "Choose Where Your Liquidity Works.",
       body: "Concentrate liquidity around the prices where you want it active. A tighter range can use capital more efficiently, but may need more attention.",

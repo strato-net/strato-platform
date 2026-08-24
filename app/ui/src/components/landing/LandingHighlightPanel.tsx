@@ -70,14 +70,18 @@ const LandingHighlightPanel = ({ highlight, accent }: LandingHighlightPanelProps
 
               {flow && (
                 <div className="flex items-center justify-center gap-8 rounded-xl bg-card p-6 shadow-sm">
-                  <div className="text-center">
+                  <div className="flex flex-col items-center text-center">
+                    {flow.fromImage && (
+                      <img src={flow.fromImage} alt="" className="mb-2 h-10 w-10" />
+                    )}
                     <Eyebrow className="text-muted-foreground">{flow.fromLabel}</Eyebrow>
                     <p className="mt-1 text-sm font-semibold text-strato-blue dark:text-white">
                       {flow.from}
                     </p>
                   </div>
                   <ArrowRight className={`h-5 w-5 shrink-0 ${tone.figure}`} aria-hidden="true" />
-                  <div className="text-center">
+                  <div className="flex flex-col items-center text-center">
+                    {flow.toImage && <img src={flow.toImage} alt="" className="mb-2 h-10 w-10" />}
                     <Eyebrow className="text-muted-foreground">{flow.toLabel}</Eyebrow>
                     <p className="mt-1 text-sm font-semibold text-strato-blue dark:text-white">
                       {flow.to}
@@ -92,14 +96,29 @@ const LandingHighlightPanel = ({ highlight, accent }: LandingHighlightPanelProps
 
       {chips && (
         <div className="mt-4 flex flex-wrap gap-3">
-          {chips.map((chip) => (
-            <div
-              key={chip}
-              className={`min-w-[8rem] flex-1 rounded-xl border bg-card px-4 py-3 text-center text-xs font-medium text-foreground/80 ${tone.chip}`}
-            >
-              {chip}
-            </div>
-          ))}
+          {chips.map((chip) => {
+            const { label, images } = typeof chip === "string" ? { label: chip, images: undefined } : chip;
+            return (
+              <div
+                key={label}
+                className={`flex min-w-[8rem] flex-1 items-center justify-center gap-2 rounded-xl border bg-card px-4 py-3 text-center text-xs font-medium text-foreground/80 ${tone.chip}`}
+              >
+                {images && (
+                  <span className="flex shrink-0">
+                    {images.map((src, i) => (
+                      <img
+                        key={src}
+                        src={src}
+                        alt=""
+                        className={`h-5 w-5 ${i > 0 ? "-ml-1.5" : ""}`}
+                      />
+                    ))}
+                  </span>
+                )}
+                {label}
+              </div>
+            );
+          })}
         </div>
       )}
     </Section>

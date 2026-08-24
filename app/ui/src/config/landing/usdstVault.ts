@@ -1,4 +1,5 @@
-import { Coins, PiggyBank, Vault } from "lucide-react";
+import { PiggyBank, Vault } from "lucide-react";
+import usdstImage from "@/assets/landing/usdst.png";
 import { EXTERNAL_LINKS } from "@/config/externalLinks";
 import { buildFooterColumns, FULL_APP_LINK, WEBSITE_LINK } from "./footerColumns";
 import type { ProductLandingConfig } from "./types";
@@ -70,7 +71,7 @@ export const usdstVault: ProductLandingConfig = {
 
   explainers: [
     {
-      icon: Coins,
+      image: usdstImage,
       tag: "USDST",
       title: "USDST, Built To Do More.",
       body: "Hold it. Trade it. Put it to work. USDST moves across STRATO—from everyday transactions to onchain yield.",

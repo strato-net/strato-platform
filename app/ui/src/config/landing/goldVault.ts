@@ -1,4 +1,5 @@
-import { Coins, Vault } from "lucide-react";
+import { Vault } from "lucide-react";
+import goldstImage from "@/assets/landing/goldst.png";
 import { EXTERNAL_LINKS } from "@/config/externalLinks";
 import { buildFooterColumns, FULL_APP_LINK, WEBSITE_LINK } from "./footerColumns";
 import type { ProductLandingConfig } from "./types";
@@ -10,7 +11,7 @@ export const goldVault: ProductLandingConfig = {
   appPath: "/dashboard/earn-yield-vault",
 
   hero: {
-    icon: Vault,
+    images: [goldstImage],
     eyebrow: "GOLDST Yield Vault",
     headline: "Get Your Gold Onchain. Make It Productive.",
     subhead:
@@ -70,7 +71,9 @@ export const goldVault: ProductLandingConfig = {
 
   explainers: [
     {
-      icon: Coins,
+      // Live GOLDST token image from mainnet asset metadata
+      // (BlockApps-Token-images @ cdc93d30182125e05eec985b631c7c61b3f63ff0).
+      image: goldstImage,
       tag: "GOLDST",
       title: "Real Gold. Onchain.",
       body: "Own tokenized, vaulted physical gold. Trade it, transfer it or put it to work across STRATO without giving up your gold exposure.",

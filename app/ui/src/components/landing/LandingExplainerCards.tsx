@@ -20,11 +20,19 @@ const LandingExplainerCards = ({ cards, accent }: LandingExplainerCardsProps) =>
             return (
               <Tile key={card.title} className="p-8">
                 <div className="flex items-center gap-3">
-                  <span
-                    className={`flex h-9 w-9 items-center justify-center rounded-full ${tone.badge}`}
-                  >
-                    <Icon className="h-4 w-4" aria-hidden="true" />
-                  </span>
+                  {card.image ? (
+                    <img
+                      src={card.image}
+                      alt=""
+                      className="h-9 w-9 rounded-full border border-border object-cover"
+                    />
+                  ) : Icon ? (
+                    <span
+                      className={`flex h-9 w-9 items-center justify-center rounded-full ${tone.badge}`}
+                    >
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                  ) : null}
                   <Eyebrow className="text-muted-foreground">{card.tag}</Eyebrow>
                 </div>
                 <Heading className="mt-5">{card.title}</Heading>

@@ -1,4 +1,5 @@
-import { Banknote, Coins, HandCoins } from "lucide-react";
+import goldstImage from "@/assets/landing/goldst.png";
+import usdstImage from "@/assets/landing/usdst.png";
 import { EXTERNAL_LINKS } from "@/config/externalLinks";
 import { buildFooterColumns, FULL_APP_LINK } from "./footerColumns";
 import type { ProductLandingConfig } from "./types";
@@ -10,7 +11,7 @@ export const borrow: ProductLandingConfig = {
   appPath: "/dashboard/borrow",
 
   hero: {
-    icon: HandCoins,
+    images: [goldstImage, usdstImage],
     eyebrow: "STRATO Borrow",
     headline: "Access USDST Without Selling Your Assets.",
     subhead:
@@ -54,8 +55,10 @@ export const borrow: ProductLandingConfig = {
     flow: {
       fromLabel: "You provide",
       from: "Collateral",
+      fromImage: goldstImage,
       toLabel: "You receive",
       to: "USDST",
+      toImage: usdstImage,
     },
     chips: ["Gold & Silver", "ETH & BTC", "Selected Stablecoins"],
   },
@@ -89,14 +92,14 @@ export const borrow: ProductLandingConfig = {
 
   explainers: [
     {
-      icon: Coins,
+      image: goldstImage,
       tag: "Your collateral",
       title: "Your Asset Backs The Position.",
       body: "You keep its price exposure while it is locked as collateral. Repay the USDST and accrued costs before withdrawing it.",
       link: { label: "View Supported Assets", href: "/dashboard/borrow" },
     },
     {
-      icon: Banknote,
+      image: usdstImage,
       tag: "Your asset",
       title: "Use USDST Across STRATO.",
       body: "Hold it, swap it, deposit it into a vault or provide liquidity. The borrowed USDST stays available in your wallet.",

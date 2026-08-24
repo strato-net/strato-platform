@@ -1,4 +1,5 @@
-import { Hexagon, TrendingUp, Users } from "lucide-react";
+import { Users } from "lucide-react";
+import stratoImage from "@/assets/landing/strato.png";
 import { EXTERNAL_LINKS } from "@/config/externalLinks";
 import { buildFooterColumns, FULL_APP_LINK } from "./footerColumns";
 import type { ProductLandingConfig } from "./types";
@@ -10,7 +11,7 @@ export const staking: ProductLandingConfig = {
   appPath: "/dashboard/earn-staking",
 
   hero: {
-    icon: Hexagon,
+    images: [stratoImage],
     eyebrow: "STRATO Staking",
     headline: "Put Your STRATO To Work.",
     subhead:
@@ -123,7 +124,7 @@ export const staking: ProductLandingConfig = {
       link: { label: "Explore Validators", href: "/dashboard/earn-staking" },
     },
     {
-      icon: TrendingUp,
+      image: stratoImage,
       tag: "Staking rewards",
       title: "Track And Claim Your Rewards.",
       body: "Your staked amount, total rewards and claimable STRATO stay visible in one place. Every staking reward you receive is paid in STRATO.",
