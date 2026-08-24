@@ -185,6 +185,16 @@ genEthConf = do
             if flags_stakingActivationBlock < 0
               then defaultStakingActivationBlock flags_network
               else Just flags_stakingActivationBlock
+        -- These two must be re-derived from flags_network. 'def' hardcodes
+        -- upquark's values, and ToJSON writes every field, so leaving them
+        -- alone bakes upquark's staking proxy into a helium node's
+        -- ethconf.yaml. FromJSON's per-network fallback can never fire after
+        -- that, because the key is present. The node then watches an address
+        -- that emits nothing on its network, derives no stake updates, and
+        -- dies with StakeMismatch on the first block whose header carries one.
+        , stakingContractAddress = defaultStakingContractAddress flags_network
+        , stakingEventsFromGovernanceBlock =
+            defaultStakingEventsFromGovernanceBlock flags_network
         }
     }
 
