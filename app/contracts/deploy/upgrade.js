@@ -166,7 +166,7 @@ async function deployImplementationAsync(tokenObj, contractArgs, baseOptions) {
       results.every((r) => r && r.status && r.status !== 'Pending'),
     (opts) => rest.getBlocResults(tokenObj, hashes, opts),
     { config, isAsync: true },
-    60000 // 1 minute polling upper bound
+    300000 // 5 min polling upper bound
   );
 
   const final = Array.isArray(finalResults) ? finalResults[0] : finalResults;
@@ -215,7 +215,7 @@ async function callAsync(tokenObj, callArgs, baseOptions) {
       results.every((r) => r && r.status && r.status !== 'Pending'),
     (opts) => rest.getBlocResults(tokenObj, hashes, opts),
     { config, isAsync: true },
-    60000
+    300000
   );
 
   const final = Array.isArray(finalResults) ? finalResults[0] : finalResults;

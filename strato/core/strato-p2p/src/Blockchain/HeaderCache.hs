@@ -4,6 +4,7 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Blockchain.HeaderCache where
@@ -21,8 +22,11 @@ import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Verification
 import Control.Monad
+import Blockchain.Model.SyncState (BestSequencedBlock, bestSequencedBlockNumber)
+import qualified Control.Monad.Change.Modify as Mod
 import Data.List hiding (insert, lookup)
 import Data.Maybe
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import Text.Tools
 import Prelude hiding (lookup)
@@ -39,11 +43,23 @@ instance MonadP2P m => HasHeaderCache m where
     return $ not $ null alreadyRequestedHeaders
 
   addToHeaderCache headers = do
+    myBest <- bestSequencedBlockNumber <$> Mod.get (Mod.Proxy @BestSequencedBlock)
     alreadyRequestedRemainingHeaders <- getRemainingBHeaders
-    let !combined = alreadyRequestedRemainingHeaders ++ headers
+    inFlight <- getBlockHeaders
+    -- Never queue a header that is already committed or already being fetched.
+    -- Every peer answers the same tip-follow GetBlockHeaders, so without this
+    -- the same 500-header range piles into the cache once per peer; the
+    -- duplicated in-flight set then wedges body fetching until the stale-cache
+    -- wipe. Stale sub-tip entries similarly accumulated forever.
+    let inFlightHashes = Set.fromList $ blockHeaderHash <$> inFlight
+        !combined =
+          filter ((`Set.notMember` inFlightHashes) . blockHeaderHash)
+            . pruneAndDedupHeaders myBest
+            $ alreadyRequestedRemainingHeaders ++ headers
     length combined `seq` putRemainingBHeaders combined
 
   getBodiesToFetch = do
+    myBest <- bestSequencedBlockNumber <$> Mod.get (Mod.Proxy @BestSequencedBlock)
     alreadyRequestedHeaders <- getBlockHeaders -- check what already requested
     alreadyRequestedRemainingHeaders <- getRemainingBHeaders
 
@@ -51,7 +67,8 @@ instance MonadP2P m => HasHeaderCache m where
       case (alreadyRequestedHeaders, alreadyRequestedRemainingHeaders) of
         ([], _) -> do
           -- proceed if we are not already requesting bodies
-          let (newNeededHeaders, remainingHeaders) = splitNeededHeaders alreadyRequestedRemainingHeaders
+          -- (prune here too: entries may have committed since they were queued)
+          let (newNeededHeaders, remainingHeaders) = splitNeededHeaders $ pruneAndDedupHeaders myBest alreadyRequestedRemainingHeaders
           putBlockHeaders newNeededHeaders
           $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putRemainingBHeaders called: inserting " ++ showRanges (map BlockHeader.number remainingHeaders)
           putRemainingBHeaders remainingHeaders
@@ -85,6 +102,20 @@ instance MonadP2P m => HasHeaderCache m where
 
 
 
+
+-- | Drop headers at or below the sequenced tip and collapse duplicates,
+-- preserving order. Both arise because every connected peer answers the same
+-- tip-follow header request.
+pruneAndDedupHeaders :: Integer -> [BlockHeader] -> [BlockHeader]
+pruneAndDedupHeaders myBest = go Set.empty
+  where
+    go _ [] = []
+    go seen (h : hs)
+      | BlockHeader.number h <= myBest = go seen hs
+      | hsh `Set.member` seen = go seen hs
+      | otherwise = h : go (Set.insert hsh seen) hs
+      where
+        hsh = blockHeaderHash h
 
 splitNeededHeaders :: [BlockHeader] -> ([BlockHeader], [BlockHeader])
 splitNeededHeaders neededHeaders =

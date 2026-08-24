@@ -79,7 +79,7 @@ import Blockchain.Strato.Model.Gas (Gas (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.Event
+import SolidVM.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.Action (Action)
@@ -659,7 +659,8 @@ getVariableOfName name = do
                        "bytes32ToString",
                        "create",
                        "create2",
-                       "fastForward"
+                       "fastForward",
+                       "setBlockContext"
                      ]
           )
           $ t "builtin function" $ Constant $ SFunction name Nothing
@@ -990,7 +991,7 @@ addEvent newEvent = do
     TraceLog
       (evContractAddress newEvent)
       (T.pack $ evName newEvent)
-      [(T.pack n, T.pack v) | (n, v, _) <- evArgs newEvent]
+      [(T.pack n, T.pack v) | (n, _, v, _) <- evArgs newEvent]
 
 addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Keccak256 -> T.Text -> m ()
 addDelegatecall s c n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c n)

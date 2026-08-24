@@ -33,6 +33,7 @@ library
     , blockapps-data
     , blockapps-datadefs
     , blockapps-mpdbs
+    , bytestring
     , common-log
     , containers
     , format

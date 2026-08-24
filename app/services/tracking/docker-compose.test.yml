@@ -45,6 +45,8 @@ services:
       - TRACKING_AUTHORIZED_USERS=tester@example.com
       - TRACKING_CACHE_TTL_SECONDS=0
       - TRACKING_ATTRIBUTION_WINDOW_DAYS=90
+      - TRACKING_ATTRIBUTION_GRACE_MINUTES=30
+      - TRACKING_IP_FALLBACK_MINUTES=30
       # Origin-chain enrichment of the user timeline, pointed at the mocks'
       # Etherscan V2 look-alike
       - TRACKING_ETHERSCAN_API_KEY=test-key

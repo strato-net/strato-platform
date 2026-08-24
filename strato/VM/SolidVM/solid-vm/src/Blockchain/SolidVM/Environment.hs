@@ -7,6 +7,7 @@ module Blockchain.SolidVM.Environment
 where
 
 import Blockchain.Data.BlockHeader
+import Blockchain.Data.ProposalFacts
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Keccak256
@@ -22,5 +23,8 @@ data Environment = Environment
     txHash :: Keccak256,
     src :: Maybe Code,
     name :: Maybe Text,
-    runningTests :: Bool
+    runningTests :: Bool,
+    -- | Facts about the parent block (@block.prev*@). 'Nothing' means "look
+    -- them up from the parent's block summary"; tests may set them explicitly.
+    prevBlock :: Maybe ProposalFacts
   }

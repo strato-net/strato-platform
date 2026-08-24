@@ -1,4 +1,4 @@
-import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher, safetyModule, sToken, priceOracle, liquidityPool, lendingPool } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataGovernance, mercataBridge, cdpRegistry, voucher, safetyModule, sToken, priceOracle, liquidityPool, lendingPool } from "./config";
 import * as config from "./config";
 import {
   SWAP_CONTRACTS,
@@ -36,6 +36,7 @@ export const constants = (() => {
   const StratoNativeCustodyVault = `${CONTRACT_PREFIX}StratoNativeCustodyVault`;
   const StratoStaking = `${CONTRACT_PREFIX}StratoStaking`;
   const ValidatorRegistry = `${CONTRACT_PREFIX}ValidatorRegistry`;
+  const MercataGovernance = "MercataGovernance";
   const CreditCardTopUp = `${CONTRACT_PREFIX}CreditCardTopUp`;
   const CDPEngine = `${CONTRACT_PREFIX}CDPEngine`;
   const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
@@ -136,6 +137,7 @@ export const constants = (() => {
     lendingRegistry,
     tokenFactory,
     adminRegistry,
+    mercataGovernance,
     cdpRegistry,
     Token,
     TokenFactory,
@@ -157,6 +159,7 @@ export const constants = (() => {
     StratoNativeCustodyVault,
     StratoStaking,
     ValidatorRegistry,
+    MercataGovernance,
     CreditCardTopUp,
     CDPEngine,
     CDPVault,
