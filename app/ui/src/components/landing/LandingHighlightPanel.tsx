@@ -3,17 +3,6 @@ import type { LandingAccent, LandingHighlight } from "@/config/landing/types";
 import { ACCENTS } from "./accents";
 import { Eyebrow, Heading, Section } from "./primitives";
 
-/**
- * Rows the feature figure spans so it sits alongside the stacked metrics rather
- * than leaving a hole in the grid. Written out because Tailwind only picks up
- * class names that appear literally in the source.
- */
-const FEATURE_ROW_SPAN: Record<number, string> = {
-  1: "",
-  2: "sm:row-span-2",
-  3: "sm:row-span-3",
-};
-
 interface LandingHighlightPanelProps {
   highlight: LandingHighlight;
   accent: LandingAccent;
@@ -23,11 +12,13 @@ interface LandingHighlightPanelProps {
  * The tinted panel under the steps. One component covers all four mockup
  * variants: a split APY breakdown (USDST), a single figure (GOLDST), a plain
  * feature callout (V3), and a collateral-in/USDST-out flow (borrow).
+ * The figures sit in separate white cards with gaps, as drawn.
  */
 const LandingHighlightPanel = ({ highlight, accent }: LandingHighlightPanelProps) => {
   const tone = ACCENTS[accent];
   const { feature, metrics, flow, chips } = highlight;
   const hasAside = Boolean(feature || flow || metrics?.length);
+  const split = Boolean(feature && metrics?.length);
 
   return (
     <Section className="pt-0">
@@ -44,15 +35,9 @@ const LandingHighlightPanel = ({ highlight, accent }: LandingHighlightPanelProps
           </div>
 
           {hasAside && (
-            <div
-              className={
-                feature && metrics?.length
-                  ? "grid grid-cols-1 gap-px overflow-hidden rounded-xl bg-border sm:grid-cols-2"
-                  : "grid grid-cols-1 gap-px overflow-hidden rounded-xl bg-border"
-              }
-            >
+            <div className={split ? "grid grid-cols-1 gap-3 sm:grid-cols-2" : "grid gap-3"}>
               {feature && (
-                <div className={`bg-card p-5 ${FEATURE_ROW_SPAN[metrics?.length ?? 0] ?? ""}`}>
+                <div className="rounded-xl bg-card p-5 shadow-sm">
                   <Eyebrow className="text-muted-foreground">{feature.label}</Eyebrow>
                   <p
                     className={`mt-2 text-3xl font-bold ${tone.figure} ${
@@ -65,20 +50,26 @@ const LandingHighlightPanel = ({ highlight, accent }: LandingHighlightPanelProps
                 </div>
               )}
 
-              {metrics?.map((metric) => (
-                <div key={metric.label} className="bg-card p-5">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <Eyebrow className="text-muted-foreground">{metric.label}</Eyebrow>
-                    <p className="font-mono text-lg font-bold text-strato-blue dark:text-white">
-                      {metric.value}
-                    </p>
-                  </div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">{metric.note}</p>
+              {(metrics?.length ?? 0) > 0 && (
+                <div className="grid gap-3">
+                  {metrics!.map((metric) => (
+                    <div key={metric.label} className="rounded-xl bg-card p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <Eyebrow className="text-muted-foreground">{metric.label}</Eyebrow>
+                          <p className="mt-1 text-[11px] text-muted-foreground">{metric.note}</p>
+                        </div>
+                        <p className="font-mono text-lg font-bold text-strato-blue dark:text-white">
+                          {metric.value}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
 
               {flow && (
-                <div className="flex items-center justify-center gap-5 bg-card p-6">
+                <div className="flex items-center justify-center gap-8 rounded-xl bg-card p-6 shadow-sm">
                   <div className="text-center">
                     <Eyebrow className="text-muted-foreground">{flow.fromLabel}</Eyebrow>
                     <p className="mt-1 text-sm font-semibold text-strato-blue dark:text-white">

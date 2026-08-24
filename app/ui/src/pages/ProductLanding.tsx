@@ -29,8 +29,8 @@ const ProductLanding = ({ slug }: { slug: string }) => {
   const connectedLabel = config.steps[config.steps.length - 1].cta;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
+    <div className="min-h-screen bg-white dark:bg-background">
+      <Navbar variant="landing" />
 
       <main>
         <LandingHero hero={config.hero} accent={config.accent} />

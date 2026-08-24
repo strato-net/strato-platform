@@ -25,7 +25,7 @@ const LandingSteps = ({ steps, appPath }: LandingStepsProps) => {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Tile className="border-strato-lightblue/40 shadow-md">
           <div className="flex items-center justify-between">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted font-mono text-[10px] font-semibold text-muted-foreground">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-strato-lightblue/10 font-mono text-[10px] font-semibold text-strato-lightblue">
               {first.index}
             </span>
             <Eyebrow className="text-strato-lightblue">{first.tag}</Eyebrow>
@@ -56,10 +56,10 @@ const LandingSteps = ({ steps, appPath }: LandingStepsProps) => {
               disabled={!isLoggedIn}
               onClick={() => navigate(appPath)}
               className={cn(
-                "mt-6 w-full rounded-full px-6 py-3 text-sm font-semibold transition-colors",
+                "mt-6 w-full px-6 py-3 text-sm font-semibold transition-colors",
                 isLoggedIn
-                  ? "border border-strato-blue/30 text-strato-blue hover:bg-strato-blue/5 dark:border-strato-lightblue/50 dark:text-strato-lightblue dark:hover:bg-strato-lightblue/10"
-                  : "cursor-not-allowed bg-muted text-muted-foreground",
+                  ? "rounded-full border border-strato-blue/30 text-strato-blue hover:bg-strato-blue/5 dark:border-strato-lightblue/50 dark:text-strato-lightblue dark:hover:bg-strato-lightblue/10"
+                  : "cursor-not-allowed rounded-lg bg-muted/70 text-muted-foreground",
               )}
             >
               {step.cta}

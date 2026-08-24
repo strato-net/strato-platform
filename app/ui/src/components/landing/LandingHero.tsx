@@ -13,15 +13,19 @@ const LandingHero = ({ hero, accent }: LandingHeroProps) => {
 
   return (
     <Section className="pb-8 pt-28 sm:pt-32 text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* Two-tone brand ring around the product icon, as drawn in the mockups. */}
       <div
-        className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ring-4 ring-inset ${tone.badge}`}
+        className="mx-auto h-16 w-16 rounded-full p-[4px] shadow-sm"
+        style={{ background: tone.ring }}
       >
-        <Icon className="h-6 w-6" aria-hidden="true" />
+        <div className="flex h-full w-full items-center justify-center rounded-full bg-white dark:bg-strato-dark">
+          <Icon className="h-6 w-6 text-strato-blue dark:text-white" aria-hidden="true" />
+        </div>
       </div>
 
-      <Eyebrow className="mt-4 text-muted-foreground">{hero.eyebrow}</Eyebrow>
+      <Eyebrow className={`mt-5 ${tone.eyebrow}`}>{hero.eyebrow}</Eyebrow>
 
-      <h1 className="mx-auto mt-3 max-w-3xl text-4xl font-bold tracking-tight text-strato-blue dark:text-white sm:text-5xl">
+      <h1 className="mx-auto mt-3 max-w-3xl text-4xl font-extrabold tracking-tight text-strato-blue dark:text-white sm:text-5xl">
         {hero.headline}
       </h1>
 
