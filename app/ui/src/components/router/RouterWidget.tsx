@@ -217,9 +217,21 @@ const RouterWidget = ({ userRewards, guestMode = false }: RouterWidgetProps) => 
   const toOptions = useMemo(
     () =>
       sourceMode === "external"
-        ? tokens
+        ? isNativeExternalToken
+          ? tokens.filter(
+              (token) =>
+                normalizeAddress(token.address) ===
+                normalizeAddress(selectedExternalRoute?.stratoToken || "")
+            )
+          : tokens
         : tokens.filter((token) => token.address !== tokenIn?.address),
-    [sourceMode, tokens, tokenIn?.address]
+    [
+      isNativeExternalToken,
+      selectedExternalRoute?.stratoToken,
+      sourceMode,
+      tokens,
+      tokenIn?.address,
+    ]
   );
   const liveTokenIn = tokenIn
     ? tokens.find((token) => token.address === tokenIn.address) ?? tokenIn
@@ -244,9 +256,19 @@ const RouterWidget = ({ userRewards, guestMode = false }: RouterWidgetProps) => 
   }, [dispatch, tokenIn, tokens]);
 
   useEffect(() => {
-    if (!tokenIn || tokenOut || toOptions.length === 0) return;
+    if (
+      (sourceMode === "strato" && !tokenIn) ||
+      toOptions.length === 0 ||
+      (tokenOut &&
+        toOptions.some(
+          (token) =>
+            normalizeAddress(token.address) === normalizeAddress(tokenOut.address)
+        ))
+    ) {
+      return;
+    }
     dispatch({ type: "SELECT_TOKEN_OUT", token: toOptions[0] });
-  }, [dispatch, tokenIn, tokenOut, toOptions]);
+  }, [dispatch, sourceMode, tokenIn, tokenOut, toOptions]);
 
   useEffect(() => {
     if (!selectedExternalRoute) {
@@ -495,7 +517,9 @@ const RouterWidget = ({ userRewards, guestMode = false }: RouterWidgetProps) => 
     : activeQuoteQuery.isError && hasAmount
       ? "No route available"
       : sourceMode === "external"
-        ? "Bridge & Trade"
+        ? isNativeExternalToken
+          ? "Bridge ETH"
+          : "Bridge & Trade"
         : "Trade Assets";
 
   return (

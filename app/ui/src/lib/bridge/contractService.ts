@@ -266,30 +266,16 @@ export async function simulateDeposit({
 
   if (isNative) {
     if (actionIntent?.action) {
-      await client.simulateContract({
-        address: routerAddress,
-        abi: DEPOSIT_ROUTER_ABI,
-        functionName: "depositETHWithAction",
-        args: [
-          formatAddress(userAddress),
-          formatAddress(targetStratoToken),
-          actionIntent.action,
-          formatAddress(actionIntent.actionToken),
-          actionIntent.minFinalOut,
-        ],
-        value: amount,
-        account: accountAddress,
-      });
-    } else {
-      await client.simulateContract({
-        address: routerAddress,
-        abi: DEPOSIT_ROUTER_ABI,
-        functionName: "depositETH",
-        args: [formatAddress(userAddress), formatAddress(targetStratoToken)],
-        value: amount,
-        account: accountAddress,
-      });
+      throw new Error("Native ETH automatic routing is not supported");
     }
+    await client.simulateContract({
+      address: routerAddress,
+      abi: DEPOSIT_ROUTER_ABI,
+      functionName: "depositETH",
+      args: [formatAddress(userAddress), formatAddress(targetStratoToken)],
+      value: amount,
+      account: accountAddress,
+    });
   } else {
     if (!permitData || !tokenAddress) {
       throw new Error("Permit data and token address are required for ERC20 deposits");

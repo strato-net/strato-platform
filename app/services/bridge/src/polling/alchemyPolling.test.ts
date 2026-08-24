@@ -22,13 +22,12 @@ const makeLog = (
   eventName: "DepositRouted" | "DepositRoutedWithAction",
   transactionHash: string,
   action = 2,
-  externalToken = token,
 ): RawDepositLog => {
   const encoded = events.encodeEventLog(
     events.getEvent(eventName)!,
     eventName === "DepositRouted"
-      ? [externalToken, 100n, sender, recipient, target, 1]
-      : [externalToken, 100n, sender, recipient, target, 1, action, metal, 90n],
+      ? [token, 100n, sender, recipient, target, 1]
+      : [token, 100n, sender, recipient, target, 1, action, metal, 90n],
   );
   return {
     address: "0x6666666666666666666666666666666666666666",
@@ -112,24 +111,4 @@ test("parses AUTO_ROUTE action intent without changing its fields", () => {
   assert.equal(actionDeposit.action, "4");
   assert.equal(actionDeposit.actionToken, metal);
   assert.equal(actionDeposit.minFinalOut, "90");
-});
-
-test("parses native ETH AUTO_ROUTE with the zero-address token", () => {
-  const actionDeposit = classifyDepositLogs(
-    [
-      makeLog(
-        "DepositRoutedWithAction",
-        `0x${"ab".repeat(32)}`,
-        4,
-        "0x0000000000000000000000000000000000000000",
-      ),
-    ],
-    1,
-  ).actionDeposits[0];
-
-  assert.equal(
-    actionDeposit.externalToken,
-    "0x0000000000000000000000000000000000000000",
-  );
-  assert.equal(actionDeposit.action, "4");
 });

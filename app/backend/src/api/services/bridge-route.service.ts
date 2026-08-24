@@ -4,7 +4,7 @@ import {
 } from "@strato/shared-types";
 import {
   getBridgeableTokens,
-  getDepositRouterVersion,
+  getDepositRouterMajor,
   getNetworkConfigs,
   isAutoRouteEnabled,
 } from "./bridge.service";
@@ -13,22 +13,22 @@ import { getRouteQuote } from "./route.service";
 const WAD = 10n ** 18n;
 const DEFAULT_SLIPPAGE_BPS = 50;
 const MIN_ACTION_ROUTER_MAJOR = 3;
-const MIN_NATIVE_ACTION_ROUTER_MINOR = 1;
+const ZERO_ADDRESS = "0".repeat(40);
 
 const normalizeAddress = (value: string): string =>
   value.toLowerCase().replace(/^0x/, "");
 
-export const supportsAutoRouteRouter = (
-  version: string | null,
-  nativeDeposit: boolean
-): boolean => {
-  if (!version) return false;
-  const [major, minor = 0] = version.split(".").map(Number);
-  return Number.isInteger(major) &&
-    Number.isInteger(minor) &&
-    (major > MIN_ACTION_ROUTER_MAJOR ||
-      (major === MIN_ACTION_ROUTER_MAJOR &&
-        (!nativeDeposit || minor >= MIN_NATIVE_ACTION_ROUTER_MINOR)));
+export const getBridgeRouteMode = (
+  externalToken: string,
+  targetStratoToken: string,
+  tokenOut: string
+): "direct" | "auto-route" | "unsupported-native-route" => {
+  if (normalizeAddress(targetStratoToken) === normalizeAddress(tokenOut)) {
+    return "direct";
+  }
+  return normalizeAddress(externalToken) === ZERO_ADDRESS
+    ? "unsupported-native-route"
+    : "auto-route";
 };
 
 export const convertExternalToStratoAmount = (
@@ -89,7 +89,12 @@ export const getCompositeBridgeRouteQuote = async (
     rebaseFactor: route.rebaseFactor,
   };
 
-  if (normalizeAddress(route.stratoToken) === normalizeAddress(tokenOut)) {
+  const routeMode = getBridgeRouteMode(
+    route.externalToken,
+    route.stratoToken,
+    tokenOut
+  );
+  if (routeMode === "direct") {
     return {
       bridge,
       tokenIn: normalizeAddress(route.stratoToken),
@@ -106,6 +111,9 @@ export const getCompositeBridgeRouteQuote = async (
         minFinalOut: bridgedAmount.toString(),
       },
     };
+  }
+  if (routeMode === "unsupported-native-route") {
+    throw new Error("Native ETH automatic routing is not supported");
   }
 
   const [autoRouteEnabled, networks] = await Promise.all([
@@ -124,10 +132,10 @@ export const getCompositeBridgeRouteQuote = async (
   const network = networks.find(
     (candidate) => String(candidate.externalChainId) === externalChainId
   );
-  const routerVersion = network?.chainInfo.depositRouter
-    ? await getDepositRouterVersion(externalChainId, network.chainInfo.depositRouter)
+  const routerMajor = network?.chainInfo.depositRouter
+    ? await getDepositRouterMajor(externalChainId, network.chainInfo.depositRouter)
     : null;
-  if (!supportsAutoRouteRouter(routerVersion, BigInt(route.externalToken || "0") === 0n)) {
+  if (routerMajor === null || routerMajor < MIN_ACTION_ROUTER_MAJOR) {
     throw new Error("The selected bridge router does not support automatic routing");
   }
 

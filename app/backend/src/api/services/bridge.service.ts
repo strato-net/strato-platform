@@ -510,10 +510,10 @@ const decodeAbiString = (value: unknown): string => {
   }
 };
 
-export const getDepositRouterVersion = async (
+export const getDepositRouterMajor = async (
   chainId: string,
   depositRouter: string
-): Promise<string | null> => {
+): Promise<number | null> => {
   const { upstream, fallback } = getRpcUpstream(chainId);
   for (const rpcUrl of [...new Set([upstream, fallback].filter(Boolean))] as string[]) {
     try {
@@ -532,22 +532,14 @@ export const getDepositRouterVersion = async (
       );
       if (data?.error) continue;
       const version = decodeAbiString(data?.result);
-      if (version) return version;
+      if (!version) continue;
+      const major = Number(version.split(".")[0]);
+      if (Number.isInteger(major)) return major;
     } catch {
       continue;
     }
   }
   return null;
-};
-
-export const getDepositRouterMajor = async (
-  chainId: string,
-  depositRouter: string
-): Promise<number | null> => {
-  const version = await getDepositRouterVersion(chainId, depositRouter);
-  if (!version) return null;
-  const major = Number(version.split(".")[0]);
-  return Number.isInteger(major) ? major : null;
 };
 
 export const buildDepositActionCatalog = ({

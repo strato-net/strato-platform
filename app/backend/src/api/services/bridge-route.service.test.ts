@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   convertExternalToStratoAmount,
-  supportsAutoRouteRouter,
+  getBridgeRouteMode,
 } from "./bridge-route.service";
 
 test("converts six-decimal external amounts to STRATO decimals", () => {
@@ -26,8 +26,24 @@ test("rejects external decimals unsupported by MercataBridge", () => {
   );
 });
 
-test("requires DepositRouter 3.1 or newer for native AUTO_ROUTE", () => {
-  assert.equal(supportsAutoRouteRouter("3.0.0", true), false);
-  assert.equal(supportsAutoRouteRouter("3.1.0", true), true);
-  assert.equal(supportsAutoRouteRouter("3.0.0", false), true);
+test("allows native ETH to bridge directly to its STRATO token", () => {
+  assert.equal(
+    getBridgeRouteMode(
+      "0000000000000000000000000000000000000000",
+      "1111111111111111111111111111111111111111",
+      "1111111111111111111111111111111111111111"
+    ),
+    "direct"
+  );
+});
+
+test("defers native ETH routing beyond its STRATO token", () => {
+  assert.equal(
+    getBridgeRouteMode(
+      "0000000000000000000000000000000000000000",
+      "1111111111111111111111111111111111111111",
+      "2222222222222222222222222222222222222222"
+    ),
+    "unsupported-native-route"
+  );
 });

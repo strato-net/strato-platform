@@ -90,6 +90,9 @@ export function useAutoRouteDeposit() {
             };
       let txHash: `0x${string}`;
       if (isNative) {
+        if (actionIntent) {
+          throw new Error("Native ETH automatic routing is not supported");
+        }
         await simulateDeposit({
           depositRouter: network.depositRouter,
           isNative: true,
@@ -98,36 +101,19 @@ export function useAutoRouteDeposit() {
           targetStratoToken: route.stratoToken,
           account: externalEvmWalletAddress,
           chainId: network.chainId,
-          actionIntent,
         });
-        txHash = actionIntent
-          ? await writeContractAsync({
-              address: ensureHexPrefix(network.depositRouter),
-              abi: DEPOSIT_ROUTER_ABI,
-              functionName: "depositETHWithAction",
-              args: [
-                ensureHexPrefix(recipient),
-                ensureHexPrefix(route.stratoToken),
-                actionIntent.action,
-                ensureHexPrefix(actionIntent.actionToken),
-                actionIntent.minFinalOut,
-              ],
-              value: amountWei,
-              chain,
-              account: account.address,
-            })
-          : await writeContractAsync({
-              address: ensureHexPrefix(network.depositRouter),
-              abi: DEPOSIT_ROUTER_ABI,
-              functionName: "depositETH",
-              args: [
-                ensureHexPrefix(recipient),
-                ensureHexPrefix(route.stratoToken),
-              ],
-              value: amountWei,
-              chain,
-              account: account.address,
-            });
+        txHash = await writeContractAsync({
+          address: ensureHexPrefix(network.depositRouter),
+          abi: DEPOSIT_ROUTER_ABI,
+          functionName: "depositETH",
+          args: [
+            ensureHexPrefix(recipient),
+            ensureHexPrefix(route.stratoToken),
+          ],
+          value: amountWei,
+          chain,
+          account: account.address,
+        });
       } else {
         const approval = await checkPermit2Approval({
           token: route.externalToken,
