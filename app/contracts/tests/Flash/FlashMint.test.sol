@@ -309,7 +309,7 @@ contract Describe_FlashMint is Authorizable {
         reg      = m.cdpRegistry();
         oracle   = m.priceOracle();
         admin    = m.adminRegistry();
-        fm       = m.flashMint();
+        fm       = new FlashMint(address(admin));
 
         // USDST
         USDST  = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);

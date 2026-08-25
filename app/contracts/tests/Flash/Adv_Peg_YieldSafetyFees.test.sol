@@ -212,7 +212,7 @@ contract Describe_Adv_Peg_YieldSafetyFees is Authorizable {
         whale.do(address(psm), "mint", 101347e18, address(USDC));
 
         // ── FlashMint
-        fm = m.flashMint();
+        fm = new FlashMint(address(areg));
         areg.addWhitelist(address(USDST), "mint", address(fm));
         areg.addWhitelist(address(USDST), "burn", address(fm));
         fm.initialize(address(USDST), address(m.feeCollector()), MAXLOAN);

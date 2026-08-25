@@ -183,7 +183,7 @@ contract Describe_Adv_Amm_V3Skew is Authorizable {
 
         m = new Mercata();
         admin = m.adminRegistry();
-        fm = m.flashMint();
+        fm = new FlashMint(address(admin));
 
         USDST = m.tokenFactory().createToken("USDST", "USD Stable", [], [], [], "USDST", 0, 18);
         usdstT = Token(USDST);

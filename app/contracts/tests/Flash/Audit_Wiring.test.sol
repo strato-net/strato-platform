@@ -18,7 +18,8 @@ contract Borrower {
     }
 }
 
-/// Audits the DEPLOYMENT and GOVERNANCE wiring of FlashMint as BaseCodeCollection.sol ships it.
+/// Audits the bolt-on DEPLOYMENT and GOVERNANCE wiring of FlashMint (see FLASHMINT_DEPLOYMENT.md).
+/// Mercata does not deploy the facility; tests stand up the same proxy-owned, closed-at-launch shape.
 contract Describe_FlashMintWiring is Authorizable {
 
     Mercata m;
@@ -30,16 +31,22 @@ contract Describe_FlashMintWiring is Authorizable {
     function beforeAll() public {
         bypassAuthorizations = true;
         m     = new Mercata();
-        fm    = m.flashMint();
         admin = m.adminRegistry();
+
+        fm = new FlashMint(address(admin));
+        fm.initialize(
+            address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010),
+            address(m.feeCollector()),
+            0
+        );
 
         USDST  = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);
         usdstT = Token(USDST);
         usdstT.setStatus(2);
     }
 
-    // ── W1: BaseCodeCollection points the facility at the HARD-CODED mainnet USDST,
-    //        which does not exist in a fresh deployment, and initialize() accepts it.
+    // ── W1: Production initialize() pins the facility at the HARD-CODED mainnet USDST,
+    //        which does not exist in a fresh deployment, and accepts it.
     function it_w1_ships_pointed_at_a_hardcoded_address() public {
         require(fm.token() == address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010),
             "BaseCodeCollection pinned token");
@@ -62,7 +69,7 @@ contract Describe_FlashMintWiring is Authorizable {
         require(fm.whitelistEnabled(), "re-initialize silently re-armed the whitelist");
     }
 
-    // ── W3: BaseCodeCollection never grants AdminRegistry.whitelist[USDST]["mint"|"burn"][FlashMint],
+    // ── W3: A fresh bolt-on never grants AdminRegistry.whitelist[USDST]["mint"|"burn"][FlashMint],
     //        so the facility as deployed cannot mint. Confirm it fails CLOSED, not open.
     function it_w3_no_mint_grant_means_the_facility_fails_closed() public {
         require(!admin.whitelist(USDST, "mint", address(fm)), "no mint grant exists");

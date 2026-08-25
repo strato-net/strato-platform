@@ -179,7 +179,7 @@ contract Describe_Adv_Peg_ForgeVault is Authorizable {
         lp.do(va, "deposit", address(USDST), 500000e18);
 
         // ── FlashMint
-        fm = m.flashMint();
+        fm = new FlashMint(address(areg));
         areg.addWhitelist(address(USDST), "mint", address(fm));
         areg.addWhitelist(address(USDST), "burn", address(fm));
         fm.initialize(address(USDST), address(m.feeCollector()), MAXLOAN);

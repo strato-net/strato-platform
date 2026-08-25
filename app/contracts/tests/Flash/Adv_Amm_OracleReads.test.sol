@@ -125,7 +125,7 @@ contract Describe_Adv_Amm_OracleReads is Authorizable {
         USDST_RES = 239376e18;
 
         m = new Mercata();
-        admin = m.adminRegistry(); pf = m.poolFactory(); fm = m.flashMint();
+        admin = m.adminRegistry(); pf = m.poolFactory(); fm = new FlashMint(address(admin));
         oracle = m.priceOracle(); cdp = m.cdpEngine(); cdpVault = m.cdpVault(); reg = m.cdpRegistry();
 
         USDST = m.tokenFactory().createToken("USDST", "USD Stable", [], [], [], "USDST", 0, 18);

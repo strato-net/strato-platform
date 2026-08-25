@@ -201,7 +201,7 @@ contract Describe_Adv_Credit_Lending is Authorizable {
         CAP = 2000000e18;
 
         m      = new Mercata();
-        fm     = m.flashMint();
+        fm     = new FlashMint(address(m.adminRegistry()));
         pool   = m.lendingPool();
         liq    = m.liquidityPool();
         cvault = m.collateralVault();

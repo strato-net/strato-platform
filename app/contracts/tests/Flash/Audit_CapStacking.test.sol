@@ -42,7 +42,7 @@ contract Describe_FlashMintCapStacking is Authorizable {
 
     function beforeAll() public {
         bypassAuthorizations = true;
-        m = new Mercata(); fm = m.flashMint(); admin = m.adminRegistry();
+        m = new Mercata(); admin = m.adminRegistry(); fm = new FlashMint(address(admin));
         USDST = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);
         usdstT = Token(USDST); usdstT.setStatus(2);
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(fm));

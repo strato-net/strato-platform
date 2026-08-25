@@ -61,14 +61,15 @@ contract Describe_MintBurnGrantScope is Authorizable {
     /// So the grant is strictly broader than FlashMint's use of it. FlashMint restricts
     /// itself to msg.sender; nothing in the grant requires that of its successor.
     function it_x3_the_grant_does_not_encode_flashmints_self_restriction() public {
-        FlashMint fm = m.flashMint();
+        FlashMint fm = new FlashMint(address(admin));
+        fm.initialize(USDST, address(m.feeCollector()), 0);
         // FlashMint's own guard is a line of its source, not a property of the grant.
         try {
             fm.flashLoan(address(0xD00D), 1e18, "");
             require(false, "FlashMint restricts itself");
         } catch { }
-        // The proxy that carries the grant is owned by AdminRegistry: a 2-of-3 quorum can
-        // replace the logic behind it while the grant stays attached to the same address.
+        // AdminRegistry-owned proxy: a 2-of-3 quorum can replace the logic while the
+        // grant stays attached to the same address.
         require(Ownable(address(fm)).owner() == address(admin),
             "the grant sits behind a proxy governance can re-point");
     }

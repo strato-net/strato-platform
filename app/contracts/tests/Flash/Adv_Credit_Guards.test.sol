@@ -152,7 +152,7 @@ contract Describe_Adv_Credit_Guards is Authorizable {
         reg      = m.cdpRegistry();
         oracle   = m.priceOracle();
         admin    = m.adminRegistry();
-        fm       = m.flashMint();
+        fm       = new FlashMint(address(admin));
 
         USDST  = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);
         usdstT = Token(USDST);

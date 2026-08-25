@@ -93,7 +93,7 @@ contract Describe_FlashMintMetalForge is Authorizable {
         MINCR      = 155e16;
 
         m = new Mercata();
-        fm = m.flashMint(); cdp = m.cdpEngine(); cdpVault = m.cdpVault();
+        fm = new FlashMint(address(m.adminRegistry())); cdp = m.cdpEngine(); cdpVault = m.cdpVault();
         reg = m.cdpRegistry(); oracle = m.priceOracle(); admin = m.adminRegistry();
 
         USDST = m.tokenFactory().createToken("USDST","USD Stable",empty,empty,empty,"USDST",0,18);
@@ -253,7 +253,7 @@ contract Describe_FlashMintForgeStacked is Authorizable {
         MAXLOAN    = 2000000e18;               // the vendor test suite's own cap
 
         m = new Mercata();
-        fm = m.flashMint(); cdp = m.cdpEngine(); reg = m.cdpRegistry();
+        fm = new FlashMint(address(m.adminRegistry())); cdp = m.cdpEngine(); reg = m.cdpRegistry();
         oracle = m.priceOracle(); admin = m.adminRegistry();
 
         USDST = m.tokenFactory().createToken("USDST","USD Stable",empty,empty,empty,"USDST",0,18);

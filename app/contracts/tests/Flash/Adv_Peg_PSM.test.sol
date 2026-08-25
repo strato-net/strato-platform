@@ -282,7 +282,7 @@ contract Describe_Adv_Peg_PSM is Authorizable {
         USDST.mint(address(this), FLOAT_OTHER);
 
         // ── FlashMint
-        fm = m.flashMint();
+        fm = new FlashMint(address(areg));
         areg.addWhitelist(address(USDST), "mint", address(fm));
         areg.addWhitelist(address(USDST), "burn", address(fm));
         fm.initialize(address(USDST), address(m.feeCollector()), MAXLOAN);

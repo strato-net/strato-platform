@@ -25,7 +25,7 @@ contract Describe_FlashMintMintFailure is Authorizable {
 
     function beforeAll() public {
         bypassAuthorizations = true;
-        m = new Mercata(); fm = m.flashMint(); admin = m.adminRegistry();
+        m = new Mercata(); admin = m.adminRegistry(); fm = new FlashMint(address(admin));
         USDST = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);
         usdstT = Token(USDST); usdstT.setStatus(2);
         fm.initialize(USDST, address(m.feeCollector()), 1000000e18);

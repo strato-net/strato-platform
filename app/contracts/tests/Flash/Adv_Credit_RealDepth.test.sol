@@ -228,7 +228,7 @@ contract Describe_Adv_Credit_RealDepth is Authorizable {
         reserve  = m.cdpReserve();
         oracle   = m.priceOracle();
         admin    = m.adminRegistry();
-        fm       = m.flashMint();
+        fm       = new FlashMint(address(admin));
         pf       = m.poolFactory();
 
         USDST  = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);

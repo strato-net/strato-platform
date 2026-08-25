@@ -146,7 +146,7 @@ contract Describe_Adv_Peg_SaveVault is Authorizable {
         vault.setRewardDistributor(address(distributor));
         vault.setPerSecondSavingsRate(MAINNET_RATE);
 
-        fm = m.flashMint();
+        fm = new FlashMint(address(areg));
         areg.addWhitelist(address(USDST), "mint", address(fm));
         areg.addWhitelist(address(USDST), "burn", address(fm));
         fm.initialize(address(USDST), address(m.feeCollector()), MAXLOAN);

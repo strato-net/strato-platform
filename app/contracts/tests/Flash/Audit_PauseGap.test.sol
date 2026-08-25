@@ -53,7 +53,7 @@ contract Describe_FlashMintPauseGap is Authorizable {
     function beforeAll() public {
         bypassAuthorizations = true;
         m = new Mercata();
-        fm = m.flashMint(); cdp = m.cdpEngine(); cdpVault = m.cdpVault();
+        fm = new FlashMint(address(m.adminRegistry())); cdp = m.cdpEngine(); cdpVault = m.cdpVault();
         reg = m.cdpRegistry(); oracle = m.priceOracle(); admin = m.adminRegistry();
 
         USDST = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);

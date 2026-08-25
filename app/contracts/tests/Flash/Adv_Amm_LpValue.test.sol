@@ -215,7 +215,7 @@ contract Describe_Adv_Amm_LpValue is Authorizable {
         USDST_RES = 239376e18;
 
         m = new Mercata();
-        admin = m.adminRegistry(); pf = m.poolFactory(); fm = m.flashMint(); oracle = m.priceOracle();
+        admin = m.adminRegistry(); pf = m.poolFactory(); fm = new FlashMint(address(admin)); oracle = m.priceOracle();
 
         USDST = m.tokenFactory().createToken("USDST", "USD Stable", [], [], [], "USDST", 0, 18);
         usdstT = Token(USDST);

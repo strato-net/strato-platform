@@ -99,8 +99,8 @@ contract Describe_Adv_Credit_Rewards is Authorizable {
         SRC = address(0xBEEF);
 
         m     = new Mercata();
-        fm    = m.flashMint();
         admin = m.adminRegistry();
+        fm    = new FlashMint(address(admin));
 
         USDST  = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);
         usdstT = Token(USDST);

@@ -114,7 +114,7 @@ contract Describe_Adv_Amm_RoundTrip is Authorizable {
         m     = new Mercata();
         admin = m.adminRegistry();
         pf    = m.poolFactory();
-        fm    = m.flashMint();
+        fm    = new FlashMint(address(admin));
 
         USDST  = m.tokenFactory().createToken("USDST", "USD Stable", [], [], [], "USDST", 0, 18);
         usdstT = Token(USDST);
