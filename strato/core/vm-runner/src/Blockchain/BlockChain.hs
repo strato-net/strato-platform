@@ -53,7 +53,7 @@ import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
-import Blockchain.Forks (isBlockRewardReceiptForkActive, isReceiptsRootForkActive)
+import Blockchain.Forks (isReceiptsRootForkActive)
 import qualified Blockchain.Verification as V
 import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
@@ -385,7 +385,7 @@ addTransactions ::
 addTransactions blockData txs proposer =
   timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
     rewardResult <- lift $ payBlockRewards blockData proposer
-    trrs <- attachBlockRewards blockData rewardResult <$> lift (go (getBlockGasLimit blockData) txs DL.empty)
+    trrs <- Bagger.attachBlockRewards blockData rewardResult <$> lift (go (getBlockGasLimit blockData) txs DL.empty)
     mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
     yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
     pure trrs
@@ -423,12 +423,14 @@ mineTransactions bd remGas otxs mSelfAddress payRewards = do
   -- happens exactly once per block on this side too.
   rewardResult <- if payRewards then payBlockRewards bd mSelfAddress else pure Nothing
   res <- mineTransactions' bd remGas DL.empty otxs mSelfAddress
-  -- Same fold as addTransactions: the run that pays the rewards is the run that
-  -- carries the block's first transaction, so both sides attach to the same one.
-  pure res {Bagger.tmrRanTxs = attachBlockRewards bd rewardResult (Bagger.tmrRanTxs res)}
+  -- Same fold as addTransactions, but this run need not be the one that carries
+  -- the block's first transaction: when it ran none, hand the reward results
+  -- back so an incremental build can attach them to the run that does.
+  let (ranTxs, unattached) = Bagger.attachBlockRewards' bd rewardResult (Bagger.tmrRanTxs res)
+  pure res {Bagger.tmrRanTxs = ranTxs, Bagger.tmrUnattachedRewards = unattached}
 
 mineTransactions' :: (VMBase m, MonadMonitor m) => BlockHeader -> Integer -> DL.DList TxRunResult -> [OutputTx] -> Address-> m Bagger.TxMiningResult
-mineTransactions' _ remGas ran [] _ = return $ Bagger.TxMiningResult Nothing (DL.toList ran) [] remGas
+mineTransactions' _ remGas ran [] _ = return $ Bagger.TxMiningResult Nothing (DL.toList ran) [] remGas Nothing
 mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
   let bt = otBaseTx tx
   beforeMap <- getAddressStateTxDBMap
@@ -444,7 +446,7 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
       flushMemStorageTxDBToBlockDB
       mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs mSelfAddress
     Left failure -> do
-      return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
+      return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas Nothing
 
 addTransaction ::
   (VMBase m, MonadMonitor m) =>
@@ -674,24 +676,8 @@ payBlockRewards b proposer = do
         Nothing -> pure $ Just rewardResult
     _ -> pure Nothing
 
--- | Fold the block-reward call's events into the block's first receipt.
---
--- The reward runs outside any transaction, so without this its events reach
--- neither the receipts nor the indexer — the payout is only visible as a balance
--- change. Attaching them to the first transaction mirrors what payFees already
--- does with its own fee events, and keeps receipts a per-transaction list.
---
--- Gated: receipts roots are live in the header, so this moves the root and
--- proposer and verifier must switch at the same block.
-attachBlockRewards :: BlockHeader -> Maybe ExecResults -> [TxRunResult] -> [TxRunResult]
-attachBlockRewards bd (Just rewardResult) (trr : rest)
-  | isBlockRewardReceiptForkActive (number bd),
-    Right er <- trrResult trr =
-      let merged = er { erEvents = erEvents rewardResult ++ erEvents er,
-                        erLogs = erLogs rewardResult ++ erLogs er
-                      }
-       in trr {trrResult = Right merged} : rest
-attachBlockRewards _ _ trrs = trrs
+-- (attachBlockRewards / attachBlockRewards' now live in Blockchain.Bagger, so
+-- the miner and the verifier cannot drift apart on how rewards reach receipts.)
 
 ----------------
 {-
