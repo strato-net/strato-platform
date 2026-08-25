@@ -121,9 +121,14 @@ handleEvents peer = awaitForever $ \case
       Nothing -> do
         BestSequencedBlock _ bestBlockNum _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
         let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
-        $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
-        $logInfoS "handleEvents/NewBlock" "#### New block is missing its parent, I am resyncing"
-        syncFetch Forward fetchNumber
+        -- Debounced: while we are far behind, every gossiped block misses its
+        -- parent, and one 500-header request per gossiped block buries the
+        -- BlockBodies responses we actually need.
+        shouldFetch <- lift $ shouldResyncFrom fetchNumber
+        when shouldFetch $ do
+          $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
+          $logInfoS "handleEvents/NewBlock" "#### New block is missing its parent, I am resyncing"
+          syncFetch Forward fetchNumber
       Just _ -> do
         let ingestBlock = IEBlock $ blockToIngestBlock (Origin.PeerString $ peerString peer) block'
         yieldL $ ToUnseq [ingestBlock]
@@ -131,8 +136,10 @@ handleEvents peer = awaitForever $ \case
     lift stampActionTimestamp
     BestSequencedBlock _ bestBlockNum _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
     let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
-    $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
-    syncFetch Forward fetchNumber
+    shouldFetch <- lift $ shouldResyncFrom fetchNumber
+    when shouldFetch $ do
+      $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
+      syncFetch Forward fetchNumber
   MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> do
     lift stampActionTimestamp
     start' <- case dir of
@@ -180,7 +187,10 @@ handleEvents peer = awaitForever $ \case
 
     unless bodyRequestAlreadyActive $ do
       bodyHashes' <- lift getBodiesToFetch
-      yieldR $ GetBlockBodies bodyHashes'
+      -- An empty fetch list means nothing was queued; asking a peer for zero
+      -- bodies just burns a round trip (it dutifully answers BlockBodies []),
+      -- which is why the BlockBodies handler below already guards on this.
+      unless (null bodyHashes') . yieldR $ GetBlockBodies bodyHashes'
 
 
 
