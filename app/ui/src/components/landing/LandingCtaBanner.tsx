@@ -6,9 +6,10 @@ interface LandingCtaBannerProps {
   banner: ProductLandingConfig["ctaBanner"];
   appPath: string;
   connectedLabel: string;
+  slug: string;
 }
 
-const LandingCtaBanner = ({ banner, appPath, connectedLabel }: LandingCtaBannerProps) => (
+const LandingCtaBanner = ({ banner, appPath, connectedLabel, slug }: LandingCtaBannerProps) => (
   <Section>
     <div className="flex flex-col items-start justify-between gap-6 rounded-2xl bg-strato-blue p-8 dark:bg-strato-dark sm:flex-row sm:items-center">
       <div>
@@ -19,6 +20,8 @@ const LandingCtaBanner = ({ banner, appPath, connectedLabel }: LandingCtaBannerP
       <LandingConnectButton
         appPath={appPath}
         connectedLabel={connectedLabel}
+        slug={slug}
+        placement="cta_banner"
         className="w-full shrink-0 bg-white text-strato-blue hover:bg-white/90 sm:w-auto"
       />
     </div>

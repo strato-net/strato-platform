@@ -38,6 +38,8 @@ export const usdstVault: ProductLandingConfig = {
       title: "Get USDST",
       body: "Buy, swap or bridge into the stable asset built for STRATO.",
       cta: "Get USDST",
+      // Funding the account happens on the deposits screen, not the vault.
+      appPath: "/dashboard/deposits",
     },
     {
       index: "03",

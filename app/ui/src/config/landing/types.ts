@@ -22,6 +22,8 @@ export interface LandingStep {
   title: string;
   body: string;
   cta: string;
+  /** Route this step's button opens; defaults to the page's `appPath`. */
+  appPath?: string;
 }
 
 export interface LandingMetric {

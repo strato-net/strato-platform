@@ -62,6 +62,7 @@ import { ArrowDownToLine, Gem, CheckCircle2, ChevronLeft, ChevronRight, AlertTri
 import { usdstAddress, WAD, METAL_BUY_FEE } from "@/lib/constants";
 import type { WalletTxProgressEvent } from "@/lib/axios";
 import { isTxPending, isTxSubmitted } from "@/utils/transactionStatus";
+import { captureApi } from "@/lib/analytics";
 
 const METAL_BUY_FEE_WEI = safeParseUnits(METAL_BUY_FEE).toString();
 
@@ -967,7 +968,17 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
 
     setIsLoading(true);
     setProgressError(undefined);
-    
+
+    // Deposits are signed directly through wagmi rather than the STRATO
+    // backend, so they never pass the axios interceptor and need explicit
+    // instrumentation.
+    captureApi("bridge_in", "started", {
+      transport: "wagmi",
+      network: selectedNetwork,
+      token_symbol: selectedToken.externalSymbol,
+      route_type: selectedToken.routeType,
+    });
+
     const isNative = selectedToken.routeType !== "native" && BigInt(selectedToken.externalToken || "0") === 0n;
     setProgressIsNative(isNative);
     setProgressIsRedemption(selectedToken.routeType === "native");
@@ -1266,6 +1277,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       // Step: Complete
       setCurrentStep("complete");
       setAmount("");
+      captureApi("bridge_in", "succeeded", {
+        transport: "wagmi",
+        network: selectedNetwork,
+        token_symbol: selectedToken.externalSymbol,
+        tx_hash: txHash,
+      });
 
       await Promise.all([
         isNative ? refetchNative() : refetchToken(),
@@ -1275,6 +1292,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       const bridgeError = normalizeError(error);
       setCurrentStep("error");
       setProgressError(bridgeError.userMessage);
+      captureApi("bridge_in", "failed", {
+        transport: "wagmi",
+        network: selectedNetwork,
+        token_symbol: selectedToken.externalSymbol,
+        error_message: bridgeError.userMessage,
+      });
       toast({
         title: "Transaction Failed",
         description: bridgeError.userMessage,

@@ -10,6 +10,7 @@ import LandingHighlightPanel from "@/components/landing/LandingHighlightPanel";
 import LandingStatStrip from "@/components/landing/LandingStatStrip";
 import LandingSteps from "@/components/landing/LandingSteps";
 import { LANDING_CONFIGS } from "@/config/landing";
+import { capture } from "@/lib/analytics";
 import NotFound from "./NotFound";
 
 /**
@@ -21,8 +22,12 @@ const ProductLanding = ({ slug }: { slug: string }) => {
   const config = LANDING_CONFIGS[slug];
 
   useEffect(() => {
-    if (config) document.title = config.documentTitle;
-  }, [config]);
+    if (!config) return;
+    document.title = config.documentTitle;
+    // Autocapture already records the URL, but a named event carrying the slug
+    // is what makes the acquisition funnel buildable without regex filters.
+    capture("landing_page_viewed", { slug });
+  }, [config, slug]);
 
   if (!config) return <NotFound />;
 
@@ -35,7 +40,7 @@ const ProductLanding = ({ slug }: { slug: string }) => {
       <main>
         <LandingHero hero={config.hero} accent={config.accent} />
         <LandingStatStrip stats={config.stats} />
-        <LandingSteps steps={config.steps} appPath={config.appPath} />
+        <LandingSteps steps={config.steps} appPath={config.appPath} slug={slug} />
         <LandingHighlightPanel highlight={config.highlight} accent={config.accent} />
         <LandingAssurances assurances={config.assurances} />
 
@@ -46,6 +51,7 @@ const ProductLanding = ({ slug }: { slug: string }) => {
           banner={config.ctaBanner}
           appPath={config.appPath}
           connectedLabel={connectedLabel}
+          slug={slug}
         />
       </main>
 

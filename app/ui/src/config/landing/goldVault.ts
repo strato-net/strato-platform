@@ -38,6 +38,8 @@ export const goldVault: ProductLandingConfig = {
       title: "Get GOLDST",
       body: "Buy or swap into tokenized, vaulted gold on STRATO.",
       cta: "Get GOLDST",
+      // Funding the account happens on the deposits screen, not the vault.
+      appPath: "/dashboard/deposits",
     },
     {
       index: "03",
