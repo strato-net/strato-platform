@@ -129,7 +129,11 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
                               stateRoot = bSumStateRoot summ
                             }
             proposer <- either error pure $ recoverProposer bHeader
-            res <- Bagger.runFromStateRoot
+            -- Verification always replays the whole block in one run, so it
+            -- always has the block's first transaction to attach the rewards
+            -- to; any leftover means the block has no transactions at all, and
+            -- then the miner drops them too. Nothing to carry here.
+            (_, res) <- Bagger.runFromStateRoot
               --account
               mineTransactions
               (bSumGasLimit summ)
