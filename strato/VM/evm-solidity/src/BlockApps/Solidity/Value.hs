@@ -9,7 +9,9 @@ import BlockApps.Solidity.Type
 import BlockApps.Solidity.TypeDefs
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
+import Control.Applicative ((<|>))
 import Control.DeepSeq
+import Control.Monad (guard)
 import qualified Data.Bimap as Bimap
 import qualified Data.Binary as Binary
 import Data.Bits (complement, shiftL, (.|.))
@@ -17,11 +19,12 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Lazy as ByteString.Lazy
+import Data.Char (isHexDigit)
 import Data.Hashable
 import qualified Data.IntMap as I
 import Data.List (uncons)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
+import Data.Maybe (fromMaybe, isJust, isNothing, listToMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -275,16 +278,23 @@ unescapeStringValue = Text.pack . go . Text.unpack
     go [] = []
 
 -- | Render a scalar as a transaction-arg literal. Like 'simpleValueToText'
--- (which display paths keep using), but a string whose content the VM's arg
--- parser would re-type as an address (1-40 hex chars, e.g. "123") is emitted
--- in the explicit cast form @string("…")@ so it stays a string. Exactly-40-hex
--- content keeps the legacy quoted form: rendered addresses travel that way
--- through variadic re-marshaling, and re-typing those to an address is
--- intended.
+-- (which display paths keep using), but values the VM's arg parser (or bloc's
+-- own 'argValueToType' inference, when a wallet-wrapped call re-marshals its
+-- inner args) would re-type are emitted in an explicit cast form:
+--
+--   * a string whose content would be read back as an address (1-40 hex chars,
+--     e.g. "123") becomes @string("…")@ so it stays a string. Exactly-40-hex
+--     content keeps the legacy quoted form: rendered addresses travel that way
+--     through variadic re-marshaling, and re-typing those to an address is
+--     intended.
+--   * bytes become @bytes("…")@ rather than the bare @hex"…"@ form. Nothing
+--     quotes @hex"…"@, so re-marshaling used to infer it as a plain string and
+--     silently store a bytes32 as 69 characters of ASCII.
 simpleValueToArgText :: SimpleValue -> Text
 simpleValueToArgText sv = case sv of
   ValueString tx
     | stringNeedsCast tx -> "string(\"" <> escapeStringValue tx <> "\")"
+  ValueBytes _ b -> "bytes(\"" <> Text.decodeUtf8 (Base16.encode b) <> "\")"
   _ -> simpleValueToText sv
 
 -- | Would the VM's arg parser re-type this quoted string as an address?
@@ -313,6 +323,84 @@ splitCastLiteral t' = listToMaybe $ mapMaybe go castKeywords
 unquoteCastInner :: Text -> Maybe Text
 unquoteCastInner inner =
   unescapeStringValue <$> (Text.stripSuffix "\"" =<< Text.stripPrefix "\"" (Text.strip inner))
+
+-- | Recognize a bare Solidity hex literal (@hex"00ff"@, single-quoted too) and
+-- return its hex digits. 'simpleValueToArgText' emits @bytes("…")@ instead
+-- now, but the VM's parser still accepts this form and clients still send it,
+-- so inference has to recognize it too — otherwise it falls through to string
+-- inference and the bytes are re-typed. Mirrors the VM's @myHexParser@:
+-- non-empty, even-length, hex digits only.
+splitHexLiteral :: Text -> Maybe Text
+splitHexLiteral t' = do
+  rest <- Text.stripPrefix "hex" (Text.strip t')
+  digits <- quoted '"' rest <|> quoted '\'' rest
+  guard $ not (Text.null digits) && even (Text.length digits) && Text.all isHexDigit digits
+  pure digits
+  where
+    quoted q s =
+      let qt = Text.singleton q
+       in Text.stripSuffix qt =<< Text.stripPrefix qt s
+
+-- | Split a rendered array literal (@[a,b,c]@) into its top-level element
+-- texts; @Nothing@ when the brackets or quotes don't balance.
+--
+-- Counterpart of the @[…]@ form 'valueToText' emits for arrays. Most rendered
+-- arrays happen to also be valid JSON and are recovered that way, but
+-- Solidity-only element forms — @[bytes("aa"),bytes("bb")]@,
+-- @[hex"aa",hex"bb"]@ — are not, and used to be re-typed as one long string.
+splitLiteralList :: Text -> Maybe [Text]
+splitLiteralList t' =
+  splitTopLevelCommas =<< (Text.stripSuffix "]" =<< Text.stripPrefix "[" (Text.strip t'))
+
+-- | Split a rendered object literal (@{k:v,k2:v2}@) into its top-level
+-- key/value texts; @Nothing@ when the braces or quotes don't balance, or a
+-- member has no @:@ separator.
+--
+-- Counterpart of the @{…}@ form 'valueToText' emits for structs. Field names
+-- are rendered bare, so this is never valid JSON; the VM's @objectE@ parses
+-- the same shape.
+splitObjectLiteral :: Text -> Maybe [(Text, Text)]
+splitObjectLiteral t' = do
+  inner <- Text.stripSuffix "}" =<< Text.stripPrefix "{" (Text.strip t')
+  members <- splitTopLevelCommas inner
+  traverse member members
+  where
+    member m = do
+      let (k, rest) = Text.break (== ':') m
+      v <- Text.stripPrefix ":" rest
+      let k' = unquoteKey (Text.strip k)
+      guard . not $ Text.null k'
+      pure (k', Text.strip v)
+    unquoteKey k = fromMaybe k (Text.stripSuffix "\"" =<< Text.stripPrefix "\"" k)
+
+-- | Split a literal's body on its top-level commas: commas inside quotes or
+-- inside nested brackets, braces or parens do not split. @Nothing@ when the
+-- quotes or nesting don't balance; an empty body yields no elements.
+splitTopLevelCommas :: Text -> Maybe [Text]
+splitTopLevelCommas body
+  | Text.null (Text.strip body) = Just []
+  | otherwise = map (Text.strip . Text.pack) <$> go [] Nothing "" (Text.unpack body)
+  where
+    closerOf c = case c of
+      '[' -> ']'
+      '(' -> ')'
+      '{' -> '}'
+      _ -> c
+    go :: String -> Maybe Char -> String -> String -> Maybe [String]
+    go stack mq acc s = case s of
+      [] -> if null stack && isNothing mq then Just [reverse acc] else Nothing
+      ('\\' : c : rest) | isJust mq -> go stack mq (c : '\\' : acc) rest
+      (c : rest) -> case mq of
+        Just q | c == q -> go stack Nothing (c : acc) rest
+               | otherwise -> go stack mq (c : acc) rest
+        Nothing
+          | c == '"' || c == '\'' -> go stack (Just c) (c : acc) rest
+          | c `elem` ("[({" :: String) -> go (closerOf c : stack) mq (c : acc) rest
+          | c `elem` ("])}" :: String) -> case stack of
+              (top : stack') | top == c -> go stack' mq (c : acc) rest
+              _ -> Nothing
+          | c == ',' && null stack -> (reverse acc :) <$> go stack mq "" rest
+          | otherwise -> go stack mq (c : acc) rest
 
 simpleValueToText :: SimpleValue -> Text
 simpleValueToText sv = case sv of

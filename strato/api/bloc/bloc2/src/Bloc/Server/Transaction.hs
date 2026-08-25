@@ -27,6 +27,7 @@ module Bloc.Server.Transaction
     marshalCreatePayload,
     marshalFunctionArgs,
     marshalInnerCallArgs,
+    getSolidityType,
     walletWrapCreate,
     walletWrapCall,
     mergeTxParams,
@@ -1533,7 +1534,12 @@ getSolidityType (ArgArray v) (Xabi.Array typ len) =
   let arrType = case len of
         Just l -> TypeArrayFixed l
         Nothing -> TypeArrayDynamic
-      elType = getSolidityType (V.head v) typ
+      -- An empty array is a legitimate value for any T[] (and the normal case
+      -- for some parameters), so there may be no element to infer from. Fall
+      -- back to the declared entry type rather than indexing an empty vector.
+      elType = case V.uncons v of
+        Just (x, _) -> getSolidityType x typ
+        Nothing -> emptyArrayEntryType typ
    in case elType of
         Right c -> Right (arrType c)
         e -> e
@@ -1542,6 +1548,22 @@ getSolidityType (ArgObject _) Xabi.Mapping {} = Right $ TypeStruct "s"
 getSolidityType av Xabi.Mapping {} = Left $ Text.pack $ "Expected Object for Mapping type, but got " ++ show av
 getSolidityType _ Xabi.Variadic = Right $ TypeVariadic
 getSolidityType _ Xabi.Decimal = Right . SimpleType $ TypeDecimal
+
+-- | Entry type of an empty array argument. 'getSolidityType' consults a sample
+-- element only to decide what an 'Xabi.UnknownLabel' names; with no elements
+-- that choice is vacuous (nothing is coerced against it), so resolve the type
+-- from the declared ABI entry alone.
+emptyArrayEntryType :: Xabi.Type -> Either Text Type
+emptyArrayEntryType = \case
+  Xabi.UnknownLabel s -> Right . TypeStruct $ Text.pack s
+  Xabi.Array typ len ->
+    let arrType = case len of
+          Just l -> TypeArrayFixed l
+          Nothing -> TypeArrayDynamic
+     in arrType <$> emptyArrayEntryType typ
+  Xabi.Mapping {} -> Right $ TypeStruct "s"
+  -- Every remaining case ignores the value it is given
+  typ -> getSolidityType (ArgObject mempty) typ
 
 getResultAndRespond ::
   ( MonadUnliftIO m,

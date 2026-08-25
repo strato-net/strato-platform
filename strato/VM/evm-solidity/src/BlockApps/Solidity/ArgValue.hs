@@ -157,21 +157,80 @@ argValueToType v@(ArgString s') = maybe (SimpleType TypeString, v) id $
         '0':'x':_ -> ((SimpleType TypeAddress, v) <$ ((readMaybe s) :: Maybe Address))
                  <|> ((SimpleType typeInt,) . ArgInt <$> ((readMaybe s) :: Maybe Integer))
         '"':_     -> ((SimpleType TypeString,) . ArgString . Text.pack <$> ((readMaybe s) :: Maybe String))
-        -- Try to parse strings that look like JSON arrays
+        -- Try to parse strings that look like JSON arrays, then as rendered
+        -- Solidity array literals (bytes elements are not valid JSON)
         '[':_     -> (argValueToType <$> A.decode (BSL.fromStrict $ Text.encodeUtf8 s'))
-        -- Try to parse strings that look like JSON objects
+                 <|> (argValueToType . ArgArray . V.fromList . map ArgString <$> solidityLiteralList s')
+        -- Try to parse strings that look like JSON objects, then as rendered
+        -- Solidity object literals (struct field names are rendered bare)
         '{':_     -> (argValueToType <$> A.decode (BSL.fromStrict $ Text.encodeUtf8 s'))
+                 <|> (argValueToType . ArgObject <$> solidityLiteralObject s')
         _         -> ((SimpleType typeInt,) . ArgInt <$> ((readMaybe s) :: Maybe Integer))
                  <|> ((SimpleType TypeAddress, v) <$ ((readMaybe s) :: Maybe Address)))
 argValueToType v@(ArgDecimal _) = (SimpleType TypeDecimal, v)
-argValueToType v@(ArgArray vs) = (TypeArrayDynamic $ fst $ argValueToType $ V.head vs, v)
+argValueToType (ArgArray vs) =
+  -- Inference rewrites elements (unwrapping cast literals), so the array has to
+  -- carry the rewritten values, not the originals. An empty array has nothing
+  -- to infer from: any element type is vacuously correct, since no element will
+  -- be coerced against it, and a declared type overrides this anyway.
+  let inferred = argValueToType <$> vs
+      elemType = maybe (SimpleType typeUInt) (fst . fst) (V.uncons inferred)
+   in (TypeArrayDynamic elemType, ArgArray $ snd <$> inferred)
 argValueToType v@(ArgObject _) = (TypeStruct "", v)
+
+-- | Would the VM's arg parser read this text as a literal? Mirrors the shapes
+-- its @literal@ production accepts: numbers, decimals, bools, quoted strings,
+-- cast literals, hex literals, and aggregates of those.
+--
+-- This is the guard on reading an aggregate back out of a rendered arg. bloc
+-- re-emits whatever it infers, so inferring a string for text the VM would have
+-- read as an aggregate is what corrupts it — but text the VM could not parse at
+-- all is better left as the string it already was.
+looksLikeLiteral :: Text -> Bool
+looksLikeLiteral t' =
+  let t = Text.strip t'
+      s = Text.unpack t
+      lowered = Text.toLower t
+   in isJust (splitCastLiteral t)
+        || isJust (splitHexLiteral t)
+        || maybe False (all looksLikeLiteral) (splitLiteralList t)
+        || maybe False (all (looksLikeLiteral . snd)) (splitObjectLiteral t)
+        || lowered == "true"
+        || lowered == "false"
+        || isJust (readMaybe s :: Maybe Integer)
+        || isJust (readMaybe s :: Maybe Decimal)
+        -- a quoted string literal, which is how strings and addresses render
+        || isJust (readMaybe s :: Maybe String)
+
+-- | A rendered array literal that JSON cannot represent, e.g.
+-- @[bytes("aa"),bytes("bb")]@. Every element has to read as a literal, so
+-- ordinary text that merely starts with a bracket keeps its string inference
+-- rather than being silently split into an array.
+solidityLiteralList :: Text -> Maybe [Text]
+solidityLiteralList t = do
+  parts <- splitLiteralList t
+  guard $ all looksLikeLiteral parts
+  pure parts
+
+-- | A rendered object literal, e.g. @{a:1,b:bytes("aa")}@ — how a struct arg
+-- renders, with bare field names that JSON rejects. Same guard as
+-- 'solidityLiteralList': every field value has to read as a literal.
+solidityLiteralObject :: Text -> Maybe (KM.KeyMap ArgValue)
+solidityLiteralObject t = do
+  members <- splitObjectLiteral t
+  guard $ all (looksLikeLiteral . snd) members
+  pure . KM.fromList $ map (BF.bimap DAK.fromText ArgString) members
 
 -- | An explicit cast literal (string("…"), address("hex"), uint(5), …) names
 -- its own type, so no shape inference is needed. These appear when
 -- already-rendered literals are re-marshaled (wallet-wrapped calls,
 -- castVoteOnIssue args); an unparseable inner value falls back to inference.
 castArgType :: Text -> Maybe (Type, ArgValue)
+-- A bare hex literal (hex"00ff") names its own type just as explicitly; the VM
+-- accepts it and clients still send it, so recognize it here too rather than
+-- letting it fall through to string inference.
+castArgType t
+  | Just digits <- splitHexLiteral t = Just (SimpleType (TypeBytes Nothing), ArgString digits)
 castArgType t = do
   (castType, raw) <- splitCastLiteral t
   -- Quoted forms unquote+unescape; bare forms pass through. The string cast
@@ -269,17 +328,22 @@ argValueToValue defs theType argVal = case theType of
       ArgObject hm -> do
         -- Try to look up struct definition for field types
         let mStructDef = defs >>= Map.lookup structName . structDefs
-            getFieldType fieldName v = case mStructDef of
+            -- The declared field type wins when the struct is known. Otherwise
+            -- infer it, taking the rewritten value too: inference unwraps a
+            -- rendered literal (bytes("…"), string("…")) into the value it
+            -- names, and coercing the original text against the inferred type
+            -- would fail or, worse, store the literal itself.
+            fieldTypeAndValue fieldName v = case mStructDef of
               Just struct -> case OMap.lookup fieldName (fields struct) of
-                Just (_, fieldType) -> fieldType
-                Nothing -> fst $ argValueToType v
-              Nothing -> fst $ argValueToType v
+                Just (_, fieldType) -> (fieldType, v)
+                Nothing -> argValueToType v
+              Nothing -> argValueToType v
         mp <-
           mapM
             ( \(k, v) -> do
                 let fieldName = DAK.toText k
-                    fieldType = getFieldType fieldName v
-                    value = argValueToValue defs fieldType v
+                    (fieldType, v') = fieldTypeAndValue fieldName v
+                    value = argValueToValue defs fieldType v'
                 return (fieldName, value)
             )
             (KM.toList hm)
