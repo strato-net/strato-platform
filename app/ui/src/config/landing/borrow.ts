@@ -20,7 +20,7 @@ export const borrow: ProductLandingConfig = {
   stats: [
     { value: "Keep", label: "Your asset exposure" },
     { value: "USDST", label: "Ready to use onchain" },
-    { value: "3", label: "Steps to borrow" },
+    { value: "2", label: "Steps to borrow" },
   ],
 
   steps: [
@@ -33,16 +33,9 @@ export const borrow: ProductLandingConfig = {
     },
     {
       index: "02",
-      tag: "Next",
-      title: "Add Collateral",
-      body: "Choose a supported asset and the amount you want to use.",
-      cta: "Choose Collateral",
-    },
-    {
-      index: "03",
       tag: "Final",
-      title: "Borrow USDST",
-      body: "Choose an amount, review your safety buffer and confirm.",
+      title: "Add Collateral & Borrow",
+      body: "Choose a supported asset and amount, then borrow USDST against it after reviewing your safety buffer.",
       cta: "Borrow USDST",
     },
   ],
@@ -102,7 +95,7 @@ export const borrow: ProductLandingConfig = {
       tag: "Your asset",
       title: "Use USDST Across STRATO.",
       body: "Hold it, swap it, deposit it into a vault or provide liquidity. The borrowed USDST stays available in your wallet.",
-      link: { label: "Explore USDST", href: `${EXTERNAL_LINKS.docs}/usdst` },
+      link: { label: "Explore USDST", href: `${EXTERNAL_LINKS.app}/dashboard/deposits` },
     },
   ],
 
