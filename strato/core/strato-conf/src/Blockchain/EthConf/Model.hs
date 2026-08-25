@@ -382,7 +382,7 @@ instance Default DiscoveryConf where
 instance Default P2PConf where
   def = P2PConf
     { maxConnections = 20
-    , connectionTimeout = 30
+    , connectionTimeout = 120
     , maxReturnedHeaders = 500
     , averageTxsPerBlock = 40
     , maxHeadersTxsLens = 2500
