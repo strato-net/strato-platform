@@ -101,12 +101,20 @@ handleEvents peer = awaitForever $ \case
   MsgEvt Status {} -> error "A status message appeared after the handshake"
   MsgEvt Ping -> yieldR Pong
   MsgEvt (Transactions txs) -> do
-    $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s) from" ++ peerString peer ++ ", they are " ++ intercalate "\n" (format <$> txs)
     lift stampActionTimestamp
-    let txo = Origin.PeerString (peerString peer)
-    ts <- liftIO getCurrentMicrotime
-    let ingestTxs = IETx ts . IngestTx txo <$> txs
-    yieldL $ ToUnseq ingestTxs
+    WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+    BestSequencedBlock _ myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
+    if worldNumber - myNumber > txGossipCatchupWindow
+      then
+        $logDebugS "handleEvents/Transactions" . T.pack $
+          "Ignoring " ++ show (length txs) ++ " gossiped transaction(s) from " ++ peerString peer
+            ++ "; still " ++ show (worldNumber - myNumber) ++ " blocks behind the tip"
+      else do
+        $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s) from" ++ peerString peer ++ ", they are " ++ intercalate "\n" (format <$> txs)
+        let txo = Origin.PeerString (peerString peer)
+        ts <- liftIO getCurrentMicrotime
+        let ingestTxs = IETx ts . IngestTx txo <$> txs
+        yieldL $ ToUnseq ingestTxs
   MsgEvt (NewBlock block' _) -> do
     lift stampActionTimestamp
     $logInfoS "handleEvents/NewBlock" "newBlock"
@@ -443,6 +451,18 @@ handleEvents peer = awaitForever $ \case
     $logInfoS "handleEvents/AbortEvt" . T.pack $ "Received AbortEvt: " ++ reason
     yieldR $ Disconnect AlreadyConnected
   event -> liftIO . error $ "unrecognized event: " ++ show event
+
+-- | How close to the tip we have to be before gossiped transactions are worth
+-- forwarding to the sequencer.
+--
+-- While a node is far behind, every gossiped transaction is one the sequencer
+-- cannot use yet: it will arrive again inside a block during sync, and in the
+-- meantime the sequencer pays an ECDSA signer recovery and a dedup lookup for
+-- each one (plus this handler formatting every transaction into the log).
+-- Being a block from the tip is not required — the mempool only has to be warm
+-- by the time we actually catch up.
+txGossipCatchupWindow :: Integer
+txGossipCatchupWindow = 1000
 
 -- | Snap a gossip-driven fetch start down to a fixed 'maxReturnedHeaders'
 -- boundary.
