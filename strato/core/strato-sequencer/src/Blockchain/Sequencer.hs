@@ -40,7 +40,8 @@ import Blockchain.Strato.Model.Keccak256
 import Conduit
 import Control.Concurrent hiding (yield)
 import qualified Control.Exception as E
-import Control.Monad (forever, forM, void, when, unless)
+import Control.Monad (forever, forM, void, when)
+import qualified Data.ByteString as B
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
@@ -60,7 +61,12 @@ import Text.ShortDescription
 -- | One unit of sequencer output. Carries both topics because committing a
 -- block produces events for each, and sending them together costs one Kafka
 -- round trip instead of two (see 'writeSeqEvents').
-data SeqOutEvent = SeqOutEvent [P2pEvent] [VmTask]
+data SeqOutEvent
+  = SeqOutEvent [P2pEvent] [VmTask]
+  | -- | End of a sequencer loop iteration: write whatever has accumulated.
+    -- Bounds how long output can sit unwritten on a quiet node, without
+    -- needing a timer.
+    SeqFlush
 
 -- | Yield events to the P2P layer (via @seq_p2p_events@ topic).
 yieldToP2p :: Monad m => [P2pEvent] -> ConduitT i SeqOutEvent m ()
@@ -145,16 +151,95 @@ initSequencer = do
   logF "Sequencer startup"
   logF "Sequencer initialized"
   bootstrapBlockstanbul
+  yield SeqFlush
 
 writeToKafka :: (
-  MonadFail m,
   MonadSequencer m,
   HasStreaming m
   ) =>
   ConduitT SeqOutEvent Void m ()
-writeToKafka = awaitForever $ \(SeqOutEvent p2pEvents vmTasks) ->
-  unless (null p2pEvents && null vmTasks) . void $
-    writeSeqEvents p2pEvents vmTasks
+writeToKafka = go noPendingWrites
+  where
+    go pending =
+      await >>= \case
+        Nothing -> flush pending
+        Just SeqFlush -> flush pending >> go noPendingWrites
+        Just (SeqOutEvent p2pEvents vmTasks) -> do
+          p2pRaw <- lift $ encodeSeqP2pEvents p2pEvents
+          vmRaw <- lift $ encodeSeqVmTasks vmTasks
+          let pending' =
+                PendingWrites
+                  (foldl' (flip (:)) (pendingP2p pending) p2pRaw)
+                  (foldl' (flip (:)) (pendingVm pending) vmRaw)
+                  ( pendingBytes pending
+                      + sum (B.length <$> p2pRaw)
+                      + sum (B.length <$> vmRaw)
+                  )
+          if pendingBytes pending' >= maxPendingBytes
+            then flush pending' >> go noPendingWrites
+            else go pending'
+
+    -- Chunked, because milena packs a produce call into ONE message set per
+    -- topic-partition and Kafka's message.max.bytes (1MiB by default) applies
+    -- to that whole set, not to the individual events. Bounding only the
+    -- accumulator is not enough: a single oversized add would still build a
+    -- set the broker rejects with MessageSizeTooLarge, which is fatal here.
+    flush pending =
+      mapM_ (\(p2pRaw, vmRaw) -> void . lift $ writeSeqEncoded p2pRaw vmRaw) $
+        zipChunks
+          (chunkByBytes maxProduceBytes . reverse $ pendingP2p pending)
+          (chunkByBytes maxProduceBytes . reverse $ pendingVm pending)
+
+    -- Pair the two topics' chunks so each request still carries both, and keep
+    -- whichever list is longer going once the other runs out.
+    zipChunks [] [] = []
+    zipChunks (p : ps) [] = (p, []) : zipChunks ps []
+    zipChunks [] (v : vs) = ([], v) : zipChunks [] vs
+    zipChunks (p : ps) (v : vs) = (p, v) : zipChunks ps vs
+
+-- | Encoded sequencer output waiting to be written, newest first.
+data PendingWrites = PendingWrites
+  { pendingP2p :: [B.ByteString],
+    pendingVm :: [B.ByteString],
+    pendingBytes :: !Int
+  }
+
+noPendingWrites :: PendingWrites
+noPendingWrites = PendingWrites [] [] 0
+
+-- | Split payloads into groups that fit inside one Kafka message set. An event
+-- larger than the budget still goes out on its own, and fails the same way it
+-- would have before batching.
+chunkByBytes :: Int -> [B.ByteString] -> [[B.ByteString]]
+chunkByBytes _ [] = []
+chunkByBytes budget xs = case go 0 [] xs of
+  (chunk, rest) -> chunk : chunkByBytes budget rest
+  where
+    go _ acc [] = (reverse acc, [])
+    go used acc (y : ys)
+      | not (null acc) && used + B.length y > budget = (reverse acc, y : ys)
+      | otherwise = go (used + B.length y) (y : acc) ys
+
+-- | Hard ceiling on one topic's share of a produce request. Comfortably under
+-- the 1MiB default 'message.max.bytes', leaving room for protocol framing.
+maxProduceBytes :: Int
+maxProduceBytes = 768 * 1024
+
+-- | How much encoded payload to accumulate before forcing a write.
+--
+-- Every Kafka request here is a synchronous acks=all round trip, so writing
+-- once per block put one in the critical path of every block. During historic
+-- replay a single loop iteration commits a long chain of dependent blocks, so
+-- coalescing an iteration's worth of output removes nearly all of them.
+--
+-- The cap is what keeps that honest: a dependent chain can be thousands of
+-- blocks, and holding all their encoded events is exactly the blow-up that
+-- made p2p produce unseq blocks one at a time (commit 9db93263e8 — a 500-block
+-- batch held across a produce kept ~2GiB live). Four megabytes still coalesces
+-- hundreds of ordinary blocks into one round trip. Kept below
+-- 'maxProduceBytes' so the common path is a single message set per topic.
+maxPendingBytes :: Int
+maxPendingBytes = 512 * 1024
 
 eventHandler :: (
   MonadFail m,
@@ -180,6 +265,7 @@ eventHandler = forever $ timeAction seqLoopTiming $ do
     UnseqEvents unseqEvents -> do
       withLabel seqLoopEvents "unseq" (flip unsafeAddCounter . fromIntegral . length $ unseqEvents)
       timeAction seqSplitEventsTiming $ unseqEventHandler unseqEvents
+  yield SeqFlush
 
 -- | Handles a batch of 'IngestEvent's from the @unseqevents@ Kafka topic.
 --

@@ -214,10 +214,12 @@ produceItems topicName events = do
 --
 -- Callers encode their own payloads because the topics generally carry
 -- different types.
-produceToTopics :: HasStreaming m => [(TopicName, [BL.ByteString])] -> m [ProduceResponse]
+-- Payloads are strict so that callers can encode ahead of time and let the
+-- source values be collected while a batch is still accumulating.
+produceToTopics :: HasStreaming m => [(TopicName, [B.ByteString])] -> m [ProduceResponse]
 produceToTopics groups = do
   let tams =
-        [ TopicAndMessage topicName . makeMessage $ BL.toStrict raw
+        [ TopicAndMessage topicName $ makeMessage raw
         | (topicName, raws) <- groups
         , raw <- raws
         ]
