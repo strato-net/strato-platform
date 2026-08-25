@@ -140,7 +140,13 @@ data Config = Config
     -- an MVar because milena's KafkaState read-modify-write in execKafka is not
     -- atomic across threads. It must NOT be shared process-wide: that made one
     -- lock serialize every peer's ToUnseq produces and starved block downloads.
-    configStreamEnv                :: MVar StreamEnv
+    configStreamEnv                :: MVar StreamEnv,
+    -- Process-wide, unlike the caches in Context. "Which block does the
+    -- sequencer still need" is one node-wide fact, so the answer must be
+    -- shared: when it was per-connection, a single gap made EVERY connection
+    -- fetch the same 500-block range (measured: one range pulled 113 times by
+    -- 113 different peer threads, 8.7x total duplication).
+    configLastResync               :: IORef LastResync
   }
 
 newtype ActionTimestamp = ActionTimestamp {unActionTimestamp :: Maybe UTCTime}
@@ -162,7 +168,6 @@ data Context = Context
   { blockHeaders          :: ([BlockHeader], UTCTime) -- keep track when last updated global headers cache
   , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp       :: ActionTimestamp
-  , lastResync            :: LastResync
   , _blockstanbulPeerAddr :: PeerAddress
   , _outboundWireMessages :: S.OSet (Host, Keccak256)
   }
@@ -340,8 +345,8 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ActionTimestamp (Reader
   access _ = Mod.get (Proxy @ActionTimestamp)
 
 instance MonadIO m => Mod.Modifiable LastResync (ReaderT Config m) where
-  get _ = lastResync <$> Mod.get (Proxy @Context)
-  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {lastResync = k}, ()))
+  get _ = readIORef =<< asks configLastResync
+  put _ k = asks configLastResync >>= flip atomicModifyIORef' (const (k, ()))
 
 instance MonadIO m => Mod.Modifiable [BlockHeader] (ReaderT Config m) where
   get _ = do
@@ -489,7 +494,8 @@ putRemainingBHeaders = Mod.put (Proxy @RemainingBlockHeaders) . RemainingBlockHe
 -- second from every peer that is a self-inflicted header flood that crowds the
 -- BlockBodies responses (the only messages that advance the sync) out of the
 -- connection's event queue. Ask at most once per fetch number, and otherwise at
--- most once per 'resyncDebounce'.
+-- most once per 'resyncDebounce'. The state is process-wide, so this also
+-- stops N connections from each fetching the same range once.
 shouldResyncFrom :: (MonadIO m, Mod.Modifiable LastResync m) => Integer -> m Bool
 shouldResyncFrom n = do
   LastResync prev <- Mod.get (Proxy @LastResync)
@@ -500,8 +506,10 @@ shouldResyncFrom n = do
   unless stillFresh . Mod.put (Proxy @LastResync) . LastResync $ Just (n, now)
   pure $ not stillFresh
 
+-- Short, because only one connection now acts on a given gap: if that peer
+-- fails to deliver, this is how long before another one retries.
 resyncDebounce :: NominalDiffTime
-resyncDebounce = 10
+resyncDebounce = 5
 
 stampActionTimestamp :: (MonadIO m, Mod.Modifiable ActionTimestamp m) => m ()
 stampActionTimestamp = do
@@ -534,19 +542,20 @@ initConfig wireMessagesRef = do
   let k = Conf.streamingConfig ethConf
   streamEnv <- createStreamEnv "strato-p2p" (Conf.streamingHost k, Conf.streamingPort k)
   streamEnvVar <- newMVar streamEnv
+  lastResyncRef <- newIORef $ LastResync Nothing
   return $ Config
     { configSQLDB = sqlDB' dbs
     , configRedisBlockDB = RBDB.RedisConnection redisBDBPool
     , configContext = initStateF
     , configBlockstanbulWireMessages = wireMessagesRef
     , configStreamEnv = streamEnvVar
+    , configLastResync = lastResyncRef
     }
 
 initContext :: MonadIO m => m Context
 initContext =
   return $
     Context { actionTimestamp = emptyActionTimestamp
-            , lastResync = LastResync Nothing
             , blockHeaders = ([], jamshidBirth)
             , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
             , _blockstanbulPeerAddr = PeerAddress Nothing

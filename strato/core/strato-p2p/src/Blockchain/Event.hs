@@ -322,7 +322,9 @@ handleEvents peer = awaitForever $ \case
     P2pBlock b -> do
       when (shouldSend peer $ obOrigin b) $ do
         WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
-        $logInfoS "handleEvents/P2pBlock" . T.pack $ "World Number: " ++ show worldNumber
+        -- Debug: this fires once per (committed block x peer connection); a
+        -- from-genesis sync logged 594k of these lines.
+        $logDebugS "handleEvents/P2pBlock" . T.pack $ "World Number: " ++ show worldNumber
         when (BlockHeader.number (obBlockData b) >= worldNumber) $ do
           $logInfoS "handleEvents/P2pBlock" . T.pack $ "yielding new block: " ++ show (BlockHeader.number . blockBlockData . outputBlockToBlock $ b)
           yieldR $ NewBlock (outputBlockToBlock b) 0
@@ -379,8 +381,17 @@ handleEvents peer = awaitForever $ \case
                   lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (ip, msgHash) Proxy
                   yieldR outbound
     P2pAskForBlocks start _ _ -> do
-      $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start
-      syncFetch Forward start
+      -- Debounced for the same reason as the missing-parent resync: while the
+      -- sequencer sits at block N, every blockstanbul message from an ahead
+      -- peer makes it emit GapFound, and this handler fans an identical
+      -- 500-header request out to EVERY connection. Measured on a syncing
+      -- node: 8k header requests covering only 118 distinct numbers, the worst
+      -- repeated 1,422 times. The longer a stall lasted, the harder p2p
+      -- flooded itself, which is what kept the stall going.
+      shouldFetch <- lift $ shouldResyncFrom start
+      when shouldFetch $ do
+        $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start
+        syncFetch Forward start
     P2pPushBlocks start end p -> do
       ss <- lift $ shouldSendToPeer p
       when ss $ do

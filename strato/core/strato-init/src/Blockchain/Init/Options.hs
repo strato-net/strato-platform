@@ -60,12 +60,15 @@ defineFlag "composeOnly" (False :: Bool) "Only generate docker-compose.yml to st
 defineFlag "includeBuild" (False :: Bool) "Include build directives in generated docker-compose.yml"
 
 -- P2P config flags
--- These two were 20 and 30 before the ethconf.yaml flag migration; the
--- migration silently raised them to 1000 and 3600, which is what turned fresh
--- syncs from minutes into hours (more peers all gossiping into one produce
--- path, and a wedged body request no longer self-healing in 30s).
+-- The ethconf.yaml flag migration silently raised these from 20/30 to
+-- 1000/3600, which is what turned fresh syncs from minutes into hours.
+-- connectionTimeout is NOT restored to its old 30: at 30s the TimerEvt
+-- liveness check reaps peers that are merely idle, and each reconnect
+-- re-downloads (measured: 1,528 handshakes for ~20 peers in 20 minutes).
+-- 30s was only safe back when it also drove the body-cache self-heal; that
+-- is now a fixed 60s in Context.hs, so this can be a real liveness timeout.
 defineFlag "maxConn" (20 :: Int) "Maximum number of P2P client connections"
-defineFlag "connectionTimeout" (30 :: Int) "Number of seconds to tolerate a useless peer"
+defineFlag "connectionTimeout" (120 :: Int) "Number of seconds to tolerate a useless peer"
 defineFlag "maxReturnedHeaders" (500 :: Int) "Number of headers to return from a GetBlockHeaders request"
 defineFlag "averageTxsPerBlock" (40 :: Int) "Average number of txs per block (used for header size estimation)"
 defineFlag "maxHeadersTxsLens" (2500 :: Int) "Max total tx size to return from a BlockHeader request"
