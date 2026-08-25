@@ -88,7 +88,7 @@ export const borrow: ProductLandingConfig = {
       tag: "Your collateral",
       title: "Your Asset Backs The Position.",
       body: "You keep its price exposure while it is locked as collateral. Repay the USDST and accrued costs before withdrawing it.",
-      link: { label: "View Supported Assets", href: "/dashboard/borrow" },
+      link: { label: "View Supported Assets", href: `${EXTERNAL_LINKS.app}/dashboard/explore` },
     },
     {
       images: [usdstImage],
