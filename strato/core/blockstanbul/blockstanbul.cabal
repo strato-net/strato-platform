@@ -60,6 +60,7 @@ test-suite blockstanbul-test
   other-modules:
       AuthenticationSpec
       MessageSpec
+      RoundChangeSpec
       Spec
       StakingConsensusSpec
       StateMachineSpec
@@ -82,6 +83,7 @@ test-suite blockstanbul-test
     , mtl
     , strato-model
     , time
+    , transformers
     , vault-monad
   default-language: Haskell2010
 

@@ -50,6 +50,7 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.SyncDB
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Validator
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import ClassyPrelude (atomically)
 import Conduit
@@ -66,6 +67,7 @@ import Control.Monad.State
 import Data.Conduit.TMChan
 import Data.IORef
 import Data.Maybe
+import qualified Data.Set as S
 import Data.String
 import qualified Data.Text as T
 import Data.Time.Clock
@@ -79,7 +81,10 @@ data Modification a = Modification a | Deletion deriving (Show)
 data SequencerContext = SequencerContext
   { _seenTransactionDB :: !SeenTransactionDB,
     _blockstanbulContext :: BlockstanbulContext,
-    _latestViewAndProposal :: IORef (View, Maybe Block)
+    _latestViewAndProposal :: IORef (View, Maybe Block),
+    -- | The view a no-proposal timer is currently armed for, if any. Keeps
+    -- 'createNewViewTimer' to one live AlarmClock per view.
+    _armedViewTimer :: IORef (Maybe View)
   }
 
 makeLenses ''SequencerContext
@@ -88,6 +93,7 @@ type MonadBlockstanbul m =
   ( MonadIO m,
     HasBlockstanbulContext m,
     Mod.Accessible (IORef (View, Maybe Block)) m,
+    Mod.Accessible (IORef (Maybe View)) m,
     Mod.Accessible (TMChan View) m,
     Mod.Accessible BlockPeriod m,
     Mod.Accessible RoundPeriod m,
@@ -140,6 +146,9 @@ instance Monad m => Mod.Modifiable SeenTransactionDB (StateT SequencerContext m)
 instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (View, Maybe Block)) (StateT SequencerContext m) where
   access _ = use latestViewAndProposal
 
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (Maybe View)) (StateT SequencerContext m) where
+  access _ = use armedViewTimer
+
 instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (TMChan View) (ReaderT SequencerConfig m) where
   access _ = asks blockstanbulTimeouts
 
@@ -188,11 +197,13 @@ runSequencerM vaultUrl' c bc m = do
         stxSize = seenTransactionDBSize c
     depBlock <- DependentBlockDB <$> LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
     latestVandP <- liftIO $ newIORef (View 0 0, Nothing)
+    armedVT <- liftIO $ newIORef Nothing
     flip runReaderT c{dependentBlockDB = depBlock} $ runStateT m
       SequencerContext
         { _seenTransactionDB = mkSeenTxDB stxSize,
           _blockstanbulContext = bc,
-          _latestViewAndProposal = latestVandP
+          _latestViewAndProposal = latestVandP,
+          _armedViewTimer = armedVT
         }
   return $ fst a
 
@@ -206,11 +217,13 @@ runSequencerMTest c bc m = do
         stxSize = seenTransactionDBSize c
     depBlock <- DependentBlockDB <$> LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
     latestVandP <- liftIO $ newIORef (View 0 0, Nothing)
+    armedVT <- liftIO $ newIORef Nothing
     flip runReaderT c{dependentBlockDB = depBlock} $ runStateT m
       SequencerContext
         { _seenTransactionDB = mkSeenTxDB stxSize,
           _blockstanbulContext = bc,
-          _latestViewAndProposal = latestVandP
+          _latestViewAndProposal = latestVandP,
+          _armedViewTimer = armedVT
         }
   return $ fst a
 
@@ -254,21 +267,48 @@ createNewTimer vw = do
 
 createNewViewTimer :: MonadBlockstanbul m => Block -> m ()
 createNewViewTimer b = do
-  updateViewTimer
-  vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
-  vCur <- fst <$> liftIO (readIORef vpref)
-  let v = vCur{ _sequence = max 1 $ fromIntegral (number $ blockBlockData b) - 1 }
-  ch <- Mod.access (Mod.Proxy @(TMChan View))
-  let act :: AlarmClock UTCTime -> IO ()
-      act this' = do
-        (v', p) <- readIORef vpref
-        when (v >= v' && isNothing p) $ do
-          atomically . writeTMChan ch $ v'
-          next <- addUTCTime 5 <$> getCurrentTime
-          setAlarm this' next
-  alarm <- liftIO $ newAlarmClock act
-  next <- addUTCTime 2 <$> liftIO getCurrentTime
-  liftIO $ setAlarm alarm next
+  ctx <- getBlockstanbulContext
+  let voting = case _selfAddr ctx of
+        Just a -> _validatorBehavior ctx && Validator a `S.member` _validators ctx
+        Nothing -> False
+      leading = fmap Validator (_selfAddr ctx) == Just (_proposer ctx)
+  -- This is the dead-proposer detector: it fires when no proposal has landed
+  -- for the current view, so it belongs on the validators that are NOT
+  -- proposing. A proposer has nothing to report to itself, and non-voting
+  -- nodes (RPC followers with the default validatorBehavior=true) must not
+  -- drive round changes at all.
+  when (voting && not leading) $ do
+    updateViewTimer
+    vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
+    vCur <- fst <$> liftIO (readIORef vpref)
+    let v = vCur{ _sequence = max 1 $ fromIntegral (number $ blockBlockData b) - 1 }
+    armedRef <- Mod.access (Mod.Proxy @(IORef (Maybe View)))
+    ch <- Mod.access (Mod.Proxy @(TMChan View))
+    -- At most one live clock per view. This used to allocate a fresh
+    -- self-re-arming AlarmClock for every UnannouncedBlock, so a stalled
+    -- chain accumulated one per candidate block -- hundreds of them, each
+    -- firing every 5s and each emitting a ROUNDCHANGE.
+    fresh <- liftIO . atomicModifyIORef' armedRef $ \armed ->
+      if armed == Just v then (armed, False) else (Just v, True)
+    when fresh $ do
+      let release =
+            atomicModifyIORef' armedRef $ \armed ->
+              (if armed == Just v then Nothing else armed, ())
+          act :: AlarmClock UTCTime -> IO ()
+          act this' = do
+            (v', p) <- readIORef vpref
+            if v >= v' && isNothing p
+              then do
+                atomically . writeTMChan ch $ v'
+                next <- addUTCTime 5 <$> getCurrentTime
+                setAlarm this' next
+              else
+                -- Superseded by a later view, or a proposal arrived: give up
+                -- the slot so the next view can arm its own clock.
+                release
+      alarm <- liftIO $ newAlarmClock act
+      next <- addUTCTime 2 <$> liftIO getCurrentTime
+      liftIO $ setAlarm alarm next
 
 updateViewTimer :: MonadBlockstanbul m => m ()
 updateViewTimer = do
