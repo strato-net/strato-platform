@@ -14,7 +14,7 @@ source of truth.
 |---|---|---|
 | `GET /t/:slug` | none | Resolve a link: record `link_opened`, set the `strato_tid` session cookie (90 days, HttpOnly, SameSite=Lax), 302 to the stored destination — a relative path lands **on the original host** (relative Location — visitors on any node edge that proxies `/t/` land back on that node), an absolute http(s) URL goes where it points (a **cross-host** destination also carries `?stid=<session id>`) |
 | `POST /tracking-api/engage` | session id | SPA boot ping; sets `engaged_at` so JS-less bots/email scanners never count as engagement |
-| `POST /tracking-api/wallet-connected` | session id | Records external wallet and/or STRATO address for the session (deduped) |
+| `POST /tracking-api/wallet-connected` | session id or PostHog session id | Records external wallet and/or STRATO address for tracking-link attribution and the privacy-safe PostHog-to-wallet join (deduped) |
 | `GET /dashboard` | OIDC (SPA login) | The dashboard app (tracking-ui container) |
 | `GET /tracking-api/me` | JWT | `{authorized}` — whether the user may use the dashboard |
 | `GET /tracking-api/links` | JWT + allowlist | Link summaries with attribution rollups |
@@ -55,6 +55,14 @@ the newest non-bot open from the **same public IP** within
 skipped for private IPs and whenever that window holds opens of more than one
 link, so it can only confirm an unambiguous visitor. `wallet_connections.session_source`
 records which carrier was used (`cookie`/`header`/`query`/`ip`).
+
+Direct product sessions do not need a tracking-link id to enter the product
+conversion funnel. The SPA sends PostHog's anonymous session/distinct ids to
+this first-party endpoint alongside the wallet address, while PostHog receives
+only a `wallet_connected` event with connector and address-presence booleans.
+Wallet addresses never enter PostHog. This creates a controlled join for later
+chain-conversion analysis without weakening the existing link-attribution
+rules.
 
 ## Bot and preview filtering
 
@@ -112,7 +120,9 @@ server order, with blanks and missing values always sorted last.
 ## Storage
 
 Owns the `tracking` Postgres database: `tracking_links`, `tracking_sessions`,
-`wallet_connections`. Migrations are embedded in `src/db/migrations.ts` and run
+`wallet_connections`, and `posthog_wallet_connections`. The last table keeps
+the first-party PostHog-session-to-wallet join separate from tracking-link
+attribution. Migrations are embedded in `src/db/migrations.ts` and run
 idempotently at startup under an advisory lock. Two database modes:
 
 - **Local container** (default for dev): start the stack with the `local-db`
