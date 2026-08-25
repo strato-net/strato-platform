@@ -55,7 +55,7 @@ const ProductLanding = ({ slug }: { slug: string }) => {
         />
       </main>
 
-      <SiteFooter columns={config.footerColumns} />
+      <SiteFooter />
     </div>
   );
 };

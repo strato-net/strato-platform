@@ -1,7 +1,6 @@
 import goldstImage from "@/assets/landing/goldst.png";
 import usdstImage from "@/assets/landing/usdst.png";
 import { EXTERNAL_LINKS } from "@/config/externalLinks";
-import { buildFooterColumns, FULL_APP_LINK } from "./footerColumns";
 import type { ProductLandingConfig } from "./types";
 
 export const borrow: ProductLandingConfig = {
@@ -112,15 +111,4 @@ export const borrow: ProductLandingConfig = {
     title: "Keep Your Assets. Access USDST.",
     body: "Start with a supported asset and choose a comfortable safety buffer.",
   },
-
-  footerColumns: buildFooterColumns(
-    [
-      { label: "Open Borrow", href: "/dashboard/borrow" },
-      FULL_APP_LINK,
-    ],
-    [
-      { label: "Borrow Guide", href: `${EXTERNAL_LINKS.docs}/borrowing` },
-      { label: "Docs", href: EXTERNAL_LINKS.docs },
-    ],
-  ),
 };

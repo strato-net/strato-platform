@@ -1,7 +1,6 @@
 import { PiggyBank, Vault } from "lucide-react";
 import usdstImage from "@/assets/landing/usdst.png";
 import { EXTERNAL_LINKS } from "@/config/externalLinks";
-import { buildFooterColumns, FULL_APP_LINK, WEBSITE_LINK } from "./footerColumns";
 import type { ProductLandingConfig } from "./types";
 
 export const usdstVault: ProductLandingConfig = {
@@ -93,6 +92,4 @@ export const usdstVault: ProductLandingConfig = {
     title: "Start Earning With USDST.",
     body: "Stay in control while your USDST works onchain.",
   },
-
-  footerColumns: buildFooterColumns([FULL_APP_LINK, WEBSITE_LINK]),
 };

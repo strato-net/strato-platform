@@ -1,14 +1,13 @@
 import { Vault } from "lucide-react";
 import goldstImage from "@/assets/landing/goldst.png";
 import { EXTERNAL_LINKS } from "@/config/externalLinks";
-import { buildFooterColumns, FULL_APP_LINK, WEBSITE_LINK } from "./footerColumns";
 import type { ProductLandingConfig } from "./types";
 
 export const goldVault: ProductLandingConfig = {
   slug: "gold-vault",
   documentTitle: "GOLDST Yield Vault | Get Your Gold Onchain | STRATO",
   accent: "gold",
-  appPath: "/dashboard/earn-yield-vault",
+  appPath: "/dashboard/earn-yield-vault?vault=goldst-yield",
 
   hero: {
     images: [goldstImage],
@@ -86,7 +85,10 @@ export const goldVault: ProductLandingConfig = {
       tag: "Yield Vault",
       title: "Deposit GOLDST. Earn Points.",
       body: "Your deposit becomes yieldGOLDST while eligible STRATO Reward Points accrue alongside your vault position.",
-      link: { label: "View Vault Details", href: `${EXTERNAL_LINKS.docs}/vaults` },
+      link: {
+        label: "View Vault Details",
+        href: `${EXTERNAL_LINKS.app}/dashboard/earn-yield-vault?vault=goldst-yield`,
+      },
     },
   ],
 
@@ -95,6 +97,4 @@ export const goldVault: ProductLandingConfig = {
     title: "Put Your GOLDST To Work.",
     body: "Keep gold exposure while your vault position earns STRATO Reward Points.",
   },
-
-  footerColumns: buildFooterColumns([FULL_APP_LINK, WEBSITE_LINK]),
 };

@@ -85,11 +85,6 @@ export interface LandingExplainer {
   link: { label: string; href: string };
 }
 
-export interface FooterColumn {
-  heading: string;
-  links: { label: string; href: string }[];
-}
-
 /** A pill under the highlight panel; paired token images render as in the mockups. */
 export interface LandingChip {
   label: string;
@@ -118,5 +113,4 @@ export interface ProductLandingConfig {
   bands?: LandingBand[];
   explainers: LandingExplainer[];
   ctaBanner: { eyebrow: string; title: string; body: string };
-  footerColumns: FooterColumn[];
 }

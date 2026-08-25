@@ -4,6 +4,7 @@
  */
 export const EXTERNAL_LINKS = {
   website: "https://strato.nexus",
+  app: "https://app.strato.nexus",
   docs: "https://docs.strato.nexus",
   tokenomics: "https://docs.strato.nexus/tokenomics/",
   blog: "https://strato.nexus/blog",

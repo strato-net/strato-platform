@@ -4,7 +4,6 @@ import usdcImage from "@/assets/landing/usdc.png";
 import usdstImage from "@/assets/landing/usdst.png";
 import usdtImage from "@/assets/landing/usdt.png";
 import { EXTERNAL_LINKS } from "@/config/externalLinks";
-import { buildFooterColumns, FULL_APP_LINK } from "./footerColumns";
 import type { ProductLandingConfig } from "./types";
 
 export const liquidity: ProductLandingConfig = {
@@ -24,7 +23,7 @@ export const liquidity: ProductLandingConfig = {
   stats: [
     { value: "5", label: "Live pools" },
     { value: "24/7", label: "Onchain markets" },
-    { value: "3", label: "Steps to open a position" },
+    { value: "2", label: "Steps to open a position" },
   ],
 
   steps: [
@@ -37,16 +36,9 @@ export const liquidity: ProductLandingConfig = {
     },
     {
       index: "02",
-      tag: "Next",
-      title: "Choose A Pool",
-      body: "Pick the token pair you want to provide liquidity for.",
-      cta: "Choose A Pool",
-    },
-    {
-      index: "03",
       tag: "Final",
-      title: "Set Range & Deposit",
-      body: "Choose where your liquidity is active, then deposit both assets.",
+      title: "Choose A Pool & Deposit",
+      body: "Pick the token pair, choose where your liquidity is active, then deposit both assets.",
       cta: "Add Liquidity",
     },
   ],
@@ -97,9 +89,4 @@ export const liquidity: ProductLandingConfig = {
     title: "Choose A Pool. Start Earning Fees.",
     body: "Open a V3 position and put your assets to work onchain.",
   },
-
-  footerColumns: buildFooterColumns([
-    { label: "Open V3 Liquidity", href: "/dashboard/v3-liquidity" },
-    FULL_APP_LINK,
-  ]),
 };

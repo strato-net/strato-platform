@@ -1,7 +1,6 @@
 import { Users } from "lucide-react";
 import stratoImage from "@/assets/landing/strato.png";
 import { EXTERNAL_LINKS } from "@/config/externalLinks";
-import { buildFooterColumns, FULL_APP_LINK } from "./footerColumns";
 import type { ProductLandingConfig } from "./types";
 
 export const staking: ProductLandingConfig = {
@@ -34,16 +33,9 @@ export const staking: ProductLandingConfig = {
     },
     {
       index: "02",
-      tag: "Next",
-      title: "Choose A Validator",
-      body: "Compare validators and choose where to delegate.",
-      cta: "Choose Validator",
-    },
-    {
-      index: "03",
       tag: "Final",
-      title: "Stake STRATO",
-      body: "Choose your amount, confirm and start earning rewards.",
+      title: "Choose A Validator & Stake",
+      body: "Compare validators, choose where to delegate, then confirm your amount and start earning rewards.",
       cta: "Stake STRATO",
     },
   ],
@@ -137,15 +129,4 @@ export const staking: ProductLandingConfig = {
     title: "Put Your STRATO To Work.",
     body: "Choose a validator and start earning rewards in STRATO.",
   },
-
-  footerColumns: buildFooterColumns(
-    [
-      { label: "Open Staking", href: "/dashboard/earn-staking" },
-      FULL_APP_LINK,
-    ],
-    [
-      { label: "Tokenomics", href: EXTERNAL_LINKS.tokenomics },
-      { label: "Litepaper", href: EXTERNAL_LINKS.litepaper },
-    ],
-  ),
 };

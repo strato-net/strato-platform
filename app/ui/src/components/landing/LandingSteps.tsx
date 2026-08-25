@@ -13,10 +13,11 @@ interface LandingStepsProps {
 }
 
 /**
- * The three numbered onboarding cards. Step 1 is the wallet connect and turns
- * into a "Connected" marker once that is done; steps 2 and 3 are drawn dimmed
- * because they are not reachable until a wallet is connected — so they stay
- * inert while logged out and open the app in a new tab once it is.
+ * The numbered onboarding cards — two or three, per config. Step 1 is the
+ * wallet connect and turns into a "Connected" marker once that is done; the
+ * remaining steps are drawn dimmed because they are not reachable until a
+ * wallet is connected, so they stay inert while logged out and open the app in
+ * a new tab once it is.
  */
 const LandingSteps = ({ steps, appPath, slug }: LandingStepsProps) => {
   const { isLoggedIn } = useUser();
@@ -24,7 +25,12 @@ const LandingSteps = ({ steps, appPath, slug }: LandingStepsProps) => {
 
   return (
     <Section>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-4",
+          steps.length === 2 ? "md:grid-cols-2" : "md:grid-cols-3",
+        )}
+      >
         <Tile className="border-strato-lightblue/40 shadow-md">
           <div className="flex items-center justify-between">
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-strato-lightblue/10 font-mono text-[10px] font-semibold text-strato-lightblue">
