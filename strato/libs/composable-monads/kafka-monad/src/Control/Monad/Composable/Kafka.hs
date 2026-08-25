@@ -28,6 +28,7 @@ module Control.Monad.Composable.Kafka (
   -- Producing
   produceItems,
   produceItemsAsJSON,
+  produceToTopics,
   -- Consuming
   consume,
   consumeBroadcast,
@@ -201,6 +202,31 @@ produceItems topicName events = do
       (TopicAndMessage topicName . makeMessage . BL.toStrict . encode) <$> events
   liftIO $ mapM_ parseKafkaResponse results
   return results
+
+-- | Produce to several topics in a SINGLE Kafka request.
+--
+-- 'produceItems' uses 'produceMessagesAsSingletonSets', which traverses the
+-- list and issues one synchronous round trip PER EVENT; with
+-- @_stateRequiredAcks = -1@ each of those waits for all in-sync replicas. A
+-- caller that writes to two topics per unit of work therefore pays two full
+-- round trips. Handing all the messages to one 'produceMessages' call lets
+-- milena collate them by broker, so a single-broker setup pays one.
+--
+-- Callers encode their own payloads because the topics generally carry
+-- different types.
+produceToTopics :: HasStreaming m => [(TopicName, [BL.ByteString])] -> m [ProduceResponse]
+produceToTopics groups = do
+  let tams =
+        [ TopicAndMessage topicName . makeMessage $ BL.toStrict raw
+        | (topicName, raws) <- groups
+        , raw <- raws
+        ]
+  if null tams
+    then return []
+    else do
+      results <- execKafka $ produceMessages tams
+      liftIO $ mapM_ parseKafkaResponse results
+      return results
 
 produceItemsAsJSON :: (JSON.ToJSON a, HasStreaming m) => TopicName -> [a] -> m [ProduceResponse]
 produceItemsAsJSON topicName events = do

@@ -40,7 +40,7 @@ import Blockchain.Strato.Model.Keccak256
 import Conduit
 import Control.Concurrent hiding (yield)
 import qualified Control.Exception as E
-import Control.Monad (forever, forM, void, when)
+import Control.Monad (forever, forM, void, when, unless)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
@@ -57,15 +57,22 @@ import Text.Format
 import Text.Printf
 import Text.ShortDescription
 
-type SeqOutEvent = Either [P2pEvent] [VmTask]
+-- | One unit of sequencer output. Carries both topics because committing a
+-- block produces events for each, and sending them together costs one Kafka
+-- round trip instead of two (see 'writeSeqEvents').
+data SeqOutEvent = SeqOutEvent [P2pEvent] [VmTask]
 
 -- | Yield events to the P2P layer (via @seq_p2p_events@ topic).
 yieldToP2p :: Monad m => [P2pEvent] -> ConduitT i SeqOutEvent m ()
-yieldToP2p = yield . Left
+yieldToP2p es = yield $ SeqOutEvent es []
 
 -- | Yield events to the VM (via @vm_tasks@ topic).
 yieldToVm :: Monad m => [VmTask] -> ConduitT i SeqOutEvent m ()
-yieldToVm = yield . Right
+yieldToVm ts = yield $ SeqOutEvent [] ts
+
+-- | Emit both topics as a single unit, so they cost one Kafka round trip.
+yieldToBoth :: Monad m => [P2pEvent] -> [VmTask] -> ConduitT i SeqOutEvent m ()
+yieldToBoth es ts = yield $ SeqOutEvent es ts
 
 instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
   doIO = lift . doIO
@@ -145,7 +152,9 @@ writeToKafka :: (
   HasStreaming m
   ) =>
   ConduitT SeqOutEvent Void m ()
-writeToKafka = awaitForever $ either writeSeqP2pEvents writeSeqVmTasks
+writeToKafka = awaitForever $ \(SeqOutEvent p2pEvents vmTasks) ->
+  unless (null p2pEvents && null vmTasks) . void $
+    writeSeqEvents p2pEvents vmTasks
 
 eventHandler :: (
   MonadFail m,
@@ -309,9 +318,8 @@ blockstanbulSend' msg = do
     pure (p2pevs, vmevs, committedBlocks)
 
   $logDebugS "seq/pbft/send_p2p" . T.pack $ format p2pevs
-  yieldToP2p p2pevs
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
-  yieldToVm vmevs
+  yieldToBoth p2pevs vmevs
   return committedBlocks
   where
     vmEvenP2pCheckptFilterHelper :: [OutEvent] -> ([VmTask], [P2pEvent])
