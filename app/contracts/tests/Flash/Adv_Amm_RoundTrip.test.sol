@@ -6,9 +6,8 @@
 // claimed to be "zero fee". Build a REAL Pool (v2) at mainnet reserve ratios and measure the
 // exact net USDST cost of a manipulate-and-restore round trip funded by a flash mint.
 //
-// NOTE ON OUTPUT: solid-vm-cli only surfaces text through a failing require(). The
-// it_zz_print_* tests therefore FAIL BY DESIGN — they are the print channel. Every real
-// assertion lives in the it_a*/it_b* tests, which must pass.
+// NOTE ON OUTPUT: it_zz_print_* dump measured numbers via log(). Every real assertion
+// lives in the it_a*/it_b* tests.
 
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/access/Authorizable.sol";
@@ -308,11 +307,11 @@ contract Describe_Adv_Amm_RoundTrip is Authorizable {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // PRINT CHANNEL (these FAIL on purpose — solid-vm-cli has no other stdout)
+    // PRINT CHANNEL
     // ─────────────────────────────────────────────────────────────────────
 
     function it_zz_print_1_premise() public {
-        require(false,
+        log(
             "PREMISE | pool.swapFeeRate=0 factory.swapFeeRate=" + string(pf.swapFeeRate()) +
             " measured_output_penalty_bps=" + string(effFeeSeen) +
             " protocolFee_on_10000e18_input=" + string(protoFeeSeen) +
@@ -320,7 +319,7 @@ contract Describe_Adv_Amm_RoundTrip is Authorizable {
     }
 
     function it_zz_print_2_roundtrip_costs() public {
-        require(false,
+        log(
             "ROUNDTRIP COST vs 239,376 USDST depth, wei | " +
             "loan=100000e18 netCost=" + string(c100k) + " bps10k=" + string((c100k * 100000) / 100000e18) +
             " | loan=500000e18 netCost=" + string(c500k) + " bps10k=" + string((c500k * 100000) / 500000e18) +
@@ -330,7 +329,7 @@ contract Describe_Adv_Amm_RoundTrip is Authorizable {
     }
 
     function it_zz_print_3_price_excursion() public {
-        require(false,
+        log(
             "PRICE USDST/GOLD 1e18 | start=" + string(pStart) +
             " mid@100k=" + string(p100k) + " (x1000=" + string(mult100k) + ") end=" + string(pEnd100k) +
             " | mid@500k=" + string(p500k) + " (x1000=" + string(mult500k) + ") end=" + string(pEnd500k) +
@@ -338,7 +337,7 @@ contract Describe_Adv_Amm_RoundTrip is Authorizable {
     }
 
     function it_zz_print_4_zero_fee_floor() public {
-        require(false,
+        log(
             "ZERO-FEE FLOOR (wei lost to rounding, Pool.getInputPrice) | 100k=" +
             string(zeroFeeDelta100k) + " 500k=" + string(zeroFeeDelta500k) +
             " 2m=" + string(zeroFeeDelta2m) + " (never negative => never profitable)");

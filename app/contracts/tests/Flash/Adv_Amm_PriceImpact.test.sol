@@ -12,8 +12,7 @@
 // The oracle is deliberately pinned to the pool's own implied price so that NOTHING in the
 // measured numbers is a pre-existing arbitrage: every gap below is pure price impact.
 //
-// OUTPUT: solid-vm-cli only surfaces text through a failing require(), so the it_zz_print_*
-// tests FAIL BY DESIGN. All it_d*/it_e* tests must pass.
+// OUTPUT: it_zz_print_* dump measured numbers via log(). All it_d*/it_e* tests must pass.
 
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/access/Authorizable.sol";
@@ -605,11 +604,11 @@ contract Describe_Adv_Amm_PriceImpact is Authorizable {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // PRINT CHANNEL (fails by design)
+    // PRINT CHANNEL
     // ─────────────────────────────────────────────────────────────────────
 
     function it_zz_print_5_whale() public {
-        require(false,
+        log(
             "WHALE LIQUIDATION | oracle GOLDST=" + string(GOLD_PRICE) +
             " (== pool parity, zero pre-existing arb) | repay=" + string(WHALE_REPAY) +
             " seized_GOLDST=" + string(whaleSeized) +
@@ -620,7 +619,7 @@ contract Describe_Adv_Amm_PriceImpact is Authorizable {
     }
 
     function it_zz_print_6_bonus_survival() public {
-        require(false,
+        log(
             "BONUS SURVIVAL vs 53.71 GOLD/239,376 USDST | optimal_repay=" + string(optRepay) +
             " max_profit=" + string(optProfit) +
             " | break_even_repay=" + string(breakEven) +
@@ -629,7 +628,7 @@ contract Describe_Adv_Amm_PriceImpact is Authorizable {
     }
 
     function it_zz_print_7_greedy() public {
-        require(false,
+        log(
             "GREEDY SINGLE-TX EXTRACTION (max liquidation MEV in one tx) | BEST netProfit=" +
             string(greedyProfit) + " iters=" + string(greedyIters) + " totalRepaid=" + string(greedyTotalRepaid) +
             " || chunk7000: profit=" + string(greedyBest7000) + " iters=" + string(greedyIt7000) +
@@ -638,7 +637,7 @@ contract Describe_Adv_Amm_PriceImpact is Authorizable {
     }
 
     function it_zz_print_8_leverage() public {
-        require(false,
+        log(
             "LEVERAGE 100k equity, borrow 150k | DESK: collateral=" + string(levDeskColl) +
             " debt=" + string(levDeskDebt) + " minted=" + string(levDeskMinted) +
             " | REAL POOL: bought_GOLDST=" + string(levPoolBought) +

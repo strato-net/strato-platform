@@ -129,13 +129,13 @@ contract Describe_Adv_Credit_Rewards is Authorizable {
         strato.setStatus(2);
 
         staking = new StratoStaking(address(this));
-        staking.initialize(address(strato), 100, 5000, 1000, 16);
+        staking.initialize(address(strato), USDST, 100, 5000, 1000, 16);
         vreg = new ValidatorRegistry(address(this));
         vreg.initialize(address(staking));
         staking.setValidatorRegistry(address(vreg));
 
         opA = new User();
-        vreg.addOperator(address(opA), 500, "Validator A", "first", "", "validator-a");
+        vreg.addOperator(address(opA), 500, "Validator A", "first", "", "validator-a", address(0));
     }
 
     function beforeEach() public { }
@@ -271,7 +271,7 @@ contract Describe_Adv_Credit_Rewards is Authorizable {
 
     /// @notice ValidatorRegistry: no token balance enters any decision at all.
     function it_da_validator_registry_has_no_balance_dependence() public {
-        (bool exists, bool active, string name,,,) = vreg.operators(address(opA));
+        (bool exists, bool active, string name,,,,) = vreg.operators(address(opA));
         log("4g operator exists / active      : " + string(exists) + " / " + string(active));
         log("4g operatorCount                 : " + string(vreg.operatorCount()));
 

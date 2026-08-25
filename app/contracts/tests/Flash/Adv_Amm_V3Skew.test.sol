@@ -20,7 +20,7 @@
 // USDST is token1 in both (price = USDST per other), and createPoolV3 preserves argument
 // order, so the orientation is reproduced exactly.
 //
-// OUTPUT: solid-vm-cli only surfaces text via a failing require(); it_zz_print_* FAIL BY DESIGN.
+// OUTPUT: it_zz_print_* dump measured numbers via log().
 
 import "../../concrete/BaseCodeCollection.sol";
 import "../../concrete/Pools/PoolV3Factory.sol";
@@ -423,11 +423,11 @@ contract Describe_Adv_Amm_V3Skew is Authorizable {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // PRINT CHANNEL (fails by design)
+    // PRINT CHANNEL
     // ─────────────────────────────────────────────────────────────────────
 
     function it_zz_print_16_skew_conservation() public {
-        require(false,
+        log(
             "V3 SELF-DIRECTED SKEW, venue A widened to +-10% (~$46.3k depth, price 1.0) | " +
             "tick " + string(aTick0) + " -> " + string(aTickManip) + " -> " + string(aTickEnd) +
             " | attacker mintedL=" + string(aMintedL) + " (honest L=" + string(aHonestL) + ")" +
@@ -441,7 +441,7 @@ contract Describe_Adv_Amm_V3Skew is Authorizable {
     }
 
     function it_zz_print_17_honest_lp_ledger() public {
-        require(false,
+        log(
             "HONEST LP LEDGER (amount0+amount1, price 1.0) | CONTROL in=" +
             string(aCtlDep0 + aCtlDep1) + " out=" + string(aCtlOut0 + aCtlOut1) +
             " | ATTACKED in=" + string(aHonestDep0 + aHonestDep1) +
@@ -454,7 +454,7 @@ contract Describe_Adv_Amm_V3Skew is Authorizable {
     }
 
     function it_zz_print_18_sizing_sweep() public {
-        require(false,
+        log(
             "SIZING SWEEP (2m flash mint, venue A +-10%) | DOMINATE L=" + string(sDomL) +
             " cost=" + string(sDomCost) + " gain=" + string(sDomGain) + " fee1=" + string(sDomFee1) +
             " | MATCHED L=" + string(sMatL) + " cost=" + string(sMatCost) +
@@ -464,7 +464,7 @@ contract Describe_Adv_Amm_V3Skew is Authorizable {
     }
 
     function it_zz_print_19_mainnet_venues() public {
-        require(false,
+        log(
             "MAINNET VENUES | A tight (L=5.96e25, [-10,10]): tick " + string(tTick0) + " -> " +
             string(tTickManip) + " -> " + string(tTickEnd) + " attackerCost=" + string(tAtkCost) +
             " gain=" + string(tAtkGain) + " fee1=" + string(tFee1) +

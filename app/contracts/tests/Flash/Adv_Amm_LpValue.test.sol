@@ -7,7 +7,7 @@
 // dislocated pool cannot flatter the numbers. Conservation is checked three ways:
 // attacker delta + LP delta + FeeCollector delta.
 //
-// OUTPUT: solid-vm-cli only surfaces text via a failing require(); it_zz_print_* FAIL BY DESIGN.
+// OUTPUT: it_zz_print_* dump measured numbers via log().
 
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/access/Authorizable.sol";
@@ -412,11 +412,11 @@ contract Describe_Adv_Amm_LpValue is Authorizable {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // PRINT CHANNEL (fails by design)
+    // PRINT CHANNEL
     // ─────────────────────────────────────────────────────────────────────
 
     function it_zz_print_12_zap_roundtrip() public {
-        require(false,
+        log(
             "ZAP ROUND TRIP vs 53.71 GOLD/239,376 USDST | 100k cost=" + string(z100kCost) +
             " (bps10k=" + string((z100kCost * 100000) / 100000e18) + ")" +
             " | 500k cost=" + string(z500kCost) +
@@ -428,7 +428,7 @@ contract Describe_Adv_Amm_LpValue is Authorizable {
     }
 
     function it_zz_print_13_who_pays() public {
-        require(false,
+        log(
             "CONSERVATION at fixed oracle price | honest LP value before=" + string(lpValBefore) +
             " after=" + string(lpValAfter) + " gained=" + string(lpGained ? 1 : 0) +
             " delta=" + string(lpDelta) +
@@ -437,14 +437,14 @@ contract Describe_Adv_Amm_LpValue is Authorizable {
     }
 
     function it_zz_print_14_manip_zap() public {
-        require(false,
+        log(
             "MANIPULATE+ZAP+RESTORE+EXIT (2m) | attacker netCost=" + string(mzCost) +
             " | spot " + string(mzPriceStart) + " -> " + string(mzPriceManip) + " -> " + string(mzPriceEnd) +
             " | honest LP gained=" + string(mzLpGained ? 1 : 0) + " delta=" + string(mzLpDelta));
     }
 
     function it_zz_print_15_stablepool() public {
-        require(false,
+        log(
             "STABLEPOOL SURFACES (400k swap on 500k/500k) | lastPrice " + string(sLastBefore) +
             " -> " + string(sLastMid) + " | getP " + string(sGetPBefore) + " -> " + string(sGetPMid) +
             " | emaPrice " + string(sEmaBefore) + " -> " + string(sEmaMid) +

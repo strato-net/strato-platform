@@ -7,7 +7,7 @@
 //       flash-mint callback window? Manipulate the deepest v2 pool 87x inside the callback and
 //       read every price surface the protocol actually uses.
 //
-// OUTPUT: solid-vm-cli only surfaces text via a failing require(); it_zz_print_* FAIL BY DESIGN.
+// OUTPUT: it_zz_print_* dump measured numbers via log().
 
 import "../../concrete/BaseCodeCollection.sol";
 import "../../concrete/Pools/PoolV3Factory.sol";
@@ -349,11 +349,11 @@ contract Describe_Adv_Amm_OracleReads is Authorizable {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // PRINT CHANNEL (fails by design)
+    // PRINT CHANNEL
     // ─────────────────────────────────────────────────────────────────────
 
     function it_zz_print_9_cardinality() public {
-        require(false,
+        log(
             "POOLV3 CARDINALITY-1 | fresh card=" + string(card0) + " next=" + string(cardNext0) +
             " | same-tx observeSingle(1) reverted=" + string(sameTxTwapReverted ? 1 : 0) +
             " | tickX=" + string(tickX) + " tickY=" + string(tickY) +
@@ -364,7 +364,7 @@ contract Describe_Adv_Amm_OracleReads is Authorizable {
     }
 
     function it_zz_print_10_flash_restore() public {
-        require(false,
+        log(
             "POOLV3 FLASH MANIPULATE+RESTORE | tickBefore=" + string(v3TickBefore) +
             " tickMid=" + string(v3TickMid) + " tickAfter=" + string(v3TickAfter) +
             " cumBefore=" + string(v3CumBefore) + " cumAfter=" + string(v3CumAfter) +
@@ -372,7 +372,7 @@ contract Describe_Adv_Amm_OracleReads is Authorizable {
     }
 
     function it_zz_print_11_no_consumers() public {
-        require(false,
+        log(
             "MID-CALLBACK PRICE READS | v2 pool spot before=" + string(probePriceBefore) +
             " mid=" + string(probePriceMid) + " after=" + string(probePriceAfter) +
             " | PriceOracle.getAssetPrice before=" + string(probeOracleBefore) +
