@@ -31,6 +31,7 @@ module Blockchain.Context
     , PeerRunner
     , RemainingBlockHeaders(..)
     , LastResync(..)
+    , HasResyncGate(..)
     , initConfig
     , initContext
     , runContextM
@@ -39,7 +40,6 @@ module Blockchain.Context
     , putBlockHeaders
     , getRemainingBHeaders
     , putRemainingBHeaders
-    , shouldResyncFrom
     , stampActionTimestamp
     , getActionTimestamp
     , clearActionTimestamp
@@ -102,7 +102,7 @@ import           Blockchain.Strato.Model.Keccak256
 
 import qualified Blockchain.Strato.RedisBlockDB          as RBDB
 import           Blockchain.SyncDB
-import           Control.Monad                           (unless, void)
+import           Control.Monad                           (void)
 import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                    as SQL
 import qualified Database.Redis                          as Redis
@@ -344,9 +344,35 @@ instance MonadIO m => Mod.Modifiable ActionTimestamp (ReaderT Config m) where
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ActionTimestamp (ReaderT Config m) where
   access _ = Mod.get (Proxy @ActionTimestamp)
 
-instance MonadIO m => Mod.Modifiable LastResync (ReaderT Config m) where
-  get _ = readIORef =<< asks configLastResync
-  put _ k = asks configLastResync >>= flip atomicModifyIORef' (const (k, ()))
+-- Short, because only one connection now acts on a given gap: if that peer
+-- fails to deliver, this is how long before another one retries.
+resyncDebounce :: NominalDiffTime
+resyncDebounce = 5
+
+-- | Node-wide gate for gossip-driven resync requests.
+--
+-- Deliberately NOT a 'Mod.Modifiable': that only offers get and put, and a
+-- get-then-put cannot express this. Every connection is handed the same
+-- sequencer event at the same moment, so with a read and a write as separate
+-- steps a whole batch of threads reads the stale value and every one of them
+-- decides it is the one to fetch. That is the bug this gate exists to prevent,
+-- so the decision and the update have to be a single atomic step.
+class HasResyncGate m where
+  -- | True at most once per (fetch number, 'resyncDebounce' window), across
+  -- all connections in the process.
+  tryResyncFrom :: Integer -> m Bool
+
+instance MonadIO m => HasResyncGate (ReaderT Config m) where
+  tryResyncFrom n = do
+    ref <- asks configLastResync
+    now <- liftIO getCurrentTime
+    liftIO . atomicModifyIORef' ref $ \old@(LastResync prev) ->
+      let stillFresh = case prev of
+            Just (n', t) -> n' == n && (now `diffUTCTime` t) < resyncDebounce
+            Nothing -> False
+       in if stillFresh
+            then (old, False)
+            else (LastResync (Just (n, now)), True)
 
 instance MonadIO m => Mod.Modifiable [BlockHeader] (ReaderT Config m) where
   get _ = do
@@ -430,6 +456,7 @@ instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Host, UDPPort, B.ByteStr
 type MonadP2P m =
   ( MonadIO m,
     MonadLogger m,
+    HasResyncGate m,
     MonadResource m,
     MonadUnliftIO m,
     HasVault m,
@@ -453,8 +480,7 @@ type MonadP2P m =
       '[Mod.Modifiable]
       '[ BestBlock,
          BestSequencedBlock,
-         WorldBestBlock,
-         LastResync
+         WorldBestBlock
        ]
       m,
     All2
@@ -487,29 +513,6 @@ getRemainingBHeaders = unRemainingBlockHeaders <$> Mod.access (Proxy @RemainingB
 
 putRemainingBHeaders :: Mod.Modifiable RemainingBlockHeaders m => [BlockHeader] -> m ()
 putRemainingBHeaders = Mod.put (Proxy @RemainingBlockHeaders) . RemainingBlockHeaders
-
--- | Rate-limit the gossip-driven "new block is missing its parent" resync.
--- While a node is far behind, every gossiped block fails the parent lookup, and
--- each failure used to fire a fresh 500-header GetBlockHeaders. With a block a
--- second from every peer that is a self-inflicted header flood that crowds the
--- BlockBodies responses (the only messages that advance the sync) out of the
--- connection's event queue. Ask at most once per fetch number, and otherwise at
--- most once per 'resyncDebounce'. The state is process-wide, so this also
--- stops N connections from each fetching the same range once.
-shouldResyncFrom :: (MonadIO m, Mod.Modifiable LastResync m) => Integer -> m Bool
-shouldResyncFrom n = do
-  LastResync prev <- Mod.get (Proxy @LastResync)
-  now <- liftIO getCurrentTime
-  let stillFresh = case prev of
-        Just (n', t) -> n' == n && (now `diffUTCTime` t) < resyncDebounce
-        Nothing -> False
-  unless stillFresh . Mod.put (Proxy @LastResync) . LastResync $ Just (n, now)
-  pure $ not stillFresh
-
--- Short, because only one connection now acts on a given gap: if that peer
--- fails to deliver, this is how long before another one retries.
-resyncDebounce :: NominalDiffTime
-resyncDebounce = 5
 
 stampActionTimestamp :: (MonadIO m, Mod.Modifiable ActionTimestamp m) => m ()
 stampActionTimestamp = do

@@ -120,11 +120,11 @@ handleEvents peer = awaitForever $ \case
     case parentHeader of
       Nothing -> do
         BestSequencedBlock _ bestBlockNum _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
-        let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
+        let fetchNumber = alignFetchNumber $ if bestBlockNum < 2 then 1 else bestBlockNum - 1
         -- Debounced: while we are far behind, every gossiped block misses its
         -- parent, and one 500-header request per gossiped block buries the
         -- BlockBodies responses we actually need.
-        shouldFetch <- lift $ shouldResyncFrom fetchNumber
+        shouldFetch <- lift $ tryResyncFrom fetchNumber
         when shouldFetch $ do
           $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
           $logInfoS "handleEvents/NewBlock" "#### New block is missing its parent, I am resyncing"
@@ -135,8 +135,8 @@ handleEvents peer = awaitForever $ \case
   MsgEvt (NewBlockHashes _) -> do
     lift stampActionTimestamp
     BestSequencedBlock _ bestBlockNum _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
-    let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
-    shouldFetch <- lift $ shouldResyncFrom fetchNumber
+    let fetchNumber = alignFetchNumber $ if bestBlockNum < 2 then 1 else bestBlockNum - 1
+    shouldFetch <- lift $ tryResyncFrom fetchNumber
     when shouldFetch $ do
       $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
       syncFetch Forward fetchNumber
@@ -388,10 +388,11 @@ handleEvents peer = awaitForever $ \case
       -- node: 8k header requests covering only 118 distinct numbers, the worst
       -- repeated 1,422 times. The longer a stall lasted, the harder p2p
       -- flooded itself, which is what kept the stall going.
-      shouldFetch <- lift $ shouldResyncFrom start
+      let start' = alignFetchNumber start
+      shouldFetch <- lift $ tryResyncFrom start'
       when shouldFetch $ do
-        $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start
-        syncFetch Forward start
+        $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start'
+        syncFetch Forward start'
     P2pPushBlocks start end p -> do
       ss <- lift $ shouldSendToPeer p
       when ss $ do
@@ -442,6 +443,29 @@ handleEvents peer = awaitForever $ \case
     $logInfoS "handleEvents/AbortEvt" . T.pack $ "Received AbortEvt: " ++ reason
     yieldR $ Disconnect AlreadyConnected
   event -> liftIO . error $ "unrecognized event: " ++ show event
+
+-- | Snap a gossip-driven fetch start down to a fixed 'maxReturnedHeaders'
+-- boundary.
+--
+-- The entry points below each derive a start from live local state (our
+-- sequenced tip, or the sequencer's gap), so two connections entering the same
+-- region a moment apart ask for e.g. 295466 and 295478. Those are different
+-- numbers, so 'tryResyncFrom' sees them as different work and lets BOTH
+-- through, and both then download almost exactly the same 500 blocks —
+-- observed as ranges (295466:295965) and (295478:295946) fetched side by side.
+-- Snapping to a boundary turns them into the same request, which is what lets
+-- the gate actually collapse them.
+--
+-- Aligning downwards is cheap: 'addToHeaderCache' prunes headers at or below
+-- the sequenced tip, so the few hundred extra headers are dropped before they
+-- can turn into extra body fetches. Only these gossip entry points are
+-- aligned; the BlockBodies continuation is a per-connection forward walk that
+-- does not collide with other peers, and snapping it backwards would re-fetch
+-- the batch it just finished.
+alignFetchNumber :: Integer -> Integer
+alignFetchNumber n = (max 0 n `div` step) * step
+  where
+    step = fromIntegral . max 1 $ Conf.maxReturnedHeaders (p2pConfig ethConf)
 
 syncFetch ::
   ( MonadIO m,
