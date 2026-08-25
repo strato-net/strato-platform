@@ -47,6 +47,7 @@ library
     , lens
     , mtl
     , prometheus-client
+    , solid-vm-model
     , strato-model
     , text
     , transformers
@@ -60,6 +61,7 @@ test-suite blockstanbul-test
       AuthenticationSpec
       MessageSpec
       Spec
+      StakingConsensusSpec
       StateMachineSpec
       Paths_blockstanbul
   hs-source-dirs:
@@ -67,9 +69,20 @@ test-suite blockstanbul-test
   ghc-options: -Wall -Werror -dynamic
   build-depends:
       base
+    , blockapps-data
+    , blockstanbul
+    , bytestring
     , common-log
+    , conduit
+    , containers
     , hflags
     , hspec
+    , labeled-error
+    , lens
+    , mtl
+    , strato-model
+    , time
+    , vault-monad
   default-language: Haskell2010
 
 benchmark one-node

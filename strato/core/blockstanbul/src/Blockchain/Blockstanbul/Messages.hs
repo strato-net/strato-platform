@@ -47,7 +47,12 @@ data View = View
   { _round :: RoundNumber,
     _sequence :: SequenceNumber
   }
-  deriving (Eq, Show, Ord, Generic, Binary, NFData, Data)
+  deriving (Eq, Show, Generic, Binary, NFData, Data)
+
+-- Sequence-major: a later height is always a later view, whatever the round.
+-- (Rounds restart at 0 on every height once stake-weighted selection is active.)
+instance Ord View where
+  compare (View r1 s1) (View r2 s2) = compare (s1, r1) (s2, r2)
 
 makeLenses ''View
 
@@ -146,7 +151,7 @@ roundchangeCode = 3
 
 data InEvent
   = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
-  | Timeout RoundNumber
+  | Timeout View
   | UnannouncedBlock Block
   | PreviousBlock Block
   | PreprepareResponse PreprepareDecision
@@ -157,7 +162,7 @@ data InEvent
 
 instance Format InEvent where
   format (IMsg (MsgAuth s _) msg) = "IMsg " ++ format msg ++ " " ++ format s
-  format (Timeout rn) = "Timeout " ++ format rn
+  format (Timeout v) = "Timeout " ++ format v
   format (UnannouncedBlock blk) = "UnannouncedBlock " ++ format (blockHash blk)
   format (PreprepareResponse rspns) = "Preprepare Response " ++ format rspns
   format (PreviousBlock blk) = "PreviousBlock " ++ format (blockHash blk)
@@ -169,7 +174,7 @@ data OutEvent
   = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
   | ToCommit Block
   | FailedHistoric Block
-  | ResetTimer RoundNumber
+  | ResetTimer View
   | -- Announce that the global consensus is ahead of us by
     -- some number of blocks, and hope that a higher power
     -- will erase the gap with PreviousBlocks.
@@ -187,7 +192,7 @@ instance Format OutEvent where
   format (OMsg (MsgAuth s _) msg) = "OMsg " ++ format msg ++ " " ++ format s
   format (ToCommit blk) = "ToCommit " ++ format (blockHash blk)
   format (FailedHistoric blk) = "FailedHistoric " ++ format (blockHash blk)
-  format (ResetTimer rn) = "ResetTimer " ++ format rn
+  format (ResetTimer v) = "ResetTimer " ++ format v
   format (GapFound we they p) = "GapFound " ++ show (we, they, p)
   format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
   format (RunPreprepare blk) = "RunPreprepare " ++ format (blockHash blk)
@@ -204,7 +209,7 @@ inShortLog :: MonadLogger m => Text -> InEvent -> m ()
 inShortLog loc iev = $logDebugS loc . pack $
   case iev of
     IMsg a m -> shortFormat $ WireMessage a m
-    Timeout rn -> CL.blue "TIMEOUT " ++ show rn
+    Timeout v -> CL.blue "TIMEOUT " ++ format v
     UnannouncedBlock blk -> CL.blue "UNANNOUNCED_BLOCK " ++ blkNum blk
     PreprepareResponse rspns -> CL.blue "PRE_PREPARE_RESPONSE " ++ format rspns
     PreviousBlock blk -> CL.blue "PREVIOUS_BLOCK " ++ blkNum blk
@@ -220,7 +225,7 @@ outShortLog loc eoev = do
       OMsg a m -> shortFormat $ WireMessage a m
       ToCommit blk -> prefix ++ CL.blue "TO_COMMIT " ++ blkNum blk
       FailedHistoric blk -> prefix ++ CL.blue "FAILED_HISTORIC " ++ blkNum blk
-      ResetTimer rn -> prefix ++ CL.blue "RESET_TIMER " ++ show rn
+      ResetTimer v -> prefix ++ CL.blue "RESET_TIMER " ++ format v
       GapFound h r p -> prefix ++ CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
       LeadFound h r p -> prefix ++ CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
       RunPreprepare blk -> prefix ++ CL.blue "RUN_PRE_PREPARE " ++ format (blockHash blk)
@@ -330,14 +335,20 @@ data AuthResult = AuthSuccess | AuthFailure String deriving (Show, Eq)
 
 data Checkpoint = Checkpoint
   { checkpointView :: View,
-    checkpointValidators :: [Validator]
+    checkpointValidators :: [Validator],
+    -- | Hash of the last committed block (the seed for proposer selection).
+    checkpointParentHash :: Maybe Keccak256,
+    -- | Stake weights in force for the next block.
+    checkpointStakes :: [(Validator, Integer)],
+    -- | PBFT round of the last committed block (the round the next height starts at).
+    checkpointLastRound :: Integer
   }
   deriving (Show, Eq, Generic, NFData, Ae.ToJSON, Ae.FromJSON, Data)
 
 instance Binary Checkpoint where
 
 instance Default Checkpoint where
-  def = Checkpoint (View 0 0) []
+  def = Checkpoint (View 0 0) [] Nothing [] 0
 
 instance Arbitrary Checkpoint where
   arbitrary = genericArbitrary

@@ -102,7 +102,7 @@ handleMsgClientConduit myId peer = do
     Just Hello {} ->
       yield
         =<< lift
-          ( Mod.get (Mod.Proxy @BestSequencedBlock) >>= \(BestSequencedBlock bHash highestBlockNum' _) -> do
+          ( Mod.get (Mod.Proxy @BestSequencedBlock) >>= \(BestSequencedBlock bHash highestBlockNum' _ _ _) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
               let s = Status
                       { protocolVersion = fromIntegral ethVersion,
@@ -176,7 +176,7 @@ handleMsgServerConduit myPubkey peer = do
       $logInfoS "serverHandshake/Status{}" "received status"
       yield
         =<< lift
-          ( Mod.get (Mod.Proxy @BestSequencedBlock) >>= \(BestSequencedBlock bHash myHighestBlockNum _) -> do
+          ( Mod.get (Mod.Proxy @BestSequencedBlock) >>= \(BestSequencedBlock bHash myHighestBlockNum _ _ _) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
               -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
               let highestBlockNum' = if ver < 63 then theirHighestBlockNum - 8192 else theirHighestBlockNum

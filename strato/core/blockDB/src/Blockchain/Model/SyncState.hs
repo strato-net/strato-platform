@@ -44,15 +44,21 @@ instance Default BestBlock where
 data BestSequencedBlock = BestSequencedBlock {
   bestSequencedBlockHash       :: Keccak256,
   bestSequencedBlockNumber     :: Integer,
-  bestSequencedBlockValidators :: [Validator]
+  bestSequencedBlockValidators :: [Validator],
+  -- | Stake weights in force for the next block (empty before staking is active)
+  bestSequencedBlockStakes     :: [(Validator, Integer)],
+  -- | PBFT round of the best block (the round the next height starts at)
+  bestSequencedBlockRound      :: Integer
   } deriving (Eq, Show)
 
 $(deriveFormat ''BestSequencedBlock)
 
 instance RLPSerializable BestSequencedBlock where
-  rlpEncode (BestSequencedBlock sha num validators) =
-    RLPArray [rlpEncode sha, rlpEncode num, rlpEncode validators]
-  rlpDecode (RLPArray [sha, num, validators]) = BestSequencedBlock (rlpDecode sha) (rlpDecode num) (rlpDecode validators)
+  rlpEncode (BestSequencedBlock sha num validators stakes rnd) =
+    RLPArray [rlpEncode sha, rlpEncode num, rlpEncode validators, rlpEncode stakes, rlpEncode rnd]
+  -- legacy 3-element form written before stakes existed
+  rlpDecode (RLPArray [sha, num, validators]) = BestSequencedBlock (rlpDecode sha) (rlpDecode num) (rlpDecode validators) [] 0
+  rlpDecode (RLPArray [sha, num, validators, stakes, rnd]) = BestSequencedBlock (rlpDecode sha) (rlpDecode num) (rlpDecode validators) (rlpDecode stakes) (rlpDecode rnd)
   rlpDecode _ = error "data in wrong format when trying to rlpDecode a RedisBestBlock"
 
 instance Binary BestSequencedBlock where
@@ -60,7 +66,7 @@ instance Binary BestSequencedBlock where
   put = put . rlpPut
 
 instance Default BestSequencedBlock where
-  def = BestSequencedBlock zeroHash 0 []
+  def = BestSequencedBlock zeroHash 0 [] [] 0
 
 newtype WorldBestBlock = WorldBestBlock {unWorldBestBlock :: BestBlock} deriving (Eq, Show)
 

@@ -14,6 +14,7 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.ProposerSelection
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Conduit
@@ -55,6 +56,16 @@ data BlockstanbulContext = BlockstanbulContext
     _proposer :: Validator,
     -- The total group of participants
     _validators :: S.Set Validator,
+    -- Stake weights in force for the next block (validators absent here weigh 0)
+    _stakes :: M.Map Validator Integer,
+    -- Block number from which stake-weighted, per-height proposer selection is
+    -- in force (Nothing = from genesis)
+    _stakingActivation :: Maybe Integer,
+    -- Network id, part of the proposer selection seed
+    _chainId :: Integer,
+    -- PBFT round of the last committed block: rounds persist across heights,
+    -- so this is the round the next height starts at
+    _lastRound :: Integer,
     -- Validators who have sent us a prepare for this round
     _prepared :: M.Map Validator Keccak256,
     -- Validators who have sent us a commitment seal for this round
@@ -83,6 +94,32 @@ data BlockstanbulContext = BlockstanbulContext
 
 makeLenses ''BlockstanbulContext
 
+-- | Is stake-weighted selection in force for the given block number?
+stakingActiveFor :: Integer -> BlockstanbulContext -> Bool
+stakingActiveFor height ctx = maybe True (height >=) (_stakingActivation ctx)
+
+-- | Height of the block currently under consideration.
+nextHeight :: BlockstanbulContext -> Integer
+nextHeight ctx = fromIntegral (_sequence $ _view ctx) + 1
+
+-- | Is stake-weighted selection in force for the block under consideration?
+stakingActiveNow :: BlockstanbulContext -> Bool
+stakingActiveNow ctx = stakingActiveFor (nextHeight ctx) ctx
+
+-- | The proposer for the current view. Stake-weighted and per-height (seeded by
+-- chain id, height and round) once staking is active; the legacy
+-- address-ordered round-robin (sticky across heights) before that.
+computeLeader :: BlockstanbulContext -> Validator
+computeLeader ctx
+  | S.null vals = error "computeLeader: you need at least one validator in the network"
+  | stakingActiveFor height ctx =
+      selectProposer (_chainId ctx) height vals (_stakes ctx) (_lastRound ctx) (fromIntegral rnd)
+  | otherwise = (fromIntegral rnd `mod` S.size vals) `S.elemAt` vals
+  where
+    vals = _validators ctx
+    height = nextHeight ctx
+    rnd = _round $ _view ctx
+
 debugShowCtx :: StateMachineM m => m ()
 debugShowCtx = do
   let debugLog :: (StateMachineM m2) => T.Text -> LensLike' (Const (m2 ())) BlockstanbulContext a -> (a -> String) -> m2 ()
@@ -90,6 +127,9 @@ debugShowCtx = do
   debugLog "showctx/view" view format
   debugLog "showctx/proposer" proposer ((++ "\n") . format)
   debugLog "showctx/validators" validators (shortDescription . S.toList)
+  debugLog "showctx/stakes" stakes show
+  debugLog "showctx/lastParent" lastParent (maybe "Nothing" format)
+  debugLog "showctx/lastRound" lastRound show
   debugLog "showctx/mBlockNumber" proposal (show . fmap (number . blockBlockData))
   debugLog "showctx/mLockedBlockNo" blockLock (show . fmap (number . blockBlockData))
   debugLog "showctx/mLockedSender" lockSender (show . fmap format)
@@ -99,17 +139,20 @@ debugShowCtx = do
   debugLog "showctx/hasPrepared" hasPrepared show
   debugLog "showctx/roundChanged" roundChanged show
 
-newContext :: String -> Checkpoint -> Maybe Address -> Bool -> BlockstanbulContext
-newContext network' (Checkpoint v as) addr valB =
+newContext :: String -> Integer -> Checkpoint -> Maybe Address -> Bool -> Maybe Integer -> BlockstanbulContext
+newContext network' chainId' (Checkpoint v as mParent stakes' lastRound') addr valB activation =
   let valSet = S.fromList as
-      prop = fromMaybe (error "you need at least one validator in the network") $ S.lookupMin valSet
-   in BlockstanbulContext
+      ctx = BlockstanbulContext
         { _view = v,
           _productionAuth = True,
           _myBlock = Nothing,
           _proposal = Nothing,
-          _proposer = prop,
+          _proposer = computeLeader ctx,
           _validators = valSet,
+          _stakes = M.fromList stakes',
+          _stakingActivation = activation,
+          _chainId = chainId',
+          _lastRound = lastRound',
           _prepared = M.empty,
           _committed = M.empty,
           _hasPreprepared = False,
@@ -120,17 +163,39 @@ newContext network' (Checkpoint v as) addr valB =
           _selfAddr = addr,
           _blockLock = Nothing,
           _lockSender = Nothing,
-          _lastParent = Nothing,
+          _lastParent = mParent,
           _validatorBehavior = valB,
           _isValidator = False,
           _network = network'
         }
+   in ctx
 
 generateNonceMap :: [Validator] -> M.Map Validator Int
 generateNonceMap = M.fromList . flip zip (repeat 0)
 
-poolSize :: (StateMachineM m) => m Int
-poolSize = uses validators S.size
+-- | Voting weights of a validator set for quorum purposes: the published stake
+-- weights once staking is active (members without stake weigh 0, so they count on
+-- neither side; if nobody has stake yet every member weighs 1), one each before.
+voteWeights :: Bool -> S.Set Validator -> M.Map Validator Integer -> M.Map Validator Integer
+voteWeights weighted vals stakeMap
+  | weighted && any (> 0) (M.elems staked) = staked
+  | otherwise = M.fromSet (const 1) vals
+  where staked = M.fromSet (\v -> max 0 (M.findWithDefault 0 v stakeMap)) vals
+
+-- | @3 * voteWeight voters > 2 * totalWeight@: the PBFT supermajority.
+hasSupermajority :: M.Map Validator Integer -> S.Set Validator -> Bool
+hasSupermajority weights voters = 3 * weightOf weights voters > 2 * sum (M.elems weights)
+
+-- | @3 * voteWeight voters > totalWeight@: more than a third (round-change piggyback).
+hasMinority :: M.Map Validator Integer -> S.Set Validator -> Bool
+hasMinority weights voters = 3 * weightOf weights voters > sum (M.elems weights)
+
+weightOf :: M.Map Validator Integer -> S.Set Validator -> Integer
+weightOf weights voters = sum [w | (v, w) <- M.toList weights, v `S.member` voters]
+
+-- | Quorum weights for the height under consideration.
+currentVoteWeights :: BlockstanbulContext -> M.Map Validator Integer
+currentVoteWeights ctx = voteWeights (stakingActiveNow ctx) (_validators ctx) (_stakes ctx)
 
 clearLock :: (StateMachineM m) => m ()
 clearLock = do

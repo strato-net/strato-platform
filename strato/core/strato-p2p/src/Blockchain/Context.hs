@@ -30,6 +30,7 @@ module Blockchain.Context
     , GenesisBlockHash(..)
     , PeerRunner
     , RemainingBlockHeaders(..)
+    , LastResync(..)
     , initConfig
     , initContext
     , runContextM
@@ -38,6 +39,7 @@ module Blockchain.Context
     , putBlockHeaders
     , getRemainingBHeaders
     , putRemainingBHeaders
+    , shouldResyncFrom
     , stampActionTimestamp
     , getActionTimestamp
     , clearActionTimestamp
@@ -100,7 +102,7 @@ import           Blockchain.Strato.Model.Keccak256
 
 import qualified Blockchain.Strato.RedisBlockDB          as RBDB
 import           Blockchain.SyncDB
-import           Control.Monad                           (void)
+import           Control.Monad                           (unless, void)
 import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                    as SQL
 import qualified Database.Redis                          as Redis
@@ -134,8 +136,10 @@ data Config = Config
     configRedisBlockDB             :: RBDB.RedisConnection,
     configContext                  :: IORef Context,
     configBlockstanbulWireMessages :: IORef (S.OSet Keccak256),
-    -- Shared per-process Kafka producer. Guarded by an MVar because milena's
-    -- KafkaState read-modify-write in execKafka is not atomic across threads.
+    -- Per-connection Kafka producer, swapped in by the peer runner. Guarded by
+    -- an MVar because milena's KafkaState read-modify-write in execKafka is not
+    -- atomic across threads. It must NOT be shared process-wide: that made one
+    -- lock serialize every peer's ToUnseq produces and starved block downloads.
     configStreamEnv                :: MVar StreamEnv
   }
 
@@ -146,6 +150,9 @@ emptyActionTimestamp = ActionTimestamp Nothing
 
 newtype RemainingBlockHeaders = RemainingBlockHeaders {unRemainingBlockHeaders :: [BlockHeader]}
 
+-- | Last missing-parent resync this connection asked for: (fetch number, when).
+newtype LastResync = LastResync {unLastResync :: Maybe (Integer, UTCTime)}
+
 newtype PeerAddress = PeerAddress {unPeerAddress :: Maybe Address}
 
 withPeerAddress :: (Maybe Address -> Maybe Address) -> PeerAddress -> PeerAddress
@@ -155,6 +162,7 @@ data Context = Context
   { blockHeaders          :: ([BlockHeader], UTCTime) -- keep track when last updated global headers cache
   , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp       :: ActionTimestamp
+  , lastResync            :: LastResync
   , _blockstanbulPeerAddr :: PeerAddress
   , _outboundWireMessages :: S.OSet (Host, Keccak256)
   }
@@ -245,7 +253,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (Reader
     RBDB.withRedisBlockDB getBestSequencedBlockInfo >>= \case
       Nothing -> do
         BestBlock s n <- Mod.get (Mod.Proxy @BestBlock)
-        return $ BestSequencedBlock s n []
+        return $ BestSequencedBlock s n [] [] 0
       Just bestSequencedBlock -> return bestSequencedBlock
   put _ bestSequencedBlock =
     RBDB.withRedisBlockDB (putBestSequencedBlockInfo bestSequencedBlock) >>= \case
@@ -331,12 +339,21 @@ instance MonadIO m => Mod.Modifiable ActionTimestamp (ReaderT Config m) where
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ActionTimestamp (ReaderT Config m) where
   access _ = Mod.get (Proxy @ActionTimestamp)
 
+instance MonadIO m => Mod.Modifiable LastResync (ReaderT Config m) where
+  get _ = lastResync <$> Mod.get (Proxy @Context)
+  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {lastResync = k}, ()))
+
 instance MonadIO m => Mod.Modifiable [BlockHeader] (ReaderT Config m) where
   get _ = do
     (bHeaders, lastUpdateTS) <- blockHeaders <$> Mod.get (Proxy @Context)
     now <- liftIO getCurrentTime
     let diffTime = now `diffUTCTime` lastUpdateTS
-    if diffTime > fromIntegral (Conf.connectionTimeout (p2pConfig ethConf))
+    -- The in-flight body-request set gates ALL body fetching node-wide
+    -- (isBodyRequestActive), so a request wedged on an unresponsive peer must
+    -- self-heal quickly. This was previously gated on connectionTimeout
+    -- (default 3600s), letting one bad peer freeze block downloads for an
+    -- hour; 60s is comfortably above any honest body-response round trip.
+    if diffTime > 60
       then do
         -- stale cache; override it
         Mod.put (Proxy @[BlockHeader]) []
@@ -431,7 +448,8 @@ type MonadP2P m =
       '[Mod.Modifiable]
       '[ BestBlock,
          BestSequencedBlock,
-         WorldBestBlock
+         WorldBestBlock,
+         LastResync
        ]
       m,
     All2
@@ -464,6 +482,26 @@ getRemainingBHeaders = unRemainingBlockHeaders <$> Mod.access (Proxy @RemainingB
 
 putRemainingBHeaders :: Mod.Modifiable RemainingBlockHeaders m => [BlockHeader] -> m ()
 putRemainingBHeaders = Mod.put (Proxy @RemainingBlockHeaders) . RemainingBlockHeaders
+
+-- | Rate-limit the gossip-driven "new block is missing its parent" resync.
+-- While a node is far behind, every gossiped block fails the parent lookup, and
+-- each failure used to fire a fresh 500-header GetBlockHeaders. With a block a
+-- second from every peer that is a self-inflicted header flood that crowds the
+-- BlockBodies responses (the only messages that advance the sync) out of the
+-- connection's event queue. Ask at most once per fetch number, and otherwise at
+-- most once per 'resyncDebounce'.
+shouldResyncFrom :: (MonadIO m, Mod.Modifiable LastResync m) => Integer -> m Bool
+shouldResyncFrom n = do
+  LastResync prev <- Mod.get (Proxy @LastResync)
+  now <- liftIO getCurrentTime
+  let stillFresh = case prev of
+        Just (n', t) -> n' == n && (now `diffUTCTime` t) < resyncDebounce
+        Nothing -> False
+  unless stillFresh . Mod.put (Proxy @LastResync) . LastResync $ Just (n, now)
+  pure $ not stillFresh
+
+resyncDebounce :: NominalDiffTime
+resyncDebounce = 10
 
 stampActionTimestamp :: (MonadIO m, Mod.Modifiable ActionTimestamp m) => m ()
 stampActionTimestamp = do
@@ -508,6 +546,7 @@ initContext :: MonadIO m => m Context
 initContext =
   return $
     Context { actionTimestamp = emptyActionTimestamp
+            , lastResync = LastResync Nothing
             , blockHeaders = ([], jamshidBirth)
             , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
             , _blockstanbulPeerAddr = PeerAddress Nothing

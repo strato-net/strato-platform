@@ -252,6 +252,11 @@ const StratoStats = () => {
     return `${cr.toFixed(2)}%`;
   };
 
+  const formatSince = (ts: number): string => {
+    const hours = Math.round((Date.now() / 1000 - ts) / 3600);
+    return hours >= 48 ? `${Math.round(hours / 24)}d ago` : `${hours}h ago`;
+  };
+
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
@@ -664,7 +669,7 @@ const StratoStats = () => {
                           +${formatLargeNumber(parseFloat(formatUnits(BigInt(yieldVaultPendingRevenue), 18)))} pending
                           {yieldVaultLastAccrual > 0 && (
                             <span className="text-muted-foreground">
-                              {' '}(since {Math.round((Date.now() / 1000 - yieldVaultLastAccrual) / 3600)}h ago)
+                              {' '}(since last sweep {formatSince(yieldVaultLastAccrual)})
                             </span>
                           )}
                         </div>

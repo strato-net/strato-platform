@@ -165,6 +165,10 @@ export function getExplorerUrl(chainId: string, txHash: string): string {
       return `https://bscscan.com/tx/${txHash}`;
     case 43114: // Avalanche
       return `https://snowtrace.io/tx/${txHash}`;
+    case 4663: // Robinhood Chain
+      return `https://robinhoodchain.blockscout.com/tx/${txHash}`;
+    case 46630: // Robinhood Chain Testnet
+      return `https://explorer.testnet.chain.robinhood.com/tx/${txHash}`;
     default:
       return `https://etherscan.io/tx/${txHash}`;
   }

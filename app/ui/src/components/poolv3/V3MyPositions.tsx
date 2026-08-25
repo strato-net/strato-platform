@@ -14,6 +14,7 @@ import { formatTokenAmount, formatTickAsPrice, formatPriceWad, poolV3TxAmounts, 
 import V3ConfirmDialog, { ConfirmRow } from "./V3ConfirmDialog";
 import V3IncreaseDialog from "./V3IncreaseDialog";
 import TokenPairIcons from "./TokenPairIcons";
+import V3PoolStatusBanner from "./V3PoolStatusBanner";
 
 type ConfirmableAction = "remove" | "fees" | "collect";
 
@@ -365,9 +366,20 @@ const V3MyPositions = ({
                   </span>
                 </div>
               </div>
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 flex-shrink-0">
-                {pool.fee / 10000}%
-              </Badge>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {pool.isDisabled ? (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-destructive border-destructive/40">
+                    Disabled
+                  </Badge>
+                ) : pool.isPaused ? (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-yellow-600 border-yellow-600/40">
+                    Paused
+                  </Badge>
+                ) : null}
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                  {pool.fee / 10000}%
+                </Badge>
+              </div>
             </button>
           ))}
         </div>
@@ -404,6 +416,10 @@ const V3MyPositions = ({
                 )}
               </span>
             </div>
+
+            {/* Disabled/paused pools stay visible here so users can see their funds; the
+                banner explains why some actions are turned off (buttons are gated below). */}
+            <V3PoolStatusBanner pool={selectedGroup.pool} />
 
             {selectedGroup.positions.map((position) => {
               const key = positionKey(position);

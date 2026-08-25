@@ -75,6 +75,20 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
 
   const { fields, replace } = useFieldArray({ control: form.control, name: 'args' });
 
+  // A stale dry-run is misleading once the proposal inputs change; drop it on
+  // any edit (form fields or the selected function).
+  useEffect(() => {
+    const sub = form.watch(() => {
+      setSimResult(null);
+      setSimError('');
+    });
+    return () => sub.unsubscribe();
+  }, [form]);
+  useEffect(() => {
+    setSimResult(null);
+    setSimError('');
+  }, [selectedFunction]);
+
   const functionArgs = (allContractFunctions[selectedFunction] || {})._funcArgs as Array<[string, { type?: { tag?: string } }]> | undefined;
   
   useEffect(() => {
