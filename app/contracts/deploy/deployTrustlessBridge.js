@@ -70,8 +70,23 @@ const PROFILES = {
 };
 
 /// keccak256("DepositRouted(address,uint256,address,address,address,uint96)")
-const DEPOSIT_ROUTED_SIG =
+/// keccak256("DepositRouted(address,uint256,address,address,address,uint96)")
+const DEPOSIT_ROUTED_SIG_V1 =
   "0x55426533b384af6fcfee0e834a6407e3ffc370a0b1b53400c4e6ec92d7f1f750";
+/// keccak256("DepositRouted(address,uint256,address,address,address,uint96,uint256)")
+/// V2 appends `maxFee` -- the most a depositor will leave a fast-fill LP.
+const DEPOSIT_ROUTED_SIG_V2 =
+  "0xfc5b47f88f9cf2b26372a1037d51adf3e637958ea873f7eda09cc87c30687a9f";
+
+/// An EthBridgeIn is bound to ONE event shape: a claim whose topic[0] does not
+/// match is rejected outright, so pointing a bridge-in at a router of the other
+/// generation fails silently -- deposits simply never become claimable. Pick it
+/// from the router being wired, via --router-event-version (default v1, which
+/// is what every currently deployed router emits).
+const DEPOSIT_ROUTED_SIG =
+  (process.env.ROUTER_EVENT_VERSION || "v1").toLowerCase() === "v2"
+    ? DEPOSIT_ROUTED_SIG_V2
+    : DEPOSIT_ROUTED_SIG_V1;
 
 /// keccak256("DisputeGameCreated(address,uint32,bytes32)")
 const DISPUTE_GAME_CREATED_SIG =
@@ -678,6 +693,10 @@ async function main() {
     throw new Error("ownerAddr resolved to zero address — Ownable would reject");
   }
   console.log(`Admin address      : ${ownerAddr}`);
+  console.log(
+    `Router event shape : ${(process.env.ROUTER_EVENT_VERSION || "v1").toLowerCase() === "v2" ? "V2 (with maxFee)" : "V1"}` +
+      ` -> depositRoutedSig ${DEPOSIT_ROUTED_SIG.slice(0, 12)}…`,
+  );
 
   // Deployment pattern: each upgradeable contract is deployed as a
   // logic contract (only `owner_` in its ctor) + a Proxy whose

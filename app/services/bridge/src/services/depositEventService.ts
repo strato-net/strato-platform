@@ -6,9 +6,21 @@ import {
 } from "../types";
 import { normalizeAddress } from "../utils/utils";
 
+// Both router generations are listed on purpose. V2 appends `maxFee` -- the
+// most a depositor will leave a fast-fill LP -- which changes topic0, so a V2
+// router's logs are invisible to a V1-only ABI. Chains migrate one at a time,
+// so the relayer has to understand both at once or it silently stops seeing
+// deposits on whichever side it was not updated for.
+//
+// ethers keys fragments by topic hash, so parseLog resolves the right one; the
+// two shapes share a name but never a signature.
 const DEPOSIT_EVENTS_ABI = [
+  // V1
   "event DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId)",
   "event DepositRoutedWithAction(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId, uint8 action, address actionToken, uint256 minFinalOut)",
+  // V2 (adds maxFee)
+  "event DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId, uint256 maxFee)",
+  "event DepositRoutedWithAction(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId, uint256 maxFee, uint8 action, address actionToken, uint256 minFinalOut)",
 ];
 
 const depositEvents = new Interface(DEPOSIT_EVENTS_ABI);
@@ -57,6 +69,8 @@ export const parseDepositLog = (
     externalTxHash: log.transactionHash,
     stratoRecipient: normalizeAddress(parsed.args.stratoAddress),
     targetStratoToken: normalizeAddress(parsed.args.targetStratoToken),
+    // Absent on V1 logs; a V1 deposit simply cannot be fast-filled.
+    maxFee: parsed.args.maxFee === undefined ? "0" : parsed.args.maxFee.toString(),
   };
   if (parsed.name === "DepositRouted") {
     return { kind: "standard", deposit: base };

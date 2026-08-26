@@ -4,6 +4,7 @@ import { Interface } from "ethers";
 import {
   buildActionDepositBatchArgs,
   classifyDepositLogs,
+  parseDepositLog,
   RawDepositLog,
 } from "../services/depositEventService";
 
@@ -99,4 +100,53 @@ test("preserves every action field in batch arguments", () => {
   assert.deepEqual(args.actions, ["2"]);
   assert.deepEqual(args.actionTokens, [metal]);
   assert.deepEqual(args.minFinalOuts, ["90"]);
+});
+
+// ── V2 router logs ────────────────────────────────────────────────────────
+//
+// V2 appends `maxFee`, which changes topic0. A relayer that only knows V1 does
+// not fail loudly on a V2 log -- it simply never matches it, and deposits stop
+// being seen. These pin that both generations decode.
+
+const v2Events = new Interface([
+  "event DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId, uint256 maxFee)",
+  "event DepositRoutedWithAction(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId, uint256 maxFee, uint8 action, address actionToken, uint256 minFinalOut)",
+]);
+
+const makeV2Log = (
+  eventName: "DepositRouted" | "DepositRoutedWithAction",
+  transactionHash: string,
+  maxFee: bigint,
+): RawDepositLog => {
+  const encoded = v2Events.encodeEventLog(
+    v2Events.getEvent(eventName)!,
+    eventName === "DepositRouted"
+      ? [token, 100n, sender, recipient, target, 1, maxFee]
+      : [token, 100n, sender, recipient, target, 1, maxFee, 2, metal, 90n],
+  );
+  return {
+    address: token,
+    topics: [...encoded.topics],
+    data: encoded.data,
+    transactionHash,
+  } as RawDepositLog;
+};
+
+test("parses a V2 standard deposit and surfaces maxFee", () => {
+  const parsed = parseDepositLog(makeV2Log("DepositRouted", "0xaa", 7n), 11155111);
+  assert.equal(parsed.kind, "standard");
+  assert.equal(parsed.deposit.maxFee, "7");
+  assert.equal(parsed.deposit.externalTokenAmount, "100");
+});
+
+test("parses a V2 action deposit and surfaces maxFee", () => {
+  const parsed = parseDepositLog(makeV2Log("DepositRoutedWithAction", "0xbb", 9n), 11155111);
+  assert.equal(parsed.kind, "action");
+  assert.equal(parsed.deposit.maxFee, "9");
+});
+
+test("V1 logs still parse, reporting a zero fee", () => {
+  const parsed = parseDepositLog(makeLog("DepositRouted", "0xcc"), 11155111);
+  assert.equal(parsed.kind, "standard");
+  assert.equal(parsed.deposit.maxFee, "0", "a V1 deposit cannot be fast-filled");
 });

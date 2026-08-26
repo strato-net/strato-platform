@@ -4,6 +4,7 @@ import "../../libraries/Bridge/LightClientShared.sol";
 import "../../libraries/Bridge/MPTProof.sol";
 import "../../libraries/Bridge/RLPDecode.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
+import "../../abstract/ERC20/IERC20.sol";
 
 /**
  * @notice Decoded contents of a `DepositRouted` log emitted by the
@@ -25,6 +26,26 @@ struct ClaimedDeposit {
     address targetStratoToken;
     uint256 amount;
     uint96  depositId;
+    /// Most the depositor is willing to leave a fast-fill LP for advancing
+    /// funds before the source block finalises. Zero on V1 router logs.
+    uint256 maxFee;
+}
+
+/**
+ * @notice A fast fill: an LP paid the recipient out of its own funds before
+ *         the deposit's source block finalised, in exchange for keeping up to
+ *         `maxFee` when the deposit is finally proven.
+ *
+ *         Recorded in full because the claim has to check the fill against the
+ *         PROVEN deposit -- an LP that pays the wrong recipient, the wrong
+ *         token, or too little is simply not reimbursed, and the real
+ *         recipient is credited as though no fill had happened.
+ */
+struct Fill {
+    address lp;
+    address recipient;
+    address stratoToken;
+    uint256 paid;
 }
 
 /**
@@ -146,6 +167,11 @@ contract EthBridgeIn is Ownable {
     /// Once true, the same deposit can never be re-claimed.
     mapping(bytes32 => bool) public processed;
 
+    /// Fast fills, keyed by the same depositKey as {processed}. `record` so
+    /// SolidVM indexes this struct-valued mapping into Cirrus -- without it
+    /// the collection is silently absent and no consumer can read fill state.
+    mapping(bytes32 => Fill) public record fills;
+
     /// Optional mint callback. If non-zero, claim() invokes
     /// {IBridgeMintTarget.creditTrustlessDeposit} on this address
     /// after dedup. With address(0) the contract just emits
@@ -176,6 +202,24 @@ contract EthBridgeIn is Ownable {
     event RouterUpdated(address oldRouter, address newRouter);
     event EventSigUpdated(bytes32 oldSig, bytes32 newSig);
     event MintTargetUpdated(address oldTarget, address newTarget);
+
+    /// An LP advanced funds to the recipient ahead of finality.
+    event FastFilled(
+        bytes32 indexed depositKey,
+        address indexed lp,
+        address indexed recipient,
+        address stratoToken,
+        uint256 paid
+    );
+
+    /// A proven claim reimbursed the LP that had fast-filled it.
+    event FastFillReimbursed(
+        bytes32 indexed depositKey,
+        address indexed lp,
+        uint256 amount,
+        uint256 paid,
+        uint256 maxFee
+    );
 
     /// @notice Emitted when a claim used a valid signed assignment
     ///         and the credit was redirected away from the original
@@ -266,6 +310,57 @@ contract EthBridgeIn is Ownable {
     }
 
     // ─────────────────────────────────────────────────────────────────
+    // Permissionless: fast fill
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * @notice Advance funds to a deposit's recipient before its source block
+     *         has finalised, in exchange for being reimbursed the full deposit
+     *         once it is proven.
+     *
+     *         Permissionless and unverified on purpose. Nothing here proves the
+     *         deposit exists -- the LP asserts it does and wears the loss if it
+     *         never finalises or differs from what was filled. The bridge is
+     *         never at risk: it still pays out exactly once, against a proven
+     *         log, and only redirects that payout to an LP whose fill MATCHES
+     *         the proven deposit.
+     *
+     *         The transfer runs through this contract so the fill is atomic --
+     *         either the recipient is paid and the LP recorded, or neither.
+     *         An LP that pays out-of-band records nothing and is not reimbursed.
+     *
+     * @param depositKey  keccak256(abi.encode(srcChainId, blockNumber, txIndex, logIndex)).
+     * @param recipient   Must equal the deposit's stratoRecipient or the fill
+     *                    is ignored at claim time.
+     * @param stratoToken Must equal the deposit's targetStratoToken.
+     * @param payAmount   Transferred to `recipient` now. Reimbursement requires
+     *                    payAmount + maxFee >= the proven amount.
+     */
+    function fastFill(
+        bytes32 depositKey,
+        address recipient,
+        address stratoToken,
+        uint256 payAmount
+    ) external {
+        require(recipient != address(0), "EthBridgeIn: zero recipient");
+        require(stratoToken != address(0), "EthBridgeIn: zero strato token");
+        require(payAmount > 0, "EthBridgeIn: zero pay amount");
+        require(!processed[depositKey], "EthBridgeIn: already claimed");
+        require(fills[depositKey].lp == address(0), "EthBridgeIn: already filled");
+
+        // Record before the external call so a token whose transferFrom
+        // re-enters cannot find an unfilled slot.
+        fills[depositKey] = Fill(msg.sender, recipient, stratoToken, payAmount);
+
+        require(
+            IERC20(stratoToken).transferFrom(msg.sender, recipient, payAmount),
+            "EthBridgeIn: transferFrom failed"
+        );
+
+        emit FastFilled(depositKey, msg.sender, recipient, stratoToken, payAmount);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
     // Permissionless: claim
     // ─────────────────────────────────────────────────────────────────
 
@@ -348,11 +443,31 @@ contract EthBridgeIn is Ownable {
         require(!processed[depositKey], "EthBridgeIn: already processed");
         processed[depositKey] = true;
 
-        // 6. Optional claim assignment. If newRecipient is non-zero,
-        //    the original stratoRecipient must have signed an
-        //    EIP-712 ClaimAssignment authorizing the redirect.
+        // 6. Fast fill takes precedence over everything else: if an LP
+        //    already paid this recipient out of its own funds, the payout is
+        //    theirs. The fill is only honoured when it MATCHES the proven
+        //    deposit -- right recipient, right token, and enough paid that the
+        //    depositor's declared maxFee covers the shortfall.
+        //
+        //    The else-branch matters as much as the if. Without it an attacker
+        //    could fill any deposit with dust purely to occupy the slot and
+        //    lock the real recipient out forever; instead their dust is a gift
+        //    and the recipient is still credited in full.
+        //
+        //    Compared as `paid + maxFee >= amount` rather than
+        //    `paid >= amount - maxFee` so a malformed maxFee cannot underflow.
         address effectiveRecipient = dep.stratoRecipient;
-        if (assignment.newRecipient != address(0)) {
+        Fill memory fill = fills[depositKey];
+        bool reimbursingLp =
+            fill.lp != address(0) &&
+            fill.recipient == dep.stratoRecipient &&
+            fill.stratoToken == dep.targetStratoToken &&
+            fill.paid + dep.maxFee >= dep.amount;
+
+        if (reimbursingLp) {
+            effectiveRecipient = fill.lp;
+            emit FastFillReimbursed(depositKey, fill.lp, dep.amount, fill.paid, dep.maxFee);
+        } else if (assignment.newRecipient != address(0)) {
             _verifyAssignment(assignment, depositKey, dep.stratoRecipient);
             effectiveRecipient = assignment.newRecipient;
             emit ClaimReassigned(depositKey, dep.stratoRecipient, assignment.newRecipient, assignment.deadline);
@@ -391,7 +506,7 @@ contract EthBridgeIn is Ownable {
         ClaimAssignment assignment,
         bytes32 expectedDepositKey,
         address expectedSigner
-    ) private view {
+    ) internal view {
         require(
             assignment.depositKey == expectedDepositKey,
             "EthBridgeIn: assignment depositKey mismatch"
@@ -429,12 +544,12 @@ contract EthBridgeIn is Ownable {
 
     /// @dev Pad an address into a 32-byte left-zero word (right-aligned
     ///      address bytes), the layout EIP-712 ABI-encode uses.
-    function _addressTo32(address a) private pure returns (bytes32) {
+    function _addressTo32(address a) internal pure returns (bytes32) {
         return bytes32(uint256(uint160(a)));
     }
 
     /// @dev Cast uint256 to bytes32 (BE; same byte layout).
-    function _uint256To32(uint256 v) private pure returns (bytes32) {
+    function _uint256To32(uint256 v) internal pure returns (bytes32) {
         return bytes32(v);
     }
 
@@ -456,7 +571,7 @@ contract EthBridgeIn is Ownable {
      *        data[64..96] = depositId (uint96, right-aligned)
      */
     function _decodeDepositLog(bytes[] topics, bytes data)
-        private
+        internal
         pure
         returns (ClaimedDeposit memory dep)
     {
@@ -465,22 +580,30 @@ contract EthBridgeIn is Ownable {
         dep.ethSender        = _addressFromTopic(topics[2]);
         dep.stratoRecipient  = _addressFromTopic(topics[3]);
 
-        require(data.length == 96, "EthBridgeIn: data must be 96 bytes (3 abi words)");
+        // V1 routers emit 3 non-indexed words; V2 appends `maxFee`. A given
+        // deployment only ever sees one shape (topic[0] is checked against the
+        // configured depositRoutedSig), but accepting both means one contract
+        // spans a router migration.
+        require(
+            data.length == 96 || data.length == 128,
+            "EthBridgeIn: data must be 96 or 128 bytes"
+        );
         dep.amount             = _readUint256(data, 0);
         dep.targetStratoToken  = _readAddress(data, 32);
         dep.depositId          = uint96(_readUint256(data, 64));
+        dep.maxFee             = data.length == 128 ? _readUint256(data, 96) : 0;
     }
 
     /// @dev Topic items in raw log RLP are 32-byte string items. After
     ///      RLPDecode.decodeBytes32, we have a bytes32 with the address
     ///      right-aligned in the low 20 bytes (per EVM topic encoding).
-    function _addressFromTopic(bytes topicRlp) private pure returns (address) {
+    function _addressFromTopic(bytes topicRlp) internal pure returns (address) {
         bytes32 raw = RLPDecode.decodeBytes32(topicRlp);
         return address(uint160(uint256(raw)));
     }
 
     /// @dev Read a uint256 from `data` at byte offset `off`, big-endian.
-    function _readUint256(bytes data, uint256 off) private pure returns (uint256 v) {
+    function _readUint256(bytes data, uint256 off) internal pure returns (uint256 v) {
         require(off + 32 <= data.length, "EthBridgeIn: read OOB");
         v = 0;
         for (uint256 i = 0; i < 32; i = i + 1) {
@@ -490,7 +613,7 @@ contract EthBridgeIn is Ownable {
 
     /// @dev Read a right-aligned address from `data` at byte offset `off`
     ///      (an ABI-encoded address word: 12 zero bytes + 20 address bytes).
-    function _readAddress(bytes data, uint256 off) private pure returns (address) {
+    function _readAddress(bytes data, uint256 off) internal pure returns (address) {
         return address(uint160(_readUint256(data, off)));
     }
 }

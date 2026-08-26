@@ -15,9 +15,19 @@ export const STANDARD_DEPOSIT_EVENT_SIGNATURE = id(
 export const ACTION_DEPOSIT_EVENT_SIGNATURE = id(
   "DepositRoutedWithAction(address,uint256,address,address,address,uint96,uint8,address,uint256)",
 );
+// V2 appends `maxFee`, which changes topic0. Both generations are watched so a
+// chain can migrate its router without the relayer going blind on either side.
+export const STANDARD_DEPOSIT_EVENT_SIGNATURE_V2 = id(
+  "DepositRouted(address,uint256,address,address,address,uint96,uint256)",
+);
+export const ACTION_DEPOSIT_EVENT_SIGNATURE_V2 = id(
+  "DepositRoutedWithAction(address,uint256,address,address,address,uint96,uint256,uint8,address,uint256)",
+);
 export const DEPOSIT_EVENT_SIGNATURES = [
   STANDARD_DEPOSIT_EVENT_SIGNATURE,
   ACTION_DEPOSIT_EVENT_SIGNATURE,
+  STANDARD_DEPOSIT_EVENT_SIGNATURE_V2,
+  ACTION_DEPOSIT_EVENT_SIGNATURE_V2,
 ];
 
 // RedemptionRequested(address indexed representationToken, uint256 amount, address indexed sender, address indexed stratoRecipient, uint96 redemptionId)

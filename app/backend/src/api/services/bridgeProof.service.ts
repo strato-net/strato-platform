@@ -182,6 +182,25 @@ export type StateProofAnchorInputs =
  *         is acceptable.
  * @throws if the source RPC / beacon API can't resolve the request.
  */
+/**
+ * Hard ceiling on parentChain hops.
+ *
+ * Deliberately well under the measured 406-hop failure: the cost per hop is
+ * not perfectly uniform and the node-level GasCap is not ours to control, so
+ * the bound is a refusal threshold, not a tuned maximum.
+ */
+const MAX_PARENT_CHAIN_HOPS = 32;
+
+/** Thrown when a deposit is too far behind finality for the parentChain walk.
+ *  Terminal, never retryable -- callers should switch to the state-proof path
+ *  rather than back off and try again. */
+export class ParentChainTooLongError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ParentChainTooLongError";
+  }
+}
+
 export async function buildAnchorInputs(
   srcChainId: string,
   srcTxHash: string,
@@ -240,6 +259,27 @@ export async function buildAnchorInputs(
   //    `finalizedHeader.parent_root` back to (and including) the
   //    target. The last entry is the target itself.
   const numHops = Number(finalizedBlockNumber - depositBlockNumber);
+
+  // The walk is O(numHops) on-chain -- each hop recomputes
+  // hash_tree_root(BeaconBlockHeader), ~7 sha256 -- against a gas ceiling a
+  // transaction cannot raise: SolidVM caps _gasLeft at a node-level GasCap
+  // (SM.hs, `min (_gasLeft gi) gasCap`) on top of BlockChain.hs's 400k
+  // availableGas, so a bigger txParams.gasLimit does not help.
+  //
+  // Measured on STRATO: 26 hops succeed, 406 exhausts gas. Refuse to build a
+  // chain we know cannot execute rather than emitting a doomed transaction --
+  // and note this is NOT retryable: numHops = finalized - target and finality
+  // only advances, so a chain too long now is permanently too long. The caller
+  // must use the constant-cost state-proof path
+  // (anchorBlockHeaderViaBlockRoots / ...ViaHistoricalSummaries) instead.
+  if (numHops > MAX_PARENT_CHAIN_HOPS) {
+    throw new ParentChainTooLongError(
+      `parentChain would need ${numHops} hops (limit ${MAX_PARENT_CHAIN_HOPS}); ` +
+        `this exceeds STRATO's gas ceiling and will never succeed. Use the ` +
+        `state-proof anchor path for this block.`,
+    );
+  }
+
   const parentChain: BeaconBlockHeaderJSON[] = [];
   let targetBeaconRoot: string | undefined;
   let targetEph: EPHJSON | undefined;

@@ -29,6 +29,7 @@ contract DepositRouter is
     error SweepEthFailed();
     error NotPermitted();
     error FeesNotSupported();
+    error FeeAboveMaximum();
 
     // ============ State Variables ============
     //Notice that in most chains, PERMIT2 is deployed at 0x000000000022D473030F116dDEE9F6B43aC78BA3
@@ -38,6 +39,21 @@ contract DepositRouter is
     address public gnosisSafe;
     uint96 public depositId;
     // address(0) represents ETH configuration for depositETH()
+    /// @notice Upper bound, in basis points of the deposited amount, on the
+    ///         `maxFee` a depositor may attach to a deposit.
+    ///
+    ///         The fee is what a fast-fill LP may keep for advancing funds
+    ///         before the source block finalises. It is carried in the deposit
+    ///         event so the destination bridge can prove the recipient was not
+    ///         short-changed -- which means a depositor (or a buggy frontend)
+    ///         could otherwise declare a fee equal to the whole deposit and the
+    ///         chain would honour it. This makes that unrepresentable rather
+    ///         than merely discouraged.
+    ///
+    ///         Zero -- the default -- disables fee-bearing deposits entirely,
+    ///         so existing behaviour is preserved until an owner opts in.
+    uint16 public maxFeeBps;
+
     mapping(address => TokenConfig) public tokenConfig;
     // key: external token => target STRATO token => permitted route
     mapping(address => mapping(address => bool)) public routePermitted;
@@ -65,13 +81,16 @@ contract DepositRouter is
     }
 
     // ============ Events ============
+    event MaxFeeBpsUpdated(uint16 oldMaxFeeBps, uint16 newMaxFeeBps);
+
     event DepositRouted(
         address indexed token,
         uint256 amount,
         address indexed sender,
         address indexed stratoAddress,
         address targetStratoToken,
-        uint96 depositId
+        uint96 depositId,
+        uint256 maxFee
     );
     event DepositRoutedWithAction(
         address indexed token,
@@ -80,6 +99,7 @@ contract DepositRouter is
         address indexed stratoAddress,
         address targetStratoToken,
         uint96 depositId,
+        uint256 maxFee,
         uint8 action,
         address actionToken,
         uint256 minFinalOut
@@ -130,7 +150,8 @@ contract DepositRouter is
         address targetStratoToken,
         uint256 nonce,
         uint256 deadline,
-        bytes calldata signature
+        bytes calldata signature,
+        uint256 maxFee
     ) external whenNotPaused nonReentrant {
         DepositRequest memory request;
         request.token = token;
@@ -141,6 +162,7 @@ contract DepositRouter is
         request.deadline = deadline;
         request.signature = signature;
         (uint256 depositedAmount, uint96 id) = _processDeposit(request);
+        _requireFeeWithinBound(depositedAmount, maxFee);
 
         emit DepositRouted(
             request.token,
@@ -148,7 +170,8 @@ contract DepositRouter is
             msg.sender,
             request.stratoAddress,
             request.targetStratoToken,
-            id
+            id,
+            maxFee
         );
     }
 
@@ -162,7 +185,8 @@ contract DepositRouter is
         uint256 minFinalOut,
         uint256 nonce,
         uint256 deadline,
-        bytes calldata signature
+        bytes calldata signature,
+        uint256 maxFee
     ) external whenNotPaused nonReentrant {
         ActionIntent memory intent;
         intent.action = action;
@@ -178,6 +202,7 @@ contract DepositRouter is
         request.deadline = deadline;
         request.signature = signature;
         (uint256 depositedAmount, uint96 id) = _processDeposit(request);
+        _requireFeeWithinBound(depositedAmount, maxFee);
 
         _emitDepositWithAction(
             request.token,
@@ -185,6 +210,7 @@ contract DepositRouter is
             request.stratoAddress,
             request.targetStratoToken,
             id,
+            maxFee,
             intent
         );
     }
@@ -195,6 +221,7 @@ contract DepositRouter is
         address stratoAddress,
         address targetStratoToken,
         uint96 id,
+        uint256 maxFee,
         ActionIntent memory intent
     ) internal {
         emit DepositRoutedWithAction(
@@ -204,6 +231,7 @@ contract DepositRouter is
             stratoAddress,
             targetStratoToken,
             id,
+            maxFee,
             intent.action,
             intent.actionToken,
             intent.minFinalOut
@@ -258,9 +286,11 @@ contract DepositRouter is
     // using address(0) for ETH
     function depositETH(
         address stratoAddress,
-        address targetStratoToken
+        address targetStratoToken,
+        uint256 maxFee
     ) external payable whenNotPaused nonReentrant {
         if (msg.value == 0) revert ZeroAmount();
+        _requireFeeWithinBound(msg.value, maxFee);
         if (stratoAddress == address(0)) revert InvalidAddress();
         if (targetStratoToken == address(0)) revert InvalidAddress();
 
@@ -283,8 +313,32 @@ contract DepositRouter is
             msg.sender,
             stratoAddress,
             targetStratoToken,
-            depositId
+            depositId,
+            maxFee
         );
+    }
+
+    /**
+     * @notice Bound the fee a depositor may attach, as basis points of the
+     *         deposited amount. Zero disables fee-bearing deposits.
+     */
+    function setMaxFeeBps(uint16 newMaxFeeBps) external onlyOwner {
+        if (newMaxFeeBps > 10_000) revert FeeAboveMaximum();
+        emit MaxFeeBpsUpdated(maxFeeBps, newMaxFeeBps);
+        maxFeeBps = newMaxFeeBps;
+    }
+
+    /**
+     * @dev Reject a fee above the configured share of `amount`.
+     *
+     *      Checked against the AMOUNT ACTUALLY RECEIVED, not the requested
+     *      amount: a fee-on-transfer token delivers less than was asked for,
+     *      and bounding against the request would let the real fee exceed
+     *      maxFeeBps of what the recipient can actually be paid.
+     */
+    function _requireFeeWithinBound(uint256 amount, uint256 maxFee) internal view {
+        if (maxFee == 0) return;
+        if (maxFee > (amount * uint256(maxFeeBps)) / 10_000) revert FeeAboveMaximum();
     }
 
     function setMinDepositAmount(

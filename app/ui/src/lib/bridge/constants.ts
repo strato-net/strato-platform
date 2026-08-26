@@ -63,9 +63,22 @@ export const ERC20_ABI = [
 export const DEPOSIT_ROUTER_ABI = [
   // Functions
   {
+    // 0 means fee-bearing deposits are disabled on this router, so the UI must
+    // send maxFee = 0 or the deposit reverts FeeAboveMaximum.
+    inputs: [],
+    name: 'maxFeeBps',
+    outputs: [{ name: '', type: 'uint16' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
     inputs: [
       { name: 'stratoAddress', type: 'address' },
-      { name: 'targetStratoToken', type: 'address' }
+      { name: 'targetStratoToken', type: 'address' },
+      // Most the depositor will leave a fast-fill LP for advancing funds ahead
+      // of source-chain finality. 0 opts out; the router rejects anything above
+      // maxFeeBps of the deposit.
+      { name: 'maxFee', type: 'uint256' }
     ],
     name: 'depositETH',
     outputs: [],
@@ -80,7 +93,8 @@ export const DEPOSIT_ROUTER_ABI = [
       { name: 'targetStratoToken', type: 'address' },
       { name: 'nonce', type: 'uint256' },
       { name: 'deadline', type: 'uint256' },
-      { name: 'signature', type: 'bytes' }
+      { name: 'signature', type: 'bytes' },
+      { name: 'maxFee', type: 'uint256' }
     ],
     name: 'deposit',
     outputs: [],
@@ -98,7 +112,8 @@ export const DEPOSIT_ROUTER_ABI = [
       { name: 'minFinalOut', type: 'uint256' },
       { name: 'nonce', type: 'uint256' },
       { name: 'deadline', type: 'uint256' },
-      { name: 'signature', type: 'bytes' }
+      { name: 'signature', type: 'bytes' },
+      { name: 'maxFee', type: 'uint256' }
     ],
     name: 'depositWithAction',
     outputs: [],

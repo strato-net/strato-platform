@@ -1173,13 +1173,19 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         setCurrentStep("confirm_tx");
       }
       const chain = await resolveViemChain(activeChainId);
+      // Most the depositor will leave a fast-fill LP for advancing funds before
+      // the source block finalises. Zero until the fee UI exists: routers ship
+      // with maxFeeBps = 0, where any non-zero value reverts FeeAboveMaximum,
+      // so opting in has to be gated on reading maxFeeBps from the router.
+      const maxFee = 0n;
+
       let txHash: `0x${string}`;
       if (isNative) {
         txHash = await writeContractAsync({
           address: depositRouter as `0x${string}`,
           abi: DEPOSIT_ROUTER_ABI,
           functionName: "depositETH",
-          args: [ensureHexPrefix(stratoRecipient), targetStratoToken],
+          args: [ensureHexPrefix(stratoRecipient), targetStratoToken, maxFee],
           value: depositAmount,
           chain,
           account: externalSenderHex,
@@ -1204,6 +1210,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               permitData.nonce,
               permitData.deadline,
               permitData.signature as `0x${string}`,
+              maxFee,
             ],
             chain,
             account: externalSenderHex,
@@ -1221,6 +1228,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               permitData.nonce,
               permitData.deadline,
               permitData.signature as `0x${string}`,
+              maxFee,
             ],
             chain,
             account: externalSenderHex,

@@ -96,6 +96,9 @@ export interface DepositArgs {
   externalTxHash: string;
   stratoRecipient: string;
   targetStratoToken: string;
+  /** Most the depositor will leave a fast-fill LP, in external-token units.
+   *  "0" for V1 router logs, which carry no fee and cannot be fast-filled. */
+  maxFee: string;
 }
 
 export interface ActionDepositArgs extends DepositArgs {

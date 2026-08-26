@@ -239,6 +239,7 @@ export async function simulateDeposit({
   chainId,
   permitData,
   actionIntent,
+  maxFee,
   }: {
   depositRouter: string;
   isNative: boolean;
@@ -250,7 +251,12 @@ export async function simulateDeposit({
     chainId: string;
   permitData?: { nonce: bigint; deadline: bigint; signature: string };
   actionIntent?: { action: number; actionToken: string; minFinalOut: bigint };
+  /** Most the depositor will leave a fast-fill LP, in external-token units.
+   *  Defaults to 0 -- routers ship with maxFeeBps = 0, where any non-zero fee
+   *  reverts FeeAboveMaximum. */
+  maxFee?: bigint;
 }): Promise<void> {
+  const fee = maxFee ?? 0n;
   const client = await getClient(chainId);
   const routerAddress = formatAddress(depositRouter);
   const accountAddress = formatAddress(account);
@@ -260,7 +266,7 @@ export async function simulateDeposit({
       address: routerAddress,
       abi: DEPOSIT_ROUTER_ABI,
       functionName: "depositETH",
-      args: [formatAddress(userAddress), formatAddress(targetStratoToken)],
+      args: [formatAddress(userAddress), formatAddress(targetStratoToken), fee],
       value: amount,
       account: accountAddress,
     });
@@ -283,7 +289,8 @@ export async function simulateDeposit({
           actionIntent.minFinalOut,
           permitData.nonce,
           permitData.deadline,
-          permitData.signature as `0x${string}`
+          permitData.signature as `0x${string}`,
+          fee
         ],
         account: accountAddress,
       });
@@ -299,7 +306,8 @@ export async function simulateDeposit({
           formatAddress(targetStratoToken),
           permitData.nonce,
           permitData.deadline,
-          permitData.signature as `0x${string}`
+          permitData.signature as `0x${string}`,
+          fee
         ],
         account: accountAddress,
       });
