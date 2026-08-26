@@ -78,9 +78,12 @@ data BlockDelta a = BlockDelta
 data BlockVerificationFailureDetails
   = StateRootMismatch        (BlockDelta StateRoot)
   | ValidatorMismatch        (BlockDelta ([Validator],[Validator]))
+  | StakeMismatch            (BlockDelta [(Validator, Integer)])
+  | RoundMismatch            (BlockDelta Integer)
   | VersionMismatch          (BlockDelta Int)
   | UnclesMismatch           (BlockDelta Keccak256)
   | UnexpectedBlockNumber    (BlockDelta Integer)
+  | ReceiptsRootMismatch     (BlockDelta StateRoot)
   deriving (Eq, Show)
 
 data BlockVerificationFailure = BlockVerificationFailure

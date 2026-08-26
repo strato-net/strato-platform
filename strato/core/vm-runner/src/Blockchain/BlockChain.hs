@@ -41,7 +41,9 @@ import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
+import Blockchain.Data.RLP (rlpEncode, rlpSerialize)
 import Blockchain.Data.BlockSummary
+import Blockchain.Data.ProposalFacts (ProposalFacts (..))
 import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import Blockchain.Data.Log
@@ -51,6 +53,8 @@ import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
+import Blockchain.Forks (isReceiptsRootForkActive)
+import qualified Blockchain.Verification as V
 import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.SolidVM as SolidVM
@@ -58,8 +62,9 @@ import qualified SolidVM.Model.Storable as MS
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.Delta
-import Blockchain.Strato.Model.Event
+import SolidVM.Model.Delta
+import SolidVM.Model.Event
+import SolidVM.Model.Value (Value (SAddress))
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
@@ -145,8 +150,14 @@ instance (HasMemRawStorageDB m) => HasMemRawStorageDB (ConduitT i o m) where
 addBlocks :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => [OutputBlock] -> ConduitT a VmOutEvent m ()
 addBlocks unfiltered = do
   let filtered = filter ((/= 0) . number . obBlockData) unfiltered
+      genesisOnly = filter ((== 0) . number . obBlockData) unfiltered
       timerToUse = Just vmBlockInsertionMined
-  unless (null unfiltered) $ yieldMany $ OutIndexEvent . RanBlock <$> unfiltered
+  -- Genesis blocks don't go through addBlock (they're filtered out below),
+  -- so emit them here with an empty receipt list. Non-genesis blocks emit
+  -- their RanBlock from inside addBlock's success path so that receipts can
+  -- be attached.
+  unless (null genesisOnly) $
+    yieldMany $ map (\b -> OutIndexEvent (RanBlock b [])) genesisOnly
   bbi <- getContextBestBlockInfo
   $logInfoS "addBlocks" $ T.pack ("Unfiltered count: " ++ show (length unfiltered))
   $logInfoS "addBlocks" $ T.pack ("Filtered count: " ++ show (length filtered))
@@ -206,11 +217,11 @@ recoverProposer bd = case getProposerSeal bd of
           Nothing -> Left "could not recover proposer from block seal"
 
 setParentStateRoot ::
-  (MonadFail m, MonadIO m, BSDB.HasBlockSummaryDB m) =>
+  (BSDB.HasBlockSummaryDB m) =>
   OutputBlock ->
   m BlockSummary
 setParentStateRoot OutputBlock {..} = do
-  liftIO $ setTitle $ "Block #" ++ show (number obBlockData)
+  -- setTitle every block is a TTY OSC write on the apply hot path; skip it.
   BSDB.getBSum (parentHash obBlockData)
 
 addBlock :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m [BlockVerificationFailure]
@@ -240,18 +251,38 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
         verifyBlockResult <- verifyBlock (outputBlockToBlock b) (trrs, postRewardSR) bSum
         case verifyBlockResult of
           failures@(_:_) -> do
+            lift clearPendingMPNodes
             lift $ P.incCounter vmBlocksInvalid
-            pure $ map (\r -> BlockVerificationFailure (bSumNumber bSum) (bSumParentHash bSum) r) failures
+            -- Identify the block that failed, not its parent. 'bSum' summarizes
+            -- the *parent* (setParentStateRoot looks it up by parentHash), so
+            -- bSumNumber/bSumParentHash name the parent and the grandparent.
+            -- These values are what the mismatch logs print and what the
+            -- StateRootMismatch handler passes to stateDiff', so getting them
+            -- wrong sends whoever is debugging to the wrong block.
+            pure $ map (BlockVerificationFailure (number bd) obh) failures
           _ -> do
+            forM_ postRewardSR $ putChainStateRoot Nothing obh
+            lift flushPendingMPNodes
             lift $ P.incCounter vmBlocksValid
             lift $ P.incCounter vmBlocksMined
             lift $ P.incCounter vmBlocksProcessed
             $logInfoS "addBlock" . T.pack $ "Inserted block became #" ++ show (number $ obBlockData b) ++ " (" ++ format obh ++ ")."
+            -- Emit RanBlock with the per-tx receipt RLP bytes so the indexer
+            -- can persist them to receipt_ref. Pre-fork blocks carry empty
+            -- receipts (matching the empty-trie sentinel in the header);
+            -- post-fork blocks carry the real receipts that combine to give
+            -- the header's receiptsRoot.
+            let blockNum = number $ obBlockData b
+            receiptsBytes <-
+              if isReceiptsRootForkActive blockNum
+                then traverse (fmap (rlpSerialize . rlpEncode) . txRunResultToReceipt) trrs
+                else pure []
+            yield . OutIndexEvent $ RanBlock b receiptsBytes
             pure []
 
 -- TODO: If we add more verifications, refactor tuple into a proper data type
 verifyBlock ::
-  HasStateDB m =>
+  (HasStateDB m, MonadIO m) =>
   Block ->
   ([TxRunResult], Maybe MP.StateRoot) ->
   BlockSummary ->
@@ -259,8 +290,10 @@ verifyBlock ::
 verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
   validity <- checkValidity parentBSum b
   let vDelt = getDeltasFromResults trrs
+      sDelt = getStakeDeltasFromResults trrs
       blockSR = Just $ stateRoot bh
-      bVd = toDelta (newValidators bh) (removedValidators bh)
+      bVd = toDelta (getBlockNewValidators bh) (getBlockRemovedValidators bh)
+      bSd = M.fromList $ getBlockStakeUpdates bh
       srCheck =  if derivedSR == blockSR
         then Nothing
         else Just . StateRootMismatch $
@@ -269,10 +302,35 @@ verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
       validatorCheck = if eqDelta bVd vDelt
         then Nothing
         else Just . ValidatorMismatch $ BlockDelta (fromDelta bVd) (fromDelta vDelt)
-   in return $ validity ++ case blockHeaderVersion bh of
-        1 -> catMaybes [srCheck]
-        2 -> catMaybes [srCheck, validatorCheck]
-        v -> [VersionMismatch $ BlockDelta v 2]
+      stakeCheck = if bSd == sDelt
+        then Nothing
+        else Just . StakeMismatch $ BlockDelta (M.toAscList bSd) (M.toAscList sDelt)
+      -- PBFT rounds persist across heights: a block's round cannot precede its parent's
+      parentRound = pfRound (bSumProposalFacts parentBSum)
+      roundCheck = if getBlockRound bh >= parentRound
+        then Nothing
+        else Just . RoundMismatch $ BlockDelta (getBlockRound bh) parentRound
+      stakingActive = Conf.stakingActiveAt (networkConfig ethConf) (number bh)
+      expectedVersion = if stakingActive then 3 else 2
+      -- Receipts-root check: post-fork, every node must arrive at the same
+      -- root from the executed transactions. Pre-fork, the header carries
+      -- the empty-trie sentinel and the check is skipped.
+      blockNum = number bh
+  receiptsForRoot <-
+    if isReceiptsRootForkActive blockNum
+      then traverse txRunResultToReceipt trrs
+      else pure []
+  let derivedReceiptsRoot = V.receiptsVerificationValue receiptsForRoot
+      receiptsRootCheck =
+        if derivedReceiptsRoot == receiptsRoot bh
+          then Nothing
+          else Just . ReceiptsRootMismatch $
+                 BlockDelta (receiptsRoot bh) derivedReceiptsRoot
+  return $ validity ++ case blockHeaderVersion bh of
+    1 -> catMaybes [srCheck]
+    2 | not stakingActive -> catMaybes [srCheck, validatorCheck, receiptsRootCheck]
+    3 | stakingActive -> catMaybes [srCheck, validatorCheck, receiptsRootCheck, stakeCheck, roundCheck]
+    v -> [VersionMismatch $ BlockDelta v expectedVersion]
 
 addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> Address -> ConduitT a VmOutEvent m [TxRunResult]
 addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = transactions} proposer = do
@@ -283,10 +341,10 @@ addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = tr
 
   flushMemStorageTxDBToBlockDB
 
-  yield . OutVMEvents =<< sendNewActionMessage b trrs
+  when (Conf.sqlDiff $ vmConfig ethConf) $
+    yield . OutVMEvents =<< sendNewActionMessage b trrs
 
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
-  flushMemAddressStateTxToBlockDB
   flushMemAddressStateTxToBlockDB
   lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
   pure trrs
@@ -329,9 +387,11 @@ addTransactions ::
   ConduitT a VmOutEvent m [TxRunResult]
 addTransactions blockData txs proposer =
   timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
-    trrs <- lift $ go (getBlockGasLimit blockData) txs DL.empty
-    mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
-    yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
+    rewardResult <- lift $ payBlockRewards blockData proposer
+    trrs <- Bagger.attachBlockRewards blockData rewardResult <$> lift (go (getBlockGasLimit blockData) txs DL.empty)
+    when (Conf.sqlDiff $ vmConfig ethConf) $ do
+      mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
+      yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
     pure trrs
   where
     go :: (VMBase m, MonadMonitor m) =>
@@ -360,10 +420,21 @@ addTransactions blockData txs proposer =
       go remainingBlockGas rest (trrs `DL.snoc` trr)
 
 mineTransactions :: (VMBase m, MonadMonitor m) => Bagger.MineTransactions m
-mineTransactions bd remGas otxs mSelfAddress = mineTransactions' bd remGas DL.empty otxs mSelfAddress
+mineTransactions bd remGas otxs mSelfAddress payRewards = do
+  -- Must mirror addTransactions, or the block the proposer builds and the block
+  -- the verifier replays end at different state roots. Bagger builds a block
+  -- incrementally and only sets payRewards on the run that starts it, so this
+  -- happens exactly once per block on this side too.
+  rewardResult <- if payRewards then payBlockRewards bd mSelfAddress else pure Nothing
+  res <- mineTransactions' bd remGas DL.empty otxs mSelfAddress
+  -- Same fold as addTransactions, but this run need not be the one that carries
+  -- the block's first transaction: when it ran none, hand the reward results
+  -- back so an incremental build can attach them to the run that does.
+  let (ranTxs, unattached) = Bagger.attachBlockRewards' bd rewardResult (Bagger.tmrRanTxs res)
+  pure res {Bagger.tmrRanTxs = ranTxs, Bagger.tmrUnattachedRewards = unattached}
 
 mineTransactions' :: (VMBase m, MonadMonitor m) => BlockHeader -> Integer -> DL.DList TxRunResult -> [OutputTx] -> Address-> m Bagger.TxMiningResult
-mineTransactions' _ remGas ran [] _ = return $ Bagger.TxMiningResult Nothing (DL.toList ran) [] remGas
+mineTransactions' _ remGas ran [] _ = return $ Bagger.TxMiningResult Nothing (DL.toList ran) [] remGas Nothing
 mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
   let bt = otBaseTx tx
   beforeMap <- getAddressStateTxDBMap
@@ -379,7 +450,7 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
       flushMemStorageTxDBToBlockDB
       mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs mSelfAddress
     Left failure -> do
-      return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
+      return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas Nothing
 
 addTransaction ::
   (VMBase m, MonadMonitor m) =>
@@ -564,8 +635,53 @@ payFees b availableGas tAddr t proposer = do
       (Just DelegateCall)
   
   case erException feeResult of
-    Nothing -> pure feeResult 
+    Nothing -> pure feeResult
     Just _ -> throwE $ TFInsufficientFunds 10_000_000_000_000_000 0 t
+
+-- | Give the installed fee contract a chance to pay block rewards once per
+-- block, before any of the block's transactions run. The implementation is
+-- whatever DeciderState (0xDEC1DE02) currently points at, so this follows
+-- updatePayFeeContract without needing a node change. A contract that defines
+-- no payBlockRewards — or one whose call throws — leaves the block untouched.
+--
+-- Both the mining and the validation path call this, and they do not call it
+-- the same number of times: Bagger mines incrementally, replaying only newly
+-- promoted transactions against the previous state root, so a block can reach
+-- this several times while being built but exactly once while being verified.
+-- The contract must therefore latch on block.number and make repeat calls
+-- no-ops, the way StratoStaking.processBlock already does. Without that latch
+-- the proposer and the verifier derive different state roots and no block can
+-- ever commit.
+-- Returns the reward call's results so the caller can fold its events into the
+-- block's receipts; 'Nothing' when no rewards were paid.
+payBlockRewards ::
+  VMBase m =>
+  BlockHeader ->
+  Address ->
+  m (Maybe ExecResults)
+payBlockRewards b proposer = do
+  let bHash = blockHeaderHash b
+      availableGas = 400_000
+      callIt addr fn =
+        SolidVM.call b addr proposer proposer availableGas proposer bHash fn [] Nothing
+  implResult <- callIt (Address 0xDEC1DE02) "getImplContract"
+  case (erException implResult, erReturnVal implResult) of
+    (Just e, _) -> do
+      $logInfoS "payBlockRewards" . T.pack $
+        "could not read the fee contract, skipping block rewards: " ++ show e
+      pure Nothing
+    (Nothing, Just (SAddress impl _)) | impl /= Address 0 -> do
+      rewardResult <- callIt impl "payBlockRewards"
+      case erException rewardResult of
+        Just e -> do
+          $logInfoS "payBlockRewards" . T.pack $
+            "no block rewards paid by " ++ format impl ++ ": " ++ show e
+          pure Nothing
+        Nothing -> pure $ Just rewardResult
+    _ -> pure Nothing
+
+-- (attachBlockRewards / attachBlockRewards' now live in Blockchain.Bagger, so
+-- the miner and the verifier cannot drift apart on how rewards reach receipts.)
 
 ----------------
 {-
@@ -625,7 +741,7 @@ mkLogEntry :: Keccak256 -> Keccak256 -> Log -> LogDB
 mkLogEntry bHash tHash Log {..} = LogDB bHash tHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
 
 mkEventEntry :: Event -> EventDB
-mkEventEntry Event {..} = EventDB evBlockHash evTxHash evContractAddress evName $ map (\(_,x,_) -> x) evArgs -- drop the field names, only slipstream needs them
+mkEventEntry Event {..} = EventDB evBlockHash evTxHash evContractAddress evName $ map eventArgValueString evArgs -- drop everything but the rendered value string; only slipstream needs the rest
 
 outputTransactionResult ::
   VMBase m =>

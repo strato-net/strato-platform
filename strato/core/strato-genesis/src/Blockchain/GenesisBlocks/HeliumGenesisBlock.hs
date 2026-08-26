@@ -19,7 +19,7 @@ import qualified Blockchain.GenesisBlocks.Instances.GenesisEscrows as GE
 import qualified Blockchain.GenesisBlocks.Instances.GenesisReserves as GR
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.Event
+import           SolidVM.Model.Event
 import qualified Blockchain.Strato.Model.Keccak256               as KECCAK256
 import           Blockchain.Strato.Model.Validator
 import           Blockchain.Stream.Action                        (Delegatecall(..))
@@ -39,6 +39,8 @@ import           Data.Text                                       (Text)
 import qualified Data.Text                                       as T
 import           Data.Text.Encoding
 import           SolidVM.Model.Storable
+import qualified SolidVM.Model.Type                              as SVMType
+import           SolidVM.Model.Value                             (Value(..))
 import           System.FilePath                                 (takeFileName)
 
 embeddedFiles :: [(FilePath, B.ByteString)]
@@ -690,7 +692,7 @@ assetToAddressInfos asset@GA.Asset{..} =
               ++ allBalances
 
 assetToEvents :: Address -> GA.Asset -> (Address, S.Seq Event)
-assetToEvents blockappsAddress asset = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "Token" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (GA.root asset, S.fromList $
+assetToEvents blockappsAddress asset = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "Token" a n ((\(v1,v2) -> (v1, SString v2, v2, SVMType.UnknownLabel "Other")) <$> v)) <$> evs)) (GA.root asset, S.fromList $
     ("Transfer", [("from", show $ Address 0),("to", show blockappsAddress),("value", show totalSupply)]) :
     ((\(a,b) -> ("Transfer", [("from", show blockappsAddress),("to", show a),("value", show b)])) <$> allBalances)
   )
@@ -767,7 +769,7 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 proxy $ toPaths $ 
   ) (zip [1 :: Integer ..] supportedCollaterals)
 
 lendingPoolEvents :: (Address, S.Seq Event)
-lendingPoolEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "LendingPool" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (lendingPoolAddress, S.fromList $
+lendingPoolEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "LendingPool" a n ((\(v1,v2) -> (v1, SString v2, v2, SVMType.UnknownLabel "Other")) <$> v)) <$> evs)) (lendingPoolAddress, S.fromList $
   map (\a -> ("AssetConfigured",
     [("asset", show a),
      ("ltv", "7500"),
@@ -786,7 +788,7 @@ poolConfigurator = SolidVMContractWithStorage poolConfiguratorAddress 0 proxy $ 
   ]
 
 poolConfiguratorEvents :: (Address, S.Seq Event)
-poolConfiguratorEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "PoolConfigurator" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (poolConfiguratorAddress, S.fromList $
+poolConfiguratorEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "PoolConfigurator" a n ((\(v1,v2) -> (v1, SString v2, v2, SVMType.UnknownLabel "Other")) <$> v)) <$> evs)) (poolConfiguratorAddress, S.fromList $
   map (\a -> ("AssetConfigured",
     [("asset", show a),
      ("ltv", "7500"),
@@ -853,7 +855,7 @@ poolFactory = SolidVMContractWithStorage poolFactoryAddress 0 proxy $ toPaths $ 
   ]
 
 poolFactoryEvents :: (Address, S.Seq Event)
-poolFactoryEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "PoolFactory" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (poolFactoryAddress, S.fromList $
+poolFactoryEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "PoolFactory" a n ((\(v1,v2) -> (v1, SString v2, v2, SVMType.UnknownLabel "Other")) <$> v)) <$> evs)) (poolFactoryAddress, S.fromList $
   [ ("NewPool", [("tokenA", show ethstRoot), ("tokenB", show usdstAddress), ("pool", show ethstPoolAddress)])
   , ("NewPool", [("tokenA", show wbtcstRoot), ("tokenB", show usdstAddress), ("pool", show wbtcstPoolAddress)])
   , ("NewPool", [("tokenA", show goldstRoot), ("tokenB", show usdstAddress), ("pool", show goldstPoolAddress)])
@@ -944,7 +946,7 @@ adminRegistry adminList bridgeRelayer oracleRelayers = SolidVMContractWithStorag
      ) GA.assets
 
 adminEvents :: Address -> (Address, S.Seq Event)
-adminEvents blockappsAddress = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "AdminRegistry" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (adminRegistryAddress, S.fromList $
+adminEvents blockappsAddress = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "AdminRegistry" a n ((\(v1,v2) -> (v1, SString v2, v2, SVMType.UnknownLabel "Other")) <$> v)) <$> evs)) (adminRegistryAddress, S.fromList $
     [("AdminAdded", [("admin", show blockappsAddress)])]
   )
 
@@ -1089,7 +1091,7 @@ cdpEngine = SolidVMContractWithStorage cdpEngineAddress 0 proxy $ toPaths $ owne
     ]) combinedEscrows
 
 cdpEngineEvents :: (Address, S.Seq Event)
-cdpEngineEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "CDPEngine" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (cdpEngineAddress, S.fromList $
+cdpEngineEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "CDPEngine" a n ((\(v1,v2) -> (v1, SString v2, v2, SVMType.UnknownLabel "Other")) <$> v)) <$> evs)) (cdpEngineAddress, S.fromList $
   map (\GE.Escrow{..} ->
     ("Deposited", [("user", show borrower), ("asset", show assetRootAddress), ("amount", show collateralQuantity)])
   ) combinedEscrows
@@ -1123,7 +1125,7 @@ cdpRegistry = SolidVMContractWithStorage cdpRegistryAddress 0 proxy $ toPaths $ 
      ]
 
 cdpRegistryEvents :: (Address, S.Seq Event)
-cdpRegistryEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "CDPRegistry" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (cdpRegistryAddress, S.fromList $
+cdpRegistryEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "CDPRegistry" a n ((\(v1,v2) -> (v1, SString v2, v2, SVMType.UnknownLabel "Other")) <$> v)) <$> evs)) (cdpRegistryAddress, S.fromList $
   [ ("ComponentsUpdated",
       [ ("cdpVault", show cdpVaultAddress)
       , ("cdpEngine", show cdpEngineAddress)
@@ -1146,7 +1148,7 @@ cdpVault = SolidVMContractWithStorage cdpVaultAddress 0 proxy $ toPaths $ ownedB
     ]) combinedEscrows
 
 cdpVaultEvents :: (Address, S.Seq Event)
-cdpVaultEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "CDPVault" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (cdpVaultAddress, S.fromList $
+cdpVaultEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "CDPVault" a n ((\(v1,v2) -> (v1, SString v2, v2, SVMType.UnknownLabel "Other")) <$> v)) <$> evs)) (cdpVaultAddress, S.fromList $
   map (\GE.Escrow{..} ->
       ("CollateralDeposited", [("user", show borrower), ("asset", show assetRootAddress), ("amount", show collateralQuantity)])
   ) combinedEscrows
@@ -1178,7 +1180,7 @@ safetyModule = SolidVMContractWithStorage safetyModuleAddress 0 proxy $ toPaths 
      ]
 
 safetyModuleEvents :: (Address, S.Seq Event)
-safetyModuleEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "SafetyModule" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (safetyModuleAddress, S.fromList $
+safetyModuleEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash KECCAK256.zeroHash 0 "SafetyModule" a n ((\(v1,v2) -> (v1, SString v2, v2, SVMType.UnknownLabel "Other")) <$> v)) <$> evs)) (safetyModuleAddress, S.fromList $
   [ ("ParamsUpdated", [("cooldown", show (1 :: Integer)), ("window", show (432000 :: Integer)), ("maxSlashBps", show (3000 :: Integer))])
   , ("TokensUpdated", [("_asset", show usdstAddress), ("_sToken", show sUsdstAddress)])
   ])
@@ -1380,6 +1382,33 @@ lithiumGenesisBlock :: GenesisInfo
 lithiumGenesisBlock = 
   let baseGenesis = genesisBlockTemplate lithiumConfig
       fundedValidator = NonContract lithiumValidatorAddress 1809251394333065553493296640760748560207343510400633813116524750123642650624
+  in baseGenesis { addressInfo = fundedValidator : addressInfo baseGenesis }
+
+-- Beryllium network configuration
+berylliumValidatorAddress :: Address
+berylliumValidatorAddress = 0x3dc1e4bdb54f6cce80c92d5d494160545a78db35
+
+berylliumValidators :: [Validator]
+berylliumValidators = [Validator berylliumValidatorAddress]
+
+berylliumAdmins :: [Address]
+berylliumAdmins = [0x101a31a25295a5dd95187ea2b0725c91443db7b7]
+
+berylliumConfig :: HeliumGenesisBlockConfig
+berylliumConfig = HeliumGenesisBlockConfig
+  berylliumValidators
+  berylliumAdmins
+  0x101a31a25295a5dd95187ea2b0725c91443db7b7
+  [sepolia]
+  [eth, wbtc, paxg, usdc, usdt]
+  (bridgeRelayerAddress, 100_000 * oneE18)
+  ((,100_000 * oneE18) <$> [oracleAddress1, oracleAddress2])
+
+-- beryllium genesis block with funded validator account
+berylliumGenesisBlock :: GenesisInfo
+berylliumGenesisBlock = 
+  let baseGenesis = genesisBlockTemplate berylliumConfig
+      fundedValidator = NonContract berylliumValidatorAddress 1809251394333065553493296640760748560207343510400633813116524750123642650624
   in baseGenesis { addressInfo = fundedValidator : addressInfo baseGenesis }
 
 descriptions :: M.Map Text Text

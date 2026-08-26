@@ -8,7 +8,12 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Blockchain.Bootstrap where
+module Blockchain.Bootstrap
+  ( populateStorageDBs,
+    seedDatabases,
+    bootstrapIndexer,
+  )
+where
 
 import BlockApps.Logging
 import Blockchain.BlockDB
@@ -28,7 +33,7 @@ import Blockchain.Model.SyncState
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
-import Blockchain.Strato.Model.Event
+import SolidVM.Model.Event
 import qualified Blockchain.Strato.Model.Address as Ad
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
@@ -209,7 +214,7 @@ bootstrapIndexer obGB = do
   putStrLn "About to bootstrap index events"
   res <-
     UEC.runStreamMConfigured "strato-api-indexer" $
-    IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB]
+    IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB []]
 
   print res
   putStrLn "bootstrapIndex genesis seed successful!"
@@ -227,7 +232,7 @@ seedDatabases genesisBlock = do
   $logInfoS "bootstrap" $ T.pack $ "Genesis hash: " ++ format genesisHash'
   $logInfoS "bootstrap" $ T.pack $ "Validators: " ++ show (length validators')
 
-  _ <- withRedisBlockDB $ putBestSequencedBlockInfo $ BestSequencedBlock genesisHash' 0 validators'
+  _ <- withRedisBlockDB $ putBestSequencedBlockInfo $ BestSequencedBlock genesisHash' 0 validators' [] 0
 
   bestBlockResult <- withRedisBlockDB $
     forceBestBlockInfo

@@ -1,0 +1,3 @@
+- Stream replay in bounded chunks, require a fresh-process nested-trie audit, reduce repeated SolidVM/state work, and atomically publish pending Merkle nodes with the verified block root while preserving `RanBlock`.
+- Frozen Helium #30000–#49999 runs reached 89.5818 and 89.7547 blocks/s with exact roots and audits; an M4 Max live comparison was 84.5447 optimized versus 28.7011 stock, and an 8 GiB backup node synced from genesis without verification errors.
+- Follow-up before production merge: make global caches context-local and byte-bounded, restore or explicitly gate every non-state/index output, repair the pre-existing broad SolidVM test-target compile failures, and qualify the same streamed binary on all 213,493 blocks.

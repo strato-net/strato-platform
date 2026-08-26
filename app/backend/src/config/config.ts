@@ -50,6 +50,8 @@ export const mercataBridge = process.env.MERCATA_BRIDGE || "00000000000000000000
 export const poolFactory = process.env.POOL_FACTORY || "000000000000000000000000000000000000100a";
 export const tokenFactory = process.env.TOKEN_FACTORY || "000000000000000000000000000000000000100b";
 export const adminRegistry = process.env.ADMIN_REGISTRY || "000000000000000000000000000000000000100c";
+// Consensus governance (validator set + stake weights), a genesis proxy at 0x100.
+export const mercataGovernance = process.env.MERCATA_GOVERNANCE || "0000000000000000000000000000000000000100";
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
 
@@ -128,12 +130,12 @@ export const defaultPoolV3FactoryFor: Record<string, string> = {
 // Populate per network after deployment (or set POSITION_MANAGER_V3).
 export const defaultPositionManagerV3For: Record<string, string> = {
   "114784819836269": "1bc216225dd4e164ded916cb88a7c09804a881d1", // Helium testnet
-  "33056204878082667": "", // Upquark mainnet
+  "33056204878082667": "ce5d96341ba4fede57d7721c5b0e41d283aa7435", // Upquark mainnet
 };
 
 export const defaultNftFactoryFor: Record<string, string> = {
   "114784819836269": "af432c49803721b242f52ed5fd1b065c9a78e0bb", // Helium testnet
-  "33056204878082667": "", // Upquark mainnet
+  "33056204878082667": "4898738a1213ffa0cbc8eb42f4efa5fc9d781ada", // Upquark mainnet
 };
 
 export const defaultStratoNativeBridgeFor: Record<string, string> = {
@@ -201,6 +203,16 @@ export const defaultUsdcYieldVaultFor: Record<string, string> = {
   "33056204878082667": "afcfc4d847d59fbc402856fd6934aff6796812b1",// Upquark mainnet
 };
 
+export const defaultGoldstYieldVaultFor: Record<string, string> = {
+  "114784819836269": "65ab8049ff949e7ed04838723a07bc9b5a7849e2", // Helium testnet
+  "33056204878082667": "ddf7c27f27ac43b25043e100c2076e515526b9ae", // Upquark mainnet
+};
+
+export const defaultSilvstYieldVaultFor: Record<string, string> = {
+  "114784819836269": "7ecc1ab7e15384cf2392b7dad8878239fda78799", // Helium testnet
+  "33056204878082667": "f8884c44d7cfbfb7c6326c515f375f8572f03e2b", // Upquark mainnet
+};
+
 /*
    How far back the admin "Executed Issues" list looks. IssueExecuted grows with every
    whitelisted call, not just governance votes, so an unbounded sort/count is proportional
@@ -236,6 +248,8 @@ export let stratoToken: string = '';
 export let stratoStaking: string = '';
 export let validatorRegistry: string = '';
 export let usdcYieldVault: string = '';
+export let goldstYieldVault: string = '';
+export let silvstYieldVault: string = '';
 export let executedIssuesLookbackDays: number = UNKNOWN_NETWORK_EXECUTED_ISSUES_LOOKBACK_DAYS;
 
 function setBridgeConfig(networkId: string) {
@@ -382,6 +396,11 @@ export function setUsdcYieldVaultConfig(networkId: string) {
   usdcYieldVault = process.env.USDC_YIELD_VAULT || defaultUsdcYieldVaultFor[networkId] || "";
 }
 
+export function setMetalYieldVaultConfig(networkId: string) {
+  goldstYieldVault = process.env.GOLDST_YIELD_VAULT || defaultGoldstYieldVaultFor[networkId] || "";
+  silvstYieldVault = process.env.SILVST_YIELD_VAULT || defaultSilvstYieldVaultFor[networkId] || "";
+}
+
 export function setExecutedIssuesLookbackConfig(networkId: string) {
   executedIssuesLookbackDays =
     defaultExecutedIssuesLookbackDaysFor[networkId] || UNKNOWN_NETWORK_EXECUTED_ISSUES_LOOKBACK_DAYS;
@@ -414,6 +433,7 @@ export async function initNetworkConfig() {
   setCarryVaultConfig(networkId);
   setDirectMintPsmConfig(networkId);
   setUsdcYieldVaultConfig(networkId);
+  setMetalYieldVaultConfig(networkId);
   setExecutedIssuesLookbackConfig(networkId);
 }
 
@@ -437,7 +457,15 @@ export async function getInternalAddresses() {
   // Network-specific addresses (set by initNetworkConfig)
   addresses.push(rewards || '', escrow, vaultFactory, positionManagerV3);
   addresses.push(stratoStaking, validatorRegistry);
-  addresses.push(saveUsdstVault, usdcYieldVault, ethCarryVault, wbtcCarryVault);
+  addresses.push(
+    saveUsdstVault,
+    usdcYieldVault,
+    ethCarryVault,
+    wbtcCarryVault,
+    goldstYieldVault,
+    silvstYieldVault
+  );
+  addresses.push(directMintPsm);
 
   // Lending Registry --> lendingPool, collateralVault, liquidityPool
   const { data: [lending] } = await cirrus.get(accessToken, "/BlockApps-LendingRegistry", {

@@ -37,10 +37,10 @@ blk2BlkDataRef ::
   Block ->
   Keccak256 ->
   Bool ->
-  (BlockDataRef, [Validator], [Validator], [Validator], Maybe Signature, [Signature])
+  (BlockDataRef, [Validator], [Validator], [Validator], Maybe Signature, [Signature], [(Validator, Integer, Bool)])
 blk2BlkDataRef b hash' makeHashOne =
-  let bdr = BlockDataRef pH uH cC sR tR rR lB d n gL gU t eD nc mH hash'' True True v --- Horrible! Apparently I need to learn the Lens library, yesterday
-   in (bdr, vs, va, vr, ps, sigs)
+  let bdr = BlockDataRef pH uH cC sR tR rR lB d n gL gU t eD nc mH hash'' True True v pr --- Horrible! Apparently I need to learn the Lens library, yesterday
+   in (bdr, vs, va, vr, ps, sigs, stakes)
   where
     hash'' = if makeHashOne then unsafeCreateKeccak256FromWord256 1 else hash'
     cC = getBlockBeneficiary bd
@@ -65,6 +65,11 @@ blk2BlkDataRef b hash' makeHashOne =
     vr = blockHeaderRemovedValidators bd
     ps = blockHeaderProposal bd
     sigs = blockHeaderSignatures bd
+    pr = if v >= 3 then Just (blockHeaderRound bd) else Nothing
+    -- (validator, stake, isUpdate): current stakes carry False, stake updates True
+    stakes = [ (val, st, isUpd)
+             | (isUpd, rows) <- [(False, blockHeaderStakes bd), (True, blockHeaderStakeUpdates bd)]
+             , (val, st) <- rows ]
 
 getBlock ::
   HasSQLDB m =>
@@ -97,7 +102,7 @@ putBlocks blockList makeHashOne = do
 
       case existingBlockData of
         [] -> do
-          let (toInsert, vs, va, vr, ps, sigs) = blk2BlkDataRef b hash' makeHashOne
+          let (toInsert, vs, va, vr, ps, sigs, stakes) = blk2BlkDataRef b hash' makeHashOne
           blkDataRefId <- SQL.insert toInsert
           forM_ (blockReceiptTransactions b) $ \tx -> do
             txID <- updateBlockNumber b (transactionHash tx)
@@ -105,6 +110,7 @@ putBlocks blockList makeHashOne = do
           forM_ vs $ \v -> SQL.insert $ BlockValidatorRef blkDataRefId v
           forM_ va $ \v -> SQL.insert $ ValidatorDeltaRef blkDataRefId v True
           forM_ vr $ \v -> SQL.insert $ ValidatorDeltaRef blkDataRefId v False
+          forM_ stakes $ \(val, st, isUpd) -> SQL.insert $ BlockStakeRef blkDataRefId val st isUpd
           forM_ ps $ \(Signature sig) -> do
             let r = bytesToWord256 . BSS.fromShort $ getCompactRecSigR sig
                 s = bytesToWord256 . BSS.fromShort $ getCompactRecSigS sig

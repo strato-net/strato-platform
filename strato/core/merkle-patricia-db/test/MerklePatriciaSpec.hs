@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -10,6 +11,7 @@ module Main where
 import Blockchain.Data.RLP
 import Blockchain.Database.MerklePatricia
 import Blockchain.Database.MerklePatricia.Internal
+import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import Blockchain.Strato.Model.Util
 import Control.Monad.Change.Alter
 import Control.Monad.Trans.Reader
@@ -110,6 +112,159 @@ putSingleKV = unsafePutKeyVal emptyTriePtr
 getSingleKV :: (StateRoot `Alters` NodeData) m => StateRoot -> Key -> m [(Key, Val)]
 getSingleKV = unsafeGetKeyVals
 
+-- ============ getInclusionProof tests ============
+
+-- Mirrors the on-chain MerklePatricia.verifyInclusion logic to verify a
+-- (root, key, value, proof) tuple end-to-end inside Haskell. Used to confirm
+-- that 'getInclusionProof' produces well-formed proofs without needing a
+-- cross-language fixture.
+verifyInclusionHaskell ::
+  StateRoot ->
+  N.NibbleString ->
+  B.ByteString ->
+  [B.ByteString] ->
+  Bool
+verifyInclusionHaskell _ _ _ [] = False
+verifyInclusionHaskell root keyN expected (firstNode : rest) =
+  let rootHash = hashNode firstNode
+   in if rootHash /= unboxStateRoot root
+        then False
+        else walk firstNode keyN (rest, True)
+  where
+    hashNode bs = keccak256ToByteString (hash bs)
+
+    walk bs k (proofRest, isHashed) =
+      let isHashOk = not isHashed || True -- caller already checked
+          nd = rlpDecode (rlpDeserialize bs) :: NodeData
+       in (case nd of
+             EmptyNodeData -> False
+             FullNodeData _ (Just v)
+               | N.null k -> rlpDecode v == expected
+             FullNodeData _ Nothing
+               | N.null k -> False
+             FullNodeData cs _ ->
+               let n = fromIntegral (N.head k)
+                   childRef = cs !! n
+                   k' = N.tail k
+                in stepInto childRef k' proofRest
+             ShortcutNodeData s (Right v) ->
+               s == k && rlpDecode v == expected
+             ShortcutNodeData s (Left ref) ->
+               s `N.isPrefixOf` k
+                 && stepInto ref (N.drop (N.length s) k) proofRest)
+        && isHashOk
+
+    stepInto (Right _expectedSr) k' (next : remaining) =
+      hashNode next == unboxStateRoot _expectedSr
+        && walk next k' (remaining, True)
+    stepInto (Right _) _ [] = False
+    stepInto (Left bytes) _ _
+      | bytes == B.pack [0x80] = False -- empty ref
+    stepInto (Left bytes) k' proofRest =
+      let nd = rlpDecode (rlpDeserialize bytes) :: NodeData
+       in walkInline nd k' proofRest
+
+    walkInline nd k proofRest = case nd of
+      EmptyNodeData -> False
+      FullNodeData _ (Just v) | N.null k -> rlpDecode v == expected
+      FullNodeData _ Nothing | N.null k -> False
+      FullNodeData cs _ ->
+        let n = fromIntegral (N.head k)
+         in stepInto (cs !! n) (N.tail k) proofRest
+      ShortcutNodeData s (Right v) ->
+        s == k && rlpDecode v == expected
+      ShortcutNodeData s (Left ref) ->
+        s `N.isPrefixOf` k
+          && stepInto ref (N.drop (N.length s) k) proofRest
+
+-- A test-only newtype that lets us pass a hand-rolled RLPObject through
+-- 'addAllKVs' (which requires RLPSerializable on the value type). The
+-- production receipts trie uses 'Receipt' from blockapps-data; this test
+-- doesn't take that dep so it builds an equivalent shape locally.
+newtype TestReceipt = TestReceipt RLPObject
+
+instance RLPSerializable TestReceipt where
+  rlpEncode (TestReceipt o) = o
+  rlpDecode = TestReceipt
+
+-- A Receipt-shaped value: an RLPArray of 3 elements. Big enough that leaves
+-- get hashed (>= 32 bytes encoded).
+sampleReceipt :: Integer -> TestReceipt
+sampleReceipt nonce = TestReceipt $
+  RLPArray
+    [ rlpEncode (1 :: Integer), -- status
+      rlpEncode (21000 :: Integer), -- gasUsed
+      RLPArray
+        [ RLPArray
+            [ rlpEncode ("aabbccddeeff00112233445566778899aabbccdd" :: B.ByteString),
+              rlpEncode ("Withdrawal" :: B.ByteString),
+              RLPArray $
+                rlpEncode nonce
+                  : rlpEncode (1 :: Integer)
+                  : replicate 6 (rlpEncode ("00000000000000000000000000000000000000ff" :: B.ByteString))
+            ]
+        ]
+    ]
+
+testGetInclusionProofSingle :: Test
+testGetInclusionProofSingle = TestCase $ do
+  res <- runMP $ do
+    sr <- addAllKVs emptyTriePtr [(0 :: Integer, sampleReceipt 42)]
+    let k = byteString2NibbleString $ rlpSerialize $ rlpEncode (0 :: Integer)
+    proof <- getInclusionProof sr k
+    return (sr, k, proof)
+  case res of
+    (_, _, Nothing) -> assertFailure "expected proof, got Nothing"
+    (sr, k, Just (valueBytes, proofNodes)) -> do
+      let expectedBytes = rlpSerialize (rlpEncode (sampleReceipt 42))
+      assertEqual "value bytes" expectedBytes valueBytes
+      assertBool "proof verifies against root"
+        $ verifyInclusionHaskell sr k valueBytes proofNodes
+
+testGetInclusionProofMissingKey :: Test
+testGetInclusionProofMissingKey = TestCase $ do
+  res <- runMP $ do
+    sr <- addAllKVs emptyTriePtr [(0 :: Integer, sampleReceipt 1)]
+    let absentKey = byteString2NibbleString $ rlpSerialize $ rlpEncode (5 :: Integer)
+    getInclusionProof sr absentKey
+  assertEqual "absent key" Nothing res
+
+testGetInclusionProofMultiTx :: Test
+testGetInclusionProofMultiTx = TestCase $ do
+  let receipts = [(i :: Integer, sampleReceipt i) | i <- [0 .. 4]]
+  res <- runMP $ do
+    sr <- addAllKVs emptyTriePtr receipts
+    fmap (sr,) $
+      mapM
+        ( \(i, _) -> do
+            let k = byteString2NibbleString $ rlpSerialize $ rlpEncode i
+            proof <- getInclusionProof sr k
+            return (i, k, proof)
+        )
+        receipts
+  let (sr, results) = res
+  flip mapM_ results $ \(i, k, mProof) -> case mProof of
+    Nothing -> assertFailure $ "expected proof for txIndex=" ++ show i
+    Just (valueBytes, proofNodes) -> do
+      let expectedBytes = rlpSerialize (rlpEncode (sampleReceipt i))
+      assertEqual ("value bytes for txIndex=" ++ show i) expectedBytes valueBytes
+      assertBool ("proof verifies for txIndex=" ++ show i)
+        $ verifyInclusionHaskell sr k valueBytes proofNodes
+
+testGetInclusionProofTamperedRejected :: Test
+testGetInclusionProofTamperedRejected = TestCase $ do
+  res <- runMP $ do
+    sr <- addAllKVs emptyTriePtr [(0 :: Integer, sampleReceipt 7)]
+    let k = byteString2NibbleString $ rlpSerialize $ rlpEncode (0 :: Integer)
+    proof <- getInclusionProof sr k
+    return (sr, k, proof)
+  case res of
+    (_, _, Nothing) -> assertFailure "expected proof"
+    (sr, k, Just (valueBytes, proofNodes)) -> do
+      let tamperedValue = B.append valueBytes (B.pack [0xab])
+      assertBool "tampered value rejected"
+        $ not (verifyInclusionHaskell sr k tamperedValue proofNodes)
+
 spec :: Spec
 spec = do
   describe "the old merkle-patricia test suite" $ do
@@ -120,6 +275,18 @@ spec = do
           TestLabel " get . putn = id" testGetPutRepeatedII,
           TestLabel " single insert" testSingleInsert,
           TestLabel " multiple insert" testMultipleInserts
+        ]
+  describe "getInclusionProof" $ do
+    fromHUnitTest $
+      TestList
+        [ TestLabel "single-tx trie: round-trips through verifier"
+            testGetInclusionProofSingle,
+          TestLabel "missing key returns Nothing"
+            testGetInclusionProofMissingKey,
+          TestLabel "multi-tx trie: each entry's proof verifies independently"
+            testGetInclusionProofMultiTx,
+          TestLabel "tampered value rejected by verifier"
+            testGetInclusionProofTamperedRejected
         ]
 
 main :: IO ()

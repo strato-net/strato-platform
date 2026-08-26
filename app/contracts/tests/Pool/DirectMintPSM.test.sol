@@ -44,19 +44,17 @@ contract Describe_DirectMintPSM {
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(USDST), "burn", address(psm));
     }
 
-   
+
     function beforeEach() {
-        (bool success, variadic ret) = m.adminRegistry().castVoteOnIssue(address(psm), "initialize", address(USDST), address(m.feeCollector()), [address(USDC), address(USDT)], 60*60*24);
+        (bool success, variadic ret) = m.adminRegistry().castVoteOnIssue(address(psm), "initialize", address(USDST), address(m.feeCollector()), [address(USDC), address(USDT)]);
         require(success, "PSM initialize did not execute");
         require(psm.mintableToken() == address(USDST), "Mintable token should be USDST");
         (bool usdcMintEnabled, uint usdcMaxBalance, uint usdcMintFeeBps) = psm.mintConfigs(address(USDC));
-        (bool usdcBurnEnabled, uint usdcMinReserve, uint usdcBurnDelay, uint usdcBurnFeeBps) = psm.burnConfigs(address(USDC));
+        (bool usdcBurnEnabled, uint usdcMinReserve, uint usdcBurnFeeBps) = psm.burnConfigs(address(USDC));
         (bool usdtMintEnabled, uint usdtMaxBalance, uint usdtMintFeeBps) = psm.mintConfigs(address(USDT));
-        (bool usdtBurnEnabled, uint usdtMinReserve, uint usdtBurnDelay, uint usdtBurnFeeBps) = psm.burnConfigs(address(USDT));
+        (bool usdtBurnEnabled, uint usdtMinReserve, uint usdtBurnFeeBps) = psm.burnConfigs(address(USDT));
         require(usdcMintEnabled && usdcBurnEnabled, "USDC should be enabled");
         require(usdtMintEnabled && usdtBurnEnabled, "USDT should be enabled");
-        require(usdcBurnDelay == 60*60*24, "USDC burn delay should be 60*60*24");
-        require(usdtBurnDelay == 60*60*24, "USDT burn delay should be 60*60*24");
     }
 
     function _ensureAuthorizableAdmin() internal {
@@ -82,20 +80,19 @@ contract Describe_DirectMintPSM {
         admin.doSuccessfully(address(m.adminRegistry()), "addWhitelist", address(USDST), "burn", address(freshPsm));
     }
 
-    function _newInitializedPsm(uint burnDelay) internal returns (DirectMintPSM freshPsm) {
+    function _newInitializedPsm() internal returns (DirectMintPSM freshPsm) {
         freshPsm = _newPsm();
-        admin.doSuccessfully(address(freshPsm), "initialize", address(USDST), address(m.feeCollector()), [address(USDC), address(USDT)], burnDelay);
+        admin.doSuccessfully(address(freshPsm), "initialize", address(USDST), address(m.feeCollector()), [address(USDC), address(USDT)]);
     }
 
     function it_psm_can_be_configured() {
         // beforeEach() runs the relevant code
         (bool mintEnabled, uint maxBalance, uint mintFeeBps) = psm.mintConfigs(address(USDC));
-        (bool burnEnabled, uint minReserve, uint burnDelay, uint burnFeeBps) = psm.burnConfigs(address(USDC));
+        (bool burnEnabled, uint minReserve, uint burnFeeBps) = psm.burnConfigs(address(USDC));
         require(mintEnabled, "USDC mint should be enabled");
         require(burnEnabled, "USDC burn should be enabled");
         require(maxBalance == 0, "USDC max balance should default to unlimited");
         require(minReserve == 0, "USDC min reserve should default to zero");
-        require(burnDelay == 60*60*24, "USDC burn delay should default to initial delay");
         require(mintFeeBps == 0, "USDC mint fee should default to zero");
         require(burnFeeBps == 0, "USDC burn fee should default to zero");
     }
@@ -118,156 +115,20 @@ contract Describe_DirectMintPSM {
         require(USDC.balanceOf(address(user)) == 0, "User should have 0 USDC");
     }
 
-    function it_psm_can_burn_instant() {
-        fastForward(1);
-        require(block.timestamp != 0, "Block timestamp cannot be 0");
-        // Otherwise burnRequests entry is like
-        // (100000000000000000000,
-        //  7808ddabfa7a0825816032b9ee63a8e52777e119,
-        //  36844afd2f73f56cc75329a6f9fdfcbac04b673e,
-        //  <reference to ba85445f2c60433f84287bf81709a2ccb3a638fe//StoragePath [Field "burnRequests",Index "0",Field "requestTime"]>)
-
+    function it_psm_can_redeem_in_a_single_step() {
         // Begins with the end state from it_psm_can_mint()
         require(USDST.balanceOf(address(user)) == 100e18, "User should have 100 USDST");
+        require(USDC.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDC");
 
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0, 0);
-        (bool burnEnabled, uint minReserve, uint burnDelay, uint burnFeeBps) = psm.burnConfigs(address(USDC));
-        require(burnDelay == 0, "USDC burn delay should be 0");
-
+        // A single call burns the USDST and pays out the USDC 1:1.
         user.doSuccessfully(address(USDST), "approve", address(psm), 100e18);
-        user.doSuccessfully(address(psm), "requestBurn", 100e18, address(USDC));
-        require(psm.burnReqCounter() == 1, "Burn request counter should be 1");
-        // BurnRequest request;
-        // (request.burnAmount, request.payoutAmount, request.redeemToken, request.requester, request.requestTime) = psm.burnRequests(0);
-        // This syntax gives
-        //  Unit test 'psm can burn instant' failed: Left type error: unknown case called in setVal (Probably tried to change the value of a constant):: src = SInteger 100000000000000000000, dst = SContractFunction 0000000000000000000000000000000000000000 "amount"
-        (uint amount, uint payoutAmount, address redeemToken, address requester, uint requestTime) = psm.burnRequests(psm.burnReqCounter());
-        require(amount == 100e18, "Burn request amount should be 100 USDST");
-        require(payoutAmount == 100e18, "Burn request payout should be 100 USDC");
-        require(redeemToken == address(USDC), "Burn request redeem token should be USDC");
-        require(requester == address(user), "Burn request requester should be user");
-        require(requestTime == block.timestamp, "Burn request request time should be current block timestamp");
-        require(USDST.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDST");
-        require(psm.pendingRedemptions(address(USDC)) == 100e18, "PSM should reserve 100 USDC");
-        require(psm.availableRedemptionLiquidity(address(USDC)) == 0, "PSM should have no available USDC");
-        require(USDC.balanceOf(address(user)) == 0, "User should have 0 USDC");
+        user.doSuccessfully(address(psm), "redeem", 100e18, address(USDC));
 
-        // Complete the burn USDST 1:1 in exchange for USDC
-        user.doSuccessfully(address(psm), "completeBurn", 1);
         require(USDST.balanceOf(address(user)) == 0, "User should have 0 USDST");
         require(USDC.balanceOf(address(user)) == 100e18, "User should have 100 USDC");
-        require(USDST.balanceOf(address(psm)) == 0, "PSM should have 0 USDST");
+        require(USDST.balanceOf(address(psm)) == 0, "PSM should never escrow USDST");
         require(USDC.balanceOf(address(psm)) == 0, "PSM should have 0 USDC");
-        require(psm.pendingRedemptions(address(USDC)) == 0, "PSM should release USDC reservation");
-        (uint _amount, uint _payoutAmount, address _redeemToken, address _requester, uint _requestTime) = psm.burnRequests(psm.burnReqCounter());
-        require(_amount == 0, "Burn request amount should be 0");
-        require(_payoutAmount == 0, "Burn request payout should be 0");
-        require(_redeemToken == address(0), "Burn request redeem token should be 0");
-        require(_requester == address(0), "Burn request requester should be 0");
-        require(_requestTime == 0, "Burn request request time should be 0");
-    }
-
-    function it_psm_can_burn_delayed() {
-        require(USDC.balanceOf(address(user)) == 100e18, "User should have 100 USDC");
-
-        // Direct mint 1:1 100 USDST against the 100 USDC
-        user.doSuccessfully(address(USDC), "approve", address(psm), 100e18);
-        user.doSuccessfully(address(psm), "mint", 100e18, address(USDC));
-        require(USDST.balanceOf(address(user)) == 100e18, "User should have 100 USDST");
-        require(USDC.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDC");
-        require(USDC.balanceOf(address(user)) == 0, "User should have 0 USDC");
-        require(block.timestamp != 0, "Block timestamp cannot be 0");
-        require(USDST.balanceOf(address(user)) == 100e18, "User should have 100 USDST");
-
-        uint burnDelay = 24*60*60;
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, burnDelay, 0);
-        (bool burnEnabled, uint minReserve, uint configuredBurnDelay, uint burnFeeBps) = psm.burnConfigs(address(USDC));
-        require(configuredBurnDelay == burnDelay, "USDC burn delay should be 24*60*60");
-
-        user.doSuccessfully(address(USDST), "approve", address(psm), 100e18);
-        user.doSuccessfully(address(psm), "requestBurn", 100e18, address(USDC));
-        require(psm.burnReqCounter() == 2, "Burn request counter should be 2");
-        (uint amount, uint payoutAmount, address redeemToken, address requester, uint requestTime) = psm.burnRequests(psm.burnReqCounter());
-        require(amount == 100e18, "Burn request amount should be 100 USDST");
-        require(payoutAmount == 100e18, "Burn request payout should be 100 USDC");
-        require(redeemToken == address(USDC), "Burn request redeem token should be USDC");
-        require(requester == address(user), "Burn request requester should be user");
-        require(requestTime == block.timestamp, "Burn request request time should be current block timestamp");
-        require(USDC.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDC");
-        require(psm.pendingRedemptions(address(USDC)) == 100e18, "PSM should reserve 100 USDC");
         require(psm.availableRedemptionLiquidity(address(USDC)) == 0, "PSM should have no available USDC");
-        require(USDST.balanceOf(address(user)) == 0, "User should have 0 USDST");
-
-        // Attempt to burn too early
-        user.doExpectingFailure(address(psm), "completeBurn", "Burn delay not passed", psm.burnReqCounter());
-        require(USDST.balanceOf(address(user)) == 0, "User should have 0 USDST");
-        require(USDC.balanceOf(address(user)) == 0, "User should have 0 USDC");
-        require(psm.burnReqCounter() == 2, "Burn request counter should be 2");
-        require(USDST.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDST");
-        require(USDC.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDC");
-
-        // Attempt to burn again, still too early
-        fastForward(burnDelay - 1);
-        user.doExpectingFailure(address(psm), "completeBurn", "Burn delay not passed", psm.burnReqCounter());
-        require(USDST.balanceOf(address(user)) == 0, "User should have 0 USDST");
-        require(USDC.balanceOf(address(user)) == 0, "User should have 0 USDC");
-        require(psm.burnReqCounter() == 2, "Burn request counter should be 2");
-        require(USDST.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDST");
-        require(USDC.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDC");
-
-        // Wind the clock forward to after the burn delay
-        fastForward(1);
-
-        // Complete the burn USDST 1:1 in exchange for USDC
-        user.doSuccessfully(address(psm), "completeBurn", psm.burnReqCounter());
-        require(USDST.balanceOf(address(user)) == 0, "User should have 0 USDST");
-        require(USDC.balanceOf(address(user)) == 100e18, "User should have 100 USDC");
-        require(USDST.balanceOf(address(psm)) == 0, "PSM should have 0 USDST");
-        require(USDC.balanceOf(address(psm)) == 0, "PSM should have 0 USDC");
-        require(psm.pendingRedemptions(address(USDC)) == 0, "PSM should release USDC reservation");
-        (uint _amount, uint _payoutAmount, address _redeemToken, address _requester, uint _requestTime) = psm.burnRequests(psm.burnReqCounter());
-        require(_amount == 0, "Burn request amount should be 0");
-        require(_payoutAmount == 0, "Burn request payout should be 0");
-        require(_redeemToken == address(0), "Burn request redeem token should be 0");
-        require(_requester == address(0), "Burn request requester should be 0");
-        require(_requestTime == 0, "Burn request request time should be 0");
-
-        // Disable burn delay
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0, 0);
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDT), true, 0, 0, 0);
-    }
-
-    function it_psm_can_cancel_burn() {
-        // User deposits 100 USDC in the PSM, getting USDST 1:1
-        user.doSuccessfully(address(USDC), "approve", address(psm), 100e18);
-        user.doSuccessfully(address(psm), "mint", 100e18, address(USDC));
-
-        // User requests to burn their USDST for USDC, but cancels the request before it can be completed
-        user.doSuccessfully(address(USDST), "approve", address(psm), 100e18);
-        user.doSuccessfully(address(psm), "requestBurn", 100e18, address(USDC));
-        require(USDST.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDST");
-        require(psm.pendingRedemptions(address(USDC)) == 100e18, "PSM should reserve 100 USDC");
-        require(USDST.balanceOf(address(user)) == 0, "User should have 0 USDST");
-        user.doSuccessfully(address(psm), "cancelBurn", psm.burnReqCounter());
-        require(USDST.balanceOf(address(user)) == 100e18, "User should have 100 USDST");
-        require(USDST.balanceOf(address(psm)) == 0, "PSM should have 0 USDST");
-        require(psm.pendingRedemptions(address(USDC)) == 0, "PSM should release USDC reservation");
-
-        // User now tries and fails to complete the burn
-        user.doExpectingFailure(address(psm), "completeBurn", "Invalid burn request ID", psm.burnReqCounter());
-        require(USDST.balanceOf(address(user)) == 100e18, "User should have 100 USDST");
-        require(USDC.balanceOf(address(user)) == 0, "User should have 0 USDC, not " + string(USDC.balanceOf(address(user))));
-        require(USDST.balanceOf(address(psm)) == 0, "PSM should have 0 USDST");
-        require(USDC.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDC");
-        (uint _amount, uint _payoutAmount, address _redeemToken, address _requester, uint _requestTime) = psm.burnRequests(psm.burnReqCounter());
-        require(_amount == 0, "Burn request amount should be 0");
-        require(_payoutAmount == 0, "Burn request payout should be 0");
-        require(_redeemToken == address(0), "Burn request redeem token should be 0");
-        require(_requester == address(0), "Burn request requester should be 0");
-        require(_requestTime == 0, "Burn request request time should be 0");
-
-        // Throw away the USDST
-        admin.doSuccessfully(address(USDST), "burn", address(user), 100e18);
     }
 
     function it_psm_works_accross_users() {
@@ -275,64 +136,57 @@ contract Describe_DirectMintPSM {
         user2 = new User();
         admin.doSuccessfully(address(USDST), "mint", address(user2), 300e18);
 
-        // User1 deposits USDT in addition to the USDC they already have deposited
+        // User1 deposits the USDC they just redeemed, plus fresh USDT
+        user.doSuccessfully(address(USDC), "approve", address(psm), 100e18);
+        user.doSuccessfully(address(psm), "mint", 100e18, address(USDC));
         admin.doSuccessfully(address(USDT), "mint", address(user), 100e18);
         user.doSuccessfully(address(USDT), "approve", address(psm), 100e18);
         user.doSuccessfully(address(psm), "mint", 100e18, address(USDT));
+        require(USDST.balanceOf(address(user)) == 200e18, "User should have 200 USDST");
 
-        // User1 creates a burn request, but fails to complete it
-        user.doSuccessfully(address(USDST), "approve", address(psm), 100e18);
-        user.doSuccessfully(address(psm), "requestBurn", 100e18, address(USDC));
-        require(USDST.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDST");
-        require(USDST.balanceOf(address(user)) == 0, "User should have 0 USDST");
-
-        // User2 is allowed to burn their USDST for unreserved USDT
-        uint initialCounter = psm.burnReqCounter() + 1;
-        user2.doSuccessfully(address(USDST), "approve", address(psm), 100e18);
-        user2.doSuccessfully(address(psm), "requestBurn", 100e18, address(USDT));
-        user2.doSuccessfully(address(USDST), "approve", address(psm), 100e18);
-        user2.doExpectingFailure(address(psm), "requestBurn", "Insufficient liquidity", 100e18, address(USDC));
-        require(USDST.balanceOf(address(psm)) == 200e18, "PSM should have 200 USDST");
+        // User2 redeems their own USDST against unrelated PSM liquidity
+        user2.doSuccessfully(address(USDST), "approve", address(psm), 300e18);
+        user2.doSuccessfully(address(psm), "redeem", 100e18, address(USDT));
         require(USDST.balanceOf(address(user2)) == 200e18, "User2 should have 200 USDST");
-        user2.doExpectingFailure(address(psm), "completeBurn", "Unauthorized", initialCounter - 1); // Can't burn the other user's request
-        user2.doSuccessfully(address(psm), "completeBurn", initialCounter);
-
-        // Enforce conditions after burns
-        require(USDST.balanceOf(address(psm)) == 100e18, "PSM should have 200 USDST");
-        require(USDST.balanceOf(address(user2)) == 200e18, "User2 should have 200 USDST");
-        require(USDC.balanceOf(address(user2)) == 0, "User2 should have 0 USDC");
         require(USDT.balanceOf(address(user2)) == 100e18, "User2 should have 100 USDT");
         require(USDT.balanceOf(address(psm)) == 0, "PSM should have 0 USDT");
-        require(USDC.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDC");
-        require(USDST.balanceOf(address(user)) == 0, "User should have 0 USDST");
-        require(USDT.balanceOf(address(user)) == 0, "User should have 0 USDT");
-        require(USDC.balanceOf(address(user)) == 0, "User should have 0 USDC");
-        require(psm.pendingRedemptions(address(USDC)) == 100e18, "PSM should keep user1 USDC reservation");
-        require(psm.pendingRedemptions(address(USDT)) == 0, "PSM should release user2 USDT reservation");
-        (uint _amount, uint _payoutAmount, address _redeemToken, address _requester, uint _requestTime) = psm.burnRequests(initialCounter);
-        require(_amount == 0, "Burn request amount should be 0");
-        require(_payoutAmount == 0, "Burn request payout should be 0");
-        require(_redeemToken == address(0), "Burn request redeem token should be 0");
-        require(_requester == address(0), "Burn request requester should be 0");
-        require(_requestTime == 0, "Burn request request time should be 0");
+
+        // USDT liquidity is now exhausted, and nobody can redeem beyond what backs the PSM
+        user2.doExpectingFailure(address(psm), "redeem", "Insufficient liquidity", 1e18, address(USDT));
+        user2.doExpectingFailure(address(psm), "redeem", "Insufficient liquidity", 200e18, address(USDC));
+
+        // One user's redemption does not touch another's balance
+        require(USDST.balanceOf(address(user)) == 200e18, "User1 USDST should be untouched by user2 redemption");
+        require(USDC.balanceOf(address(psm)) == 100e18, "PSM should still hold user1 USDC backing");
+        require(USDST.balanceOf(address(psm)) == 0, "PSM should hold no USDST between redemptions");
     }
 
     function it_psm_liquidity_limited() {
-        // User1's earlier USDC burn remains reserved until claimed or canceled
-        user.doSuccessfully(address(psm), "cancelBurn", psm.burnReqCounter()-1);
-        require(USDST.balanceOf(address(user)) == 100e18, "User should have 100 USDST");
-        require(USDST.balanceOf(address(psm)) == 0, "PSM should have 0 USDST");
-        require(psm.pendingRedemptions(address(USDC)) == 0, "PSM should release USDC reservation");
-        (uint _amount, uint _payoutAmount, address _redeemToken, address _requester, uint _requestTime) = psm.burnRequests(psm.burnReqCounter()-1);
-        require(_amount == 0, "Burn request amount should be 0");
-        require(_payoutAmount == 0, "Burn request payout should be 0");
-        require(_redeemToken == address(0), "Burn request redeem token should be 0");
-        require(_requester == address(0), "Burn request requester should be 0");
-        require(_requestTime == 0, "Burn request request time should be 0");
+        // Redeemable liquidity is exactly what the PSM holds — there is nothing reserved.
+        require(psm.availableRedemptionLiquidity(address(USDC)) == USDC.balanceOf(address(psm)), "Available USDC should equal PSM balance");
+        require(psm.availableRedemptionLiquidity(address(USDT)) == 0, "Available USDT should be zero");
+
+        // User1 redeems half of their USDST, leaving the rest outstanding.
+        user.doSuccessfully(address(USDST), "approve", address(psm), 200e18);
+        user.doSuccessfully(address(psm), "redeem", 50e18, address(USDC));
+        require(USDC.balanceOf(address(user)) == 50e18, "User should receive 50 USDC");
+        require(USDST.balanceOf(address(user)) == 150e18, "User should retain 150 USDST");
+        require(psm.availableRedemptionLiquidity(address(USDC)) == 50e18, "Remaining USDC should stay redeemable");
+
+        // The rest of their USDST is unbacked by USDC and cannot be redeemed.
+        user.doExpectingFailure(address(psm), "redeem", "Insufficient liquidity", 150e18, address(USDC));
+
+        // Return the PSM to a 100 USDC backing for the tests that follow.
+        user.doSuccessfully(address(USDC), "approve", address(psm), 50e18);
+        user.doSuccessfully(address(psm), "mint", 50e18, address(USDC));
+        require(USDC.balanceOf(address(psm)) == 100e18, "PSM should hold 100 USDC");
     }
 
     function it_psm_enforces_mint_controls() {
-        admin.doSuccessfully(address(psm), "setMintConfig", address(USDC), true, 250e18, 0);
+        uint psmUsdcBefore = USDC.balanceOf(address(psm));
+        uint user2UsdstBefore = USDST.balanceOf(address(user2));
+
+        admin.doSuccessfully(address(psm), "setMintConfig", address(USDC), true, psmUsdcBefore + 145e18, 0);
         admin.doSuccessfully(address(USDC), "mint", address(user2), 200e18);
 
         user2.doSuccessfully(address(USDC), "approve", address(psm), 200e18);
@@ -341,28 +195,30 @@ contract Describe_DirectMintPSM {
         user2.doSuccessfully(address(psm), "mint", 75e18, address(USDC));
         user2.doExpectingFailure(address(psm), "mint", "Token balance cap exceeded", 10e18, address(USDC));
 
-        require(USDC.balanceOf(address(psm)) == 245e18, "PSM should hold 245 USDC");
-        require(USDST.balanceOf(address(user2)) == 345e18, "User2 should have original plus newly minted USDST");
+        require(USDC.balanceOf(address(psm)) == psmUsdcBefore + 145e18, "PSM should hold the capped USDC");
+        require(USDST.balanceOf(address(user2)) == user2UsdstBefore + 145e18, "User2 should have original plus newly minted USDST");
 
         admin.doSuccessfully(address(psm), "setMintConfig", address(USDC), true, 0, 0);
     }
 
     function it_psm_enforces_burn_controls() {
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 100e18, 0, 0);
+        // minReserve is a hard floor on redeemable liquidity.
+        uint psmUsdcBefore = USDC.balanceOf(address(psm));
+        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, psmUsdcBefore - 100e18, 0);
+        require(psm.availableRedemptionLiquidity(address(USDC)) == 100e18, "PSM should preserve min reserve");
 
         user2.doSuccessfully(address(USDST), "approve", address(psm), 200e18);
+        user2.doSuccessfully(address(psm), "redeem", 50e18, address(USDC));
+        require(psm.availableRedemptionLiquidity(address(USDC)) == 50e18, "Redeem should draw down available liquidity");
 
-        user2.doSuccessfully(address(psm), "requestBurn", 50e18, address(USDC));
-        user2.doSuccessfully(address(psm), "requestBurn", 50e18, address(USDC));
-        user2.doExpectingFailure(address(psm), "requestBurn", "Insufficient liquidity", 50e18, address(USDC));
+        user2.doSuccessfully(address(psm), "redeem", 50e18, address(USDC));
+        require(psm.availableRedemptionLiquidity(address(USDC)) == 0, "Redeem should exhaust available liquidity");
 
-        require(psm.pendingRedemptions(address(USDC)) == 100e18, "PSM should reserve 100 USDC");
-        require(psm.availableRedemptionLiquidity(address(USDC)) == 45e18, "PSM should preserve min reserve");
+        // The reserve itself is untouchable.
+        user2.doExpectingFailure(address(psm), "redeem", "Insufficient liquidity", 1e18, address(USDC));
+        require(USDC.balanceOf(address(psm)) == psmUsdcBefore - 100e18, "PSM should retain exactly minReserve");
 
-        user2.doSuccessfully(address(psm), "cancelBurn", psm.burnReqCounter());
-        user2.doSuccessfully(address(psm), "cancelBurn", psm.burnReqCounter()-1);
-        require(psm.pendingRedemptions(address(USDC)) == 0, "PSM should clear outstanding burn reservations");
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0, 0);
+        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0);
     }
 
     function it_psm_enforces_enabled_controls() {
@@ -370,11 +226,11 @@ contract Describe_DirectMintPSM {
         user2.doExpectingFailure(address(psm), "mint", "Minting for this token is disabled", 10e18, address(USDC));
 
         admin.doSuccessfully(address(psm), "setMintConfig", address(USDC), true, 0, 0);
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), false, 0, 0, 0);
+        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), false, 0, 0);
         user2.doSuccessfully(address(USDST), "approve", address(psm), 100e18);
-        user2.doExpectingFailure(address(psm), "requestBurn", "Token burn is disabled", 10e18, address(USDC));
+        user2.doExpectingFailure(address(psm), "redeem", "Token burn is disabled", 10e18, address(USDC));
 
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0, 0);
+        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0);
     }
 
     function it_psm_requires_active_tokens_for_user_flows() {
@@ -382,16 +238,13 @@ contract Describe_DirectMintPSM {
         user2.doSuccessfully(address(USDC), "approve", address(psm), 30e18);
         user2.doSuccessfully(address(psm), "mint", 10e18, address(USDC));
         user2.doSuccessfully(address(USDST), "approve", address(psm), 10e18);
-        user2.doSuccessfully(address(psm), "requestBurn", 10e18, address(USDC));
-        uint requestId = psm.burnReqCounter();
 
         admin.doSuccessfully(address(USDC), "setStatus", 3);
         user2.doExpectingFailure(address(psm), "mint", "Token not active", 10e18, address(USDC));
-        user2.doExpectingFailure(address(psm), "requestBurn", "Token not active", 10e18, address(USDC));
-        user2.doExpectingFailure(address(psm), "completeBurn", "Token not active", requestId);
+        user2.doExpectingFailure(address(psm), "redeem", "Token not active", 10e18, address(USDC));
 
         admin.doSuccessfully(address(USDC), "setStatus", 2);
-        user2.doSuccessfully(address(psm), "cancelBurn", requestId);
+        user2.doSuccessfully(address(psm), "redeem", 10e18, address(USDC));
     }
 
     function it_psm_rejects_invalid_amounts_without_state_changes() {
@@ -399,18 +252,14 @@ contract Describe_DirectMintPSM {
         uint usdcUserBefore = USDC.balanceOf(address(user2));
         uint usdstUserBefore = USDST.balanceOf(address(user2));
         uint usdstPsmBefore = USDST.balanceOf(address(psm));
-        uint pendingBefore = psm.pendingRedemptions(address(USDC));
-        uint counterBefore = psm.burnReqCounter();
 
         user2.doExpectingFailure(address(psm), "mint", "Amount must be nonzero", 0, address(USDC));
-        user2.doExpectingFailure(address(psm), "requestBurn", "Amount must be nonzero", 0, address(USDC));
+        user2.doExpectingFailure(address(psm), "redeem", "Amount must be nonzero", 0, address(USDC));
 
         require(USDC.balanceOf(address(psm)) == usdcPsmBefore, "PSM USDC should not change");
         require(USDC.balanceOf(address(user2)) == usdcUserBefore, "User2 USDC should not change");
         require(USDST.balanceOf(address(user2)) == usdstUserBefore, "User2 USDST should not change");
         require(USDST.balanceOf(address(psm)) == usdstPsmBefore, "PSM USDST should not change");
-        require(psm.pendingRedemptions(address(USDC)) == pendingBefore, "Pending redemptions should not change");
-        require(psm.burnReqCounter() == counterBefore, "Burn counter should not change");
     }
 
     function it_psm_rejected_mint_preserves_allowance_and_balances() {
@@ -432,96 +281,31 @@ contract Describe_DirectMintPSM {
         admin.doSuccessfully(address(psm), "setMintConfig", address(USDC), true, 0, 0);
     }
 
-    function it_psm_rejected_burn_preserves_allowance_balances_and_counter() {
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, USDC.balanceOf(address(psm)), 0, 0);
+    function it_psm_rejected_redeem_preserves_allowance_and_balances() {
+        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, USDC.balanceOf(address(psm)), 0);
 
         uint userBalanceBefore = USDST.balanceOf(address(user2));
         uint psmUsdBefore = USDST.balanceOf(address(psm));
-        uint pendingBefore = psm.pendingRedemptions(address(USDC));
-        uint counterBefore = psm.burnReqCounter();
+        uint psmUsdcBefore = USDC.balanceOf(address(psm));
         user2.doSuccessfully(address(USDST), "approve", address(psm), 25e18);
 
-        user2.doExpectingFailure(address(psm), "requestBurn", "Insufficient liquidity", 25e18, address(USDC));
+        user2.doExpectingFailure(address(psm), "redeem", "Insufficient liquidity", 25e18, address(USDC));
 
-        require(USDST.balanceOf(address(user2)) == userBalanceBefore, "Rejected burn should not pull USDST");
-        require(USDST.balanceOf(address(psm)) == psmUsdBefore, "Rejected burn should not increase PSM USDST");
-        require(USDST.allowance(address(user2), address(psm)) == 25e18, "Rejected burn should not consume allowance");
-        require(psm.pendingRedemptions(address(USDC)) == pendingBefore, "Rejected burn should not reserve liquidity");
-        require(psm.burnReqCounter() == counterBefore, "Rejected burn should not create request");
+        require(USDST.balanceOf(address(user2)) == userBalanceBefore, "Rejected redeem should not pull USDST");
+        require(USDST.balanceOf(address(psm)) == psmUsdBefore, "Rejected redeem should not increase PSM USDST");
+        require(USDC.balanceOf(address(psm)) == psmUsdcBefore, "Rejected redeem should not pay out USDC");
+        require(USDST.allowance(address(user2), address(psm)) == 25e18, "Rejected redeem should not consume allowance");
 
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0, 0);
-    }
-
-    function it_psm_tracks_multiple_pending_burns_for_same_token() {
-        admin.doSuccessfully(address(USDC), "mint", address(user2), 60e18);
-        user2.doSuccessfully(address(USDC), "approve", address(psm), 60e18);
-        user2.doSuccessfully(address(psm), "mint", 60e18, address(USDC));
-
-        uint pendingBefore = psm.pendingRedemptions(address(USDC));
-        user2.doSuccessfully(address(USDST), "approve", address(psm), 60e18);
-        user2.doSuccessfully(address(psm), "requestBurn", 20e18, address(USDC));
-        uint firstRequest = psm.burnReqCounter();
-        user2.doSuccessfully(address(psm), "requestBurn", 40e18, address(USDC));
-        uint secondRequest = psm.burnReqCounter();
-
-        require(psm.pendingRedemptions(address(USDC)) == pendingBefore + 60e18, "Pending redemptions should aggregate requests");
-        require(USDST.balanceOf(address(psm)) >= 60e18, "PSM should escrow requested USDST");
-
-        user2.doSuccessfully(address(psm), "cancelBurn", firstRequest);
-        require(psm.pendingRedemptions(address(USDC)) == pendingBefore + 40e18, "Cancel should release only one request");
-        user2.doSuccessfully(address(psm), "completeBurn", secondRequest);
-        require(psm.pendingRedemptions(address(USDC)) == pendingBefore, "Complete should release remaining request");
-    }
-
-    function it_psm_uses_per_asset_burn_delays_independently() {
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 24*60*60, 0);
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDT), true, 0, 0, 0);
-
-        admin.doSuccessfully(address(USDT), "mint", address(user2), 30e18);
-        user2.doSuccessfully(address(USDT), "approve", address(psm), 30e18);
-        user2.doSuccessfully(address(psm), "mint", 30e18, address(USDT));
-
-        user2.doSuccessfully(address(USDST), "approve", address(psm), 60e18);
-        user2.doSuccessfully(address(psm), "requestBurn", 30e18, address(USDC));
-        uint usdcRequest = psm.burnReqCounter();
-        user2.doSuccessfully(address(psm), "requestBurn", 30e18, address(USDT));
-        uint usdtRequest = psm.burnReqCounter();
-
-        user2.doExpectingFailure(address(psm), "completeBurn", "Burn delay not passed", usdcRequest);
-        user2.doSuccessfully(address(psm), "completeBurn", usdtRequest);
-        require(psm.pendingRedemptions(address(USDT)) == 0, "USDT burn should complete immediately");
-        require(psm.pendingRedemptions(address(USDC)) >= 30e18, "USDC burn should remain pending");
-
-        user2.doSuccessfully(address(psm), "cancelBurn", usdcRequest);
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0, 0);
-    }
-
-    function it_psm_disabled_burn_blocks_completion_but_allows_cancel() {
-        admin.doSuccessfully(address(USDC), "mint", address(user2), 20e18);
-        user2.doSuccessfully(address(USDC), "approve", address(psm), 20e18);
-        user2.doSuccessfully(address(psm), "mint", 20e18, address(USDC));
-
-        user2.doSuccessfully(address(USDST), "approve", address(psm), 20e18);
-        user2.doSuccessfully(address(psm), "requestBurn", 20e18, address(USDC));
-        uint requestId = psm.burnReqCounter();
-        uint pendingBeforeCancel = psm.pendingRedemptions(address(USDC));
-
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), false, 0, 0, 0);
-        user2.doExpectingFailure(address(psm), "completeBurn", "Token burn is disabled", requestId);
-        require(psm.pendingRedemptions(address(USDC)) == pendingBeforeCancel, "Disabled complete should keep reservation");
-
-        user2.doSuccessfully(address(psm), "cancelBurn", requestId);
-        require(psm.pendingRedemptions(address(USDC)) == pendingBeforeCancel - 20e18, "Cancel should release disabled burn reservation");
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0, 0);
+        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0);
     }
 
     function it_psm_rejects_invalid_config_tokens_and_fee_bps() {
         user2.doExpectingFailure(address(psm), "setMintConfig", "Only an admin or a whitelisted account can call castVoteOnIssue", address(USDC), true, 0, 0);
         admin.doExpectingFailure(address(psm), "setMintConfig", "Invalid token", address(0), true, 0, 0);
         admin.doExpectingFailure(address(psm), "setMintConfig", "Invalid token", address(USDST), true, 0, 0);
-        admin.doExpectingFailure(address(psm), "setBurnConfig", "Invalid token", address(USDST), true, 0, 0, 0);
+        admin.doExpectingFailure(address(psm), "setBurnConfig", "Invalid token", address(USDST), true, 0, 0);
         admin.doExpectingFailure(address(psm), "setMintConfig", "Invalid fee bps", address(USDC), true, 0, 10001);
-        admin.doExpectingFailure(address(psm), "setBurnConfig", "Invalid fee bps", address(USDC), true, 0, 0, 10001);
+        admin.doExpectingFailure(address(psm), "setBurnConfig", "Invalid fee bps", address(USDC), true, 0, 10001);
     }
 
     function it_psm_supports_granular_mint_config_setters() {
@@ -555,44 +339,33 @@ contract Describe_DirectMintPSM {
     }
 
     function it_psm_supports_granular_burn_config_setters() {
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0, 0);
+        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0);
 
         admin.doSuccessfully(address(psm), "setBurnEnabled", address(USDC), false);
-        (bool burnEnabled1, uint minReserve1, uint burnDelay1, uint burnFeeBps1) = psm.burnConfigs(address(USDC));
+        (bool burnEnabled1, uint minReserve1, uint burnFeeBps1) = psm.burnConfigs(address(USDC));
         require(!burnEnabled1, "Burn enabled should update");
         require(minReserve1 == 0, "Burn enabled setter should preserve min reserve");
-        require(burnDelay1 == 0, "Burn enabled setter should preserve delay");
         require(burnFeeBps1 == 0, "Burn enabled setter should preserve fee");
 
         admin.doSuccessfully(address(psm), "setBurnMinReserve", address(USDC), 33e18);
-        (bool burnEnabled2, uint minReserve2, uint burnDelay2, uint burnFeeBps2) = psm.burnConfigs(address(USDC));
+        (bool burnEnabled2, uint minReserve2, uint burnFeeBps2) = psm.burnConfigs(address(USDC));
         require(!burnEnabled2, "Burn reserve setter should preserve enabled");
         require(minReserve2 == 33e18, "Burn min reserve should update");
-        require(burnDelay2 == 0, "Burn reserve setter should preserve delay");
         require(burnFeeBps2 == 0, "Burn reserve setter should preserve fee");
 
-        admin.doSuccessfully(address(psm), "setBurnDelay", address(USDC), 3600);
-        (bool burnEnabled3, uint minReserve3, uint burnDelay3, uint burnFeeBps3) = psm.burnConfigs(address(USDC));
-        require(!burnEnabled3, "Burn delay setter should preserve enabled");
-        require(minReserve3 == 33e18, "Burn delay setter should preserve min reserve");
-        require(burnDelay3 == 3600, "Burn delay should update");
-        require(burnFeeBps3 == 0, "Burn delay setter should preserve fee");
-
         admin.doSuccessfully(address(psm), "setBurnFeeBps", address(USDC), 17);
-        (bool burnEnabled4, uint minReserve4, uint burnDelay4, uint burnFeeBps4) = psm.burnConfigs(address(USDC));
-        require(!burnEnabled4, "Burn fee setter should preserve enabled");
-        require(minReserve4 == 33e18, "Burn fee setter should preserve min reserve");
-        require(burnDelay4 == 3600, "Burn fee setter should preserve delay");
-        require(burnFeeBps4 == 17, "Burn fee should update");
+        (bool burnEnabled3, uint minReserve3, uint burnFeeBps3) = psm.burnConfigs(address(USDC));
+        require(!burnEnabled3, "Burn fee setter should preserve enabled");
+        require(minReserve3 == 33e18, "Burn fee setter should preserve min reserve");
+        require(burnFeeBps3 == 17, "Burn fee should update");
 
         admin.doExpectingFailure(address(psm), "setBurnFeeBps", "Invalid fee bps", address(USDC), 10001);
-        (bool burnEnabled5, uint minReserve5, uint burnDelay5, uint burnFeeBps5) = psm.burnConfigs(address(USDC));
-        require(!burnEnabled5, "Rejected burn fee should preserve enabled");
-        require(minReserve5 == 33e18, "Rejected burn fee should preserve min reserve");
-        require(burnDelay5 == 3600, "Rejected burn fee should preserve delay");
-        require(burnFeeBps5 == 17, "Rejected burn fee should preserve fee");
+        (bool burnEnabled4, uint minReserve4, uint burnFeeBps4) = psm.burnConfigs(address(USDC));
+        require(!burnEnabled4, "Rejected burn fee should preserve enabled");
+        require(minReserve4 == 33e18, "Rejected burn fee should preserve min reserve");
+        require(burnFeeBps4 == 17, "Rejected burn fee should preserve fee");
 
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0, 0);
+        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0);
     }
 
     function it_psm_sends_mint_fee_to_fee_collector_without_breaking_backing() {
@@ -629,157 +402,79 @@ contract Describe_DirectMintPSM {
     }
 
     function it_psm_enforces_global_burn_pause_controls() {
-        admin.doSuccessfully(address(USDST), "mint", address(user2), 40e18);
         user2.doSuccessfully(address(USDST), "approve", address(psm), 40e18);
 
         admin.doSuccessfully(address(psm), "pauseBurn");
         require(psm.burnPaused(), "Burn should be paused");
-        user2.doExpectingFailure(address(psm), "requestBurn", "Burning is paused", 10e18, address(USDC));
+        user2.doExpectingFailure(address(psm), "redeem", "Burning is paused", 10e18, address(USDC));
 
         admin.doSuccessfully(address(psm), "unpauseBurn");
         require(!psm.burnPaused(), "Burn should be unpaused");
-        user2.doSuccessfully(address(psm), "requestBurn", 10e18, address(USDC));
-        uint requestId = psm.burnReqCounter();
-
-        admin.doSuccessfully(address(psm), "pauseBurn");
-        user2.doExpectingFailure(address(psm), "completeBurn", "Burning is paused", requestId);
-        user2.doSuccessfully(address(psm), "cancelBurn", requestId);
-        admin.doSuccessfully(address(psm), "unpauseBurn");
+        user2.doSuccessfully(address(psm), "redeem", 10e18, address(USDC));
     }
 
-    function it_psm_applies_burn_fee_to_reserved_and_paid_amount() {
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0, 100);
+    function it_psm_applies_redeem_fee_to_payout_and_collector() {
+        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 100);
         admin.doSuccessfully(address(USDST), "mint", address(user2), 100e18);
 
         uint userUsdcBefore = USDC.balanceOf(address(user2));
         uint userUsdstBefore = USDST.balanceOf(address(user2));
         uint psmUsdcBefore = USDC.balanceOf(address(psm));
         uint collectorUsdcBefore = USDC.balanceOf(address(m.feeCollector()));
-        uint pendingBefore = psm.pendingRedemptions(address(USDC));
 
         user2.doSuccessfully(address(USDST), "approve", address(psm), 100e18);
-        user2.doSuccessfully(address(psm), "requestBurn", 100e18, address(USDC));
-        uint requestId = psm.burnReqCounter();
-        (uint burnAmount, uint payoutAmount, address redeemToken, address requester, uint requestTime) = psm.burnRequests(requestId);
+        user2.doSuccessfully(address(psm), "redeem", 100e18, address(USDC));
 
-        require(burnAmount == 100e18, "Burn fee request should escrow full USDST");
-        require(payoutAmount == 99e18, "Burn fee request should record net payout");
-        require(redeemToken == address(USDC), "Burn fee request redeem token should be USDC");
-        require(requester == address(user2), "Burn fee request requester should be user2");
-        require(psm.pendingRedemptions(address(USDC)) == pendingBefore + 100e18, "Burn fee should reserve full outflow");
+        require(USDST.balanceOf(address(user2)) == userUsdstBefore - 100e18, "Redeem should burn the full amount of USDST");
+        require(USDC.balanceOf(address(user2)) == userUsdcBefore + 99e18, "Redeem should pay net USDC");
+        require(USDC.balanceOf(address(m.feeCollector())) == collectorUsdcBefore + 1e18, "Redeem fee should go to FeeCollector");
+        require(USDC.balanceOf(address(psm)) == psmUsdcBefore - 100e18, "Redeem should remove full outflow from PSM");
 
-        user2.doSuccessfully(address(psm), "completeBurn", requestId);
-
-        require(USDST.balanceOf(address(user2)) == userUsdstBefore - 100e18, "Burn fee flow should spend escrowed USDST");
-        require(USDC.balanceOf(address(user2)) == userUsdcBefore + 99e18, "Burn fee flow should pay net USDC");
-        require(USDC.balanceOf(address(m.feeCollector())) == collectorUsdcBefore + 1e18, "Burn fee should go to FeeCollector");
-        require(USDC.balanceOf(address(psm)) == psmUsdcBefore - 100e18, "Burn fee flow should remove full outflow from PSM");
-        require(psm.pendingRedemptions(address(USDC)) == pendingBefore, "Burn fee complete should clear full reservation");
-
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0, 0);
-    }
-
-    function it_psm_cancel_burn_fee_request_returns_full_escrow() {
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0, 100);
-        admin.doSuccessfully(address(USDST), "mint", address(user2), 100e18);
-
-        uint userUsdstBefore = USDST.balanceOf(address(user2));
-        uint psmUsdstBefore = USDST.balanceOf(address(psm));
-        uint pendingBefore = psm.pendingRedemptions(address(USDC));
-        uint collectorUsdcBefore = USDC.balanceOf(address(m.feeCollector()));
-
-        user2.doSuccessfully(address(USDST), "approve", address(psm), 100e18);
-        user2.doSuccessfully(address(psm), "requestBurn", 100e18, address(USDC));
-        uint requestId = psm.burnReqCounter();
-        require(psm.pendingRedemptions(address(USDC)) == pendingBefore + 100e18, "Burn fee cancel test should reserve full outflow");
-        require(USDST.balanceOf(address(user2)) == userUsdstBefore - 100e18, "Burn request should escrow full USDST");
-        require(USDST.balanceOf(address(psm)) == psmUsdstBefore + 100e18, "PSM should hold full escrow");
-
-        user2.doSuccessfully(address(psm), "cancelBurn", requestId);
-
-        require(USDST.balanceOf(address(user2)) == userUsdstBefore, "Cancel should return full escrowed USDST");
-        require(USDST.balanceOf(address(psm)) == psmUsdstBefore, "Cancel should remove full PSM escrow");
-        require(USDC.balanceOf(address(m.feeCollector())) == collectorUsdcBefore, "Cancel should not send fee");
-        require(psm.pendingRedemptions(address(USDC)) == pendingBefore, "Cancel should release full reservation");
-
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0, 0);
-    }
-
-    function it_psm_owner_can_cancel_expired_burn_request() {
-        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0, 0);
-        admin.doSuccessfully(address(USDC), "mint", address(user2), 25e18);
-
-        uint userUsdstBefore = USDST.balanceOf(address(user2));
-        uint psmUsdstBefore = USDST.balanceOf(address(psm));
-        uint pendingBefore = psm.pendingRedemptions(address(USDC));
-
-        user2.doSuccessfully(address(USDC), "approve", address(psm), 25e18);
-        user2.doSuccessfully(address(psm), "mint", 25e18, address(USDC));
-        user2.doSuccessfully(address(USDST), "approve", address(psm), 25e18);
-        user2.doSuccessfully(address(psm), "requestBurn", 25e18, address(USDC));
-        uint requestId = psm.burnReqCounter();
-
-        require(USDST.balanceOf(address(user2)) == userUsdstBefore, "Burn request should escrow newly minted USDST");
-        require(USDST.balanceOf(address(psm)) == psmUsdstBefore + 25e18, "PSM should hold escrowed USDST");
-        require(psm.pendingRedemptions(address(USDC)) == pendingBefore + 25e18, "Burn request should reserve USDC");
-
-        try admin.do(address(psm), "clearExpiredBurnRequest", requestId) {
-            revert("Expected clearExpiredBurnRequest to fail before expiry");
-        } catch Error(string e) {
-            require(e == "Burn request not expired", "Expected clearExpiredBurnRequest to fail before expiry");
-        }
-
-        fastForward(7 * 24 * 60 * 60);
-        admin.doSuccessfully(address(psm), "clearExpiredBurnRequest", requestId);
-
-        require(USDST.balanceOf(address(user2)) == userUsdstBefore + 25e18, "Expired cancel should return escrowed USDST");
-        require(USDST.balanceOf(address(psm)) == psmUsdstBefore, "Expired cancel should remove PSM escrow");
-        require(psm.pendingRedemptions(address(USDC)) == pendingBefore, "Expired cancel should release reservation");
-        user2.doExpectingFailure(address(psm), "completeBurn", "Invalid burn request ID", requestId);
+        admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0);
     }
 
     function it_psm_rejects_invalid_initialize_inputs() {
         DirectMintPSM fresh = _newPsm();
 
-        admin.doExpectingFailure(address(fresh), "initialize", "Invalid mintable token", address(0), address(m.feeCollector()), [address(USDC)], 0);
-        admin.doExpectingFailure(address(fresh), "initialize", "Invalid fee collector", address(USDST), address(0), [address(USDC)], 0);
-        admin.doExpectingFailure(address(fresh), "initialize", "Invalid eligible tokens", address(USDST), address(m.feeCollector()), [], 0);
-        admin.doExpectingFailure(address(fresh), "initialize", "Invalid token", address(USDST), address(m.feeCollector()), [address(USDST)], 0);
+        admin.doExpectingFailure(address(fresh), "initialize", "Invalid mintable token", address(0), address(m.feeCollector()), [address(USDC)]);
+        admin.doExpectingFailure(address(fresh), "initialize", "Invalid fee collector", address(USDST), address(0), [address(USDC)]);
+        admin.doExpectingFailure(address(fresh), "initialize", "Invalid eligible tokens", address(USDST), address(m.feeCollector()), []);
+        admin.doExpectingFailure(address(fresh), "initialize", "Invalid token", address(USDST), address(m.feeCollector()), [address(USDST)]);
 
         Token sixDecimalToken = _createActiveToken("Six Decimal Token", "SIX", 6);
-        admin.doExpectingFailure(address(fresh), "initialize", "Decimal mismatch", address(USDST), address(m.feeCollector()), [address(sixDecimalToken)], 0);
+        admin.doExpectingFailure(address(fresh), "initialize", "Decimal mismatch", address(USDST), address(m.feeCollector()), [address(sixDecimalToken)]);
 
         variadic retPending = admin.doSuccessfully(address(m.tokenFactory()), "createToken", "Pending Token", "Pending Token", [], [], [], "PEND", 0, 18);
         Token pendingToken = Token(address(retPending));
-        admin.doExpectingFailure(address(fresh), "initialize", "Token not active", address(USDST), address(m.feeCollector()), [address(pendingToken)], 0);
+        admin.doExpectingFailure(address(fresh), "initialize", "Token not active", address(USDST), address(m.feeCollector()), [address(pendingToken)]);
 
-        admin.doSuccessfully(address(fresh), "initialize", address(USDST), address(m.feeCollector()), [address(USDC)], 0);
+        admin.doSuccessfully(address(fresh), "initialize", address(USDST), address(m.feeCollector()), [address(USDC)]);
         require(fresh.mintableToken() == address(USDST), "Valid initialize should set mintable token");
         (bool mintEnabled, uint maxBalance, uint mintFeeBps) = fresh.mintConfigs(address(USDC));
-        (bool burnEnabled, uint minReserve, uint burnDelay, uint burnFeeBps) = fresh.burnConfigs(address(USDC));
+        (bool burnEnabled, uint minReserve, uint burnFeeBps) = fresh.burnConfigs(address(USDC));
         require(mintEnabled && burnEnabled, "Valid initialize should enable eligible token");
-        require(maxBalance == 0 && minReserve == 0 && burnDelay == 0, "Valid initialize should set defaults");
+        require(maxBalance == 0 && minReserve == 0, "Valid initialize should set defaults");
         require(mintFeeBps == 0 && burnFeeBps == 0, "Valid initialize should set zero fees");
     }
 
     function it_psm_reinitialize_is_currently_allowed_and_overwrites_admin_config() {
-        DirectMintPSM fresh = _newInitializedPsm(0);
+        DirectMintPSM fresh = _newInitializedPsm();
         FeeCollector newCollector = FeeCollector(address(new Proxy(address(new FeeCollector(address(0xdeadbeef))), address(m.adminRegistry()))));
 
         admin.doSuccessfully(address(fresh), "setMintConfig", address(USDC), true, 500e18, 25);
-        admin.doSuccessfully(address(fresh), "initialize", address(USDST), address(newCollector), [address(USDT)], 123);
+        admin.doSuccessfully(address(fresh), "initialize", address(USDST), address(newCollector), [address(USDT)]);
 
         require(address(fresh.feeCollector()) == address(newCollector), "Reinitialize should overwrite fee collector today");
         (bool usdcMintEnabled, uint usdcMaxBalance, uint usdcMintFeeBps) = fresh.mintConfigs(address(USDC));
         (bool usdtMintEnabled, uint usdtMaxBalance, uint usdtMintFeeBps) = fresh.mintConfigs(address(USDT));
-        (bool usdtBurnEnabled, uint usdtMinReserve, uint usdtBurnDelay, uint usdtBurnFeeBps) = fresh.burnConfigs(address(USDT));
+        (bool usdtBurnEnabled, uint usdtMinReserve, uint usdtBurnFeeBps) = fresh.burnConfigs(address(USDT));
         require(usdcMintEnabled && usdcMaxBalance == 500e18 && usdcMintFeeBps == 25, "Reinitialize should not clear old token config today");
         require(usdtMintEnabled && usdtMaxBalance == 0 && usdtMintFeeBps == 0, "Reinitialize should set new mint config today");
-        require(usdtBurnEnabled && usdtMinReserve == 0 && usdtBurnDelay == 123 && usdtBurnFeeBps == 0, "Reinitialize should set new burn config today");
+        require(usdtBurnEnabled && usdtMinReserve == 0 && usdtBurnFeeBps == 0, "Reinitialize should set new burn config today");
     }
 
     function it_psm_fee_bps_10000_rejects_user_flows_without_state_changes() {
-        DirectMintPSM fresh = _newInitializedPsm(0);
+        DirectMintPSM fresh = _newInitializedPsm();
         User actor = new User();
         admin.doSuccessfully(address(USDC), "mint", address(actor), 20e18);
 
@@ -795,104 +490,14 @@ contract Describe_DirectMintPSM {
 
         admin.doSuccessfully(address(fresh), "setBurnFeeBps", address(USDC), 10000);
         actor.doSuccessfully(address(USDST), "approve", address(fresh), 10e18);
-        actor.doExpectingFailure(address(fresh), "requestBurn", "Payout amount must be nonzero", 10e18, address(USDC));
+        actor.doExpectingFailure(address(fresh), "redeem", "Payout amount must be nonzero", 10e18, address(USDC));
         require(USDST.balanceOf(address(actor)) == 10e18, "Rejected 100% burn fee should not pull USDST");
         require(USDST.allowance(address(actor), address(fresh)) == 10e18, "Rejected 100% burn fee should preserve allowance");
-        require(fresh.pendingRedemptions(address(USDC)) == 0, "Rejected 100% burn fee should not reserve liquidity");
-    }
-
-    function it_psm_pending_redemptions_track_live_requests_across_lifecycle() {
-        DirectMintPSM fresh = _newInitializedPsm(0);
-        User actor = new User();
-        admin.doSuccessfully(address(USDC), "mint", address(actor), 45e18);
-
-        actor.doSuccessfully(address(USDC), "approve", address(fresh), 45e18);
-        actor.doSuccessfully(address(fresh), "mint", 45e18, address(USDC));
-        actor.doSuccessfully(address(USDST), "approve", address(fresh), 45e18);
-
-        actor.doSuccessfully(address(fresh), "requestBurn", 10e18, address(USDC));
-        uint cancelId = fresh.burnReqCounter();
-        actor.doSuccessfully(address(fresh), "requestBurn", 15e18, address(USDC));
-        uint completeId = fresh.burnReqCounter();
-        actor.doSuccessfully(address(fresh), "requestBurn", 20e18, address(USDC));
-        uint expireId = fresh.burnReqCounter();
-
-        require(fresh.pendingRedemptions(address(USDC)) == 45e18, "Pending should equal all live requests");
-        require(fresh.availableRedemptionLiquidity(address(USDC)) == 0, "All liquidity should be reserved");
-
-        actor.doSuccessfully(address(fresh), "cancelBurn", cancelId);
-        require(fresh.pendingRedemptions(address(USDC)) == 35e18, "Cancel should release only canceled request");
-
-        actor.doSuccessfully(address(fresh), "completeBurn", completeId);
-        require(fresh.pendingRedemptions(address(USDC)) == 20e18, "Complete should release only completed request");
-
-        fastForward(7 * 24 * 60 * 60);
-        admin.doSuccessfully(address(fresh), "clearExpiredBurnRequest", expireId);
-        require(fresh.pendingRedemptions(address(USDC)) == 0, "Expired owner cancel should release final request");
-        require(fresh.availableRedemptionLiquidity(address(USDC)) == 30e18, "Completed payout should be the only spent liquidity");
-    }
-
-    function it_psm_burn_delay_changes_apply_to_existing_requests() {
-        DirectMintPSM fresh = _newInitializedPsm(7 * 24 * 60 * 60);
-        User actor = new User();
-        admin.doSuccessfully(address(USDC), "mint", address(actor), 10e18);
-
-        actor.doSuccessfully(address(USDC), "approve", address(fresh), 10e18);
-        actor.doSuccessfully(address(fresh), "mint", 10e18, address(USDC));
-        actor.doSuccessfully(address(USDST), "approve", address(fresh), 10e18);
-        actor.doSuccessfully(address(fresh), "requestBurn", 10e18, address(USDC));
-        uint requestId = fresh.burnReqCounter();
-
-        actor.doExpectingFailure(address(fresh), "completeBurn", "Burn delay not passed", requestId);
-        admin.doSuccessfully(address(fresh), "setBurnDelay", address(USDC), 0);
-        actor.doSuccessfully(address(fresh), "completeBurn", requestId);
-        require(fresh.pendingRedemptions(address(USDC)) == 0, "Delay reduction should allow existing request to complete");
-    }
-
-    function it_psm_burn_fee_is_locked_at_request_time() {
-        DirectMintPSM fresh = _newInitializedPsm(0);
-        User actor = new User();
-        admin.doSuccessfully(address(USDC), "mint", address(actor), 100e18);
-
-        actor.doSuccessfully(address(USDC), "approve", address(fresh), 100e18);
-        actor.doSuccessfully(address(fresh), "mint", 100e18, address(USDC));
-        admin.doSuccessfully(address(fresh), "setBurnFeeBps", address(USDC), 100);
-
-        uint userUsdcBefore = USDC.balanceOf(address(actor));
-        uint collectorUsdcBefore = USDC.balanceOf(address(m.feeCollector()));
-
-        actor.doSuccessfully(address(USDST), "approve", address(fresh), 100e18);
-        actor.doSuccessfully(address(fresh), "requestBurn", 100e18, address(USDC));
-        uint requestId = fresh.burnReqCounter();
-        admin.doSuccessfully(address(fresh), "setBurnFeeBps", address(USDC), 500);
-        actor.doSuccessfully(address(fresh), "completeBurn", requestId);
-
-        require(USDC.balanceOf(address(actor)) == userUsdcBefore + 99e18, "Completion should pay request-time payout");
-        require(USDC.balanceOf(address(m.feeCollector())) == collectorUsdcBefore + 1e18, "Completion should collect request-time fee");
-    }
-
-    function it_psm_cancel_fails_when_mintable_token_is_paused_without_transfer_whitelist() {
-        DirectMintPSM fresh = _newInitializedPsm(0);
-        User actor = new User();
-        admin.doSuccessfully(address(USDC), "mint", address(actor), 10e18);
-
-        actor.doSuccessfully(address(USDC), "approve", address(fresh), 10e18);
-        actor.doSuccessfully(address(fresh), "mint", 10e18, address(USDC));
-        actor.doSuccessfully(address(USDST), "approve", address(fresh), 10e18);
-        actor.doSuccessfully(address(fresh), "requestBurn", 10e18, address(USDC));
-        uint requestId = fresh.burnReqCounter();
-
-        admin.doSuccessfully(address(USDST), "pause");
-        actor.doExpectingFailure(address(fresh), "cancelBurn", "not whitelisted", requestId);
-        require(fresh.pendingRedemptions(address(USDC)) == 10e18, "Failed paused cancel should keep reservation");
-
-        admin.doSuccessfully(address(USDST), "unpause");
-        actor.doSuccessfully(address(fresh), "cancelBurn", requestId);
-        require(fresh.pendingRedemptions(address(USDC)) == 0, "Unpaused cancel should release reservation");
+        require(USDC.balanceOf(address(fresh)) == 10e18, "Rejected 100% burn fee should not pay out USDC");
     }
 
     function it_psm_rejects_zero_fee_collector_and_self_collector_breaks_fee_flows() {
-        DirectMintPSM fresh = _newInitializedPsm(0);
+        DirectMintPSM fresh = _newInitializedPsm();
         User actor = new User();
         admin.doSuccessfully(address(USDC), "mint", address(actor), 20e18);
 
@@ -913,45 +518,285 @@ contract Describe_DirectMintPSM {
     }
 
     function it_psm_rejects_unauthorized_admin_controls_without_state_changes() {
-        DirectMintPSM fresh = _newInitializedPsm(0);
+        DirectMintPSM fresh = _newInitializedPsm();
         User outsider = new User();
 
         outsider.doExpectingFailure(address(fresh), "pauseMint", "Only an admin or a whitelisted account can call castVoteOnIssue");
         outsider.doExpectingFailure(address(fresh), "pauseBurn", "Only an admin or a whitelisted account can call castVoteOnIssue");
         outsider.doExpectingFailure(address(fresh), "setFeeCollector", "Only an admin or a whitelisted account can call castVoteOnIssue", address(m.feeCollector()));
-        outsider.doExpectingFailure(address(fresh), "clearExpiredBurnRequest", "Only an admin or a whitelisted account can call castVoteOnIssue", 1);
+        outsider.doExpectingFailure(address(fresh), "setBurnMinReserve", "Only an admin or a whitelisted account can call castVoteOnIssue", address(USDC), 1e18);
 
         require(!fresh.mintPaused(), "Unauthorized pauseMint should not mutate state");
         require(!fresh.burnPaused(), "Unauthorized pauseBurn should not mutate state");
         require(address(fresh.feeCollector()) == address(m.feeCollector()), "Unauthorized fee collector change should not mutate state");
     }
 
-    function it_psm_liquidity_reservation_can_block_other_users_until_cancelled() {
-        DirectMintPSM fresh = _newInitializedPsm(24 * 60 * 60);
-        User reserver = new User();
-        User victim = new User();
+    function it_psm_redeem_leaves_no_escrow_or_request_state() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        User redeemer = new User();
 
-        admin.doSuccessfully(address(USDC), "mint", address(reserver), 100e18);
-        reserver.doSuccessfully(address(USDC), "approve", address(fresh), 100e18);
-        reserver.doSuccessfully(address(fresh), "mint", 100e18, address(USDC));
+        admin.doSuccessfully(address(USDC), "mint", address(redeemer), 100e18);
+        redeemer.doSuccessfully(address(USDC), "approve", address(fresh), 100e18);
+        redeemer.doSuccessfully(address(fresh), "mint", 100e18, address(USDC));
 
-        admin.doSuccessfully(address(USDST), "mint", address(victim), 1e18);
+        redeemer.doSuccessfully(address(USDST), "approve", address(fresh), 100e18);
+        redeemer.doSuccessfully(address(fresh), "redeem", 40e18, address(USDC));
 
-        reserver.doSuccessfully(address(USDST), "approve", address(fresh), 100e18);
-        reserver.doSuccessfully(address(fresh), "requestBurn", 100e18, address(USDC));
-        uint reserverRequestId = fresh.burnReqCounter();
-        require(fresh.availableRedemptionLiquidity(address(USDC)) == 0, "Reservation should consume all available liquidity");
+        // Nothing is held back mid-flight: the PSM never holds the mintable token.
+        require(USDST.balanceOf(address(fresh)) == 0, "PSM should hold no USDST after redeem");
+        require(USDC.balanceOf(address(fresh)) == 60e18, "PSM should hold only unredeemed backing");
+        require(fresh.availableRedemptionLiquidity(address(USDC)) == 60e18, "Available liquidity should equal the remaining balance");
 
-        victim.doSuccessfully(address(USDST), "approve", address(fresh), 1e18);
-        victim.doExpectingFailure(address(fresh), "requestBurn", "Insufficient liquidity", 1e18, address(USDC));
+        // A second redeem from the same approval works without any intermediate step.
+        redeemer.doSuccessfully(address(fresh), "redeem", 60e18, address(USDC));
+        require(USDC.balanceOf(address(redeemer)) == 100e18, "Redeemer should recover the full backing");
+        require(USDST.balanceOf(address(redeemer)) == 0, "Redeemer should have burned all USDST");
+        require(fresh.availableRedemptionLiquidity(address(USDC)) == 0, "PSM should be fully drained");
+    }
 
-        reserver.doSuccessfully(address(fresh), "cancelBurn", reserverRequestId);
-        require(fresh.availableRedemptionLiquidity(address(USDC)) == 100e18, "Cancel should restore liquidity for other users");
+    function it_psm_redeem_honours_min_reserve_precisely() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        User redeemer = new User();
 
-        victim.doSuccessfully(address(fresh), "requestBurn", 1e18, address(USDC));
-        uint victimRequestId = fresh.burnReqCounter();
-        require(fresh.pendingRedemptions(address(USDC)) == 1e18, "Victim should reserve liquidity after blocker cancels");
-        victim.doSuccessfully(address(fresh), "cancelBurn", victimRequestId);
+        admin.doSuccessfully(address(USDC), "mint", address(redeemer), 100e18);
+        redeemer.doSuccessfully(address(USDC), "approve", address(fresh), 100e18);
+        redeemer.doSuccessfully(address(fresh), "mint", 100e18, address(USDC));
+
+        // 1% redeem fee, and 40 USDC that must stay in the PSM.
+        admin.doSuccessfully(address(fresh), "setBurnConfig", address(USDC), true, 40e18, 100);
+        require(fresh.availableRedemptionLiquidity(address(USDC)) == 60e18, "minReserve should withhold 40 USDC");
+
+        uint collectorBefore = USDC.balanceOf(address(m.feeCollector()));
+
+        redeemer.doSuccessfully(address(USDST), "approve", address(fresh), 100e18);
+        redeemer.doExpectingFailure(address(fresh), "redeem", "Insufficient liquidity", 61e18, address(USDC));
+
+        redeemer.doSuccessfully(address(fresh), "redeem", 60e18, address(USDC));
+
+        require(USDC.balanceOf(address(redeemer)) == 59400000000000000000, "Redeemer should receive 60 USDC less 1% fee");
+        require(USDC.balanceOf(address(m.feeCollector())) == collectorBefore + 600000000000000000, "Fee should reach the FeeCollector");
+        require(USDC.balanceOf(address(fresh)) == 40e18, "PSM should retain exactly minReserve");
+        require(USDST.balanceOf(address(redeemer)) == 40e18, "Only the redeemed USDST should be burned");
+    }
+
+    function _newVault() internal returns (SaveUSDSTVault vault) {
+        _ensureAuthorizableAdmin();
+        vault = SaveUSDSTVault(address(new Proxy(address(new SaveUSDSTVault(address(0xdeadbeef))), address(m.adminRegistry()))));
+        admin.doSuccessfully(address(vault), "initialize", address(USDST), "Save USDST", "saveUSDST");
+    }
+
+    function it_psm_mint_and_save_delivers_shares_instead_of_usdst() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        SaveUSDSTVault vault = _newVault();
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(vault));
+        require(fresh.savingsVault() == address(vault), "PSM should record the savings vault");
+        require(fresh.savingsDepositAvailable(100e18), "Savings deposit should be available");
+
+        User saver = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(saver), 100e18);
+        saver.doSuccessfully(address(USDC), "approve", address(fresh), 100e18);
+        saver.doSuccessfully(address(fresh), "mintAndSave", 100e18, address(USDC));
+
+        // The user ends up holding shares, never the underlying.
+        require(USDST.balanceOf(address(saver)) == 0, "Saver should receive shares, not USDST");
+        require(vault.balanceOf(address(saver)) == 100e18, "Saver should hold 100 saveUSDST");
+
+        // The vault custodies the freshly minted USDST.
+        require(USDST.balanceOf(address(vault)) == 100e18, "Vault should custody the USDST");
+        require(vault.totalAssets() == 100e18, "Vault should account for the deposit");
+
+        // The PSM keeps the collateral and retains nothing else.
+        require(USDC.balanceOf(address(fresh)) == 100e18, "PSM should hold the collateral");
+        require(USDST.balanceOf(address(fresh)) == 0, "PSM should not retain USDST");
+        require(USDST.allowance(address(fresh), address(vault)) == 0, "PSM should leave no standing allowance");
+    }
+
+    function it_psm_mint_and_save_applies_mint_fee_before_depositing() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        SaveUSDSTVault vault = _newVault();
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(vault));
+        admin.doSuccessfully(address(fresh), "setMintFeeBps", address(USDC), 100);
+
+        uint collectorBefore = USDC.balanceOf(address(m.feeCollector()));
+
+        User saver = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(saver), 100e18);
+        saver.doSuccessfully(address(USDC), "approve", address(fresh), 100e18);
+        saver.doSuccessfully(address(fresh), "mintAndSave", 100e18, address(USDC));
+
+        // Only the net amount reaches the vault.
+        require(vault.balanceOf(address(saver)) == 99e18, "Saver should hold shares for the net mint");
+        require(USDST.balanceOf(address(vault)) == 99e18, "Vault should custody only the net USDST");
+        require(USDC.balanceOf(address(m.feeCollector())) == collectorBefore + 1e18, "Mint fee should reach the FeeCollector");
+        require(USDC.balanceOf(address(fresh)) == 99e18, "PSM should keep net backing");
+    }
+
+    function it_psm_mint_and_save_prices_shares_at_the_live_exchange_rate() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        SaveUSDSTVault vault = _newVault();
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(vault));
+
+        User first = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(first), 100e18);
+        first.doSuccessfully(address(USDC), "approve", address(fresh), 100e18);
+        first.doSuccessfully(address(fresh), "mintAndSave", 100e18, address(USDC));
+        require(vault.balanceOf(address(first)) == 100e18, "First saver should mint 1:1");
+
+        // Double the vault's assets, so one share is now worth two USDST.
+        admin.doSuccessfully(address(USDST), "mint", address(vault), 100e18);
+        admin.doSuccessfully(address(vault), "recordRewardTransfer", 100e18);
+        require(vault.totalAssets() == 200e18, "Vault should credit the reward");
+        require(vault.previewDeposit(100e18) == 50e18, "Deposits should now price at 2:1");
+
+        User second = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(second), 100e18);
+        second.doSuccessfully(address(USDC), "approve", address(fresh), 100e18);
+        second.doSuccessfully(address(fresh), "mintAndSave", 100e18, address(USDC));
+
+        require(vault.balanceOf(address(second)) == 50e18, "Second saver should receive rate-adjusted shares");
+        require(vault.balanceOf(address(first)) == 100e18, "First saver's shares should be undiluted");
+        require(USDST.balanceOf(address(fresh)) == 0, "PSM should not retain USDST across deposits");
+    }
+
+    function it_psm_savings_availability_prices_pending_accrual() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        SaveUSDSTVault vault = _newVault();
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(vault));
+
+        User saver = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(saver), 100e18);
+        saver.doSuccessfully(address(USDC), "approve", address(fresh), 100e18);
+        saver.doSuccessfully(address(fresh), "mintAndSave", 100e18, address(USDC));
+
+        User distributor = new User();
+        admin.doSuccessfully(address(USDST), "mint", address(distributor), 100e18);
+        distributor.doSuccessfully(address(USDST), "approve", address(vault), 100e18);
+        admin.doSuccessfully(address(vault), "setRewardDistributor", address(distributor));
+        admin.doSuccessfully(address(vault), "setPerSecondSavingsRate", 1000000021979553151239153027);
+        fastForward(1);
+
+        require(vault.previewDeposit(1) == 1, "Realized preview should still be 1:1");
+        (, uint fundedAmount) = vault.pendingAccrual();
+        require(fundedAmount > 0, "Expected funded pending accrual");
+        require(!fresh.savingsDepositAvailable(1), "Projected zero-share deposit should be unavailable");
+
+        User dustSaver = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(dustSaver), 1);
+        dustSaver.doSuccessfully(address(USDC), "approve", address(fresh), 1);
+        dustSaver.doExpectingFailure(address(fresh), "mintAndSave", "Savings deposit unavailable", 1, address(USDC));
+
+        require(USDC.balanceOf(address(dustSaver)) == 1, "Rejected save should preserve collateral");
+        require(USDC.allowance(address(dustSaver), address(fresh)) == 1, "Rejected save should preserve allowance");
+        require(vault.balanceOf(address(dustSaver)) == 0, "Rejected save should mint no shares");
+    }
+
+    function it_psm_plain_mint_still_delivers_usdst_when_a_vault_is_set() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        SaveUSDSTVault vault = _newVault();
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(vault));
+
+        User minter = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(minter), 50e18);
+        minter.doSuccessfully(address(USDC), "approve", address(fresh), 50e18);
+        minter.doSuccessfully(address(fresh), "mint", 50e18, address(USDC));
+
+        // Configuring a vault must not change the default mint path.
+        require(USDST.balanceOf(address(minter)) == 50e18, "Plain mint should still deliver USDST");
+        require(vault.balanceOf(address(minter)) == 0, "Plain mint should not mint shares");
+        require(vault.totalAssets() == 0, "Plain mint should not touch the vault");
+    }
+
+    function it_psm_mint_and_save_requires_a_configured_vault() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        require(!fresh.savingsDepositAvailable(10e18), "Savings should be unavailable with no vault");
+
+        User saver = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(saver), 20e18);
+        saver.doSuccessfully(address(USDC), "approve", address(fresh), 20e18);
+
+        saver.doExpectingFailure(address(fresh), "mintAndSave", "Savings deposit unavailable", 10e18, address(USDC));
+
+        require(USDC.balanceOf(address(saver)) == 20e18, "Rejected save should not pull collateral");
+        require(USDC.balanceOf(address(fresh)) == 0, "Rejected save should not bank collateral");
+        require(USDST.balanceOf(address(saver)) == 0, "Rejected save should not mint USDST");
+    }
+
+    function it_psm_mint_and_save_reverts_and_rolls_back_when_vault_is_paused() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        SaveUSDSTVault vault = _newVault();
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(vault));
+
+        User saver = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(saver), 20e18);
+        saver.doSuccessfully(address(USDC), "approve", address(fresh), 20e18);
+
+        admin.doSuccessfully(address(vault), "pause");
+        require(!fresh.savingsDepositAvailable(10e18), "Paused vault should report unavailable");
+        saver.doExpectingFailure(address(fresh), "mintAndSave", "Savings deposit unavailable", 10e18, address(USDC));
+
+        // The collateral pull and the USDST mint both unwind with the deposit.
+        require(USDC.balanceOf(address(saver)) == 20e18, "Paused save should not pull collateral");
+        require(USDC.balanceOf(address(fresh)) == 0, "Paused save should not bank collateral");
+        require(USDST.balanceOf(address(fresh)) == 0, "Paused save should not leave USDST in the PSM");
+        require(USDST.balanceOf(address(vault)) == 0, "Paused save should not reach the vault");
+
+        admin.doSuccessfully(address(vault), "unpause");
+        saver.doSuccessfully(address(fresh), "mintAndSave", 10e18, address(USDC));
+        require(vault.balanceOf(address(saver)) == 10e18, "Save should succeed once the vault is unpaused");
+    }
+
+    function it_psm_set_savings_vault_validates_asset_and_can_be_cleared() {
+        DirectMintPSM fresh = _newInitializedPsm();
+
+        // A vault over a different asset is rejected outright.
+        Token OTHER = _createActiveToken("Other Stable", "OTHER", 18);
+        SaveUSDSTVault wrongVault = SaveUSDSTVault(address(new Proxy(address(new SaveUSDSTVault(address(0xdeadbeef))), address(m.adminRegistry()))));
+        admin.doSuccessfully(address(wrongVault), "initialize", address(OTHER), "Other Vault", "saveOTHER");
+        admin.doExpectingFailure(address(fresh), "setSavingsVault", "Vault asset mismatch", address(wrongVault));
+        require(fresh.savingsVault() == address(0), "Rejected vault should not be recorded");
+
+        // The matching vault is accepted, then cleared with the zero address.
+        SaveUSDSTVault vault = _newVault();
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(vault));
+        require(fresh.savingsVault() == address(vault), "Matching vault should be recorded");
+
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(0));
+        require(fresh.savingsVault() == address(0), "Zero address should clear the vault");
+        require(!fresh.savingsDepositAvailable(10e18), "Cleared vault should report unavailable");
+
+        User outsider = new User();
+        outsider.doExpectingFailure(address(fresh), "setSavingsVault", "Only an admin or a whitelisted account can call castVoteOnIssue", address(vault));
+    }
+
+    function it_psm_mint_and_save_respects_mint_controls() {
+        DirectMintPSM fresh = _newInitializedPsm();
+        SaveUSDSTVault vault = _newVault();
+        admin.doSuccessfully(address(fresh), "setSavingsVault", address(vault));
+
+        User saver = new User();
+        admin.doSuccessfully(address(USDC), "mint", address(saver), 100e18);
+        saver.doSuccessfully(address(USDC), "approve", address(fresh), 100e18);
+
+        // The savings path shares every gate with the plain mint path.
+        admin.doSuccessfully(address(fresh), "pauseMint");
+        saver.doExpectingFailure(address(fresh), "mintAndSave", "Minting is paused", 10e18, address(USDC));
+        admin.doSuccessfully(address(fresh), "unpauseMint");
+
+        admin.doSuccessfully(address(fresh), "setMintEnabled", address(USDC), false);
+        saver.doExpectingFailure(address(fresh), "mintAndSave", "Minting for this token is disabled", 10e18, address(USDC));
+        admin.doSuccessfully(address(fresh), "setMintEnabled", address(USDC), true);
+
+        admin.doSuccessfully(address(fresh), "setMintMaxBalance", address(USDC), 10e18);
+        saver.doExpectingFailure(address(fresh), "mintAndSave", "Token balance cap exceeded", 20e18, address(USDC));
+        admin.doSuccessfully(address(fresh), "setMintMaxBalance", address(USDC), 0);
+
+        saver.doExpectingFailure(address(fresh), "mintAndSave", "Amount must be nonzero", 0, address(USDC));
+
+        require(vault.totalAssets() == 0, "No rejected save should reach the vault");
+        require(USDC.balanceOf(address(fresh)) == 0, "No rejected save should bank collateral");
+
+        saver.doSuccessfully(address(fresh), "mintAndSave", 20e18, address(USDC));
+        require(vault.balanceOf(address(saver)) == 20e18, "Save should succeed once controls allow it");
     }
 
 }

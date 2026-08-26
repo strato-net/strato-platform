@@ -187,6 +187,24 @@ const YIELD_VAULTS = [
     iconBg: "bg-emerald-500/15 dark:bg-emerald-400/15",
     iconColor: "text-emerald-600 dark:text-emerald-400",
   },
+  {
+    key: "goldst-yield",
+    name: "GOLDST Yield Vault",
+    subtitle: "Deposit GOLDST and earn Reward Points",
+    asset: "GOLDST",
+    badge: "Yield Vault",
+    iconBg: "bg-amber-500/15 dark:bg-amber-400/15",
+    iconColor: "text-amber-600 dark:text-amber-400",
+  },
+  {
+    key: "silvst-yield",
+    name: "SILVST Yield Vault",
+    subtitle: "Deposit SILVST and earn Reward Points",
+    asset: "SILVST",
+    badge: "Yield Vault",
+    iconBg: "bg-slate-500/15 dark:bg-slate-400/15",
+    iconColor: "text-slate-600 dark:text-slate-400",
+  },
 ] as const;
 
 const Earn = () => {

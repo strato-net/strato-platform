@@ -63,4 +63,67 @@ ALTER TABLE tracking_sessions
   ADD COLUMN geo_lon     DOUBLE PRECISION;
 `,
   },
+  {
+    // source becomes the general channel (LinkedIn, X, website, …);
+    // full_source keeps the specific detail. Existing free-form values are
+    // detail, not channel, so they seed full_source.
+    name: "003_source_split",
+    sql: `
+ALTER TABLE tracking_links ADD COLUMN full_source TEXT;
+UPDATE tracking_links SET full_source = source;
+`,
+  },
+  {
+    // The daily snapshot scans today's and yesterday's sessions across ALL
+    // links; the existing index leads with link_id, so it can't serve those
+    // time-only ranges.
+    name: "004_metrics_indexes",
+    sql: `
+CREATE INDEX tracking_sessions_opened_at_idx ON tracking_sessions (opened_at);
+`,
+  },
+  {
+    // Diagnosing "why is this link at zero?": bot_reason records WHY a visit
+    // was filtered (or which ambiguous token a real browser overrode), and
+    // session_source records how a wallet connection found its session
+    // (cookie, stid param/header, or the same-IP fallback). The partial index
+    // serves that fallback lookup.
+    name: "005_session_diagnostics",
+    sql: `
+ALTER TABLE tracking_sessions ADD COLUMN bot_reason TEXT;
+ALTER TABLE wallet_connections ADD COLUMN session_source TEXT;
+CREATE INDEX tracking_sessions_ip_opened_idx
+  ON tracking_sessions (ip_address, opened_at DESC)
+  WHERE ip_address IS NOT NULL AND NOT is_bot_or_preview;
+`,
+  },
+  {
+    // PostHog session IDs join anonymous product behavior to a wallet without
+    // sending the wallet address to PostHog. This table is independent of
+    // tracking-link sessions so direct app traffic is measurable too.
+    name: "006_posthog_wallet_connections",
+    sql: `
+CREATE TABLE posthog_wallet_connections (
+  id                      BIGSERIAL   PRIMARY KEY,
+  posthog_session_id      UUID        NOT NULL,
+  posthog_distinct_id     TEXT,
+  external_wallet_address TEXT        NOT NULL DEFAULT '',
+  strato_address          TEXT        NOT NULL DEFAULT '',
+  connector               TEXT,
+  connected_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT posthog_wallet_connections_has_address
+    CHECK (external_wallet_address <> '' OR strato_address <> ''),
+  CONSTRAINT posthog_wallet_connections_dedup
+    UNIQUE (posthog_session_id, external_wallet_address, strato_address)
+);
+CREATE INDEX posthog_wallet_connections_ext_addr_idx
+  ON posthog_wallet_connections (external_wallet_address)
+  WHERE external_wallet_address <> '';
+CREATE INDEX posthog_wallet_connections_strato_addr_idx
+  ON posthog_wallet_connections (strato_address)
+  WHERE strato_address <> '';
+CREATE INDEX posthog_wallet_connections_connected_idx
+  ON posthog_wallet_connections (connected_at);
+`,
+  },
 ];

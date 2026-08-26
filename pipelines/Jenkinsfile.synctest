@@ -47,11 +47,12 @@ pipeline {
 
   post {
     always {
+      // Deliberately NO node teardown here. The node is left running after the
+      // pipeline finishes (on success or failure) so it can be inspected for
+      // debugging. Cleanup happens at the START of the next run: Prepare's
+      // reclaimDisk -> cleanNodeState, and each deployAndSync/verifySnapshotRestore
+      // begins with cleanNodeState.
       archiveArtifacts artifacts: 'mynode/logs/**', fingerprint: true, allowEmptyArchive: true
-      sh '''#!/bin/bash -le
-        strato-down mynode || true
-        pkill convoke || true
-      '''
     }
     success {
       slackSend (
@@ -287,10 +288,8 @@ def verifySnapshotRestore(String network, String archivePath, def snapshotBlock)
       error("Restored node block (${restoredBlock}) is far below the snapshot height (${snapshotBlock}); restore likely failed")
     }
 
-    // Tear the verification node down before moving on.
-    sh '''#!/bin/bash -le
-      strato-down mynode || true
-      pkill convoke || true
-    '''
+    // Deliberately NO teardown here: leave the restored node running for
+    // debugging. The next network's deployAndSync starts with cleanNodeState,
+    // and so does the next build's Prepare stage, so nothing is left dirty.
   }
 }

@@ -38,12 +38,12 @@ import qualified GHC.Generics as GHCG
 import Text.Format
 
 data SeqLoopEvent
-  = TimerFire PBFT.RoundNumber
+  = TimerFire PBFT.View
   | UnseqEvents [IngestEvent]
   deriving (Eq, Show, GHCG.Generic)
 
 instance Format SeqLoopEvent where
-  format (TimerFire rn) = "TimerFire " ++ format rn
+  format (TimerFire v) = "TimerFire " ++ format v
   format (UnseqEvents ev) = "UnseqEvents " ++ format ev
 
 class ShowConstructor a where

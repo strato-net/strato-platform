@@ -30,6 +30,8 @@ module Blockchain.Context
     , GenesisBlockHash(..)
     , PeerRunner
     , RemainingBlockHeaders(..)
+    , LastResync(..)
+    , HasResyncGate(..)
     , initConfig
     , initContext
     , runContextM
@@ -134,9 +136,17 @@ data Config = Config
     configRedisBlockDB             :: RBDB.RedisConnection,
     configContext                  :: IORef Context,
     configBlockstanbulWireMessages :: IORef (S.OSet Keccak256),
-    -- Shared per-process Kafka producer. Guarded by an MVar because milena's
-    -- KafkaState read-modify-write in execKafka is not atomic across threads.
-    configStreamEnv                :: MVar StreamEnv
+    -- Per-connection Kafka producer, swapped in by the peer runner. Guarded by
+    -- an MVar because milena's KafkaState read-modify-write in execKafka is not
+    -- atomic across threads. It must NOT be shared process-wide: that made one
+    -- lock serialize every peer's ToUnseq produces and starved block downloads.
+    configStreamEnv                :: MVar StreamEnv,
+    -- Process-wide, unlike the caches in Context. "Which block does the
+    -- sequencer still need" is one node-wide fact, so the answer must be
+    -- shared: when it was per-connection, a single gap made EVERY connection
+    -- fetch the same 500-block range (measured: one range pulled 113 times by
+    -- 113 different peer threads, 8.7x total duplication).
+    configLastResync               :: IORef LastResync
   }
 
 newtype ActionTimestamp = ActionTimestamp {unActionTimestamp :: Maybe UTCTime}
@@ -145,6 +155,9 @@ emptyActionTimestamp :: ActionTimestamp
 emptyActionTimestamp = ActionTimestamp Nothing
 
 newtype RemainingBlockHeaders = RemainingBlockHeaders {unRemainingBlockHeaders :: [BlockHeader]}
+
+-- | Last missing-parent resync this connection asked for: (fetch number, when).
+newtype LastResync = LastResync {unLastResync :: Maybe (Integer, UTCTime)}
 
 newtype PeerAddress = PeerAddress {unPeerAddress :: Maybe Address}
 
@@ -245,7 +258,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (Reader
     RBDB.withRedisBlockDB getBestSequencedBlockInfo >>= \case
       Nothing -> do
         BestBlock s n <- Mod.get (Mod.Proxy @BestBlock)
-        return $ BestSequencedBlock s n []
+        return $ BestSequencedBlock s n [] [] 0
       Just bestSequencedBlock -> return bestSequencedBlock
   put _ bestSequencedBlock =
     RBDB.withRedisBlockDB (putBestSequencedBlockInfo bestSequencedBlock) >>= \case
@@ -331,12 +344,47 @@ instance MonadIO m => Mod.Modifiable ActionTimestamp (ReaderT Config m) where
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ActionTimestamp (ReaderT Config m) where
   access _ = Mod.get (Proxy @ActionTimestamp)
 
+-- Short, because only one connection now acts on a given gap: if that peer
+-- fails to deliver, this is how long before another one retries.
+resyncDebounce :: NominalDiffTime
+resyncDebounce = 5
+
+-- | Node-wide gate for gossip-driven resync requests.
+--
+-- Deliberately NOT a 'Mod.Modifiable': that only offers get and put, and a
+-- get-then-put cannot express this. Every connection is handed the same
+-- sequencer event at the same moment, so with a read and a write as separate
+-- steps a whole batch of threads reads the stale value and every one of them
+-- decides it is the one to fetch. That is the bug this gate exists to prevent,
+-- so the decision and the update have to be a single atomic step.
+class HasResyncGate m where
+  -- | True at most once per (fetch number, 'resyncDebounce' window), across
+  -- all connections in the process.
+  tryResyncFrom :: Integer -> m Bool
+
+instance MonadIO m => HasResyncGate (ReaderT Config m) where
+  tryResyncFrom n = do
+    ref <- asks configLastResync
+    now <- liftIO getCurrentTime
+    liftIO . atomicModifyIORef' ref $ \old@(LastResync prev) ->
+      let stillFresh = case prev of
+            Just (n', t) -> n' == n && (now `diffUTCTime` t) < resyncDebounce
+            Nothing -> False
+       in if stillFresh
+            then (old, False)
+            else (LastResync (Just (n, now)), True)
+
 instance MonadIO m => Mod.Modifiable [BlockHeader] (ReaderT Config m) where
   get _ = do
     (bHeaders, lastUpdateTS) <- blockHeaders <$> Mod.get (Proxy @Context)
     now <- liftIO getCurrentTime
     let diffTime = now `diffUTCTime` lastUpdateTS
-    if diffTime > fromIntegral (Conf.connectionTimeout (p2pConfig ethConf))
+    -- The in-flight body-request set gates ALL body fetching node-wide
+    -- (isBodyRequestActive), so a request wedged on an unresponsive peer must
+    -- self-heal quickly. This was previously gated on connectionTimeout
+    -- (default 3600s), letting one bad peer freeze block downloads for an
+    -- hour; 60s is comfortably above any honest body-response round trip.
+    if diffTime > 60
       then do
         -- stale cache; override it
         Mod.put (Proxy @[BlockHeader]) []
@@ -408,6 +456,7 @@ instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Host, UDPPort, B.ByteStr
 type MonadP2P m =
   ( MonadIO m,
     MonadLogger m,
+    HasResyncGate m,
     MonadResource m,
     MonadUnliftIO m,
     HasVault m,
@@ -496,12 +545,14 @@ initConfig wireMessagesRef = do
   let k = Conf.streamingConfig ethConf
   streamEnv <- createStreamEnv "strato-p2p" (Conf.streamingHost k, Conf.streamingPort k)
   streamEnvVar <- newMVar streamEnv
+  lastResyncRef <- newIORef $ LastResync Nothing
   return $ Config
     { configSQLDB = sqlDB' dbs
     , configRedisBlockDB = RBDB.RedisConnection redisBDBPool
     , configContext = initStateF
     , configBlockstanbulWireMessages = wireMessagesRef
     , configStreamEnv = streamEnvVar
+    , configLastResync = lastResyncRef
     }
 
 initContext :: MonadIO m => m Context
