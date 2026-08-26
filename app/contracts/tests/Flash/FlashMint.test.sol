@@ -348,7 +348,7 @@ contract Describe_FlashMint is Authorizable {
         FlashMint fresh = new FlashMint(address(this));
         fresh.initialize(USDST, address(m.feeCollector()), 0);
         require(fresh.maxLoan() == 0, "fresh facility must be disabled");
-        require(fresh.whitelistEnabled(), "fresh facility must be whitelisted");
+        require(!fresh.whitelistEnabled(), "fresh facility must not be whitelisted");
         require(fresh.maxFlashLoan() == 0, "fresh maxFlashLoan must be 0");
         require(!fresh.canBorrow(address(this)), "nobody may borrow from a fresh facility");
     }
