@@ -662,7 +662,7 @@ const StratoStats = () => {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} yield vault fees
+                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} yield vault net revenue (sweeps minus savings funding)
                       </p>
                       {!revenueLoading && BigInt(yieldVaultPendingRevenue || '0') > 0n && (
                         <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
