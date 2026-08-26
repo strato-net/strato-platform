@@ -65,13 +65,13 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
   };
 
   return (
-    <header className="bg-background border-b border-border py-4 px-4 md:px-6 flex items-center justify-between">
-      <div className="flex items-center gap-2 md:gap-3">
+    <header className="bg-background border-b border-border py-4 px-4 md:px-6 flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2 md:gap-3 min-w-0">
         {/* Back button for non-portfolio pages - redirects based on origin or to Portfolio */}
         {!isPortfolioPage && (
           <button 
             onClick={handleBackClick}
-            className="flex items-center justify-center p-1 hover:bg-muted rounded-md transition-colors"
+            className="flex items-center justify-center p-1 hover:bg-muted rounded-md transition-colors shrink-0"
           >
             <ChevronLeft size={20} className="text-muted-foreground" />
           </button>
@@ -79,28 +79,28 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
         {/* Logo on mobile - tapping redirects to Portfolio */}
         <button 
           onClick={() => navigate('/dashboard')}
-          className="md:hidden focus:outline-none"
+          className="md:hidden focus:outline-none shrink-0"
         >
           <img 
             src={resolvedTheme === 'dark' ? STRATOICONDARK : STRATOICON} 
             alt="STRATO" 
-            className="h-8" 
+            className="h-8 w-auto" 
           />
         </button>
-        <div className="flex flex-col">
-          <h1 className="text-base md:text-xl font-bold whitespace-nowrap">{title}</h1>
+        <div className="flex flex-col min-w-0">
+          <h1 className="text-base md:text-xl font-bold truncate">{title}</h1>
           {subtitle && (
-            <p className="text-xs md:text-sm text-muted-foreground">{subtitle}</p>
+            <p className="text-xs md:text-sm text-muted-foreground truncate">{subtitle}</p>
           )}
         </div>
         {isTestnet && (
-          <span className="bg-orange-500 text-white px-2 py-1 rounded text-xs font-bold uppercase hidden sm:inline-block">
+          <span className="bg-orange-500 text-white px-2 py-1 rounded text-xs font-bold uppercase hidden sm:inline-block shrink-0">
             TESTNET
           </span>
         )}
       </div>
 
-      <div className="flex items-center gap-2 md:gap-3">
+      <div className="flex items-center gap-2 md:gap-3 shrink-0">
         {isLoggedIn && <LiquidationNotification />}
         <ModeToggle />
         
