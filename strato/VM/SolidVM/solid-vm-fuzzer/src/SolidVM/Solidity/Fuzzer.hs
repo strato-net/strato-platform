@@ -20,7 +20,7 @@ import BlockApps.Logging
 import Blockchain.MemVMContext
 import Blockchain.SolidVM.Simple hiding (runningTests)
 import Blockchain.Strato.Model.Address
-import Blockchain.VMContext (VMBase, runningTests)
+import Blockchain.VMContext (VMBase, runningTests, vmGasCap)
 import Control.Lens
 import Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
@@ -101,7 +101,9 @@ runFuzzerWithHook dSettings compile src hook = compile src >>= \case
     let args = FuzzerArgs src "" [] "" [] Nothing
     ctx <- FuzzerContext args <$> newIORef (error "_fuzzerContextBlockHeader not initialized")
     runNoLoggingT . evalMemContextM dSettings . flip runReaderT ctx $ do
-      lift . modify' $ runningTests .~ True
+      -- Match Simple.hs create/call allotment (100M). Default vmGasCap follows
+      -- ethConf gasLimit (~1M) and would OOG the swap-math slope points.
+      lift . modify' $ (runningTests .~ True) . (vmGasCap .~ 100000000)
       let contractsInSourceOrder =
             sortBy (comparing (\(_, c') -> c' ^. contractContext . sourceAnnotationStart)) (M.toList $ _contracts cc)
        in fmap concat . for contractsInSourceOrder $ \(cName, c) ->

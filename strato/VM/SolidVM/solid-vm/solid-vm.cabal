@@ -17,6 +17,7 @@ library
       Blockchain.SolidVM.GasInfo
       Blockchain.SolidVM.Simple
       Blockchain.SolidVM.SM
+      Blockchain.SolidVM.FastUIntIR
       Blockchain.SolidVM.BLS12381
       Blockchain.SolidVM.BLS12381.Compress
       Blockchain.SolidVM.BLS12381.HashToCurve
@@ -97,6 +98,7 @@ test-suite solid-vm-spec
   other-modules:
       BLS12381Spec
       BuiltinsSpec
+      FastUIntIRSpec
       OptimizerSpec
       SolidVMSpec
       Spec
@@ -151,6 +153,26 @@ test-suite solid-vm-spec
     , unliftio
     , utf8-string
     , vm-tools
+  default-language: Haskell2010
+
+test-suite fast-uint-ir-spec
+  type: exitcode-stdio-1.0
+  main-is: FastUIntIRMain.hs
+  other-modules:
+      FastUIntIRSpec
+  hs-source-dirs:
+      tests/
+  ghc-options: -Wall
+  build-depends:
+      base
+    , containers
+    , hspec
+    , lens
+    , solid-vm
+    , solid-vm-compiler
+    , solid-vm-model
+    , text
+    , unliftio
   default-language: Haskell2010
 
 benchmark codebench

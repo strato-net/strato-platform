@@ -13,6 +13,7 @@ library:
     - Blockchain.SolidVM.GasInfo
     - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
+    - Blockchain.SolidVM.FastUIntIR
     # BLS12-381 internal modules. Exposed so the test target (and anyone
     # cross-checking against RFC 9380 vectors) can drive the pipeline
     # stages directly. Stable public API for bridge contracts is via the
@@ -134,6 +135,20 @@ tests:
       - utf8-string
       - vm-tools
       - ordered-containers
+
+  fast-uint-ir-spec:
+    source-dirs: tests/
+    main: FastUIntIRMain.hs
+    ghc-options: -Wall
+    dependencies:
+      - containers
+      - hspec
+      - lens
+      - solid-vm
+      - solid-vm-compiler
+      - solid-vm-model
+      - text
+      - unliftio
 
 benchmarks:
     codebench:

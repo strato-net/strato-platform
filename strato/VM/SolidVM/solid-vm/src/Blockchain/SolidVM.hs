@@ -42,9 +42,11 @@ import Blockchain.Data.Util (integer2Bytes)
 import qualified Blockchain.Database.MerklePatricia as MP
 import BlockApps.Solidity.ABI.Codec (abiDecode)
 import qualified Blockchain.SolidVM.Builtins as Builtins
+import Blockchain.DB.SolidStorageDB (getSolidStorageKeyVal', putSolidStorageKeyVal')
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
+import Blockchain.SolidVM.FastUIntIR (StorageHooks (..), runAnyStorageIR, runAnyUIntIR)
 import Blockchain.SolidVM.GasInfo
 import Blockchain.SolidVM.Metrics
 import Blockchain.SolidVM.SM
@@ -1087,6 +1089,13 @@ expToVar x = do
   decrementGas 1
   return v
 
+fastPureIntegerArg :: Value -> Maybe Integer
+fastPureIntegerArg (SInteger n) = Just n
+fastPureIntegerArg (SBool True) = Just 1
+fastPureIntegerArg (SBool False) = Just 0
+fastPureIntegerArg (SAddress a _) = Just (toInteger a)
+fastPureIntegerArg _ = Nothing
+
 decrementGas :: MonadSM m => Gas -> m ()
 decrementGas !gas = do
   gasInfo' <- Mod.modifyStatefully (Mod.Proxy @GasInfo) $ gasLeft -= gas
@@ -1540,13 +1549,21 @@ expToVar' (CC.FunctionCall _ e args) = do
       -- This avoids double-evaluation which could cause side effects
       argVarsRaw <- traverse expToVar args
       argVals <- argsToValsFromVars argVarsRaw
+      -- Scalar arguments are always copied into fresh callee variables. Only
+      -- memory arrays/structs use argVars for pass-by-reference. Empty argVars
+      -- on the scalar path is what lets FastUIntIR intercept inner uint helpers.
       -- Helium network ID = 114784819836269
       -- Pass-by-reference for memory arrays/structs is only enabled after fork block on helium
       -- Set to high value until network upgrade is coordinated
-      currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
-      let heliumPassByRefForkBlock = 33918 :: Integer
-      let passByRefEnabled = not (Conf.networkID (networkConfig ethConf) == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
-      let argVars = if passByRefEnabled then argVarsRaw else []
+      let hasMemoryComposite = any (\case SArray {} -> True; SStruct {} -> True; _ -> False) argVals
+      argVars <-
+        if not hasMemoryComposite
+          then pure []
+          else do
+            currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
+            let heliumPassByRefForkBlock = 33918 :: Integer
+                passByRefEnabled = not (Conf.networkID (networkConfig ethConf) == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
+            pure $ if passByRefEnabled then argVarsRaw else []
       case e of -- FunctionCall Special Case when calling a function via Member Access
         (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall e argVals argVars Nothing --Because of the hardcoded Util functions
         (CC.MemberAccess ctx' expr name) -> do
@@ -3064,7 +3081,187 @@ runTheCallWithVars ::
   Bool ->
   Bool ->
   m (Maybe Value)
-runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVals' argVars ro ff = do
+-- Fast uint/bool/address IR: no by-ref vars, tracing off, every argument
+-- lowers. Pure uint programs run in ST; mapping/msg.sender/event programs
+-- run in SM via storage hooks. Anything else stays on the AST interpreter.
+runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVals' argVars ro ff
+  | null argVars
+  , not (Conf.svmTrace (Conf.debugConfig ethConf))
+  , Just args <- traverse fastPureIntegerArg argVals'
+  = case runAnyUIntIR cc contract' theFunction args of
+      Just (values, cost) -> do
+        decrementGas (Gas $ 5 + cost)
+        pure $ packFastIRResult theFunction values
+      Nothing -> do
+        let hooks = storageHooks address' ro contract' cc
+        runAnyStorageIR hooks cc contract' theFunction args >>= \case
+          Just (values, cost) -> do
+            decrementGas (Gas $ 5 + cost)
+            pure $ packFastIRResult theFunction values
+          Nothing ->
+            runTheCallWithVarsInterpreted address' codeAddr contract' funcName hsh cc theFunction argVals' argVars ro ff
+runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVals' argVars ro ff =
+  runTheCallWithVarsInterpreted address' codeAddr contract' funcName hsh cc theFunction argVals' argVars ro ff
+
+packFastIRResult :: CC.Func -> [Integer] -> Maybe Value
+packFastIRResult func values =
+  case (CC._funcVals func, values) of
+    (_, []) -> Nothing
+    ([(_, CC.IndexedType _ SVMType.Bool _)], [v]) -> Just $ SBool (v /= 0)
+    ([(_, CC.IndexedType _ ty _)], [v]) | isFastIRAddressType ty ->
+      Just $ SAddress (fromInteger v) False
+    (_, [v]) -> Just $ SInteger v
+    (_, vs) -> Just . STuple . V.fromList $ Constant . SInteger <$> vs
+  where
+    isFastIRAddressType (SVMType.Address {}) = True
+    isFastIRAddressType (SVMType.Contract {}) = True
+    isFastIRAddressType (SVMType.UnknownLabel {}) = True
+    isFastIRAddressType (SVMType.UserDefined _ t) = isFastIRAddressType t
+    isFastIRAddressType _ = False
+
+storageHooks :: MonadSM m => Address -> Bool -> CC.Contract -> CC.CodeCollection -> StorageHooks m
+storageHooks callee ro contract cc =
+  StorageHooks
+    { -- Same as AST `msg.sender`: Env.sender, which pushSender updates on
+      -- external calls. getCurrentAddress is `this` once a frame is already
+      -- on the stack (internal owner/modifier helpers).
+      shSender = toInteger . Env.sender <$> getEnv,
+      shMapGet = mapGet callee,
+      shMapSet = mapSet callee,
+      shMapGetAt = \addrInt mapName key isAddr -> mapGet (fromInteger addrInt) mapName key isAddr,
+      shMapSetAt = \addrInt mapName key val isAddr -> mapSet (fromInteger addrInt) mapName key val isAddr,
+      shMapGet2At = \addrInt mapName k1 ia1 k2 ia2 -> mapGet2 (fromInteger addrInt) mapName k1 ia1 k2 ia2,
+      shMapSet2At = \addrInt mapName k1 ia1 k2 val ia2 -> mapSet2 (fromInteger addrInt) mapName k1 ia1 k2 val ia2,
+      shSloadAddr = \field -> sloadAt (toInteger callee) field,
+      shSloadAt = sloadAt,
+      shSstore = \field val -> sstoreAt (toInteger callee) field val,
+      shSstoreAt = sstoreAt,
+      shThis = pure (toInteger callee),
+      shTimestamp =
+        round . utcTimeToPOSIXSeconds . BlockHeader.timestamp . Env.blockHeader <$> getEnv,
+      shNumber = BlockHeader.number . Env.blockHeader <$> getEnv,
+      shEmit = \eventName ints -> emitMany [(eventName, ints)],
+      shEmitMany = emitMany
+    }
+  where
+    lookupEv eventName nInts =
+      let hits c =
+            [ ev
+            | Just ev <- [M.lookup (stringToLabel eventName) (CC._events c)],
+              length (CC._eventLogs ev) == nInts
+            ]
+       in listToMaybe (hits contract ++ concatMap hits (M.elems (cc ^. CC.contracts)))
+    emitMany [] = pure ()
+    emitMany pairs = do
+      bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
+      tHash <- Env.txHash <$> getEnv
+      txSender <- Env.origin <$> getEnv
+      let contractName' = labelToString $ CC._contractName contract
+          addrStrs =
+            M.fromList
+              [ (n, show (fromInteger n :: Address))
+              | (eventName, ints) <- pairs,
+                Just ev <- [lookupEv eventName (length ints)],
+                (CC.EventLog _ _ (CC.IndexedType _ ty _), n) <- zip (CC._eventLogs ev) ints,
+                isAddrTy ty
+              ]
+          renderStr ty n
+            | isAddrTy ty = M.findWithDefault (show (fromInteger n :: Address)) n addrStrs
+            | ty == SVMType.Bool = if n /= 0 then "true" else "false"
+            | otherwise = show n
+      evs <- forM pairs $ \(eventName, ints) ->
+        case lookupEv eventName (length ints) of
+          Nothing -> missingType "no corresponding event has been declared" eventName
+          Just ev -> do
+            let logs = CC._eventLogs ev
+            guardEmit (length ints == length logs) eventName
+            let expVals = zipWith eventValue logs ints
+                expStrs = zipWith (\(CC.EventLog _ _ (CC.IndexedType _ ty _)) n -> renderStr ty n) logs ints
+                evArgs =
+                  zipWith3
+                    (\(CC.EventLog name _ (CC.IndexedType _ idxType _)) value valStr ->
+                       (T.unpack name, value, valStr, idxType))
+                    logs
+                    expVals
+                    expStrs
+            pure $ Event bHash tHash txSender contractName' callee eventName evArgs
+      addEvents evs
+    sloadAt addrInt field = do
+      v <- getSolidStorageKeyVal' (fromInteger addrInt) (MS.singleton $ BC.pack $ labelToString field)
+      pure $ case v of
+        MS.BAddress a -> toInteger a
+        MS.BContract _ a -> toInteger a
+        MS.BInteger i -> i
+        MS.BBool b -> if b then 1 else 0
+        MS.BEnumVal _ _ n -> toInteger n
+        _ -> 0
+    sstoreAt addrInt field val = do
+      when ro $
+        invalidWrite "Invalid write during read-only access" (labelToString field)
+      let addr = fromInteger addrInt
+          path = MS.singleton $ BC.pack $ labelToString field
+          b = MS.BInteger val
+      markDiffForAction addr path b
+      putSolidStorageKeyVal' addr path b
+    unpackInt v = case v of
+      MS.BInteger i -> i
+      MS.BBool b -> if b then 1 else 0
+      MS.BEnumVal _ _ n -> toInteger n
+      MS.BAddress a -> toInteger a
+      MS.BContract _ a -> toInteger a
+      _ -> 0
+    mapGet addr mapName key isAddr = do
+      v <- getSolidStorageKeyVal' addr (mapPath mapName key isAddr)
+      pure $ unpackInt v
+    mapSet addr mapName key val isAddr = do
+      when ro $
+        invalidWrite "Invalid write during read-only access" (labelToString mapName)
+      let path = mapPath mapName key isAddr
+          b = MS.BInteger val
+      markDiffForAction addr path b
+      putSolidStorageKeyVal' addr path b
+    mapPath mapName key isAddr =
+      MS.snoc
+        (MS.singleton $ BC.pack $ labelToString mapName)
+        (MS.Index $ BC.pack $ if isAddr then show (fromInteger key :: Address) else show key)
+    mapGet2 addr mapName k1 ia1 k2 ia2 = do
+      v <- getSolidStorageKeyVal' addr (mapPath2 mapName k1 ia1 k2 ia2)
+      pure $ unpackInt v
+    mapSet2 addr mapName k1 ia1 k2 val ia2 = do
+      when ro $
+        invalidWrite "Invalid write during read-only access" (labelToString mapName)
+      let path = mapPath2 mapName k1 ia1 k2 ia2
+          b = MS.BInteger val
+      markDiffForAction addr path b
+      putSolidStorageKeyVal' addr path b
+    mapPath2 mapName k1 ia1 k2 ia2 =
+      MS.snoc (mapPath mapName k1 ia1) (MS.Index $ BC.pack $ if ia2 then show (fromInteger k2 :: Address) else show k2)
+    eventValue (CC.EventLog _ _ (CC.IndexedType _ ty _)) n
+      | isAddrTy ty = SAddress (fromInteger n) False
+      | ty == SVMType.Bool = SBool (n /= 0)
+      | otherwise = SInteger n
+    isAddrTy (SVMType.Address {}) = True
+    isAddrTy (SVMType.UserDefined _ t) = isAddrTy t
+    isAddrTy _ = False
+    guardEmit True _ = pure ()
+    guardEmit False name =
+      invalidArguments "arguments to statement are inconsistent with those declared" name
+
+runTheCallWithVarsInterpreted ::
+  MonadSM m =>
+  Address ->
+  Address ->
+  CC.Contract ->
+  SolidString ->
+  Keccak256 ->
+  CC.CodeCollection ->
+  CC.Func ->
+  ValList ->
+  [Variable] ->
+  Bool ->
+  Bool ->
+  m (Maybe Value)
+runTheCallWithVarsInterpreted address' codeAddr contract' funcName hsh cc theFunction argVals' argVars ro ff = do
   decrementGas 5
   let !returnNamesAndTypes = [(n, t) | (Just n, CC.IndexedType _ t _) <- CC._funcVals theFunction]
       !theModifierNames = map fst $ (CC._funcModifiers theFunction)

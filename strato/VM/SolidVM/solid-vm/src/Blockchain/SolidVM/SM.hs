@@ -44,6 +44,7 @@ module Blockchain.SolidVM.SM
     getBlockHashWithNumber,
     getBSum,
     addEvent,
+    addEvents,
     renderValueShallow,
     addDelegatecall,
     getUsername,
@@ -984,14 +985,23 @@ markDiffForAction owner key' val' = do
     Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %= ins
 
 addEvent :: (MonadIO m, Mod.Modifiable (Q.Seq Event) m, Mod.Modifiable (Maybe VmTracer) m) => Event -> m ()
-addEvent newEvent = do
-  Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
+addEvent newEvent = addEvents [newEvent]
+
+-- One Seq splice for a whole call's events. Tracer work is skipped when off.
+addEvents :: (MonadIO m, Mod.Modifiable (Q.Seq Event) m, Mod.Modifiable (Maybe VmTracer) m) => [Event] -> m ()
+addEvents [] = pure ()
+addEvents newEvents = do
+  Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ \s -> pure (s <> Q.fromList newEvents)
   mTracer <- Mod.get (Mod.Proxy @(Maybe VmTracer))
-  traceAddLog mTracer $
-    TraceLog
-      (evContractAddress newEvent)
-      (T.pack $ evName newEvent)
-      [(T.pack n, T.pack v) | (n, _, v, _) <- evArgs newEvent]
+  case mTracer of
+    Nothing -> pure ()
+    Just _ ->
+      for_ newEvents $ \newEvent ->
+        traceAddLog mTracer $
+          TraceLog
+            (evContractAddress newEvent)
+            (T.pack $ evName newEvent)
+            [(T.pack n, T.pack v) | (n, _, v, _) <- evArgs newEvent]
 
 addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Keccak256 -> T.Text -> m ()
 addDelegatecall s c n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c n)
