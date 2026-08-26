@@ -93,8 +93,8 @@ createCommandsFile = do
   let baseCommands =
         [ "ethereum-discover +RTS -T -RTS"
         , "strato-p2p +RTS -T -RTS"
-        , "strato-sequencer +RTS -T -N1 -RTS"
-        , "vm-runner +RTS -T -I2 -N1 -RTS"
+        , "strato-sequencer +RTS -T -N4 -A128m -RTS"
+        , "vm-runner +RTS -T -I2 -N4 -A128m -RTS"
         , "strato-indexer"
         , "slipstream +RTS -T -RTS"
         , "strato-api +RTS -T -N -maxN4 -RTS"
