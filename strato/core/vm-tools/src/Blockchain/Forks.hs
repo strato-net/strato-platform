@@ -35,13 +35,10 @@ upquarkNetworkID = 33056204878082667
 heliumReceiptsRootForkBlock :: Integer
 heliumReceiptsRootForkBlock = 250000
 
-upquarkReceiptsRootForkBlock :: Integer
-upquarkReceiptsRootForkBlock = 250000
-
 isReceiptsRootForkActive :: Integer -> Bool
 isReceiptsRootForkActive blockNum =
   let net = Conf.networkID $ networkConfig ethConf
-   in not $ (net == upquarkNetworkID && blockNum < upquarkReceiptsRootForkBlock)
+   in not $ (net == upquarkNetworkID && blockNum < upquarkStakingForkBlock)
          || (net == heliumNetworkID  && blockNum < heliumReceiptsRootForkBlock)
 
 -- | Block from which the block-reward call's events are folded into the block's
@@ -59,10 +56,14 @@ isReceiptsRootForkActive blockNum =
 heliumStakingForkBlock :: Integer
 heliumStakingForkBlock = 300000
 
+upquarkStakingForkBlock :: Integer
+upquarkStakingForkBlock = 1000000
+
 isBlockRewardReceiptForkActive :: Integer -> Bool
 isBlockRewardReceiptForkActive blockNum =
   let conf = networkConfig ethConf
       switchAt
+        | Conf.networkID conf == upquarkNetworkID = upquarkStakingForkBlock
         | Conf.networkID conf == heliumNetworkID = heliumStakingForkBlock
         -- 'Nothing' means staking is live from genesis, so the fork is too.
         | otherwise = maybe 0 id (Conf.stakingActivationBlock conf)
