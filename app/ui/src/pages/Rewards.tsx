@@ -147,10 +147,16 @@ const Rewards = () => {
             onValueChange={(value) => setActiveTab(value as "activities" | "my-rewards" | "leaderboard")}
             className="w-full"
           >
-            <TabsList className="grid w-full grid-cols-3 mb-6">
-            <TabsTrigger value="activities">Activities (Season {state?.currentSeason || 3})</TabsTrigger>
-               <TabsTrigger value="my-rewards">My Active Positions</TabsTrigger>
-              <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3 mb-6 h-auto">
+              <TabsTrigger value="activities" className="text-xs md:text-sm py-2 px-1 md:px-3 whitespace-normal">
+                Activities (Season {state?.currentSeason || 3})
+              </TabsTrigger>
+              <TabsTrigger value="my-rewards" className="text-xs md:text-sm py-2 px-1 md:px-3 whitespace-normal">
+                My Active Positions
+              </TabsTrigger>
+              <TabsTrigger value="leaderboard" className="text-xs md:text-sm py-2 px-1 md:px-3">
+                Leaderboard
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="my-rewards">
