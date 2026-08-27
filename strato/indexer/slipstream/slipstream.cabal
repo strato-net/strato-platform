@@ -110,6 +110,7 @@ test-suite slipstream-batching-test
     , bytestring
     , common-log
     , conduit
+    , containers
     , evm-solidity
     , hspec
     , slipstream
