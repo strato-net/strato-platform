@@ -7,7 +7,7 @@
     "start": "ts-node src/index.ts",
     "dev": "nodemon src/index.ts",
     "build": "tsc",
-    "test": "npm run build && node --test dist/polling/alchemyPolling.test.js"
+    "test": "npm run build && node --test dist/polling/alchemyPolling.test.js dist/services/verificationService.test.js"
   },
   "engines": {
     "node": ">=22.12 <23.0"

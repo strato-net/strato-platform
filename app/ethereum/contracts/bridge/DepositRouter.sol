@@ -35,6 +35,8 @@ contract DepositRouter is
     // https://etherscan.io/address/0x000000000022d473030f116ddee9f6b43ac78ba3
     IPermit2 public PERMIT2;
 
+    // Deprecated storage name retained to preserve the proxy layout and legacy getter.
+    // The value is the ExternalBridgeVault custody destination.
     address public gnosisSafe;
     uint96 public depositId;
     // address(0) represents ETH configuration for depositETH()
@@ -95,6 +97,10 @@ contract DepositRouter is
         bool isPermitted
     );
     event GnosisSafeUpdated(address indexed oldSafe, address indexed newSafe);
+    event ExternalBridgeVaultUpdated(
+        address indexed oldVault,
+        address indexed newVault
+    );
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -103,12 +109,12 @@ contract DepositRouter is
 
     function initialize(
         address permit2_,
-        address gnosisSafe_,
+        address externalBridgeVault_,
         address owner_
     ) public initializer {
         if (
             owner_ == address(0) ||
-            gnosisSafe_ == address(0) ||
+            externalBridgeVault_ == address(0) ||
             permit2_ == address(0)
         ) revert InvalidAddress();
         __Ownable_init(owner_);
@@ -119,8 +125,9 @@ contract DepositRouter is
         // Set PERMIT2 once during initialization - this value persists across all upgrades
         PERMIT2 = IPermit2(permit2_);
 
-        gnosisSafe = gnosisSafe_;
-        emit GnosisSafeUpdated(address(0), gnosisSafe_);
+        gnosisSafe = externalBridgeVault_;
+        emit GnosisSafeUpdated(address(0), externalBridgeVault_);
+        emit ExternalBridgeVaultUpdated(address(0), externalBridgeVault_);
     }
 
     function deposit(
@@ -224,12 +231,12 @@ contract DepositRouter is
         if (!c.isPermitted) revert NotPermitted();
         if (!routePermitted[request.token][request.targetStratoToken]) revert NotPermitted();
 
-        address safe = gnosisSafe;
+        address vault = gnosisSafe;
         unchecked {
             id = ++depositId;
         }
 
-        uint256 balanceBefore = IERC20(request.token).balanceOf(safe);
+        uint256 balanceBefore = IERC20(request.token).balanceOf(vault);
 
         IPermit2.PermitTransferFrom memory permit = IPermit2
             .PermitTransferFrom({
@@ -241,7 +248,7 @@ contract DepositRouter is
                 deadline: request.deadline
             });
         IPermit2.SignatureTransferDetails memory transferDetails = IPermit2
-            .SignatureTransferDetails({to: safe, requestedAmount: request.amount});
+            .SignatureTransferDetails({to: vault, requestedAmount: request.amount});
         PERMIT2.permitTransferFrom(
             permit,
             transferDetails,
@@ -249,7 +256,7 @@ contract DepositRouter is
             request.signature
         );
 
-        depositedAmount = IERC20(request.token).balanceOf(safe) - balanceBefore;
+        depositedAmount = IERC20(request.token).balanceOf(vault) - balanceBefore;
 
         if (depositedAmount == 0) revert ZeroAmount();
         if (depositedAmount < request.amount) revert FeesNotSupported();
@@ -269,12 +276,12 @@ contract DepositRouter is
         if (!c.isPermitted) revert NotPermitted();
         if (!routePermitted[address(0)][targetStratoToken]) revert NotPermitted();
 
-        address safe = gnosisSafe;
+        address vault = gnosisSafe;
         unchecked {
             ++depositId;
         }
 
-        (bool success, ) = safe.call{value: msg.value}("");
+        (bool success, ) = vault.call{value: msg.value}("");
         if (!success) revert ETHTransferFailed();
 
         emit DepositRouted(
@@ -345,11 +352,24 @@ contract DepositRouter is
     }
 
     function setGnosisSafe(address newSafe) external onlyOwner {
-        if (newSafe == address(0)) revert InvalidAddress();
-        address old = gnosisSafe;
-        if (newSafe == old) revert SameAddressProposed();
-        gnosisSafe = newSafe;
-        emit GnosisSafeUpdated(old, newSafe);
+        _setExternalBridgeVault(newSafe);
+    }
+
+    function setExternalBridgeVault(address newVault) external onlyOwner {
+        _setExternalBridgeVault(newVault);
+    }
+
+    function externalBridgeVault() external view returns (address) {
+        return gnosisSafe;
+    }
+
+    function _setExternalBridgeVault(address newVault) internal {
+        if (newVault == address(0)) revert InvalidAddress();
+        address oldVault = gnosisSafe;
+        if (newVault == oldVault) revert SameAddressProposed();
+        gnosisSafe = newVault;
+        emit GnosisSafeUpdated(oldVault, newVault);
+        emit ExternalBridgeVaultUpdated(oldVault, newVault);
     }
 
     function pause() external onlyOwner {
@@ -376,7 +396,7 @@ contract DepositRouter is
     }
 
     function version() external pure virtual returns (string memory) {
-        return "3.0.0";
+        return "3.1.0";
     }
 
     function _authorizeUpgrade(

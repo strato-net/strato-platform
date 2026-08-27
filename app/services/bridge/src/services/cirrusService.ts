@@ -40,6 +40,7 @@ export const getEnabledChains = async (): Promise<Map<number, ChainInfo>> => {
     lastProcessedBlock: Number(v.lastProcessedBlock),
     enabled: !!v.enabled,
     custody: v.custody,
+    vault: v.vault,
     chainName: v.chainName,
   });
 
@@ -193,6 +194,9 @@ export const getDepositsByStatus = async (
       const chainInfo = enabledChains.get(Number(externalChainId));
       if (!chainInfo || !chainInfo?.depositRouter)
         throw new Error(`Chain info not found for chain ${externalChainId}`);
+      const custodyAddress = chainInfo.vault || chainInfo.custody;
+      if (!custodyAddress)
+        throw new Error(`Custody address not found for chain ${externalChainId}`);
 
       return {
         ...v,
@@ -200,6 +204,7 @@ export const getDepositsByStatus = async (
         externalTxHash,
         externalDecimals: asset.externalDecimals,
         depositRouter: chainInfo.depositRouter,
+        custodyAddress,
       };
     }
   );

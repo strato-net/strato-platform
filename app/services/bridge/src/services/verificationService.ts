@@ -1,4 +1,4 @@
-import { config, ZERO_ADDRESS, TRANSFER_EVENT_SIGNATURE, WAD } from "../config";
+import { ZERO_ADDRESS, TRANSFER_EVENT_SIGNATURE, WAD } from "../config";
 import { 
   getTransactionReceiptsBatch, 
   getInternalTransactionsBatch 
@@ -29,16 +29,20 @@ const findInternalEthTransfer = (traces: any[], toAddr: string, expectedAmount: 
     return false;
   });
 
-const validateDeposit = (deposit: DepositInfo, chainId: Number, safe: string, rebaseFactor?: bigint) => {
+export const validateDeposit = (deposit: DepositInfo, chainId: Number, rebaseFactor?: bigint) => {
   if (Number(deposit.externalChainId) !== chainId) {
     return new Error(`Chain mismatch for token ${normalizeAddress(deposit.externalToken)}. Expected: ${chainId}, Got: ${deposit.externalChainId}`);
   }
 
   const externalToken = normalizeAddress(ensureHexPrefix(deposit.externalToken));
   const depositRouter = normalizeAddress(deposit.depositRouter);
+  const custodyAddress = normalizeAddress(deposit.custodyAddress);
+  if (!custodyAddress) {
+    return new Error(`Custody address not configured for chain ${chainId}`);
+  }
   
   return {
-    safe,
+    custodyAddress,
     isETH: externalToken === ZERO_ADDRESS,
     externalToken,
     depositRouter,
@@ -48,10 +52,10 @@ const validateDeposit = (deposit: DepositInfo, chainId: Number, safe: string, re
   };
 };
 
-const verifyEthDeposit = (receipt: any, traces: any[], ctx: any): Error | null => {
+export const verifyEthDeposit = (receipt: any, traces: any[], ctx: any): Error | null => {
   const to = receipt.to ? normalizeAddress(receipt.to) : "";
   
-  if (to === ctx.safe) {
+  if (to === ctx.custodyAddress) {
     return null;
   }
 
@@ -59,24 +63,24 @@ const verifyEthDeposit = (receipt: any, traces: any[], ctx: any): Error | null =
     return new Error(`ETH receiver mismatch. Expected: ${ctx.depositRouter}, Got: ${to || "null"}`);
   }
   
-  if (!findInternalEthTransfer(traces, ctx.safe, ctx.stratoTokenAmount)) {
-    return new Error(`No internal ETH transfer to Safe ${ctx.safe} found`);
+  if (!findInternalEthTransfer(traces, ctx.custodyAddress, ctx.stratoTokenAmount)) {
+    return new Error(`No internal ETH transfer to custody ${ctx.custodyAddress} found`);
   }
   
   return null;
 };
 
-const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
+export const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
   const sig = TRANSFER_EVENT_SIGNATURE.toLowerCase();
   const logs = Array.isArray(receipt.logs) ? receipt.logs : [];
 
-  logInfo("Verification", `ERC20 check: token=${ctx.externalToken} safe=${ctx.safe} expected=${ctx.stratoTokenAmount} decimals=${ctx.externalDecimals} rebaseFactor=${ctx.rebaseFactor ?? 'none'} logCount=${logs.length}`);
+  logInfo("Verification", `ERC20 check: token=${ctx.externalToken} custody=${ctx.custodyAddress} expected=${ctx.stratoTokenAmount} decimals=${ctx.externalDecimals} rebaseFactor=${ctx.rebaseFactor ?? 'none'} logCount=${logs.length}`);
   
   const validTransfer = logs.some(log => {
     const decoded = decodeTransferLog(log, sig);
     if (!decoded) return false;
 
-    if (decoded.tokenAddr !== ctx.externalToken || decoded.toAddr !== ctx.safe) {
+    if (decoded.tokenAddr !== ctx.externalToken || decoded.toAddr !== ctx.custodyAddress) {
       logInfo("Verification", `  skip log: addr=${decoded.tokenAddr} to=${decoded.toAddr} amount=${decoded.amount}`);
       return false;
     }
@@ -97,7 +101,7 @@ const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
   });
   
   if (!validTransfer) {
-    return new Error(`No ERC20 Transfer to Safe ${ctx.safe} for token ${ctx.externalToken}`);
+    return new Error(`No ERC20 Transfer to custody ${ctx.custodyAddress} for token ${ctx.externalToken}`);
   }
   
   return null;
@@ -121,14 +125,6 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
     }
     depositsByChain.get(externalChainId)!.push(deposit);
   });
-
-  // Normalize once, reuse everywhere
-  const safe = normalizeAddress(config?.safe?.address ?? "");
-  if (!safe) {
-    const error = new Error("Gnosis Safe address not configured");
-    deposits.forEach(d => results.set(d.externalTxHash, error));
-    return results;
-  }
 
   // Fetch rebase factors for all deposits' STRATO tokens
   const allStratoTokens = [...new Set(deposits.map(d => d.stratoToken).filter(Boolean))];
@@ -162,7 +158,7 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
 
         // Early guard + context object
         const rebaseFactor = rebaseFactorMap.get(deposit.stratoToken);
-        const ctx = validateDeposit(deposit, chainId, safe, rebaseFactor);
+        const ctx = validateDeposit(deposit, chainId, rebaseFactor);
         if (ctx instanceof Error) {
           results.set(deposit.externalTxHash, ctx);
           continue;

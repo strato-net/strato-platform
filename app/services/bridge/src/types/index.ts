@@ -145,6 +145,7 @@ export interface DepositInfo {
   externalTxHash: string;
   externalDecimals: number;
   depositRouter: string;
+  custodyAddress: string;
 }
 
 export interface NativeDepositInfo {
@@ -206,7 +207,8 @@ export interface ChainInfo {
   depositRouter: string;
   lastProcessedBlock: number;
   enabled: boolean;
-  custody: string;
+  custody?: string;
+  vault?: string;
   chainName: string;
 }
 
