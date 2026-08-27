@@ -54,6 +54,7 @@ cp .env.example .env
 #### Blockchain
 - `ALCHEMY_API_KEY` - Alchemy API key (used for all chains)
 - `BRIDGE_ADDRESS` - MercataBridge contract address
+- `EXTERNAL_ASSET_BRIDGE_ADDRESS` - ExternalAssetBridge proxy address used for non-native deposits
 
 #### Chain RPC URLs (Dynamically Validated)
 The service automatically validates that RPC URLs are configured for all enabled chains from the bridge contract:

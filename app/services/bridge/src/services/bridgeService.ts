@@ -190,6 +190,7 @@ const recordNativeWithdrawalProposal = async (
 const isDuplicateDepositError = (error: unknown): boolean => {
   const message = (error as Error).message;
   return (
+    message.includes("EAB: duplicate deposit") ||
     message.includes("MB: dup key") ||
     message.includes("MB: duplicate deposit")
   );
@@ -197,8 +198,8 @@ const isDuplicateDepositError = (error: unknown): boolean => {
 
 const recordStandardDeposit = async (deposit: DepositArgs) => {
   await execute({
-    contractName: "MercataBridge",
-    contractAddress: config.bridge.address!,
+    contractName: "ExternalAssetBridge",
+    contractAddress: config.externalAssetBridge.address!,
     method: "deposit",
     args: {
       externalChainId: deposit.externalChainId,
@@ -207,15 +208,15 @@ const recordStandardDeposit = async (deposit: DepositArgs) => {
       externalTokenAmount: deposit.externalTokenAmount,
       externalTxHash: deposit.externalTxHash,
       stratoRecipient: deposit.stratoRecipient,
-      targetStratoToken: deposit.targetStratoToken,
+      stratoToken: deposit.targetStratoToken,
     },
   });
 };
 
 const recordActionDeposit = async (deposit: ActionDepositArgs) => {
   await execute({
-    contractName: "MercataBridge",
-    contractAddress: config.bridge.address!,
+    contractName: "ExternalAssetBridge",
+    contractAddress: config.externalAssetBridge.address!,
     method: "depositWithAction",
     args: {
       externalChainId: deposit.externalChainId,
@@ -224,7 +225,7 @@ const recordActionDeposit = async (deposit: ActionDepositArgs) => {
       externalTokenAmount: deposit.externalTokenAmount,
       externalTxHash: deposit.externalTxHash,
       stratoRecipient: deposit.stratoRecipient,
-      targetStratoToken: deposit.targetStratoToken,
+      stratoToken: deposit.targetStratoToken,
       action: deposit.action,
       actionToken: deposit.actionToken,
       minFinalOut: deposit.minFinalOut,
@@ -260,8 +261,8 @@ export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
 
   try {
     await execute({
-      contractName: "MercataBridge",
-      contractAddress: config.bridge.address!,
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
       method: "depositBatch",
       args: {
         externalChainIds,
@@ -270,7 +271,7 @@ export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
         externalTokenAmounts,
         stratoRecipients,
         externalSenders,
-        targetStratoTokens,
+        stratoTokens: targetStratoTokens,
       },
     });
 
@@ -294,14 +295,20 @@ export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
 export const depositBatchWithAction = async (
   depositArgs: NonEmptyArray<ActionDepositArgs>,
 ) => {
-  const args = buildActionDepositBatchArgs(depositArgs);
+  const {
+    targetStratoTokens,
+    ...args
+  } = buildActionDepositBatchArgs(depositArgs);
 
   try {
     await execute({
-      contractName: "MercataBridge",
-      contractAddress: config.bridge.address!,
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
       method: "depositBatchWithAction",
-      args,
+      args: {
+        ...args,
+        stratoTokens: targetStratoTokens,
+      },
     });
     logInfo(
       "BridgeService",
@@ -380,8 +387,8 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<ConfirmDeposit
 
   try {
     const result = await execute({
-      contractName: "MercataBridge",
-      contractAddress: config.bridge.address!,
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
       method: "confirmDepositBatch",
       args: {
         externalChainIds,
@@ -407,7 +414,7 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<ConfirmDeposit
     const errorMessage = (error as Error).message;
     
     // Check if this is a bad state error (expected when multiple servers confirm same deposits)
-    if (errorMessage.includes("MB: bad state")) {
+    if (errorMessage.includes("EAB: bad state")) {
       logInfo(
         "BridgeService",
         `Deposits already confirmed by another server: ${deposits.length} deposits (${externalTxHashes.join(", ")})`,
@@ -479,8 +486,8 @@ export const reviewDepositBatch = async (deposits: NonEmptyArray<ConfirmDepositA
 
   try {
     await execute({
-      contractName: "MercataBridge",
-      contractAddress: config.bridge.address!,
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
       method: "reviewDepositBatch",
       args: {
         externalChainIds,
@@ -496,7 +503,7 @@ export const reviewDepositBatch = async (deposits: NonEmptyArray<ConfirmDepositA
     const errorMessage = (error as Error).message;
     
     // Check if this is a bad state error (expected when multiple servers review same deposits)
-    if (errorMessage.includes("MB: bad state")) {
+    if (errorMessage.includes("EAB: bad state")) {
       logInfo(
         "BridgeService",
         `Deposits already reviewed by another server: ${deposits.length} deposits (${externalTxHashes.join(", ")})`,

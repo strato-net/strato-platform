@@ -85,8 +85,8 @@ class BlockTrackingService {
    */
   async updateLastProcessedBlockOnBlockchain(chainId: number, blockNumber: number): Promise<void> {
     await execute({
-      contractName: "MercataBridge",
-      contractAddress: config.bridge.address!,
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
       method: "setLastProcessedBlock",
       args: {
         externalChainId: chainId,

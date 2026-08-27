@@ -51,6 +51,7 @@ import "Staking/ValidatorRegistry.sol";
 
 //Bridging
 import "./Bridge/MercataBridge.sol";
+import "./Bridge/ExternalAssetBridge.sol";
 import "./Bridge/StratoNativeBridge.sol";
 import "./Bridge/StratoNativeCustodyVault.sol";
 

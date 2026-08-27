@@ -33,6 +33,7 @@ export async function validateBridgeConfig(): Promise<boolean> {
     "CLIENT_ID",
     "OPENID_DISCOVERY_URL",
     "BRIDGE_ADDRESS",
+    "EXTERNAL_ASSET_BRIDGE_ADDRESS",
     "SAFE_ADDRESS",
     "SAFE_PROPOSER_ADDRESS",
     "SAFE_PROPOSER_PRIVATE_KEY",
@@ -103,6 +104,15 @@ export async function validateBridgeConfig(): Promise<boolean> {
         `Invalid bridge contract address format: ${config.bridge.address}`,
       );
     }
+  }
+
+  if (
+    config.externalAssetBridge.address &&
+    !isAddress(config.externalAssetBridge.address)
+  ) {
+    errors.push(
+      `Invalid external asset bridge address format: ${config.externalAssetBridge.address}`,
+    );
   }
 
   // Validate Safe wallet configuration

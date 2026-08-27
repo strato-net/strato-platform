@@ -42,6 +42,9 @@ const config = {
   bridge: {
     address: process.env.BRIDGE_ADDRESS,
   },
+  externalAssetBridge: {
+    address: process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS,
+  },
   nativeBridge: {
     address: process.env.STRATO_NATIVE_BRIDGE_ADDRESS,
   },
@@ -173,6 +176,7 @@ const requiredEnvVars = [
   "CLIENT_ID",
   "OPENID_DISCOVERY_URL",
   "BRIDGE_ADDRESS",
+  "EXTERNAL_ASSET_BRIDGE_ADDRESS",
   "PRICE_ORACLE_ADDRESS",
   "SAFE_ADDRESS",
   "SAFE_PROPOSER_ADDRESS",

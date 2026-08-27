@@ -11,23 +11,25 @@ import {
   BridgeInfo,
 } from "../types";
 
-const { bridge, nativeBridge, oracle } = config;
+const { bridge, externalAssetBridge, nativeBridge, oracle } = config;
 const toCirrusAddress = (address?: string) =>
   address ? address.toLowerCase().replace(/^0x/, "") : undefined;
 
 const bridgeAddress = toCirrusAddress(bridge.address);
+const externalAssetBridgeAddress = toCirrusAddress(externalAssetBridge.address);
 const nativeBridgeAddress = toCirrusAddress(nativeBridge.address);
 const oracleAddress = toCirrusAddress(oracle.address);
 const MERCATA_BRIDGE_URL = "BlockApps-MercataBridge";
+const EXTERNAL_ASSET_BRIDGE_URL = "BlockApps-ExternalAssetBridge";
 const NATIVE_BRIDGE_URL = "BlockApps-StratoNativeBridge";
 const ORACLE_URL = "BlockApps-PriceOracle";
 
 // Get all enabled chains from the bridge contract
 export const getEnabledChains = async (): Promise<Map<number, ChainInfo>> => {
-  const data = await cirrus.get(`/${MERCATA_BRIDGE_URL}-chains`, {
+  const data = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-chains`, {
     params: {
       "value->>enabled": "eq.true",
-      address: `eq.${bridgeAddress}`,
+      address: `eq.${externalAssetBridgeAddress}`,
       select: "key,value",
     },
   });
@@ -54,20 +56,20 @@ export const getAssetInfo = async (
   externalTokenAddress: NonEmptyArray<string>,
   externalChainId?: number
 ): Promise<Map<string, AssetInfo>> => {
-  const data = await cirrus.get(`/${MERCATA_BRIDGE_URL}-assets`, {
+  const data = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-routes`, {
     params: {
       key: `in.(${externalTokenAddress.join(",")})`,
       ...(externalChainId ? { key2: `eq.${externalChainId}` } : {}),
-      "value->>enabled": "eq.true",
-      address: `eq.${bridgeAddress}`,
-      select: "key,key2,value",
+      "value->>depositsEnabled": "eq.true",
+      address: `eq.${externalAssetBridgeAddress}`,
+      select: "key,key2,key3,value",
     },
   });
 
   if (!Array.isArray(data) || !data.length) return new Map();
 
   const normalize = (v: any): AssetInfo => ({
-    enabled: !!v.enabled,
+    enabled: !!v.depositsEnabled || !!v.withdrawalsEnabled,
     stratoToken: v.stratoToken,
     externalName: v.externalName,
     externalToken: v.externalToken,
@@ -78,7 +80,10 @@ export const getAssetInfo = async (
   });
 
   return new Map(
-    data.map(({ key, key2, value }) => [`${key}:${key2}`, normalize(value)])
+    data.map(({ key, key2, key3, value }) => [
+      `${key}:${key2}:${key3}`,
+      normalize(value),
+    ])
   );
 };
 
@@ -157,11 +162,11 @@ export const getDepositsByStatus = async (
   status: string
 ): Promise<DepositInfo[]> => {
   const data = await cirrus.get(
-    `/${MERCATA_BRIDGE_URL}-deposits?select=*,bridge:${MERCATA_BRIDGE_URL}!inner(depositsPaused)`,
+    `/${EXTERNAL_ASSET_BRIDGE_URL}-deposits?select=*,bridge:${EXTERNAL_ASSET_BRIDGE_URL}!inner(depositsPaused)`,
     {
       params: {
-        "value->>bridgeStatus": `eq.${status}`,
-        address: `eq.${bridgeAddress}`,
+        "value->>status": `eq.${status}`,
+        address: `eq.${externalAssetBridgeAddress}`,
         order: "value->>timestamp.asc",
         "bridge.depositsPaused": "eq.false",
       },
@@ -184,7 +189,9 @@ export const getDepositsByStatus = async (
   return data.map(
     ({ value: v, key: externalChainId, key2: externalTxHash }) => {
       const externalToken = v?.externalToken;
-      const asset = assetMapping.get(`${externalToken}:${externalChainId}`);
+      const asset = assetMapping.get(
+        `${externalToken}:${externalChainId}:${v?.stratoToken}`,
+      );
 
       if (!asset || !asset?.externalDecimals)
         throw new Error(
@@ -200,6 +207,7 @@ export const getDepositsByStatus = async (
 
       return {
         ...v,
+        bridgeStatus: v.status,
         externalChainId,
         externalTxHash,
         externalDecimals: asset.externalDecimals,
@@ -235,9 +243,9 @@ export const getNativeDepositsByStatus = async (
 };
 
 export const getBridgeInfo = async (): Promise<BridgeInfo | null> => {
-  const data = await cirrus.get(`/${MERCATA_BRIDGE_URL}`, {
+  const data = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}`, {
     params: {
-      address: `eq.${bridgeAddress}`,
+      address: `eq.${externalAssetBridgeAddress}`,
       select:
         "DECIMAL_PLACES,USDST_ADDRESS,WITHDRAWAL_ABORT_DELAY,_owner,depositsPaused,tokenFactory,withdrawalCounter,withdrawalsPaused",
     },
