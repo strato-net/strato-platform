@@ -96,13 +96,20 @@ createCommandsFile = do
   -- being hard-coded. Sizing happens here, once, at setup time: resizing a
   -- node means re-running strato-setup or editing commands.txt.
   resources <- detectMachineResources
-  putStrLn $ "  RTS sizing: " ++ describeMachineResources resources
-  sequencerRts <- rtsWithOverride "STRATO_SEQUENCER_RTS" $
+  (sequencerRts, seqNote) <- rtsWithOverride "STRATO_SEQUENCER_RTS" $
     sequencerRtsFlags (mrCores resources) (mrMemMB resources)
-  vmRunnerRts <- rtsWithOverride "STRATO_VMRUNNER_RTS" $
+  (vmRunnerRts, vmNote) <- rtsWithOverride "STRATO_VMRUNNER_RTS" $
     vmRunnerRtsFlags (mrCores resources) (mrMemMB resources)
-  putStrLn $ "  strato-sequencer: " ++ sequencerRts
-  putStrLn $ "  vm-runner: " ++ vmRunnerRts
+  let sizingReport =
+        [ "RTS sizing: " ++ describeMachineResources resources ]
+        ++ seqNote ++ vmNote ++
+        [ "strato-sequencer: " ++ sequencerRts
+        , "vm-runner: " ++ vmRunnerRts
+        ]
+  mapM_ (putStrLn . ("  " ++)) sizingReport
+  -- Persist the decision where support can find it later: setup's terminal
+  -- output is gone by the time anyone asks why a node runs with these flags.
+  writeFile ("logs" </> "rts-sizing.log") (unlines sizingReport)
   when (mrMemMB resources <= smallestRamTierMB) $
     putStrLn $ "\ESC[1;33mWarning: " ++ show (mrMemMB resources) ++ " MB RAM is not enough "
       ++ "for from-genesis sync (vm-runner live data alone is ~3.5GB). "
@@ -130,14 +137,16 @@ createCommandsFile = do
 -- | The computed RTS flags for a process, unless its escape-hatch env var is
 -- set, in which case the env var's value is used verbatim (wrapped in
 -- +RTS/-RTS). Lets support tune a misbehaving node without a rebuild.
-rtsWithOverride :: String -> [String] -> IO String
+-- Returns the rendered flags plus a report line when an override is in effect.
+rtsWithOverride :: String -> [String] -> IO (String, [String])
 rtsWithOverride envVar computed = do
   mOverride <- lookupEnv envVar
-  case mOverride of
-    Just override | not (null override) -> do
-      putStrLn $ "  " ++ envVar ++ " override in effect, replacing computed RTS flags"
-      return $ renderRtsFlags [override]
-    _ -> return $ renderRtsFlags computed
+  return $ case mOverride of
+    Just override | not (null override) ->
+      ( renderRtsFlags [override]
+      , [envVar ++ " override in effect, replacing computed RTS flags"]
+      )
+    _ -> (renderRtsFlags computed, [])
 
 
 
