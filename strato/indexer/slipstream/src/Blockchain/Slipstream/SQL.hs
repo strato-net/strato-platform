@@ -43,7 +43,7 @@ performSlipstreamQueries conn queries =
           $logErrorLS "performSlipstreamQueries" e
           mapM_ executeIndividually chunk
 
-    executeQueries :: MonadIO n => [SlipstreamQuery] -> E.SqlPersistT n ()
+    executeQueries :: MonadUnliftIO n => [SlipstreamQuery] -> E.SqlPersistT n ()
     executeQueries [] = pure ()
     executeQueries (InsertDelegatecall (Delegatecall s c n) : rest) = do
       void . insertUnique_ $ Contract s c n
@@ -53,12 +53,13 @@ performSlipstreamQueries conn queries =
       executeChunk sqlQueries
       executeQueries rest
 
-    executeChunk :: MonadIO n => [SlipstreamQuery] -> E.SqlPersistT n ()
+    executeChunk :: MonadUnliftIO n => [SlipstreamQuery] -> E.SqlPersistT n ()
     executeChunk chunk =
       let statements =
             filter (not . T.null . T.strip) $ slipstreamQueryPostgres <$> chunk
        in unless (null statements) $
-            rawExecute (T.concat $ (<> ";\n") <$> statements) []
+            withStatementCacheCleanup $
+              rawExecute (T.concat $ (<> ";\n") <$> statements) []
 
     isDelegatecall InsertDelegatecall {} = True
     isDelegatecall _ = False
