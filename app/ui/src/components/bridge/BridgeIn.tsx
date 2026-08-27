@@ -436,7 +436,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   );
 
   const nativeBridgeTokens = useMemo(
-    () => bridgeableTokens.filter((token) => token.routeType === "native" && !token.depositsPaused),
+    () => bridgeableTokens.filter(
+      (token) => token.routeType === "native" && !token.depositsPaused && !token.depositsDisabled
+    ),
     [bridgeableTokens]
   );
 

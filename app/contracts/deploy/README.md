@@ -196,7 +196,10 @@ npm run configure:native-route -- \
   --max-per-withdrawal <amount> \
   [--instant-withdrawal-threshold <amount>] \
   --strato-token <strato-token> \
-  [--enabled <true|false>]
+  [--enabled <true|false>] \
+  [--deposits-disabled <true|false> \
+   --withdrawals-disabled <true|false> \
+   --max-outstanding-withdrawal <amount>]
 ```
 
 **Required Arguments**:
@@ -212,9 +215,15 @@ npm run configure:native-route -- \
 **Optional Arguments**:
 - `--enabled` - Route enabled flag (`true` by default)
 - `--instant-withdrawal-threshold` - Native withdrawals at or below this amount stay on the instant lane; larger native withdrawals remain pending manual approval/execution (`0` disables instant auto-minting)
+- `--deposits-disabled` - Blocks new deposits for the STRATO token without affecting withdrawals
+- `--withdrawals-disabled` - Blocks new withdrawals for the STRATO token without affecting deposits
+- `--max-outstanding-withdrawal` - Maximum amount of the STRATO token that may be locked in native bridge custody (`0` disables the aggregate cap)
+
+The three token bridge configuration arguments must be provided together.
 
 **What it does**:
 - Calls `StratoNativeBridge.setAsset(enabled, externalChainId, externalBridge, representationToken, externalName, externalSymbol, maxPerWithdrawal, instantWithdrawalThreshold, stratoToken)`
+- Calls `StratoNativeBridge.setTokenBridgeConfig(stratoToken, depositsDisabled, withdrawalsDisabled, maxOutstandingWithdrawal)` when the token bridge configuration arguments are provided
 - Prints a governance vote ID if the route update requires approval
 
 #### `smoke-native-bridge.js`

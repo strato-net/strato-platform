@@ -257,7 +257,8 @@ stakingNotScheduled = 2 ^ (62 :: Int)
 -- dev/test networks) activates from genesis.
 defaultStakingActivationBlock :: String -> Maybe Integer
 defaultStakingActivationBlock net
-  | net `elem` ["upquark", "lithium", "mercata", "mercata-hydrogen", "uranium"] = Just stakingNotScheduled
+  | net == "upquark" = Just 1000000
+  | net `elem` ["lithium", "mercata", "mercata-hydrogen", "uranium"] = Just stakingNotScheduled
   | take 6 net == "helium" = Just 250000
   | otherwise = Nothing
 
