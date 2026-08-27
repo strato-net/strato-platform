@@ -15,6 +15,7 @@ import type {
   PoolV3BurnParams,
   PoolV3CollectParams,
   PoolV3CreateParams,
+  PoolV3FeeTier,
 } from '@strato/shared-types';
 
 export * from '@strato/shared-types';
@@ -133,6 +134,7 @@ export interface SwapContextActions {
   // V3 (concentrated liquidity) operations
   createV3Pool: (data: PoolV3CreateParams) => Promise<void>;
   fetchV3Pools: () => Promise<PoolV3[]>;
+  fetchV3FeeTiers: () => Promise<PoolV3FeeTier[]>;
   getV3PoolByAddress: (address: string) => Promise<PoolV3 | null>;
   getV3LiquidityDistribution: (poolAddress: string, signal?: AbortSignal) => Promise<PoolV3LiquidityDistribution | null>;
   fetchV3Positions: (poolAddress?: string) => Promise<PoolV3Position[]>;
