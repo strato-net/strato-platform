@@ -1,13 +1,14 @@
 # STRATO Bridge Service
 
-The STRATO Bridge Service is responsible for seamlessly bridging assets between multiple blockchain networks and the STRATO mainnet/testnet. It manages deposits and withdrawals using a Safe multisig wallet and monitors blockchain activity in real-time using dynamic RPC connections.
+The STRATO Bridge Service is responsible for seamlessly bridging assets between multiple blockchain networks and the STRATO mainnet/testnet. It manages vault-backed non-native transfers, native bridge transfers, and legacy Safe withdrawals while monitoring blockchain activity through dynamic RPC connections.
 
 ## Features
 
 * **Dynamic Chain Support**: Automatically detects and configures RPC endpoints for all enabled chains from the bridge contract
 * **Safe Multisig Integration**: Proposes and executes transactions through Gnosis Safe for secure asset management
+* **External Vault Releases**: Reserves and releases routine non-native withdrawals using threshold-signed vault authorizations
 * **Real-time Monitoring**: Polls blockchain events and transaction statuses across all supported chains
-* **Bridge Out Flow**: Complete STRATO → Ethereum asset transfer with Safe approval workflow
+* **Bridge Out Flow**: STRATO → external-chain transfers through route-local vaults, with manual review for large withdrawals
 * **Bridge In Flow**: Ethereum → STRATO deposit processing and confirmation
 * **Dynamic Asset Management**: Fetches enabled assets and chain information from on-chain bridge contract
 * **Email Notifications**: Sends transaction alerts to configured email addresses
@@ -76,6 +77,12 @@ The service automatically validates that RPC URLs are configured for all enabled
 
 Native withdrawal review delay and attestation validity are enforced by the native bridge contracts, not bridge-service environment variables.
 
+#### External Vault Releases
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY` - Destination-chain key used to pay gas and sign external vault withdrawal authorizations
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY_1`, `_2`, ... - Optional additional signer keys required by the vault threshold
+
+Routine non-native withdrawals are marked ready on STRATO, reserved in the route-local vault, released externally, and only then finalized and burned on STRATO. Withdrawals flagged for manual review remain pending.
+
 #### Optional
 - `VOUCHER_CONTRACT_ADDRESS` - Voucher contract address (defaults to `0x000000000000000000000000000000000000100e`)
 - `TRANSACTION_APPROVER_EMAILS` - Comma-separated list of emails for transaction alerts
@@ -135,19 +142,18 @@ npm start
 ### Bridge Out Flow (STRATO → Ethereum)
 
 1. **Withdrawal Initiation**
-   - Service polls for withdrawals with status "1" (INITIATED)
-   - Groups withdrawals by destination chain and token
-   - Creates Safe transactions for each unique combination
+   - Service polls `ExternalAssetBridge` for initiated routine withdrawals
+   - Persists the vault signer-set version and authorization window on STRATO
 
-2. **Safe Transaction Processing**
-   - Generates Safe transaction with total amount and destination address
-   - Proposes transaction to Safe multisig for approval
-   - Monitors transaction status (executed/rejected/pending)
+2. **Vault Processing**
+   - Collects threshold-sorted EIP-712 validator signatures
+   - Reserves route-local vault liquidity and records the reservation on STRATO
+   - Releases the canonical external asset to the recipient
 
 3. **Finalization**
-   - **Executed**: Calls `finaliseWithdrawalBatch` on bridge contract
-   - **Rejected**: Calls `abortWithdrawalBatch` on bridge contract
-   - Sends email notifications for completed transactions
+   - Records the confirmed release transaction on STRATO
+   - Burns the escrowed STRATO representation only after release
+   - Leaves large withdrawals pending for the manual-review path
 
 ### Bridge In Flow (Ethereum → STRATO)
 
@@ -209,7 +215,7 @@ The service logs important events and errors using Winston logger:
 ## Security Considerations
 
 - **Private Keys**: Stored securely in environment variables
-- **Safe Multisig**: All bridge operations require Safe approval
+- **Safe Multisig**: Safe remains available for governance, manual review, and legacy withdrawals
 - **OAuth**: Secure authentication with STRATO
 - **Contract Validation**: All operations filter by specific bridge contract address
 - **Error Handling**: Prevents service crashes and data corruption

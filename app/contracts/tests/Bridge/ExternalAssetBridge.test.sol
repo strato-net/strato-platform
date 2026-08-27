@@ -473,7 +473,20 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(bridge),
             "markWithdrawalReady",
             withdrawalId,
-            deadline
+            block.timestamp,
+            deadline,
+            1
+        );
+        (
+            uint256 authorizationNotBefore,
+            uint256 authorizationDeadline,
+            uint256 signerSetVersion
+        ) = bridge.withdrawalAuthorizations(withdrawalId);
+        require(
+            authorizationNotBefore == block.timestamp &&
+                authorizationDeadline == deadline &&
+                signerSetVersion == 1,
+            "Withdrawal authorization should be persisted"
         );
         relayer.do(
             address(bridge),
@@ -551,7 +564,9 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(bridge),
             "markWithdrawalReady",
             readyId,
-            block.timestamp + 1800
+            block.timestamp,
+            block.timestamp + 1800,
+            1
         );
 
         bool reverted = false;
@@ -578,7 +593,9 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(bridge),
             "markWithdrawalReady",
             withdrawalId,
-            block.timestamp + 1800
+            block.timestamp,
+            block.timestamp + 1800,
+            1
         );
 
         bool reverted = false;

@@ -4,7 +4,11 @@ import {
   getEnabledChains,
   getEnabledNativeChainIds,
 } from "../services/cirrusService";
-import { config, getNativeBridgePrivateKeys } from "../config";
+import {
+  config,
+  getExternalBridgeAttestationPrivateKeys,
+  getNativeBridgePrivateKeys,
+} from "../config";
 
 const isPrivateKey = (value: string): boolean =>
   /^(0x)?[a-fA-F0-9]{64}$/.test(value);
@@ -13,6 +17,12 @@ const REPRESENTATION_BRIDGE_ABI = [
   "function attestationSigners(address) view returns (bool)",
   "function attestationThreshold() view returns (uint8)",
   "function maxAttestationValiditySeconds() view returns (uint256)",
+];
+
+const EXTERNAL_VAULT_ABI = [
+  "function attestationSigners(address) view returns (bool)",
+  "function attestationThreshold() view returns (uint8)",
+  "function maxAuthorizationValiditySeconds() view returns (uint256)",
 ];
 
 const isAddress = (value: string): boolean =>
@@ -237,6 +247,63 @@ export async function validateBridgeConfig(): Promise<boolean> {
         "ConfigValidator",
         `Found ${enabledChainsArr.length} enabled chains`,
       );
+
+      for (const chain of enabledChainsArr) {
+        const chainId = chain.externalChainId;
+        const keyEnv =
+          `CHAIN_${chainId}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY`;
+        const keyConfigs = getExternalBridgeAttestationPrivateKeys(chainId);
+        if (keyConfigs.length === 0) {
+          errors.push(`Missing external bridge environment variable: ${keyEnv}`);
+          continue;
+        }
+        if (!chain.vault || !isAddress(chain.vault)) {
+          errors.push(`Invalid external bridge vault for chain ${chainId}`);
+          continue;
+        }
+
+        const validKeys = keyConfigs.filter(({ envVar, privateKey }) => {
+          if (isPrivateKey(privateKey)) return true;
+          errors.push(`Invalid external bridge private key format: ${envVar}`);
+          return false;
+        });
+        const rpcUrl = process.env[`CHAIN_${chainId}_RPC_URL`];
+        if (!rpcUrl || validKeys.length === 0) continue;
+
+        try {
+          const vault = new Contract(
+            chain.vault,
+            EXTERNAL_VAULT_ABI,
+            new JsonRpcProvider(rpcUrl),
+          );
+          const [threshold, validitySeconds, signerStatuses] = await Promise.all([
+            vault.attestationThreshold(),
+            vault.maxAuthorizationValiditySeconds(),
+            Promise.all(
+              validKeys.map(({ privateKey }) =>
+                vault.attestationSigners(
+                  new Wallet(normalizePrivateKey(privateKey)).address,
+                ),
+              ),
+            ),
+          ]);
+          const enabledSignerCount = signerStatuses.filter(Boolean).length;
+          if (Number(threshold) <= 0 || Number(threshold) > enabledSignerCount) {
+            errors.push(
+              `External vault on chain ${chainId} requires ${String(threshold)} signatures; bridge service has ${enabledSignerCount} enabled signer(s)`,
+            );
+          }
+          if (BigInt(validitySeconds.toString()) <= 0n) {
+            errors.push(
+              `External vault on chain ${chainId} maxAuthorizationValiditySeconds must be greater than zero`,
+            );
+          }
+        } catch (error) {
+          errors.push(
+            `Failed to validate external vault policy for chain ${chainId}: ${(error as Error).message}`,
+          );
+        }
+      }
 
       if (config.nativeBridge.address) {
         const nativeChainIds = await getEnabledNativeChainIds();

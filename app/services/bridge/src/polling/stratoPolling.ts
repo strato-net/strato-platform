@@ -9,10 +9,12 @@ import {
   confirmWithdrawalBatch,
   finaliseWithdrawalBatch,
   handleRejectedWithdrawalBatch,
+  processExternalWithdrawal,
 } from "../services/bridgeService";
 import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositInfo, NativeDepositInfo, ConfirmDepositArgs, ConfirmNativeDepositArgs } from "../types";
 import {
   getWithdrawalsByStatus,
+  getExternalWithdrawalsByStatus,
   getNativeWithdrawalsByStatus,
   getDepositsByStatus,
   getNativeDepositsByStatus,
@@ -76,6 +78,37 @@ export const startWithdrawalRequestPolling = (): void => {
 
   startNonOverlappingPolling(
     "startWithdrawalRequestPolling",
+    pollingInterval,
+    poll,
+  );
+};
+
+export const startExternalWithdrawalPolling = (): void => {
+  const pollingInterval = config.polling.withdrawalInterval || 5 * 60 * 1000;
+
+  const poll = async () => {
+    const [initiated, ready] = await Promise.all([
+      getExternalWithdrawalsByStatus("1"),
+      getExternalWithdrawalsByStatus("3"),
+    ]);
+    const routineWithdrawals = [...initiated, ...ready].filter(
+      (withdrawal) => !withdrawal.requiresManualReview,
+    );
+
+    for (const withdrawal of routineWithdrawals) {
+      try {
+        await processExternalWithdrawal(withdrawal);
+      } catch (error) {
+        logError("StratoPolling", error as Error, {
+          operation: "processExternalWithdrawal",
+          withdrawalId: withdrawal.withdrawalId,
+        });
+      }
+    }
+  };
+
+  startNonOverlappingPolling(
+    "startExternalWithdrawalPolling",
     pollingInterval,
     poll,
   );
@@ -376,6 +409,7 @@ export const initializeStratoPolling = async () => {
   startDepositInitiatedPolling();
   startNativeDepositInitiatedPolling();
   startWithdrawalRequestPolling();
+  startExternalWithdrawalPolling();
   startNativeWithdrawalRequestPolling();
   startWithdrawalTxPolling();
   startNativeWithdrawalTxPolling();

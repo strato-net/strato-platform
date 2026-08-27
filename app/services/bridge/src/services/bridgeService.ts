@@ -19,6 +19,12 @@ import {
   proposeNativeMint,
 } from "./nativeMintService";
 import { buildActionDepositBatchArgs } from "./depositEventService";
+import {
+  buildWithdrawalAuthorization,
+  getReservationId,
+  releaseWithdrawal,
+  reserveWithdrawal,
+} from "./externalWithdrawalService";
 
 let cachedStratoNetworkId: bigint | null = null;
 const announcedManualNativeWithdrawals = new Map<string, string | null>();
@@ -32,7 +38,7 @@ const normalizeOptionalHash = (value?: string | null): string | null => {
   return /^0+$/.test(withoutPrefix) ? null : normalized;
 };
 
-const getStratoNetworkId = async (): Promise<bigint> => {
+export const getStratoNetworkId = async (): Promise<bigint> => {
   if (cachedStratoNetworkId != null) {
     return cachedStratoNetworkId;
   }
@@ -556,6 +562,93 @@ export const reviewNativeDepositBatch = async (
 
     throw error;
   }
+};
+
+export const processExternalWithdrawal = async (
+  withdrawal: WithdrawalInfo,
+): Promise<void> => {
+  if (withdrawal.requiresManualReview) {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} requires manual review`,
+    );
+  }
+
+  const sourceChainId = await getStratoNetworkId();
+  const authorization = await buildWithdrawalAuthorization(
+    withdrawal,
+    sourceChainId,
+    config.externalAssetBridge.address!,
+  );
+
+  if (String(withdrawal.bridgeStatus) === "1") {
+    const readyResult = await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "markWithdrawalReady",
+      args: {
+        withdrawalId: withdrawal.withdrawalId,
+        authorizationNotBefore: authorization.notBefore,
+        authorizationDeadline: authorization.deadline,
+        signerSetVersion: authorization.signerSetVersion,
+      },
+    });
+    if (readyResult.status !== "Success") {
+      throw new Error(
+        `Withdrawal ${withdrawal.withdrawalId} remains ${readyResult.status}`,
+      );
+    }
+  }
+
+  let reservationId = withdrawal.reservationId;
+  if (!reservationId) {
+    const reservation = await reserveWithdrawal(authorization);
+    reservationId = reservation.reservationId;
+    const reservationResult = await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "recordWithdrawalReservation",
+      args: {
+        withdrawalId: withdrawal.withdrawalId,
+        reservationId,
+        reservationTxHash: reservation.transactionHash,
+      },
+    });
+    if (reservationResult.status !== "Success") {
+      throw new Error(
+        `Withdrawal reservation ${reservationId} remains ${reservationResult.status}`,
+      );
+    }
+  } else if (
+    reservationId.toLowerCase().replace(/^0x/, "") !==
+    getReservationId(authorization).toLowerCase().replace(/^0x/, "")
+  ) {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} has a mismatched reservation`,
+    );
+  }
+
+  const releaseTxHash = await releaseWithdrawal(authorization, reservationId);
+  const finalizeResult = await execute({
+    contractName: "ExternalAssetBridge",
+    contractAddress: config.externalAssetBridge.address!,
+    method: "finalizeWithdrawal",
+    args: {
+      withdrawalId: withdrawal.withdrawalId,
+      reservationId,
+      externalTxHash: releaseTxHash,
+    },
+  });
+  if (finalizeResult.status !== "Success") {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} finalization remains ${finalizeResult.status}`,
+    );
+  }
+
+  logInfo(
+    "BridgeService",
+    `Released and finalized external withdrawal ${withdrawal.withdrawalId}`,
+    { reservationId, releaseTxHash },
+  );
 };
 
 export const confirmWithdrawalBatch = async (

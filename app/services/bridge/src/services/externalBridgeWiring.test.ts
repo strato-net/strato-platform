@@ -116,3 +116,108 @@ test("reads pending deposits and vault custody from ExternalAssetBridge", async 
     requestedUrls.every((url) => url.includes("BlockApps-ExternalAssetBridge")),
   );
 });
+
+test("reserves and releases before finalizing a routine withdrawal", async () => {
+  const stratoHelper = await import("../utils/stratoHelper");
+  const api = await import("../utils/api");
+  const vaultService = await import("./externalWithdrawalService");
+  const trace: string[] = [];
+
+  (api.eth as any).get = async () => ({ networkID: "9001" });
+  (stratoHelper as any).execute = async (input: any) => {
+    trace.push(`strato:${input.method}`);
+    return { status: "Success", hash: `${input.method}-hash` };
+  };
+  (vaultService as any).buildWithdrawalAuthorization = async () => ({
+    sourceChainId: "9001",
+    sourceBridge: "0x1111111111111111111111111111111111111111",
+    sourceWithdrawalId: "7",
+    destinationChainId: "1",
+    destinationVault: "0x2222222222222222222222222222222222222222",
+    token: "0x3333333333333333333333333333333333333333",
+    recipient: "0x4444444444444444444444444444444444444444",
+    amount: "100",
+    notBefore: "1000",
+    deadline: "2800",
+    signerSetVersion: "1",
+  });
+  (vaultService as any).reserveWithdrawal = async () => {
+    trace.push("vault:reserve");
+    return { reservationId: "reservation", transactionHash: "reserve-hash" };
+  };
+  (vaultService as any).releaseWithdrawal = async () => {
+    trace.push("vault:release");
+    return "release-hash";
+  };
+
+  const { processExternalWithdrawal } = await import("./bridgeService");
+  await processExternalWithdrawal({
+    bridgeStatus: "1",
+    custodyTxHash: "",
+    externalChainId: 1,
+    externalRecipient: "recipient",
+    externalToken: "token",
+    externalTokenAmount: "100",
+    requestedAt: "1",
+    stratoSender: "sender",
+    stratoToken: "strato-token",
+    stratoTokenAmount: "100000000000000",
+    timestamp: "1",
+    withdrawalId: "7",
+    vault: "vault",
+  });
+
+  assert.deepEqual(trace, [
+    "strato:markWithdrawalReady",
+    "vault:reserve",
+    "strato:recordWithdrawalReservation",
+    "vault:release",
+    "strato:finalizeWithdrawal",
+  ]);
+});
+
+test("restores ready withdrawal authorization state from Cirrus", async () => {
+  const { cirrus } = await import("../utils/api");
+  (cirrus as any).get = async (url: string) => {
+    if (url.includes("-withdrawals")) {
+      return [{
+        key: "7",
+        value: {
+          status: 3,
+          externalChainId: 1,
+          authorizationDeadline: "2800",
+        },
+      }];
+    }
+    if (url.includes("-withdrawalAuthorizations")) {
+      return [{
+        key: "7",
+        value: {
+          notBefore: "1000",
+          deadline: "2800",
+          signerSetVersion: "4",
+        },
+      }];
+    }
+    if (url.includes("-chains")) {
+      return [{
+        key: "1",
+        value: {
+          chainName: "Ethereum",
+          depositRouter: "router",
+          enabled: true,
+          lastProcessedBlock: 10,
+          vault: "vault",
+        },
+      }];
+    }
+    return [];
+  };
+
+  const { getExternalWithdrawalsByStatus } = await import("./cirrusService");
+  const withdrawals = await getExternalWithdrawalsByStatus("3");
+
+  assert.equal(withdrawals[0].authorizationNotBefore, "1000");
+  assert.equal(withdrawals[0].authorizationDeadline, "2800");
+  assert.equal(withdrawals[0].signerSetVersion, "4");
+});

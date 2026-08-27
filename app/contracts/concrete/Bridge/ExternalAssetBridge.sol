@@ -119,7 +119,9 @@ contract record ExternalAssetBridge is Ownable {
     );
     event WithdrawalReady(
         uint256 withdrawalId,
-        uint256 authorizationDeadline
+        uint256 authorizationNotBefore,
+        uint256 authorizationDeadline,
+        uint256 signerSetVersion
     );
     event WithdrawalReservationRecorded(
         uint256 withdrawalId,
@@ -179,6 +181,7 @@ contract record ExternalAssetBridge is Ownable {
     mapping(uint256 => mapping(string => DepositActionIntent)) public record depositActions;
     mapping(address => mapping(uint256 => mapping(address => DepositActionConfig))) public record depositActionConfigs;
     mapping(uint256 => WithdrawalInfo) public record withdrawals;
+    mapping(uint256 => WithdrawalAuthorizationInfo) public record withdrawalAuthorizations;
     mapping(string => uint256) public withdrawalByReservationId;
     mapping(string => uint256) public withdrawalByExternalTxHash;
 
@@ -799,7 +802,9 @@ contract record ExternalAssetBridge is Ownable {
 
     function markWithdrawalReady(
         uint256 withdrawalId,
-        uint256 authorizationDeadline
+        uint256 authorizationNotBefore,
+        uint256 authorizationDeadline,
+        uint256 signerSetVersion
     ) public onlyBridgeOperator whenWithdrawalsOpen {
         WithdrawalInfo withdrawal = withdrawals[
             withdrawalId
@@ -810,15 +815,29 @@ contract record ExternalAssetBridge is Ownable {
         );
         require(
             authorizationDeadline > block.timestamp &&
+                authorizationDeadline >= authorizationNotBefore &&
                 authorizationDeadline <=
-                block.timestamp + MAX_AUTHORIZATION_VALIDITY_SECONDS,
+                authorizationNotBefore +
+                    MAX_AUTHORIZATION_VALIDITY_SECONDS,
             "EAB: invalid deadline"
         );
+        require(signerSetVersion > 0, "EAB: invalid signer set");
 
         withdrawal.status = Status.READY;
         withdrawal.authorizationDeadline = authorizationDeadline;
+        WithdrawalAuthorizationInfo authorization = withdrawalAuthorizations[
+            withdrawalId
+        ];
+        authorization.notBefore = authorizationNotBefore;
+        authorization.deadline = authorizationDeadline;
+        authorization.signerSetVersion = signerSetVersion;
         withdrawal.timestamp = block.timestamp;
-        emit WithdrawalReady(withdrawalId, authorizationDeadline);
+        emit WithdrawalReady(
+            withdrawalId,
+            authorizationNotBefore,
+            authorizationDeadline,
+            signerSetVersion
+        );
     }
 
     function recordWithdrawalReservation(

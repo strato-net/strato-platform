@@ -79,4 +79,10 @@ library ExternalBridgeTypes {
         string externalTxHash;
         string cancellationTxHash;
     }
+
+    struct WithdrawalAuthorizationInfo {
+        uint256 notBefore;
+        uint256 deadline;
+        uint256 signerSetVersion;
+    }
 }

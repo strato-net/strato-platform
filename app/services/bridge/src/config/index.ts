@@ -168,6 +168,31 @@ export const getNativeBridgePrivateKeys = (
   return keys;
 };
 
+export const getExternalBridgeAttestationPrivateKeys = (
+  chainId: number | bigint,
+): NativeBridgePrivateKeyConfig[] => {
+  const chainIdStr = chainId.toString();
+  const baseEnv = `CHAIN_${chainIdStr}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY`;
+  const keys: NativeBridgePrivateKeyConfig[] = [];
+  const seen = new Set<string>();
+
+  const addKey = (envVar: string) => {
+    const privateKey = process.env[envVar]?.trim();
+    if (!privateKey || seen.has(privateKey)) return;
+    seen.add(privateKey);
+    keys.push({ envVar, privateKey });
+  };
+
+  addKey(baseEnv);
+  for (let index = 1; ; index += 1) {
+    const envVar = `${baseEnv}_${index}`;
+    if (!process.env[envVar]) break;
+    addKey(envVar);
+  }
+
+  return keys;
+};
+
 // Validate required environment variables
 const requiredEnvVars = [
   "BA_USERNAME",

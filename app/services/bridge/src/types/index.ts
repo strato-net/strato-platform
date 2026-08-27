@@ -167,11 +167,18 @@ export interface NativeDepositInfo {
 
 export interface WithdrawalInfo {
   bridgeStatus: string; // NONE / INITIATED / COMPLETED / ABORTED
-  custodyTxHash: string;
+  custodyTxHash?: string;
+  authorizationNotBefore?: string;
+  authorizationDeadline?: string;
+  cancellationTxHash?: string;
   externalChainId: string | number;
   externalRecipient: string;
   externalToken: string;
   externalTokenAmount: string;
+  requiresManualReview?: boolean;
+  reservationId?: string;
+  reservationTxHash?: string;
+  signerSetVersion?: string;
   requestedAt: string;
   stratoSender: string;
   stratoToken: string;
@@ -180,6 +187,7 @@ export interface WithdrawalInfo {
 
   withdrawalId: string;
   useHotWallet?: boolean;
+  vault?: string;
 }
 
 export interface NativeWithdrawalInfo {

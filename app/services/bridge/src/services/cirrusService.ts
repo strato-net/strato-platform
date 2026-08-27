@@ -133,6 +133,60 @@ export const getWithdrawalsByStatus = async (
   }));
 };
 
+export const getExternalWithdrawalsByStatus = async (
+  status: string,
+): Promise<WithdrawalInfo[]> => {
+  const [data, enabledChains] = await Promise.all([
+    cirrus.get(
+      `/${EXTERNAL_ASSET_BRIDGE_URL}-withdrawals?select=*,bridge:${EXTERNAL_ASSET_BRIDGE_URL}!inner(withdrawalsPaused)`,
+      {
+        params: {
+          "value->>status": `eq.${status}`,
+          address: `eq.${externalAssetBridgeAddress}`,
+          order: "value->>requestedAt.asc",
+          "bridge.withdrawalsPaused": "eq.false",
+        },
+      },
+    ),
+    getEnabledChains(),
+  ]);
+
+  if (!Array.isArray(data) || data.length === 0) return [];
+  const withdrawalIds = data.map((item) => item.key);
+  const authorizationData = await cirrus.get(
+    `/${EXTERNAL_ASSET_BRIDGE_URL}-withdrawalAuthorizations`,
+    {
+      params: {
+        key: `in.(${withdrawalIds.join(",")})`,
+        address: `eq.${externalAssetBridgeAddress}`,
+        select: "key,value",
+      },
+    },
+  );
+  const authorizations = new Map(
+    (Array.isArray(authorizationData) ? authorizationData : []).map((item) => [
+      String(item.key),
+      item.value,
+    ]),
+  );
+
+  return data.map((item) => {
+    const externalChainId = Number(item.value.externalChainId);
+    const vault = enabledChains.get(externalChainId)?.vault;
+    if (!vault) {
+      throw new Error(`Vault not found for chain ${externalChainId}`);
+    }
+    return {
+      ...item.value,
+      bridgeStatus: item.value.status,
+      withdrawalId: item.key,
+      vault,
+      authorizationNotBefore: authorizations.get(String(item.key))?.notBefore,
+      signerSetVersion: authorizations.get(String(item.key))?.signerSetVersion,
+    };
+  });
+};
+
 export const getNativeWithdrawalsByStatus = async (
   status: string
 ): Promise<NativeWithdrawalInfo[]> => {
