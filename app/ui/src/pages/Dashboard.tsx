@@ -21,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import LiquidationAlertBanner, { CDPLiquidationAlertBanner } from "@/components/ui/LiquidationAlertBanner";
 import GuestPromoSection from "@/components/dashboard/GuestPromoSection";
 import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
+import MemberBenefitDialog from "@/components/dashboard/MemberBenefitDialog";
+import { useMemberBenefitPopup } from "@/hooks/useMemberBenefitPopup";
 import { useNetwork } from "@/context/NetworkContext";
 
 const TIME_RANGES = ["7d", "1m", "3m", "6m", "1y", "all"] as const;
@@ -59,6 +61,12 @@ const Dashboard = () => {
   });
   const { contactEnabled } = useNetwork();
   const [contactModalOpen, setContactModalOpen] = useState(false);
+  const {
+    popup: benefitPopup,
+    open: benefitOpen,
+    dismiss: dismissBenefit,
+    acknowledgeCta: acknowledgeBenefitCta,
+  } = useMemberBenefitPopup();
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(() => {
     const stored = localStorage.getItem('dashboard-timeRange');
     if (stored && TIME_RANGES.includes(stored as TimeRange)) {
@@ -409,6 +417,12 @@ const Dashboard = () => {
       {contactEnabled && (
         <ContactInquiryModal open={contactModalOpen} onOpenChange={setContactModalOpen} />
       )}
+      <MemberBenefitDialog
+        popup={benefitPopup}
+        open={benefitOpen}
+        onDismiss={dismissBenefit}
+        onCta={acknowledgeBenefitCta}
+      />
     </div>
   );
 };
