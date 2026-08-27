@@ -26,6 +26,7 @@ library
       Blockchain.Init.BuildMetadata.TH
       Blockchain.Init.Monad
       Blockchain.Init.Options
+      Blockchain.Init.RtsFlags
   other-modules:
       Paths_strato_init
   hs-source-dirs:
@@ -100,4 +101,16 @@ executable strato-setup
     , hflags
     , strato-init
     , strato-model
+  default-language: Haskell2010
+
+test-suite strato-init-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  hs-source-dirs:
+      test/
+  ghc-options: -Wall -O2 -threaded -Wall -threaded
+  build-depends:
+      base
+    , hspec
+    , strato-init
   default-language: Haskell2010

@@ -24,5 +24,6 @@ executable convoke
     , filepath
     , process
     , shellwords
+    , time
     , unix
   default-language: Haskell2010

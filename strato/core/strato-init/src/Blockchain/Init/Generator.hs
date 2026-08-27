@@ -18,6 +18,7 @@ import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
 import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_pghost, flags_sslDir)
+import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
@@ -90,11 +91,28 @@ createCommandsFile = do
       return ["blockapps-vault-wrapper-server --pghost " ++ preferIPv4Loopback flags_pghost ++ " --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
     else return []
 
+  -- The sequencer and vm-runner carry multi-GB heaps during catch-up, so
+  -- their RTS flags are sized to this machine (or container limit) instead of
+  -- being hard-coded. Sizing happens here, once, at setup time: resizing a
+  -- node means re-running strato-setup or editing commands.txt.
+  resources <- detectMachineResources
+  putStrLn $ "  RTS sizing: " ++ describeMachineResources resources
+  sequencerRts <- rtsWithOverride "STRATO_SEQUENCER_RTS" $
+    sequencerRtsFlags (mrCores resources) (mrMemMB resources)
+  vmRunnerRts <- rtsWithOverride "STRATO_VMRUNNER_RTS" $
+    vmRunnerRtsFlags (mrCores resources) (mrMemMB resources)
+  putStrLn $ "  strato-sequencer: " ++ sequencerRts
+  putStrLn $ "  vm-runner: " ++ vmRunnerRts
+  when (mrMemMB resources <= smallestRamTierMB) $
+    putStrLn $ "\ESC[1;33mWarning: " ++ show (mrMemMB resources) ++ " MB RAM is not enough "
+      ++ "for from-genesis sync (vm-runner live data alone is ~3.5GB). "
+      ++ "Restore this node from a snapshot instead (strato-up --snapshot).\ESC[0m"
+
   let baseCommands =
         [ "ethereum-discover +RTS -T -RTS"
         , "strato-p2p +RTS -T -RTS"
-        , "strato-sequencer +RTS -T -N4 -A128m -RTS"
-        , "vm-runner +RTS -T -I2 -N4 -A128m -RTS"
+        , "strato-sequencer " ++ sequencerRts
+        , "vm-runner " ++ vmRunnerRts
         , "strato-indexer"
         , "slipstream +RTS -T -RTS"
         , "strato-api +RTS -T -N -maxN4 -RTS"
@@ -104,10 +122,22 @@ createCommandsFile = do
 
       jsonrpcCommands =
         if flags_jsonrpc
-          then ["ethereum-jsonrpc +RTS -T -RTS"]
+          then ["ethereum-jsonrpc +RTS -T -N -maxN4 -RTS"]
           else []
 
   writeFile "commands.txt" $ unlines (localAuthCommands ++ baseCommands ++ jsonrpcCommands)
+
+-- | The computed RTS flags for a process, unless its escape-hatch env var is
+-- set, in which case the env var's value is used verbatim (wrapped in
+-- +RTS/-RTS). Lets support tune a misbehaving node without a rebuild.
+rtsWithOverride :: String -> [String] -> IO String
+rtsWithOverride envVar computed = do
+  mOverride <- lookupEnv envVar
+  case mOverride of
+    Just override | not (null override) -> do
+      putStrLn $ "  " ++ envVar ++ " override in effect, replacing computed RTS flags"
+      return $ renderRtsFlags [override]
+    _ -> return $ renderRtsFlags computed
 
 
 

@@ -67,7 +67,10 @@ launchCommand (cmd, args) = do
       error $ "Could not get PID for: " ++ cmd
     Just pid -> do
       appendFile pidFile (show pid ++ "\n")
-      putStrLn $ "Started: " ++ cmd ++ " (PID " ++ show pid ++ ")"
+      -- Log the full command line: the RTS flags in it are sized per machine
+      -- at setup time (see Blockchain.Init.RtsFlags), and support needs to see
+      -- what a node is actually running with from convoke.log alone.
+      putStrLn $ "Started: " ++ unwords (cmd : args) ++ " (PID " ++ show pid ++ ")"
       async $ do
         ec <- waitForProcess ph
         hClose h
