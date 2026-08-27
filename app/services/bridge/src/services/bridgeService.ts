@@ -21,7 +21,9 @@ import {
 import { buildActionDepositBatchArgs } from "./depositEventService";
 import {
   buildWithdrawalAuthorization,
+  cancelExpiredWithdrawal,
   getReservationId,
+  getReservationState,
   releaseWithdrawal,
   reserveWithdrawal,
 } from "./externalWithdrawalService";
@@ -599,9 +601,25 @@ export const processExternalWithdrawal = async (
     }
   }
 
+  let reservationState = await getReservationState(authorization);
+  const authorizationExpired =
+    reservationState.latestTimestamp > BigInt(authorization.deadline);
   let reservationId = withdrawal.reservationId;
   if (!reservationId) {
-    const reservation = await reserveWithdrawal(authorization);
+    if (reservationState.status === 0 && authorizationExpired) {
+      logInfo(
+        "BridgeService",
+        `External withdrawal ${withdrawal.withdrawalId} expired without a reservation and is ready for governance refund`,
+      );
+      return;
+    }
+    const reservation =
+      reservationState.status === 0
+        ? await reserveWithdrawal(authorization)
+        : {
+            reservationId: reservationState.reservationId,
+            transactionHash: reservationState.reservationTxHash!,
+          };
     reservationId = reservation.reservationId;
     const reservationResult = await execute({
       contractName: "ExternalAssetBridge",
@@ -618,6 +636,9 @@ export const processExternalWithdrawal = async (
         `Withdrawal reservation ${reservationId} remains ${reservationResult.status}`,
       );
     }
+    if (reservationState.status === 0) {
+      reservationState = { ...reservationState, status: 1 };
+    }
   } else if (
     reservationId.toLowerCase().replace(/^0x/, "") !==
     getReservationId(authorization).toLowerCase().replace(/^0x/, "")
@@ -625,6 +646,37 @@ export const processExternalWithdrawal = async (
     throw new Error(
       `Withdrawal ${withdrawal.withdrawalId} has a mismatched reservation`,
     );
+  }
+
+  if (
+    reservationState.status === 3 ||
+    (reservationState.status === 1 && authorizationExpired)
+  ) {
+    const cancellationTxHash = await cancelExpiredWithdrawal(
+      authorization,
+      reservationId,
+    );
+    const cancellationResult = await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "recordWithdrawalCancellation",
+      args: {
+        withdrawalId: withdrawal.withdrawalId,
+        reservationId,
+        cancellationTxHash,
+      },
+    });
+    if (cancellationResult.status !== "Success") {
+      throw new Error(
+        `Withdrawal cancellation ${reservationId} remains ${cancellationResult.status}`,
+      );
+    }
+    logInfo(
+      "BridgeService",
+      `Cancelled expired external withdrawal ${withdrawal.withdrawalId}; governance refund is now available`,
+      { reservationId, cancellationTxHash },
+    );
+    return;
   }
 
   const releaseTxHash = await releaseWithdrawal(authorization, reservationId);

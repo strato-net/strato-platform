@@ -35,8 +35,10 @@ const EXTERNAL_VAULT_ABI = [
   "function reservations(bytes32) view returns (uint8 status,address token,address recipient,uint256 amount,uint256 deadline,bytes32 authorizationDigest)",
   "function reserve((uint256 sourceChainId,address sourceBridge,uint256 sourceWithdrawalId,uint256 destinationChainId,address destinationVault,address token,address recipient,uint256 amount,uint256 notBefore,uint256 deadline,uint256 signerSetVersion) authorization,bytes[] signatures) returns (bytes32)",
   "function release(bytes32 reservationId)",
+  "function cancelExpired(bytes32 reservationId)",
   "event WithdrawalReserved(bytes32 indexed reservationId,bytes32 indexed authorizationDigest,uint256 indexed sourceWithdrawalId,address token,address recipient,uint256 amount,uint256 deadline)",
   "event WithdrawalReleased(bytes32 indexed reservationId,address indexed token,address indexed recipient,uint256 amount)",
+  "event WithdrawalCancelled(bytes32 indexed reservationId)",
 ];
 
 const WITHDRAWAL_AUTHORIZATION_TYPES = {
@@ -130,10 +132,12 @@ export const buildWithdrawalAuthorization = async (
   }
 
   const validitySeconds = BigInt(validity.toString());
-  const hasStoredAuthorization = withdrawal.authorizationDeadline != null;
+  const storedDeadline = BigInt(withdrawal.authorizationDeadline || 0);
+  const hasStoredAuthorization = storedDeadline > 0n;
   if (
     hasStoredAuthorization &&
-    (!withdrawal.authorizationNotBefore || !withdrawal.signerSetVersion)
+    (withdrawal.authorizationNotBefore == null ||
+      BigInt(withdrawal.signerSetVersion || 0) <= 0n)
   ) {
     throw new Error(
       `Withdrawal ${withdrawal.withdrawalId} has incomplete authorization state`,
@@ -143,10 +147,10 @@ export const buildWithdrawalAuthorization = async (
     ? BigInt(withdrawal.authorizationNotBefore!)
     : BigInt(latestBlock.timestamp);
   const deadline = hasStoredAuthorization
-    ? BigInt(withdrawal.authorizationDeadline!)
+    ? storedDeadline
     : notBefore + validitySeconds;
-  if (validitySeconds <= 0n || deadline <= BigInt(latestBlock.timestamp)) {
-    throw new Error(`Withdrawal ${withdrawal.withdrawalId} authorization expired`);
+  if (validitySeconds <= 0n) {
+    throw new Error(`Vault on chain ${destinationChainId} has invalid validity`);
   }
 
   return {
@@ -182,7 +186,10 @@ export const getReservationId = (
 const getEventTransactionHash = async (
   provider: JsonRpcProvider,
   vaultAddress: string,
-  eventName: "WithdrawalReserved" | "WithdrawalReleased",
+  eventName:
+    | "WithdrawalReserved"
+    | "WithdrawalReleased"
+    | "WithdrawalCancelled",
   reservationId: string,
 ): Promise<string> => {
   const logs = await provider.getLogs({
@@ -196,6 +203,49 @@ const getEventTransactionHash = async (
     throw new Error(`${eventName} event not found for ${reservationId}`);
   }
   return transactionHash;
+};
+
+export const getReservationState = async (
+  authorization: WithdrawalAuthorization,
+): Promise<{
+  reservationId: string;
+  status: number;
+  latestTimestamp: bigint;
+  reservationTxHash?: string;
+}> => {
+  const provider = new JsonRpcProvider(
+    getChainRpcUrl(BigInt(authorization.destinationChainId)),
+  );
+  const vault = new Contract(
+    authorization.destinationVault,
+    EXTERNAL_VAULT_ABI,
+    provider,
+  );
+  const reservationId = getReservationId(authorization);
+  const [reservation, latestBlock] = await Promise.all([
+    vault.reservations(reservationId),
+    provider.getBlock("latest"),
+  ]);
+  if (!latestBlock) {
+    throw new Error(
+      `Latest block not found for chain ${authorization.destinationChainId}`,
+    );
+  }
+  const status = Number(reservation.status ?? reservation[0]);
+  return {
+    reservationId,
+    status,
+    latestTimestamp: BigInt(latestBlock.timestamp),
+    reservationTxHash:
+      status === 0
+        ? undefined
+        : await getEventTransactionHash(
+            provider,
+            authorization.destinationVault,
+            "WithdrawalReserved",
+            reservationId,
+          ),
+  };
 };
 
 const getVaultWithSigner = (
@@ -281,6 +331,34 @@ export const releaseWithdrawal = async (
     provider,
     authorization.destinationVault,
     "WithdrawalReleased",
+    reservationId,
+  );
+};
+
+export const cancelExpiredWithdrawal = async (
+  authorization: WithdrawalAuthorization,
+  reservationId: string,
+): Promise<string> => {
+  const { provider, vault } = getVaultWithSigner(authorization);
+  const reservation = await vault.reservations(reservationId);
+  const status = Number(reservation.status ?? reservation[0]);
+
+  if (status === 1) {
+    const transaction = await vault.cancelExpired(reservationId);
+    const receipt = await transaction.wait();
+    if (!receipt || receipt.status !== 1) {
+      throw new Error(`Vault cancellation failed: ${transaction.hash}`);
+    }
+    return receipt.hash;
+  }
+  if (status !== 3) {
+    throw new Error(`Reservation ${reservationId} is not cancellable`);
+  }
+
+  return getEventTransactionHash(
+    provider,
+    authorization.destinationVault,
+    "WithdrawalCancelled",
     reservationId,
   );
 };

@@ -82,6 +82,7 @@ Native withdrawal review delay and attestation validity are enforced by the nati
 - `CHAIN_${chainId}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY_1`, `_2`, ... - Optional additional signer keys required by the vault threshold
 
 Routine non-native withdrawals are marked ready on STRATO, reserved in the route-local vault, released externally, and only then finalized and burned on STRATO. Withdrawals flagged for manual review remain pending.
+Expired reservations are cancelled on the destination vault and recorded on STRATO; governance can then refund the escrowed representation with `npm run refund:external-withdrawal` from `app/contracts`.
 
 #### Optional
 - `VOUCHER_CONTRACT_ADDRESS` - Voucher contract address (defaults to `0x000000000000000000000000000000000000100e`)

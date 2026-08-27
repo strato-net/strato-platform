@@ -141,6 +141,11 @@ test("reserves and releases before finalizing a routine withdrawal", async () =>
     deadline: "2800",
     signerSetVersion: "1",
   });
+  (vaultService as any).getReservationState = async () => ({
+    reservationId: "reservation",
+    status: 0,
+    latestTimestamp: 1000n,
+  });
   (vaultService as any).reserveWithdrawal = async () => {
     trace.push("vault:reserve");
     return { reservationId: "reservation", transactionHash: "reserve-hash" };
@@ -174,6 +179,89 @@ test("reserves and releases before finalizing a routine withdrawal", async () =>
     "vault:release",
     "strato:finalizeWithdrawal",
   ]);
+});
+
+test("cancels an expired reservation before allowing governance refund", async () => {
+  const stratoHelper = await import("../utils/stratoHelper");
+  const vaultService = await import("./externalWithdrawalService");
+  const trace: string[] = [];
+
+  (stratoHelper as any).execute = async (input: any) => {
+    trace.push(`strato:${input.method}`);
+    return { status: "Success", hash: `${input.method}-hash` };
+  };
+  (vaultService as any).getReservationState = async () => ({
+    reservationId: "reservation",
+    status: 1,
+    latestTimestamp: 3000n,
+    reservationTxHash: "reserve-hash",
+  });
+  (vaultService as any).cancelExpiredWithdrawal = async () => {
+    trace.push("vault:cancel");
+    return "cancel-hash";
+  };
+
+  const { processExternalWithdrawal } = await import("./bridgeService");
+  await processExternalWithdrawal({
+    bridgeStatus: "3",
+    externalChainId: 1,
+    externalRecipient: "recipient",
+    externalToken: "token",
+    externalTokenAmount: "100",
+    requestedAt: "1",
+    stratoSender: "sender",
+    stratoToken: "strato-token",
+    stratoTokenAmount: "100000000000000",
+    timestamp: "1",
+    withdrawalId: "7",
+    vault: "vault",
+    authorizationNotBefore: "1000",
+    authorizationDeadline: "2800",
+    signerSetVersion: "1",
+  });
+
+  assert.deepEqual(trace, [
+    "strato:recordWithdrawalReservation",
+    "vault:cancel",
+    "strato:recordWithdrawalCancellation",
+  ]);
+});
+
+test("leaves an expired unreserved withdrawal for governance refund", async () => {
+  const stratoHelper = await import("../utils/stratoHelper");
+  const vaultService = await import("./externalWithdrawalService");
+  const trace: string[] = [];
+
+  (stratoHelper as any).execute = async (input: any) => {
+    trace.push(`strato:${input.method}`);
+    return { status: "Success", hash: `${input.method}-hash` };
+  };
+  (vaultService as any).getReservationState = async () => ({
+    reservationId: "reservation",
+    status: 0,
+    latestTimestamp: 3000n,
+  });
+
+  const { processExternalWithdrawal } = await import("./bridgeService");
+  await processExternalWithdrawal({
+    bridgeStatus: "3",
+    externalChainId: 1,
+    externalRecipient: "recipient",
+    externalToken: "token",
+    externalTokenAmount: "100",
+    requestedAt: "1",
+    stratoSender: "sender",
+    stratoToken: "strato-token",
+    stratoTokenAmount: "100000000000000",
+    timestamp: "1",
+    withdrawalId: "7",
+    vault: "vault",
+    authorizationNotBefore: "1000",
+    authorizationDeadline: "2800",
+    signerSetVersion: "1",
+  });
+
+  assert.deepEqual(trace, []);
 });
 
 test("restores ready withdrawal authorization state from Cirrus", async () => {

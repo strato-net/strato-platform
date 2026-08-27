@@ -12,6 +12,7 @@
         "happy:native-redemption": "node deploy/happy-native-redemption.js",
         "happy:native-withdrawal": "node deploy/happy-native-withdrawal.js",
         "initialize:native-bridge": "node deploy/initialize-native-bridge.js",
+        "refund:external-withdrawal": "node deploy/refund-external-withdrawal.js",
         "smoke:native-bridge": "node deploy/smoke-native-bridge.js",
         "upgrade": "node deploy/upgrade.js",
         "upgrade:poolv3-nft": "node deploy/upgrade-poolv3-nft.js",
