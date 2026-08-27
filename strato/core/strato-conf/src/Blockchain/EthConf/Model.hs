@@ -257,7 +257,8 @@ stakingNotScheduled = 2 ^ (62 :: Int)
 -- dev/test networks) activates from genesis.
 defaultStakingActivationBlock :: String -> Maybe Integer
 defaultStakingActivationBlock net
-  | net `elem` ["upquark", "lithium", "mercata", "mercata-hydrogen", "uranium"] = Just stakingNotScheduled
+  | net == "upquark" = Just 1000000
+  | net `elem` ["lithium", "mercata", "mercata-hydrogen", "uranium"] = Just stakingNotScheduled
   | take 6 net == "helium" = Just 250000
   | otherwise = Nothing
 
@@ -381,8 +382,8 @@ instance Default DiscoveryConf where
 
 instance Default P2PConf where
   def = P2PConf
-    { maxConnections = 1000
-    , connectionTimeout = 3600
+    { maxConnections = 20
+    , connectionTimeout = 120
     , maxReturnedHeaders = 500
     , averageTxsPerBlock = 40
     , maxHeadersTxsLens = 2500

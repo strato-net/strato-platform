@@ -32,17 +32,27 @@ heliumNetworkID = 114784819836269
 upquarkNetworkID :: Integer
 upquarkNetworkID = 33056204878082667
 
+-- | Throwaway network for rehearsing the staking/receipts-root flag day before
+-- it runs on a live chain. Its forks sit at a low height on purpose: the point
+-- is to exercise the legacy paths, the transition, and the post-fork paths in
+-- one short-lived chain. Unlike helium and upquark, this network is created
+-- after the fork code exists, so without an entry here it would run the new
+-- rules from genesis and never test the old ones at all.
+forktestNetworkID :: Integer
+forktestNetworkID = 7381244120123405172
+
+forktestForkBlock :: Integer
+forktestForkBlock = 10000
+
 heliumReceiptsRootForkBlock :: Integer
 heliumReceiptsRootForkBlock = 250000
-
-upquarkReceiptsRootForkBlock :: Integer
-upquarkReceiptsRootForkBlock = 250000
 
 isReceiptsRootForkActive :: Integer -> Bool
 isReceiptsRootForkActive blockNum =
   let net = Conf.networkID $ networkConfig ethConf
-   in not $ (net == upquarkNetworkID && blockNum < upquarkReceiptsRootForkBlock)
-         || (net == heliumNetworkID  && blockNum < heliumReceiptsRootForkBlock)
+   in not $ (net == upquarkNetworkID  && blockNum < upquarkStakingForkBlock)
+         || (net == heliumNetworkID   && blockNum < heliumReceiptsRootForkBlock)
+         || (net == forktestNetworkID && blockNum < forktestForkBlock)
 
 -- | Block from which the block-reward call's events are folded into the block's
 -- first receipt, so BlockRewardsPaid is visible to receipts and the indexer.
@@ -59,10 +69,14 @@ isReceiptsRootForkActive blockNum =
 heliumStakingForkBlock :: Integer
 heliumStakingForkBlock = 300000
 
+upquarkStakingForkBlock :: Integer
+upquarkStakingForkBlock = 1000000
+
 isBlockRewardReceiptForkActive :: Integer -> Bool
 isBlockRewardReceiptForkActive blockNum =
   let conf = networkConfig ethConf
       switchAt
+        | Conf.networkID conf == upquarkNetworkID = upquarkStakingForkBlock
         | Conf.networkID conf == heliumNetworkID = heliumStakingForkBlock
         -- 'Nothing' means staking is live from genesis, so the fork is too.
         | otherwise = maybe 0 id (Conf.stakingActivationBlock conf)

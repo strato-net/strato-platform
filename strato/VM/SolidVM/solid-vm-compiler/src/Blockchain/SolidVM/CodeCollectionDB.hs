@@ -44,7 +44,6 @@ import qualified Data.Aeson as Aeson
 import Data.Bifunctor (bimap, first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.Cache.LRU as LRU
 import Data.Default
 import Data.Foldable (foldrM)
 import Data.IORef
@@ -98,12 +97,11 @@ instance Monad m => (Keccak256 `A.Alters` DBCode) (MemCompilerT m) where
 runMemCompilerT :: Monad m => MemCompilerT m a -> m a
 runMemCompilerT = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT . unMemCompilerT
 
-maxCacheSize :: Integer
-maxCacheSize = 10
-
-{-# NOINLINE unsafeCodeCacheLRUIORef #-}
-unsafeCodeCacheLRUIORef :: IORef (LRU.LRU Keccak256 CodeCollection)
-unsafeCodeCacheLRUIORef = unsafePerformIO $ newIORef $ LRU.newLRU (Just maxCacheSize)
+-- Apply/catchup touches far more than 10 contracts (DEC1DE, USDST, voucher,
+-- oracles, user code). A 10-entry LRU evicts and re-typechecks on the hot path.
+{-# NOINLINE unsafeCodeCacheIORef #-}
+unsafeCodeCacheIORef :: IORef (M.Map Keccak256 CodeCollection)
+unsafeCodeCacheIORef = unsafePerformIO $ newIORef M.empty
 
 withAnnotations :: Monad m => (a -> m (Either CompilationError b)) -> a -> m (Either [SourceAnnotation T.Text] b)
 withAnnotations f = fmap (first unwind) . f
@@ -231,13 +229,12 @@ codeCollectionFromSource isRunningTests typeCheck initCode = do
         [(t, src)] | T.null t -> encodeUtf8 src -- for backwards compatibility
         _ -> BL.toStrict $ Aeson.encode initList
       hsh = hash canonicalInitCode
-  codeCache <- liftIO $ readIORef unsafeCodeCacheLRUIORef
-  case LRU.lookup hsh codeCache of
-    (newCache, (Just cc)) -> do
+  codeCache <- liftIO $ readIORef unsafeCodeCacheIORef
+  case M.lookup hsh codeCache of
+    Just cc -> do
       recordCacheEvent CacheHit
-      liftIO $ writeIORef unsafeCodeCacheLRUIORef newCache
       return (hsh, cc)
-    (_, Nothing) -> do
+    Nothing -> do
       recordCacheEvent StorageWrite
       hsh' <- addCode canonicalInitCode
       ecc <- compileSource isRunningTests typeCheck initMap
@@ -247,7 +244,7 @@ codeCollectionFromSource isRunningTests typeCheck initCode = do
             Left (IEx p) -> typeError "codeCollectionFromSource" $ show p
             Left (SVMEx (s, _)) -> throw s
             Left (TCEx xs) -> typeError "Typechecker" $ T.unpack (typeErrorToAnnotation xs)
-      liftIO $ modifyIORef' unsafeCodeCacheLRUIORef (LRU.insert hsh cc)
+      liftIO $ modifyIORef' unsafeCodeCacheIORef (M.insert hsh cc)
       return $ assert (hsh == hsh') (hsh, cc)
 
 codeCollectionFromHash ::
@@ -261,16 +258,15 @@ codeCollectionFromHash ::
   Keccak256 ->
   m CodeCollection
 codeCollectionFromHash isRunningTests typeCheck hsh = do
-  codeCache <- liftIO $ readIORef unsafeCodeCacheLRUIORef
-  case LRU.lookup hsh codeCache of
-    (newCache, (Just cc)) -> do
+  codeCache <- liftIO $ readIORef unsafeCodeCacheIORef
+  case M.lookup hsh codeCache of
+    Just cc -> do
       recordCacheEvent CacheHit
-      liftIO $ writeIORef unsafeCodeCacheLRUIORef newCache
       return cc
-    (_, Nothing) -> do
+    Nothing -> do
       recordCacheEvent CacheMiss
       cc <- codeCollectionFromHashNoCache isRunningTests True typeCheck hsh
-      liftIO $ modifyIORef' unsafeCodeCacheLRUIORef (LRU.insert hsh cc)
+      liftIO $ modifyIORef' unsafeCodeCacheIORef (M.insert hsh cc)
       return cc
 
 codeCollectionFromHashNoCache ::

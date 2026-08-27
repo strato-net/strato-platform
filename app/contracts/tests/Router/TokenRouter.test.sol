@@ -67,7 +67,7 @@ contract Describe_TokenRouter is Authorizable {
         v3Pool.mint(address(this), -600, 600, 1000e18, BIG, BIG, block.timestamp + DEADLINE_OFFSET);
 
         psm = new DirectMintPSM(address(this));
-        psm.initialize(address(usdst), address(m.feeCollector()), [address(tokenB)], 0);
+        psm.initialize(address(usdst), address(m.feeCollector()), [address(tokenB)]);
         m.adminRegistry().castVoteOnIssue(
             address(m.adminRegistry()),
             "addWhitelist",

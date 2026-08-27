@@ -165,7 +165,7 @@ newContext network' chainId' (Checkpoint v as mParent stakes' lastRound') addr v
           _lockSender = Nothing,
           _lastParent = mParent,
           _validatorBehavior = valB,
-          _isValidator = False,
+          _isValidator = maybe False (\a -> Validator a `S.member` valSet) addr,
           _network = network'
         }
    in ctx

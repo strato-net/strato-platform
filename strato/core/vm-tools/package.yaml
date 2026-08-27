@@ -35,7 +35,7 @@ library:
     - Blockchain.VMMetrics
     - Blockchain.Wiring
     - Executable.EVMFlags
-  ghc-options: -Wall -O2
+  ghc-options: -Wall -O2 -fexpose-all-unfoldings -fspecialise-aggressively
   dependencies:
     - aeson
     - binary
@@ -83,6 +83,7 @@ library:
     - text
     - time
     - transformers
+    - unordered-containers
     - unliftio
 
 

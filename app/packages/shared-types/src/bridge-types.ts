@@ -42,6 +42,11 @@ export interface BridgeToken {
   enabled: boolean;              // effective route enabled state
   depositsPaused?: boolean;      // Native-only; hides native redemption/deposit routes when true
   withdrawalsPaused?: boolean;   // Native-only; hides native withdrawal routes when true
+  depositsDisabled?: boolean;    // Native-only; token-specific deposit control
+  withdrawalsDisabled?: boolean; // Native-only; token-specific withdrawal control
+  maxOutstandingWithdrawal?: string; // Native-only; aggregate custody cap, 0 means unlimited
+  outstandingWithdrawal?: string; // Native-only; amount currently locked in custody
+  remainingOutstandingWithdrawal?: string; // Native-only; available aggregate capacity
   isDefaultRoute: boolean;       // true when route token matches asset default token
   stratoTokenImage?: string;     // First image URL from TokenFactory images
   rebaseFactor?: string;         // External-only; for example, getCurrentMultiplier() for TSLAx

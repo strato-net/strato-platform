@@ -40,7 +40,8 @@ import Blockchain.VMContext hiding (state)
 import Blockchain.VMMetrics
 import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
 import qualified Blockchain.EthConf.Model as Conf
-import Blockchain.Forks (isReceiptsRootForkActive)
+import Blockchain.Data.ExecResults (ExecResults, erEvents, erLogs)
+import Blockchain.Forks (isBlockRewardReceiptForkActive, isReceiptsRootForkActive)
 import qualified Blockchain.Verification as V
 import Blockchain.Data.Receipt (Receipt)
 import Control.Monad
@@ -77,7 +78,10 @@ data TxMiningResult = TxMiningResult
   { tmrFailure :: Maybe TransactionFailureCause,
     tmrRanTxs :: [TxRunResult],
     tmrUnranTxs :: [OutputTx],
-    tmrRemGas :: Integer
+    tmrRemGas :: Integer,
+    -- | The block-reward results when this run paid them but ran no
+    -- transaction to attach them to. See 'attachBlockRewards''.
+    tmrUnattachedRewards :: Maybe ExecResults
   }
   deriving (Show)
 
@@ -95,10 +99,53 @@ getBaggerState = Mod.get (Mod.Proxy @B.BaggerState)
 putBaggerState :: Mod.Modifiable B.BaggerState m => B.BaggerState -> m ()
 putBaggerState = Mod.put (Mod.Proxy @B.BaggerState)
 
-runFromStateRoot :: MonadBagger m => MineTransactions m -> Integer -> BlockHeader -> [OutputTx] -> Address -> Bool -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
+-- | Fold the block-reward call's events into the block's first receipt.
+--
+-- The reward runs outside any transaction, so without this its events reach
+-- neither the receipts nor the indexer. Attaching them to the first transaction
+-- mirrors what payFees does with its own fee events and keeps receipts a
+-- per-transaction list.
+--
+-- Gated: receipts roots are live in the header, so this moves the root and
+-- proposer and verifier must switch at the same block.
+attachBlockRewards :: BlockHeader -> Maybe ExecResults -> [TxRunResult] -> [TxRunResult]
+attachBlockRewards bd mRewards trrs = fst $ attachBlockRewards' bd mRewards trrs
+
+-- | 'attachBlockRewards', but also returning the reward results when there was
+-- no receipt to attach them to, so an incremental build can carry them to the
+-- run that does produce the block's first transaction. A 'Just' in the second
+-- component means nothing was attached and these results are still owed to the
+-- block; dropping it puts a receiptsRoot in the header that no verifier can
+-- derive, and the block is then rejected at every round, forever.
+attachBlockRewards' ::
+  BlockHeader ->
+  Maybe ExecResults ->
+  [TxRunResult] ->
+  ([TxRunResult], Maybe ExecResults)
+attachBlockRewards' bd (Just rewardResult) (trr : rest)
+  | isBlockRewardReceiptForkActive (number bd),
+    Right er <- trrResult trr =
+      let merged = er { erEvents = erEvents rewardResult ++ erEvents er,
+                        erLogs = erLogs rewardResult ++ erLogs er
+                      }
+       in (trr {trrResult = Right merged} : rest, Nothing)
+-- A run that produced transactions owns the block's first receipt, so nothing is
+-- owed onward: either the merge above happened, or this is a pre-fork block (or
+-- a first transaction with no receipt to merge into) where the verifier drops
+-- the results too. Only a run that produced nothing still owes them.
+attachBlockRewards' _ _ trrs@(_ : _) = (trrs, Nothing)
+attachBlockRewards' _ mRewards [] = ([], mRewards)
+
+-- | Run @txs@ from @theBlockHeader@'s state root. The first component of the
+-- result is the block-reward results this run paid but could not attach to a
+-- receipt, which an incremental build must carry forward; it is returned
+-- alongside the outcome rather than inside it because a run can pay the rewards
+-- and still fail (a rejected transaction aborts the run after the rewards have
+-- already been applied to the state).
+runFromStateRoot :: MonadBagger m => MineTransactions m -> Integer -> BlockHeader -> [OutputTx] -> Address -> Bool -> m (Maybe ExecResults, Either RunAttemptError (StateRoot, [TxRunResult], Integer))
 runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress payBlockRewards' = do
   A.insert (A.Proxy @StateRoot) (Nothing :: Maybe Word256) (stateRoot theBlockHeader)
-  (TxMiningResult res ranTxs unranTxs newGas) <-
+  (TxMiningResult res ranTxs unranTxs newGas unattachedRewards) <-
     timeit "mineTransactions bagger" (Just vmBlockInsertionMined) $
       mineTransactions theBlockHeader remainingGas txs mSelfAddress payBlockRewards'
   flushMemStorageTxDBToBlockDB
@@ -107,7 +154,7 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress p
   timeit "flushMemAddressStateDB bagger" (Just vmBlockInsertionMined) flushMemAddressStateDB
   newStateRoot <- A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
   let recoverable f = Left (RecoverableFailure (tfToBaggerTxRejection f) ranTxs unranTxs newStateRoot newGas)
-  return $ case res of -- currently only get GasLimit errors out of mineTransactions'
+  return . (,) unattachedRewards $ case res of -- currently only get GasLimit errors out of mineTransactions'
     Nothing -> Right (newStateRoot, ranTxs, newGas)
     Just TFBlockGasLimitExceeded {} -> Left (GasLimitReached ranTxs unranTxs newStateRoot newGas)
     Just f@TFInsufficientFunds {} -> recoverable f
@@ -259,7 +306,8 @@ processNewBestBlock bh bd txShas = do
             B.privateHashes = hashMap,
             B.startTimestamp = time,
             -- New best block, so the next height's rewards have not been paid.
-            B.blockRewardsPaid = False
+            B.blockRewardsPaid = False,
+            B.pendingBlockRewards = Nothing
           }
   $logInfoS "Bagger.processNewBestBlock" . T.pack $ show (length hashMap) ++ " private hashses in Bagger cache"
   putBaggerState $ state {B.seen = S.empty, B.miningCache = newMiningCache}
@@ -301,7 +349,7 @@ makeNewBlock mineTransactions mSelfAddress = do
           -- flag is cleared in processNewBestBlock when the height advances.
           let payRewards = not $ B.blockRewardsPaid cache
           withBagger $ do
-            !run <- runFromStateRoot mineTransactions remGas tempBlockHeader promoted mSelfAddress payRewards
+            (!mUnattached, !run) <- runFromStateRoot mineTransactions remGas tempBlockHeader promoted mSelfAddress payRewards
             (newSR, newGas, newExec, newUnexec) <- case run of
               Right (newSR', newRR', newGas') -> return (newSR', newGas', lastExec ++ newRR', [])
               Left e -> do
@@ -315,13 +363,22 @@ makeNewBlock mineTransactions mSelfAddress = do
                     return (nsr, nbg, lastExec ++ rtx, filter (on (/=) otSigner theRejectedTx) urtx)
                   x -> error (show x)
 
+            -- Rewards owed from an earlier run that ran no transactions, or
+            -- from this one. Both can never be set at once: carrying any means
+            -- the rewards were already paid, which makes payRewards False.
+            let owedRewards = case B.pendingBlockRewards cache of
+                  Just carried -> Just carried
+                  Nothing -> mUnattached
+                (newExec', stillOwedRewards) =
+                  attachBlockRewards' tempBlockHeader owedRewards newExec
             let !newMiningCache =
                   cache
                     { B.lastExecutedStateRoot = newSR,
                       B.remainingGas = newGas,
-                      B.lastExecutedTxs = newExec,
+                      B.lastExecutedTxs = newExec',
                       B.promotedTransactions = newUnexec,
-                      B.blockRewardsPaid = B.blockRewardsPaid cache || payRewards
+                      B.blockRewardsPaid = B.blockRewardsPaid cache || payRewards,
+                      B.pendingBlockRewards = stillOwedRewards
                     }
             $logDebugS "Bagger.makeNewBlock" . T.pack $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
             updateBaggerState (\s -> s {B.miningCache = newMiningCache})
