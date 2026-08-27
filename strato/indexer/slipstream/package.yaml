@@ -81,6 +81,7 @@ tests:
       - base
       - bytestring
       - conduit
+      - evm-solidity
       - hspec
       - slipstream
       - text
