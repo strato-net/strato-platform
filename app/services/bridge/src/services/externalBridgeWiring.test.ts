@@ -10,6 +10,7 @@ for (const name of [
   "OPENID_DISCOVERY_URL",
   "BRIDGE_ADDRESS",
   "EXTERNAL_ASSET_BRIDGE_ADDRESS",
+  "EXTERNAL_BRIDGE_SIGNER_API_TOKEN",
   "PRICE_ORACLE_ADDRESS",
   "SAFE_ADDRESS",
   "SAFE_PROPOSER_ADDRESS",
@@ -25,7 +26,7 @@ process.env.SENDGRID_API_KEY = "SG.test.test";
 
 const externalBridgeAddress = process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS!;
 
-test("records non-native deposits on ExternalAssetBridge", async () => {
+test("atomically settles non-native deposits on ExternalAssetBridge", async () => {
   const stratoHelper = await import("../utils/stratoHelper");
   const calls: any[] = [];
   (stratoHelper as any).execute = async (input: any) => {
@@ -33,33 +34,117 @@ test("records non-native deposits on ExternalAssetBridge", async () => {
     return { status: "Success", hash: "test" };
   };
 
-  const { depositBatch } = await import("./bridgeService");
-  await depositBatch([
-    {
+  const { settleDeposit } = await import("./bridgeService");
+  await settleDeposit({
+    externalChainId: 1,
+    depositRouter: "router",
+    depositId: "7",
+    externalSender: "sender",
+    externalToken: "external-token",
+    externalTokenAmount: "100",
+    observedExternalTokenAmount: "100",
+    externalTxHash: "transaction",
+    externalBlockHash: "block",
+    externalBlockNumber: 10,
+    externalBlockTimestamp: 1,
+    externalLogIndex: 2,
+    detectedAt: 1,
+    stratoRecipient: "recipient",
+    targetStratoToken: "strato-token",
+  });
+
+  assert.deepEqual(calls[0], {
+    contractName: "ExternalAssetBridge",
+    contractAddress: externalBridgeAddress,
+    method: "settleDeposit",
+    args: {
       externalChainId: 1,
+      depositRouter: "router",
+      depositId: "7",
       externalSender: "sender",
       externalToken: "external-token",
       externalTokenAmount: "100",
       externalTxHash: "transaction",
       stratoRecipient: "recipient",
-      targetStratoToken: "strato-token",
+      stratoToken: "strato-token",
+      action: "0",
+      actionToken: "0000000000000000000000000000000000000000",
+      minFinalOut: "0",
     },
-  ]);
+  });
+});
 
+test("treats a duplicate identity as settled only when Cirrus confirms completion", async () => {
+  const stratoHelper = await import("../utils/stratoHelper");
+  const { cirrus } = await import("../utils/api");
+  (stratoHelper as any).execute = async () => {
+    throw new Error("EAB: duplicate deposit");
+  };
+  const deposit = {
+    externalChainId: 1,
+    depositRouter: "router",
+    depositId: "7",
+    externalSender: "sender",
+    externalToken: "external-token",
+    externalTokenAmount: "100",
+    observedExternalTokenAmount: "100",
+    externalTxHash: "transaction",
+    externalBlockHash: "block",
+    externalBlockNumber: 10,
+    externalBlockTimestamp: 1,
+    externalLogIndex: 2,
+    detectedAt: 1,
+    stratoRecipient: "recipient",
+    targetStratoToken: "strato-token",
+  };
+  const { settleDeposit } = await import("./bridgeService");
+
+  (cirrus as any).get = async () => [{ status: "2" }];
+  await assert.rejects(() => settleDeposit(deposit), /not completed/);
+
+  (cirrus as any).get = async () => [{ status: "4" }];
+  assert.equal(await settleDeposit(deposit), null);
+});
+
+test("confirms reviewed deposits through the bridge operator", async () => {
+  const stratoHelper = await import("../utils/stratoHelper");
+  const calls: any[] = [];
+  (stratoHelper as any).execute = async (input: any) => {
+    calls.push(input);
+    return { status: "Success", hash: "confirm-hash" };
+  };
+
+  const { confirmReviewedDeposit } = await import("./bridgeService");
+  const hash = await confirmReviewedDeposit(1, "router", "7");
+
+  assert.equal(hash, "confirm-hash");
   assert.deepEqual(calls[0], {
     contractName: "ExternalAssetBridge",
     contractAddress: externalBridgeAddress,
-    method: "depositBatch",
+    method: "confirmReviewedDeposit",
     args: {
-      externalChainIds: [1],
-      externalTxHashes: ["transaction"],
-      externalTokens: ["external-token"],
-      externalTokenAmounts: ["100"],
-      stratoRecipients: ["recipient"],
-      externalSenders: ["sender"],
-      stratoTokens: ["strato-token"],
+      externalChainId: 1,
+      depositRouter: "router",
+      depositId: "7",
     },
   });
+});
+
+test("isolates a failed settlement from later deposits", async () => {
+  const { attemptDepositSettlement } = await import("../polling/alchemyPolling");
+  const deposit = {} as any;
+  const first = await attemptDepositSettlement(deposit, async () => {
+    throw new Error("route disabled");
+  });
+  let submitted = false;
+  const second = await attemptDepositSettlement(deposit, async () => {
+    submitted = true;
+    return null;
+  });
+
+  assert.match(first?.message || "", /route disabled/);
+  assert.equal(second, null);
+  assert.equal(submitted, true);
 });
 
 test("reads pending deposits and vault custody from ExternalAssetBridge", async () => {
@@ -70,9 +155,11 @@ test("reads pending deposits and vault custody from ExternalAssetBridge", async 
     if (url.includes("-deposits")) {
       return [{
         key: "1",
-        key2: "transaction",
+        key2: "router",
+        key3: "7",
         value: {
           status: 1,
+          externalTxHash: "transaction",
           externalToken: "external-token",
           stratoToken: "strato-token",
           stratoRecipient: "recipient",
@@ -112,6 +199,8 @@ test("reads pending deposits and vault custody from ExternalAssetBridge", async 
 
   assert.equal(deposits[0].custodyAddress, "vault");
   assert.equal(deposits[0].bridgeStatus, 1);
+  assert.equal(deposits[0].depositRouter, "router");
+  assert.equal(deposits[0].depositId, "7");
   assert.ok(
     requestedUrls.every((url) => url.includes("BlockApps-ExternalAssetBridge")),
   );
@@ -519,4 +608,64 @@ test("restores ready withdrawal authorization state from Cirrus", async () => {
   assert.equal(withdrawals[0].reviewApprovalDeadline, "9000");
   assert.equal(withdrawals[0].reviewDigest, "0xaaaa");
   assert.equal(withdrawals[0].reviewProposalHash, "0xbbbb");
+});
+
+test("collects threshold signatures from independent signer services", async () => {
+  const { Wallet } = await import("ethers");
+  const api = await import("../utils/api");
+  const signerOne = new Wallet(`0x${"31".repeat(32)}`);
+  const signerTwo = new Wallet(`0x${"32".repeat(32)}`);
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_SIGNER_URLS =
+    "https://signer-one,https://signer-two";
+
+  const authorization = {
+    sourceChainId: "9001",
+    sourceBridge: "0x1111111111111111111111111111111111111111",
+    sourceWithdrawalId: "7",
+    destinationChainId: "1",
+    destinationVault: "0x2222222222222222222222222222222222222222",
+    token: "0x3333333333333333333333333333333333333333",
+    recipient: "0x4444444444444444444444444444444444444444",
+    amount: "100",
+    notBefore: "1000",
+    deadline: "1100",
+    signerSetVersion: "1",
+  };
+  const types = {
+    WithdrawalAuthorization: [
+      { name: "sourceChainId", type: "uint256" },
+      { name: "sourceBridge", type: "address" },
+      { name: "sourceWithdrawalId", type: "uint256" },
+      { name: "destinationChainId", type: "uint256" },
+      { name: "destinationVault", type: "address" },
+      { name: "token", type: "address" },
+      { name: "recipient", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "notBefore", type: "uint256" },
+      { name: "deadline", type: "uint256" },
+      { name: "signerSetVersion", type: "uint256" },
+    ],
+  };
+  (api.fetch as any).post = async (url: string) => {
+    const signer = url.includes("one") ? signerOne : signerTwo;
+    return {
+      signer: signer.address,
+      signature: await signer.signTypedData(
+        {
+          name: "ExternalBridgeVault",
+          version: "1",
+          chainId: 1,
+          verifyingContract: authorization.destinationVault,
+        },
+        types,
+        authorization,
+      ),
+    };
+  };
+
+  const { signWithdrawalAuthorization } = await import(
+    "./externalWithdrawalService"
+  );
+  const signatures = await signWithdrawalAuthorization(authorization);
+  assert.equal(signatures.length, 2);
 });

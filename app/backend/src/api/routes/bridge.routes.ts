@@ -164,8 +164,6 @@ router.get("/depositActions", authHandler.authorizeRequest(), BridgeController.g
  *                 properties:
  *                   id:
  *                     type: string
- *                   isDefaultRoute:
- *                     type: boolean
  *                   enabled:
  *                     type: boolean
  *                   stratoToken:

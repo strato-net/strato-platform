@@ -7,16 +7,18 @@ import {
   TypedDataEncoder,
   Wallet,
   keccak256,
+  verifyTypedData,
 } from "ethers";
 import { OperationType } from "@safe-global/types-kit";
 import {
   config,
+  getExternalBridgeExecutorPrivateKey,
+  getExternalBridgeSignerUrls,
   getChainRpcUrl,
-  getExternalBridgeAttestationPrivateKeys,
 } from "../config";
 import { WithdrawalInfo } from "../types";
 import { ensureHexPrefix, safeChecksum } from "../utils/utils";
-import { retry } from "../utils/api";
+import { fetch as http, retry } from "../utils/api";
 import { initializeSafeForChain } from "../utils/safeHelper";
 
 export interface WithdrawalAuthorization {
@@ -86,7 +88,7 @@ const vaultInterface = new Interface(EXTERNAL_VAULT_ABI);
 const normalizePrivateKey = (privateKey: string): string => {
   const prefixed = ensureHexPrefix(privateKey.trim());
   if (!/^0x[a-fA-F0-9]{64}$/.test(prefixed)) {
-    throw new Error("Invalid external bridge attestation private key format");
+    throw new Error("Invalid external bridge executor private key format");
   }
   return prefixed;
 };
@@ -212,33 +214,58 @@ export const proposeWithdrawalReview = async (
 export const signWithdrawalAuthorization = async (
   authorization: WithdrawalAuthorization,
 ): Promise<string[]> => {
-  const keys = getExternalBridgeAttestationPrivateKeys(
+  const signerUrls = getExternalBridgeSignerUrls(
     BigInt(authorization.destinationChainId),
   );
-  if (keys.length === 0) {
+  if (signerUrls.length === 0) {
     throw new Error(
-      `CHAIN_${authorization.destinationChainId}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY is not configured`,
+      `CHAIN_${authorization.destinationChainId}_EXTERNAL_BRIDGE_SIGNER_URLS is not configured`,
     );
   }
 
-  const signatures = await Promise.all(
-    keys.map(async ({ privateKey }) => {
-      const wallet = new Wallet(normalizePrivateKey(privateKey));
-      const signature = await wallet.signTypedData(
+  const responses = await Promise.all(
+    signerUrls.map(async (url) => {
+      const response: any = await http.post(
+        `${url}/v1/sign-withdrawal`,
+        authorization,
+        {
+          headers: process.env.EXTERNAL_BRIDGE_SIGNER_API_TOKEN
+            ? {
+                Authorization: `Bearer ${process.env.EXTERNAL_BRIDGE_SIGNER_API_TOKEN}`,
+              }
+            : undefined,
+        },
+      );
+      const signature = Signature.from(response.signature).serialized;
+      const recovered = verifyTypedData(
         authorizationDomain(authorization),
         WITHDRAWAL_AUTHORIZATION_TYPES,
         authorization,
-      );
+        signature,
+      ).toLowerCase();
+      if (
+        typeof response.signer !== "string" ||
+        recovered !== response.signer.toLowerCase()
+      ) {
+        throw new Error(`Signer ${url} returned an invalid signature`);
+      }
       return {
-        signer: wallet.address.toLowerCase(),
-        signature: Signature.from(signature).serialized,
+        signer: recovered,
+        signature,
       };
     }),
   );
 
-  return signatures
-    .sort((a, b) => a.signer.localeCompare(b.signer))
-    .map(({ signature }) => signature);
+  const signatures = new Map<string, string>();
+  for (const response of responses) {
+    if (signatures.has(response.signer)) {
+      throw new Error(`Duplicate external bridge signer ${response.signer}`);
+    }
+    signatures.set(response.signer, response.signature);
+  }
+  return [...signatures.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, signature]) => signature);
 };
 
 export const buildWithdrawalAuthorization = async (
@@ -390,10 +417,10 @@ const getVaultWithSigner = (
   vault: Contract;
 } => {
   const chainId = BigInt(authorization.destinationChainId);
-  const privateKey = getExternalBridgeAttestationPrivateKeys(chainId)[0]?.privateKey;
+  const privateKey = getExternalBridgeExecutorPrivateKey(chainId);
   if (!privateKey) {
     throw new Error(
-      `CHAIN_${chainId}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY is not configured`,
+      `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY is not configured`,
     );
   }
   const provider = new JsonRpcProvider(getChainRpcUrl(chainId));

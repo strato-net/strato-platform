@@ -713,6 +713,16 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       };
     },
   },
+  "ExternalDeposit": {
+    contract_name: "ExternalAssetBridge",
+    event_name: "DepositCompleted",
+    displayName: "Non-native Deposit",
+    iconConfig: { icon: Download, color: "bg-green-500" },
+    getTokenAddress: (event: Event) =>
+      activityTypes.Deposit.getTokenAddress(event),
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>) =>
+      activityTypes.Deposit.handler(event, tokenSymbols, userAddress, tokenImages),
+  },
   "NativeDeposit": {
     contract_name: "StratoNativeBridge",
     event_name: "NativeDepositCompleted",
@@ -818,6 +828,33 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         },
       };
     },
+  },
+  "ExternalWithdraw": {
+    contract_name: "ExternalAssetBridge",
+    event_name: "WithdrawalRequested",
+    displayName: "Non-native Bridge Out",
+    iconConfig: { icon: Upload, color: "bg-red-500" },
+    getTokenAddress: (event: Event) => {
+      const token = event.attributes.stratoToken || event.attributes.strato_token;
+      const externalToken = event.attributes.externalToken || event.attributes.external_token;
+      return [token, externalToken].filter(Boolean) as string[];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData =>
+      activityTypes.Withdraw.handler(
+        {
+          ...event,
+          attributes: {
+            ...event.attributes,
+            token: event.attributes.stratoToken || event.attributes.strato_token,
+            user: event.attributes.stratoSender || event.attributes.strato_sender,
+            dest: event.attributes.externalRecipient || event.attributes.external_recipient,
+            destChainId: event.attributes.externalChainId || event.attributes.external_chain_id,
+          },
+        },
+        tokenSymbols,
+        userAddress,
+        tokenImages,
+      ),
   },
   "NativeWithdraw": {
     contract_name: "StratoNativeBridge",

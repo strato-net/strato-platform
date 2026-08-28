@@ -6,9 +6,11 @@ import {
 } from "../services/cirrusService";
 import {
   config,
-  getExternalBridgeAttestationPrivateKeys,
+  getExternalBridgeExecutorPrivateKey,
+  getExternalBridgeSignerUrls,
   getNativeBridgePrivateKeys,
 } from "../config";
+import { ensureHexPrefix } from "./utils";
 
 const isPrivateKey = (value: string): boolean =>
   /^(0x)?[a-fA-F0-9]{64}$/.test(value);
@@ -54,6 +56,18 @@ export async function validateBridgeConfig(): Promise<boolean> {
       errors.push(`Missing required environment variable: ${varName}`);
     }
   });
+  if (
+    !["development", "test"].includes(process.env.NODE_ENV || "") &&
+    !process.env.DEPOSIT_WEBHOOK_TOKEN
+  ) {
+    errors.push("Missing required environment variable: DEPOSIT_WEBHOOK_TOKEN");
+  }
+  if (
+    !["development", "test"].includes(process.env.NODE_ENV || "") &&
+    !process.env.DEPOSIT_OPERATIONS_TOKEN
+  ) {
+    errors.push("Missing required environment variable: DEPOSIT_OPERATIONS_TOKEN");
+  }
 
   // Initialize OAuth first (required for chain/asset validation)
   let oauthInitialized = false;
@@ -193,6 +207,33 @@ export async function validateBridgeConfig(): Promise<boolean> {
       "Withdrawal polling interval is very short (< 5s) - may cause rate limiting",
     );
   }
+  const missingReceiptGraceMs = Number(
+    process.env.DEPOSIT_MISSING_RECEIPT_GRACE_MS || 5 * 60 * 1000,
+  );
+  if (
+    !Number.isSafeInteger(missingReceiptGraceMs) ||
+    missingReceiptGraceMs <= 0
+  ) {
+    errors.push("DEPOSIT_MISSING_RECEIPT_GRACE_MS must be a positive integer");
+  }
+  const settlementRetryGraceMs = Number(
+    process.env.DEPOSIT_SETTLEMENT_RETRY_GRACE_MS || 15 * 60 * 1000,
+  );
+  if (
+    !Number.isSafeInteger(settlementRetryGraceMs) ||
+    settlementRetryGraceMs <= 0
+  ) {
+    errors.push("DEPOSIT_SETTLEMENT_RETRY_GRACE_MS must be a positive integer");
+  }
+  const reviewRecordRetryMs = Number(
+    process.env.DEPOSIT_REVIEW_RECORD_RETRY_MS || 60 * 1000,
+  );
+  if (
+    !Number.isSafeInteger(reviewRecordRetryMs) ||
+    reviewRecordRetryMs <= 0
+  ) {
+    errors.push("DEPOSIT_REVIEW_RECORD_RETRY_MS must be a positive integer");
+  }
 
   // Validate chain RPC URLs (only if OAuth is initialized)
   if (oauthInitialized) {
@@ -260,25 +301,37 @@ export async function validateBridgeConfig(): Promise<boolean> {
 
       for (const chain of enabledChainsArr) {
         const chainId = chain.externalChainId;
-        const keyEnv =
-          `CHAIN_${chainId}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY`;
-        const keyConfigs = getExternalBridgeAttestationPrivateKeys(chainId);
-        if (keyConfigs.length === 0) {
-          errors.push(`Missing external bridge environment variable: ${keyEnv}`);
-          continue;
+        const confirmationValue =
+          process.env[`CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS`];
+        if (
+          process.env.NODE_ENV === "production" &&
+          (!confirmationValue ||
+            !Number.isSafeInteger(Number(confirmationValue)) ||
+            Number(confirmationValue) <= 0)
+        ) {
+          errors.push(
+            `CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS must be an explicit positive integer in production`,
+          );
+        }
+        const signerUrls = getExternalBridgeSignerUrls(chainId);
+        const executorPrivateKey = getExternalBridgeExecutorPrivateKey(chainId);
+        if (signerUrls.length === 0) {
+          errors.push(
+            `Missing external bridge environment variable: CHAIN_${chainId}_EXTERNAL_BRIDGE_SIGNER_URLS`,
+          );
+        }
+        if (!executorPrivateKey || !isPrivateKey(executorPrivateKey)) {
+          errors.push(
+            `Missing or invalid external bridge executor key: CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY`,
+          );
         }
         if (!chain.vault || !isAddress(chain.vault)) {
           errors.push(`Invalid external bridge vault for chain ${chainId}`);
           continue;
         }
 
-        const validKeys = keyConfigs.filter(({ envVar, privateKey }) => {
-          if (isPrivateKey(privateKey)) return true;
-          errors.push(`Invalid external bridge private key format: ${envVar}`);
-          return false;
-        });
         const rpcUrl = process.env[`CHAIN_${chainId}_RPC_URL`];
-        if (!rpcUrl || validKeys.length === 0) continue;
+        if (!rpcUrl || signerUrls.length === 0) continue;
 
         try {
           const vault = new Contract(
@@ -286,21 +339,65 @@ export async function validateBridgeConfig(): Promise<boolean> {
             EXTERNAL_VAULT_ABI,
             new JsonRpcProvider(rpcUrl),
           );
-          const [threshold, validitySeconds, signerStatuses] = await Promise.all([
+          const signerMetadata = await Promise.all(
+            signerUrls.map(async (url) => {
+              const response = await fetch(`${url}/health`, {
+                headers: process.env.EXTERNAL_BRIDGE_SIGNER_API_TOKEN
+                  ? {
+                      Authorization: `Bearer ${process.env.EXTERNAL_BRIDGE_SIGNER_API_TOKEN}`,
+                    }
+                  : undefined,
+              });
+              if (!response.ok) {
+                throw new Error(`Signer ${url} health returned ${response.status}`);
+              }
+              return (await response.json()) as {
+                signer: string;
+                destinationChainId: string;
+                destinationVault: string;
+              };
+            }),
+          );
+          const signerAddresses = signerMetadata.map(({ signer }) => signer);
+          if (new Set(signerAddresses.map((value) => value.toLowerCase())).size !== signerAddresses.length) {
+            errors.push(`External bridge signer URLs for chain ${chainId} contain duplicate signers`);
+          }
+          signerMetadata.forEach((metadata, index) => {
+            if (
+              metadata.destinationChainId !== String(chainId) ||
+              metadata.destinationVault.toLowerCase() !==
+                ensureHexPrefix(chain.vault!).toLowerCase()
+            ) {
+              errors.push(`External bridge signer ${signerUrls[index]} is configured for a different vault`);
+            }
+          });
+          const executorAddress = new Wallet(
+            normalizePrivateKey(executorPrivateKey!),
+          ).address;
+          const [
+            threshold,
+            validitySeconds,
+            signerStatuses,
+            executorIsSigner,
+          ] = await Promise.all([
             vault.attestationThreshold(),
             vault.maxAuthorizationValiditySeconds(),
             Promise.all(
-              validKeys.map(({ privateKey }) =>
-                vault.attestationSigners(
-                  new Wallet(normalizePrivateKey(privateKey)).address,
-                ),
+              signerAddresses.map((signer) =>
+                vault.attestationSigners(signer),
               ),
             ),
+            vault.attestationSigners(executorAddress),
           ]);
+          if (executorIsSigner) {
+            errors.push(
+              `External bridge executor ${executorAddress} must not be an attestation signer on chain ${chainId}`,
+            );
+          }
           const enabledSignerCount = signerStatuses.filter(Boolean).length;
           if (Number(threshold) <= 0 || Number(threshold) > enabledSignerCount) {
             errors.push(
-              `External vault on chain ${chainId} requires ${String(threshold)} signatures; bridge service has ${enabledSignerCount} enabled signer(s)`,
+              `External vault on chain ${chainId} requires ${String(threshold)} signatures; ${enabledSignerCount} independent signer(s) are enabled`,
             );
           }
           if (BigInt(validitySeconds.toString()) <= 0n) {

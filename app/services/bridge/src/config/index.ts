@@ -124,6 +124,45 @@ export const getChainRpcUrl = (chainId: number | bigint): string => {
   return rpcUrl;
 };
 
+export const getChainRpcUrls = (chainId: number | bigint): string[] => [
+  getChainRpcUrl(chainId),
+  ...(process.env[`CHAIN_${chainId}_VERIFICATION_RPC_URLS`] || "")
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean),
+];
+
+export const getDepositConfirmationPolicy = (
+  chainId: number | bigint,
+): number => {
+  const value =
+    process.env[`CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS`] ||
+    process.env.DEPOSIT_CONFIRMATIONS ||
+    "0";
+  const confirmations = Number(value);
+  if (!Number.isSafeInteger(confirmations) || confirmations < 0) {
+    throw new Error(`Invalid deposit confirmation policy for chain ${chainId}`);
+  }
+  return confirmations;
+};
+
+export const getDepositReconciliationDepth = (): number =>
+  Number(process.env.DEPOSIT_RECONCILIATION_BLOCKS || 64);
+
+export const getMissingReceiptGraceMs = (): number =>
+  Number(process.env.DEPOSIT_MISSING_RECEIPT_GRACE_MS || 5 * 60 * 1000);
+
+export const getSettlementRetryGraceMs = (): number =>
+  Number(process.env.DEPOSIT_SETTLEMENT_RETRY_GRACE_MS || 15 * 60 * 1000);
+
+export const getReviewRecordRetryMs = (): number =>
+  Number(process.env.DEPOSIT_REVIEW_RECORD_RETRY_MS || 60 * 1000);
+
+export const getChainWsRpcUrl = (
+  chainId: number | bigint,
+): string | undefined =>
+  process.env[`CHAIN_${chainId}_WS_RPC_URL`];
+
 export const getNativeRepresentationBridgeAddress = (
   chainId: number | bigint,
 ): string | undefined => {
@@ -172,30 +211,18 @@ export const getNativeBridgePrivateKeys = (
   return keys;
 };
 
-export const getExternalBridgeAttestationPrivateKeys = (
+export const getExternalBridgeSignerUrls = (
   chainId: number | bigint,
-): NativeBridgePrivateKeyConfig[] => {
-  const chainIdStr = chainId.toString();
-  const baseEnv = `CHAIN_${chainIdStr}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY`;
-  const keys: NativeBridgePrivateKeyConfig[] = [];
-  const seen = new Set<string>();
+): string[] =>
+  (process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_SIGNER_URLS`] || "")
+    .split(",")
+    .map((url) => url.trim().replace(/\/$/, ""))
+    .filter(Boolean);
 
-  const addKey = (envVar: string) => {
-    const privateKey = process.env[envVar]?.trim();
-    if (!privateKey || seen.has(privateKey)) return;
-    seen.add(privateKey);
-    keys.push({ envVar, privateKey });
-  };
-
-  addKey(baseEnv);
-  for (let index = 1; ; index += 1) {
-    const envVar = `${baseEnv}_${index}`;
-    if (!process.env[envVar]) break;
-    addKey(envVar);
-  }
-
-  return keys;
-};
+export const getExternalBridgeExecutorPrivateKey = (
+  chainId: number | bigint,
+): string | undefined =>
+  process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY`]?.trim();
 
 // Validate required environment variables
 const requiredEnvVars = [
@@ -206,6 +233,7 @@ const requiredEnvVars = [
   "OPENID_DISCOVERY_URL",
   "BRIDGE_ADDRESS",
   "EXTERNAL_ASSET_BRIDGE_ADDRESS",
+  "EXTERNAL_BRIDGE_SIGNER_API_TOKEN",
   "PRICE_ORACLE_ADDRESS",
   "SAFE_ADDRESS",
   "SAFE_PROPOSER_ADDRESS",

@@ -46,7 +46,6 @@ contract record ExternalAssetBridge is Ownable {
         uint256 externalDecimals,
         string externalName,
         string externalSymbol,
-        bool isDefaultRoute,
         uint256 maxPerWithdrawal,
         uint256 manualReviewThreshold
     );
@@ -65,6 +64,12 @@ contract record ExternalAssetBridge is Ownable {
         address stratoToken,
         uint256 stratoTokenAmount
     );
+    event DepositIdentity(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
+        string externalTxHash
+    );
     event DepositPendingReview(
         uint256 externalChainId,
         string externalTxHash
@@ -80,6 +85,8 @@ contract record ExternalAssetBridge is Ownable {
     event DepositAborted(uint256 externalChainId, string externalTxHash);
     event AutoSavedUSDST(
         uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
         string externalTxHash,
         address recipient,
         address sourceToken,
@@ -90,6 +97,8 @@ contract record ExternalAssetBridge is Ownable {
     );
     event AutoForgedViaPSM(
         uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
         string externalTxHash,
         address recipient,
         address sourceToken,
@@ -100,6 +109,8 @@ contract record ExternalAssetBridge is Ownable {
     );
     event DepositActionFallback(
         uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
         string externalTxHash,
         address recipient,
         uint256 action,
@@ -165,6 +176,11 @@ contract record ExternalAssetBridge is Ownable {
         uint256 previousValidity,
         uint256 newValidity
     );
+    event DepositRouterUpdated(
+        uint256 externalChainId,
+        address depositRouter,
+        bool enabled
+    );
 
     uint256 public DECIMAL_PLACES = 18;
     uint256 public WITHDRAWAL_ABORT_DELAY = 172800;
@@ -185,9 +201,10 @@ contract record ExternalAssetBridge is Ownable {
     uint256 public withdrawalCounter;
 
     mapping(uint256 => ChainInfo) public record chains;
+    mapping(uint256 => mapping(address => bool)) public record depositRouters;
     mapping(address => mapping(uint256 => mapping(address => RouteInfo))) public record routes;
-    mapping(uint256 => mapping(string => DepositInfo)) public record deposits;
-    mapping(uint256 => mapping(string => DepositActionIntent)) public record depositActions;
+    mapping(uint256 => mapping(address => mapping(uint256 => DepositInfo))) public record deposits;
+    mapping(uint256 => mapping(address => mapping(uint256 => DepositActionIntent))) public record depositActions;
     mapping(address => mapping(uint256 => mapping(address => DepositActionConfig))) public record depositActionConfigs;
     mapping(uint256 => WithdrawalInfo) public record withdrawals;
     mapping(uint256 => WithdrawalAuthorizationInfo) public record withdrawalAuthorizations;
@@ -298,6 +315,7 @@ contract record ExternalAssetBridge is Ownable {
             enabled,
             lastProcessedBlock
         );
+        depositRouters[externalChainId][depositRouter] = true;
         emit ChainUpdated(
             chainName,
             vault,
@@ -305,6 +323,29 @@ contract record ExternalAssetBridge is Ownable {
             enabled,
             externalChainId,
             lastProcessedBlock
+        );
+        emit DepositRouterUpdated(
+            externalChainId,
+            depositRouter,
+            true
+        );
+    }
+
+    function setDepositRouterEnabled(
+        uint256 externalChainId,
+        address depositRouter,
+        bool enabled
+    ) external onlyOwner {
+        require(
+            chains[externalChainId].vault != address(0),
+            "EAB: chain missing"
+        );
+        require(depositRouter != address(0), "EAB: zero router");
+        depositRouters[externalChainId][depositRouter] = enabled;
+        emit DepositRouterUpdated(
+            externalChainId,
+            depositRouter,
+            enabled
         );
     }
 
@@ -334,7 +375,6 @@ contract record ExternalAssetBridge is Ownable {
         uint256 externalDecimals,
         string externalName,
         string externalSymbol,
-        bool isDefaultRoute,
         uint256 maxPerWithdrawal,
         uint256 manualReviewThreshold
     ) external onlyOwner {
@@ -365,8 +405,7 @@ contract record ExternalAssetBridge is Ownable {
             externalToken,
             stratoToken,
             maxPerWithdrawal,
-            manualReviewThreshold,
-            isDefaultRoute
+            manualReviewThreshold
         );
 
         emit RouteUpdated(
@@ -378,7 +417,6 @@ contract record ExternalAssetBridge is Ownable {
             externalDecimals,
             externalName,
             externalSymbol,
-            isDefaultRoute,
             maxPerWithdrawal,
             manualReviewThreshold
         );
@@ -480,28 +518,10 @@ contract record ExternalAssetBridge is Ownable {
         MAX_AUTHORIZATION_VALIDITY_SECONDS = newValidity;
     }
 
-    function deposit(
+    function settleDeposit(
         uint256 externalChainId,
-        address externalSender,
-        address externalToken,
-        uint256 externalTokenAmount,
-        string externalTxHash,
-        address stratoRecipient,
-        address stratoToken
-    ) public onlyBridgeOperator whenDepositsOpen {
-        _recordDeposit(
-            externalChainId,
-            externalSender,
-            externalToken,
-            externalTokenAmount,
-            externalTxHash,
-            stratoRecipient,
-            stratoToken
-        );
-    }
-
-    function depositWithAction(
-        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
         address externalSender,
         address externalToken,
         uint256 externalTokenAmount,
@@ -511,110 +531,87 @@ contract record ExternalAssetBridge is Ownable {
         uint256 action,
         address actionToken,
         uint256 minFinalOut
-    ) public onlyBridgeOperator whenDepositsOpen {
-        string normalizedTxHash = _recordDeposit(
+    ) external onlyBridgeOperator whenDepositsOpen {
+        _recordDeposit(
             externalChainId,
+            depositRouter,
+            depositId,
             externalSender,
             externalToken,
             externalTokenAmount,
             externalTxHash,
             stratoRecipient,
-            stratoToken
+            stratoToken,
+            action,
+            actionToken,
+            minFinalOut
         );
-        if (action != uint256(DepositAction.NONE)) {
-            depositActions[externalChainId][
-                normalizedTxHash
-            ] = DepositActionIntent(
-                action,
-                actionToken,
-                minFinalOut
-            );
-        }
+        _confirmDeposit(
+            externalChainId,
+            depositRouter,
+            depositId
+        );
     }
 
-    function depositBatch(
-        uint256[] externalChainIds,
-        address[] externalSenders,
-        address[] externalTokens,
-        uint256[] externalTokenAmounts,
-        string[] externalTxHashes,
-        address[] stratoRecipients,
-        address[] stratoTokens
-    ) external onlyBridgeOperator whenDepositsOpen {
-        uint256 n = externalChainIds.length;
-        require(
-            n > 0 &&
-                n == externalSenders.length &&
-                n == externalTokens.length &&
-                n == externalTokenAmounts.length &&
-                n == externalTxHashes.length &&
-                n == stratoRecipients.length &&
-                n == stratoTokens.length,
-            "EAB: len"
-        );
-        for (uint256 i = 0; i < n; i++) {
-            deposit(
-                externalChainIds[i],
-                externalSenders[i],
-                externalTokens[i],
-                externalTokenAmounts[i],
-                externalTxHashes[i],
-                stratoRecipients[i],
-                stratoTokens[i]
-            );
-        }
-    }
-
-    function depositBatchWithAction(
-        uint256[] externalChainIds,
-        address[] externalSenders,
-        address[] externalTokens,
-        uint256[] externalTokenAmounts,
-        string[] externalTxHashes,
-        address[] stratoRecipients,
-        address[] stratoTokens,
-        uint256[] actions,
-        address[] actionTokens,
-        uint256[] minFinalOuts
-    ) external onlyBridgeOperator whenDepositsOpen {
-        uint256 n = externalChainIds.length;
-        require(
-            n > 0 &&
-                n == externalSenders.length &&
-                n == externalTokens.length &&
-                n == externalTokenAmounts.length &&
-                n == externalTxHashes.length &&
-                n == stratoRecipients.length &&
-                n == stratoTokens.length &&
-                n == actions.length &&
-                n == actionTokens.length &&
-                n == minFinalOuts.length,
-            "EAB: len"
-        );
-        for (uint256 i = 0; i < n; i++) {
-            depositWithAction(
-                externalChainIds[i],
-                externalSenders[i],
-                externalTokens[i],
-                externalTokenAmounts[i],
-                externalTxHashes[i],
-                stratoRecipients[i],
-                stratoTokens[i],
-                actions[i],
-                actionTokens[i],
-                minFinalOuts[i]
-            );
-        }
-    }
-
-    function confirmDeposit(
+    function recordDepositForReview(
         uint256 externalChainId,
-        string externalTxHash
-    ) public onlyBridgeOperator whenDepositsOpen {
-        string normalizedTxHash = externalTxHash.normalizeHex();
+        address depositRouter,
+        uint256 depositId,
+        address externalSender,
+        address externalToken,
+        uint256 externalTokenAmount,
+        string externalTxHash,
+        address stratoRecipient,
+        address stratoToken,
+        uint256 action,
+        address actionToken,
+        uint256 minFinalOut
+    ) external onlyBridgeOperator whenDepositsOpen {
+        _recordDeposit(
+            externalChainId,
+            depositRouter,
+            depositId,
+            externalSender,
+            externalToken,
+            externalTokenAmount,
+            externalTxHash,
+            stratoRecipient,
+            stratoToken,
+            action,
+            actionToken,
+            minFinalOut
+        );
         DepositInfo depositInfo = deposits[
             externalChainId
-        ][normalizedTxHash];
+        ][depositRouter][depositId];
+        depositInfo.status = Status.PENDING_REVIEW;
+        depositInfo.timestamp = block.timestamp;
+        emit DepositPendingReview(
+            externalChainId,
+            depositInfo.externalTxHash
+        );
+    }
+
+    function confirmReviewedDeposit(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId
+    ) external onlyBridgeOperator whenDepositsOpen {
+        _confirmDeposit(
+            externalChainId,
+            depositRouter,
+            depositId
+        );
+    }
+
+    function _confirmDeposit(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId
+    ) internal {
+        DepositInfo depositInfo = deposits[
+            externalChainId
+        ][depositRouter][depositId];
         require(
             depositInfo.status == Status.INITIATED ||
                 depositInfo.status ==
@@ -624,7 +621,7 @@ contract record ExternalAssetBridge is Ownable {
 
         DepositActionIntent intent = depositActions[
             externalChainId
-        ][normalizedTxHash];
+        ][depositRouter][depositId];
         bool executable =
             (
                 intent.action ==
@@ -640,12 +637,18 @@ contract record ExternalAssetBridge is Ownable {
 
         if (executable) {
             try {
-                _executeDepositAction(externalChainId, normalizedTxHash);
+                _executeDepositAction(
+                    externalChainId,
+                    depositRouter,
+                    depositId
+                );
             } catch {
                 _mintDepositFallback(
                     depositInfo,
                     externalChainId,
-                    normalizedTxHash,
+                    depositRouter,
+                    depositId,
+                    depositInfo.externalTxHash,
                     intent
                 );
             }
@@ -656,7 +659,9 @@ contract record ExternalAssetBridge is Ownable {
             _mintDepositFallback(
                 depositInfo,
                 externalChainId,
-                normalizedTxHash,
+                depositRouter,
+                depositId,
+                depositInfo.externalTxHash,
                 intent
             );
         } else {
@@ -667,66 +672,31 @@ contract record ExternalAssetBridge is Ownable {
             );
         }
 
-        _deleteDepositAction(externalChainId, normalizedTxHash);
+        _deleteDepositAction(
+            externalChainId,
+            depositRouter,
+            depositId
+        );
         depositInfo.status = Status.COMPLETED;
         depositInfo.timestamp = block.timestamp;
         emit DepositCompleted(
             externalChainId,
             depositInfo.externalSender,
-            normalizedTxHash,
+            depositInfo.externalTxHash,
             depositInfo.stratoRecipient,
             depositInfo.stratoToken,
             depositInfo.stratoTokenAmount
         );
     }
 
-    function confirmDepositBatch(
-        uint256[] externalChainIds,
-        string[] externalTxHashes
-    ) external onlyBridgeOperator whenDepositsOpen {
-        uint256 n = externalChainIds.length;
-        require(n > 0 && n == externalTxHashes.length, "EAB: len");
-        for (uint256 i = 0; i < n; i++) {
-            confirmDeposit(externalChainIds[i], externalTxHashes[i]);
-        }
-    }
-
-    function reviewDeposit(
-        uint256 externalChainId,
-        string externalTxHash
-    ) public onlyBridgeOperator {
-        string normalizedTxHash = externalTxHash.normalizeHex();
-        DepositInfo depositInfo = deposits[
-            externalChainId
-        ][normalizedTxHash];
-        require(
-            depositInfo.status == Status.INITIATED,
-            "EAB: bad state"
-        );
-        depositInfo.status = Status.PENDING_REVIEW;
-        depositInfo.timestamp = block.timestamp;
-        emit DepositPendingReview(externalChainId, normalizedTxHash);
-    }
-
-    function reviewDepositBatch(
-        uint256[] externalChainIds,
-        string[] externalTxHashes
-    ) external onlyBridgeOperator {
-        uint256 n = externalChainIds.length;
-        require(n > 0 && n == externalTxHashes.length, "EAB: len");
-        for (uint256 i = 0; i < n; i++) {
-            reviewDeposit(externalChainIds[i], externalTxHashes[i]);
-        }
-    }
-
     function abortDeposit(
         uint256 externalChainId,
-        string externalTxHash
+        address depositRouter,
+        uint256 depositId
     ) external onlyOwner {
-        string normalizedTxHash = externalTxHash.normalizeHex();
         DepositInfo depositInfo = deposits[
             externalChainId
-        ][normalizedTxHash];
+        ][depositRouter][depositId];
         require(
             depositInfo.status ==
                 Status.PENDING_REVIEW,
@@ -734,8 +704,15 @@ contract record ExternalAssetBridge is Ownable {
         );
         depositInfo.status = Status.ABORTED;
         depositInfo.timestamp = block.timestamp;
-        _deleteDepositAction(externalChainId, normalizedTxHash);
-        emit DepositAborted(externalChainId, normalizedTxHash);
+        _deleteDepositAction(
+            externalChainId,
+            depositRouter,
+            depositId
+        );
+        emit DepositAborted(
+            externalChainId,
+            depositInfo.externalTxHash
+        );
     }
 
     function requestWithdrawal(
@@ -1104,18 +1081,29 @@ contract record ExternalAssetBridge is Ownable {
 
     function _recordDeposit(
         uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
         address externalSender,
         address externalToken,
         uint256 externalTokenAmount,
         string externalTxHash,
         address stratoRecipient,
-        address stratoToken
-    ) internal returns (string normalizedTxHash) {
+        address stratoToken,
+        uint256 action,
+        address actionToken,
+        uint256 minFinalOut
+    ) internal {
+        require(depositRouter != address(0), "EAB: zero router");
+        require(depositId > 0, "EAB: zero deposit id");
         require(externalSender != address(0), "EAB: zero sender");
         require(externalTokenAmount > 0, "EAB: zero amount");
         require(externalTxHash.length > 0, "EAB: empty tx hash");
         require(stratoRecipient != address(0), "EAB: zero recipient");
         require(chains[externalChainId].enabled, "EAB: chain disabled");
+        require(
+            depositRouters[externalChainId][depositRouter],
+            "EAB: unknown router"
+        );
 
         RouteInfo route = routes[externalToken][
             externalChainId
@@ -1126,10 +1114,13 @@ contract record ExternalAssetBridge is Ownable {
             "EAB: inactive token"
         );
 
-        normalizedTxHash = externalTxHash.normalizeHex();
+        string normalizedTxHash = externalTxHash.normalizeHex();
+        Status existingStatus = deposits[externalChainId][
+            depositRouter
+        ][depositId].status;
         require(
-            deposits[externalChainId][normalizedTxHash].status ==
-                Status.NONE,
+            existingStatus == Status.NONE ||
+                existingStatus == Status.ABORTED,
             "EAB: duplicate deposit"
         );
 
@@ -1138,19 +1129,28 @@ contract record ExternalAssetBridge is Ownable {
             (10 ** (DECIMAL_PLACES - route.externalDecimals));
         require(stratoTokenAmount > 0, "EAB: invalid amount");
 
-        deposits[externalChainId][
-            normalizedTxHash
-        ] = DepositInfo(
-            Status.INITIATED,
-            externalSender,
-            externalToken,
-            externalTokenAmount,
-            block.timestamp,
-            stratoRecipient,
-            stratoToken,
-            stratoTokenAmount,
-            block.timestamp
-        );
+        DepositInfo depositInfo = deposits[externalChainId][
+            depositRouter
+        ][depositId];
+        depositInfo.status = Status.INITIATED;
+        depositInfo.externalSender = externalSender;
+        depositInfo.externalToken = externalToken;
+        depositInfo.externalTokenAmount = externalTokenAmount;
+        depositInfo.externalTxHash = normalizedTxHash;
+        depositInfo.requestedAt = block.timestamp;
+        depositInfo.stratoRecipient = stratoRecipient;
+        depositInfo.stratoToken = stratoToken;
+        depositInfo.stratoTokenAmount = stratoTokenAmount;
+        depositInfo.timestamp = block.timestamp;
+        if (action != uint256(DepositAction.NONE)) {
+            depositActions[externalChainId][depositRouter][
+                depositId
+            ] = DepositActionIntent(
+                action,
+                actionToken,
+                minFinalOut
+            );
+        }
         emit DepositInitiated(
             externalChainId,
             externalSender,
@@ -1159,18 +1159,26 @@ contract record ExternalAssetBridge is Ownable {
             stratoToken,
             stratoTokenAmount
         );
+        emit DepositIdentity(
+            externalChainId,
+            depositRouter,
+            depositId,
+            normalizedTxHash
+        );
     }
 
     function _executeDepositAction(
         uint256 externalChainId,
-        string normalizedTxHash
+        address depositRouter,
+        uint256 depositId
     ) internal {
         DepositInfo depositInfo = deposits[
             externalChainId
-        ][normalizedTxHash];
+        ][depositRouter][depositId];
         DepositActionIntent intent = depositActions[
             externalChainId
-        ][normalizedTxHash];
+        ][depositRouter][depositId];
+        string normalizedTxHash = depositInfo.externalTxHash;
 
         uint256 sourceAmount = _mintFunds(
             depositInfo.stratoToken,
@@ -1223,6 +1231,8 @@ contract record ExternalAssetBridge is Ownable {
             );
             emit AutoSavedUSDST(
                 externalChainId,
+                depositRouter,
+                depositId,
                 normalizedTxHash,
                 depositInfo.stratoRecipient,
                 depositInfo.stratoToken,
@@ -1264,6 +1274,8 @@ contract record ExternalAssetBridge is Ownable {
             );
             emit AutoForgedViaPSM(
                 externalChainId,
+                depositRouter,
+                depositId,
                 normalizedTxHash,
                 depositInfo.stratoRecipient,
                 depositInfo.stratoToken,
@@ -1278,6 +1290,8 @@ contract record ExternalAssetBridge is Ownable {
     function _mintDepositFallback(
         DepositInfo depositInfo,
         uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
         string normalizedTxHash,
         DepositActionIntent intent
     ) internal {
@@ -1288,6 +1302,8 @@ contract record ExternalAssetBridge is Ownable {
         );
         emit DepositActionFallback(
             externalChainId,
+            depositRouter,
+            depositId,
             normalizedTxHash,
             depositInfo.stratoRecipient,
             intent.action,
@@ -1322,11 +1338,12 @@ contract record ExternalAssetBridge is Ownable {
 
     function _deleteDepositAction(
         uint256 externalChainId,
-        string normalizedTxHash
+        address depositRouter,
+        uint256 depositId
     ) internal {
-        delete depositActions[externalChainId][normalizedTxHash].action;
-        delete depositActions[externalChainId][normalizedTxHash].actionToken;
-        delete depositActions[externalChainId][normalizedTxHash].minFinalOut;
+        delete depositActions[externalChainId][depositRouter][depositId].action;
+        delete depositActions[externalChainId][depositRouter][depositId].actionToken;
+        delete depositActions[externalChainId][depositRouter][depositId].minFinalOut;
     }
 
     function _escrowFunds(

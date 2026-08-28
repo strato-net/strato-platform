@@ -50,7 +50,6 @@ export type BridgeableAssetRoute = {
   externalToken: string;
   externalChainId: string;
   AssetInfo: BridgeAssetInfo;
-  isDefaultRoute: boolean;
 };
 
 export type NativeBridgeAssetRow = {
@@ -97,9 +96,23 @@ const QUERY_CONFIGS: Record<string, QueryConfig> = {
   },
   deposit: {
     tableName: `${constants.ExternalAssetBridge}-deposits`,
-    selectFields: "externalChainId:key,externalTxHash:key2,DepositInfo:value,block_timestamp",
+    selectFields: "externalChainId:key,depositRouter:key2,depositId:key3,externalTxHash:value->>externalTxHash,DepositInfo:value,block_timestamp",
     countField: "count()",
   }
+};
+
+const LEGACY_QUERY_CONFIGS: Record<string, QueryConfig> = {
+  withdrawal: {
+    tableName: `${constants.MercataBridge}-withdrawals`,
+    selectFields: "withdrawalId:key,WithdrawalInfo:value,block_timestamp",
+    countField: "count()",
+  },
+  deposit: {
+    tableName: `${constants.MercataBridge}-deposits`,
+    selectFields:
+      "externalChainId:key,externalTxHash:key2,DepositInfo:value,block_timestamp",
+    countField: "count()",
+  },
 };
 
 export function buildQueryParams(
@@ -266,11 +279,32 @@ async function fetchExternalMeta(accessToken: string, tokens: Set<string>): Prom
   return map;
 }
 
+export function getDepositOutcomeIdentity(
+  externalChainId: unknown,
+  depositRouter: unknown,
+  depositId: unknown,
+  externalTxHash: unknown,
+): string {
+  if (
+    externalChainId != null &&
+    typeof depositRouter === "string" &&
+    depositRouter &&
+    depositId != null
+  ) {
+    return [
+      String(externalChainId),
+      normalizeAddr(depositRouter),
+      String(depositId),
+    ].join(":");
+  }
+  return String(externalTxHash || "").toLowerCase();
+}
+
 async function fetchDepositEvents(accessToken: string, txHashes: string[]): Promise<Map<string, any>> {
   if (!txHashes.length) return new Map();
   const { data } = await cirrus.get(accessToken, `/${constants.Event}`, {
     params: {
-      select: "event_name,attributes",
+      select: "address,event_name,attributes",
       address: constants.mercataBridge
         ? `in.(${constants.externalAssetBridge},${constants.mercataBridge})`
         : `eq.${constants.externalAssetBridge}`,
@@ -281,8 +315,16 @@ async function fetchDepositEvents(accessToken: string, txHashes: string[]): Prom
   });
   const map = new Map<string, any>();
   for (const e of data || []) {
-    const hash = e.attributes?.externalTxHash;
-    if (hash) map.set(hash, e);
+    const attributes = e.attributes || {};
+    const isExternalAssetBridge =
+      normalizeAddr(e.address) === normalizeAddr(constants.externalAssetBridge);
+    const key = getDepositOutcomeIdentity(
+      isExternalAssetBridge ? attributes.externalChainId : undefined,
+      isExternalAssetBridge ? attributes.depositRouter : undefined,
+      isExternalAssetBridge ? attributes.depositId : undefined,
+      attributes.externalTxHash,
+    );
+    if (key) map.set(key, e);
   }
   return map;
 }
@@ -310,7 +352,14 @@ async function fetchWithdrawalReviews(
 }
 
 function applyDepositOutcome(enriched: any, eventMap: Map<string, any>, stratoMap: Map<string, { name: string; symbol: string }>) {
-  const evt = eventMap.get(enriched.externalTxHash);
+  const evt = eventMap.get(
+    getDepositOutcomeIdentity(
+      enriched.bridgeSource === "external" ? enriched.externalChainId : undefined,
+      enriched.bridgeSource === "external" ? enriched.depositRouter : undefined,
+      enriched.bridgeSource === "external" ? enriched.depositId : undefined,
+      enriched.externalTxHash,
+    ),
+  );
   if (evt?.event_name === "AutoForged" || evt?.event_name === "AutoForgedViaPSM") {
     const addr = stripHex(evt.attributes.metalToken || "");
     enriched.depositOutcome = "forge";
@@ -423,7 +472,6 @@ export function enrichAssetsWithTokenData(
       stratoTokenName: meta?.name ?? "",
       stratoTokenSymbol: meta?.symbol ?? "",
       stratoTokenImage: meta?.image,
-      isDefaultRoute: route.isDefaultRoute,
       id: route.id,
     };
   });
@@ -476,7 +524,6 @@ export function parseBridgeRouteMappings(mappings: BridgeMappingRow[]): Bridgeab
       id: `${externalToken}-${externalChainId}-${stratoToken}`,
       externalToken,
       externalChainId,
-      isDefaultRoute: isMappingTrue(raw.isDefaultRoute),
       AssetInfo: {
         routeType: "standard",
         externalChainId,
@@ -529,7 +576,7 @@ export function parseBridgeRouteMappings(mappings: BridgeMappingRow[]): Bridgeab
 
     routes.push({
       id: `${externalToken}-${externalChainId}-${defaultToken}`,
-      externalToken, externalChainId, isDefaultRoute: true,
+      externalToken, externalChainId,
       AssetInfo: { ...asset, enabled: asset.enabled || explicitTokens.has(defaultToken) },
     });
 
@@ -537,7 +584,7 @@ export function parseBridgeRouteMappings(mappings: BridgeMappingRow[]): Bridgeab
       if (stratoToken === defaultToken) continue;
       routes.push({
         id: `${externalToken}-${externalChainId}-${stratoToken}`,
-        externalToken, externalChainId, isDefaultRoute: false,
+        externalToken, externalChainId,
         AssetInfo: { ...asset, stratoToken, enabled: true },
       });
     }
@@ -602,7 +649,6 @@ export function parseNativeBridgeAssets(
       externalToken: representationToken,
       externalChainId,
       AssetInfo: asset,
-      isDefaultRoute: true,
     });
   }
 
@@ -644,4 +690,4 @@ export function parseNativeLockedBalances(
   return balances;
 }
 
-export { QUERY_CONFIGS };
+export { LEGACY_QUERY_CONFIGS, QUERY_CONFIGS };

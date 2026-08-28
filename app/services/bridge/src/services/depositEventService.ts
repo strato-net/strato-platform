@@ -15,6 +15,7 @@ const depositEvents = new Interface(DEPOSIT_EVENTS_ABI);
 
 export interface RawDepositLog {
   address: string;
+  blockHash?: string;
   blockNumber: string;
   data: string;
   logIndex: string;
@@ -25,6 +26,10 @@ export interface RawDepositLog {
 export interface ClassifiedDepositLogs {
   standardDeposits: DepositArgs[];
   actionDeposits: ActionDepositArgs[];
+  quarantinedLogs: Array<{
+    log: RawDepositLog;
+    error: string;
+  }>;
 }
 
 export type ParsedDepositEvent =
@@ -41,6 +46,9 @@ export const parseDepositLog = (
   log: RawDepositLog,
   externalChainId: number,
 ): ParsedDepositEvent => {
+  if (!log.address || !log.transactionHash || !log.blockHash) {
+    throw new Error("Deposit log is missing router, transaction hash, or block hash");
+  }
   const parsed = depositEvents.parseLog({
     topics: log.topics,
     data: log.data,
@@ -51,10 +59,18 @@ export const parseDepositLog = (
 
   const base: DepositArgs = {
     externalChainId,
+    depositRouter: normalizeAddress(log.address),
+    depositId: parsed.args.depositId.toString(),
     externalSender: normalizeAddress(parsed.args.sender),
     externalToken: normalizeAddress(parsed.args.token),
     externalTokenAmount: parsed.args.amount.toString(),
+    observedExternalTokenAmount: parsed.args.amount.toString(),
     externalTxHash: log.transactionHash,
+    externalBlockHash: log.blockHash,
+    externalBlockNumber: Number(BigInt(log.blockNumber)),
+    externalBlockTimestamp: 0,
+    externalLogIndex: Number(BigInt(log.logIndex)),
+    detectedAt: Date.now(),
     stratoRecipient: normalizeAddress(parsed.args.stratoAddress),
     targetStratoToken: normalizeAddress(parsed.args.targetStratoToken),
   };
@@ -109,21 +125,24 @@ export const classifyDepositLogs = (
   const result: ClassifiedDepositLogs = {
     standardDeposits: [],
     actionDeposits: [],
+    quarantinedLogs: [],
   };
 
-  for (const [groupKey, groupedLogs] of groups.entries()) {
-    const transactionHash = groupedLogs[0].transactionHash || groupKey;
-    if (groupedLogs.length > 1) {
-      throw new Error(
-        `Multiple deposit events found for transaction ${transactionHash}`,
-      );
-    }
-
-    const parsed = parseDepositLog(groupedLogs[0], externalChainId);
-    if (parsed.kind === "standard") {
-      result.standardDeposits.push(parsed.deposit);
-    } else {
-      result.actionDeposits.push(parsed.deposit);
+  for (const groupedLogs of groups.values()) {
+    for (const log of groupedLogs) {
+      try {
+        const parsed = parseDepositLog(log, externalChainId);
+        if (parsed.kind === "standard") {
+          result.standardDeposits.push(parsed.deposit);
+        } else {
+          result.actionDeposits.push(parsed.deposit);
+        }
+      } catch (error) {
+        result.quarantinedLogs.push({
+          log,
+          error: (error as Error).message,
+        });
+      }
     }
   }
 
@@ -134,6 +153,8 @@ export const buildActionDepositBatchArgs = (
   depositArgs: NonEmptyArray<ActionDepositArgs>,
 ) => ({
   externalChainIds: depositArgs.map((deposit) => deposit.externalChainId),
+  depositRouters: depositArgs.map((deposit) => deposit.depositRouter),
+  depositIds: depositArgs.map((deposit) => deposit.depositId),
   externalSenders: depositArgs.map((deposit) => deposit.externalSender),
   externalTokens: depositArgs.map((deposit) => deposit.externalToken),
   externalTokenAmounts: depositArgs.map((deposit) => deposit.externalTokenAmount),

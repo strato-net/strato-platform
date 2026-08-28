@@ -90,10 +90,18 @@ export interface PreparedWithdrawal {
 
 export interface DepositArgs {
   externalChainId: string | number;
+  depositRouter: string;
+  depositId: string;
   externalSender: string;
   externalToken: string;
   externalTokenAmount: string;
+  observedExternalTokenAmount: string;
   externalTxHash: string;
+  externalBlockHash: string;
+  externalBlockNumber: number;
+  externalBlockTimestamp: number;
+  externalLogIndex: number;
+  detectedAt: number;
   stratoRecipient: string;
   targetStratoToken: string;
 }
@@ -107,6 +115,8 @@ export interface ActionDepositArgs extends DepositArgs {
 export interface ConfirmDepositArgs {
   externalChainId: string | number;
   externalTxHash: string;
+  depositRouter: string;
+  depositId: string;
   stratoRecipient: string;
   verified: boolean;
 }
@@ -143,6 +153,7 @@ export interface DepositInfo {
 
   externalChainId: string | number;
   externalTxHash: string;
+  depositId: string;
   externalDecimals: number;
   depositRouter: string;
   custodyAddress: string;
@@ -216,6 +227,7 @@ export interface NativeWithdrawalInfo {
 export interface ChainInfo {
   externalChainId: number;
   depositRouter: string;
+  depositRouters?: string[];
   lastProcessedBlock: number;
   enabled: boolean;
   custody?: string;

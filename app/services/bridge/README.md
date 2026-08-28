@@ -5,7 +5,7 @@ The STRATO Bridge Service is responsible for seamlessly bridging assets between 
 ## Features
 
 * **Dynamic Chain Support**: Automatically detects and configures RPC endpoints for all enabled chains from the bridge contract
-* **Safe Multisig Integration**: Proposes and executes transactions through Gnosis Safe for secure asset management
+* **Safe Governance Integration**: Uses Safe governance for large-withdrawal approval and reviewed-deposit aborts
 * **External Vault Releases**: Reserves and releases routine non-native withdrawals using threshold-signed vault authorizations
 * **Real-time Monitoring**: Polls blockchain events and transaction statuses across all supported chains
 * **Bridge Out Flow**: STRATO → external-chain transfers through route-local vaults, with manual review for large withdrawals
@@ -79,13 +79,26 @@ The service automatically validates that RPC URLs are configured for all enabled
 Native withdrawal review delay and attestation validity are enforced by the native bridge contracts, not bridge-service environment variables.
 
 #### External Vault Releases
-- `CHAIN_${chainId}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY` - Destination-chain key used to pay gas and sign external vault withdrawal authorizations
-- `CHAIN_${chainId}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY_1`, `_2`, ... - Optional additional signer keys required by the vault threshold
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY` - Unprivileged destination-chain gas key used only to submit reserve/release/cancel transactions
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_SIGNER_URLS` - Comma-separated independent signer service URLs
+- `EXTERNAL_BRIDGE_SIGNER_API_TOKEN` - Shared authentication token for signer service requests
+
+Run each signer independently with `npm run start:signer`. Each process must use its own `SIGNER_RPC_URL`, KMS/HSM adapter (`KMS_SIGNER_URL`, `KMS_SIGNER_ADDRESS`), and read-only STRATO OAuth account (`SIGNER_OPENID_DISCOVERY_URL`, `SIGNER_CLIENT_ID`, `SIGNER_CLIENT_SECRET`, `SIGNER_BA_USERNAME`, `SIGNER_BA_PASSWORD`). Access tokens are refreshed before expiry and once after a 401 response. A signer verifies the source withdrawal and destination vault policy itself before requesting a digest signature; no attestation private key is held by the bridge executor.
+
+Production signer deployments use `docker-compose.bridge-signer.tpl.yml`. Deploy one isolated stack per signer with a distinct RPC provider, KMS/HSM key and API endpoint.
 
 Routine non-native withdrawals are marked ready on STRATO, reserved in the route-local vault, released externally, and only then finalized and burned on STRATO. Large withdrawals require an executed Safe approval over their stable review digest before receiving a fresh release authorization.
 Expired reservations are cancelled on the destination vault and recorded on STRATO; governance can then refund the escrowed representation with `npm run refund:external-withdrawal` from `app/contracts`.
 
 #### Optional
+- `CHAIN_${chainId}_WS_RPC_URL` - WebSocket RPC used for immediate deposit detection
+- `CHAIN_${chainId}_VERIFICATION_RPC_URLS` - Independent receipt-verification RPCs; the primary `CHAIN_${chainId}_RPC_URL` must support `trace_transaction` for native ETH deposits
+- `CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS` - Per-chain confirmation count (defaults to `0` in development; production requires an explicit positive value)
+- `DEPOSIT_MISSING_RECEIPT_GRACE_MS` - Time a missing/lagging receipt remains retryable before review (defaults to `300000`)
+- `DEPOSIT_SETTLEMENT_RETRY_GRACE_MS` - Time a verified deposit settlement may retry before terminal quarantine/review (defaults to `900000`)
+- `DEPOSIT_REVIEW_RECORD_RETRY_MS` - Minimum interval between STRATO review-recording attempts (defaults to `60000`; persisted reviews retry independently of log reconciliation)
+- `DEPOSIT_WEBHOOK_TOKEN` - Required outside development/test for deposit webhook authentication
+- `DEPOSIT_OPERATIONS_TOKEN` - Required outside development/test to confirm reviewed deposits through the operator endpoint
 - `VOUCHER_CONTRACT_ADDRESS` - Voucher contract address (defaults to `0x000000000000000000000000000000000000100e`)
 - `TRANSACTION_APPROVER_EMAILS` - Comma-separated list of emails for transaction alerts
 - `SENDGRID_API_KEY` - SendGrid API key for sending emails
@@ -124,7 +137,7 @@ npm start
 1. **Bridge Service** (`bridgeService.ts`)
    - Core bridge contract interactions
    - Handles deposit and withdrawal confirmations
-   - Manages batch operations for efficiency
+   - Atomically settles independently verified deposits
 
 2. **Safe Service** (`safeService.ts`)
    - Centralized Safe multisig wallet operations
@@ -163,33 +176,34 @@ npm start
    - External-chain polling reads standard and action deposit events in one ordered block range
    - ABI-decodes the action intent
    - Deduplicates exact RPC log repeats
-   - Rejects unsupported multi-deposit transactions without advancing the cursor
+   - Processes every deposit event independently, including multiple events in one transaction
+   - Quarantines malformed logs without stopping the chain cursor
 
 2. **Processing**
-   - Records standard deposits with `depositBatch`
-   - Records action deposits with `depositBatchWithAction`
-   - Advances the cursor only after both recording paths succeed
+   - Verifies the receipt, canonical event and custody transfer before any STRATO write
+   - Calls `settleDeposit` once per verified deposit
+   - Keeps the cursor behind the oldest pending deposit
+   - Logs a failed settlement and continues processing later deposits
 
-### Action Deposit Rollout
+### Reviewed Deposits
 
-Before starting the updated relayer in dev, test, or production:
-
-1. Upgrade and configure `MercataBridge`.
-2. Dry-run the two required relayer whitelist operations:
+Use the review resolver in dry-run mode before submitting either decision:
 ```bash
 cd app/contracts/deploy
-node configure-bridge-relayer-actions.js \
-  --bridge-address <bridge-proxy> \
-  --relayer-address <relayer-address>
+node resolve-external-deposit.js \
+  --decision confirm \
+  --external-chain-id <chain-id> \
+  --deposit-router <router> \
+  --deposit-id <deposit-id> \
+  --bridge-service-url <bridge-service-url>
 ```
-3. Repeat with `--execute` as each required admin until governance executes both operations.
-4. Verify the relayer is whitelisted for `depositWithAction` and `depositBatchWithAction`.
-5. Start one relayer instance, validate standard and action deposits, then roll out remaining instances.
+
+Add `--execute` after review to call `confirmReviewedDeposit` through the authenticated bridge-operator endpoint. Use `--decision abort --bridge-address <bridge> --bridge-service-url <bridge-service-url>` to submit `abortDeposit` through AdminRegistry governance and reset the persisted observation for canonical reprocessing. The authenticated `/reset` operation is also the manual recovery path after correcting a terminal settlement configuration failure.
 
 ### Key Components
 
 - **Dynamic RPC Management**: Uses `getChainRpcUrl(chainId)` for all chain interactions
-- **Safe Integration**: Leverages `@safe-global/protocol-kit` and `@safe-global/api-kit`
+- **Safe Integration**: Retained for governance and legacy withdrawal operations
 - **OAuth Authentication**: Secure STRATO access with JWT validation
 - **Error Handling**: Comprehensive error handling with detailed logging
 

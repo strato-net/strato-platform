@@ -1,4 +1,9 @@
-import { ZERO_ADDRESS, TRANSFER_EVENT_SIGNATURE, WAD } from "../config";
+import {
+  getDepositConfirmationPolicy,
+  ZERO_ADDRESS,
+  TRANSFER_EVENT_SIGNATURE,
+  WAD,
+} from "../config";
 import { 
   getTransactionReceiptsBatch, 
   getInternalTransactionsBatch 
@@ -6,7 +11,8 @@ import {
 import { getRebaseFactors } from "./cirrusService";
 import { normalizeAddress, safeToBigInt, ensureHexPrefix, convertToStratoDecimals, parseUint256, decodeTopicAddr, isOkStatus } from "../utils/utils";
 import { logInfo } from "../utils/logger";
-import { DepositInfo } from "../types";
+import { ActionDepositArgs, DepositArgs, DepositInfo } from "../types";
+import { parseDepositLog, RawDepositLog } from "./depositEventService";
 
 const decodeTransferLog = (log: any, sig: string) => {
   if (!log?.topics || log.topics.length < 3) return null;
@@ -108,6 +114,161 @@ export const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
 };
 
 const fail = (txHash: string, msg: string): Error => new Error(`${msg} for ${txHash}`);
+
+export type DetectedDepositVerification =
+  | { state: "verified" }
+  | { state: "confirming" }
+  | { state: "missing" }
+  | { state: "relocated" }
+  | { state: "invalid"; error: Error };
+
+export const depositIdentity = (deposit: DepositArgs): string =>
+  `${deposit.externalChainId}:${deposit.depositRouter.toLowerCase()}:${deposit.depositId}`;
+
+const sameDetectedDeposit = (
+  expected: DepositArgs | ActionDepositArgs,
+  actual: DepositArgs | ActionDepositArgs,
+): boolean =>
+  expected.depositRouter === actual.depositRouter &&
+  expected.depositId === actual.depositId &&
+  expected.externalSender === actual.externalSender &&
+  expected.externalToken === actual.externalToken &&
+  expected.observedExternalTokenAmount === actual.observedExternalTokenAmount &&
+  expected.stratoRecipient === actual.stratoRecipient &&
+  expected.targetStratoToken === actual.targetStratoToken &&
+  ("action" in expected ? expected.action : "0") ===
+    ("action" in actual ? actual.action : "0") &&
+  ("actionToken" in expected ? expected.actionToken : "") ===
+    ("actionToken" in actual ? actual.actionToken : "") &&
+  ("minFinalOut" in expected ? expected.minFinalOut : "0") ===
+    ("minFinalOut" in actual ? actual.minFinalOut : "0");
+
+export const verifyDetectedDepositsBatch = async (
+  deposits: Array<DepositArgs | ActionDepositArgs>,
+  latestBlock: number,
+  custodyAddress: string,
+): Promise<Map<string, DetectedDepositVerification>> => {
+  const results = new Map<string, DetectedDepositVerification>();
+  const depositsByChain = new Map<number, Array<DepositArgs | ActionDepositArgs>>();
+  for (const deposit of deposits) {
+    const chainId = Number(deposit.externalChainId);
+    depositsByChain.set(chainId, [
+      ...(depositsByChain.get(chainId) || []),
+      deposit,
+    ]);
+  }
+
+  for (const [chainId, chainDeposits] of depositsByChain) {
+    const txHashes = [...new Set(chainDeposits.map((item) => item.externalTxHash))];
+    const ethTxHashes = [
+      ...new Set(
+        chainDeposits
+          .filter((item) => item.externalToken === ZERO_ADDRESS)
+          .map((item) => item.externalTxHash),
+      ),
+    ];
+    const [receipts, traces] = await Promise.all([
+      getTransactionReceiptsBatch(chainId, txHashes),
+      ethTxHashes.length
+        ? getInternalTransactionsBatch(chainId, ethTxHashes)
+        : Promise.resolve(new Map<string, any[]>()),
+    ]);
+
+    for (const deposit of chainDeposits) {
+      const key = depositIdentity(deposit);
+      try {
+        const receipt = receipts.get(deposit.externalTxHash);
+        if (!receipt) {
+          results.set(key, { state: "missing" });
+          continue;
+        }
+        if (receipt.__rpcDisagreement) {
+          results.set(key, {
+            state: "invalid",
+            error: fail(deposit.externalTxHash, "RPC providers disagree"),
+          });
+          continue;
+        }
+        if (!isOkStatus(receipt)) {
+          results.set(key, {
+            state: "invalid",
+            error: fail(deposit.externalTxHash, "Deposit transaction failed"),
+          });
+          continue;
+        }
+        if (
+          String(receipt.blockHash).toLowerCase() !==
+          deposit.externalBlockHash.toLowerCase()
+        ) {
+          results.set(key, { state: "relocated" });
+          continue;
+        }
+        const confirmations = getDepositConfirmationPolicy(chainId);
+        if (latestBlock - Number(BigInt(receipt.blockNumber)) < confirmations) {
+          results.set(key, { state: "confirming" });
+          continue;
+        }
+        const receiptLog = (receipt.logs || []).find(
+          (log: any) =>
+            Number(BigInt(log.logIndex)) === deposit.externalLogIndex &&
+            normalizeAddress(log.address) === deposit.depositRouter,
+        );
+        if (!receiptLog) {
+          throw fail(deposit.externalTxHash, "Deposit event missing from receipt");
+        }
+        const parsed = parseDepositLog(
+          {
+            ...(receiptLog as RawDepositLog),
+            blockHash: receipt.blockHash,
+            blockNumber: receipt.blockNumber,
+            transactionHash: receipt.transactionHash,
+          },
+          chainId,
+        ).deposit;
+        if (!sameDetectedDeposit(deposit, parsed)) {
+          throw fail(deposit.externalTxHash, "Deposit event changed");
+        }
+
+        const observedAmount = BigInt(deposit.observedExternalTokenAmount);
+        if (deposit.externalToken === ZERO_ADDRESS) {
+          const transactionTraces = traces.get(deposit.externalTxHash);
+          if (!transactionTraces) {
+            results.set(key, { state: "missing" });
+            continue;
+          }
+          if (
+            !findInternalEthTransfer(
+              transactionTraces,
+              normalizeAddress(custodyAddress),
+              observedAmount,
+            )
+          ) {
+            throw fail(deposit.externalTxHash, "ETH custody transfer missing");
+          }
+        } else {
+          const transferFound = (receipt.logs || []).some((log: any) => {
+            const transfer = decodeTransferLog(
+              log,
+              TRANSFER_EVENT_SIGNATURE.toLowerCase(),
+            );
+            return (
+              transfer?.tokenAddr === deposit.externalToken &&
+              transfer.toAddr === normalizeAddress(custodyAddress) &&
+              transfer.amount === observedAmount
+            );
+          });
+          if (!transferFound) {
+            throw fail(deposit.externalTxHash, "ERC20 custody transfer missing");
+          }
+        }
+        results.set(key, { state: "verified" });
+      } catch (error) {
+        results.set(key, { state: "invalid", error: error as Error });
+      }
+    }
+  }
+  return results;
+};
 
 // Batched verification for multiple deposits
 export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<string, Error | null>> => {

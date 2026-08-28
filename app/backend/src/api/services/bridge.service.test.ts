@@ -13,6 +13,9 @@ import {
   parseNativeLockedBalances,
   parseNativeTokenBridgeConfigs,
   parseBridgeRouteMappings,
+  LEGACY_QUERY_CONFIGS,
+  getDepositOutcomeIdentity,
+  QUERY_CONFIGS,
 } from "../helpers/bridge.helper";
 import type { BridgeToken } from "@strato/shared-types";
 
@@ -34,7 +37,32 @@ const route = (
   externalDecimals: "18",
   maxPerWithdrawal: "0",
   enabled,
-  isDefaultRoute: true,
+});
+
+test("selects router-scoped deposit identity and transaction metadata", () => {
+  assert.match(QUERY_CONFIGS.deposit.selectFields, /depositRouter:key2/);
+  assert.match(QUERY_CONFIGS.deposit.selectFields, /depositId:key3/);
+  assert.match(
+    QUERY_CONFIGS.deposit.selectFields,
+    /externalTxHash:value->>externalTxHash/,
+  );
+});
+
+test("keeps the legacy MercataBridge deposit query on its original keys", () => {
+  assert.match(LEGACY_QUERY_CONFIGS.deposit.selectFields, /externalTxHash:key2/);
+  assert.doesNotMatch(LEGACY_QUERY_CONFIGS.deposit.selectFields, /key3/);
+});
+
+test("correlates action outcomes by router-scoped deposit identity", () => {
+  const txHash = "0xabc";
+  assert.notEqual(
+    getDepositOutcomeIdentity("1", "0x1111111111111111111111111111111111111111", "1", txHash),
+    getDepositOutcomeIdentity("1", "0x1111111111111111111111111111111111111111", "2", txHash),
+  );
+  assert.equal(
+    getDepositOutcomeIdentity(undefined, undefined, undefined, txHash),
+    txHash,
+  );
 });
 
 test("builds actions only for eligible routes and configured products", () => {
@@ -130,7 +158,7 @@ test("builds actions only for eligible routes and configured products", () => {
   assert.deepEqual(buildDepositActionCatalog({ ...base, actionChainIds: new Set() }), []);
 });
 
-test("parses ExternalAssetBridge route controls and default route metadata", () => {
+test("parses ExternalAssetBridge route controls", () => {
   const routes = parseBridgeRouteMappings([{
     externalToken: "1111111111111111111111111111111111111111",
     externalChainId: "1",
@@ -141,14 +169,12 @@ test("parses ExternalAssetBridge route controls and default route metadata", () 
       externalDecimals: "6",
       externalName: "USD Coin",
       externalSymbol: "USDC",
-      isDefaultRoute: true,
       maxPerWithdrawal: "1000000",
       manualReviewThreshold: "500000",
     },
   }]);
 
   assert.equal(routes.length, 1);
-  assert.equal(routes[0].isDefaultRoute, true);
   assert.equal(routes[0].AssetInfo.enabled, true);
   assert.equal(routes[0].AssetInfo.depositsEnabled, true);
   assert.equal(routes[0].AssetInfo.withdrawalsEnabled, false);

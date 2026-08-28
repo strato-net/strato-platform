@@ -115,7 +115,6 @@ contract Describe_ExternalAssetBridge is Authorizable {
             18,
             "External USD",
             "xUSD",
-            true,
             1000e18,
             100e18
         );
@@ -209,23 +208,22 @@ contract Describe_ExternalAssetBridge is Authorizable {
         require(reverted, "Second initialization should revert");
     }
 
-    function it_records_and_confirms_a_plain_deposit() {
+    function it_atomically_settles_a_plain_deposit() {
         relayer.do(
             address(bridge),
-            "deposit",
+            "settleDeposit",
             externalChainId,
+            depositRouter,
+            1,
             address(0x1111),
             externalToken,
             25e18,
             "0xABCDEF",
             address(user),
-            address(stratoToken)
-        );
-        relayer.do(
-            address(bridge),
-            "confirmDeposit",
-            externalChainId,
-            "0xabcdef"
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
         );
 
         require(
@@ -234,18 +232,34 @@ contract Describe_ExternalAssetBridge is Authorizable {
         );
         (
             Status status,
-            ,
-            ,
-            ,
-            ,
-            ,
-            ,
-            ,
-
-        ) = bridge.deposits(externalChainId, "0xabcdef");
+            address storedSender,
+            address storedExternalToken,
+            uint256 storedExternalAmount,
+            string storedTxHash,
+            uint256 requestedAt,
+            address storedRecipient,
+            address storedStratoToken,
+            uint256 storedStratoAmount,
+            uint256 timestamp
+        ) = bridge.deposits(
+            externalChainId,
+            depositRouter,
+            1
+        );
         require(
             status == Status.COMPLETED,
             "Deposit should complete"
+        );
+        require(
+            storedSender == address(0x1111) &&
+                storedExternalToken == externalToken &&
+                storedExternalAmount == 25e18 &&
+                storedTxHash == "0xabcdef" &&
+                storedRecipient == address(user) &&
+                storedStratoToken == address(stratoToken) &&
+                storedStratoAmount == 25e18 &&
+                timestamp >= requestedAt,
+            "Deposit metadata should persist"
         );
     }
 
@@ -259,8 +273,10 @@ contract Describe_ExternalAssetBridge is Authorizable {
         );
         relayer.do(
             address(bridge),
-            "depositWithAction",
+            "settleDeposit",
             externalChainId,
+            depositRouter,
+            1,
             address(0x1111),
             externalToken,
             10e18,
@@ -271,12 +287,6 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(0),
             0
         );
-        relayer.do(
-            address(bridge),
-            "confirmDeposit",
-            externalChainId,
-            "0x1234"
-        );
 
         require(
             stratoToken.balanceOf(address(user)) == 10e18,
@@ -284,17 +294,260 @@ contract Describe_ExternalAssetBridge is Authorizable {
         );
         (
             uint256 action,
-            ,
+            address actionToken,
+            uint256 minFinalOut
+        ) = bridge.depositActions(
+            externalChainId,
+            depositRouter,
+            1
+        );
+        require(
+            action == 0 &&
+                actionToken == address(0) &&
+                minFinalOut == 0,
+            "Completed action intent should be deleted"
+        );
+    }
 
-        ) = bridge.depositActions(externalChainId, "0x1234");
-        require(action == 0, "Completed action intent should be deleted");
+    function it_settles_multiple_deposits_from_one_external_transaction() {
+        relayer.do(
+            address(bridge),
+            "settleDeposit",
+            externalChainId,
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0xaaaa",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
+        relayer.do(
+            address(bridge),
+            "settleDeposit",
+            externalChainId,
+            depositRouter,
+            2,
+            address(0x1111),
+            externalToken,
+            15e18,
+            "0xaaaa",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
+
+        require(
+            stratoToken.balanceOf(address(user)) == 25e18,
+            "Both deposits should settle"
+        );
+    }
+
+    function it_rejects_duplicate_router_deposit_ids() {
+        relayer.do(
+            address(bridge),
+            "settleDeposit",
+            externalChainId,
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0xaaaa",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
+
+        bool reverted = false;
+        try relayer.do(
+            address(bridge),
+            "settleDeposit",
+            externalChainId,
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0xbbbb",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        ) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Duplicate deposit identity should revert");
+    }
+
+    function it_reuses_an_aborted_deposit_id_after_a_reorg() {
+        relayer.do(
+            address(bridge),
+            "recordDepositForReview",
+            externalChainId,
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0xaaaa",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
+        bridge.abortDeposit(externalChainId, depositRouter, 1);
+
+        relayer.do(
+            address(bridge),
+            "settleDeposit",
+            externalChainId,
+            depositRouter,
+            1,
+            address(0x2222),
+            externalToken,
+            15e18,
+            "0xbbbb",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
+
+        require(
+            stratoToken.balanceOf(address(user)) == 15e18,
+            "Canonical replacement should settle"
+        );
+    }
+
+    function it_rolls_back_identity_when_atomic_settlement_fails() {
+        adminRegistry.castVoteOnIssue(
+            address(adminRegistry),
+            "removeWhitelist",
+            address(stratoToken),
+            "mint",
+            address(bridge)
+        );
+        bool reverted = false;
+        try relayer.do(
+            address(bridge),
+            "settleDeposit",
+            externalChainId,
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0xaaaa",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        ) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Settlement failure should revert");
+
+        adminRegistry.castVoteOnIssue(
+            address(adminRegistry),
+            "addWhitelist",
+            address(stratoToken),
+            "mint",
+            address(bridge)
+        );
+        relayer.do(
+            address(bridge),
+            "settleDeposit",
+            externalChainId,
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0xaaaa",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
+        require(
+            stratoToken.balanceOf(address(user)) == 10e18,
+            "Failed settlement must not retain the identity"
+        );
+    }
+
+    function it_keeps_previous_router_deposits_valid_after_rotation() {
+        address nextRouter = address(0x8888);
+        bridge.setChain(
+            "External",
+            externalVault,
+            nextRouter,
+            true,
+            externalChainId,
+            100
+        );
+
+        relayer.do(
+            address(bridge),
+            "settleDeposit",
+            externalChainId,
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0xaaaa",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
+        relayer.do(
+            address(bridge),
+            "settleDeposit",
+            externalChainId,
+            nextRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            15e18,
+            "0xbbbb",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
+
+        require(
+            stratoToken.balanceOf(address(user)) == 25e18,
+            "Old and new routers should settle independently"
+        );
     }
 
     function it_executes_auto_save_and_delivers_shares_to_the_recipient() {
         relayer.do(
             address(bridge),
-            "depositWithAction",
+            "settleDeposit",
             externalChainId,
+            depositRouter,
+            1,
             address(0x1111),
             externalToken,
             10e18,
@@ -304,12 +557,6 @@ contract Describe_ExternalAssetBridge is Authorizable {
             uint256(DepositAction.AUTO_SAVE),
             address(0),
             0
-        );
-        relayer.do(
-            address(bridge),
-            "confirmDeposit",
-            externalChainId,
-            "0x2345"
         );
 
         require(
@@ -325,8 +572,10 @@ contract Describe_ExternalAssetBridge is Authorizable {
     function it_executes_auto_forge_and_delivers_metal_to_the_recipient() {
         relayer.do(
             address(bridge),
-            "depositWithAction",
+            "settleDeposit",
             externalChainId,
+            depositRouter,
+            1,
             address(0x1111),
             externalToken,
             2000e18,
@@ -336,12 +585,6 @@ contract Describe_ExternalAssetBridge is Authorizable {
             uint256(DepositAction.AUTO_FORGE),
             address(metalToken),
             0
-        );
-        relayer.do(
-            address(bridge),
-            "confirmDeposit",
-            externalChainId,
-            "0x3456"
         );
 
         require(
@@ -364,21 +607,25 @@ contract Describe_ExternalAssetBridge is Authorizable {
             18,
             "External USD",
             "xUSD",
-            true,
             1000e18,
             100e18
         );
 
         relayer.do(
             address(bridge),
-            "deposit",
+            "settleDeposit",
             externalChainId,
+            depositRouter,
+            1,
             address(0x1111),
             externalToken,
             5e18,
             "0x5678",
             address(user),
-            address(stratoToken)
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
         );
 
         bool reverted = false;

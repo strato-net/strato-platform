@@ -26,19 +26,43 @@ const ORACLE_URL = "BlockApps-PriceOracle";
 
 // Get all enabled chains from the bridge contract
 export const getEnabledChains = async (): Promise<Map<number, ChainInfo>> => {
-  const data = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-chains`, {
-    params: {
-      "value->>enabled": "eq.true",
-      address: `eq.${externalAssetBridgeAddress}`,
-      select: "key,value",
-    },
-  });
+  const [data, routerData] = await Promise.all([
+    cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-chains`, {
+      params: {
+        "value->>enabled": "eq.true",
+        address: `eq.${externalAssetBridgeAddress}`,
+        select: "key,value",
+      },
+    }),
+    cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-depositRouters`, {
+      params: {
+        address: `eq.${externalAssetBridgeAddress}`,
+        value: "eq.true",
+        select: "key,key2,value",
+      },
+    }),
+  ]);
 
   if (!Array.isArray(data) || !data.length) return new Map();
+
+  const routersByChain = new Map<number, string[]>();
+  for (const row of Array.isArray(routerData) ? routerData : []) {
+    const chainId = Number(row.key);
+    routersByChain.set(chainId, [
+      ...(routersByChain.get(chainId) || []),
+      row.key2,
+    ]);
+  }
 
   const normalize = (v: any, key: string): ChainInfo => ({
     externalChainId: Number(key),
     depositRouter: v.depositRouter,
+    depositRouters: [
+      ...new Set([
+        v.depositRouter,
+        ...(routersByChain.get(Number(key)) || []),
+      ]),
+    ],
     lastProcessedBlock: Number(v.lastProcessedBlock),
     enabled: !!v.enabled,
     custody: v.custody,
@@ -262,7 +286,12 @@ export const getDepositsByStatus = async (
   ]);
 
   return data.map(
-    ({ value: v, key: externalChainId, key2: externalTxHash }) => {
+    ({
+      value: v,
+      key: externalChainId,
+      key2: depositRouter,
+      key3: depositId,
+    }) => {
       const externalToken = v?.externalToken;
       const asset = assetMapping.get(
         `${externalToken}:${externalChainId}:${v?.stratoToken}`,
@@ -284,13 +313,35 @@ export const getDepositsByStatus = async (
         ...v,
         bridgeStatus: v.status,
         externalChainId,
-        externalTxHash,
+        externalTxHash: v.externalTxHash,
+        depositId,
         externalDecimals: asset.externalDecimals,
-        depositRouter: chainInfo.depositRouter,
+        depositRouter,
         custodyAddress,
       };
     }
   );
+};
+
+export const getDepositStatusByIdentity = async (
+  externalChainId: number | string,
+  depositRouter: string,
+  depositId: string,
+): Promise<string | undefined> => {
+  const data = await cirrus.get(
+    `/${EXTERNAL_ASSET_BRIDGE_URL}-deposits`,
+    {
+      params: {
+        address: `eq.${externalAssetBridgeAddress}`,
+        key: `eq.${externalChainId}`,
+        key2: `eq.${depositRouter.replace(/^0x/i, "")}`,
+        key3: `eq.${depositId}`,
+        select: "value->>status",
+        limit: 1,
+      },
+    },
+  );
+  return data?.[0]?.status == null ? undefined : String(data[0].status);
 };
 
 export const getNativeDepositsByStatus = async (

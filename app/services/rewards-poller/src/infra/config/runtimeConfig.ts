@@ -23,6 +23,9 @@ const config = {
   rewards: {
     address: getEnv("REWARDS_CONTRACT_ADDRESS"),
   },
+  externalAssetBridge: {
+    address: getEnv("EXTERNAL_ASSET_BRIDGE_ADDRESS"),
+  },
   priceOracle: {
     address: getEnv("PRICE_ORACLE_ADDRESS"),
   },

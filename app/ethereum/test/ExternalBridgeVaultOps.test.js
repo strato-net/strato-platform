@@ -9,6 +9,7 @@ const {
 
 const signerOneKey = `0x${"11".repeat(32)}`;
 const signerTwoKey = `0x${"22".repeat(32)}`;
+const executorKey = `0x${"33".repeat(32)}`;
 const signerOne = new ethers.Wallet(signerOneKey).address;
 const signerTwo = new ethers.Wallet(signerTwoKey).address;
 
@@ -84,20 +85,30 @@ test("builds governance, router, and explicit liquidity migration operations", (
   assert.equal(operations.liquidity[1].args[1], 750n);
 });
 
-test("validates service keys against the configured signer threshold", () => {
+test("validates independent signer addresses against the configured threshold", () => {
   const chain = config().chains[0];
   const valid = validateServiceSigners(chain, {
-    CHAIN_11155111_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY: signerOneKey,
-    CHAIN_11155111_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY_1: signerTwoKey,
+    CHAIN_11155111_EXTERNAL_BRIDGE_SIGNER_ADDRESSES: `${signerOne},${signerTwo}`,
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY: executorKey,
   });
   assert.equal(valid.valid, true);
   assert.equal(valid.missingSignerCount, 0);
 
   const incomplete = validateServiceSigners(chain, {
-    CHAIN_11155111_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY: signerOneKey,
+    CHAIN_11155111_EXTERNAL_BRIDGE_SIGNER_ADDRESSES: signerOne,
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY: executorKey,
   });
   assert.equal(incomplete.valid, false);
   assert.equal(incomplete.missingSignerCount, 1);
+});
+
+test("rejects an executor that is also an attestation signer", () => {
+  const result = validateServiceSigners(config().chains[0], {
+    CHAIN_11155111_EXTERNAL_BRIDGE_SIGNER_ADDRESSES: `${signerOne},${signerTwo}`,
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY: signerOneKey,
+  });
+  assert.equal(result.valid, false);
+  assert.equal(result.executorIsSigner, true);
 });
 
 test("rejects a threshold above the configured signer count", () => {

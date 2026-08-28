@@ -240,28 +240,27 @@ function buildOperations(config, chain) {
 }
 
 function getServiceSignerAddresses(chainId, env = process.env) {
-  const base = `CHAIN_${chainId}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY`;
-  const entries = [];
-  for (let index = 0; ; index += 1) {
-    const envVar = index === 0 ? base : `${base}_${index}`;
-    const privateKey = String(env[envVar] || "").trim();
-    if (!privateKey) {
-      if (index === 0) return [];
-      break;
-    }
-    const normalizedPrivateKey = privateKey.startsWith("0x")
-      ? privateKey
-      : `0x${privateKey}`;
-    entries.push({
-      envVar,
-      address: new ethers.Wallet(normalizedPrivateKey).address,
-    });
-  }
-  return entries;
+  const envVar = `CHAIN_${chainId}_EXTERNAL_BRIDGE_SIGNER_ADDRESSES`;
+  return String(env[envVar] || "")
+    .split(",")
+    .map((address) => address.trim())
+    .filter(Boolean)
+    .map((address, index) => ({
+      envVar: `${envVar}[${index}]`,
+      address: ethers.getAddress(address),
+    }));
 }
 
 function validateServiceSigners(chain, env = process.env) {
   const configured = getServiceSignerAddresses(chain.chainId, env);
+  const executorKey = String(
+    env[`CHAIN_${chain.chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY`] || "",
+  ).trim();
+  const executorAddress = executorKey
+    ? new ethers.Wallet(
+        executorKey.startsWith("0x") ? executorKey : `0x${executorKey}`,
+      ).address
+    : null;
   const expected = new Set(
     chain.attestationSigners.map((address) => address.toLowerCase()),
   );
@@ -271,11 +270,16 @@ function validateServiceSigners(chain, env = process.env) {
   return {
     valid:
       actual.size >= chain.attestationThreshold &&
-      [...actual].every((address) => expected.has(address)),
+      [...actual].every((address) => expected.has(address)) &&
+      executorAddress !== null &&
+      !expected.has(executorAddress.toLowerCase()),
     threshold: chain.attestationThreshold,
     configured: configured.map(({ envVar, address }) => ({ envVar, address })),
     missingSignerCount: Math.max(0, chain.attestationThreshold - actual.size),
     unexpectedAddresses: [...actual].filter((address) => !expected.has(address)),
+    executorAddress,
+    executorIsSigner:
+      executorAddress !== null && expected.has(executorAddress.toLowerCase()),
   };
 }
 

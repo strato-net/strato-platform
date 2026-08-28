@@ -51,7 +51,6 @@ export interface BridgeToken {
   maxOutstandingWithdrawal?: string; // Native-only; aggregate custody cap, 0 means unlimited
   outstandingWithdrawal?: string; // Native-only; amount currently locked in custody
   remainingOutstandingWithdrawal?: string; // Native-only; available aggregate capacity
-  isDefaultRoute: boolean;       // true when route token matches asset default token
   stratoTokenImage?: string;     // First image URL from TokenFactory images
   rebaseFactor?: string;         // External-only; for example, getCurrentMultiplier() for TSLAx
 }
@@ -147,6 +146,8 @@ export interface BridgeTransaction {
   finalAmount?: string;
   routeType?: BridgeRouteType;
   bridgeSource?: "external" | "legacy" | "native";
+  depositRouter?: string;
+  depositId?: string;
   WithdrawalInfo?: ExternalWithdrawalInfo;
   DepositInfo?: {
     status?: string;
@@ -154,6 +155,7 @@ export interface BridgeTransaction {
     externalSender: string;
     externalToken: string;
     externalTokenAmount: string;
+    externalTxHash: string;
     stratoRecipient: string;
     stratoToken: string;
     stratoTokenAmount: string;

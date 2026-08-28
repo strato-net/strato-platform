@@ -5,6 +5,7 @@
   "main": "src/index.ts",
   "scripts": {
     "start": "ts-node src/index.ts",
+    "start:signer": "ts-node src/signer/index.ts",
     "dev": "nodemon src/index.ts",
     "build": "tsc",
     "test": "npm run build && node --test dist/polling/alchemyPolling.test.js dist/services/externalBridgeWiring.test.js dist/services/verificationService.test.js"

@@ -6,7 +6,7 @@ import {
 import { JsonRpcProvider } from "ethers";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
-import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, NativeDepositArgs, ConfirmDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
+import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, NativeDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
 import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
 import { mintVouchersForDeposits } from "./voucherService";
@@ -18,7 +18,6 @@ import {
   getNativeMintProposalExecution,
   proposeNativeMint,
 } from "./nativeMintService";
-import { buildActionDepositBatchArgs } from "./depositEventService";
 import {
   buildWithdrawalReview,
   buildWithdrawalAuthorization,
@@ -30,6 +29,7 @@ import {
   releaseWithdrawal,
   reserveWithdrawal,
 } from "./externalWithdrawalService";
+import { getDepositStatusByIdentity } from "./cirrusService";
 
 let cachedStratoNetworkId: bigint | null = null;
 const announcedManualNativeWithdrawals = new Map<string, string | null>();
@@ -207,135 +207,99 @@ const isDuplicateDepositError = (error: unknown): boolean => {
   );
 };
 
-const recordStandardDeposit = async (deposit: DepositArgs) => {
-  await execute({
-    contractName: "ExternalAssetBridge",
-    contractAddress: config.externalAssetBridge.address!,
-    method: "deposit",
-    args: {
-      externalChainId: deposit.externalChainId,
-      externalSender: deposit.externalSender,
-      externalToken: deposit.externalToken,
-      externalTokenAmount: deposit.externalTokenAmount,
-      externalTxHash: deposit.externalTxHash,
-      stratoRecipient: deposit.stratoRecipient,
-      stratoToken: deposit.targetStratoToken,
-    },
-  });
-};
-
-const recordActionDeposit = async (deposit: ActionDepositArgs) => {
-  await execute({
-    contractName: "ExternalAssetBridge",
-    contractAddress: config.externalAssetBridge.address!,
-    method: "depositWithAction",
-    args: {
-      externalChainId: deposit.externalChainId,
-      externalSender: deposit.externalSender,
-      externalToken: deposit.externalToken,
-      externalTokenAmount: deposit.externalTokenAmount,
-      externalTxHash: deposit.externalTxHash,
-      stratoRecipient: deposit.stratoRecipient,
-      stratoToken: deposit.targetStratoToken,
-      action: deposit.action,
-      actionToken: deposit.actionToken,
-      minFinalOut: deposit.minFinalOut,
-    },
-  });
-};
-
-const recoverMixedDuplicateBatch = async <T extends DepositArgs>(
-  deposits: NonEmptyArray<T>,
-  recordOne: (deposit: T) => Promise<void>,
-) => {
-  for (const deposit of deposits) {
-    try {
-      await recordOne(deposit);
-    } catch (error) {
-      if (!isDuplicateDepositError(error)) throw error;
-      logInfo(
-        "BridgeService",
-        `Deposit already recorded: ${deposit.externalTxHash}`,
-      );
-    }
-  }
-};
-
-export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
-  const externalChainIds = depositArgs.map((deposit) => deposit.externalChainId);
-  const externalSenders = depositArgs.map((deposit) => deposit.externalSender);
-  const externalTokens = depositArgs.map((deposit) => deposit.externalToken);
-  const externalTokenAmounts = depositArgs.map((deposit) => deposit.externalTokenAmount);
-  const externalTxHashes = depositArgs.map((deposit) => deposit.externalTxHash);
-  const stratoRecipients = depositArgs.map((deposit) => deposit.stratoRecipient);
-  const targetStratoTokens = depositArgs.map((deposit) => deposit.targetStratoToken);
-
+export const settleDeposit = async (
+  deposit: DepositArgs | ActionDepositArgs,
+): Promise<string | null> => {
+  const actionDeposit = deposit as Partial<ActionDepositArgs>;
   try {
-    await execute({
+    const result = await execute({
       contractName: "ExternalAssetBridge",
       contractAddress: config.externalAssetBridge.address!,
-      method: "depositBatch",
+      method: "settleDeposit",
       args: {
-        externalChainIds,
-        externalTxHashes,
-        externalTokens,
-        externalTokenAmounts,
-        stratoRecipients,
-        externalSenders,
-        stratoTokens: targetStratoTokens,
+        externalChainId: deposit.externalChainId,
+        depositRouter: deposit.depositRouter,
+        depositId: deposit.depositId,
+        externalSender: deposit.externalSender,
+        externalToken: deposit.externalToken,
+        externalTokenAmount: deposit.externalTokenAmount,
+        externalTxHash: deposit.externalTxHash,
+        stratoRecipient: deposit.stratoRecipient,
+        stratoToken: deposit.targetStratoToken,
+        action: actionDeposit.action || "0",
+        actionToken: actionDeposit.actionToken || "0000000000000000000000000000000000000000",
+        minFinalOut: actionDeposit.minFinalOut || "0",
       },
     });
-
     logInfo(
       "BridgeService",
-      `Successfully deposited ${depositArgs.length} deposits`,
+      `Settled deposit ${deposit.externalChainId}:${deposit.depositRouter}:${deposit.depositId}`,
     );
+    await mintVouchersForDeposits([deposit.stratoRecipient]);
+    return result.hash;
   } catch (error) {
     if (isDuplicateDepositError(error)) {
+      const status = await getDepositStatusByIdentity(
+        deposit.externalChainId,
+        deposit.depositRouter,
+        deposit.depositId,
+      );
+      if (status !== "4") {
+        throw new Error(
+          `Duplicate deposit identity is not completed (status ${status || "unavailable"})`,
+        );
+      }
       logInfo(
         "BridgeService",
-        `Standard deposit batch contained an existing deposit; recovering item-by-item`,
+        `Deposit already settled: ${deposit.externalChainId}:${deposit.depositRouter}:${deposit.depositId}`,
       );
-      await recoverMixedDuplicateBatch(depositArgs, recordStandardDeposit);
-      return;
+      return null;
     }
     throw error;
   }
 };
 
-export const depositBatchWithAction = async (
-  depositArgs: NonEmptyArray<ActionDepositArgs>,
-) => {
-  const {
-    targetStratoTokens,
-    ...args
-  } = buildActionDepositBatchArgs(depositArgs);
-
+export const recordDepositForReview = async (
+  deposit: DepositArgs | ActionDepositArgs,
+): Promise<void> => {
+  const actionDeposit = deposit as Partial<ActionDepositArgs>;
   try {
     await execute({
       contractName: "ExternalAssetBridge",
       contractAddress: config.externalAssetBridge.address!,
-      method: "depositBatchWithAction",
+      method: "recordDepositForReview",
       args: {
-        ...args,
-        stratoTokens: targetStratoTokens,
+        externalChainId: deposit.externalChainId,
+        depositRouter: deposit.depositRouter,
+        depositId: deposit.depositId,
+        externalSender: deposit.externalSender,
+        externalToken: deposit.externalToken,
+        externalTokenAmount: deposit.externalTokenAmount,
+        externalTxHash: deposit.externalTxHash,
+        stratoRecipient: deposit.stratoRecipient,
+        stratoToken: deposit.targetStratoToken,
+        action: actionDeposit.action || "0",
+        actionToken: actionDeposit.actionToken || "0000000000000000000000000000000000000000",
+        minFinalOut: actionDeposit.minFinalOut || "0",
       },
     });
-    logInfo(
-      "BridgeService",
-      `Successfully recorded ${depositArgs.length} action deposits`,
-    );
   } catch (error) {
-    if (isDuplicateDepositError(error)) {
-      logInfo(
-        "BridgeService",
-        `Action deposit batch contained an existing deposit; recovering item-by-item`,
-      );
-      await recoverMixedDuplicateBatch(depositArgs, recordActionDeposit);
-      return;
-    }
-    throw error;
+    if (!isDuplicateDepositError(error)) throw error;
   }
+};
+
+export const confirmReviewedDeposit = async (
+  externalChainId: number,
+  depositRouter: string,
+  depositId: string,
+): Promise<string> => {
+  const result = await execute({
+    contractName: "ExternalAssetBridge",
+    contractAddress: config.externalAssetBridge.address!,
+    method: "confirmReviewedDeposit",
+    args: { externalChainId, depositRouter, depositId },
+  });
+  return result.hash;
 };
 
 export const recordNativeDepositBatch = async (
@@ -391,53 +355,6 @@ export const recordNativeDepositBatch = async (
   }
 };
 
-export const confirmDepositBatch = async (deposits: NonEmptyArray<ConfirmDepositArgs>) => {
-  const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
-  const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
-  const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
-
-  try {
-    const result = await execute({
-      contractName: "ExternalAssetBridge",
-      contractAddress: config.externalAssetBridge.address!,
-      method: "confirmDepositBatch",
-      args: {
-        externalChainIds,
-        externalTxHashes,
-      },
-    });
-
-    if (result.status !== "Success") {
-      logInfo(
-        "BridgeService",
-        `Deposit confirmation still ${result.status}; skipping voucher mint for ${deposits.length} deposits`,
-      );
-      return;
-    }
-
-    logInfo(
-      "BridgeService",
-      `Successfully confirmed ${deposits.length} deposits`,
-    );
-
-    await mintVouchersForDeposits(stratoRecipients);
-  } catch (error) {
-    const errorMessage = (error as Error).message;
-    
-    // Check if this is a bad state error (expected when multiple servers confirm same deposits)
-    if (errorMessage.includes("EAB: bad state")) {
-      logInfo(
-        "BridgeService",
-        `Deposits already confirmed by another server: ${deposits.length} deposits (${externalTxHashes.join(", ")})`,
-      );
-      return; // Gracefully handle already confirmed deposits
-    }
-    
-    // Re-throw other errors
-    throw error;
-  }
-};
-
 export const confirmNativeDepositBatch = async (
   deposits: NonEmptyArray<ConfirmNativeDepositArgs>
 ) => {
@@ -487,42 +404,6 @@ export const confirmNativeDepositBatch = async (
       return;
     }
 
-    throw error;
-  }
-};
-
-export const reviewDepositBatch = async (deposits: NonEmptyArray<ConfirmDepositArgs>) => {
-  const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
-  const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
-
-  try {
-    await execute({
-      contractName: "ExternalAssetBridge",
-      contractAddress: config.externalAssetBridge.address!,
-      method: "reviewDepositBatch",
-      args: {
-        externalChainIds,
-        externalTxHashes,
-      },
-    });
-
-    logInfo(
-      "BridgeService",
-      `Successfully set ${deposits.length} deposits to pending review`,
-    );
-  } catch (error) {
-    const errorMessage = (error as Error).message;
-    
-    // Check if this is a bad state error (expected when multiple servers review same deposits)
-    if (errorMessage.includes("EAB: bad state")) {
-      logInfo(
-        "BridgeService",
-        `Deposits already reviewed by another server: ${deposits.length} deposits (${externalTxHashes.join(", ")})`,
-      );
-      return; // Gracefully handle already reviewed deposits
-    }
-    
-    // Re-throw other errors
     throw error;
   }
 };

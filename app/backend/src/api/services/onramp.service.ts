@@ -8,7 +8,7 @@ import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { openIdTokenEndpoint } from "../../config/config";
 
-const { ExternalAssetBridge, externalAssetBridge } = constants;
+const { MercataBridge, mercataBridge } = constants;
 
 // ————————————————————————————————————————————————————————————————
 // Types
@@ -148,7 +148,7 @@ async function getBridgeAdminToken(): Promise<string> {
 }
 
 // ————————————————————————————————————————————————————————————————
-// ExternalAssetBridge deposit (Step 1 of 2 — bridge service confirms)
+// MercataBridge deposit (Step 1 of 2 — bridge service confirms)
 // ————————————————————————————————————————————————————————————————
 
 function toRawAmount(humanAmount: string, decimals: number): string {
@@ -169,8 +169,8 @@ async function depositOnStrato(
   const accessToken = await getBridgeAdminToken();
 
   const tx = await buildFunctionTx({
-    contractName: extractContractName(ExternalAssetBridge),
-    contractAddress: externalAssetBridge,
+    contractName: extractContractName(MercataBridge),
+    contractAddress: mercataBridge,
     method: "deposit",
     args: {
       externalChainId,
@@ -302,7 +302,7 @@ export async function handleSessionUpdate(sessionData: any): Promise<void> {
         targetStratoToken,
       );
     } catch (err: any) {
-      if (err.message?.includes("EAB: duplicate deposit")) {
+      if (err.message?.includes("MB: duplicate deposit")) {
         console.log(`[Onramp] Deposit already recorded for txHash=${txHash} — skipping`);
       } else {
         console.error(`[Onramp] depositBatch FAILED — ${err.message}`);
@@ -315,12 +315,12 @@ export async function handleSessionUpdate(sessionData: any): Promise<void> {
 
 export async function getDepositStatus(accessToken: string, externalTxHash: string): Promise<{ status: "pending" | "initiated" | "completed" }> {
 
-  const { data: completed } = await cirrus.get(accessToken, `/${ExternalAssetBridge}-DepositCompleted`, {
+  const { data: completed } = await cirrus.get(accessToken, `/${MercataBridge}-DepositCompleted`, {
     params: { externalTxHash: `eq.${externalTxHash}`, limit: "1" },
   });
   if (completed?.length > 0) return { status: "completed" };
 
-  const { data: initiated } = await cirrus.get(accessToken, `/${ExternalAssetBridge}-DepositInitiated`, {
+  const { data: initiated } = await cirrus.get(accessToken, `/${MercataBridge}-DepositInitiated`, {
     params: { externalTxHash: `eq.${externalTxHash}`, limit: "1" },
   });
   if (initiated?.length > 0) return { status: "initiated" };
@@ -336,7 +336,7 @@ export async function getUserTransactions(
   const hotWallet = (process.env.ONRAMP_HOT_WALLET_ADDRESS || "").replace(/^0x/, "");
 
   const baseParams: Record<string, string> = {
-    address: `eq.${externalAssetBridge}`,
+    address: `eq.${mercataBridge}`,
     select: "externalChainId:key,externalTxHash:key2,DepositInfo:value,block_timestamp",
     "value->>externalSender": `eq.${hotWallet}`,
     "value->>stratoRecipient": `eq.${userStratoAddress}`,
@@ -345,15 +345,15 @@ export async function getUserTransactions(
   };
 
   const countParams: Record<string, string> = {
-    address: `eq.${externalAssetBridge}`,
+    address: `eq.${mercataBridge}`,
     select: "count()",
     "value->>externalSender": `eq.${hotWallet}`,
     "value->>stratoRecipient": `eq.${userStratoAddress}`,
   };
 
   const [dataRes, countRes] = await Promise.all([
-    cirrus.get(accessToken, `/${ExternalAssetBridge}-deposits`, { params: baseParams }),
-    cirrus.get(accessToken, `/${ExternalAssetBridge}-deposits`, { params: countParams }),
+    cirrus.get(accessToken, `/${MercataBridge}-deposits`, { params: baseParams }),
+    cirrus.get(accessToken, `/${MercataBridge}-deposits`, { params: countParams }),
   ]);
 
   const deposits = (dataRes.data || []).map((d: any) => {
@@ -366,8 +366,9 @@ export async function getUserTransactions(
 
     return {
       externalTxHash: d.externalTxHash,
-      status: String(d.DepositInfo?.status) === "4" ? "fulfillment_complete"
-        : ["1", "2", "3"].includes(String(d.DepositInfo?.status)) ? "fulfillment_processing"
+      status: d.DepositInfo?.bridgeStatus === "3" ? "fulfillment_complete"
+        : d.DepositInfo?.bridgeStatus === "1" ? "fulfillment_processing"
+        : d.DepositInfo?.bridgeStatus === "2" ? "fulfillment_processing"
         : "unknown",
       createdAt: d.block_timestamp,
       destinationCurrency: isEth ? "eth" : "usdc",

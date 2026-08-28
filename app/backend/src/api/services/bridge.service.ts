@@ -17,6 +17,7 @@ import {
   parseNativeBridgeAssets,
   parseNativeLockedBalances,
   parseNativeTokenBridgeConfigs,
+  LEGACY_QUERY_CONFIGS,
   QUERY_CONFIGS 
 } from "../helpers/bridge.helper";
 import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction } from "@strato/shared-types";
@@ -344,12 +345,7 @@ export const getBridgeTransactions = async (
   };
   const nativeParams = nativeTransactionParams(rawParams, userAddress, type);
   const legacyParams = legacyTransactionParams(rawParams, userAddress, type);
-  const legacyConfig = {
-    ...config,
-    tableName: `${constants.MercataBridge}-${
-      type === "withdrawal" ? "withdrawals" : "deposits"
-    }`,
-  };
+  const legacyConfig = LEGACY_QUERY_CONFIGS[type];
 
   const [standardResponse, legacyResponse, nativeResponse, nativeCountResponse] = await Promise.all([
     executeParallelQueries(

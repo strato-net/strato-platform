@@ -314,13 +314,9 @@ async function main() {
       serviceSignerValidation: serviceSigners,
       expectedServiceEnvironment: [
         `CHAIN_${chain.chainId}_RPC_URL`,
-        ...chain.attestationSigners
-          .slice(0, chain.attestationThreshold)
-          .map((_, index) =>
-            index === 0
-              ? `CHAIN_${chain.chainId}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY`
-              : `CHAIN_${chain.chainId}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY_${index}`,
-          ),
+        `CHAIN_${chain.chainId}_EXTERNAL_BRIDGE_SIGNER_ADDRESSES`,
+        `CHAIN_${chain.chainId}_EXTERNAL_BRIDGE_SIGNER_URLS`,
+        `CHAIN_${chain.chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY`,
       ],
       proposals: [],
     };

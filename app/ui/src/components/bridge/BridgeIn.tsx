@@ -1455,8 +1455,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                     onValueChange={(val) => {
                       const match = val.startsWith("native:")
                         ? nativeBridgeTokens.find((t) => `native:${t.id}` === val) || null
-                        : depositableBridgeTokens.find((t) => (t.externalToken || "").toLowerCase() === val && t.isDefaultRoute)
-                          || depositableBridgeTokens.find((t) => (t.externalToken || "").toLowerCase() === val) || null;
+                        : depositableBridgeTokens.find(
+                            (t) => (t.externalToken || "").toLowerCase() === val
+                          ) || null;
                       setSelectedToken(match);
                     }}
                     disabled={(!uniqueExternalTokens.length && !nativeBridgeTokens.length) || guestMode || isLoading}>
