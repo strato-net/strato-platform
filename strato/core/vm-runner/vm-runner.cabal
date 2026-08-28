@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.38.1.
+-- This file has been generated from package.yaml by hpack version 0.39.6.
 --
 -- see: https://github.com/sol/hpack
 
@@ -71,6 +71,41 @@ library
     , time
     , transformers
     , unliftio
+    , vm-tools
+  default-language: Haskell2010
+
+executable vm-replay
+  main-is: Replay.hs
+  hs-source-dirs:
+      replay_src
+  ghc-options: -Wall -O2 -threaded -rtsopts -flate-specialise
+  build-depends:
+      async
+    , base
+    , binary
+    , blockDB
+    , blockapps-data
+    , blockapps-init
+    , blockapps-mpdbs
+    , bytestring
+    , common-log
+    , composable-monads-base
+    , conduit
+    , ethereum-rlp
+    , hflags
+    , merkle-patricia-db
+    , process-monitor
+    , prometheus-client
+    , resourcet
+    , seqevents
+    , strato-conf
+    , strato-genesis
+    , strato-model
+    , streaming
+    , time
+    , transformers
+    , unliftio
+    , vm-runner
     , vm-tools
   default-language: Haskell2010
 

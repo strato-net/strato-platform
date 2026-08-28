@@ -26,6 +26,7 @@ library:
     - bloc2
     - blockapps-data
     - blockapps-datadefs
+    - blockDB
     - conduit
     - containers
     - deepseq
@@ -36,6 +37,7 @@ library:
     - network
     - persistent
     - persistent-postgresql
+    - postgresql-simple
     - prometheus-client
     - resource-pool
     - solid-vm-model
@@ -44,6 +46,7 @@ library:
     - sql-monad
     - strato-conf
     - strato-model
+    - strato-redis-blockdb
     - text
     - time
     - transformers
@@ -73,6 +76,19 @@ executables:
       - warp
 
 tests:
+  slipstream-batching-test:
+    main: Main.hs
+    source-dirs: tests-batching/
+    dependencies:
+      - base
+      - bytestring
+      - conduit
+      - containers
+      - evm-solidity
+      - hspec
+      - slipstream
+      - text
+
   slipstream-test:
     main: Main.hs
     source-dirs: tests/

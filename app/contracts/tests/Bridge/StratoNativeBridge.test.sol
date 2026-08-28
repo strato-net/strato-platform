@@ -163,6 +163,149 @@ contract Describe_StratoNativeBridge is Authorizable {
         require(nativeBridge.INSTANT_WITHDRAWAL_DELAY_SECONDS() == 1234, "Instant delay should update");
     }
 
+    function it_owner_can_configure_token_bridge_directions_and_cap() {
+        nativeBridge.setTokenBridgeConfig(nativeTokenAddress, true, true, 250e18);
+
+        (
+            bool depositsDisabled,
+            bool withdrawalsDisabled,
+            uint256 maxOutstandingWithdrawal
+        ) = nativeBridge.tokenBridgeConfigs(nativeTokenAddress);
+
+        require(depositsDisabled, "Token deposits should be disabled");
+        require(withdrawalsDisabled, "Token withdrawals should be disabled");
+        require(maxOutstandingWithdrawal == 250e18, "Aggregate withdrawal cap should update");
+    }
+
+    function it_non_owner_cannot_configure_token_bridge() {
+        bool reverted = false;
+        try user1.do(
+            nativeBridgeAddress,
+            "setTokenBridgeConfig",
+            nativeTokenAddress,
+            true,
+            true,
+            250e18
+        ) {
+        } catch {
+            reverted = true;
+        }
+
+        require(reverted, "Non-owner should not configure token bridge controls");
+    }
+
+    function it_token_withdrawal_control_does_not_disable_deposits() {
+        nativeBridge.setTokenBridgeConfig(nativeTokenAddress, false, true, 0);
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
+
+        bool withdrawalReverted = false;
+        try user1.do(
+            nativeBridgeAddress,
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            nativeTokenAddress,
+            50e18
+        ) {
+        } catch {
+            withdrawalReverted = true;
+        }
+        require(withdrawalReverted, "Disabled token withdrawals should revert");
+
+        relayer.do(
+            nativeBridgeAddress,
+            "recordDeposit",
+            externalChainId,
+            externalBridge,
+            externalRedemptionId,
+            externalSender,
+            externalTxHash,
+            representationToken,
+            address(user2),
+            10e18
+        );
+
+        string depositId = nativeBridge.getDepositId(externalChainId, externalBridge, externalRedemptionId);
+        (BridgeStatus depositStatus,,,,,,,,,,) = nativeBridge.getDepositInfo(depositId);
+        require(depositStatus == BridgeStatus.INITIATED, "Token deposits should remain enabled");
+    }
+
+    function it_token_deposit_control_does_not_disable_withdrawals() {
+        nativeBridge.setTokenBridgeConfig(nativeTokenAddress, true, false, 0);
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
+
+        uint256 withdrawalId = user1.do(
+            nativeBridgeAddress,
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            nativeTokenAddress,
+            50e18
+        );
+        (BridgeStatus withdrawalStatus,,,,,,,,,,,) = nativeBridge.getWithdrawalInfo(withdrawalId);
+        require(withdrawalStatus == BridgeStatus.INITIATED, "Token withdrawals should remain enabled");
+
+        bool depositReverted = false;
+        try relayer.do(
+            nativeBridgeAddress,
+            "recordDeposit",
+            externalChainId,
+            externalBridge,
+            externalRedemptionId,
+            externalSender,
+            externalTxHash,
+            representationToken,
+            address(user2),
+            10e18
+        ) {
+        } catch {
+            depositReverted = true;
+        }
+        require(depositReverted, "Disabled token deposits should revert");
+    }
+
+    function it_aggregate_withdrawal_cap_counts_locked_supply_and_abort_restores_capacity() {
+        nativeBridge.setTokenBridgeConfig(nativeTokenAddress, false, false, 100e18);
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 250e18);
+
+        uint256 withdrawalId = user1.do(
+            nativeBridgeAddress,
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            nativeTokenAddress,
+            75e18
+        );
+        require(custodyVault.lockedBalance(nativeTokenAddress) == 75e18, "First withdrawal should consume cap");
+
+        bool reverted = false;
+        try user1.do(
+            nativeBridgeAddress,
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            nativeTokenAddress,
+            50e18
+        ) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Withdrawal exceeding aggregate cap should revert");
+
+        relayer.do(nativeBridgeAddress, "abortWithdrawal", withdrawalId);
+        require(custodyVault.lockedBalance(nativeTokenAddress) == 0, "Abort should restore aggregate capacity");
+
+        user1.do(
+            nativeBridgeAddress,
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            nativeTokenAddress,
+            100e18
+        );
+        require(custodyVault.lockedBalance(nativeTokenAddress) == 100e18, "Restored capacity should be reusable");
+    }
+
     function it_native_withdrawal_pending_state_blocks_user_abort_before_external_mint() {
         user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
         uint256 withdrawalId = user1.do(

@@ -121,3 +121,26 @@ export const recordWalletConnection = async (
     ]
   );
 };
+
+export const recordPostHogWalletConnection = async (
+  posthogSessionId: string,
+  posthogDistinctId: string | null,
+  externalWalletAddress: string | null,
+  stratoAddress: string | null,
+  connector: string | null
+): Promise<void> => {
+  await query(
+    `INSERT INTO posthog_wallet_connections
+       (posthog_session_id, posthog_distinct_id, external_wallet_address,
+        strato_address, connector)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT ON CONSTRAINT posthog_wallet_connections_dedup DO NOTHING`,
+    [
+      posthogSessionId,
+      posthogDistinctId,
+      externalWalletAddress ?? "",
+      stratoAddress ?? "",
+      connector,
+    ]
+  );
+};

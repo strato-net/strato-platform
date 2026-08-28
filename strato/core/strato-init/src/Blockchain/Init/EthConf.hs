@@ -193,8 +193,17 @@ genEthConf = do
         -- that emits nothing on its network, derives no stake updates, and
         -- dies with StakeMismatch on the first block whose header carries one.
         , stakingContractAddress = defaultStakingContractAddress flags_network
+        -- An explicit --stakingActivationBlock has to carry the stake-event
+        -- source with it. The per-network default resolves to Nothing for a
+        -- network name this build has never heard of, and Nothing here means
+        -- "never switch to governance"; combined with stakingContractAddress
+        -- also being Nothing for a new network, stakeEventSourceAt would yield
+        -- no source at any height. Staking would activate at the requested
+        -- block with nothing publishing weights.
         , stakingEventsFromGovernanceBlock =
-            defaultStakingEventsFromGovernanceBlock flags_network
+            if flags_stakingActivationBlock < 0
+              then defaultStakingEventsFromGovernanceBlock flags_network
+              else Just flags_stakingActivationBlock
         }
     }
 

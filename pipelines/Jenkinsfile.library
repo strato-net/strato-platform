@@ -249,14 +249,19 @@ def replaceServerPortsDocker() {
 }
 
 /**
- * Wait for the local node to report isSynced=true, failing fast if the node's
- * host processes die while we wait.
+ * Wait for the local node to report isSynced=true AND for Cirrus to catch up
+ * to the node tip, failing fast if the node's host processes die while we wait.
  *
  * Every caller deploys with strato-up, so the node's services run under convoke
  * on the host and strato-ps can see them. A from-genesis sync runs for hours,
  * and if convoke dies mid-sync (vm-runner crash, OOM, unclean shutdown) the
  * metadata endpoint simply goes quiet -- without the strato-ps check the poll
  * burns its full ~4h timeout before reporting a generic "failed to sync".
+ *
+ * isSynced=true only covers the p2p/VM pipeline (node best block vs world best
+ * block in Redis). Cirrus is populated by slipstream from a separate Kafka
+ * topic (vmevents) and can still be tens of thousands of blocks behind at the
+ * moment isSynced flips true, so a second wait covers that layer.
  *
  * @param nodeDir  Node directory to pass to strato-ps. Default: empty, which
  *                 lets strato-ps fall back to ~/.strato/default-node (written
@@ -266,6 +271,7 @@ def waitLocalNodeIsSynced(String nodeDir = '') {
   echo "Waiting for local node to be in-sync and healthy..."
   for (int i = 0; i < 9000; i++) {
     if (sh(returnStatus: true, script: "sudo docker exec strato-nginx-1 curl 172.17.0.1:3000/eth/v1.2/metadata | grep \\\"isSynced\\\":true") == 0) {
+      waitLocalCirrusIsSynced(nodeDir)
       return true
     }
     // strato-ps shells out to docker compose and strato-barometer, so it costs
@@ -278,6 +284,51 @@ def waitLocalNodeIsSynced(String nodeDir = '') {
     sleep 2
   }
   error ("STRATO node failed to sync after within the expected time window of ~5hrs. Check the strato logs in artifacts for more details.")
+}
+
+/**
+ * Wait until Cirrus (slipstream) has indexed up to the node's best block.
+ *
+ * Mirrors the layer check strato-snapshot create runs for
+ * scripts/create-and-publish-snapshot.sh: the node tip comes from apex /status
+ * (lastBlock.number, reachable as apex:3009 from the nginx container), the
+ * Cirrus tip from max(storage.block_number) in the cirrus DB (same query as
+ * strato-snapshot's psql fallback -- no HTTP endpoint serves the Cirrus tip),
+ * and Cirrus counts as caught up when it is within 5 blocks of the node tip.
+ * Unreadable tips are treated as "keep waiting": on a healthy node both become
+ * readable, and a dead node is caught by the strato-ps check below.
+ *
+ * @param nodeDir  Node directory to pass to strato-ps (see waitLocalNodeIsSynced).
+ */
+def waitLocalCirrusIsSynced(String nodeDir = '') {
+  echo "Node is in-sync; waiting for Cirrus to catch up to the node tip..."
+  // ~5h at 10s per poll, matching the isSynced wait window above.
+  for (int i = 0; i < 1800; i++) {
+    def caughtUp = sh(returnStatus: true, script: '''#!/bin/bash
+      ALLOWED_LAG=5
+      node_tip=$(sudo docker exec strato-nginx-1 curl -fsS apex:3009/status 2>/dev/null | jq -r '.lastBlock.number // empty' 2>/dev/null)
+      cirrus_tip=$(sudo docker exec strato-postgres-1 psql -U postgres -d cirrus -tAc \\
+        "select coalesce(max(block_number::numeric), 0)::bigint from storage where block_number ~ '^[0-9]+$';" 2>/dev/null | tr -d '[:space:]')
+      if ! [[ "$node_tip" =~ ^[0-9]+$ && "$cirrus_tip" =~ ^[0-9]+$ ]]; then
+        echo "Cirrus sync check: tips not readable yet (node_tip='$node_tip', cirrus_tip='$cirrus_tip')"
+        exit 1
+      fi
+      if (( cirrus_tip + ALLOWED_LAG < node_tip )); then
+        echo "Cirrus tip ($cirrus_tip) is behind node tip ($node_tip) by more than $ALLOWED_LAG block(s); waiting"
+        exit 1
+      fi
+      echo "Cirrus tip ($cirrus_tip) has caught up to node tip ($node_tip)"
+    ''') == 0
+    if (caughtUp) {
+      return true
+    }
+    // Same ~30s strato-ps cadence as the isSynced poll (see comment there).
+    if (i > 0 && i % 3 == 0) {
+      assertStratoIsRunning(nodeDir)
+    }
+    sleep 10
+  }
+  error ("Cirrus failed to catch up to the node tip within ~5hrs after the node synced. Slipstream is stuck or too slow; check the slipstream logs in artifacts for more details.")
 }
 
 /**

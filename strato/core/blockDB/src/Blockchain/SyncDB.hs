@@ -19,7 +19,9 @@ module Blockchain.SyncDB
     getWorldBestBlockInfo,
     updateWorldBestBlockInfo,
     getSyncStatus,
-    getSyncStatusNow
+    getSyncStatusNow,
+    getCirrusBestBlockNumber,
+    updateCirrusBestBlockNumber
   )
 where
 
@@ -270,6 +272,28 @@ getSyncStatusNow = do
 syncStatusKey :: S8.ByteString
 syncStatusKey = "<sync_status>"
 {-# INLINE syncStatusKey #-}
+
+cirrusBestBlockNumberKey :: S8.ByteString
+cirrusBestBlockNumberKey = "<cirrus_best>"
+{-# INLINE cirrusBestBlockNumberKey #-}
+
+-- | Highest block number slipstream has finished indexing into Cirrus.
+-- Written by slipstream after each fully-processed vmevents batch; folded into
+-- the metadata isSynced flag so it does not flip true while Cirrus is still
+-- catching up on the vmevents backlog.
+getCirrusBestBlockNumber :: Redis (Maybe Integer)
+getCirrusBestBlockNumber = fmap fromValue . eitherToMaybe <$> REDIS.get cirrusBestBlockNumberKey
+  where
+    eitherToMaybe :: Either a (Maybe b) -> Maybe b
+    eitherToMaybe (Left _)  = Nothing
+    eitherToMaybe (Right a) = a
+
+-- | Monotonic: keeps the stored high-water mark even if a caller reports an
+-- older block (e.g. a replayed batch after a consumer rebalance).
+updateCirrusBestBlockNumber :: Integer -> Redis ()
+updateCirrusBestBlockNumber n = do
+  current <- getCirrusBestBlockNumber
+  when (maybe True (< n) current) . void $ REDIS.set cirrusBestBlockNumberKey (toValue n)
 
 getSyncStatus :: Redis (Maybe Bool)
 getSyncStatus = fmap fromValue . eitherToMaybe <$> REDIS.get syncStatusKey

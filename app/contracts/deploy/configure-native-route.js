@@ -12,7 +12,10 @@
  *     --max-per-withdrawal <amount> \
  *     [--instant-withdrawal-threshold <amount>] \
  *     --strato-token <addr> \
- *     [--enabled <true|false>]
+ *     [--enabled <true|false>] \
+ *     [--deposits-disabled <true|false> \
+ *      --withdrawals-disabled <true|false> \
+ *      --max-outstanding-withdrawal <amount>]
  */
 require('dotenv').config();
 const config = require('./config');
@@ -126,7 +129,7 @@ async function main() {
     console.error(`Missing required arguments: ${missing.map((key) => `--${key}`).join(', ')}`);
     console.error('\nUsage:');
     console.error(
-      '  node configure-native-route.js --bridge-address <addr> --external-chain-id <id> --external-bridge <addr> --representation-token <addr> --external-name <name> --external-symbol <symbol> --max-per-withdrawal <amount> --strato-token <addr> [--enabled <true|false>]'
+      '  node configure-native-route.js --bridge-address <addr> --external-chain-id <id> --external-bridge <addr> --representation-token <addr> --external-name <name> --external-symbol <symbol> --max-per-withdrawal <amount> --strato-token <addr> [--enabled <true|false>] [--deposits-disabled <true|false> --withdrawals-disabled <true|false> --max-outstanding-withdrawal <amount>]'
     );
     process.exit(1);
   }
@@ -159,6 +162,23 @@ async function main() {
     ).trim(),
     stratoToken: args['strato-token'],
   };
+  const tokenConfigKeys = [
+    'deposits-disabled',
+    'withdrawals-disabled',
+    'max-outstanding-withdrawal',
+  ];
+  const providedTokenConfigKeys = tokenConfigKeys.filter((key) => args[key] != null);
+  if (providedTokenConfigKeys.length > 0 && providedTokenConfigKeys.length !== tokenConfigKeys.length) {
+    throw new Error(`Token bridge configuration requires: ${tokenConfigKeys.map((key) => `--${key}`).join(', ')}`);
+  }
+  const tokenConfigArgs = providedTokenConfigKeys.length === tokenConfigKeys.length
+    ? {
+        stratoToken: callArgs.stratoToken,
+        depositsDisabled: parseBoolean(args['deposits-disabled']),
+        withdrawalsDisabled: parseBoolean(args['withdrawals-disabled']),
+        maxOutstandingWithdrawal: String(args['max-outstanding-withdrawal']).trim(),
+      }
+    : null;
 
   if (!/^[0-9]+$/.test(callArgs.maxPerWithdrawal)) {
     throw new Error('max-per-withdrawal must be an unsigned integer string');
@@ -166,9 +186,12 @@ async function main() {
   if (!/^[0-9]+$/.test(callArgs.instantWithdrawalThreshold)) {
     throw new Error('instant-withdrawal-threshold must be an unsigned integer string');
   }
+  if (tokenConfigArgs && !/^[0-9]+$/.test(tokenConfigArgs.maxOutstandingWithdrawal)) {
+    throw new Error('max-outstanding-withdrawal must be an unsigned integer string');
+  }
 
   console.log('Native route configuration plan:');
-  console.log(JSON.stringify({ bridgeAddress, callArgs }, null, 2));
+  console.log(JSON.stringify({ bridgeAddress, callArgs, tokenConfigArgs }, null, 2));
   console.log('');
 
   console.log(`Calling StratoNativeBridge(${bridgeAddress}).setAsset(...)`);
@@ -180,6 +203,18 @@ async function main() {
     callArgs
   );
   logCallResult('Route configuration', result);
+
+  if (tokenConfigArgs) {
+    console.log(`Calling StratoNativeBridge(${bridgeAddress}).setTokenBridgeConfig(...)`);
+    const tokenConfigResult = await callContract(
+      tokenObj,
+      bridgeAddress,
+      'StratoNativeBridge',
+      'setTokenBridgeConfig',
+      tokenConfigArgs
+    );
+    logCallResult('Token bridge configuration', tokenConfigResult);
+  }
 
   console.log('\nNative route configuration complete.');
   console.log(`Bridge proxy: ${bridgeAddress}`);

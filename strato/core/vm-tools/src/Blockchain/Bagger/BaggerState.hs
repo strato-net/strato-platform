@@ -8,6 +8,7 @@ module Blockchain.Bagger.BaggerState where
 import Blockchain.Bagger.TransactionList
 import Blockchain.Bagger.Transactions
 import Blockchain.Data.BlockHeader
+import Blockchain.Data.ExecResults (ExecResults)
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Database.MerklePatricia (StateRoot (..), blankStateRoot)
 import Blockchain.Model.WrappedBlock (OutputTx (..))
@@ -43,7 +44,19 @@ data MiningCache = MiningCache
     -- called many times — so this is what keeps rewards to once per block
     -- without relying on the fee contract to deduplicate. Reset whenever the
     -- cache moves to a new best block, i.e. when the height advances.
-    blockRewardsPaid :: Bool
+    blockRewardsPaid :: Bool,
+    -- | The block-reward call's results, held here until a run produces the
+    -- block's *first* transaction to attach them to.
+    --
+    -- The rewards are paid before the transactions of the run that pays them,
+    -- but that run's transactions can all be rejected (a mempool balance check
+    -- failing mid-run is enough), leaving no receipt to carry the reward's
+    -- events. The verifier replays the whole block in a single run and always
+    -- has the block's first transaction to attach them to, so dropping them
+    -- here puts a receiptsRoot in the header that no one else can derive and
+    -- the block is rejected at every round, forever. Carrying them until a
+    -- transaction shows up keeps both sides attaching to the same receipt.
+    pendingBlockRewards :: Maybe ExecResults
   }
   deriving (Show, Generic)
 
@@ -118,7 +131,8 @@ defaultMiningCache =
       promotedTransactions = [],
       privateHashes = DL.empty,
       startTimestamp = posixSecondsToUTCTime 0,
-      blockRewardsPaid = False
+      blockRewardsPaid = False,
+      pendingBlockRewards = Nothing
     }
 
 addToATL :: OutputTx -> ATL -> (Maybe OutputTx, OutputTx, ATL)
