@@ -110,6 +110,103 @@ After deployment, verify the implementation contract on Etherscan:
 npm run verify:sepolia -- 0xIMPLEMENTATION_ADDRESS
 ```
 
+## External Asset Bridge Rollout
+
+`ExternalBridgeVault` holds route-local external liquidity. The Safe remains its
+administrator and the owner of the existing `DepositRouter`; validator private
+keys remain in the bridge service environment and are never written to rollout
+files.
+
+### 1. Development
+
+Compile and run the contract and rollout-plan tests:
+
+```bash
+npm run compile
+npx hardhat test test/ExternalBridgeVault.js test/DepositRouter.test.js
+npm run external:vault:ops:test
+```
+
+Copy `externalBridgeVault.config.example.json` outside the repository and
+replace every sample value. Amounts are raw token units. Keep every
+`migrateAmount` at `0` until configuration and router verification pass.
+
+### 2. Testnet
+
+Deploy one vault proxy per external chain. The initializer assigns governance
+to the Safe and pause authority to the guardian:
+
+```bash
+CONTRACT_NAME=ExternalBridgeVault \
+INIT_PARAMS='["0xSAFE_ADDRESS","0xGUARDIAN_ADDRESS"]' \
+npm run deployWithProxy:sepolia
+```
+
+Record the proxy address in the rollout configuration. Deploy the current
+`DepositRouter` implementation and use the existing router upgrade proposal
+flow. Execute that Safe proposal before running vault operations.
+
+Dry-run the vault configuration and router destination update:
+
+```bash
+npm run external:vault:ops -- \
+  --config /absolute/path/external-bridge-vault.json \
+  --chains 11155111 \
+  --step all
+```
+
+The plan verifies Safe and guardian roles and reports router ownership,
+migration balances, and whether service validator keys derive to configured
+signer addresses. Apply mode fails closed on role, ownership, signer, or
+liquidity mismatches. Review the JSON output, then propose the Safe
+transactions:
+
+```bash
+npm run external:vault:ops -- \
+  --config /absolute/path/external-bridge-vault.json \
+  --chains 11155111 \
+  --step configure \
+  --apply
+
+npm run external:vault:ops -- \
+  --config /absolute/path/external-bridge-vault.json \
+  --chains 11155111 \
+  --step router \
+  --apply
+```
+
+Execute the proposals in nonce order. Verify the resulting on-chain state:
+
+```bash
+npm run external:vault:ops -- \
+  --config /absolute/path/external-bridge-vault.json \
+  --chains 11155111 \
+  --step verify
+```
+
+After successful verification, set only the intended `migrateAmount` values,
+dry-run `--step liquidity`, then repeat with `--apply`. ERC-20 transfers and
+native-asset transfers are proposed from the Safe directly to the vault.
+
+Finally, use the existing STRATO contract-update flow to set each chain's vault
+address and routes on `ExternalAssetBridge`. The bridge service reads vault
+addresses from STRATO and requires these environment variables per chain:
+
+```bash
+CHAIN_11155111_RPC_URL=https://...
+CHAIN_11155111_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY=...
+CHAIN_11155111_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY_1=...
+```
+
+### 3. Production
+
+Repeat the testnet sequence without changing contract versions. Use production
+Safe, guardian, RPC, validator, policy, and token addresses. Start with
+`migrateAmount: "0"`, execute and verify configuration and router proposals,
+then migrate one explicitly reviewed asset at a time. Do not disable the legacy
+custody path or transfer its remaining balance until deposits and withdrawals
+complete successfully against the new vault.
+
 ## Advanced Configuration
 
 **Optional environment variables:**

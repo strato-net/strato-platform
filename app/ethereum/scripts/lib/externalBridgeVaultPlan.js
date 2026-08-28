@@ -1,0 +1,288 @@
+const { ethers } = require("ethers");
+
+const ZERO_ADDRESS = ethers.ZeroAddress;
+
+function asAddress(value, field, { allowZero = false } = {}) {
+  let address;
+  try {
+    address = ethers.getAddress(String(value || ""));
+  } catch {
+    throw new Error(`${field} must be a valid address`);
+  }
+  if (!allowZero && address === ZERO_ADDRESS) {
+    throw new Error(`${field} must not be the zero address`);
+  }
+  return address;
+}
+
+function asUint(value, field, { positive = false } = {}) {
+  let parsed;
+  try {
+    parsed = BigInt(value);
+  } catch {
+    throw new Error(`${field} must be an unsigned integer`);
+  }
+  if (parsed < 0n || (positive && parsed === 0n)) {
+    throw new Error(`${field} must be ${positive ? "positive" : "non-negative"}`);
+  }
+  return parsed;
+}
+
+function normalizeConfig(input) {
+  const sourceChainId = asUint(input.sourceChainId, "sourceChainId", {
+    positive: true,
+  });
+  const sourceBridge = asAddress(input.sourceBridge, "sourceBridge");
+  if (!Array.isArray(input.chains) || input.chains.length === 0) {
+    throw new Error("chains must contain at least one chain");
+  }
+
+  const seenChains = new Set();
+  const chains = input.chains.map((chain, chainIndex) => {
+    const prefix = `chains[${chainIndex}]`;
+    const chainId = Number(chain.chainId);
+    if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+      throw new Error(`${prefix}.chainId must be a positive safe integer`);
+    }
+    if (seenChains.has(chainId)) {
+      throw new Error(`Duplicate chainId ${chainId}`);
+    }
+    seenChains.add(chainId);
+
+    const attestationSigners = (chain.attestationSigners || []).map(
+      (address, index) =>
+        asAddress(address, `${prefix}.attestationSigners[${index}]`),
+    );
+    const disabledAttestationSigners = (
+      chain.disabledAttestationSigners || []
+    ).map((address, index) =>
+      asAddress(address, `${prefix}.disabledAttestationSigners[${index}]`),
+    );
+    if (
+      new Set(attestationSigners.map((address) => address.toLowerCase())).size !==
+      attestationSigners.length
+    ) {
+      throw new Error(`${prefix}.attestationSigners contains duplicates`);
+    }
+    if (attestationSigners.length > 255) {
+      throw new Error(`${prefix}.attestationSigners exceeds 255 signers`);
+    }
+    const activeSignerSet = new Set(
+      attestationSigners.map((address) => address.toLowerCase()),
+    );
+    if (
+      disabledAttestationSigners.some((address) =>
+        activeSignerSet.has(address.toLowerCase()),
+      )
+    ) {
+      throw new Error(
+        `${prefix}.disabledAttestationSigners overlaps active signers`,
+      );
+    }
+    const threshold = Number(chain.attestationThreshold);
+    if (
+      !Number.isSafeInteger(threshold) ||
+      threshold <= 0 ||
+      threshold > 255 ||
+      threshold > attestationSigners.length
+    ) {
+      throw new Error(
+        `${prefix}.attestationThreshold must be between 1 and the configured signer count`,
+      );
+    }
+
+    const tokens = (chain.tokens || []).map((token, tokenIndex) => {
+      const tokenPrefix = `${prefix}.tokens[${tokenIndex}]`;
+      if (typeof token.enabled !== "boolean") {
+        throw new Error(`${tokenPrefix}.enabled must be a boolean`);
+      }
+      const normalizedToken = {
+        token: asAddress(token.token, `${tokenPrefix}.token`, {
+          allowZero: true,
+        }),
+        enabled: token.enabled,
+        maxPerWithdrawal: asUint(
+          token.maxPerWithdrawal,
+          `${tokenPrefix}.maxPerWithdrawal`,
+        ),
+        windowLimit: asUint(
+          token.windowLimit,
+          `${tokenPrefix}.windowLimit`,
+        ),
+        windowSeconds: asUint(
+          token.windowSeconds,
+          `${tokenPrefix}.windowSeconds`,
+        ),
+        manualReviewThreshold: asUint(
+          token.manualReviewThreshold,
+          `${tokenPrefix}.manualReviewThreshold`,
+        ),
+        migrateAmount: asUint(
+          token.migrateAmount || 0,
+          `${tokenPrefix}.migrateAmount`,
+        ),
+      };
+      if (
+        normalizedToken.windowLimit > 0n &&
+        normalizedToken.windowSeconds === 0n
+      ) {
+        throw new Error(
+          `${tokenPrefix}.windowSeconds must be positive when windowLimit is set`,
+        );
+      }
+      return normalizedToken;
+    });
+    if (
+      new Set(tokens.map(({ token }) => token.toLowerCase())).size !==
+      tokens.length
+    ) {
+      throw new Error(`${prefix}.tokens contains duplicate token addresses`);
+    }
+
+    return {
+      chainId,
+      safeAddress: asAddress(chain.safeAddress, `${prefix}.safeAddress`),
+      guardianAddress: asAddress(
+        chain.guardianAddress,
+        `${prefix}.guardianAddress`,
+      ),
+      vaultAddress: asAddress(chain.vaultAddress, `${prefix}.vaultAddress`),
+      depositRouterAddress: asAddress(
+        chain.depositRouterAddress,
+        `${prefix}.depositRouterAddress`,
+      ),
+      attestationSigners,
+      disabledAttestationSigners,
+      attestationThreshold: threshold,
+      maxAuthorizationValiditySeconds: asUint(
+        chain.maxAuthorizationValiditySeconds || 1800,
+        `${prefix}.maxAuthorizationValiditySeconds`,
+        { positive: true },
+      ),
+      tokens,
+    };
+  });
+
+  return { sourceChainId, sourceBridge, chains };
+}
+
+function buildOperations(config, chain) {
+  const configure = [
+    {
+      target: chain.vaultAddress,
+      method: "setSourceBridge",
+      args: [config.sourceChainId, config.sourceBridge, true],
+      value: 0n,
+    },
+    ...chain.attestationSigners.map((signer) => ({
+      target: chain.vaultAddress,
+      method: "setAttestationSigner",
+      args: [signer, true],
+      value: 0n,
+    })),
+    {
+      target: chain.vaultAddress,
+      method: "setAttestationThreshold",
+      args: [chain.attestationThreshold],
+      value: 0n,
+    },
+    ...chain.disabledAttestationSigners.map((signer) => ({
+      target: chain.vaultAddress,
+      method: "setAttestationSigner",
+      args: [signer, false],
+      value: 0n,
+    })),
+    {
+      target: chain.vaultAddress,
+      method: "setMaxAuthorizationValiditySeconds",
+      args: [chain.maxAuthorizationValiditySeconds],
+      value: 0n,
+    },
+    ...chain.tokens.map((token) => ({
+      target: chain.vaultAddress,
+      method: "setTokenPolicy",
+      args: [
+        token.token,
+        token.enabled,
+        token.maxPerWithdrawal,
+        token.windowLimit,
+        token.windowSeconds,
+        token.manualReviewThreshold,
+      ],
+      value: 0n,
+    })),
+  ];
+  const router = [{
+    target: chain.depositRouterAddress,
+    method: "setExternalBridgeVault",
+    args: [chain.vaultAddress],
+    value: 0n,
+  }];
+  const liquidity = chain.tokens
+    .filter((token) => token.migrateAmount > 0n)
+    .map((token) =>
+      token.token === ZERO_ADDRESS
+        ? {
+            target: chain.vaultAddress,
+            method: "transferNative",
+            args: [],
+            value: token.migrateAmount,
+          }
+        : {
+            target: token.token,
+            method: "transfer",
+            args: [chain.vaultAddress, token.migrateAmount],
+            value: 0n,
+          },
+    );
+
+  return { configure, router, liquidity };
+}
+
+function getServiceSignerAddresses(chainId, env = process.env) {
+  const base = `CHAIN_${chainId}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY`;
+  const entries = [];
+  for (let index = 0; ; index += 1) {
+    const envVar = index === 0 ? base : `${base}_${index}`;
+    const privateKey = String(env[envVar] || "").trim();
+    if (!privateKey) {
+      if (index === 0) return [];
+      break;
+    }
+    const normalizedPrivateKey = privateKey.startsWith("0x")
+      ? privateKey
+      : `0x${privateKey}`;
+    entries.push({
+      envVar,
+      address: new ethers.Wallet(normalizedPrivateKey).address,
+    });
+  }
+  return entries;
+}
+
+function validateServiceSigners(chain, env = process.env) {
+  const configured = getServiceSignerAddresses(chain.chainId, env);
+  const expected = new Set(
+    chain.attestationSigners.map((address) => address.toLowerCase()),
+  );
+  const actual = new Set(
+    configured.map(({ address }) => address.toLowerCase()),
+  );
+  return {
+    valid:
+      actual.size >= chain.attestationThreshold &&
+      [...actual].every((address) => expected.has(address)),
+    threshold: chain.attestationThreshold,
+    configured: configured.map(({ envVar, address }) => ({ envVar, address })),
+    missingSignerCount: Math.max(0, chain.attestationThreshold - actual.size),
+    unexpectedAddresses: [...actual].filter((address) => !expected.has(address)),
+  };
+}
+
+module.exports = {
+  ZERO_ADDRESS,
+  normalizeConfig,
+  buildOperations,
+  getServiceSignerAddresses,
+  validateServiceSigners,
+};
