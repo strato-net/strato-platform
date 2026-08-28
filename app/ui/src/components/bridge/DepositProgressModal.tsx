@@ -133,7 +133,7 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
             {currentStep === "error" ? (
               <AlertCircle className="w-5 h-5 text-destructive" />
             ) : currentStep === "complete" ? (
-              <CheckCircle2 className="w-5 h-5 text-success" />
+              <CheckCircle2 className="w-5 h-5 text-success animate-in zoom-in-95 fade-in-0 duration-200 ease-out motion-reduce:animate-none" />
             ) : (
               <Loader2 className="w-5 h-5 text-primary animate-spin" />
             )}
@@ -182,7 +182,7 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
             return (
               <div
                 key={step.key}
-                className={`rounded-lg transition-all ${
+                className={`rounded-lg transition-colors ${
                   isActive
                     ? "bg-primary/10 border-2 border-primary/30"
                     : isCompleted && isCompleteStep

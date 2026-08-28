@@ -496,7 +496,7 @@ export default function CreditCardPage() {
     <div className="h-screen bg-background overflow-hidden pb-16 md:pb-0">
       <DashboardSidebar />
       <div
-        className="h-screen flex flex-col transition-all duration-300"
+        className="h-screen flex flex-col transition-[padding-left] duration-300"
         style={{ paddingLeft: "var(--sidebar-width, 0px)" }}
       >
         <DashboardHeader title="Card" />

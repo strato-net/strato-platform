@@ -65,7 +65,7 @@ const BorrowProgressModal: React.FC<BorrowProgressModalProps> = ({
             {hasError ? (
               <AlertCircle className="w-5 h-5 text-destructive" />
             ) : allCompleted ? (
-              <CheckCircle2 className="w-5 h-5 text-success" />
+              <CheckCircle2 className="w-5 h-5 text-success animate-in zoom-in-95 fade-in-0 duration-200 ease-out motion-reduce:animate-none" />
             ) : (
               <Loader2 className="w-5 h-5 text-primary animate-spin" />
             )}

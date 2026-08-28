@@ -1335,7 +1335,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             </button>
           </div>
 
-          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          <div className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out ${
             fundingMode === "bridge" ? "max-h-[200px] opacity-100" : "max-h-0 opacity-0"
           }`}>
             <p className="text-xs font-medium text-muted-foreground mb-2">Choose network</p>
@@ -1377,7 +1377,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">2</span>
               <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You send</h3>
             </div>
-            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            <div className={`overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out ${
               fundingMode === "bridge" ? "max-w-[300px] opacity-100" : "max-w-0 opacity-0"
             }`}>
               <div className="flex items-center gap-2">
@@ -1638,7 +1638,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                   ? "Redeem to STRATO"
                   : "Deposit"}
           </Button>
-          <div className={`overflow-hidden transition-all duration-300 ease-in-out text-right ${
+          <div className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out text-right ${
             fundingMode === "bridge" ? "max-h-[30px] opacity-100" : "max-h-0 opacity-0"
           }`}>
             <Link to="/dashboard/withdrawals" className="text-xs text-primary hover:text-primary/80">
@@ -1646,7 +1646,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             </Link>
           </div>
           <div
-            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out ${
               fundingMode === "metals" && contactEnabled ? "max-h-[120px] opacity-100" : "max-h-0 opacity-0"
             }`}
           >

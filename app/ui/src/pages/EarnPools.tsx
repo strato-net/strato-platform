@@ -178,7 +178,7 @@ const EarnPools = () => {
   return (
     <div className="min-h-screen bg-background">
       <DashboardSidebar />
-      <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}>
+      <div className="transition-[padding-left] duration-300 md:pl-64" style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}>
         <DashboardHeader title="Swap pools" />
         <main className="pb-16 md:pb-6 p-4 md:p-6 space-y-5">
           {!isLoggedIn && <GuestSignInBanner message="Sign in to deposit or withdraw liquidity from pools" />}

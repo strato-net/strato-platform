@@ -204,7 +204,7 @@ const Advanced = () => {
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
 
-      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+      <div className="transition-[padding-left] duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="Advanced" />
         
         <main className="px-3 md:px-6 pt-2 md:pt-3 pb-2 md:pb-6 max-w-7xl mx-auto">

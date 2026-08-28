@@ -103,7 +103,7 @@ const OnrampProgressModal: React.FC<OnrampProgressModalProps> = ({ open, externa
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
             {isDone ? (
-              <CheckCircle2 className="w-5 h-5 text-success" />
+              <CheckCircle2 className="w-5 h-5 text-success animate-in zoom-in-95 fade-in-0 duration-200 ease-out motion-reduce:animate-none" />
             ) : (
               <Loader2 className="w-5 h-5 text-primary animate-spin" />
             )}
@@ -149,7 +149,7 @@ const OnrampProgressModal: React.FC<OnrampProgressModalProps> = ({ open, externa
             return (
               <div
                 key={step.key}
-                className={`rounded-lg transition-all ${
+                className={`rounded-lg transition-colors ${
                   isActive
                     ? "bg-primary/10 border-2 border-primary/30"
                     : isCompleted

@@ -1394,7 +1394,7 @@ const EarnStaking = () => {
       <DashboardSidebar />
 
       <div
-        className="transition-all duration-300 md:pl-64"
+        className="transition-[padding-left] duration-300 md:pl-64"
         style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}
       >
         <DashboardHeader title="Stake STRATO" />

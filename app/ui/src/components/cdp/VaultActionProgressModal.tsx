@@ -100,7 +100,7 @@ const VaultActionProgressModal: React.FC<VaultActionProgressModalProps> = ({
             {hasError ? (
               <AlertCircle className="w-5 h-5 text-destructive" />
             ) : allCompleted ? (
-              <CheckCircle2 className="w-5 h-5 text-success" />
+              <CheckCircle2 className="w-5 h-5 text-success animate-in zoom-in-95 fade-in-0 duration-200 ease-out motion-reduce:animate-none" />
             ) : (
               <Loader2 className="w-5 h-5 text-primary animate-spin" />
             )}
@@ -132,7 +132,7 @@ const VaultActionProgressModal: React.FC<VaultActionProgressModalProps> = ({
 
         <div className="space-y-2">
           {steps.map((step) => (
-            <div key={step.id} className={`rounded-lg transition-all ${getStepClassName(step.status)}`}>
+            <div key={step.id} className={`rounded-lg transition-colors ${getStepClassName(step.status)}`}>
               <div className="flex items-start gap-4 p-4">
                 <div className="flex-shrink-0 mt-0.5">{getStepIcon(step.status)}</div>
                 <div className="flex-1 min-w-0">

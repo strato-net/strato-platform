@@ -96,7 +96,7 @@ const Navbar = () => {
       </div>
 
       {isMenuOpen && (
-        <div className="md:hidden">
+        <div className="md:hidden animate-in fade-in slide-in-from-top-2 duration-200 ease-out motion-reduce:animate-none">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-background shadow-lg">
             <div className="pt-4 pb-2 border-t border-border space-y-2">
               {isLoggedIn && (

@@ -77,7 +77,7 @@ const PoolV3Liquidity = () => {
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
 
-      <div className="transition-all duration-300" style={{ paddingLeft: "var(--sidebar-width, 0px)" }}>
+      <div className="transition-[padding-left] duration-300" style={{ paddingLeft: "var(--sidebar-width, 0px)" }}>
         <DashboardHeader title="Liquidity" />
         <main className="p-4 md:p-6">
           {!isLoggedIn && <GuestSignInBanner message="Sign in to provide concentrated liquidity" />}

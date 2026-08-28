@@ -256,7 +256,7 @@ const AssetDetail = () => {
     return (
       <div className="min-h-screen bg-background">
         <DashboardSidebar />
-        <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
+        <div className="transition-[padding-left] duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
           <DashboardHeader title={isLoading ? "Loading..." : "Asset not found"} />
           {isLoading ?
             <div className="flex justify-center items-center h-40">
@@ -289,7 +289,7 @@ const AssetDetail = () => {
     <div className="min-h-screen bg-background">
       <DashboardSidebar />
 
-      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
+      <div className="transition-[padding-left] duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
         <DashboardHeader title={`${asset?.token?._symbol || asset?._symbol} Details`} />
 
         <main className="p-6">

@@ -115,7 +115,7 @@ const MintProgressModal: React.FC<MintProgressModalProps> = ({
             {currentStep === "error" ? (
               <AlertCircle className="w-5 h-5 text-destructive" />
             ) : currentStep === "complete" ? (
-              <CheckCircle2 className="w-5 h-5 text-success" />
+              <CheckCircle2 className="w-5 h-5 text-success animate-in zoom-in-95 fade-in-0 duration-200 ease-out motion-reduce:animate-none" />
             ) : (
               <Loader2 className="w-5 h-5 text-primary animate-spin" />
             )}
@@ -152,7 +152,7 @@ const MintProgressModal: React.FC<MintProgressModalProps> = ({
             return (
               <div
                 key={`${tx.type}-${tx.symbol}-${index}`}
-                className={`rounded-lg transition-all ${
+                className={`rounded-lg transition-[background-color,border-color,opacity] ${
                   isProcessing
                     ? "bg-primary/10 border-2 border-primary/30"
                     : isCompleted

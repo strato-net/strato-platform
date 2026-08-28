@@ -1561,7 +1561,7 @@ const PriceTracking = () => {
   return (
     <div className="min-h-screen bg-background">
       <DashboardSidebar />
-      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+      <div className="transition-[padding-left] duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="Trading Desk" />
         <main className="p-4 md:p-6 pb-24 md:pb-6">
           {loadingAssets ? (

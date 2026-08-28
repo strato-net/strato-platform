@@ -143,10 +143,10 @@ const ActivityFeedFilters = memo(({
                     variant={filters.transaction_sender ? "default" : "outline"}
                     size="sm"
                     onClick={handleMyTransactionsToggle}
-                    className={`h-9 transition-all duration-200 relative ${
+                    className={`h-9 transition-[color,background-color,border-color,box-shadow,transform] duration-200 relative ${
                       filters.transaction_sender
                         ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md scale-105"
-                        : "hover:bg-primary/10 hover:border-primary/30 hover:text-primary hover:scale-105"
+                        : "hover:bg-primary/10 hover:border-primary/30 hover:text-primary"
                     }`}
                   >
                     {filters.transaction_sender && (

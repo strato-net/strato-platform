@@ -53,7 +53,7 @@ const WithdrawalsPage = () => {
       <DashboardSidebar />
 
       <div
-        className="h-screen flex flex-col transition-all duration-300"
+        className="h-screen flex flex-col transition-[padding-left] duration-300"
         style={{ paddingLeft: "var(--sidebar-width, 0px)" }}
       >
         <DashboardHeader title="Bridge Out" />

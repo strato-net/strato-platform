@@ -82,7 +82,7 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
             variant="outline"
             size="sm"
             onClick={() => handlePercentageClick(percent)}
-            className={`flex-1 transition-all duration-200 ${!shouldDisable ? "hover:scale-105" : ""} ${
+            className={`flex-1 transition-colors duration-200 ${
               isActive ? "border-primary bg-primary/10 text-primary" : ""
             }`}
             disabled={shouldDisable}

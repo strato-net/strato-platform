@@ -421,7 +421,7 @@ const AssetsList = ({
             </Button>
           </div>
           <div
-            className={`transition-all duration-300 ease-in-out overflow-hidden ${showNonEarningAssetsTable
+            className={`transition-[max-height,opacity] duration-300 ease-in-out overflow-hidden ${showNonEarningAssetsTable
               ? "max-h-[400px] opacity-100"
               : "max-h-0 opacity-0"
               }`}

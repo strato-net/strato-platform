@@ -669,7 +669,7 @@ const BulkTransferModal = ({
                 return (
                   <div
                     key={index}
-                    className={`rounded-lg border p-3 transition-all ${getBorderClass()}`}
+                    className={`rounded-lg border p-3 transition-colors ${getBorderClass()}`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex-shrink-0">{getStatusIcon()}</div>

@@ -69,14 +69,14 @@ const Hero = () => {
               <div className="flex flex-col sm:flex-row gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
             <button
               onClick={handleGetStarted}
-                  className="group inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
+                  className="group inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-lg font-medium transition-[background-color,box-shadow] duration-300 shadow-lg hover:shadow-xl"
                 >
                   Get Started
                   <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
                 </button>
                 <Link
                   to="/dashboard/rewards"
-                  className="inline-flex items-center justify-center gap-2 bg-card hover:bg-accent text-foreground px-6 py-3 rounded-lg font-medium border border-border transition-all duration-300"
+                  className="inline-flex items-center justify-center gap-2 bg-card hover:bg-accent text-foreground px-6 py-3 rounded-lg font-medium border border-border transition-colors duration-300"
                 >
                   Earn Rewards
             </Link>
@@ -138,8 +138,8 @@ const Hero = () => {
           {/* Feature Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Easy Savings */}
-            <div className="group p-6 lg:p-8 bg-card rounded-2xl border border-border shadow-sm hover:shadow-lg hover:border-primary/30 transition-all duration-300">
-              <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-primary/10 mb-6 group-hover:scale-110 transition-transform duration-300">
+            <div className="group p-6 lg:p-8 bg-card rounded-2xl border border-border shadow-sm hover:shadow-lg hover:border-primary/30 transition-[border-color,box-shadow] duration-300">
+              <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-primary/10 mb-6 motion-safe:[@media(hover:hover)]:group-hover:scale-110 transition-transform duration-200 ease-out">
                 <PiggyBank className="w-6 h-6 text-primary" />
               </div>
               <span className="text-sm font-medium text-primary">Grow your wealth</span>
@@ -149,7 +149,7 @@ const Hero = () => {
               </p>
               <Link 
                 to="/dashboard/deposits"
-                className="inline-flex items-center gap-2 text-primary font-medium hover:gap-3 transition-all duration-300"
+                className="inline-flex items-center gap-2 text-primary font-medium hover:gap-3 transition-[gap] duration-300"
               >
                 Start Saving
                 <ArrowRight className="w-4 h-4" />
@@ -157,8 +157,8 @@ const Hero = () => {
             </div>
             
             {/* Borrow */}
-            <div className="group p-6 lg:p-8 bg-card rounded-2xl border border-border shadow-sm hover:shadow-lg hover:border-primary/30 transition-all duration-300">
-              <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-primary/10 mb-6 group-hover:scale-110 transition-transform duration-300">
+            <div className="group p-6 lg:p-8 bg-card rounded-2xl border border-border shadow-sm hover:shadow-lg hover:border-primary/30 transition-[border-color,box-shadow] duration-300">
+              <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-primary/10 mb-6 motion-safe:[@media(hover:hover)]:group-hover:scale-110 transition-transform duration-200 ease-out">
                 <FileText className="w-6 h-6 text-primary" />
               </div>
               <span className="text-sm font-medium text-primary">Unlock liquidity</span>
@@ -168,7 +168,7 @@ const Hero = () => {
               </p>
               <Link 
                 to="/dashboard/borrow"
-                className="inline-flex items-center gap-2 text-primary font-medium hover:gap-3 transition-all duration-300"
+                className="inline-flex items-center gap-2 text-primary font-medium hover:gap-3 transition-[gap] duration-300"
               >
                 Borrow Now
                 <ArrowRight className="w-4 h-4" />
@@ -176,8 +176,8 @@ const Hero = () => {
             </div>
             
             {/* Rewards */}
-            <div className="group p-6 lg:p-8 bg-card rounded-2xl border border-border shadow-sm hover:shadow-lg hover:border-primary/30 transition-all duration-300">
-              <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-primary/10 mb-6 group-hover:scale-110 transition-transform duration-300">
+            <div className="group p-6 lg:p-8 bg-card rounded-2xl border border-border shadow-sm hover:shadow-lg hover:border-primary/30 transition-[border-color,box-shadow] duration-300">
+              <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-primary/10 mb-6 motion-safe:[@media(hover:hover)]:group-hover:scale-110 transition-transform duration-200 ease-out">
                 <Gift className="w-6 h-6 text-primary" />
               </div>
               <span className="text-sm font-medium text-primary">Earn as you go</span>
@@ -187,7 +187,7 @@ const Hero = () => {
               </p>
               <Link 
                 to="/dashboard/rewards"
-                className="inline-flex items-center gap-2 text-primary font-medium hover:gap-3 transition-all duration-300"
+                className="inline-flex items-center gap-2 text-primary font-medium hover:gap-3 transition-[gap] duration-300"
               >
                 View Rewards
                 <ArrowRight className="w-4 h-4" />
@@ -208,7 +208,7 @@ const Hero = () => {
               </div>
               <Link
                 to="/dashboard/advanced"
-                className="group flex-shrink-0 inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
+                className="group flex-shrink-0 inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-lg font-medium transition-[background-color,box-shadow] duration-300 shadow-lg hover:shadow-xl"
               >
                 Advanced Features
                 <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />

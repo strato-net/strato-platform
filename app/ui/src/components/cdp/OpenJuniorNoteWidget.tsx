@@ -292,7 +292,7 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
               return (
                 <div
                   key={asset.asset}
-                  className={`p-3 border rounded-lg transition-all ${
+                  className={`p-3 border rounded-lg transition-[background-color,border-color,box-shadow,opacity] ${
                     guestMode 
                       ? 'cursor-default border-border bg-card'
                       : `cursor-pointer hover:shadow-sm ${

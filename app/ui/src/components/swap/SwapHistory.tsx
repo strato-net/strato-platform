@@ -54,7 +54,7 @@ const SenderCell = ({ sender, copiedHash, onCopy }: { sender: string; copiedHash
         <TooltipTrigger asChild>
           <button
             onClick={() => onCopy(sender)}
-            className="flex items-center gap-1 hover:text-primary hover:bg-primary/10 active:bg-primary/20 active:scale-95 transition-all duration-150 rounded px-1 py-0.5"
+            className="flex items-center gap-1 hover:text-primary hover:bg-primary/10 active:bg-primary/20 active:scale-95 transition-[color,background-color,transform] duration-150 rounded px-1 py-0.5"
           >
             <span>
               {copiedHash === sender ? 'Copied!' : formatHash(sender)}
