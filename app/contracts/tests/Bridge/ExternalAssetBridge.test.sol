@@ -471,6 +471,14 @@ contract Describe_ExternalAssetBridge is Authorizable {
         uint256 deadline = block.timestamp + 1800;
         relayer.do(
             address(bridge),
+            "recordWithdrawalReview",
+            withdrawalId,
+            "0xaaaa",
+            block.timestamp + 7 * 24 * 60 * 60,
+            "0xbbbb"
+        );
+        relayer.do(
+            address(bridge),
             "markWithdrawalReady",
             withdrawalId,
             block.timestamp,
@@ -547,6 +555,59 @@ contract Describe_ExternalAssetBridge is Authorizable {
         require(
             refundReverted,
             "Completed withdrawal should never be refundable"
+        );
+    }
+
+    function it_records_and_rejects_large_withdrawal_review() {
+        stratoToken.mint(address(user), 200e18);
+        user.do(address(stratoToken), "approve", address(bridge), 200e18);
+        uint256 withdrawalId = user.do(
+            address(bridge),
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            externalToken,
+            address(stratoToken),
+            150e18
+        );
+
+        relayer.do(
+            address(bridge),
+            "recordWithdrawalReview",
+            withdrawalId,
+            "0xaaaa",
+            block.timestamp + 7 * 24 * 60 * 60,
+            "0xbbbb"
+        );
+        (
+            string reviewDigest,
+            uint256 approvalDeadline,
+            string proposalHash
+        ) = bridge.withdrawalManualReviews(withdrawalId);
+        (Status pendingStatus, , , , , , , , , , , , , , , ) = bridge
+            .withdrawals(withdrawalId);
+        require(
+            pendingStatus == Status.PENDING_REVIEW &&
+                reviewDigest == "0xaaaa" &&
+                approvalDeadline == block.timestamp + 7 * 24 * 60 * 60 &&
+                proposalHash == "0xbbbb",
+            "Manual review should be persisted"
+        );
+
+        relayer.do(
+            address(bridge),
+            "rejectWithdrawalReview",
+            withdrawalId
+        );
+        (Status rejectedStatus, , , , , , , , , , , , , , , ) = bridge
+            .withdrawals(withdrawalId);
+        require(
+            rejectedStatus == Status.ABORTED,
+            "Rejected withdrawal should abort"
+        );
+        require(
+            stratoToken.balanceOf(address(user)) == 200e18,
+            "Rejected withdrawal should refund escrow"
         );
     }
 

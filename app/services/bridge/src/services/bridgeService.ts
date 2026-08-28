@@ -20,10 +20,13 @@ import {
 } from "./nativeMintService";
 import { buildActionDepositBatchArgs } from "./depositEventService";
 import {
+  buildWithdrawalReview,
   buildWithdrawalAuthorization,
   cancelExpiredWithdrawal,
+  getExternalChainLatestTimestamp,
   getReservationId,
   getReservationState,
+  proposeWithdrawalReview,
   releaseWithdrawal,
   reserveWithdrawal,
 } from "./externalWithdrawalService";
@@ -568,8 +571,9 @@ export const reviewNativeDepositBatch = async (
 
 export const processExternalWithdrawal = async (
   withdrawal: WithdrawalInfo,
+  manualReviewApproved = false,
 ): Promise<void> => {
-  if (withdrawal.requiresManualReview) {
+  if (withdrawal.requiresManualReview && !manualReviewApproved) {
     throw new Error(
       `Withdrawal ${withdrawal.withdrawalId} requires manual review`,
     );
@@ -582,7 +586,10 @@ export const processExternalWithdrawal = async (
     config.externalAssetBridge.address!,
   );
 
-  if (String(withdrawal.bridgeStatus) === "1") {
+  if (
+    String(withdrawal.bridgeStatus) === "1" ||
+    (String(withdrawal.bridgeStatus) === "2" && manualReviewApproved)
+  ) {
     const readyResult = await execute({
       contractName: "ExternalAssetBridge",
       contractAddress: config.externalAssetBridge.address!,
@@ -701,6 +708,81 @@ export const processExternalWithdrawal = async (
     `Released and finalized external withdrawal ${withdrawal.withdrawalId}`,
     { reservationId, releaseTxHash },
   );
+};
+
+export const queueExternalWithdrawalReview = async (
+  withdrawal: WithdrawalInfo,
+): Promise<void> => {
+  if (!withdrawal.requiresManualReview) {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} does not require manual review`,
+    );
+  }
+  const sourceChainId = await getStratoNetworkId();
+  const review = buildWithdrawalReview(
+    withdrawal,
+    sourceChainId,
+    config.externalAssetBridge.address!,
+  );
+  const proposal = await proposeWithdrawalReview(review);
+  const result = await execute({
+    contractName: "ExternalAssetBridge",
+    contractAddress: config.externalAssetBridge.address!,
+    method: "recordWithdrawalReview",
+    args: {
+      withdrawalId: withdrawal.withdrawalId,
+      reviewDigest: proposal.reviewDigest,
+      approvalDeadline: proposal.approvalDeadline,
+      proposalHash: proposal.proposalHash,
+    },
+  });
+  if (result.status !== "Success") {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} review remains ${result.status}`,
+    );
+  }
+};
+
+export const processPendingExternalWithdrawalReview = async (
+  withdrawal: WithdrawalInfo,
+): Promise<void> => {
+  if (!withdrawal.reviewProposalHash || !withdrawal.reviewApprovalDeadline) {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} is missing manual review state`,
+    );
+  }
+  const destinationTimestamp = await getExternalChainLatestTimestamp(
+    withdrawal.externalChainId,
+  );
+  if (
+    destinationTimestamp > BigInt(withdrawal.reviewApprovalDeadline)
+  ) {
+    await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "expireWithdrawalReview",
+      args: { withdrawalId: withdrawal.withdrawalId },
+    });
+    return;
+  }
+  const proposal = await getNativeMintProposalExecution(
+    withdrawal.reviewProposalHash,
+    withdrawal.externalChainId,
+  );
+  if (proposal.status === "pending") {
+    return;
+  }
+  if (proposal.status === "rejected") {
+    await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "rejectWithdrawalReview",
+      args: { withdrawalId: withdrawal.withdrawalId },
+    });
+    return;
+  }
+
+  await processExternalWithdrawal(withdrawal, true);
 };
 
 export const confirmWithdrawalBatch = async (

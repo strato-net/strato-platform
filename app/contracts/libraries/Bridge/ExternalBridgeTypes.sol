@@ -85,4 +85,10 @@ library ExternalBridgeTypes {
         uint256 deadline;
         uint256 signerSetVersion;
     }
+
+    struct WithdrawalManualReview {
+        string reviewDigest;
+        uint256 approvalDeadline;
+        string proposalHash;
+    }
 }

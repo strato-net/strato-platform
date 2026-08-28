@@ -264,6 +264,204 @@ test("leaves an expired unreserved withdrawal for governance refund", async () =
   assert.deepEqual(trace, []);
 });
 
+test("queues large withdrawals for Safe review", async () => {
+  const stratoHelper = await import("../utils/stratoHelper");
+  const api = await import("../utils/api");
+  const vaultService = await import("./externalWithdrawalService");
+  const calls: any[] = [];
+
+  (api.eth as any).get = async () => ({ networkID: "9001" });
+  (vaultService as any).buildWithdrawalReview = () => ({ review: true });
+  (vaultService as any).proposeWithdrawalReview = async () => ({
+    reviewDigest: "0xaaaa",
+    approvalDeadline: "9000",
+    proposalHash: "0xbbbb",
+  });
+  (stratoHelper as any).execute = async (input: any) => {
+    calls.push(input);
+    return { status: "Success", hash: "record-review-hash" };
+  };
+
+  const { queueExternalWithdrawalReview } = await import("./bridgeService");
+  await queueExternalWithdrawalReview({
+    bridgeStatus: "1",
+    externalChainId: 1,
+    externalRecipient: "recipient",
+    externalToken: "token",
+    externalTokenAmount: "501",
+    requestedAt: "1",
+    stratoSender: "sender",
+    stratoToken: "strato-token",
+    stratoTokenAmount: "501",
+    timestamp: "1",
+    withdrawalId: "8",
+    vault: "vault",
+    requiresManualReview: true,
+  });
+
+  assert.equal(calls[0].method, "recordWithdrawalReview");
+  assert.deepEqual(calls[0].args, {
+    withdrawalId: "8",
+    reviewDigest: "0xaaaa",
+    approvalDeadline: "9000",
+    proposalHash: "0xbbbb",
+  });
+});
+
+test("releases a large withdrawal only after Safe approval", async () => {
+  const stratoHelper = await import("../utils/stratoHelper");
+  const nativeMintService = await import("./nativeMintService");
+  const vaultService = await import("./externalWithdrawalService");
+  const trace: string[] = [];
+
+  (nativeMintService as any).getNativeMintProposalExecution = async () => ({
+    status: "executed",
+    txHash: "approval-hash",
+  });
+  (vaultService as any).getExternalChainLatestTimestamp = async () => 1000n;
+  (stratoHelper as any).execute = async (input: any) => {
+    trace.push(`strato:${input.method}`);
+    return { status: "Success", hash: `${input.method}-hash` };
+  };
+  (vaultService as any).buildWithdrawalAuthorization = async () => ({
+    sourceChainId: "9001",
+    sourceBridge: "0x1111111111111111111111111111111111111111",
+    sourceWithdrawalId: "8",
+    destinationChainId: "1",
+    destinationVault: "0x2222222222222222222222222222222222222222",
+    token: "0x3333333333333333333333333333333333333333",
+    recipient: "0x4444444444444444444444444444444444444444",
+    amount: "501",
+    notBefore: "1000",
+    deadline: "2800",
+    signerSetVersion: "1",
+  });
+  (vaultService as any).getReservationState = async () => ({
+    reservationId: "reservation",
+    status: 0,
+    latestTimestamp: 1000n,
+  });
+  (vaultService as any).reserveWithdrawal = async () => {
+    trace.push("vault:reserve");
+    return { reservationId: "reservation", transactionHash: "reserve-hash" };
+  };
+  (vaultService as any).releaseWithdrawal = async () => {
+    trace.push("vault:release");
+    return "release-hash";
+  };
+
+  const { processPendingExternalWithdrawalReview } = await import(
+    "./bridgeService"
+  );
+  await processPendingExternalWithdrawalReview({
+    bridgeStatus: "2",
+    externalChainId: 1,
+    externalRecipient: "recipient",
+    externalToken: "token",
+    externalTokenAmount: "501",
+    requestedAt: "1",
+    stratoSender: "sender",
+    stratoToken: "strato-token",
+    stratoTokenAmount: "501",
+    timestamp: "1",
+    withdrawalId: "8",
+    vault: "vault",
+    requiresManualReview: true,
+    reviewApprovalDeadline: "9000",
+    reviewProposalHash: "0xbbbb",
+  });
+
+  assert.deepEqual(trace, [
+    "strato:markWithdrawalReady",
+    "vault:reserve",
+    "strato:recordWithdrawalReservation",
+    "vault:release",
+    "strato:finalizeWithdrawal",
+  ]);
+});
+
+test("refunds escrow when Safe rejects a large withdrawal", async () => {
+  const stratoHelper = await import("../utils/stratoHelper");
+  const nativeMintService = await import("./nativeMintService");
+  const vaultService = await import("./externalWithdrawalService");
+  const calls: any[] = [];
+
+  (nativeMintService as any).getNativeMintProposalExecution = async () => ({
+    status: "rejected",
+  });
+  (vaultService as any).getExternalChainLatestTimestamp = async () => 1000n;
+  (stratoHelper as any).execute = async (input: any) => {
+    calls.push(input);
+    return { status: "Success", hash: "rejection-hash" };
+  };
+
+  const { processPendingExternalWithdrawalReview } = await import(
+    "./bridgeService"
+  );
+  await processPendingExternalWithdrawalReview({
+    bridgeStatus: "2",
+    externalChainId: 1,
+    externalRecipient: "recipient",
+    externalToken: "token",
+    externalTokenAmount: "501",
+    requestedAt: "1",
+    stratoSender: "sender",
+    stratoToken: "strato-token",
+    stratoTokenAmount: "501",
+    timestamp: "1",
+    withdrawalId: "8",
+    vault: "vault",
+    requiresManualReview: true,
+    reviewApprovalDeadline: "9000",
+    reviewProposalHash: "0xbbbb",
+  });
+
+  assert.equal(calls[0].method, "rejectWithdrawalReview");
+  assert.deepEqual(calls[0].args, { withdrawalId: "8" });
+});
+
+test("expires stale Safe reviews before release authorization", async () => {
+  const stratoHelper = await import("../utils/stratoHelper");
+  const nativeMintService = await import("./nativeMintService");
+  const vaultService = await import("./externalWithdrawalService");
+  const calls: any[] = [];
+  let checkedSafe = false;
+
+  (vaultService as any).getExternalChainLatestTimestamp = async () => 9001n;
+  (nativeMintService as any).getNativeMintProposalExecution = async () => {
+    checkedSafe = true;
+    return { status: "executed" };
+  };
+  (stratoHelper as any).execute = async (input: any) => {
+    calls.push(input);
+    return { status: "Success", hash: "expiry-hash" };
+  };
+
+  const { processPendingExternalWithdrawalReview } = await import(
+    "./bridgeService"
+  );
+  await processPendingExternalWithdrawalReview({
+    bridgeStatus: "2",
+    externalChainId: 1,
+    externalRecipient: "recipient",
+    externalToken: "token",
+    externalTokenAmount: "501",
+    requestedAt: "1",
+    stratoSender: "sender",
+    stratoToken: "strato-token",
+    stratoTokenAmount: "501",
+    timestamp: "1",
+    withdrawalId: "8",
+    vault: "vault",
+    requiresManualReview: true,
+    reviewApprovalDeadline: "9000",
+    reviewProposalHash: "0xbbbb",
+  });
+
+  assert.equal(checkedSafe, false);
+  assert.equal(calls[0].method, "expireWithdrawalReview");
+});
+
 test("restores ready withdrawal authorization state from Cirrus", async () => {
   const { cirrus } = await import("../utils/api");
   (cirrus as any).get = async (url: string) => {
@@ -284,6 +482,16 @@ test("restores ready withdrawal authorization state from Cirrus", async () => {
           notBefore: "1000",
           deadline: "2800",
           signerSetVersion: "4",
+        },
+      }];
+    }
+    if (url.includes("-withdrawalManualReviews")) {
+      return [{
+        key: "7",
+        value: {
+          approvalDeadline: "9000",
+          reviewDigest: "0xaaaa",
+          proposalHash: "0xbbbb",
         },
       }];
     }
@@ -308,4 +516,7 @@ test("restores ready withdrawal authorization state from Cirrus", async () => {
   assert.equal(withdrawals[0].authorizationNotBefore, "1000");
   assert.equal(withdrawals[0].authorizationDeadline, "2800");
   assert.equal(withdrawals[0].signerSetVersion, "4");
+  assert.equal(withdrawals[0].reviewApprovalDeadline, "9000");
+  assert.equal(withdrawals[0].reviewDigest, "0xaaaa");
+  assert.equal(withdrawals[0].reviewProposalHash, "0xbbbb");
 });

@@ -244,15 +244,30 @@ describe("ExternalBridgeVault", function () {
       "LargeWithdrawalApprovalRequired",
     );
 
-    const digest = await vault.authorizationDigest(authorization);
-    await vault.approveLargeWithdrawal(digest, authorization.deadline);
-    await expect(vault.connect(executor).reserve(authorization, signatures)).to
+    const digest = await vault.withdrawalReviewDigest(authorization);
+    await vault.approveLargeWithdrawal(
+      digest,
+      authorization.deadline + 24n * 60n * 60n,
+    );
+    await time.increase(1);
+    const refreshedAuthorization = await buildAuthorization({ amount: 501n });
+    expect(
+      await vault.withdrawalReviewDigest(refreshedAuthorization),
+    ).to.equal(digest);
+    const refreshedSignatures = await thresholdSignatures(
+      refreshedAuthorization,
+    );
+    await expect(
+      vault
+        .connect(executor)
+        .reserve(refreshedAuthorization, refreshedSignatures),
+    ).to
       .emit(vault, "WithdrawalReserved");
   });
 
   it("prevents non-governance accounts from approving large withdrawals", async function () {
     const authorization = await buildAuthorization({ amount: 501n });
-    const digest = await vault.authorizationDigest(authorization);
+    const digest = await vault.withdrawalReviewDigest(authorization);
 
     await expect(
       vault

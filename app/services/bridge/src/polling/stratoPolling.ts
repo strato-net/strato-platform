@@ -10,6 +10,8 @@ import {
   finaliseWithdrawalBatch,
   handleRejectedWithdrawalBatch,
   processExternalWithdrawal,
+  processPendingExternalWithdrawalReview,
+  queueExternalWithdrawalReview,
 } from "../services/bridgeService";
 import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositInfo, NativeDepositInfo, ConfirmDepositArgs, ConfirmNativeDepositArgs } from "../types";
 import {
@@ -87,8 +89,9 @@ export const startExternalWithdrawalPolling = (): void => {
   const pollingInterval = config.polling.withdrawalInterval || 5 * 60 * 1000;
 
   const poll = async () => {
-    const [initiated, ready] = await Promise.all([
+    const [initiated, pendingReview, ready] = await Promise.all([
       getExternalWithdrawalsByStatus("1"),
+      getExternalWithdrawalsByStatus("2"),
       getExternalWithdrawalsByStatus("3"),
     ]);
     const routineWithdrawals = [...initiated, ...ready].filter(
@@ -101,6 +104,36 @@ export const startExternalWithdrawalPolling = (): void => {
       } catch (error) {
         logError("StratoPolling", error as Error, {
           operation: "processExternalWithdrawal",
+          withdrawalId: withdrawal.withdrawalId,
+        });
+      }
+    }
+    for (const withdrawal of initiated.filter((item) => item.requiresManualReview)) {
+      try {
+        await queueExternalWithdrawalReview(withdrawal);
+      } catch (error) {
+        logError("StratoPolling", error as Error, {
+          operation: "queueExternalWithdrawalReview",
+          withdrawalId: withdrawal.withdrawalId,
+        });
+      }
+    }
+    for (const withdrawal of pendingReview) {
+      try {
+        await processPendingExternalWithdrawalReview(withdrawal);
+      } catch (error) {
+        logError("StratoPolling", error as Error, {
+          operation: "processPendingExternalWithdrawalReview",
+          withdrawalId: withdrawal.withdrawalId,
+        });
+      }
+    }
+    for (const withdrawal of ready.filter((item) => item.requiresManualReview)) {
+      try {
+        await processExternalWithdrawal(withdrawal, true);
+      } catch (error) {
+        logError("StratoPolling", error as Error, {
+          operation: "resumeApprovedExternalWithdrawal",
           withdrawalId: withdrawal.withdrawalId,
         });
       }

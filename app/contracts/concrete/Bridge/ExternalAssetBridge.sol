@@ -123,6 +123,14 @@ contract record ExternalAssetBridge is Ownable {
         uint256 authorizationDeadline,
         uint256 signerSetVersion
     );
+    event WithdrawalReviewRequested(
+        uint256 withdrawalId,
+        string reviewDigest,
+        uint256 approvalDeadline,
+        string proposalHash
+    );
+    event WithdrawalReviewExpired(uint256 withdrawalId);
+    event WithdrawalReviewRejected(uint256 withdrawalId);
     event WithdrawalReservationRecorded(
         uint256 withdrawalId,
         string reservationId,
@@ -182,6 +190,7 @@ contract record ExternalAssetBridge is Ownable {
     mapping(address => mapping(uint256 => mapping(address => DepositActionConfig))) public record depositActionConfigs;
     mapping(uint256 => WithdrawalInfo) public record withdrawals;
     mapping(uint256 => WithdrawalAuthorizationInfo) public record withdrawalAuthorizations;
+    mapping(uint256 => WithdrawalManualReview) public record withdrawalManualReviews;
     mapping(string => uint256) public withdrawalByReservationId;
     mapping(string => uint256) public withdrawalByExternalTxHash;
 
@@ -809,8 +818,13 @@ contract record ExternalAssetBridge is Ownable {
         WithdrawalInfo withdrawal = withdrawals[
             withdrawalId
         ];
+        WithdrawalManualReview review = withdrawalManualReviews[withdrawalId];
         require(
-            withdrawal.status == Status.INITIATED,
+            (!withdrawal.requiresManualReview &&
+                withdrawal.status == Status.INITIATED) ||
+                (withdrawal.requiresManualReview &&
+                    withdrawal.status == Status.PENDING_REVIEW &&
+                    review.approvalDeadline >= authorizationDeadline),
             "EAB: bad state"
         );
         require(
@@ -838,6 +852,77 @@ contract record ExternalAssetBridge is Ownable {
             authorizationDeadline,
             signerSetVersion
         );
+    }
+
+    function recordWithdrawalReview(
+        uint256 withdrawalId,
+        string reviewDigest,
+        uint256 approvalDeadline,
+        string proposalHash
+    ) external onlyBridgeOperator {
+        WithdrawalInfo withdrawal = withdrawals[withdrawalId];
+        require(
+            withdrawal.status == Status.INITIATED &&
+                withdrawal.requiresManualReview,
+            "EAB: bad state"
+        );
+        require(
+            reviewDigest.length > 0 &&
+                proposalHash.length > 0 &&
+                approvalDeadline > block.timestamp,
+            "EAB: invalid review"
+        );
+
+        string normalizedDigest = reviewDigest.normalizeHex();
+        string normalizedProposalHash = proposalHash.normalizeHex();
+        WithdrawalManualReview review = withdrawalManualReviews[withdrawalId];
+        review.reviewDigest = normalizedDigest;
+        review.approvalDeadline = approvalDeadline;
+        review.proposalHash = normalizedProposalHash;
+        withdrawal.status = Status.PENDING_REVIEW;
+        withdrawal.timestamp = block.timestamp;
+        emit WithdrawalReviewRequested(
+            withdrawalId,
+            normalizedDigest,
+            approvalDeadline,
+            normalizedProposalHash
+        );
+    }
+
+    function expireWithdrawalReview(
+        uint256 withdrawalId
+    ) external onlyBridgeOperator {
+        WithdrawalInfo withdrawal = withdrawals[withdrawalId];
+        WithdrawalManualReview review = withdrawalManualReviews[withdrawalId];
+        require(
+            withdrawal.status == Status.PENDING_REVIEW &&
+                block.timestamp > review.approvalDeadline,
+            "EAB: review active"
+        );
+        delete withdrawalManualReviews[withdrawalId];
+        withdrawal.status = Status.INITIATED;
+        withdrawal.timestamp = block.timestamp;
+        emit WithdrawalReviewExpired(withdrawalId);
+    }
+
+    function rejectWithdrawalReview(
+        uint256 withdrawalId
+    ) external onlyBridgeOperator {
+        WithdrawalInfo withdrawal = withdrawals[withdrawalId];
+        require(
+            withdrawal.status == Status.PENDING_REVIEW &&
+                withdrawal.requiresManualReview,
+            "EAB: bad state"
+        );
+        _refundFunds(
+            withdrawal.stratoToken,
+            withdrawal.stratoSender,
+            withdrawal.stratoTokenAmount
+        );
+        delete withdrawalManualReviews[withdrawalId];
+        withdrawal.status = Status.ABORTED;
+        withdrawal.timestamp = block.timestamp;
+        emit WithdrawalReviewRejected(withdrawalId);
     }
 
     function recordWithdrawalReservation(

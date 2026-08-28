@@ -124,6 +124,16 @@ export async function validateBridgeConfig(): Promise<boolean> {
       `Invalid external asset bridge address format: ${config.externalAssetBridge.address}`,
     );
   }
+  if (
+    !Number.isSafeInteger(
+      config.externalAssetBridge.manualReviewValiditySeconds,
+    ) ||
+    config.externalAssetBridge.manualReviewValiditySeconds <= 0
+  ) {
+    errors.push(
+      "EXTERNAL_BRIDGE_MANUAL_REVIEW_VALIDITY_SECONDS must be a positive integer",
+    );
+  }
 
   // Validate Safe wallet configuration
   if (config.safe.address) {

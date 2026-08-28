@@ -153,18 +153,36 @@ export const getExternalWithdrawalsByStatus = async (
 
   if (!Array.isArray(data) || data.length === 0) return [];
   const withdrawalIds = data.map((item) => item.key);
-  const authorizationData = await cirrus.get(
-    `/${EXTERNAL_ASSET_BRIDGE_URL}-withdrawalAuthorizations`,
-    {
-      params: {
-        key: `in.(${withdrawalIds.join(",")})`,
-        address: `eq.${externalAssetBridgeAddress}`,
-        select: "key,value",
+  const [authorizationData, reviewData] = await Promise.all([
+    cirrus.get(
+      `/${EXTERNAL_ASSET_BRIDGE_URL}-withdrawalAuthorizations`,
+      {
+        params: {
+          key: `in.(${withdrawalIds.join(",")})`,
+          address: `eq.${externalAssetBridgeAddress}`,
+          select: "key,value",
+        },
       },
-    },
-  );
+    ),
+    cirrus.get(
+      `/${EXTERNAL_ASSET_BRIDGE_URL}-withdrawalManualReviews`,
+      {
+        params: {
+          key: `in.(${withdrawalIds.join(",")})`,
+          address: `eq.${externalAssetBridgeAddress}`,
+          select: "key,value",
+        },
+      },
+    ),
+  ]);
   const authorizations = new Map(
     (Array.isArray(authorizationData) ? authorizationData : []).map((item) => [
+      String(item.key),
+      item.value,
+    ]),
+  );
+  const reviews = new Map(
+    (Array.isArray(reviewData) ? reviewData : []).map((item) => [
       String(item.key),
       item.value,
     ]),
@@ -183,6 +201,9 @@ export const getExternalWithdrawalsByStatus = async (
       vault,
       authorizationNotBefore: authorizations.get(String(item.key))?.notBefore,
       signerSetVersion: authorizations.get(String(item.key))?.signerSetVersion,
+      reviewApprovalDeadline: reviews.get(String(item.key))?.approvalDeadline,
+      reviewDigest: reviews.get(String(item.key))?.reviewDigest,
+      reviewProposalHash: reviews.get(String(item.key))?.proposalHash,
     };
   });
 };

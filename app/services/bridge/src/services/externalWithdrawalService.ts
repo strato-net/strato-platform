@@ -4,15 +4,20 @@ import {
   Interface,
   JsonRpcProvider,
   Signature,
+  TypedDataEncoder,
   Wallet,
   keccak256,
 } from "ethers";
+import { OperationType } from "@safe-global/types-kit";
 import {
+  config,
   getChainRpcUrl,
   getExternalBridgeAttestationPrivateKeys,
 } from "../config";
 import { WithdrawalInfo } from "../types";
 import { ensureHexPrefix, safeChecksum } from "../utils/utils";
+import { retry } from "../utils/api";
+import { initializeSafeForChain } from "../utils/safeHelper";
 
 export interface WithdrawalAuthorization {
   sourceChainId: string;
@@ -28,10 +33,22 @@ export interface WithdrawalAuthorization {
   signerSetVersion: string;
 }
 
+export interface WithdrawalReview {
+  sourceChainId: string;
+  sourceBridge: string;
+  sourceWithdrawalId: string;
+  destinationChainId: string;
+  destinationVault: string;
+  token: string;
+  recipient: string;
+  amount: string;
+}
+
 const EXTERNAL_VAULT_ABI = [
   "function attestationThreshold() view returns (uint8)",
   "function maxAuthorizationValiditySeconds() view returns (uint256)",
   "function signerSetVersion() view returns (uint256)",
+  "function approveLargeWithdrawal(bytes32 reviewDigest,uint256 approvalDeadline)",
   "function reservations(bytes32) view returns (uint8 status,address token,address recipient,uint256 amount,uint256 deadline,bytes32 authorizationDigest)",
   "function reserve((uint256 sourceChainId,address sourceBridge,uint256 sourceWithdrawalId,uint256 destinationChainId,address destinationVault,address token,address recipient,uint256 amount,uint256 notBefore,uint256 deadline,uint256 signerSetVersion) authorization,bytes[] signatures) returns (bytes32)",
   "function release(bytes32 reservationId)",
@@ -57,6 +74,13 @@ const WITHDRAWAL_AUTHORIZATION_TYPES = {
   ],
 };
 
+const WITHDRAWAL_REVIEW_TYPES = {
+  WithdrawalReview: WITHDRAWAL_AUTHORIZATION_TYPES.WithdrawalAuthorization.slice(
+    0,
+    8,
+  ),
+};
+
 const vaultInterface = new Interface(EXTERNAL_VAULT_ABI);
 
 const normalizePrivateKey = (privateKey: string): string => {
@@ -73,6 +97,117 @@ const authorizationDomain = (authorization: WithdrawalAuthorization) => ({
   chainId: BigInt(authorization.destinationChainId),
   verifyingContract: authorization.destinationVault,
 });
+
+const reviewDomain = (review: WithdrawalReview) => ({
+  name: "ExternalBridgeVault",
+  version: "1",
+  chainId: BigInt(review.destinationChainId),
+  verifyingContract: review.destinationVault,
+});
+
+export const buildWithdrawalReview = (
+  withdrawal: WithdrawalInfo,
+  sourceChainId: bigint,
+  sourceBridgeAddress: string,
+): WithdrawalReview => {
+  if (!withdrawal.vault) {
+    throw new Error(`Withdrawal ${withdrawal.withdrawalId} is missing its vault`);
+  }
+  return {
+    sourceChainId: sourceChainId.toString(),
+    sourceBridge: safeChecksum(sourceBridgeAddress),
+    sourceWithdrawalId: withdrawal.withdrawalId,
+    destinationChainId: withdrawal.externalChainId.toString(),
+    destinationVault: safeChecksum(withdrawal.vault),
+    token: safeChecksum(withdrawal.externalToken),
+    recipient: safeChecksum(withdrawal.externalRecipient),
+    amount: withdrawal.externalTokenAmount,
+  };
+};
+
+export const getWithdrawalReviewDigest = (review: WithdrawalReview): string =>
+  TypedDataEncoder.hash(
+    reviewDomain(review),
+    WITHDRAWAL_REVIEW_TYPES,
+    review,
+  );
+
+export const getExternalChainLatestTimestamp = async (
+  chainId: string | number,
+): Promise<bigint> => {
+  const provider = new JsonRpcProvider(getChainRpcUrl(BigInt(chainId)));
+  const latestBlock = await provider.getBlock("latest");
+  if (!latestBlock) {
+    throw new Error(`Latest block not found for chain ${chainId}`);
+  }
+  return BigInt(latestBlock.timestamp);
+};
+
+export const proposeWithdrawalReview = async (
+  review: WithdrawalReview,
+): Promise<{
+  reviewDigest: string;
+  approvalDeadline: string;
+  proposalHash: string;
+}> => {
+  const chainId = Number(review.destinationChainId);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+    throw new Error(
+      `Unsupported external review chain id: ${review.destinationChainId}`,
+    );
+  }
+  const provider = new JsonRpcProvider(getChainRpcUrl(chainId));
+  const latestBlock = await provider.getBlock("latest");
+  if (!latestBlock) {
+    throw new Error(`Latest block not found for chain ${chainId}`);
+  }
+  const approvalDeadline =
+    BigInt(latestBlock.timestamp) +
+    BigInt(config.externalAssetBridge.manualReviewValiditySeconds);
+  const reviewDigest = getWithdrawalReviewDigest(review);
+  const safeAddress = config.safe.address || "";
+  const relayer = config.safe.safeProposerAddress || "";
+  const { protocolKit, apiKit } = await initializeSafeForChain(
+    chainId,
+    safeAddress,
+  );
+  const nonce = Number(
+    await retry(() => apiKit.getNextNonce(safeAddress), {
+      logPrefix: "ExternalWithdrawalService",
+    }),
+  );
+  const safeTransaction = await protocolKit.createTransaction({
+    transactions: [{
+      to: review.destinationVault,
+      value: "0",
+      data: vaultInterface.encodeFunctionData("approveLargeWithdrawal", [
+        reviewDigest,
+        approvalDeadline,
+      ]),
+      operation: OperationType.Call,
+    }],
+    options: { nonce },
+  });
+  const proposalHash = await protocolKit.getTransactionHash(safeTransaction);
+  const signature = await protocolKit.signHash(proposalHash);
+  await retry(
+    () =>
+      apiKit.proposeTransaction({
+        safeAddress,
+        safeTransactionData: safeTransaction.data,
+        safeTxHash: proposalHash,
+        senderAddress: relayer,
+        senderSignature: signature.data,
+      }),
+    { logPrefix: "ExternalWithdrawalService" },
+  );
+
+  return {
+    reviewDigest,
+    approvalDeadline: approvalDeadline.toString(),
+    proposalHash,
+  };
+};
 
 export const signWithdrawalAuthorization = async (
   authorization: WithdrawalAuthorization,

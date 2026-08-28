@@ -35,6 +35,9 @@ contract ExternalBridgeVault is
     bytes32 private constant WITHDRAWAL_AUTHORIZATION_TYPEHASH = keccak256(
         "WithdrawalAuthorization(uint256 sourceChainId,address sourceBridge,uint256 sourceWithdrawalId,uint256 destinationChainId,address destinationVault,address token,address recipient,uint256 amount,uint256 notBefore,uint256 deadline,uint256 signerSetVersion)"
     );
+    bytes32 private constant WITHDRAWAL_REVIEW_TYPEHASH = keccak256(
+        "WithdrawalReview(uint256 sourceChainId,address sourceBridge,uint256 sourceWithdrawalId,uint256 destinationChainId,address destinationVault,address token,address recipient,uint256 amount)"
+    );
 
     enum ReservationStatus {
         NONE,
@@ -225,13 +228,14 @@ contract ExternalBridgeVault is
             policy.manualReviewThreshold != 0 &&
             authorization.amount > policy.manualReviewThreshold
         ) {
+            bytes32 reviewDigest = withdrawalReviewDigest(authorization);
             if (
-                largeWithdrawalApprovalDeadline[digest] <
+                largeWithdrawalApprovalDeadline[reviewDigest] <
                 authorization.deadline
             ) {
                 revert LargeWithdrawalApprovalRequired();
             }
-            delete largeWithdrawalApprovalDeadline[digest];
+            delete largeWithdrawalApprovalDeadline[reviewDigest];
         }
 
         totalReserved[authorization.token] += authorization.amount;
@@ -457,6 +461,27 @@ contract ExternalBridgeVault is
                         authorization.notBefore,
                         authorization.deadline,
                         authorization.signerSetVersion
+                    )
+                )
+            );
+    }
+
+    function withdrawalReviewDigest(
+        WithdrawalAuthorization calldata authorization
+    ) public view returns (bytes32) {
+        return
+            _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        WITHDRAWAL_REVIEW_TYPEHASH,
+                        authorization.sourceChainId,
+                        authorization.sourceBridge,
+                        authorization.sourceWithdrawalId,
+                        authorization.destinationChainId,
+                        authorization.destinationVault,
+                        authorization.token,
+                        authorization.recipient,
+                        authorization.amount
                     )
                 )
             );

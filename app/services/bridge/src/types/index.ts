@@ -178,6 +178,9 @@ export interface WithdrawalInfo {
   requiresManualReview?: boolean;
   reservationId?: string;
   reservationTxHash?: string;
+  reviewApprovalDeadline?: string;
+  reviewDigest?: string;
+  reviewProposalHash?: string;
   signerSetVersion?: string;
   requestedAt: string;
   stratoSender: string;

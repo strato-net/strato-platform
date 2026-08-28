@@ -44,6 +44,10 @@ const config = {
   },
   externalAssetBridge: {
     address: process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS,
+    manualReviewValiditySeconds: Number(
+      process.env.EXTERNAL_BRIDGE_MANUAL_REVIEW_VALIDITY_SECONDS ||
+        7 * 24 * 60 * 60,
+    ),
   },
   nativeBridge: {
     address: process.env.STRATO_NATIVE_BRIDGE_ADDRESS,

@@ -56,6 +56,7 @@ cp .env.example .env
 - `ALCHEMY_API_KEY` - Alchemy API key (used for all chains)
 - `BRIDGE_ADDRESS` - MercataBridge contract address
 - `EXTERNAL_ASSET_BRIDGE_ADDRESS` - ExternalAssetBridge proxy address used for non-native deposits
+- `EXTERNAL_BRIDGE_MANUAL_REVIEW_VALIDITY_SECONDS` - Safe approval validity for large withdrawals (defaults to seven days)
 
 #### Chain RPC URLs (Dynamically Validated)
 The service automatically validates that RPC URLs are configured for all enabled chains from the bridge contract:
@@ -81,7 +82,7 @@ Native withdrawal review delay and attestation validity are enforced by the nati
 - `CHAIN_${chainId}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY` - Destination-chain key used to pay gas and sign external vault withdrawal authorizations
 - `CHAIN_${chainId}_EXTERNAL_BRIDGE_ATTESTATION_PRIVATE_KEY_1`, `_2`, ... - Optional additional signer keys required by the vault threshold
 
-Routine non-native withdrawals are marked ready on STRATO, reserved in the route-local vault, released externally, and only then finalized and burned on STRATO. Withdrawals flagged for manual review remain pending.
+Routine non-native withdrawals are marked ready on STRATO, reserved in the route-local vault, released externally, and only then finalized and burned on STRATO. Large withdrawals require an executed Safe approval over their stable review digest before receiving a fresh release authorization.
 Expired reservations are cancelled on the destination vault and recorded on STRATO; governance can then refund the escrowed representation with `npm run refund:external-withdrawal` from `app/contracts`.
 
 #### Optional
