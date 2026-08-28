@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "../../concrete/Staking/StratoStaking.sol";
-import "../../concrete/Staking/ValidatorRegistry.sol";
+import "../../concrete/Staking/StratoStakingV2.sol";
+import "../../concrete/Staking/ValidatorRegistryV2.sol";
 import "../../concrete/Governance/MercataGovernance.sol";
 import "../../concrete/Tokens/TokenFactory.sol";
 import "../../abstract/ERC20/IERC20.sol";

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "../../concrete/Staking/ValidatorRegistry.sol";
+import "../../concrete/Staking/ValidatorRegistryV2.sol";
 import "../Util.sol";
 
 contract record MockOperatorSync is IStratoStakingOperatorSync {
