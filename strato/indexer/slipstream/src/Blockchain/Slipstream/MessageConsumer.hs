@@ -22,6 +22,10 @@ import Blockchain.Slipstream.Metrics
 import Blockchain.Slipstream.Processor
 import Blockchain.Slipstream.OutputData
 import Blockchain.Slipstream.SQL
+import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
+import qualified Blockchain.Stream.Action as A
+import Blockchain.Stream.VMEvent (VMEvent (..))
+import Blockchain.SyncDB (updateCirrusBestBlockNumber)
 import Conduit
 import Control.Monad
 import Control.Monad.Composable.Streaming
@@ -48,6 +52,9 @@ getAndProcessMessages conn = do
         sinkSlipstreamOutputChunks slipstreamOutputChunkSize (writeOutputChunk conn)
     recordProcessedKafkaMessages messages
     -- _ <- produceSolidVmEvents _emittedEvents  -- UNUSED: no consumer for solidvmevents
+    -- Publish the high-water mark only after the conduit above has committed
+    -- the batch's rows, so it never claims blocks Cirrus hasn't indexed yet.
+    publishCirrusHighWaterMark messages
     return ()
 
 writeOutputChunk ::
@@ -87,6 +94,17 @@ sinkSlipstreamOutputChunks chunkSize writeChunk = go
 
 slipstreamOutputChunkSize :: Int
 slipstreamOutputChunkSize = 256
+
+-- | Record the highest block number this batch covered in Redis, where
+-- strato-api folds it into the metadata isSynced flag. vm-runner emits exactly
+-- one NewAction per executed block (empty blocks included, see
+-- sendNewActionMessage), so the max NewAction block number is the exact Cirrus
+-- tip; batches with no NewAction carry no block information to record.
+publishCirrusHighWaterMark :: MonadIO m => [VMEvent] -> m ()
+publishCirrusHighWaterMark messages =
+  case [A._blockNumber a | NewAction a <- messages] of
+    [] -> pure ()
+    blockNumbers -> runStratoRedisIO . updateCirrusBestBlockNumber $ maximum blockNumbers
 
 ------ solidvmevents indexer code here ------
 -- UNUSED: no consumer for solidvmevents topic

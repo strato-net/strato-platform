@@ -195,6 +195,13 @@ export interface PoolV3LiquidityDistribution {
   segments: PoolV3LiquiditySegment[];
 }
 
+/** A fee tier currently enabled on the PoolV3Factory */
+export interface PoolV3FeeTier {
+  /** fee in pips (hundredths of a bip, 1e6 denominator; e.g. 3000 = 0.30%) */
+  fee: number;
+  tickSpacing: number;
+}
+
 export interface PoolV3CreateParams {
   tokenA: string;
   tokenB: string;

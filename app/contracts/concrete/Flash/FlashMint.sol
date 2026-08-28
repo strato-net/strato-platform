@@ -83,7 +83,7 @@ interface IFlashMintReceiver {
     constructor(address initialOwner) Ownable(initialOwner) { }
 
     /**
-     * @notice Wire the facility. Pass maxLoan 0 to keep it closed; whitelist starts on.
+     * @notice Wire the facility. Pass maxLoan 0 to keep it closed; whitelist starts off.
      */
     function initialize(address _token, address _feeCollector, uint _maxLoan) external onlyOwner {
         require(_token != address(0), "FlashMint: invalid token");
@@ -97,7 +97,7 @@ interface IFlashMintReceiver {
         maxLoan           = _maxLoan;
         feeBps            = 0;
         paused            = false;
-        whitelistEnabled  = true;                // opt-in at launch
+        whitelistEnabled  = false;
         locked            = false;
     }
 

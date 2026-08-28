@@ -3,7 +3,16 @@ import test from "node:test";
 import axios from "axios";
 import { constants } from "../../config/constants";
 import * as rpcConfig from "../../config/rpc.config";
-import { buildDepositActionCatalog, getDepositRouterMajor } from "./bridge.service";
+import {
+  buildDepositActionCatalog,
+  getDepositRouterMajor,
+  validateNativeWithdrawalRoute,
+} from "./bridge.service";
+import {
+  parseNativeBridgeAssets,
+  parseNativeLockedBalances,
+  parseNativeTokenBridgeConfigs,
+} from "../helpers/bridge.helper";
 import type { BridgeToken } from "@strato/shared-types";
 
 const route = (
@@ -118,6 +127,66 @@ test("builds actions only for eligible routes and configured products", () => {
   assert.equal(saveOnlyActions.filter(({ payToken, action }) => payToken === usdc && action === 3).length, 1);
 
   assert.deepEqual(buildDepositActionCatalog({ ...base, actionChainIds: new Set() }), []);
+});
+
+test("adds token-specific native bridge controls to routes", () => {
+  const stratoToken = "1111111111111111111111111111111111111111";
+  const tokenConfigs = parseNativeTokenBridgeConfigs([{
+    key: stratoToken,
+    value: {
+      depositsDisabled: true,
+      withdrawalsDisabled: false,
+      maxOutstandingWithdrawal: "100000000000000000000",
+    },
+  }]);
+  const lockedBalances = parseNativeLockedBalances([{
+    key: stratoToken,
+    lockedBalance: "75000000000000000000",
+  }]);
+  const routes = parseNativeBridgeAssets([{
+    key: stratoToken,
+    key2: "1",
+    value: {
+      enabled: true,
+      externalBridge: "2222222222222222222222222222222222222222",
+      representationToken: "3333333333333333333333333333333333333333",
+      externalName: "Native token",
+      externalSymbol: "NATIVE",
+      maxPerWithdrawal: "50000000000000000000",
+      instantWithdrawalThreshold: "0",
+    },
+  }], {}, tokenConfigs, lockedBalances);
+
+  assert.equal(routes.length, 1);
+  assert.equal(routes[0].AssetInfo.depositsDisabled, true);
+  assert.equal(routes[0].AssetInfo.withdrawalsDisabled, false);
+  assert.equal(routes[0].AssetInfo.maxOutstandingWithdrawal, "100000000000000000000");
+  assert.equal(routes[0].AssetInfo.outstandingWithdrawal, "75000000000000000000");
+  assert.equal(routes[0].AssetInfo.remainingOutstandingWithdrawal, "25000000000000000000");
+});
+
+test("rejects native withdrawals that are disabled or exceed remaining capacity", () => {
+  const nativeRoute: BridgeToken = {
+    ...route("native", "1", "0x1111111111111111111111111111111111111111"),
+    routeType: "native",
+    withdrawalsDisabled: false,
+    maxPerWithdrawal: "50000000000000000000",
+    maxOutstandingWithdrawal: "100000000000000000000",
+    outstandingWithdrawal: "75000000000000000000",
+    remainingOutstandingWithdrawal: "25000000000000000000",
+  };
+
+  assert.doesNotThrow(() =>
+    validateNativeWithdrawalRoute(nativeRoute, "25000000000000000000")
+  );
+  assert.throws(
+    () => validateNativeWithdrawalRoute(nativeRoute, "25000000000000000001"),
+    /remaining aggregate capacity/
+  );
+  assert.throws(
+    () => validateNativeWithdrawalRoute({ ...nativeRoute, withdrawalsDisabled: true }, "1"),
+    /withdrawals are disabled/
+  );
 });
 
 const encodeAbiString = (value: string): string => {

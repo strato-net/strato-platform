@@ -51,7 +51,7 @@ contract Describe_FlashMintWiring is Authorizable {
         require(fm.token() == address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010),
             "BaseCodeCollection pinned token");
         require(fm.maxLoan() == 0, "ships with maxLoan 0");
-        require(fm.whitelistEnabled(), "ships whitelisted");
+        require(!fm.whitelistEnabled(), "ships with whitelist off");
     }
 
     // ── W2: initialize() has NO one-shot guard. It can be re-run to re-point the
@@ -59,14 +59,14 @@ contract Describe_FlashMintWiring is Authorizable {
     function it_w2_initialize_is_re_callable_and_repoints_the_token() public {
         address before = fm.token();
         fm.setMaxLoan(123e18);
-        fm.setWhitelistEnabled(false);
+        fm.setWhitelistEnabled(true);
         require(fm.maxLoan() == 123e18, "dial set");
 
         fm.initialize(USDST, address(m.feeCollector()), 0);   // second call — must NOT be allowed
 
         require(fm.token() == USDST && fm.token() != before, "token re-pointed by re-initialize");
         require(fm.maxLoan() == 0, "re-initialize silently reset maxLoan");
-        require(fm.whitelistEnabled(), "re-initialize silently re-armed the whitelist");
+        require(!fm.whitelistEnabled(), "re-initialize silently turned the whitelist off");
     }
 
     // ── W3: A fresh bolt-on never grants AdminRegistry.whitelist[USDST]["mint"|"burn"][FlashMint],

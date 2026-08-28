@@ -82,6 +82,10 @@ type ProcessingAction =
 type StakingInfo = {
   configured: boolean;
   deployed: boolean;
+  // False until the validator-set / proposer-fee staking upgrade is deployed on this
+  // network: validator addresses, set membership and liveness counters do not exist
+  // on chain yet, so the features built on them stay hidden rather than showing zeros.
+  validatorSetDeployed: boolean;
   stakingAddress: string;
   validatorRegistryAddress: string;
   stratoTokenAddress: string;
@@ -358,6 +362,9 @@ const EarnStaking = () => {
     () => validators.find((validator) => validatorKey(validator) === info?.operatorAddress),
     [info?.operatorAddress, validators]
   );
+  // A backend that predates the flag still reports the full validator set, so only an
+  // explicit false hides these controls.
+  const validatorSetDeployed = info?.validatorSetDeployed !== false;
   const operatorActive = Boolean(operatorValidator?.active);
   const operatorInSet = Boolean(operatorValidator?.isValidator);
   const operatorExiting = Number(operatorValidator?.exitReadyTime || "0") > 0;
@@ -858,7 +865,7 @@ const EarnStaking = () => {
                       ? "Claim validator rewards, update commission, or manage self-bond."
                       : "Claim accrued validator rewards or unbond existing self-bond."}
                   </p>
-                  {operatorValidator && (
+                  {operatorValidator && validatorSetDeployed && (
                     <p className="mt-1 text-xs text-muted-foreground">
                       Validator {truncateAddress(operatorValidator.validatorAddress || "", 8, 6) || "not set"}
                       {" · "}{operatorValidator.blocksProposed} blocks proposed · {operatorValidator.missedProposals} missed
@@ -873,12 +880,12 @@ const EarnStaking = () => {
                       {actionButtonLabel("activate", "Activate", "Activating")}
                     </Button>
                   )}
-                  {operatorInSet && !operatorExiting && (
+                  {validatorSetDeployed && operatorInSet && !operatorExiting && (
                     <Button size="sm" variant="outline" onClick={handleRequestExit} disabled={submitting || !canCoverActionFee}>
                       {actionButtonLabel("exit", "Request exit", "Requesting")}
                     </Button>
                   )}
-                  {operatorInSet && operatorExiting && (
+                  {validatorSetDeployed && operatorInSet && operatorExiting && (
                     <Button size="sm" variant="outline" onClick={handleCancelExit} disabled={submitting || !canCoverActionFee}>
                       {actionButtonLabel("cancel-exit", `Cancel exit (${formatReleaseTime(operatorValidator?.exitReadyTime || "0")})`, "Cancelling")}
                     </Button>
@@ -999,7 +1006,7 @@ const EarnStaking = () => {
           </Card>
         )}
 
-        {isLoggedIn && !info.isOperator && (
+        {isLoggedIn && !info.isOperator && validatorSetDeployed && (
           <BecomeValidatorCard
             minStake={formatToken(info.minStake, decimals, 0)}
             maxCommissionBps={info.maxCommissionBps}
@@ -1020,7 +1027,7 @@ const EarnStaking = () => {
                 <h2 className="text-lg font-semibold">Validators</h2>
                 <p className="text-sm text-muted-foreground">
                   {info.validatorCount} in the validator set{Number(info.maxActiveValidators || "0") > 0 ? ` of ${info.maxActiveValidators}` : ""}
-                  {" · "}{info.activeValidatorCount} listed · unbonding {formatDuration(info.unbondingSeconds)}
+                  {validatorSetDeployed ? ` · ${info.activeValidatorCount} listed` : ""} · unbonding {formatDuration(info.unbondingSeconds)}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1104,10 +1111,12 @@ const EarnStaking = () => {
                           <p className="text-xs text-muted-foreground">Total Stake</p>
                           <p className="font-semibold">{formatToken(validator.totalStake, decimals)} {symbol}</p>
                         </div>
-                        <div className="rounded-md bg-muted/30 px-3 py-2">
-                          <p className="text-xs text-muted-foreground">Blocks</p>
-                          <p className="font-semibold">{validator.blocksProposed} <span className="text-xs font-normal text-muted-foreground">({validator.missedProposals} missed)</span></p>
-                        </div>
+                        {validatorSetDeployed && (
+                          <div className="rounded-md bg-muted/30 px-3 py-2">
+                            <p className="text-xs text-muted-foreground">Blocks</p>
+                            <p className="font-semibold">{validator.blocksProposed} <span className="text-xs font-normal text-muted-foreground">({validator.missedProposals} missed)</span></p>
+                          </div>
+                        )}
                         <div className="rounded-md bg-muted/30 px-3 py-2">
                           <p className="text-xs text-muted-foreground">Your Stake</p>
                           <p className="font-semibold">{formatToken(validator.userStake, decimals)} {symbol}</p>
@@ -1184,9 +1193,11 @@ const EarnStaking = () => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
                         <TipLabel label="Status" tooltip="Active validators are in the consensus set and propose blocks in proportion to their stake. Registered operators can receive stake but are not yet in the set." />
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
-                        <TipLabel label="Blocks" tooltip="Blocks this validator has proposed, and proposals it missed when it was the intended proposer." />
-                      </th>
+                      {validatorSetDeployed && (
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
+                          <TipLabel label="Blocks" tooltip="Blocks this validator has proposed, and proposals it missed when it was the intended proposer." />
+                        </th>
+                      )}
                       <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
                         <TipLabel label="Total Stake" tooltip="All STRATO staked with this validator, including delegations and the operator's self-bond." />
                       </th>
@@ -1224,10 +1235,12 @@ const EarnStaking = () => {
                             </div>
                           </td>
                           <td className="px-4 py-3 text-sm"><ValidatorStatusBadge validator={validator} /></td>
-                          <td className="px-4 py-3 text-right text-sm">
-                            {validator.blocksProposed}
-                            <span className="ml-1 text-xs text-muted-foreground">({validator.missedProposals} missed)</span>
-                          </td>
+                          {validatorSetDeployed && (
+                            <td className="px-4 py-3 text-right text-sm">
+                              {validator.blocksProposed}
+                              <span className="ml-1 text-xs text-muted-foreground">({validator.missedProposals} missed)</span>
+                            </td>
+                          )}
                           <td className="px-4 py-3 text-right text-sm">{formatToken(validator.totalStake, decimals)}</td>
                           <td className="px-4 py-3 text-right text-sm">{formatToken(validator.userStake, decimals)}</td>
                           <td className="px-4 py-3 text-right text-sm">{formatToken(validator.pendingRewards, decimals)}</td>

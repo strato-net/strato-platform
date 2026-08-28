@@ -27,6 +27,9 @@ type AdminOperator = {
 type AdminInfo = {
   stakingAddress: string;
   validatorRegistryAddress: string;
+  // False until the validator-set / proposer-fee upgrade is deployed on this network.
+  // Everything below the eligibility/set/governance line is unreachable until then.
+  validatorSetDeployed: boolean;
   minStake: string;
   minSelfBond: string;
   proposerFeeBps: string;
@@ -146,6 +149,11 @@ const StakingAdminTab = () => {
     return <p className="text-sm text-muted-foreground">Staking is not configured on this network.</p>;
   }
 
+  // Every control below the reward/commission basics calls a method the upgrade added.
+  // The reads already default to unset, so the writes are what has to stay locked.
+  const upgradePending = info.validatorSetDeployed === false;
+  const blocked = busy !== null || upgradePending;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -154,6 +162,15 @@ const StakingAdminTab = () => {
         </p>
         <Button variant="outline" size="sm" onClick={refresh} disabled={loading}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button>
       </div>
+
+      {upgradePending && (
+        <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          The validator-set staking upgrade is not deployed on this network yet. Validator parameters, set
+          admission, the governance link and validator-address binding read as unset and cannot be voted on
+          until the new StratoStaking and ValidatorRegistry are live. Rewards, commission and operator
+          listing continue to work against the deployed contracts.
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -168,7 +185,7 @@ const StakingAdminTab = () => {
             { key: "maxConsecutiveMisses", label: "Jail after consecutive misses" },
             { key: "jailCooldown", label: "Jail cooldown (seconds)" },
           ], validatorParams, setValidatorParams)}
-          <Button size="sm" disabled={busy !== null} onClick={() => run("validator-params", () => api.patch("/staking/admin/validator-params", {
+          <Button size="sm" disabled={blocked} onClick={() => run("validator-params", () => api.patch("/staking/admin/validator-params", {
             minStake: toWad(validatorParams.minStake || "0"),
             minSelfBond: toWad(validatorParams.minSelfBond || "0"),
             proposerFeeBps: validatorParams.proposerFeeBps,
@@ -200,7 +217,7 @@ const StakingAdminTab = () => {
               <span>Permissionless joins {joinsPaused ? "paused" : "open"}</span>
             </label>
           ))}
-          <Button size="sm" disabled={busy !== null} onClick={() => run("set-params", () => api.patch("/staking/admin/set-params", { ...setParams, joinsPaused }), "Validator set vote")}>
+          <Button size="sm" disabled={blocked} onClick={() => run("set-params", () => api.patch("/staking/admin/set-params", { ...setParams, joinsPaused }), "Validator set vote")}>
             {label("set-params", "Save set parameters")}
           </Button>
         </CardContent>
@@ -212,28 +229,28 @@ const StakingAdminTab = () => {
           <CardDescription>Wire MercataGovernance (0x100) to the staking contract and bound the consensus set. Enable sync only once every current validator is listed and staked.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-3">
-          <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => run("gov-staking", () => api.patch("/staking/admin/governance/staking-contract", {}), "Governance staking-contract vote")}>
+          <Button size="sm" variant="outline" disabled={blocked} onClick={() => run("gov-staking", () => api.patch("/staking/admin/governance/staking-contract", {}), "Governance staking-contract vote")}>
             {label("gov-staking", "Point governance at staking")}
           </Button>
           <label className="flex items-center gap-2 text-xs">
             <Switch checked={governanceSync} onCheckedChange={setGovernanceSync} />
             <span>Staking → governance sync {governanceSync ? "enabled" : "disabled"}</span>
           </label>
-          <Button size="sm" disabled={busy !== null} onClick={() => run("gov-sync", () => api.patch("/staking/admin/governance", { syncEnabled: governanceSync }), "Governance sync vote")}>
+          <Button size="sm" disabled={blocked} onClick={() => run("gov-sync", () => api.patch("/staking/admin/governance", { syncEnabled: governanceSync }), "Governance sync vote")}>
             {label("gov-sync", "Save sync")}
           </Button>
           <label className="space-y-1 text-xs">
             <span className="text-muted-foreground">Governance hard cap</span>
             <Input value={hardCap} onChange={(event) => setHardCap(event.target.value)} placeholder="50" className="w-28" />
           </label>
-          <Button size="sm" variant="outline" disabled={busy !== null || !/^\d+$/.test(hardCap)} onClick={() => run("gov-cap", () => api.patch("/staking/admin/governance/hard-cap", { hardCap }), "Governance hard-cap vote")}>
+          <Button size="sm" variant="outline" disabled={blocked || !/^\d+$/.test(hardCap)} onClick={() => run("gov-cap", () => api.patch("/staking/admin/governance/hard-cap", { hardCap }), "Governance hard-cap vote")}>
             {label("gov-cap", "Set hard cap")}
           </Button>
           <label className="space-y-1 text-xs">
             <span className="text-muted-foreground">Emergency kicker (ops key)</span>
             <Input value={emergencyKicker} onChange={(event) => setEmergencyKicker(event.target.value)} placeholder="address" className="w-96" />
           </label>
-          <Button size="sm" variant="outline" disabled={busy !== null || !isAddressLike(emergencyKicker)} onClick={() => run("kicker", () => api.patch("/staking/admin/emergency-kicker", { kicker: emergencyKicker.trim() }), "Emergency kicker vote")}>
+          <Button size="sm" variant="outline" disabled={blocked || !isAddressLike(emergencyKicker)} onClick={() => run("kicker", () => api.patch("/staking/admin/emergency-kicker", { kicker: emergencyKicker.trim() }), "Emergency kicker vote")}>
             {label("kicker", "Set kicker")}
           </Button>
         </CardContent>
@@ -250,7 +267,7 @@ const StakingAdminTab = () => {
             <Input value={newOperator.validatorAddress} onChange={(event) => setNewOperator({ ...newOperator, validatorAddress: event.target.value })} placeholder="Validator (node) address" />
             <Input value={newOperator.commissionPercent} onChange={(event) => setNewOperator({ ...newOperator, commissionPercent: event.target.value })} placeholder="Commission %" inputMode="decimal" />
             <Input value={newOperator.name} onChange={(event) => setNewOperator({ ...newOperator, name: event.target.value })} placeholder="Name" />
-            <Button size="sm" disabled={busy !== null || !isAddressLike(newOperator.operator) || !isAddressLike(newOperator.validatorAddress) || !/^\d+(\.\d{0,2})?$/.test(newOperator.commissionPercent)}
+            <Button size="sm" disabled={busy !== null || !isAddressLike(newOperator.operator) || (!upgradePending && !isAddressLike(newOperator.validatorAddress)) || !/^\d+(\.\d{0,2})?$/.test(newOperator.commissionPercent)}
               onClick={() => run("add", () => api.post("/staking/admin/operators", {
                 operator: newOperator.operator.trim(),
                 validatorAddress: newOperator.validatorAddress.trim(),
@@ -263,7 +280,7 @@ const StakingAdminTab = () => {
           <div className="grid gap-3 md:grid-cols-5">
             <Input value={validatorAddressEdit.operator} onChange={(event) => setValidatorAddressEdit({ ...validatorAddressEdit, operator: event.target.value })} placeholder="Operator address" />
             <Input value={validatorAddressEdit.validatorAddress} onChange={(event) => setValidatorAddressEdit({ ...validatorAddressEdit, validatorAddress: event.target.value })} placeholder="New validator address (0x0 clears)" className="md:col-span-2" />
-            <Button size="sm" variant="outline" disabled={busy !== null || !isAddressLike(validatorAddressEdit.operator) || !isAddressLike(validatorAddressEdit.validatorAddress)}
+            <Button size="sm" variant="outline" disabled={blocked || !isAddressLike(validatorAddressEdit.operator) || !isAddressLike(validatorAddressEdit.validatorAddress)}
               onClick={() => run("validator-address", () => api.patch("/staking/admin/operators/validator-address", {
                 operator: validatorAddressEdit.operator.trim(),
                 validatorAddress: validatorAddressEdit.validatorAddress.trim(),
@@ -298,7 +315,7 @@ const StakingAdminTab = () => {
                     <td className="px-3 py-2">
                       <div className="flex justify-end gap-2">
                         {operator.isWaiter && (
-                          <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => run(`activate-${operator.operator}`, () => api.post("/staking/activate", { operator: operator.operator }), "Activation submitted")}>
+                          <Button size="sm" variant="outline" disabled={blocked} onClick={() => run(`activate-${operator.operator}`, () => api.post("/staking/activate", { operator: operator.operator }), "Activation submitted")}>
                             {label(`activate-${operator.operator}`, "Activate")}
                           </Button>
                         )}
@@ -315,13 +332,13 @@ const StakingAdminTab = () => {
             </table>
           </div>
           <div className="flex flex-wrap items-end gap-3">
-            <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => run("reconcile", () => api.post("/staking/reconcile", {}), "Reconcile submitted")}>
+            <Button size="sm" variant="outline" disabled={blocked} onClick={() => run("reconcile", () => api.post("/staking/reconcile", {}), "Reconcile submitted")}>
               {label("reconcile", "Promote waiters (reconcile)")}
             </Button>
             <span className="text-xs text-muted-foreground">Unattributed fees: {fromWad(info.unattributedFees)} USDST</span>
             <Input value={recovery.to} onChange={(event) => setRecovery({ ...recovery, to: event.target.value })} placeholder="Recover to" className="w-80" />
             <Input value={recovery.amount} onChange={(event) => setRecovery({ ...recovery, amount: event.target.value })} placeholder="USDST" className="w-32" inputMode="decimal" />
-            <Button size="sm" variant="outline" disabled={busy !== null || !isAddressLike(recovery.to) || !/^\d+(\.\d+)?$/.test(recovery.amount)}
+            <Button size="sm" variant="outline" disabled={blocked || !isAddressLike(recovery.to) || !/^\d+(\.\d+)?$/.test(recovery.amount)}
               onClick={() => run("recover", () => api.post("/staking/admin/recover-fees", { to: recovery.to.trim(), amount: toWad(recovery.amount) }), "Fee recovery vote")}>
               {label("recover", "Recover fees")}
             </Button>
