@@ -37,6 +37,7 @@ library:
     - network
     - persistent
     - persistent-postgresql
+    - postgresql-simple
     - prometheus-client
     - resource-pool
     - solid-vm-model
@@ -75,6 +76,19 @@ executables:
       - warp
 
 tests:
+  slipstream-batching-test:
+    main: Main.hs
+    source-dirs: tests-batching/
+    dependencies:
+      - base
+      - bytestring
+      - conduit
+      - containers
+      - evm-solidity
+      - hspec
+      - slipstream
+      - text
+
   slipstream-test:
     main: Main.hs
     source-dirs: tests/
