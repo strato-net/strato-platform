@@ -3,15 +3,11 @@ pragma solidity ^0.8.30;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pinned to the V1 (18.4) ValidatorRegistry, which is what BaseCodeCollection
-// currently ships. The V2 registry lives in ValidatorRegistryV2.sol until the
+// currently ships. The V2 contract is parked outside the collection until the
 // validator fleet is upgraded past the staking fork.
 //
-// Two tests below are disabled (xit_) because they exercise V2-only registry
-// features. Their bodies are commented out as well as renamed: a disabled test
-// still has to compile, and these call functions V1 does not declare.
-//
-// To restore when V2 moves back into the collection, take the full V2 file:
-//     git show 65bf9628f2:app/contracts/tests/Staking/ValidatorRegistry.test.sol
+// Tests for the V2 contract live in ValidatorRegistryV2.test.sol and are not run by
+// Jenkins yet — the "Contract tests" stage skips *V2.test.sol.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import "../../concrete/Staking/ValidatorRegistry.sol";
@@ -312,59 +308,5 @@ contract Describe_ValidatorRegistry {
         require(staking.syncCount() == 3, "Reactivation sync count");
         require(staking.operatorActive(address(operatorA)), "Operator active in staking");
         require(staking.operatorCommissionBps(address(operatorA)) == 700, "Reactivated commission");
-    }
-
-    // ── DISABLED: V2-only registry features ──────────────────────────────────
-    // Needs ValidatorRegistryV2 (validatorOperators, setValidatorAddress,
-    // setEmergencyKicker, emergencyKick) and the V2 MockOperatorSync members
-    // (syncValidatorAddress, exceedsOneThird, setOverOneThird, operatorValidator,
-    // lastValidatorAddress, validatorAddressSyncCount).
-
-    function xit_binds_validator_addresses_uniquely_and_syncs_staking() public {
-        // registry.addOperator(address(operatorA), 500, "Operator A", "", "", "validator-a", address(0xaaaa));
-        // (,,,,,, address validatorAddress) = registry.operators(address(operatorA));
-        // require(validatorAddress == address(0xaaaa), "Profile validator address");
-        // require(registry.validatorOperators(address(0xaaaa)) == address(operatorA), "Reverse lookup");
-        // require(staking.lastValidatorAddress() == address(0xaaaa), "Synced to staking on add");
-        //
-        // bool duplicateRejected = false;
-        // try registry.addOperator(address(operatorB), 250, "Operator B", "", "", "validator-b", address(0xaaaa)) {
-        // } catch {
-        //     duplicateRejected = true;
-        // }
-        // require(duplicateRejected, "Validator address must be unique");
-        //
-        // registry.setValidatorAddress(address(operatorA), address(0xabcd));
-        // require(registry.validatorOperators(address(0xaaaa)) == address(0), "Old address released");
-        // require(registry.validatorOperators(address(0xabcd)) == address(operatorA), "New address bound");
-        // require(staking.validatorAddressSyncCount() == 1, "Address change synced to staking");
-        // require(staking.operatorValidator(address(operatorA)) == address(0xabcd), "Staking sees the new address");
-        //
-        // registry.setValidatorAddress(address(operatorA), address(0));
-        // require(registry.validatorOperators(address(0xabcd)) == address(0), "Zero clears the binding");
-        //
-        // bool unauthorizedRejected = false;
-        // try user.do(address(registry), "setValidatorAddress(address,address)", address(operatorA), address(0x1234)) {
-        // } catch {
-        //     unauthorizedRejected = true;
-        // }
-        // require(unauthorizedRejected, "Only the owner binds validator addresses");
-        //
-        // registry.removeOperator(address(operatorA));
-        // require(staking.lastValidatorAddress() == address(0), "Removal passes the stored address");
-    }
-
-    function xit_emergency_kick_only_by_the_kicker_and_only_over_one_third() public {
-        // _addOperatorA();
-        // user.doExpectingFailure(address(registry), "emergencyKick(address)", "VR: not the emergency kicker", address(operatorA));
-        //
-        // registry.setEmergencyKicker(address(user));
-        // user.doExpectingFailure(address(registry), "emergencyKick(address)", "VR: operator below one third of stake", address(operatorA));
-        //
-        // staking.setOverOneThird(address(operatorA), true);
-        // user.doSuccessfully(address(registry), "emergencyKick(address)", address(operatorA));
-        // (, bool active,,,,,) = registry.operators(address(operatorA));
-        // require(!active, "Operator removed");
-        // require(!staking.lastActive(), "Staking synced as removed");
     }
 }
