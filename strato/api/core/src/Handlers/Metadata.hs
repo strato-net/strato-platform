@@ -29,7 +29,7 @@ import Blockchain.EthConf (ethConf, networkConfig)
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Strato.Model.Validator
 import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
-import Blockchain.SyncDB (getSyncStatusNow, getBestSequencedBlockInfo)
+import Blockchain.SyncDB (getSyncStatusNow, getBestSequencedBlockInfo, getBestBlockInfo, getCirrusBestBlockNumber)
 import Control.Lens
 import Control.Monad.Change.Modify
 import Control.Monad.Reader
@@ -107,5 +107,29 @@ getMetaData =
     let nc = networkConfig ethConf
     pure $ MetadataResponse validators isSynced True (show $ Conf.networkID nc) (show $ Conf.chainId nc) (Conf.network nc) urlMap
 
+-- | A node counts as synced only when the p2p/VM pipeline has caught up to
+-- the network (the Redis sync status) AND Cirrus has been indexed up to the
+-- node's best block. Cirrus is fed by slipstream from a separate Kafka topic
+-- (vmevents) and can lag tens of thousands of blocks behind at the moment the
+-- p2p pipeline catches up, so the base status alone overstates readiness.
+-- The Cirrus part is true when slipstream's high-water mark has reached the
+-- node's best block, allowing one block of transient lag (mirroring the
+-- ntd + 1 hysteresis in checkAndUpdateSyncStatus). A missing high-water mark
+-- counts as not synced: slipstream writes one as soon as it processes its
+-- first vmevents batch, and even the genesis block produces a NewAction, so on
+-- a node with sqlDiff enabled the mark is only ever absent while Cirrus
+-- indexing is behind (or slipstream is down, which equally should not report
+-- synced).
 checkIsSynced :: MonadIO m => m Bool
-checkIsSynced = fromMaybe False <$> runStratoRedisIO getSyncStatusNow
+checkIsSynced = runStratoRedisIO $ do
+  baseSynced <- fromMaybe False <$> getSyncStatusNow
+  let cirrusEnabled = Conf.sqlDiff . Conf.vmConfig $ ethConf
+  if not (baseSynced && cirrusEnabled)
+    then pure baseSynced
+    else do
+      nodeBest <- getBestBlockInfo
+      cirrusBest <- getCirrusBestBlockNumber
+      pure $ case (nodeBest, cirrusBest) of
+        (Just bb, Just cirrusBlockNumber) -> cirrusBlockNumber + 1 >= bestBlockNumber bb
+        (Nothing, _) -> True -- no node tip to compare against; defer to the base status
+        (Just _, Nothing) -> False

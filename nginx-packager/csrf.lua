@@ -4,13 +4,15 @@
 
 local _M = {}
 
+local resty_random = require "resty.random"
+local resty_sha256 = require "resty.sha256"
+local str = require "resty.string"
+
 function _M.init(csrf_tokens_dict)
     _M.csrf_tokens = csrf_tokens_dict
 end
 
 function _M.generate_csrf_token()
-    local resty_random = require "resty.random"
-    local str = require "resty.string"
     local random_bytes = resty_random.bytes(32)
     if not random_bytes then
         ngx.log(ngx.ERR, "CSRF: Failed to generate random bytes")
@@ -47,9 +49,22 @@ function _M.validate_csrf_token(header_token, cookie_token, session_id)
     return true
 end
 
--- Session ID = encrypted session cookie value (unique and stable per user)
+-- Dict keys must be sha256(session cookie), never the raw cookie: encrypted
+-- session cookies run 4-7KB each, so raw-cookie keys exhaust the 10M
+-- csrf_tokens zone within days of uptime ("no memory" on every store, which
+-- 403s every browser POST). Hashing keeps entries at a fixed ~100 bytes.
+function _M.hash_session_id(session_cookie)
+    if not session_cookie then
+        return nil
+    end
+    local sha256 = resty_sha256:new()
+    sha256:update(session_cookie)
+    return str.to_hex(sha256:final())
+end
+
+-- Session ID = sha256 of the encrypted session cookie value (unique and stable per user)
 function _M.get_session_id()
-    return ngx.var.cookie_strato_session
+    return _M.hash_session_id(ngx.var.cookie_strato_session)
 end
 
 -- Whitelist known API clients; validate Sec-Fetch headers for modern browsers
@@ -82,10 +97,14 @@ function _M.is_browser_request()
 end
 
 function _M.regenerate_token_for_new_session(new_session_id, old_session_id)
+    -- Callers pass raw cookie values (from ngx.ctx set in openid.lua)
+    new_session_id = _M.hash_session_id(new_session_id)
+    old_session_id = _M.hash_session_id(old_session_id)
+
     if not new_session_id then
         return nil
     end
-    
+
     if old_session_id and old_session_id ~= new_session_id then
         _M.csrf_tokens:delete(old_session_id)
     end
@@ -129,6 +148,8 @@ function _M.ensure_csrf_token_for_session(session_id, context)
                 ngx.header["Set-Cookie"] = _M.build_csrf_cookie(existing_token)
                 return true
             end
+        else
+            ngx.log(ngx.ERR, "CSRF: Failed to store token (", context, "): ", err)
         end
         return false
     else

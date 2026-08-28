@@ -29,4 +29,5 @@ executables:
     - filepath
     - process
     - shellwords
+    - time
     - unix

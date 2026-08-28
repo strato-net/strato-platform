@@ -303,7 +303,7 @@ Should succeed without CSRF token (but may fail auth if not properly authenticat
 - **Token Refresh**: Automatic on any GET request to protected endpoint
 - **Token Storage**: 
   - Client: `CSRF-TOKEN` cookie (readable by JavaScript)
-  - Server: Nginx shared memory (10MB, can store ~100k tokens)
+  - Server: Nginx shared memory (10MB `csrf_tokens` dict), keyed by **sha256 of the session cookie**, can store ~50k tokens. Keys must never be the raw `strato_session` cookie: encrypted session cookies run 4-7KB each, which exhausts the zone within days ("no memory" on every store → 403 on every browser POST)
 
 ## Troubleshooting
 
