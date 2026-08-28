@@ -21,7 +21,7 @@ import Data.Hashable
 import qualified Data.IntMap as I
 import Data.List (uncons)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -245,7 +245,7 @@ valueToTexts = \case
 
 valueToText :: Value -> Text
 valueToText = \case
-  SimpleValue sv -> simpleValueToText sv
+  SimpleValue sv -> simpleValueToArgText sv
   ValueArrayDynamic vals ->
     "[" <> Text.intercalate "," (map valueToText $ unsparse vals) <> "]"
   ValueArrayFixed _ vals ->
@@ -265,6 +265,54 @@ valueToText = \case
 escapeStringValue :: Text -> Text
 escapeStringValue = Text.replace "\"" "\\\""
                   . Text.replace "\\" "\\\\"
+
+-- | Inverse of 'escapeStringValue': undo backslash escapes left-to-right.
+unescapeStringValue :: Text -> Text
+unescapeStringValue = Text.pack . go . Text.unpack
+  where
+    go ('\\' : c : rest) = c : go rest
+    go (c : rest) = c : go rest
+    go [] = []
+
+-- | Render a scalar as a transaction-arg literal. Like 'simpleValueToText'
+-- (which display paths keep using), but a string whose content the VM's arg
+-- parser would re-type as an address (1-40 hex chars, e.g. "123") is emitted
+-- in the explicit cast form @string("…")@ so it stays a string. Exactly-40-hex
+-- content keeps the legacy quoted form: rendered addresses travel that way
+-- through variadic re-marshaling, and re-typing those to an address is
+-- intended.
+simpleValueToArgText :: SimpleValue -> Text
+simpleValueToArgText sv = case sv of
+  ValueString tx
+    | stringNeedsCast tx -> "string(\"" <> escapeStringValue tx <> "\")"
+  _ -> simpleValueToText sv
+
+-- | Would the VM's arg parser re-type this quoted string as an address?
+stringNeedsCast :: Text -> Bool
+stringNeedsCast tx =
+  Text.length tx /= 40 && case readMaybe (Text.unpack tx) :: Maybe Address of
+    Just _ -> True
+    Nothing -> False
+
+-- | Recognize an explicit cast literal (@string("…")@, @address("hex")@,
+-- @uint(5)@, …) in a rendered transaction arg. Returns the cast keyword and
+-- the raw inner text (still quoted for quoted forms; see 'unquoteCastInner').
+-- Counterpart of the cast forms 'simpleValueToArgText' (and clients) emit;
+-- the VM's arg parser accepts the same shapes.
+splitCastLiteral :: Text -> Maybe (Text, Text)
+splitCastLiteral t' = listToMaybe $ mapMaybe go castKeywords
+  where
+    t = Text.strip t'
+    castKeywords = ["string", "address", "uint", "int", "bool", "decimal", "bytes"]
+    go name = do
+      inner <- Text.stripSuffix ")" =<< Text.stripPrefix (name <> "(") t
+      pure (name, Text.strip inner)
+
+-- | Strip the surrounding quotes of a cast literal's inner text and undo
+-- escapes; Nothing when the inner text is not quoted.
+unquoteCastInner :: Text -> Maybe Text
+unquoteCastInner inner =
+  unescapeStringValue <$> (Text.stripSuffix "\"" =<< Text.stripPrefix "\"" (Text.strip inner))
 
 simpleValueToText :: SimpleValue -> Text
 simpleValueToText sv = case sv of

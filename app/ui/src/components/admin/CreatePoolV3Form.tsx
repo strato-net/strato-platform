@@ -5,18 +5,15 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { PoolV3 } from '@/interface';
+import { PoolV3, PoolV3FeeTier } from '@/interface';
 import { Loader2, Info } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSwapContext } from '@/context/SwapContext';
 import { useTokenContext } from '@/context/TokenContext';
 
-/** Canonical fee tiers enabled on the PoolV3Factory at initialization. */
-const FEE_TIERS = [
-  { fee: 500, label: '0.05%' },
-  { fee: 3000, label: '0.30%' },
-  { fee: 10000, label: '1.00%' },
-];
+/** fee in pips (1e6 denominator) as a percentage, e.g. 3000 -> "0.30%" */
+const feeLabel = (fee: number) =>
+  `${(fee / 10000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}%`;
 
 interface CreatePoolV3FormValues {
   tokenA: string;
@@ -26,10 +23,11 @@ interface CreatePoolV3FormValues {
 }
 
 const CreatePoolV3Form = () => {
-  const { createV3Pool, fetchV3Pools, loading: swapLoading } = useSwapContext();
+  const { createV3Pool, fetchV3Pools, fetchV3FeeTiers, loading: swapLoading } = useSwapContext();
   const { activeTokens, getActiveTokens, loading: tokenLoading } = useTokenContext();
   const { toast } = useToast();
   const [v3Pools, setV3Pools] = useState<PoolV3[]>([]);
+  const [feeTiers, setFeeTiers] = useState<PoolV3FeeTier[]>([]);
 
   const loading = swapLoading || tokenLoading;
 
@@ -49,7 +47,15 @@ const CreatePoolV3Form = () => {
   useEffect(() => {
     getActiveTokens();
     refreshV3Pools();
-  }, [getActiveTokens, refreshV3Pools]);
+    // Enabled tiers come from the factory's feeTiers mapping — they can be added
+    // on-chain, so fall back to the first one when the default is not enabled.
+    fetchV3FeeTiers().then((tiers) => {
+      setFeeTiers(tiers);
+      if (tiers.length > 0 && !tiers.some((tier) => String(tier.fee) === form.getValues('fee'))) {
+        form.setValue('fee', String(tiers[0].fee));
+      }
+    });
+  }, [getActiveTokens, refreshV3Pools, fetchV3FeeTiers, form]);
 
   const tokenA = form.watch('tokenA');
   const tokenB = form.watch('tokenB');
@@ -97,7 +103,7 @@ const CreatePoolV3Form = () => {
 
       toast({
         title: 'V3 Pool Creation Submitted',
-        description: `${symbolA}/${symbolB} at ${FEE_TIERS.find((t) => t.fee === Number(data.fee))?.label}. If a governance vote is required, the pool appears once it executes.`,
+        description: `${symbolA}/${symbolB} at ${feeLabel(Number(data.fee))}. If a governance vote is required, the pool appears once it executes.`,
       });
 
       form.reset();
@@ -183,9 +189,9 @@ const CreatePoolV3Form = () => {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {FEE_TIERS.map((tier) => (
+                    {feeTiers.map((tier) => (
                       <SelectItem key={tier.fee} value={String(tier.fee)}>
-                        {tier.label}
+                        {feeLabel(tier.fee)}
                       </SelectItem>
                     ))}
                   </SelectContent>

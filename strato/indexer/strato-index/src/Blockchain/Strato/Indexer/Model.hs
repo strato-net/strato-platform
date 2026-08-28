@@ -12,11 +12,19 @@ import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff (StateDiff)
+import qualified Data.ByteString as B
 import Data.Binary
 import Data.Map (Map)
 
 data IndexEvent
-  = RanBlock OutputBlock
+  = -- | Block plus per-tx receipt RLP bytes (in tx order). Receipts are
+    -- present post-fork (per Blockchain.Forks.isReceiptsRootForkActive) and
+    -- empty for pre-fork blocks and the genesis block. The bytes are
+    -- @rlpSerialize (rlpEncode receipt)@ -- exactly the value the receipts
+    -- trie stores at each leaf, so re-running them through @addAllKVs@
+    -- reproduces the header's @receiptsRoot@ and supports inclusion-proof
+    -- generation.
+    RanBlock OutputBlock [B.ByteString]
   | NewBestBlock (Keccak256, Integer)
   | LogDBEntry LogDB
   | TxResult TransactionResult
@@ -31,7 +39,7 @@ instance Binary IndexEvent where
   get = do
     tag <- getWord8
     case tag of
-      0 -> RanBlock <$> get
+      0 -> RanBlock <$> get <*> get
       1 -> NewBestBlock <$> get
       2 -> LogDBEntry <$> get
       3 -> TxResult <$> get
@@ -42,7 +50,7 @@ instance Binary IndexEvent where
       9 -> AddressStateUpdates <$> get
       x -> error $ "Unknown IndexEvent tag in decode `" ++ show x ++ "`"
 
-  put (RanBlock b) = putWord8 0 >> put b
+  put (RanBlock b receipts) = putWord8 0 >> put b >> put receipts
   put (NewBestBlock n) = putWord8 1 >> put n
   put (LogDBEntry e) = putWord8 2 >> put e
   put (TxResult r) = putWord8 3 >> put r

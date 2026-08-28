@@ -1271,8 +1271,10 @@ const integrateGrossYield = (
  * per vault: gross benchmark yield on deployed capital minus the depositor savings
  * accrual, over the window since the last observed sweep transfer. Savings include
  * the un-checkpointed accrual since the vault's last Accrued event, clipped to the
- * window. Stateless approximation of the sweep keeper's math: an accrual window
- * straddling the anchor counts fully as savings, which understates the fee slightly.
+ * window; an Accrued event whose window straddles the anchor is prorated to its
+ * post-anchor fraction. Stateless approximation of the sweep keeper's math.
+ * The returned lastAccrual is the latest sweep timestamp — the moment the pending
+ * window starts.
  */
 const getYieldVaultPendingFees = async (
   accessToken: string,
@@ -1282,7 +1284,7 @@ const getYieldVaultPendingFees = async (
 ): Promise<{ pendingRevenue: bigint; lastAccrual: number }> => {
   const nowSec = Math.floor(Date.now() / 1000);
   let totalPendingUsd = 0n;
-  let latestAccrual = 0;
+  let latestSweep = 0;
 
   await Promise.all(vaultDefs.map(async (def) => {
     try {
@@ -1306,6 +1308,7 @@ const getYieldVaultPendingFees = async (
         const ts = parseTimestamp(event.block_timestamp);
         if (ts > anchorTs) anchorTs = ts;
       }
+      if (anchorTs > latestSweep) latestSweep = anchorTs;
 
       // A never-emitted event has no Cirrus table at all — treat as no events
       const fetchCapitalEvents = (table: string, strategyColumn: string) =>
@@ -1375,10 +1378,22 @@ const getYieldVaultPendingFees = async (
         const growth = rpow(perSecondSavingsRate, BigInt(nowSec - pendingFrom), RAY);
         savingsAccrual = (accrualBaseAssets * (growth - RAY)) / RAY;
       }
+      // Accrued events are ordered ascending; an event whose accrual window
+      // straddles the anchor was partly settled by that sweep — count only the
+      // post-anchor fraction (linear proration; compounding curvature over one
+      // window is negligible)
+      let prevAccruedTs = 0;
       for (const event of accruedEvents) {
         const ts = parseTimestamp(event.block_timestamp);
-        if (ts > latestAccrual) latestAccrual = ts;
-        if (ts > anchorTs) savingsAccrual += BigInt(String(event.targetAmount || "0"));
+        const amount = BigInt(String(event.targetAmount || "0"));
+        if (ts > anchorTs) {
+          if (prevAccruedTs > 0 && prevAccruedTs < anchorTs) {
+            savingsAccrual += (amount * BigInt(ts - anchorTs)) / BigInt(ts - prevAccruedTs);
+          } else {
+            savingsAccrual += amount;
+          }
+        }
+        prevAccruedTs = ts;
       }
 
       // Piecewise-constant strategyDebt timeline per strategy — every capital event
@@ -1409,7 +1424,7 @@ const getYieldVaultPendingFees = async (
     }
   }));
 
-  return { pendingRevenue: totalPendingUsd, lastAccrual: latestAccrual };
+  return { pendingRevenue: totalPendingUsd, lastAccrual: latestSweep };
 };
 
 /**

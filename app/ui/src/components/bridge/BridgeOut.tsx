@@ -68,7 +68,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
 
   const currentTokens = useMemo(() => {
     return bridgeableTokens.filter((token) =>
-      (token.routeType !== "native" || !token.withdrawalsPaused) &&
+      (token.routeType !== "native" || (!token.withdrawalsPaused && !token.withdrawalsDisabled)) &&
       (isSaving ? !token.isDefaultRoute : token.isDefaultRoute)
     );
   }, [bridgeableTokens, isSaving]);
@@ -99,19 +99,30 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       setFeeError
     );
 
-    if (!selectedToken?.maxPerWithdrawal) return maxTransferable;
+    let max = BigInt(maxTransferable);
+    const perWithdrawal = BigInt(selectedToken?.maxPerWithdrawal || "0");
+    if (perWithdrawal > 0n && perWithdrawal < max) {
+      max = perWithdrawal;
+    }
 
-    const perWithdrawal = BigInt(selectedToken.maxPerWithdrawal);
-    if (perWithdrawal <= 0n) return maxTransferable;
+    const aggregateCap = BigInt(selectedToken?.maxOutstandingWithdrawal || "0");
+    const aggregateRemaining = BigInt(selectedToken?.remainingOutstandingWithdrawal || "0");
+    if (
+      selectedToken?.routeType === "native"
+      && aggregateCap > 0n
+      && aggregateRemaining < max
+    ) {
+      max = aggregateRemaining;
+    }
 
-    const transferable = BigInt(maxTransferable);
-    return (
-      transferable < perWithdrawal ? transferable : perWithdrawal
-    ).toString();
+    return max.toString();
   }, [
     balanceData?.balance,
     selectedToken?.stratoToken,
+    selectedToken?.routeType,
     selectedToken?.maxPerWithdrawal,
+    selectedToken?.maxOutstandingWithdrawal,
+    selectedToken?.remainingOutstandingWithdrawal,
     usdstBalance,
     voucherBalance,
   ]);
