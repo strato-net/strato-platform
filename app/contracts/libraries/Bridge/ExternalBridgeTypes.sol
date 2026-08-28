@@ -36,6 +36,7 @@ library ExternalBridgeTypes {
         address stratoToken;
         uint256 maxPerWithdrawal;
         uint256 manualReviewThreshold;
+        bool isDefaultRoute;
     }
 
     struct DepositInfo {

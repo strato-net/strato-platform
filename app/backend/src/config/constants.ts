@@ -1,4 +1,4 @@
-import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataGovernance, mercataBridge, cdpRegistry, voucher, safetyModule, sToken, priceOracle, liquidityPool, lendingPool } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataGovernance, mercataBridge, externalAssetBridge, cdpRegistry, voucher, safetyModule, sToken, priceOracle, liquidityPool, lendingPool } from "./config";
 import * as config from "./config";
 import {
   SWAP_CONTRACTS,
@@ -32,6 +32,7 @@ export const constants = (() => {
   const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
   const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
   const MercataBridge = `${CONTRACT_PREFIX}MercataBridge`;
+  const ExternalAssetBridge = `${CONTRACT_PREFIX}ExternalAssetBridge`;
   const StratoNativeBridge = `${CONTRACT_PREFIX}StratoNativeBridge`;
   const StratoNativeCustodyVault = `${CONTRACT_PREFIX}StratoNativeCustodyVault`;
   const StratoStaking = `${CONTRACT_PREFIX}StratoStaking`;
@@ -155,6 +156,7 @@ export const constants = (() => {
     PoolConfigurator,
     AdminRegistry,
     MercataBridge,
+    ExternalAssetBridge,
     StratoNativeBridge,
     StratoNativeCustodyVault,
     StratoStaking,
@@ -184,6 +186,7 @@ export const constants = (() => {
     safetyModule,
     sToken,
     mercataBridge,
+    externalAssetBridge,
     get stratoNativeBridge() { return config.stratoNativeBridge; },
     get stratoNativeCustodyVault() { return config.stratoNativeCustodyVault; },
     get stratoToken() { return config.stratoToken; },

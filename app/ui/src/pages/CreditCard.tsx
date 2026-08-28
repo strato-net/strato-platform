@@ -18,6 +18,7 @@ import { useUser } from "@/context/UserContext";
 import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import type { BridgeToken } from "@strato/shared-types";
+import { ExternalBridgeStatus } from "@/lib/bridge/utils";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { Loader2, CreditCard, DollarSign, Plus, Settings, ChevronDown, ChevronUp, Clock, Info } from "lucide-react";
 import { safeParseUnits } from "@/utils/numberUtils";
@@ -804,11 +805,16 @@ export default function CreditCardPage() {
                         <span>{formatWeiAmount(p.amount, DECIMALS)} USDST</span>
                         <div className="flex items-center gap-2">
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                            p.status === 1
+                            p.status === ExternalBridgeStatus.INITIATED ||
+                            p.status === ExternalBridgeStatus.READY
                               ? "bg-blue-500/20 text-blue-400"
                               : "bg-amber-500/20 text-amber-400"
                           }`}>
-                            {p.status === 1 ? "Initiated" : "Pending Review"}
+                            {p.status === ExternalBridgeStatus.INITIATED
+                              ? "Initiated"
+                              : p.status === ExternalBridgeStatus.READY
+                                ? "Ready"
+                                : "Pending Review"}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             {new Date(p.timestamp).toLocaleDateString()}

@@ -3,7 +3,7 @@ import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { Table, Select, Space, Card } from "antd";
 import { FrownOutlined, CopyOutlined } from "@ant-design/icons";
 import { useBridgeContext } from "@/context/BridgeContext";
-import { formatDate, getChainName, BRIDGE_STATUS_OPTIONS, handleCopyToClipboard, getExplorerUrl, mergePendingDeposits } from "@/lib/bridge/utils";
+import { formatDate, getChainName, DEPOSIT_STATUS_OPTIONS, ExternalBridgeStatus, handleCopyToClipboard, getExplorerUrl, mergePendingDeposits } from "@/lib/bridge/utils";
 import { renderTruncatedAddressWithCopy } from "@/lib/bridge/components";
 import { DepositTransaction } from "@/lib/bridge/types";
 import { ITEMS_PER_PAGE } from "@/lib/bridge/constants";
@@ -20,7 +20,6 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
   const [selectedChainId, setSelectedChainId] = useState<number>(0);
   const [selectedType, setSelectedType] = useState<'bridge' | 'save' | 'forge' | ''>('');
   const [transactions, setTransactions] = useState<DepositTransaction[]>([]);
-  const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter((o) => o.value !== 4);
 
   const {
     loading: isLoading,
@@ -181,25 +180,25 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
       render: (_: any, record: any) => {
         const statusStr = record?.DepositInfo?.bridgeStatus || "0";
         const statusNum = parseInt(statusStr);
-        if (statusNum === 1) {
+        if (statusNum === ExternalBridgeStatus.INITIATED) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
               <Clock className="h-3 w-3 mr-1" />
               Initiated
             </span>
           );
-        } else if (statusNum === 2) {
-          return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-              <CheckCircle2 className="h-3 w-3 mr-1" />
-              Pending Review
-            </span>
-          );
-        } else if (statusNum === 3) {
+        } else if (statusNum === ExternalBridgeStatus.COMPLETED) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               Completed
+            </span>
+          );
+        } else if (statusNum === ExternalBridgeStatus.ABORTED) {
+          return (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              <AlertCircle className="h-3 w-3 mr-1" />
+              Aborted
             </span>
           );
         }

@@ -12,6 +12,7 @@ import {
   parseNativeBridgeAssets,
   parseNativeLockedBalances,
   parseNativeTokenBridgeConfigs,
+  parseBridgeRouteMappings,
 } from "../helpers/bridge.helper";
 import type { BridgeToken } from "@strato/shared-types";
 
@@ -127,6 +128,31 @@ test("builds actions only for eligible routes and configured products", () => {
   assert.equal(saveOnlyActions.filter(({ payToken, action }) => payToken === usdc && action === 3).length, 1);
 
   assert.deepEqual(buildDepositActionCatalog({ ...base, actionChainIds: new Set() }), []);
+});
+
+test("parses ExternalAssetBridge route controls and default route metadata", () => {
+  const routes = parseBridgeRouteMappings([{
+    externalToken: "1111111111111111111111111111111111111111",
+    externalChainId: "1",
+    targetStratoToken: "2222222222222222222222222222222222222222",
+    mappingValue: {
+      depositsEnabled: true,
+      withdrawalsEnabled: false,
+      externalDecimals: "6",
+      externalName: "USD Coin",
+      externalSymbol: "USDC",
+      isDefaultRoute: true,
+      maxPerWithdrawal: "1000000",
+      manualReviewThreshold: "500000",
+    },
+  }]);
+
+  assert.equal(routes.length, 1);
+  assert.equal(routes[0].isDefaultRoute, true);
+  assert.equal(routes[0].AssetInfo.enabled, true);
+  assert.equal(routes[0].AssetInfo.depositsEnabled, true);
+  assert.equal(routes[0].AssetInfo.withdrawalsEnabled, false);
+  assert.equal(routes[0].AssetInfo.manualReviewThreshold, "500000");
 });
 
 test("adds token-specific native bridge controls to routes", () => {

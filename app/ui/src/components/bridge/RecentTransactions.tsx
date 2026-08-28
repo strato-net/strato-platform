@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, Gem, Frown } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useBridgeContext } from '@/context/BridgeContext';
 import { formatBalance } from '@/utils/numberUtils';
-import { mergePendingDeposits } from '@/lib/bridge/utils';
+import { ExternalBridgeStatus, mergePendingDeposits } from '@/lib/bridge/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { activityFeedApi } from '@/lib/activityFeed';
 import { METAL_ACTIVITY_PAIR, resolveTokenSymbols, collectMetalTokenAddrs, mapEventsToMetalTxs } from '@/lib/metalActivity';
@@ -27,13 +27,16 @@ type RecentTx = {
 };
 
 const STATUS_LABELS: Record<number, { text: string; color: string }> = {
-  3: { text: "Complete", color: "bg-emerald-500/15 text-emerald-500" },
-  2: { text: "Pending", color: "bg-amber-500/15 text-amber-500" },
-  4: { text: "Aborted", color: "bg-red-500/15 text-red-500" },
-  1: { text: "Initiated", color: "bg-blue-500/15 text-blue-500" },
+  [ExternalBridgeStatus.INITIATED]: { text: "Initiated", color: "bg-blue-500/15 text-blue-500" },
+  [ExternalBridgeStatus.PENDING_REVIEW]: { text: "Pending Review", color: "bg-amber-500/15 text-amber-500" },
+  [ExternalBridgeStatus.READY]: { text: "Ready", color: "bg-blue-500/15 text-blue-500" },
+  [ExternalBridgeStatus.COMPLETED]: { text: "Complete", color: "bg-emerald-500/15 text-emerald-500" },
+  [ExternalBridgeStatus.CANCELLED]: { text: "Cancelled", color: "bg-red-500/15 text-red-500" },
+  [ExternalBridgeStatus.REFUNDED]: { text: "Refunded", color: "bg-emerald-500/15 text-emerald-500" },
+  [ExternalBridgeStatus.ABORTED]: { text: "Aborted", color: "bg-red-500/15 text-red-500" },
 };
 const UNKNOWN_STATUS = { text: "Unknown", color: "bg-muted text-muted-foreground" };
-const METAL_STATUS = STATUS_LABELS[3];
+const METAL_STATUS = STATUS_LABELS[ExternalBridgeStatus.COMPLETED];
 
 const getStatusLabel = (status?: string | number) => STATUS_LABELS[parseInt(String(status || "0"))] || UNKNOWN_STATUS;
 
@@ -110,7 +113,7 @@ function useMetalTransactions(limit: number, isLoggedIn: boolean) {
       const events = result.events || [];
       const symbolMap = await resolveTokenSymbols([...collectMetalTokenAddrs(events)]);
       setTransactions(mapEventsToMetalTxs(events, symbolMap).map((tx) => ({
-        ...tx, _type: 'metal' as const, amount: tx.metalAmount, status: "3",
+        ...tx, _type: 'metal' as const, amount: tx.metalAmount, status: String(ExternalBridgeStatus.COMPLETED),
       })));
     } catch { setTransactions([]); }
     finally { setLoading(false); loadedRef.current = true; }

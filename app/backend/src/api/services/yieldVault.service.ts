@@ -30,7 +30,7 @@ const {
   CDPRegistry,
   cdpRegistry,
   priceOracle,
-  mercataBridge,
+  externalAssetBridge,
 } = constants;
 
 const WAD = 10n ** 18n;
@@ -181,7 +181,7 @@ export interface YieldVaultStrategyHolding {
    */
   baseApyPct: number | null;
   /**
-   * USD value (1e18 WAD) of capital currently bridged out via MercataBridge
+   * USD value (1e18 WAD) of capital currently bridged out via ExternalAssetBridge
    * within the rolling lookback window (`OFF_CHAIN_EVENT_WINDOW_DAYS`).
    * Computed as: pooled outbound − pooled inbound at current oracle prices,
    * clamped to ≥ 0. Subtracted from equity in the Base APY calc so the
@@ -1172,7 +1172,7 @@ const sumUsdstDebt = (cdpPositions: StrategyCdpPosition[]): string => {
 };
 
 /**
- * Pooled off-chain capital tracking via MercataBridge events.
+ * Pooled off-chain capital tracking via ExternalAssetBridge events.
  *
  * For each strategy address, sums `WithdrawalRequested` (assets that left the
  * strategy's wallet on Strato — bridge takes custody at request-time, *before*
@@ -1194,7 +1194,7 @@ const sumUsdstDebt = (cdpPositions: StrategyCdpPosition[]): string => {
  * pooled total).
  *
  * Note on event field names (mind the schema differences):
- *   WithdrawalRequested → attributes.user, attributes.token, attributes.stratoTokenAmount, attributes.withdrawalId
+ *   WithdrawalRequested → attributes.stratoSender, attributes.stratoToken, attributes.stratoTokenAmount, attributes.withdrawalId
  *   WithdrawalAborted   → attributes.withdrawalId
  *   DepositCompleted    → attributes.stratoRecipient, attributes.stratoToken, attributes.stratoTokenAmount
  */
@@ -1204,16 +1204,56 @@ const getStrategyOffChainCapital = async (
   priceMap: Map<string, string>
 ): Promise<{ offChainUsdWad: string; recentOutflows: RecentBridgeOutflow[] }> => {
   const empty = { offChainUsdWad: "0", recentOutflows: [] as RecentBridgeOutflow[] };
-  if (!mercataBridge || !strategyAddress) return empty;
+  if (!externalAssetBridge || !strategyAddress) return empty;
 
   const cutoffMs = Date.now() - OFF_CHAIN_EVENT_WINDOW_DAYS * DAY_MS;
   const cutoffStr = toUTCTime(new Date(cutoffMs));
 
-  const [outflowsRes, inflowsRes, abortedRes] = await Promise.all([
+  const [
+    outflowsRes,
+    inflowsRes,
+    abortedRes,
+    legacyOutflowsRes,
+    legacyInflowsRes,
+    legacyAbortedRes,
+  ] = await Promise.all([
     cirrus
       .get(serviceToken, "/event", {
         params: {
-          address: `eq.${mercataBridge}`,
+          address: `eq.${externalAssetBridge}`,
+          event_name: "eq.WithdrawalRequested",
+          "attributes->>stratoSender": `eq.${strategyAddress}`,
+          block_timestamp: `gte.${cutoffStr}`,
+          select: "attributes,block_timestamp",
+          order: "block_timestamp.desc",
+        },
+      })
+      .catch(() => ({ data: [] as Array<Record<string, any>> })),
+    cirrus
+      .get(serviceToken, "/event", {
+        params: {
+          address: `eq.${externalAssetBridge}`,
+          event_name: "eq.DepositCompleted",
+          "attributes->>stratoRecipient": `eq.${strategyAddress}`,
+          block_timestamp: `gte.${cutoffStr}`,
+          select: "attributes,block_timestamp",
+        },
+      })
+      .catch(() => ({ data: [] as Array<Record<string, any>> })),
+    cirrus
+      .get(serviceToken, "/event", {
+        params: {
+          address: `eq.${externalAssetBridge}`,
+          event_name: "in.(WithdrawalAborted,WithdrawalRefunded,WithdrawalReviewRejected)",
+          block_timestamp: `gte.${cutoffStr}`,
+          select: "attributes",
+        },
+      })
+      .catch(() => ({ data: [] as Array<Record<string, any>> })),
+    cirrus
+      .get(serviceToken, "/event", {
+        params: {
+          address: `eq.${constants.mercataBridge}`,
           event_name: "eq.WithdrawalRequested",
           "attributes->>user": `eq.${strategyAddress}`,
           block_timestamp: `gte.${cutoffStr}`,
@@ -1225,7 +1265,7 @@ const getStrategyOffChainCapital = async (
     cirrus
       .get(serviceToken, "/event", {
         params: {
-          address: `eq.${mercataBridge}`,
+          address: `eq.${constants.mercataBridge}`,
           event_name: "eq.DepositCompleted",
           "attributes->>stratoRecipient": `eq.${strategyAddress}`,
           block_timestamp: `gte.${cutoffStr}`,
@@ -1236,7 +1276,7 @@ const getStrategyOffChainCapital = async (
     cirrus
       .get(serviceToken, "/event", {
         params: {
-          address: `eq.${mercataBridge}`,
+          address: `eq.${constants.mercataBridge}`,
           event_name: "eq.WithdrawalAborted",
           block_timestamp: `gte.${cutoffStr}`,
           select: "attributes",
@@ -1245,37 +1285,64 @@ const getStrategyOffChainCapital = async (
       .catch(() => ({ data: [] as Array<Record<string, any>> })),
   ]);
 
-  const allOutflows = (outflowsRes.data || []) as Array<{
+  const allOutflows = [
+    ...(outflowsRes.data || []).map((event: any) => ({
+      ...event,
+      bridgeSource: "external",
+    })),
+    ...(legacyOutflowsRes.data || []).map((event: any) => ({
+      ...event,
+      bridgeSource: "legacy",
+      attributes: {
+        ...event.attributes,
+        stratoToken: event.attributes?.token,
+      },
+    })),
+  ] as Array<{
+    attributes: Record<string, any>;
+    block_timestamp?: string;
+    bridgeSource: string;
+  }>;
+  const inflows = [
+    ...(inflowsRes.data || []),
+    ...(legacyInflowsRes.data || []),
+  ] as Array<{
     attributes: Record<string, any>;
     block_timestamp?: string;
   }>;
-  const inflows = (inflowsRes.data || []) as Array<{
+  const abortedRows = [
+    ...(abortedRes.data || []).map((event: any) => ({
+      ...event,
+      bridgeSource: "external",
+    })),
+    ...(legacyAbortedRes.data || []).map((event: any) => ({
+      ...event,
+      bridgeSource: "legacy",
+    })),
+  ] as Array<{
     attributes: Record<string, any>;
-    block_timestamp?: string;
-  }>;
-  const abortedRows = (abortedRes.data || []) as Array<{
-    attributes: Record<string, any>;
+    bridgeSource: string;
   }>;
 
   // Build set of aborted withdrawalIds (as strings — IDs are uint256, may exceed Number safety).
   const abortedIds = new Set<string>();
   for (const e of abortedRows) {
     const id = String(e.attributes?.withdrawalId ?? "").trim();
-    if (id) abortedIds.add(id);
+    if (id) abortedIds.add(`${e.bridgeSource}:${id}`);
   }
 
   // Drop any WithdrawalRequested that has a matching WithdrawalAborted in the window
   // — those funds were refunded to the strategy and never left for real.
   const outflows = allOutflows.filter((e) => {
     const id = String(e.attributes?.withdrawalId ?? "").trim();
-    return !id || !abortedIds.has(id);
+    return !id || !abortedIds.has(`${e.bridgeSource}:${id}`);
   });
 
   if (outflows.length === 0 && inflows.length === 0) return empty;
 
   const tokenAddresses = new Set<string>();
   for (const e of outflows) {
-    const addr = String(e.attributes?.token || "").trim();
+    const addr = String(e.attributes?.stratoToken || "").trim();
     if (addr) tokenAddresses.add(addr);
   }
   for (const e of inflows) {
@@ -1308,7 +1375,7 @@ const getStrategyOffChainCapital = async (
 
   const sumUsdWad = (
     events: Array<{ attributes: Record<string, any> }>,
-    tokenAttr: "token" | "stratoToken"
+    tokenAttr: "stratoToken"
   ) => {
     let total = 0n;
     for (const e of events) {
@@ -1335,7 +1402,7 @@ const getStrategyOffChainCapital = async (
     return total;
   };
 
-  const outflowsUsdWad = sumUsdWad(outflows, "token");
+  const outflowsUsdWad = sumUsdWad(outflows, "stratoToken");
   const inflowsUsdWad = sumUsdWad(inflows, "stratoToken");
   const offChainUsdWad =
     outflowsUsdWad > inflowsUsdWad ? outflowsUsdWad - inflowsUsdWad : 0n;
@@ -1361,7 +1428,7 @@ const getStrategyOffChainCapital = async (
 
   const recentOutflows: RecentBridgeOutflow[] = [];
   for (const e of outflowsForDisplay.slice(0, MAX_DISPLAYED_OUTFLOWS)) {
-    const tokenAddr = String(e.attributes?.token || "").trim();
+    const tokenAddr = String(e.attributes?.stratoToken || "").trim();
     if (!tokenAddr) continue;
     const meta = metaMap.get(tokenAddr);
     const amountStr = String(e.attributes?.stratoTokenAmount || "0");

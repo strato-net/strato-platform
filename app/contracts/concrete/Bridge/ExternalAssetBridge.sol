@@ -46,6 +46,7 @@ contract record ExternalAssetBridge is Ownable {
         uint256 externalDecimals,
         string externalName,
         string externalSymbol,
+        bool isDefaultRoute,
         uint256 maxPerWithdrawal,
         uint256 manualReviewThreshold
     );
@@ -333,6 +334,7 @@ contract record ExternalAssetBridge is Ownable {
         uint256 externalDecimals,
         string externalName,
         string externalSymbol,
+        bool isDefaultRoute,
         uint256 maxPerWithdrawal,
         uint256 manualReviewThreshold
     ) external onlyOwner {
@@ -363,7 +365,8 @@ contract record ExternalAssetBridge is Ownable {
             externalToken,
             stratoToken,
             maxPerWithdrawal,
-            manualReviewThreshold
+            manualReviewThreshold,
+            isDefaultRoute
         );
 
         emit RouteUpdated(
@@ -375,6 +378,7 @@ contract record ExternalAssetBridge is Ownable {
             externalDecimals,
             externalName,
             externalSymbol,
+            isDefaultRoute,
             maxPerWithdrawal,
             manualReviewThreshold
         );

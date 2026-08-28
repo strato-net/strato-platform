@@ -319,7 +319,7 @@ function addLendingApys(add: AddFn, ctx: Phase1Ctx, rewardActivities: any[]) {
 }
 
 function addDirectMintRewards(add: AddFn, rewardActivities: any[]) {
-  const activity = findRewardActivity(rewardActivities, { sourceContract: constants.mercataBridge });
+  const activity = findRewardActivity(rewardActivities, { sourceContract: constants.externalAssetBridge });
   const apy = computeRewardsApy(activity?.emissionRate, activity?.totalStakeUsd);
   if (apy) add(constants.USDST, { source: "rewards", apy, meta: "direct_mint" });
 }

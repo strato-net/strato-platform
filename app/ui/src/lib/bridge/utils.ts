@@ -3,6 +3,17 @@ import { message } from "antd";
 import { DEPOSIT_ROUTER_ABI, SUPPORTED_CHAINS } from "./constants";
 import { BridgeError } from "./types";
 
+export const ExternalBridgeStatus = {
+  NONE: 0,
+  INITIATED: 1,
+  PENDING_REVIEW: 2,
+  READY: 3,
+  COMPLETED: 4,
+  CANCELLED: 5,
+  REFUNDED: 6,
+  ABORTED: 7,
+} as const;
+
 /**
  * Normalizes errors from various sources into a consistent BridgeError format
  */
@@ -188,11 +199,18 @@ export function getChainName(chainId: number | string): string {
  */
 export const BRIDGE_STATUS_OPTIONS = [
   { value: 0, label: "All Statuses" },
-  { value: 1, label: "Initiated" },
-  { value: 2, label: "Pending Review" },
-  { value: 3, label: "Completed" },
-  { value: 4, label: "Aborted" },
+  { value: ExternalBridgeStatus.INITIATED, label: "Initiated" },
+  { value: ExternalBridgeStatus.PENDING_REVIEW, label: "Pending Review" },
+  { value: ExternalBridgeStatus.READY, label: "Ready" },
+  { value: ExternalBridgeStatus.COMPLETED, label: "Completed" },
+  { value: ExternalBridgeStatus.CANCELLED, label: "Cancelled" },
+  { value: ExternalBridgeStatus.REFUNDED, label: "Refunded" },
+  { value: ExternalBridgeStatus.ABORTED, label: "Aborted" },
 ];
+
+export const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter(({ value }) =>
+  [0, ExternalBridgeStatus.INITIATED, ExternalBridgeStatus.COMPLETED, ExternalBridgeStatus.ABORTED].includes(value)
+);
 
 /**
  * Chain options for filter dropdowns

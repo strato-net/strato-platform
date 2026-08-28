@@ -12,6 +12,8 @@ export const ACTIVITY_FILTER_CONFIGS: Record<string, FilterConfig> = {
   "MercataBridge:DepositCompleted": { type: "single", attribute: "stratoRecipient" },
   "StratoNativeBridge:NativeDepositCompleted": { type: "single", attribute: "stratoRecipient" },
   "MercataBridge:WithdrawalRequested": { type: "single", attribute: "user" },
+  "ExternalAssetBridge:DepositCompleted": { type: "single", attribute: "stratoRecipient" },
+  "ExternalAssetBridge:WithdrawalRequested": { type: "single", attribute: "stratoSender" },
   "StratoNativeBridge:NativeWithdrawalRequested": { type: "single", attribute: "stratoSender" },
   "CDPEngine:USDSTMinted": { type: "single", attribute: "owner" },
   "Pool:Swap": { type: "single", attribute: "sender" },

@@ -47,6 +47,7 @@ export const lendingPool = process.env.LENDING_POOL || "000000000000000000000000
 export const poolConfigurator = process.env.POOL_CONFIGURATOR || "0000000000000000000000000000000000001006";
 export const lendingRegistry = process.env.LENDING_REGISTRY || "0000000000000000000000000000000000001007";
 export const mercataBridge = process.env.MERCATA_BRIDGE || "0000000000000000000000000000000000001008";
+export const externalAssetBridge = process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS || "";
 export const poolFactory = process.env.POOL_FACTORY || "000000000000000000000000000000000000100a";
 export const tokenFactory = process.env.TOKEN_FACTORY || "000000000000000000000000000000000000100b";
 export const adminRegistry = process.env.ADMIN_REGISTRY || "000000000000000000000000000000000000100c";
@@ -449,6 +450,7 @@ export async function getInternalAddresses() {
   // Static: well-known system contract addresses from config
   const addresses: string[] = [
     mercataBridge,
+    externalAssetBridge,
     stratoNativeBridge,
     stratoNativeCustodyVault,
     burnAddress,

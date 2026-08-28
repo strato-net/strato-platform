@@ -115,6 +115,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             18,
             "External USD",
             "xUSD",
+            true,
             1000e18,
             100e18
         );
@@ -363,6 +364,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             18,
             "External USD",
             "xUSD",
+            true,
             1000e18,
             100e18
         );

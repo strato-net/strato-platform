@@ -463,23 +463,23 @@ export async function runBalanceWatcher(operatorAccessToken: string): Promise<vo
 
 /**
  * Fetch pending bridge withdrawals for a card's wallet address.
- * Queries MercataBridge-withdrawals from Cirrus where externalRecipient matches
- * and bridgeStatus is INITIATED (1) or PENDING_REVIEW (2).
+ * Queries ExternalAssetBridge withdrawals where the external recipient matches
+ * and the withdrawal has not reached a terminal state.
  */
 export async function getPendingWithdrawalsForCard(
   accessToken: string,
   cardWalletAddress: string
 ): Promise<Array<{ amount: string; status: number; timestamp: string }>> {
-  const bridgeAddress = process.env.BRIDGE_ADDRESS || '0000000000000000000000000000000000001008';
+  const bridgeAddress = constants.externalAssetBridge;
   if (!bridgeAddress) return [];
   const normalizedWallet = normalizeAddress(cardWalletAddress);
   if (!normalizedWallet) return [];
   try {
-    const { data } = await cirrus.get(accessToken, "/BlockApps-MercataBridge-withdrawals", {
+    const { data } = await cirrus.get(accessToken, `/${constants.ExternalAssetBridge}-withdrawals`, {
       params: {
         select: "key,value",
         address: `eq.${bridgeAddress}`,
-        or: "(value->>bridgeStatus.eq.1,value->>bridgeStatus.eq.2)",
+        "value->>status": "in.(1,2,3)",
         "value->>externalRecipient": `eq.${normalizedWallet}`,
         order: "value->>requestedAt.desc",
       },
@@ -489,7 +489,7 @@ export async function getPendingWithdrawalsForCard(
       const v = row?.value ?? {};
       return {
         amount: String(v.stratoTokenAmount ?? "0"),
-        status: Number(v.bridgeStatus ?? 0),
+        status: Number(v.status ?? 0),
         timestamp: v.requestedAt
           ? new Date(Number(v.requestedAt) * 1000).toISOString()
           : new Date().toISOString(),
