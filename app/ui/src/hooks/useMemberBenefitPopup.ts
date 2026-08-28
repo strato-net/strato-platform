@@ -3,6 +3,7 @@ import { useUser } from '@/context/UserContext';
 import { capture } from '@/lib/analytics';
 import {
   fetchActionCompletion,
+  fetchHasAnyActivity,
   selectPopup,
   snoozePopup,
   type MemberBenefitPopup,
@@ -54,7 +55,12 @@ export function useMemberBenefitPopup(): {
       if (!selected) {
         const completion = await fetchActionCompletion(userAddress);
         if (cancelled) return;
-        selected = selectPopup(completion, userAddress);
+        // The "returning user at all?" probe is only needed to tell a fresh
+        // account (no popup) from an active one at 0 of 4 milestone actions.
+        const noneDone = Object.values(completion).every((done) => !done);
+        const hasAnyActivity = noneDone ? await fetchHasAnyActivity() : true;
+        if (cancelled) return;
+        selected = selectPopup(completion, userAddress, hasAnyActivity);
       }
       if (!selected) return;
       setPopup(selected);

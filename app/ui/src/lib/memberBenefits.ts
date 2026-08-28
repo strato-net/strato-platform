@@ -94,6 +94,7 @@ export async function fetchActionCompletion(userAddress: string): Promise<Action
     // fall through to a live fetch
   }
 
+  let anyFailed = false;
   const results = await Promise.all(
     MILESTONE_ACTIONS.map(async (action) => {
       try {
@@ -105,18 +106,41 @@ export async function fetchActionCompletion(userAddress: string): Promise<Action
       } catch {
         // On failure, claim completion: it suppresses popups rather than
         // showing a wrong "you haven't done this yet" to a user who has.
+        anyFailed = true;
         return [action.key, true] as const;
       }
     })
   );
 
   const completion = Object.fromEntries(results) as ActionCompletion;
-  try {
-    localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), completion }));
-  } catch {
-    // storage full/blocked: just skip caching
+  // Never cache a degraded result — a transient failure here would otherwise
+  // suppress the popup for the whole cache window.
+  if (!anyFailed) {
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), completion }));
+    } catch {
+      // storage full/blocked: just skip caching
+    }
   }
   return completion;
+}
+
+/**
+ * Is this a returning user at all? Zero milestone actions could mean a brand
+ * new account or an active one that simply hasn't touched earn/borrow yet
+ * (e.g. marketplace-only users). Any token transfer involving the address
+ * settles it.
+ */
+export async function fetchHasAnyActivity(): Promise<boolean> {
+  try {
+    const res = await activityFeedApi.getActivities(
+      [{ contract_name: 'Token', event_name: 'Transfer' }],
+      { limit: 1, myActivity: true }
+    );
+    return res.total > 0;
+  } catch {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -164,20 +188,22 @@ export function snoozePopup(
 /**
  * Decide whether the returning user should see the milestone popup.
  *
- * - 0 of 4 actions: no popup. That's a brand-new user; these are returning-user
- *   campaigns (the mockups' slide 1 — the STRATO Odds credit — is out of scope
- *   here and lives on a different surface anyway).
- * - 1–3 of 4: the milestone popup ("One More Move Unlocks 500 Points"), unless
- *   snoozed at the same progress. New progress re-arms it.
  * - 4 of 4: nothing to nudge — the milestone is complete.
+ * - 0–3 of 4: the milestone popup ("One More Move Unlocks 500 Points"),
+ *   unless snoozed at the same progress; new progress re-arms it. At 0 of 4
+ *   the caller must confirm the user is returning at all (hasAnyActivity) —
+ *   brand-new accounts get nothing; these are returning-user campaigns (the
+ *   mockups' slide 1, the STRATO Odds credit, is out of scope here).
  */
 export function selectPopup(
   completion: ActionCompletion,
-  userAddress: string
+  userAddress: string,
+  hasAnyActivity: boolean
 ): MemberBenefitPopup | null {
   const completedCount = MILESTONE_ACTIONS.filter((a) => completion[a.key]).length;
 
-  if (completedCount === 0 || completedCount >= MILESTONE_ACTIONS.length) return null;
+  if (completedCount >= MILESTONE_ACTIONS.length) return null;
+  if (completedCount === 0 && !hasAnyActivity) return null;
 
   const snooze = readSnooze('milestone', userAddress);
   const snoozed =
