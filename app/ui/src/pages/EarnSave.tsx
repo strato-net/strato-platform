@@ -280,7 +280,7 @@ const VaultLineChart = ({
     <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <p className="text-xs text-muted-foreground">{title}</p>
-        <p className="mt-1 text-2xl font-semibold">{value}</p>
+        <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
       </div>
       <p className="text-xs text-muted-foreground sm:text-right">{subtitle}</p>
     </div>
@@ -470,15 +470,15 @@ const EarnSave = () => {
   const allTimePerformance = useMemo(() => getHistoryPerformance(priceChartData), [priceChartData]);
   const performanceStats = [
     {
-      label: "7D Performance",
+      label: "7D performance",
       value: formatPerformance(sevenDayPerformance),
     },
     {
-      label: "30D Performance",
+      label: "30D performance",
       value: formatPerformance(thirtyDayPerformance),
     },
     {
-      label: "All Time Performance",
+      label: "All-time performance",
       value: formatPerformance(allTimePerformance),
     },
   ];
@@ -513,9 +513,9 @@ const EarnSave = () => {
 
   const userMetrics = [
     {
-      label: "USDST Balance",
+      label: "USDST balance",
       value: loadingInfo ? "..." : isLoggedIn ? formatTokenAmount(usdstBalance) : "--",
-      icon: <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />,
+      icon: <Wallet className="h-4 w-4 text-primary" />,
     },
     {
       label: "Your saveUSDST",
@@ -523,12 +523,12 @@ const EarnSave = () => {
       icon: <PiggyBank className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />,
     },
     {
-      label: "Position Value",
+      label: "Position value",
       value: loadingInfo ? "..." : isLoggedIn ? `${formatTokenAmount(redeemableAssets)} USDST` : "--",
       icon: <CircleDollarSign className="h-4 w-4 text-violet-600 dark:text-violet-400" />,
     },
     {
-      label: "Rewards / Day",
+      label: "Rewards / day",
       value: loadingInfo || rewardsUserLoading ? "..." : isLoggedIn ? `${saveRewardPointsPerDay} points` : "--",
       icon: <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400" />,
     },
@@ -645,19 +645,19 @@ const EarnSave = () => {
                 <section className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="secondary" className="text-[9px] uppercase tracking-wide">
-                      Native Savings
+                      Native savings
                     </Badge>
                     <Badge variant="outline" className="text-[9px] uppercase tracking-wide">
-                      USDST Only
+                      USDST only
                     </Badge>
                     {!isConfigured && (
                       <Badge variant="outline" className="text-[9px] uppercase tracking-wide">
-                        Needs Config
+                        Needs config
                       </Badge>
                     )}
                     {isConfigured && !isDeployed && (
                       <Badge variant="outline" className="text-[9px] uppercase tracking-wide">
-                        Not Deployed
+                        Not deployed
                       </Badge>
                     )}
                     {isPaused && (
@@ -667,13 +667,13 @@ const EarnSave = () => {
                     )}
                   </div>
 
-                  <Card className="border border-blue-500/25 dark:border-blue-400/25 bg-gradient-to-br from-[#f8fbff] to-[#edf3ff] dark:from-[#0f1a33] dark:to-[#111c3a]">
+                  <Card className="border border-primary/25 bg-gradient-to-br from-primary/5 to-muted">
                     <CardContent className="p-3 md:p-4">
                       <div className="space-y-3">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-blue-500/15 dark:bg-blue-400/15 flex items-center justify-center">
-                              <PiggyBank className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center">
+                              <PiggyBank className="h-5 w-5 text-primary" />
                             </div>
                             <div>
                               <h1 className="text-xl md:text-2xl font-semibold tracking-tight">USDST Savings Vault</h1>
@@ -708,11 +708,11 @@ const EarnSave = () => {
                         <div className="space-y-3">
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                             <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
-                              <p className="text-muted-foreground">Current Price</p>
+                              <p className="text-muted-foreground">Current price</p>
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <p className="mt-1 text-base font-semibold cursor-default">{price}</p>
+                                    <p className="mt-1 text-base font-semibold tabular-nums cursor-default">{price}</p>
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     <p className="font-mono text-xs">{fullPrice}</p>
@@ -722,18 +722,18 @@ const EarnSave = () => {
                             </div>
                             <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
                               <p className="text-muted-foreground">TVL</p>
-                              <p className="mt-1 text-base font-semibold">{tvlDisplay}</p>
+                              <p className="mt-1 text-base font-semibold tabular-nums">{tvlDisplay}</p>
                             </div>
                             <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
                               <p className="text-muted-foreground inline-flex items-center gap-1">
-                                Best Available APY
+                                Best available APY
                                 <BestApyInfoTooltip />
                               </p>
                               {loadingInfo || rewardsActivitiesLoading ? (
                                 <p className="mt-1 text-base font-semibold">...</p>
                               ) : (
                                 <EarnApyTooltip info={incentiveYieldInfo}>
-                                  <p className={`mt-1 text-base font-semibold cursor-default ${incentiveYieldDisplay.className}`}>
+                                  <p className={`mt-1 text-base font-semibold tabular-nums cursor-default ${incentiveYieldDisplay.className}`}>
                                     {incentiveYieldDisplay.label}
                                   </p>
                                 </EarnApyTooltip>
@@ -742,7 +742,7 @@ const EarnSave = () => {
                           </div>
 
                           <div className="space-y-2">
-                            <p className="text-xs font-medium text-muted-foreground">Your Position</p>
+                            <p className="text-xs font-medium text-muted-foreground">Your position</p>
                             <div className="grid grid-cols-2 xl:grid-cols-4 gap-2">
                               {userMetrics.map((metric) => (
                                 <div key={metric.label} className="rounded-lg border border-border/60 bg-background/70 p-2.5">
@@ -750,7 +750,7 @@ const EarnSave = () => {
                                     <p className="text-xs text-muted-foreground">{metric.label}</p>
                                     {metric.icon}
                                   </div>
-                                  <p className="mt-1 text-base font-semibold leading-tight">{metric.value}</p>
+                                  <p className="mt-1 text-base font-semibold leading-tight tabular-nums">{metric.value}</p>
                                 </div>
                               ))}
                             </div>
@@ -764,7 +764,7 @@ const EarnSave = () => {
                 <section className="rounded-lg border border-border/70 bg-background/60 p-3 md:p-4 space-y-3">
                   <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                     <div>
-                      <h2 className="text-sm font-semibold">Vault Performance</h2>
+                      <h2 className="text-sm font-semibold">Vault performance</h2>
                       <p className="text-xs text-muted-foreground">Historical saveUSDST price and TVL</p>
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -801,7 +801,7 @@ const EarnSave = () => {
                     {performanceStats.map((stat) => (
                       <div key={stat.label} className="rounded-lg border border-border/60 bg-card/60 p-4">
                         <p className="text-xs text-muted-foreground">{stat.label}</p>
-                        <p className="mt-2 text-xl font-semibold">{loadingInfo ? "..." : stat.value}</p>
+                        <p className="mt-2 text-xl font-semibold tabular-nums">{loadingInfo ? "..." : stat.value}</p>
                       </div>
                     ))}
                   </div>
@@ -832,7 +832,7 @@ const EarnSave = () => {
                 <span>Available</span>
                 <button
                   type="button"
-                  className="font-medium text-foreground hover:underline"
+                  className="font-medium text-primary hover:text-primary/80 tabular-nums"
                   onClick={() => setActionAmount(actionMaxInputValue === "0.0" || actionMaxInputValue === "0" ? "" : actionMaxInputValue)}
                 >
                   Max: {actionMaxLabel}
@@ -849,16 +849,16 @@ const EarnSave = () => {
             </div>
             <div className="rounded-lg border border-border/70 bg-muted/40 p-3 space-y-2">
               <div className="flex items-center justify-between">
-                <span>USDST Balance</span>
-                <span className="font-medium text-foreground">{formatTokenAmount(usdstBalance)}</span>
+                <span>USDST balance</span>
+                <span className="font-medium text-foreground tabular-nums">{formatTokenAmount(usdstBalance)}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>saveUSDST Balance</span>
-                <span className="font-medium text-foreground">{formatTokenAmount(userShares)}</span>
+                <span>saveUSDST balance</span>
+                <span className="font-medium text-foreground tabular-nums">{formatTokenAmount(userShares)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span>{actionSecondaryLabel}</span>
-                <span className="font-medium text-foreground">
+                <span className="font-medium text-foreground tabular-nums">
                   {formatTokenAmount(previewValueWei.toString())} {actionPreviewSymbol}
                 </span>
               </div>
@@ -892,7 +892,7 @@ const EarnSave = () => {
                   disabled={BigInt(userInfo?.maxRedeem || "0") <= 0n || isSubmitting}
                   onClick={handleRedeemAll}
                 >
-                  Redeem All
+                  Redeem all
                 </Button>
               )}
             </div>

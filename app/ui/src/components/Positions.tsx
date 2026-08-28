@@ -56,7 +56,7 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
     <Card className="border border-border shadow-sm">
       <CardHeader className="pb-4">
         <div>
-          <CardTitle className="text-2xl font-bold">Your Position</CardTitle>
+          <CardTitle className="text-2xl font-bold">Your position</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="px-6 pb-8">
@@ -65,8 +65,8 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
             <div className="flex flex-col gap-4">
               {/* Total Amount Owed */}
               <div className="flex flex-col space-y-3 p-4 bg-muted/50 rounded-lg">
-                <span className="text-muted-foreground text-sm font-medium">Total Amount Owed</span>
-                <span className="font-semibold text-lg">
+                <span className="text-muted-foreground text-sm font-medium">Total amount owed</span>
+                <span className="font-semibold text-lg tabular-nums">
                   {(() => {
                     try {
                       const owed = BigInt(loanData?.totalAmountOwed || 0);
@@ -82,22 +82,22 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
               {/* Interest Rate */}
               <div className="flex flex-col space-y-3 p-4 bg-muted/50 rounded-lg">
                 <InfoTooltip content="Annual percentage rate you pay on borrowed amounts. This rate applies to your total borrowed amount.">
-                  <span className="text-muted-foreground text-sm font-medium">Interest Rate</span>
+                  <span className="text-muted-foreground text-sm font-medium">Interest rate</span>
                 </InfoTooltip>
-                <span className="font-semibold text-lg">{((Number(loanData?.interestRate) || 0) / 100).toFixed(2)}%</span>
+                <span className="font-semibold text-lg tabular-nums">{((Number(loanData?.interestRate) || 0) / 100).toFixed(2)}%</span>
               </div>
 
               {/* Health Factor */}
               <div className="flex flex-col space-y-3 p-4 bg-muted/50 rounded-lg">
                 <InfoTooltip content="Measures your position's safety. Higher is better. Close to 1.0 means high risk of liquidation. Below 1.0 means your position can be liquidated. No loan means you have no outstanding debt.">
-                  <span className="text-muted-foreground text-sm font-medium">Health Factor</span>
+                  <span className="text-muted-foreground text-sm font-medium">Health factor</span>
                 </InfoTooltip>
                 <div className="flex flex-row gap-3">
-                  <span className="font-semibold text-lg mt-3" style={{ color: getTextColor(loanData?.healthFactor || 0, 3, !loanData || BigInt(loanData.totalAmountOwed) === 0n) }}>
+                  <span className="font-semibold text-lg mt-3 tabular-nums" style={{ color: getTextColor(loanData?.healthFactor || 0, 3, !loanData || BigInt(loanData.totalAmountOwed) === 0n) }}>
                     {(() => {
                       const totalAmountOwed = loanData?.totalAmountOwed ? parseFloat(formatUnits(loanData.totalAmountOwed.toString(), 18)) : 0;
                       if (totalAmountOwed === 0) {
-                        return "No Loan";
+                        return "No loan";
                       }
                       if (loanData?.healthFactor !== undefined && !isNaN((loanData.healthFactor))) {
                         return (loanData.healthFactor).toFixed(2);
@@ -106,9 +106,9 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
                     })()}
                   </span>
                   {loanData?.healthFactor < 1 && (
-                    <div className="flex items-center gap-2 text-red-500 text-sm border border-red-500 rounded-md p-2 mt-2">
+                    <div className="flex items-center gap-2 text-destructive text-sm border border-destructive/30 rounded-md p-2 mt-2">
                       <AlertTriangle className="flex-shrink-0" />
-                      <span className="text-red-500 text-xs sm:text-sm">Your position is at risk—add collateral or repay to restore health.</span>
+                      <span className="text-destructive text-xs sm:text-sm">Your position is at risk—add collateral or repay to restore health.</span>
                     </div>
                   )}
                 </div>
@@ -117,9 +117,9 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
               {/* Collateral Supplied */}
               <div className="flex flex-col space-y-3 p-4 bg-muted/50 rounded-lg">
                 <InfoTooltip content="The total USD value of collateral you have supplied to the lending pool.">
-                  <span className="text-muted-foreground text-sm font-medium">Collateral Supplied</span>
+                  <span className="text-muted-foreground text-sm font-medium">Collateral supplied</span>
                 </InfoTooltip>
-                <span className="font-semibold text-lg">
+                <span className="font-semibold text-lg tabular-nums">
                   {formatBalance(loanData?.totalCollateralValueSupplied || 0n, undefined, 18, 2, 2, true)}
                 </span>
               </div>

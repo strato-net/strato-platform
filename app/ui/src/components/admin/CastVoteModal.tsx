@@ -233,7 +233,7 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
                       variant="outline"
                       onClick={handleDismiss}
                       disabled={!onDismissIssue || !canDismiss || isDismissing || isSubmitting}
-                      className="text-red-600 border-red-600 hover:bg-red-50"
+                      className="text-destructive border-destructive hover:bg-destructive/10"
                     >
                       {isDismissing ? (
                         <>

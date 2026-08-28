@@ -257,18 +257,18 @@ const AssetDetail = () => {
       <div className="min-h-screen bg-background">
         <DashboardSidebar />
         <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>
-          <DashboardHeader title={isLoading ? "Loading..." : "Asset Not Found"} />
+          <DashboardHeader title={isLoading ? "Loading..." : "Asset not found"} />
           {isLoading ?
             <div className="flex justify-center items-center h-40">
-              <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
             :
             <main className="p-6">
               <div className="text-center py-12">
-                <h2 className="text-2xl font-bold mb-4">Asset Not Found</h2>
+                <h2 className="text-2xl font-bold mb-4">Asset not found</h2>
                 <p className="text-muted-foreground mb-6">The asset you are looking for does not exist or has been removed.</p>
                 <Link to="/dashboard/deposits">
-                  <Button>Back to Deposits</Button>
+                  <Button>Back to deposits</Button>
                 </Link>
               </div>
             </main>
@@ -294,8 +294,8 @@ const AssetDetail = () => {
 
         <main className="p-6">
           <div className="mb-6">
-            <Link to="/dashboard/deposits" className="inline-flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
-              <ChevronLeft size={16} className="mr-1" /> Back to Deposits
+            <Link to="/dashboard/deposits" className="inline-flex items-center text-primary hover:text-primary/80">
+              <ChevronLeft size={16} className="mr-1" /> Back to deposits
             </Link>
           </div>
 
@@ -307,12 +307,12 @@ const AssetDetail = () => {
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">{asset?.token?._symbol || asset?._symbol}</p>
+                      <p className="text-sm font-semibold text-primary">{asset?.token?._symbol || asset?._symbol}</p>
                       <CardTitle className="text-xl">{asset?.token?._name || asset?._name}</CardTitle>
                     </div>
                     <div
-                      className="w-16 h-16 rounded-full flex items-center justify-center text-white text-sm font-bold overflow-hidden"
-                      style={{ backgroundColor: asset?.color || "#EF4444" }} // fallback to red if no color
+                      className={`w-16 h-16 rounded-full flex items-center justify-center text-sm font-bold overflow-hidden ${asset?.color ? 'text-white' : 'bg-muted text-muted-foreground'}`}
+                      style={asset?.color ? { backgroundColor: asset.color } : undefined}
                     >
                       {asset?.token?._symbol?.toUpperCase() || asset?._symbol?.toUpperCase() || "N/A"}
                     </div>
@@ -345,9 +345,9 @@ const AssetDetail = () => {
                       onMouseEnter={() => setShowPriceTooltip(true)}
                       onMouseLeave={() => setShowPriceTooltip(false)}
                     >
-                      <span className="text-muted-foreground">Current Price:</span>
+                      <span className="text-muted-foreground">Current price:</span>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">
+                        <span className="font-medium tabular-nums">
                           {addCommasToInput(formatUnits(asset?.price?.toLocaleString("fullwide", { useGrouping: false }), 18))} USDST
                         </span>
                         
@@ -401,14 +401,14 @@ const AssetDetail = () => {
                       return (
                         <>
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Market Cap:</span>
-                            <span className="font-medium">
+                            <span className="text-muted-foreground">Market cap:</span>
+                            <span className="font-medium tabular-nums">
                               {marketCap > 0 ? `$${formatLargeNumber(marketCap)}` : '—'}
                             </span>
                           </div>
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Total Supply:</span>
-                            <span className="font-medium">{supplyLabel}</span>
+                            <span className="text-muted-foreground">Total supply:</span>
+                            <span className="font-medium tabular-nums">{supplyLabel}</span>
                           </div>
                         </>
                       );
@@ -417,7 +417,7 @@ const AssetDetail = () => {
                     {isLoggedIn && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Balance:</span>
-                      <span className="font-medium">{formatUnits(BigInt(asset?.balance || "0") + BigInt(asset?.collateralBalance || "0"), 18)}</span>
+                      <span className="font-medium tabular-nums">{formatUnits(BigInt(asset?.balance || "0") + BigInt(asset?.collateralBalance || "0"), 18)}</span>
                     </div>
                     )}
 
@@ -429,7 +429,7 @@ const AssetDetail = () => {
                       return (
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Equivalent {ea.rebasingExternalSymbol}:</span>
-                          <span className="font-medium">{formatUnits(equivalent, 18)}</span>
+                          <span className="font-medium tabular-nums">{formatUnits(equivalent, 18)}</span>
                         </div>
                       );
                     })()}
@@ -523,7 +523,7 @@ const AssetDetail = () => {
                   swapData={swapPriceData}
                   spotLoading={priceDataLoading}
                   swapLoading={swapPriceDataLoading}
-                  title="Price History"
+                  title="Price history"
                   subtitle={
                     isLPToken(asset)
                       ? "Net Asset Value per token, calculated from pool balances and oracle prices"
@@ -534,7 +534,7 @@ const AssetDetail = () => {
 
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-lg">Recent Swaps</CardTitle>
+                    <CardTitle className="text-lg">Recent swaps</CardTitle>
                     <p className="text-sm text-muted-foreground">
                       Latest trades involving {asset?.token?._symbol || asset?._symbol} across all pools
                     </p>

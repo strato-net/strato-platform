@@ -333,7 +333,7 @@ const VaultAdminTab = () => {
                             className="w-6 h-6 rounded-full object-cover"
                           />
                         ) : (
-                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-xs text-white font-medium">
+                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-strato-blue to-primary flex items-center justify-center text-xs text-primary-foreground font-medium">
                             {asset.symbol?.slice(0, 2)}
                           </div>
                         )}
@@ -350,7 +350,7 @@ const VaultAdminTab = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
                         onClick={() => setRemoveAssetAddress(asset.address)}
                         disabled={BigInt(asset.balance || "0") > BigInt(0)}
                       >
@@ -589,7 +589,7 @@ const VaultAdminTab = () => {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRemoveAsset}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
               {removeAssetLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />

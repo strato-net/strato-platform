@@ -46,18 +46,18 @@ const Hero = () => {
             
             <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-12 md:py-16 lg:py-20 min-h-[500px] md:min-h-[calc(100vh-100px)] flex flex-col justify-center">
               {/* Badge */}
-              <div className="inline-flex items-center gap-2 bg-white dark:bg-slate-800 rounded-full px-4 py-2 shadow-sm border border-border/50 w-fit mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <Sparkles className="w-4 h-4 text-strato-lightblue" />
+              <div className="inline-flex items-center gap-2 bg-card rounded-full px-4 py-2 shadow-sm border border-border/50 w-fit mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <Sparkles className="w-4 h-4 text-primary" />
                 <span className="text-sm font-medium text-foreground">Welcome to STRATO</span>
               </div>
               
               {/* Headline */}
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
+              <h1 className="font-display tracking-tight text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
                 <span className="text-foreground">Where Stability</span>
                 <br />
-                <span className="text-strato-lightblue">Meets</span>
+                <span className="text-primary">Meets</span>
                 <br />
-                <span className="text-strato-lightblue">Opportunity</span>
+                <span className="text-primary">Opportunity</span>
               </h1>
               
               {/* Description */}
@@ -69,14 +69,14 @@ const Hero = () => {
               <div className="flex flex-col sm:flex-row gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
             <button
               onClick={handleGetStarted}
-                  className="group inline-flex items-center justify-center gap-2 bg-strato-lightblue hover:bg-strato-blue text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
+                  className="group inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
                 >
                   Get Started
                   <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
                 </button>
                 <Link
                   to="/dashboard/rewards"
-                  className="inline-flex items-center justify-center gap-2 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 text-foreground px-6 py-3 rounded-lg font-medium border border-border transition-all duration-300"
+                  className="inline-flex items-center justify-center gap-2 bg-card hover:bg-accent text-foreground px-6 py-3 rounded-lg font-medium border border-border transition-all duration-300"
                 >
                   Earn Rewards
             </Link>
@@ -138,18 +138,18 @@ const Hero = () => {
           {/* Feature Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Easy Savings */}
-            <div className="group p-6 lg:p-8 bg-card rounded-2xl border border-border shadow-sm hover:shadow-lg hover:border-strato-lightblue/30 transition-all duration-300">
-              <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/20 mb-6 group-hover:scale-110 transition-transform duration-300">
-                <PiggyBank className="w-6 h-6 text-strato-lightblue" />
+            <div className="group p-6 lg:p-8 bg-card rounded-2xl border border-border shadow-sm hover:shadow-lg hover:border-primary/30 transition-all duration-300">
+              <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-primary/10 mb-6 group-hover:scale-110 transition-transform duration-300">
+                <PiggyBank className="w-6 h-6 text-primary" />
               </div>
-              <span className="text-sm font-medium text-strato-lightblue">Grow your wealth</span>
+              <span className="text-sm font-medium text-primary">Grow your wealth</span>
               <h3 className="text-xl font-bold text-foreground mt-1 mb-3">Easy Savings</h3>
               <p className="text-muted-foreground mb-6 leading-relaxed">
                 Deposit your assets and watch them grow. Earn competitive yields automatically with our simple savings solution.
               </p>
               <Link 
                 to="/dashboard/deposits"
-                className="inline-flex items-center gap-2 text-strato-lightblue font-medium hover:gap-3 transition-all duration-300"
+                className="inline-flex items-center gap-2 text-primary font-medium hover:gap-3 transition-all duration-300"
               >
                 Start Saving
                 <ArrowRight className="w-4 h-4" />
@@ -157,18 +157,18 @@ const Hero = () => {
             </div>
             
             {/* Borrow */}
-            <div className="group p-6 lg:p-8 bg-card rounded-2xl border border-border shadow-sm hover:shadow-lg hover:border-strato-lightblue/30 transition-all duration-300">
-              <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/20 mb-6 group-hover:scale-110 transition-transform duration-300">
-                <FileText className="w-6 h-6 text-strato-lightblue" />
+            <div className="group p-6 lg:p-8 bg-card rounded-2xl border border-border shadow-sm hover:shadow-lg hover:border-primary/30 transition-all duration-300">
+              <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-primary/10 mb-6 group-hover:scale-110 transition-transform duration-300">
+                <FileText className="w-6 h-6 text-primary" />
               </div>
-              <span className="text-sm font-medium text-strato-lightblue">Unlock liquidity</span>
+              <span className="text-sm font-medium text-primary">Unlock liquidity</span>
               <h3 className="text-xl font-bold text-foreground mt-1 mb-3">Borrow</h3>
               <p className="text-muted-foreground mb-6 leading-relaxed">
                 Use your deposits as collateral to borrow USDST instantly. Flexible terms, competitive rates, no credit checks.
               </p>
               <Link 
                 to="/dashboard/borrow"
-                className="inline-flex items-center gap-2 text-strato-lightblue font-medium hover:gap-3 transition-all duration-300"
+                className="inline-flex items-center gap-2 text-primary font-medium hover:gap-3 transition-all duration-300"
               >
                 Borrow Now
                 <ArrowRight className="w-4 h-4" />
@@ -176,18 +176,18 @@ const Hero = () => {
             </div>
             
             {/* Rewards */}
-            <div className="group p-6 lg:p-8 bg-card rounded-2xl border border-border shadow-sm hover:shadow-lg hover:border-strato-lightblue/30 transition-all duration-300">
-              <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/20 mb-6 group-hover:scale-110 transition-transform duration-300">
-                <Gift className="w-6 h-6 text-strato-lightblue" />
+            <div className="group p-6 lg:p-8 bg-card rounded-2xl border border-border shadow-sm hover:shadow-lg hover:border-primary/30 transition-all duration-300">
+              <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-primary/10 mb-6 group-hover:scale-110 transition-transform duration-300">
+                <Gift className="w-6 h-6 text-primary" />
               </div>
-              <span className="text-sm font-medium text-strato-lightblue">Earn as you go</span>
+              <span className="text-sm font-medium text-primary">Earn as you go</span>
               <h3 className="text-xl font-bold text-foreground mt-1 mb-3">Rewards</h3>
               <p className="text-muted-foreground mb-6 leading-relaxed">
                 Get rewarded for every action you take. Climb the leaderboard, unlock achievements, and maximize your earnings.
               </p>
               <Link 
                 to="/dashboard/rewards"
-                className="inline-flex items-center gap-2 text-strato-lightblue font-medium hover:gap-3 transition-all duration-300"
+                className="inline-flex items-center gap-2 text-primary font-medium hover:gap-3 transition-all duration-300"
               >
                 View Rewards
                 <ArrowRight className="w-4 h-4" />
@@ -208,7 +208,7 @@ const Hero = () => {
               </div>
               <Link
                 to="/dashboard/advanced"
-                className="group flex-shrink-0 inline-flex items-center justify-center gap-2 bg-strato-lightblue hover:bg-strato-blue text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
+                className="group flex-shrink-0 inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
               >
                 Advanced Features
                 <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />

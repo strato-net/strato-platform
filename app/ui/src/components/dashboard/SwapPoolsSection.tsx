@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CircleArrowDown, CircleArrowUp, Search, LineChart } from "lucide-react";
+import { CircleArrowDown, CircleArrowUp, Loader2, Search, LineChart } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useUser } from '@/context/UserContext';
 import { useTokenContext } from '@/context/TokenContext';
@@ -145,7 +145,7 @@ const SwapPoolsSection = () => {
       <div className="grid grid-cols-1 gap-4">
         {poolsLoading && pools.length === 0 ? (
           <div className="flex justify-center items-center h-12">
-            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : !pools.length ? (
           <div className="flex justify-center items-center h-12">
@@ -175,8 +175,8 @@ const SwapPoolsSection = () => {
                           ) : (
                             <div
                               key={coin.address}
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium border-2 border-white absolute"
-                              style={{ backgroundColor: "red", zIndex: pool.coins!.length - idx, left: `${pool.coins!.length <= 1 ? 0 : idx * (16 / (pool.coins!.length - 1))}px` }}
+                              className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium border-2 border-white absolute"
+                              style={{ zIndex: pool.coins!.length - idx, left: `${pool.coins!.length <= 1 ? 0 : idx * (16 / (pool.coins!.length - 1))}px` }}
                             >
                               {coin._symbol?.slice(0, 2)}
                             </div>
@@ -193,8 +193,8 @@ const SwapPoolsSection = () => {
                             />
                           ) : (
                             <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium border-2 border-white absolute"
-                              style={{ backgroundColor: "red", zIndex: 2, left: 0 }}
+                              className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium border-2 border-white absolute"
+                              style={{ zIndex: 2, left: 0 }}
                             >
                               {pool.poolName?.slice(0, 2)}
                             </div>
@@ -208,8 +208,8 @@ const SwapPoolsSection = () => {
                             />
                           ) : (
                             <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium absolute"
-                              style={{ backgroundColor: "red", zIndex: 1, left: '16px' }}
+                              className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium absolute"
+                              style={{ zIndex: 1, left: '16px' }}
                             >
                               {pool.poolName?.split('/')[1]?.slice(0, 2)}
                             </div>
@@ -226,7 +226,7 @@ const SwapPoolsSection = () => {
                       {isLoggedIn && (
                         <>
                           <div className="flex items-center text-xs text-muted-foreground mt-1">
-                            <span>Your Liquidity: {formatYourLiquidityValue(pool)}</span>
+                            <span>Your liquidity: {formatYourLiquidityValue(pool)}</span>
                           </div>
                         </>
                       )}
@@ -240,11 +240,11 @@ const SwapPoolsSection = () => {
                   <div className="flex items-center justify-between sm:justify-end space-x-4">
                     <div className="text-left sm:text-right">
                       <div className="text-sm text-muted-foreground inline-flex items-center gap-1">
-                        Best Available APY
+                        Best available APY
                         <BestApyInfoTooltip />
                       </div>
                       <EarnApyTooltip info={apyInfo}>
-                        <div className="font-medium cursor-default">{displayedApy}</div>
+                        <div className="font-medium cursor-default tabular-nums">{displayedApy}</div>
                       </EarnApyTooltip>
                     </div>
                
@@ -263,7 +263,7 @@ const SwapPoolsSection = () => {
                         <Button
                         size="sm"
                         variant="outline"
-                        className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-auto disabled:border-muted disabled:text-muted-foreground disabled:hover:bg-transparent disabled:dark:border-muted disabled:dark:text-muted-foreground"
+                        className="border-primary text-primary hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-auto disabled:border-muted disabled:text-muted-foreground disabled:hover:bg-transparent disabled:dark:border-muted disabled:dark:text-muted-foreground"
                         onClick={() => handleOpenWithdrawModal(pool)}
                         disabled={!isLoggedIn || BigInt(pool.lpToken.totalBalance || "0") === BigInt(0)}
                         title={!isLoggedIn ? "Sign in to withdraw" : BigInt(pool.lpToken.totalBalance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}

@@ -84,7 +84,7 @@ const HistoryChart = ({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs text-muted-foreground">{title}</p>
-          <p className="mt-1 text-2xl font-semibold">{loading ? "..." : value}</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{loading ? "..." : value}</p>
           <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
         </div>
         {performance && (
@@ -92,7 +92,7 @@ const HistoryChart = ({
             {performance.map((item) => (
               <div key={item.label} className="min-w-16 rounded-md border border-border/60 bg-muted/30 px-2.5 py-1.5 text-right">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{item.label}</p>
-                <p className="text-xs font-semibold text-foreground">{item.value}</p>
+                <p className="text-xs font-semibold text-foreground tabular-nums">{item.value}</p>
               </div>
             ))}
           </div>
@@ -202,7 +202,7 @@ export const YieldVaultHistoryCharts = ({
   return (
     <section className="rounded-lg border border-border/70 bg-background/60 p-3 md:p-4 space-y-3">
       <div>
-        <h2 className="text-sm font-semibold">Vault Performance</h2>
+        <h2 className="text-sm font-semibold">Vault performance</h2>
         <p className="text-xs text-muted-foreground">Historical vault price and TVL</p>
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

@@ -1429,7 +1429,7 @@ const PriceTracking = () => {
                     onClick={() => handleOpenSwap(asset, 'buy')}
                     disabled={!buyEnabled}
                   >
-                    <span className={buyEnabled ? 'text-green-500' : 'text-muted-foreground'}>Buy</span>
+                    <span className={buyEnabled ? 'text-success' : 'text-muted-foreground'}>Buy</span>
                   </Button>
                   <Button
                     size="sm"
@@ -1438,7 +1438,7 @@ const PriceTracking = () => {
                     onClick={() => handleOpenSwap(asset, 'sell')}
                     disabled={!sellEnabled}
                   >
-                    <span className={sellEnabled ? 'text-red-500' : 'text-muted-foreground'}>Sell</span>
+                    <span className={sellEnabled ? 'text-destructive' : 'text-muted-foreground'}>Sell</span>
                   </Button>
                 </div>
               );
@@ -1452,7 +1452,7 @@ const PriceTracking = () => {
                 onClick={() => handleOpenArb(asset)}
                 aria-label="Arbitrage"
               >
-                <span className="text-amber-500">ARB</span>
+                <span className="text-warning">ARB</span>
               </Button>
             )}
             {/* Spot price toggle (pools only) */}

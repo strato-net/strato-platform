@@ -36,7 +36,7 @@ const AdvancedOptionsDropdown: React.FC<AdvancedOptionsDropdownProps> = ({
             isAdvancedOpen ? "border border-b-0 border-border rounded-b-none" : "border-0"
           }`}
         >
-          <span>See Advanced Options</span>
+          <span>See advanced options</span>
           <ChevronDown
             className={`h-4 w-4 transition-transform duration-200 ${
               isAdvancedOpen ? "rotate-180" : ""

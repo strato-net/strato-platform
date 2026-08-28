@@ -108,7 +108,7 @@ const TokenStatusTable = () => {
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
-            <p className="text-red-600 dark:text-red-400">Error loading tokens: {error}</p>
+            <p className="text-destructive">Error loading tokens: {error}</p>
             <Button 
               variant="outline" 
               onClick={refreshAllData}

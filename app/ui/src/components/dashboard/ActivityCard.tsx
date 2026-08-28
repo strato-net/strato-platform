@@ -108,10 +108,7 @@ const AssetImageDisplay = ({
 
   if (error) {
     return (
-      <div
-        className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs"
-        style={{ backgroundColor: "red" }}
-      >
+      <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs">
         {fallback.slice(0, 2).toUpperCase()}
       </div>
     );

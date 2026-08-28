@@ -347,8 +347,8 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         <BridgeWalletStatus
           guestMode={guestMode}
           externalOnly
-          connectedLabel="External Wallet Connected"
-          connectLabel="Connect External Wallet"
+          connectedLabel="External wallet connected"
+          connectLabel="Connect external wallet"
           copiedDescription="External wallet address copied to clipboard"
         />
       </div>
@@ -366,14 +366,14 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
           <Label htmlFor="amount" className="text-sm">{modeLabels.amountLabel}</Label>
           {!maxAmount && isBalanceLoading ? (
             <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               <p className="text-xs md:text-sm text-muted-foreground">Fetching balance...</p>
             </div>
           ) : (
             maxAmount && (
               <div>
                 <div className="flex items-center gap-3">
-                  <p className="text-xs md:text-sm text-muted-foreground">
+                  <p className="text-xs md:text-sm text-muted-foreground tabular-nums">
                     Max: {formatBalance(
                       maxAmount,
                       undefined,
@@ -382,7 +382,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
                       6
                     )}
                   </p>
-                  <p className="text-xs md:text-sm text-muted-foreground">
+                  <p className="text-xs md:text-sm text-muted-foreground tabular-nums">
                     Min: {isSaving ? MIN_USDST_WITHDRAWAL : "0"}
                   </p>
                 </div>
@@ -390,7 +390,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
                   try {
                     const equiv = (BigInt(maxAmount) * BigInt(selectedToken.rebaseFactor!) / WAD).toString();
                     return (
-                      <p className="text-xs text-muted-foreground mt-0.5 text-right">
+                      <p className="text-xs text-muted-foreground mt-0.5 text-right tabular-nums">
                         ≈ {formatBalance(equiv, undefined, DECIMAL, 2, 6)} {selectedToken.externalSymbol}
                       </p>
                     );
@@ -406,15 +406,15 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
           inputMode="decimal"
           pattern="[0-9]*\.?[0-9]*"
           placeholder={hasExternalRecipient ? "0.00" : "Connect external wallet to enter amount"}
-          className={`w-full ${
-            amountError ? "border-red-500 focus:ring-red-400" : ""
+          className={`w-full tabular-nums ${
+            amountError ? "border-destructive focus:ring-destructive" : ""
           }`}
           value={amount}
           onChange={(e) => { if (!guestMode) handleAmountChange(e.target.value); }}
           disabled={guestMode || !hasExternalRecipient || isLoading}
         />
-        {amountError && <p className="text-sm text-red-500">{amountError}</p>}
-        {feeError && <p className="text-sm text-yellow-600">{feeError}</p>}
+        {amountError && <p className="text-sm text-destructive">{amountError}</p>}
+        {feeError && <p className="text-sm text-warning">{feeError}</p>}
 
         {hasExternalRecipient && !guestMode && (
           <PercentageButtons
@@ -441,7 +441,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         disabled={isButtonDisabled}
         className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
-        {isLoading ? "Processing..." : "Bridge Out"}
+        {isLoading ? "Processing..." : "Bridge out"}
         </Button>
 
       <AdvancedOptionsDropdown
@@ -456,8 +456,8 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         open={isModalOpen}
         onOk={handleBridgeOut}
         onCancel={handleModalCancel}
-        title="Confirm Bridge Transaction"
-        okText="Yes, Bridge Assets"
+        title="Confirm bridge transaction"
+        okText="Yes, bridge assets"
         cancelText="Cancel"
         fromNetwork="STRATO"
         toNetwork={selectedNetwork || "Not selected"}

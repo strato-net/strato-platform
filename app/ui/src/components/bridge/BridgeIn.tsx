@@ -253,22 +253,22 @@ const TokenCard = ({ active, image, symbol, estimated, estimatedUsd, onClick, di
 }) => (
   <button type="button" onClick={onClick} disabled={disabled}
     className={`relative text-left rounded-md border-2 p-3 transition-colors snap-start ${
-      active ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10" : "border-border hover:bg-muted/30"
+      active ? "border-primary bg-primary/5" : "border-border hover:bg-muted/30"
     }`}>
-    {active && <div className="absolute top-2 right-2"><CheckCircle2 className="w-4 h-4 text-blue-500" /></div>}
+    {active && <div className="absolute top-2 right-2"><CheckCircle2 className="w-4 h-4 text-primary" /></div>}
     <div className="flex items-center gap-2 mb-1">
       {image
         ? <img src={image} alt={symbol} className="w-6 h-6 rounded-full object-cover shrink-0" />
         : <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-foreground shrink-0">{(symbol || "?").charAt(0)}</span>}
       <div>
         <p className="text-sm font-semibold text-foreground leading-tight">{symbol}</p>
-        <p className="min-h-[14px] text-[11px] text-muted-foreground leading-tight">{effectivePrice ? `${effectivePrice}/unit` : "\u00A0"}</p>
+        <p className="min-h-[14px] text-[11px] text-muted-foreground leading-tight tabular-nums">{effectivePrice ? `${effectivePrice}/unit` : "\u00A0"}</p>
       </div>
     </div>
-    <p className="text-xs text-muted-foreground">{"\u2248"} {estimated} {symbol}</p>
-    <p className="min-h-[14px] text-[11px] font-medium text-foreground/80 leading-tight">{estimatedUsd ? `\u2248 ${estimatedUsd}` : "\u00a0"}</p>
+    <p className="text-xs text-muted-foreground tabular-nums">{"\u2248"} {estimated} {symbol}</p>
+    <p className="min-h-[14px] text-[11px] font-medium text-foreground/80 leading-tight tabular-nums">{estimatedUsd ? `\u2248 ${estimatedUsd}` : "\u00A0"}</p>
     {apyBadge}
-    <p className="min-h-[14px] text-[10px] text-muted-foreground mt-0.5">{spotLabel || "\u00A0"}</p>
+    <p className="min-h-[14px] text-[10px] text-muted-foreground mt-0.5 tabular-nums">{spotLabel || "\u00A0"}</p>
   </button>
 );
 
@@ -481,13 +481,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     return (
       <div className={STEP3_APY_ROW_CLASS}>
         {!tokenApysLoaded ? (
-          <p className="text-[10px] font-medium text-green-500/40 animate-pulse blur-[2px] leading-none">{"\u2026"}</p>
+          <p className="text-[10px] font-medium text-success/40 animate-pulse blur-[2px] leading-none">{"\u2026"}</p>
         ) : info ? (
           <EarnApyTooltip info={info} side="top" align="start">
             <span
               role="link"
               tabIndex={0}
-              className="inline-flex items-center gap-0.5 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-500 cursor-pointer hover:bg-green-500/20 transition-colors"
+              className="inline-flex items-center gap-0.5 rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-medium text-success cursor-pointer hover:bg-success/20 transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
                 go();
@@ -1300,8 +1300,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         {/* STEP 1 */}
         <section className="space-y-3">
           <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">1</span>
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">How Are You Funding?</h3>
+            <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">1</span>
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">How are you funding?</h3>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -1310,13 +1310,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               onClick={() => { if (guestMode) openConnectModal?.(); else setFundingMode("bridge"); }}
               className={`relative rounded-md border-2 p-3 text-left transition-colors ${
                 fundingMode === "bridge"
-                  ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
+                  ? "border-primary bg-primary/5"
                   : "border-border hover:bg-muted/30"
               }`}
             >
-              {fundingMode === "bridge" && <div className="absolute top-2 right-2"><CheckCircle2 className="w-5 h-5 text-blue-500" /></div>}
-              <ArrowDownToLine className={`w-5 h-5 mb-2 ${fundingMode === "bridge" ? "text-blue-500" : "text-muted-foreground"}`} />
-              <p className="text-sm font-semibold">{guestMode ? "Connect" : "Bridge In"}</p>
+              {fundingMode === "bridge" && <div className="absolute top-2 right-2"><CheckCircle2 className="w-5 h-5 text-primary" /></div>}
+              <ArrowDownToLine className={`w-5 h-5 mb-2 ${fundingMode === "bridge" ? "text-primary" : "text-muted-foreground"}`} />
+              <p className="text-sm font-semibold">{guestMode ? "Connect" : "Bridge in"}</p>
               <p className="text-xs text-muted-foreground mt-0.5">From {networkNames}</p>
             </button>
             <button
@@ -1324,21 +1324,21 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               onClick={() => { if (guestMode) openConnectModal?.(); else { setFundingMode("metals"); fetchTokens(); } }}
               className={`relative rounded-md border-2 p-3 text-left transition-colors ${
                 fundingMode === "metals"
-                  ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
+                  ? "border-primary bg-primary/5"
                   : "border-border hover:bg-muted/30"
               }`}
             >
-              {fundingMode === "metals" && <div className="absolute top-2 right-2"><CheckCircle2 className="w-5 h-5 text-blue-500" /></div>}
-              <Gem className={`w-5 h-5 mb-2 ${fundingMode === "metals" ? "text-blue-500" : "text-muted-foreground"}`} />
-              <p className="text-sm font-semibold">Buy Metals</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Gold, Silver & more</p>
+              {fundingMode === "metals" && <div className="absolute top-2 right-2"><CheckCircle2 className="w-5 h-5 text-primary" /></div>}
+              <Gem className={`w-5 h-5 mb-2 ${fundingMode === "metals" ? "text-primary" : "text-muted-foreground"}`} />
+              <p className="text-sm font-semibold">Buy metals</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Gold, silver & more</p>
             </button>
           </div>
 
           <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
             fundingMode === "bridge" ? "max-h-[200px] opacity-100" : "max-h-0 opacity-0"
           }`}>
-            <p className="text-xs font-medium text-muted-foreground mb-2">Choose Network</p>
+            <p className="text-xs font-medium text-muted-foreground mb-2">Choose network</p>
             <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${availableNetworks.length || 1}, 1fr)` }}>
               {availableNetworks.map((network) => {
                 const active = selectedNetwork === network.chainName;
@@ -1353,13 +1353,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                     disabled={guestMode || isLoading}
                     className={`relative h-10 rounded-md text-sm font-medium border-2 transition-colors flex items-center justify-center ${
                       active
-                        ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-300"
+                        ? "border-primary bg-primary/10 text-primary"
                         : "border-border text-foreground hover:bg-muted/50"
                     }`}
                   >
                     {active && (
                       <div className="absolute top-1 right-1">
-                        <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                        <CheckCircle2 className="w-4 h-4 text-primary" />
                       </div>
                     )}
                     {network.chainName}
@@ -1374,8 +1374,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">2</span>
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Send</h3>
+              <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">2</span>
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You send</h3>
             </div>
             <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
               fundingMode === "bridge" ? "max-w-[300px] opacity-100" : "max-w-0 opacity-0"
@@ -1386,8 +1386,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                   <BridgeWalletStatus
                     guestMode={guestMode}
                     externalOnly
-                    connectedLabel="External Wallet"
-                    connectLabel="Connect External"
+                    connectedLabel="External wallet"
+                    connectLabel="Connect external"
                     copiedDescription="External wallet address copied to clipboard"
                   />
                 </div>
@@ -1424,15 +1424,15 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                     </SelectContent>
                   </Select>
                   <Input type="text" inputMode="decimal" pattern="[0-9]*\.?[0-9]*" placeholder="0.00"
-                    className={`flex-1 h-10 text-right text-xl font-bold text-foreground border-0 focus-visible:ring-0 p-0 ${amountError ? "!text-red-500" : ""}`}
+                    className={`flex-1 h-10 text-right text-xl font-bold text-foreground border-0 focus-visible:ring-0 p-0 tabular-nums ${amountError ? "!text-destructive" : ""}`}
                     value={amount} onChange={(e) => handleAmountChange(e.target.value)}
                     disabled={fundingMode !== "metals" || guestMode || isLoading} />
                 </div>
-                {amountError && fundingMode === "metals" && <p className="text-xs text-red-500">{amountError}</p>}
-                {metalsFeeError && fundingMode === "metals" && <p className="text-xs text-yellow-600">{metalsFeeError}</p>}
+                {amountError && fundingMode === "metals" && <p className="text-xs text-destructive">{amountError}</p>}
+                {metalsFeeError && fundingMode === "metals" && <p className="text-xs text-warning">{metalsFeeError}</p>}
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-xs text-muted-foreground">
-                    Balance: <span className="text-foreground font-medium">{metalsPayBalance || "0.00"} {selectedPayToken?.symbol || ""}</span>
+                    Balance: <span className="text-foreground font-medium tabular-nums">{metalsPayBalance || "0.00"} {selectedPayToken?.symbol || ""}</span>
                   </span>
                   <div className="flex items-center gap-1">
                     <PercentageButtons value={amount} maxValue={metalsMaxAmount} onChange={handleAmountChange}
@@ -1475,15 +1475,15 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                     </SelectContent>
                   </Select>
                   <Input type="text" inputMode="decimal" pattern="[0-9]*\.?[0-9]*" placeholder="0.00"
-                    className={`flex-1 h-10 text-right text-xl font-bold text-foreground border-0 focus-visible:ring-0 p-0 ${amountError ? "!text-red-500" : ""}`}
+                    className={`flex-1 h-10 text-right text-xl font-bold text-foreground border-0 focus-visible:ring-0 p-0 tabular-nums ${amountError ? "!text-destructive" : ""}`}
                     value={amount} onChange={(e) => handleAmountChange(e.target.value)}
                     disabled={guestMode || !hasExternalWallet || isLoading} />
                 </div>
-                {sendUsd && <p className="text-right text-xs text-muted-foreground pt-0.5">{"≈"} {sendUsd}</p>}
-                {amountError && <p className="text-xs text-red-500">{amountError}</p>}
+                {sendUsd && <p className="text-right text-xs text-muted-foreground pt-0.5 tabular-nums">{"≈"} {sendUsd}</p>}
+                {amountError && <p className="text-xs text-destructive">{amountError}</p>}
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-xs text-muted-foreground">
-                    Balance: <span className="text-foreground font-medium">{formatBalanceDisplay(maxAmount)} {selectedToken?.externalSymbol || ""}</span>
+                    Balance: <span className="text-foreground font-medium tabular-nums">{formatBalanceDisplay(maxAmount)} {selectedToken?.externalSymbol || ""}</span>
                   </span>
                   <div className="flex items-center gap-1">
                     <PercentageButtons value={amount} maxValue={maxAmount} onChange={handleAmountChange}
@@ -1501,8 +1501,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">3</span>
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Receive On STRATO</h3>
+              <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">3</span>
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You receive on STRATO</h3>
             </div>
             {stratoRecipientHex && (
               <button
@@ -1612,10 +1612,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         </section>
 
         {fundingMode === "bridge" && selectedToken?.rebaseFactor && (
-          <div className="flex items-start gap-3 p-3 bg-amber-500/10 dark:bg-amber-500/20 border border-amber-500/30 rounded-lg">
-            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-amber-800 dark:text-amber-200">
-              <div className="font-medium mb-1">Rebasing Token</div>
+          <div className="flex items-start gap-3 p-3 bg-warning/10 border border-warning/40 rounded-lg">
+            <AlertTriangle className="w-5 h-5 text-warning mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-warning">
+              <div className="font-medium mb-1">Rebasing token</div>
               <div>
               This token&apos;s quantity may change due to rebasing events on Ethereum.<br/>
               The received amount on STRATO reflects your underlying share value at the current multiplier.
@@ -1641,7 +1641,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           <div className={`overflow-hidden transition-all duration-300 ease-in-out text-right ${
             fundingMode === "bridge" ? "max-h-[30px] opacity-100" : "max-h-0 opacity-0"
           }`}>
-            <Link to="/dashboard/withdrawals" className="text-xs text-blue-500 hover:text-blue-400">
+            <Link to="/dashboard/withdrawals" className="text-xs text-primary hover:text-primary/80">
               Need to withdraw? <span className="font-semibold">Withdraw {"\u2192"}</span>
             </Link>
           </div>
@@ -1650,10 +1650,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               fundingMode === "metals" && contactEnabled ? "max-h-[120px] opacity-100" : "max-h-0 opacity-0"
             }`}
           >
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-500/10 p-3">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/10 p-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="bg-blue-500 rounded-full p-1 shrink-0">
-                  <Gem className="w-3 h-3 text-white" />
+                <div className="bg-primary rounded-full p-1 shrink-0">
+                  <Gem className="w-3 h-3 text-primary-foreground" />
                 </div>
                 <p className="text-xs text-muted-foreground">
                   We are currently accepting gold and silver physical deposits for tokenizing into GOLDST and SILVST.
@@ -1662,7 +1662,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               <button
                 type="button"
                 onClick={() => setContactModalOpen(true)}
-                className="inline-flex items-center gap-1 shrink-0 font-semibold text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 underline underline-offset-2"
+                className="inline-flex items-center gap-1 shrink-0 font-semibold text-xs text-primary hover:text-primary/80 underline underline-offset-2"
               >
                 <Mail className="w-3 h-3" />
                 Contact us {"\u2192"}
@@ -1672,7 +1672,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         </div>
 
         {networkError && (
-          <p className="text-sm text-red-500">{networkError}</p>
+          <p className="text-sm text-destructive">{networkError}</p>
         )}
 
         <DepositProgressModal

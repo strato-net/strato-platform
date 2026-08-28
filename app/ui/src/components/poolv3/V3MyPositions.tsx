@@ -323,8 +323,8 @@ const V3MyPositions = ({
   if (groups.length === 0) {
     return (
       <div className="bg-card shadow-sm rounded-xl p-8 border border-border text-center">
-        <p className="text-sm text-muted-foreground mb-3">You don't have any liquidity positions yet.</p>
-        <Button className="bg-strato-blue hover:bg-strato-blue/90" onClick={onBrowsePools}>
+        <p className="text-sm text-muted-foreground mb-3">No positions yet — add liquidity to open your first position.</p>
+        <Button className="bg-primary hover:bg-primary/90 text-primary-foreground" onClick={onBrowsePools}>
           Add liquidity
         </Button>
       </div>
@@ -352,7 +352,7 @@ const V3MyPositions = ({
               key={pool.address}
               onClick={() => setSelectedPoolAddress(pool.address)}
               className={`flex items-center justify-between gap-2 rounded-lg border p-3 text-left transition-colors ${
-                selectedPoolAddress === pool.address ? "border-strato-blue bg-muted" : "border-border hover:bg-muted/50"
+                selectedPoolAddress === pool.address ? "border-primary bg-muted" : "border-border hover:bg-muted/50"
               }`}
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -372,11 +372,11 @@ const V3MyPositions = ({
                     Disabled
                   </Badge>
                 ) : pool.isPaused ? (
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-yellow-600 border-yellow-600/40">
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-warning border-warning/40">
                     Paused
                   </Badge>
                 ) : null}
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 tabular-nums">
                   {pool.fee / 10000}%
                 </Badge>
               </div>
@@ -395,13 +395,13 @@ const V3MyPositions = ({
                 <span className="text-sm font-semibold truncate">
                   {selectedGroup.pool.token0.symbol}/{selectedGroup.pool.token1.symbol}
                 </span>
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 tabular-nums">
                   {selectedGroup.pool.fee / 10000}%
                 </Badge>
               </div>
               <span className="text-xs text-muted-foreground text-right flex-shrink-0">
                 {priceDomainEdge(selectedGroup.pool) ? (
-                  <span className="text-yellow-600">
+                  <span className="text-warning">
                     Price unavailable — no{" "}
                     {priceDomainEdge(selectedGroup.pool) === "max"
                       ? selectedGroup.pool.token0.symbol
@@ -437,11 +437,11 @@ const V3MyPositions = ({
                   key={key}
                   id={`v3-position-${key}`}
                   className={`bg-card shadow-sm rounded-xl border p-4 space-y-3 transition-colors ${
-                    highlightKey === key ? "border-strato-blue ring-2 ring-strato-blue/40" : "border-border"
+                    highlightKey === key ? "border-primary ring-2 ring-primary/40" : "border-border"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground tabular-nums">
                       Range: {formatTickAsPrice(position.tickLower)} – {formatTickAsPrice(position.tickUpper)}{" "}
                       {pool.token1.symbol}/{pool.token0.symbol}
                     </span>
@@ -454,7 +454,7 @@ const V3MyPositions = ({
                         >
                           <Badge
                             variant="outline"
-                            className="text-[10px] px-1.5 py-0 hover:bg-muted hover:text-strato-blue transition-colors"
+                            className="text-[10px] px-1.5 py-0 hover:bg-muted hover:text-primary transition-colors"
                           >
                             NFT #{position.tokenId}
                             <ArrowUpRight className="h-2.5 w-2.5 ml-0.5" />
@@ -470,7 +470,7 @@ const V3MyPositions = ({
                         </Badge>
                       )}
                       {(position.apy || 0) > 0 && (
-                        <span className="text-[11px] text-green-600 font-medium whitespace-nowrap">
+                        <span className="text-[11px] text-success font-medium whitespace-nowrap tabular-nums">
                           {position.apy.toFixed(2)}% APY
                         </span>
                       )}
@@ -478,8 +478,8 @@ const V3MyPositions = ({
                         variant="outline"
                         className={`text-[10px] px-1.5 py-0 flex-shrink-0 ${
                           position.inRange
-                            ? "text-green-600 border-green-600/40"
-                            : "text-yellow-600 border-yellow-600/40"
+                            ? "text-success border-success/30"
+                            : "text-warning border-warning/40"
                         }`}
                       >
                         {position.inRange ? "In range" : "Out of range"}
@@ -490,19 +490,19 @@ const V3MyPositions = ({
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="flex flex-col">
                       <span className="text-muted-foreground">Position value</span>
-                      <span className="font-medium">
+                      <span className="font-medium tabular-nums">
                         {formatTokenAmount(position.amount0, pool.token0.decimals)} {pool.token0.symbol}
                       </span>
-                      <span className="font-medium">
+                      <span className="font-medium tabular-nums">
                         {formatTokenAmount(position.amount1, pool.token1.decimals)} {pool.token1.symbol}
                       </span>
                     </div>
                     <div className="flex flex-col">
                       <span className="text-muted-foreground">Uncollected (incl. pending fees)</span>
-                      <span className="font-medium">
+                      <span className="font-medium tabular-nums">
                         {formatTokenAmount(uncollected0.toString(), pool.token0.decimals)} {pool.token0.symbol}
                       </span>
-                      <span className="font-medium">
+                      <span className="font-medium tabular-nums">
                         {formatTokenAmount(uncollected1.toString(), pool.token1.decimals)} {pool.token1.symbol}
                       </span>
                     </div>
@@ -522,7 +522,7 @@ const V3MyPositions = ({
                         onValueChange={(value) => setRemovePercents((prev) => ({ ...prev, [key]: value[0] }))}
                         className="flex-1"
                       />
-                      <span className="text-xs font-semibold w-10 text-right">{percent}%</span>
+                      <span className="text-xs font-semibold w-10 text-right tabular-nums">{percent}%</span>
                     </div>
                   )}
 

@@ -50,7 +50,7 @@ const VaultUserPosition = ({ onDeposit, onWithdraw, guestMode = false }: VaultUs
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Wallet className="h-5 w-5" />
-            Your Position
+            Your position
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -70,7 +70,7 @@ const VaultUserPosition = ({ onDeposit, onWithdraw, guestMode = false }: VaultUs
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Wallet className="h-5 w-5" />
-            Your Position
+            Your position
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -87,7 +87,7 @@ const VaultUserPosition = ({ onDeposit, onWithdraw, guestMode = false }: VaultUs
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Wallet className="h-5 w-5" />
-          Your Position
+          Your position
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -97,12 +97,12 @@ const VaultUserPosition = ({ onDeposit, onWithdraw, guestMode = false }: VaultUs
               You don't have any vault shares yet. Deposit tokens to start earning.
             </p>
             {paused && (
-              <p className="text-sm text-orange-600 dark:text-orange-400 mb-2">
+              <p className="text-sm text-warning mb-2">
                 Vault is paused. Deposits are disabled.
               </p>
             )}
             <Button onClick={onDeposit} disabled={paused}>
-              Make Your First Deposit
+              Make your first deposit
             </Button>
           </div>
         ) : (
@@ -111,9 +111,9 @@ const VaultUserPosition = ({ onDeposit, onWithdraw, guestMode = false }: VaultUs
             <div className="bg-muted/50 rounded-lg p-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <Wallet className="h-4 w-4" />
-                Your Shares
+                Your shares
               </div>
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-bold tabular-nums">
                 {formatShares(userShares)} <span className="text-base text-muted-foreground">(${formatUsd(userValueUsd)})</span>
               </div>
               <div className="text-xs text-muted-foreground">{shareTokenSymbol}</div>
@@ -122,7 +122,7 @@ const VaultUserPosition = ({ onDeposit, onWithdraw, guestMode = false }: VaultUs
             {/* Action Buttons */}
             <div className="flex flex-col gap-2">
               {paused && (
-                <p className="text-sm text-orange-600 dark:text-orange-400 text-center">
+                <p className="text-sm text-warning text-center">
                   Vault is paused. Deposits and withdrawals are disabled.
                 </p>
               )}

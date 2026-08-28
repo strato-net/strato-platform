@@ -33,9 +33,9 @@ const TransferConfirmationModal = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Confirm Send</DialogTitle>
+          <DialogTitle>Confirm send</DialogTitle>
           <DialogDescription>
-            Please review your send details before confirming.
+            Review the details before sending.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
@@ -47,22 +47,22 @@ const TransferConfirmationModal = ({
           </div>
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">Amount</p>
-            <p className="font-medium">{fromAmount}</p>
+            <p className="font-medium tabular-nums">{fromAmount}</p>
           </div>
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">Recipient</p>
-            <p className="font-medium text-xs break-all">{recipient}</p>
+            <p className="font-medium font-mono text-xs break-all">{recipient}</p>
           </div>
           <div className="border-t pt-4 space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Transaction Fee</span>
-              <span className="font-medium">
+              <span className="text-muted-foreground">Transaction fee</span>
+              <span className="font-medium tabular-nums">
                 {TRANSFER_FEE} USDST ({parseFloat(TRANSFER_FEE) * 100} voucher)
               </span>
             </div>
             <div className="flex justify-between text-sm font-medium border-t pt-2">
               <span>Total</span>
-              <span>
+              <span className="tabular-nums">
                 {fromAmount} {fromAsset?.token?._symbol || fromAsset?.token?._name} + {TRANSFER_FEE} USDST ({parseFloat(TRANSFER_FEE) * 100} voucher) fee
               </span>
             </div>
@@ -76,11 +76,10 @@ const TransferConfirmationModal = ({
             Cancel
           </Button>
           <Button
-            className="bg-blue-600 hover:bg-blue-700"
             onClick={onConfirm}
             disabled={swapLoading}
           >
-            {swapLoading ? "Processing..." : "Confirm Send"}
+            {swapLoading ? "Processing..." : "Confirm and send"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -195,7 +195,7 @@ const VaultDepositModal = ({ isOpen, onClose, onSuccess }: VaultDepositModalProp
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Deposit to Vault</DialogTitle>
+          <DialogTitle>Deposit to vault</DialogTitle>
           <DialogDescription>
             Deposit tokens to receive vault shares.
           </DialogDescription>
@@ -221,7 +221,7 @@ const VaultDepositModal = ({ isOpen, onClose, onSuccess }: VaultDepositModalProp
 
           {/* Token Selector */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Select Token</label>
+            <label className="text-sm font-medium">Select token</label>
             {!loadingBalances && availableTokens.length === 0 ? (
               <Alert>
                 <AlertCircle className="h-4 w-4" />
@@ -282,7 +282,7 @@ const VaultDepositModal = ({ isOpen, onClose, onSuccess }: VaultDepositModalProp
                     }
                   }}
                   disabled={!selectedToken}
-                  className="border-none text-xl font-medium p-0 h-auto focus-visible:ring-0"
+                  className="border-none text-xl font-medium tabular-nums p-0 h-auto focus-visible:ring-0"
                 />
                 {selectedTokenData && (
                   <div className="flex items-center gap-1 bg-muted rounded-md px-2 py-1 flex-shrink-0">
@@ -302,14 +302,14 @@ const VaultDepositModal = ({ isOpen, onClose, onSuccess }: VaultDepositModalProp
 
               {selectedTokenData && (
                 <div className="flex items-center justify-between mt-2">
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm text-muted-foreground tabular-nums">
                     Balance: {formatTokenAmount(selectedTokenData.balance)}
                   </span>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="text-xs text-blue-500"
+                    className="text-xs text-primary hover:text-primary/80 font-medium"
                     onClick={handleMaxClick}
                   >
                     Max
@@ -318,7 +318,7 @@ const VaultDepositModal = ({ isOpen, onClose, onSuccess }: VaultDepositModalProp
               )}
 
               {validationError && (
-                <p className="text-red-600 text-sm mt-2">{validationError}</p>
+                <p className="text-destructive text-sm mt-2">{validationError}</p>
               )}
             </div>
           </div>
@@ -327,12 +327,12 @@ const VaultDepositModal = ({ isOpen, onClose, onSuccess }: VaultDepositModalProp
           {amount && parseFloat(amount) > 0 && !validationError && (
             <div className="rounded-lg bg-muted/50 p-3 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">USD Value</span>
-                <span className="font-medium">${formatUsd(usdValue)}</span>
+                <span className="text-muted-foreground">USD value</span>
+                <span className="font-medium tabular-nums">${formatUsd(usdValue)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Shares to Receive</span>
-                <span className="font-medium">
+                <span className="text-muted-foreground">Shares to receive</span>
+                <span className="font-medium tabular-nums">
                   {formatTokenAmount(sharesToReceive)} {vaultState.shareTokenSymbol}
                 </span>
               </div>
@@ -363,9 +363,9 @@ const VaultDepositModal = ({ isOpen, onClose, onSuccess }: VaultDepositModalProp
             {depositLoading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : paused ? (
-              "Vault is Paused"
+              "Vault is paused"
             ) : (
-              "Confirm Deposit"
+              "Confirm deposit"
             )}
           </Button>
         </div>

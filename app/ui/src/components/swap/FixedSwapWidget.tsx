@@ -120,11 +120,11 @@ const TokenInputDisplay = ({
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium text-muted-foreground">{label}</label>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>Balance: {formattedBalance}</span>
+          <span className="tabular-nums">Balance: {formattedBalance}</span>
           {isFromInput && onMaxClick && (
             <button
               onClick={onMaxClick}
-              className="text-primary hover:underline"
+              className="text-primary hover:text-primary/80 font-medium"
             >
               Max
             </button>
@@ -143,11 +143,11 @@ const TokenInputDisplay = ({
               }}
               placeholder="0.00"
               inputMode="decimal"
-              className="w-full bg-transparent text-lg font-semibold outline-none focus:outline-none"
+              className="w-full bg-transparent text-lg font-semibold outline-none focus:outline-none tabular-nums"
               autoComplete="off"
             />
             {amountError && (
-              <p className="text-red-500 text-xs mt-1">{amountError}</p>
+              <p className="text-destructive text-xs mt-1">{amountError}</p>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -160,7 +160,7 @@ const TokenInputDisplay = ({
         </div>
       </div>
       {!isFromInput && formattedPoolBalance !== "0.00" && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground tabular-nums">
           Pool liquidity: {formattedPoolBalance}
         </p>
       )}
@@ -183,7 +183,7 @@ const SlippageControl = ({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Slippage Tolerance</span>
+          <span className="text-sm font-medium">Slippage tolerance</span>
           <Tooltip>
             <TooltipTrigger>
               <HelpCircle className="h-4 w-4 text-muted-foreground" />
@@ -210,7 +210,7 @@ const SlippageControl = ({
               min="0"
               max="50"
               step="0.1"
-              className="w-16 px-2 py-1 text-xs border rounded bg-background"
+              className="w-16 px-2 py-1 text-xs border rounded bg-background tabular-nums"
             />
           )}
           <span className="text-xs text-muted-foreground">%</span>
@@ -264,7 +264,7 @@ const SwapDialog = ({
   <Dialog open={isOpen} onOpenChange={onOpenChange}>
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>Confirm Swap</DialogTitle>
+        <DialogTitle>Confirm swap</DialogTitle>
         <DialogDescription>
           Please review the details below. Slippage tolerance and fees have already been applied.
         </DialogDescription>
@@ -272,33 +272,33 @@ const SwapDialog = ({
       <div className="py-4 space-y-4">
         <div className="flex justify-between">
           <span className="text-muted-foreground">You pay:</span>
-          <span className="font-semibold">
+          <span className="font-semibold tabular-nums">
             {fromAmount} {fromAsset?._symbol || ""}
           </span>
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">You receive:</span>
-          <span className="font-semibold">
+          <span className="font-semibold tabular-nums">
             {toAmount} {toAsset?._symbol || ""}
           </span>
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Minimum received (after slippage):</span>
-          <span className="font-semibold">
+          <span className="font-semibold tabular-nums">
             {toAmountMin} {toAsset?._symbol || ""}
           </span>
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Exchange rate:</span>
           <span className="flex flex-col items-end gap-0.5">
-            <span className="font-semibold">1 {fromAsset?._symbol || ""} ≈ {exchangeRate} {toAsset?._symbol || ""}</span>
+            <span className="font-semibold tabular-nums">1 {fromAsset?._symbol || ""} ≈ {exchangeRate} {toAsset?._symbol || ""}</span>
             {invertedExchangeRate && (
-              <span className="text-muted-foreground/70">1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} {fromAsset?._symbol || ""}</span>
+              <span className="text-muted-foreground/70 tabular-nums">1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} {fromAsset?._symbol || ""}</span>
             )}
           </span>
         </div>
         {isHighPriceImpact && (
-          <div className="text-yellow-600 text-sm mt-2">
+          <div className="text-warning text-sm mt-2">
             ⚠️ Warning: High price impact detected. Consider reducing the swap amount.
           </div>
         )}
@@ -308,7 +308,7 @@ const SwapDialog = ({
           Cancel
         </Button>
         <Button onClick={onConfirm} disabled={isLoading}>
-          {isLoading ? "Processing..." : "Confirm Swap"}
+          {isLoading ? "Processing..." : "Confirm swap"}
         </Button>
       </DialogFooter>
     </DialogContent>
@@ -779,13 +779,13 @@ const FixedSwapWidget = ({ fromAsset, toAsset, initialFromAmount, onSwapSuccess 
       <div className="space-y-4 p-4 border border-border rounded-lg bg-muted/50">
         {exchangeRate && (
           <div className="flex justify-between items-center text-sm">
-            <span className="text-muted-foreground">Exchange Rate</span>
+            <span className="text-muted-foreground">Exchange rate</span>
             <div className="flex flex-col items-end gap-0.5">
-              <span className="font-semibold">
+              <span className="font-semibold tabular-nums">
                 1 {fromAsset?._symbol || ""} ≈ {exchangeRate} {toAsset?._symbol || ""}
               </span>
               {invertedExchangeRate && (
-                <span className="text-muted-foreground/70 text-xs">
+                <span className="text-muted-foreground/70 text-xs tabular-nums">
                   1 {toAsset?._symbol || ""} ≈ {invertedExchangeRate} {fromAsset?._symbol || ""}
                 </span>
               )}
@@ -795,15 +795,15 @@ const FixedSwapWidget = ({ fromAsset, toAsset, initialFromAmount, onSwapSuccess 
 
         {priceImpact !== null && priceImpact !== undefined && (
           <div className="flex justify-between items-center text-sm">
-            <span className="text-muted-foreground">Price Impact</span>
-            <span className={priceImpact >= 5 ? "text-yellow-600 font-semibold" : "font-semibold"}>
+            <span className="text-muted-foreground">Price impact</span>
+            <span className={priceImpact >= 5 ? "text-warning font-semibold tabular-nums" : "font-semibold tabular-nums"}>
               {priceImpact.toFixed(2)}%
             </span>
           </div>
         )}
 
         {isLowBalanceWarning && (
-          <p className="text-yellow-600 text-sm mt-1">
+          <p className="text-warning text-sm mt-1">
             Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
           </p>
         )}
@@ -817,11 +817,11 @@ const FixedSwapWidget = ({ fromAsset, toAsset, initialFromAmount, onSwapSuccess 
       </div>
 
       <Button
-        className="w-full bg-strato-blue hover:bg-strato-blue/90"
+        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
         onClick={() => setIsDialogOpen(true)}
         disabled={isSwapDisabled()}
       >
-        Swap Assets
+        Swap assets
       </Button>
 
       <SwapDialog

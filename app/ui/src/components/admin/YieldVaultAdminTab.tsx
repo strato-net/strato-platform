@@ -205,7 +205,7 @@ const YieldVaultAdminTab = () => {
                 onChange={(event) => setStrategyAddress(event.target.value)}
               />
               {strategyAddress.trim() && !hasStrategy && (
-                <p className="text-xs text-red-600 dark:text-red-400">
+                <p className="text-xs text-destructive">
                   Enter the full strategy address. Shortened values like `0x1234...abcd` will be rejected.
                 </p>
               )}
@@ -472,7 +472,7 @@ const YieldVaultAdminTab = () => {
                     Reporting loss writes down vault assets directly and lowers the exchange rate.
                   </p>
                   {lossExceedsDebt && (
-                    <p className="text-red-600 dark:text-red-400">
+                    <p className="text-destructive">
                       Loss cannot exceed current strategy debt.
                     </p>
                   )}

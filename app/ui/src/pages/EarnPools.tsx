@@ -75,7 +75,7 @@ const TokenPairIcon = ({ pool }: { pool: Pool }) => (
     {pool.tokenA?.images?.[0]?.value ? (
       <img src={pool.tokenA.images[0].value} alt={pool.tokenA._symbol} className="w-8 h-8 rounded-full border-2 border-background object-cover" />
     ) : (
-      <div className="w-8 h-8 rounded-full border-2 border-background bg-blue-500/20 flex items-center justify-center text-[10px] font-semibold">
+      <div className="w-8 h-8 rounded-full border-2 border-background bg-primary/20 flex items-center justify-center text-[10px] font-semibold">
         {(pool.tokenA?._symbol || "A").slice(0, 1)}
       </div>
     )}
@@ -179,7 +179,7 @@ const EarnPools = () => {
     <div className="min-h-screen bg-background">
       <DashboardSidebar />
       <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}>
-        <DashboardHeader title="Swap Pools" />
+        <DashboardHeader title="Swap pools" />
         <main className="pb-16 md:pb-6 p-4 md:p-6 space-y-5">
           {!isLoggedIn && <GuestSignInBanner message="Sign in to deposit or withdraw liquidity from pools" />}
 
@@ -192,13 +192,13 @@ const EarnPools = () => {
             Back to Earn
           </button>
 
-          <Card className="border border-border/70 bg-gradient-to-br from-blue-500/10 via-background to-background">
+          <Card className="border border-border/70 bg-gradient-to-br from-primary/10 via-background to-background">
             <CardContent className="pt-6">
               <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Earn Opportunity</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Earn opportunity</p>
                   <h1 className="text-2xl md:text-3xl font-semibold mt-1">
-                    {highlightedPoolData?.poolName || "Swap Pool"}
+                    {highlightedPoolData?.poolName || "Swap pool"}
                   </h1>
                   <p className="text-sm text-muted-foreground mt-1">
                     Supply swap liquidity and withdraw on demand.
@@ -207,18 +207,18 @@ const EarnPools = () => {
                 <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
                   <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
                     <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
-                      Best Available APY
+                      Best available APY
                       <BestApyInfoTooltip />
                     </p>
                     <EarnApyTooltip info={highlightedPoolApyInfo}>
-                      <p className="text-sm font-semibold cursor-default">
+                      <p className="text-sm font-semibold cursor-default tabular-nums">
                         {pageLoading ? "Loading..." : displayedHighlightedPoolApy ? formatPct(displayedHighlightedPoolApy) : "N/A"}
                       </p>
                     </EarnApyTooltip>
                   </div>
                   <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
                     <p className="text-[11px] text-muted-foreground">TVL</p>
-                    <p className="text-sm font-semibold">
+                    <p className="text-sm font-semibold tabular-nums">
                       {pageLoading ? "Loading..." : highlightedPoolData ? `$${formatUsd(highlightedPoolData.totalLiquidityUSD)}` : "N/A"}
                     </p>
                   </div>
@@ -277,7 +277,7 @@ const EarnPools = () => {
                     <p className="text-sm text-muted-foreground">
                       Remove liquidity using your LP token balance for this pool.
                     </p>
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-sm text-muted-foreground tabular-nums">
                       Withdrawable: {pageLoading ? "Loading..." : `${formatLpTokenAmount(highlightedPoolData?.lpToken?.totalBalance)} LP`}
                     </div>
                     <div className="flex items-center justify-end">
@@ -300,8 +300,8 @@ const EarnPools = () => {
                   <CardContent className="pt-5">
                     <div className="flex items-center justify-between gap-2 mb-4">
                       <div className="flex items-center gap-2">
-                        <Landmark className="h-4 w-4 text-blue-600" />
-                        <p className="text-base font-semibold">Pool Stats</p>
+                        <Landmark className="h-4 w-4 text-primary" />
+                        <p className="text-base font-semibold">Pool stats</p>
                       </div>
                       <Badge variant="secondary" className="text-[10px]">
                         {pageLoading ? "Loading..." : highlightedPoolData?.isStable ? "Stable" : "Volatile"}
@@ -309,8 +309,8 @@ const EarnPools = () => {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2.5">
                       <div className="rounded-lg border border-border/60 p-3">
-                        <p className="text-xs text-muted-foreground">Your Liquidity</p>
-                        <p className="text-sm font-semibold">
+                        <p className="text-xs text-muted-foreground">Your liquidity</p>
+                        <p className="text-sm font-semibold tabular-nums">
                           {pageLoading
                             ? "Loading..."
                             : `$${formatUsd(
@@ -322,43 +322,43 @@ const EarnPools = () => {
                         </p>
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
-                        <p className="text-xs text-muted-foreground">Your LP Tokens</p>
-                        <p className="text-sm font-semibold">
+                        <p className="text-xs text-muted-foreground">Your LP tokens</p>
+                        <p className="text-sm font-semibold tabular-nums">
                           {pageLoading ? "Loading..." : formatLpTokenAmount(highlightedPoolData?.lpToken?.totalBalance)}
                         </p>
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
                         <p className="text-xs text-muted-foreground">Pool TVL</p>
-                        <p className="text-sm font-semibold">
+                        <p className="text-sm font-semibold tabular-nums">
                           {pageLoading ? "Loading..." : `$${formatUsd(highlightedPoolData?.totalLiquidityUSD || "0")}`}
                         </p>
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
-                        <p className="text-xs text-muted-foreground">24h Volume</p>
-                        <p className="text-sm font-semibold">
+                        <p className="text-xs text-muted-foreground">24h volume</p>
+                        <p className="text-sm font-semibold tabular-nums">
                           {pageLoading ? "Loading..." : `$${formatUsd(highlightedPoolData?.tradingVolume24h || "0")}`}
                         </p>
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
                         <p className="text-xs text-muted-foreground inline-flex items-center gap-1">
-                          Best Available APY
+                          Best available APY
                           <BestApyInfoTooltip />
                         </p>
                         <EarnApyTooltip info={highlightedPoolApyInfo}>
-                          <p className="text-sm font-semibold cursor-default">
+                          <p className="text-sm font-semibold cursor-default tabular-nums">
                             {pageLoading ? "Loading..." : formatPct(displayedHighlightedPoolApy)}
                           </p>
                         </EarnApyTooltip>
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
-                        <p className="text-xs text-muted-foreground">A to B Ratio</p>
-                        <p className="text-sm font-semibold">
+                        <p className="text-xs text-muted-foreground">A to B ratio</p>
+                        <p className="text-sm font-semibold tabular-nums">
                           {pageLoading ? "Loading..." : formatRatio(highlightedPoolData?.aToBRatio)}
                         </p>
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
-                        <p className="text-xs text-muted-foreground">B to A Ratio</p>
-                        <p className="text-sm font-semibold">
+                        <p className="text-xs text-muted-foreground">B to A ratio</p>
+                        <p className="text-sm font-semibold tabular-nums">
                           {pageLoading ? "Loading..." : formatRatio(highlightedPoolData?.bToARatio)}
                         </p>
                       </div>

@@ -108,12 +108,12 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
       <CardContent className="px-4 md:px-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="flex items-start space-x-3">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-              <Zap className="h-4 w-4 md:h-5 md:w-5 text-blue-600 dark:text-blue-400" />
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Zap className="h-4 w-4 md:h-5 md:w-5 text-primary" />
             </div>
             <div className="flex-1">
               <p className="text-xs md:text-sm text-muted-foreground">Total Emission Rate</p>
-              <p className="text-xl md:text-2xl font-semibold">{emissionPerDay} {emissionPerDay !== "?" && "points/day"}</p>
+              <p className="text-xl md:text-2xl font-semibold tabular-nums">{emissionPerDay} {emissionPerDay !== "?" && "points/day"}</p>
               {emissionPerWeek !== "?" && (
                 <p className="text-xs text-muted-foreground mt-1">{emissionPerWeek} points/week</p>
               )}
@@ -135,12 +135,12 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
           </div>
 
           <div className="flex items-start space-x-3">
-            <div className="p-2 bg-amber-100 dark:bg-amber-900 rounded-lg">
-              <Star className="h-4 w-4 md:h-5 md:w-5 text-amber-600 dark:text-amber-400" />
+            <div className="p-2 bg-gold/15 rounded-lg">
+              <Star className="h-4 w-4 md:h-5 md:w-5 text-gold" />
             </div>
             <div className="flex-1">
               <p className="text-xs md:text-sm text-muted-foreground">Total Earned</p>
-              <p className="text-xl md:text-2xl font-semibold">
+              <p className="text-xl md:text-2xl font-semibold tabular-nums">
                 {state.totalDistributed ? 
                   formatRoundedWithCommas(roundByMagnitude(String(parseFloat(state.totalDistributed) / 1e18))) 
                   : "0"}
@@ -150,8 +150,8 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
           </div>
 
           <div className="flex items-start space-x-3">
-            <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-              <Coins className="h-4 w-4 md:h-5 md:w-5 text-green-600 dark:text-green-400" />
+            <div className="p-2 bg-success/10 rounded-lg">
+              <Coins className="h-4 w-4 md:h-5 md:w-5 text-success" />
             </div>
             <div className="flex-1">
               <p className="text-xs md:text-sm text-muted-foreground">Reward Token</p>
@@ -170,8 +170,8 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
           </div>
 
           <div className="flex items-start space-x-3">
-            <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-              <Clock className="h-4 w-4 md:h-5 md:w-5 text-purple-600 dark:text-purple-400" />
+            <div className="p-2 bg-accent rounded-lg">
+              <Clock className="h-4 w-4 md:h-5 md:w-5 text-accent-foreground" />
             </div>
             <div className="flex-1">
               <p className="text-xs md:text-sm text-muted-foreground">Last Update</p>

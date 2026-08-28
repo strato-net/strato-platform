@@ -48,7 +48,7 @@ const VaultTransactions = () => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Recent Vault Activity</CardTitle>
+          <CardTitle>Recent vault activity</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
@@ -62,7 +62,7 @@ const VaultTransactions = () => {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Recent Vault Activity</CardTitle>
+        <CardTitle>Recent vault activity</CardTitle>
         <Button
           variant="ghost"
           size="sm"
@@ -93,9 +93,9 @@ const VaultTransactions = () => {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {tx.type === "liquidation" ? (
-                          <Zap className="h-4 w-4 text-orange-600" />
+                          <Zap className="h-4 w-4 text-warning" />
                         ) : (
-                          <RefreshCw className="h-4 w-4 text-blue-600" />
+                          <RefreshCw className="h-4 w-4 text-primary" />
                         )}
                         <Badge variant={tx.type === "liquidation" ? "destructive" : "secondary"}>
                           {tx.type.charAt(0).toUpperCase() + tx.type.slice(1)}
@@ -108,26 +108,26 @@ const VaultTransactions = () => {
                     <TableCell>
                       {tx.type === "liquidation" && tx.liquidation ? (
                         <div className="flex items-center gap-1 text-sm">
-                          <span className="font-mono">{formatTokenAmount(tx.liquidation.collateralSeized)}</span>
+                          <span className="font-mono tabular-nums">{formatTokenAmount(tx.liquidation.collateralSeized)}</span>
                           <span className="text-muted-foreground">{tx.liquidation.assetSymbol}</span>
                           <span className="text-muted-foreground">seized</span>
                           <span className="text-muted-foreground">for</span>
-                          <span className="font-mono">{formatTokenAmount(tx.liquidation.debtBurnedUSD)}</span>
+                          <span className="font-mono tabular-nums">{formatTokenAmount(tx.liquidation.debtBurnedUSD)}</span>
                           <span className="text-muted-foreground">USDST</span>
                         </div>
                       ) : (
                         <div className="space-y-1">
                           {tx.tokenIn && (
                             <div className="flex items-center gap-1 text-sm">
-                              <span className="text-red-600">-</span>
-                              <span className="font-mono">{formatTokenAmount(tx.tokenIn.amount)}</span>
+                              <span className="text-destructive">-</span>
+                              <span className="font-mono tabular-nums">{formatTokenAmount(tx.tokenIn.amount)}</span>
                               <span className="text-muted-foreground">{tx.tokenIn.symbol}</span>
                             </div>
                           )}
                           {tx.tokenOut && (
                             <div className="flex items-center gap-1 text-sm">
-                              <span className="text-green-600">+</span>
-                              <span className="font-mono">{formatTokenAmount(tx.tokenOut.amount)}</span>
+                              <span className="text-success">+</span>
+                              <span className="font-mono tabular-nums">{formatTokenAmount(tx.tokenOut.amount)}</span>
                               <span className="text-muted-foreground">{tx.tokenOut.symbol}</span>
                             </div>
                           )}

@@ -56,8 +56,7 @@ const AssetCard = ({ id, name, symbol, price, deposit, collateralBalance, image,
       />
     ) : (
       <div
-        className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm"
-        style={{ backgroundColor: "red" }}
+        className="w-10 h-10 rounded-full flex items-center justify-center bg-muted text-muted-foreground text-sm"
       >
         {symbol?.slice(0, 2)}
       </div>
@@ -67,7 +66,7 @@ const AssetCard = ({ id, name, symbol, price, deposit, collateralBalance, image,
   // Asset details rows
   const assetDetails = [
     { label: "Price", value: formattedPrice },
-    { label: "User Balance", value: formattedDeposit },
+    { label: "User balance", value: formattedDeposit },
     { label: "Collateral", value: formattedCollateral }
   ];
 
@@ -88,16 +87,16 @@ const AssetCard = ({ id, name, symbol, price, deposit, collateralBalance, image,
           {assetDetails.map(({ label, value }) => (
             <div key={label} className="flex justify-between">
               <span className="text-xs sm:text-sm text-muted-foreground">{label}</span>
-              <span className="font-medium text-xs sm:text-sm">{value}</span>
+              <span className="font-medium text-xs sm:text-sm tabular-nums">{value}</span>
             </div>
           ))}
         </div>
 
         <Link
           to={`/dashboard/deposits/${id}`}
-          className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium text-sm mt-2"
+          className="inline-flex items-center text-primary hover:text-primary/80 font-medium text-sm mt-2"
         >
-          View Details <ArrowUpRight className="ml-1 h-4 w-4" />
+          View details <ArrowUpRight className="ml-1 h-4 w-4" />
         </Link>
       </CardContent>
     </Card>

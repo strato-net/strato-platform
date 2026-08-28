@@ -86,7 +86,7 @@ const PoolV3Liquidity = () => {
               <TabsList className="mb-4">
                 <TabsTrigger value="pools">Pools</TabsTrigger>
                 <TabsTrigger value="positions">
-                  My Positions{positionCount > 0 ? ` (${positionCount})` : ""}
+                  My positions{positionCount > 0 ? ` (${positionCount})` : ""}
                 </TabsTrigger>
               </TabsList>
 
@@ -94,7 +94,7 @@ const PoolV3Liquidity = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   Pick a pair and fee tier, choose a price range, and deposit. Concentrated positions earn fees only
                   while the pool price is inside the range. If you are looking to trade tokens, visit the{" "}
-                  <Link to="/dashboard/swap" className="text-strato-blue hover:underline">
+                  <Link to="/dashboard/swap" className="text-primary hover:underline">
                     trade page
                   </Link>
                   .

@@ -165,7 +165,7 @@ const VoteTab = () => {
               size="sm"
               onClick={() => setRemoveAdminOpen(true)}
               disabled={admins.length <= 1}
-              className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed text-xs md:text-sm"
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground disabled:opacity-50 disabled:cursor-not-allowed text-xs md:text-sm"
             >
               Remove Admin
             </Button>
@@ -276,11 +276,11 @@ const VoteTab = () => {
                     const hasUserVoted = votes.some((v) => v.issueId === issueId && normalizeAddress(v.voter) === normalizeAddress(userAddress));
 
                     return (
-                      <TableRow key={`${issueId}-${index}`} className={`border-border hover:bg-muted/50 ${hasUserVoted ? 'bg-green-500/10' : ''}`}>
+                      <TableRow key={`${issueId}-${index}`} className={`border-border hover:bg-muted/50 ${hasUserVoted ? 'bg-success/10' : ''}`}>
                         <TableCell className="font-medium text-xs md:text-sm pl-4 md:pl-4 dark:text-foreground">
                           <div className="flex items-center gap-1 md:space-x-2">
                             {hasUserVoted && (
-                              <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                              <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 text-success flex-shrink-0" />
                             )}
                             <span className="truncate">
                               {issueId && issueId !== 'Unknown' 
@@ -333,7 +333,7 @@ const VoteTab = () => {
                               View Vote
                             </Button>
                             {hasUserVoted && (
-                              <span className="text-[10px] md:text-xs text-green-600 dark:text-green-400 font-medium whitespace-nowrap">You voted</span>
+                              <span className="text-[10px] md:text-xs text-success font-medium whitespace-nowrap">You voted</span>
                             )}
                           </div>
                         </TableCell>

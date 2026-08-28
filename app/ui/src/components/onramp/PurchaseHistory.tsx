@@ -18,9 +18,9 @@ const STRATO_TOKEN: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  fulfillment_processing: { label: "Processing", color: "text-blue-600" },
-  fulfillment_complete: { label: "Complete", color: "text-green-600" },
-  unknown: { label: "Unknown", color: "text-gray-500" },
+  fulfillment_processing: { label: "Processing", color: "text-primary" },
+  fulfillment_complete: { label: "Complete", color: "text-success" },
+  unknown: { label: "Unknown", color: "text-muted-foreground" },
 };
 
 const ITEMS_PER_PAGE = 8;
@@ -59,7 +59,7 @@ const PurchaseHistory = ({ refreshKey }: { refreshKey?: number }) => {
   return (
     <Card className="shadow-sm">
       <CardHeader>
-        <CardTitle className="text-base">Purchase History</CardTitle>
+        <CardTitle className="text-base">Purchase history</CardTitle>
       </CardHeader>
       <CardContent>
         {initialLoading ? (
@@ -86,7 +86,7 @@ const PurchaseHistory = ({ refreshKey }: { refreshKey?: number }) => {
                   {transactions.map((tx) => {
                     const statusInfo = STATUS_LABELS[tx.status] || {
                       label: tx.status,
-                      color: "text-gray-500",
+                      color: "text-muted-foreground",
                     };
                     return (
                       <tr key={tx.externalTxHash} className="border-b last:border-0">
@@ -102,7 +102,7 @@ const PurchaseHistory = ({ refreshKey }: { refreshKey?: number }) => {
                             <span className="text-muted-foreground"> → {STRATO_TOKEN[tx.destinationCurrency]}</span>
                           )}
                         </td>
-                        <td className="py-3" title={tx.destinationAmount || ""}>
+                        <td className="py-3 tabular-nums" title={tx.destinationAmount || ""}>
                           {tx.destinationAmount
                             ? Number(tx.destinationAmount).toFixed(6)
                             : "—"}

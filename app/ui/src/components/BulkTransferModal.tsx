@@ -364,7 +364,7 @@ const BulkTransferModal = ({
   const renderUploadState = () => (
     <>
       <DialogHeader>
-        <DialogTitle>Bulk Send</DialogTitle>
+        <DialogTitle>Bulk send</DialogTitle>
         <DialogDescription>
           Upload a CSV file to send tokens to multiple recipients.
         </DialogDescription>
@@ -373,7 +373,7 @@ const BulkTransferModal = ({
       <div className="space-y-4 py-4">
         <div
           className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-            dragActive ? "border-blue-500 bg-blue-50 dark:bg-blue-950" : "border-border hover:border-muted-foreground"
+            dragActive ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground"
           }`}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
@@ -410,7 +410,7 @@ const BulkTransferModal = ({
             className="mt-2"
           >
             <Download className="h-4 w-4 mr-2" />
-            Download Template
+            Download template
           </Button>
         </div>
       </div>
@@ -426,10 +426,10 @@ const BulkTransferModal = ({
   const renderPreviewState = () => (
     <>
       <DialogHeader>
-        <DialogTitle className="text-lg sm:text-xl">Review Sends</DialogTitle>
+        <DialogTitle className="text-lg sm:text-xl">Review sends</DialogTitle>
         <DialogDescription className="text-xs sm:text-sm">
           Review the sends before confirming. {invalidTransfers.length > 0 && (
-            <span className="text-yellow-600">
+            <span className="text-warning">
               {invalidTransfers.length} invalid send(s) will be skipped.
             </span>
           )}
@@ -455,7 +455,7 @@ const BulkTransferModal = ({
                   const token = tokens.find(t => t.address.toLowerCase() === transfer.tokenAddress.toLowerCase());
                   const tokenName = token?.token?._symbol || token?.token?._name || transfer.tokenAddress.slice(0, 8) + "...";
                   return (
-                    <TableRow key={index} className={transfer.error ? "bg-red-50 dark:bg-red-950/20" : ""}>
+                    <TableRow key={index} className={transfer.error ? "bg-destructive/10" : ""}>
                       <TableCell className="font-mono text-xs">{index + 1}</TableCell>
                       <TableCell className="text-xs truncate max-w-[100px]" title={transfer.tokenAddress}>
                         {tokenName}
@@ -463,15 +463,15 @@ const BulkTransferModal = ({
                       <TableCell className="font-mono text-xs truncate max-w-[150px]" title={transfer.to}>
                         {transfer.to.length > 16 ? `${transfer.to.slice(0, 8)}...${transfer.to.slice(-6)}` : transfer.to}
                       </TableCell>
-                      <TableCell className="text-right text-sm">{transfer.amount}</TableCell>
+                      <TableCell className="text-right text-sm tabular-nums">{transfer.amount}</TableCell>
                       <TableCell>
                         {transfer.error ? (
-                          <span className="flex items-center text-red-600 text-xs" title={transfer.error}>
+                          <span className="flex items-center text-destructive text-xs" title={transfer.error}>
                             <XCircle className="h-4 w-4 mr-1" />
                             <span>Error</span>
                           </span>
                         ) : (
-                          <span className="flex items-center text-green-600 text-xs">
+                          <span className="flex items-center text-success text-xs">
                             <CheckCircle2 className="h-4 w-4 mr-1" />
                             Valid
                           </span>
@@ -497,7 +497,7 @@ const BulkTransferModal = ({
                     key={index}
                     className={`p-3 rounded-lg border ${
                       transfer.error
-                        ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900"
+                        ? "bg-destructive/10 border-destructive/30"
                         : "bg-card border-border"
                     }`}
                   >
@@ -507,12 +507,12 @@ const BulkTransferModal = ({
                         <span className="text-sm font-medium">{tokenName}</span>
                       </div>
                       {transfer.error ? (
-                        <span className="flex items-center text-red-600 text-xs" title={transfer.error}>
+                        <span className="flex items-center text-destructive text-xs" title={transfer.error}>
                           <XCircle className="h-4 w-4 mr-1" />
                           <span>Error</span>
                         </span>
                       ) : (
-                        <span className="flex items-center text-green-600 text-xs">
+                        <span className="flex items-center text-success text-xs">
                           <CheckCircle2 className="h-4 w-4 mr-1" />
                           Valid
                         </span>
@@ -525,11 +525,11 @@ const BulkTransferModal = ({
                       </div>
                       <div>
                         <span className="text-muted-foreground">Amount: </span>
-                        <span className="font-medium">{transfer.amount}</span>
+                        <span className="font-medium tabular-nums">{transfer.amount}</span>
                       </div>
                       {transfer.error && (
-                        <div className="mt-2 pt-2 border-t border-red-200 dark:border-red-800">
-                          <span className="text-red-600 font-medium">{transfer.error}</span>
+                        <div className="mt-2 pt-2 border-t border-destructive/30">
+                          <span className="text-destructive font-medium">{transfer.error}</span>
                         </div>
                       )}
                     </div>
@@ -541,12 +541,12 @@ const BulkTransferModal = ({
         </div>
 
         {invalidTransfers.length > 0 && (
-          <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded-lg">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200 flex items-center mb-2">
-              <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+          <div className="bg-warning/10 border border-warning/40 p-3 rounded-lg">
+            <p className="text-sm text-foreground flex items-center mb-2">
+              <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0 text-warning" />
               <span>{invalidTransfers.length} transfer(s) have errors and will be skipped</span>
             </p>
-            <div className="text-xs text-yellow-700 dark:text-yellow-300 mt-2 space-y-1">
+            <div className="text-xs text-muted-foreground mt-2 space-y-1">
               <p className="font-medium">Errors found at CSV lines:</p>
               <ul className="list-disc list-inside ml-2 space-y-1">
                 {invalidTransfers.map((transfer, idx) => {
@@ -563,9 +563,9 @@ const BulkTransferModal = ({
         )}
 
         {hasInsufficientBalance && (
-          <div className="bg-red-50 dark:bg-red-950/20 p-3 rounded-lg">
-            <p className="text-sm text-red-800 dark:text-red-200 flex items-center">
-              <AlertCircle className="h-4 w-4 mr-2" />
+          <div className="bg-destructive/10 border border-destructive/30 p-3 rounded-lg">
+            <p className="text-sm text-foreground flex items-center">
+              <AlertCircle className="h-4 w-4 mr-2 text-destructive" />
               Insufficient balance for: {insufficientBalanceTokens.join(", ")}
             </p>
           </div>
@@ -573,16 +573,16 @@ const BulkTransferModal = ({
 
         <div className="bg-muted/50 p-4 rounded-lg space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Valid Transfers</span>
-            <span className="font-medium">{validTransfers.length}</span>
+            <span className="text-muted-foreground">Valid transfers</span>
+            <span className="font-medium tabular-nums">{validTransfers.length}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Tokens</span>
             <span className="font-medium">{Object.keys(transfersByToken).length}</span>
           </div>
           <div className="flex justify-between text-sm flex-wrap gap-1">
-            <span className="text-muted-foreground text-xs sm:text-sm">Total Fee ({validTransfers.length} x {TRANSFER_FEE} USDST)</span>
-            <span className="font-medium">
+            <span className="text-muted-foreground text-xs sm:text-sm">Total fee ({validTransfers.length} x {TRANSFER_FEE} USDST)</span>
+            <span className="font-medium tabular-nums">
               {formatBalance(totalFee, "USDST", 18, 2, 2)}
             </span>
           </div>
@@ -594,11 +594,11 @@ const BulkTransferModal = ({
           Back
         </Button>
         <Button
-          className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
+          className="w-full sm:w-auto"
           onClick={handleConfirmTransfer}
           disabled={validTransfers.length === 0 || hasInsufficientBalance}
         >
-          Confirm {validTransfers.length} Transfer{validTransfers.length !== 1 ? "s" : ""}
+          Confirm and send {validTransfers.length} transfer{validTransfers.length !== 1 ? "s" : ""}
         </Button>
       </DialogFooter>
     </>
@@ -612,8 +612,8 @@ const BulkTransferModal = ({
       <>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-            Processing Transfers
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            Processing transfers
           </DialogTitle>
           <DialogDescription>
             {completed} of {total} transfers completed. Do not close this window.
@@ -630,11 +630,11 @@ const BulkTransferModal = ({
                 const getStatusIcon = () => {
                   switch (transfer.status) {
                     case "processing":
-                      return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
+                      return <Loader2 className="h-4 w-4 animate-spin text-primary" />;
                     case "success":
-                      return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+                      return <CheckCircle2 className="h-4 w-4 text-success" />;
                     case "failed":
-                      return <XCircle className="h-4 w-4 text-red-500" />;
+                      return <XCircle className="h-4 w-4 text-destructive" />;
                     default:
                       return <Clock className="h-4 w-4 text-muted-foreground" />;
                   }
@@ -643,11 +643,11 @@ const BulkTransferModal = ({
                 const getStatusBadge = () => {
                   switch (transfer.status) {
                     case "processing":
-                      return <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-500">Processing</span>;
+                      return <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary">Processing</span>;
                     case "success":
-                      return <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-500">Success</span>;
+                      return <span className="text-xs px-2 py-0.5 rounded-full bg-success/15 text-success">Success</span>;
                     case "failed":
-                      return <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-500">Failed</span>;
+                      return <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/15 text-destructive">Failed</span>;
                     default:
                       return <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">Pending</span>;
                   }
@@ -656,11 +656,11 @@ const BulkTransferModal = ({
                 const getBorderClass = () => {
                   switch (transfer.status) {
                     case "processing":
-                      return "border-blue-500/30 bg-blue-500/5";
+                      return "border-primary/30 bg-primary/5";
                     case "success":
-                      return "border-green-500/30 bg-green-500/5";
+                      return "border-success/30 bg-success/5";
                     case "failed":
-                      return "border-red-500/30 bg-red-500/5";
+                      return "border-destructive/30 bg-destructive/5";
                     default:
                       return "border-border bg-muted/30";
                   }
@@ -675,7 +675,7 @@ const BulkTransferModal = ({
                       <div className="flex-shrink-0">{getStatusIcon()}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">
+                          <span className="text-sm font-medium tabular-nums">
                             {transfer.amount} {tokenName}
                           </span>
                           {getStatusBadge()}
@@ -689,7 +689,7 @@ const BulkTransferModal = ({
                           </p>
                         )}
                         {transfer.error && (
-                          <p className="text-xs text-red-500 mt-1">{transfer.error}</p>
+                          <p className="text-xs text-destructive mt-1">{transfer.error}</p>
                         )}
                       </div>
                     </div>
@@ -706,7 +706,7 @@ const BulkTransferModal = ({
   const renderResultsState = () => (
     <>
       <DialogHeader>
-        <DialogTitle>Send Results</DialogTitle>
+        <DialogTitle>Send results</DialogTitle>
         <DialogDescription>
           {successCount} successful, {failureCount} failed
         </DialogDescription>
@@ -714,14 +714,14 @@ const BulkTransferModal = ({
 
       <div className="space-y-4 py-4">
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-green-50 dark:bg-green-950/20 p-4 rounded-lg text-center">
-            <CheckCircle2 className="h-8 w-8 text-green-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-green-600">{successCount}</p>
+          <div className="bg-success/10 p-4 rounded-lg text-center">
+            <CheckCircle2 className="h-8 w-8 text-success mx-auto mb-2" />
+            <p className="text-2xl font-bold text-success tabular-nums">{successCount}</p>
             <p className="text-sm text-muted-foreground">Successful</p>
           </div>
-          <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg text-center">
-            <XCircle className="h-8 w-8 text-red-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-red-600">{failureCount}</p>
+          <div className="bg-destructive/10 p-4 rounded-lg text-center">
+            <XCircle className="h-8 w-8 text-destructive mx-auto mb-2" />
+            <p className="text-2xl font-bold text-destructive tabular-nums">{failureCount}</p>
             <p className="text-sm text-muted-foreground">Failed</p>
           </div>
         </div>
@@ -748,17 +748,17 @@ const BulkTransferModal = ({
                     <TableCell className="font-mono text-xs truncate max-w-[120px]" title={result.to}>
                       {result.to.length > 14 ? `${result.to.slice(0, 6)}...${result.to.slice(-4)}` : result.to}
                     </TableCell>
-                    <TableCell className="text-right text-sm">
+                    <TableCell className="text-right text-sm tabular-nums">
                       {formatBalance(result.value, undefined, 18, 0, 4)}
                     </TableCell>
                     <TableCell>
                       {isTxSubmitted(result.status) ? (
-                        <span className="flex items-center text-green-600 text-xs">
+                        <span className="flex items-center text-success text-xs">
                           <CheckCircle2 className="h-4 w-4 mr-1" />
                           {isTxPending(result.status) ? "Submitted" : "Success"}
                         </span>
                       ) : (
-                        <span className="flex items-center text-red-600 text-xs" title={result.error}>
+                        <span className="flex items-center text-destructive text-xs" title={result.error}>
                           <XCircle className="h-4 w-4 mr-1" />
                           Failed
                         </span>

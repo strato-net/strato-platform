@@ -1,5 +1,6 @@
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
   Line,
   LineChart,
@@ -94,7 +95,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
   selectedTimeRange = '7d',
   isLoading = false,
   tabType = 'netBalance',
-  title = 'Portfolio Value',
+  title = 'Portfolio value',
   subtitle = 'Net balance over time',
   currentValue: propCurrentValue
 }) => {
@@ -102,11 +103,11 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
   const getColorScheme = (tab: TabType): { line: string; positive: string; negative: string } => {
     switch (tab) {
       case 'rewards':
-        return { line: '#a855f7', positive: '#a855f7', negative: '#ef4444' }; // purple-500
+        return { line: '#a855f7', positive: '#a855f7', negative: 'hsl(var(--destructive))' }; // purple-500
       case 'borrowed':
         return { line: '#f97316', positive: '#f97316', negative: '#f97316' }; // orange-500
       default:
-        return { line: '#3b82f6', positive: '#22c55e', negative: '#ef4444' }; // blue-500
+        return { line: 'hsl(var(--primary))', positive: 'hsl(var(--success))', negative: 'hsl(var(--destructive))' };
     }
   };
 
@@ -190,7 +191,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
             <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold tabular-nums">
               {tabType === 'rewards' ? (
                 `${currentValue.toLocaleString('en-US', { 
                   minimumFractionDigits: 2, 
@@ -208,7 +209,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                 })}`
               )}
             </div>
-            <div className={`flex items-center gap-1 text-sm ${tabType === 'rewards' ? 'text-purple-500' : tabType === 'borrowed' ? 'text-orange-500' : change.isPositive ? 'text-green-500' : 'text-red-500'}`}>
+            <div className={`flex items-center gap-1 text-sm tabular-nums ${tabType === 'rewards' ? 'text-purple-500' : tabType === 'borrowed' ? 'text-orange-500' : change.isPositive ? 'text-success' : 'text-destructive'}`}>
               {change.isPositive ? <TrendingUp size={16} color={getColorScheme(tabType).positive} /> : <TrendingDown size={16} color={getColorScheme(tabType).negative}/>}
               <span>{getChangeText(hasData, tabType, change)}</span>
             </div>
@@ -334,7 +335,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                   <span>Loading chart data...</span>
                 </div>
               ) : (
-                <span>No portfolio data available</span>
+                <span>No holdings yet — fund your account to see your portfolio here.</span>
               )}
             </div>
           )}
@@ -344,24 +345,21 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
         {onTimeRangeChange && (
           <div className="flex flex-wrap items-center justify-center gap-2 mt-4 pt-4 border-t border-border">
             {[
-              { label: '1 Week', value: '7d' },
-              { label: '1 Month', value: '1m' },
-              { label: '3 Months', value: '3m' },
-              { label: '6 Months', value: '6m' },
-              { label: '1 Year', value: '1y' },
-              { label: 'All Time', value: 'all' }
+              { label: '1 week', value: '7d' },
+              { label: '1 month', value: '1m' },
+              { label: '3 months', value: '3m' },
+              { label: '6 months', value: '6m' },
+              { label: '1 year', value: '1y' },
+              { label: 'All time', value: 'all' }
             ].map(({ label, value }) => (
-              <button
+              <Button
                 key={value}
+                variant={selectedTimeRange === value ? "default" : "outline"}
+                size="sm"
                 onClick={() => onTimeRangeChange(value)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  selectedTimeRange === value
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
-                }`}
               >
                 {label}
-              </button>
+              </Button>
             ))}
           </div>
         )}

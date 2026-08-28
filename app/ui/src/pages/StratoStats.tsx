@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { api } from "@/lib/axios";
 import { formatUnits } from '@/utils/numberUtils';
 import { useUser } from '@/context/UserContext';
@@ -262,7 +263,7 @@ const StratoStats = () => {
       <DashboardSidebar />
 
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
-        <DashboardHeader title="STRATO Stats" />
+        <DashboardHeader title="STRATO stats" />
         <main className="p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             {!isLoggedIn && (
@@ -271,13 +272,13 @@ const StratoStats = () => {
             <Tabs defaultValue="tokens" className="w-full">
               <TabsList className="grid w-full grid-cols-3 mb-6 h-auto">
                 <TabsTrigger value="tokens" className="text-xs md:text-sm py-2 px-1 md:px-3">
-                  Token Stats
+                  Token stats
                 </TabsTrigger>
                 <TabsTrigger value="cdp" className="text-xs md:text-sm py-2 px-1 md:px-3">
-                  CDP Stats
+                  CDP stats
                 </TabsTrigger>
                 <TabsTrigger value="revenue" className="text-xs md:text-sm py-2 px-1 md:px-3 whitespace-nowrap">
-                  Protocol Revenue
+                  Protocol revenue
                 </TabsTrigger>
               </TabsList>
 
@@ -286,10 +287,10 @@ const StratoStats = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Market Cap</CardTitle>
+                      <CardTitle className="text-sm font-medium">Total market cap</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">
+                      <div className="text-2xl font-bold tabular-nums">
                         {loading ? <Skeleton className="h-8 w-24" /> : `$${formatLargeNumber(parseFloat(totalMarketCap))}`}
                       </div>
                       <p className="text-xs text-muted-foreground">
@@ -302,7 +303,7 @@ const StratoStats = () => {
                 {/* Token Stats Table */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Token Statistics</CardTitle>
+                    <CardTitle>Token statistics</CardTitle>
                     <CardDescription>
                       Detailed breakdown of token supplies and market capitalizations
                     </CardDescription>
@@ -322,8 +323,8 @@ const StratoStats = () => {
                           <TableHeader>
                             <TableRow>
                               <TableHead>Token</TableHead>
-                              <TableHead className="text-right">Total Supply</TableHead>
-                              <TableHead className="text-right">Market Cap</TableHead>
+                              <TableHead className="text-right">Total supply</TableHead>
+                              <TableHead className="text-right">Market cap</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -335,8 +336,8 @@ const StratoStats = () => {
                                     <div className="text-sm text-muted-foreground">{token.name}</div>
                                   </div>
                                 </TableCell>
-                                <TableCell className="text-right">{formatSupply(token.totalSupply)}</TableCell>
-                                <TableCell className="text-right font-semibold">${formatLargeNumber(parseFloat(token.marketCap))}</TableCell>
+                                <TableCell className="text-right tabular-nums">{formatSupply(token.totalSupply)}</TableCell>
+                                <TableCell className="text-right font-semibold tabular-nums">${formatLargeNumber(parseFloat(token.marketCap))}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -352,10 +353,10 @@ const StratoStats = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Collateral Value</CardTitle>
+                      <CardTitle className="text-sm font-medium">Total collateral value</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">
+                      <div className="text-2xl font-bold tabular-nums">
                         {cdpLoading ? <Skeleton className="h-8 w-24" /> : `$${formatLargeNumber(parseFloat(formatUnits(BigInt(totalCollateralValueUSD || '0'), 18)))}`}
                       </div>
                       <p className="text-xs text-muted-foreground">
@@ -366,10 +367,10 @@ const StratoStats = () => {
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Debt</CardTitle>
+                      <CardTitle className="text-sm font-medium">Total debt</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">
+                      <div className="text-2xl font-bold tabular-nums">
                         {cdpLoading ? <Skeleton className="h-8 w-24" /> : `$${formatLargeNumber(parseFloat(formatUnits(BigInt(totalDebtUSD || '0'), 18)))}`}
                       </div>
                       <p className="text-xs text-muted-foreground">
@@ -383,7 +384,7 @@ const StratoStats = () => {
                       <CardTitle className="text-sm font-medium">Global CR</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">
+                      <div className="text-2xl font-bold tabular-nums">
                         {cdpLoading ? <Skeleton className="h-8 w-24" /> : formatCR(globalCollateralizationRatio)}
                       </div>
                       <p className="text-xs text-muted-foreground">
@@ -396,7 +397,7 @@ const StratoStats = () => {
                 {/* CDP Stats Table */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>CDP Statistics by Asset</CardTitle>
+                    <CardTitle>CDP statistics by asset</CardTitle>
                     <CardDescription>
                       Aggregated collateral and debt data for each asset
                     </CardDescription>
@@ -416,9 +417,9 @@ const StratoStats = () => {
                           <TableHeader>
                             <TableRow>
                               <TableHead className="text-xs md:text-sm pl-2 md:pl-4">Asset</TableHead>
-                              <TableHead className="text-center text-xs md:text-sm px-1 md:px-4">Number of Vaults</TableHead>
-                              <TableHead className="text-center text-xs md:text-sm px-1 md:px-4">Total Collateral Value</TableHead>
-                              <TableHead className="text-center text-xs md:text-sm px-1 md:px-4">Total Debt (USDST)</TableHead>
+                              <TableHead className="text-center text-xs md:text-sm px-1 md:px-4">Number of vaults</TableHead>
+                              <TableHead className="text-center text-xs md:text-sm px-1 md:px-4">Total collateral value</TableHead>
+                              <TableHead className="text-center text-xs md:text-sm px-1 md:px-4">Total debt (USDST)</TableHead>
                               <TableHead className="text-right text-xs md:text-sm pr-2 md:pr-4">CR</TableHead>
                             </TableRow>
                           </TableHeader>
@@ -431,14 +432,14 @@ const StratoStats = () => {
                                     <div className="text-xs text-muted-foreground">{asset.asset.slice(0, 6)}...{asset.asset.slice(-4)}</div>
                                   </div>
                                 </TableCell>
-                                <TableCell className="text-center text-xs md:text-sm px-1 md:px-4">{asset.numberOfVaults}</TableCell>
-                                <TableCell className="text-center text-xs md:text-sm px-1 md:px-4 font-semibold">
+                                <TableCell className="text-center text-xs md:text-sm px-1 md:px-4 tabular-nums">{asset.numberOfVaults}</TableCell>
+                                <TableCell className="text-center text-xs md:text-sm px-1 md:px-4 font-semibold tabular-nums">
                                   ${formatLargeNumber(parseFloat(formatUnits(BigInt(asset.collateralValueUSD || '0'), 18)))}
                                 </TableCell>
-                                <TableCell className="text-center text-xs md:text-sm px-1 md:px-4 font-semibold">
+                                <TableCell className="text-center text-xs md:text-sm px-1 md:px-4 font-semibold tabular-nums">
                                   ${formatLargeNumber(parseFloat(formatUnits(BigInt(asset.totalDebtUSD || '0'), 18)))}
                                 </TableCell>
-                                <TableCell className="text-right text-xs md:text-sm pr-2 md:pr-4">
+                                <TableCell className="text-right text-xs md:text-sm pr-2 md:pr-4 tabular-nums">
                                   {formatCR(asset.collateralizationRatio)}
                                 </TableCell>
                               </TableRow>
@@ -454,61 +455,51 @@ const StratoStats = () => {
               <TabsContent value="revenue">
                 {/* Time Period Selector */}
                 <div className="flex flex-wrap gap-2 mb-6">
-                  <button
+                  <Button
+                    variant={selectedPeriod === 'daily' ? "default" : "outline"}
+                    size="sm"
                     onClick={() => setSelectedPeriod('daily')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedPeriod === 'daily'
-                      ? 'bg-blue-600 text-white dark:bg-blue-700'
-                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                      }`}
                   >
                     Daily
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant={selectedPeriod === 'weekly' ? "default" : "outline"}
+                    size="sm"
                     onClick={() => setSelectedPeriod('weekly')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedPeriod === 'weekly'
-                      ? 'bg-blue-600 text-white dark:bg-blue-700'
-                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                      }`}
                   >
                     Weekly
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant={selectedPeriod === 'monthly' ? "default" : "outline"}
+                    size="sm"
                     onClick={() => setSelectedPeriod('monthly')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedPeriod === 'monthly'
-                      ? 'bg-blue-600 text-white dark:bg-blue-700'
-                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                      }`}
                   >
                     Monthly
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant={selectedPeriod === 'ytd' ? "default" : "outline"}
+                    size="sm"
                     onClick={() => setSelectedPeriod('ytd')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedPeriod === 'ytd'
-                      ? 'bg-blue-600 text-white dark:bg-blue-700'
-                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                      }`}
                   >
                     YTD
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant={selectedPeriod === 'allTime' ? "default" : "outline"}
+                    size="sm"
                     onClick={() => setSelectedPeriod('allTime')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedPeriod === 'allTime'
-                      ? 'bg-blue-600 text-white dark:bg-blue-700'
-                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                      }`}
                   >
-                    All Time
-                  </button>
+                    All time
+                  </Button>
                 </div>
 
                 {/* Revenue Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">CDP Revenue</CardTitle>
+                      <CardTitle className="text-sm font-medium">CDP revenue</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">
+                      <div className="text-2xl font-bold tabular-nums">
                         {revenueLoading ? (
                           <Skeleton className="h-8 w-24" />
                         ) : (
@@ -519,7 +510,7 @@ const StratoStats = () => {
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} CDP fees
                       </p>
                       {!revenueLoading && BigInt(cdpPendingRevenue || '0') > 0n && (
-                        <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                        <div className="mt-2 text-xs text-warning tabular-nums">
                           +${formatLargeNumber(parseFloat(formatUnits(BigInt(cdpPendingRevenue), 18)))} pending
                           {cdpLastAccrual > 0 && (
                             <span className="text-muted-foreground">
@@ -533,10 +524,10 @@ const StratoStats = () => {
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Lending Revenue</CardTitle>
+                      <CardTitle className="text-sm font-medium">Lending revenue</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">
+                      <div className="text-2xl font-bold tabular-nums">
                         {revenueLoading ? (
                           <Skeleton className="h-8 w-24" />
                         ) : (
@@ -547,7 +538,7 @@ const StratoStats = () => {
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} lending fees
                       </p>
                       {!revenueLoading && BigInt(lendingPendingRevenue || '0') > 0n && (
-                        <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                        <div className="mt-2 text-xs text-warning tabular-nums">
                           +${formatLargeNumber(parseFloat(formatUnits(BigInt(lendingPendingRevenue), 18)))} pending
                           {lendingLastAccrual > 0 && (
                             <span className="text-muted-foreground">
@@ -561,10 +552,10 @@ const StratoStats = () => {
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Swap Pool Revenue</CardTitle>
+                      <CardTitle className="text-sm font-medium">Swap pool revenue</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">
+                      <div className="text-2xl font-bold tabular-nums">
                         {revenueLoading ? (
                           <Skeleton className="h-8 w-24" />
                         ) : (
@@ -579,10 +570,10 @@ const StratoStats = () => {
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Stable Pool Revenue</CardTitle>
+                      <CardTitle className="text-sm font-medium">Stable pool revenue</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">
+                      <div className="text-2xl font-bold tabular-nums">
                         {revenueLoading ? (
                           <Skeleton className="h-8 w-24" />
                         ) : (
@@ -597,10 +588,10 @@ const StratoStats = () => {
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">V3 Pool Revenue</CardTitle>
+                      <CardTitle className="text-sm font-medium">V3 pool revenue</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">
+                      <div className="text-2xl font-bold tabular-nums">
                         {revenueLoading ? (
                           <Skeleton className="h-8 w-24" />
                         ) : (
@@ -615,10 +606,10 @@ const StratoStats = () => {
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Metal Forge Revenue</CardTitle>
+                      <CardTitle className="text-sm font-medium">Metal Forge revenue</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">
+                      <div className="text-2xl font-bold tabular-nums">
                         {revenueLoading ? (
                           <Skeleton className="h-8 w-24" />
                         ) : (
@@ -633,10 +624,10 @@ const StratoStats = () => {
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Gas Fee Revenue</CardTitle>
+                      <CardTitle className="text-sm font-medium">Gas fee revenue</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">
+                      <div className="text-2xl font-bold tabular-nums">
                         {revenueLoading ? (
                           <Skeleton className="h-8 w-24" />
                         ) : (
@@ -651,10 +642,10 @@ const StratoStats = () => {
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Yield Vault Revenue</CardTitle>
+                      <CardTitle className="text-sm font-medium">Yield vault revenue</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">
+                      <div className="text-2xl font-bold tabular-nums">
                         {revenueLoading ? (
                           <Skeleton className="h-8 w-24" />
                         ) : (
@@ -665,7 +656,7 @@ const StratoStats = () => {
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} yield vault fees
                       </p>
                       {!revenueLoading && BigInt(yieldVaultPendingRevenue || '0') > 0n && (
-                        <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                        <div className="mt-2 text-xs text-warning tabular-nums">
                           +${formatLargeNumber(parseFloat(formatUnits(BigInt(yieldVaultPendingRevenue), 18)))} pending
                           {yieldVaultLastAccrual > 0 && (
                             <span className="text-muted-foreground">
@@ -677,12 +668,12 @@ const StratoStats = () => {
                     </CardContent>
                   </Card>
 
-                  <Card className="border-2 border-green-500 dark:border-green-700">
+                  <Card className="border-2 border-success/30">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Combined Revenue</CardTitle>
+                      <CardTitle className="text-sm font-medium">Combined revenue</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      <div className="text-2xl font-bold tabular-nums text-success">
                         {revenueLoading ? (
                           <Skeleton className="h-8 w-24" />
                         ) : (
@@ -703,7 +694,7 @@ const StratoStats = () => {
                 {/* Revenue by Asset Table */}
                 <Card>
                   <CardHeader className="px-4 md:px-6">
-                    <CardTitle className="text-base md:text-xl whitespace-nowrap">Combined Revenue by Asset</CardTitle>
+                    <CardTitle className="text-base md:text-xl whitespace-nowrap">Combined revenue by asset</CardTitle>
                     <CardDescription className="text-xs md:text-sm">
                       Total protocol revenue across all sources by asset
                     </CardDescription>
@@ -738,7 +729,7 @@ const StratoStats = () => {
                                       <div className="text-sm text-muted-foreground">{item.asset.slice(0, 6)}...{item.asset.slice(-4)}</div>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-right font-semibold">
+                                  <TableCell className="text-right font-semibold tabular-nums">
                                     ${formatLargeNumber(parseFloat(formatUnits(BigInt(item.revenue || '0'), 18)))}
                                   </TableCell>
                                 </TableRow>

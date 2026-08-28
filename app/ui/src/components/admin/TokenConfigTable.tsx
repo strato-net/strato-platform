@@ -212,7 +212,7 @@ const TokenConfigTable = () => {
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
-            <p className="text-red-600">Error loading active tokens: {error}</p>
+            <p className="text-destructive">Error loading active tokens: {error}</p>
           </div>
         </CardContent>
       </Card>

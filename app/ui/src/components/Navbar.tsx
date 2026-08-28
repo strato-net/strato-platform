@@ -44,30 +44,30 @@ const Navbar = () => {
               />
             </Link>
             {isTestnet && (
-              <span className="bg-orange-500 text-white px-3 py-1.5 rounded-md text-sm font-bold uppercase tracking-wide shadow-md">
-                TESTNET
+              <span className="bg-warning text-warning-foreground px-3 py-1.5 rounded-md text-sm font-bold uppercase tracking-wide shadow-sm">
+                Testnet
               </span>
             )}
           </div>
           <div className="hidden md:flex items-center space-x-4">
             <ModeToggle />
             {isLoggedIn && (
-            <Link 
+            <Link
               to="/dashboard"
-              className="bg-strato-blue text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-strato-blue/90 transition-colors"
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-medium hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               Launch App
             </Link>
             )}
-            <button 
+            <button
               onClick={handleAuthClick}
               disabled={loading}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                loading 
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                loading
                   ? 'opacity-75 cursor-not-allowed text-muted-foreground border border-border'
-                  : isLoggedIn 
-                    ? 'text-red-600 dark:text-red-400 border border-red-300 dark:border-red-400 hover:bg-red-50 dark:hover:bg-red-400/10' 
-                    : 'text-strato-blue dark:text-strato-lightblue border border-strato-blue/30 dark:border-strato-lightblue/50 hover:bg-strato-blue/5 dark:hover:bg-strato-lightblue/10'
+                  : isLoggedIn
+                    ? 'text-destructive border border-destructive/40 hover:bg-destructive/10'
+                    : 'text-primary border border-primary/40 hover:bg-primary/10'
               }`}
             >
               {loading ? <Spinner /> : isLoggedIn ? 'Log Out' : 'Connect Wallet'}
@@ -77,8 +77,8 @@ const Navbar = () => {
             <button
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-foreground hover:text-strato-blue hover:bg-muted focus:outline-none focus:ring-2 focus:ring-inset focus:ring-strato-blue"
-              aria-expanded="false"
+              className="inline-flex items-center justify-center p-2 rounded-md text-foreground hover:text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              aria-expanded={isMenuOpen}
             >
               <span className="sr-only">Open main menu</span>
               {isMenuOpen ? (
@@ -100,22 +100,22 @@ const Navbar = () => {
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-background shadow-lg">
             <div className="pt-4 pb-2 border-t border-border space-y-2">
               {isLoggedIn && (
-                <Link 
+                <Link
                   to="/dashboard"
-                  className="block text-center w-full bg-strato-blue text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-strato-blue/90 transition-colors"
+                  className="block text-center w-full bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-medium hover:bg-primary/90 transition-colors"
                 >
                   Launch App
                 </Link>
               )}
-              <button 
+              <button
                 onClick={handleAuthClick}
                 disabled={loading}
                 className={`block text-center w-full px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  loading 
+                  loading
                     ? 'opacity-75 cursor-not-allowed text-muted-foreground border border-border'
-                    : isLoggedIn 
-                      ? 'text-red-600 dark:text-red-400 border border-red-300 dark:border-red-400 hover:bg-red-50 dark:hover:bg-red-400/10' 
-                      : 'text-strato-blue dark:text-strato-lightblue border border-strato-blue dark:border-strato-lightblue hover:bg-strato-blue/5 dark:hover:bg-strato-lightblue/10'
+                    : isLoggedIn
+                      ? 'text-destructive border border-destructive/40 hover:bg-destructive/10'
+                      : 'text-primary border border-primary/40 hover:bg-primary/10'
                 }`}
               >
                 {loading ? <Spinner /> : isLoggedIn ? 'Log Out' : 'Connect Wallet'}

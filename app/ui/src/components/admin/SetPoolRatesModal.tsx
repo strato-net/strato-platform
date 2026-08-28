@@ -130,13 +130,13 @@ const SetPoolRatesModal = ({
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="font-medium">Current Swap Fee:</span>
-                    <div className="text-lg font-bold text-blue-600">
+                    <div className="text-lg font-bold text-primary tabular-nums">
                       {currentSwapFee.toFixed(2)}%
                     </div>
                   </div>
                   <div>
                     <span className="font-medium">Current LP Share:</span>
-                    <div className="text-lg font-bold text-green-600">
+                    <div className="text-lg font-bold text-success tabular-nums">
                       {currentLpShare.toFixed(1)}%
                     </div>
                   </div>

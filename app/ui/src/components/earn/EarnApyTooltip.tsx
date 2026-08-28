@@ -29,13 +29,13 @@ export default function EarnApyTooltip({
       {info.breakdown.map((item) => (
         <div key={item.label} className="flex justify-between gap-4">
           <span className="text-foreground">{item.label}:</span>
-          <span className="font-medium">{item.apy}%</span>
+          <span className="font-medium tabular-nums">{item.apy}%</span>
         </div>
       ))}
       {info.breakdown.length > 1 && (
         <div className="flex justify-between gap-4 border-t border-border/50 pt-1">
           <span className="text-foreground">Total:</span>
-          <span className="font-medium">{info.total.toFixed(2)}%</span>
+          <span className="font-medium tabular-nums">{info.total.toFixed(2)}%</span>
         </div>
       )}
     </div>

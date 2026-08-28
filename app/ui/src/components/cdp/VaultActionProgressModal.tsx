@@ -35,11 +35,11 @@ const VaultActionProgressModal: React.FC<VaultActionProgressModalProps> = ({
   const getStepIcon = (status: VaultActionProgressStatus) => {
     switch (status) {
       case "completed":
-        return <CheckCircle2 className="w-5 h-5 text-green-500" />;
+        return <CheckCircle2 className="w-5 h-5 text-success" />;
       case "processing":
-        return <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />;
+        return <Loader2 className="w-5 h-5 text-primary animate-spin" />;
       case "error":
-        return <AlertCircle className="w-5 h-5 text-red-500" />;
+        return <AlertCircle className="w-5 h-5 text-destructive" />;
       default:
         return <Circle className="w-5 h-5 text-muted-foreground" />;
     }
@@ -48,11 +48,11 @@ const VaultActionProgressModal: React.FC<VaultActionProgressModalProps> = ({
   const getStepClassName = (status: VaultActionProgressStatus) => {
     switch (status) {
       case "completed":
-        return "bg-green-500/10 border border-green-500/30";
+        return "bg-success/10 border border-success/30";
       case "processing":
-        return "bg-blue-500/10 border-2 border-blue-500/30";
+        return "bg-primary/10 border-2 border-primary/30";
       case "error":
-        return "bg-red-500/10 border border-red-500/30";
+        return "bg-destructive/10 border border-destructive/30";
       default:
         return "bg-muted/30 border border-border";
     }
@@ -63,7 +63,7 @@ const VaultActionProgressModal: React.FC<VaultActionProgressModalProps> = ({
       case "completed":
         return "Completed";
       case "processing":
-        return "In Progress";
+        return "In progress";
       case "error":
         return "Failed";
       default:
@@ -74,11 +74,11 @@ const VaultActionProgressModal: React.FC<VaultActionProgressModalProps> = ({
   const getStatusClassName = (status: VaultActionProgressStatus) => {
     switch (status) {
       case "completed":
-        return "bg-green-500/20 text-green-500";
+        return "bg-success/15 text-success";
       case "processing":
-        return "bg-blue-500/20 text-blue-500";
+        return "bg-primary/15 text-primary";
       case "error":
-        return "bg-red-500/20 text-red-500";
+        return "bg-destructive/15 text-destructive";
       default:
         return "bg-muted text-muted-foreground";
     }
@@ -95,14 +95,14 @@ const VaultActionProgressModal: React.FC<VaultActionProgressModalProps> = ({
       title={
         <div className="flex items-center gap-3">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            hasError ? "bg-red-500/20" : allCompleted ? "bg-green-500/20" : "bg-blue-500/20"
+            hasError ? "bg-destructive/15" : allCompleted ? "bg-success/15" : "bg-primary/15"
           }`}>
             {hasError ? (
-              <AlertCircle className="w-5 h-5 text-red-500" />
+              <AlertCircle className="w-5 h-5 text-destructive" />
             ) : allCompleted ? (
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <CheckCircle2 className="w-5 h-5 text-success" />
             ) : (
-              <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+              <Loader2 className="w-5 h-5 text-primary animate-spin" />
             )}
           </div>
           <span className="text-lg font-semibold text-foreground">{modalTitle}</span>
@@ -113,7 +113,7 @@ const VaultActionProgressModal: React.FC<VaultActionProgressModalProps> = ({
       footer={canClose ? (
         <button
           onClick={onClose}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
         >
           Close
         </button>
@@ -125,8 +125,8 @@ const VaultActionProgressModal: React.FC<VaultActionProgressModalProps> = ({
     >
       <div className="space-y-6">
         {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-            <p className="text-sm text-red-500">{error}</p>
+          <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+            <p className="text-sm text-destructive">{error}</p>
           </div>
         )}
 
@@ -139,11 +139,11 @@ const VaultActionProgressModal: React.FC<VaultActionProgressModalProps> = ({
                   <div className="flex items-center justify-between gap-3">
                     <h4 className={`font-medium ${
                       step.status === "processing"
-                        ? "text-blue-500"
+                        ? "text-primary"
                         : step.status === "completed"
-                          ? "text-green-500"
+                          ? "text-success"
                           : step.status === "error"
-                            ? "text-red-500"
+                            ? "text-destructive"
                             : "text-muted-foreground"
                     }`}>
                       {step.label}
@@ -156,11 +156,11 @@ const VaultActionProgressModal: React.FC<VaultActionProgressModalProps> = ({
                   {step.description && (
                     <p className={`text-sm mt-1 ${
                       step.status === "processing"
-                        ? "text-blue-500/80"
+                        ? "text-primary/80"
                         : step.status === "completed"
-                          ? "text-green-500/80"
+                          ? "text-success/80"
                           : step.status === "error"
-                            ? "text-red-500/80"
+                            ? "text-destructive/80"
                             : "text-muted-foreground"
                     }`}>
                       {step.description}
@@ -174,7 +174,7 @@ const VaultActionProgressModal: React.FC<VaultActionProgressModalProps> = ({
                   )}
 
                   {step.error && (
-                    <p className="text-xs text-red-500 mt-2">{step.error}</p>
+                    <p className="text-xs text-destructive mt-2">{step.error}</p>
                   )}
                 </div>
               </div>

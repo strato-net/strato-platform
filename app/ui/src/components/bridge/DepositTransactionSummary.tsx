@@ -25,8 +25,8 @@ const DepositTransactionSummary: React.FC<DepositTransactionSummaryProps> = ({
   return (
     <div className="rounded-xl border border-border bg-muted/50 p-4 space-y-3 text-sm text-muted-foreground">
       <div className="flex items-center justify-between">
-        <span>{selectedToken?.externalSymbol || ""} Balance</span>
-        <span className="font-medium text-foreground">
+        <span>{selectedToken?.externalSymbol || ""} balance</span>
+        <span className="font-medium text-foreground tabular-nums">
           {formatBalanceDisplay(balanceImpact.before)}
           {amountError
             ? ""
@@ -35,14 +35,14 @@ const DepositTransactionSummary: React.FC<DepositTransactionSummaryProps> = ({
       </div>
       <div className="flex items-center justify-between">
         <span>Outcome</span>
-        <span className="font-medium text-foreground">
+        <span className="font-medium text-foreground tabular-nums">
           {amount || "0.00"} {selectedToken?.stratoTokenSymbol || "USDST"} deposited
         </span>
       </div>
       {isSaving && (
         <div className="flex items-center justify-between">
-          <span>Current Saving Rate</span>
-          <span className={`font-medium ${autoDeposit && savingRate !== undefined ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+          <span>Current saving rate</span>
+          <span className={`font-medium tabular-nums ${autoDeposit && savingRate !== undefined ? 'text-success' : 'text-muted-foreground'}`}>
             {autoDeposit && savingRate !== undefined ? `${savingRate.toFixed(2)}%` : "—"}
           </span>
         </div>

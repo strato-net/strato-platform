@@ -155,24 +155,24 @@ const EarnVault = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
                     <div className="rounded-xl border border-border bg-muted/40 p-4">
                       <p className="text-xs md:text-sm text-muted-foreground">TVL</p>
-                      <p className="mt-1 text-2xl md:text-3xl font-semibold">
+                      <p className="mt-1 text-2xl md:text-3xl font-semibold tabular-nums">
                         {loading ? "..." : `$${formatUsd(totalEquity)}`}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">Total Value Locked</p>
+                      <p className="text-xs text-muted-foreground mt-1">Total value locked</p>
                     </div>
                     <div className="rounded-xl border border-border bg-muted/40 p-4">
-                      <p className="text-xs md:text-sm text-muted-foreground">Total Shares</p>
-                      <p className="mt-1 text-2xl md:text-3xl font-semibold">
+                      <p className="text-xs md:text-sm text-muted-foreground">Total shares</p>
+                      <p className="mt-1 text-2xl md:text-3xl font-semibold tabular-nums">
                         {loading ? "..." : formatTotalShares(totalShares)}
                       </p>
                     </div>
                     <div className="rounded-xl border border-border bg-muted/40 p-4">
                       <p className="text-xs md:text-sm text-muted-foreground">Alpha vs HODL</p>
                       <p
-                        className={`mt-1 text-2xl md:text-3xl font-semibold ${
+                        className={`mt-1 text-2xl md:text-3xl font-semibold tabular-nums ${
                           alphaDisplay.positive
-                            ? "text-green-600 dark:text-green-400"
-                            : "text-red-600 dark:text-red-400"
+                            ? "text-success"
+                            : "text-destructive"
                         }`}
                       >
                         {loading ? "..." : alphaDisplay.text}
@@ -191,7 +191,7 @@ const EarnVault = () => {
                 </section>
 
                 <section className="space-y-3">
-                  <h2 className="text-xl font-semibold">Allocation Breakdown</h2>
+                  <h2 className="text-xl font-semibold">Allocation breakdown</h2>
                   <div className="rounded-xl border border-border overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[560px]">
@@ -232,8 +232,8 @@ const EarnVault = () => {
                                     <span>{asset.symbol}</span>
                                   </div>
                                 </td>
-                                <td className="px-4 py-3 text-right">{asset.allocationPercent}%</td>
-                                <td className="px-4 py-3 text-right font-medium">
+                                <td className="px-4 py-3 text-right tabular-nums">{asset.allocationPercent}%</td>
+                                <td className="px-4 py-3 text-right font-medium tabular-nums">
                                   ${formatUsd(asset.valueUsd)}
                                 </td>
                               </tr>
@@ -264,10 +264,10 @@ const EarnVault = () => {
                 </section> */}
 
                 <section className="space-y-3">
-                  <h2 className="text-xl font-semibold">Your Position</h2>
+                  <h2 className="text-xl font-semibold">Your position</h2>
                   <div className="rounded-xl border border-border bg-muted/30 p-4">
-                    <p className="text-sm text-muted-foreground">Your Shares</p>
-                    <p className="text-2xl font-semibold mt-1">
+                    <p className="text-sm text-muted-foreground">Your shares</p>
+                    <p className="text-2xl font-semibold mt-1 tabular-nums">
                       {guestMode || loadingUser
                         ? "-"
                         : <>{formatShares(userShares)} <span className="text-base text-muted-foreground">(${formatUsd(userValueUsd)})</span></>

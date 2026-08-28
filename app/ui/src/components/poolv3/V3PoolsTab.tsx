@@ -39,7 +39,7 @@ const TokenPairIcons = ({ token0, token1 }: { token0: PoolV3["token0"]; token1: 
       ) : (
         <div
           key={token.address}
-          className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-white font-medium bg-strato-blue border border-border"
+          className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-primary-foreground font-medium bg-primary border border-border"
         >
           {token.symbol?.slice(0, 1)}
         </div>
@@ -139,7 +139,7 @@ const V3PoolsTab = ({ pools, loading, onMinted }: V3PoolsTabProps) => {
               key={group.key}
               onClick={() => selectPair(group)}
               className={`flex items-center justify-between gap-2 rounded-lg border p-3 text-left transition-colors ${
-                pairKey === group.key ? "border-strato-blue bg-muted" : "border-border hover:bg-muted/50"
+                pairKey === group.key ? "border-primary bg-muted" : "border-border hover:bg-muted/50"
               }`}
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -154,10 +154,10 @@ const V3PoolsTab = ({ pools, loading, onMinted }: V3PoolsTabProps) => {
                 </div>
               </div>
               <div className="flex flex-col items-end flex-shrink-0 text-xs">
-                <span className="text-muted-foreground">{formatUsd(group.tvl)} TVL</span>
-                <span className="text-muted-foreground">{formatUsd(group.volume24h)} 24h vol</span>
+                <span className="text-muted-foreground tabular-nums">{formatUsd(group.tvl)} TVL</span>
+                <span className="text-muted-foreground tabular-nums">{formatUsd(group.volume24h)} 24h vol</span>
                 {group.bestApy > 0 && (
-                  <span className="text-green-600 font-medium">up to {group.bestApy.toFixed(2)}% APY</span>
+                  <span className="text-success font-medium tabular-nums">up to {group.bestApy.toFixed(2)}% APY</span>
                 )}
               </div>
             </button>
@@ -184,24 +184,24 @@ const V3PoolsTab = ({ pools, loading, onMinted }: V3PoolsTabProps) => {
                     onClick={() => setPoolAddress(pool.address)}
                     className={`rounded-lg border p-2.5 text-left transition-colors ${
                       selectedPool.address === pool.address
-                        ? "border-strato-blue bg-muted"
+                        ? "border-primary bg-muted"
                         : "border-border hover:bg-muted/50"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-sm font-medium">{pool.fee / 10000}%</span>
+                      <span className="text-sm font-medium tabular-nums">{pool.fee / 10000}%</span>
                       {pool.isPaused ? (
-                        <span className="text-[11px] text-yellow-600 font-medium whitespace-nowrap">Paused</span>
+                        <span className="text-[11px] text-warning font-medium whitespace-nowrap">Paused</span>
                       ) : (pool.apy || 0) > 0 ? (
-                        <span className="text-[11px] text-green-600 font-medium whitespace-nowrap">
+                        <span className="text-[11px] text-success font-medium whitespace-nowrap tabular-nums">
                           {pool.apy.toFixed(2)}% APY
                         </span>
                       ) : null}
                     </div>
-                    <div className="text-[11px] text-muted-foreground">
+                    <div className="text-[11px] text-muted-foreground tabular-nums">
                       {formatUsd(pool.totalLiquidityUSD)} TVL
                     </div>
-                    <div className="text-[11px] text-muted-foreground">
+                    <div className="text-[11px] text-muted-foreground tabular-nums">
                       {formatUsd(pool.volume24hUSD)} 24h vol
                     </div>
                   </button>
@@ -209,7 +209,7 @@ const V3PoolsTab = ({ pools, loading, onMinted }: V3PoolsTabProps) => {
               </div>
               <div className="text-xs text-muted-foreground mt-3">
                 {priceDomainEdge(selectedPool) ? (
-                  <span className="text-yellow-600">
+                  <span className="text-warning">
                     Price unavailable — one-sided liquidity (the pool has no{" "}
                     {priceDomainEdge(selectedPool) === "max"
                       ? selectedPool.token0.symbol

@@ -67,7 +67,7 @@ const ContactInquiryModal = ({ open, onOpenChange }: ContactInquiryModalProps) =
         </DialogHeader>
         {submitted ? (
           <div className="flex flex-col items-center gap-4 py-6">
-            <CheckCircle2 className="h-10 w-10 text-green-500" />
+            <CheckCircle2 className="h-10 w-10 text-success" />
             <p className="text-sm text-muted-foreground text-center">
               Thanks — your message was sent. We&apos;ll reach you at{" "}
               <span className="font-medium text-foreground">{email}</span>.
@@ -118,7 +118,7 @@ const ContactInquiryModal = ({ open, onOpenChange }: ContactInquiryModalProps) =
             <Button
               type="submit"
               disabled={!isValid || submitting}
-              className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
+              className="w-full bg-gradient-to-br from-strato-blue to-primary text-white hover:opacity-90"
             >
               {submitting ? (
                 <>
@@ -126,7 +126,7 @@ const ContactInquiryModal = ({ open, onOpenChange }: ContactInquiryModalProps) =
                   Sending...
                 </>
               ) : (
-                "Send Inquiry"
+                "Send inquiry"
               )}
             </Button>
           </form>

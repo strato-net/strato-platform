@@ -28,8 +28,8 @@ const calculateHealthFactor = (cr: number, lt: number): number => {
 // Get health factor color based on value
 const getHealthFactorColor = (healthFactor: number): string => {
   if (healthFactor >= 1.5) return "text-foreground"; // Healthy - standard text color
-  if (healthFactor >= 1.0) return "text-yellow-600 dark:text-yellow-500"; // Warning - yellow
-  return "text-red-600 dark:text-red-400"; // Danger - red
+  if (healthFactor >= 1.0) return "text-warning"; // Warning
+  return "text-destructive"; // Danger
 };
 
 // Format percentage with reasonable precision
@@ -869,7 +869,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       <>
         <Card className="w-full">
           <CardHeader>
-            <CardTitle>Your Positions</CardTitle>
+            <CardTitle>Your positions</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-center py-8">
@@ -893,12 +893,12 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       <>
         <Card className="w-full">
           <CardHeader>
-            <CardTitle>Your Vaults</CardTitle>
+            <CardTitle>Your vaults</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="text-muted-foreground mb-4">No positions found</div>
-              <div className="text-sm text-muted-foreground/70">Create your first position by depositing collateral and minting USDST above</div>
+              <div className="text-muted-foreground mb-4">No positions yet</div>
+              <div className="text-sm text-muted-foreground/70">Deposit collateral and mint USDST above to open your first position</div>
             </div>
           </CardContent>
         </Card>
@@ -911,7 +911,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
     <TooltipProvider>
       <Card className="w-full">
         <CardHeader>
-          <CardTitle>Your Vaults</CardTitle>
+          <CardTitle>Your vaults</CardTitle>
         </CardHeader>
         <CardContent>
         <style>{`
@@ -1008,7 +1008,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                   <p className="text-xs text-muted-foreground mb-1">Collateral</p>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <p className="font-semibold cursor-help">{formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralAmount, position.collateralAmountDecimals)))} {position.symbol}</p>
+                      <p className="font-semibold cursor-help tabular-nums">{formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralAmount, position.collateralAmountDecimals)))} {position.symbol}</p>
                     </TooltipTrigger>
                     <TooltipContent>
                       <div className="text-xs">
@@ -1018,7 +1018,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <p className="text-xs text-muted-foreground cursor-help">${formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralValueUSD, 18)))}</p>
+                      <p className="text-xs text-muted-foreground cursor-help tabular-nums">${formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralValueUSD, 18)))}</p>
                     </TooltipTrigger>
                     <TooltipContent>
                       <div className="text-xs">
@@ -1031,7 +1031,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                   <p className="text-xs text-muted-foreground mb-1">Debt</p>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <p className="font-semibold cursor-help">{formatNumber(parseFloat(formatWeiToDecimalHP(position.debtAmount, 18)))} USDST</p>
+                      <p className="font-semibold cursor-help tabular-nums">{formatNumber(parseFloat(formatWeiToDecimalHP(position.debtAmount, 18)))} USDST</p>
                     </TooltipTrigger>
                     <TooltipContent>
                       <div className="text-xs">
@@ -1041,7 +1041,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <p className="text-xs text-muted-foreground cursor-help">${formatNumber(parseFloat(formatWeiToDecimalHP(position.debtAmount, 18)))}</p>
+                      <p className="text-xs text-muted-foreground cursor-help tabular-nums">${formatNumber(parseFloat(formatWeiToDecimalHP(position.debtAmount, 18)))}</p>
                     </TooltipTrigger>
                     <TooltipContent>
                       <div className="text-xs">
@@ -1051,10 +1051,10 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                   </Tooltip>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Health Factor</p>
+                  <p className="text-xs text-muted-foreground mb-1">Health factor</p>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <p className={`font-semibold cursor-help ${hasDebt ? getHealthFactorColor(healthFactor) : 'text-green-600 dark:text-green-400'}`}>
+                      <p className={`font-semibold cursor-help tabular-nums ${hasDebt ? getHealthFactorColor(healthFactor) : 'text-success'}`}>
                         {hasDebt ? formatNumber(healthFactor) : '∞'}
                       </p>
                     </TooltipTrigger>
@@ -1069,10 +1069,10 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                   </Tooltip>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Stability Fee</p>
+                  <p className="text-xs text-muted-foreground mb-1">Stability fee</p>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <p className="font-semibold cursor-help">{formatPercentage(position.stabilityFeeRate)}</p>
+                      <p className="font-semibold cursor-help tabular-nums">{formatPercentage(position.stabilityFeeRate)}</p>
                     </TooltipTrigger>
                     <TooltipContent>
                       <div className="text-xs">
@@ -1094,14 +1094,14 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
 
               {/* Preview Values */}
               {previewValues && (
-                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <h5 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">New Values After {activeAction}:</h5>
+                <div className="mt-4 p-3 bg-primary/10 border border-primary/30 rounded-lg">
+                  <h5 className="text-sm font-medium text-foreground mb-2">New Values After {activeAction}:</h5>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
-                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Collateral</p>
+                      <p className="text-xs text-primary mb-1">Collateral</p>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <p className="font-semibold text-blue-900 dark:text-blue-100 cursor-help">{previewValues.collateralAmount} {position.symbol}</p>
+                          <p className="font-semibold text-foreground cursor-help tabular-nums">{previewValues.collateralAmount} {position.symbol}</p>
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="text-xs">
@@ -1111,7 +1111,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <p className="text-xs text-blue-500 dark:text-blue-400 cursor-help">${previewValues.collateralValueUSD}</p>
+                          <p className="text-xs text-primary cursor-help tabular-nums">${previewValues.collateralValueUSD}</p>
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="text-xs">
@@ -1121,10 +1121,10 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                       </Tooltip>
                     </div>
                     <div>
-                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Debt</p>
+                      <p className="text-xs text-primary mb-1">Debt</p>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <p className="font-semibold text-blue-900 dark:text-blue-100 cursor-help">{previewValues.debtAmount} USDST</p>
+                          <p className="font-semibold text-foreground cursor-help tabular-nums">{previewValues.debtAmount} USDST</p>
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="text-xs">
@@ -1134,7 +1134,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <p className="text-xs text-blue-500 dark:text-blue-400 cursor-help">${previewValues.debtAmount}</p>
+                          <p className="text-xs text-primary cursor-help tabular-nums">${previewValues.debtAmount}</p>
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="text-xs">
@@ -1144,10 +1144,10 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                       </Tooltip>
                     </div>
                     <div>
-                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Health Factor</p>
+                      <p className="text-xs text-primary mb-1">Health factor</p>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <p className={`font-semibold cursor-help ${previewValues.healthFactor === Infinity ? 'text-green-600 dark:text-green-400' : getHealthFactorColor(previewValues.healthFactor)}`}>
+                          <p className={`font-semibold cursor-help tabular-nums ${previewValues.healthFactor === Infinity ? 'text-success' : getHealthFactorColor(previewValues.healthFactor)}`}>
                             {previewValues.healthFactor === Infinity ? '∞' : formatNumber(previewValues.healthFactor)}
                           </p>
                         </TooltipTrigger>
@@ -1162,10 +1162,10 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                       </Tooltip>
                     </div>
                     <div>
-                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Stability Fee</p>
+                      <p className="text-xs text-primary mb-1">Stability fee</p>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <p className="font-semibold text-blue-900 dark:text-blue-100 cursor-help">{formatPercentage(position.stabilityFeeRate)}</p>
+                          <p className="font-semibold text-foreground cursor-help tabular-nums">{formatPercentage(position.stabilityFeeRate)}</p>
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="text-xs">
@@ -1189,8 +1189,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                       </p>
                     </div>
                   ) : (isGlobalPaused || assetPauseStates[position.asset]) && (activeActions[position.asset] === 'mint' || activeActions[position.asset] === 'withdraw') ? (
-                    <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-center">
-                      <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
+                    <div className="p-3 bg-warning/10 border border-warning/40 rounded-lg text-center">
+                      <p className="text-sm text-warning font-medium">
                         {isGlobalPaused 
                           ? `${activeActions[position.asset] === 'mint' ? 'Mint' : 'Withdraw'} paused by admin at this time`
                           : `${activeActions[position.asset] === 'mint' ? 'Mint' : 'Withdraw'} for ${position.symbol} paused by admin at this time`
@@ -1201,7 +1201,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                     <>
                       <div className="mb-2">
                         <p className="text-xs text-muted-foreground">
-                          Transaction Fee: {activeActions[position.asset] === 'deposit' || activeActions[position.asset] === 'repay' ? '0.02' : '0.01'} USDST
+                          Transaction fee: {activeActions[position.asset] === 'deposit' || activeActions[position.asset] === 'repay' ? '0.02' : '0.01'} USDST
                         </p>
                       </div>
                       <div className="flex gap-2">
@@ -1210,8 +1210,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                           value={inputAmounts[position.asset] || ""}
                           onChange={(e) => handleInputChange(position.asset, e.target.value, e)}
                           className={`flex-1 ${
-                            maxStates[position.asset] 
-                              ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-800' 
+                            maxStates[position.asset]
+                              ? 'text-primary bg-primary/10 border-primary/30'
                               : isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")
                                 ? 'text-destructive bg-destructive/10 border-destructive/50'
                                 : ''
@@ -1221,7 +1221,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                       <Button 
                         variant={maxStates[position.asset] ? "default" : "outline"}
                         size="sm" 
-                        className={`min-w-[50px] ${maxStates[position.asset] ? 'bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white' : ''}`}
+                        className={`min-w-[50px] ${maxStates[position.asset] ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : ''}`}
                         onClick={() => handleMaxClick(position.asset, activeActions[position.asset]!)}
                       >
                         MAX

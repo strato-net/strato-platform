@@ -25,14 +25,14 @@ const AssetCard = ({ title, type, image, logoColor, logoText, description }: Ass
         </div>
       </div>
       <div className="text-left">
-        <div className="text-sm font-semibold text-blue-600 mb-1">{type}</div>
+        <div className="text-sm font-semibold text-primary mb-1">{type}</div>
         <h3 className="text-xl font-bold mb-2">{title}</h3>
         <p className="text-muted-foreground text-sm mb-6">{description}</p>
         <a 
           href="#view-project" 
-          className="inline-flex items-center text-strato-blue hover:text-strato-purple font-medium text-sm transition-colors"
+          className="inline-flex items-center text-primary hover:text-primary/80 font-medium text-sm transition-colors"
         >
-          View Project <ArrowUpRight className="ml-1 h-4 w-4" />
+          View project <ArrowUpRight className="ml-1 h-4 w-4" />
         </a>
       </div>
     </div>

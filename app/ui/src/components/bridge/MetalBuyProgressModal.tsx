@@ -31,36 +31,36 @@ const MetalBuyProgressModal: React.FC<MetalBuyProgressModalProps> = ({
   const canClose = allCompleted || hasError;
 
   const iconFor = (status: MetalBuyStepStatus) => {
-    if (status === "completed") return <CheckCircle2 className="w-5 h-5 text-green-500" />;
-    if (status === "processing") return <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />;
-    if (status === "error") return <AlertCircle className="w-5 h-5 text-red-500" />;
+    if (status === "completed") return <CheckCircle2 className="w-5 h-5 text-success" />;
+    if (status === "processing") return <Loader2 className="w-5 h-5 text-primary animate-spin" />;
+    if (status === "error") return <AlertCircle className="w-5 h-5 text-destructive" />;
     return <Circle className="w-5 h-5 text-muted-foreground" />;
   };
 
   const containerFor = (status: MetalBuyStepStatus) => {
-    if (status === "completed") return "bg-green-500/10 border border-green-500/30";
-    if (status === "processing") return "bg-blue-500/10 border-2 border-blue-500/30";
-    if (status === "error") return "bg-red-500/10 border border-red-500/30";
+    if (status === "completed") return "bg-success/10 border border-success/30";
+    if (status === "processing") return "bg-primary/10 border-2 border-primary/30";
+    if (status === "error") return "bg-destructive/10 border border-destructive/30";
     return "bg-muted/30 border border-border";
   };
 
   const textFor = (status: MetalBuyStepStatus) => {
-    if (status === "completed") return "text-green-500";
-    if (status === "processing") return "text-blue-500";
-    if (status === "error") return "text-red-500";
+    if (status === "completed") return "text-success";
+    if (status === "processing") return "text-primary";
+    if (status === "error") return "text-destructive";
     return "text-muted-foreground";
   };
 
   const badgeFor = (status: MetalBuyStepStatus) => {
-    if (status === "completed") return "bg-green-500/20 text-green-500";
-    if (status === "processing") return "bg-blue-500/20 text-blue-500";
-    if (status === "error") return "bg-red-500/20 text-red-500";
+    if (status === "completed") return "bg-success/20 text-success";
+    if (status === "processing") return "bg-primary/20 text-primary";
+    if (status === "error") return "bg-destructive/20 text-destructive";
     return "bg-muted text-muted-foreground";
   };
 
   const labelFor = (status: MetalBuyStepStatus) => {
     if (status === "completed") return "Completed";
-    if (status === "processing") return "In Progress";
+    if (status === "processing") return "In progress";
     if (status === "error") return "Failed";
     return "Pending";
   };
@@ -70,18 +70,18 @@ const MetalBuyProgressModal: React.FC<MetalBuyProgressModalProps> = ({
       title={
         <div className="flex items-center gap-3">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            hasError ? "bg-red-500/20" : allCompleted ? "bg-green-500/20" : "bg-blue-500/20"
+            hasError ? "bg-destructive/20" : allCompleted ? "bg-success/20" : "bg-primary/20"
           }`}>
             {hasError ? (
-              <AlertCircle className="w-5 h-5 text-red-500" />
+              <AlertCircle className="w-5 h-5 text-destructive" />
             ) : allCompleted ? (
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <CheckCircle2 className="w-5 h-5 text-success" />
             ) : (
-              <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+              <Loader2 className="w-5 h-5 text-primary animate-spin" />
             )}
           </div>
           <span className="text-lg font-semibold text-foreground">
-            {hasError ? "Metal Purchase Failed" : allCompleted ? "Metal Purchase Complete" : "Processing Metal Purchase"}
+            {hasError ? "Metal purchase failed" : allCompleted ? "Metal purchase complete" : "Processing metal purchase"}
           </span>
         </div>
       }
@@ -90,7 +90,7 @@ const MetalBuyProgressModal: React.FC<MetalBuyProgressModalProps> = ({
       footer={canClose ? (
         <button
           onClick={onClose}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
         >
           Close
         </button>
@@ -102,8 +102,8 @@ const MetalBuyProgressModal: React.FC<MetalBuyProgressModalProps> = ({
     >
       <div className="space-y-6">
         {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-            <p className="text-sm text-red-500">{error}</p>
+          <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+            <p className="text-sm text-destructive">{error}</p>
           </div>
         )}
 
@@ -126,7 +126,7 @@ const MetalBuyProgressModal: React.FC<MetalBuyProgressModalProps> = ({
                     </p>
                   )}
                   {step.error && (
-                    <p className="text-xs text-red-500 mt-2">{step.error}</p>
+                    <p className="text-xs text-destructive mt-2">{step.error}</p>
                   )}
                 </div>
               </div>

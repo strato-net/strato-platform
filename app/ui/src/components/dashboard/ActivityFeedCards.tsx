@@ -481,7 +481,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
         </div>
       ) : error ? (
         <Card>
-          <CardContent className="p-6 text-center text-red-600">
+          <CardContent className="p-6 text-center text-destructive">
             {error}
           </CardContent>
         </Card>

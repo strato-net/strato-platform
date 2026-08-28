@@ -1,4 +1,5 @@
 import { Check } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { TradePool, TradeQuote } from "@/interface";
 import { formatAmount, formatUnits } from "@/utils/numberUtils";
 
@@ -87,21 +88,21 @@ export const PoolSelector = ({
               onClick={() => { if (!disabled) onSelect(pool.address); }}
               disabled={disabled}
               className={`rounded-lg border p-2.5 md:p-3 text-left transition-colors ${
-                selected ? 'border-strato-blue bg-muted' : 'border-border hover:bg-muted/50'
+                selected ? 'border-primary bg-muted' : 'border-border hover:bg-muted/50'
               } ${disabled ? 'opacity-50 cursor-not-allowed hover:bg-transparent' : ''}`}
             >
               <div className="flex items-center justify-between gap-1">
                 <span className="text-sm font-semibold whitespace-nowrap">{pool.poolLabel}</span>
                 {isBest ? (
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 whitespace-nowrap">
+                  <Badge variant="success" className="text-[10px] px-1.5 py-0.5 whitespace-nowrap">
                     Best rate
-                  </span>
+                  </Badge>
                 ) : selected ? (
-                  <Check className="h-3.5 w-3.5 text-strato-blue flex-shrink-0" />
+                  <Check className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                 ) : null}
               </div>
               <div className="text-[11px] text-muted-foreground mt-0.5">{SUBTITLES[pool.poolType]}</div>
-              <div className="text-[11px] text-muted-foreground mt-1 truncate">{detailFor(pool)}</div>
+              <div className="text-[11px] text-muted-foreground mt-1 truncate tabular-nums">{detailFor(pool)}</div>
             </button>
           );
         })}

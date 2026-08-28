@@ -32,8 +32,8 @@ const SimulationResultPanel: React.FC<Props> = ({ result, error, title }) => {
     <div
       className={
         failed
-          ? 'rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm'
-          : 'rounded-lg border border-green-600/40 bg-green-500/10 p-3 text-sm'
+          ? 'rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm'
+          : 'rounded-lg border border-success/40 bg-success/10 p-3 text-sm'
       }
     >
       <div className="font-semibold">
@@ -42,7 +42,7 @@ const SimulationResultPanel: React.FC<Props> = ({ result, error, title }) => {
       </div>
 
       {message ? (
-        <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap break-all text-xs text-red-600">
+        <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap break-all text-xs text-destructive">
           {message}
         </pre>
       ) : null}
@@ -127,9 +127,9 @@ const TraceFrameView: React.FC<{ frame: SimulationTraceFrame; parentErrored: boo
         {frame.output != null ? <span className="text-muted-foreground"> → {frame.output}</span> : null}
         {frame.error ? (
           caught ? (
-            <span className="text-amber-600 dark:text-amber-500"> ⚠ caught &amp; handled: {frame.error}</span>
+            <span className="text-warning"> ⚠ caught &amp; handled: {frame.error}</span>
           ) : (
-            <span className="text-red-600"> ✗ {frame.error}</span>
+            <span className="text-destructive"> ✗ {frame.error}</span>
           )
         ) : null}
       </div>

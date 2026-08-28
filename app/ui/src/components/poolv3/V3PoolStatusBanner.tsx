@@ -34,7 +34,7 @@ const V3PoolStatusBanner = ({ pool, className }: { pool: PoolV3; className?: str
     return (
       <div
         className={cn(
-          "flex items-start gap-2 rounded-lg border border-yellow-600/40 bg-yellow-500/10 p-3 text-yellow-700 dark:text-yellow-500",
+          "flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-warning",
           className
         )}
       >

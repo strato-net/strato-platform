@@ -99,33 +99,35 @@ const VaultOverview = () => {
         <AssetSummary
           title="TVL"
           value={`$${formatUsd(totalEquity)}`}
-          icon={<Wallet className="text-white" size={18} />}
-          color="bg-blue-500"
+          icon={<Wallet className="text-primary-foreground" size={18} />}
+          color="bg-primary"
           isLoading={loading}
           tooltip="Total Net Asset Value of all tokens held in the vault"
+          valueClassName="tabular-nums"
         />
 
         <AssetSummary
-          title="Total Shares"
+          title="Total shares"
           value={formatShares(totalShares)}
           icon={<Coins className="text-white" size={18} />}
           color="bg-purple-500"
           isLoading={loading}
           tooltip="Total number of vault shares in circulation"
+          valueClassName="tabular-nums"
         />
 
         {(() => {
           const { formatted, isPositive, isNeutral } = formatApy(alpha);
-          const valueColor = isNeutral ? "" : isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
+          const valueColor = isNeutral ? "" : isPositive ? "text-success" : "text-destructive";
           return (
             <AssetSummary
               title="Alpha vs HODL"
               value={formatted}
-              icon={<TrendingUp className="text-white" size={18} />}
-              color="bg-orange-500"
+              icon={<TrendingUp className="text-warning-foreground" size={18} />}
+              color="bg-warning"
               isLoading={loading}
               tooltip="Annualized outperformance vs passively holding the same portfolio (30-day trailing)"
-              valueClassName={valueColor}
+              valueClassName={`tabular-nums ${valueColor}`}
             />
           );
         })()}
@@ -138,7 +140,7 @@ const VaultOverview = () => {
             <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 rounded-t-lg transition-colors">
               <div className="flex items-center gap-2">
                 <Coins className="h-5 w-5 text-muted-foreground" />
-                <span className="font-semibold">Vault Tokens</span>
+                <span className="font-semibold">Vault tokens</span>
                 <span className="text-sm text-muted-foreground">
                   ({assets.length} {assets.length === 1 ? "token" : "tokens"})
                 </span>
@@ -189,10 +191,10 @@ const VaultOverview = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-medium">
+                        <div className="font-medium tabular-nums">
                           {formatTokenBalance(asset.balance)}
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-sm text-muted-foreground tabular-nums">
                           ${formatUsd(asset.valueUsd)}
                         </div>
                       </div>

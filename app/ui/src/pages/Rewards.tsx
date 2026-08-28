@@ -92,8 +92,8 @@ const Rewards = () => {
   const GuestLoginPrompt = () => (
     <Card className="border-dashed">
       <CardHeader className="text-center pb-2">
-        <div className="mx-auto w-16 h-16 bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 rounded-full flex items-center justify-center mb-4">
-          <Gift className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+        <div className="mx-auto w-16 h-16 bg-gradient-to-br from-primary/15 to-primary/5 rounded-full flex items-center justify-center mb-4">
+          <Gift className="w-8 h-8 text-primary" />
         </div>
         <CardTitle className="text-xl">Start Earning Rewards</CardTitle>
         <CardDescription className="text-base">

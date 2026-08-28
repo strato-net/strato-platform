@@ -11,6 +11,7 @@ import { ensureHexPrefix } from '@/utils/numberUtils';
 import { usdstAddress } from '@/lib/constants';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { getStratoChain } from '@/lib/stratoChain';
+import { Badge } from '@/components/ui/badge';
 
 const normalizeStratoAccount = (account?: string) => (account || '').replace(/^0x/i, '');
 
@@ -97,12 +98,12 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
               href={addressUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800"
+              className="text-primary hover:text-primary/80"
             >
               {`${displayAddr.slice(0, 6)}...${displayAddr.slice(-4)}`}
             </a>
             <CopyOutlined
-              className="text-muted-foreground hover:text-blue-500 cursor-pointer transition-colors"
+              className="text-muted-foreground hover:text-primary cursor-pointer transition-colors"
               onClick={() => handleCopyToClipboard(displayAddr)}
             />
           </div>
@@ -131,12 +132,12 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
                   href={addressUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800"
+                  className="text-primary hover:text-primary/80"
                 >
                   {`${addr.slice(0, 6)}...${addr.slice(-4)}`}
                 </a>
                 <CopyOutlined
-                  className="text-muted-foreground hover:text-blue-500 cursor-pointer transition-colors"
+                  className="text-muted-foreground hover:text-primary cursor-pointer transition-colors"
                   onClick={() => handleCopyToClipboard(addr)}
                 />
               </div>
@@ -152,7 +153,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
       render: (_: any, record: any) => {
         const symbol = record?.stratoTokenSymbol || '-';
         const amount = formatWeiToDecimalHP(record?.WithdrawalInfo?.stratoTokenAmount || '0', 18);
-        return <span className="text-sm text-foreground">{amount} {symbol}</span>;
+        return <span className="text-sm text-foreground tabular-nums">{amount} {symbol}</span>;
       },
       width: 140,
     },
@@ -166,10 +167,10 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
         if (factor) {
           try {
             const externalAmount = (BigInt(stratoAmount) * BigInt(factor) / (10n ** 18n)).toString();
-            return <span className="text-sm text-foreground">≈ {formatWeiToDecimalHP(externalAmount, 18)} {symbol}</span>;
+            return <span className="text-sm text-foreground tabular-nums">≈ {formatWeiToDecimalHP(externalAmount, 18)} {symbol}</span>;
           } catch { /* fall through */ }
         }
-        return <span className="text-sm text-foreground">{formatWeiToDecimalHP(stratoAmount, 18)} {symbol}</span>;
+        return <span className="text-sm text-foreground tabular-nums">{formatWeiToDecimalHP(stratoAmount, 18)} {symbol}</span>;
       },
       width: 140,
     },
@@ -181,36 +182,36 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
         const statusNum = parseInt(statusStr);
         if (statusNum === 1) {
           return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            <Badge variant="secondary">
               <Clock className="h-3 w-3 mr-1" />
               Initiated
-            </span>
+            </Badge>
           );
         } else if (statusNum === 2) {
           return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+            <Badge variant="warning">
               <CheckCircle2 className="h-3 w-3 mr-1" />
-              Pending Review
-            </span>
+              Pending review
+            </Badge>
           );
         } else if (statusNum === 3) {
           return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+            <Badge variant="success">
               Completed
-            </span>
+            </Badge>
           );
         } else if (statusNum === 4) {
           return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+            <Badge variant="destructive">
               Aborted
-            </span>
+            </Badge>
           );
         }
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">
+          <Badge variant="secondary">
             <AlertCircle className="h-3 w-3 mr-1" />
             Unknown
-          </span>
+          </Badge>
         );
       },
       width: 80,
@@ -245,7 +246,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
               }}
               style={{ width: isMobile ? '100%' : 150 }}
               options={[
-                { value: '', label: 'All Types' },
+                { value: '', label: 'All types' },
                 { value: 'bridge', label: 'Bridge' },
                 { value: 'convert', label: 'Convert' },
               ]}
@@ -253,7 +254,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
           </div>
           <div className={isMobile ? "w-full" : ""}>
             <label className="block text-sm font-medium text-foreground mb-1">
-              Status Filter
+              Status filter
             </label>
             <Select
               value={withdrawalStatus || 0}
@@ -267,7 +268,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
           </div>
           <div className={isMobile ? "w-full" : ""}>
             <label className="block text-sm font-medium text-foreground mb-1">
-              Chain Filter
+              Chain filter
             </label>
             <Select
               value={selectedChainId || 0}
@@ -277,7 +278,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
               }}
               style={{ width: isMobile ? '100%' : 150 }}
               options={[
-                { value: 0, label: 'All Chains' },
+                { value: 0, label: 'All chains' },
                 ...availableNetworks.map((n) => ({ value: parseInt(n.chainId), label: n.chainName }))
               ]}
             />

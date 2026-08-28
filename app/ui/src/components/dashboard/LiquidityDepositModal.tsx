@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -455,7 +456,7 @@ const LiquidityDepositModal = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Deposit Liquidity</DialogTitle>
+          <DialogTitle>Deposit liquidity</DialogTitle>
           <DialogDescription>
             Add liquidity to the {selectedPool?.poolName} pool.
           </DialogDescription>
@@ -472,13 +473,13 @@ const LiquidityDepositModal = ({
                   const insufficientBalance = amountWei > BigInt(coinBalance);
 
                   return (
-                    <div key={coin.address} className="rounded-lg border border-blue-400 p-2">
+                    <div key={coin.address} className="rounded-lg border border-primary p-2">
                       <span className="text-sm text-muted-foreground">Amount</span>
                       <div className="flex items-center gap-2">
                         <Input
                           placeholder="0.0"
                           className={`flex-1 border-none text-lg font-medium p-0 h-auto focus-visible:ring-0 ${
-                            insufficientBalance ? "text-red-500" : ""
+                            insufficientBalance ? "text-destructive" : ""
                           }`}
                           value={amount}
                           onChange={(e) => {
@@ -494,7 +495,7 @@ const LiquidityDepositModal = ({
                           {coin.images?.[0]?.value ? (
                             <img src={coin.images[0].value} alt={coin._name} className="w-6 h-6 rounded-full object-cover" />
                           ) : (
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium" style={{ backgroundColor: "red" }}>
+                            <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
                               {coin._symbol?.slice(0, 2)}
                             </div>
                           )}
@@ -509,7 +510,7 @@ const LiquidityDepositModal = ({
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="text-xs text-blue-500"
+                          className="text-xs text-primary hover:text-primary/80"
                           onClick={() => {
                             let maxBigInt = BigInt(coinBalance);
                             if (coin.address.toLowerCase() === usdstAddress.toLowerCase()) {
@@ -529,7 +530,7 @@ const LiquidityDepositModal = ({
                         </Button>
                       </div>
                       {insufficientBalance && (
-                        <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
+                        <p className="text-destructive text-sm mt-1">Insufficient balance</p>
                       )}
                     </div>
                   );
@@ -540,11 +541,11 @@ const LiquidityDepositModal = ({
               <div className="rounded-lg bg-muted/50 p-2 md:p-3">
                 <div className="flex justify-between items-center text-xs md:text-sm text-muted-foreground">
                   <span className="inline-flex items-center gap-1">
-                    Best Available APY
+                    Best available APY
                     <BestApyInfoTooltip />
                   </span>
                   <EarnApyTooltip info={selectedPoolApyInfo}>
-                    <span className="font-medium cursor-default">{selectedPoolApyLabel}</span>
+                    <span className="font-medium cursor-default tabular-nums">{selectedPoolApyLabel}</span>
                   </EarnApyTooltip>
                 </div>
                 <div className="flex justify-between items-center text-xs md:text-sm mt-2 text-muted-foreground">
@@ -561,10 +562,10 @@ const LiquidityDepositModal = ({
                 >
                   {depositLoading ? (
                     <div className="flex justify-center items-center h-12">
-                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
                   ) : (
-                    "Confirm Deposit"
+                    "Confirm deposit"
                   )}
                 </Button>
               </div>
@@ -574,8 +575,8 @@ const LiquidityDepositModal = ({
           <div className="grid grid-cols-1 gap-4">
             {/* First Token */}
             <div className={`rounded-lg border p-2 transition-colors ${
-              depositMode === 'A' ? 'border-blue-400 ' :
-              depositMode === 'A&B' ? 'border-blue-400 ' :
+              depositMode === 'A' ? 'border-primary ' :
+              depositMode === 'A&B' ? 'border-primary ' :
               'border-border bg-muted/50'
             }`}>
               <span className="text-sm text-muted-foreground">Amount</span>
@@ -584,7 +585,7 @@ const LiquidityDepositModal = ({
                   disabled={balanceLoading || isInputDisabled('A')}
                   placeholder="0.0"
                   className={`flex-1 border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
-                    safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") ? "text-red-500" : ""
+                    safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") ? "text-destructive" : ""
                   } ${isInputDisabled('A') ? "opacity-50 cursor-not-allowed" : ""}`}
                   value={token1Amount}
                   onChange={(e) => {
@@ -609,8 +610,7 @@ const LiquidityDepositModal = ({
                         />
                       ) : (
                         <div
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
-                          style={{ backgroundColor: "red" }}
+                          className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-medium"
                         >
                           {selectedPool.tokenA._symbol?.slice(0, 2)}
                         </div>
@@ -623,14 +623,14 @@ const LiquidityDepositModal = ({
               <div className='flex items-center'>
                 <span className="text-sm text-muted-foreground flex gap-1">
                   Balance: {balanceLoading ?
-                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     : formatUnits(tokenABalance || "0", 18)}
                 </span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="text-xs text-blue-500"
+                  className="text-xs text-primary hover:text-primary/80"
                   onClick={() => handleMaxClick(true)}
                   disabled={balanceLoading || isInputDisabled('A')}
                 >
@@ -638,17 +638,17 @@ const LiquidityDepositModal = ({
                 </Button>
               </div>
               {safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") && (
-                <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
+                <p className="text-destructive text-sm mt-1">Insufficient balance</p>
               )}
               {selectedPool?.tokenA.address === usdstAddress && token1Amount && 
                (BigInt(tokenABalance || "0") - safeParseUnits(token1Amount, 18) + BigInt(voucherBalance || "0")) < safeParseUnits(DEPOSIT_FEE, 18) && 
                safeParseUnits(token1Amount, 18) <= BigInt(tokenABalance || "0") && (
-                <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
+                <p className="text-warning text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
               )}
               {selectedPool?.tokenA.address !== usdstAddress && 
                selectedPool?.tokenB.address !== usdstAddress && 
                (BigInt(usdstBalance || "0") + BigInt(voucherBalance || "0")) < safeParseUnits(DEPOSIT_FEE, 18) && (
-                <p className="text-yellow-600 text-sm mt-1">Insufficient USDST + voucher balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
+                <p className="text-warning text-sm mt-1">Insufficient USDST + voucher balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
               )}
               {(() => {
                 if (selectedPool?.tokenA.address === usdstAddress && token1Amount) {
@@ -663,7 +663,7 @@ const LiquidityDepositModal = ({
                     inputAmountWei <= balanceWei - feeWei;
 
                   return isLowBalanceWarning ? (
-                    <p className="text-yellow-600 text-sm mt-1">
+                    <p className="text-warning text-sm mt-1">
                       Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
                     </p>
                   ) : null;
@@ -678,17 +678,17 @@ const LiquidityDepositModal = ({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="px-4 py-2 text-sm font-medium rounded-md border-blue-500/30 bg-blue-500/10 text-blue-500 transition-colors"
-                onClick={toggleDepositMode} 
+                className="px-4 py-2 text-sm font-medium rounded-md border-primary/30 bg-primary/10 text-primary transition-colors"
+                onClick={toggleDepositMode}
               >
-                Deposit Mode ({depositMode === 'A' ? 'A' : depositMode === 'B' ? 'B' : 'A&B'})
+                Deposit mode ({depositMode === 'A' ? 'A' : depositMode === 'B' ? 'B' : 'A&B'})
               </Button>
             </div>
 
             {/* Second Token */}
             <div className={`rounded-lg border p-3 transition-colors ${
-              depositMode === 'B' ? 'border-blue-400 ' : 
-              depositMode === 'A&B' ? 'border-blue-400 ' :
+              depositMode === 'B' ? 'border-primary ' :
+              depositMode === 'A&B' ? 'border-primary ' :
               'border-border '
             }`}>
               <div className="flex justify-between mb-2">
@@ -699,7 +699,7 @@ const LiquidityDepositModal = ({
                   disabled={balanceLoading || isInputDisabled('B')}
                   placeholder="0.0"
                   className={`flex-1 border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
-                    safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") ? "text-red-500" : ""
+                    safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") ? "text-destructive" : ""
                   } ${isInputDisabled('B') ? "opacity-50 cursor-not-allowed" : ""}`}
                   value={token2Amount}
                   onChange={(e) => {
@@ -724,8 +724,7 @@ const LiquidityDepositModal = ({
                         />
                       ) : (
                         <div
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
-                          style={{ backgroundColor: "red" }}
+                          className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-medium"
                         >
                           {selectedPool.tokenB._symbol?.slice(0, 2)}
                         </div>
@@ -738,14 +737,14 @@ const LiquidityDepositModal = ({
               <div className='flex items-center'>
                 <span className="text-sm text-muted-foreground flex gap-1">
                   Balance: {balanceLoading ?
-                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     : formatUnits(tokenBBalance || "0", 18)}
                 </span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="text-xs text-blue-500"
+                  className="text-xs text-primary hover:text-primary/80"
                   onClick={() => handleMaxClick(false)}
                   disabled={balanceLoading || isInputDisabled('B')}
                 >
@@ -753,17 +752,17 @@ const LiquidityDepositModal = ({
                 </Button>
               </div>
               {safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") && (
-                <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
+                <p className="text-destructive text-sm mt-1">Insufficient balance</p>
               )}
               {selectedPool?.tokenB.address === usdstAddress && token2Amount &&
                (BigInt(tokenBBalance || "0") - safeParseUnits(token2Amount, 18) + BigInt(voucherBalance || "0")) < safeParseUnits(DEPOSIT_FEE, 18) && 
                safeParseUnits(token2Amount, 18) <= BigInt(tokenBBalance || "0") && (
-                <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
+                <p className="text-warning text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
               )}
               {selectedPool?.tokenA.address !== usdstAddress && 
                selectedPool?.tokenB.address !== usdstAddress && 
                (BigInt(usdstBalance || "0") + BigInt(voucherBalance || "0")) < safeParseUnits(DEPOSIT_FEE, 18) && (
-                <p className="text-yellow-600 text-sm mt-1">Insufficient USDST + voucher balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
+                <p className="text-warning text-sm mt-1">Insufficient USDST + voucher balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
               )}
               {(() => {
                 if (selectedPool?.tokenB.address === usdstAddress && token2Amount) {
@@ -778,7 +777,7 @@ const LiquidityDepositModal = ({
                     inputAmountWei <= balanceWei - feeWei;
 
                   return isLowBalanceWarning ? (
-                    <p className="text-yellow-600 text-sm mt-1">
+                    <p className="text-warning text-sm mt-1">
                       Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
                     </p>
                   ) : null;
@@ -832,16 +831,16 @@ const LiquidityDepositModal = ({
           <div className="rounded-lg bg-muted/50 p-2 md:p-3">
             <div className="flex justify-between items-center text-xs md:text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1">
-                Best Available APY
+                Best available APY
                 <BestApyInfoTooltip />
               </span>
               <EarnApyTooltip info={selectedPoolApyInfo}>
-                <span className="font-medium cursor-default">{selectedPoolApyLabel}</span>
+                <span className="font-medium cursor-default tabular-nums">{selectedPoolApyLabel}</span>
               </EarnApyTooltip>
             </div>
             <div className="flex flex-col md:flex-row md:justify-between md:items-center text-xs md:text-sm mt-2 text-muted-foreground gap-0.5">
               <span className="shrink-0">Current pool ratio</span>
-              <span className="font-medium text-right break-all">
+              <span className="font-medium text-right break-all tabular-nums">
                 {selectedPool && `1 ${selectedPool.tokenA._symbol} = ${formatNumber(selectedPool.aToBRatio)} ${selectedPool.tokenB._symbol}`}
               </span>
             </div>
@@ -871,10 +870,10 @@ const LiquidityDepositModal = ({
             >
               {depositLoading ? (
                 <div className="flex justify-center items-center h-12">
-                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               ) : (
-                "Confirm Deposit"
+                "Confirm deposit"
               )}
             </Button>
           </div>

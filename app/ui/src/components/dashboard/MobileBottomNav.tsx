@@ -21,6 +21,7 @@ import {
   X
 } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
+import { Badge } from '@/components/ui/badge';
 import { useUser } from '@/context/UserContext';
 import { LucideIcon } from 'lucide-react';
 
@@ -107,7 +108,7 @@ const MobileBottomNav = () => {
               key={path}
               to={path}
               className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${isActive(path)
-                  ? 'text-blue-600 dark:text-blue-400'
+                  ? 'text-primary'
                   : 'text-gray-500 dark:text-gray-400'
                 }`}
             >
@@ -120,7 +121,7 @@ const MobileBottomNav = () => {
           <button
             onClick={() => setIsMoreOpen(true)}
             className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${isMoreActive
-                ? 'text-blue-600 dark:text-blue-400'
+                ? 'text-primary'
                 : 'text-gray-500 dark:text-gray-400'
               }`}
           >
@@ -159,16 +160,16 @@ const MobileBottomNav = () => {
                       key={path}
                       onClick={() => handleMoreItemClick(path)}
                       className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-lg transition-colors ${isActive(path)
-                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                          ? 'bg-primary/10 text-primary'
                           : 'text-foreground hover:bg-muted'
                         }`}
                     >
                       <Icon size={18} />
                       <span className="text-[13px] font-medium">{label}</span>
                       {badge && (
-                        <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+                        <Badge variant="secondary" className="ml-auto text-[10px] uppercase tracking-wide px-1.5 py-0.5">
                           {badge}
-                        </span>
+                        </Badge>
                       )}
                     </button>
                   ))}

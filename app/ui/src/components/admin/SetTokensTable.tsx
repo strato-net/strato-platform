@@ -118,7 +118,7 @@ const AllTokensTable = () => {
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
-            <p className="text-red-600">Error loading tokens: {error}</p>
+            <p className="text-destructive">Error loading tokens: {error}</p>
           </div>
         </CardContent>
       </Card>

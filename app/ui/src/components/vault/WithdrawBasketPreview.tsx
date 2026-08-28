@@ -85,7 +85,7 @@ const WithdrawBasketPreview = ({ basket, totalUsd }: WithdrawBasketPreviewProps)
             <TableRow>
               <TableHead>Token</TableHead>
               <TableHead className="text-right">Weight</TableHead>
-              <TableHead className="text-right">USD Value</TableHead>
+              <TableHead className="text-right">USD value</TableHead>
               <TableHead className="text-right">Amount</TableHead>
             </TableRow>
           </TableHeader>
@@ -108,13 +108,13 @@ const WithdrawBasketPreview = ({ basket, totalUsd }: WithdrawBasketPreviewProps)
                     <span className="font-medium">{item.symbol}</span>
                   </div>
                 </TableCell>
-                <TableCell className="text-right font-mono">
+                <TableCell className="text-right font-mono tabular-nums">
                   {formatPercent(item.weightPercent)}%
                 </TableCell>
-                <TableCell className="text-right font-mono">
+                <TableCell className="text-right font-mono tabular-nums">
                   ${formatUsd(item.usdValue)}
                 </TableCell>
-                <TableCell className="text-right font-mono">
+                <TableCell className="text-right font-mono tabular-nums">
                   {formatTokenAmount(item.tokenAmount)}
                 </TableCell>
               </TableRow>
@@ -125,8 +125,8 @@ const WithdrawBasketPreview = ({ basket, totalUsd }: WithdrawBasketPreviewProps)
 
       {/* Summary */}
       <div className="flex justify-between items-center pt-2 border-t">
-        <span className="font-medium">Total Value</span>
-        <span className="text-lg font-bold">${formatUsd(totalUsd)}</span>
+        <span className="font-medium">Total value</span>
+        <span className="text-lg font-bold tabular-nums">${formatUsd(totalUsd)}</span>
       </div>
     </div>
   );

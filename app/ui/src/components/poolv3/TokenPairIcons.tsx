@@ -28,7 +28,7 @@ const TokenPairIcons = ({
       ) : (
         <div
           key={token.address}
-          className={`${sizeClasses[size]} rounded-full flex items-center justify-center text-[10px] text-white font-medium bg-strato-blue border border-border`}
+          className={`${sizeClasses[size]} rounded-full flex items-center justify-center text-[10px] text-primary-foreground font-medium bg-primary border border-border`}
         >
           {token.symbol?.slice(0, 1)}
         </div>

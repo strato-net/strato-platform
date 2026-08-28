@@ -27,7 +27,7 @@ const LiquidationNotification = () => {
         <button className="relative p-2 hover:bg-muted rounded-md transition-colors">
           <Bell className="w-5 h-5 md:w-6 md:h-6 text-foreground" />
           {hasActiveAlert && (
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+            <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full animate-pulse" />
           )}
         </button>
       </PopoverTrigger>
@@ -45,7 +45,7 @@ const LiquidationNotification = () => {
           <div className="p-3 border-b last:border-b-0 hover:bg-muted/50 transition-colors">
             <div className="flex items-start gap-2">
               <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-1.5 ${
-                riskLevel === 'critical' || riskLevel === 'high' ? 'bg-red-500' : 'bg-orange-500'
+                riskLevel === 'critical' || riskLevel === 'high' ? 'bg-destructive' : 'bg-warning'
               }`} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2 mb-1">
@@ -56,7 +56,7 @@ const LiquidationNotification = () => {
                   </p>
                   <button
                     onClick={dismiss}
-                    className="flex-shrink-0 p-0.5 hover:bg-muted rounded transition-colors"
+                    className="flex-shrink-0 p-0.5 hover:bg-muted rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     aria-label="Dismiss notification"
                   >
                     <X className="w-3 h-3 text-muted-foreground" />

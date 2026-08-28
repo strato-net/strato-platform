@@ -42,7 +42,7 @@ interface LoanFormProps {
 }
 
 const LoanForm: React.FC<LoanFormProps> = ({
-  availableLabel = 'Available to Mint',
+  availableLabel = 'Available to mint',
   availableAmount,
   averageStabilityFee,
   showStabilityFee = false,
@@ -60,7 +60,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
   disabled = false,
   inputDisabled,
   sliderDisabled,
-  actionButtonLabel = 'Confirm Mint',
+  actionButtonLabel = 'Confirm mint',
   onConfirm,
   isProcessing = false,
   showButton = false,
@@ -78,7 +78,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
             </div>
             {showStabilityFee && averageStabilityFee !== undefined && (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Average Stability Fee</span>
+                <span className="text-sm text-muted-foreground">Average stability fee</span>
                 <span className="text-sm font-semibold tabular-nums">{formatPercentage(averageStabilityFee)}</span>
               </div>
             )}
@@ -92,7 +92,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
             isMaxMode={isMaxMode}
             exceedsMax={exceedsMaxMint}
             maxAvailable={availableAmount}
-            label="Mint Amount"
+            label="Mint amount"
             placeholder="0"
             unit="USDST"
             disabled={inputDisabled ?? disabled}

@@ -9,6 +9,7 @@ import { formatEmissionRatePerDay } from "@/services/rewardsService";
 import { findBestEarnApyInfo, buildEarnApyMap } from "@/utils/earnUtils";
 import type { UserRewardsData } from "@/services/rewardsService";
 import { rewardsEnabled, usdstAddress } from "@/lib/constants";
+import { Badge } from "@/components/ui/badge";
 
 /** GOLDST / SILVST — images from TokenContext (earningAssets ∪ inactiveTokens) */
 const METAL_PROMO_TOKEN_ADDRESSES = [
@@ -141,8 +142,8 @@ const GuestPromoSection = ({ variant, userRewards }: GuestPromoSectionProps) => 
           <div className="flex flex-col lg:flex-row">
             <div className="flex-1 px-4 py-5 md:px-6 md:py-6 lg:px-8 lg:py-7">
               <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-3 py-1 mb-5">
-                <span className="w-2 h-2 rounded-full bg-green-400" />
-                <span className="text-white text-xs font-medium">Live Now</span>
+                <span className="w-2 h-2 rounded-full bg-success" />
+                <span className="text-white text-xs font-medium">Live now</span>
               </div>
               <h1 className="text-3xl md:text-4xl lg:text-[2.75rem] font-bold text-white mb-2 leading-tight">
                 {tokenApysLoaded && highestAvailableApy
@@ -161,20 +162,20 @@ const GuestPromoSection = ({ variant, userRewards }: GuestPromoSectionProps) => 
                 onClick={() => navigate("/dashboard/earn")}
                 className="inline-flex items-center gap-2 border border-white/30 text-white rounded-full px-5 py-2.5 text-sm font-medium hover:bg-white/10 transition-colors"
               >
-                Start Earning
+                Start earning
                 <ArrowRight size={16} />
               </button>
             </div>
 
             <div className="lg:w-[360px] xl:w-[400px] px-4 py-5 md:px-6 md:py-6 bg-white/5 border-t lg:border-t-0 lg:border-l border-white/10 flex flex-col justify-center gap-2">
-              <h3 className="text-white font-bold text-xl mb-1">Your Daily Points</h3>
-              <p className="text-white/50 text-base mb-4">
+              <h3 className="text-white font-bold text-xl mb-1">Your daily points</h3>
+              <p className="text-white/50 text-base mb-4 tabular-nums">
                 {dailyPointsStr ? `${dailyPointsStr} pts/day` : "—"}
               </p>
               <div>
                 <div className="w-full h-2 bg-white/10 rounded-full mb-5">
                   <div
-                    className="h-full bg-blue-500 rounded-full transition-[width] duration-[400ms]"
+                    className="h-full bg-primary rounded-full transition-[width] duration-[400ms]"
                     style={{ width: rewardsButtonHovered ? "100%" : `${emissionFillPct}%` }}
                   />
                 </div>
@@ -184,7 +185,7 @@ const GuestPromoSection = ({ variant, userRewards }: GuestPromoSectionProps) => 
                   onMouseLeave={() => setRewardsButtonHovered(false)}
                   className="text-white/50 text-sm hover:text-white/70 transition-colors inline-flex items-center gap-1 self-start"
                 >
-                  See Rewards
+                  See rewards
                   <ArrowRight size={14} />
                 </button>
               </div>
@@ -208,8 +209,8 @@ const GuestPromoSection = ({ variant, userRewards }: GuestPromoSectionProps) => 
         <div className="flex flex-col lg:flex-row">
           <div className="flex-1 px-4 py-5 md:px-6 md:py-6 lg:px-8 lg:py-7">
             <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-3 py-1 mb-5">
-              <span className="w-2 h-2 rounded-full bg-green-400" />
-              <span className="text-white text-xs font-medium">Live Now</span>
+              <span className="w-2 h-2 rounded-full bg-success" />
+              <span className="text-white text-xs font-medium">Live now</span>
             </div>
 
             <h1 className="text-3xl md:text-4xl lg:text-[2.75rem] font-bold text-white mb-2 leading-tight">
@@ -230,25 +231,23 @@ const GuestPromoSection = ({ variant, userRewards }: GuestPromoSectionProps) => 
               onClick={() => variant === 1 ? requestWalletConnection() : navigate("/dashboard/earn")}
               className="inline-flex items-center gap-2 border border-white/30 text-white rounded-full px-5 py-2.5 text-sm font-medium hover:bg-white/10 transition-colors"
             >
-              Start Earning
+              Start earning
               <ArrowRight size={16} />
             </button>
           </div>
 
           <div className="lg:w-[360px] xl:w-[400px] px-4 py-5 md:px-6 md:py-6 bg-white/5 border-t lg:border-t-0 lg:border-l border-white/10 flex flex-col justify-center gap-2">
-            <div className="inline-flex items-center self-start border border-blue-400/50 rounded-full px-3 py-0.5 mb-2">
-              <span className="text-blue-400 text-xs font-medium">Preview</span>
-            </div>
+            <Badge variant="secondary" className="self-start mb-2">Preview</Badge>
 
-            <h3 className="text-white font-bold text-xl mb-1">Your Daily Points</h3>
-            <p className="text-white/50 text-base mb-4">
+            <h3 className="text-white font-bold text-xl mb-1">Your daily points</h3>
+            <p className="text-white/50 text-base mb-4 tabular-nums">
               {totalDailyPointsStr ? `${totalDailyPointsStr} pts/day` : "—"}
             </p>
 
             <div>
               <div className="w-full h-2 bg-white/10 rounded-full mb-5">
                 <div
-                  className="h-full bg-blue-500 rounded-full transition-[width] duration-[400ms]"
+                  className="h-full bg-primary rounded-full transition-[width] duration-[400ms]"
                   style={{ width: rewardsButtonHovered ? "100%" : "80%" }}
                 />
               </div>
@@ -269,7 +268,7 @@ const GuestPromoSection = ({ variant, userRewards }: GuestPromoSectionProps) => 
                   onMouseLeave={() => setRewardsButtonHovered(false)}
                   className="text-white/50 text-sm hover:text-white/70 transition-colors inline-flex items-center gap-1 self-start"
                 >
-                  See Rewards
+                  See rewards
                   <ArrowRight size={14} />
                 </button>
               )}
@@ -358,7 +357,7 @@ const GuestPromoSection = ({ variant, userRewards }: GuestPromoSectionProps) => 
               yield generated through lending.
             </p>
             {usdstApy && (
-              <span className="inline-block border border-green-500 bg-green-500/10 text-green-700 dark:text-green-400 text-xs font-semibold rounded-full px-3 py-1">
+              <span className="inline-block border border-success/30 bg-success/10 text-success text-xs font-semibold rounded-full px-3 py-1">
                 {usdstApy}% APY
               </span>
             )}

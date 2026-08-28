@@ -27,10 +27,10 @@ type RecentTx = {
 };
 
 const STATUS_LABELS: Record<number, { text: string; color: string }> = {
-  3: { text: "Complete", color: "bg-emerald-500/15 text-emerald-500" },
-  2: { text: "Pending", color: "bg-amber-500/15 text-amber-500" },
-  4: { text: "Aborted", color: "bg-red-500/15 text-red-500" },
-  1: { text: "Initiated", color: "bg-blue-500/15 text-blue-500" },
+  3: { text: "Complete", color: "bg-success/15 text-success" },
+  2: { text: "Pending", color: "bg-warning/15 text-warning" },
+  4: { text: "Aborted", color: "bg-destructive/15 text-destructive" },
+  1: { text: "Initiated", color: "bg-primary/15 text-primary" },
 };
 const UNKNOWN_STATUS = { text: "Unknown", color: "bg-muted text-muted-foreground" };
 const METAL_STATUS = STATUS_LABELS[3];
@@ -66,8 +66,8 @@ const TxRow = ({ icon, iconBg, label, status, timeLabel, fromAmount, fromSymbol,
       <p className="text-xs text-muted-foreground mt-0.5">{timeLabel}</p>
     </div>
     <div className="text-right shrink-0">
-      <p className="text-sm font-semibold text-foreground">{fromAmount} {fromSymbol}</p>
-      <p className="text-xs text-muted-foreground">{"\u2192"} {toAmount} {toSymbol}</p>
+      <p className="text-sm font-semibold text-foreground tabular-nums">{fromAmount} {fromSymbol}</p>
+      <p className="text-xs text-muted-foreground tabular-nums">{"\u2192"} {toAmount} {toSymbol}</p>
     </div>
   </div>
 );
@@ -198,8 +198,8 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: Rec
         const key = `${tx.block_timestamp || "tx"}-${index}`;
 
         if (tx._type === 'metal') {
-          return <TxRow key={key} icon={<Gem className="w-4 h-4 text-yellow-600" />} iconBg="bg-yellow-500/15"
-            label="Metal Mint" status={METAL_STATUS} timeLabel={formatTimeAgo(tx.block_timestamp)}
+          return <TxRow key={key} icon={<Gem className="w-4 h-4 text-gold" />} iconBg="bg-gold/15"
+            label="Metal mint" status={METAL_STATUS} timeLabel={formatTimeAgo(tx.block_timestamp)}
             fromAmount={formatBalance(tx.payAmount || "0", undefined, 18, 2, 4)} fromSymbol={tx.paySymbol || "-"}
             toAmount={amt} toSymbol={tx.metalSymbol || "-"} />;
         }
@@ -212,10 +212,10 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: Rec
         const externalAmt = rebasedExt ? `≈ ${formatBalance(rebasedExt, undefined, 18, 2, 4)}` : amt;
 
         return <TxRow key={key}
-          icon={isW ? <ArrowUp className="w-4 h-4 text-amber-500" /> : <ArrowDown className="w-4 h-4 text-emerald-500" />}
-          iconBg={isW ? "bg-amber-500/15" : "bg-emerald-500/15"}
-          label={isW ? "Withdrawal" : isFallback ? "Deposit (Fallback)" : "Deposit"} status={status}
-          timeLabel={`${formatTimeAgo(tx.block_timestamp)} · ${chainNameMap.get(String(tx.externalChainId)) || "Unknown Chain"}`}
+          icon={isW ? <ArrowUp className="w-4 h-4 text-warning" /> : <ArrowDown className="w-4 h-4 text-success" />}
+          iconBg={isW ? "bg-warning/15" : "bg-success/15"}
+          label={isW ? "Withdrawal" : isFallback ? "Deposit (fallback)" : "Deposit"} status={status}
+          timeLabel={`${formatTimeAgo(tx.block_timestamp)} · ${chainNameMap.get(String(tx.externalChainId)) || "Unknown chain"}`}
           fromAmount={isW ? amt : externalAmt} fromSymbol={(isW ? tx.stratoTokenSymbol : tx.externalSymbol) || "-"}
           toAmount={hasOutcome && tx.finalAmount ? formatBalance(tx.finalAmount, undefined, 18, 2, 4) : (isW ? externalAmt : amt)}
           toSymbol={(hasOutcome ? tx.finalTokenSymbol : (isW ? tx.externalSymbol : tx.stratoTokenSymbol)) || "-"} />;
@@ -226,14 +226,14 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: Rec
   const activeTxs = isBridge ? bridgeTxs : metal.transactions;
   const activeLoading = isBridge ? bridgeLoading : metal.loading;
   const viewAllLink = isBridge ? "/bridge-transactions?from=deposits" : "/metal-transactions?from=deposits";
-  const linkClass = `text-sm font-semibold ${isLoggedIn ? "text-blue-500 hover:text-blue-700" : "text-muted-foreground pointer-events-none opacity-50"}`;
+  const linkClass = `text-sm font-semibold ${isLoggedIn ? "text-primary hover:text-primary/80" : "text-muted-foreground pointer-events-none opacity-50"}`;
 
   const emptyState = !isBridge ? (
     <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-muted-foreground">
       <Frown className="w-10 h-10 mb-2 opacity-30" />
-      <span className="text-sm font-medium">No metal purchases found</span>
+      <span className="text-sm font-medium">No metal purchases yet — buy metals to see them here.</span>
     </div>
-  ) : <p className="text-sm text-muted-foreground px-4 py-4">No recent transactions.</p>;
+  ) : <p className="text-sm text-muted-foreground px-4 py-4">No transactions yet — bridge assets to see them here.</p>;
 
   const skeleton = (
     <div className="divide-y divide-border/40">
@@ -252,10 +252,10 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: Rec
       <CardContent className="p-0">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/70">
           <CardTitle className="text-base">
-            {isBridge ? "Recent Transactions" : "Recent Metal Purchases"}
+            {isBridge ? "Recent transactions" : "Recent metal purchases"}
           </CardTitle>
           <Link to={viewAllLink} className={linkClass}>
-            View All {"\u2192"}
+            View all {"\u2192"}
           </Link>
         </div>
 

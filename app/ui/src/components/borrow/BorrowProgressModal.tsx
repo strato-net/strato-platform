@@ -28,11 +28,11 @@ const BorrowProgressModal: React.FC<BorrowProgressModalProps> = ({
   const getStepIcon = (status: StepStatus) => {
     switch (status) {
       case "completed":
-        return <CheckCircle2 className="w-5 h-5 text-green-500" />;
+        return <CheckCircle2 className="w-5 h-5 text-success" />;
       case "processing":
-        return <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />;
+        return <Loader2 className="w-5 h-5 text-primary animate-spin" />;
       case "error":
-        return <AlertCircle className="w-5 h-5 text-red-500" />;
+        return <AlertCircle className="w-5 h-5 text-destructive" />;
       default:
         return <Circle className="w-5 h-5 text-muted-foreground" />;
     }
@@ -41,11 +41,11 @@ const BorrowProgressModal: React.FC<BorrowProgressModalProps> = ({
   const getStepColor = (status: StepStatus) => {
     switch (status) {
       case "completed":
-        return "border-green-500 bg-green-500/10";
+        return "border-success bg-success/10";
       case "processing":
-        return "border-blue-500 bg-blue-500/10";
+        return "border-primary bg-primary/10";
       case "error":
-        return "border-red-500 bg-red-500/10";
+        return "border-destructive bg-destructive/10";
       default:
         return "border-muted bg-muted/50";
     }
@@ -60,18 +60,18 @@ const BorrowProgressModal: React.FC<BorrowProgressModalProps> = ({
       title={
         <div className="flex items-center gap-3">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            hasError ? "bg-red-500/20" : allCompleted ? "bg-green-500/20" : "bg-blue-500/20"
+            hasError ? "bg-destructive/15" : allCompleted ? "bg-success/15" : "bg-primary/15"
           }`}>
             {hasError ? (
-              <AlertCircle className="w-5 h-5 text-red-500" />
+              <AlertCircle className="w-5 h-5 text-destructive" />
             ) : allCompleted ? (
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <CheckCircle2 className="w-5 h-5 text-success" />
             ) : (
-              <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+              <Loader2 className="w-5 h-5 text-primary animate-spin" />
             )}
           </div>
           <span className="text-lg font-semibold text-foreground">
-            {hasError ? "Borrow Failed" : allCompleted ? "Borrow Complete" : "Processing Borrow"}
+            {hasError ? "Borrow failed" : allCompleted ? "Borrow complete" : "Processing borrow"}
           </span>
         </div>
       }
@@ -80,7 +80,7 @@ const BorrowProgressModal: React.FC<BorrowProgressModalProps> = ({
       footer={null}
       closable={allCompleted || hasError}
       width={600}
-      className="[&_.ant-modal-content]:rounded-xl [&_.ant-modal-content]:bg-card [&_.ant-modal-content]:text-foreground [&_.ant-modal-content]:border-2 [&_.ant-modal-content]:border-blue-200 [&_.ant-modal-content]:dark:border-blue-400 [&_.ant-modal-content]:shadow-[0_0_24px_rgba(59,130,246,0.25)] [&_.ant-modal-content]:dark:shadow-[0_0_24px_rgba(96,165,250,0.35)] [&_.ant-modal-content]:backdrop-blur-sm [&_.ant-modal-header]:border-b [&_.ant-modal-header]:border-border [&_.ant-modal-header]:bg-card [&_.ant-modal-body]:p-6 [&_.ant-modal-body]:text-foreground [&_.ant-modal-title]:text-foreground [&_.ant-modal-close]:text-muted-foreground"
+      className="[&_.ant-modal-content]:rounded-xl [&_.ant-modal-content]:bg-card [&_.ant-modal-content]:text-foreground [&_.ant-modal-content]:border-2 [&_.ant-modal-content]:border-primary/30 [&_.ant-modal-content]:shadow-[0_0_24px_hsl(var(--primary)/0.25)] [&_.ant-modal-content]:dark:shadow-[0_0_24px_hsl(var(--primary)/0.35)] [&_.ant-modal-content]:backdrop-blur-sm [&_.ant-modal-header]:border-b [&_.ant-modal-header]:border-border [&_.ant-modal-header]:bg-card [&_.ant-modal-body]:p-6 [&_.ant-modal-body]:text-foreground [&_.ant-modal-title]:text-foreground [&_.ant-modal-close]:text-muted-foreground"
     >
       <div className="space-y-4">
         {/* Steps List */}
@@ -101,7 +101,7 @@ const BorrowProgressModal: React.FC<BorrowProgressModalProps> = ({
                     {/* Connector Line */}
                     {showConnector && (
                       <div className={`absolute left-1/2 top-10 w-0.5 h-4 -translate-x-1/2 ${
-                        step.status === "completed" ? "bg-green-500" : "bg-muted"
+                        step.status === "completed" ? "bg-success" : "bg-muted"
                       }`} />
                     )}
                   </div>
@@ -110,9 +110,9 @@ const BorrowProgressModal: React.FC<BorrowProgressModalProps> = ({
                   <div className="flex-1 min-w-0 pt-2">
                     <div className="flex items-center justify-between mb-1">
                       <span className={`font-medium ${
-                        step.status === "completed" ? "text-green-600 dark:text-green-400" :
-                        step.status === "processing" ? "text-blue-600 dark:text-blue-400" :
-                        step.status === "error" ? "text-red-600 dark:text-red-400" :
+                        step.status === "completed" ? "text-success" :
+                        step.status === "processing" ? "text-primary" :
+                        step.status === "error" ? "text-destructive" :
                         "text-muted-foreground"
                       }`}>
                         {step.label}
@@ -123,13 +123,13 @@ const BorrowProgressModal: React.FC<BorrowProgressModalProps> = ({
                     </div>
                     
                     {step.asset && step.amount && (
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-sm text-muted-foreground tabular-nums">
                         {step.amount} {step.asset._symbol}
                       </div>
                     )}
-                    
+
                     {step.error && (
-                      <div className="mt-2 text-sm text-red-600 dark:text-red-400">
+                      <div className="mt-2 text-sm text-destructive">
                         {step.error}
                       </div>
                     )}
@@ -142,18 +142,18 @@ const BorrowProgressModal: React.FC<BorrowProgressModalProps> = ({
 
         {/* Summary Message */}
         {allCompleted && (
-          <div className="mt-4 p-4 bg-green-500/10 dark:bg-green-500/20 border border-green-500/30 rounded-lg">
-            <div className="text-sm text-green-800 dark:text-green-200">
-              <div className="font-medium mb-1">Borrow Successful!</div>
+          <div className="mt-4 p-4 bg-success/10 border border-success/30 rounded-lg">
+            <div className="text-sm text-success">
+              <div className="font-medium mb-1">Borrow successful!</div>
               <div>All steps completed successfully. Your borrow transaction has been processed.</div>
             </div>
           </div>
         )}
 
         {hasError && (
-          <div className="mt-4 p-4 bg-red-500/10 dark:bg-red-500/20 border border-red-500/30 rounded-lg">
-            <div className="text-sm text-red-800 dark:text-red-200">
-              <div className="font-medium mb-1">Transaction Failed</div>
+          <div className="mt-4 p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+            <div className="text-sm text-destructive">
+              <div className="font-medium mb-1">Transaction failed</div>
               <div>One or more steps failed. Please try again or contact support if the issue persists.</div>
             </div>
           </div>

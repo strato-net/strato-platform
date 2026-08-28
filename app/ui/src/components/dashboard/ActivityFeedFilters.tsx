@@ -103,7 +103,7 @@ const ActivityFeedFilters = memo(({
               <SelectValue placeholder="Select contract" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Contracts</SelectItem>
+              <SelectItem value="all">All contracts</SelectItem>
               {contractNames.map((name) => (
                 <SelectItem key={name} value={name}>
                   {name}
@@ -123,7 +123,7 @@ const ActivityFeedFilters = memo(({
               <SelectValue placeholder="Select event" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Events</SelectItem>
+              <SelectItem value="all">All events</SelectItem>
               {uniqueEventNames.map((event) => (
                 <SelectItem key={`${event.contract}-${event.name}`} value={event.name}>
                   {event.name}
@@ -144,15 +144,15 @@ const ActivityFeedFilters = memo(({
                     size="sm"
                     onClick={handleMyTransactionsToggle}
                     className={`h-9 transition-all duration-200 relative ${
-                      filters.transaction_sender 
-                        ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md scale-105" 
-                        : "hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 hover:scale-105"
+                      filters.transaction_sender
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md scale-105"
+                        : "hover:bg-primary/10 hover:border-primary/30 hover:text-primary hover:scale-105"
                     }`}
                   >
                     {filters.transaction_sender && (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-success rounded-full border-2 border-white"></div>
                     )}
-                    My Transactions
+                    My transactions
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -177,8 +177,8 @@ const ActivityFeedFilters = memo(({
             </Badge>
           )}
           {filters.transaction_sender && (
-            <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800">
-              My Transactions
+            <Badge variant="secondary" className="text-xs">
+              My transactions
             </Badge>
           )}
         </div>

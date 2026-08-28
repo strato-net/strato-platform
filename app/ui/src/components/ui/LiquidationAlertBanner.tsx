@@ -56,7 +56,7 @@ export const LiquidationAlertBannerView = ({
           </div>
           <button
             onClick={toggleCollapse}
-            className="flex-shrink-0 p-1 hover:bg-current/10 rounded transition-colors"
+            className="flex-shrink-0 p-1 hover:bg-current/10 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label={isCollapsed ? 'Expand' : 'Collapse'}
           >
             {isCollapsed ? (

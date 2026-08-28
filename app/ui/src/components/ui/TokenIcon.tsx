@@ -20,8 +20,7 @@ const TokenIcon: React.FC<TokenIconProps> = ({ symbol, size = "md", className = 
 
   return (
     <div
-      className={`${sizeClasses[size]} rounded-full flex items-center justify-center text-white font-medium ${className}`}
-      style={{ backgroundColor: "red" }}
+      className={`${sizeClasses[size]} rounded-full flex items-center justify-center bg-muted text-muted-foreground font-medium ${className}`}
     >
       {abbrev}
     </div>

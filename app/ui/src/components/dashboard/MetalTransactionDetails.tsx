@@ -8,6 +8,7 @@ import { formatWeiToDecimalHP } from "@/utils/numberUtils";
 import { activityFeedApi } from "@/lib/activityFeed";
 import { METAL_ACTIVITY_PAIR, MetalTx, resolveTokenSymbols, collectMetalTokenAddrs, mapEventsToMetalTxs } from "@/lib/metalActivity";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Badge } from "@/components/ui/badge";
 
 async function fetchMetalPage(page: number): Promise<{ txs: MetalTx[]; total: number }> {
   const result = await activityFeedApi.getActivities(
@@ -23,22 +24,22 @@ const columns = [
   {
     title: "Paid", key: "paid", width: 180,
     render: (_: unknown, r: MetalTx) => (
-      <span className="text-sm text-foreground">{formatWeiToDecimalHP(r.payAmount, 18)} {r.paySymbol}</span>
+      <span className="text-sm text-foreground tabular-nums">{formatWeiToDecimalHP(r.payAmount, 18)} {r.paySymbol}</span>
     ),
   },
   {
     title: "Received", key: "received", width: 180,
     render: (_: unknown, r: MetalTx) => (
-      <span className="text-sm text-foreground">{formatWeiToDecimalHP(r.metalAmount, 18)} {r.metalSymbol}</span>
+      <span className="text-sm text-foreground tabular-nums">{formatWeiToDecimalHP(r.metalAmount, 18)} {r.metalSymbol}</span>
     ),
   },
   {
     title: "Status", key: "status", width: 120,
     render: () => (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+      <Badge variant="success">
         <CheckCircle2 className="h-3 w-3 mr-1" />
         Completed
-      </span>
+      </Badge>
     ),
   },
   {

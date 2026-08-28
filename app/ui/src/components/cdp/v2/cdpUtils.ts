@@ -710,11 +710,11 @@ export const truncateForDisplay = (value: number): string => {
  * - hf < 1.5: red (High Risk)
  */
 export const getHFColorClass = (hf: string, hfNum: number): string => {
-  if (isNaN(hfNum) || hf === '∞') return 'text-green-600';
-  if (hfNum >= 2.5) return 'text-green-600';
-  if (hfNum >= 2.0) return 'text-blue-600';
-  if (hfNum >= 1.5) return 'text-yellow-600';
-  return 'text-red-600';
+  if (isNaN(hfNum) || hf === '∞') return 'text-success';
+  if (hfNum >= 2.5) return 'text-success';
+  if (hfNum >= 2.0) return 'text-primary';
+  if (hfNum >= 1.5) return 'text-warning';
+  return 'text-destructive';
 };
 
 // ============================================================================

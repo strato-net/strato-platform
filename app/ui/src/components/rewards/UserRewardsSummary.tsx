@@ -224,8 +224,8 @@ export const UserRewardsSummary = ({
           <div className="flex flex-col items-start gap-3">
             <div>
               <div className="flex items-center space-x-2 mb-1">
-                <Coins className="h-4 w-4 text-yellow-500" />
-                <p className="text-lg md:text-xl font-bold">{totalClaimableFormatted}</p>
+                <Coins className="h-4 w-4 text-gold" />
+                <p className="text-lg md:text-xl font-bold tabular-nums">{totalClaimableFormatted}</p>
               </div>
               <p className="text-xs text-muted-foreground">
                 Amount you will receive if you click "Claim All"
@@ -259,8 +259,8 @@ export const UserRewardsSummary = ({
         <CardContent className="px-4 md:px-6 space-y-3">
           <div>
             <div className="flex items-center space-x-2 mb-1">
-              <Star className="h-4 w-4 text-amber-500" />
-              <p className="text-lg md:text-xl font-bold">{totalClaimedFormatted}</p>
+              <Star className="h-4 w-4 text-gold" />
+              <p className="text-lg md:text-xl font-bold tabular-nums">{totalClaimedFormatted}</p>
             </div>
             <p className="text-xs text-muted-foreground">Reward Points</p>
           </div>
@@ -271,8 +271,8 @@ export const UserRewardsSummary = ({
                 <InfoTooltip content="Community bonus points earned this season. Unclaimed amounts are already included in your Total Claimable Rewards; claimed amounts are included in Total Claimed." />
               </div>
               <div className="flex items-center space-x-2">
-                <Gift className="h-4 w-4 text-emerald-500" />
-                <p className="text-base md:text-lg font-semibold">{bonusFormatted}</p>
+                <Gift className="h-4 w-4 text-success" />
+                <p className="text-base md:text-lg font-semibold tabular-nums">{bonusFormatted}</p>
               </div>
             </div>
           )}
@@ -294,17 +294,17 @@ export const UserRewardsSummary = ({
           ) : (
             <div className="space-y-2 text-xs md:text-sm">
               <div className="flex items-center gap-2">
-                <Star className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                <Star className="h-3.5 w-3.5 text-gold shrink-0" />
                 <span className="text-muted-foreground">Total Earned:</span>
                 <span className="font-semibold truncate">{totalDistributedFormatted}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Activity className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                <Activity className="h-3.5 w-3.5 text-primary shrink-0" />
                 <span className="text-muted-foreground">Activities:</span>
                 <span className="font-semibold truncate">{activityCountLabel}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Coins className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                <Coins className="h-3.5 w-3.5 text-success shrink-0" />
                 <span className="text-muted-foreground">Reward Token:</span>
                 {rewardsState?.rewardToken ? (
                   <span className="flex items-center gap-1 min-w-0">

@@ -94,15 +94,15 @@ const CRSlider: React.FC<CRSliderProps> = ({
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="flex justify-between items-start cursor-help">
-              <span className="text-base font-bold">Collateralization Ratio (CR)</span>
+              <span className="text-base font-bold">Collateralization ratio (CR)</span>
               <span className={
-                `text-3xl font-bold ${
-                  projectedCR >= 999999 
-                    ? 'text-green-600' 
+                `text-3xl font-bold tabular-nums ${
+                  projectedCR >= 999999
+                    ? 'text-success'
                     : isAtMinCR
-                      ? 'text-yellow-600'
-                      : isPositionDangerous 
-                        ? 'text-red-600' 
+                      ? 'text-warning'
+                      : isPositionDangerous
+                        ? 'text-destructive'
                         : 'text-foreground'
                 }`
               }>
@@ -142,14 +142,14 @@ const CRSlider: React.FC<CRSliderProps> = ({
       </div>
       
       {/* Slider Labels */}
-      <div className="flex justify-between text-sm text-muted-foreground mt-2">
+      <div className="flex justify-between text-sm text-muted-foreground mt-2 tabular-nums">
         <span>{formatPercentage(minCR)}</span>
         <span>{formatPercentage(sliderMax)}</span>
       </div>
       
       {/* Status message */}
       {isOutOfBounds && !isSliderDisabled && (
-        <div className="text-center text-base text-blue-600">
+        <div className="text-center text-base text-primary">
           {projectedCR+0.1 < sliderMin 
             ? `CR below minimum safe threshold (${formatPercentage(sliderMin)}) - Click slider to set new CR`
             : projectedCR > sliderMax 

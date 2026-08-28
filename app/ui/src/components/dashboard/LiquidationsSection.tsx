@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ChevronDown, ChevronRight, PauseCircle } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, PauseCircle } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 const shorten = (addr: string) => addr.slice(0, 6) + "..." + addr.slice(-4);
 const normalizeAddress = (addr?: string | null): string => (addr || "").toLowerCase().replace(/^0x/, "");
@@ -55,17 +55,17 @@ const LiquidationsSection: React.FC = () => {
     setExpanded((p) => ({ ...p, [id]: !p[id] }));
   };
 
-  if (error) return <div className="text-red-600">Error: {error}</div>;
+  if (error) return <div className="text-destructive">Error: {error}</div>;
 
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg md:text-xl">Liquidatable Positions</CardTitle>
+        <CardTitle className="text-lg md:text-xl">Liquidatable positions</CardTitle>
       </CardHeader>
       <CardContent className="px-3 md:px-6">
         {loading ? (
           <div className="flex justify-center items-center h-12">
-            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : liquidatable.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
@@ -90,18 +90,18 @@ const LiquidationsSection: React.FC = () => {
                         <span className="font-medium text-sm">{shorten(ln.user)}</span>
                         <CopyButton address={ln.user} />
                       </div>
-                      <div className={`text-sm font-medium ${ln.healthFactor < 1 ? 'text-red-600' : 'text-yellow-600'}`}>
+                      <div className={`text-sm font-medium tabular-nums ${ln.healthFactor < 1 ? 'text-destructive' : 'text-warning'}`}>
                         {(ln.healthFactor * 100).toFixed(2)}%
                       </div>
                     </div>
                     {/* Alert users to their own unhealthy loans, which they cannot liquidate */}
                     {isOwnLoan(ln) && (
-                      <div className="text-sm text-red-500">
+                      <div className="text-sm text-destructive">
                         <span className="font-medium">(You)</span>
                       </div>
                     )}
                     <div className="text-sm text-muted-foreground">
-                      Borrowed: <span className="font-medium text-foreground">{weiToEther(ln.amount).toFixed(2)} {ln.assetSymbol}</span>
+                      Borrowed: <span className="font-medium text-foreground tabular-nums">{weiToEther(ln.amount).toFixed(2)} {ln.assetSymbol}</span>
                     </div>
                   </div>
                   
@@ -118,7 +118,7 @@ const LiquidationsSection: React.FC = () => {
                         <div className="flex items-center gap-2">
                         <div className="text-sm text-muted-foreground">Borrower</div>
                         {isOwnLoan(ln) && (
-                        <div className="text-sm text-red-500">
+                        <div className="text-sm text-destructive">
                           <span className="font-medium">(You)</span>
                         </div>
                       )} </div>
@@ -132,15 +132,15 @@ const LiquidationsSection: React.FC = () => {
                     {/* Borrowed amount */}
                     <div>
                       <div className="text-sm text-muted-foreground">Borrowed</div>
-                      <div className="font-medium">
+                      <div className="font-medium tabular-nums">
                         {weiToEther(ln.amount).toFixed(2)} {ln.assetSymbol}
                       </div>
                     </div>
                     
                     {/* Health Factor */}
                     <div>
-                      <div className="text-sm text-muted-foreground">Health Factor</div>
-                      <div className={`font-medium ${ln.healthFactor < 1 ? 'text-red-600' : 'text-yellow-600'}`}>
+                      <div className="text-sm text-muted-foreground">Health factor</div>
+                      <div className={`font-medium tabular-nums ${ln.healthFactor < 1 ? 'text-destructive' : 'text-warning'}`}>
                         {(ln.healthFactor * 100).toFixed(2)}%
                       </div>
                     </div>
@@ -186,8 +186,8 @@ const LiquidationsSection: React.FC = () => {
                                   </span>
                                 </TooltipTrigger>
                                 {c.isPaused && (
-                                  <TooltipContent className="bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-900 text-amber-900 dark:text-amber-400">
-                                    <p>Lending Pool is on pause. Action currently disabled.</p>
+                                  <TooltipContent className="bg-warning/10 border-warning/30 text-warning">
+                                    <p>Lending pool is on pause. This action is currently disabled.</p>
                                   </TooltipContent>
                                 )}
                               </Tooltip>
@@ -195,15 +195,15 @@ const LiquidationsSection: React.FC = () => {
                             <div className="grid grid-cols-2 gap-2 text-sm">
                               <div>
                                 <span className="text-muted-foreground">Amount: </span>
-                                <span className="font-medium">{weiToEther(c.amount).toFixed(2)}</span>
+                                <span className="font-medium tabular-nums">{weiToEther(c.amount).toFixed(2)}</span>
                               </div>
                               <div>
                                 <span className="text-muted-foreground">Value: </span>
-                                <span className="font-medium">${usdVal}</span>
+                                <span className="font-medium tabular-nums">${usdVal}</span>
                               </div>
                               <div className="col-span-2">
-                                <span className="text-muted-foreground">Expected Profit: </span>
-                                <span className={positive ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                                <span className="text-muted-foreground">Expected profit: </span>
+                                <span className={positive ? "text-success font-medium tabular-nums" : "text-destructive font-medium tabular-nums"}>
                                   ${profit}
                                 </span>
                               </div>
@@ -218,10 +218,10 @@ const LiquidationsSection: React.FC = () => {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Collateral Asset</TableHead>
+                            <TableHead>Collateral asset</TableHead>
                             <TableHead>Amount</TableHead>
                             <TableHead>Value (USD)</TableHead>
-                            <TableHead>Expected Profit</TableHead>
+                            <TableHead>Expected profit</TableHead>
                             <TableHead>Action</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -240,14 +240,14 @@ const LiquidationsSection: React.FC = () => {
                                     size="sm"
                                   />
                                 </TableCell>
-                                <TableCell className="font-medium">
+                                <TableCell className="font-medium tabular-nums">
                                   {weiToEther(c.amount).toFixed(2)}
                                 </TableCell>
-                                <TableCell className="font-medium">
+                                <TableCell className="font-medium tabular-nums">
                                   ${usdVal}
                                 </TableCell>
                                 <TableCell>
-                                  <span className={positive ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                                  <span className={positive ? "text-success font-medium tabular-nums" : "text-destructive font-medium tabular-nums"}>
                                     ${profit}
                                   </span>
                                 </TableCell>
@@ -270,8 +270,8 @@ const LiquidationsSection: React.FC = () => {
                                       </span>
                                     </TooltipTrigger>
                                     {c.isPaused && (
-                                      <TooltipContent className="bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-900 text-amber-900 dark:text-amber-400">
-                                        <p>Lending Pool is on pause. Action currently disabled.</p>
+                                      <TooltipContent className="bg-warning/10 border-warning/30 text-warning">
+                                        <p>Lending pool is on pause. This action is currently disabled.</p>
                                       </TooltipContent>
                                     )}
                                   </Tooltip>

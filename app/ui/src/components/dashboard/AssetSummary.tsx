@@ -33,7 +33,7 @@ const AssetSummary = ({
   return (
     <div 
       className={`bg-card rounded-xl border-2 p-4 md:p-5 shadow-sm transition-all w-full h-full flex flex-col justify-center ${
-        isActive ? 'border-border md:border-blue-500 md:shadow-md' : 'border-border hover:shadow-md'
+        isActive ? 'border-border md:border-primary md:shadow-md' : 'border-border hover:shadow-md'
       } ${onClick ? 'md:cursor-pointer' : ''}`}
       onClick={onClick}
     >

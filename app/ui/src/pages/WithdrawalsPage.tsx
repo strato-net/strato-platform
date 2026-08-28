@@ -79,7 +79,7 @@ const WithdrawalsPage = () => {
                         setTargetTransactionTab('WithdrawalInitiated');
                       }}
                       className={`flex items-center gap-1 text-xs md:text-sm font-semibold transition-colors whitespace-nowrap ${isLoggedIn
-                          ? "text-blue-600 hover:text-blue-800 cursor-pointer"
+                          ? "text-primary hover:text-primary/80 cursor-pointer"
                           : "text-muted-foreground hover:text-foreground cursor-pointer"
                         }`}
                     >

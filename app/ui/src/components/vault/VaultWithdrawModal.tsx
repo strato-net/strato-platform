@@ -244,7 +244,7 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Withdraw from Vault</DialogTitle>
+          <DialogTitle>Withdraw from vault</DialogTitle>
           <DialogDescription>
             Withdraw your vault shares for a basket of underlying tokens.
           </DialogDescription>
@@ -254,12 +254,12 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
           {/* Max Withdrawable */}
           <div className="bg-muted/50 rounded-lg p-3">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Your Position Value</span>
-              <span className="font-medium">${formatUsd(userValueUsd)}</span>
+              <span className="text-muted-foreground">Your position value</span>
+              <span className="font-medium tabular-nums">${formatUsd(userValueUsd)}</span>
             </div>
             <div className="flex justify-between text-sm mt-1">
-              <span className="text-muted-foreground">Max Withdrawable</span>
-              <span className="font-medium text-green-600 dark:text-green-400">
+              <span className="text-muted-foreground">Max withdrawable</span>
+              <span className="font-medium text-success tabular-nums">
                 ${formatUsd(maxWithdrawableUsd)}
               </span>
             </div>
@@ -268,8 +268,8 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
           {/* Input Mode Toggle */}
           <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as InputMode)}>
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="usd">USD Amount</TabsTrigger>
-              <TabsTrigger value="percent">% of Position</TabsTrigger>
+              <TabsTrigger value="usd">USD amount</TabsTrigger>
+              <TabsTrigger value="percent">% of position</TabsTrigger>
             </TabsList>
           </Tabs>
 
@@ -296,7 +296,7 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
                       }
                     }
                   }}
-                  className="border-none text-xl font-medium p-0 h-auto focus-visible:ring-0"
+                  className="border-none text-xl font-medium tabular-nums p-0 h-auto focus-visible:ring-0"
                 />
                 <div className="flex items-center gap-1 bg-muted rounded-md px-2 py-1 flex-shrink-0">
                   <span className="font-medium text-sm">
@@ -306,7 +306,7 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
               </div>
 
               <div className="flex items-center justify-between mt-2">
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-muted-foreground tabular-nums">
                   {inputMode === "usd"
                     ? `≈ ${formatShares(sharesToBurn)} ${shareTokenSymbol}`
                     : `≈ $${formatUsd(actualUsdAmount)}`}
@@ -315,7 +315,7 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="text-xs text-blue-500"
+                  className="text-xs text-primary hover:text-primary/80 font-medium"
                   onClick={handleMaxClick}
                 >
                   Max
@@ -323,7 +323,7 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
               </div>
 
               {validationError && (
-                <p className="text-red-600 text-sm mt-2">{validationError}</p>
+                <p className="text-destructive text-sm mt-2">{validationError}</p>
               )}
             </div>
           </div>
@@ -333,7 +333,7 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Tokens will be received based on availability.
+                You'll receive tokens based on availability.
               </AlertDescription>
             </Alert>
           }
@@ -359,8 +359,8 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
           {BigInt(actualUsdAmount || "0") > BigInt(0) && !validationError && (
             <div className="bg-muted/50 rounded-lg p-3">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Shares to Burn</span>
-                <span className="font-medium">
+                <span className="text-muted-foreground">Shares to burn</span>
+                <span className="font-medium tabular-nums">
                   {formatShares(sharesToBurn)} {shareTokenSymbol}
                 </span>
               </div>
@@ -390,9 +390,9 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
             {withdrawLoading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : paused ? (
-              "Vault is Paused"
+              "Vault is paused"
             ) : (
-              "Confirm Withdrawal"
+              "Confirm withdrawal"
             )}
           </Button>
         </div>

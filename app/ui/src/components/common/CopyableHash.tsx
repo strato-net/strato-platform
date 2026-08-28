@@ -42,7 +42,7 @@ export const CopyableHash: React.FC<CopyableHashProps> = ({
         title="Click to copy transaction hash"
       >
         {showLabel && <span className="text-muted-foreground">{label} </span>}
-        <span className="text-blue-600 select-all">{displayHash}</span>
+        <span className="text-primary select-all">{displayHash}</span>
       </div>
       {showInstructions && (
         <p className="text-xs text-muted-foreground">Click hash to copy</p>
