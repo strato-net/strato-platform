@@ -11,6 +11,15 @@
 -- @-M@ cap, so small-RAM machines die by OOM-killer during catch-up instead of
 -- degrading gracefully.
 --
+-- What actually matters (measured, 2026-08-28 A/B: five vm-runner variants,
+-- eight full from-genesis upquark syncs on a 4-core/32GB box; data in
+-- replay/results/2026-08-28-rts-flag-ab.md): the capability count and the TOTAL
+-- nursery pool size (N×A). Halving the pool cost +8%…+35%; the GC trimmings
+-- previously emitted here (@-n@ chunking, @-qg1@, @-qn@) showed no measurable
+-- effect either way against a ~4.5% same-variant noise floor, so they are
+-- gone. Sizing is therefore pool-first: pick a total pool by RAM tier, divide
+-- by N.
+--
 -- Sizing runs once, at strato-setup time, when commands.txt is generated.
 -- Resizing a node (moving it to a different machine, changing its container
 -- limits) requires re-running strato-setup or editing commands.txt by hand.
@@ -136,27 +145,18 @@ tryReadFile path = do
 smallestRamTierMB :: Integer
 smallestRamTierMB = 4 * 1024
 
--- | Nursery size (@-A@, MB, per capability) by RAM tier. Budget: total
--- nursery across both processes ≈ 2–3% of RAM. Diminishing returns above
--- 64m; the big win is escaping the 4m default. The boundaries are nominal
--- machine sizes — real machines report slightly less than nominal (a "16GB"
--- box shows ~15.6GB), so they land in their intended tier.
-nurseryMB :: Integer -> Integer
-nurseryMB memMB
-  | memMB <= 4 * 1024 = 16
-  | memMB <= 8 * 1024 = 32
-  | memMB <= 16 * 1024 = 64
-  | otherwise = 128
-
--- | Nursery chunking (@-n@): lets the single busy thread use the whole N×A
--- pool before a minor GC. Only meaningful with several capabilities sharing
--- a large nursery.
-chunkFlags :: Int -> Integer -> [String]
-chunkFlags n a
-  | n <= 1 = []
-  | a >= 64 = ["-n4m"]
-  | a >= 32 = ["-n2m"]
-  | otherwise = []
+-- | Total vm-runner nursery pool (MB) by RAM tier; per-capability @-A@ is
+-- pool/N. The pool size is what the 2026-08-28 A/B showed matters: halving it
+-- cost +8%…+35% sync time. Budget: pool + the sequencer's half-pool ≈ 2–3% of
+-- RAM. The boundaries are nominal machine sizes — real machines report
+-- slightly less than nominal (a "16GB" box shows ~15.6GB), so they land in
+-- their intended tier.
+vmNurseryPoolMB :: Integer -> Integer
+vmNurseryPoolMB memMB
+  | memMB <= 4 * 1024 = 64
+  | memMB <= 8 * 1024 = 128
+  | memMB <= 16 * 1024 = 256
+  | otherwise = 512
 
 -- | Heap cap for the vm-runner on small-RAM machines: @-M@ at 60% of RAM
 -- converts an OOM-kill into bounded behavior (the RTS auto-enables compacting
@@ -168,34 +168,46 @@ heapCapFlags memMB
   | memMB <= 16 * 1024 = ["-F1.5", "-M" ++ show ((memMB * 6) `div` 10) ++ "m"]
   | otherwise = []
 
--- | vm-runner: serial mutator, so cap @-N@ at 4 — beyond that, extra
--- capabilities only add GC-sync cost (revisit when parallel tx execution
--- lands). @-qg1@ keeps minor GCs serial (they copy ~450KB; a parallel sync
--- costs more than it saves) and @-qn@ bounds old-gen GC threads. @-I2@ (idle
--- GC) is kept from the previous fixed flags, @-T@ powers the metrics export.
+-- | vm-runner: @-N4 -A⟨pool/4⟩@ was the fastest measured config on the
+-- 4-core reference box (2,972s vs 3,114–3,201s for -N2 at the same pool).
+-- Cap @-N@ at 4 — the mutator is serial, so more capabilities only add
+-- GC-sync cost (revisit when parallel tx execution lands). The ≤3-core rules
+-- are PREDICTIONS, not measurements: they anchor on the A/B's @-N1 -A256m@
+-- result (whole pool in one capability, within 6.6% of the best, beating -N2
+-- at the same pool) — on a 2-core box one capability avoids GC-sync cost and
+-- pool splitting, and leaves the other core to the sequencer/p2p/postgres.
+-- @-I2@ (idle GC) is kept from the previous fixed flags, @-T@ powers the
+-- metrics export.
 vmRunnerRtsFlags :: Int -> Integer -> [String]
 vmRunnerRtsFlags cores memMB =
-  ["-T", "-N" ++ show n, "-A" ++ show a ++ "m"]
-    ++ chunkFlags n a
-    ++ (if n > 1 then ["-qg1", "-qn" ++ show (max 1 (n `div` 2))] else [])
-    ++ ["-I2"]
+  ["-T", "-N" ++ show n, "-A" ++ show (pool `div` fromIntegral n) ++ "m", "-I2"]
     ++ heapCapFlags memMB
   where
-    n = max 1 (min 4 cores)
-    a = nurseryMB memMB
+    n :: Int
+    n | cores >= 4 = 4
+      | cores == 3 = 2
+      | otherwise = 1
+    pool = vmNurseryPoolMB memMB
 
--- | strato-sequencer: serial event loop with a multi-GB heap. Two threads
--- halve major-GC pauses on machines with cores to spare; on small boxes keep
--- it at one so it doesn't fight the vm-runner's GC. No @-M@ cap here: its
--- catch-up peak is the look-ahead cache, which flags don't control.
+-- | strato-sequencer: serial event loop with a multi-GB catch-up heap, same
+-- shape as the vm-runner but never A/B'd — every rule here is a PREDICTION by
+-- analogy to the vm-runner measurements. Two capabilities halve major-GC
+-- pauses on machines with cores to spare; on small boxes keep it at one so it
+-- doesn't fight the vm-runner's GC. Total pool = half the vm-runner's, @-A@ =
+-- pool/N (preserves the previous values on big machines). @-I2@ is new and
+-- unmeasured: at the chain head the sequencer idles between blocks, and the
+-- RTS default 0.3s idle GC can fire repeated major GCs over its ~2.4GB
+-- post-catch-up residual heap; 2s matches the vm-runner's cadence. No @-M@
+-- cap here, for two reasons: its catch-up peak is the look-ahead cache, which
+-- flags don't control, and that ~2.4GB residual retention (known open issue)
+-- means a cap would risk HeapOverflow aborts until it is fixed.
 sequencerRtsFlags :: Int -> Integer -> [String]
 sequencerRtsFlags cores memMB =
-  ["-T", "-N" ++ show n, "-A" ++ show a ++ "m"]
-    ++ chunkFlags n a
-    ++ (if n > 1 then ["-qg1"] else [])
+  ["-T", "-N" ++ show n, "-A" ++ show (pool `div` fromIntegral n) ++ "m", "-I2"]
   where
+    n :: Int
     n = if cores >= 4 then 2 else 1
-    a = nurseryMB memMB
+    pool = vmNurseryPoolMB memMB `div` 2
 
 renderRtsFlags :: [String] -> String
 renderRtsFlags flags = unwords (["+RTS"] ++ flags ++ ["-RTS"])

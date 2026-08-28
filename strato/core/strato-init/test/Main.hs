@@ -1,5 +1,7 @@
--- | Pins the RTS flag sizing to the expected-output matrix of
--- strato-net/private#94 (dynamic RTS flags by machine size).
+-- | Pins the RTS flag sizing to the acceptance table of the 2026-08-28 A/B
+-- benchmark round (strato-net/private#94 follow-up; data in
+-- vm-runner/replay/results/2026-08-28-rts-flag-ab.md): pool-first nursery
+-- sizing, no GC trimmings (-n/-qg1/-qn measured as no-ops).
 module Main (main) where
 
 import Blockchain.Init.RtsFlags
@@ -8,34 +10,44 @@ import Test.Hspec
 main :: IO ()
 main = hspec $ do
   describe "vmRunnerRtsFlags" $ do
-    it "1 core, 4GB: serial, small nursery, capped heap" $
-      vmRunnerRtsFlags 1 4096
-        `shouldBe` words "-T -N1 -A16m -I2 -F1.5 -M2457m"
-    it "2 cores, 8GB" $
-      vmRunnerRtsFlags 2 8192
-        `shouldBe` words "-T -N2 -A32m -n2m -qg1 -qn1 -I2 -F1.5 -M4915m"
-    it "4 cores, 16GB" $
-      vmRunnerRtsFlags 4 16384
-        `shouldBe` words "-T -N4 -A64m -n4m -qg1 -qn2 -I2 -F1.5 -M9830m"
-    it "4+ cores, >16GB: no heap cap" $
-      vmRunnerRtsFlags 4 32768
-        `shouldBe` words "-T -N4 -A128m -n4m -qg1 -qn2 -I2"
+    it "4+ cores, >16GB: full 512MB pool across 4 capabilities, no heap cap" $
+      vmRunnerRtsFlags 4 32768 `shouldBe` words "-T -N4 -A128m -I2"
     it "caps -N at 4 on many-core machines (serial mutator)" $
-      vmRunnerRtsFlags 16 65536
-        `shouldBe` words "-T -N4 -A128m -n4m -qg1 -qn2 -I2"
-    it "real-world 16GB box reporting less than nominal stays in its tier" $
-      vmRunnerRtsFlags 4 15990
-        `shouldBe` words "-T -N4 -A64m -n4m -qg1 -qn2 -I2 -F1.5 -M9594m"
+      vmRunnerRtsFlags 16 65536 `shouldBe` words "-T -N4 -A128m -I2"
+    it "4 cores, 16GB nominal" $
+      vmRunnerRtsFlags 4 16384
+        `shouldBe` words "-T -N4 -A64m -I2 -F1.5 -M9830m"
+    it "4 cores, real-world 16GB box reporting less than nominal" $
+      vmRunnerRtsFlags 4 15975
+        `shouldBe` words "-T -N4 -A64m -I2 -F1.5 -M9585m"
+    it "2 cores, real-world 8GB: one capability owns the whole 128MB pool" $
+      vmRunnerRtsFlags 2 7987
+        `shouldBe` words "-T -N1 -A128m -I2 -F1.5 -M4792m"
+    it "cgroup-limited container: 2 CPUs, 8GB memory.max" $
+      vmRunnerRtsFlags 2 8192
+        `shouldBe` words "-T -N1 -A128m -I2 -F1.5 -M4915m"
+    it "3 cores, 8GB" $
+      vmRunnerRtsFlags 3 8192
+        `shouldBe` words "-T -N2 -A64m -I2 -F1.5 -M4915m"
+    it "4 cores, 8GB: least-validated cell (32MB per-cap nursery)" $
+      vmRunnerRtsFlags 4 8192
+        `shouldBe` words "-T -N4 -A32m -I2 -F1.5 -M4915m"
+    it "1 core, 4GB: snapshot-only tier" $
+      vmRunnerRtsFlags 1 4096
+        `shouldBe` words "-T -N1 -A64m -I2 -F1.5 -M2457m"
 
   describe "sequencerRtsFlags" $ do
-    it "1 core, 4GB" $
-      sequencerRtsFlags 1 4096 `shouldBe` words "-T -N1 -A16m"
-    it "2 cores, 8GB: single capability, so no -n chunking or -qg" $
-      sequencerRtsFlags 2 8192 `shouldBe` words "-T -N1 -A32m"
-    it "4 cores, 16GB" $
-      sequencerRtsFlags 4 16384 `shouldBe` words "-T -N2 -A64m -n4m -qg1"
     it "4+ cores, >16GB" $
-      sequencerRtsFlags 8 32768 `shouldBe` words "-T -N2 -A128m -n4m -qg1"
+      sequencerRtsFlags 8 32768 `shouldBe` words "-T -N2 -A128m -I2"
+    it "4 cores, 16GB (nominal and real-world)" $ do
+      sequencerRtsFlags 4 16384 `shouldBe` words "-T -N2 -A64m -I2"
+      sequencerRtsFlags 4 15975 `shouldBe` words "-T -N2 -A64m -I2"
+    it "2 cores, real-world 8GB" $
+      sequencerRtsFlags 2 7987 `shouldBe` words "-T -N1 -A64m -I2"
+    it "3 cores, 8GB: single capability below 4 cores" $
+      sequencerRtsFlags 3 8192 `shouldBe` words "-T -N1 -A64m -I2"
+    it "1 core, 4GB" $
+      sequencerRtsFlags 1 4096 `shouldBe` words "-T -N1 -A32m -I2"
 
   describe "renderRtsFlags" $
     it "wraps flags in +RTS/-RTS" $
