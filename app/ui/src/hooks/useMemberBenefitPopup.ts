@@ -5,7 +5,6 @@ import {
   fetchActionCompletion,
   fetchHasAnyActivity,
   selectPopup,
-  snoozePopup,
   type MemberBenefitPopup,
 } from '@/lib/memberBenefits';
 
@@ -28,8 +27,8 @@ function forcedPopup(): MemberBenefitPopup | null {
 
 /**
  * Drives the returning-user member-benefit dialog on the dashboard. Fetches
- * the user's on-chain action history (via lib/memberBenefits -> Cirrus),
- * picks at most one popup per session, and records snoozes on close/CTA.
+ * the user's on-chain action history (via lib/memberBenefits -> Cirrus) and
+ * picks at most one popup per session.
  */
 export function useMemberBenefitPopup(): {
   popup: MemberBenefitPopup | null;
@@ -60,7 +59,7 @@ export function useMemberBenefitPopup(): {
         const noneDone = Object.values(completion).every((done) => !done);
         const hasAnyActivity = noneDone ? await fetchHasAnyActivity() : true;
         if (cancelled) return;
-        selected = selectPopup(completion, userAddress, hasAnyActivity);
+        selected = selectPopup(completion, hasAnyActivity);
       }
       if (!selected) return;
       setPopup(selected);
@@ -85,19 +84,17 @@ export function useMemberBenefitPopup(): {
 
   const dismiss = useCallback(() => {
     setOpen(false);
-    if (popup && userAddress) {
-      snoozePopup(popup, userAddress, 'dismiss');
+    if (popup) {
       capture('benefit_popup_dismissed', { popup: popup.kind });
     }
-  }, [popup, userAddress]);
+  }, [popup]);
 
   const acknowledgeCta = useCallback(() => {
     setOpen(false);
-    if (popup && userAddress) {
-      snoozePopup(popup, userAddress, 'cta');
+    if (popup) {
       capture('benefit_popup_cta_clicked', { popup: popup.kind });
     }
-  }, [popup, userAddress]);
+  }, [popup]);
 
   return { popup, open, dismiss, acknowledgeCta };
 }

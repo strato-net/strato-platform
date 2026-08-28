@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { CheckCircle2, Circle, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { Progress } from "@/components/ui/progress";
@@ -15,9 +15,9 @@ import STRATOMARK from "@/assets/icon.png";
 interface MemberBenefitDialogProps {
   popup: MemberBenefitPopup | null;
   open: boolean;
-  /** Close via X / "Maybe Later" — snoozes the popup. */
+  /** Close via X / "Maybe Later". */
   onDismiss: () => void;
-  /** Primary CTA — snoozes longer and navigates. */
+  /** Primary CTA — navigates to the next incomplete action. */
   onCta: () => void;
 }
 
@@ -45,7 +45,6 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
 
   if (!popup) return null;
 
-  const completedActions = MILESTONE_ACTIONS.filter((a) => popup.completion[a.key]);
   const totalActions = MILESTONE_ACTIONS.length;
   const percent = Math.round((popup.completedCount / totalActions) * 100);
 
@@ -111,11 +110,29 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
                   value={percent}
                   className="mt-3 h-2 bg-muted [&>div]:bg-strato-lightblue"
                 />
-                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs font-medium text-muted-foreground">
-                  {completedActions.map((a) => (
-                    <span key={a.key}>{a.label}</span>
-                  ))}
-                </div>
+                <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+                  {MILESTONE_ACTIONS.map((a) => {
+                    const done = popup.completion[a.key];
+                    return (
+                      <li key={a.key} className="flex items-center gap-2 text-sm">
+                        {done ? (
+                          <CheckCircle2 className="h-4 w-4 shrink-0 text-strato-lightblue" />
+                        ) : (
+                          <Circle className="h-4 w-4 shrink-0 text-muted-foreground/40" />
+                        )}
+                        <span
+                          className={
+                            done
+                              ? "font-medium text-strato-blue line-through decoration-strato-lightblue/60 dark:text-foreground"
+                              : "font-medium text-muted-foreground"
+                          }
+                        >
+                          {a.label}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
 
               {/* CTAs */}

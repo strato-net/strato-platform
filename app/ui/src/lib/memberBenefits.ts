@@ -19,7 +19,7 @@ export interface MilestoneAction {
   pairs: Array<{ contract_name: string; event_name: string }>;
 }
 
-// Keys must stay stable: they are persisted in the snooze/progress storage.
+// Keys must stay stable: they are persisted in the cached completion storage.
 export const MILESTONE_ACTIONS: MilestoneAction[] = [
   {
     key: 'deposit',
@@ -147,68 +147,25 @@ export async function fetchHasAnyActivity(): Promise<boolean> {
 // Popup selection
 // ---------------------------------------------------------------------------
 
-const SNOOZE_PREFIX = 'memberBenefitSnooze_';
-const DISMISS_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000; // "Maybe later"
-const CTA_SNOOZE_MS = 30 * 24 * 60 * 60 * 1000; // they acted on it
-
-interface SnoozeRecord {
-  until: number;
-  /** Milestone progress at snooze time; new progress re-arms the popup. */
-  progress?: number;
-}
-
-function snoozeKey(kind: MemberBenefitPopup['kind'], userAddress: string): string {
-  return `${SNOOZE_PREFIX}${kind}_${userAddress.toLowerCase()}`;
-}
-
-function readSnooze(kind: MemberBenefitPopup['kind'], userAddress: string): SnoozeRecord | null {
-  try {
-    return JSON.parse(localStorage.getItem(snoozeKey(kind, userAddress)) || 'null');
-  } catch {
-    return null;
-  }
-}
-
-export function snoozePopup(
-  popup: MemberBenefitPopup,
-  userAddress: string,
-  reason: 'dismiss' | 'cta'
-): void {
-  const record: SnoozeRecord = {
-    until: Date.now() + (reason === 'cta' ? CTA_SNOOZE_MS : DISMISS_SNOOZE_MS),
-    progress: popup.completedCount,
-  };
-  try {
-    localStorage.setItem(snoozeKey(popup.kind, userAddress), JSON.stringify(record));
-  } catch {
-    // if storage fails the popup may show again next session — acceptable
-  }
-}
-
 /**
- * Decide whether the returning user should see the milestone popup.
+ * Decide whether the returning user should see the milestone popup. There is
+ * no snooze: eligible users see it once per dashboard visit.
  *
  * - 4 of 4: nothing to nudge — the milestone is complete.
- * - 0–3 of 4: the milestone popup ("One More Move Unlocks 500 Points"),
- *   unless snoozed at the same progress; new progress re-arms it. At 0 of 4
- *   the caller must confirm the user is returning at all (hasAnyActivity) —
- *   brand-new accounts get nothing; these are returning-user campaigns (the
- *   mockups' slide 1, the STRATO Odds credit, is out of scope here).
+ * - 0–3 of 4: the milestone popup ("One More Move Unlocks 500 Points"). At
+ *   0 of 4 the caller must confirm the user is returning at all
+ *   (hasAnyActivity) — brand-new accounts get nothing; these are
+ *   returning-user campaigns (the mockups' slide 1, the STRATO Odds credit,
+ *   is out of scope here).
  */
 export function selectPopup(
   completion: ActionCompletion,
-  userAddress: string,
   hasAnyActivity: boolean
 ): MemberBenefitPopup | null {
   const completedCount = MILESTONE_ACTIONS.filter((a) => completion[a.key]).length;
 
   if (completedCount >= MILESTONE_ACTIONS.length) return null;
   if (completedCount === 0 && !hasAnyActivity) return null;
-
-  const snooze = readSnooze('milestone', userAddress);
-  const snoozed =
-    snooze && snooze.until > Date.now() && (snooze.progress ?? -1) === completedCount;
-  if (snoozed) return null;
 
   return { kind: 'milestone', completion, completedCount };
 }
