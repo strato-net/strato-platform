@@ -31,9 +31,12 @@
 
     --success: 152 55% 32%;
     --success-foreground: 150 40% 98%;
+    --success-surface: 150 45% 94%;
 
     --warning: 38 92% 38%;
     --warning-foreground: 40 40% 98%;
+    --warning-surface: 45 90% 94%;
+    --destructive-surface: 0 75% 96%;
 
     --gold: 43 65% 47%;
     --gold-foreground: 43 60% 12%;
@@ -86,9 +89,12 @@
 
     --success: 152 55% 45%;
     --success-foreground: 152 60% 8%;
+    --success-surface: 152 45% 12%;
 
     --warning: 43 90% 55%;
     --warning-foreground: 40 60% 8%;
+    --warning-surface: 43 50% 12%;
+    --destructive-surface: 0 45% 13%;
 
     --gold: 43 70% 55%;
     --gold-foreground: 43 60% 10%;

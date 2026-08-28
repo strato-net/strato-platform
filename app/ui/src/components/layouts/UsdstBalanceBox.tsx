@@ -103,8 +103,8 @@ const UsdstBalanceBox: React.FC = () => {
 
   const getCardClasses = () => {
     if (loadingUsdstBalance) return "border-primary/30 bg-card/95";
-    if (isCriticalBalance) return "border-destructive/50 bg-destructive/20";
-    if (isLowBalance) return "border-warning/50 bg-warning/20";
+    if (isCriticalBalance) return "border-destructive/50 bg-destructive-surface";
+    if (isLowBalance) return "border-warning/50 bg-warning-surface";
     return "border-primary/30 bg-card/95";
   };
 
