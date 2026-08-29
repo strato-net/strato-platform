@@ -8,7 +8,7 @@
     "start:signer": "ts-node src/signer/index.ts",
     "dev": "nodemon src/index.ts",
     "build": "tsc",
-    "test": "npm run build && node --test dist/polling/alchemyPolling.test.js dist/services/externalBridgeWiring.test.js dist/services/verificationService.test.js"
+    "test": "npm run build && node --test dist/polling/alchemyPolling.test.js dist/services/externalBridgeWiring.test.js dist/services/routeQuoteService.test.js dist/services/verificationService.test.js dist/signer/authorizationValidation.test.js"
   },
   "engines": {
     "node": ">=22.12 <23.0"

@@ -243,6 +243,7 @@ export let saveUsdstVault: string = '';
 export let ethCarryVault: string = '';
 export let wbtcCarryVault: string = '';
 export let directMintPsm: string = '';
+export let tokenRouter: string = '';
 export let stratoNativeBridge: string = '';
 export let stratoNativeCustodyVault: string = '';
 export let stratoToken: string = '';
@@ -380,6 +381,10 @@ export function setDirectMintPsmConfig(networkId: string) {
   }
 }
 
+export function setTokenRouterConfig() {
+  tokenRouter = process.env.TOKEN_ROUTER || "";
+}
+
 export function setVaultConfig(networkId: string) {
   if (process.env.VAULT) {
     vault = process.env.VAULT;
@@ -409,7 +414,7 @@ export function setExecutedIssuesLookbackConfig(networkId: string) {
 
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
-  const { eth } = await import("../utils/appApiHelper");
+  const { eth, cirrus } = await import("../utils/appApiHelper");
   const accessToken = await getServiceToken();
   const { data } = await eth.get(accessToken, `/metadata`);
   networkId = data.networkID;
@@ -433,6 +438,39 @@ export async function initNetworkConfig() {
   setVaultConfig(networkId);
   setCarryVaultConfig(networkId);
   setDirectMintPsmConfig(networkId);
+  setTokenRouterConfig();
+  if (!tokenRouter) {
+    throw new Error("TOKEN_ROUTER is required for unified routing");
+  }
+  const normalizedTokenRouter = tokenRouter.toLowerCase().replace(/^0x/, "");
+  const [{ data: bridgeRows }, { data: routerRows }] = await Promise.all([
+    cirrus.get(accessToken, "/BlockApps-ExternalAssetBridge", {
+      params: {
+        address: `eq.${externalAssetBridge}`,
+        select: "tokenRouter",
+        limit: 1,
+      },
+    }),
+    cirrus.get(accessToken, "/BlockApps-TokenRouter", {
+      params: {
+        address: `eq.${normalizedTokenRouter}`,
+        select: "initialized",
+        limit: 1,
+      },
+    }),
+  ]);
+  if (
+    bridgeRows?.[0]?.tokenRouter?.toLowerCase().replace(/^0x/, "") !==
+    normalizedTokenRouter
+  ) {
+    throw new Error("ExternalAssetBridge.tokenRouter does not match TOKEN_ROUTER");
+  }
+  if (
+    routerRows?.[0]?.initialized !== true &&
+    String(routerRows?.[0]?.initialized) !== "true"
+  ) {
+    throw new Error("Configured TokenRouter is not initialized");
+  }
   setUsdcYieldVaultConfig(networkId);
   setMetalYieldVaultConfig(networkId);
   setExecutedIssuesLookbackConfig(networkId);
@@ -467,7 +505,7 @@ export async function getInternalAddresses() {
     goldstYieldVault,
     silvstYieldVault
   );
-  addresses.push(directMintPsm);
+  addresses.push(directMintPsm, tokenRouter);
 
   // Lending Registry --> lendingPool, collateralVault, liquidityPool
   const { data: [lending] } = await cirrus.get(accessToken, "/BlockApps-LendingRegistry", {

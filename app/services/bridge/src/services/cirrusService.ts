@@ -344,6 +344,47 @@ export const getDepositStatusByIdentity = async (
   return data?.[0]?.status == null ? undefined : String(data[0].status);
 };
 
+export const getDepositSettlementInfoByIdentity = async (
+  externalChainId: number | string,
+  depositRouter: string,
+  depositId: string,
+): Promise<
+  | {
+      status: string;
+      stratoToken: string;
+      stratoTokenAmount: string;
+    }
+  | undefined
+> => {
+  const data = await cirrus.get(
+    `/${EXTERNAL_ASSET_BRIDGE_URL}-deposits`,
+    {
+      params: {
+        address: `eq.${externalAssetBridgeAddress}`,
+        key: `eq.${externalChainId}`,
+        key2: `eq.${depositRouter.replace(/^0x/i, "")}`,
+        key3: `eq.${depositId}`,
+        select:
+          "value->>status,value->>stratoToken,value->>stratoTokenAmount",
+        limit: 1,
+      },
+    },
+  );
+  const row = data?.[0];
+  if (
+    row?.status == null ||
+    !row.stratoToken ||
+    row.stratoTokenAmount == null
+  ) {
+    return undefined;
+  }
+  return {
+    status: String(row.status),
+    stratoToken: String(row.stratoToken),
+    stratoTokenAmount: String(row.stratoTokenAmount),
+  };
+};
+
 export const getNativeDepositsByStatus = async (
   status: string
 ): Promise<NativeDepositInfo[]> => {
@@ -413,6 +454,100 @@ export const getRebaseFactors = async (
 
   const result = new Map<string, bigint>();
   for (const { key, value } of data) {
+    const factor = BigInt(value || "0");
+    if (factor > 0n) result.set(key, factor);
+  }
+  return result;
+};
+
+export const getRouteRebaseKey = (
+  externalToken: string,
+  externalChainId: string | number,
+  stratoToken: string,
+): string =>
+  [
+    externalToken.toLowerCase().replace(/^0x/, ""),
+    String(externalChainId),
+    stratoToken.toLowerCase().replace(/^0x/, ""),
+  ].join(":");
+
+export const getRebaseRequiredRoutes = async (): Promise<Set<string>> => {
+  const data = await cirrus.get(
+    `/${EXTERNAL_ASSET_BRIDGE_URL}-routeRebaseRequired`,
+    {
+      params: {
+        address: `eq.${externalAssetBridgeAddress}`,
+        value: "eq.true",
+        select: "key,key2,key3",
+      },
+    },
+  );
+  return new Set(
+    (Array.isArray(data) ? data : []).map((row) =>
+      getRouteRebaseKey(row.key, row.key2, row.key3),
+    ),
+  );
+};
+
+export const getTokenRouterWiring = async (): Promise<{
+  bridgeTokenRouter?: string;
+  initialized: boolean;
+}> => {
+  const bridgeRows = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}`, {
+    params: {
+      address: `eq.${externalAssetBridgeAddress}`,
+      select: "tokenRouter",
+      limit: 1,
+    },
+  });
+  const bridgeTokenRouter = bridgeRows?.[0]?.tokenRouter;
+  if (!bridgeTokenRouter) {
+    return { initialized: false };
+  }
+  const routerRows = await cirrus.get("/BlockApps-TokenRouter", {
+    params: {
+      address: `eq.${bridgeTokenRouter}`,
+      select: "initialized",
+      limit: 1,
+    },
+  });
+  return {
+    bridgeTokenRouter,
+    initialized:
+      routerRows?.[0]?.initialized === true ||
+      String(routerRows?.[0]?.initialized) === "true",
+  };
+};
+
+export const getExternalBridgeRebaseFactors = async (
+  stratoTokenAddresses: string[],
+): Promise<Map<string, bigint>> => {
+  const normalized = stratoTokenAddresses.map((address) =>
+    address.toLowerCase().replace(/^0x/, ""),
+  );
+  if (!normalized.length) return new Map();
+  const bridgeRows = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}`, {
+    params: {
+      address: `eq.${externalAssetBridgeAddress}`,
+      select: "priceOracle",
+      limit: 1,
+    },
+  });
+  const bridgeOracle = bridgeRows?.[0]?.priceOracle
+    ?.toLowerCase()
+    .replace(/^0x/, "");
+  if (!bridgeOracle || /^0+$/.test(bridgeOracle)) {
+    throw new Error("ExternalAssetBridge price oracle is not configured");
+  }
+  const data = await cirrus.get(`/${ORACLE_URL}-rebaseFactors`, {
+    params: {
+      key: `in.(${normalized.join(",")})`,
+      address: `eq.${bridgeOracle}`,
+      select: "key,value::text",
+    },
+  });
+  const result = new Map<string, bigint>();
+  for (const { key, value } of Array.isArray(data) ? data : []) {
     const factor = BigInt(value || "0");
     if (factor > 0n) result.set(key, factor);
   }

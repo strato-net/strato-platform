@@ -641,31 +641,36 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     iconConfig: { icon: Download, color: "bg-green-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
-      return token ? [token] : [];
+      return [token, event.finalToken].filter(Boolean) as string[];
     },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const stratoToken = event.attributes.stratoToken || event.attributes.strato_token;
-      const tokenSymbol = stratoToken ? tokenSymbols.get(stratoToken) : undefined;
+      const isRouted = event.depositOutcome === "route" && !!event.finalToken;
+      const isFallback = event.depositOutcome === "fallback" && !!event.finalToken;
+      const displayedToken = isRouted || isFallback ? event.finalToken : stratoToken;
+      const displayedAmount = isRouted || isFallback
+        ? event.finalAmount || "0"
+        : event.attributes.stratoTokenAmount || event.attributes.strato_token_amount || "0";
+      const tokenSymbol = displayedToken ? tokenSymbols.get(displayedToken) : undefined;
       const stratoRecipient = event.attributes.stratoRecipient || event.attributes.strato_recipient || "";
       const externalSender = event.attributes.externalSender || event.attributes.external_sender || "";
-      const stratoTokenAmount = event.attributes.stratoTokenAmount || event.attributes.strato_token_amount || "0";
       const externalChainId = event.attributes.externalChainId || event.attributes.external_chain_id || "";
       const externalTxHash = event.attributes.externalTxHash || event.attributes.external_tx_hash || "";
 
       const chainName = externalChainId ? getChainName(parseInt(externalChainId)) : "Unknown Chain";
 
-      const stratoTokenImage = stratoToken ? tokenImages?.get(stratoToken) : undefined;
+      const stratoTokenImage = displayedToken ? tokenImages?.get(displayedToken) : undefined;
 
       const fields: ActivityField[] = [
         // Amount first (for line 1)
-        stratoToken ? {
+        displayedToken ? {
           label: "Amount",
-          value: formatValue(stratoTokenAmount, stratoToken),
+          value: formatValue(displayedAmount, displayedToken),
           type: "amount",
           badge: tokenSymbol,
           image: stratoTokenImage,
-          imageFallback: tokenSymbol || stratoToken,
-          rawAmount: getFullAmount(stratoTokenAmount),
+          imageFallback: tokenSymbol || displayedToken,
+          rawAmount: getFullAmount(displayedAmount),
         } : null,
         // From, To, Tx for line 2
         {
@@ -695,7 +700,11 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ].filter(Boolean) as ActivityField[];
 
       return {
-        title: "Non-native Deposit",
+        title: isRouted
+          ? "Deposit & Trade"
+          : isFallback
+            ? "Deposit (Fallback)"
+            : "Non-native Deposit",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),

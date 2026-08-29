@@ -6,7 +6,7 @@ import {
 import { JsonRpcProvider } from "ethers";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
-import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, NativeDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
+import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, RouteDepositArgs, NativeDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
 import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
 import { mintVouchersForDeposits } from "./voucherService";
@@ -29,7 +29,18 @@ import {
   releaseWithdrawal,
   reserveWithdrawal,
 } from "./externalWithdrawalService";
-import { getDepositStatusByIdentity } from "./cirrusService";
+import {
+  getDepositStatusByIdentity,
+  getDepositSettlementInfoByIdentity,
+  getEnabledChains,
+} from "./cirrusService";
+import { depositStateService } from "./depositStateService";
+import { getCurrentBlockNumber } from "./rpcService";
+import {
+  depositIdentity,
+  verifyDetectedDepositsBatch,
+} from "./verificationService";
+import { fetchRouteSteps } from "./routeQuoteService";
 
 let cachedStratoNetworkId: bigint | null = null;
 const announcedManualNativeWithdrawals = new Map<string, string | null>();
@@ -259,6 +270,53 @@ export const settleDeposit = async (
   }
 };
 
+export const settleRoutedDeposit = async (
+  deposit: RouteDepositArgs,
+): Promise<string | null> => {
+  try {
+    const result = await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "settleDepositWithRoute",
+      args: {
+        externalChainId: deposit.externalChainId,
+        depositRouter: deposit.depositRouter,
+        depositId: deposit.depositId,
+        externalSender: deposit.externalSender,
+        externalToken: deposit.externalToken,
+        externalTokenAmount: deposit.externalTokenAmount,
+        externalTxHash: deposit.externalTxHash,
+        stratoRecipient: deposit.stratoRecipient,
+        stratoToken: deposit.targetStratoToken,
+        expectedTokenOut: deposit.actionToken,
+        minFinalOut: deposit.minFinalOut,
+        steps: deposit.steps,
+      },
+    });
+    logInfo(
+      "BridgeService",
+      `Settled routed deposit ${deposit.externalChainId}:${deposit.depositRouter}:${deposit.depositId}`,
+    );
+    await mintVouchersForDeposits([deposit.stratoRecipient]);
+    return result.hash;
+  } catch (error) {
+    if (isDuplicateDepositError(error)) {
+      const status = await getDepositStatusByIdentity(
+        deposit.externalChainId,
+        deposit.depositRouter,
+        deposit.depositId,
+      );
+      if (status !== "4") {
+        throw new Error(
+          `Duplicate deposit identity is not completed (status ${status || "unavailable"})`,
+        );
+      }
+      return null;
+    }
+    throw error;
+  }
+};
+
 export const recordDepositForReview = async (
   deposit: DepositArgs | ActionDepositArgs,
 ): Promise<void> => {
@@ -293,11 +351,90 @@ export const confirmReviewedDeposit = async (
   depositRouter: string,
   depositId: string,
 ): Promise<string> => {
+  const pending = await depositStateService.getByIdentity(
+    externalChainId,
+    depositRouter,
+    depositId,
+  );
+  if (!pending || pending.status !== "review") {
+    throw new Error("Reviewed deposit observation is unavailable");
+  }
+  const onchainStatus = await getDepositStatusByIdentity(
+    externalChainId,
+    depositRouter,
+    depositId,
+  );
+  if (onchainStatus !== "2") {
+    throw new Error(
+      `Deposit is not pending review on STRATO (status ${onchainStatus || "unavailable"})`,
+    );
+  }
+  const chain = (await getEnabledChains()).get(externalChainId);
+  const custodyAddress = chain?.vault || chain?.custody;
+  if (!chain || !custodyAddress) {
+    throw new Error("Enabled chain custody configuration is unavailable");
+  }
+  const latestBlock = await getCurrentBlockNumber(externalChainId);
+  logInfo(
+    "BridgeService",
+    `Reviewed deposit verification entry ${depositIdentity(pending.deposit)}`,
+    { latestBlock, custodyAddress },
+  );
+  const verification = (
+    await verifyDetectedDepositsBatch(
+      [pending.deposit],
+      latestBlock,
+      custodyAddress,
+    )
+  ).get(depositIdentity(pending.deposit));
+  logInfo(
+    "BridgeService",
+    `Reviewed deposit verification exit ${depositIdentity(pending.deposit)} state=${verification?.state || "unknown"}`,
+  );
+  if (verification?.state !== "verified") {
+    const reason =
+      verification?.state === "invalid"
+        ? verification.error.message
+        : verification?.state || "unknown";
+    throw new Error(`Reviewed deposit re-verification failed: ${reason}`);
+  }
+  const actionDeposit = pending.deposit as Partial<ActionDepositArgs>;
+  let method = "confirmReviewedDeposit";
+  let args: Record<string, unknown> = {
+    externalChainId,
+    depositRouter,
+    depositId,
+  };
+  if (actionDeposit.action === "4") {
+    const settlementInfo = await getDepositSettlementInfoByIdentity(
+      externalChainId,
+      depositRouter,
+      depositId,
+    );
+    if (!settlementInfo || settlementInfo.status !== "2") {
+      throw new Error("Reviewed deposit settlement data is unavailable");
+    }
+    try {
+      const steps = await fetchRouteSteps({
+        tokenIn: settlementInfo.stratoToken,
+        tokenOut: actionDeposit.actionToken!,
+        amountIn: settlementInfo.stratoTokenAmount,
+        minFinalOut: actionDeposit.minFinalOut!,
+      });
+      method = "confirmReviewedDepositWithRoute";
+      args = { ...args, steps };
+    } catch (error) {
+      logInfo(
+        "BridgeService",
+        `Reviewed routed deposit ${depositIdentity(pending.deposit)} will use source-token fallback: ${(error as Error).message}`,
+      );
+    }
+  }
   const result = await execute({
     contractName: "ExternalAssetBridge",
     contractAddress: config.externalAssetBridge.address!,
-    method: "confirmReviewedDeposit",
-    args: { externalChainId, depositRouter, depositId },
+    method,
+    args,
   });
   return result.hash;
 };

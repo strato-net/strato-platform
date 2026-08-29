@@ -18,7 +18,7 @@ type RecentTx = {
   stratoTokenSymbol?: string;
   amount?: string;
   status?: string;
-  depositOutcome?: 'bridge' | 'save' | 'forge' | 'fallback';
+  depositOutcome?: 'bridge' | 'save' | 'forge' | 'route' | 'fallback';
   finalTokenSymbol?: string;
   finalAmount?: string;
   paySymbol?: string;
@@ -83,7 +83,7 @@ const mapDeposit = (tx: Record<string, unknown>, type: 'api' | 'pending'): Recen
     externalSymbol: tx.externalSymbol as string, stratoTokenSymbol: tx.stratoTokenSymbol as string,
     amount: info?.stratoTokenAmount as string, status: info?.bridgeStatus as string,
     depositOutcome: (type === 'pending'
-      ? (tx.type === 'saving' ? 'save' : tx.type === 'forge' ? 'forge' : 'bridge')
+      ? (tx.type === 'saving' ? 'save' : tx.type === 'forge' ? 'forge' : tx.type === 'route' ? 'route' : 'bridge')
       : tx.depositOutcome) as RecentTx['depositOutcome'],
     finalTokenSymbol: tx.finalTokenSymbol as string | undefined,
     finalAmount: tx.finalAmount as string | undefined,
@@ -209,6 +209,7 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: Rec
 
         const isW = tx._type === 'withdrawal';
         const isFallback = !isW && tx.depositOutcome === "fallback";
+        const isRouted = !isW && tx.depositOutcome === "route";
         const status = getStatusLabel(tx.status);
         const hasOutcome = !isW && tx.depositOutcome && tx.depositOutcome !== "bridge" && tx.finalTokenSymbol;
         const rebasedExt = computeRebasedAmount(tx.amount || "0", tx.stratoTokenSymbol);
@@ -217,7 +218,7 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: Rec
         return <TxRow key={key}
           icon={isW ? <ArrowUp className="w-4 h-4 text-amber-500" /> : <ArrowDown className="w-4 h-4 text-emerald-500" />}
           iconBg={isW ? "bg-amber-500/15" : "bg-emerald-500/15"}
-          label={isW ? "Withdrawal" : isFallback ? "Deposit (Fallback)" : "Deposit"} status={status}
+          label={isW ? "Withdrawal" : isFallback ? "Deposit (Fallback)" : isRouted ? "Deposit & Trade" : "Deposit"} status={status}
           timeLabel={`${formatTimeAgo(tx.block_timestamp)} · ${chainNameMap.get(String(tx.externalChainId)) || "Unknown Chain"}`}
           fromAmount={isW ? amt : externalAmt} fromSymbol={(isW ? tx.stratoTokenSymbol : tx.externalSymbol) || "-"}
           toAmount={hasOutcome && tx.finalAmount ? formatBalance(tx.finalAmount, undefined, 18, 2, 4) : (isW ? externalAmt : amt)}

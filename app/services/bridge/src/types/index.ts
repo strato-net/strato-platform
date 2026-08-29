@@ -112,6 +112,10 @@ export interface ActionDepositArgs extends DepositArgs {
   minFinalOut: string;
 }
 
+export interface RouteDepositArgs extends ActionDepositArgs {
+  steps: import("@strato/shared-types").RouteStep[];
+}
+
 export interface ConfirmDepositArgs {
   externalChainId: string | number;
   externalTxHash: string;

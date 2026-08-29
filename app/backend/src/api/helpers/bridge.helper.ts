@@ -309,7 +309,7 @@ async function fetchDepositEvents(accessToken: string, txHashes: string[]): Prom
         ? `in.(${constants.externalAssetBridge},${constants.mercataBridge})`
         : `eq.${constants.externalAssetBridge}`,
       event_name:
-        "in.(AutoForged,AutoSaved,AutoForgedViaPSM,AutoSavedUSDST,DepositActionFallback)",
+        "in.(AutoForged,AutoSaved,AutoForgedViaPSM,AutoSavedUSDST,AutoRouted,DepositActionFallback)",
       "attributes->>externalTxHash": `in.(${txHashes.join(",")})`,
     }
   });
@@ -375,6 +375,12 @@ function applyDepositOutcome(enriched: any, eventMap: Map<string, any>, stratoMa
   } else if (evt?.event_name === "AutoSaved") {
     enriched.depositOutcome = "save";
     enriched.finalAmount = evt.attributes.mTokenAmount || "0";
+  } else if (evt?.event_name === "AutoRouted") {
+    const addr = stripHex(evt.attributes.finalToken || "");
+    enriched.depositOutcome = "route";
+    enriched.finalToken = addr;
+    enriched.finalTokenSymbol = stratoMap.get(addr)?.symbol || "-";
+    enriched.finalAmount = evt.attributes.finalAmount || "0";
   } else if (evt?.event_name === "DepositActionFallback") {
     const addr = stripHex(evt.attributes.fallbackToken || "");
     enriched.depositOutcome = "fallback";
@@ -410,6 +416,8 @@ export async function enrichTransactionData(
       ? evt.attributes?.metalToken
       : evt.event_name === "AutoSavedUSDST"
         ? evt.attributes?.saveToken
+        : evt.event_name === "AutoRouted"
+          ? evt.attributes?.finalToken
         : evt.event_name === "DepositActionFallback"
           ? evt.attributes?.fallbackToken
           : undefined;

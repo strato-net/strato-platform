@@ -166,9 +166,9 @@ app.post(
       depositRouter,
       depositId,
     );
-    if (onchainStatus !== undefined && onchainStatus !== "7") {
+    if (onchainStatus !== undefined && onchainStatus !== "0") {
       res.status(409).json({
-        error: `Deposit must be absent or aborted before reset (status ${onchainStatus})`,
+        error: `Deposit reuse must be owner-authorized before reset (status ${onchainStatus})`,
       });
       return;
     }

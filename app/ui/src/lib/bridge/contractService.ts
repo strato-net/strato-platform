@@ -268,8 +268,18 @@ export async function simulateDeposit({
     await client.simulateContract({
       address: routerAddress,
       abi: DEPOSIT_ROUTER_ABI,
-      functionName: "depositETH",
-      args: [formatAddress(userAddress), formatAddress(targetStratoToken)],
+      functionName: actionIntent?.action
+        ? "depositETHWithAction"
+        : "depositETH",
+      args: actionIntent?.action
+        ? [
+            formatAddress(userAddress),
+            formatAddress(targetStratoToken),
+            actionIntent.action,
+            formatAddress(actionIntent.actionToken),
+            actionIntent.minFinalOut,
+          ]
+        : [formatAddress(userAddress), formatAddress(targetStratoToken)],
       value: amount,
       account: accountAddress,
     });

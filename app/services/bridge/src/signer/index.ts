@@ -11,6 +11,7 @@ import {
   getAddress,
   verifyTypedData,
 } from "ethers";
+import { matchesSourceWithdrawalAuthorization } from "./authorizationValidation";
 
 interface WithdrawalAuthorization {
   sourceChainId: string;
@@ -63,6 +64,7 @@ const stratoNodeUrl = required("STRATO_NODE_URL").replace(/\/$/, "");
 const sourceChainId = BigInt(required("SOURCE_CHAIN_ID"));
 const sourceBridge = required("EXTERNAL_ASSET_BRIDGE_ADDRESS").replace(/^0x/, "");
 const kmsSignerUrl = required("KMS_SIGNER_URL");
+const kmsSignerApiToken = required("KMS_SIGNER_API_TOKEN");
 const signerApiToken = required("EXTERNAL_BRIDGE_SIGNER_API_TOKEN");
 const signerOpenIdDiscoveryUrl = required("SIGNER_OPENID_DISCOVERY_URL");
 const signerClientId = required("SIGNER_CLIENT_ID");
@@ -171,6 +173,19 @@ const validateSourceWithdrawal = async (
     throw new Error("Source withdrawal does not match authorization");
   }
 
+  const authorizationResponse = await stratoGet(
+    "/cirrus/search/BlockApps-ExternalAssetBridge-withdrawalAuthorizations",
+    {
+      address: `eq.${sourceBridge}`,
+      key: `eq.${authorization.sourceWithdrawalId}`,
+      select: "value",
+    },
+  );
+  const sourceAuthorization = authorizationResponse.data?.[0]?.value;
+  if (!matchesSourceWithdrawalAuthorization(sourceAuthorization, authorization)) {
+    throw new Error("Source withdrawal authorization does not match request");
+  }
+
   const chainResponse = await stratoGet(
     "/cirrus/search/BlockApps-ExternalAssetBridge-chains",
     {
@@ -230,7 +245,7 @@ const signWithKms = async (
   const response = await axios.post(
     kmsSignerUrl,
     { digest },
-    { headers: authHeaders(process.env.KMS_SIGNER_API_TOKEN) },
+    { headers: authHeaders(kmsSignerApiToken) },
   );
   const signature = Signature.from(response.data?.signature).serialized;
   const recovered = verifyTypedData(

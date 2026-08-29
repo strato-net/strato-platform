@@ -3,6 +3,7 @@ import { Contract, JsonRpcProvider, Wallet } from "ethers";
 import {
   getEnabledChains,
   getEnabledNativeChainIds,
+  getTokenRouterWiring,
 } from "../services/cirrusService";
 import {
   config,
@@ -46,6 +47,8 @@ export async function validateBridgeConfig(): Promise<boolean> {
     "OPENID_DISCOVERY_URL",
     "BRIDGE_ADDRESS",
     "EXTERNAL_ASSET_BRIDGE_ADDRESS",
+    "STRATO_APP_API_URL",
+    "TOKEN_ROUTER",
     "SAFE_ADDRESS",
     "SAFE_PROPOSER_ADDRESS",
     "SAFE_PROPOSER_PRIVATE_KEY",
@@ -137,6 +140,32 @@ export async function validateBridgeConfig(): Promise<boolean> {
     errors.push(
       `Invalid external asset bridge address format: ${config.externalAssetBridge.address}`,
     );
+  }
+  if (config.tokenRouter.address && !isAddress(config.tokenRouter.address)) {
+    errors.push(
+      `Invalid TokenRouter address format: ${config.tokenRouter.address}`,
+    );
+  }
+  if (oauthInitialized && config.tokenRouter.address) {
+    try {
+      const wiring = await getTokenRouterWiring();
+      const expected = config.tokenRouter.address.toLowerCase().replace(/^0x/, "");
+      const configured = wiring.bridgeTokenRouter
+        ?.toLowerCase()
+        .replace(/^0x/, "");
+      if (configured !== expected) {
+        errors.push(
+          "ExternalAssetBridge.tokenRouter does not match TOKEN_ROUTER",
+        );
+      }
+      if (!wiring.initialized) {
+        errors.push("Configured TokenRouter is not initialized");
+      }
+    } catch (error) {
+      errors.push(
+        `TokenRouter wiring validation failed: ${(error as Error).message}`,
+      );
+    }
   }
   if (
     !Number.isSafeInteger(

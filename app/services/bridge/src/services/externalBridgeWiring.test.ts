@@ -108,13 +108,58 @@ test("treats a duplicate identity as settled only when Cirrus confirms completio
 
 test("confirms reviewed deposits through the bridge operator", async () => {
   const stratoHelper = await import("../utils/stratoHelper");
+  const { cirrus } = await import("../utils/api");
+  const cirrusService = await import("./cirrusService");
+  const rpcService = await import("./rpcService");
+  const verificationService = await import("./verificationService");
+  const { depositStateService } = await import("./depositStateService");
+  const originalGetEnabledChains = cirrusService.getEnabledChains;
+  const originalGetCurrentBlockNumber = rpcService.getCurrentBlockNumber;
+  const originalVerifyDetectedDepositsBatch =
+    verificationService.verifyDetectedDepositsBatch;
+  const originalGetByIdentity = depositStateService.getByIdentity;
   const calls: any[] = [];
+  const deposit = {
+    externalChainId: 1,
+    depositRouter: "router",
+    depositId: "7",
+    externalSender: "sender",
+    externalToken: "external-token",
+    externalTokenAmount: "100",
+    observedExternalTokenAmount: "100",
+    externalTxHash: "transaction",
+    externalBlockHash: "block",
+    externalBlockNumber: 10,
+    externalBlockTimestamp: 1,
+    externalLogIndex: 2,
+    detectedAt: 1,
+    stratoRecipient: "recipient",
+    targetStratoToken: "strato-token",
+  };
   (stratoHelper as any).execute = async (input: any) => {
     calls.push(input);
     return { status: "Success", hash: "confirm-hash" };
   };
+  (depositStateService as any).getByIdentity = async () => ({
+    deposit,
+    status: "review",
+  });
+  (cirrus as any).get = async () => [{ status: "2" }];
+  (cirrusService as any).getEnabledChains = async () =>
+    new Map([[1, { externalChainId: 1, vault: "vault" }]]);
+  (rpcService as any).getCurrentBlockNumber = async () => 20;
+  (verificationService as any).verifyDetectedDepositsBatch = async () =>
+    new Map([[verificationService.depositIdentity(deposit), { state: "invalid", error: new Error("custody missing") }]]);
 
   const { confirmReviewedDeposit } = await import("./bridgeService");
+  await assert.rejects(
+    () => confirmReviewedDeposit(1, "router", "7"),
+    /custody missing/,
+  );
+  assert.equal(calls.length, 0);
+
+  (verificationService as any).verifyDetectedDepositsBatch = async () =>
+    new Map([[verificationService.depositIdentity(deposit), { state: "verified" }]]);
   const hash = await confirmReviewedDeposit(1, "router", "7");
 
   assert.equal(hash, "confirm-hash");
@@ -128,6 +173,11 @@ test("confirms reviewed deposits through the bridge operator", async () => {
       depositId: "7",
     },
   });
+  (cirrusService as any).getEnabledChains = originalGetEnabledChains;
+  (rpcService as any).getCurrentBlockNumber = originalGetCurrentBlockNumber;
+  (verificationService as any).verifyDetectedDepositsBatch =
+    originalVerifyDetectedDepositsBatch;
+  (depositStateService as any).getByIdentity = originalGetByIdentity;
 });
 
 test("isolates a failed settlement from later deposits", async () => {

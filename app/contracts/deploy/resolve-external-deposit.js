@@ -1,8 +1,8 @@
 /**
- * Confirm or abort a reviewed ExternalAssetBridge deposit.
+ * Confirm, abort, or owner-authorize reuse of a reviewed deposit identity.
  *
  * Confirm calls the bridge operator service. Abort submits an owner-governance
- * vote through AdminRegistry.
+ * vote through AdminRegistry. Abort is final until a separate reuse vote.
  */
 require('dotenv').config();
 const config = require('./config');
@@ -59,6 +59,37 @@ async function callOperator(url) {
   console.log(await response.text());
 }
 
+async function getDepositStatus(token, args) {
+  const baseUrl = String(config.nodes[0].url || '').replace(/\/$/, '');
+  if (!baseUrl) throw new Error('NODE_URL is required');
+  const params = new URLSearchParams({
+    address: `eq.${address(args['bridge-address'], 'bridge-address')}`,
+    key: `eq.${args['external-chain-id']}`,
+    key2: `eq.${address(args['deposit-router'], 'deposit-router')}`,
+    key3: `eq.${args['deposit-id']}`,
+    select: 'value->>status',
+    limit: '1',
+  });
+  const response = await fetch(
+    `${baseUrl}/cirrus/search/BlockApps-ExternalAssetBridge-deposits?${params}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!response.ok) {
+    throw new Error(`Deposit status query failed (${response.status}): ${await response.text()}`);
+  }
+  const rows = await response.json();
+  return rows[0]?.status == null ? undefined : String(rows[0].status);
+}
+
+async function waitForReuseAuthorization(token, args) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const status = await getDepositStatus(token, args);
+    if (status === '0') return true;
+    if (attempt < 9) await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  return false;
+}
+
 async function confirm(args) {
   const chainId = String(args['external-chain-id'] || '');
   const depositId = String(args['deposit-id'] || '');
@@ -71,7 +102,7 @@ async function confirm(args) {
   await callOperator(url);
 }
 
-async function abort(args) {
+async function governDeposit(args, method, label, resetAfter) {
   const bridge = address(args['bridge-address'], 'bridge-address');
   const router = address(args['deposit-router'], 'deposit-router');
   const chainId = String(args['external-chain-id'] || '');
@@ -85,7 +116,7 @@ async function abort(args) {
   );
   const voteArgs = {
     _target: bridge,
-    _func: 'abortDeposit',
+    _func: method,
     _args: [
       { type: 'uint256', value: chainId },
       { type: 'address', value: router },
@@ -97,8 +128,10 @@ async function abort(args) {
     method: 'castVoteOnIssue',
     args: voteArgs,
   }, null, 2));
-  const resetUrl = operationUrl(args, 'reset');
-  console.log(JSON.stringify({ afterGovernanceExecution: resetUrl }, null, 2));
+  const resetUrl = resetAfter ? operationUrl(args, 'reset') : undefined;
+  if (resetUrl) {
+    console.log(JSON.stringify({ afterGovernanceExecution: resetUrl }, null, 2));
+  }
   if (!args.execute) return;
   const required = [
     'GLOBAL_ADMIN_NAME',
@@ -143,17 +176,28 @@ async function abort(args) {
   );
   const final = Array.isArray(results) ? results[0] : results;
   if (!final || final.status !== 'Success') {
-    throw new Error(`Abort vote failed: ${JSON.stringify(final || results)}`);
+    throw new Error(`${label} vote failed: ${JSON.stringify(final || results)}`);
   }
-  console.log(`Abort vote submitted successfully (${final.hash})`);
-  await callOperator(resetUrl);
+  console.log(`${label} vote submitted successfully (${final.hash})`);
+  if (resetUrl) {
+    if (!(await waitForReuseAuthorization(token, args))) {
+      console.log('Reuse authorization has not executed; local state was not reset');
+      return;
+    }
+    await callOperator(resetUrl);
+  }
 }
 
 async function main() {
   const args = parseArgs();
   if (args.decision === 'confirm') return confirm(args);
-  if (args.decision === 'abort') return abort(args);
-  throw new Error('--decision must be confirm or abort');
+  if (args.decision === 'abort') {
+    return governDeposit(args, 'abortDeposit', 'Abort', false);
+  }
+  if (args.decision === 'reuse') {
+    return governDeposit(args, 'authorizeDepositReuse', 'Reuse authorization', true);
+  }
+  throw new Error('--decision must be confirm, abort, or reuse');
 }
 
 if (require.main === module) {

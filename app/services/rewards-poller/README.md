@@ -50,6 +50,7 @@ cp .env.example .env
 - `NODE_URL` - STRATO node URL
 - `REWARDS_CONTRACT_ADDRESS` - Rewards contract address
 - `PRICE_ORACLE_ADDRESS` - Price Oracle contract address (required for Swap event USD conversion)
+- `TOKEN_ROUTER` - TokenRouter address excluded from underlying Forge and vault attribution; the EAB completion rewards the actual recipient
 
 ### Optional Environment Variables
 
@@ -92,6 +93,7 @@ OPENID_DISCOVERY_URL=https://your-openid-provider/.well-known/openid-configurati
 # Contract Addresses
 REWARDS_CONTRACT_ADDRESS=0000000000000000000000000000000000000000
 EXTERNAL_ASSET_BRIDGE_ADDRESS=0000000000000000000000000000000000000000
+TOKEN_ROUTER=0000000000000000000000000000000000000000
 PRICE_ORACLE_ADDRESS=0000000000000000000000000000000000000000
 USDST_ADDRESS=937efa7e3a77e20bbdbd7c0d32b6514f368c1010
 VOUCHER_ADDRESS=000000000000000000000000000000000000100e

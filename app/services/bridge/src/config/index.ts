@@ -49,6 +49,9 @@ const config = {
         7 * 24 * 60 * 60,
     ),
   },
+  tokenRouter: {
+    address: process.env.TOKEN_ROUTER,
+  },
   nativeBridge: {
     address: process.env.STRATO_NATIVE_BRIDGE_ADDRESS,
   },
@@ -97,6 +100,7 @@ const config = {
   },
   api: {
     nodeUrl: process.env.NODE_URL,
+    appUrl: process.env.STRATO_APP_API_URL,
     errorCodes: {
       ECONNREFUSED: "Connection refused",
       ENOTFOUND: "DNS lookup failed",

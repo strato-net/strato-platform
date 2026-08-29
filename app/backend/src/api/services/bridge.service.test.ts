@@ -82,7 +82,7 @@ test("builds actions only for eligible routes and configured products", () => {
         String(item.externalChainId),
         item.stratoToken.toLowerCase().replace(/^0x/, ""),
       ].join(":"),
-      { autoForge: true, autoSave: true },
+      { autoForge: false, autoSave: false, autoRoute: true },
     ])
   );
   const base = {
@@ -126,11 +126,11 @@ test("builds actions only for eligible routes and configured products", () => {
   const actions = buildDepositActionCatalog(base);
 
   assert.equal(actions.length, 4);
-  assert.deepEqual(new Set(actions.map(({ action }) => action)), new Set([2, 3]));
+  assert.deepEqual(new Set(actions.map(({ action }) => action)), new Set([4]));
   assert.ok(actions.every(({ externalChainIds }) => externalChainIds.join() === "1"));
   assert.ok(actions.filter(({ payToken }) => payToken === usdc).every(({ psmFeeBps }) => psmFeeBps === "25"));
   assert.ok(actions.filter(({ payToken }) => payToken === constants.USDST).every(({ psmFeeBps }) => psmFeeBps === "0"));
-  assert.ok(actions.filter(({ action }) => action === 3).every(({ oraclePrice }) => oraclePrice === "1000000000000000000"));
+  assert.ok(actions.filter(({ id }) => id.startsWith("save-")).every(({ oraclePrice }) => oraclePrice === "1000000000000000000"));
 
   const pausedPsmActions = buildDepositActionCatalog({
     ...base,
@@ -138,22 +138,24 @@ test("builds actions only for eligible routes and configured products", () => {
   });
   assert.ok(pausedPsmActions.every(({ payToken }) => payToken === constants.USDST));
 
-  const saveOnlyRoutes = new Map(bridgeActionRoutes);
+  const disabledRouteActions = new Map(bridgeActionRoutes);
   const usdcRoute = routes[0];
-  saveOnlyRoutes.set(
+  disabledRouteActions.set(
     [
       usdcRoute.externalToken?.toLowerCase().replace(/^0x/, ""),
       String(usdcRoute.externalChainId),
       usdcRoute.stratoToken.toLowerCase().replace(/^0x/, ""),
     ].join(":"),
-    { autoForge: false, autoSave: true }
+    { autoForge: false, autoSave: false, autoRoute: false }
   );
-  const saveOnlyActions = buildDepositActionCatalog({
+  const routeDisabledActions = buildDepositActionCatalog({
     ...base,
-    bridgeActionRoutes: saveOnlyRoutes,
+    bridgeActionRoutes: disabledRouteActions,
   });
-  assert.equal(saveOnlyActions.filter(({ payToken, action }) => payToken === usdc && action === 2).length, 0);
-  assert.equal(saveOnlyActions.filter(({ payToken, action }) => payToken === usdc && action === 3).length, 1);
+  assert.equal(
+    routeDisabledActions.filter(({ payToken }) => payToken === usdc).length,
+    0
+  );
 
   assert.deepEqual(buildDepositActionCatalog({ ...base, actionChainIds: new Set() }), []);
 });

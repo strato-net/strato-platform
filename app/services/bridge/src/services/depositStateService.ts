@@ -174,6 +174,19 @@ export const depositStateService = {
         status === "review",
     ),
 
+  getByIdentity: async (
+    externalChainId: number,
+    depositRouter: string,
+    depositId: string,
+  ): Promise<PendingDeposit | undefined> =>
+    Object.values(await readState()).find(
+      ({ deposit }) =>
+        Number(deposit.externalChainId) === externalChainId &&
+        deposit.depositRouter.replace(/^0x/i, "").toLowerCase() ===
+          depositRouter.replace(/^0x/i, "").toLowerCase() &&
+        deposit.depositId === depositId,
+    ),
+
   markReceiptMissing: (deposit: DepositArgs, graceMs: number) =>
     updateState((state) => {
       const pending = state[identity(deposit)];

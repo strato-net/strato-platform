@@ -14,6 +14,27 @@ import {
   resetPendingForRetry,
   shouldRecordReview,
 } from "../services/depositStateService";
+import { getExecutableRouteSteps } from "../utils/routeQuoteUtils";
+import { RouteAction, RouteQuoteResponse } from "@strato/shared-types";
+
+for (const name of [
+  "BA_USERNAME",
+  "BA_PASSWORD",
+  "CLIENT_SECRET",
+  "CLIENT_ID",
+  "OPENID_DISCOVERY_URL",
+  "BRIDGE_ADDRESS",
+  "EXTERNAL_ASSET_BRIDGE_ADDRESS",
+  "EXTERNAL_BRIDGE_SIGNER_API_TOKEN",
+  "PRICE_ORACLE_ADDRESS",
+  "SAFE_ADDRESS",
+  "SAFE_PROPOSER_ADDRESS",
+  "SAFE_PROPOSER_PRIVATE_KEY",
+  "TOKEN_ROUTER",
+]) {
+  process.env[name] ||= "1111111111111111111111111111111111111111";
+}
+process.env.SENDGRID_API_KEY ||= "SG.test.test";
 
 const events = new Interface([
   "event DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId)",
@@ -30,12 +51,13 @@ const makeLog = (
   eventName: "DepositRouted" | "DepositRoutedWithAction",
   transactionHash: string,
   depositId = 1,
+  action = 2,
 ): RawDepositLog => {
   const encoded = events.encodeEventLog(
     events.getEvent(eventName)!,
     eventName === "DepositRouted"
       ? [token, 100n, sender, recipient, target, depositId]
-      : [token, 100n, sender, recipient, target, depositId, 2, metal, 90n],
+      : [token, 100n, sender, recipient, target, depositId, action, metal, 90n],
   );
   return {
     address: "0x6666666666666666666666666666666666666666",
@@ -122,6 +144,116 @@ test("preserves every action field in batch arguments", () => {
   assert.deepEqual(args.minFinalOuts, ["90"]);
 });
 
+test("carries event intent through quote steps into routed settlement", async () => {
+  const actionDeposit = classifyDepositLogs(
+    [makeLog("DepositRoutedWithAction", `0x${"ef".repeat(32)}`, 1, 4)],
+    1,
+  ).actionDeposits[0];
+  const quote: RouteQuoteResponse = {
+    tokenIn: target,
+    tokenOut: metal,
+    amountIn: "100",
+    amountOut: "95",
+    minFinalOut: "90",
+    slippageBps: 0,
+    deadline: 1,
+    steps: [
+      {
+        action: RouteAction.FORGE,
+        target: "0x7777777777777777777777777777777777777777",
+        tokenIn: target,
+        tokenOut: metal,
+        minAmountOut: "95",
+        parameter1: "0",
+        parameter2: "0",
+        direction: false,
+        factoryPoolIndex: "0",
+        amountIn: "100",
+        amountOut: "95",
+        feeAmount: "5",
+        feeBps: 500,
+        priceImpact: 0,
+        label: "Forge",
+      },
+    ],
+  };
+  const steps = getExecutableRouteSteps(
+    quote,
+    actionDeposit.targetStratoToken,
+    actionDeposit.actionToken,
+    actionDeposit.minFinalOut,
+  );
+  const { attemptDepositSettlement } = await import("./alchemyPolling");
+
+  const error = await attemptDepositSettlement(
+    { ...actionDeposit, steps },
+    async (deposit) => {
+      assert.equal(deposit.action, "4");
+      assert.equal(deposit.minFinalOut, "90");
+      assert.equal(deposit.steps[0].minAmountOut, "90");
+      return "0xsettled";
+    },
+  );
+  assert.equal(error, null);
+});
+
+test("applies rebase only when the exact route requires it", async () => {
+  const [{ getRoutedDepositAmount }, { getRouteRebaseKey }] = await Promise.all([
+    import("./alchemyPolling"),
+    import("../services/cirrusService"),
+  ]);
+  const deposit = classifyDepositLogs(
+    [makeLog("DepositRouted", `0x${"ab".repeat(32)}`)],
+    1,
+  ).standardDeposits[0];
+  const ordinaryDeposit = {
+    ...deposit,
+    externalToken: "0x7777777777777777777777777777777777777777",
+    externalTokenAmount: "100",
+  };
+  const requiredRoutes = new Set([
+    getRouteRebaseKey(
+      deposit.externalToken,
+      deposit.externalChainId,
+      deposit.targetStratoToken,
+    ),
+  ]);
+
+  const rebasedAmount = await getRoutedDepositAmount(
+    deposit,
+    18,
+    async () => requiredRoutes,
+    async () =>
+      new Map([
+        [
+          deposit.targetStratoToken.replace(/^0x/, "").toLowerCase(),
+          2n * 10n ** 18n,
+        ],
+      ]),
+  );
+  const ordinaryAmount = await getRoutedDepositAmount(
+    ordinaryDeposit,
+    18,
+    async () => requiredRoutes,
+    async () => new Map(),
+  );
+
+  assert.equal(rebasedAmount, 50n);
+  assert.equal(ordinaryAmount, 100n);
+  assert.equal(deposit.externalTokenAmount, "100");
+  assert.equal(ordinaryDeposit.externalTokenAmount, "100");
+  await assert.rejects(
+    () =>
+      getRoutedDepositAmount(
+        { ...deposit, externalTokenAmount: "100" },
+        18,
+        async () => requiredRoutes,
+        async () => new Map(),
+      ),
+    /Rebase factor unavailable/,
+  );
+});
+
 test("uses elapsed time rather than poll count for missing receipt review", () => {
   assert.equal(hasReceiptGraceExpired(1_000, 300_000, 299_999), false);
   assert.equal(hasReceiptGraceExpired(1_000, 300_000, 301_000), true);
@@ -187,7 +319,7 @@ test("replaces a reverted pending observation when its deposit ID is reused", ()
   );
 });
 
-test("resets reviewed local state after governance abort", () => {
+test("resets reviewed local state after owner reuse authorization", () => {
   const deposit = classifyDepositLogs(
     [makeLog("DepositRouted", `0x${"56".repeat(32)}`)],
     1,

@@ -139,8 +139,8 @@ export interface BridgeTransaction {
   externalName?: string;
   externalSymbol?: string;
   externalToken?: string;
-  // Deposit action outcome (only for deposits with AUTO_SAVE or AUTO_FORGE)
-  depositOutcome?: "bridge" | "save" | "forge" | "fallback";
+  // Deposit action outcome
+  depositOutcome?: "bridge" | "save" | "forge" | "route" | "fallback";
   finalToken?: string;
   finalTokenSymbol?: string;
   finalAmount?: string;

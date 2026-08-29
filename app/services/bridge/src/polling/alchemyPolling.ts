@@ -11,18 +11,24 @@ import {
 import { WebSocketProvider } from "ethers";
 import {
   getEnabledChains,
+  getAssetInfo,
   getBridgeInfo,
-  getRebaseFactors,
+  getExternalBridgeRebaseFactors,
+  getRebaseRequiredRoutes,
+  getRouteRebaseKey,
 } from "../services/cirrusService";
 import {
   recordDepositForReview,
   settleDeposit,
+  settleRoutedDeposit,
 } from "../services/bridgeService";
 import { blockTrackingService } from "../services/blockTrackingService";
 import {
   ActionDepositArgs,
   ChainInfo,
   DepositArgs,
+  NonEmptyArray,
+  RouteDepositArgs,
 } from "../types";
 import {
   getCurrentBlockNumber,
@@ -49,35 +55,48 @@ import {
   verifyDetectedDepositsBatch,
 } from "../services/verificationService";
 import { depositMetricsService } from "../services/depositMetricsService";
+import { fetchRouteSteps } from "../services/routeQuoteService";
+import { convertToStratoDecimals } from "../utils/utils";
+
+const AUTO_ROUTE_ACTION = "4";
+const normalizeAddress = (value: string): string =>
+  value.toLowerCase().replace(/^0x/, "");
 
 const realtimeProviders = new Map<
   number,
   { provider: WebSocketProvider; routerKey: string }
 >();
 
-const applyRebaseFactors = async (
-  deposits: Array<DepositArgs | ActionDepositArgs>,
-) => {
-  if (deposits.length === 0) return;
-  const targetTokens = [...new Set(deposits.map((d) => d.targetStratoToken))];
-  const factors = await getRebaseFactors(targetTokens);
-  for (const deposit of deposits) {
-    const stratoKey = deposit.targetStratoToken.toLowerCase().replace(/^0x/, "");
-    const factor = factors.get(stratoKey);
-    if (!factor) continue;
-    const original = BigInt(deposit.externalTokenAmount);
-    const adjusted = (original * WAD) / factor;
-    logInfo(
-      "AlchemyPolling",
-      `Rebasing deposit ${deposit.externalTxHash}: ${original} → ${adjusted} (factor=${factor})`,
-    );
-    deposit.externalTokenAmount = adjusted.toString();
+export const getRoutedDepositAmount = async (
+  deposit: DepositArgs | ActionDepositArgs,
+  externalDecimals: number,
+  loadRequiredRoutes = getRebaseRequiredRoutes,
+  loadFactors = getExternalBridgeRebaseFactors,
+): Promise<bigint> => {
+  const amount = convertToStratoDecimals(
+    deposit.externalTokenAmount,
+    externalDecimals,
+  );
+  const requiredRoutes = await loadRequiredRoutes();
+  const routeKey = getRouteRebaseKey(
+    deposit.externalToken,
+    deposit.externalChainId,
+    deposit.targetStratoToken,
+  );
+  if (!requiredRoutes.has(routeKey)) return amount;
+
+  const factors = await loadFactors([deposit.targetStratoToken]);
+  const stratoKey = deposit.targetStratoToken.toLowerCase().replace(/^0x/, "");
+  const factor = factors.get(stratoKey);
+  if (!factor || factor <= 0n) {
+    throw new Error(`Rebase factor unavailable for required route ${routeKey}`);
   }
+  return (amount * WAD) / factor;
 };
 
-export const attemptDepositSettlement = async (
-  deposit: DepositArgs | ActionDepositArgs,
-  submit = settleDeposit,
+export const attemptDepositSettlement = async <T extends DepositArgs>(
+  deposit: T,
+  submit: (deposit: T) => Promise<string | null> = settleDeposit,
 ): Promise<Error | null> => {
   try {
     await submit(deposit);
@@ -113,7 +132,6 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
     await depositStateService.listReviews(externalChainId);
   for (const reviewed of reviewedDeposits) {
     if (!shouldRecordReview(reviewed, reviewRetryMs)) continue;
-    await applyRebaseFactors([reviewed.deposit]);
     await recordReviewOnce(reviewed.deposit, "retryDepositReviewRecord");
   }
   const blockchainLastProcessedBlock = chainInfo.lastProcessedBlock;
@@ -191,7 +209,6 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
       );
     }
     if (shouldRecordReview(pending, reviewRetryMs)) {
-      await applyRebaseFactors([pending.deposit]);
       await recordReviewOnce(pending.deposit, "recordDetectedDepositForReview");
       logError("AlchemyPolling", new Error(pending.reviewReason), {
         depositIdentity: depositIdentity(deposit),
@@ -201,7 +218,17 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
 
   const pending = await depositStateService.list(externalChainId);
   const pendingDeposits = pending.map(({ deposit }) => deposit);
-  await applyRebaseFactors(pendingDeposits);
+  const routedDeposits = pendingDeposits.filter(
+    (deposit) =>
+      (deposit as Partial<ActionDepositArgs>).action === AUTO_ROUTE_ACTION,
+  );
+  const routeAssets =
+    routedDeposits.length > 0
+      ? await getAssetInfo(
+          [...new Set(routedDeposits.map(({ externalToken }) => externalToken))] as NonEmptyArray<string>,
+          externalChainId,
+        )
+      : new Map();
   const custodyAddress = chainInfo.vault || chainInfo.custody;
   if (!custodyAddress) {
     throw new Error(`Custody address not configured for chain ${externalChainId}`);
@@ -257,7 +284,60 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
       continue;
     }
     const submissionStartedAt = Date.now();
-    const settlementError = await attemptDepositSettlement(deposit);
+    let settlementError: Error | null;
+    const actionDeposit = deposit as Partial<ActionDepositArgs>;
+    depositMetricsService.recordOperatorSettlementChoice(
+      actionDeposit.action === AUTO_ROUTE_ACTION,
+    );
+    logInfo(
+      "AlchemyPolling",
+      `Deposit settlement authority trace ${depositIdentity(deposit)}`,
+      {
+        settlementAuthority: "bridgeOperator",
+        stratoRecipient: deposit.stratoRecipient,
+        stratoToken: deposit.targetStratoToken,
+        externalTokenAmount: deposit.externalTokenAmount,
+        action: actionDeposit.action || "0",
+        actionToken: actionDeposit.actionToken,
+        minFinalOut: actionDeposit.minFinalOut,
+      },
+    );
+    if (actionDeposit.action === AUTO_ROUTE_ACTION) {
+      const asset = [...routeAssets.values()].find(
+        (candidate) =>
+          normalizeAddress(candidate.externalToken) ===
+            normalizeAddress(deposit.externalToken) &&
+          normalizeAddress(candidate.stratoToken) ===
+            normalizeAddress(deposit.targetStratoToken),
+      );
+      try {
+        if (!asset) {
+          throw new Error("Bridge route metadata is unavailable");
+        }
+        const amountIn = await getRoutedDepositAmount(
+          deposit,
+          asset.externalDecimals,
+        );
+        const steps = await fetchRouteSteps({
+          tokenIn: deposit.targetStratoToken,
+          tokenOut: actionDeposit.actionToken!,
+          amountIn: amountIn.toString(),
+          minFinalOut: actionDeposit.minFinalOut!,
+        });
+        settlementError = await attemptDepositSettlement(
+          { ...deposit, ...actionDeposit, steps } as RouteDepositArgs,
+          settleRoutedDeposit,
+        );
+      } catch (error) {
+        logInfo(
+          "AlchemyPolling",
+          `AUTO_ROUTE quote unavailable for ${depositIdentity(deposit)}; using source-token fallback: ${(error as Error).message}`,
+        );
+        settlementError = await attemptDepositSettlement(deposit);
+      }
+    } else {
+      settlementError = await attemptDepositSettlement(deposit);
+    }
     if (settlementError) {
       logError("AlchemyPolling", settlementError, {
         operation: "settleDeposit",

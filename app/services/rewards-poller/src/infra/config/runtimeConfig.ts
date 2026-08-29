@@ -26,6 +26,9 @@ const config = {
   externalAssetBridge: {
     address: getEnv("EXTERNAL_ASSET_BRIDGE_ADDRESS"),
   },
+  tokenRouter: {
+    address: getEnv("TOKEN_ROUTER"),
+  },
   priceOracle: {
     address: getEnv("PRICE_ORACLE_ADDRESS"),
   },

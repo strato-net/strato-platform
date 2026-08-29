@@ -87,7 +87,45 @@ describe("DepositRouter", function () {
       "DepositRouted",
     ]);
     expect(standardEvents[0].args.depositId).to.equal(2);
-    expect(await router.version()).to.equal("3.1.0");
+    expect(await router.version()).to.equal("3.2.0");
+  });
+
+  it("routes ETH with an action intent into the external vault", async function () {
+    const { router, vault, user, targetStratoToken } = await deployFixture();
+    const amount = ethers.parseEther("1");
+    const actionToken = ethers.Wallet.createRandom().address;
+    await router.setPermitted(ethers.ZeroAddress, true);
+    await router.setRoutePermitted(
+      ethers.ZeroAddress,
+      targetStratoToken,
+      true
+    );
+
+    const vaultBalanceBefore = await ethers.provider.getBalance(vault.address);
+    const receipt = await (
+      await router.connect(user).depositETHWithAction(
+        user.address,
+        targetStratoToken,
+        4,
+        actionToken,
+        1,
+        { value: amount }
+      )
+    ).wait();
+    const events = routerEvents(router, receipt);
+
+    expect(events.map((event) => event.name)).to.deep.equal([
+      "DepositRoutedWithAction",
+    ]);
+    expect(events[0].args.token).to.equal(ethers.ZeroAddress);
+    expect(events[0].args.amount).to.equal(amount);
+    expect(events[0].args.depositId).to.equal(1);
+    expect(events[0].args.action).to.equal(4);
+    expect(events[0].args.actionToken).to.equal(actionToken);
+    expect(events[0].args.minFinalOut).to.equal(1);
+    expect(await ethers.provider.getBalance(vault.address)).to.equal(
+      vaultBalanceBefore + amount
+    );
   });
 
   it("moves subsequent deposits when governance updates the vault", async function () {

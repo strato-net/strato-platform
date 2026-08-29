@@ -85,6 +85,14 @@ const queryRegularEvents = async (
 
       const userAttr = mapping[item.address]?.[item.event_name]?.user;
       const user = userAttr ? (attributes[userAttr] || item.transaction_sender) : item.transaction_sender;
+      const tokenRouterAddress = config.tokenRouter.address;
+      if (
+        tokenRouterAddress &&
+        user?.toLowerCase().replace(/^0x/, "") ===
+        tokenRouterAddress.toLowerCase().replace(/^0x/, "")
+      ) {
+        return null;
+      }
 
       return {
         address: item.address,

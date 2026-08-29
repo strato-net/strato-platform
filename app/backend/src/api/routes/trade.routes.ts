@@ -94,6 +94,21 @@ router.get("/pools/:tokenAddress1/:tokenAddress2", authHandler.authorizeRequest(
  *         description: Per-pool quotes plus the best executable pool address
  */
 router.get("/quote", authHandler.authorizeRequest(true), TradeController.quote);
+router.get(
+  "/route/assets",
+  authHandler.authorizeRequest(true),
+  TradeController.routeAssets
+);
+router.get(
+  "/route/quote",
+  authHandler.authorizeRequest(true),
+  TradeController.routeQuote
+);
+router.get(
+  "/bridge-route/quote",
+  authHandler.authorizeRequest(true),
+  TradeController.compositeRouteQuote
+);
 
 /**
  * @openapi
@@ -131,6 +146,7 @@ router.get("/quote", authHandler.authorizeRequest(true), TradeController.quote);
  *         description: Swap transaction payload
  */
 router.post("/swap", walletAuth, TradeController.swap);
+router.post("/route", walletAuth, TradeController.route);
 
 /**
  *

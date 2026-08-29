@@ -51,6 +51,7 @@ export const constants = (() => {
   const MetalForge = `${CONTRACT_PREFIX}MetalForge`;
   const SafetyModule = `${CONTRACT_PREFIX}SafetyModule`;
   const DirectMintPSM = `${CONTRACT_PREFIX}DirectMintPSM`;
+  const TokenRouter = `${CONTRACT_PREFIX}TokenRouter`;
   const Event = "event";
     
   const tokenSelectFields = [
@@ -175,7 +176,9 @@ export const constants = (() => {
     MetalForge,
     SafetyModule,
     DirectMintPSM,
+    TokenRouter,
     get directMintPsm() { return config.directMintPsm; },
+    get tokenRouter() { return config.tokenRouter; },
     get metalForge() { return config.metalForge; },
     get saveUsdstVault() { return config.saveUsdstVault; },
     get vaultFactory() { return config.vaultFactory; },  // Use getter to get current value after init

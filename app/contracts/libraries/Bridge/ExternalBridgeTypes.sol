@@ -14,7 +14,8 @@ library ExternalBridgeTypes {
         NONE,
         DEPRECATED_AUTO_SAVE_V1,
         AUTO_FORGE,
-        AUTO_SAVE
+        AUTO_SAVE,
+        AUTO_ROUTE
     }
 
     struct ChainInfo {
@@ -60,6 +61,7 @@ library ExternalBridgeTypes {
     struct DepositActionConfig {
         bool autoForge;
         bool autoSave;
+        bool autoRoute;
     }
 
     struct WithdrawalInfo {

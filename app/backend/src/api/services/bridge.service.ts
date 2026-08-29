@@ -430,6 +430,7 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
     nativeBridgeResponse,
     nativeTokenConfigResponse,
     nativeLockedBalanceResponse,
+    routeRebaseResponse,
   ] = await Promise.all([
     cirrus.get(accessToken, `/${ExternalAssetBridge}-routes`, { params: standardParams }),
     constants.stratoNativeBridge
@@ -460,6 +461,16 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
           }
         })
       : Promise.resolve({ data: [] }),
+    cirrus.get(
+      accessToken,
+      `/${ExternalAssetBridge}-routeRebaseRequired`,
+      {
+        params: {
+          address: `eq.${externalAssetBridge}`,
+          select: "key,key2,key3,value",
+        },
+      }
+    ),
   ]);
 
   const standardRoutes = Array.isArray(standardResponse.data)
@@ -499,9 +510,29 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
     tokenMap.get(AssetInfo.stratoToken.toLowerCase().replace(/^0x/, ""))?.status === "2"
   );
   const tokens = enrichAssetsWithTokenData(activeRoutes, tokenMap);
+  const rebasingRoutes = new Set(
+    (routeRebaseResponse.data || [])
+      .filter(
+        ({ value }: { value: unknown }) =>
+          value === true || String(value).toLowerCase() === "true"
+      )
+      .map(
+        ({ key, key2, key3 }: { key: string; key2: string; key3: string }) =>
+          depositActionRouteKey(key, String(key2), key3)
+      )
+  );
   for (const token of tokens) {
     const factor = rebaseFactorMap.get(token.stratoToken.toLowerCase().replace(/^0x/, ''));
-    if (factor) token.rebaseFactor = factor;
+    const requiresRebase =
+      token.routeType === "native" ||
+      rebasingRoutes.has(
+        depositActionRouteKey(
+          token.externalToken,
+          String(token.externalChainId),
+          token.stratoToken
+        )
+      );
+    if (requiresRebase && factor) token.rebaseFactor = factor;
   }
   return tokens;
 };
@@ -666,7 +697,7 @@ const depositActionRouteKey = (
 ].join(":");
 const parseDepositActionFlags = (
   value: unknown
-): { autoForge: boolean; autoSave: boolean } => {
+): { autoForge: boolean; autoSave: boolean; autoRoute: boolean } => {
   let parsed = value;
   if (typeof value === "string") {
     try {
@@ -679,7 +710,31 @@ const parseDepositActionFlags = (
   return {
     autoForge: flags.autoForge === true || String(flags.autoForge).toLowerCase() === "true",
     autoSave: flags.autoSave === true || String(flags.autoSave).toLowerCase() === "true",
+    autoRoute: flags.autoRoute === true || String(flags.autoRoute).toLowerCase() === "true",
   };
+};
+
+export const isAutoRouteEnabled = async (
+  accessToken: string,
+  externalToken: string,
+  externalChainId: string,
+  targetStratoToken: string
+): Promise<boolean> => {
+  const { data } = await cirrus.get(
+    accessToken,
+    `/${ExternalAssetBridge}-depositActionConfigs`,
+    {
+      params: {
+        address: `eq.${externalAssetBridge}`,
+        key: `eq.${normalizeCatalogAddress(externalToken)}`,
+        key2: `eq.${externalChainId}`,
+        key3: `eq.${normalizeCatalogAddress(targetStratoToken)}`,
+        select: "value",
+        limit: "1",
+      },
+    }
+  );
+  return parseDepositActionFlags(data?.[0]?.value).autoRoute;
 };
 
 const decodeAbiString = (value: unknown): string => {
@@ -696,10 +751,10 @@ const decodeAbiString = (value: unknown): string => {
   }
 };
 
-export const getDepositRouterMajor = async (
+export const getDepositRouterVersion = async (
   chainId: string,
   depositRouter: string
-): Promise<number | null> => {
+): Promise<string | null> => {
   const { upstream, fallback } = getRpcUpstream(chainId);
   for (const rpcUrl of [...new Set([upstream, fallback].filter(Boolean))] as string[]) {
     try {
@@ -718,14 +773,22 @@ export const getDepositRouterMajor = async (
       );
       if (data?.error) continue;
       const version = decodeAbiString(data?.result);
-      if (!version) continue;
-      const major = Number(version.split(".")[0]);
-      if (Number.isInteger(major)) return major;
+      if (version) return version;
     } catch {
       continue;
     }
   }
   return null;
+};
+
+export const getDepositRouterMajor = async (
+  chainId: string,
+  depositRouter: string
+): Promise<number | null> => {
+  const version = await getDepositRouterVersion(chainId, depositRouter);
+  if (!version) return null;
+  const major = Number(version.split(".")[0]);
+  return Number.isInteger(major) ? major : null;
 };
 
 export const buildDepositActionCatalog = ({
@@ -743,7 +806,7 @@ export const buildDepositActionCatalog = ({
   saveState: SaveUsdstActionState | null;
   forgeConfigs: MetalForgeConfig;
   bridgeActionConfig: { directMintPsm?: string; saveUsdstVault?: string };
-  bridgeActionRoutes: Map<string, { autoForge: boolean; autoSave: boolean }>;
+  bridgeActionRoutes: Map<string, { autoForge: boolean; autoSave: boolean; autoRoute?: boolean }>;
 }): DepositAction[] => {
   if (!actionChainIds.size) return [];
 
@@ -751,8 +814,7 @@ export const buildDepositActionCatalog = ({
   const psmReady = Boolean(
     psmState &&
     !psmState.mintPaused &&
-    psmState.mintableToken === usdst &&
-    normalizeCatalogAddress(bridgeActionConfig.directMintPsm) === normalizeCatalogAddress(constants.directMintPsm)
+    psmState.mintableToken === usdst
   );
   const sources = new Map<string, {
     address: string;
@@ -776,7 +838,7 @@ export const buildDepositActionCatalog = ({
     const actionConfig = bridgeActionRoutes.get(
       depositActionRouteKey(route.externalToken, chainId, route.stratoToken)
     );
-    if (!actionConfig?.autoForge && !actionConfig?.autoSave) continue;
+    if (!actionConfig?.autoRoute) continue;
 
     const source = sources.get(address) || {
       address: route.stratoToken,
@@ -784,8 +846,8 @@ export const buildDepositActionCatalog = ({
       saveChainIds: new Set<string>(),
       psmFeeBps: address === usdst ? "0" : mintConfig!.feeBps,
     };
-    if (actionConfig.autoForge) source.forgeChainIds.add(chainId);
-    if (actionConfig.autoSave) source.saveChainIds.add(chainId);
+    source.forgeChainIds.add(chainId);
+    source.saveChainIds.add(chainId);
     sources.set(address, source);
   }
 
@@ -793,8 +855,7 @@ export const buildDepositActionCatalog = ({
   const saveEnabled = Boolean(
     saveState &&
     !saveState.paused &&
-    normalizeCatalogAddress(saveState.assetAddress) === usdst &&
-    normalizeCatalogAddress(bridgeActionConfig.saveUsdstVault) === normalizeCatalogAddress(saveState.vaultAddress)
+    normalizeCatalogAddress(saveState.assetAddress) === usdst
   );
   const forgeEnabled = forgeConfigs.payTokens.some(
     ({ address }) => normalizeCatalogAddress(address) === usdst
@@ -818,7 +879,7 @@ export const buildDepositActionCatalog = ({
     if (saveEnabled && saveState && source.saveChainIds.size) {
       actions.push({
         id: `save-${source.address}`,
-        action: 3,
+        action: 4,
         stratoToken: saveState.vaultAddress,
         stratoTokenName: "Save USDST",
         stratoTokenSymbol: saveState.shareSymbol,
@@ -831,7 +892,7 @@ export const buildDepositActionCatalog = ({
     for (const metal of source.forgeChainIds.size ? enabledMetals : []) {
       actions.push({
         id: `forge-${source.address}-${metal.address}`,
-        action: 2,
+        action: 4,
         stratoToken: metal.address,
         stratoTokenName: metal.name,
         stratoTokenSymbol: metal.symbol,
@@ -877,7 +938,7 @@ export const getDepositActions = async (accessToken: string): Promise<DepositAct
     }).then(({ data }) => data || []),
   ]);
 
-  const bridgeActionRoutes = new Map<string, { autoForge: boolean; autoSave: boolean }>(
+  const bridgeActionRoutes = new Map<string, { autoForge: boolean; autoSave: boolean; autoRoute: boolean }>(
     bridgeActionRouteRows.map((row: any) => [
       depositActionRouteKey(row.externalToken, String(row.externalChainId), row.targetStratoToken),
       parseDepositActionFlags(row.value),

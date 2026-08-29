@@ -9,7 +9,7 @@ The STRATO Bridge Service is responsible for seamlessly bridging assets between 
 * **External Vault Releases**: Reserves and releases routine non-native withdrawals using threshold-signed vault authorizations
 * **Real-time Monitoring**: Polls blockchain events and transaction statuses across all supported chains
 * **Bridge Out Flow**: STRATO → external-chain transfers through route-local vaults, with manual review for large withdrawals
-* **Bridge In Flow**: Ethereum → STRATO deposit processing and confirmation
+* **Bridge In Flow**: External-chain → STRATO settlement with optional one-click TokenRouter execution
 * **Dynamic Asset Management**: Fetches enabled assets and chain information from on-chain bridge contract
 * **Email Notifications**: Sends transaction alerts to configured email addresses
 * **Comprehensive Logging**: Secure and contextual logging using Winston
@@ -57,6 +57,8 @@ cp .env.example .env
 - `BRIDGE_ADDRESS` - MercataBridge contract address
 - `EXTERNAL_ASSET_BRIDGE_ADDRESS` - ExternalAssetBridge proxy address used for non-native deposits
 - `EXTERNAL_BRIDGE_MANUAL_REVIEW_VALIDITY_SECONDS` - Safe approval validity for large withdrawals (defaults to seven days)
+- `STRATO_APP_API_URL` - Backend base URL used to refresh executable `AUTO_ROUTE` quotes
+- `TOKEN_ROUTER` - Initialized TokenRouter address; startup requires it to match `ExternalAssetBridge.tokenRouter`
 
 #### Chain RPC URLs (Dynamically Validated)
 The service automatically validates that RPC URLs are configured for all enabled chains from the bridge contract:
@@ -83,7 +85,7 @@ Native withdrawal review delay and attestation validity are enforced by the nati
 - `CHAIN_${chainId}_EXTERNAL_BRIDGE_SIGNER_URLS` - Comma-separated independent signer service URLs
 - `EXTERNAL_BRIDGE_SIGNER_API_TOKEN` - Shared authentication token for signer service requests
 
-Run each signer independently with `npm run start:signer`. Each process must use its own `SIGNER_RPC_URL`, KMS/HSM adapter (`KMS_SIGNER_URL`, `KMS_SIGNER_ADDRESS`), and read-only STRATO OAuth account (`SIGNER_OPENID_DISCOVERY_URL`, `SIGNER_CLIENT_ID`, `SIGNER_CLIENT_SECRET`, `SIGNER_BA_USERNAME`, `SIGNER_BA_PASSWORD`). Access tokens are refreshed before expiry and once after a 401 response. A signer verifies the source withdrawal and destination vault policy itself before requesting a digest signature; no attestation private key is held by the bridge executor.
+Run each signer independently with `npm run start:signer`. Each process must use its own `SIGNER_RPC_URL`, authenticated KMS/HSM adapter (`KMS_SIGNER_URL`, `KMS_SIGNER_ADDRESS`, `KMS_SIGNER_API_TOKEN`), and read-only STRATO OAuth account (`SIGNER_OPENID_DISCOVERY_URL`, `SIGNER_CLIENT_ID`, `SIGNER_CLIENT_SECRET`, `SIGNER_BA_USERNAME`, `SIGNER_BA_PASSWORD`). Access tokens are refreshed before expiry and once after a 401 response. A signer verifies the source withdrawal, exact STRATO authorization timing/version and destination vault policy before requesting a digest signature; no attestation private key is held by the bridge executor.
 
 Production signer deployments use `docker-compose.bridge-signer.tpl.yml`. Deploy one isolated stack per signer with a distinct RPC provider, KMS/HSM key and API endpoint.
 
@@ -198,7 +200,21 @@ node resolve-external-deposit.js \
   --bridge-service-url <bridge-service-url>
 ```
 
-Add `--execute` after review to call `confirmReviewedDeposit` through the authenticated bridge-operator endpoint. Use `--decision abort --bridge-address <bridge> --bridge-service-url <bridge-service-url>` to submit `abortDeposit` through AdminRegistry governance and reset the persisted observation for canonical reprocessing. The authenticated `/reset` operation is also the manual recovery path after correcting a terminal settlement configuration failure.
+Add `--execute` after review to call `confirmReviewedDeposit` through the authenticated bridge-operator endpoint. Use `--decision abort --bridge-address <bridge>` to submit the final `abortDeposit` decision through AdminRegistry governance. A reorg replacement requires a separate `--decision reuse --bridge-address <bridge> --bridge-service-url <bridge-service-url>` governance vote; only after `authorizeDepositReuse` executes does the tool reset the persisted observation for canonical reprocessing. The `/reset` endpoint cannot authorize reuse by itself.
+
+Configure `ExternalAssetBridge.setPriceOracle` and call `setRouteRebaseRequired(externalToken, chainId, stratoToken, true)` before enabling a rebasing route. The same route flag controls on-chain inbound division and outbound multiplication. The service preserves the raw verified external amount. Required-rebase routes fail closed unless `PriceOracle.rebaseFactors(stratoToken)` is nonzero; a failure is isolated to that deposit. Keep each xStock route disabled until the route flag, oracle, and factor are verified.
+
+### AUTO_ROUTE rollout
+
+1. Deploy and initialize the standalone `TokenRouter` proxy; do not initialize it from `BaseCodeCollection`.
+2. Transfer TokenRouter ownership to AdminRegistry and approve each supported YieldVault.
+3. Set the TokenRouter proxy on `ExternalAssetBridge`.
+4. Upgrade each external DepositRouter to 3.2 and verify both ERC-20 and native ETH action deposits.
+5. Set backend and bridge-service `TOKEN_ROUTER`, plus bridge-service `STRATO_APP_API_URL`.
+6. Verify `/api/trade/route/quote` for each intended Save, Forge, swap and YieldVault destination.
+7. Enable action 4 per source route with `setDepositAction(externalToken, chainId, stratoToken, 4, true)`.
+
+Save and Forge remain distinct UI destinations, but they are no longer distinct bridge execution modes. Both emit an `AUTO_ROUTE` intent. The service refreshes the route after external finality, derives every step minimum from the user's signed `minFinalOut`, and submits `settleDepositWithRoute`; quote or execution failure atomically falls back to the bridged source token.
 
 ### Key Components
 

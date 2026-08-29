@@ -2,8 +2,11 @@ import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../abstract/ERC20/utils/StringUtils.sol";
 import "../../libraries/Bridge/ExternalBridgeTypes.sol";
+import "../../libraries/Router/RouterTypes.sol";
+import "../Lending/PriceOracle.sol";
 import "../Metals/MetalForge.sol";
 import "../Pools/DirectMintPSM.sol";
+import "../Router/TokenRouter.sol";
 import "../Savings/SaveUSDSTVault.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
@@ -14,6 +17,7 @@ import "../Tokens/TokenFactory.sol";
  */
 contract record ExternalAssetBridge is Ownable {
     using ExternalBridgeTypes for *;
+    using RouterTypes for *;
     using StringUtils for string;
 
     event Initialized(
@@ -24,6 +28,7 @@ contract record ExternalAssetBridge is Ownable {
     );
     event BridgeOperatorUpdated(address previousOperator, address newOperator);
     event GuardianUpdated(address previousGuardian, address newGuardian);
+    event PriceOracleUpdated(address previousOracle, address newOracle);
     event PauseToggled(bool depositsPaused, bool withdrawalsPaused);
     event ChainUpdated(
         string chainName,
@@ -48,6 +53,12 @@ contract record ExternalAssetBridge is Ownable {
         string externalSymbol,
         uint256 maxPerWithdrawal,
         uint256 manualReviewThreshold
+    );
+    event RouteRebaseRequirementUpdated(
+        address externalToken,
+        uint256 externalChainId,
+        address stratoToken,
+        bool required
     );
     event DepositActionAvailabilityUpdated(
         address externalToken,
@@ -83,6 +94,11 @@ contract record ExternalAssetBridge is Ownable {
         uint256 stratoTokenAmount
     );
     event DepositAborted(uint256 externalChainId, string externalTxHash);
+    event DepositReuseAuthorized(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId
+    );
     event AutoSavedUSDST(
         uint256 externalChainId,
         address depositRouter,
@@ -168,6 +184,18 @@ contract record ExternalAssetBridge is Ownable {
     event DirectMintPsmUpdated(address newPsm, address oldPsm);
     event SaveUsdstVaultUpdated(address newVault, address oldVault);
     event MetalForgeUpdated(address newForge, address oldForge);
+    event TokenRouterUpdated(address newRouter, address oldRouter);
+    event AutoRouted(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
+        string externalTxHash,
+        address recipient,
+        address sourceToken,
+        uint256 sourceAmount,
+        address finalToken,
+        uint256 finalAmount
+    );
     event WithdrawalAbortDelayUpdated(
         uint256 previousDelay,
         uint256 newDelay
@@ -185,6 +213,8 @@ contract record ExternalAssetBridge is Ownable {
     uint256 public DECIMAL_PLACES = 18;
     uint256 public WITHDRAWAL_ABORT_DELAY = 172800;
     uint256 public MAX_AUTHORIZATION_VALIDITY_SECONDS = 1800;
+    uint256 public constant MAX_ROUTE_STEPS = 6;
+    uint256 public constant ROUTE_EXECUTION_DEADLINE = 300;
 
     bool public initialized;
     bool public depositsPaused;
@@ -211,6 +241,11 @@ contract record ExternalAssetBridge is Ownable {
     mapping(uint256 => WithdrawalManualReview) public record withdrawalManualReviews;
     mapping(string => uint256) public withdrawalByReservationId;
     mapping(string => uint256) public withdrawalByExternalTxHash;
+    address public priceOracle;
+    mapping(address => mapping(uint256 => mapping(address => bool))) public record routeRebaseRequired;
+    address public tokenRouter;
+    mapping(uint256 => mapping(address => mapping(uint256 => mapping(uint256 => RouteStep)))) public record depositRouteSteps;
+    mapping(uint256 => mapping(address => mapping(uint256 => uint256))) public record depositRouteStepCounts;
 
     modifier onlyBridgeOperator() {
         require(
@@ -273,6 +308,12 @@ contract record ExternalAssetBridge is Ownable {
         require(newGuardian != address(0), "EAB: zero guardian");
         emit GuardianUpdated(guardian, newGuardian);
         guardian = newGuardian;
+    }
+
+    function setPriceOracle(address newPriceOracle) external onlyOwner {
+        require(newPriceOracle != address(0), "EAB: zero oracle");
+        emit PriceOracleUpdated(priceOracle, newPriceOracle);
+        priceOracle = newPriceOracle;
     }
 
     function setPause(
@@ -422,6 +463,34 @@ contract record ExternalAssetBridge is Ownable {
         );
     }
 
+    function setRouteRebaseRequired(
+        address externalToken,
+        uint256 externalChainId,
+        address stratoToken,
+        bool required
+    ) external onlyOwner {
+        RouteInfo route = routes[externalToken][
+            externalChainId
+        ][stratoToken];
+        require(route.stratoToken != address(0), "EAB: route missing");
+        if (required) {
+            require(priceOracle != address(0), "EAB: oracle not set");
+            require(
+                PriceOracle(priceOracle).rebaseFactors(stratoToken) > 0,
+                "EAB: rebase factor not set"
+            );
+        }
+        routeRebaseRequired[externalToken][externalChainId][
+            stratoToken
+        ] = required;
+        emit RouteRebaseRequirementUpdated(
+            externalToken,
+            externalChainId,
+            stratoToken,
+            required
+        );
+    }
+
     function setDepositAction(
         address externalToken,
         uint256 externalChainId,
@@ -430,9 +499,7 @@ contract record ExternalAssetBridge is Ownable {
         bool enabled
     ) external onlyOwner {
         require(
-            action == uint256(DepositAction.AUTO_FORGE) ||
-                action ==
-                uint256(DepositAction.AUTO_SAVE),
+            action == uint256(DepositAction.AUTO_ROUTE),
             "EAB: invalid action"
         );
         RouteInfo route = routes[externalToken][
@@ -441,18 +508,17 @@ contract record ExternalAssetBridge is Ownable {
         require(route.stratoToken != address(0), "EAB: route missing");
         if (enabled) {
             require(route.depositsEnabled, "EAB: deposits disabled");
+            require(tokenRouter != address(0), "EAB: token router not set");
+            require(
+                TokenRouter(tokenRouter).initialized(),
+                "EAB: token router not initialized"
+            );
         }
 
         DepositActionConfig config = depositActionConfigs[
             externalToken
         ][externalChainId][stratoToken];
-        if (
-            action == uint256(DepositAction.AUTO_FORGE)
-        ) {
-            config.autoForge = enabled;
-        } else {
-            config.autoSave = enabled;
-        }
+        config.autoRoute = enabled;
         emit DepositActionAvailabilityUpdated(
             externalToken,
             externalChainId,
@@ -500,6 +566,16 @@ contract record ExternalAssetBridge is Ownable {
         metalForge = newForge;
     }
 
+    function setTokenRouter(address newRouter) external onlyOwner {
+        require(newRouter != address(0), "EAB: zero token router");
+        require(
+            TokenRouter(newRouter).initialized(),
+            "EAB: token router not initialized"
+        );
+        emit TokenRouterUpdated(newRouter, tokenRouter);
+        tokenRouter = newRouter;
+    }
+
     function setWithdrawalAbortDelay(
         uint256 newDelay
     ) external onlyOwner {
@@ -545,6 +621,47 @@ contract record ExternalAssetBridge is Ownable {
             action,
             actionToken,
             minFinalOut
+        );
+        _confirmDeposit(
+            externalChainId,
+            depositRouter,
+            depositId
+        );
+    }
+
+    function settleDepositWithRoute(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
+        address externalSender,
+        address externalToken,
+        uint256 externalTokenAmount,
+        string externalTxHash,
+        address stratoRecipient,
+        address stratoToken,
+        address expectedTokenOut,
+        uint256 minFinalOut,
+        RouteStep[] steps
+    ) external onlyBridgeOperator whenDepositsOpen {
+        _recordDeposit(
+            externalChainId,
+            depositRouter,
+            depositId,
+            externalSender,
+            externalToken,
+            externalTokenAmount,
+            externalTxHash,
+            stratoRecipient,
+            stratoToken,
+            uint256(DepositAction.AUTO_ROUTE),
+            expectedTokenOut,
+            minFinalOut
+        );
+        _recordDepositRoute(
+            externalChainId,
+            depositRouter,
+            depositId,
+            steps
         );
         _confirmDeposit(
             externalChainId,
@@ -604,6 +721,32 @@ contract record ExternalAssetBridge is Ownable {
         );
     }
 
+    function confirmReviewedDepositWithRoute(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
+        RouteStep[] steps
+    ) external onlyBridgeOperator whenDepositsOpen {
+        DepositInfo depositInfo = deposits[
+            externalChainId
+        ][depositRouter][depositId];
+        require(
+            depositInfo.status == Status.PENDING_REVIEW,
+            "EAB: bad state"
+        );
+        _recordDepositRoute(
+            externalChainId,
+            depositRouter,
+            depositId,
+            steps
+        );
+        _confirmDeposit(
+            externalChainId,
+            depositRouter,
+            depositId
+        );
+    }
+
     function _confirmDeposit(
         uint256 externalChainId,
         address depositRouter,
@@ -623,12 +766,8 @@ contract record ExternalAssetBridge is Ownable {
             externalChainId
         ][depositRouter][depositId];
         bool executable =
-            (
-                intent.action ==
-                    uint256(DepositAction.AUTO_FORGE) ||
-                intent.action ==
-                    uint256(DepositAction.AUTO_SAVE)
-            ) &&
+            intent.action ==
+                uint256(DepositAction.AUTO_ROUTE) &&
             _isDepositActionEnabled(
                 depositInfo,
                 externalChainId,
@@ -677,6 +816,11 @@ contract record ExternalAssetBridge is Ownable {
             depositRouter,
             depositId
         );
+        _deleteDepositRoute(
+            externalChainId,
+            depositRouter,
+            depositId
+        );
         depositInfo.status = Status.COMPLETED;
         depositInfo.timestamp = block.timestamp;
         emit DepositCompleted(
@@ -709,9 +853,32 @@ contract record ExternalAssetBridge is Ownable {
             depositRouter,
             depositId
         );
+        _deleteDepositRoute(
+            externalChainId,
+            depositRouter,
+            depositId
+        );
         emit DepositAborted(
             externalChainId,
             depositInfo.externalTxHash
+        );
+    }
+
+    function authorizeDepositReuse(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId
+    ) external onlyOwner {
+        DepositInfo depositInfo = deposits[
+            externalChainId
+        ][depositRouter][depositId];
+        require(depositInfo.status == Status.ABORTED, "EAB: bad state");
+        depositInfo.status = Status.NONE;
+        depositInfo.timestamp = block.timestamp;
+        emit DepositReuseAuthorized(
+            externalChainId,
+            depositRouter,
+            depositId
         );
     }
 
@@ -736,7 +903,29 @@ contract record ExternalAssetBridge is Ownable {
         );
 
         uint256 scale = 10 ** (DECIMAL_PLACES - route.externalDecimals);
-        uint256 externalTokenAmount = stratoTokenAmount / scale;
+        bool requiresRebase = routeRebaseRequired[externalToken][
+            externalChainId
+        ][stratoToken];
+        uint256 rebaseFactor;
+        if (requiresRebase) {
+            require(priceOracle != address(0), "EAB: oracle not set");
+            rebaseFactor = PriceOracle(priceOracle).rebaseFactors(stratoToken);
+            require(rebaseFactor > 0, "EAB: rebase factor not set");
+        }
+        uint256 externalTokenAmount;
+        uint256 escrowAmount;
+        if (rebaseFactor == 0) {
+            externalTokenAmount = stratoTokenAmount / scale;
+            escrowAmount = externalTokenAmount * scale;
+        } else {
+            uint256 scaledWad = scale * 1e18;
+            externalTokenAmount =
+                (stratoTokenAmount * rebaseFactor) /
+                scaledWad;
+            escrowAmount =
+                (externalTokenAmount * scaledWad + rebaseFactor - 1) /
+                rebaseFactor;
+        }
         require(externalTokenAmount > 0, "EAB: amount too small");
         if (route.maxPerWithdrawal != 0) {
             require(
@@ -745,13 +934,14 @@ contract record ExternalAssetBridge is Ownable {
             );
         }
 
-        stratoTokenAmount = externalTokenAmount * scale;
         stratoTokenAmount = _escrowFunds(
             stratoToken,
             msg.sender,
-            stratoTokenAmount
+            escrowAmount
         );
-        externalTokenAmount = stratoTokenAmount / scale;
+        externalTokenAmount = rebaseFactor == 0
+            ? stratoTokenAmount / scale
+            : (stratoTokenAmount * rebaseFactor) / (scale * 1e18);
         require(externalTokenAmount > 0, "EAB: invalid external amount");
 
         bool requiresManualReview =
@@ -1118,15 +1308,22 @@ contract record ExternalAssetBridge is Ownable {
         Status existingStatus = deposits[externalChainId][
             depositRouter
         ][depositId].status;
-        require(
-            existingStatus == Status.NONE ||
-                existingStatus == Status.ABORTED,
-            "EAB: duplicate deposit"
-        );
+        require(existingStatus == Status.NONE, "EAB: duplicate deposit");
 
-        uint256 stratoTokenAmount =
-            externalTokenAmount *
-            (10 ** (DECIMAL_PLACES - route.externalDecimals));
+        uint256 scale = 10 ** (DECIMAL_PLACES - route.externalDecimals);
+        uint256 stratoTokenAmount = externalTokenAmount * scale;
+        if (
+            routeRebaseRequired[externalToken][externalChainId][stratoToken]
+        ) {
+            require(priceOracle != address(0), "EAB: oracle not set");
+            uint256 rebaseFactor = PriceOracle(priceOracle).rebaseFactors(
+                stratoToken
+            );
+            require(rebaseFactor > 0, "EAB: rebase factor not set");
+            stratoTokenAmount =
+                (externalTokenAmount * scale * 1e18) /
+                rebaseFactor;
+        }
         require(stratoTokenAmount > 0, "EAB: invalid amount");
 
         DepositInfo depositInfo = deposits[externalChainId][
@@ -1143,6 +1340,12 @@ contract record ExternalAssetBridge is Ownable {
         depositInfo.stratoTokenAmount = stratoTokenAmount;
         depositInfo.timestamp = block.timestamp;
         if (action != uint256(DepositAction.NONE)) {
+            require(
+                action == uint256(DepositAction.AUTO_ROUTE),
+                "EAB: invalid action"
+            );
+            require(actionToken != address(0), "EAB: zero action token");
+            require(minFinalOut > 0, "EAB: zero action minimum");
             depositActions[externalChainId][depositRouter][
                 depositId
             ] = DepositActionIntent(
@@ -1178,113 +1381,57 @@ contract record ExternalAssetBridge is Ownable {
         DepositActionIntent intent = depositActions[
             externalChainId
         ][depositRouter][depositId];
-        string normalizedTxHash = depositInfo.externalTxHash;
-
+        require(
+            intent.action == uint256(DepositAction.AUTO_ROUTE),
+            "EAB: invalid action"
+        );
+        require(tokenRouter != address(0), "EAB: token router not set");
+        uint256 stepCount = depositRouteStepCounts[externalChainId][
+            depositRouter
+        ][depositId];
+        require(
+            stepCount > 0 && stepCount <= MAX_ROUTE_STEPS,
+            "EAB: route missing"
+        );
+        RouteStep[] steps = new RouteStep[](stepCount);
+        for (uint256 i = 0; i < stepCount; i++) {
+            steps[i] = depositRouteSteps[externalChainId][depositRouter][
+                depositId
+            ][i];
+        }
         uint256 sourceAmount = _mintFunds(
             depositInfo.stratoToken,
             address(this),
             depositInfo.stratoTokenAmount
         );
-        uint256 usdstOut;
-        if (depositInfo.stratoToken == USDST_ADDRESS) {
-            usdstOut = sourceAmount;
-        } else {
-            require(directMintPsm != address(0), "EAB: PSM not set");
+        require(
             IERC20(depositInfo.stratoToken).approve(
-                directMintPsm,
+                tokenRouter,
                 sourceAmount
-            );
-            uint256 beforeBalance = IERC20(USDST_ADDRESS).balanceOf(
-                address(this)
-            );
-            DirectMintPSM(directMintPsm).mint(
-                sourceAmount,
-                depositInfo.stratoToken
-            );
-            usdstOut =
-                IERC20(USDST_ADDRESS).balanceOf(address(this)) -
-                beforeBalance;
-            require(usdstOut > 0, "EAB: no USDST minted");
-        }
-
-        if (
-            intent.action ==
-            uint256(DepositAction.AUTO_SAVE)
-        ) {
-            require(saveUsdstVault != address(0), "EAB: save vault not set");
-            IERC20(USDST_ADDRESS).approve(saveUsdstVault, usdstOut);
-            uint256 beforeShares = IERC20(saveUsdstVault).balanceOf(
-                depositInfo.stratoRecipient
-            );
-            uint256 shares = SaveUSDSTVault(saveUsdstVault).deposit(
-                usdstOut,
-                depositInfo.stratoRecipient
-            );
-            uint256 actualShares =
-                IERC20(saveUsdstVault).balanceOf(
-                    depositInfo.stratoRecipient
-                ) -
-                beforeShares;
-            require(
-                actualShares > 0 && actualShares == shares,
-                "EAB: autosave failed"
-            );
-            emit AutoSavedUSDST(
-                externalChainId,
-                depositRouter,
-                depositId,
-                normalizedTxHash,
-                depositInfo.stratoRecipient,
-                depositInfo.stratoToken,
-                sourceAmount,
-                usdstOut,
-                saveUsdstVault,
-                actualShares
-            );
-        } else {
-            require(
-                intent.action ==
-                    uint256(
-                        DepositAction.AUTO_FORGE
-                    ),
-                "EAB: invalid action"
-            );
-            require(metalForge != address(0), "EAB: forge not set");
-            require(intent.actionToken != address(0), "EAB: zero metal");
-            IERC20(USDST_ADDRESS).approve(metalForge, usdstOut);
-            uint256 beforeMetal = IERC20(intent.actionToken).balanceOf(
-                address(this)
-            );
-            MetalForge(metalForge).mintMetal(
-                intent.actionToken,
-                USDST_ADDRESS,
-                usdstOut,
-                intent.minFinalOut
-            );
-            uint256 metalOut =
-                IERC20(intent.actionToken).balanceOf(address(this)) -
-                beforeMetal;
-            require(metalOut > 0, "EAB: no metal minted");
-            require(
-                IERC20(intent.actionToken).transfer(
-                    depositInfo.stratoRecipient,
-                    metalOut
-                ),
-                "EAB: metal transfer failed"
-            );
-            emit AutoForgedViaPSM(
-                externalChainId,
-                depositRouter,
-                depositId,
-                normalizedTxHash,
-                depositInfo.stratoRecipient,
-                depositInfo.stratoToken,
-                sourceAmount,
-                usdstOut,
-                intent.actionToken,
-                metalOut
-            );
-        }
+            ),
+            "EAB: router approval failed"
+        );
+        uint256 finalAmount = TokenRouter(tokenRouter).executeRoute(
+            depositInfo.stratoToken,
+            intent.actionToken,
+            sourceAmount,
+            depositInfo.stratoRecipient,
+            steps,
+            block.timestamp + ROUTE_EXECUTION_DEADLINE,
+            intent.minFinalOut
+        );
+        require(finalAmount >= intent.minFinalOut, "EAB: route under minimum");
+        emit AutoRouted(
+            externalChainId,
+            depositRouter,
+            depositId,
+            depositInfo.externalTxHash,
+            depositInfo.stratoRecipient,
+            depositInfo.stratoToken,
+            sourceAmount,
+            intent.actionToken,
+            finalAmount
+        );
     }
 
     function _mintDepositFallback(
@@ -1321,19 +1468,62 @@ contract record ExternalAssetBridge is Ownable {
         DepositActionConfig config = depositActionConfigs[
             depositInfo.externalToken
         ][externalChainId][depositInfo.stratoToken];
-        if (
-            action ==
-            uint256(DepositAction.AUTO_FORGE)
-        ) {
-            return config.autoForge;
+        return
+            action == uint256(DepositAction.AUTO_ROUTE) &&
+            config.autoRoute;
+    }
+
+    function _recordDepositRoute(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
+        RouteStep[] steps
+    ) internal {
+        DepositInfo depositInfo = deposits[
+            externalChainId
+        ][depositRouter][depositId];
+        DepositActionIntent intent = depositActions[
+            externalChainId
+        ][depositRouter][depositId];
+        require(
+            intent.action == uint256(DepositAction.AUTO_ROUTE),
+            "EAB: route intent missing"
+        );
+        require(
+            steps.length > 0 && steps.length <= MAX_ROUTE_STEPS,
+            "EAB: invalid route length"
+        );
+        require(
+            steps[0].tokenIn == depositInfo.stratoToken,
+            "EAB: route source mismatch"
+        );
+        require(
+            steps[steps.length - 1].tokenOut == intent.actionToken,
+            "EAB: route output mismatch"
+        );
+        for (uint256 i = 0; i < steps.length; i++) {
+            require(
+                steps[i].action != RouteAction.NONE,
+                "EAB: invalid route action"
+            );
+            require(steps[i].target != address(0), "EAB: zero route target");
+            require(
+                steps[i].tokenOut != address(0),
+                "EAB: zero route token"
+            );
+            if (i > 0) {
+                require(
+                    steps[i].tokenIn == steps[i - 1].tokenOut,
+                    "EAB: route discontinuity"
+                );
+            }
+            depositRouteSteps[externalChainId][depositRouter][depositId][
+                i
+            ] = steps[i];
         }
-        if (
-            action ==
-            uint256(DepositAction.AUTO_SAVE)
-        ) {
-            return config.autoSave;
-        }
-        return false;
+        depositRouteStepCounts[externalChainId][depositRouter][
+            depositId
+        ] = steps.length;
     }
 
     function _deleteDepositAction(
@@ -1344,6 +1534,24 @@ contract record ExternalAssetBridge is Ownable {
         delete depositActions[externalChainId][depositRouter][depositId].action;
         delete depositActions[externalChainId][depositRouter][depositId].actionToken;
         delete depositActions[externalChainId][depositRouter][depositId].minFinalOut;
+    }
+
+    function _deleteDepositRoute(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId
+    ) internal {
+        uint256 stepCount = depositRouteStepCounts[externalChainId][
+            depositRouter
+        ][depositId];
+        for (uint256 i = 0; i < stepCount; i++) {
+            delete depositRouteSteps[externalChainId][depositRouter][
+                depositId
+            ][i];
+        }
+        delete depositRouteStepCounts[externalChainId][depositRouter][
+            depositId
+        ];
     }
 
     function _escrowFunds(
