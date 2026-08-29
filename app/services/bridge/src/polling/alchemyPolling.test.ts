@@ -197,6 +197,41 @@ test("carries event intent through quote steps into routed settlement", async ()
   assert.equal(error, null);
 });
 
+test("falls back only after a deterministic routed settlement failure", async () => {
+  const { attemptRoutedSettlementWithFallback } = await import(
+    "./alchemyPolling"
+  );
+  const deposit = {} as any;
+  let fallbackCalls = 0;
+  const deterministic = await attemptRoutedSettlementWithFallback(
+    deposit,
+    async () => {
+      throw new Error("TR: step slippage");
+    },
+    async () => {
+      fallbackCalls += 1;
+      return "0xfallback";
+    },
+  );
+  assert.equal(deterministic.error, null);
+  assert.equal(deterministic.usedFallback, true);
+  assert.equal(fallbackCalls, 1);
+
+  const transport = await attemptRoutedSettlementWithFallback(
+    deposit,
+    async () => {
+      throw new Error("Request timeout");
+    },
+    async () => {
+      fallbackCalls += 1;
+      return "0xunsafe";
+    },
+  );
+  assert.match(transport.error?.message || "", /timeout/i);
+  assert.equal(transport.usedFallback, false);
+  assert.equal(fallbackCalls, 1);
+});
+
 test("applies rebase only when the exact route requires it", async () => {
   const [{ getRoutedDepositAmount }, { getRouteRebaseKey }] = await Promise.all([
     import("./alchemyPolling"),

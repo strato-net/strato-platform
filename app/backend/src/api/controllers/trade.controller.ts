@@ -106,7 +106,10 @@ class TradeController {
 
   static async routeAssets(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const result = await getRouteAssets(req.accessToken);
+      const result = await getRouteAssets(
+        req.accessToken,
+        req.address as string | undefined
+      );
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

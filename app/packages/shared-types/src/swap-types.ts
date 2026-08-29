@@ -178,6 +178,7 @@ export interface SwapToken {
   price: string; // Token price
   poolBalance: string; // Pool balance of this token
   images: Array<{ value: string }>; // Token images (filtered to exclude empty values)
+  routableSource?: boolean; // TokenRouter has at least one outgoing route
 }
 
 /**

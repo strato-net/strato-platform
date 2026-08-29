@@ -50,7 +50,7 @@ cp .env.example .env
 - `NODE_URL` - STRATO node URL
 - `REWARDS_CONTRACT_ADDRESS` - Rewards contract address
 - `PRICE_ORACLE_ADDRESS` - Price Oracle contract address (required for Swap event USD conversion)
-- `TOKEN_ROUTER` - TokenRouter address excluded from underlying Forge and vault attribution; the EAB completion rewards the actual recipient
+- `TOKEN_ROUTER` - TokenRouter address used to reward direct `RouteExecuted` output while excluding underlying Forge/vault events and EAB-originated routes
 
 ### Optional Environment Variables
 
@@ -58,7 +58,7 @@ cp .env.example .env
 - `PORT` - Service port (default: `3004`)
 
 #### Contract Addresses
-- `EXTERNAL_ASSET_BRIDGE_ADDRESS` - ExternalAssetBridge proxy address; required when EAB deposit or withdrawal reward activities are configured
+- `EXTERNAL_ASSET_BRIDGE_ADDRESS` - ExternalAssetBridge proxy address; required to distinguish EAB routes from directly submitted TokenRouter routes
 - `USDST_ADDRESS` - USDST token contract address (default: `937efa7e3a77e20bbdbd7c0d32b6514f368c1010`)
 - `VOUCHER_ADDRESS` - Voucher contract address (default: `000000000000000000000000000000000000100e`)
 

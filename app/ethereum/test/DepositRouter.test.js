@@ -53,7 +53,7 @@ describe("DepositRouter", function () {
         amount,
         user.address,
         targetStratoToken,
-        2,
+        4,
         ethers.Wallet.createRandom().address,
         1,
         1,
@@ -126,6 +126,87 @@ describe("DepositRouter", function () {
     expect(await ethers.provider.getBalance(vault.address)).to.equal(
       vaultBalanceBefore + amount
     );
+  });
+
+  it("rejects invalid action intents before moving custody", async function () {
+    const { router, token, vault, user, targetStratoToken, amount } =
+      await deployFixture();
+    const deadline = (await ethers.provider.getBlock("latest")).timestamp + 3600;
+    const actionToken = ethers.Wallet.createRandom().address;
+    const tokenAddress = await token.getAddress();
+
+    await expect(
+      router.connect(user).depositWithAction(
+        tokenAddress,
+        amount,
+        user.address,
+        targetStratoToken,
+        3,
+        actionToken,
+        1,
+        1,
+        deadline,
+        "0x"
+      )
+    ).to.be.revertedWithCustomError(router, "InvalidAction");
+    await expect(
+      router.connect(user).depositWithAction(
+        tokenAddress,
+        amount,
+        user.address,
+        targetStratoToken,
+        4,
+        ethers.ZeroAddress,
+        1,
+        2,
+        deadline,
+        "0x"
+      )
+    ).to.be.revertedWithCustomError(router, "InvalidAddress");
+    await expect(
+      router.connect(user).depositWithAction(
+        tokenAddress,
+        amount,
+        user.address,
+        targetStratoToken,
+        4,
+        actionToken,
+        0,
+        3,
+        deadline,
+        "0x"
+      )
+    ).to.be.revertedWithCustomError(router, "ZeroAmount");
+    expect(await token.balanceOf(vault.address)).to.equal(0);
+  });
+
+  it("rejects zero and unpermitted STRATO targets", async function () {
+    const { router, token, user, amount } = await deployFixture();
+    const deadline = (await ethers.provider.getBlock("latest")).timestamp + 3600;
+    const tokenAddress = await token.getAddress();
+
+    await expect(
+      router.connect(user).deposit(
+        tokenAddress,
+        amount,
+        user.address,
+        ethers.ZeroAddress,
+        1,
+        deadline,
+        "0x"
+      )
+    ).to.be.revertedWithCustomError(router, "InvalidAddress");
+    await expect(
+      router.connect(user).deposit(
+        tokenAddress,
+        amount,
+        user.address,
+        ethers.Wallet.createRandom().address,
+        2,
+        deadline,
+        "0x"
+      )
+    ).to.be.revertedWithCustomError(router, "NotPermitted");
   });
 
   it("moves subsequent deposits when governance updates the vault", async function () {

@@ -732,6 +732,69 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>) =>
       activityTypes.Deposit.handler(event, tokenSymbols, userAddress, tokenImages),
   },
+  "RoutedTrade": {
+    contract_name: "TokenRouter",
+    event_name: "RouteExecuted",
+    displayName: "Routed Trade",
+    iconConfig: { icon: ArrowLeftRight, color: "bg-orange-500" },
+    getTokenAddress: (event: Event) =>
+      [event.attributes.tokenIn, event.attributes.tokenOut].filter(
+        Boolean
+      ) as string[],
+    handler: (
+      event: Event,
+      tokenSymbols: Map<string, string>,
+      userAddress?: string | null,
+      tokenImages?: Map<string, string>
+    ): ActivityCardData => {
+      const tokenIn = event.attributes.tokenIn || "";
+      const tokenOut = event.attributes.tokenOut || "";
+      const caller = event.attributes.caller || "";
+      const recipient = event.attributes.recipient || "";
+      return {
+        title: "Routed Trade",
+        fields: [
+          addImageToField(
+            {
+              label: "From Amount",
+              value: formatValue(event.attributes.amountIn || "0", tokenIn),
+              type: "amount",
+              badge: tokenSymbols.get(tokenIn),
+            },
+            tokenIn,
+            tokenImages,
+            tokenSymbols
+          ),
+          addImageToField(
+            {
+              label: "To Amount",
+              value: formatValue(event.attributes.amountOut || "0", tokenOut),
+              type: "amount",
+              badge: tokenSymbols.get(tokenOut),
+            },
+            tokenOut,
+            tokenImages,
+            tokenSymbols
+          ),
+          addressField("From", caller, userAddress),
+          addressField("To", recipient, userAddress),
+        ],
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["From Amount", "To Amount"],
+            renderer: "amounts-with-arrow",
+          },
+          line2: {
+            fieldLabels: ["From", "To"],
+            renderer: "addresses-with-arrow",
+          },
+        },
+      };
+    },
+  },
   "NativeDeposit": {
     contract_name: "StratoNativeBridge",
     event_name: "NativeDepositCompleted",

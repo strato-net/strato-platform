@@ -41,6 +41,7 @@ import {
   verifyDetectedDepositsBatch,
 } from "./verificationService";
 import { fetchRouteSteps } from "./routeQuoteService";
+import { isTransportRouteError } from "../utils/routeFailure";
 
 let cachedStratoNetworkId: bigint | null = null;
 const announcedManualNativeWithdrawals = new Map<string, string | null>();
@@ -424,19 +425,40 @@ export const confirmReviewedDeposit = async (
       method = "confirmReviewedDepositWithRoute";
       args = { ...args, steps };
     } catch (error) {
+      if (isTransportRouteError(error)) throw error;
       logInfo(
         "BridgeService",
         `Reviewed routed deposit ${depositIdentity(pending.deposit)} will use source-token fallback: ${(error as Error).message}`,
       );
     }
   }
-  const result = await execute({
-    contractName: "ExternalAssetBridge",
-    contractAddress: config.externalAssetBridge.address!,
-    method,
-    args,
-  });
-  return result.hash;
+  try {
+    const result = await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method,
+      args,
+    });
+    return result.hash;
+  } catch (error) {
+    if (
+      method !== "confirmReviewedDepositWithRoute" ||
+      isTransportRouteError(error)
+    ) {
+      throw error;
+    }
+    logInfo(
+      "BridgeService",
+      `Reviewed routed settlement ${depositIdentity(pending.deposit)} failed deterministically; using source-token fallback: ${(error as Error).message}`,
+    );
+    const result = await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "confirmReviewedDeposit",
+      args: { externalChainId, depositRouter, depositId },
+    });
+    return result.hash;
+  }
 };
 
 export const recordNativeDepositBatch = async (

@@ -17,6 +17,7 @@ export const ACTIVITY_FILTER_CONFIGS: Record<string, FilterConfig> = {
   "StratoNativeBridge:NativeWithdrawalRequested": { type: "single", attribute: "stratoSender" },
   "CDPEngine:USDSTMinted": { type: "single", attribute: "owner" },
   "Pool:Swap": { type: "single", attribute: "sender" },
+  "TokenRouter:RouteExecuted": { type: "or", attributes: ["caller", "recipient"] },
   "Pool:AddLiquidity": { type: "single", attribute: "provider" },
   // V3 events carry both the caller (sender/owner) and the recipient; either can be "me".
   // Positions held as NFTs act through PositionManagerV3, so pool-level Mint/Burn/Collect

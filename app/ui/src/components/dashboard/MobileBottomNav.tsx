@@ -53,6 +53,7 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
   {
     label: 'TRADE',
     items: [
+      { icon: ArrowLeftRight, label: 'Trade-New', path: '/dashboard/unified-trade' },
       { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
       { icon: Send, label: 'Send', path: '/dashboard/transfer' },
       { icon: Download, label: 'Bridge Out', path: '/dashboard/withdrawals' },

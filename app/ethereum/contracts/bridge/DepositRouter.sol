@@ -29,6 +29,7 @@ contract DepositRouter is
     error SweepEthFailed();
     error NotPermitted();
     error FeesNotSupported();
+    error InvalidAction();
 
     // ============ State Variables ============
     //Notice that in most chains, PERMIT2 is deployed at 0x000000000022D473030F116dDEE9F6B43aC78BA3
@@ -175,6 +176,7 @@ contract DepositRouter is
         intent.action = action;
         intent.actionToken = actionToken;
         intent.minFinalOut = minFinalOut;
+        _validateActionIntent(intent);
 
         DepositRequest memory request;
         request.token = token;
@@ -290,6 +292,7 @@ contract DepositRouter is
         intent.action = action;
         intent.actionToken = actionToken;
         intent.minFinalOut = minFinalOut;
+        _validateActionIntent(intent);
 
         uint96 id = _processETHDeposit(stratoAddress, targetStratoToken);
         _emitDepositWithAction(
@@ -300,6 +303,12 @@ contract DepositRouter is
             id,
             intent
         );
+    }
+
+    function _validateActionIntent(ActionIntent memory intent) internal pure {
+        if (intent.action != 4) revert InvalidAction();
+        if (intent.actionToken == address(0)) revert InvalidAddress();
+        if (intent.minFinalOut == 0) revert ZeroAmount();
     }
 
     function _processETHDeposit(

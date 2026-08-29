@@ -6,7 +6,6 @@ import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import {
   useRouteAssets,
-  useTradeTokens,
 } from "@/hooks/trade/useTradeTokens";
 import { useRouteQuote } from "@/hooks/trade/useRouteQuote";
 import { useCompositeRouteQuote } from "@/hooks/trade/useCompositeRouteQuote";
@@ -18,10 +17,22 @@ import {
   safeParseUnits,
 } from "@/utils/numberUtils";
 import RoutePreview from "./RoutePreview";
+import { useTokenContext } from "@/context/TokenContext";
+import { SWAP_FEE, usdstAddress } from "@/lib/constants";
+import { handleAmountInputChange } from "@/utils/transferValidation";
+import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
 
-const RouterWidget = ({ guestMode = false }: { guestMode?: boolean }) => {
+const RouterWidget = ({
+  guestMode = false,
+  onTransactionSubmitted,
+}: {
+  guestMode?: boolean;
+  onTransactionSubmitted?: () => void;
+}) => {
   const { toast } = useToast();
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn, isAppAuthenticated } = useUser();
+  const { usdstBalance, voucherBalance, loadingUsdstBalance } =
+    useTokenContext();
   const {
     availableNetworks,
     bridgeableTokens,
@@ -29,17 +40,11 @@ const RouterWidget = ({ guestMode = false }: { guestMode?: boolean }) => {
     setSelectedNetwork,
     loadNetworksAndTokens,
   } = useBridgeContext();
-  const tokensQuery = useTradeTokens();
   const routeAssetsQuery = useRouteAssets();
-  const tradeTokens = useMemo(
-    () => tokensQuery.data ?? [],
-    [tokensQuery.data]
-  );
   const routeAssets = useMemo(
     () => [
       ...new Map(
         [
-          ...(routeAssetsQuery.data ?? []),
           ...bridgeableTokens
             .filter(
               (route) => route.routeType === "standard" && route.enabled
@@ -57,21 +62,16 @@ const RouterWidget = ({ guestMode = false }: { guestMode?: boolean }) => {
                 ? [{ value: route.stratoTokenImage }]
                 : [],
             })),
+          ...(routeAssetsQuery.data ?? []),
         ].map((token) => [token.address, token])
       ).values(),
     ],
     [routeAssetsQuery.data, bridgeableTokens]
   );
-  const tokens = useMemo(
-    () => [
-      ...new Map(
-        [...tradeTokens, ...routeAssets].map((token) => [
-          token.address,
-          token,
-        ])
-      ).values(),
-    ],
-    [tradeTokens, routeAssets]
+  const tokens = routeAssets;
+  const routeSources = useMemo(
+    () => routeAssets.filter((token) => token.routableSource),
+    [routeAssets]
   );
   const [sourceMode, setSourceMode] = useState<"strato" | "external">(
     "strato"
@@ -80,6 +80,7 @@ const RouterWidget = ({ guestMode = false }: { guestMode?: boolean }) => {
   const [tokenOutAddress, setTokenOutAddress] = useState("");
   const [externalRouteId, setExternalRouteId] = useState("");
   const [amount, setAmount] = useState("");
+  const [amountError, setAmountError] = useState("");
   const [slippageBps, setSlippageBps] = useState(50);
 
   useEffect(() => {
@@ -87,8 +88,8 @@ const RouterWidget = ({ guestMode = false }: { guestMode?: boolean }) => {
   }, [loadNetworksAndTokens]);
 
   const tokenIn =
-    tradeTokens.find((token) => token.address === tokenInAddress) ??
-    tradeTokens[0];
+    routeSources.find((token) => token.address === tokenInAddress) ??
+    routeSources[0];
   const tokenOut =
     routeAssets.find((token) => token.address === tokenOutAddress) ??
     routeAssets.find((token) => token.address !== tokenIn?.address);
@@ -113,6 +114,25 @@ const RouterWidget = ({ guestMode = false }: { guestMode?: boolean }) => {
       return "0";
     }
   }, [amount, inputDecimals]);
+  const routeFeeWei = safeParseUnits(SWAP_FEE);
+  const availableFees = BigInt(usdstBalance || "0") + BigInt(voucherBalance || "0");
+  const feeError =
+    sourceMode === "strato" &&
+    !loadingUsdstBalance &&
+    availableFees < routeFeeWei
+      ? "Insufficient USDST + voucher balance for two transaction fees"
+      : "";
+  const inputBalance = BigInt(tokenIn?.balance || "0");
+  const usdFeePortion =
+    routeFeeWei > BigInt(voucherBalance || "0")
+      ? routeFeeWei - BigInt(voucherBalance || "0")
+      : 0n;
+  const maxSpendableWei =
+    tokenIn?.address.toLowerCase() === usdstAddress.toLowerCase()
+      ? inputBalance > usdFeePortion
+        ? (inputBalance - usdFeePortion).toString()
+        : "0"
+      : inputBalance.toString();
 
   const routeQuote = useRouteQuote({
     tokenIn: sourceMode === "strato" ? tokenIn?.address : undefined,
@@ -149,6 +169,9 @@ const RouterWidget = ({ guestMode = false }: { guestMode?: boolean }) => {
     if (!quote || !tokenOut || amountWei === "0") return;
     try {
       if (sourceMode === "external") {
+        if (!isAppAuthenticated) {
+          throw new Error("Sign in to STRATO before bridging assets");
+        }
         if (!externalRoute || !network || !compositeQuote.data) return;
         await autoRouteDeposit.execute({
           route: externalRoute,
@@ -181,6 +204,7 @@ const RouterWidget = ({ guestMode = false }: { guestMode?: boolean }) => {
           variant: "success",
         });
       }
+      onTransactionSubmitted?.();
       setAmount("");
     } catch (error) {
       toast({
@@ -197,34 +221,51 @@ const RouterWidget = ({ guestMode = false }: { guestMode?: boolean }) => {
         <Button
           type="button"
           variant={sourceMode === "strato" ? "default" : "ghost"}
-          onClick={() => setSourceMode("strato")}
+          onClick={() => {
+            setSourceMode("strato");
+            setAmount("");
+            setAmountError("");
+          }}
         >
           STRATO
         </Button>
         <Button
           type="button"
           variant={sourceMode === "external" ? "default" : "ghost"}
-          onClick={() => setSourceMode("external")}
+          onClick={() => {
+            setSourceMode("external");
+            setAmount("");
+            setAmountError("");
+          }}
         >
           External network
         </Button>
       </div>
 
       {sourceMode === "external" && (
-        <select
-          className="h-10 w-full rounded-md border border-input bg-background px-3"
-          value={network?.chainName ?? ""}
-          onChange={(event) => {
-            setExternalRouteId("");
-            void setSelectedNetwork(event.target.value);
-          }}
-        >
-          {availableNetworks.map((item) => (
-            <option key={item.chainId} value={item.chainName}>
-              {item.chainName}
-            </option>
-          ))}
-        </select>
+        <div className="space-y-3">
+          <BridgeWalletStatus
+            guestMode={guestMode}
+            externalOnly
+            connectedLabel="External Wallet"
+            connectLabel="Connect External Wallet"
+            copiedDescription="External wallet address copied to clipboard"
+          />
+          <select
+            className="h-10 w-full rounded-md border border-input bg-background px-3"
+            value={network?.chainName ?? ""}
+            onChange={(event) => {
+              setExternalRouteId("");
+              void setSelectedNetwork(event.target.value);
+            }}
+          >
+            {availableNetworks.map((item) => (
+              <option key={item.chainId} value={item.chainName}>
+                {item.chainName}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
 
       <div className="rounded-lg border border-border bg-muted/50 p-4">
@@ -235,7 +276,17 @@ const RouterWidget = ({ guestMode = false }: { guestMode?: boolean }) => {
             inputMode="decimal"
             placeholder="0"
             value={amount}
-            onChange={(event) => setAmount(event.target.value)}
+            onChange={(event) =>
+              sourceMode === "strato"
+                ? handleAmountInputChange(
+                    event.target.value,
+                    setAmount,
+                    setAmountError,
+                    maxSpendableWei,
+                    inputDecimals
+                  )
+                : setAmount(event.target.value)
+            }
           />
           <select
             className="rounded-md border border-input bg-background px-2"
@@ -250,7 +301,7 @@ const RouterWidget = ({ guestMode = false }: { guestMode?: boolean }) => {
                 : setTokenInAddress(event.target.value)
             }
           >
-            {(sourceMode === "external" ? externalRoutes : tradeTokens).map(
+            {(sourceMode === "external" ? externalRoutes : routeSources).map(
               (item) => (
                 <option
                   key={item.id ?? item.address}
@@ -264,6 +315,30 @@ const RouterWidget = ({ guestMode = false }: { guestMode?: boolean }) => {
             )}
           </select>
         </div>
+        {sourceMode === "strato" && tokenIn && (
+          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+            <span>
+              Available:{" "}
+              {formatAmount(
+                formatUnits(maxSpendableWei, tokenIn.customDecimals),
+                6
+              )}{" "}
+              {tokenIn._symbol}
+            </span>
+            <button
+              type="button"
+              className="font-semibold text-primary"
+              onClick={() => {
+                setAmount(
+                  formatUnits(maxSpendableWei, tokenIn.customDecimals)
+                );
+                setAmountError("");
+              }}
+            >
+              Max
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex justify-center">
@@ -342,6 +417,9 @@ const RouterWidget = ({ guestMode = false }: { guestMode?: boolean }) => {
           {(quoteError as Error).message}
         </p>
       )}
+      {(amountError || feeError) && (
+        <p className="text-sm text-destructive">{amountError || feeError}</p>
+      )}
 
       <Button
         className="w-full"
@@ -350,6 +428,9 @@ const RouterWidget = ({ guestMode = false }: { guestMode?: boolean }) => {
           pending ||
           quoteLoading ||
           !quote ||
+          !!amountError ||
+          !!feeError ||
+          (sourceMode === "external" && !isAppAuthenticated) ||
           amountWei === "0"
         }
         onClick={handleTrade}
@@ -358,6 +439,8 @@ const RouterWidget = ({ guestMode = false }: { guestMode?: boolean }) => {
           ? "Sign in to trade"
           : pending
             ? "Submitting..."
+            : sourceMode === "external" && !isAppAuthenticated
+              ? "Sign in to STRATO"
             : sourceMode === "external"
               ? "Deposit & Trade"
               : "Trade"}

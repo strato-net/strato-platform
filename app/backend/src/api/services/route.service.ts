@@ -357,12 +357,14 @@ const buildRouteEdges = async (
 };
 
 export const getRouteAssets = async (
-  accessToken: string
+  accessToken: string,
+  userAddress?: string
 ): Promise<SwapToken[]> => {
   const edges = await buildRouteEdges(accessToken);
   const addresses = [
     ...new Set(edges.flatMap(({ tokenIn, tokenOut }) => [tokenIn, tokenOut])),
   ];
+  const sourceAddresses = new Set(edges.map(({ tokenIn }) => tokenIn));
   if (addresses.length === 0) return [];
 
   const { data } = await cirrus.get(accessToken, `/${constants.Token}`, {
@@ -376,7 +378,9 @@ export const getRouteAssets = async (
         "_totalSupply::text",
         "customDecimals",
         `images:${constants.Token}-images(value)`,
+        `balances:${constants.Token}-_balances(user:key,balance:value::text)`,
       ].join(","),
+      ...(userAddress ? { "balances.key": `eq.${userAddress}` } : {}),
     },
   });
   const assets = new Map<string, SwapToken>(
@@ -385,10 +389,11 @@ export const getRouteAssets = async (
       {
         ...token,
         address: normalizeAddress(token.address),
-        balance: "0",
+        balance: token.balances?.[0]?.balance || "0",
         price: "0",
         poolBalance: "0",
         images: token.images || [],
+        routableSource: sourceAddresses.has(normalizeAddress(token.address)),
       },
     ])
   );
@@ -404,6 +409,7 @@ export const getRouteAssets = async (
       price: edge.priceOut || "0",
       poolBalance: "0",
       images: [],
+      routableSource: sourceAddresses.has(edge.tokenOut),
     });
   }
   return [...assets.values()].sort((a, b) =>

@@ -37,6 +37,7 @@ import {
   isChainConfigured,
 } from "../services/rpcService";
 import { logError, logInfo } from "../utils/logger";
+import { isTransportRouteError } from "../utils/routeFailure";
 import {
   classifyDepositLogs,
   RawDepositLog,
@@ -104,6 +105,23 @@ export const attemptDepositSettlement = async <T extends DepositArgs>(
   } catch (error) {
     return error as Error;
   }
+};
+
+export const attemptRoutedSettlementWithFallback = async (
+  deposit: RouteDepositArgs,
+  submitRoute: (deposit: RouteDepositArgs) => Promise<string | null> =
+    settleRoutedDeposit,
+  submitFallback: (deposit: DepositArgs) => Promise<string | null> =
+    settleDeposit,
+): Promise<{ error: Error | null; usedFallback: boolean }> => {
+  const routeError = await attemptDepositSettlement(deposit, submitRoute);
+  if (!routeError || isTransportRouteError(routeError)) {
+    return { error: routeError, usedFallback: false };
+  }
+  return {
+    error: await attemptDepositSettlement(deposit, submitFallback),
+    usedFallback: true,
+  };
 };
 
 const recordReviewOnce = async (
@@ -324,16 +342,26 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
           amountIn: amountIn.toString(),
           minFinalOut: actionDeposit.minFinalOut!,
         });
-        settlementError = await attemptDepositSettlement(
+        const routedSettlement = await attemptRoutedSettlementWithFallback(
           { ...deposit, ...actionDeposit, steps } as RouteDepositArgs,
-          settleRoutedDeposit,
         );
+        settlementError = routedSettlement.error;
+        if (routedSettlement.usedFallback) {
+          logInfo(
+            "AlchemyPolling",
+            `Deterministic AUTO_ROUTE settlement failure for ${depositIdentity(deposit)}; used source-token fallback`,
+          );
+        }
       } catch (error) {
-        logInfo(
-          "AlchemyPolling",
-          `AUTO_ROUTE quote unavailable for ${depositIdentity(deposit)}; using source-token fallback: ${(error as Error).message}`,
-        );
-        settlementError = await attemptDepositSettlement(deposit);
+        if (isTransportRouteError(error)) {
+          settlementError = error as Error;
+        } else {
+          logInfo(
+            "AlchemyPolling",
+            `Deterministic AUTO_ROUTE quote failure for ${depositIdentity(deposit)}; using source-token fallback: ${(error as Error).message}`,
+          );
+          settlementError = await attemptDepositSettlement(deposit);
+        }
       }
     } else {
       settlementError = await attemptDepositSettlement(deposit);

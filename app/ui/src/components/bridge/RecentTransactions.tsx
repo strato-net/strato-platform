@@ -9,9 +9,10 @@ import { ExternalBridgeStatus, mergePendingDeposits } from '@/lib/bridge/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { activityFeedApi } from '@/lib/activityFeed';
 import { METAL_ACTIVITY_PAIR, resolveTokenSymbols, collectMetalTokenAddrs, mapEventsToMetalTxs } from '@/lib/metalActivity';
+import { api } from '@/lib/axios';
 
 type RecentTx = {
-  _type: 'deposit' | 'withdrawal' | 'metal';
+  _type: 'deposit' | 'withdrawal' | 'metal' | 'route';
   block_timestamp?: string;
   externalChainId?: number | string;
   externalSymbol?: string;
@@ -37,6 +38,8 @@ const STATUS_LABELS: Record<number, { text: string; color: string }> = {
 };
 const UNKNOWN_STATUS = { text: "Unknown", color: "bg-muted text-muted-foreground" };
 const METAL_STATUS = STATUS_LABELS[ExternalBridgeStatus.COMPLETED];
+const normalizeAddress = (address?: string) =>
+  (address || "").toLowerCase().replace(/^0x/, "");
 
 const getStatusLabel = (status?: string | number) => STATUS_LABELS[parseInt(String(status || "0"))] || UNKNOWN_STATUS;
 
@@ -125,9 +128,11 @@ function useMetalTransactions(limit: number, isLoggedIn: boolean) {
 interface RecentTransactionsProps {
   fundingMode?: "bridge" | "metals";
   metalRefreshKey?: number;
+  includeRoutes?: boolean;
+  routeRefreshKey?: number;
 }
 
-const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: RecentTransactionsProps) => {
+const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0, includeRoutes = false, routeRefreshKey = 0 }: RecentTransactionsProps) => {
   const { isLoggedIn } = useUser();
   const {
     fetchDepositTransactions, fetchWithdrawTransactions,
@@ -164,20 +169,56 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: Rec
     Promise.all([
       fetchDepositTransactions(params, "deposits"),
       fetchWithdrawTransactions(params, "deposits"),
-    ]).then(([depositResult, withdrawalResult]) => {
+      includeRoutes
+        ? activityFeedApi.getActivities(
+            [{ contract_name: "TokenRouter", event_name: "RouteExecuted" }],
+            { limit: recentLimit, myActivity: true }
+          )
+        : Promise.resolve({ events: [], total: 0 }),
+    ]).then(async ([depositResult, withdrawalResult, routeResult]) => {
       const apiDeposits = (depositResult.data || []) as unknown as Record<string, unknown>[];
       const { remaining } = mergePendingDeposits(apiDeposits);
+      const routeEvents = routeResult.events || [];
+      const routeSymbols = new Map<string, string>();
+      if (routeEvents.length > 0) {
+        try {
+          const { data: routeAssets } = await api.get("/trade/route/assets");
+          for (const asset of routeAssets || []) {
+            routeSymbols.set(normalizeAddress(asset.address), asset._symbol);
+          }
+        } catch {
+          const addresses = routeEvents.flatMap((event) => [
+            event.attributes.tokenIn,
+            event.attributes.tokenOut,
+          ]);
+          const resolved = await resolveTokenSymbols(addresses);
+          for (const [address, symbol] of resolved) {
+            routeSymbols.set(normalizeAddress(address), symbol);
+          }
+        }
+      }
       const all = [
         ...remaining.map((p: Record<string, unknown>) => mapDeposit(p, 'pending')),
         ...apiDeposits.map((tx) => mapDeposit(tx, 'api')),
         ...((withdrawalResult.data || []) as unknown as Record<string, unknown>[]).map(mapWithdrawal),
+        ...routeEvents.map((event): RecentTx => ({
+          _type: "route",
+          block_timestamp: event.block_timestamp,
+          amount: event.attributes.amountIn,
+          stratoTokenSymbol:
+            routeSymbols.get(normalizeAddress(event.attributes.tokenIn)) || "-",
+          finalAmount: event.attributes.amountOut,
+          finalTokenSymbol:
+            routeSymbols.get(normalizeAddress(event.attributes.tokenOut)) || "-",
+          status: String(ExternalBridgeStatus.COMPLETED),
+        })),
       ].sort((a, b) => new Date(b.block_timestamp || 0).getTime() - new Date(a.block_timestamp || 0).getTime())
        .slice(0, recentLimit);
       setBridgeTxs(all);
       setBridgeLoading(false);
       bridgeLoadedRef.current = true;
     }).catch(() => { setBridgeTxs([]); setBridgeLoading(false); bridgeLoadedRef.current = true; });
-  }, [isLoggedIn, fundingMode, fetchDepositTransactions, fetchWithdrawTransactions, depositRefreshKey, withdrawalRefreshKey, recentLimit]);
+  }, [isLoggedIn, fundingMode, fetchDepositTransactions, fetchWithdrawTransactions, depositRefreshKey, withdrawalRefreshKey, recentLimit, includeRoutes, routeRefreshKey]);
 
   if (fundingMode === "metals" && isLoggedIn && lastMetalRefreshKey !== metalRefreshKey) {
     setLastMetalRefreshKey(metalRefreshKey);
@@ -205,6 +246,12 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: Rec
             label="Metal Mint" status={METAL_STATUS} timeLabel={formatTimeAgo(tx.block_timestamp)}
             fromAmount={formatBalance(tx.payAmount || "0", undefined, 18, 2, 4)} fromSymbol={tx.paySymbol || "-"}
             toAmount={amt} toSymbol={tx.metalSymbol || "-"} />;
+        }
+        if (tx._type === "route") {
+          return <TxRow key={key} icon={<ArrowDown className="w-4 h-4 text-blue-500" />} iconBg="bg-blue-500/15"
+            label="Routed Trade" status={METAL_STATUS} timeLabel={formatTimeAgo(tx.block_timestamp)}
+            fromAmount={amt} fromSymbol={tx.stratoTokenSymbol || "-"}
+            toAmount={formatBalance(tx.finalAmount || "0", undefined, 18, 2, 4)} toSymbol={tx.finalTokenSymbol || "-"} />;
         }
 
         const isW = tx._type === 'withdrawal';

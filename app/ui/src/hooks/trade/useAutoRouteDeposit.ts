@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { useAccount, useSignTypedData, useWriteContract } from "wagmi";
+import {
+  useAccount,
+  useSignTypedData,
+  useSwitchChain,
+  useWriteContract,
+} from "wagmi";
 import {
   BridgeToken,
   CompositeRouteQuoteResponse,
@@ -30,6 +35,7 @@ export function useAutoRouteDeposit() {
   const [isPending, setIsPending] = useState(false);
   const account = useAccount();
   const { signTypedDataAsync } = useSignTypedData();
+  const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
   const {
     externalEvmWalletAddress,
@@ -59,12 +65,24 @@ export function useAutoRouteDeposit() {
     ) {
       throw new Error("Connect an external wallet to bridge and trade");
     }
-    const recipient = isAppAuthenticated
-      ? stratoAddress
-      : externalEvmWalletAddress;
-    if (!recipient) throw new Error("STRATO recipient is unavailable");
+    if (
+      account.address.toLowerCase() !== externalEvmWalletAddress.toLowerCase()
+    ) {
+      throw new Error("Connected external wallet address does not match");
+    }
+    if (!isAppAuthenticated || !stratoAddress) {
+      throw new Error("Sign in to STRATO before bridging assets");
+    }
+    const recipient = stratoAddress;
     if (!network.depositRouter) {
       throw new Error("Deposit router is unavailable");
+    }
+    const expectedChainId = Number(network.chainId);
+    if (!Number.isSafeInteger(expectedChainId) || expectedChainId <= 0) {
+      throw new Error("External network chain ID is not wallet-compatible");
+    }
+    if (account.chainId !== expectedChainId) {
+      await switchChainAsync({ chainId: expectedChainId });
     }
 
     setIsPending(true);

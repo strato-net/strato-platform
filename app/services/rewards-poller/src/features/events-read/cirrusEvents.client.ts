@@ -27,6 +27,7 @@ import {
   reassembleStructArrayRows,
   shouldTrackActivity,
 } from "./mappingRow.parser";
+import { shouldSkipRouteReward } from "./routeAttribution";
 
 const STRATO_PREFIX = "BlockApps-";
 
@@ -86,6 +87,17 @@ const queryRegularEvents = async (
       const userAttr = mapping[item.address]?.[item.event_name]?.user;
       const user = userAttr ? (attributes[userAttr] || item.transaction_sender) : item.transaction_sender;
       const tokenRouterAddress = config.tokenRouter.address;
+      if (
+        shouldSkipRouteReward({
+          eventAddress: item.address,
+          eventName: item.event_name,
+          caller: attributes.caller,
+          tokenRouter: tokenRouterAddress,
+          externalAssetBridge: config.externalAssetBridge.address,
+        })
+      ) {
+        return null;
+      }
       if (
         tokenRouterAddress &&
         user?.toLowerCase().replace(/^0x/, "") ===

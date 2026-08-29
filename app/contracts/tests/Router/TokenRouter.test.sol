@@ -463,4 +463,37 @@ contract Describe_TokenRouter is Authorizable {
             "Shares should roll back"
         );
     }
+
+    function it_rejects_a_route_step_with_the_wrong_target() {
+        RouteStep[] steps = new RouteStep[](1);
+        steps[0] = _step(
+            RouteAction.PSM_MINT,
+            address(forge),
+            address(payToken),
+            address(usdst),
+            1
+        );
+
+        uint256 beforeBalance = Token(address(payToken)).balanceOf(address(this));
+        Token(address(payToken)).approve(address(router), 100e18);
+        bool reverted = false;
+        try router.executeRoute(
+            address(payToken),
+            address(usdst),
+            100e18,
+            address(this),
+            steps,
+            block.timestamp + 300,
+            1
+        ) {
+        } catch {
+            reverted = true;
+        }
+
+        require(reverted, "Invalid target should revert");
+        require(
+            Token(address(payToken)).balanceOf(address(this)) == beforeBalance,
+            "Input should not move"
+        );
+    }
 }

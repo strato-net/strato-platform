@@ -15,13 +15,13 @@ Non-native bridge-in:
 2. It waits for the configured confirmations and verifies the canonical receipt, exact router log and vault custody transfer.
 3. Plain deposits call `settleDeposit`. `AUTO_ROUTE` deposits receive a fresh backend quote and call `settleDepositWithRoute`; both operations atomically record and complete the deposit while preserving `DepositInitiated` and `DepositCompleted`. ExternalAssetBridge converts the verified raw external amount to STRATO decimals and applies any required inbound rebase factor on-chain.
 4. Save and Forge remain user-facing destinations, but both are TokenRouter routes encoded as `AUTO_ROUTE = 4`. Legacy action ordinals 2 and 3 are not executed by ExternalAssetBridge.
-5. Before external submission the UI states the exact STRATO source token and amount the recipient will receive if routing fails. If route quoting or execution cannot satisfy the signed `minFinalOut`, the recipient receives that source token through `DepositActionFallback`; custody is never left unsettled.
-6. RPC conflicts, permanently missing receipts and expired settlement retries enter persistent review/quarantine.
+5. Before external submission the UI requires an authenticated STRATO account as recipient, connects the external wallet only as the external-chain signer, switches it to the selected chain, and states the exact STRATO source token and amount the recipient will receive if routing fails. DepositRouter accepts only `AUTO_ROUTE = 4` with a nonzero destination token and positive `minFinalOut`.
+6. Deterministic quote or route-execution errors settle through `DepositActionFallback`. Transport errors remain retryable because submission may be ambiguous; RPC conflicts, permanently missing receipts and expired settlement retries enter persistent review/quarantine.
 7. Reviewed deposits are re-verified and resolved through `confirmReviewedDepositWithRoute` (or source-token fallback), or owner-governed `abortDeposit`.
 
 `externalTxHash` is metadata, not replay identity. Multiple deposits in one external transaction settle and report action outcomes independently.
 
-Activity history enriches the canonical completion with `AutoRouted` or `DepositActionFallback` final-token data and labels it `Deposit & Trade` or `Deposit (Fallback)`. Rewards continue to consume only `DepositCompleted` and its bridged source amount; action outcomes are presentation metadata and do not create a second reward.
+Activity history enriches the canonical completion with `AutoRouted` or `DepositActionFallback` final-token data and labels it `Deposit & Trade` or `Deposit (Fallback)`. Direct STRATO routes are recorded from `TokenRouter.RouteExecuted`; Unified Trade displays those recent routes alongside pending and completed bridge deposits. Its STRATO source catalog includes every graph node with an outgoing route, including PSM-only assets, and reserves both STRATO call fees from maximum transferable USDST. Rewards continue to consume only `DepositCompleted` and its bridged source amount; action outcomes are presentation metadata and do not create a second reward.
 
 External action intent is not cryptographically signed by the external wallet. The bridge operator is trusted to submit the verified deposit identity, STRATO recipient, source route and action intent observed in the DepositRouter event. The absolute `minFinalOut` is preserved from that event, refreshed route-step minima are derived from it, and every submitted authority choice is logged. Contract route allowlists, on-chain rebase accounting, replay protection and source-token fallback bound the operator's effect, but a compromised operator remains able to choose settlement parameters within those controls.
 
@@ -48,5 +48,6 @@ Deployment order:
 3. Upgrade each external `DepositRouter` to 3.2 and verify `version()`, vault custody, token permissions and route permissions.
 4. Enable `ExternalAssetBridge.setDepositAction(externalToken, chainId, stratoToken, 4, true)` only after `/trade/route/quote` succeeds for the intended destinations.
 5. Configure backend, bridge service and rewards poller `TOKEN_ROUTER`, plus bridge-service `STRATO_APP_API_URL`. Startup must confirm that the address matches `ExternalAssetBridge.tokenRouter` and that `TokenRouter.initialized` is true.
+6. Create a Rewards activity with TokenRouter as `sourceContract` and `RouteExecuted` as its actionable event. The poller rewards direct callers from the destination `amountOut`/`tokenOut` value and excludes ExternalAssetBridge callers because their canonical reward is `DepositCompleted`.
 
 
