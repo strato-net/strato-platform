@@ -50,7 +50,7 @@ cp .env.example .env
 - `NODE_URL` - STRATO node URL
 - `REWARDS_CONTRACT_ADDRESS` - Rewards contract address
 - `PRICE_ORACLE_ADDRESS` - Price Oracle contract address (required for Swap event USD conversion)
-- `TOKEN_ROUTER` - TokenRouter address used to reward direct `RouteExecuted` output while excluding underlying Forge/vault events and EAB-originated routes
+- `TOKEN_ROUTER` - TokenRouter address used to correlate underlying swap, Forge, and vault events with the direct route caller; EAB-originated routes remain excluded
 
 ### Optional Environment Variables
 

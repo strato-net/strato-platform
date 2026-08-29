@@ -48,6 +48,6 @@ Deployment order:
 3. Upgrade each external `DepositRouter` to 3.2 and verify `version()`, vault custody, token permissions and route permissions.
 4. Enable `ExternalAssetBridge.setDepositAction(externalToken, chainId, stratoToken, 4, true)` only after `/trade/route/quote` succeeds for the intended destinations.
 5. Configure backend, bridge service and rewards poller `TOKEN_ROUTER`, plus bridge-service `STRATO_APP_API_URL`. Startup must confirm that the address matches `ExternalAssetBridge.tokenRouter` and that `TokenRouter.initialized` is true.
-6. Create a Rewards activity with TokenRouter as `sourceContract` and `RouteExecuted` as its actionable event. The poller rewards direct callers from the destination `amountOut`/`tokenOut` value and excludes ExternalAssetBridge callers because their canonical reward is `DepositCompleted`.
+6. Keep pool, Forge, and vault reward activities registered against their existing source contracts. The poller correlates their TokenRouter-owned events with `RouteExecuted` and attributes direct routes to the caller; ExternalAssetBridge callers remain excluded because their canonical reward is `DepositCompleted`.
 
 

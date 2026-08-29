@@ -11,7 +11,6 @@ const PriceOracleBatchUpdateEvents = `${STRATO_PREFIX}PriceOracle-BatchPricesUpd
 
 const PRICE_CONVERSION_MAP: Record<string, string> = {
   Swap: "tokenIn",
-  RouteExecuted: "tokenOut",
   DepositCompleted: "stratoToken",
   WithdrawalCompleted: "stratoToken",
 };
@@ -56,18 +55,6 @@ export const loadAttributeMapping = (): AttributeMapping => {
         WithdrawalCompleted: {
           amount: "stratoTokenAmount",
           user: "stratoSender",
-        },
-      };
-    }
-    const tokenRouter = (config.tokenRouter.address || "")
-      .replace(/^0x/i, "")
-      .toLowerCase();
-    if (tokenRouter) {
-      attributeMapping[tokenRouter] = {
-        ...attributeMapping[tokenRouter],
-        RouteExecuted: {
-          amount: "amountOut",
-          user: "caller",
         },
       };
     }

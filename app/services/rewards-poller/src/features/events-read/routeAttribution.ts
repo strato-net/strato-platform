@@ -1,25 +1,27 @@
 const normalizeAddress = (address?: string): string =>
   (address || "").toLowerCase().replace(/^0x/, "");
 
-export const shouldSkipRouteReward = ({
-  eventAddress,
-  eventName,
-  caller,
+export const resolveRoutedActivityUser = ({
+  attributedUser,
+  routedCaller,
   tokenRouter,
   externalAssetBridge,
 }: {
-  eventAddress: string;
-  eventName: string;
-  caller?: string;
+  attributedUser?: string;
+  routedCaller?: string;
   tokenRouter?: string;
   externalAssetBridge?: string;
-}): boolean => {
-  if (
-    eventName !== "RouteExecuted" ||
-    normalizeAddress(eventAddress) !== normalizeAddress(tokenRouter)
-  ) {
-    return false;
+}): string | null => {
+  if (normalizeAddress(attributedUser) !== normalizeAddress(tokenRouter)) {
+    return attributedUser || null;
   }
   const bridge = normalizeAddress(externalAssetBridge);
-  return !bridge || normalizeAddress(caller) === bridge;
+  if (
+    !bridge ||
+    !routedCaller ||
+    normalizeAddress(routedCaller) === bridge
+  ) {
+    return null;
+  }
+  return routedCaller;
 };

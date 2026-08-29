@@ -146,6 +146,7 @@ export interface SwapHistoryEntry {
   amountOut: string;
   impliedPrice: string;
   sender: string;
+  transactionHash?: string;
   /** V3 pair-scoped history only: which pool (fee tier) the swap executed in */
   poolAddress?: string;
   poolName?: string;
@@ -388,6 +389,7 @@ export interface RawSwapEvent {
   amountIn: string;
   amountOut: string;
   sender: string;
+  transaction_hash?: string;
   block_timestamp: string;
   pool: {
     tokenA: {

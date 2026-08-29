@@ -433,7 +433,8 @@ export const getSwapHistory = async (
       amountIn: event.amountIn,
       amountOut: event.amountOut,
       impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, isAToB, isStable),
-      sender: event.sender
+      sender: event.sender,
+      transactionHash: event.transaction_hash,
     };
   });
 
@@ -506,6 +507,7 @@ export const getPairSwapHistory = async (
     amountOut: event.amountOut,
     impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, event.tokenIn === a, event.pool.isStable),
     sender: event.sender,
+    transactionHash: event.transaction_hash,
     poolAddress: event.address,
     poolName: event.pool.isStable ? "Stable" : "V2",
   }));
@@ -582,6 +584,7 @@ export const getTokenSwapHistory = async (
     amountOut: event.amountOut,
     impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, true, event.pool.isStable),
     sender: event.sender,
+    transactionHash: event.transaction_hash,
     poolAddress: event.address,
     poolName: event.pool.isStable ? "Stable" : "V2",
   }));

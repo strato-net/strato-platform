@@ -6,10 +6,12 @@ import { useUser } from "@/context/UserContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import RecentTransactions from "@/components/bridge/RecentTransactions";
 import { useState } from "react";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
 const UnifiedTrade = () => {
   const { isLoggedIn } = useUser();
   const [routeRefreshKey, setRouteRefreshKey] = useState(0);
+  const { userRewards } = useRewardsUserInfo();
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
@@ -29,6 +31,7 @@ const UnifiedTrade = () => {
               </div>
               <RouterWidget
                 guestMode={!isLoggedIn}
+                userRewards={userRewards}
                 onTransactionSubmitted={() =>
                   setRouteRefreshKey((key) => key + 1)
                 }

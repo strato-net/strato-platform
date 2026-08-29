@@ -21,13 +21,18 @@ import { useTokenContext } from "@/context/TokenContext";
 import { SWAP_FEE, usdstAddress } from "@/lib/constants";
 import { handleAmountInputChange } from "@/utils/transferValidation";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
+import PairSwapHistory from "./PairSwapHistory";
+import { RewardsWidget } from "@/components/rewards/RewardsWidget";
+import { UserRewardsData } from "@/services/rewardsService";
 
 const RouterWidget = ({
   guestMode = false,
   onTransactionSubmitted,
+  userRewards,
 }: {
   guestMode?: boolean;
   onTransactionSubmitted?: () => void;
+  userRewards?: UserRewardsData | null;
 }) => {
   const { toast } = useToast();
   const { isLoggedIn, isAppAuthenticated } = useUser();
@@ -164,6 +169,35 @@ const RouterWidget = ({
   const routeExecute = useRouteExecute();
   const autoRouteDeposit = useAutoRouteDeposit();
   const pending = routeExecute.isPending || autoRouteDeposit.isPending;
+  const rewardedRouteSteps = useMemo(() => {
+    if (sourceMode !== "strato" || !quote || !userRewards) return [];
+    const seen = new Set<string>();
+    return quote.steps.flatMap((step) => {
+      if (step.action < 1 || step.action > 3) return [];
+      const target = step.target.toLowerCase().replace(/^0x/, "");
+      if (seen.has(target)) return [];
+      const activity = userRewards.activities.find(
+        (item) =>
+          item.activity.sourceContract?.toLowerCase().replace(/^0x/, "") ===
+          target
+      );
+      if (!activity) return [];
+      seen.add(target);
+      const stepInputToken = tokens.find(
+        (token) =>
+          token.address.toLowerCase().replace(/^0x/, "") ===
+          step.tokenIn.toLowerCase().replace(/^0x/, "")
+      );
+      return [{
+        activity,
+        inputAmount: formatUnits(
+          step.amountIn,
+          stepInputToken?.customDecimals ?? 18
+        ),
+        tokenIn: step.tokenIn,
+      }];
+    });
+  }, [sourceMode, quote, userRewards, tokens]);
 
   const handleTrade = async () => {
     if (!quote || !tokenOut || amountWei === "0") return;
@@ -399,6 +433,17 @@ const RouterWidget = ({
           outputToken={tokenOut}
         />
       ) : null}
+      {rewardedRouteSteps.map(({ activity, inputAmount, tokenIn }) => (
+        <RewardsWidget
+          key={activity.activityId}
+          userRewards={{ ...userRewards!, activities: [activity] }}
+          activityName={activity.activity.name}
+          inputAmount={inputAmount}
+          swapTokenInAddress={tokenIn}
+          actionLabel="Trade"
+          hideWhenZero
+        />
+      ))}
       {sourceMode === "external" &&
         compositeQuote.data?.depositAction.action === 4 &&
         externalRoute && (
@@ -445,6 +490,12 @@ const RouterWidget = ({
               ? "Deposit & Trade"
               : "Trade"}
       </Button>
+      {sourceMode === "strato" && (
+        <PairSwapHistory
+          tokenIn={tokenIn?.address}
+          tokenOut={tokenOut?.address}
+        />
+      )}
     </div>
   );
 };
