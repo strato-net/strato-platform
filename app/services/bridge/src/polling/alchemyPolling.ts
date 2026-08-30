@@ -291,6 +291,7 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
       continue;
     }
     if (verification.state === "invalid") {
+      await quarantineDeposit(deposit, verification.error.message);
       await depositStateService.markForReview(
         deposit,
         verification.error.message,

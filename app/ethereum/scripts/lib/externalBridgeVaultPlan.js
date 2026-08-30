@@ -251,16 +251,65 @@ function getServiceSignerAddresses(chainId, env = process.env) {
     }));
 }
 
+function getServiceExecutor(chainId, env = process.env) {
+  const prefix = `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR`;
+  const kmsAddress = String(env[`${prefix}_ADDRESS`] || "").trim();
+  const kmsUrl = String(env[`${prefix}_KMS_URL`] || "").trim();
+  const kmsApiToken = String(env[`${prefix}_KMS_API_TOKEN`] || "").trim();
+  const privateKey = String(env[`${prefix}_PRIVATE_KEY`] || "").trim();
+
+  if (kmsAddress || kmsUrl || kmsApiToken) {
+    const errors = [];
+    if (!kmsAddress) errors.push(`${prefix}_ADDRESS`);
+    if (!kmsUrl) errors.push(`${prefix}_KMS_URL`);
+    let address = null;
+    if (kmsAddress) {
+      try {
+        address = ethers.getAddress(kmsAddress);
+      } catch {
+        errors.push(`${prefix}_ADDRESS`);
+      }
+    }
+    return {
+      source: "kms",
+      address,
+      valid: errors.length === 0,
+      errors,
+    };
+  }
+
+  if (!privateKey) {
+    return {
+      source: "privateKey",
+      address: null,
+      valid: false,
+      errors: [`${prefix}_PRIVATE_KEY`],
+    };
+  }
+
+  try {
+    return {
+      source: "privateKey",
+      address: new ethers.Wallet(
+        privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`,
+      ).address,
+      valid: true,
+      errors: [],
+    };
+  } catch {
+    return {
+      source: "privateKey",
+      address: null,
+      valid: false,
+      errors: [`${prefix}_PRIVATE_KEY`],
+    };
+  }
+}
+
 function validateServiceSigners(chain, env = process.env) {
   const configured = getServiceSignerAddresses(chain.chainId, env);
-  const executorKey = String(
-    env[`CHAIN_${chain.chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY`] || "",
-  ).trim();
-  const executorAddress = executorKey
-    ? new ethers.Wallet(
-        executorKey.startsWith("0x") ? executorKey : `0x${executorKey}`,
-      ).address
-    : null;
+  const executor = getServiceExecutor(chain.chainId, env);
+  const executorAddress = executor.address;
   const expected = new Set(
     chain.attestationSigners.map((address) => address.toLowerCase()),
   );
@@ -272,12 +321,15 @@ function validateServiceSigners(chain, env = process.env) {
       actual.size >= chain.attestationThreshold &&
       [...actual].every((address) => expected.has(address)) &&
       executorAddress !== null &&
+      executor.valid &&
       !expected.has(executorAddress.toLowerCase()),
     threshold: chain.attestationThreshold,
     configured: configured.map(({ envVar, address }) => ({ envVar, address })),
     missingSignerCount: Math.max(0, chain.attestationThreshold - actual.size),
     unexpectedAddresses: [...actual].filter((address) => !expected.has(address)),
     executorAddress,
+    executorConfigSource: executor.source,
+    executorConfigErrors: executor.errors,
     executorIsSigner:
       executorAddress !== null && expected.has(executorAddress.toLowerCase()),
   };
@@ -288,5 +340,6 @@ module.exports = {
   normalizeConfig,
   buildOperations,
   getServiceSignerAddresses,
+  getServiceExecutor,
   validateServiceSigners,
 };

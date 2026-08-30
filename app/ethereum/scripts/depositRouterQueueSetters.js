@@ -24,6 +24,8 @@ const {
   proposeBatch,
   chunkArray,
   writeOutput,
+  buildTransactionBuilderBatch,
+  writeTransactionBuilderOutput,
 } = require("./lib/depositRouterSafeOps");
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -34,7 +36,12 @@ const DEFAULT_BRIDGE_ADDRESS = "0x0000000000000000000000000000000000001008";
 function parseArgs() {
   const argv = process.argv.slice(2);
   const args = { apply: false };
-  const allowedWithValue = new Set(["env", "chains"]);
+  const allowedWithValue = new Set([
+    "env",
+    "chains",
+    "router-address",
+    "safe-address",
+  ]);
 
   for (let i = 0; i < argv.length; i++) {
     const item = argv[i];
@@ -495,6 +502,12 @@ async function main() {
   const args = parseArgs();
   const chains = parseChains(args);
   if (!chains.length) throw new Error("No valid chains selected");
+  if ((args["router-address"] || args["safe-address"]) && chains.length !== 1) {
+    throw new Error("--router-address/--safe-address require exactly one chain");
+  }
+  if (Boolean(args["router-address"]) !== Boolean(args["safe-address"])) {
+    throw new Error("--router-address and --safe-address must be provided together");
+  }
 
   const apply = !!args.apply;
   const chunkSize = 20;
@@ -521,8 +534,8 @@ async function main() {
     env: envProfile.profile,
     nodeUrl,
     bridgeAddress: topology.bridgeAddress,
-    safeSource: "cirrus",
-    routerSource: "cirrus",
+    safeSource: args["safe-address"] ? "argument" : "cirrus",
+    routerSource: args["router-address"] ? "argument" : "cirrus",
     apply,
     chunkSize,
     chains,
@@ -537,9 +550,13 @@ async function main() {
       throw new Error(`Missing route config for chain ${chainId}`);
     }
 
-    const proxyAddress = normalizeAddress(topology.routersByChain.get(chainId));
+    const proxyAddress = normalizeAddress(
+      args["router-address"] || topology.routersByChain.get(chainId),
+    );
     if (!proxyAddress) throw new Error(`Missing proxy address for chain ${chainId}`);
-    const safeAddress = normalizeAddress(topology.safesByChain.get(chainId));
+    const safeAddress = normalizeAddress(
+      args["safe-address"] || topology.safesByChain.get(chainId),
+    );
     if (!safeAddress) throw new Error(`Missing Safe address for chain ${chainId}`);
 
     const artifact = loadDepositRouterArtifact();
@@ -559,9 +576,37 @@ async function main() {
       ownerIsSafe,
       routeCount: chainConfig.tokenUpdates.length,
       queuedCallCount: txs.length,
+      transactions: txs.map(({ meta, ...transaction }) => ({
+        ...transaction,
+        meta,
+      })),
+      transactionBuilderFiles: [],
       proposals: [],
       warning: ownerIsSafe ? null : "Proxy owner is not the Safe address",
     };
+    txs.forEach((tx, index) => {
+      const transaction = {
+        to: tx.to,
+        value: tx.value,
+        data: tx.data,
+        operation: tx.operation,
+      };
+      const transactionBuilder = buildTransactionBuilderBatch(
+        chainId,
+        safeAddress,
+        [transaction],
+        {
+          name: `DepositRouter token batch ${index + 1} (${chainId})`,
+          description: `${tx.meta.itemCount} token and route permission updates`,
+        },
+      );
+      chainResult.transactionBuilderFiles.push(
+        writeTransactionBuilderOutput(
+          `deposit-router-setters-${chainId}-${index + 1}`,
+          transactionBuilder,
+        ),
+      );
+    });
 
     if (apply) {
       if (!ownerIsSafe) {

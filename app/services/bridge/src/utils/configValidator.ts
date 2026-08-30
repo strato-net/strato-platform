@@ -7,6 +7,7 @@ import {
 } from "../services/cirrusService";
 import {
   config,
+  getExternalBridgeExecutorKmsConfig,
   getExternalBridgeExecutorPrivateKey,
   getExternalBridgeSignerUrls,
   getNativeBridgePrivateKeys,
@@ -33,6 +34,71 @@ const isAddress = (value: string): boolean =>
 
 const normalizePrivateKey = (value: string): string =>
   value.startsWith("0x") ? value : `0x${value}`;
+
+interface ExternalBridgeExecutorValidationResult {
+  executorAddress?: string;
+  errors: string[];
+  warnings: string[];
+}
+
+export const validateExternalBridgeExecutorConfig = (
+  chainId: number | bigint,
+  kmsConfig: ReturnType<typeof getExternalBridgeExecutorKmsConfig>,
+  privateKey: string | undefined,
+  production: boolean,
+): ExternalBridgeExecutorValidationResult => {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const prefix = `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR`;
+  let executorAddress: string | undefined;
+
+  if (!kmsConfig) {
+    if (production) {
+      errors.push(
+        privateKey
+          ? `${prefix}_PRIVATE_KEY must not be configured in production; configure ${prefix}_ADDRESS and ${prefix}_KMS_URL`
+          : `Production external bridge executor requires ${prefix}_ADDRESS and ${prefix}_KMS_URL`,
+      );
+    } else if (!privateKey || !isPrivateKey(privateKey)) {
+      errors.push(
+        `Missing or invalid external bridge executor signing config: set ${prefix}_KMS_URL plus ${prefix}_ADDRESS, or ${prefix}_PRIVATE_KEY`,
+      );
+    } else {
+      executorAddress = new Wallet(normalizePrivateKey(privateKey)).address;
+    }
+    return { executorAddress, errors, warnings };
+  }
+
+  if (!kmsConfig.address || !isAddress(kmsConfig.address)) {
+    errors.push(
+      `Missing or invalid external bridge executor KMS address: ${prefix}_ADDRESS`,
+    );
+  } else {
+    executorAddress = ensureHexPrefix(kmsConfig.address);
+  }
+  if (!kmsConfig.url) {
+    errors.push(`Missing external bridge executor KMS URL: ${prefix}_KMS_URL`);
+  } else if (production) {
+    try {
+      if (new URL(kmsConfig.url).protocol !== "https:") {
+        errors.push(`${prefix}_KMS_URL must use HTTPS in production`);
+      }
+    } catch {
+      errors.push(`${prefix}_KMS_URL must use HTTPS in production`);
+    }
+  }
+  if (privateKey) {
+    if (production) {
+      errors.push(`${prefix}_PRIVATE_KEY must not be configured in production`);
+    } else {
+      warnings.push(
+        `Both KMS and private-key executor config are set for chain ${chainId}; KMS executor signing will be used`,
+      );
+    }
+  }
+
+  return { executorAddress, errors, warnings };
+};
 
 export async function validateBridgeConfig(): Promise<boolean> {
   const errors: string[] = [];
@@ -343,15 +409,20 @@ export async function validateBridgeConfig(): Promise<boolean> {
           );
         }
         const signerUrls = getExternalBridgeSignerUrls(chainId);
+        const executorKmsConfig = getExternalBridgeExecutorKmsConfig(chainId);
         const executorPrivateKey = getExternalBridgeExecutorPrivateKey(chainId);
+        const executorValidation = validateExternalBridgeExecutorConfig(
+          chainId,
+          executorKmsConfig,
+          executorPrivateKey,
+          process.env.NODE_ENV === "production",
+        );
+        errors.push(...executorValidation.errors);
+        warnings.push(...executorValidation.warnings);
+        const executorAddress = executorValidation.executorAddress;
         if (signerUrls.length === 0) {
           errors.push(
             `Missing external bridge environment variable: CHAIN_${chainId}_EXTERNAL_BRIDGE_SIGNER_URLS`,
-          );
-        }
-        if (!executorPrivateKey || !isPrivateKey(executorPrivateKey)) {
-          errors.push(
-            `Missing or invalid external bridge executor key: CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY`,
           );
         }
         if (!chain.vault || !isAddress(chain.vault)) {
@@ -360,7 +431,7 @@ export async function validateBridgeConfig(): Promise<boolean> {
         }
 
         const rpcUrl = process.env[`CHAIN_${chainId}_RPC_URL`];
-        if (!rpcUrl || signerUrls.length === 0) continue;
+        if (!rpcUrl || signerUrls.length === 0 || !executorAddress) continue;
 
         try {
           const vault = new Contract(
@@ -400,9 +471,6 @@ export async function validateBridgeConfig(): Promise<boolean> {
               errors.push(`External bridge signer ${signerUrls[index]} is configured for a different vault`);
             }
           });
-          const executorAddress = new Wallet(
-            normalizePrivateKey(executorPrivateKey!),
-          ).address;
           const [
             threshold,
             validitySeconds,

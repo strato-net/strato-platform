@@ -81,9 +81,14 @@ The service automatically validates that RPC URLs are configured for all enabled
 Native withdrawal review delay and attestation validity are enforced by the native bridge contracts, not bridge-service environment variables.
 
 #### External Vault Releases
-- `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY` - Unprivileged destination-chain gas key used only to submit reserve/release/cancel transactions
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS` - Unprivileged destination-chain gas executor address
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_KMS_URL` - KMS/HSM adapter URL for executor transaction digest signing
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_KMS_API_TOKEN` - Optional bearer token for the executor KMS adapter
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY` - Local/dev fallback destination-chain gas key used only to submit reserve/release/cancel transactions
 - `CHAIN_${chainId}_EXTERNAL_BRIDGE_SIGNER_URLS` - Comma-separated independent signer service URLs
 - `EXTERNAL_BRIDGE_SIGNER_API_TOKEN` - Shared authentication token for signer service requests
+
+Production executor deployments should use the KMS/HSM adapter rather than `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY`. The adapter receives `{ "digest": "0x..." }` and must return a recoverable 65-byte ECDSA signature in `{ "signature": "0x..." }`; the bridge service verifies the signature recovers to `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS` before broadcasting the transaction.
 
 Run each signer independently with `npm run start:signer`. Each process must use its own `SIGNER_RPC_URL`, authenticated KMS/HSM adapter (`KMS_SIGNER_URL`, `KMS_SIGNER_ADDRESS`, `KMS_SIGNER_API_TOKEN`), and read-only STRATO OAuth account (`SIGNER_OPENID_DISCOVERY_URL`, `SIGNER_CLIENT_ID`, `SIGNER_CLIENT_SECRET`, `SIGNER_BA_USERNAME`, `SIGNER_BA_PASSWORD`). Access tokens are refreshed before expiry and once after a 401 response. A signer verifies the source withdrawal, exact STRATO authorization timing/version and destination vault policy before requesting a digest signature; no attestation private key is held by the bridge executor.
 
@@ -178,11 +183,12 @@ npm start
    - External-chain polling reads standard and action deposit events in one ordered block range
    - ABI-decodes the action intent
    - Deduplicates exact RPC log repeats
-   - Processes every deposit event independently, including multiple events in one transaction
-   - Quarantines malformed logs without stopping the chain cursor
+   - Groups deposit events by transaction and requires a unique custody movement for every event
+   - Deduplicates exact RPC evidence, but quarantines the whole transaction when an event or movement is malformed, reused, missing, or ambiguous
 
 2. **Processing**
-   - Verifies the receipt, canonical event and custody transfer before any STRATO write
+   - Fetches each transaction receipt and trace once, then validates token, sender, custody, exact amount, and execution ordering
+   - Settles no deposits from a transaction unless every event passes custody verification
    - Calls `settleDeposit` once per verified deposit
    - Keeps the cursor behind the oldest pending deposit
    - Logs a failed settlement and continues processing later deposits

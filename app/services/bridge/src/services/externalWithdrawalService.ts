@@ -1,17 +1,24 @@
 import {
   AbiCoder,
+  AbstractSigner,
   Contract,
   Interface,
   JsonRpcProvider,
+  type Provider,
   Signature,
   TypedDataEncoder,
+  Transaction,
+  type TransactionRequest,
   Wallet,
   keccak256,
+  recoverAddress,
   verifyTypedData,
 } from "ethers";
 import { OperationType } from "@safe-global/types-kit";
 import {
   config,
+  getExternalBridgeExecutorKmsConfig,
+  type ExternalBridgeExecutorKmsConfig,
   getExternalBridgeExecutorPrivateKey,
   getExternalBridgeSignerUrls,
   getChainRpcUrl,
@@ -92,6 +99,71 @@ const normalizePrivateKey = (privateKey: string): string => {
   }
   return prefixed;
 };
+
+const authHeaders = (token?: string): Record<string, string> | undefined =>
+  token ? { Authorization: `Bearer ${token}` } : undefined;
+
+export class ExternalBridgeExecutorKmsSigner extends AbstractSigner<Provider> {
+  private readonly executorAddress: string;
+  private readonly kmsUrl: string;
+  private readonly kmsApiToken?: string;
+
+  constructor(kmsConfig: ExternalBridgeExecutorKmsConfig, provider: Provider) {
+    super(provider);
+    if (!kmsConfig.url) {
+      throw new Error("External bridge executor KMS URL is not configured");
+    }
+    this.executorAddress = safeChecksum(kmsConfig.address);
+    this.kmsUrl = kmsConfig.url;
+    this.kmsApiToken = kmsConfig.apiToken;
+  }
+
+  async getAddress(): Promise<string> {
+    return this.executorAddress;
+  }
+
+  connect(provider: null | Provider): ExternalBridgeExecutorKmsSigner {
+    if (!provider) {
+      throw new Error("External bridge executor KMS signer requires a provider");
+    }
+    return new ExternalBridgeExecutorKmsSigner(
+      {
+        address: this.executorAddress,
+        url: this.kmsUrl,
+        apiToken: this.kmsApiToken,
+      },
+      provider,
+    );
+  }
+
+  async signTransaction(tx: TransactionRequest): Promise<string> {
+    const transaction = Transaction.from(tx as any);
+    const response = await http.post<{ signature: string }>(
+      this.kmsUrl,
+      { digest: transaction.unsignedHash },
+      { headers: authHeaders(this.kmsApiToken) },
+    );
+    const signature = Signature.from(response.signature).serialized;
+    if (
+      safeChecksum(recoverAddress(transaction.unsignedHash, signature)) !==
+      this.executorAddress
+    ) {
+      throw new Error(
+        "External bridge executor KMS returned a signature from an unexpected key",
+      );
+    }
+    transaction.signature = signature;
+    return transaction.serialized;
+  }
+
+  async signMessage(): Promise<string> {
+    throw new Error("External bridge executor KMS signer cannot sign messages");
+  }
+
+  async signTypedData(): Promise<string> {
+    throw new Error("External bridge executor KMS signer cannot sign typed data");
+  }
+}
 
 const authorizationDomain = (authorization: WithdrawalAuthorization) => ({
   name: "ExternalBridgeVault",
@@ -417,13 +489,25 @@ const getVaultWithSigner = (
   vault: Contract;
 } => {
   const chainId = BigInt(authorization.destinationChainId);
+  const provider = new JsonRpcProvider(getChainRpcUrl(chainId));
+  const kmsConfig = getExternalBridgeExecutorKmsConfig(chainId);
+  if (kmsConfig) {
+    return {
+      provider,
+      vault: new Contract(
+        authorization.destinationVault,
+        EXTERNAL_VAULT_ABI,
+        new ExternalBridgeExecutorKmsSigner(kmsConfig, provider),
+      ),
+    };
+  }
+
   const privateKey = getExternalBridgeExecutorPrivateKey(chainId);
   if (!privateKey) {
     throw new Error(
-      `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY is not configured`,
+      `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY or CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_KMS_URL is not configured`,
     );
   }
-  const provider = new JsonRpcProvider(getChainRpcUrl(chainId));
   const wallet = new Wallet(normalizePrivateKey(privateKey), provider);
   return {
     provider,

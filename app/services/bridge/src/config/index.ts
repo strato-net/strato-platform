@@ -228,6 +228,24 @@ export const getExternalBridgeExecutorPrivateKey = (
 ): string | undefined =>
   process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY`]?.trim();
 
+export interface ExternalBridgeExecutorKmsConfig {
+  address: string;
+  url: string;
+  apiToken?: string;
+}
+
+export const getExternalBridgeExecutorKmsConfig = (
+  chainId: number | bigint,
+): ExternalBridgeExecutorKmsConfig | undefined => {
+  const prefix = `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR`;
+  const address = process.env[`${prefix}_ADDRESS`]?.trim();
+  const url = process.env[`${prefix}_KMS_URL`]?.trim();
+  const apiToken = process.env[`${prefix}_KMS_API_TOKEN`]?.trim();
+
+  if (!address && !url && !apiToken) return undefined;
+  return { address: address || "", url: url || "", apiToken };
+};
+
 // Validate required environment variables
 const requiredEnvVars = [
   "BA_USERNAME",

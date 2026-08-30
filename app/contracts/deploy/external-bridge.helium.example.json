@@ -1,0 +1,62 @@
+{
+  "adminRegistry": "000000000000000000000000000000000000100c",
+  "tokenRouter": {
+    "address": "0000000000000000000000000000000000000000",
+    "poolFactory": "000000000000000000000000000000000000100a",
+    "poolV3Factory": "e6b6f05a88e649e4102a801aade9a6bae02f352d",
+    "directMintPsm": "0b30adc5f2d90bada37afa699b75f485f04e7287",
+    "metalForge": "c5ed981b816a626981a5747d125e0e7296b2c7c6",
+    "saveUsdstVault": "ceeb982f671b4ee2b4471e5b49f3126739537f15",
+    "yieldVaults": [
+      "9c9bcc6e040910c6705d15864067720923bacc82",
+      "65ab8049ff949e7ed04838723a07bc9b5a7849e2",
+      "7ecc1ab7e15384cf2392b7dad8878239fda78799"
+    ]
+  },
+  "externalAssetBridge": {
+    "address": "0000000000000000000000000000000000000000",
+    "tokenFactory": "000000000000000000000000000000000000100b",
+    "bridgeOperator": "0000000000000000000000000000000000000000",
+    "guardian": "0000000000000000000000000000000000000000",
+    "usdst": "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
+    "priceOracle": "0000000000000000000000000000000000001002"
+  },
+  "chains": [
+    {
+      "chainName": "sepolia",
+      "externalChainId": "11155111",
+      "vault": "0000000000000000000000000000000000000000",
+      "depositRouter": "0000000000000000000000000000000000000000",
+      "enabled": true,
+      "lastProcessedBlock": "0",
+      "routes": [
+        {
+          "externalToken": "1c7d4b196cb0c7b01d743fbc6116a902379c7238",
+          "stratoToken": "6aeacaa19c68e53035bf495d15e0a328fc600ba8",
+          "depositsEnabled": true,
+          "withdrawalsEnabled": true,
+          "externalDecimals": "6",
+          "externalName": "USDC",
+          "externalSymbol": "USDC",
+          "maxPerWithdrawal": "REVIEW_REQUIRED",
+          "manualReviewThreshold": "REVIEW_REQUIRED",
+          "rebaseRequired": false,
+          "autoRouteEnabled": true
+        },
+        {
+          "externalToken": "0000000000000000000000000000000000000000",
+          "stratoToken": "93fb7295859b2d70199e0a4883b7c320cf874e6c",
+          "depositsEnabled": true,
+          "withdrawalsEnabled": true,
+          "externalDecimals": "18",
+          "externalName": "Ether",
+          "externalSymbol": "ETH",
+          "maxPerWithdrawal": "REVIEW_REQUIRED",
+          "manualReviewThreshold": "REVIEW_REQUIRED",
+          "rebaseRequired": false,
+          "autoRouteEnabled": true
+        }
+      ]
+    }
+  ]
+}

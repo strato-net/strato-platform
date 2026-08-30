@@ -12,6 +12,7 @@
     "deployImpl:mainnet": "npx hardhat run scripts/deployImplementationOnly.js --network mainnet",
     "deployImpl:baseSepolia": "npx hardhat run scripts/deployImplementationOnly.js --network baseSepolia",
     "deployImpl:base": "npx hardhat run scripts/deployImplementationOnly.js --network base",
+    "deployExternalBridge:testnet": "npx hardhat run scripts/deployExternalBridgeTestnet.js --network sepolia",
     "router:ops": "node scripts/depositRouterOps.js",
     "router:ops:testnet": "node scripts/depositRouterOps.js --env testnet",
     "router:ops:prod": "node scripts/depositRouterOps.js --env prod",

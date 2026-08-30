@@ -5,6 +5,7 @@
     "main": "deploy/deploy.js",
     "scripts": {
         "configure:native-route": "node deploy/configure-native-route.js",
+        "configure:external-bridge": "node deploy/configure-external-bridge.js",
         "deploy": "node deploy/deploy.js",
         "deployProxy": "node deploy/deployProxy.js",
         "happy:eth-deposit": "node deploy/happy-eth-deposit.js",
@@ -19,7 +20,8 @@
         "bridge:ops": "node deploy/bridge-usdc-route-migration.js",
         "bridge:ops:testnet": "node deploy/bridge-usdc-route-migration.js --env testnet",
         "bridge:ops:prod": "node deploy/bridge-usdc-route-migration.js --env prod",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "test:external-bridge-config": "node --test deploy/configure-external-bridge.test.js"
     },
     "dependencies": {
         "@openzeppelin/contracts": "^5.4.0",

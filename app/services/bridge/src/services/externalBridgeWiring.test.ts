@@ -719,3 +719,135 @@ test("collects threshold signatures from independent signer services", async () 
   const signatures = await signWithdrawalAuthorization(authorization);
   assert.equal(signatures.length, 2);
 });
+
+test("signs external vault executor transactions through KMS", async () => {
+  const { JsonRpcProvider, Transaction, Wallet } = await import("ethers");
+  const api = await import("../utils/api");
+  const executor = new Wallet(`0x${"41".repeat(32)}`);
+  const calls: any[] = [];
+  const originalPost = (api.fetch as any).post;
+  (api.fetch as any).post = async (url: string, body: any, options: any) => {
+    calls.push({ url, body, options });
+    return { signature: executor.signingKey.sign(body.digest).serialized };
+  };
+
+  try {
+    const { ExternalBridgeExecutorKmsSigner } = await import(
+      "./externalWithdrawalService"
+    );
+    const signer = new ExternalBridgeExecutorKmsSigner(
+      {
+        address: executor.address,
+        url: "https://executor-kms",
+        apiToken: "executor-token",
+      },
+      new JsonRpcProvider("http://127.0.0.1:1"),
+    );
+    const signed = await signer.signTransaction({
+      to: "0x2222222222222222222222222222222222222222",
+      value: 0,
+      nonce: 1,
+      gasLimit: 100000,
+      gasPrice: 1,
+      chainId: 1,
+      data: "0x1234",
+    });
+    const transaction = Transaction.from(signed);
+
+    assert.equal(transaction.from, executor.address);
+    assert.equal(calls[0].url, "https://executor-kms");
+    assert.equal(
+      calls[0].options.headers.Authorization,
+      "Bearer executor-token",
+    );
+  } finally {
+    (api.fetch as any).post = originalPost;
+  }
+});
+
+test("rejects external vault executor KMS signatures from the wrong key", async () => {
+  const { JsonRpcProvider, Wallet } = await import("ethers");
+  const api = await import("../utils/api");
+  const executor = new Wallet(`0x${"42".repeat(32)}`);
+  const wrongSigner = new Wallet(`0x${"43".repeat(32)}`);
+  const originalPost = (api.fetch as any).post;
+  (api.fetch as any).post = async (_url: string, body: any) => ({
+    signature: wrongSigner.signingKey.sign(body.digest).serialized,
+  });
+
+  try {
+    const { ExternalBridgeExecutorKmsSigner } = await import(
+      "./externalWithdrawalService"
+    );
+    const signer = new ExternalBridgeExecutorKmsSigner(
+      { address: executor.address, url: "https://executor-kms" },
+      new JsonRpcProvider("http://127.0.0.1:1"),
+    );
+
+    await assert.rejects(
+      () =>
+        signer.signTransaction({
+          to: "0x2222222222222222222222222222222222222222",
+          value: 0,
+          nonce: 1,
+          gasLimit: 100000,
+          gasPrice: 1,
+          chainId: 1,
+          data: "0x1234",
+        }),
+      /unexpected key/,
+    );
+  } finally {
+    (api.fetch as any).post = originalPost;
+  }
+});
+
+test("rejects private-key external vault executor config in production", async () => {
+  const { validateExternalBridgeExecutorConfig } = await import(
+    "../utils/configValidator"
+  );
+  const privateKey = `0x${"44".repeat(32)}`;
+
+  const production = validateExternalBridgeExecutorConfig(
+    1,
+    undefined,
+    privateKey,
+    true,
+  );
+  assert.match(
+    production.errors.join("\n"),
+    /must not be configured in production/,
+  );
+
+  const development = validateExternalBridgeExecutorConfig(
+    1,
+    undefined,
+    privateKey,
+    false,
+  );
+  assert.deepEqual(development.errors, []);
+  assert.ok(development.executorAddress);
+});
+
+test("requires HTTPS for external vault executor KMS in production", async () => {
+  const { validateExternalBridgeExecutorConfig } = await import(
+    "../utils/configValidator"
+  );
+  const address = "0x5555555555555555555555555555555555555555";
+
+  const insecure = validateExternalBridgeExecutorConfig(
+    1,
+    { address, url: "http://executor-kms" },
+    undefined,
+    true,
+  );
+  assert.match(insecure.errors.join("\n"), /must use HTTPS in production/);
+
+  const secure = validateExternalBridgeExecutorConfig(
+    1,
+    { address, url: "https://executor-kms" },
+    undefined,
+    true,
+  );
+  assert.deepEqual(secure.errors, []);
+});

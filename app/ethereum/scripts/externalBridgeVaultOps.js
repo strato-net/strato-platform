@@ -11,6 +11,8 @@ const {
   loadDepositRouterArtifact,
   proposeBatch,
   writeOutput,
+  buildTransactionBuilderBatch,
+  writeTransactionBuilderOutput,
 } = require("./lib/depositRouterSafeOps");
 const {
   ZERO_ADDRESS,
@@ -268,6 +270,9 @@ async function main() {
   for (const chain of chains) {
     const operations = buildOperations(config, chain);
     const state = await readState(config, chain, vaultArtifact, routerArtifact);
+    if (state.routerTargetsVault) {
+      operations.router = [];
+    }
     const serviceSigners = validateServiceSigners(chain);
     if (!state.safeHasGovernanceRoles) {
       throw new Error(`Chain ${chain.chainId}: Safe is missing a vault role`);
@@ -316,9 +321,13 @@ async function main() {
         `CHAIN_${chain.chainId}_RPC_URL`,
         `CHAIN_${chain.chainId}_EXTERNAL_BRIDGE_SIGNER_ADDRESSES`,
         `CHAIN_${chain.chainId}_EXTERNAL_BRIDGE_SIGNER_URLS`,
+        `CHAIN_${chain.chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS`,
+        `CHAIN_${chain.chainId}_EXTERNAL_BRIDGE_EXECUTOR_KMS_URL`,
+        `CHAIN_${chain.chainId}_EXTERNAL_BRIDGE_EXECUTOR_KMS_API_TOKEN`,
         `CHAIN_${chain.chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY`,
       ],
       proposals: [],
+      transactionBuilderFiles: [],
     };
 
     for (const step of ["configure", "router", "liquidity"]) {
@@ -333,11 +342,26 @@ async function main() {
         vaultInterface,
         routerInterface,
       );
+      const transactionBuilder = buildTransactionBuilderBatch(
+        chain.chainId,
+        chain.safeAddress,
+        transactions,
+        {
+          name: `External bridge ${step} (${chain.chainId})`,
+          description: `ExternalAssetBridge rollout ${step} operations`,
+        },
+      );
+      chainSummary.transactionBuilderFiles.push(
+        writeTransactionBuilderOutput(
+          `external-bridge-vault-${chain.chainId}-${step}`,
+          transactionBuilder,
+        ),
+      );
       if (args.apply) {
         const proposal = await proposeBatch(chain.chainId, transactions, {
           safeAddress: chain.safeAddress,
         });
-        chainSummary.proposals.push({ step, ...proposal });
+        chainSummary.proposals.push({ step, transactions, ...proposal });
       } else {
         chainSummary.proposals.push({ step, transactions });
       }

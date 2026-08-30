@@ -161,23 +161,33 @@ app.post(
       res.status(400).json({ error: "Invalid deposit identity" });
       return;
     }
-    const onchainStatus = await getDepositStatusByIdentity(
-      chainId,
-      depositRouter,
-      depositId,
-    );
-    if (onchainStatus !== undefined && onchainStatus !== "0") {
-      res.status(409).json({
-        error: `Deposit reuse must be owner-authorized before reset (status ${onchainStatus})`,
+    try {
+      const onchainStatus = await getDepositStatusByIdentity(
+        chainId,
+        depositRouter,
+        depositId,
+      );
+      if (onchainStatus !== undefined && onchainStatus !== "0") {
+        res.status(409).json({
+          error: `Deposit reuse must be owner-authorized before reset (status ${onchainStatus})`,
+        });
+        return;
+      }
+      await depositStateService.resetForRetryByIdentity(
+        chainId,
+        depositRouter,
+        depositId,
+      );
+      res.status(202).json({ reset: true });
+    } catch (error) {
+      logError("DepositOperations", error as Error, {
+        operation: "resetDepositForRetry",
+        chainId,
+        depositRouter,
+        depositId,
       });
-      return;
+      res.status(503).json({ error: "Deposit reset failed" });
     }
-    await depositStateService.resetForRetryByIdentity(
-      chainId,
-      depositRouter,
-      depositId,
-    );
-    res.status(202).json({ reset: true });
   },
 );
 

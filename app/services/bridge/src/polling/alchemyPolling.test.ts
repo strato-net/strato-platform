@@ -131,6 +131,31 @@ test("quarantines a deposit log that cannot be ABI decoded", () => {
   assert.match(result.quarantinedLogs[0].error, /data|buffer|overflow/i);
 });
 
+test("quarantines every deposit log when one event in the transaction is malformed", () => {
+  const transactionHash = `0x${"de".repeat(32)}`;
+  const valid = makeLog("DepositRouted", transactionHash);
+  const malformed = makeLog("DepositRoutedWithAction", transactionHash, 2);
+  malformed.logIndex = "0x1";
+  malformed.data = "0x";
+  const result = classifyDepositLogs([valid, malformed], 1);
+
+  assert.equal(result.standardDeposits.length, 0);
+  assert.equal(result.actionDeposits.length, 0);
+  assert.equal(result.quarantinedLogs.length, 2);
+});
+
+test("quarantines duplicate deposit identities as one transaction", () => {
+  const transactionHash = `0x${"df".repeat(32)}`;
+  const first = makeLog("DepositRouted", transactionHash, 1);
+  const duplicate = makeLog("DepositRouted", transactionHash, 1);
+  duplicate.logIndex = "0x1";
+  const result = classifyDepositLogs([first, duplicate], 1);
+
+  assert.equal(result.standardDeposits.length, 0);
+  assert.equal(result.quarantinedLogs.length, 2);
+  assert.match(result.quarantinedLogs[0].error, /Duplicate deposit identity/);
+});
+
 test("preserves every action field in batch arguments", () => {
   const actionDeposit = classifyDepositLogs(
     [makeLog("DepositRoutedWithAction", `0x${"ee".repeat(32)}`)],

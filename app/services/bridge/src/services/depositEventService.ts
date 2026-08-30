@@ -129,21 +129,41 @@ export const classifyDepositLogs = (
   };
 
   for (const groupedLogs of groups.values()) {
+    const parsedGroup: ParsedDepositEvent[] = [];
+    let groupError: string | undefined;
     for (const log of groupedLogs) {
       try {
-        const parsed = parseDepositLog(log, externalChainId);
-        if (parsed.kind === "standard") {
-          result.standardDeposits.push(parsed.deposit);
-        } else {
-          result.actionDeposits.push(parsed.deposit);
-        }
+        parsedGroup.push(parseDepositLog(log, externalChainId));
       } catch (error) {
-        result.quarantinedLogs.push({
-          log,
-          error: (error as Error).message,
-        });
+        groupError = (error as Error).message;
+        break;
       }
     }
+    if (!groupError) {
+      const identities = parsedGroup.map(
+        ({ deposit }) =>
+          `${deposit.depositRouter}:${deposit.depositId}`,
+      );
+      if (new Set(identities).size !== identities.length) {
+        groupError = "Duplicate deposit identity in transaction";
+      }
+    }
+    if (groupError) {
+      groupedLogs.forEach((log) =>
+        result.quarantinedLogs.push({
+          log,
+          error: `Transaction deposit event is invalid: ${groupError}`,
+        }),
+      );
+      continue;
+    }
+    parsedGroup.forEach((parsed) => {
+      if (parsed.kind === "standard") {
+        result.standardDeposits.push(parsed.deposit);
+      } else {
+        result.actionDeposits.push(parsed.deposit);
+      }
+    });
   }
 
   return result;

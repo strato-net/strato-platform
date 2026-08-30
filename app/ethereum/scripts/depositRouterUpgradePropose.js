@@ -24,6 +24,8 @@ const {
   encodeCall,
   proposeBatch,
   writeOutput,
+  buildTransactionBuilderBatch,
+  writeTransactionBuilderOutput,
 } = require("./lib/depositRouterSafeOps");
 
 const MAPPINGS_TABLE = "BlockApps-MercataBridge-mappings";
@@ -455,6 +457,7 @@ async function main() {
       proposedUpgrade: false,
       safeTxHash: null,
       nonce: null,
+      transactionBuilderFile: null,
       warning: ownerIsSafe ? null : "Proxy owner is not the Safe address",
     };
 
@@ -479,6 +482,13 @@ async function main() {
       data: upgradeData,
       operation: 0,
     };
+    chainOp.transactionBuilderFile = writeTransactionBuilderOutput(
+      `deposit-router-upgrade-${chainId}`,
+      buildTransactionBuilderBatch(chainId, safeAddress, [tx], {
+        name: `DepositRouter upgrade (${chainId})`,
+        description: `Upgrade ${proxyAddress} to ${implementationAddress}`,
+      }),
+    );
 
     if (apply) {
       if (!ownerIsSafe) {

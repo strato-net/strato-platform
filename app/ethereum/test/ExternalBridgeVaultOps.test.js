@@ -4,14 +4,19 @@ const { ethers } = require("ethers");
 const {
   normalizeConfig,
   buildOperations,
+  getServiceExecutor,
   validateServiceSigners,
 } = require("../scripts/lib/externalBridgeVaultPlan");
+const {
+  buildTransactionBuilderBatch,
+} = require("../scripts/lib/depositRouterSafeOps");
 
 const signerOneKey = `0x${"11".repeat(32)}`;
 const signerTwoKey = `0x${"22".repeat(32)}`;
 const executorKey = `0x${"33".repeat(32)}`;
 const signerOne = new ethers.Wallet(signerOneKey).address;
 const signerTwo = new ethers.Wallet(signerTwoKey).address;
+const executor = new ethers.Wallet(executorKey).address;
 
 function config(overrides = {}) {
   return normalizeConfig({
@@ -93,6 +98,7 @@ test("validates independent signer addresses against the configured threshold", 
   });
   assert.equal(valid.valid, true);
   assert.equal(valid.missingSignerCount, 0);
+  assert.equal(valid.executorConfigSource, "privateKey");
 
   const incomplete = validateServiceSigners(chain, {
     CHAIN_11155111_EXTERNAL_BRIDGE_SIGNER_ADDRESSES: signerOne,
@@ -100,6 +106,30 @@ test("validates independent signer addresses against the configured threshold", 
   });
   assert.equal(incomplete.valid, false);
   assert.equal(incomplete.missingSignerCount, 1);
+});
+
+test("validates KMS-only executor config against the signer threshold", () => {
+  const chain = config().chains[0];
+  const valid = validateServiceSigners(chain, {
+    CHAIN_11155111_EXTERNAL_BRIDGE_SIGNER_ADDRESSES: `${signerOne},${signerTwo}`,
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS: executor,
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_URL: "https://executor-kms",
+  });
+
+  assert.equal(valid.valid, true);
+  assert.equal(valid.executorAddress, executor);
+  assert.equal(valid.executorConfigSource, "kms");
+});
+
+test("rejects incomplete KMS executor config", () => {
+  const result = getServiceExecutor(11155111, {
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_URL: "https://executor-kms",
+  });
+
+  assert.equal(result.valid, false);
+  assert.deepEqual(result.errors, [
+    "CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS",
+  ]);
 });
 
 test("rejects an executor that is also an attestation signer", () => {
@@ -116,4 +146,33 @@ test("rejects a threshold above the configured signer count", () => {
     () => config({ attestationThreshold: 3 }),
     /attestationThreshold must be between 1 and the configured signer count/,
   );
+});
+
+test("builds standalone Safe Transaction Builder JSON", () => {
+  const batch = buildTransactionBuilderBatch(
+    11155111,
+    "0x2222222222222222222222222222222222222222",
+    [{
+      to: "0x3333333333333333333333333333333333333333",
+      value: "0",
+      data: "0x1234",
+      operation: 0,
+    }],
+    { name: "Test batch" },
+  );
+
+  assert.equal(batch.version, "1.0");
+  assert.equal(batch.chainId, "11155111");
+  assert.equal(batch.meta.name, "Test batch");
+  assert.equal(
+    batch.meta.createdFromSafeAddress,
+    "0x2222222222222222222222222222222222222222",
+  );
+  assert.deepEqual(batch.transactions[0], {
+    to: "0x3333333333333333333333333333333333333333",
+    value: "0",
+    data: "0x1234",
+    contractMethod: null,
+    contractInputsValues: null,
+  });
 });

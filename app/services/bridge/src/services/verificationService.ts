@@ -1,5 +1,6 @@
 import {
   getDepositConfirmationPolicy,
+  DEPOSIT_EVENT_SIGNATURES,
   ZERO_ADDRESS,
   TRANSFER_EVENT_SIGNATURE,
   WAD,
@@ -20,8 +21,10 @@ const decodeTransferLog = (log: any, sig: string) => {
   
   return {
     tokenAddr: normalizeAddress(log.address),
+    fromAddr: decodeTopicAddr(log.topics[1]),
     toAddr: decodeTopicAddr(log.topics[2]),
-    amount: parseUint256(log.data ?? "0x")
+    amount: parseUint256(log.data ?? "0x"),
+    logIndex: Number(BigInt(log.logIndex ?? -1)),
   };
 };
 
@@ -143,6 +146,221 @@ const sameDetectedDeposit = (
   ("minFinalOut" in expected ? expected.minFinalOut : "0") ===
     ("minFinalOut" in actual ? actual.minFinalOut : "0");
 
+const uniqueReceiptLogs = (logs: any[]): { logs: any[]; error?: Error } => {
+  const byPosition = new Map<string, { fingerprint: string; log: any }>();
+  for (const log of logs) {
+    let logIndex: number;
+    try {
+      logIndex = Number(BigInt(log.logIndex));
+    } catch {
+      return { logs: [], error: new Error("Receipt log is missing its index") };
+    }
+    const position = `${normalizeAddress(log.address)}:${logIndex}`;
+    const fingerprint = JSON.stringify([
+      normalizeAddress(log.address),
+      (log.topics || []).map((topic: string) => topic.toLowerCase()),
+      String(log.data || "0x").toLowerCase(),
+    ]);
+    const existing = byPosition.get(position);
+    if (existing && existing.fingerprint !== fingerprint) {
+      return {
+        logs: [],
+        error: new Error(`Conflicting receipt logs at index ${logIndex}`),
+      };
+    }
+    if (!existing) byPosition.set(position, { fingerprint, log });
+  }
+  return {
+    logs: [...byPosition.values()]
+      .map(({ log }) => log)
+      .sort((a, b) => Number(BigInt(a.logIndex)) - Number(BigInt(b.logIndex))),
+  };
+};
+
+const parseReceiptDeposits = (
+  receipt: any,
+  chainId: number,
+  depositRouters: Set<string>,
+): { deposits: Array<DepositArgs | ActionDepositArgs>; error?: Error } => {
+  const unique = uniqueReceiptLogs(Array.isArray(receipt.logs) ? receipt.logs : []);
+  if (unique.error) return { deposits: [], error: unique.error };
+  const signatures = new Set(
+    DEPOSIT_EVENT_SIGNATURES.map((signature) => signature.toLowerCase()),
+  );
+  try {
+    const deposits = unique.logs
+      .filter(
+        (log) =>
+          depositRouters.has(normalizeAddress(log.address)) &&
+          signatures.has(String(log.topics?.[0] || "").toLowerCase()),
+      )
+      .map(
+        (log) =>
+          parseDepositLog(
+            {
+              ...(log as RawDepositLog),
+              blockHash: receipt.blockHash,
+              blockNumber: receipt.blockNumber,
+              transactionHash: receipt.transactionHash,
+            },
+            chainId,
+          ).deposit,
+      );
+    const identities = deposits.map(depositIdentity);
+    if (new Set(identities).size !== identities.length) {
+      return {
+        deposits: [],
+        error: new Error("Duplicate deposit identity in transaction receipt"),
+      };
+    }
+    return { deposits };
+  } catch (error) {
+    return { deposits: [], error: error as Error };
+  }
+};
+
+const compareTraceAddress = (left: number[], right: number[]): number => {
+  for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
+    if (left[index] !== right[index]) return left[index] - right[index];
+  }
+  return left.length - right.length;
+};
+
+const isTraceAncestor = (ancestor: number[], descendant: number[]): boolean =>
+  ancestor.length < descendant.length &&
+  ancestor.every((value, index) => descendant[index] === value);
+
+const uniqueTraces = (traces: any[]): { traces: any[]; error?: Error } => {
+  const byPosition = new Map<string, { fingerprint: string; trace: any }>();
+  for (const trace of traces) {
+    if (!Array.isArray(trace.traceAddress)) {
+      return {
+        traces: [],
+        error: new Error("ETH trace is missing traceAddress ordering"),
+      };
+    }
+    const position = JSON.stringify(trace.traceAddress);
+    const fingerprint = JSON.stringify([
+      trace.type,
+      normalizeAddress(trace.action?.from),
+      normalizeAddress(trace.action?.to),
+      String(trace.action?.value || "0").toLowerCase(),
+      String(trace.action?.input || "").toLowerCase(),
+    ]);
+    const existing = byPosition.get(position);
+    if (existing && existing.fingerprint !== fingerprint) {
+      return {
+        traces: [],
+        error: new Error(`Conflicting ETH traces at ${position}`),
+      };
+    }
+    if (!existing) byPosition.set(position, { fingerprint, trace });
+  }
+  return {
+    traces: [...byPosition.values()]
+      .map(({ trace }) => trace)
+      .sort((a, b) => compareTraceAddress(a.traceAddress, b.traceAddress)),
+  };
+};
+
+export const verifyTransactionCustody = (
+  deposits: Array<DepositArgs | ActionDepositArgs>,
+  receipt: any,
+  traces: any[],
+  custodyAddress: string,
+): Error | null => {
+  const normalizedCustody = normalizeAddress(custodyAddress);
+  const unique = uniqueReceiptLogs(Array.isArray(receipt.logs) ? receipt.logs : []);
+  if (unique.error) return unique.error;
+  const transfers = unique.logs
+    .map((log) => decodeTransferLog(log, TRANSFER_EVENT_SIGNATURE.toLowerCase()))
+    .filter(Boolean);
+  const orderedDeposits = [...deposits].sort(
+    (left, right) => left.externalLogIndex - right.externalLogIndex,
+  );
+
+  for (let index = 0; index < orderedDeposits.length; index += 1) {
+    const deposit = orderedDeposits[index];
+    if (deposit.externalToken === ZERO_ADDRESS) continue;
+    const previousDepositIndex =
+      index === 0 ? -1 : orderedDeposits[index - 1].externalLogIndex;
+    const matchingTransfers = transfers.filter(
+      (transfer: any) =>
+        transfer.logIndex > previousDepositIndex &&
+        transfer.logIndex < deposit.externalLogIndex &&
+        transfer.tokenAddr === deposit.externalToken &&
+        transfer.fromAddr === deposit.externalSender &&
+        transfer.toAddr === normalizedCustody &&
+        transfer.amount === BigInt(deposit.observedExternalTokenAmount),
+    );
+    if (matchingTransfers.length !== 1) {
+      return new Error(
+        matchingTransfers.length === 0
+          ? `ERC20 custody transfer missing before deposit ${deposit.depositId}`
+          : `Ambiguous ERC20 custody transfers before deposit ${deposit.depositId}`,
+      );
+    }
+  }
+
+  const ethDeposits = orderedDeposits.filter(
+    (deposit) => deposit.externalToken === ZERO_ADDRESS,
+  );
+  if (ethDeposits.length === 0) return null;
+  const uniqueTraceResult = uniqueTraces(traces);
+  if (uniqueTraceResult.error) return uniqueTraceResult.error;
+  const orderedTraces = uniqueTraceResult.traces;
+  const routers = new Set(ethDeposits.map((deposit) => deposit.depositRouter));
+  const movements = orderedTraces
+    .filter(
+      (trace) =>
+        trace.type === "call" &&
+        routers.has(normalizeAddress(trace.action?.from)) &&
+        normalizeAddress(trace.action?.to) === normalizedCustody &&
+        safeToBigInt(trace.action?.value || "0") > 0n,
+    )
+    .map((movement) => {
+      const ancestors = orderedTraces.filter(
+        (candidate) =>
+          candidate.type === "call" &&
+          normalizeAddress(candidate.action?.to) ===
+            normalizeAddress(movement.action?.from) &&
+          isTraceAncestor(candidate.traceAddress, movement.traceAddress),
+      );
+      const invocation = ancestors.sort(
+        (left, right) => right.traceAddress.length - left.traceAddress.length,
+      )[0];
+      return { movement, invocation };
+    })
+    .sort((left, right) =>
+      compareTraceAddress(
+        left.invocation?.traceAddress || left.movement.traceAddress,
+        right.invocation?.traceAddress || right.movement.traceAddress,
+      ),
+    );
+  if (movements.length !== ethDeposits.length) {
+    return new Error(
+      `ETH custody movement count mismatch: expected ${ethDeposits.length}, got ${movements.length}`,
+    );
+  }
+  for (let index = 0; index < ethDeposits.length; index += 1) {
+    const deposit = ethDeposits[index];
+    const { movement, invocation } = movements[index];
+    if (
+      !invocation ||
+      normalizeAddress(invocation.action?.from) !== deposit.externalSender ||
+      normalizeAddress(invocation.action?.to) !== deposit.depositRouter ||
+      normalizeAddress(movement.action?.from) !== deposit.depositRouter ||
+      safeToBigInt(movement.action?.value || "0") !==
+        BigInt(deposit.observedExternalTokenAmount)
+    ) {
+      return new Error(
+        `ETH custody movement does not uniquely match deposit ${deposit.depositId}`,
+      );
+    }
+  }
+  return null;
+};
+
 export const verifyDetectedDepositsBatch = async (
   deposits: Array<DepositArgs | ActionDepositArgs>,
   latestBlock: number,
@@ -159,111 +377,121 @@ export const verifyDetectedDepositsBatch = async (
   }
 
   for (const [chainId, chainDeposits] of depositsByChain) {
-    const txHashes = [...new Set(chainDeposits.map((item) => item.externalTxHash))];
-    const ethTxHashes = [
-      ...new Set(
-        chainDeposits
-          .filter((item) => item.externalToken === ZERO_ADDRESS)
-          .map((item) => item.externalTxHash),
-      ),
+    const txHashes = [
+      ...new Map(
+        chainDeposits.map((item) => [
+          item.externalTxHash.toLowerCase(),
+          item.externalTxHash,
+        ]),
+      ).values(),
     ];
     const [receipts, traces] = await Promise.all([
       getTransactionReceiptsBatch(chainId, txHashes),
-      ethTxHashes.length
-        ? getInternalTransactionsBatch(chainId, ethTxHashes)
-        : Promise.resolve(new Map<string, any[]>()),
+      getInternalTransactionsBatch(chainId, txHashes),
     ]);
 
+    const depositsByTransaction = new Map<
+      string,
+      Array<DepositArgs | ActionDepositArgs>
+    >();
     for (const deposit of chainDeposits) {
-      const key = depositIdentity(deposit);
+      const transactionHash = deposit.externalTxHash.toLowerCase();
+      depositsByTransaction.set(transactionHash, [
+        ...(depositsByTransaction.get(transactionHash) || []),
+        deposit,
+      ]);
+    }
+    const setTransactionState = (
+      transactionDeposits: Array<DepositArgs | ActionDepositArgs>,
+      state: DetectedDepositVerification,
+    ) => {
+      transactionDeposits.forEach((deposit) =>
+        results.set(depositIdentity(deposit), state),
+      );
+    };
+
+    for (const transactionDeposits of depositsByTransaction.values()) {
+      const transactionHash = transactionDeposits[0].externalTxHash;
       try {
-        const receipt = receipts.get(deposit.externalTxHash);
+        const receipt = receipts.get(transactionHash);
         if (!receipt) {
-          results.set(key, { state: "missing" });
+          setTransactionState(transactionDeposits, { state: "missing" });
           continue;
         }
         if (receipt.__rpcDisagreement) {
-          results.set(key, {
+          setTransactionState(transactionDeposits, {
             state: "invalid",
-            error: fail(deposit.externalTxHash, "RPC providers disagree"),
+            error: fail(transactionHash, "RPC providers disagree"),
           });
           continue;
         }
         if (!isOkStatus(receipt)) {
-          results.set(key, {
+          setTransactionState(transactionDeposits, {
             state: "invalid",
-            error: fail(deposit.externalTxHash, "Deposit transaction failed"),
+            error: fail(transactionHash, "Deposit transaction failed"),
           });
           continue;
         }
-        if (
-          String(receipt.blockHash).toLowerCase() !==
-          deposit.externalBlockHash.toLowerCase()
-        ) {
-          results.set(key, { state: "relocated" });
+        if (transactionDeposits.some(
+          (deposit) =>
+            String(receipt.blockHash).toLowerCase() !==
+            deposit.externalBlockHash.toLowerCase(),
+        )) {
+          setTransactionState(transactionDeposits, { state: "relocated" });
           continue;
         }
         const confirmations = getDepositConfirmationPolicy(chainId);
         if (latestBlock - Number(BigInt(receipt.blockNumber)) < confirmations) {
-          results.set(key, { state: "confirming" });
+          setTransactionState(transactionDeposits, { state: "confirming" });
           continue;
         }
-        const receiptLog = (receipt.logs || []).find(
-          (log: any) =>
-            Number(BigInt(log.logIndex)) === deposit.externalLogIndex &&
-            normalizeAddress(log.address) === deposit.depositRouter,
+        const depositRouters = new Set(
+          transactionDeposits.map((deposit) =>
+            normalizeAddress(deposit.depositRouter),
+          ),
         );
-        if (!receiptLog) {
-          throw fail(deposit.externalTxHash, "Deposit event missing from receipt");
-        }
-        const parsed = parseDepositLog(
-          {
-            ...(receiptLog as RawDepositLog),
-            blockHash: receipt.blockHash,
-            blockNumber: receipt.blockNumber,
-            transactionHash: receipt.transactionHash,
-          },
+        const parsedReceipt = parseReceiptDeposits(
+          receipt,
           chainId,
-        ).deposit;
-        if (!sameDetectedDeposit(deposit, parsed)) {
-          throw fail(deposit.externalTxHash, "Deposit event changed");
-        }
-
-        const observedAmount = BigInt(deposit.observedExternalTokenAmount);
-        if (deposit.externalToken === ZERO_ADDRESS) {
-          const transactionTraces = traces.get(deposit.externalTxHash);
-          if (!transactionTraces) {
-            results.set(key, { state: "missing" });
-            continue;
+          depositRouters,
+        );
+        if (parsedReceipt.error) throw parsedReceipt.error;
+        for (const deposit of transactionDeposits) {
+          const parsed = parsedReceipt.deposits.find(
+            (candidate) =>
+              candidate.externalLogIndex === deposit.externalLogIndex &&
+              candidate.depositRouter === deposit.depositRouter,
+          );
+          if (!parsed) {
+            throw fail(transactionHash, "Deposit event missing from receipt");
           }
-          if (
-            !findInternalEthTransfer(
-              transactionTraces,
-              normalizeAddress(custodyAddress),
-              observedAmount,
-            )
-          ) {
-            throw fail(deposit.externalTxHash, "ETH custody transfer missing");
-          }
-        } else {
-          const transferFound = (receipt.logs || []).some((log: any) => {
-            const transfer = decodeTransferLog(
-              log,
-              TRANSFER_EVENT_SIGNATURE.toLowerCase(),
-            );
-            return (
-              transfer?.tokenAddr === deposit.externalToken &&
-              transfer.toAddr === normalizeAddress(custodyAddress) &&
-              transfer.amount === observedAmount
-            );
-          });
-          if (!transferFound) {
-            throw fail(deposit.externalTxHash, "ERC20 custody transfer missing");
+          if (!sameDetectedDeposit(deposit, parsed)) {
+            throw fail(transactionHash, "Deposit event changed");
           }
         }
-        results.set(key, { state: "verified" });
+        const containsEth = parsedReceipt.deposits.some(
+          (deposit) => deposit.externalToken === ZERO_ADDRESS,
+        );
+        const transactionTraces = traces.get(transactionHash);
+        if (containsEth && !transactionTraces) {
+          setTransactionState(transactionDeposits, { state: "missing" });
+          continue;
+        }
+        const custodyError = verifyTransactionCustody(
+          parsedReceipt.deposits,
+          receipt,
+          transactionTraces || [],
+          custodyAddress,
+        );
+        if (custodyError) {
+          throw fail(transactionHash, custodyError.message);
+        }
+        setTransactionState(transactionDeposits, { state: "verified" });
       } catch (error) {
-        results.set(key, { state: "invalid", error: error as Error });
+        setTransactionState(transactionDeposits, {
+          state: "invalid",
+          error: error as Error,
+        });
       }
     }
   }

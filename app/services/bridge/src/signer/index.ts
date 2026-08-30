@@ -11,7 +11,10 @@ import {
   getAddress,
   verifyTypedData,
 } from "ethers";
-import { matchesSourceWithdrawalAuthorization } from "./authorizationValidation";
+import {
+  matchesSourceWithdrawalAuthorization,
+  validateSignerKmsUrl,
+} from "./authorizationValidation";
 
 interface WithdrawalAuthorization {
   sourceChainId: string;
@@ -63,7 +66,10 @@ const vault = new Contract(destinationVault, VAULT_ABI, provider);
 const stratoNodeUrl = required("STRATO_NODE_URL").replace(/\/$/, "");
 const sourceChainId = BigInt(required("SOURCE_CHAIN_ID"));
 const sourceBridge = required("EXTERNAL_ASSET_BRIDGE_ADDRESS").replace(/^0x/, "");
-const kmsSignerUrl = required("KMS_SIGNER_URL");
+const kmsSignerUrl = validateSignerKmsUrl(
+  required("KMS_SIGNER_URL"),
+  process.env.NODE_ENV === "production",
+);
 const kmsSignerApiToken = required("KMS_SIGNER_API_TOKEN");
 const signerApiToken = required("EXTERNAL_BRIDGE_SIGNER_API_TOKEN");
 const signerOpenIdDiscoveryUrl = required("SIGNER_OPENID_DISCOVERY_URL");
