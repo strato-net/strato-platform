@@ -512,8 +512,8 @@ export function RecipientClaim(props: Props) {
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5 text-blue-500" />
-                  Claim Information
+                  <AlertCircle className="h-5 w-5 text-primary" />
+                  Claim information
                   {!row && displayData && (
                     <span className="text-xs text-muted-foreground font-normal ml-2">
                       (Preview - Sign up to claim)
@@ -600,7 +600,7 @@ export function RecipientClaim(props: Props) {
                         Expired
                       </span>
                     ) : (
-                      <span className="text-sm font-medium text-blue-600">Pending</span>
+                      <span className="text-sm font-medium text-primary">Pending</span>
                     )}
                   </div>
                 )}

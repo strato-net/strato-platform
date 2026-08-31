@@ -52,8 +52,8 @@ const HealthImpactDisplay = ({
           <span
             className={`font-medium ${
               healthImpact.healthImpact >= 0
-                ? "text-green-600 dark:text-green-400"
-                : "text-red-600 dark:text-red-400"
+                ? "text-success"
+                : "text-destructive"
             }`}
           >
             {healthImpact.healthImpact >= 0 ? "+" : ""}
@@ -61,7 +61,7 @@ const HealthImpactDisplay = ({
           </span>
         </div>
         {shouldWarn && (
-          <div className="mt-2 p-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded text-xs text-red-700 dark:text-red-400">
+          <div className="mt-2 p-2 bg-destructive/10 border border-destructive/30 rounded text-xs text-destructive">
             ⚠️ Warning: This action would make your position
             unhealthy and vulnerable to liquidation.
           </div>

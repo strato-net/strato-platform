@@ -430,40 +430,40 @@ export const RewardsWidget = ({
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="mt-3 p-3 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 dark:from-amber-950 dark:via-yellow-950 dark:to-orange-950 border border-amber-200 dark:border-amber-800 rounded-lg shadow-sm w-full">
+    <div className="mt-3 p-3 bg-gradient-to-br from-gold/15 via-gold/10 to-gold/5 border border-gold/30 rounded-lg shadow-sm w-full">
       {/* Current Rate - Always visible */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Coins className="h-4 w-4 text-amber-500 flex-shrink-0" />
-          <span className="text-sm font-medium text-amber-800 dark:text-amber-200">Earning Now</span>
-          <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+          <Coins className="h-4 w-4 text-gold flex-shrink-0" />
+          <span className="text-sm font-medium text-foreground">Earning now</span>
+          <span className="text-sm font-semibold text-foreground tabular-nums">
             <RateValue formatted={currentRateFormatted.formatted} raw={currentRateFormatted.raw} />
           </span>
-          <span className="text-sm text-amber-600 dark:text-amber-400">pts/day</span>
+          <span className="text-sm text-muted-foreground">pts/day</span>
           {currentRatePerDollarFormatted && (
-            <span className="text-xs text-amber-500 dark:text-amber-500">
+            <span className="text-xs text-muted-foreground">
               (<RateValue formatted={currentRatePerDollarFormatted.formatted} raw={currentRatePerDollarFormatted.raw} /> pts/$1/day)
             </span>
           )}
         </div>
-        <Sparkles className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
+        <Sparkles className="h-3.5 w-3.5 text-gold flex-shrink-0" />
       </div>
 
       {/* New Rate - Shows when user types input */}
       {hasValidInput && (
-        <div className={`mt-2 pt-2 border-t ${isIncrease ? 'border-green-200 dark:border-green-800' : isDecrease ? 'border-red-200 dark:border-red-800' : 'border-amber-200 dark:border-amber-800'}`}>
+        <div className={`mt-2 pt-2 border-t ${isIncrease ? 'border-success/30' : isDecrease ? 'border-destructive/30' : 'border-gold/30'}`}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className={`flex-shrink-0 ${isIncrease ? 'text-green-500' : isDecrease ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'}`}>
+              <div className={`flex-shrink-0 ${isIncrease ? 'text-success' : isDecrease ? 'text-destructive' : 'text-muted-foreground'}`}>
                 {isIncrease ? <Star className="h-4 w-4 fill-current" /> : isDecrease ? <TrendingDown className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
               </div>
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">After {actionLabel}</span>
-              <span className={`text-sm font-semibold ${isIncrease ? 'text-green-600 dark:text-green-400' : isDecrease ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
+              <span className="text-sm font-medium text-foreground">After {actionLabel}</span>
+              <span className={`text-sm font-semibold tabular-nums ${isIncrease ? 'text-success' : isDecrease ? 'text-destructive' : 'text-foreground'}`}>
                 <RateValue formatted={newRateFormatted.formatted} raw={newRateFormatted.raw} />
               </span>
-              <span className="text-sm text-gray-500 dark:text-gray-400">pts/day</span>
+              <span className="text-sm text-muted-foreground">pts/day</span>
               {newRatePerDollarFormatted && (
-                <span className="text-xs text-gray-500 dark:text-gray-400">
+                <span className="text-xs text-muted-foreground">
                   (<RateValue formatted={newRatePerDollarFormatted.formatted} raw={newRatePerDollarFormatted.raw} /> pts/$1/day)
                 </span>
               )}
@@ -471,13 +471,13 @@ export const RewardsWidget = ({
 
             {/* Percentage Badge */}
             {(isIncrease || isDecrease) && percentageChange !== 0 && (
-              <div className={`flex items-center gap-1 px-2 py-0.5 ${isIncrease ? 'bg-green-500' : 'bg-red-500'} rounded-full flex-shrink-0`}>
+              <div className={`flex items-center gap-1 px-2 py-0.5 ${isIncrease ? 'bg-success text-success-foreground' : 'bg-destructive text-destructive-foreground'} rounded-full flex-shrink-0`}>
                 {isIncrease ? (
-                  <TrendingUp className="h-3 w-3 text-white" />
+                  <TrendingUp className="h-3 w-3" />
                 ) : (
-                  <TrendingDown className="h-3 w-3 text-white" />
+                  <TrendingDown className="h-3 w-3" />
                 )}
-                <span className="text-xs font-semibold text-white">
+                <span className="text-xs font-semibold tabular-nums">
                   {isIncrease ? "+" : "-"}{formattedPercentage}%
                 </span>
               </div>

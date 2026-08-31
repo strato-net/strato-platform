@@ -21,9 +21,9 @@ interface LeaderboardTableProps {
 }
 
 const RANK_ICONS: Record<number, { Icon: typeof Trophy; className: string }> = {
-  1: { Icon: Trophy, className: "h-5 w-5 text-yellow-500" },
-  2: { Icon: Medal, className: "h-5 w-5 text-gray-400" },
-  3: { Icon: Award, className: "h-5 w-5 text-amber-600" },
+  1: { Icon: Trophy, className: "h-5 w-5 text-gold" },
+  2: { Icon: Medal, className: "h-5 w-5 text-muted-foreground" },
+  3: { Icon: Award, className: "h-5 w-5 text-warning" },
 };
 
 const formatPoints = (pointsStr: string) => {
@@ -69,7 +69,7 @@ export const LeaderboardTable = ({
             <span>{address.slice(0, 6)}...{address.slice(-4)}</span>
             <CopyButton address={address} />
             {isCurrentUser && (
-              <Badge variant="default" className="ml-1 bg-blue-500 hover:bg-blue-600 text-white">
+              <Badge variant="default" className="ml-1">
                 <User className="h-3 w-3 mr-1 inline" />
                 You
               </Badge>

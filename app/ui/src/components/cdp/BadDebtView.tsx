@@ -78,7 +78,7 @@ const BadDebtView: React.FC<BadDebtViewProps> = ({ guestMode = false }) => {
         <Card>
           <CardContent className="p-6">
             <div className="text-center">
-              <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-blue-500" />
+              <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
               <div>Loading on-chain bad debt data...</div>
             </div>
           </CardContent>
@@ -96,7 +96,7 @@ const BadDebtView: React.FC<BadDebtViewProps> = ({ guestMode = false }) => {
         <Card>
           <CardHeader className="px-4 md:px-6 pb-2 md:pb-4">
             <CardTitle className="flex items-center justify-between gap-2">
-              <span className="text-base md:text-xl whitespace-nowrap">Total Bad Debt</span>
+              <span className="text-base md:text-xl whitespace-nowrap">Total bad debt</span>
               <div className="flex items-center gap-1 md:gap-2">
                 {lastUpdated && (
                   <Badge variant="outline" className="text-[10px] md:text-xs whitespace-nowrap px-1.5 md:px-2.5">
@@ -118,8 +118,8 @@ const BadDebtView: React.FC<BadDebtViewProps> = ({ guestMode = false }) => {
           <CardContent className="px-4 md:px-6">
             {error ? (
               <div className="text-center py-6 md:py-8">
-                <AlertTriangle className="h-10 w-10 md:h-12 md:w-12 text-red-500 mx-auto mb-3 md:mb-4" />
-                <div className="text-red-600 font-medium mb-2 text-sm md:text-base">Failed to load on-chain data</div>
+                <AlertTriangle className="h-10 w-10 md:h-12 md:w-12 text-destructive mx-auto mb-3 md:mb-4" />
+                <div className="text-destructive font-medium mb-2 text-sm md:text-base">Failed to load on-chain data</div>
                 <div className="text-xs md:text-sm text-muted-foreground mb-4">{error}</div>
                 <Button onClick={handleRefresh} disabled={refreshing} size="sm">
                   {refreshing ? "Retrying..." : "Retry"}
@@ -127,7 +127,7 @@ const BadDebtView: React.FC<BadDebtViewProps> = ({ guestMode = false }) => {
               </div>
             ) : (
               <div className="text-center">
-                <div className="text-2xl md:text-3xl font-bold text-red-600 dark:text-red-400">
+                <div className="text-2xl md:text-3xl font-bold text-destructive tabular-nums">
                   {formatNumber(totalBadDebt)} USDST
                 </div>
                 <p className="text-xs md:text-sm text-muted-foreground mt-2">

@@ -11,6 +11,7 @@ import { formatWeiToDecimalHP } from "@/utils/numberUtils";
 import { ensureHexPrefix } from "@/utils/numberUtils";
 
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Badge } from "@/components/ui/badge";
 
 const DepositTransactionDetails = ({ context }: { context?: string }) => {
   const isMobile = useIsMobile();
@@ -113,12 +114,12 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
                   href={addressUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800"
+                  className="text-primary hover:text-primary/80"
                 >
                   {`${addr.slice(0, 6)}...${addr.slice(-4)}`}
                 </a>
                 <CopyOutlined
-                  className="text-muted-foreground hover:text-blue-500 cursor-pointer transition-colors"
+                  className="text-muted-foreground hover:text-primary cursor-pointer transition-colors"
                   onClick={() => handleCopyToClipboard(addr)}
                 />
               </div>
@@ -148,10 +149,10 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         if (factor) {
           try {
             const externalAmount = (BigInt(stratoAmount) * BigInt(factor) / (10n ** 18n)).toString();
-            return <span className="text-sm text-foreground">≈ {formatWeiToDecimalHP(externalAmount, 18)} {symbol}</span>;
+            return <span className="text-sm text-foreground tabular-nums">≈ {formatWeiToDecimalHP(externalAmount, 18)} {symbol}</span>;
           } catch { /* fall through */ }
         }
-        return <span className="text-sm text-foreground">{formatWeiToDecimalHP(stratoAmount, 18)} {symbol}</span>;
+        return <span className="text-sm text-foreground tabular-nums">{formatWeiToDecimalHP(stratoAmount, 18)} {symbol}</span>;
       },
       width: 140,
     },
@@ -168,7 +169,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         const badge = outcome === "forge" ? "Metal" : outcome === "save" ? "Earn" : outcome === "fallback" ? "Fallback" : null;
         return (
           <div>
-            <span className="text-sm text-foreground">{amount} {symbol}</span>
+            <span className="text-sm text-foreground tabular-nums">{amount} {symbol}</span>
             {badge && <span className="text-[10px] text-muted-foreground ml-1.5">{badge}</span>}
           </div>
         );
@@ -183,31 +184,31 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         const statusNum = parseInt(statusStr);
         if (statusNum === 1) {
           return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            <Badge variant="secondary">
               <Clock className="h-3 w-3 mr-1" />
               Initiated
-            </span>
+            </Badge>
           );
         } else if (statusNum === 2) {
           return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+            <Badge variant="warning">
               <CheckCircle2 className="h-3 w-3 mr-1" />
-              Pending Review
-            </span>
+              Pending review
+            </Badge>
           );
         } else if (statusNum === 3) {
           return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+            <Badge variant="success">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               Completed
-            </span>
+            </Badge>
           );
         }
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">
+          <Badge variant="secondary">
             <AlertCircle className="h-3 w-3 mr-1" />
             Unknown
-          </span>
+          </Badge>
         );
       },
       width: 80,
@@ -242,7 +243,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
               }}
               style={{ width: isMobile ? '100%' : 150 }}
               options={[
-                { value: '', label: 'All Types' },
+                { value: '', label: 'All types' },
                 { value: 'bridge', label: 'Bridge' },
                 { value: 'save', label: 'Earn' },
                 { value: 'forge', label: 'Metal' },
@@ -251,7 +252,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
           </div>
           <div className={isMobile ? "w-full" : ""}>
             <label className="block text-sm font-medium text-foreground mb-1">
-              Status Filter
+              Status filter
             </label>
             <Select
               value={depositStatus || 0}
@@ -265,7 +266,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
           </div>
           <div className={isMobile ? "w-full" : ""}>
             <label className="block text-sm font-medium text-foreground mb-1">
-              Chain Filter
+              Chain filter
             </label>
             <Select
               value={selectedChainId || 0}
@@ -275,7 +276,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
               }}
               style={{ width: isMobile ? '100%' : 150 }}
               options={[
-                  { value: 0, label: "All Chains" },
+                  { value: 0, label: "All chains" },
                 ...availableNetworks.map((n) => ({ value: parseInt(n.chainId), label: n.chainName }))
               ]}
             />
@@ -305,7 +306,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
                 <div className="flex flex-col items-center justify-center gap-2">
                   <FrownOutlined style={{ fontSize: 48, color: "currentColor" }} />
                   <span className="text-lg font-semibold text-muted-foreground">
-                    Sorry, no data found
+                    No transactions found
                   </span>
                 </div>
               </div>

@@ -161,11 +161,11 @@ const ActivityFeedList = () => {
   const getEventColor = useCallback((eventName: string) => {
     switch (eventName.toLowerCase()) {
       case 'transfer':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+        return 'bg-primary/10 text-primary';
       case 'mint':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+        return 'bg-success/15 text-success';
       case 'burn':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+        return 'bg-destructive/10 text-destructive';
       default:
         return 'bg-muted text-foreground';
     }
@@ -402,7 +402,7 @@ const ActivityFeedList = () => {
           </div>
           
           <div className="space-y-2 overflow-hidden">
-            <div className="text-xs sm:text-sm font-medium text-foreground">Event Attributes:</div>
+            <div className="text-xs sm:text-sm font-medium text-foreground">Event attributes:</div>
             <div className="space-y-1">
               {Object.entries(event?.attributes).map(([key, value]) => (
                 <div key={key} className="flex justify-between gap-2 text-xs sm:text-sm">
@@ -450,7 +450,7 @@ const ActivityFeedList = () => {
       {error && (
         <Card className="mb-6">
           <CardContent className="p-6 text-center">
-            <div className="text-red-600 mb-2">Error loading events</div>
+            <div className="text-destructive mb-2">Error loading events</div>
             <Button onClick={() => window.location.reload()}>Retry</Button>
           </CardContent>
         </Card>
@@ -461,7 +461,7 @@ const ActivityFeedList = () => {
           <div className="text-xs sm:text-sm text-muted-foreground">
             Showing {paginationInfo.startItem}-{paginationInfo.endItem} of {totalEvents} events
             {loading && (
-              <span className="ml-2 inline-flex items-center gap-1 text-blue-600">
+              <span className="ml-2 inline-flex items-center gap-1 text-primary">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 <span className="text-xs">Updating...</span>
               </span>

@@ -27,7 +27,7 @@ const ActivityFeed = () => {
   const GuestLoginPrompt = () => (
     <Card className="border-dashed">
       <CardHeader className="text-center pb-2">
-        <CardTitle className="text-xl">View Your Activity</CardTitle>
+        <CardTitle className="text-xl">View your activity</CardTitle>
         <CardDescription className="text-base">
           Connect a wallet to see your personal activity and filter events.
         </CardDescription>
@@ -35,7 +35,7 @@ const ActivityFeed = () => {
       <CardContent className="text-center space-y-4">
         <Button onClick={handleLogin} className="gap-2" size="lg">
           <Wallet className="w-4 h-4" />
-          Connect Wallet to Continue
+          Connect wallet to continue
         </Button>
       </CardContent>
     </Card>
@@ -45,7 +45,7 @@ const ActivityFeed = () => {
     <div className="min-h-screen bg-background pb-16 md:pb-0 overflow-x-hidden">
       <DashboardSidebar />
 
-      <div className="transition-all duration-300 overflow-x-hidden" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+      <div className="transition-[padding-left] duration-300 overflow-x-hidden" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="Activity Feed" />
 
         <main className="p-4 md:p-6 overflow-x-hidden">
@@ -54,7 +54,7 @@ const ActivityFeed = () => {
           )}
           <div className="mb-6 md:mb-8">
             <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
-              <Activity className="h-5 w-5 md:h-6 md:w-6 text-blue-600 dark:text-blue-400" />
+              <Activity className="h-5 w-5 md:h-6 md:w-6 text-primary" />
               <h1 className="text-xl md:text-2xl font-bold text-foreground">Activity Feed</h1>
             </div>
             <p className="text-sm md:text-base text-muted-foreground">
@@ -65,13 +65,13 @@ const ActivityFeed = () => {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-6 p-0">
               <TabsTrigger value="my-activity" className="text-[11px] sm:text-sm px-1 sm:px-3 min-w-0 truncate">
-                My Activity
+                My activity
               </TabsTrigger>
               <TabsTrigger value="all-activity" className="text-[11px] sm:text-sm px-1 sm:px-3 min-w-0 truncate">
-                All Activity
+                All activity
               </TabsTrigger>
               <TabsTrigger value="blockchain-events" className="text-[11px] sm:text-sm px-1 sm:px-3 min-w-0 truncate">
-                Blockchain Events
+                Blockchain events
               </TabsTrigger>
             </TabsList>
 

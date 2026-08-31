@@ -38,11 +38,11 @@ export const SwapDetails = ({
     {/* Exchange Rate */}
     <div className="flex flex-col gap-1 text-sm">
       <div className="flex flex-col md:flex-row md:justify-between gap-1">
-        <span className="text-muted-foreground">Exchange Rate</span>
+        <span className="text-muted-foreground">Exchange rate</span>
         {!exchangeRate ? (
           <LoadingSpinner />
         ) : (
-          <span className="font-medium text-foreground text-xs md:text-sm">
+          <span className="font-medium text-foreground text-xs md:text-sm tabular-nums">
             1 {tokenInSymbol} ≈ {exchangeRate}{oracleExchangeRate ? ` (${oracleExchangeRate}*)` : ""} {tokenOutSymbol}
           </span>
         )}
@@ -50,7 +50,7 @@ export const SwapDetails = ({
       {exchangeRate && (
         <>
           <div className="md:text-right">
-            <span className="text-muted-foreground/70 text-xs md:text-sm">
+            <span className="text-muted-foreground/70 text-xs md:text-sm tabular-nums">
               1 {tokenOutSymbol} ≈ {invertedExchangeRate}{invertedOracleExchangeRate ? ` (${invertedOracleExchangeRate}*)` : ""} {tokenInSymbol}
             </span>
           </div>
@@ -65,14 +65,14 @@ export const SwapDetails = ({
 
     {/* Transaction Fee */}
     <div className="flex flex-col md:flex-row md:justify-between gap-1 text-sm">
-      <span className="text-muted-foreground">Transaction Fee</span>
-      <span className="font-medium text-xs md:text-sm">{SWAP_FEE} USDST ({parseFloat(SWAP_FEE) * 100} voucher)</span>
+      <span className="text-muted-foreground">Transaction fee</span>
+      <span className="font-medium text-xs md:text-sm tabular-nums">{SWAP_FEE} USDST ({parseFloat(SWAP_FEE) * 100} voucher)</span>
     </div>
 
     {/* Price Impact */}
     <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-1 text-sm">
       <div className="flex items-center gap-1">
-        <span className="text-muted-foreground">Price Impact</span>
+        <span className="text-muted-foreground">Price impact</span>
         <Tooltip>
           <TooltipTrigger asChild>
             <HelpCircle className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground cursor-help" />
@@ -82,23 +82,23 @@ export const SwapDetails = ({
           </TooltipContent>
         </Tooltip>
       </div>
-      <span className={`font-medium text-xs md:text-sm ${
+      <span className={`font-medium text-xs md:text-sm tabular-nums ${
         priceImpact === null ? 'text-muted-foreground' :
         priceImpact < 1 ? 'text-foreground' :
-        priceImpact < 5 ? 'text-yellow-600' :
-        'text-red-600'
+        priceImpact < 5 ? 'text-warning' :
+        'text-destructive'
       }`}>
         {priceImpact === null ? '—' : `${priceImpact.toFixed(2)}% ${priceImpact < 1 ? '(Low)' : priceImpact < 5 ? '(Medium)' : '(High)'}`}
       </span>
     </div>
     {priceImpact !== null && priceImpact >= 5 && (
-      <p className="text-yellow-600 text-sm mt-1">
+      <p className="text-warning text-sm mt-1">
         ⚠️ High price impact — you may receive fewer tokens than expected.
       </p>
     )}
 
     {warnings.map((warning) => (
-      <p key={warning} className="text-yellow-600 text-sm mt-1">
+      <p key={warning} className="text-warning text-sm mt-1">
         {warning}
       </p>
     ))}

@@ -470,7 +470,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }
       {/* Main Card */}
       <Card>
         <CardHeader className="px-4 md:px-6 pb-2 md:pb-4">
-          <CardTitle className="text-base md:text-xl">Liquidatable Positions</CardTitle>
+          <CardTitle className="text-base md:text-xl">Liquidatable positions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 px-4 md:px-6">
           {liquidatableVaults.length === 0 ? (
@@ -504,23 +504,23 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }
                       </div>
                       <div className="min-w-0">
                           <span className="text-xs text-muted-foreground">Borrowed</span>
-                          <div className="font-medium text-xs md:text-sm mt-0.5">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.debtAmount, 18)))} USDST</div>
+                          <div className="font-medium text-xs md:text-sm mt-0.5 tabular-nums">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.debtAmount, 18)))} USDST</div>
                         </div>
                         <div className="min-w-0">
-                          <span className="text-xs text-muted-foreground">Up for Liquidation</span>
-                          <div className="font-medium text-xs md:text-sm mt-0.5">
+                          <span className="text-xs text-muted-foreground">Up for liquidation</span>
+                          <div className="font-medium text-xs md:text-sm mt-0.5 tabular-nums">
                             {positionMaxValues[vaultKey] ? `${formatNumber(positionMaxValues[vaultKey])} USDST` : "—"}
                           </div>
                         </div>
                         <div className="min-w-0">
-                          <span className="text-xs text-muted-foreground">Max Profit</span>
-                          <div className="font-medium text-xs md:text-sm text-green-600 mt-0.5">
+                          <span className="text-xs text-muted-foreground">Max profit</span>
+                          <div className="font-medium text-xs md:text-sm text-success mt-0.5 tabular-nums">
                             {calculateMaxProfit(vault, index)}
                           </div>
                         </div>
                         <div className="min-w-0 md:text-left">
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">Health Factor</span>
-                          <div className="font-medium text-xs md:text-sm text-red-600 dark:text-red-400 mt-0.5">{formatNumber(vault.healthFactor)}</div>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">Health factor</span>
+                          <div className="font-medium text-xs md:text-sm text-destructive mt-0.5 tabular-nums">{formatNumber(vault.healthFactor)}</div>
                       </div>
                       </div>
                     </div>
@@ -553,7 +553,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }
                                 </TooltipProvider>
                               </div>
                               <div className="min-w-[100px] flex items-center gap-1">
-                                <span className="whitespace-nowrap">Your Profit</span>
+                                <span className="whitespace-nowrap">Your profit</span>
                                 <TooltipProvider>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
@@ -573,23 +573,23 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }
                             <div className="w-4 shrink-0"></div>
                             <div className="flex-1 grid grid-cols-5 gap-2 md:gap-4 items-center">
                               <div className="flex items-center space-x-1.5 min-w-[80px]">
-                                <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] md:text-xs font-bold flex-shrink-0">
+                                <div className="w-4 h-4 bg-destructive rounded-full flex items-center justify-center text-destructive-foreground text-[10px] md:text-xs font-bold flex-shrink-0">
                                   {vault.symbol.charAt(0)}
                                 </div>
                                 <span className="font-medium truncate">{vault.symbol}</span>
                               </div>
-                              <div className="truncate min-w-[80px]">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
-                              <div className="truncate min-w-[80px]">${formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralValueUSD, 18)))}</div>
-                              <div className="truncate font-medium min-w-[100px]">
+                              <div className="truncate min-w-[80px] tabular-nums">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
+                              <div className="truncate min-w-[80px] tabular-nums">${formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralValueUSD, 18)))}</div>
+                              <div className="truncate font-medium min-w-[100px] tabular-nums">
                                 {maxValues[vaultKey] ? `${formatNumber(maxValues[vaultKey])} USDST` : "—"}
                               </div>
-                              <div className={`flex items-center gap-1 font-medium min-w-[100px] ${isBalanceLimitingProfit(vaultKey) ? 'text-yellow-600' : 'text-green-600'}`}>
+                              <div className={`flex items-center gap-1 font-medium min-w-[100px] tabular-nums ${isBalanceLimitingProfit(vaultKey) ? 'text-warning' : 'text-success'}`}>
                                 <span className="truncate">{calculateYourProfit(vault, liquidationAmount, index)}</span>
                                 {isBalanceLimitingProfit(vaultKey) && (
                                   <TooltipProvider>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <AlertTriangle className="h-3 w-3 text-yellow-600 cursor-help flex-shrink-0" />
+                                        <AlertTriangle className="h-3 w-3 text-warning cursor-help flex-shrink-0" />
                                       </TooltipTrigger>
                                       <TooltipContent className="max-w-[250px] whitespace-normal">
                                         <p>Your USDST balance ({formatNumber(availableUsdstBalance)}) limits your liquidation capacity. Acquire more USDST to maximize profits.</p>
@@ -608,13 +608,13 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }
                         <div className="flex flex-col gap-3">
                           {/* Transaction Fee Display */}
                           <p className="text-xs text-muted-foreground">
-                            Transaction Fee: 0.02 USDST
+                            Transaction fee: 0.02 USDST
                           </p>
-                          
+
                           {/* Error messages */}
                           {(isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()) && (
-                            <p className="text-xs text-red-500">
-                              {isUsdstBalanceInsufficient() ? "Insufficient USDST Balance" : "Max amount reached"}
+                            <p className="text-xs text-destructive">
+                              {isUsdstBalanceInsufficient() ? "Insufficient USDST balance" : "Max amount reached"}
                             </p>
                           )}
                           
@@ -625,7 +625,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }
                               placeholder="Amount to liquidate"
                               value={liquidationAmount}
                               onChange={(e) => handleLiquidationAmountChange(vaultKey, e.target.value)}
-                              className={`flex-1 sm:w-40 text-sm ${isAmountExceedsMax(vaultKey) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                              className={`flex-1 sm:w-40 text-sm ${isAmountExceedsMax(vaultKey) ? 'border-destructive focus:border-destructive focus:ring-destructive' : ''}`}
                               min="0"
                               step="0.01"
                               disabled={guestMode}
@@ -634,14 +634,14 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }
                               <Button 
                                 variant={maxStates[vaultKey] ? "default" : "outline"}
                                 size="sm" 
-                                className={`flex-1 sm:min-w-[50px] ${maxStates[vaultKey] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+                                className={`flex-1 sm:min-w-[50px] ${maxStates[vaultKey] ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : ''}`}
                                 onClick={() => handleMaxClick(vault, vaultKey)}
                                 disabled={guestMode || isUsdstBalanceInsufficient()}
                               >
                                 MAX
                               </Button>
                               <Button 
-                                className="flex-1 sm:flex-initial bg-red-600 hover:bg-red-700 text-white text-sm"
+                                className="flex-1 sm:flex-initial bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm"
                                 size="sm"
                                 onClick={() => handleLiquidate(vault, vaultKey)}
                                 disabled={guestMode || isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}

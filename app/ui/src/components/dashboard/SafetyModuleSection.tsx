@@ -135,7 +135,7 @@ const SafetyModuleSection = () => {
       });
 
       toast({
-        title: "Approval Successful",
+        title: "Approval successful",
         description: "Now depositing your USDST to Safety Module...",
         variant: "success",
       });
@@ -143,7 +143,7 @@ const SafetyModuleSection = () => {
       await stakeSafety({ amount: amountWei });
 
       toast({
-        title: "Stake Successful",
+        title: "Stake successful",
         description: `You have successfully staked ${stakeAmount} USDST for safetyUSDST.`,
         variant: "success",
       });
@@ -163,7 +163,7 @@ const SafetyModuleSection = () => {
       await startCooldown();
 
       toast({
-        title: "Cooldown Started",
+        title: "Cooldown started",
         description: "Your unstaking cooldown period has started. You can redeem after the cooldown completes.",
         variant: "success",
       });
@@ -198,7 +198,7 @@ const SafetyModuleSection = () => {
       }
 
       toast({
-        title: "Redeem Successful",
+        title: "Redeem successful",
         description: `You have successfully redeemed safetyUSDST for USDST.`,
         variant: "success",
       });
@@ -251,7 +251,7 @@ const SafetyModuleSection = () => {
                         placeholder="0.00"
                         value={stakeAmount}
                         onChange={(e) => setStakeAmount(e.target.value)}
-                        className={`pl-16 ${!isStakeAmountValid() ? 'text-red-600' : ''}`}
+                        className={`pl-16 ${!isStakeAmountValid() ? 'text-destructive' : ''}`}
                         disabled={!isLoggedIn}
                       />
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">USDST</span>
@@ -288,7 +288,7 @@ const SafetyModuleSection = () => {
                         const clamped = `${whole}.${frac.slice(0, 18)}`;
                         setStakeAmount(clamped);
                       }}
-                      className="text-blue-600 hover:underline mr-2"
+                      className="text-primary hover:text-primary/80 hover:underline mr-2"
                     >
                       Max
                     </button>
@@ -304,7 +304,7 @@ const SafetyModuleSection = () => {
                   </div>
                   {/* Fee Display */}
                   <div className="text-sm text-muted-foreground mt-1">
-                    Transaction Fee: {SAFETY_STAKE_FEE} USDST
+                    Transaction fee: {SAFETY_STAKE_FEE} USDST
                   </div>
                     </>
                   )}
@@ -331,12 +331,12 @@ const SafetyModuleSection = () => {
                     return (
                       <>
                         {isInsufficientBalanceForStakeAndFee && (
-                          <p className="text-yellow-600 text-sm mt-1">
+                          <p className="text-warning text-sm mt-1">
                             Insufficient USDST balance for transaction fee ({SAFETY_STAKE_FEE} USDST)
                           </p>
                         )}
                         {isLowBalanceWarning && !isInsufficientUsdstForFee && !isInsufficientBalanceForStakeAndFee && (
-                          <p className="text-yellow-600 text-sm mt-1">
+                          <p className="text-warning text-sm mt-1">
                             Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
                           </p>
                         )}
@@ -376,49 +376,49 @@ const SafetyModuleSection = () => {
                         <Button
                           onClick={handleStartCooldown}
                           variant="outline"
-                          className="border-orange-500 text-orange-500 hover:bg-orange-500/10 w-full"
+                          className="border-warning/30 text-warning hover:bg-warning/10 w-full"
                           disabled={isProcessing}
                         >
-                          {isProcessing ? "Processing..." : "Start Cooldown"}
+                          {isProcessing ? "Processing..." : "Start cooldown"}
                         </Button>
                       </div>
                     ) : (
                       <div className="space-y-3">
                         {safetyInfo?.cooldownTimeRemaining && safetyInfo.cooldownTimeRemaining !== "0" ? (
-                          <div className="bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-900 rounded-lg p-3">
-                            <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
+                          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
+                            <div className="flex items-center gap-2 text-warning">
                               <Clock className="h-4 w-4" />
-                              <span className="font-medium">Cooldown Active</span>
+                              <span className="font-medium">Cooldown active</span>
                             </div>
-                            <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                            <p className="text-sm text-warning mt-1">
                               Time remaining: {formatTimeRemaining(safetyInfo.cooldownTimeRemaining)}
                             </p>
                           </div>
                         ) : safetyInfo?.unstakeWindowTimeRemaining && safetyInfo.unstakeWindowTimeRemaining !== "0" ? (
-                          <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 rounded-lg p-3">
-                            <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
+                          <div className="bg-success/10 border border-success/30 rounded-lg p-3">
+                            <div className="flex items-center gap-2 text-success">
                               <CircleArrowUp className="h-4 w-4" />
-                              <span className="font-medium">Unstake Window Open</span>
+                              <span className="font-medium">Unstake window open</span>
                             </div>
-                            <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                            <p className="text-sm text-success mt-1">
                               Window closes in: {formatTimeRemaining(safetyInfo.unstakeWindowTimeRemaining)}
                             </p>
                           </div>
                         ) : (
-                          <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg p-3">
-                            <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
-                              <span className="font-medium">Unstake Window Closed</span>
+                          <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                            <div className="flex items-center gap-2 text-destructive">
+                              <span className="font-medium">Unstake window closed</span>
                             </div>
-                            <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                            <p className="text-sm text-destructive mt-1">
                               You need to start a new cooldown period.
                             </p>
                             <Button
                               onClick={handleStartCooldown}
                               variant="outline"
-                              className="border-orange-500 text-orange-600 hover:bg-orange-50 w-full mt-2"
+                              className="border-warning/30 text-warning hover:bg-warning/10 w-full mt-2"
                               disabled={isProcessing}
                             >
-                              {isProcessing ? "Processing..." : "Restart Cooldown"}
+                              {isProcessing ? "Processing..." : "Restart cooldown"}
                             </Button>
                           </div>
                         )}
@@ -439,8 +439,8 @@ const SafetyModuleSection = () => {
                       </p>
                     </div>
                   ) : !safetyInfo?.canRedeem ? (
-                    <div className="bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-900 rounded-lg p-3 mb-3">
-                      <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-3">
+                      <p className="text-sm text-warning">
                           {!safetyInfo?.cooldownActive 
                           ? "Start cooldown period before you can redeem your safetyUSDST."
                           : safetyInfo?.cooldownTimeRemaining && safetyInfo.cooldownTimeRemaining !== "0"
@@ -450,8 +450,8 @@ const SafetyModuleSection = () => {
                       </p>
                     </div>
                   ) : (
-                    <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 rounded-lg p-3 mb-3">
-                      <p className="text-sm text-green-800 dark:text-green-200">
+                    <div className="bg-success/10 border border-success/30 rounded-lg p-3 mb-3">
+                      <p className="text-sm text-success">
                         ✓ Unstake window is open. You can now redeem your safetyUSDST for USDST.
                       </p>
                     </div>
@@ -466,7 +466,7 @@ const SafetyModuleSection = () => {
                             placeholder="0.00"
                             value={redeemAmount}
                             onChange={(e) => setRedeemAmount(e.target.value)}
-                            className={`pl-24 ${!isRedeemAmountValid() ? 'text-red-600' : ''}`}
+                            className={`pl-24 ${!isRedeemAmountValid() ? 'text-destructive' : ''}`}
                             disabled={!safetyInfo?.canRedeem || BigInt(safetyInfo?.userShares || "0") === 0n}
                           />
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">safetyUSDST</span>
@@ -474,7 +474,7 @@ const SafetyModuleSection = () => {
                         <Button
                           onClick={() => handleRedeemAction("redeem")}
                           variant="outline"
-                          className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 w-full sm:w-28 hidden sm:flex sm:items-center sm:justify-center"
+                          className="border-primary text-primary hover:bg-primary/10 w-full sm:w-28 hidden sm:flex sm:items-center sm:justify-center"
                           disabled={loading || isProcessing || !isRedeemAmountValid() || !safetyInfo?.canRedeem}
                         >
                           {isProcessing ? (
@@ -502,7 +502,7 @@ const SafetyModuleSection = () => {
                           setRedeemAmount(clampedClean);
                         }}
                         className={`mr-2 ${safetyInfo?.canRedeem && BigInt(safetyInfo?.userShares || "0") > 0n
-                          ? "text-blue-600 hover:underline cursor-pointer"
+                          ? "text-primary hover:text-primary/80 hover:underline cursor-pointer"
                           : "text-muted-foreground cursor-not-allowed"}`}
                         disabled={!safetyInfo?.canRedeem || BigInt(safetyInfo?.userShares || "0") === 0n}
                       >
@@ -518,13 +518,13 @@ const SafetyModuleSection = () => {
                     </div>
                     {/* Fee Display */}
                     <div className="text-sm text-muted-foreground mt-1">
-                      Transaction Fee: {SAFETY_REDEEM_FEE} USDST
+                      Transaction fee: {SAFETY_REDEEM_FEE} USDST
                     </div>
                     {/* Mobile Button */}
                     <Button
                       onClick={() => handleRedeemAction("redeem")}
                       variant="outline"
-                      className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 w-full mt-4 sm:hidden"
+                      className="border-primary text-primary hover:bg-primary/10 w-full mt-4 sm:hidden"
                       disabled={loading || isProcessing || !isRedeemAmountValid() || !safetyInfo?.canRedeem}
                     >
                       {isProcessing ? (
@@ -544,12 +544,12 @@ const SafetyModuleSection = () => {
 
             <div className="bg-card rounded-lg p-4 border border-border">
               <div className="flex justify-between mb-4">
-                <h3 className="font-medium">Safety Module Stats</h3>
+                <h3 className="font-medium">Safety Module stats</h3>
               </div>
               <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Total USDST Staked</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                  <span className="text-muted-foreground text-sm sm:text-base">Total USDST staked</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right tabular-nums">
                     {loading ? (
                       <span className="text-muted-foreground animate-pulse">
                         Loading...
@@ -562,8 +562,8 @@ const SafetyModuleSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Total safetyUSDST Shares</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                  <span className="text-muted-foreground text-sm sm:text-base">Total safetyUSDST shares</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right tabular-nums">
                     {loading ? (
                       <span className="text-muted-foreground animate-pulse">
                         Loading...
@@ -576,8 +576,8 @@ const SafetyModuleSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Exchange Rate</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                  <span className="text-muted-foreground text-sm sm:text-base">Exchange rate</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right tabular-nums">
                     {loading ? (
                       <span className="text-muted-foreground animate-pulse">Loading...</span>
                     ) : safetyInfo?.exchangeRate ? (
@@ -589,14 +589,14 @@ const SafetyModuleSection = () => {
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                   <span className="text-muted-foreground text-sm sm:text-base inline-flex items-center gap-1">
-                    Best Available APY
+                    Best available APY
                     <BestApyInfoTooltip />
                   </span>
                   {loading || !tokenApysLoaded ? (
                     <span className="text-muted-foreground animate-pulse text-sm sm:text-base">Loading...</span>
                   ) : (
                     <EarnApyTooltip info={safetyBestApyInfo}>
-                      <span className="font-medium text-sm sm:text-base sm:text-right cursor-default">
+                      <span className="font-medium text-sm sm:text-base sm:text-right tabular-nums cursor-default">
                         {safetyDisplayApy ? `${safetyDisplayApy}%` : "N/A"}
                       </span>
                     </EarnApyTooltip>
@@ -606,8 +606,8 @@ const SafetyModuleSection = () => {
                 {isLoggedIn && (
                   <>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                    <span className="text-muted-foreground text-sm sm:text-base">Your safetyUSDST (Total)</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                    <span className="text-muted-foreground text-sm sm:text-base">Your safetyUSDST (total)</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right tabular-nums">
                     {loading ? (
                       <span className="text-muted-foreground animate-pulse">
                         Loading...
@@ -622,8 +622,8 @@ const SafetyModuleSection = () => {
                   </>
                 )}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Cooldown Period</span>
-                  <span className="font-medium text-sm sm:text-base">
+                  <span className="text-muted-foreground text-sm sm:text-base">Cooldown period</span>
+                  <span className="font-medium text-sm sm:text-base tabular-nums">
                     {safetyInfo?.cooldownSeconds ? 
                       formatTimeRemaining(safetyInfo.cooldownSeconds) : 
                       "N/A"
@@ -631,8 +631,8 @@ const SafetyModuleSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Unstake Window</span>
-                  <span className="font-medium text-sm sm:text-base">
+                  <span className="text-muted-foreground text-sm sm:text-base">Unstake window</span>
+                  <span className="font-medium text-sm sm:text-base tabular-nums">
                     {safetyInfo?.unstakeWindow ? 
                       formatTimeRemaining(safetyInfo.unstakeWindow) : 
                       "N/A"
@@ -642,18 +642,18 @@ const SafetyModuleSection = () => {
                 {/* User-specific cooldown status - only show when logged in */}
                 {isLoggedIn && safetyInfo?.cooldownActive && (
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                    <span className="text-muted-foreground text-sm sm:text-base">Cooldown Status</span>
-                    <span className="font-medium text-sm sm:text-base sm:text-right">
+                    <span className="text-muted-foreground text-sm sm:text-base">Cooldown status</span>
+                    <span className="font-medium text-sm sm:text-base sm:text-right tabular-nums">
                       {safetyInfo?.cooldownTimeRemaining && safetyInfo.cooldownTimeRemaining !== "0" ? (
-                        <span className="text-yellow-600">
+                        <span className="text-warning">
                           {formatTimeRemaining(safetyInfo.cooldownTimeRemaining)} remaining
                         </span>
                       ) : safetyInfo?.unstakeWindowTimeRemaining && safetyInfo.unstakeWindowTimeRemaining !== "0" ? (
-                        <span className="text-green-600">
+                        <span className="text-success">
                           Window open ({formatTimeRemaining(safetyInfo.unstakeWindowTimeRemaining)} left)
                         </span>
                       ) : (
-                        <span className="text-red-600">
+                        <span className="text-destructive">
                           Window closed
                         </span>
                       )}

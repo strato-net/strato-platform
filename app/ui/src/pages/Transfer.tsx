@@ -217,7 +217,7 @@ const Transfer = () => {
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
 
-      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+      <div className="transition-[padding-left] duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="Send" />
         <main className="p-4 md:p-6">
           {guestMode && (
@@ -234,7 +234,7 @@ const Transfer = () => {
                 title={tokens.length === 0 ? "No tokens available" : "Upload CSV for bulk transfer"}
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Bulk Send
+                Bulk send
               </Button>
             </div>
 
@@ -259,7 +259,7 @@ const Transfer = () => {
                       {fromAsset
                         ? fromAsset?.token?._symbol ||
                         fromAsset?.token?._name
-                        : "Select Token"}
+                        : "Select token"}
                     </span>
                     <ChevronDown className="h-4 w-4" />
                   </Button>
@@ -298,7 +298,7 @@ const Transfer = () => {
                             }}
                             disabled={guestMode}
                           >
-                            Show More ({inactiveTokens.length})
+                            Show more ({inactiveTokens.length})
                           </Button>
                         )}
 
@@ -332,7 +332,7 @@ const Transfer = () => {
                             }}
                             disabled={guestMode}
                           >
-                            Show Less
+                            Show less
                           </Button>
                         )}
                       </>
@@ -348,9 +348,9 @@ const Transfer = () => {
 
             {/* Recipient Address */}
             <div className="space-y-2">
-              <label className="text-sm text-muted-foreground">Recipient STRATO Address</label>
-              <div className="rounded-md border border-blue-300 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800 p-3">
-                <div className="flex items-start gap-2 text-blue-800 dark:text-blue-300 text-sm">
+              <label className="text-sm text-muted-foreground">Recipient STRATO address</label>
+              <div className="rounded-md border border-primary/30 bg-primary/10 p-3">
+                <div className="flex items-start gap-2 text-primary text-sm">
                   <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                   <p>
                     This sends tokens to another STRATO account. It is{" "}
@@ -358,7 +358,7 @@ const Transfer = () => {
                     enter an Ethereum or other external chain address. To move tokens off
                     STRATO, use the{" "}
                     <Link to="/dashboard/withdrawals" className="font-medium underline">
-                      Bridge Out page
+                      Bridge out page
                     </Link>
                     .
                   </p>
@@ -369,13 +369,13 @@ const Transfer = () => {
                 value={recipient}
                 onChange={(e) => handleRecipientAddress(e, setRecipient, setRecipientError, userAddress)}
                 placeholder="..."
-                className="w-full p-2 border rounded"
+                className="w-full p-2 border rounded font-mono"
                 disabled={guestMode}
               />
-              {recipientError && <span className="text-red-600 text-sm">{recipientError}</span>}
+              {recipientError && <span className="text-destructive text-sm">{recipientError}</span>}
               {nonceWarning && !recipientError && (
-                <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 p-3">
-                  <div className="flex items-start gap-2 text-amber-800 dark:text-amber-300 text-sm">
+                <div className="rounded-md border border-warning/40 bg-warning/10 p-3">
+                  <div className="flex items-start gap-2 text-warning text-sm">
                     <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                     <div>
                       <p>
@@ -383,7 +383,7 @@ const Transfer = () => {
                         If you are trying to withdraw to an external chain (e.g. Ethereum),
                         please use the{" "}
                         <Link to="/dashboard/withdrawals" className="font-medium underline">
-                          Bridge Out page
+                          Bridge out page
                         </Link>{" "}
                         instead.
                       </p>
@@ -418,7 +418,7 @@ const Transfer = () => {
                           console.error("Error setting max amount:", error);
                         }
                       }}
-                      className="font-medium text-blue-600 hover:underline focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="font-medium text-primary hover:text-primary/80 tabular-nums focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={guestMode}
                     >
                       Max: {formatBalance(maxAmount, undefined, 18, 0, 4)}
@@ -435,17 +435,17 @@ const Transfer = () => {
                   handleAmountInputChange(e.target.value, setFromAmount, setAmountError, maxAmount, 18);
                 }}
                 placeholder="0.00"
-                className={`w-full p-2 border rounded ${amountError ? "border-red-500" : ""
+                className={`w-full p-2 border rounded tabular-nums ${amountError ? "border-destructive" : ""
                   }`}
                 disabled={guestMode}
               />
               {amountError && (
-                <p className="text-red-600 text-sm">
+                <p className="text-destructive text-sm">
                   {amountError}
                 </p>
               )}
               {feeError && (
-                <p className="text-red-600 text-sm">
+                <p className="text-destructive text-sm">
                   {feeError}
                 </p>
               )}
@@ -454,8 +454,8 @@ const Transfer = () => {
             {/* Transaction Fee Display */}
             <div className="bg-muted/50 p-4 rounded-lg">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Transaction Fee</span>
-                <span className="font-medium">
+                <span className="text-muted-foreground">Transaction fee</span>
+                <span className="font-medium tabular-nums">
                   {TRANSFER_FEE} USDST ({parseFloat(TRANSFER_FEE) * 100} voucher)
                 </span>
               </div>

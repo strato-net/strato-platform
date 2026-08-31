@@ -47,7 +47,7 @@ const DebtPosition: React.FC<DebtPositionProps> = ({ refreshTrigger }) => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Your Position</CardTitle>
+          <CardTitle>Your position</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-4 text-muted-foreground">Loading...</div>
@@ -59,29 +59,29 @@ const DebtPosition: React.FC<DebtPositionProps> = ({ refreshTrigger }) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Your Position</CardTitle>
+        <CardTitle>Your position</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Total Debt</span>
-            <span className="text-sm font-semibold">{formatNumber(totalDebt, 2)} USDST</span>
+            <span className="text-sm text-muted-foreground">Total debt</span>
+            <span className="text-sm font-semibold tabular-nums">{formatNumber(totalDebt, 2)} USDST</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Average Stability Fee</span>
-            <span className="text-sm font-semibold">
+            <span className="text-sm text-muted-foreground">Average stability fee</span>
+            <span className="text-sm font-semibold tabular-nums">
               {positions.length === 0 || totalDebt === 0 ? '—' : `${formatNumber(weightedAverageFee, 2)}%`}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Average Health Factor</span>
-            <span className="text-sm font-semibold">
-              {overallHealthFactor === Infinity ? 'No Position' : formatNumber(overallHealthFactor, 2)}
+            <span className="text-sm text-muted-foreground">Average health factor</span>
+            <span className="text-sm font-semibold tabular-nums">
+              {overallHealthFactor === Infinity ? 'No position' : formatNumber(overallHealthFactor, 2)}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Vault Collateral Supplied</span>
-            <span className="text-sm font-semibold">${formatNumber(totalCollateralUSD, 2)}</span>
+            <span className="text-sm text-muted-foreground">Vault collateral supplied</span>
+            <span className="text-sm font-semibold tabular-nums">${formatNumber(totalCollateralUSD, 2)}</span>
           </div>
         </div>
       </CardContent>

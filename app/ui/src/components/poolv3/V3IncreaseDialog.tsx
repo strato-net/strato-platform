@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
 import { safeParseUnits } from "@/utils/numberUtils";
 import { formatTokenAmount, formatTickAsPrice, poolV3TxAmounts, describePoolAmounts } from "./poolV3Utils";
 
@@ -199,11 +200,11 @@ const V3IncreaseDialog = ({ position, pool, open, onOpenChange, onIncreased }: V
             <div className="bg-muted/50 rounded-lg border border-border p-3 space-y-1 text-xs">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{pool.token0.symbol} deposited</span>
-                <span className="font-medium">{formatTokenAmount(preview.amount0, pool.token0.decimals)}</span>
+                <span className="font-medium tabular-nums">{formatTokenAmount(preview.amount0, pool.token0.decimals)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{pool.token1.symbol} deposited</span>
-                <span className="font-medium">{formatTokenAmount(preview.amount1, pool.token1.decimals)}</span>
+                <span className="font-medium tabular-nums">{formatTokenAmount(preview.amount1, pool.token1.decimals)}</span>
               </div>
             </div>
           )}
@@ -216,11 +217,9 @@ const V3IncreaseDialog = ({ position, pool, open, onOpenChange, onIncreased }: V
           <Button
             disabled={!canIncrease}
             onClick={handleIncrease}
-            className="w-full sm:w-auto bg-strato-blue hover:bg-strato-blue/90"
+            className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground"
           >
-            {loading && (
-              <span className="inline-flex items-center animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-current mr-2" />
-            )}
+            {loading && <Loader2 className="h-4 w-4 animate-spin text-current mr-2" />}
             {previewLoading ? "Calculating…" : previewZero ? "Amount too small" : "Add liquidity"}
           </Button>
         </DialogFooter>

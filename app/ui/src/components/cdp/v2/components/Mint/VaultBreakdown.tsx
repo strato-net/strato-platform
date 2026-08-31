@@ -1163,7 +1163,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
             variant="ghost"
             className="w-full flex items-center justify-between p-3 rounded-md border border-border hover:bg-muted/80"
           >
-            <Label className="text-sm font-medium cursor-pointer">Vault Breakdown</Label>
+            <Label className="text-sm font-medium cursor-pointer">Vault breakdown</Label>
             <div className="flex items-center gap-2">
               {isOpen && (
                 <span
@@ -1186,18 +1186,18 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
           <div className="mt-2 px-3 pt-3 pb-3 border border-border rounded-md bg-muted/50 space-y-3">
             {/* Warnings */}
             {exceedsBalance && !autoAllocate && (
-              <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Deposit Exceeds Available Balance</p>
-                <p className="text-xs text-red-700 dark:text-red-300">
+              <div className="p-3 rounded-md bg-destructive/10 border border-destructive/30">
+                <p className="text-sm font-semibold text-destructive mb-2">Deposit exceeds available balance</p>
+                <p className="text-xs text-destructive/90">
                   One or more vaults have a deposit amount that exceeds your available balance.
                 </p>
               </div>
             )}
 
             {hasLowHF && !autoAllocate && (
-              <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Insufficient Collateralization</p>
-                <p className="text-xs text-red-700 dark:text-red-300">
+              <div className="p-3 rounded-md bg-destructive/10 border border-destructive/30">
+                <p className="text-sm font-semibold text-destructive mb-2">Insufficient collateralization</p>
+                <p className="text-xs text-destructive/90">
                   One or more vaults have insufficient collateral for the mint amount. Increase deposit or decrease mint amount.
                 </p>
               </div>
@@ -1210,7 +1210,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                 <div className="min-w-[640px]">
                   <div className={`grid gap-2 text-xs font-medium text-muted-foreground pb-2 border-b border-border ${getGridClass()}`}>
                     <div className="min-w-[100px]">Asset</div>
-                    <div className="min-w-[90px]">Stability Fee</div>
+                    <div className="min-w-[90px]">Stability fee</div>
                     <div className="min-w-[120px]">Deposit</div>
                     {showMintAmounts && <div className="min-w-[120px]">Mint</div>}
                     {!autoAllocate && <div className="text-right pr-3 min-w-[60px]">HF</div>}
@@ -1306,7 +1306,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                     </div>
 
                     {/* Stability Fee */}
-                    <div className="text-muted-foreground min-w-[90px]">{formatPercentage(stabilityFeeRate)}</div>
+                    <div className="text-muted-foreground min-w-[90px] tabular-nums">{formatPercentage(stabilityFeeRate)}</div>
                     
                     {/* Deposit Input */}
                     <div className="space-y-1 min-w-[120px]">
@@ -1331,9 +1331,9 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                           placeholder="0"
                           className={`h-8 text-xs ${displayMode === 'Value' ? 'pl-5' : ''} ${
                             vaultHasLowHF || depositExceedsMax
-                              ? 'border-red-500 focus-visible:ring-red-500' 
-                              : depositMatchesAvailable 
-                              ? 'border-blue-500 focus-visible:ring-blue-500' 
+                              ? 'border-destructive focus-visible:ring-destructive'
+                              : depositMatchesAvailable
+                              ? 'border-primary focus-visible:ring-primary'
                               : ''
                           }`}
                           disabled={autoAllocate}
@@ -1382,9 +1382,9 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                             placeholder="0"
                             className={`h-8 text-xs ${displayMode === 'Value' ? 'pl-5' : ''} ${
                               vaultHasLowHF || mintExceedsMax
-                                ? 'border-red-500 focus-visible:ring-red-500' 
-                                : mintMatchesAvailable 
-                                ? 'border-blue-500 focus-visible:ring-blue-500' 
+                                ? 'border-destructive focus-visible:ring-destructive'
+                                : mintMatchesAvailable
+                                ? 'border-primary focus-visible:ring-primary'
                                 : ''
                             }`}
                             disabled={autoAllocate}
@@ -1403,7 +1403,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                     
                     {/* HF */}
                     {!autoAllocate && (
-                      <div className={`font-medium text-right pr-3 min-w-[60px] ${hfColor}`}>{hf}</div>
+                      <div className={`font-medium text-right pr-3 min-w-[60px] tabular-nums ${hfColor}`}>{hf}</div>
                     )}
                   </div>
                 );
@@ -1433,11 +1433,11 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
               return (
                 <div className="pt-2 border-t border-border space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Total Mint Amount:</span>
+                    <span className="text-sm font-medium text-muted-foreground">Total mint amount:</span>
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <span className="text-sm font-bold tabular-nums cursor-help text-blue-600">
+                          <span className="text-sm font-bold tabular-nums cursor-help text-primary">
                             {totalMintDisplay} USDST
                           </span>
                         </TooltipTrigger>
@@ -1449,7 +1449,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                   </div>
                   {projectedVaultHealth && (
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">Projected Vault Health:</span>
+                      <span className="text-sm font-medium text-muted-foreground">Projected vault health:</span>
                       <span className="text-sm font-bold tabular-nums">{projectedVaultHealth}</span>
                     </div>
                   )}

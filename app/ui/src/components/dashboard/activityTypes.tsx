@@ -1350,7 +1350,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "Rewards",
     event_name: "RewardsClaimed",
     displayName: "Reward Points Claimed",
-    iconConfig: { icon: Gift, color: "bg-gradient-to-br from-emerald-400 to-teal-500" },
+    iconConfig: { icon: Gift, color: "bg-emerald-500" },
     getTokenAddress: (event: Event) => {
       // The reward token address is stored in the Rewards contract, not in the event
       // We could fetch it from the contract, but for now return empty array
@@ -1517,7 +1517,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "StratoStaking",
     event_name: "DelegatorRewardsClaimed",
     displayName: "STRATO Rewards Claimed",
-    iconConfig: { icon: Gift, color: "bg-gradient-to-br from-cyan-400 to-teal-500" },
+    iconConfig: { icon: Gift, color: "bg-cyan-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const user = getEventAttribute(event, "user", "User");
       const amount = getEventAttribute(event, "amount", "Amount") || "0";
@@ -1598,7 +1598,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "StratoStaking",
     event_name: "DelegatorFeesClaimed",
     displayName: "Validator Fees Claimed",
-    iconConfig: { icon: Gift, color: "bg-gradient-to-br from-emerald-400 to-teal-500" },
+    iconConfig: { icon: Gift, color: "bg-emerald-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const user = getEventAttribute(event, "user", "User");
       const amount = getEventAttribute(event, "amount", "Amount") || "0";
@@ -1623,7 +1623,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "StratoStaking",
     event_name: "OperatorFeesClaimed",
     displayName: "Operator Fees Claimed",
-    iconConfig: { icon: Gift, color: "bg-gradient-to-br from-emerald-500 to-sky-500" },
+    iconConfig: { icon: Gift, color: "bg-emerald-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const operator = getEventAttribute(event, "operator", "Operator");
       const amount = getEventAttribute(event, "amount", "Amount") || "0";
@@ -1697,7 +1697,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     contract_name: "StratoStaking",
     event_name: "OperatorRewardsClaimed",
     displayName: "STRATO Operator Rewards Claimed",
-    iconConfig: { icon: Gift, color: "bg-gradient-to-br from-sky-400 to-cyan-500" },
+    iconConfig: { icon: Gift, color: "bg-sky-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const operator = getEventAttribute(event, "operator", "Operator");
       const amount = getEventAttribute(event, "amount", "Amount") || "0";

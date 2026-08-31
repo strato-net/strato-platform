@@ -168,7 +168,7 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
         <Button
           onClick={() => requestWalletConnection()}
         >
-          Connect Wallet to View Your Junior Note
+          Connect wallet to view your Junior Note
         </Button>
       </div>
     );
@@ -177,7 +177,7 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <RefreshCw className="h-6 w-6 animate-spin mr-2 text-blue-500" />
+        <RefreshCw className="h-6 w-6 animate-spin mr-2 text-primary" />
         <div className="text-muted-foreground">Loading junior note...</div>
       </div>
     );
@@ -195,7 +195,7 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
     <div className="border border-border rounded-lg p-4 hover:bg-muted/50 transition-colors">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center text-xs font-semibold text-green-500">
+          <div className="w-8 h-8 bg-success/15 rounded-full flex items-center justify-center text-xs font-semibold text-success">
             JN
           </div>
           <div>
@@ -216,16 +216,16 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <div>
-          <p className="text-xs text-muted-foreground mb-1">Remaining Cap</p>
-          <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimalHP(note.capUSDST, 18)))} USDST</p>
+          <p className="text-xs text-muted-foreground mb-1">Remaining cap</p>
+          <p className="font-semibold tabular-nums">{formatNumber(parseFloat(formatWeiToDecimalHP(note.capUSDST, 18)))} USDST</p>
           <p className="text-xs text-muted-foreground">Max rewards left</p>
         </div>
         <div>
-          <p className="text-xs text-muted-foreground mb-1">Claimable Now</p>
-          <p 
-            className={`font-semibold ${
+          <p className="text-xs text-muted-foreground mb-1">Claimable now</p>
+          <p
+            className={`font-semibold tabular-nums ${
               parseFloat(note.claimableAmount) > 0 && !isGlobalPaused
-                ? 'text-green-600 cursor-pointer hover:text-green-700 hover:underline' 
+                ? 'text-success cursor-pointer hover:text-success/80 hover:underline'
                 : parseFloat(note.claimableAmount) > 0 && isGlobalPaused
                   ? 'text-muted-foreground cursor-not-allowed'
                   : 'text-muted-foreground'
@@ -258,7 +258,7 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
           <div>
             <div className="mb-2">
               <p className="text-xs text-muted-foreground">
-                Transaction Fee: 0.01 USDST
+                Transaction fee: 0.01 USDST
               </p>
             </div>
             <Button 

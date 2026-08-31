@@ -94,7 +94,7 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
           )}
         </div>
         {isTestnet && (
-          <span className="bg-orange-500 text-white px-2 py-1 rounded text-xs font-bold uppercase hidden sm:inline-block shrink-0">
+          <span className="bg-warning text-warning-foreground px-2 py-1 rounded text-xs font-bold uppercase hidden sm:inline-block shrink-0">
             TESTNET
           </span>
         )}
@@ -134,7 +134,7 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
                     variant="ghost"
                     size="sm"
                     onClick={logout}
-                    className="w-full h-9 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 justify-start gap-2"
+                    className="w-full h-9 text-destructive hover:text-destructive hover:bg-destructive/10 justify-start gap-2"
                   >
                     <LogOutIcon size={16} />
                     <span className="text-sm font-medium">Logout</span>
@@ -170,7 +170,7 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
 
                 <div className="border-t pt-3">
                   <Button onClick={() => disconnect()} size="sm" className={`${GRADIENT_BUTTON_CLASS} h-8 text-xs`}>
-                    Disconnect Wallet
+                    Disconnect wallet
                   </Button>
                 </div>
               </div>
@@ -186,7 +186,7 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
                   size="sm"
                   className="h-8 md:h-9 px-3 md:px-4 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 gap-1.5"
                 >
-                  <span className="text-xs md:text-sm font-medium">Connect Wallet</span>
+                  <span className="text-xs md:text-sm font-medium">Connect wallet</span>
                 </Button>
               );
             }}

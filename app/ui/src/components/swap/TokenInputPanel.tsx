@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Loader2 } from "lucide-react";
 import { SwapToken } from "@/interface";
 import { formatBalance, toWei } from "@/utils/numberUtils";
 
@@ -22,8 +22,7 @@ export const TokenAvatar = ({ token, size = "w-4 h-4" }: TokenAvatarProps) => {
     />
   ) : (
     <div
-      className={`${size} rounded-full flex items-center justify-center text-xs text-white font-medium`}
-      style={{ backgroundColor: "red" }}
+      className={`${size} rounded-full flex items-center justify-center text-xs text-muted-foreground font-medium bg-muted`}
     >
       {token._symbol?.slice(0, 1)}
     </div>
@@ -34,7 +33,7 @@ export const TokenAvatar = ({ token, size = "w-4 h-4" }: TokenAvatarProps) => {
 // LOADING / ANIMATED VALUE
 // ============================================================================
 export const LoadingSpinner = () => (
-  <span className="inline-flex items-center animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary" />
+  <Loader2 className="h-5 w-5 animate-spin text-current" />
 );
 
 export const AnimatedNumber = ({ value, isLoading, hideLoader = false }: { value: string | undefined; isLoading: boolean; hideLoader?: boolean }) => {
@@ -181,12 +180,12 @@ export const TokenInputPanel = ({
             placeholder="0.00"
             inputMode="decimal"
             disabled={disabled}
-            className={`p-1 md:p-2 bg-transparent border-none text-sm md:text-lg font-medium focus:outline-none text-foreground placeholder:text-muted-foreground w-full ${
-              amountError ? " border border-red-500 rounded-md" : ""
+            className={`p-1 md:p-2 bg-transparent border-none text-sm md:text-lg font-medium focus:outline-none text-foreground placeholder:text-muted-foreground w-full tabular-nums ${
+              amountError ? " border border-destructive rounded-md" : ""
               } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
           />
           {amountError && (
-            <p className="text-red-600 text-xs md:text-sm mt-1">{amountError}</p>
+            <p className="text-destructive text-xs md:text-sm mt-1">{amountError}</p>
           )}
         </div>
         <div className="flex-shrink-0">
@@ -204,8 +203,8 @@ export const TokenInputPanel = ({
         <div className="mt-2 flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
           {showUserBalance && (isFromInput ? (
             <span className="text-xs md:text-sm text-muted-foreground flex flex-wrap items-center gap-1">
-              <span className="whitespace-nowrap">Your Balance:</span>
-              <span className="whitespace-nowrap">
+              <span className="whitespace-nowrap">Your balance:</span>
+              <span className="whitespace-nowrap tabular-nums">
                 <AnimatedNumber
                   value={maxAmountWei !== "0" ? formatBalance(maxAmountWei, asset._symbol || "", undefined, 2, 6) : "0"}
                   isLoading={loading}
@@ -214,7 +213,7 @@ export const TokenInputPanel = ({
               </span>
               <button
                 type="button"
-                className={`text-blue-600 text-xs underline ${(disabled || toWei(maxAmountWei) === 0n) ? "opacity-50 cursor-not-allowed" : ""}`}
+                className={`text-primary hover:text-primary/80 font-medium text-xs ${(disabled || toWei(maxAmountWei) === 0n) ? "opacity-50 cursor-not-allowed" : ""}`}
                 onClick={() => { if (!disabled) onMaxClick?.(); }}
                 disabled={disabled || toWei(maxAmountWei) === 0n}
               >
@@ -223,8 +222,8 @@ export const TokenInputPanel = ({
             </span>
           ) : (
             <span className="text-xs md:text-sm text-muted-foreground flex flex-wrap items-center gap-1">
-              <span className="whitespace-nowrap">Your Balance:</span>
-              <span className="whitespace-nowrap">
+              <span className="whitespace-nowrap">Your balance:</span>
+              <span className="whitespace-nowrap tabular-nums">
                 <AnimatedNumber
                   value={userBalanceWei !== "0" ? formatBalance(userBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"}
                   isLoading={loading}
@@ -236,8 +235,8 @@ export const TokenInputPanel = ({
           <span className={`text-xs md:text-sm text-muted-foreground flex flex-wrap items-center gap-1 ${
             showUserBalance ? "" : "sm:ml-auto"
           }`}>
-            <span className="whitespace-nowrap">Pool Balance:</span>
-              <span className="whitespace-nowrap">
+            <span className="whitespace-nowrap">Pool balance:</span>
+              <span className="whitespace-nowrap tabular-nums">
                 <AnimatedNumber
                   value={poolBalanceWei !== "0" ? formatBalance(poolBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"}
                   isLoading={loading}

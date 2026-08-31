@@ -19,7 +19,7 @@ export const SlippageControl = ({ slippage, effectivePercent, onChange, disabled
   const isHighSlippage = effectivePercent > 5;
   const isLowSlippage = !isAuto && effectivePercent < 0.5;
   const slippageClass = isHighSlippage || isLowSlippage
-    ? 'border-yellow-400 text-yellow-600'
+    ? 'border-warning/40 text-warning'
     : 'border-border text-foreground';
 
   return (
@@ -45,7 +45,7 @@ export const SlippageControl = ({ slippage, effectivePercent, onChange, disabled
           >
             Manual
           </button>
-          <span className={`ml-1 md:ml-2 px-2 md:px-3 py-1 rounded-full border text-xs font-semibold ${slippageClass}`}>
+          <span className={`ml-1 md:ml-2 px-2 md:px-3 py-1 rounded-full border text-xs font-semibold tabular-nums ${slippageClass}`}>
             {isAuto ? `Auto · ${effectivePercent.toFixed(2)}%` : `${effectivePercent}%`}
           </span>
         </div>
@@ -64,10 +64,10 @@ export const SlippageControl = ({ slippage, effectivePercent, onChange, disabled
         </div>
       )}
       {isHighSlippage && (
-        <div className="text-xs text-yellow-600 mt-1 font-bold">⚠️ High slippage</div>
+        <div className="text-xs text-warning mt-1 font-bold">⚠️ High slippage</div>
       )}
       {isLowSlippage && (
-        <div className="text-xs text-yellow-600 mt-1 font-bold">⚠️ Low slippage</div>
+        <div className="text-xs text-warning mt-1 font-bold">⚠️ Low slippage</div>
       )}
     </div>
   );

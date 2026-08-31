@@ -11,15 +11,15 @@ const SyncingPage = ({ nodeHealth }: SyncingPageProps) => {
   const issues = nodeHealth?.healthIssues?.filter(Boolean) || [];
   const isStalled = nodeHealth?.nodeSync?.isSyncStalled === true || status === "SYNC STALLED";
   const title = isStalled
-    ? "Node Sync Stalled"
+    ? "Sync paused"
     : status === "UNHEALTHY"
-      ? "Node Unhealthy"
-      : "Node Syncing";
+      ? "Connection trouble"
+      : "Catching up with the network";
   const description = isStalled
-    ? "The blockchain node has stopped catching up with the network."
+    ? "The node has stopped catching up with the network. This usually resolves on its own — you can leave this page open."
     : status === "UNHEALTHY"
-      ? "The blockchain node is currently reporting an unhealthy state."
-      : "The blockchain node is currently synchronizing data from the network.";
+      ? "The node is having trouble right now. This usually resolves on its own — you can leave this page open."
+      : "The node is downloading the latest activity. This usually resolves on its own — you can leave this page open.";
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -38,7 +38,7 @@ const SyncingPage = ({ nodeHealth }: SyncingPageProps) => {
           </div>
         </div>
         <h1 className="text-3xl font-bold tracking-tight mb-4">
-          {title}{dots}
+          {title}{isStalled || status === "UNHEALTHY" ? "" : dots}
         </h1>
         <p className="text-lg text-muted-foreground mb-6">
           {description}

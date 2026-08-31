@@ -80,7 +80,7 @@ const TransferNFTModal = ({
             Transfers are permanent — the recipient becomes the sole owner of this NFT.
           </DialogDescription>
         </DialogHeader>
-        {warning && <p className="text-yellow-600 text-xs md:text-sm">⚠️ {warning}</p>}
+        {warning && <p className="text-warning text-xs md:text-sm">⚠️ {warning}</p>}
         <div className="space-y-2">
           <Label htmlFor="nft-transfer-to">Recipient address</Label>
           <Input

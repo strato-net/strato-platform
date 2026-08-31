@@ -367,7 +367,7 @@ const V3LiquidityChart = ({
                   half: Math.max(tickUpper! - tickLower!, 8 * spacing),
                 })
               }
-              className="absolute z-10 top-1/2 -translate-y-1/2 text-[11px] font-medium px-2 py-1 rounded-full border border-border bg-background/90 backdrop-blur text-blue-600 dark:text-blue-400 hover:bg-muted transition-colors"
+              className="absolute z-10 top-1/2 -translate-y-1/2 text-[11px] font-medium px-2 py-1 rounded-full border border-border bg-background/90 backdrop-blur text-primary hover:bg-muted transition-colors"
               style={selX1 < 0 ? { left: 8 } : { right: 8 }}
             >
               {selX1 < 0 ? "◀ " : ""}Range out of view{selX0 > width ? " ▶" : ""}

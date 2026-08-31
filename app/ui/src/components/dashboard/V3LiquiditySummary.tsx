@@ -83,7 +83,7 @@ const V3LiquiditySummary = () => {
   return (
     <div className="mb-8 bg-card shadow-sm rounded-xl border border-border overflow-hidden">
       <div className="flex items-center justify-between px-4 md:px-6 pt-4 md:pt-5 pb-3">
-        <h3 className="text-base md:text-lg font-semibold">V3 Pool Liquidity</h3>
+        <h3 className="text-base md:text-lg font-semibold">V3 pool liquidity</h3>
         <Button
           type="button"
           variant="outline"
@@ -136,12 +136,12 @@ const V3LiquiditySummary = () => {
               <div className="flex items-center gap-2 flex-shrink-0">
                 <div className="flex flex-col items-end text-xs">
                   {row.amount0 > 0n && (
-                    <span className="font-medium">
+                    <span className="font-medium tabular-nums">
                       {formatTokenAmount(row.amount0, pool.token0.decimals)} {pool.token0.symbol}
                     </span>
                   )}
                   {row.amount1 > 0n && (
-                    <span className="font-medium">
+                    <span className="font-medium tabular-nums">
                       {formatTokenAmount(row.amount1, pool.token1.decimals)} {pool.token1.symbol}
                     </span>
                   )}

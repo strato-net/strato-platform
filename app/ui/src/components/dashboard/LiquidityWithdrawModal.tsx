@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -192,7 +193,7 @@ const LiquidityWithdrawModal = ({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Withdraw Liquidity</DialogTitle>
+          <DialogTitle>Withdraw liquidity</DialogTitle>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(handleWithdrawSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 gap-4">
@@ -223,8 +224,7 @@ const LiquidityWithdrawModal = ({
                             />
                           ) : (
                             <div
-                              className="w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-medium border border-white"
-                              style={{ backgroundColor: "red" }}
+                              className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-medium border border-white"
                             >
                               {selectedPool.poolName?.split('/')[0]?.slice(0, 1)}
                             </div>
@@ -239,8 +239,7 @@ const LiquidityWithdrawModal = ({
                             />
                           ) : (
                             <div
-                              className="w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-medium border border-white"
-                              style={{ backgroundColor: "red" }}
+                              className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-medium border border-white"
                             >
                               {selectedPool.poolName?.split('/')[1]?.slice(0, 1)}
                             </div>
@@ -258,7 +257,7 @@ const LiquidityWithdrawModal = ({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="text-xs text-blue-500"
+                  className="text-xs text-primary hover:text-primary/80"
                   onClick={() => setWithdrawPercent('100')}
                 >
                   Max
@@ -266,7 +265,7 @@ const LiquidityWithdrawModal = ({
               </div>
               {
                 withdrawPercentError && (
-                  <p className="text-red-600 text-sm mt-1">{withdrawPercentError}</p>
+                  <p className="text-destructive text-sm mt-1">{withdrawPercentError}</p>
                 )
               }
             </div>
@@ -279,7 +278,7 @@ const LiquidityWithdrawModal = ({
                   <div key={coin.address}>
                     <div className="flex justify-between items-center text-sm mt-1">
                       <span className="text-muted-foreground">{coin._symbol} position</span>
-                      <span className="font-medium">
+                      <span className="font-medium tabular-nums">
                         {selectedPool.lpToken._totalSupply === "0" ? "0" :
                           (Number(BigInt(totalLiquidityBalance || "0") * BigInt(coin.poolBalance || "0") / BigInt(selectedPool.lpToken._totalSupply || "1")) / 1e18).toFixed(6)}
                       </span>
@@ -287,7 +286,7 @@ const LiquidityWithdrawModal = ({
                     {withdrawPercent && selectedPool.lpToken._totalSupply !== "0" && (
                       <div className="flex justify-between items-center text-sm mt-0.5">
                         <span className="text-muted-foreground">New {coin._symbol} position</span>
-                        <span className="font-medium text-blue-600">
+                        <span className="font-medium text-primary tabular-nums">
                           {(Number(BigInt(availableLPBalance || "0") * BigInt(coin.poolBalance || "0") * (BigInt(10000) - BigInt(Math.floor(Number(withdrawPercent) * 100 || 0))) / (BigInt(selectedPool.lpToken._totalSupply || "1") * BigInt(10000))) / 1e18).toFixed(6)}
                         </span>
                       </div>
@@ -299,7 +298,7 @@ const LiquidityWithdrawModal = ({
               <>
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground">{tokenALabel} position</span>
-                  <span className="font-medium">
+                  <span className="font-medium tabular-nums">
                     {selectedPool?.lpToken?._totalSupply === "0" ? "0" :
                       (Number(BigInt(totalLiquidityBalance || "0") * BigInt(selectedPool?.tokenA.poolBalance || "0") / BigInt(selectedPool?.lpToken?._totalSupply || "1")) / 1e18).toFixed(10)}
                   </span>
@@ -307,14 +306,14 @@ const LiquidityWithdrawModal = ({
                 {selectedPool && withdrawPercent && selectedPool.lpToken._totalSupply !== "0" && (
                   <div className="flex justify-between items-center text-sm mt-1">
                     <span className="text-muted-foreground">New {tokenALabel} position</span>
-                    <span className="font-medium text-blue-600">
+                    <span className="font-medium text-primary tabular-nums">
                       {(Number(BigInt(availableLPBalance || "0") * BigInt(selectedPool.tokenA.poolBalance || "0") * (BigInt(10000) - BigInt(Math.floor(Number(withdrawPercent) * 100 || 0))) / (BigInt(selectedPool.lpToken._totalSupply || "1") * BigInt(10000))) / 1e18).toFixed(10)}
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between items-center text-sm mt-1">
                   <span className="text-muted-foreground">{tokenBLabel} position</span>
-                  <span className="font-medium">
+                  <span className="font-medium tabular-nums">
                     {selectedPool?.lpToken?._totalSupply === "0" ? "0" :
                       (Number(BigInt(totalLiquidityBalance || "0") * BigInt(selectedPool?.tokenB.poolBalance || "0") / BigInt(selectedPool?.lpToken?._totalSupply || "1")) / 1e18).toFixed(10)}
                   </span>
@@ -322,7 +321,7 @@ const LiquidityWithdrawModal = ({
                 {selectedPool && withdrawPercent && selectedPool.lpToken._totalSupply !== "0" && (
                   <div className="flex justify-between items-center text-sm mt-1">
                     <span className="text-muted-foreground">New {tokenBLabel} position</span>
-                    <span className="font-medium text-blue-600">
+                    <span className="font-medium text-primary tabular-nums">
                       {(Number(BigInt(availableLPBalance || "0") * BigInt(selectedPool.tokenB.poolBalance || "0") * (BigInt(10000) - BigInt(Math.floor(Number(withdrawPercent) * 100))) / (BigInt(selectedPool.lpToken._totalSupply || "1") * BigInt(10000))) / 1e18).toFixed(10)}
                     </span>
                   </div>
@@ -334,7 +333,7 @@ const LiquidityWithdrawModal = ({
               <span>{WITHDRAW_FEE} USDST ({parseFloat(WITHDRAW_FEE) * 100} voucher)</span>
             </div>
             {feeError && (
-              <p className="text-yellow-600 text-sm mt-1">{feeError}</p>
+              <p className="text-warning text-sm mt-1">{feeError}</p>
             )}
             {(() => {
               const usdstBalanceWei = BigInt(usdstBalance || "0");
@@ -344,7 +343,7 @@ const LiquidityWithdrawModal = ({
               const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
 
               return isLowBalanceWarning && usdstBalanceWei >= feeWei ? (
-                <p className="text-yellow-600 text-sm mt-1">
+                <p className="text-warning text-sm mt-1">
                   Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
                 </p>
               ) : null;
@@ -386,10 +385,10 @@ const LiquidityWithdrawModal = ({
             >
               {withdrawLoading ? (
                 <div className="flex justify-center items-center h-12">
-                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               ) : (
-                "Confirm Withdraw"
+                "Confirm withdraw"
               )}
             </Button>
           </div>

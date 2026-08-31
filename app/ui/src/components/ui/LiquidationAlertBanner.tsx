@@ -43,7 +43,7 @@ export const LiquidationAlertBannerView = ({
 
   return (
     <div className={`mb-4 md:mb-6 ${className}`}>
-      <div className={`${colorClasses} border rounded-lg overflow-hidden transition-all`}>
+      <div className={`${colorClasses} border rounded-lg overflow-hidden transition-colors`}>
         {/* Header - Always visible */}
         <div className="px-4 py-3 flex items-start gap-3">
           <div className="flex-shrink-0 mt-0.5">
@@ -56,7 +56,7 @@ export const LiquidationAlertBannerView = ({
           </div>
           <button
             onClick={toggleCollapse}
-            className="flex-shrink-0 p-1 hover:bg-current/10 rounded transition-colors"
+            className="flex-shrink-0 p-1 hover:bg-current/10 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label={isCollapsed ? 'Expand' : 'Collapse'}
           >
             {isCollapsed ? (

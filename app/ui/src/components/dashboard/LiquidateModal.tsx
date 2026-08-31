@@ -179,8 +179,8 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
         onOpenChange(false);
       } else {
         // Transaction failed at blockchain level
-        toast({ 
-          title: "Liquidation Failed", 
+        toast({
+          title: "Liquidation failed",
           description: "The liquidation transaction failed. Please try again.",
           variant: "destructive" 
         });
@@ -196,12 +196,12 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent aria-describedby={null} className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Quick Liquidation Calculator</DialogTitle>
+          <DialogTitle>Quick liquidation calculator</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
           <div className="space-y-3">
-            <label className="text-sm font-medium">Repay Amount ({loan.assetSymbol})</label>
+            <label className="text-sm font-medium">Repay amount ({loan.assetSymbol})</label>
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Total debt: {isFinite(totalDebtEth) ? totalDebtEth.toFixed(6) : "0.000000"} {loan.assetSymbol}</span>
               <span>Max repayable now: {isFinite(maxRepayEth) ? maxRepayEth.toFixed(6) : "0.000000"} {loan.assetSymbol}</span>
@@ -212,7 +212,7 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
                 inputMode="decimal"
                 pattern="[0-9]*\.?[0-9]*"
                 placeholder="0.00"
-                className={`${repayEth > maxRepayEth ? 'text-red-600' : ''}`}
+                className={`${repayEth > maxRepayEth ? 'text-destructive' : ''}`}
                 value={displayAmount}
                 onChange={handleAmountChange}
               />
@@ -225,7 +225,7 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
           </div>
 
           <div className="space-y-3">
-            <label className="text-sm font-medium">Min Collateral Out ({collateral.symbol || "COLL"}) - Optional</label>
+            <label className="text-sm font-medium">Min collateral out ({collateral.symbol || "COLL"}) - optional</label>
             <div className="text-xs text-muted-foreground mb-2">
               Set a minimum collateral amount to receive (slippage protection). Leave at 0 to accept any amount.
             </div>
@@ -243,25 +243,25 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
 
           <div className="grid grid-cols-2 gap-4 text-sm pt-2">
             <div>
-              <span className="text-muted-foreground">Seized Collateral</span>
+              <span className="text-muted-foreground">Seized collateral</span>
               <div className="font-medium flex items-center gap-2 mt-1">
                 <TokenIcon symbol={collateral.symbol || "COLL"} size="sm" />
-                <span>{seizedTokensEth.toFixed(4)} {collateral.symbol || "COLL"}</span>
+                <span className="tabular-nums">{seizedTokensEth.toFixed(4)} {collateral.symbol || "COLL"}</span>
               </div>
               <div className="text-xs text-muted-foreground mt-1">
                 Value: ${(seizedTokensEth * collPriceUsd).toFixed(2)} (includes {(bonusPct * 100).toFixed(0)}% bonus)
               </div>
             </div>
             <div>
-              <span className="text-muted-foreground">Repay Amount (USDST)</span>
-              <div className="font-medium">{repayUsdCost.toFixed(2)}</div>
+              <span className="text-muted-foreground">Repay amount (USDST)</span>
+              <div className="font-medium tabular-nums">{repayUsdCost.toFixed(2)}</div>
             </div>
           </div>
 
           <div className="p-4 bg-muted/50 rounded-md">
             <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Estimated Profit</span>
-              <span className={profitUsd >= 0 ? "text-green-600 font-semibold text-lg" : "text-red-600 font-semibold text-lg"}>
+              <span className="text-muted-foreground">Estimated profit</span>
+              <span className={profitUsd >= 0 ? "text-success font-semibold text-lg tabular-nums" : "text-destructive font-semibold text-lg tabular-nums"}>
                 ${profitUsd.toFixed(2)}
               </span>
             </div>
@@ -285,7 +285,7 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
             disabled={repayEth <= 0}
             className="px-6"
           >
-            Confirm Liquidation
+            Confirm liquidation
           </Button>
         </DialogFooter>
       </DialogContent>

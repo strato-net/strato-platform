@@ -6,32 +6,49 @@
 @layer base {
   :root {
     --background: 225 50% 99%;
-    --foreground: 220 40% 10%;
+    --foreground: 224 40% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 224 40% 8%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 224 40% 8%;
 
-    --primary: 223 75% 40%;
+    --primary: 229 79% 45%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 222 40% 96%;
+    --secondary-foreground: 224 47% 11%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 222 40% 96%;
+    --muted-foreground: 222 16% 44%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 222 40% 94%;
+    --accent-foreground: 224 47% 11%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 72% 45%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --success: 152 55% 32%;
+    --success-foreground: 150 40% 98%;
+    --success-surface: 150 45% 94%;
+
+    --warning: 38 92% 38%;
+    --warning-foreground: 40 40% 98%;
+    --warning-surface: 45 90% 94%;
+    --destructive-surface: 0 75% 96%;
+
+    --gold: 43 65% 47%;
+    --gold-foreground: 43 60% 12%;
+
+    /* Motion: strong curves — built-in CSS easings are too weak for UI */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+    --border: 222 32% 91%;
+    --input: 222 32% 88%;
+    --ring: 229 79% 45%;
 
     --radius: 0.5rem;
 
@@ -46,33 +63,45 @@
   }
 
   .dark {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
+    --background: 227 55% 5%;
+    --foreground: 220 30% 91%;
 
-    --card: 224 71% 6%;
-    --card-foreground: 213 31% 91%;
+    --card: 227 48% 8%;
+    --card-foreground: 220 30% 91%;
 
-    --popover: 224 71% 6%;
-    --popover-foreground: 213 31% 91%;
+    --popover: 227 48% 8%;
+    --popover-foreground: 220 30% 91%;
 
-    --primary: 223 75% 40%;
+    --primary: 229 88% 60%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 222.2 47.4% 11.2%;
+    --secondary: 226 40% 13%;
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 223 47% 11%;
-    --muted-foreground: 215.4 16.3% 56.9%;
+    --muted: 226 40% 12%;
+    --muted-foreground: 222 16% 60%;
 
-    --accent: 216 34% 17%;
+    --accent: 226 38% 17%;
     --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 60% 25%;
+    --destructive: 0 65% 55%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --success: 152 55% 45%;
+    --success-foreground: 152 60% 8%;
+    --success-surface: 152 45% 12%;
+
+    --warning: 43 90% 55%;
+    --warning-foreground: 40 60% 8%;
+    --warning-surface: 43 50% 12%;
+    --destructive-surface: 0 45% 13%;
+
+    --gold: 43 70% 55%;
+    --gold-foreground: 43 60% 10%;
+
+    --border: 226 36% 16%;
+    --input: 226 36% 18%;
+    --ring: 229 90% 62%;
     
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
@@ -96,7 +125,34 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1, h2, h3 {
+    @apply font-display tracking-tight;
+  }
+}
+
+@layer utilities {
+  /* Financial figures: equal-width numerals so columns and tickers don't jitter */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  /* Signature: assay-mark rule — a short gold hairline above headline value moments.
+     Use on the one element per view that carries the vaulted-value story. */
+  .hallmark {
+    position: relative;
+    padding-top: 0.625rem;
+  }
+  .hallmark::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2rem;
+    height: 2px;
+    background: linear-gradient(90deg, hsl(var(--gold)), hsl(var(--gold) / 0.25));
   }
 }
 
@@ -105,15 +161,15 @@
 }
 
 .cta-button {
-  @apply bg-strato-blue hover:bg-strato-blue/90 text-white font-medium py-3 px-6 rounded-full transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-lg;
+  @apply bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-3 px-6 rounded-full transition-colors duration-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background;
 }
 
 .secondary-button {
-  @apply border border-strato-blue text-strato-blue hover:bg-strato-blue/10 font-medium py-3 px-6 rounded-full transition-all duration-300 ease-in-out;
+  @apply border border-primary text-primary hover:bg-primary/10 font-medium py-3 px-6 rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background;
 }
 
 .asset-card {
-  @apply bg-card border border-border rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6;
+  @apply bg-card border border-border rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 p-6;
 }
 
 .asset-circle {
@@ -147,6 +203,14 @@
 
 .animate-float {
   animation: float 6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-gradient-flow,
+  .gradient-blob {
+    animation: none;
+  }
 }
 
 @keyframes gradient-flow {

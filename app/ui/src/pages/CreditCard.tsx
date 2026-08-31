@@ -496,7 +496,7 @@ export default function CreditCardPage() {
     <div className="h-screen bg-background overflow-hidden pb-16 md:pb-0">
       <DashboardSidebar />
       <div
-        className="h-screen flex flex-col transition-all duration-300"
+        className="h-screen flex flex-col transition-[padding-left] duration-300"
         style={{ paddingLeft: "var(--sidebar-width, 0px)" }}
       >
         <DashboardHeader title="Card" />
@@ -505,9 +505,9 @@ export default function CreditCardPage() {
             <GuestSignInBanner message="Sign in to link your card wallet and set up automatic top-ups" />
           )}
 
-          <div className="mb-6 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30 p-4">
+          <div className="mb-6 rounded-lg border border-primary/30 bg-primary/5 p-4">
             <div className="flex gap-3">
-              <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
               <div className="space-y-1">
                 <h2 className="text-sm font-semibold text-foreground">How it works</h2>
                 <p className="text-sm text-muted-foreground">
@@ -535,7 +535,7 @@ export default function CreditCardPage() {
                   <div className="w-12 h-12 rounded-full border-2 border-dashed border-white/50 flex items-center justify-center">
                     <Plus className="h-6 w-6" />
                   </div>
-                  <span className="text-lg font-medium">Connect Card</span>
+                  <span className="text-lg font-medium">Connect card</span>
                 </div>
               </button>
             </div>
@@ -591,7 +591,7 @@ export default function CreditCardPage() {
                   <div className="mt-2 flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-medium">{d.networkName}</p>
-                      <p className="text-lg font-semibold mt-1">
+                      <p className="text-lg font-semibold mt-1 tabular-nums">
                         Balance: {d.balance !== null ? formatWeiAmount(d.balance, 6) : "—"} {d.tokenSymbol}
                       </p>
                     </div>
@@ -623,7 +623,7 @@ export default function CreditCardPage() {
                   <div className="w-12 h-12 rounded-full border-2 border-dashed border-white/50 flex items-center justify-center">
                     <Plus className="h-6 w-6" />
                   </div>
-                  <span className="text-lg font-medium">Connect Card</span>
+                  <span className="text-lg font-medium">Connect card</span>
                 </div>
               </button>
             </div>
@@ -704,7 +704,7 @@ export default function CreditCardPage() {
                   ))}
                 </select>
                 {selectedTokenSymbol && !isComboSupported && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                  <p className="text-xs text-warning">
                     {selectedTokenSymbol} on this network is not yet supported for bridging.
                   </p>
                 )}
@@ -793,22 +793,22 @@ export default function CreditCardPage() {
               const pending = display?.pendingTopUps ?? [];
               if (pending.length === 0) return null;
               return (
-                <div className="space-y-2 border rounded-md p-3 bg-amber-500/5">
+                <div className="space-y-2 border rounded-md p-3 bg-warning/5">
                   <p className="text-sm font-medium flex items-center gap-1.5">
-                    <Clock className="h-4 w-4 text-amber-500" />
-                    Pending Top-Ups ({pending.length})
+                    <Clock className="h-4 w-4 text-warning" />
+                    Pending top-ups ({pending.length})
                   </p>
                   <div className="space-y-1.5">
                     {pending.map((p, i) => (
                       <div key={i} className="flex items-center justify-between text-sm">
-                        <span>{formatWeiAmount(p.amount, DECIMALS)} USDST</span>
+                        <span className="tabular-nums">{formatWeiAmount(p.amount, DECIMALS)} USDST</span>
                         <div className="flex items-center gap-2">
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                             p.status === 1
-                              ? "bg-blue-500/20 text-blue-400"
-                              : "bg-amber-500/20 text-amber-400"
+                              ? "bg-primary/15 text-primary"
+                              : "bg-warning/15 text-warning"
                           }`}>
-                            {p.status === 1 ? "Initiated" : "Pending Review"}
+                            {p.status === 1 ? "Initiated" : "Pending review"}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             {new Date(p.timestamp).toLocaleDateString()}

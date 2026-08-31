@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import { formatUnits } from "ethers";
 import { CollateralData, NewLoanData } from "@/interface";
 import { safeParseUnits, addCommasToInput } from "@/utils/numberUtils";
@@ -211,10 +212,7 @@ const CollateralModal = ({
                 className="w-6 h-6 rounded-full object-cover"
               />
             ) : (
-              <div
-                className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs"
-                style={{ backgroundColor: "red" }}
-              >
+              <div className="w-6 h-6 rounded-full flex items-center justify-center bg-muted text-muted-foreground text-xs">
                 {asset?._symbol?.slice(0, 2) || "??"}
               </div>
             )}
@@ -226,12 +224,12 @@ const CollateralModal = ({
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">{getBalanceText()}</span>
-              <span className="font-medium">{getBalanceValue()}</span>
+              <span className="font-medium tabular-nums">{getBalanceValue()}</span>
             </div>
             {!isSupply && (
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Max withdrawable now</span>
-                <span className="font-medium">{formatUnits(maxDisplayAmount)}</span>
+                <span className="font-medium tabular-nums">{formatUnits(maxDisplayAmount)}</span>
               </div>
             )}
           </div>
@@ -248,11 +246,11 @@ const CollateralModal = ({
                     const max = formatUnits(maxAmount);
                     setAmount(max);
                   }}
-                  className="px-2 py-1 mr-1 bg-muted hover:bg-muted/80 rounded-full text-foreground text-xs font-medium transition"
+                  className="px-2 py-1 mr-1 rounded-full text-primary hover:text-primary/80 text-xs font-medium transition"
                 >
                   Max :
                 </button>
-                <span>
+                <span className="tabular-nums">
                   {formatUnits(maxAmount)} {asset?._symbol}
                 </span>
               </div>
@@ -262,7 +260,7 @@ const CollateralModal = ({
                 placeholder="0.00"
                 className={`pr-8 ${
                   safeParseUnits(amount || "0") > BigInt(maxAmount)
-                    ? "text-red-600"
+                    ? "text-destructive"
                     : ""
                 }`}
                 value={addCommasToInput(amount)}
@@ -276,7 +274,7 @@ const CollateralModal = ({
               </span>
             </div>
             {amountError && (
-              <p className="text-red-600 text-sm">{amountError}</p>
+              <p className="text-destructive text-sm">{amountError}</p>
             )}
             <div className="flex gap-2">
               <Button
@@ -339,8 +337,8 @@ const CollateralModal = ({
           {/* Transaction Fee Display */}
           <div className="px-4 bg-muted/50 rounded-md">
             <div className="flex justify-between text-sm mb-2">
-              <span className="text-muted-foreground">Transaction Fee</span>
-              <span className="font-medium">{transactionFee} USDST ({parseFloat(transactionFee) * 100} voucher)</span>
+              <span className="text-muted-foreground">Transaction fee</span>
+              <span className="font-medium tabular-nums">{transactionFee} USDST ({parseFloat(transactionFee) * 100} voucher)</span>
             </div>
             {(() => {
               const feeAmount = safeParseUnits(transactionFee);
@@ -356,12 +354,12 @@ const CollateralModal = ({
               return (
                 <>
                   {feeError && (
-                    <p className="text-yellow-600 text-sm mt-1">
+                    <p className="text-warning text-sm mt-1">
                       {feeError}
                     </p>
                   )}
                   {isLowBalanceWarning && !feeError && (
-                    <p className="text-yellow-600 text-sm mt-1">
+                    <p className="text-warning text-sm mt-1">
                       Warning: Your USDST balance is running low. Add more funds
                       now to avoid issues with future transactions.
                     </p>
@@ -382,7 +380,7 @@ const CollateralModal = ({
             className="px-6"
           >
             {loading && (
-              <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-purple-50"></div>
+              <Loader2 className="h-5 w-5 animate-spin text-current" />
             )}{" "}
             {getButtonText()}
           </Button>

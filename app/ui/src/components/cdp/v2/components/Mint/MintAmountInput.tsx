@@ -25,7 +25,7 @@ const MintAmountInput: React.FC<MintAmountInputProps> = ({
   isMaxMode,
   exceedsMax = false,
   maxAvailable,
-  label = 'Mint Amount',
+  label = 'Mint amount',
   placeholder = '0',
   unit = 'USDST',
   disabled = false,
@@ -56,10 +56,10 @@ const MintAmountInput: React.FC<MintAmountInputProps> = ({
           inputMode="decimal"
           disabled={disabled}
           className={`pr-20 ${
-            exceedsMax 
-              ? 'border-red-500 focus-visible:ring-red-500 text-red-600 dark:text-red-400' 
-              : isMaxMode 
-              ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-800' 
+            exceedsMax
+              ? 'border-destructive focus-visible:ring-destructive text-destructive'
+              : isMaxMode
+              ? 'text-primary bg-primary/10 border-primary/30'
               : ''
           }`}
         />
@@ -78,7 +78,7 @@ const MintAmountInput: React.FC<MintAmountInputProps> = ({
         </div>
       </div>
       {exceedsMax && (
-        <p className="text-xs text-red-600 dark:text-red-400">
+        <p className="text-xs text-destructive">
           Insufficient collateral. Maximum available: {maxAvailable ? `${maxAvailable} ${unit}` : `${unit}`}. Try decreasing the mint amount or moving the Risk Slider to the right.
         </p>
       )}

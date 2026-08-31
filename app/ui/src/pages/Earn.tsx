@@ -511,7 +511,7 @@ const Earn = () => {
         apyRaw: saveUsdstDisplayApyRaw,
         tvl: saveUsdstTvl,
         badge: "Savings Vault",
-        rateLabel: "Best Available APY",
+        rateLabel: "Best available APY",
         actionLabel: "Deposit",
         onCardClick: () => navigate("/dashboard/earn-save"),
         onActionClick: () => navigate("/dashboard/earn-save"),
@@ -528,8 +528,8 @@ const Earn = () => {
         apyRaw: isLive ? getYieldVaultDisplayApyRaw(cfg.key) : undefined,
         tvl: isLive ? (vaultData?.tvlUsd || "0") : "0",
         badge: cfg.badge,
-        rateLabel: "Best Available APY",
-        actionLabel: isLive ? "Deposit" : "Coming Soon",
+        rateLabel: "Best available APY",
+        actionLabel: isLive ? "Deposit" : "Coming soon",
         onCardClick: () => navigate(`/dashboard/earn-yield-vault?vault=${cfg.key}`),
         onActionClick: () => navigate(`/dashboard/earn-yield-vault?vault=${cfg.key}`),
       };
@@ -541,7 +541,7 @@ const Earn = () => {
       apyRaw: stakingDisplayApyRaw,
       tvl: stakingInfo?.totalRewardableStakeUsd || "0",
       badge: "Staking",
-      rateLabel: "Best Available APY",
+      rateLabel: "Best available APY",
       actionLabel: "Stake",
       onCardClick: () => navigate("/dashboard/earn-staking"),
       onActionClick: () => navigate("/dashboard/earn-staking"),
@@ -651,10 +651,10 @@ const Earn = () => {
         />
 
         <div
-          className="transition-all duration-300 md:pl-64"
+          className="transition-[padding-left] duration-300 md:pl-64"
           style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}
         >
-          <DashboardHeader title="Earn Opportunities" />
+          <DashboardHeader title="Earn opportunities" />
 
           <main className="p-4 md:p-6 pb-16 md:pb-6 space-y-6">
             <Skeleton className="h-7 w-44" />
@@ -684,10 +684,10 @@ const Earn = () => {
       />
 
       <div
-        className="transition-all duration-300 md:pl-64"
+        className="transition-[padding-left] duration-300 md:pl-64"
         style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}
       >
-        <DashboardHeader title="Earn Opportunities" />
+        <DashboardHeader title="Earn opportunities" />
 
         <main className="p-4 md:p-6 pb-16 md:pb-6 space-y-8">
           {guestMode && (
@@ -699,7 +699,7 @@ const Earn = () => {
               {configuredFeaturedOpportunity && featuredOpportunityMeta && (
                 <div>
                   <Card
-                    className="h-full cursor-pointer rounded-[22px] border border-amber-300/70 bg-gradient-to-br from-[#fff9ef] via-[#fff7ea] to-[#fff2dc] shadow-[0_6px_18px_rgba(217,119,6,0.07)] dark:border-amber-400/35 dark:from-[#24190a] dark:via-[#2a1c0c] dark:to-[#2b1d0c]"
+                    className="h-full cursor-pointer rounded-[22px] border border-gold/40 bg-gradient-to-br from-gold/10 to-muted shadow-[0_6px_18px_rgba(217,119,6,0.07)]"
                     role="button"
                     tabIndex={0}
                     onClick={featuredOpportunityMeta.onCardClick}
@@ -712,7 +712,7 @@ const Earn = () => {
                   >
                     <CardContent className="space-y-4 px-4 pb-4 pt-4 md:px-5 md:pb-5 md:pt-5">
                       <p className="text-sm font-semibold text-foreground/90">
-                        Featured Opportunity
+                        Featured opportunity
                       </p>
                       <div className="flex items-start gap-3.5">
                         {configuredFeaturedOpportunity.kind === "saveUsdst" ? (
@@ -740,17 +740,17 @@ const Earn = () => {
                       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-xl bg-white/45 px-3 py-2.5 dark:bg-white/5">
                         <p className="text-[11px] font-medium text-muted-foreground md:text-xs inline-flex items-center gap-1">
                           {featuredOpportunityMeta.rateLabel}
-                          {featuredOpportunityMeta.rateLabel === "Best Available APY" && <BestApyInfoTooltip />}
+                          {featuredOpportunityMeta.rateLabel === "Best available APY" && <BestApyInfoTooltip />}
                         </p>
                         <EarnApyTooltip info={featuredOpportunityApyInfo}>
-                          <span className={`text-[22px] leading-none font-semibold md:text-[28px] ${featuredOpportunityApy.className} cursor-default`}>
+                          <span className={`text-[22px] leading-none font-semibold tabular-nums md:text-[28px] ${featuredOpportunityApy.className} cursor-default`}>
                             {featuredOpportunityApy.label === "-" ? "-" : featuredOpportunityApy.label}
                           </span>
                         </EarnApyTooltip>
                         <p className="text-[11px] font-medium text-muted-foreground md:text-xs">
                           TVL
                         </p>
-                        <p className="text-sm font-medium text-foreground/80 md:text-sm">
+                        <p className="text-sm font-medium tabular-nums text-foreground/80 md:text-sm">
                           {configuredFeaturedOpportunity.kind === "staking"
                             ? stakingTotalStakedLabel
                             : configuredFeaturedOpportunity.kind === "yieldVault"
@@ -769,12 +769,12 @@ const Earn = () => {
                         <Badge variant="secondary" className="rounded-md border-0 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-foreground shadow-none dark:bg-white/10">
                           {featuredOpportunityMeta.badge}
                         </Badge>
-                        <Badge className="rounded-md bg-amber-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-amber-600">
+                        <Badge className="rounded-md bg-gold px-2.5 py-1 text-[11px] font-medium text-gold-foreground hover:bg-gold">
                           Featured
                         </Badge>
                       </div>
                       <Button
-                        className="h-10 w-full rounded-xl bg-amber-600 text-[15px] font-semibold text-white hover:bg-amber-600"
+                        className="h-10 w-full rounded-xl bg-gold text-[15px] font-semibold text-gold-foreground hover:bg-gold/90"
                         variant="default"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -791,7 +791,7 @@ const Earn = () => {
 
               <div>
                 <Card
-                  className="h-full cursor-pointer rounded-[22px] border border-blue-300/70 bg-gradient-to-br from-[#f8fbff] via-[#f4f8ff] to-[#edf3ff] shadow-[0_6px_18px_rgba(37,99,235,0.07)] dark:border-blue-400/35 dark:from-[#0f1a33] dark:via-[#101a35] dark:to-[#111c3a]"
+                  className="h-full cursor-pointer rounded-[22px] border border-primary/30 bg-gradient-to-br from-primary/5 to-muted shadow-[0_6px_18px_rgba(37,99,235,0.07)]"
                   role="button"
                   tabIndex={0}
                   onClick={topOpportunityMeta.onCardClick}
@@ -804,7 +804,7 @@ const Earn = () => {
                 >
                   <CardContent className="space-y-4 px-4 pb-4 pt-4 md:px-5 md:pb-5 md:pt-5">
                     <p className="text-sm font-semibold text-foreground/90">
-                      Top Opportunity
+                      Top opportunity
                     </p>
                     <div className="flex items-start gap-3.5">
                       {topOpportunity.kind === "saveUsdst" ? (
@@ -832,17 +832,17 @@ const Earn = () => {
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-xl bg-white/45 px-3 py-2.5 dark:bg-white/5">
                       <p className="text-[11px] font-medium text-muted-foreground md:text-xs inline-flex items-center gap-1">
                         {topOpportunityMeta.rateLabel}
-                        {topOpportunityMeta.rateLabel === "Best Available APY" && <BestApyInfoTooltip />}
+                        {topOpportunityMeta.rateLabel === "Best available APY" && <BestApyInfoTooltip />}
                       </p>
                       <EarnApyTooltip info={topOpportunityApyInfo}>
-                        <span className={`text-[22px] leading-none font-semibold md:text-[28px] ${topOpportunityApy.className} cursor-default`}>
+                        <span className={`text-[22px] leading-none font-semibold tabular-nums md:text-[28px] ${topOpportunityApy.className} cursor-default`}>
                           {topOpportunityApy.label === "-" ? "-" : topOpportunityApy.label}
                         </span>
                       </EarnApyTooltip>
                       <p className="text-[11px] font-medium text-muted-foreground md:text-xs">
                         TVL
                       </p>
-                      <p className="text-sm font-medium text-foreground/80 md:text-sm">
+                      <p className="text-sm font-medium tabular-nums text-foreground/80 md:text-sm">
                         {topOpportunity.kind === "yieldVault"
                           ? (() => {
                             const vd = yieldVaults[YIELD_VAULTS[topOpportunity.vaultIndex].key];
@@ -858,12 +858,12 @@ const Earn = () => {
                       <Badge variant="secondary" className="rounded-md border-0 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-foreground shadow-none dark:bg-white/10">
                         {topOpportunityMeta.badge}
                       </Badge>
-                      <Badge className="rounded-md bg-blue-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-blue-600">
-                        Top Ranked
+                      <Badge className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground hover:bg-primary">
+                        Top ranked
                       </Badge>
                     </div>
                     <Button
-                      className="h-10 w-full rounded-xl bg-blue-600 text-[15px] font-semibold text-white hover:bg-blue-600"
+                      className="h-10 w-full rounded-xl bg-primary text-[15px] font-semibold text-primary-foreground hover:bg-primary/90"
                       variant="default"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -880,7 +880,7 @@ const Earn = () => {
           </section>
 
           <section className="mt-2 space-y-3 border-t border-border/60 pt-5">
-            <h2 className="text-lg font-semibold">All Opportunities</h2>
+            <h2 className="text-lg font-semibold">All opportunities</h2>
 
             <Card className="border border-border/70 overflow-hidden">
               <CardContent className="p-0">
@@ -891,12 +891,12 @@ const Earn = () => {
                         <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">Opportunity</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                           <span className="inline-flex items-center gap-1">
-                            Best Available APY
+                            Best available APY
                             <BestApyInfoTooltip />
                           </span>
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">TVL</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">Your Position</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">Your position</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">Type</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground tracking-wide">Action</th>
                       </tr>
@@ -933,17 +933,17 @@ const Earn = () => {
                               </td>
                               <td className="px-4 py-3">
                                 <EarnApyTooltip info={saveUsdstApyInfo}>
-                                  <p className={`text-sm font-semibold ${saveUsdstApyDisplay.className} cursor-default`}>
+                                  <p className={`text-sm font-semibold tabular-nums ${saveUsdstApyDisplay.className} cursor-default`}>
                                     {saveUsdstApyDisplay.label}
                                   </p>
                                 </EarnApyTooltip>
                               </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">
+                                <p className="text-sm font-semibold tabular-nums">
                                   ${formatUsd(saveUsdstTvl)}
                                 </p>                              </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>                              </td>
+                                <p className="text-sm font-semibold tabular-nums">{getOpportunityPositionValue(opportunity)}</p>                              </td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 Savings Vault
                               </td>
@@ -997,19 +997,19 @@ const Earn = () => {
                                   <p className="font-medium truncate">{cfg.name}</p>
                                   <Badge variant="secondary" className="text-[10px]">{cfg.badge}</Badge>
                                   {!yvLive && (
-                                    <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-600 dark:text-amber-400">Coming Soon</Badge>
+                                    <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">Coming soon</Badge>
                                   )}
                                 </div>
                               </td>
                               <td className="px-4 py-3">
                                 <EarnApyTooltip info={yvApyInfo}>
-                                  <p className={`text-sm font-semibold cursor-default ${yvApyDisplay.className}`}>
+                                  <p className={`text-sm font-semibold tabular-nums cursor-default ${yvApyDisplay.className}`}>
                                     {yvApyDisplay.label}
                                   </p>
                                 </EarnApyTooltip>
                               </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">
+                                <p className="text-sm font-semibold tabular-nums">
                                   {yvLive
                                     ? (() => {
                                       const s = formatYieldVaultTvlUsd(yvData);
@@ -1018,7 +1018,7 @@ const Earn = () => {
                                     : "--"}
                                 </p>                              </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>                              </td>
+                                <p className="text-sm font-semibold tabular-nums">{getOpportunityPositionValue(opportunity)}</p>                              </td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 {cfg.badge}
                               </td>
@@ -1040,7 +1040,7 @@ const Earn = () => {
                                         Deposit
                                       </>
                                     ) : (
-                                      "Coming Soon"
+                                      "Coming soon"
                                     )}
                                   </Button>
                                 </div>
@@ -1076,15 +1076,15 @@ const Earn = () => {
                               </td>
                               <td className="px-4 py-3">
                                 <EarnApyTooltip info={stakingApyInfo}>
-                                  <p className={`text-sm font-semibold cursor-default ${stakingApyDisplay.className}`}>
+                                  <p className={`text-sm font-semibold tabular-nums cursor-default ${stakingApyDisplay.className}`}>
                                     {stakingApyDisplay.label}
                                   </p>
                                 </EarnApyTooltip>
                               </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">{stakingTotalStakedLabel}</p>                              </td>
+                                <p className="text-sm font-semibold tabular-nums">{stakingTotalStakedLabel}</p>                              </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">{getOpportunityPositionValue(opportunity)}</p>                              </td>
+                                <p className="text-sm font-semibold tabular-nums">{getOpportunityPositionValue(opportunity)}</p>                              </td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 Protocol staking
                               </td>

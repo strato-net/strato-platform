@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle, ArrowUpCircle, ArrowDownCircle, PauseCircle } from "lucide-react";
+import { HelpCircle, ArrowUpCircle, ArrowDownCircle, PauseCircle, Loader2 } from "lucide-react";
 import { formatBalance } from "@/utils/numberUtils";
 import { CollateralData, NewLoanData } from "@/interface";
 import { getMaxSafeWithdrawAmount } from "@/utils/lendingUtils";
@@ -26,7 +26,7 @@ interface CollateralManagementTableProps {
 
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-12">
-    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
   </div>
 );
 
@@ -70,16 +70,16 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
 // Helper function to format token amount with tooltip
 const TokenAmountDisplay = ({ amount, decimals }: { amount: bigint; decimals: number }) => {
   if (amount <= 1n) {
-    return <div className="font-medium">0</div>;
+    return <div className="font-medium tabular-nums">0</div>;
   }
-  
+
   const fullAmount = formatBalance(amount, undefined, decimals, 2);
   const displayAmount = formatBalance(amount, undefined, decimals, 0, 4);
-  
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="font-medium cursor-help">{displayAmount}</div>
+        <div className="font-medium tabular-nums cursor-help">{displayAmount}</div>
       </TooltipTrigger>
       <TooltipContent>
         <p>{fullAmount}</p>
@@ -91,11 +91,11 @@ const TokenAmountDisplay = ({ amount, decimals }: { amount: bigint; decimals: nu
 // Helper function to format USD value (no tooltip, 2 decimals)
 const USDValueDisplay = ({ value }: { value: bigint }) => {
   if (value <= 1n) {
-    return <div className="text-xs text-muted-foreground">$0.00</div>;
+    return <div className="text-xs text-muted-foreground tabular-nums">$0.00</div>;
   }
-  
+
   const displayValue = formatBalance(value, undefined, 18, 0, 2, true);
-  return <div className="text-xs text-muted-foreground">{displayValue}</div>;
+  return <div className="text-xs text-muted-foreground tabular-nums">{displayValue}</div>;
 };
 
 const CollateralManagementTable = ({
@@ -111,7 +111,7 @@ const CollateralManagementTable = ({
       <CardHeader className="px-3 md:px-6 pb-2 md:pb-4">
         <CardTitle className="text-base md:text-lg">
           <InfoTooltip content="Manage your collateral assets. Supply tokens from your wallet or withdraw supplied collateral.">
-            Collateral Management
+            Collateral management
           </InfoTooltip>
         </CardTitle>
       </CardHeader>
@@ -165,10 +165,7 @@ const CollateralManagementTable = ({
                             className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover"
                           />
                         ) : (
-                          <div
-                            className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-white text-xs"
-                            style={{ backgroundColor: "red" }}
-                          >
+                          <div className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center bg-muted text-muted-foreground text-xs">
                             {asset?._symbol.slice(0, 2)}
                           </div>
                         )}
@@ -179,11 +176,11 @@ const CollateralManagementTable = ({
                       </div>
                     </TableCell>
                     {/* LTV */}
-                    <TableCell className="px-2 md:px-4 text-sm">
+                    <TableCell className="px-2 md:px-4 text-sm tabular-nums">
                       {asset?.ltv ? (Number(asset.ltv) / 100) : 0}%
                     </TableCell>
                     {/* LT */}
-                    <TableCell className="px-2 md:px-4 text-sm">
+                    <TableCell className="px-2 md:px-4 text-sm tabular-nums">
                       {asset?.liquidationThreshold ? (Number(asset.liquidationThreshold) / 100) : 0}%
                     </TableCell>
                     {/* Supply - hidden on mobile */}
@@ -259,7 +256,7 @@ const CollateralManagementTable = ({
                                     </Button>
                                   </span>
                                 </TooltipTrigger>
-                                <TooltipContent className={isPaused ? "bg-amber-50 border-amber-300 text-amber-900" : ""}>
+                                <TooltipContent className={isPaused ? "bg-popover border-warning/40 text-warning" : ""}>
                                   <span>{tooltipMessage}</span>
                                 </TooltipContent>
                               </Tooltip>

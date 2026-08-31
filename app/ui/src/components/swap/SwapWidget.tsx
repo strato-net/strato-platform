@@ -297,7 +297,7 @@ const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
               <button
                 type="button"
                 onClick={() => setShowPoolSelector((open) => !open)}
-                className="flex items-center gap-1.5 text-xs md:text-sm text-foreground hover:text-strato-blue transition-colors"
+                className="flex items-center gap-1.5 text-xs md:text-sm text-foreground hover:text-primary transition-colors"
               >
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-semibold">
                   {activePool?.poolLabel ?? "—"}
@@ -338,7 +338,7 @@ const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
       </SwapDetails>
 
       <Button
-        className="w-full bg-strato-blue hover:bg-strato-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={() => setIsDialogOpen(true)}
         disabled={guestMode || isSwapDisabled}
       >
@@ -348,7 +348,7 @@ const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
             ? "This pool is disabled"
             : activePool?.isPaused
               ? "Pool is paused by admin at this time"
-              : "Trade Assets"}
+              : "Trade assets"}
       </Button>
 
       <SwapConfirmDialog

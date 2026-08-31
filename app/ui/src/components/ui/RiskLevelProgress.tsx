@@ -6,9 +6,9 @@ interface RiskLevelProgressProps {
 
 const RiskLevelProgress = ({ riskLevel }: RiskLevelProgressProps) => {
   const getRiskColor = () => {
-    if (riskLevel < 30) return "bg-green-500";
-    if (riskLevel < 70) return "bg-yellow-500";
-    return "bg-red-500";
+    if (riskLevel < 30) return "bg-success";
+    if (riskLevel < 70) return "bg-warning";
+    return "bg-destructive";
   };
 
   const getRiskText = () => {
@@ -25,10 +25,10 @@ const RiskLevelProgress = ({ riskLevel }: RiskLevelProgressProps) => {
           <span
             className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
               riskLevel < 30
-                ? "bg-green-50 text-green-700"
+                ? "bg-success/15 text-success"
                 : riskLevel < 70
-                  ? "bg-yellow-50 text-yellow-700"
-                  : "bg-red-50 text-red-700"
+                  ? "bg-warning/15 text-warning"
+                  : "bg-destructive/15 text-destructive"
             }`}
           >
             {getRiskText()}

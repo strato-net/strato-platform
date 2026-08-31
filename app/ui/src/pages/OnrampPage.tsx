@@ -117,14 +117,14 @@ const OnrampPage = () => {
         return (
           <button
             onClick={initOnramp}
-            className="w-full py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            className="w-full py-2.5 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors"
           >
-            Make Another Purchase
+            Make another purchase
           </button>
         );
       case "rejected":
         return (
-          <div className="flex items-start gap-2 text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg text-sm">
+          <div className="flex items-start gap-2 text-destructive bg-destructive/10 px-3 py-2 rounded-lg text-sm">
             <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
             <span>
               This session was rejected by Stripe. No payment was processed and
@@ -142,7 +142,7 @@ const OnrampPage = () => {
       <DashboardSidebar />
 
       <div
-        className="h-screen flex flex-col transition-all duration-300"
+        className="h-screen flex flex-col transition-[padding-left] duration-300"
         style={{ paddingLeft: "var(--sidebar-width, 0px)" }}
       >
         <DashboardHeader title="Buy Crypto" />
@@ -168,7 +168,7 @@ const OnrampPage = () => {
                     href={`${onrampNodeUrls[0]}/dashboard/onramp`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors"
                   >
                     Go to {isTestnet ? "Testnet" : ""} Onramp
                     <ExternalLink className="h-3.5 w-3.5" />
@@ -186,11 +186,11 @@ const OnrampPage = () => {
 
                   {sessionStatus === "error" && (
                     <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-                      <AlertCircle className="h-10 w-10 text-red-400" />
+                      <AlertCircle className="h-10 w-10 text-destructive" />
                       <p className="text-sm text-muted-foreground max-w-sm">{errorMessage}</p>
                       <button
                         onClick={initOnramp}
-                        className="text-sm text-blue-600 hover:underline"
+                        className="text-sm text-primary hover:text-primary/80 hover:underline"
                       >
                         Try again
                       </button>

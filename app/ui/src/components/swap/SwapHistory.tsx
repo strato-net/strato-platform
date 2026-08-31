@@ -42,7 +42,7 @@ const LoadingRow = ({ colSpan }: { colSpan: number }) => (
 const EmptyRow = ({ colSpan }: { colSpan: number }) => (
   <TableRow>
     <TableCell colSpan={colSpan} className="text-center py-8">
-      <p className="text-muted-foreground">No trade history found for this pair</p>
+      <p className="text-muted-foreground">No trades yet for this pair — make the first trade to get started.</p>
     </TableCell>
   </TableRow>
 );
@@ -54,7 +54,7 @@ const SenderCell = ({ sender, copiedHash, onCopy }: { sender: string; copiedHash
         <TooltipTrigger asChild>
           <button
             onClick={() => onCopy(sender)}
-            className="flex items-center gap-1 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 active:bg-blue-100 dark:active:bg-blue-900/30 active:scale-95 transition-all duration-150 rounded px-1 py-0.5"
+            className="flex items-center gap-1 hover:text-primary hover:bg-primary/10 active:bg-primary/20 active:scale-95 transition-[color,background-color,transform] duration-150 rounded px-1 py-0.5"
           >
             <span>
               {copiedHash === sender ? 'Copied!' : formatHash(sender)}
@@ -79,16 +79,16 @@ const SwapRow = ({ swap, copiedHash, onCopy }: { swap: SwapHistoryEntry & { time
     <TableCell className="font-medium text-sm">
       {swap.tokenIn}
     </TableCell>
-    <TableCell className="text-sm">
+    <TableCell className="text-sm tabular-nums">
       {formatWeiAmount(swap.amountIn)}
     </TableCell>
     <TableCell className="font-medium text-sm">
       {swap.tokenOut}
     </TableCell>
-    <TableCell className="text-sm">
+    <TableCell className="text-sm tabular-nums">
       {formatWeiAmount(swap.amountOut)}
     </TableCell>
-    <TableCell className="text-sm">
+    <TableCell className="text-sm tabular-nums">
       {swap.tokenIn === 'USDST' || swap.tokenOut === 'USDST' ? '$' : ''}{swap.impliedPrice}
     </TableCell>
     <TableCell className="text-sm text-muted-foreground">
@@ -143,7 +143,7 @@ const PaginationControls = ({
       </Button>
       <span className="text-sm text-muted-foreground">
         Page {currentPage} of {totalPages}
-        {loading && <span className="ml-2 text-blue-500">Loading...</span>}
+        {loading && <span className="ml-2 text-primary">Loading...</span>}
       </span>
       <Button
         variant="outline"
@@ -206,7 +206,7 @@ const SwapHistory: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Trade History</h3>
+        <h3 className="text-lg font-semibold">Trade history</h3>
         {userAddress && (
           <Button
             variant={showMySwapsOnly ? "default" : "outline"}
@@ -215,7 +215,7 @@ const SwapHistory: React.FC = () => {
             disabled={!hasPair || loading}
           >
             {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            {showMySwapsOnly ? "Showing My Trades" : "Show My Trades"}
+            {showMySwapsOnly ? "Showing my trades" : "Show my trades"}
           </Button>
         )}
       </div>
@@ -226,10 +226,10 @@ const SwapHistory: React.FC = () => {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[140px]">Time</TableHead>
-                <TableHead className="w-[100px]">Token In</TableHead>
-                <TableHead className="w-[120px]">Amount In</TableHead>
-                <TableHead className="w-[100px]">Token Out</TableHead>
-                <TableHead className="w-[120px]">Amount Out</TableHead>
+                <TableHead className="w-[100px]">Token in</TableHead>
+                <TableHead className="w-[120px]">Amount in</TableHead>
+                <TableHead className="w-[100px]">Token out</TableHead>
+                <TableHead className="w-[120px]">Amount out</TableHead>
                 <TableHead className="w-[120px]">Price {priceLabel}</TableHead>
                 <TableHead className="w-[80px]">Pool</TableHead>
                 <TableHead className="w-[100px]">Sender</TableHead>
@@ -271,7 +271,7 @@ const SwapHistory: React.FC = () => {
       ) : (
         <div className="bg-muted/50 rounded-lg p-6 text-center">
           <p className="text-muted-foreground">
-            Please select both token pairs to view trade history
+            Select both tokens to view trade history
           </p>
         </div>
       )}

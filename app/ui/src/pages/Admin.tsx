@@ -41,7 +41,7 @@ const Admin = () => {
               </Button>
               <div className="flex items-center gap-1 md:space-x-2">
                 <Shield className="h-5 w-5 md:h-6 md:w-6 text-strato-blue" />
-                <h1 className="text-base md:text-xl font-bold whitespace-nowrap">Admin Panel</h1>
+                <h1 className="text-base md:text-xl font-bold whitespace-nowrap">Admin panel</h1>
               </div>
             </div>
           </div>
@@ -51,7 +51,7 @@ const Admin = () => {
       {/* Main Content */}
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
         <div className="mb-4 md:mb-8">
-          <h2 className="text-xl md:text-3xl font-bold mb-1 md:mb-2 text-foreground">Platform Administration</h2>
+          <h2 className="text-xl md:text-3xl font-bold mb-1 md:mb-2 text-foreground">Platform administration</h2>
           <p className="text-xs md:text-base text-muted-foreground">Manage tokens, pools, liquidity, and asset pricing</p>
         </div>
 
@@ -60,13 +60,13 @@ const Admin = () => {
             <TabsList className="grid grid-cols-7 w-full min-w-[700px] md:min-w-0">
               <TabsTrigger value="pools" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
                 <Droplets className="h-3 w-3 md:h-4 md:w-4" />
-                <span className="hidden sm:inline">Create Pools</span>
+                <span className="hidden sm:inline">Create pools</span>
                 <span className="sm:hidden">Pools</span>
               </TabsTrigger>
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${['lending', 'configs'].includes(activeTab)
+                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-[color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${['lending', 'configs'].includes(activeTab)
                       ? 'bg-background text-foreground shadow-sm dark:bg-muted dark:text-primary-foreground'
                       : 'hover:bg-muted hover:text-accent-foreground dark:hover:bg-muted/50 dark:hover:text-primary-foreground'
                       }`}
@@ -80,18 +80,18 @@ const Admin = () => {
                 <DropdownMenuContent align="start">
                   <DropdownMenuItem onClick={() => setActiveTab('lending')}>
                     <TrendingUp className="h-4 w-4 mr-2" />
-                    Lending Config
+                    Lending config
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setActiveTab('configs')}>
                     <Cog className="h-4 w-4 mr-2" />
-                    Token Configs
+                    Token configs
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${['tokens', 'pricing', 'status'].includes(activeTab)
+                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-[color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${['tokens', 'pricing', 'status'].includes(activeTab)
                       ? 'bg-background text-foreground shadow-sm dark:bg-muted dark:text-primary-foreground'
                       : 'hover:bg-muted hover:text-accent-foreground dark:hover:bg-muted/50 dark:hover:text-primary-foreground'
                       }`}
@@ -105,26 +105,26 @@ const Admin = () => {
                 <DropdownMenuContent align="start">
                   <DropdownMenuItem onClick={() => setActiveTab('tokens')}>
                     <Coins className="h-4 w-4 mr-2" />
-                    Create Tokens
+                    Create tokens
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setActiveTab('pricing')}>
                     <DollarSign className="h-4 w-4 mr-2" />
-                    Set Prices
+                    Set prices
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setActiveTab('status')}>
                     <ToggleLeft className="h-4 w-4 mr-2" />
-                    Token Status
+                    Token status
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <TabsTrigger value="cdp" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
                 <Database className="h-3 w-3 md:h-4 md:w-4" />
-                <span className="hidden sm:inline">CDP Config</span>
+                <span className="hidden sm:inline">CDP config</span>
                 <span className="sm:hidden">CDP</span>
               </TabsTrigger>
               <TabsTrigger value="vote" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
                 <Vote className="h-3 w-3 md:h-4 md:w-4" />
-                <span className="hidden sm:inline">Vote on Issues</span>
+                <span className="hidden sm:inline">Vote on issues</span>
                 <span className="sm:hidden">Vote</span>
               </TabsTrigger>
               <TabsTrigger value="bridge" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
@@ -148,7 +148,7 @@ const Admin = () => {
           <TabsContent value="tokens" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Create New Token</CardTitle>
+                <CardTitle>Create new token</CardTitle>
                 <CardDescription>
                   Deploy a new ERC20 token on the STRATO blockchain
                 </CardDescription>
@@ -162,7 +162,7 @@ const Admin = () => {
           <TabsContent value="pools" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Create Swap Pool</CardTitle>
+                <CardTitle>Create swap pool</CardTitle>
                 <CardDescription>
                   Create a V2 (constant product), stable, or V3 (concentrated-liquidity) pool
                 </CardDescription>
@@ -181,7 +181,7 @@ const Admin = () => {
           <TabsContent value="pricing" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Set Asset Prices</CardTitle>
+                <CardTitle>Set asset prices</CardTitle>
                 <CardDescription>
                   Configure oracle pricing for assets
                 </CardDescription>
@@ -213,7 +213,7 @@ const Admin = () => {
           <TabsContent value="staking" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Validators & Staking</CardTitle>
+                <CardTitle>Validators & staking</CardTitle>
                 <CardDescription>
                   Validator set, eligibility and fee parameters, governance wiring, operator management.
                 </CardDescription>
@@ -226,7 +226,7 @@ const Admin = () => {
           <TabsContent value="vault" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Carry Vaults</CardTitle>
+                <CardTitle>Carry vaults</CardTitle>
                 <CardDescription>
                   Admin tools for the ETH and wBTC carry vaults.
                 </CardDescription>
@@ -238,7 +238,7 @@ const Admin = () => {
 
             <Card>
               <CardHeader>
-                <CardTitle>Diversified Vault</CardTitle>
+                <CardTitle>Diversified vault</CardTitle>
                 <CardDescription>
                   Admin tools for the diversified multi-asset vault.
                 </CardDescription>

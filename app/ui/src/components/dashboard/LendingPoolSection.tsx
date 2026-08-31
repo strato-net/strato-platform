@@ -131,7 +131,7 @@ const LendingPoolSection = () => {
 
       toast({
         title:
-          type === "deposit" ? "Deposit Successful" : "Withdrawal Successful",
+          type === "deposit" ? "Deposit successful" : "Withdrawal successful",
         description: `You have successfully ${type === "deposit" ? "deposited" : "withdrawn"} ${amount} USDST.`,
         variant: "success",
       });
@@ -155,7 +155,7 @@ const LendingPoolSection = () => {
       <Card className="mb-6 border-0 md:border shadow-none md:shadow-sm">
         <CardHeader className="px-2 py-2 md:px-6 md:py-6">
           <div className="flex justify-between items-center">
-            <CardTitle>USDST Lending Pool</CardTitle>
+            <CardTitle>USDST lending pool</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="px-2 py-2 md:px-6 md:py-6">
@@ -171,14 +171,14 @@ const LendingPoolSection = () => {
                         placeholder="0.00"
                         value={depositAmount}
                         onChange={(e) => setDepositAmount(e.target.value)}
-                        className={`pl-16 ${!isDepositAmountValid() ? 'text-red-600' : ''}`}
+                        className={`pl-16 ${!isDepositAmountValid() ? 'text-destructive' : ''}`}
                         disabled={!isLoggedIn}
                       />
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">USDST</span>
                     </div>
                     <Button
                       onClick={() => handleLiquidityAction("deposit")}
-                      className="bg-strato-blue hover:bg-strato-blue/90 w-full sm:w-28 hidden sm:flex sm:items-center sm:justify-center"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90 w-full sm:w-28 hidden sm:flex sm:items-center sm:justify-center"
                       disabled={loading || isProcessing || !isDepositAmountValid() || !isLoggedIn}
                     >
                       {isProcessing ? (
@@ -205,7 +205,7 @@ const LendingPoolSection = () => {
                         const clamped = `${whole}.${frac.slice(0, 18)}`;
                         setDepositAmount(clamped);
                       }}
-                      className="text-blue-600 hover:underline mr-2"
+                      className="text-primary hover:text-primary/80 hover:underline mr-2"
                     >
                       Max
                     </button>
@@ -221,7 +221,7 @@ const LendingPoolSection = () => {
                   </div>
                   {/* Fee Display */}
                   <div className="text-sm text-muted-foreground mt-1">
-                    Transaction Fee: {LENDING_DEPOSIT_FEE} USDST
+                    Transaction fee: {LENDING_DEPOSIT_FEE} USDST
                   </div>
                   {/* Estimated Rewards */}
                   <RewardsWidget
@@ -250,12 +250,12 @@ const LendingPoolSection = () => {
                     return (
                       <>
                         {isInsufficientBalanceForDepositAndFee && (
-                          <p className="text-yellow-600 text-sm mt-1">
+                          <p className="text-warning text-sm mt-1">
                             Insufficient USDST balance for transaction fee ({LENDING_DEPOSIT_FEE} USDST)
                           </p>
                         )}
                         {isLowBalanceWarning && !isInsufficientUsdstForFee && !isInsufficientBalanceForDepositAndFee && (
-                          <p className="text-yellow-600 text-sm mt-1">
+                          <p className="text-warning text-sm mt-1">
                             Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
                           </p>
                         )}
@@ -265,7 +265,7 @@ const LendingPoolSection = () => {
                   {/* Mobile Button */}
                   <Button
                     onClick={() => handleLiquidityAction("deposit")}
-                    className="bg-strato-blue hover:bg-strato-blue/90 w-full mt-4 sm:hidden"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90 w-full mt-4 sm:hidden"
                     disabled={loading || isProcessing || !isDepositAmountValid() || !isLoggedIn}
                   >
                     {isProcessing ? (
@@ -288,7 +288,7 @@ const LendingPoolSection = () => {
                         placeholder="0.00"
                         value={withdrawAmount}
                         onChange={(e) => setWithdrawAmount(e.target.value)}
-                        className={`pl-16 ${!isWithdrawAmountValid() ? 'text-red-600' : ''}`}
+                        className={`pl-16 ${!isWithdrawAmountValid() ? 'text-destructive' : ''}`}
                         disabled={!isLoggedIn}
                       />
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">USDST</span>
@@ -299,7 +299,7 @@ const LendingPoolSection = () => {
                           <Button
                             onClick={() => handleLiquidityAction("withdraw")}
                             variant="outline"
-                            className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 w-full"
+                            className="border-primary text-primary hover:bg-primary/10 w-full"
                             disabled={
                               loadingLiquidity ||
                               isProcessing ||
@@ -324,8 +324,8 @@ const LendingPoolSection = () => {
                         </span>
                       </TooltipTrigger>
                       {liquidityInfo?.isPaused && (
-                        <TooltipContent className="bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-900 text-orange-900 dark:text-orange-400">
-                          <p>Lending Pool is on pause. This action currently disabled.</p>
+                        <TooltipContent className="bg-warning/10 border-warning/30 text-warning">
+                          <p>Lending pool is on pause. This action is currently disabled.</p>
                         </TooltipContent>
                       )}
                     </Tooltip>
@@ -350,7 +350,7 @@ const LendingPoolSection = () => {
 
                         setWithdrawAmount(clampedClean);
                       }}
-                      className="text-blue-600 hover:underline mr-2"
+                      className="text-primary hover:text-primary/80 hover:underline mr-2"
                     >
                       Max
                     </button>
@@ -385,7 +385,7 @@ const LendingPoolSection = () => {
                     const isInsufficientWithdrawable = withdrawAmountWei > 0n && withdrawAmountWei > maxWithdrawableWei;
 
                     return isInsufficientWithdrawable ? (
-                      <p className="text-red-600 text-sm mt-1">
+                      <p className="text-destructive text-sm mt-1">
                         Insufficient balance - amount exceeds withdrawable limit ({formatBalance(maxWithdrawableWei, "USDST", 18, 2)} available)
                       </p>
                     ) : null;
@@ -406,12 +406,12 @@ const LendingPoolSection = () => {
                     return (
                       <>
                         {isInsufficientUsdstForFee && (
-                          <p className="text-yellow-600 text-sm mt-1">
+                          <p className="text-warning text-sm mt-1">
                             Insufficient USDST balance for transaction fee ({LENDING_WITHDRAW_FEE} USDST)
                           </p>
                         )}
                         {isLowBalanceWarning && !isInsufficientUsdstForFee && (
-                          <p className="text-yellow-600 text-sm mt-1">
+                          <p className="text-warning text-sm mt-1">
                             Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
                           </p>
                         )}
@@ -425,7 +425,7 @@ const LendingPoolSection = () => {
                         <Button
                           onClick={() => handleLiquidityAction("withdraw")}
                           variant="outline"
-                          className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 w-full"
+                          className="border-primary text-primary hover:bg-primary/10 w-full"
                           disabled={
                             loadingLiquidity ||
                             isProcessing ||
@@ -450,8 +450,8 @@ const LendingPoolSection = () => {
                       </span>
                     </TooltipTrigger>
                     {liquidityInfo?.isPaused && (
-                      <TooltipContent className="bg-orange-500/10 border-orange-500/30 text-orange-500">
-                        <p>Lending Pool is on pause. This action currently disabled.</p>
+                      <TooltipContent className="bg-warning/10 border-warning/30 text-warning">
+                        <p>Lending pool is on pause. This action is currently disabled.</p>
                       </TooltipContent>
                     )}
                   </Tooltip>
@@ -461,12 +461,12 @@ const LendingPoolSection = () => {
 
                 <div className="bg-card rounded-lg p-4 border border-border">
               <div className="flex justify-between mb-4">
-                <h3 className="font-medium">Pool Stats</h3>
+                <h3 className="font-medium">Pool stats</h3>
               </div>
               <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Total USDST Supplied</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                  <span className="text-muted-foreground text-sm sm:text-base">Total USDST supplied</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right tabular-nums">
                     {loadingLiquidity ? (
                       <span className="text-muted-foreground animate-pulse">
                         Loading...
@@ -479,8 +479,8 @@ const LendingPoolSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Total USDST Borrowed</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                  <span className="text-muted-foreground text-sm sm:text-base">Total USDST borrowed</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right tabular-nums">
                     {loadingLiquidity ? (
                       <span className="text-muted-foreground animate-pulse">
                         Loading...
@@ -493,12 +493,12 @@ const LendingPoolSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Utilization Rate</span>
-                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.utilizationRate || '0'}%</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Utilization rate</span>
+                  <span className="font-medium text-sm sm:text-base tabular-nums">{liquidityInfo?.utilizationRate || '0'}%</span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Available Liquidity</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                  <span className="text-muted-foreground text-sm sm:text-base">Available liquidity</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right tabular-nums">
                      {loadingLiquidity ? (
                       <span className="text-muted-foreground animate-pulse">
                         Loading...
@@ -511,8 +511,8 @@ const LendingPoolSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Total Collateral Value</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                  <span className="text-muted-foreground text-sm sm:text-base">Total collateral value</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right tabular-nums">
                     {loadingLiquidity ? (
                       <span className="text-muted-foreground animate-pulse">
                         Loading...
@@ -525,8 +525,8 @@ const LendingPoolSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Borrow Index</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                  <span className="text-muted-foreground text-sm sm:text-base">Borrow index</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right tabular-nums">
                     {loadingLiquidity ? (
                       <span className="text-muted-foreground animate-pulse">Loading...</span>
                     ) : liquidityInfo?.borrowIndex ? (
@@ -541,8 +541,8 @@ const LendingPoolSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Reserves Accrued</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                  <span className="text-muted-foreground text-sm sm:text-base">Reserves accrued</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right tabular-nums">
                     {loadingLiquidity ? (
                       <span className="text-muted-foreground animate-pulse">Loading...</span>
                     ) : liquidityInfo?.reservesAccrued ? (
@@ -554,29 +554,29 @@ const LendingPoolSection = () => {
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                   <span className="text-muted-foreground text-sm sm:text-base inline-flex items-center gap-1">
-                    Best Available APY
+                    Best available APY
                     <BestApyInfoTooltip />
                   </span>
                   <EarnApyTooltip info={lendingEarnApyInfo}>
-                    <span className="font-medium text-sm sm:text-base cursor-default">
+                    <span className="font-medium text-sm sm:text-base cursor-default tabular-nums">
                       {lendingDisplayApy ? `${lendingDisplayApy}%` : "N/A"}
                     </span>
                   </EarnApyTooltip>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Max Supply APY</span>
-                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.maxSupplyAPY ? `${liquidityInfo.maxSupplyAPY}%` : "N/A"}</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Max supply APY</span>
+                  <span className="font-medium text-sm sm:text-base tabular-nums">{liquidityInfo?.maxSupplyAPY ? `${liquidityInfo.maxSupplyAPY}%` : "N/A"}</span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                   <span className="text-muted-foreground text-sm sm:text-base">Borrow APY</span>
-                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.borrowAPY ? `${liquidityInfo.borrowAPY}%` : "N/A"}</span>
+                  <span className="font-medium text-sm sm:text-base tabular-nums">{liquidityInfo?.borrowAPY ? `${liquidityInfo.borrowAPY}%` : "N/A"}</span>
                 </div>
                 {/* User-specific data - only show when logged in */}
                 {isLoggedIn && (
                   <>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                    <span className="text-muted-foreground text-sm sm:text-base">Your {liquidityInfo?.withdrawable?._name || "lendUSDST"} (Total)</span>
-                      <span className="font-medium text-sm sm:text-base sm:text-right">
+                    <span className="text-muted-foreground text-sm sm:text-base">Your {liquidityInfo?.withdrawable?._name || "lendUSDST"} (total)</span>
+                      <span className="font-medium text-sm sm:text-base sm:text-right tabular-nums">
                         {loadingLiquidity ? (
                           <span className="text-muted-foreground animate-pulse">
                             Loading...
@@ -591,8 +591,8 @@ const LendingPoolSection = () => {
                   </>
                 )}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Conversion Rate</span>
-                  <span className="font-medium text-sm sm:text-base sm:text-right">{liquidityInfo?.exchangeRate ? "1 " + (liquidityInfo?.withdrawable?._name || "lendUSDST") + " = " + formatUnits(liquidityInfo?.exchangeRate || 0, 18) + " USDST" : "N/A"}</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Conversion rate</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right tabular-nums">{liquidityInfo?.exchangeRate ? "1 " + (liquidityInfo?.withdrawable?._name || "lendUSDST") + " = " + formatUnits(liquidityInfo?.exchangeRate || 0, 18) + " USDST" : "N/A"}</span>
                 </div>
               </div>
             </div>

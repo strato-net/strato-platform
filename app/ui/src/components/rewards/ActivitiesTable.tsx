@@ -96,7 +96,7 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
   const { tokenApys } = useEarnContext();
   const { saveUsdstInfo } = useSaveUsdstContext();
   const { vaults: yieldVaults } = useYieldVaultContext();
-  const loginButtonClass = "bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90";
+  const loginButtonClass = "bg-gradient-to-r from-strato-blue to-primary text-white hover:opacity-90";
   const visibleActivities = activities.filter(
     (activity) => safeBigInt(activity?.emissionRate || "0") > 0n
   );

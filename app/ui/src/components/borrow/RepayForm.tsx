@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
 import { REPAY_FEE } from "@/lib/constants";
 import { safeParseUnits, addCommasToInput, formatUnits, formatBalance } from "@/utils/numberUtils";
 import { NewLoanData } from "@/interface";
@@ -32,7 +33,7 @@ const FormattedAmount = ({
 }) => {
   
   if (value <= 1n) {
-    return <span className={className}>0.00 {symbol}</span>;
+    return <span className={`tabular-nums ${className}`}>0.00 {symbol}</span>;
   }
 
   // Format to exactly 2 decimals for display
@@ -45,13 +46,13 @@ const FormattedAmount = ({
   const needsTooltip = displayAmount !== fullAmount;
 
   if (!needsTooltip) {
-    return <span className={className}>{displayAmount}</span>;
+    return <span className={`tabular-nums ${className}`}>{displayAmount}</span>;
   }
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className={`cursor-help ${className}`}>{displayAmount}</span>
+        <span className={`tabular-nums cursor-help ${className}`}>{displayAmount}</span>
       </TooltipTrigger>
       <TooltipContent>
         <p>{fullAmount}</p>
@@ -146,7 +147,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance,
       {/* Loan Details */}
       <div className="space-y-2">
         <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">Total Amount Owed</span>
+          <span className="text-sm text-muted-foreground">Total amount owed</span>
           <span className="font-normal">
             {(() => {
               try {
@@ -160,7 +161,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance,
 
         {loans?.totalAmountOwedPreview && (
           <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Projected Debt</span>
+            <span className="text-sm text-muted-foreground">Projected debt</span>
             <span className="font-medium">
               {(() => {
                 try {
@@ -188,7 +189,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance,
 
       {/* Repay Amount Input */}
       <div className="space-y-3">
-        <label className="text-sm font-medium">Repay Amount (USDST)</label>
+        <label className="text-sm font-medium">Repay amount (USDST)</label>
         <div className="flex justify-between items-center text-xs text-muted-foreground">
           <span>Min: 0.01 USDST</span>
           <div>
@@ -203,7 +204,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance,
                 disabled={guestMode || (() => {
                 return BigInt(maxAmount) === 0n;
               })()}
-              className="px-2 py-1 mr-1 bg-muted hover:bg-muted/80 rounded-full text-foreground text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-2 py-1 mr-1 rounded-full text-primary hover:text-primary/80 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
               title={(() => {
                 if (guestMode) return "Connect wallet to repay";
                 const owed = BigInt(loans?.totalAmountOwed || 0);
@@ -222,8 +223,8 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance,
         <div className="relative">
           <Input
             placeholder="0.00"
-            className={`pr-16 ${(() => { 
-              return safeParseUnits(repayAmount || "0") > BigInt(maxAmount) ? 'text-red-600' : ''; 
+            className={`pr-16 ${(() => {
+              return safeParseUnits(repayAmount || "0") > BigInt(maxAmount) ? 'text-destructive' : '';
             })()}`}
             value={addCommasToInput(repayAmount)}
             onChange={(e)=>{
@@ -235,7 +236,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance,
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">USDST</span>
         </div>
         {repayAmountError && (
-          <p className="text-red-600 text-sm">{repayAmountError}</p>
+          <p className="text-destructive text-sm">{repayAmountError}</p>
         )}
         <PercentageButtons
           value={repayAmount}
@@ -259,14 +260,14 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance,
       {/* Payment Summary */}
       <div className="space-y-2 pt-3 border-t border-border">
         <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">Payment Amount</span>
+          <span className="text-sm text-muted-foreground">Payment amount</span>
           <span className="font-medium">
             <FormattedAmount value={repayAmountError ? 0n : safeParseUnits(repayAmount || "0")} />
           </span>
         </div>
         
         <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">Remaining Balance</span>
+          <span className="text-sm text-muted-foreground">Remaining balance</span>
           <span className="font-medium">
             {(() => {
               try {
@@ -289,11 +290,11 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance,
       {/* Transaction Fee */}
       <div className="px-4 py-3 bg-muted/50 rounded-md">
         <div className="flex justify-between text-sm mb-2">
-          <span className="text-muted-foreground">Transaction Fee</span>
-          <span className="font-medium">{REPAY_FEE} USDST ({parseFloat(REPAY_FEE) * 100} voucher)</span>
+          <span className="text-muted-foreground">Transaction fee</span>
+          <span className="font-medium tabular-nums">{REPAY_FEE} USDST ({parseFloat(REPAY_FEE) * 100} voucher)</span>
         </div>
         { feeError && (
-          <p className="text-yellow-600 dark:text-yellow-500 text-sm mt-1">{feeError}</p>
+          <p className="text-warning text-sm mt-1">{feeError}</p>
         )}
       </div>
 
@@ -311,9 +312,9 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance,
         className="w-full"
       >
         {repayLoading ? (
-          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
+          <Loader2 className="h-5 w-5 animate-spin text-current mr-2" />
         ) : (
-          guestMode ? "Connect Wallet to Repay" : "Repay"
+          guestMode ? "Connect wallet to repay" : "Repay"
         )}
       </Button>
       </div>

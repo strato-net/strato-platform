@@ -46,7 +46,7 @@ const VaultUserActivity = () => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Your Activity</CardTitle>
+          <CardTitle>Your activity</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
@@ -60,7 +60,7 @@ const VaultUserActivity = () => {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Your Activity</CardTitle>
+        <CardTitle>Your activity</CardTitle>
         <Button
           variant="ghost"
           size="sm"
@@ -73,7 +73,7 @@ const VaultUserActivity = () => {
       <CardContent>
         {userActivity.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            No deposits or withdrawals yet.
+            No deposits or withdrawals yet — make your first deposit to start earning.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -91,9 +91,9 @@ const VaultUserActivity = () => {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {item.type === "deposit" ? (
-                          <ArrowDownToLine className="h-4 w-4 text-green-600" />
+                          <ArrowDownToLine className="h-4 w-4 text-success" />
                         ) : (
-                          <ArrowUpFromLine className="h-4 w-4 text-red-600" />
+                          <ArrowUpFromLine className="h-4 w-4 text-destructive" />
                         )}
                         <Badge variant={item.type === "deposit" ? "default" : "secondary"}>
                           {item.type === "deposit" ? "Deposit" : "Withdraw"}
@@ -103,7 +103,7 @@ const VaultUserActivity = () => {
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                       {formatTimestamp(item.timestamp)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-sm">
+                    <TableCell className="text-right font-mono text-sm tabular-nums">
                       ${formatUsd(item.valueUsd)}
                     </TableCell>
                   </TableRow>

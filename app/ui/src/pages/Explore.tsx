@@ -69,7 +69,7 @@ const formatWeiAsAmount = (wei?: string | bigint | null): string => {
 };
 
 const changeClass = (change: number) =>
-  change >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500';
+  change >= 0 ? 'text-success' : 'text-destructive';
 
 const formatChange = (change: number | null | undefined) => {
   if (change == null || Number.isNaN(change)) {
@@ -109,7 +109,7 @@ const Sparkline = ({
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="inline-block" aria-hidden>
       <polyline
         fill="none"
-        stroke={positive ? '#16a34a' : '#dc2626'}
+        stroke={positive ? 'hsl(var(--success))' : 'hsl(var(--destructive))'}
         strokeWidth="1.75"
         strokeLinejoin="round"
         strokeLinecap="round"
@@ -252,7 +252,7 @@ const Explore = () => {
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
-      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+      <div className="transition-[padding-left] duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="Explore" />
         <main className="p-4 md:p-6">
           <div className="max-w-7xl mx-auto space-y-6">
@@ -266,7 +266,7 @@ const Explore = () => {
             <div className="grid grid-cols-2 gap-3 md:gap-4">
               <Card>
                 <CardContent className="p-4">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Total Market Cap</div>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Total market cap</div>
                   <div className="text-xl md:text-2xl font-semibold tabular-nums mt-1">
                     {loading ? <Skeleton className="h-7 w-28" /> : `$${formatLargeNumber(parseFloat(totalMarketCap))}`}
                   </div>
@@ -274,7 +274,7 @@ const Explore = () => {
               </Card>
               <Card>
                 <CardContent className="p-4">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Listed Tokens</div>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Listed tokens</div>
                   <div className="text-xl md:text-2xl font-semibold tabular-nums mt-1">
                     {loading ? <Skeleton className="h-7 w-12" /> : tokens.length}
                   </div>
@@ -316,7 +316,7 @@ const Explore = () => {
                             className="inline-flex items-center gap-1 ml-auto hover:text-foreground"
                             onClick={() => toggleSort('marketCap')}
                           >
-                            Market Cap
+                            Market cap
                             <SortIcon active={sortKey === 'marketCap'} dir={sortDir} />
                           </button>
                         </TableHead>
@@ -326,11 +326,11 @@ const Explore = () => {
                             className="inline-flex items-center gap-1 ml-auto hover:text-foreground"
                             onClick={() => toggleSort('totalSupply')}
                           >
-                            Total Supply
+                            Total supply
                             <SortIcon active={sortKey === 'totalSupply'} dir={sortDir} />
                           </button>
                         </TableHead>
-                        {isLoggedIn && <TableHead className="text-right">Your Balance</TableHead>}
+                        {isLoggedIn && <TableHead className="text-right">Your balance</TableHead>}
                         <TableHead className="text-right w-[120px]">1D chart</TableHead>
                         <TableHead className="text-right w-[88px] sticky right-0 bg-card border-l">
                           Buy
@@ -421,18 +421,18 @@ const Explore = () => {
                       <div className="mt-3 flex items-end justify-between gap-3">
                         <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs flex-1">
                           <div>
-                            <div className="text-muted-foreground">Market Cap</div>
+                            <div className="text-muted-foreground">Market cap</div>
                             <div className="font-medium tabular-nums">
                               ${formatLargeNumber(parseFloat(token.marketCap || '0'))}
                             </div>
                           </div>
                           <div>
-                            <div className="text-muted-foreground">Total Supply</div>
+                            <div className="text-muted-foreground">Total supply</div>
                             <div className="font-medium tabular-nums">{formatWeiAsAmount(token.totalSupply)}</div>
                           </div>
                           {isLoggedIn && (
                             <div>
-                              <div className="text-muted-foreground">Your Balance</div>
+                              <div className="text-muted-foreground">Your balance</div>
                               <div className="font-medium tabular-nums">
                                 {balanceLabel(token.address)}
                               </div>

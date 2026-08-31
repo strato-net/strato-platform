@@ -364,7 +364,7 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
               ? "Calculating…"
               : previewZero
                 ? "Amount too small"
-                : "Add Liquidity";
+                : "Add liquidity";
 
   const canMint =
     !loading && !previewLoading && !!preview && !previewZero && rangeValid &&
@@ -388,13 +388,13 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
           <div className="flex justify-between gap-2 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1 min-w-0">
               <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
-              <span className="truncate">
+              <span className="truncate tabular-nums">
                 {formatTokenAmount(pool.token1Balance, pool.token1.decimals)} {pool.token1.symbol} ({composition.pct1.toFixed(1)}%)
               </span>
             </span>
             <span className="flex items-center gap-1 min-w-0">
               <span className="w-2 h-2 rounded-full bg-strato-blue flex-shrink-0" />
-              <span className="truncate">
+              <span className="truncate tabular-nums">
                 {formatTokenAmount(pool.token0Balance, pool.token0.decimals)} {pool.token0.symbol} ({composition.pct0.toFixed(1)}%)
               </span>
             </span>
@@ -438,7 +438,7 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
           token1Symbol={pool.token1.symbol}
         />
         {priceEdge && (
-          <p className="text-xs text-yellow-600">
+          <p className="text-xs text-warning">
             The pool's {priceEdge === "max" ? pool.token0.symbol : pool.token1.symbol} side was fully bought
             out, so its price sits at the tick-domain {priceEdge === "max" ? "ceiling" : "floor"} and the
             percentage presets would anchor to it. Enter explicit Min/Max prices around the real market
@@ -457,7 +457,7 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
               className="h-8 border-none bg-transparent px-0 text-sm font-medium focus-visible:ring-0"
             />
             {tickLower !== null && (
-              <span className="text-[11px] text-muted-foreground">tick {tickLower}</span>
+              <span className="text-[11px] text-muted-foreground tabular-nums">tick {tickLower}</span>
             )}
           </div>
           <div className="bg-muted/50 rounded-lg border border-border p-2.5">
@@ -470,20 +470,20 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
               className="h-8 border-none bg-transparent px-0 text-sm font-medium focus-visible:ring-0"
             />
             {tickUpper !== null && (
-              <span className="text-[11px] text-muted-foreground">tick {tickUpper}</span>
+              <span className="text-[11px] text-muted-foreground tabular-nums">tick {tickUpper}</span>
             )}
           </div>
         </div>
         {tickLower !== null && tickUpper !== null && tickLower >= tickUpper && (
-          <p className="text-xs text-red-600">Min price must be below max price</p>
+          <p className="text-xs text-destructive">Min price must be below max price</p>
         )}
         {rangeValid && inRange && (
-          <p className="text-xs text-green-600">
+          <p className="text-xs text-success">
             Range spans the current price — deposits both tokens and earns fees now.
           </p>
         )}
         {rangeValid && !inRange && (
-          <p className="text-xs text-yellow-600">
+          <p className="text-xs text-warning">
             Range is entirely {pool.currentTick < tickLower! ? "above" : "below"} the current price — deposits only{" "}
             {needsToken0 ? pool.token0.symbol : pool.token1.symbol} and earns no fees until the price enters the range.
           </p>
@@ -526,21 +526,21 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
         </div>
         {isLoggedIn && (
           <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>
+            <span className="tabular-nums">
               Balance: {formatTokenAmount(enteredBalance, enteredDecimals)} {enteredSymbol}
             </span>
             <button
               type="button"
               onClick={handleMaxClick}
               disabled={!rangeValid || enteredBalance === 0n}
-              className="text-blue-600 underline disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-primary hover:text-primary/80 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Max
             </button>
           </div>
         )}
         {insufficientTokens.length > 0 && (
-          <p className="text-xs text-red-600">
+          <p className="text-xs text-destructive">
             Insufficient {insufficientTokens.join(" and ")} balance — you can deposit at most what your wallet holds.
           </p>
         )}
@@ -556,21 +556,21 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
         <div className="bg-muted/50 rounded-lg border border-border p-3 space-y-1 text-xs">
           <div className="flex justify-between">
             <span className="text-muted-foreground">{pool.token0.symbol} deposited</span>
-            <span className="font-medium">{formatTokenAmount(preview.amount0, pool.token0.decimals)}</span>
+            <span className="font-medium tabular-nums">{formatTokenAmount(preview.amount0, pool.token0.decimals)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">{pool.token1.symbol} deposited</span>
-            <span className="font-medium">{formatTokenAmount(preview.amount1, pool.token1.decimals)}</span>
+            <span className="font-medium tabular-nums">{formatTokenAmount(preview.amount1, pool.token1.decimals)}</span>
           </div>
           <div className="flex justify-between border-t border-border pt-1 mt-1">
             <span className="text-muted-foreground">Liquidity</span>
-            <span className="font-medium">{formatUnits(preview.liquidity)}</span>
+            <span className="font-medium tabular-nums">{formatUnits(preview.liquidity)}</span>
           </div>
         </div>
       )}
 
       <Button
-        className="w-full bg-strato-blue hover:bg-strato-blue/90"
+        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
         onClick={() => setConfirmOpen(true)}
         disabled={!canMint}
       >
@@ -587,7 +587,7 @@ const V3NewPositionCard = ({ pool, onMinted }: V3NewPositionCardProps) => {
             ? `The range is entirely ${pool.currentTick < (tickLower ?? 0) ? "above" : "below"} the current price — the position earns no fees until the price enters the range.`
             : undefined
         }
-        confirmLabel="Add Liquidity"
+        confirmLabel="Add liquidity"
         onConfirm={confirmMint}
         loading={loading}
       />

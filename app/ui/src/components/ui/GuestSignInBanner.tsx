@@ -13,18 +13,18 @@ const GuestSignInBanner = ({ message }: GuestSignInBannerProps) => {
   return (
     <div 
       onClick={handleSignIn}
-      className="block mb-4 md:mb-6 cursor-pointer"
+      className="block mb-4 md:mb-6 cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <div className="bg-gradient-to-r from-blue-500/10 via-blue-500/5 to-transparent border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-3 flex items-center justify-between hover:bg-blue-500/15 transition-colors">
+      <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/30 rounded-lg px-4 py-3 flex items-center justify-between hover:bg-primary/15 transition-colors">
         <div className="flex items-center gap-3">
-          <div className="bg-blue-500 rounded-full p-1.5 flex-shrink-0">
-            <Wallet className="w-4 h-4 text-white" />
+          <div className="bg-primary rounded-full p-1.5 flex-shrink-0">
+            <Wallet className="w-4 h-4 text-primary-foreground" />
           </div>
           <span className="text-sm md:text-base font-medium text-foreground">
             {message}
           </span>
         </div>
-        <span className="text-blue-600 dark:text-blue-400 text-sm font-semibold hover:underline flex-shrink-0">
+        <span className="text-primary text-sm font-semibold hover:underline flex-shrink-0">
           Connect Wallet →
         </span>
       </div>

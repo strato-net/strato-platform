@@ -52,7 +52,7 @@ const BorrowingSection = ({ loanData, guestMode = false }: BorrowingSectionProps
     <Card className="border border-border shadow-sm">
       <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 space-y-4 sm:space-y-0">
         <div>
-          <CardTitle className="text-xl font-bold">My Borrowing</CardTitle>
+          <CardTitle className="text-xl font-bold">My borrowing</CardTitle>
           <CardDescription className="text-muted-foreground">Leverage your assets with secured loans</CardDescription>
         </div>
         {/* Mobile: full width button */}
@@ -79,8 +79,8 @@ const BorrowingSection = ({ loanData, guestMode = false }: BorrowingSectionProps
             {/* Added extra spacing with mt-8 to separate indicators from data */}
             <div className="flex flex-col gap-2 mt-8">
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-muted-foreground text-sm sm:text-base">Available Borrowing Power</span>
-                <span className="font-semibold text-sm sm:text-base">
+                <span className="text-muted-foreground text-sm sm:text-base">Available borrowing power</span>
+                <span className="font-semibold text-sm sm:text-base tabular-nums">
                   {guestMode ? "-" : `${availableBorrowingPower.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
@@ -88,8 +88,8 @@ const BorrowingSection = ({ loanData, guestMode = false }: BorrowingSectionProps
                 </span>
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-muted-foreground text-sm sm:text-base">Total Amount Owed</span>
-                <span className="font-semibold text-sm sm:text-base">
+                <span className="text-muted-foreground text-sm sm:text-base">Total amount owed</span>
+                <span className="font-semibold text-sm sm:text-base tabular-nums">
                   {guestMode ? "-" : `${currentBorrowed.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
@@ -97,19 +97,19 @@ const BorrowingSection = ({ loanData, guestMode = false }: BorrowingSectionProps
                 </span>
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-muted-foreground text-sm sm:text-base">Interest Rate</span>
-                <span className="font-semibold text-sm sm:text-base">
+                <span className="text-muted-foreground text-sm sm:text-base">Interest rate</span>
+                <span className="font-semibold text-sm sm:text-base tabular-nums">
                   {guestMode ? "-" : `${((Number(loanData?.interestRate) || 0) / 100).toFixed(2)}%`}
                 </span>
               </div>
 
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-muted-foreground text-sm sm:text-base">Health Factor</span>
-                <span className="font-semibold text-sm sm:text-base" style={{ color: guestMode ? undefined : getTextColor((loanData?.healthFactor || 0), 3, currentBorrowed === 0) }}>
+                <span className="text-muted-foreground text-sm sm:text-base">Health factor</span>
+                <span className="font-semibold text-sm sm:text-base tabular-nums" style={{ color: guestMode ? undefined : getTextColor((loanData?.healthFactor || 0), 3, currentBorrowed === 0) }}>
                   {guestMode ? "-" : (() => {
                     // Check if there's no outstanding debt
                     if (currentBorrowed === 0) {
-                      return "No Loan";
+                      return "No loan";
                     }
                     // Check if health factor is valid
                     if (loanData?.healthFactor && !isNaN((loanData.healthFactor))) {

@@ -148,7 +148,7 @@ const V3PositionNFTDetail = ({ item, onChanged }: NFTDetailRendererProps) => {
             <Badge
               variant="outline"
               className={`text-[11px] px-1.5 py-0 ${
-                position.inRange ? "text-green-600 border-green-600/40" : "text-yellow-600 border-yellow-600/40"
+                position.inRange ? "text-success border-success/40" : "text-warning border-warning/40"
               }`}
             >
               {position.inRange ? "In range" : "Out of range"}

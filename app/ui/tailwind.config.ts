@@ -20,6 +20,11 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				sans: ['"IBM Plex Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+				display: ['"Bricolage Grotesque Variable"', '"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+				mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+			},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
@@ -36,7 +41,22 @@ export default {
 				},
 				destructive: {
 					DEFAULT: 'hsl(var(--destructive))',
-					foreground: 'hsl(var(--destructive-foreground))'
+					foreground: 'hsl(var(--destructive-foreground))',
+					surface: 'hsl(var(--destructive-surface))'
+				},
+				success: {
+					DEFAULT: 'hsl(var(--success))',
+					foreground: 'hsl(var(--success-foreground))',
+					surface: 'hsl(var(--success-surface))'
+				},
+				warning: {
+					DEFAULT: 'hsl(var(--warning))',
+					foreground: 'hsl(var(--warning-foreground))',
+					surface: 'hsl(var(--warning-surface))'
+				},
+				gold: {
+					DEFAULT: 'hsl(var(--gold))',
+					foreground: 'hsl(var(--gold-foreground))'
 				},
 				muted: {
 					DEFAULT: 'hsl(var(--muted))',
@@ -79,6 +99,11 @@ export default {
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
 			},
+			transitionTimingFunction: {
+				out: 'var(--ease-out)',
+				'in-out': 'var(--ease-in-out)',
+				drawer: 'var(--ease-drawer)'
+			},
 			keyframes: {
 				'accordion-down': {
 					from: { height: '0' },
@@ -87,6 +112,14 @@ export default {
 				'accordion-up': {
 					from: { height: 'var(--radix-accordion-content-height)' },
 					to: { height: '0' },
+				},
+				'collapsible-down': {
+					from: { height: '0', opacity: '0' },
+					to: { height: 'var(--radix-collapsible-content-height)', opacity: '1' },
+				},
+				'collapsible-up': {
+					from: { height: 'var(--radix-collapsible-content-height)', opacity: '1' },
+					to: { height: '0', opacity: '0' },
 				},
 				'gradient-flow': {
 					'0%, 100%': { backgroundPosition: '0% 50%' },
@@ -102,8 +135,10 @@ export default {
 				}
 			},
 			animation: {
-				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out',
+				'accordion-down': 'accordion-down 0.2s var(--ease-out)',
+				'accordion-up': 'accordion-up 0.2s var(--ease-out)',
+				'collapsible-down': 'collapsible-down 0.2s var(--ease-out)',
+				'collapsible-up': 'collapsible-up 0.2s var(--ease-out)',
 				'gradient-flow': 'gradient-flow 8s ease infinite',
 				'pulse-slow': 'pulse-slow 3s ease-in-out infinite',
 				'float': 'float 6s ease-in-out infinite',

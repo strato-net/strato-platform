@@ -21,15 +21,15 @@ const GuestReferralsView = () => {
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
 
-      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+      <div className="transition-[padding-left] duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="My Referrals" />
         <main className="p-4 md:p-6">
           <div className="max-w-4xl mx-auto space-y-6">
             <GuestSignInBanner message="Sign in to create referral deposits and gift tokens to friends" />
             {/* Hero Section */}
-            <Card className="border-2 border-dashed bg-gradient-to-br from-pink-50/50 to-purple-50/50 dark:from-pink-950/20 dark:to-purple-950/20">
+            <Card className="border-2 border-dashed bg-gradient-to-br from-primary/5 to-muted/50">
               <CardHeader className="text-center pb-2">
-                <div className="mx-auto w-20 h-20 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center mb-4 shadow-lg">
+                <div className="mx-auto w-20 h-20 bg-gradient-to-br from-strato-blue to-primary rounded-full flex items-center justify-center mb-4 shadow-lg">
                   <Gift className="w-10 h-10 text-white" />
                 </div>
                 <CardTitle className="text-2xl">Refer Friends & Gift Tokens</CardTitle>
@@ -42,17 +42,17 @@ const GuestReferralsView = () => {
                 {/* Key Features */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
                   <div className="flex flex-col items-center gap-2 p-4 rounded-lg bg-card border">
-                    <Gift className="w-8 h-8 text-pink-500" />
+                    <Gift className="w-8 h-8 text-primary" />
                     <span className="font-medium">Token Gifting</span>
                     <span className="text-sm text-muted-foreground">Gift tokens to new users</span>
                   </div>
                   <div className="flex flex-col items-center gap-2 p-4 rounded-lg bg-card border">
-                    <Users className="w-8 h-8 text-purple-500" />
+                    <Users className="w-8 h-8 text-primary" />
                     <span className="font-medium">Grow Community</span>
                     <span className="text-sm text-muted-foreground">Help onboard new members</span>
                   </div>
                   <div className="flex flex-col items-center gap-2 p-4 rounded-lg bg-card border">
-                    <Clock className="w-8 h-8 text-blue-500" />
+                    <Clock className="w-8 h-8 text-primary" />
                     <span className="font-medium">Expiry Control</span>
                     <span className="text-sm text-muted-foreground">Set expiration dates</span>
                   </div>
@@ -69,7 +69,7 @@ const GuestReferralsView = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div className="flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                      <CheckCircle className="w-5 h-5 text-success mt-0.5" />
                       <div>
                         <h4 className="font-medium">Multiple Tokens</h4>
                         <p className="text-sm text-muted-foreground">
@@ -78,7 +78,7 @@ const GuestReferralsView = () => {
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                      <CheckCircle className="w-5 h-5 text-success mt-0.5" />
                       <div>
                         <h4 className="font-medium">Quantity Control</h4>
                         <p className="text-sm text-muted-foreground">
@@ -87,7 +87,7 @@ const GuestReferralsView = () => {
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                      <CheckCircle className="w-5 h-5 text-success mt-0.5" />
                       <div>
                         <h4 className="font-medium">Easy Sharing</h4>
                         <p className="text-sm text-muted-foreground">
@@ -98,7 +98,7 @@ const GuestReferralsView = () => {
                   </div>
                   <div className="space-y-4">
                     <div className="flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                      <CheckCircle className="w-5 h-5 text-success mt-0.5" />
                       <div>
                         <h4 className="font-medium">Expiration Control</h4>
                         <p className="text-sm text-muted-foreground">
@@ -107,7 +107,7 @@ const GuestReferralsView = () => {
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                      <CheckCircle className="w-5 h-5 text-success mt-0.5" />
                       <div>
                         <h4 className="font-medium">Secure Redemption</h4>
                         <p className="text-sm text-muted-foreground">
@@ -116,7 +116,7 @@ const GuestReferralsView = () => {
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                      <CheckCircle className="w-5 h-5 text-success mt-0.5" />
                       <div>
                         <h4 className="font-medium">Token Recovery</h4>
                         <p className="text-sm text-muted-foreground">
@@ -271,7 +271,7 @@ const ReferralsManagement = () => {
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
 
-      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+      <div className="transition-[padding-left] duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="My Referrals" />
         <main className="p-4 md:p-6">
           <div className="max-w-6xl mx-auto space-y-6">
@@ -389,7 +389,7 @@ const ReferralsManagement = () => {
                                 {expired ? (
                                   <Badge variant="destructive">Expired</Badge>
                                 ) : (
-                                  <Badge variant="default" className="bg-blue-500">Active</Badge>
+                                  <Badge variant="default">Active</Badge>
                                 )}
                               </TableCell>
                               <TableCell className="text-right">
@@ -568,9 +568,9 @@ const ReferralHistoryTable = ({ userAddress, getTokenInfo }: ReferralHistoryTabl
                   <div className="text-muted-foreground whitespace-nowrap">{timestamp.time}</div>
                 </TableCell>
                 <TableCell>
-                  <Badge 
-                    variant={entry.eventName === "Redeemed" ? "default" : "destructive"}
-                    className={`text-[10px] md:text-xs ${entry.eventName === "Redeemed" ? "bg-green-500" : ""}`}
+                  <Badge
+                    variant={entry.eventName === "Redeemed" ? "success" : "destructive"}
+                    className="text-[10px] md:text-xs"
                   >
                     {entry.eventName}
                   </Badge>

@@ -124,21 +124,21 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
 
   // Overall trend color (green/red) based on first vs latest close
   const trendColor = useMemo(() => {
-    if (chartData.length < 2) return '#22c55e';
+    if (chartData.length < 2) return 'hsl(var(--success))';
     const firstPrice = showPoolPrice ? chartData[0].close : (chartData[0].spotPrice ?? chartData[0].close);
     const latestPrice = showPoolPrice
       ? chartData[chartData.length - 1].close
       : (chartData[chartData.length - 1].spotPrice ?? chartData[chartData.length - 1].close);
-    return latestPrice >= firstPrice ? '#22c55e' : '#ef4444';
+    return latestPrice >= firstPrice ? 'hsl(var(--success))' : 'hsl(var(--destructive))';
   }, [chartData, showPoolPrice]);
 
   const trendBgClass = useMemo(() => {
-    if (chartData.length < 2) return 'bg-green-600';
+    if (chartData.length < 2) return 'bg-success text-success-foreground';
     const firstPrice = showPoolPrice ? chartData[0].close : (chartData[0].spotPrice ?? chartData[0].close);
     const latestPrice = showPoolPrice
       ? chartData[chartData.length - 1].close
       : (chartData[chartData.length - 1].spotPrice ?? chartData[chartData.length - 1].close);
-    return latestPrice >= firstPrice ? 'bg-green-600' : 'bg-red-600';
+    return latestPrice >= firstPrice ? 'bg-success text-success-foreground' : 'bg-destructive text-destructive-foreground';
   }, [chartData, showPoolPrice]);
 
   const volumeDomain = useMemo(() => {
@@ -150,7 +150,7 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
 
   // Calculate line color based on first vs latest price
   const lineColor = useMemo(() => {
-    if (chartType !== 'line' || chartData.length === 0) return '#3b82f6'; // Default blue
+    if (chartType !== 'line' || chartData.length === 0) return 'hsl(var(--primary))'; // Default primary
 
     const firstPrice = showPoolPrice ? chartData[0].close : (chartData[0].spotPrice ?? chartData[0].close);
     const latestPrice = showPoolPrice
@@ -158,7 +158,7 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
       : (chartData[chartData.length - 1].spotPrice ?? chartData[chartData.length - 1].close);
 
     // Otherwise, green if up, red if down
-    return latestPrice > firstPrice ? '#22c55e' : '#ef4444';
+    return latestPrice > firstPrice ? 'hsl(var(--success))' : 'hsl(var(--destructive))';
   }, [chartData, chartType, showPoolPrice]);
 
   // Calculate lighter spot price color (lighter version of main line color)
@@ -248,8 +248,8 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
       <>
         <defs>
           <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" opacity={0.3} />
@@ -308,7 +308,7 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
                 const closeY = y; // Use the provided y position
 
                 const isUp = payload.close >= payload.open;
-                const color = isUp ? '#22c55e' : '#ef4444';
+                const color = isUp ? 'hsl(var(--success))' : 'hsl(var(--destructive))';
 
                 const bodyTop = Math.min(openY, closeY);
                 const bodyBottom = Math.max(openY, closeY);
@@ -480,7 +480,7 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
               }}
             />
             <div
-              className={`absolute pointer-events-none text-white text-[10px] font-semibold px-1.5 py-0.5 rounded z-20 ${trendBgClass}`}
+              className={`absolute pointer-events-none text-[10px] font-semibold px-1.5 py-0.5 rounded z-20 ${trendBgClass}`}
               style={{
                 left: `${chartMargin.left}px`,
                 top: `${currentPriceYPx}px`,
@@ -645,7 +645,7 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({
                 return (
                   <Cell
                     key={`cell-${index}`}
-                    fill={isUp ? '#22c55e' : '#ef4444'}
+                    fill={isUp ? 'hsl(var(--success))' : 'hsl(var(--destructive))'}
                     opacity={0.6}
                   />
                 );

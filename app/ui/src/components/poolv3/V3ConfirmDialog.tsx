@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
 export interface ConfirmRow {
   label: string;
@@ -55,10 +56,10 @@ const V3ConfirmDialog = ({
         {rows.map((row) => (
           <div key={row.label} className="flex justify-between items-start gap-2 text-sm">
             <span className="text-muted-foreground flex-shrink-0">{row.label}</span>
-            <span className="font-medium text-right break-words">{row.value}</span>
+            <span className="font-medium text-right break-words tabular-nums">{row.value}</span>
           </div>
         ))}
-        {warning && <p className="text-yellow-600 text-xs md:text-sm">⚠️ {warning}</p>}
+        {warning && <p className="text-warning text-xs md:text-sm">⚠️ {warning}</p>}
       </div>
       <DialogFooter className="flex-col sm:flex-row gap-2">
         <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading} className="w-full sm:w-auto">
@@ -68,12 +69,12 @@ const V3ConfirmDialog = ({
           disabled={loading}
           onClick={onConfirm}
           className={`w-full sm:w-auto ${
-            destructive ? "bg-red-600 hover:bg-red-700 text-white" : "bg-strato-blue hover:bg-strato-blue/90"
+            destructive
+              ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              : "bg-primary hover:bg-primary/90 text-primary-foreground"
           }`}
         >
-          {loading && (
-            <span className="inline-flex items-center animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-current mr-2" />
-          )}
+          {loading && <Loader2 className="h-4 w-4 animate-spin text-current mr-2" />}
           {confirmLabel}
         </Button>
       </DialogFooter>

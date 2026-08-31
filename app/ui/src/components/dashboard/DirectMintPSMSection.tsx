@@ -177,7 +177,7 @@ const DirectMintPSMSection = () => {
         ? formatUnits(applyBpsFee(amountWei, selectedMintToken.mintFeeBps), 18)
         : mintAmount;
       toast({
-        title: toSavings ? "Mint & Save Successful" : "Mint Successful",
+        title: toSavings ? "Mint & save successful" : "Mint successful",
         description: toSavings
           ? `Minted ${netMintAmount} ${psmInfo?.mintableTokenSymbol} against ${selectedMintToken?.symbol} and deposited it into Savings`
           : `Minted ${netMintAmount} ${psmInfo?.mintableTokenSymbol} against ${selectedMintToken?.symbol}`,
@@ -208,7 +208,7 @@ const DirectMintPSMSection = () => {
         : redeemAmount;
       await psmService.redeem(redeemAmount, redeemToken);
       toast({
-        title: "Redemption Complete",
+        title: "Redemption complete",
         description: `Redeemed ${redeemAmount} ${psmInfo?.mintableTokenSymbol} for ${payoutAmount} ${selectedRedeemToken?.symbol}`,
         variant: "success",
       });
@@ -311,7 +311,7 @@ const DirectMintPSMSection = () => {
                     <div className="text-sm text-muted-foreground">
                       <button
                         type="button"
-                        className="text-blue-600 hover:underline mr-2"
+                        className="text-primary hover:text-primary/80 hover:underline mr-2"
                         onClick={() => {
                           if (mintMaxAmount <= 0n) return;
                           const formatted = formatUnits(mintMaxAmount, 18);
@@ -333,7 +333,7 @@ const DirectMintPSMSection = () => {
                       {mintCapacity !== null && (
                         <>
                           {" · "}
-                          System Limit:{" "}
+                          System limit:{" "}
                           {formatBalance(mintCapacity, undefined, 18, 2, 6)}{" "}
                           {selectedMintToken.symbol}
                         </>
@@ -367,7 +367,7 @@ const DirectMintPSMSection = () => {
                     <div className="text-sm text-muted-foreground">
                       {mintFeeBps > 0n && (
                         <>
-                          PSM Fee: {formatBps(selectedMintToken.mintFeeBps)}
+                          PSM fee: {formatBps(selectedMintToken.mintFeeBps)}
                           {estimatedMintAmount > 0n && " · "}
                         </>
                       )}
@@ -399,7 +399,7 @@ const DirectMintPSMSection = () => {
 
                   {isLoggedIn && (
                     <div className="text-sm text-muted-foreground">
-                      Transaction Fee: {PSM_MINT_FEE} USDST
+                      Transaction fee: {PSM_MINT_FEE} USDST
                     </div>
                   )}
 
@@ -411,7 +411,7 @@ const DirectMintPSMSection = () => {
                     {isProcessing
                       ? "Processing..."
                       : mintToSavings
-                        ? "Mint & Save"
+                        ? "Mint & save"
                         : `Mint ${psmInfo?.mintableTokenSymbol || "USDST"}`}
                   </Button>
                 </div>
@@ -471,7 +471,7 @@ const DirectMintPSMSection = () => {
                   <div className="text-sm text-muted-foreground">
                     <button
                       type="button"
-                      className="text-blue-600 hover:underline mr-2"
+                      className="text-primary hover:text-primary/80 hover:underline mr-2"
                       onClick={() => {
                         if (redeemMaxAmount <= 0n) return;
                         const formatted = formatUnits(redeemMaxAmount, 18);
@@ -490,7 +490,7 @@ const DirectMintPSMSection = () => {
                       6
                     )}
                     {" · "}
-                    System Limit:{" "}
+                    System limit:{" "}
                     {formatBalance(redeemSystemLimit, undefined, 18, 2, 6)}{" "}
                     {selectedRedeemToken.symbol}
                   </div>
@@ -498,7 +498,7 @@ const DirectMintPSMSection = () => {
 
                 {isLoggedIn && selectedRedeemToken && safeBigInt(selectedRedeemToken.burnFeeBps) > 0n && (
                   <div className="text-sm text-muted-foreground">
-                    PSM Fee: {formatBps(selectedRedeemToken.burnFeeBps)}
+                    PSM fee: {formatBps(selectedRedeemToken.burnFeeBps)}
                     {estimatedRedeemPayout > 0n && (
                       <>
                         {" · "}
@@ -518,14 +518,14 @@ const DirectMintPSMSection = () => {
 
                 {isLoggedIn && (
                   <div className="text-sm text-muted-foreground">
-                    Transaction Fee: {PSM_REDEEM_FEE} USDST
+                    Transaction fee: {PSM_REDEEM_FEE} USDST
                   </div>
                 )}
 
                 <Button
                   onClick={() => setRedeemDialogOpen(true)}
                   variant="outline"
-                  className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 w-full"
+                  className="border-primary text-primary hover:bg-primary/10 w-full"
                   disabled={!isLoggedIn || isProcessing || !isRedeemValid()}
                 >
                   {isProcessing
@@ -555,17 +555,17 @@ const DirectMintPSMSection = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Redemption</AlertDialogTitle>
+            <AlertDialogTitle>Confirm redemption</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2">
                 <p>
                   This will burn{" "}
-                  <span className="font-semibold text-foreground">
+                  <span className="font-semibold text-foreground tabular-nums">
                     {redeemAmount} {psmInfo?.mintableTokenSymbol || "USDST"}
                   </span>
                   <br />
                   and transfer{" "}
-                  <span className="font-semibold text-foreground">
+                  <span className="font-semibold text-foreground tabular-nums">
                     {formatUnits(estimatedRedeemPayout, 18)}{" "}
                     {selectedRedeemToken?.symbol}
                   </span>{" "}
@@ -580,10 +580,10 @@ const DirectMintPSMSection = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-success text-success-foreground hover:bg-success/90"
               onClick={handleRedeem}
             >
-              Confirm & Redeem
+              Confirm & redeem
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -94,14 +94,14 @@ const Dashboard = () => {
   const chartConfig = useMemo(() => ({
     netBalance: {
       data: netBalanceHistoryCache[selectedTimeRange] || [],
-      title: "Portfolio Value",
+      title: "Portfolio value",
       subtitle: "Net balance over time",
       currentValue: totalBalance,
     },
     rewards: {
       data: rewardsHistoryCache[selectedTimeRange] || [],
       title: "Rewards",
-      subtitle: "Reward Points over time",
+      subtitle: "Reward points over time",
       currentValue: cataBalance,
     },
     borrowed: {
@@ -213,7 +213,7 @@ const Dashboard = () => {
 
     if (successParam === "true") {
       toast?.({
-        title: "Purchase Successful",
+        title: "Purchase successful",
         description: "Your purchase was completed successfully.",
       });
       navigate("/dashboard", { replace: true });
@@ -224,7 +224,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       <DashboardSidebar />
 
-      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+      <div className="transition-[padding-left] duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="Portfolio" />
 
         <main className="p-4 md:p-6 pb-24 md:pb-6">
@@ -236,6 +236,7 @@ const Dashboard = () => {
               <AssetSummary
                 title="Net Balance"
                 value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`}
+                valueClassName="hallmark tabular-nums"
                 icon={<Wallet className="text-white" size={18} />}
                 color="bg-blue-500"
                 onClick={() => setActiveTab('netBalance')}
@@ -261,7 +262,7 @@ const Dashboard = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-7 text-xs border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 hover:border-blue-300 dark:hover:border-blue-700 text-blue-700 dark:text-blue-300 font-medium"
+                      className="h-7 text-xs border-primary/30 hover:bg-primary/10 hover:border-primary/50 text-primary font-medium"
                       onClick={(e) => {
                         e.stopPropagation();
                         navigate(`/dashboard/rewards?tab=leaderboard`);
@@ -274,11 +275,11 @@ const Dashboard = () => {
                         </>
                       ) : userRank !== null ? (
                         <>
-                          <Trophy className="h-3.5 w-3.5 mr-1.5 text-yellow-500" />
+                          <Trophy className="h-3.5 w-3.5 mr-1.5 text-gold" />
                           Rank #{userRank} - Leaderboard
                         </>
                       ) : (
-                        "View Leaderboard"
+                        "View leaderboard"
                       )}
                     </Button>
                     {communityBonusFormatted && (
@@ -289,7 +290,7 @@ const Dashboard = () => {
                           navigate(`/dashboard/rewards`);
                         }}
                         title={`Community bonus: +${communityBonusFormatted} pts — view on Rewards page`}
-                        className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 whitespace-nowrap"
+                        className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium bg-success/10 text-success border border-success/30 hover:bg-success/15 whitespace-nowrap"
                       >
                         <Gift className="h-3.5 w-3.5" />
                         +{communityBonusFormatted} Bonus
@@ -363,11 +364,11 @@ const Dashboard = () => {
           {/* Physical Metals Deposit Banner (only when contact API is configured) */}
           {contactEnabled && (
             <div className="mb-8">
-              <div className="bg-gradient-to-r from-blue-500/10 via-blue-500/5 to-transparent border border-blue-200 dark:border-blue-800 rounded-xl p-4 md:p-5 hover:bg-blue-500/15 transition-colors">
+              <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/30 rounded-xl p-4 md:p-5 hover:bg-primary/15 transition-colors">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="bg-blue-500 rounded-full p-1.5 shrink-0">
-                      <Gem className="w-4 h-4 text-white" />
+                    <div className="bg-primary rounded-full p-1.5 shrink-0">
+                      <Gem className="w-4 h-4 text-primary-foreground" />
                     </div>
                     <div>
                       <h3 className="text-sm md:text-base font-semibold text-foreground">Deposit Physical Gold & Silver</h3>
@@ -379,10 +380,10 @@ const Dashboard = () => {
                   <Button
                     type="button"
                     onClick={() => setContactModalOpen(true)}
-                    className="inline-flex items-center justify-center gap-2 shrink-0 h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
+                    className="inline-flex items-center justify-center gap-2 shrink-0 h-9 px-4 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium"
                   >
                     <Mail size={16} />
-                    Contact Us
+                    Contact us
                   </Button>
                 </div>
               </div>

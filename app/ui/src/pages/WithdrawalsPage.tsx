@@ -53,7 +53,7 @@ const WithdrawalsPage = () => {
       <DashboardSidebar />
 
       <div
-        className="h-screen flex flex-col transition-all duration-300"
+        className="h-screen flex flex-col transition-[padding-left] duration-300"
         style={{ paddingLeft: "var(--sidebar-width, 0px)" }}
       >
         <DashboardHeader title="Bridge Out" />
@@ -79,7 +79,7 @@ const WithdrawalsPage = () => {
                         setTargetTransactionTab('WithdrawalInitiated');
                       }}
                       className={`flex items-center gap-1 text-xs md:text-sm font-semibold transition-colors whitespace-nowrap ${isLoggedIn
-                          ? "text-blue-600 hover:text-blue-800 cursor-pointer"
+                          ? "text-primary hover:text-primary/80 cursor-pointer"
                           : "text-muted-foreground hover:text-foreground cursor-pointer"
                         }`}
                     >

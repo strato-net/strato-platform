@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import { HelpCircle, ChevronDown, ChevronUp, AlertTriangle, Loader2 } from "lucide-react";
 import { safeParseUnits, addCommasToInput, formatUnits, formatBalance } from "@/utils/numberUtils";
 import { NewLoanData, CollateralData } from "@/interface";
 import { 
@@ -287,9 +287,9 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   // Get risk indicator color and label
   const riskIndicator = useMemo(() => {
     const label = getRiskLabel(targetHealthFactor);
-    if (label === 'Low Risk') return { label, color: 'text-green-500' };
-    if (label === 'Moderate Risk') return { label, color: 'text-yellow-500' };
-    return { label, color: 'text-red-500' };
+    if (label === 'Low Risk') return { label, color: 'text-success' };
+    if (label === 'Moderate Risk') return { label, color: 'text-warning' };
+    return { label, color: 'text-destructive' };
   }, [targetHealthFactor]);
 
   // Consolidated polling handler
@@ -466,23 +466,23 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       <div className="space-y-1">
         <h3 className="text-lg font-semibold">Borrow USDST</h3>
         <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Available to Borrow</span>
-          <span className="font-medium">USDST {Number(formatUnits(availableToBorrow, 18)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span className="text-muted-foreground">Available to borrow</span>
+          <span className="font-medium tabular-nums">USDST {Number(formatUnits(availableToBorrow, 18)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Interest Rate</span>
-          <span className="font-medium">{interestRateDisplay}</span>
+          <span className="text-muted-foreground">Interest rate</span>
+          <span className="font-medium tabular-nums">{interestRateDisplay}</span>
         </div>
       </div>
 
       {/* Borrow Amount Input */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">Borrow Amount</label>
+        <label className="text-sm font-medium">Borrow amount</label>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Input
               placeholder="0"
-              className={`pr-20 ${borrowAmountExceedsMax ? 'text-red-600' : ''}`}
+              className={`pr-20 ${borrowAmountExceedsMax ? 'text-destructive' : ''}`}
               value={addCommasToInput(borrowAmount)}
               onChange={(e) => {
                 const value = e.target.value;
@@ -504,13 +504,13 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
               } catch {}
             }}
             disabled={ guestMode || availableToBorrow <= 0n}
-            className="px-4"
+            className="px-4 text-primary hover:text-primary/80 font-medium"
           >
             MAX
           </Button>
         </div>
         {borrowAmountError && (
-          <p className="text-red-600 text-sm">{borrowAmountError}</p>
+          <p className="text-destructive text-sm">{borrowAmountError}</p>
         )}
       </div>
 
@@ -521,7 +521,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="flex items-center gap-1.5 cursor-help">
-                  <span className="text-base font-semibold">Health Factor</span>
+                  <span className="text-base font-semibold">Health factor</span>
                   <HelpCircle className="h-4 w-4 text-muted-foreground" />
                 </div>
               </TooltipTrigger>
@@ -552,10 +552,10 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
 
           {/* Health Impact: Before => After */}
           <div className="flex justify-between items-center text-sm border-t pt-3">
-            <span className="text-muted-foreground">Health Impact</span>
+            <span className="text-muted-foreground">Health impact</span>
             <span className="font-medium tabular-nums">
               {currentHF === null ? (
-                <span style={{ color: getTextColor(0, 3, true) }}>No Loan</span>
+                <span style={{ color: getTextColor(0, 3, true) }}>No loan</span>
               ) : (
                 <span style={{ color: getTextColor(currentHF, 3) }}>{currentHF.toFixed(2)}</span>
               )}
@@ -570,12 +570,12 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
 
       {/* Warning Message Box - Above Borrow Button */}
       {targetHealthFactor < 1.6 && !customBorrowError && (
-        <div className="p-4 border rounded-lg bg-red-500/10 dark:bg-red-500/20 border-red-500/30">
+        <div className="p-4 border rounded-lg bg-destructive/10 border-destructive/30">
           <div className="flex items-start gap-2 mb-2">
-            <AlertTriangle className="h-5 w-5 flex-shrink-0 text-red-600 dark:text-red-400" />
-            <p className="text-sm font-semibold text-red-800 dark:text-red-200">High Risk Warning</p>
+            <AlertTriangle className="h-5 w-5 flex-shrink-0 text-destructive" />
+            <p className="text-sm font-semibold text-destructive">High risk warning</p>
           </div>
-          <p className="text-sm whitespace-pre-line text-red-800 dark:text-red-200">
+          <p className="text-sm whitespace-pre-line text-destructive">
             Borrowing at this risk level can result in liquidation if the collateral drops in value.
           </p>
         </div>
@@ -583,8 +583,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
 
       {/* Error Message Box - Above Borrow Button */}
       {customBorrowError && (
-        <div className="p-4 bg-red-500/10 dark:bg-red-500/20 border border-red-500/30 rounded-lg">
-          <p className="text-red-800 dark:text-red-200 text-sm whitespace-pre-line">{customBorrowError}</p>
+        <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+          <p className="text-destructive text-sm whitespace-pre-line">{customBorrowError}</p>
         </div>
       )}
 
@@ -608,7 +608,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         className="w-full"
       >
         {borrowLoading ? (
-          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
+          <Loader2 className="h-5 w-5 animate-spin text-current mr-2" />
         ) : null}
         Borrow
       </Button>
@@ -642,8 +642,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           disabled={guestMode}
         >
           <span>
-            Additional Collateral Needed{' '}
-            <span className="text-muted-foreground font-normal">
+            Additional collateral needed{' '}
+            <span className="text-muted-foreground font-normal tabular-nums">
               (Value: ${additionalCollateralNeededValue.toFixed(2)})
             </span>
           </span>
@@ -666,21 +666,21 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             }
           `}</style>
           {/* Total Value Header */}
-          <div className="text-sm font-medium mb-3 pt-2 border-t">
-            Selected Additional Collateral Value: ${totalCollateralValue.toFixed(2)}
+          <div className="text-sm font-medium mb-3 pt-2 border-t tabular-nums">
+            Selected additional collateral value: ${totalCollateralValue.toFixed(2)}
             {(() => {
               // Show delta in custom mode (input-driven), where the user may be short or have excess.
               if (autoSupplyCollateral) return null;
               if (hasInsufficientCollateral) {
                 return (
-                  <span className="text-yellow-600 dark:text-yellow-400 ml-2">
+                  <span className="text-warning ml-2">
                     (${centCeil(additionalCollateralShortfall).toFixed(2)} more is needed)
                   </span>
                 );
               }
               else if (hasExcessCollateral) {
                 return (
-                  <span className="text-yellow-600 dark:text-yellow-400 ml-2">
+                  <span className="text-warning ml-2">
                     (${centFloor(-additionalCollateralShortfall).toFixed(2)} less is needed)
                   </span>
                 );
@@ -766,7 +766,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
                               return item.valueUSD.toFixed(2);
                             })()}
                             onChange={(e) => handleCustomValueChange(item.collateral.address, e.target.value)}
-                            className={`collateral-value-input w-20 h-7 text-right text-sm px-2 ${collateralExceedsMaxMap.get(item.collateral.address) ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                            className={`collateral-value-input w-20 h-7 text-right text-sm px-2 tabular-nums ${collateralExceedsMaxMap.get(item.collateral.address) ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                             disabled={guestMode}
                           />
                         </div>
@@ -805,11 +805,11 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
 
       {/* Transaction Fee */}
       <div className="flex justify-between text-sm">
-        <span className="text-muted-foreground underline cursor-help" title="Fee paid to process this transaction">Transaction Fee</span>
-        <span className="font-medium">{txFee.fee.toFixed(2)} USDST ({txFee.voucher} vouchers)</span>
+        <span className="text-muted-foreground underline cursor-help" title="Fee paid to process this transaction">Transaction fee</span>
+        <span className="font-medium tabular-nums">{txFee.fee.toFixed(2)} USDST ({txFee.voucher} vouchers)</span>
       </div>
       {feeError && (
-        <p className="text-yellow-600 text-sm">{feeError}</p>
+        <p className="text-warning text-sm">{feeError}</p>
       )}
 
       {/* Rewards Display */}

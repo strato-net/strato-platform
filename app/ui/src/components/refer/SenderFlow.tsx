@@ -816,7 +816,7 @@ export function SenderFlow(props: Props) {
                                   console.error("Error setting max amount:", error);
                                 }
                               }}
-                              className="font-medium text-blue-600 hover:underline focus:outline-none"
+                              className="font-medium text-primary hover:text-primary/80 hover:underline focus:outline-none"
                             >
                               Max: {formatBalance(maxAmount, undefined, 18, 0, 4)}
                             </button>
@@ -830,10 +830,10 @@ export function SenderFlow(props: Props) {
                         value={addCommasToInput(entry.amount)}
                         onChange={(e) => updateEntryAmount(entry.id, e.target.value)}
                         placeholder="0.00"
-                        className={entry.amountError ? "border-red-500" : ""}
+                        className={entry.amountError ? "border-destructive" : ""}
                       />
                       {entry.amountError && (
-                        <p className="text-red-600 text-sm">
+                        <p className="text-destructive text-sm">
                           {entry.amountError}
                         </p>
                       )}
@@ -873,10 +873,10 @@ export function SenderFlow(props: Props) {
                 }
               }}
               placeholder="1"
-              className={quantityError ? "border-red-500" : "w-full"}
+              className={quantityError ? "border-destructive" : "w-full"}
             />
             {quantityError ? (
-              <p className="text-xs text-red-600">{quantityError}</p>
+              <p className="text-xs text-destructive">{quantityError}</p>
             ) : (
               <p className="text-xs text-muted-foreground">
                 Number of referrals this deposit will support. Each redemption will use one quantity.
@@ -984,13 +984,13 @@ export function SenderFlow(props: Props) {
               </CardHeader>
               <CardContent className="space-y-2">
                 {/* Warning Alert */}
-                <div className="flex items-start gap-3 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                  <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div className="flex items-start gap-3 p-4 bg-warning/10 border border-warning/40 rounded-lg">
+                  <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                    <p className="text-sm font-medium text-foreground">
                       Important: Copy this message before leaving the page
                     </p>
-                    <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       The referral link and redemption code cannot be regenerated. Make sure to save this information before navigating away.
                     </p>
                   </div>

@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3, Droplets, SlidersHorizontal, Download, Coins, HandCoins, Layers, ArrowDownToLine, Compass } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
+import { Badge } from '@/components/ui/badge';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
 
@@ -132,9 +133,9 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
                             <span className={`flex-shrink-0 ${active ? 'text-primary' : ''}`}>{item.icon}</span>
                             <span className={`ml-3 ${active ? 'font-semibold' : ''}`}>{item.label}</span>
                             {item.badge && (
-                              <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+                              <Badge variant="secondary" className="ml-auto text-[10px] uppercase tracking-wide px-1.5 py-0.5">
                                 {item.badge}
-                              </span>
+                              </Badge>
                             )}
                           </Link>
                         </li>

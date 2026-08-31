@@ -124,8 +124,7 @@ const SwapPoolsTable = () => {
                               />
                             ) : (
                               <div
-                                className="w-8 h-8 md:w-6 md:h-6 rounded-full flex items-center justify-center text-xs text-white font-medium border-2 border-background flex-shrink-0"
-                                style={{ backgroundColor: "#ef4444" }}
+                                className="w-8 h-8 md:w-6 md:h-6 rounded-full flex items-center justify-center text-xs text-primary-foreground font-medium border-2 border-background flex-shrink-0 bg-primary"
                               >
                                 {pool.poolName?.slice(0, 2)}
                               </div>
@@ -140,8 +139,7 @@ const SwapPoolsTable = () => {
                               />
                             ) : (
                               <div
-                                className="w-8 h-8 md:w-6 md:h-6 rounded-full flex items-center justify-center text-xs text-white font-medium border-2 border-background flex-shrink-0"
-                                style={{ backgroundColor: "#ef4444" }}
+                                className="w-8 h-8 md:w-6 md:h-6 rounded-full flex items-center justify-center text-xs text-primary-foreground font-medium border-2 border-background flex-shrink-0 bg-primary"
                               >
                                 {pool.poolName?.split('/')[1]?.slice(0, 2)}
                               </div>
@@ -190,7 +188,7 @@ const SwapPoolsTable = () => {
                       </div>
                     </td>
                     <td className="py-4 px-2 md:px-4">
-                      <div className="font-medium text-green-600 text-sm md:text-base">
+                      <div className="font-medium text-success text-sm md:text-base tabular-nums">
                         {pool.apy ? `${pool.apy}%` : "N/A"}
                       </div>
                     </td>

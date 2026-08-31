@@ -50,10 +50,10 @@ const HFSlider: React.FC<HFSliderProps> = ({
   
   // Determine risk level
   const getRiskLevel = (hf: number): { label: string; color: string } => {
-    if (hf >= 2.5) return { label: 'Low Risk', color: 'text-green-600' };
-    if (hf >= 2.0) return { label: 'Medium Risk', color: 'text-blue-600' };
-    if (hf >= 1.5) return { label: 'Higher Risk', color: 'text-yellow-600' };
-    return { label: 'High Risk', color: 'text-red-600' };
+    if (hf >= 2.5) return { label: 'Low risk', color: 'text-success' };
+    if (hf >= 2.0) return { label: 'Medium risk', color: 'text-primary' };
+    if (hf >= 1.5) return { label: 'Higher risk', color: 'text-warning' };
+    return { label: 'High risk', color: 'text-destructive' };
   };
   
   const riskLevel = getRiskLevel(clampedValue);
@@ -101,7 +101,7 @@ const HFSlider: React.FC<HFSliderProps> = ({
           <Tooltip>
             <TooltipTrigger asChild>
               <button type="button" className="flex items-center gap-1.5 md:gap-2 cursor-help touch-manipulation p-1 -m-1">
-                <span className="text-sm md:text-base font-bold whitespace-nowrap">Health Factor</span>
+                <span className="text-sm md:text-base font-bold whitespace-nowrap">Health factor</span>
                 <HelpCircle className="w-5 h-5 md:w-4 md:h-4 text-muted-foreground shrink-0" />
               </button>
             </TooltipTrigger>
@@ -141,9 +141,9 @@ const HFSlider: React.FC<HFSliderProps> = ({
         
         {/* Average Vault Health */}
         <div className="text-sm text-muted-foreground flex items-center justify-between">
-          <span>Average Vault Health</span>
-          <span className={`font-medium tabular-nums ${disabled ? 'text-muted-foreground' : 'text-blue-600'}`}>
-            {currentHF === 0 || currentHF === undefined ? 'No Position' : currentHF >= 999999 ? '∞' : formatNumber(currentHF, 2)}
+          <span>Average vault health</span>
+          <span className={`font-medium tabular-nums ${disabled ? 'text-muted-foreground' : 'text-primary'}`}>
+            {currentHF === 0 || currentHF === undefined ? 'No position' : currentHF >= 999999 ? '∞' : formatNumber(currentHF, 2)}
             {' → '}
             {averageVaultHealth || formatNumber(clampedValue, 2)}
           </span>

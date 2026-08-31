@@ -154,10 +154,10 @@ const EarnLending = () => {
       <DashboardSidebar />
 
       <div
-        className="transition-all duration-300 md:pl-64"
+        className="transition-[padding-left] duration-300 md:pl-64"
         style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}
       >
-        <DashboardHeader title="Lending Pool" />
+        <DashboardHeader title="Lending pool" />
 
         <main className="pb-16 md:pb-6 p-4 md:p-6">
           {guestMode && (
@@ -176,29 +176,29 @@ const EarnLending = () => {
           </div>
 
           <div className="space-y-5">
-            <Card className="border border-border/70 bg-gradient-to-br from-blue-500/10 via-background to-background">
+            <Card className="border border-border/70 bg-gradient-to-br from-primary/10 via-background to-background">
               <CardContent className="pt-6">
                 <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Earn Opportunity</p>
-                    <h1 className="text-2xl md:text-3xl font-semibold mt-1">USDST Lending Pool</h1>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Earn opportunity</p>
+                    <h1 className="text-2xl md:text-3xl font-semibold mt-1">USDST lending pool</h1>
                     <p className="text-sm text-muted-foreground mt-1">Supply USDST liquidity and withdraw on demand.</p>
                   </div>
                   <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
                     <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
                       <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
-                        Best Available APY
+                        Best available APY
                         <BestApyInfoTooltip />
                       </p>
                       <EarnApyTooltip info={lendingEarnApyInfo}>
-                        <p className="text-sm font-semibold cursor-default">
+                        <p className="text-sm font-semibold tabular-nums cursor-default">
                           {lendingDisplayApy ? `${lendingDisplayApy}%` : "N/A"}
                         </p>
                       </EarnApyTooltip>
                     </div>
                     <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
                       <p className="text-[11px] text-muted-foreground">TVL</p>
-                      <p className="text-sm font-semibold">
+                      <p className="text-sm font-semibold tabular-nums">
                         {loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.totalUSDSTSupplied || 0n, undefined, 18, 2, 2, true)}
                       </p>
                     </div>
@@ -226,7 +226,7 @@ const EarnLending = () => {
                           placeholder="0.00"
                           value={depositAmount}
                           onChange={(e) => setDepositAmount(e.target.value)}
-                          className={`pl-16 h-11 ${!isDepositAmountValid() && depositAmount ? "text-red-600" : ""}`}
+                          className={`pl-16 h-11 ${!isDepositAmountValid() && depositAmount ? "text-destructive" : ""}`}
                           disabled={!isLoggedIn}
                         />
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">USDST</span>
@@ -251,14 +251,14 @@ const EarnLending = () => {
                           const [whole, frac = ""] = formatted.split(".");
                           setDepositAmount(`${whole}.${frac.slice(0, 18)}`);
                         }}
-                        className="text-blue-600 hover:underline mr-2"
+                        className="text-primary hover:text-primary/80 font-medium mr-2"
                       >
                         Max
                       </button>
                       Available: {loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.supplyable?.userBalance || 0n, undefined, 18, 2)} USDST
                     </div>
 
-                    <div className="text-sm text-muted-foreground">Transaction Fee: {LENDING_DEPOSIT_FEE} USDST</div>
+                    <div className="text-sm text-muted-foreground">Transaction fee: {LENDING_DEPOSIT_FEE} USDST</div>
 
                     <RewardsWidget
                       userRewards={userRewards}
@@ -305,7 +305,7 @@ const EarnLending = () => {
                           placeholder="0.00"
                           value={withdrawAmount}
                           onChange={(e) => setWithdrawAmount(e.target.value)}
-                          className={`pl-16 h-11 ${!isWithdrawAmountValid() && withdrawAmount ? "text-red-600" : ""}`}
+                          className={`pl-16 h-11 ${!isWithdrawAmountValid() && withdrawAmount ? "text-destructive" : ""}`}
                           disabled={!isLoggedIn}
                         />
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">USDST</span>
@@ -330,7 +330,7 @@ const EarnLending = () => {
                         </TooltipTrigger>
                         {liquidityInfo?.isPaused && (
                           <TooltipContent>
-                            <p>Lending Pool is on pause. This action is disabled.</p>
+                            <p>Lending pool is on pause. This action is disabled.</p>
                           </TooltipContent>
                         )}
                       </Tooltip>
@@ -350,14 +350,14 @@ const EarnLending = () => {
                           const clamped = f.length > 18 ? `${w}.${f.slice(0, 18)}` : formatted;
                           setWithdrawAmount(clamped.replace(/\.?0+$/, ""));
                         }}
-                        className="text-blue-600 hover:underline mr-2"
+                        className="text-primary hover:text-primary/80 font-medium mr-2"
                       >
                         Max
                       </button>
                       Withdrawable: {loadingLiquidity ? "Loading..." : formatBalance(getMaxWithdrawableAmount(), undefined, 18, 2)} USDST
                     </div>
 
-                    <div className="text-sm text-muted-foreground">Transaction Fee: {LENDING_WITHDRAW_FEE} USDST</div>
+                    <div className="text-sm text-muted-foreground">Transaction fee: {LENDING_WITHDRAW_FEE} USDST</div>
 
                     <RewardsWidget
                       userRewards={userRewards}
@@ -374,29 +374,29 @@ const EarnLending = () => {
                 <Card className="border border-border/70 h-full">
                   <CardContent className="pt-5">
                     <div className="flex items-center gap-2 mb-4">
-                      <Landmark className="h-4 w-4 text-blue-600" />
-                      <p className="text-base font-semibold">Pool Stats</p>
+                      <Landmark className="h-4 w-4 text-primary" />
+                      <p className="text-base font-semibold">Pool stats</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2.5">
-                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Total USDST Supplied</p><p className="text-sm font-semibold">{loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.totalUSDSTSupplied || 0n, undefined, 18, 2, 2, true)}</p></div>
-                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Total USDST Borrowed</p><p className="text-sm font-semibold">{loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.totalBorrowed || 0n, undefined, 18, 2, 2, true)}</p></div>
-                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Utilization Rate</p><p className="text-sm font-semibold">{liquidityInfo?.utilizationRate || "0"}%</p></div>
-                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Available Liquidity</p><p className="text-sm font-semibold">{loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.availableLiquidity || 0n, undefined, 18, 2, 2, true)}</p></div>
-                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Total Collateral Value</p><p className="text-sm font-semibold">{loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.totalCollateralValue || 0n, undefined, 18, 2, 2, true)}</p></div>
-                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Borrow Index</p><p className="text-sm font-semibold">{loadingLiquidity ? "Loading..." : liquidityInfo?.borrowIndex ? (() => { const s = formatUnits(liquidityInfo.borrowIndex || 0, 27); const [w, f = ""] = s.split("."); return f ? `${w}.${f.slice(0, 5)}` : w; })() : "0"}</p></div>
-                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Reserves Accrued</p><p className="text-sm font-semibold">{loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.reservesAccrued || 0n, undefined, 18, 2, 2, true)}</p></div>
-                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground inline-flex items-center gap-1">Best Available APY<BestApyInfoTooltip /></p><EarnApyTooltip info={lendingEarnApyInfo}><p className="text-sm font-semibold cursor-default">{lendingDisplayApy ? `${lendingDisplayApy}%` : "N/A"}</p></EarnApyTooltip></div>
-                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Max Supply APY</p><p className="text-sm font-semibold">{liquidityInfo?.maxSupplyAPY ? `${liquidityInfo.maxSupplyAPY}%` : "N/A"}</p></div>
-                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Borrow APY</p><p className="text-sm font-semibold">{liquidityInfo?.borrowAPY ? `${liquidityInfo.borrowAPY}%` : "N/A"}</p></div>
+                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Total USDST supplied</p><p className="text-sm font-semibold tabular-nums">{loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.totalUSDSTSupplied || 0n, undefined, 18, 2, 2, true)}</p></div>
+                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Total USDST borrowed</p><p className="text-sm font-semibold tabular-nums">{loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.totalBorrowed || 0n, undefined, 18, 2, 2, true)}</p></div>
+                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Utilization rate</p><p className="text-sm font-semibold tabular-nums">{liquidityInfo?.utilizationRate || "0"}%</p></div>
+                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Available liquidity</p><p className="text-sm font-semibold tabular-nums">{loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.availableLiquidity || 0n, undefined, 18, 2, 2, true)}</p></div>
+                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Total collateral value</p><p className="text-sm font-semibold tabular-nums">{loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.totalCollateralValue || 0n, undefined, 18, 2, 2, true)}</p></div>
+                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Borrow index</p><p className="text-sm font-semibold tabular-nums">{loadingLiquidity ? "Loading..." : liquidityInfo?.borrowIndex ? (() => { const s = formatUnits(liquidityInfo.borrowIndex || 0, 27); const [w, f = ""] = s.split("."); return f ? `${w}.${f.slice(0, 5)}` : w; })() : "0"}</p></div>
+                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Reserves accrued</p><p className="text-sm font-semibold tabular-nums">{loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.reservesAccrued || 0n, undefined, 18, 2, 2, true)}</p></div>
+                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground inline-flex items-center gap-1">Best available APY<BestApyInfoTooltip /></p><EarnApyTooltip info={lendingEarnApyInfo}><p className="text-sm font-semibold tabular-nums cursor-default">{lendingDisplayApy ? `${lendingDisplayApy}%` : "N/A"}</p></EarnApyTooltip></div>
+                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Max supply APY</p><p className="text-sm font-semibold tabular-nums">{liquidityInfo?.maxSupplyAPY ? `${liquidityInfo.maxSupplyAPY}%` : "N/A"}</p></div>
+                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Borrow APY</p><p className="text-sm font-semibold tabular-nums">{liquidityInfo?.borrowAPY ? `${liquidityInfo.borrowAPY}%` : "N/A"}</p></div>
                       {isLoggedIn && (
                         <div className="rounded-lg border border-border/60 p-3">
-                          <p className="text-xs text-muted-foreground">Your {liquidityInfo?.withdrawable?._name || "lendUSDST"} (Total)</p>
-                          <p className="text-sm font-semibold">{loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n, undefined, 18, 2, 2)}</p>
+                          <p className="text-xs text-muted-foreground">Your {liquidityInfo?.withdrawable?._name || "lendUSDST"} (total)</p>
+                          <p className="text-sm font-semibold tabular-nums">{loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n, undefined, 18, 2, 2)}</p>
                         </div>
                       )}
                       <div className="rounded-lg border border-border/60 p-3 sm:col-span-2 xl:col-span-1">
-                        <p className="text-xs text-muted-foreground">Conversion Rate</p>
-                        <p className="text-sm font-semibold break-all">{liquidityInfo?.exchangeRate ? `1 ${liquidityInfo?.withdrawable?._name || "lendUSDST"} = ${formatUnits(liquidityInfo.exchangeRate, 18)} USDST` : "N/A"}</p>
+                        <p className="text-xs text-muted-foreground">Conversion rate</p>
+                        <p className="text-sm font-semibold tabular-nums break-all">{liquidityInfo?.exchangeRate ? `1 ${liquidityInfo?.withdrawable?._name || "lendUSDST"} = ${formatUnits(liquidityInfo.exchangeRate, 18)} USDST` : "N/A"}</p>
                       </div>
                     </div>
                   </CardContent>

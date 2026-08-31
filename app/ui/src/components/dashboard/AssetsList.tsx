@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useLayoutEffect } from "react";
 import { Link } from "react-router-dom";
-import { Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { Token as TokenType, EarningAsset } from "@strato/shared-types";
@@ -149,7 +149,7 @@ const AssetsList = ({
       {isDashboard && (
         <div className="p-4 md:p-5">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <h2 className="font-bold text-lg">My Tokens</h2>
+            <h2 className="font-bold text-lg">My tokens</h2>
             {/* Mobile: full width button */}
             <Button
               className="w-full sm:hidden flex items-center justify-center gap-2"
@@ -175,14 +175,14 @@ const AssetsList = ({
         {!isDashboard && (
           <div className="p-4 text-right border-b border-border flex justify-between">
             <span className="font-bold inline-flex items-center gap-1">
-              Earning Assets
+              Earning assets
             </span>
           </div>
         )}
         {isDashboard && (
           <div className="p-3 md:p-4 text-right flex justify-between">
             <span className="font-bold text-sm md:text-base inline-flex items-center gap-1">
-              Earning Assets
+              Earning assets
             </span>
           </div>
         )}
@@ -195,7 +195,7 @@ const AssetsList = ({
                 </th>
                 <th className="hidden md:table-cell w-[14%] text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   <span className="inline-flex items-center gap-1 justify-end w-full">
-                    Best Available APY
+                    Best available APY
                     <BestApyInfoTooltip />
                   </span>
                 </th>
@@ -227,7 +227,7 @@ const AssetsList = ({
                     className="py-4 px-4 whitespace-nowrap w-full"
                   >
                     <div className="w-full flex justify-center items-center h-16">
-                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
                   </td>
                 </tr>
@@ -248,10 +248,7 @@ const AssetsList = ({
                               className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover shrink-0"
                             />
                           ) : (
-                            <div
-                              className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs text-white font-medium shrink-0"
-                              style={{ backgroundColor: "red" }}
-                            >
+                            <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium shrink-0">
                               {asset?._symbol?.slice(0, 2) || "??"}
                             </div>
                           )}
@@ -262,7 +259,7 @@ const AssetsList = ({
                                   <TooltipTrigger asChild>
                                     <Link
                                       to={getAssetDetailHref(asset)}
-                                      className="font-medium text-sm md:text-base text-blue-600 truncate hover:text-blue-800 underline transition-colors"
+                                      className="font-medium text-sm md:text-base text-primary truncate hover:text-primary/80 underline transition-colors"
                                     >
                                       {asset?._symbol || asset?._name || ""}
                                     </Link>
@@ -288,7 +285,7 @@ const AssetsList = ({
                                 if (!info) return <span className="min-w-0">-</span>;
                                 return (
                                   <EarnApyTooltip info={info} side="bottom" align="start">
-                                    <span className="min-w-0 font-medium text-foreground cursor-default">
+                                    <span className="min-w-0 font-medium text-foreground cursor-default tabular-nums">
                                       {info.total.toFixed(2)}%
                                     </span>
                                   </EarnApyTooltip>
@@ -304,41 +301,41 @@ const AssetsList = ({
                           if (!info) return <p className="text-sm text-muted-foreground">-</p>;
                           return (
                             <EarnApyTooltip info={info} side="left" align="end">
-                              <span className="text-sm font-medium text-foreground cursor-default">{info.total.toFixed(2)}%</span>
+                              <span className="text-sm font-medium text-foreground cursor-default tabular-nums">{info.total.toFixed(2)}%</span>
                             </EarnApyTooltip>
                           );
                         })()}
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-foreground">
+                        <p className="font-medium text-foreground tabular-nums">
                           {!asset?.price || asset.price === "0"
                             ? "-"
                             : formatBalance(asset.price, undefined, 18, 2, 2, true)}
                         </p>
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-foreground">
+                        <p className="font-medium text-foreground tabular-nums">
                           {guestMode || !asset?.balance || asset.balance === "0"
                             ? "-"
                             : formatBalance(asset.balance, undefined, 18, 1, 2)}
                         </p>
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-foreground">
+                        <p className="font-medium text-foreground tabular-nums">
                           {guestMode || !asset?.collateralBalance || asset.collateralBalance === "0"
                             ? "-"
                             : formatBalance(asset.collateralBalance, undefined, 18, 1, 4)}
                         </p>
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-foreground">
+                        <p className="font-medium text-foreground tabular-nums">
                           {guestMode || !asset?.stakedBalance || asset.stakedBalance === "0"
                             ? "-"
                             : formatBalance(asset.stakedBalance, undefined, 18, 1, 4)}
                         </p>
                       </td>
                       <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-sm md:text-base text-foreground">
+                        <p className="font-medium text-sm md:text-base text-foreground tabular-nums">
                           {guestMode || !asset?.value || asset.value === "0.00" || parseFloat(asset.value) === 0
                             ? "-"
                             : `$${asset.value}`}
@@ -349,7 +346,7 @@ const AssetsList = ({
                           <p className="font-medium text-sm md:text-base text-foreground">-</p>
                         ) : (
                           <div>
-                            <p className="font-medium text-sm md:text-base text-foreground">
+                            <p className="font-medium text-sm md:text-base text-foreground tabular-nums">
                               {formatBalance(asset.totalBalance, undefined, 18, 1, 4)}
                             </p>
                             {asset.rebaseFactor && asset.rebasingExternalSymbol && (
@@ -391,12 +388,12 @@ const AssetsList = ({
             >
               {showAllTokens ? (
                 <>
-                  Show Less
+                  Show less
                   <ChevronUp size={16} />
                 </>
               ) : (
                 <>
-                  Show More ({hiddenCount})
+                  Show more ({hiddenCount})
                   <ChevronDown size={16} />
                 </>
               )}
@@ -409,7 +406,7 @@ const AssetsList = ({
         <div>
           <div className="mx-3 md:mx-0 border-t border-border"></div>
           <div className="p-3 md:p-4 text-right flex justify-between items-center">
-            <span className="font-bold text-sm md:text-base">Non-earning Assets</span>
+            <span className="font-bold text-sm md:text-base">Non-earning assets</span>
             <Button
               size="sm"
               variant="outline"
@@ -424,7 +421,7 @@ const AssetsList = ({
             </Button>
           </div>
           <div
-            className={`transition-all duration-300 ease-in-out overflow-hidden ${showNonEarningAssetsTable
+            className={`transition-[max-height,opacity] duration-300 ease-in-out overflow-hidden ${showNonEarningAssetsTable
               ? "max-h-[400px] opacity-100"
               : "max-h-0 opacity-0"
               }`}
@@ -449,7 +446,7 @@ const AssetsList = ({
                         className="py-4 px-4 whitespace-nowrap w-full"
                       >
                         <div className="w-full flex justify-center items-center h-16">
-                          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                         </div>
                       </td>
                     </tr>
@@ -468,17 +465,14 @@ const AssetsList = ({
                                 className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover"
                               />
                             ) : (
-                              <div
-                                className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
-                                style={{ backgroundColor: "red" }}
-                              >
+                              <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
                                 {asset?._symbol?.slice(0, 2) || "??"}
                               </div>
                             )}
                             <div className="ml-2 md:ml-3 min-w-0 flex-1">
                               <Link
                                 to={getAssetDetailHref(asset)}
-                                className="font-medium text-sm md:text-base text-blue-600 hover:text-blue-800 underline transition-colors block truncate"
+                                className="font-medium text-sm md:text-base text-primary hover:text-primary/80 underline transition-colors block truncate"
                               >
                                 {asset?._symbol || asset?._name || ""}
                               </Link>
@@ -489,7 +483,7 @@ const AssetsList = ({
                           </div>
                         </td>
                         <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
-                          <p className="font-medium text-sm md:text-base text-foreground">
+                          <p className="font-medium text-sm md:text-base text-foreground tabular-nums">
                             {!asset?.balance || asset.balance === "0"
                               ? "-"
                               : formatBalance(asset.balance, undefined, 18, 1, 2)}

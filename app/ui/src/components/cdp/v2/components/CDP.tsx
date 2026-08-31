@@ -64,8 +64,8 @@ const CDP = () => {
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Avatar className="w-8 h-8 bg-strato-blue cursor-pointer">
-            <AvatarFallback className="text-white text-xs bg-strato-blue">
+          <Avatar className="w-8 h-8 bg-primary cursor-pointer">
+            <AvatarFallback className="text-primary-foreground text-xs bg-primary">
               {userInitials}
             </AvatarFallback>
           </Avatar>
@@ -77,7 +77,7 @@ const CDP = () => {
         <div className="border-b border-border px-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="vaults">Vaults</TabsTrigger>
-            <TabsTrigger value="bad-debt">Bad Debt</TabsTrigger>
+            <TabsTrigger value="bad-debt">Bad debt</TabsTrigger>
             <TabsTrigger value="liquidations">Liquidations</TabsTrigger>
           </TabsList>
         </div>

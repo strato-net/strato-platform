@@ -27,7 +27,7 @@ const DashboardFAQ = () => {
   
   return (
     <div className="bg-card text-card-foreground rounded-xl border border-border p-5 shadow-sm">
-      <h2 className="font-bold text-lg mb-4">Frequently Asked Questions</h2>
+      <h2 className="font-bold text-lg mb-4">Frequently asked questions</h2>
       
       <Accordion type="single" collapsible className="w-full">
         {faqItems.map((item, index) => (

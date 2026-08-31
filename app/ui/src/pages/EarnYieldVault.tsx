@@ -60,7 +60,7 @@ const VAULT_META: Record<string, {
     badge: "Yield Vault",
     iconBg: "bg-indigo-500/15 dark:bg-indigo-400/15",
     iconColor: "text-indigo-600 dark:text-indigo-400",
-    cardBorder: "border-blue-500/25 dark:border-blue-400/25 bg-gradient-to-br from-[#f8fbff] to-[#edf3ff] dark:from-[#0f1a33] dark:to-[#111c3a]",
+    cardBorder: "border-primary/25 bg-gradient-to-br from-primary/5 to-muted",
     strategyDescription: "Deposited ETH is put to work across approved yield strategies, including wstETH staking yield. Net strategy returns are converted to ETH, which funds the vault’s configured Base APY. Funded rewards increase the ETH value of each vault share over time. The vault maintains an idle buffer for withdrawals; larger redemptions may queue while capital is deployed.",
   },
   "wbtc-carry": {
@@ -69,7 +69,7 @@ const VAULT_META: Record<string, {
     badge: "Carry Vault",
     iconBg: "bg-orange-500/15 dark:bg-orange-400/15",
     iconColor: "text-orange-600 dark:text-orange-400",
-    cardBorder: "border-orange-500/25 dark:border-orange-400/25 bg-gradient-to-br from-[#fff7ed] to-[#ffedd5] dark:from-[#241a0a] dark:to-[#2b1d0c]",
+    cardBorder: "border-warning/30 bg-gradient-to-br from-warning/10 to-muted",
     strategyDescription: "The vault targets growth in BTC per share. Deposited wBTC is used as collateral to borrow USDST, which is deployed into yield-bearing stablecoins (syrupUSDC, sUSDS). The net carry is periodically converted back into BTC, increasing each share's claim on BTC over time. The vault maintains an idle buffer for withdrawals; large redemptions may queue when capital is deployed.",
   },
   "usdc-yield": {
@@ -78,7 +78,7 @@ const VAULT_META: Record<string, {
     badge: "Yield Vault",
     iconBg: "bg-emerald-500/15 dark:bg-emerald-400/15",
     iconColor: "text-emerald-600 dark:text-emerald-400",
-    cardBorder: "border-emerald-500/25 dark:border-emerald-400/25 bg-gradient-to-br from-[#ecfdf5] to-[#d1fae5] dark:from-[#0a2018] dark:to-[#0c2a1f]",
+    cardBorder: "border-success/25 bg-gradient-to-br from-success/10 to-muted",
     strategyDescription: "The vault targets growth in USDC per share by routing deposits across approved yield strategies. USDC may be converted into other tokens when needed to access yield, but the vault manages returns back to USDC-denominated value. Yield is harvested, rebalanced, and compounded over time. The vault maintains an idle buffer for withdrawals; large redemptions may queue when capital is deployed.",
   },
   "goldst-yield": {
@@ -87,7 +87,7 @@ const VAULT_META: Record<string, {
     badge: "Yield Vault",
     iconBg: "bg-amber-500/15 dark:bg-amber-400/15",
     iconColor: "text-amber-600 dark:text-amber-400",
-    cardBorder: "border-amber-500/25 dark:border-amber-400/25 bg-gradient-to-br from-[#fffbeb] to-[#fef3c7] dark:from-[#211a08] dark:to-[#2a210a]",
+    cardBorder: "border-gold/30 bg-gradient-to-br from-gold/10 to-muted",
     strategyDescription: "Deposits remain denominated in GOLDST. This vault does not use a funded Base APY; users earn Reward Points based on their vault-share position. The vault maintains an idle buffer for withdrawals, and redemptions may queue when idle liquidity is unavailable.",
   },
   "silvst-yield": {
@@ -96,7 +96,7 @@ const VAULT_META: Record<string, {
     badge: "Yield Vault",
     iconBg: "bg-slate-500/15 dark:bg-slate-400/15",
     iconColor: "text-slate-600 dark:text-slate-400",
-    cardBorder: "border-slate-500/25 dark:border-slate-400/25 bg-gradient-to-br from-[#f8fafc] to-[#e2e8f0] dark:from-[#151a22] dark:to-[#1c222c]",
+    cardBorder: "border-slate-500/25 dark:border-slate-400/25 bg-gradient-to-br from-card to-muted",
     strategyDescription: "Deposits remain denominated in SILVST. This vault does not use a funded Base APY; users earn Reward Points based on their vault-share position. The vault maintains an idle buffer for withdrawals, and redemptions may queue when idle liquidity is unavailable.",
   },
 };
@@ -530,7 +530,7 @@ const EarnYieldVault = () => {
       <div className="min-h-screen bg-background">
         <DashboardSidebar />
         <div
-          className="transition-all duration-300 md:pl-64"
+          className="transition-[padding-left] duration-300 md:pl-64"
           style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}
         >
           <DashboardHeader title={meta.title} />
@@ -569,10 +569,10 @@ const EarnYieldVault = () => {
 
   const metrics = [
     {
-      label: `${assetSymbol} Balance`,
+      label: `${assetSymbol} balance`,
       value: loadingVaults ? "..." : isLoggedIn ? formatTokenAmount(walletAssets, decimals) : "--",
       hint: "Available to deposit",
-      icon: <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />,
+      icon: <Wallet className="h-4 w-4 text-primary" />,
     },
     {
       label: `Your ${shareSymbol}`,
@@ -590,7 +590,7 @@ const EarnYieldVault = () => {
       icon: <CircleDollarSign className="h-4 w-4 text-violet-600 dark:text-violet-400" />,
     },
     {
-      label: "Reward Points / Day",
+      label: "Reward Points / day",
       value:
         loadingVaults || rewardsActivitiesLoading || rewardsUserLoading
           ? "..."
@@ -609,7 +609,7 @@ const EarnYieldVault = () => {
       <DashboardSidebar />
 
       <div
-        className="transition-all duration-300 md:pl-64"
+        className="transition-[padding-left] duration-300 md:pl-64"
         style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}
       >
         <DashboardHeader title={meta.title} />
@@ -643,7 +643,7 @@ const EarnYieldVault = () => {
                     </Badge>
                     {!isDeployed && (
                       <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                        Not Deployed
+                        Not deployed
                       </Badge>
                     )}
                   </div>
@@ -687,23 +687,23 @@ const EarnYieldVault = () => {
 
                           <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
                             <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
-                              <p className="text-muted-foreground">Current Price</p>
-                              <p className="mt-1 text-base font-semibold">{exchangeRate}</p>
+                              <p className="text-muted-foreground">Current price</p>
+                              <p className="mt-1 text-base font-semibold tabular-nums">{exchangeRate}</p>
                             </div>
                             <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
                               <p className="text-muted-foreground">TVL</p>
-                              <p className="mt-1 text-base font-semibold">{tvlDisplay}</p>
+                              <p className="mt-1 text-base font-semibold tabular-nums">{tvlDisplay}</p>
                             </div>
                             <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
                               <p className="inline-flex items-center gap-1 text-muted-foreground">
-                                Best Available APY
+                                Best available APY
                                 <BestApyInfoTooltip />
                               </p>
                               {loadingVaults || rewardsActivitiesLoading ? (
-                                <p className="mt-1 text-base font-semibold">...</p>
+                                <p className="mt-1 text-base font-semibold tabular-nums">...</p>
                               ) : (
                                 <EarnApyTooltip info={bestApyInfo}>
-                                  <p className={`mt-1 text-base font-semibold cursor-default ${bestApyDisplay.className}`}>
+                                  <p className={`mt-1 text-base font-semibold tabular-nums cursor-default ${bestApyDisplay.className}`}>
                                     {bestApyDisplay.label}
                                   </p>
                                 </EarnApyTooltip>
@@ -712,31 +712,31 @@ const EarnYieldVault = () => {
                           </div>
 
                           <div className="space-y-2">
-                            <p className="text-xs font-medium text-muted-foreground">Your Position</p>
+                            <p className="text-xs font-medium text-muted-foreground">Your position</p>
                             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                               <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
-                                <p className="text-xs text-muted-foreground">Position Value</p>
-                                <p className="mt-1 text-base font-semibold">{positionValueDisplay}</p>
+                                <p className="text-xs text-muted-foreground">Position value</p>
+                                <p className="mt-1 text-base font-semibold tabular-nums">{positionValueDisplay}</p>
                               </div>
                               <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
                                 <p className="text-xs text-muted-foreground">Redeemable</p>
-                                <p className="mt-1 text-base font-semibold">
+                                <p className="mt-1 text-base font-semibold tabular-nums">
                                   {isLoggedIn ? formatTokenAmount(redeemableAssets, decimals) : "--"}{" "}
                                   {isLoggedIn ? assetSymbol : ""}
                                 </p>
                               </div>
                               <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
                                 <p className="text-xs text-muted-foreground">Your {shareSymbol}</p>
-                                <p className="mt-1 text-base font-semibold">
+                                <p className="mt-1 text-base font-semibold tabular-nums">
                                   {isLoggedIn ? formatTokenAmount(userShares, decimals) : "--"}
                                 </p>
                               </div>
                               <div className="rounded-lg border border-border/60 bg-background/70 p-2.5">
                                 <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                  Reward Points / Day
+                                  Reward Points / day
                                   <Sparkles className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
                                 </p>
-                                <p className="mt-1 text-base font-semibold">{rewardPointsDisplay}</p>
+                                <p className="mt-1 text-base font-semibold tabular-nums">{rewardPointsDisplay}</p>
                               </div>
                             </div>
                           </div>
@@ -746,8 +746,8 @@ const EarnYieldVault = () => {
                               {hasClaimableAssets && (
                                 <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-background/70 p-2.5 text-xs">
                                   <div>
-                                    <p className="text-muted-foreground">Ready to Claim</p>
-                                    <p className="mt-1 text-base font-semibold text-foreground">
+                                    <p className="text-muted-foreground">Ready to claim</p>
+                                    <p className="mt-1 text-base font-semibold tabular-nums text-foreground">
                                       {formatTokenAmount(claimableAssets, decimals)} {assetSymbol}
                                     </p>
                                   </div>
@@ -763,8 +763,8 @@ const EarnYieldVault = () => {
                               )}
                               {hasPendingWithdrawal && (
                                 <div className="rounded-lg border border-border/60 bg-background/70 p-2.5 text-xs">
-                                  <p className="text-muted-foreground">Queued Withdrawal</p>
-                                  <p className="mt-1 text-base font-semibold text-foreground">
+                                  <p className="text-muted-foreground">Queued withdrawal</p>
+                                  <p className="mt-1 text-base font-semibold tabular-nums text-foreground">
                                     {formatTokenAmount(pendingWithdrawal?.shares || "0", decimals)} {shareSymbol}
                                   </p>
                                 </div>
@@ -799,29 +799,29 @@ const EarnYieldVault = () => {
 
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                             <div className="rounded-lg border border-border/60 bg-background/70 p-3">
-                              <p className="text-muted-foreground">Exchange Rate</p>
-                              <p className="mt-1 text-lg font-semibold">{exchangeRate}</p>
+                              <p className="text-muted-foreground">Exchange rate</p>
+                              <p className="mt-1 text-lg font-semibold tabular-nums">{exchangeRate}</p>
                               <p className="text-xs text-muted-foreground mt-1">
                                 {assetSymbol} redeemable per {shareSymbol}
                               </p>
                             </div>
                             <div className="rounded-lg border border-border/60 bg-background/70 p-3">
                               <p className="text-muted-foreground">TVL</p>
-                              <p className="mt-1 text-lg font-semibold">{tvlDisplay}</p>
+                              <p className="mt-1 text-lg font-semibold tabular-nums">{tvlDisplay}</p>
                               <p className="text-xs text-muted-foreground mt-1">
                                 Total value locked in the vault
                               </p>
                             </div>
                             <div className="rounded-lg border border-border/60 bg-background/70 p-3">
                               <p className="text-muted-foreground inline-flex items-center gap-1">
-                                Best Available APY
+                                Best available APY
                                 <BestApyInfoTooltip />
                               </p>
                               {loadingVaults || rewardsActivitiesLoading ? (
-                                <p className="mt-1 text-lg font-semibold">...</p>
+                                <p className="mt-1 text-lg font-semibold tabular-nums">...</p>
                               ) : (
                                 <EarnApyTooltip info={bestApyInfo}>
-                                  <p className={`mt-1 text-lg font-semibold cursor-default ${bestApyDisplay.className}`}>
+                                  <p className={`mt-1 text-lg font-semibold tabular-nums cursor-default ${bestApyDisplay.className}`}>
                                     {bestApyDisplay.label}
                                   </p>
                                 </EarnApyTooltip>
@@ -874,7 +874,7 @@ const EarnYieldVault = () => {
                             <p className="text-xs text-muted-foreground">{metric.label}</p>
                             {metric.icon}
                           </div>
-                          <p className="text-2xl font-semibold leading-none">{metric.value}</p>
+                          <p className="text-2xl font-semibold leading-none tabular-nums">{metric.value}</p>
                           <p className="text-xs text-muted-foreground">{metric.hint}</p>
                         </CardContent>
                       </Card>
@@ -894,21 +894,21 @@ const EarnYieldVault = () => {
 
                 {!isFundedVault && (
                   <section className="space-y-3">
-                    <h2 className="text-xl font-semibold">Vault Parameters</h2>
+                    <h2 className="text-xl font-semibold">Vault parameters</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                     <Card className="border border-border/70">
                       <CardContent className="pt-4 space-y-2">
-                        <p className="text-xs text-muted-foreground">Vault Address</p>
+                        <p className="text-xs text-muted-foreground">Vault address</p>
                         <div className="flex items-center gap-1">
-                          <p className="text-lg font-semibold break-all">{formatAddress(effectiveInfo?.vaultAddress || "")}</p>
+                          <p className="font-mono text-sm font-semibold break-all">{formatAddress(effectiveInfo?.vaultAddress || "")}</p>
                           <CopyButton address={effectiveInfo?.vaultAddress || ""} />
                         </div>
                       </CardContent>
                     </Card>
                     <Card className="border border-border/70">
                       <CardContent className="pt-4 space-y-2">
-                        <p className="text-xs text-muted-foreground">Idle Assets</p>
-                        <p className="text-lg font-semibold">
+                        <p className="text-xs text-muted-foreground">Idle assets</p>
+                        <p className="text-lg font-semibold tabular-nums">
                           {formatTokenAmount(effectiveInfo?.idleAssets || "0", decimals)} {assetSymbol}
                         </p>
                         <p className="text-xs text-muted-foreground">Currently available inside the vault</p>
@@ -916,8 +916,8 @@ const EarnYieldVault = () => {
                     </Card>
                     <Card className="border border-border/70">
                       <CardContent className="pt-4 space-y-2">
-                        <p className="text-xs text-muted-foreground">Deployed Assets</p>
-                        <p className="text-lg font-semibold">
+                        <p className="text-xs text-muted-foreground">Deployed assets</p>
+                        <p className="text-lg font-semibold tabular-nums">
                           {formatTokenAmount(effectiveInfo?.deployedAssets || "0", decimals)} {assetSymbol}
                         </p>
                         <p className="text-xs text-muted-foreground">Capital deployed to the strategy</p>
@@ -925,8 +925,8 @@ const EarnYieldVault = () => {
                     </Card>
                     <Card className="border border-border/70">
                       <CardContent className="pt-4 space-y-2">
-                        <p className="text-xs text-muted-foreground">Min Idle Reserve</p>
-                        <p className="text-lg font-semibold">{formatBps(effectiveInfo?.minIdleBps || "0")}</p>
+                        <p className="text-xs text-muted-foreground">Min idle reserve</p>
+                        <p className="text-lg font-semibold tabular-nums">{formatBps(effectiveInfo?.minIdleBps || "0")}</p>
                         <p className="text-xs text-muted-foreground">
                           Queue: {BigInt(effectiveInfo?.totalQueuedShares || "0") > 0n ? "open" : "clear"}
                         </p>
@@ -938,7 +938,7 @@ const EarnYieldVault = () => {
 
                 <section className="space-y-3">
                   <h2 className="text-xl font-semibold">
-                    {isFundedVault ? "How This Vault Earns" : "Strategy"}
+                    {isFundedVault ? "How this vault earns" : "Strategy"}
                   </h2>
                   <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
                     {meta?.strategyDescription}
@@ -958,41 +958,41 @@ const EarnYieldVault = () => {
                           : "hidden"
                       }
                     >
-                      Vault &amp; Strategy Details
+                      Vault &amp; strategy details
                       <ChevronDown className="h-5 w-5 transition-transform group-open:rotate-180" />
                     </summary>
                     <div className={isFundedVault ? "space-y-3 border-t border-border/70 p-4" : "space-y-3"}>
                   {isFundedVault && (
                     <div className="grid grid-cols-2 gap-x-6 gap-y-4 border-b border-border/60 pb-4 text-sm lg:grid-cols-4">
                       <div>
-                        <p className="text-xs text-muted-foreground">Vault Address</p>
+                        <p className="text-xs text-muted-foreground">Vault address</p>
                         <div className="mt-1 flex items-center gap-1">
-                          <p className="font-medium">{formatAddress(effectiveInfo?.vaultAddress || "")}</p>
+                          <p className="font-mono font-medium">{formatAddress(effectiveInfo?.vaultAddress || "")}</p>
                           <CopyButton address={effectiveInfo?.vaultAddress || ""} />
                         </div>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Idle Assets</p>
-                        <p className="mt-1 font-medium">
+                        <p className="text-xs text-muted-foreground">Idle assets</p>
+                        <p className="mt-1 font-medium tabular-nums">
                           {formatTokenAmount(effectiveInfo?.idleAssets || "0", decimals)} {assetSymbol}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Deployed Assets</p>
-                        <p className="mt-1 font-medium">
+                        <p className="text-xs text-muted-foreground">Deployed assets</p>
+                        <p className="mt-1 font-medium tabular-nums">
                           {formatTokenAmount(effectiveInfo?.deployedAssets || "0", decimals)} {assetSymbol}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Reserve / Queue</p>
-                        <p className="mt-1 font-medium">
+                        <p className="text-xs text-muted-foreground">Reserve / queue</p>
+                        <p className="mt-1 font-medium tabular-nums">
                           {formatBps(effectiveInfo?.minIdleBps || "0")} ·{" "}
                           {BigInt(effectiveInfo?.totalQueuedShares || "0") > 0n ? "Open" : "Clear"}
                         </p>
                       </div>
                     </div>
                   )}
-                  <h2 className={isFundedVault ? "sr-only" : "text-xl font-semibold"}>Strategy Holdings</h2>
+                  <h2 className={isFundedVault ? "sr-only" : "text-xl font-semibold"}>Strategy holdings</h2>
                   {strategyHoldings.length > 0 ? (
                     <div className="grid grid-cols-1 gap-3">
                       {strategyHoldings.map((holding) => (
@@ -1000,15 +1000,15 @@ const EarnYieldVault = () => {
                           <CardContent className="pt-4 space-y-4">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                               <div className="space-y-1">
-                                <p className="text-xs text-muted-foreground">Strategy Address</p>
+                                <p className="text-xs text-muted-foreground">Strategy address</p>
                                 <div className="flex items-center gap-1">
-                                  <p className="text-sm font-medium break-all">{formatAddress(holding.strategyAddress)}</p>
+                                  <p className="font-mono text-sm font-medium break-all">{formatAddress(holding.strategyAddress)}</p>
                                   <CopyButton address={holding.strategyAddress} />
                                 </div>
                               </div>
                               <div className="space-y-1 sm:text-right">
-                                <p className="text-xs text-muted-foreground">Deployed Capital</p>
-                                <p className="text-lg font-semibold">
+                                <p className="text-xs text-muted-foreground">Deployed capital</p>
+                                <p className="text-lg font-semibold tabular-nums">
                                   {formatTokenAmount(holding.deployedAssets, decimals)} {assetSymbol}
                                 </p>
                               </div>
@@ -1024,12 +1024,12 @@ const EarnYieldVault = () => {
                                   const sign = apy > 0 ? "+" : apy < 0 ? "" : "";
                                   const tone =
                                     apy > 0
-                                      ? "text-emerald-600 dark:text-emerald-400"
+                                      ? "text-success"
                                       : apy < 0
-                                        ? "text-red-600 dark:text-red-400"
+                                        ? "text-destructive"
                                         : "text-foreground";
                                   return (
-                                    <p className={`text-lg font-semibold ${tone}`}>
+                                    <p className={`text-lg font-semibold tabular-nums ${tone}`}>
                                       {`${sign}${apy.toFixed(2)}%`}
                                     </p>
                                   );
@@ -1049,10 +1049,10 @@ const EarnYieldVault = () => {
                                       key={asset.tokenAddress}
                                       className="flex items-center justify-between px-3 py-2 text-sm"
                                     >
-                                      <span className="font-medium text-foreground">
+                                      <span className="font-medium text-foreground tabular-nums">
                                         {asset.tokenSymbol || formatAddress(asset.tokenAddress)}
                                       </span>
-                                      <span className="font-mono text-foreground">
+                                      <span className="font-mono tabular-nums text-foreground">
                                         {formatTokenAmount(asset.amount, asset.decimals)}
                                       </span>
                                     </div>
@@ -1069,10 +1069,10 @@ const EarnYieldVault = () => {
                             </div>
 
                             <div className="space-y-2">
-                              <p className="text-xs text-muted-foreground uppercase tracking-wide">USDST Debt</p>
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">USDST debt</p>
                               <div className="rounded-md border border-border/60 px-3 py-2 text-sm flex items-center justify-between">
-                                <span className="font-medium text-foreground">USDST</span>
-                                <span className="font-mono text-foreground">
+                                <span className="font-medium text-foreground tabular-nums">USDST</span>
+                                <span className="font-mono tabular-nums text-foreground">
                                   {formatTokenAmount(holding.usdstDebt || "0", 18)}
                                 </span>
                               </div>
@@ -1089,10 +1089,10 @@ const EarnYieldVault = () => {
                               const outflows = holding.recentOutflows || [];
                               return (
                                 <div className="space-y-2">
-                                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Off-Chain Capital</p>
+                                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Off-chain capital</p>
                                   <div className="rounded-md border border-border/60 px-3 py-2 text-sm flex items-center justify-between">
-                                    <span className="font-medium text-foreground">In transit</span>
-                                    <span className="font-mono text-foreground">
+                                    <span className="font-medium text-foreground tabular-nums">In transit</span>
+                                    <span className="font-mono tabular-nums text-foreground">
                                       ~{formatUsdAmount(holding.offChainUsdWad || "0")}
                                     </span>
                                   </div>
@@ -1106,11 +1106,11 @@ const EarnYieldVault = () => {
                                           key={`${outflow.tokenAddress}-${outflow.timestampMs}-${idx}`}
                                           className="flex items-center justify-between px-3 py-2 text-sm"
                                         >
-                                          <span className="font-medium text-foreground">
+                                          <span className="font-medium text-foreground tabular-nums">
                                             {outflow.tokenSymbol || formatAddress(outflow.tokenAddress)}
                                           </span>
                                           <div className="flex flex-col items-end">
-                                            <span className="font-mono text-foreground">
+                                            <span className="font-mono tabular-nums text-foreground">
                                               {formatTokenAmount(outflow.amount, outflow.decimals)}
                                             </span>
                                             <span className="text-[11px] text-muted-foreground">
@@ -1147,12 +1147,12 @@ const EarnYieldVault = () => {
 
                 {!isFundedVault && (
                   <section className="space-y-3">
-                    <h2 className="text-xl font-semibold">Withdrawal Status</h2>
+                    <h2 className="text-xl font-semibold">Withdrawal status</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <Card className="border border-border/70">
                       <CardContent className="pt-4 space-y-2">
-                        <p className="text-xs text-muted-foreground">Withdrawable Instantly</p>
-                        <p className="text-2xl font-semibold">
+                        <p className="text-xs text-muted-foreground">Withdrawable instantly</p>
+                        <p className="text-2xl font-semibold tabular-nums">
                           {isLoggedIn ? formatTokenAmount(maxWithdrawAssets, decimals) : "--"} {isLoggedIn ? assetSymbol : ""}
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -1164,8 +1164,8 @@ const EarnYieldVault = () => {
                     </Card>
                     <Card className="border border-border/70">
                       <CardContent className="pt-4 space-y-2">
-                        <p className="text-xs text-muted-foreground">Estimated Pending Claim</p>
-                        <p className="text-2xl font-semibold">
+                        <p className="text-xs text-muted-foreground">Estimated pending claim</p>
+                        <p className="text-2xl font-semibold tabular-nums">
                           {pendingWithdrawal
                             ? `${formatTokenAmount(pendingWithdrawal.estimatedAssets, decimals)} ${assetSymbol}`
                             : "--"}
@@ -1180,8 +1180,8 @@ const EarnYieldVault = () => {
                     <Card className="border border-border/70">
                       <CardContent className="pt-4 space-y-3">
                         <div className="space-y-2">
-                          <p className="text-xs text-muted-foreground">Claimable Now</p>
-                          <p className="text-2xl font-semibold">
+                          <p className="text-xs text-muted-foreground">Claimable now</p>
+                          <p className="text-2xl font-semibold tabular-nums">
                             {isLoggedIn ? formatTokenAmount(claimableAssets, decimals) : "--"} {isLoggedIn ? assetSymbol : ""}
                           </p>
                           <p className="text-xs text-muted-foreground">
@@ -1230,7 +1230,7 @@ const EarnYieldVault = () => {
                 <span>Available</span>
                 <button
                   type="button"
-                  className="font-medium text-foreground hover:underline"
+                  className="font-medium text-primary hover:text-primary/80 tabular-nums"
                   onClick={() =>
                     setActionAmount(
                       actionMaxInputValue === "0.0" || actionMaxInputValue === "0"
@@ -1253,20 +1253,20 @@ const EarnYieldVault = () => {
             </div>
             <div className="rounded-lg border border-border/70 bg-muted/40 p-3 space-y-2">
               <div className="flex items-center justify-between">
-                <span>{assetSymbol} Balance</span>
-                <span className="font-medium text-foreground">
+                <span>{assetSymbol} balance</span>
+                <span className="font-medium text-foreground tabular-nums">
                   {formatTokenAmount(walletAssets, decimals)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span>{shareSymbol} Balance</span>
-                <span className="font-medium text-foreground">
+                <span>{shareSymbol} balance</span>
+                <span className="font-medium text-foreground tabular-nums">
                   {formatTokenAmount(userShares, decimals)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span>You receive</span>
-                <span className="font-medium text-foreground">
+                <span className="font-medium text-foreground tabular-nums">
                   {formatTokenAmount(previewValueWei.toString(), decimals)} {actionPreviewSymbol}
                 </span>
               </div>
@@ -1275,19 +1275,19 @@ const EarnYieldVault = () => {
               <div className="rounded-lg border border-border/70 bg-background/60 p-3 space-y-2 text-xs">
                 <div className="flex items-center justify-between">
                   <span>Withdrawable instantly</span>
-                  <span className="font-medium text-foreground">
+                  <span className="font-medium text-foreground tabular-nums">
                     {formatTokenAmount(instantWithdrawAssetsWei.toString(), decimals)} {assetSymbol}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Estimated queued</span>
-                  <span className="font-medium text-foreground">
+                  <span className="font-medium text-foreground tabular-nums">
                     {formatTokenAmount(queuedWithdrawAssetsEstimateWei.toString(), decimals)} {assetSymbol}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Total position claim</span>
-                  <span className="font-medium text-foreground">
+                  <span className="font-medium text-foreground tabular-nums">
                     {formatTokenAmount(redeemableAssets, decimals)} {assetSymbol}
                     {BigInt(userInfo?.assetPriceWad || "0") > 0n || BigInt(positionUsdWad || "0") > 0n ? (
                       <> (~ {formatUsdAmount(positionUsdWad)})</>
@@ -1325,7 +1325,7 @@ const EarnYieldVault = () => {
                   disabled={BigInt(userInfo?.userShares || "0") <= 0n || isSubmitting || hasPendingWithdrawal}
                   onClick={handleRedeemAll}
                 >
-                  Withdraw All
+                  Withdraw all
                 </Button>
               )}
             </div>

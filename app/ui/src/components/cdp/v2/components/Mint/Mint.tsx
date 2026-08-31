@@ -761,7 +761,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
 
           {/* Loan Form */}
           <LoanForm
-            availableLabel="Available to Mint"
+            availableLabel="Available to mint"
             availableAmount={availableToMint}
             averageStabilityFee={displayedStabilityFee}
             showStabilityFee={hasAllocationsWithMint}
@@ -779,7 +779,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
             sliderDisabled={guestMode || !autoAllocate}
             averageVaultHealth={projectedVaultHealth}
             showButton={false}
-            actionButtonLabel="Confirm Mint"
+            actionButtonLabel="Confirm mint"
             onConfirm={handleConfirmMint}
             isProcessing={transactionsExecuting}
             buttonDisabled={isButtonDisabled}
@@ -800,25 +800,25 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
 
           {/* Warning Messages - only for logged-in users */}
           {!guestMode && (shouldLockInput && autoAllocate ? (
-            <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-              <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Insufficient Collateral</p>
-              <p className="text-xs text-red-700 dark:text-red-300">
+            <div className="p-3 rounded-md bg-destructive/10 border border-destructive/30">
+              <p className="text-sm font-semibold text-destructive mb-2">Insufficient collateral</p>
+              <p className="text-xs text-destructive/90">
                 Zero USDST can be minted with your current asset balances and selected Risk value. Try moving the Risk Slider to the right to increase headroom.
               </p>
             </div>
           ) : exceedsMaxCollateral && autoAllocate ? (
-            <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-              <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Insufficient Collateral</p>
-              <p className="text-xs text-red-700 dark:text-red-300">
+            <div className="p-3 rounded-md bg-destructive/10 border border-destructive/30">
+              <p className="text-sm font-semibold text-destructive mb-2">Insufficient collateral</p>
+              <p className="text-xs text-destructive/90">
                 The requested mint amount exceeds your maximum borrowing capacity ({availableToMint} USDST). Try decreasing the mint amount or moving the Risk Slider to the right.
               </p>
             </div>
           ) : allocations.length === 0 && parseFloat(availableToMint.replace(/,/g, '')) <= 0 && autoAllocate ? (
-            <div className="p-3 rounded-md bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
-              <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+            <div className="p-3 rounded-md bg-warning/10 border border-warning/40">
+              <p className="text-sm font-semibold text-warning mb-2">
                 {debtFloorHit ? 'Debt floor prevents allocation' : totalHeadroom <= 0n ? 'Vaults at capacity for current risk value' : 'No suitable vaults found'}
               </p>
-              <p className="text-xs text-yellow-700 dark:text-yellow-300">
+              <p className="text-xs text-warning/90">
                 {debtFloorHit
                   ? 'Each vault requires a minimum debt amount. Try increasing your mint amount or use a different vault.'
                   : totalHeadroom <= 0n
@@ -830,8 +830,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
 
           {/* Debt Constraint Warning - only for logged-in users */}
           {!guestMode && (debtFloorHit || debtCeilingHit) && (
-            <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-              <p className="text-xs text-amber-800 dark:text-amber-200">
+            <div className="p-3 rounded-md bg-warning/10 border border-warning/40">
+              <p className="text-xs text-warning">
                 ⚠️ One or more vaults have hit a debt {debtFloorHit && debtCeilingHit ? 'floor/ceiling' : debtFloorHit ? 'floor' : 'ceiling'}. Effective mint amount may be lower than requested.
               </p>
             </div>
@@ -843,7 +843,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
               onClick={handleGuestMintClick}
               className="w-full"
             >
-              Connect Wallet to Mint USDST
+              Connect wallet to mint USDST
             </Button>
           ) : (
             <Button
@@ -851,7 +851,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
               onClick={handleConfirmMint}
               className="w-full"
             >
-              {transactionsExecuting ? 'Processing...' : 'Confirm Mint'}
+              {transactionsExecuting ? 'Processing...' : 'Confirm mint'}
             </Button>
           )}
 
@@ -880,16 +880,16 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
           <div className="space-y-1 text-sm text-muted-foreground">
             {mintRewardsApyInfo && (
               <div className="flex items-center justify-between gap-3">
-                <span>Mint Rewards APY</span>
-                <span className="font-medium text-foreground">
+                <span>Mint rewards APY</span>
+                <span className="font-medium text-foreground tabular-nums">
                   {mintRewardsApyInfo.total.toFixed(2)}%
                 </span>
               </div>
             )}
             {!guestMode && (
               <div className="flex items-center justify-between gap-3">
-                <span>Transaction Fee</span>
-                <span className="font-medium text-foreground">
+                <span>Transaction fee</span>
+                <span className="font-medium text-foreground tabular-nums">
                   {formatUSD(totalFees, 2)} USDST ({Math.round(totalFees * 100)} vouchers)
                 </span>
               </div>

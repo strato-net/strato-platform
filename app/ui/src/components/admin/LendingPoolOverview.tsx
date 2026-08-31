@@ -141,7 +141,7 @@ const LendingPoolOverview = () => {
               disabled={pauseLoading}
               variant={isPaused ? "destructive" : "default"}
               size="sm"
-              className={`flex items-center gap-1 md:space-x-2 text-xs md:text-sm ${!isPaused ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
+              className={`flex items-center gap-1 md:space-x-2 text-xs md:text-sm ${!isPaused ? 'bg-warning text-warning-foreground hover:bg-warning/90' : ''}`}
             >
               {pauseLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -155,12 +155,12 @@ const LendingPoolOverview = () => {
           </CardTitle>
           <CardDescription>
             {isPaused ? (
-              <span className="text-red-600 font-medium flex items-center space-x-2">
+              <span className="text-destructive font-medium flex items-center space-x-2">
                 <ExclamationCircleOutlined />
                 <span>Lending Pool is paused - Certain operations are blocked</span>
               </span>
             ) : (
-              <span className="text-green-600 font-medium flex items-center space-x-2">
+              <span className="text-success font-medium flex items-center space-x-2">
                 <CheckCircleOutlined />
                 <span>Lending Pool is active - All operations are allowed</span>
               </span>

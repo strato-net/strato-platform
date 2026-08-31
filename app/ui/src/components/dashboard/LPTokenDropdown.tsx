@@ -17,7 +17,7 @@ export default function LPTokenDropdown({ lpToken, className = "", isExpanded }:
         <div className="p-3 bg-card border border-border rounded-md mb-2">
           <div className="space-y-3">
             <div className="text-sm font-medium text-foreground mb-2">
-              Your Position Breakdown ({userShare < 0.01 ? '<0.01' : userShare.toFixed(2)}% share):
+              Your position breakdown ({userShare < 0.01 ? '<0.01' : userShare.toFixed(2)}% share):
             </div>
             
             {/* Token A */}
@@ -41,10 +41,10 @@ export default function LPTokenDropdown({ lpToken, className = "", isExpanded }:
                 </span>
               </div>
               <div className="text-right">
-                <div className="text-sm font-medium text-foreground">
+                <div className="text-sm font-medium text-foreground tabular-nums">
                   {formatBalance(tokenQuantities.tokenA, lpToken.tokenA._symbol, 18, 6, 12)}
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-xs text-muted-foreground tabular-nums">
                   {formatBalance(
                     (BigInt(tokenQuantities.tokenA) * BigInt(lpToken.tokenA.price || "0")) / BigInt(10 ** 18),
                     undefined, 18, 2, 2, true
@@ -74,10 +74,10 @@ export default function LPTokenDropdown({ lpToken, className = "", isExpanded }:
                 </span>
               </div>
               <div className="text-right">
-                <div className="text-sm font-medium text-foreground">
+                <div className="text-sm font-medium text-foreground tabular-nums">
                   {formatBalance(tokenQuantities.tokenB, lpToken.tokenB._symbol, 18, 6, 12)}
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-xs text-muted-foreground tabular-nums">
                   {formatBalance(
                     (BigInt(tokenQuantities.tokenB) * BigInt(lpToken.tokenB.price || "0")) / BigInt(10 ** 18),
                     undefined, 18, 2, 2, true
