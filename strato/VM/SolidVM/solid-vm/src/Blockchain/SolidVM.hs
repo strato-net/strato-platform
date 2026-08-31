@@ -3675,20 +3675,24 @@ runCanonicalOnlyOwnerCatch address' contract' funcName theFunction argVals ro
       currentSender <- Env.sender <$> getEnv
       case ownerAddress ownerValue of
         Just owner | owner /= currentSender -> do
-          decrementGas 5
-          let sender = if owner == address' then address' else currentSender
-              !_ = noteIRDecision $ "fast-only-owner-catch " ++ labelToString funcName
-          result <-
-            callWithResult
-              address'
-              owner
-              CC.DefaultCall
-              "castVoteOnIssue"
-              [ SAddress sender False,
-                SString $ labelToString funcName,
-                SVariadic argVals
-              ]
-          Just . Just <$> governanceReturn result
+          ownerState <- A.lookup (A.Proxy @AddressState) owner
+          case addressStateCodeHash <$> ownerState of
+            Just SolidVMCode {} -> do
+              decrementGas 5
+              let sender = if owner == address' then address' else currentSender
+                  !_ = noteIRDecision $ "fast-only-owner-catch " ++ labelToString funcName
+              result <-
+                callWithResult
+                  address'
+                  owner
+                  CC.DefaultCall
+                  "castVoteOnIssue"
+                  [ SAddress sender False,
+                    SString $ labelToString funcName,
+                    SVariadic argVals
+                  ]
+              Just . Just <$> governanceReturn result
+            _ -> pure Nothing
         _ -> pure Nothing
   where
     ownerAddress (SAddress address _) = Just address

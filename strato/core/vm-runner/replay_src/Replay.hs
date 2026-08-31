@@ -10,11 +10,13 @@ module Main where
 
 import BlockApps.Init
 import BlockApps.Logging
-import Blockchain.DB.ChainDB (getChainStateRoot)
+import Blockchain.DB.ChainDB (bootstrapChainDB, getChainStateRoot)
+import Blockchain.DB.StateDB (setStateDBStateRoot)
 import Blockchain.Data.AddressStateDB (AddressState (..))
 import Blockchain.Data.BlockHeader (number, stateRoot)
 import Blockchain.Data.GenesisBlock (genesisInfoToBlock)
 import Blockchain.Data.GenesisInfo (getGenesisInfo)
+import qualified Blockchain.Data.GenesisInfo as Genesis
 import Blockchain.EthConf (runStreamMConfigured)
 import Blockchain.Event (BlockVerificationFailure, VmOutEvent (..))
 import Blockchain.Model.WrappedBlock (OutputBlock (..), OutputTx (..), outputBlockHash)
@@ -34,6 +36,7 @@ import Blockchain.Strato.Model.Class
         txTxData
       ),
   )
+import qualified Blockchain.Strato.Model.Class as Model
 import Blockchain.Strato.Model.Code (Code (..))
 import Blockchain.Strato.Model.Options ()
 import Blockchain.Strato.Model.StateRoot (StateRoot)
@@ -42,6 +45,7 @@ import Blockchain.VMContext
     finalizePendingMPNodes,
     initBatchedContext,
     initReplayContext,
+    withCurrentBlockHash,
   )
 import Blockchain.VMOptions ()
 import Blockchain.Wiring (HasContext)
@@ -347,8 +351,14 @@ applyBlocksPreloaded inPath mRange = do
       -- Historical MP nodes come from a copied LevelDB (helium-ldb).
       -- Rebuilding genesis.json storage here hits a BasicValue parse on HTML
       -- strings and is not how a live node boots (strato-setup already wrote the trie).
-      gi <- getGenesisInfo
-      seedDatabases (genesisInfoToBlock gi)
+      genesisInfo <- getGenesisInfo
+      let genesisBlock = genesisInfoToBlock genesisInfo
+          genesisHash = Model.blockHash genesisBlock
+          genesisRoot = Genesis.stateRoot genesisInfo
+      withCurrentBlockHash genesisHash $ do
+        bootstrapChainDB genesisHash genesisRoot
+        setStateDBStateRoot Nothing genesisRoot
+        seedDatabases genesisBlock
       initializeBestBlock
       result <- runConduit $ processBlocks blocks .| collectFailures
       finalizePendingMPNodes
@@ -735,8 +745,18 @@ applyBlocksStreamed fullPipeline chunkSize inPath mRange = do
     (failures, maybeStats, finalSource) <- runLoggingT $ runResourceT $ do
       ctx <- if fullPipeline then initBatchedContext else initReplayContext
       lift $ runStreamMConfigured "vm-apply-replay-stream" $ evalContextM' ctx $ do
-        gi <- getGenesisInfo
-        seedDatabases (genesisInfoToBlock gi)
+        -- strato-setup has already populated the genesis state/code tries in
+        -- the checkpoint. Install and select that canonical root before block
+        -- 1, matching ethereumVM startup without publishing bootstrap events
+        -- inside the timed replay.
+        genesisInfo <- getGenesisInfo
+        let genesisBlock = genesisInfoToBlock genesisInfo
+            genesisHash = Model.blockHash genesisBlock
+            genesisRoot = Genesis.stateRoot genesisInfo
+        withCurrentBlockHash genesisHash $ do
+          bootstrapChainDB genesisHash genesisRoot
+          setStateDBStateRoot Nothing genesisRoot
+          seedDatabases genesisBlock
         initializeBestBlock
         let processChunk [] = pure ([] :: [BlockVerificationFailure])
             processChunk reversedBlocks

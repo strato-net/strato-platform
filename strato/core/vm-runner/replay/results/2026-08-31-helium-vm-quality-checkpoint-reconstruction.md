@@ -18,10 +18,12 @@ The last correctness-safe candidate was `cfgfallback137`:
 | Historical-sequence rebuild | `c72cc6ed2b56d388b2136077903fa6203e1ad6a492ddc835d601b4c385de1109` |
 
 The archived patch reconstructed to the exact recorded dirty tree before this
-report and `BUILD_METADATA` were added. Comparing this branch commit with tree
-`1b86bc5f698d2a4256ebeb212d5970dac0569d82` shows that the only differences
-are this report and `BUILD_METADATA`: the VM code is the exact quality-run
-code.
+report and `BUILD_METADATA` were added. Commit `abf4b9d7e6` records that exact
+quality checkpoint: compared with tree
+`1b86bc5f698d2a4256ebeb212d5970dac0569d82`, its only differences are this
+report and `BUILD_METADATA`. The follow-up commit on this branch adds the two
+corrections found by the first genesis-to-tip attempt, while preserving
+`abf4b9d7e6` as the immutable reconstruction point.
 
 The high-throughput build did happen. The transcript records the complete
 repository-default `--force-dirty` build, including rebuilding the local
@@ -139,6 +141,46 @@ repository-default `vm-replay` build. Focused suites produced:
 
 These outcomes are recorded as partial semantic evidence, not as a claim that
 the complete repository test suite is green.
+
+## First full-replay attempt and follow-up correction
+
+The first replacement-corpus `apply-stream-full` attempt started from genesis
+with the restored quality source and the canonical genesis root installed by
+the replay harness. It processed 100,000 input blocks in 745.689 seconds
+(134.10 blk/s, 160,294 transactions, 13,544,964,096 bytes peak RSS), but it is
+not an accepted performance result: exact verification stopped at block
+97,126. The header expected state root
+`3c566a31fd4a90df71b0fd69da19947efbab1003ade6916f7461f4e77a83b2c6`,
+while the candidate derived
+`a439931feb8beae7db2ef8a6b7eb49ba6b5638897675dfbe1512f7ed24538dd0`.
+
+The mismatch reproduced with FastIR disabled. The pre-optimization binary
+processed the same block from the same audited block-97,125 checkpoint and
+matched the expected root. A lookup trace then identified the regression: the
+new canonical `onlyOwner` shortcut tried to call `castVoteOnIssue` on
+`0x101a31a25295a5dd95187ea2b0725c91443db7b7`, whose account is externally
+owned, bypassing the consensus evaluator's try/catch behavior. The correction
+keeps the shortcut for SolidVM contract owners and falls back to the canonical
+evaluator for externally owned or missing owner accounts.
+
+The replay harness also now installs and selects the canonical genesis root
+before processing block zero, matching normal VM startup. The resulting
+repository-default forced-dirty binary is banked as
+`vm-replay-cfgfallback137-genesis-owner-guard-20260831-bin`, SHA-256
+`bdcd8cd54873e88e5d07e06a7e5968284edcdd23a1832bbcaf414be4b2e7be4d`,
+with source worktree tree
+`b9044d85d82e325fc74b42b3e419992c121e49a7`.
+
+Exact diagnostic gates for that banked binary passed:
+
+- Genesis blocks 0-1 matched the canonical block-1 state root.
+- Block 97,126 matched the expected state root from a fresh audited
+  block-97,125 checkpoint.
+- Blocks 97,127-100,000 then matched every header root, completing at
+  157.04 blk/s over 2,874 blocks. This is a diagnostic continuation, not a
+  full-pipeline qualification rate.
+
+A new genesis-to-tip full-pipeline run remains the final acceptance gate.
 
 ## Qualification boundary
 
