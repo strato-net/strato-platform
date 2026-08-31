@@ -15,7 +15,7 @@ export const liquidity: ProductLandingConfig = {
   hero: {
     images: [goldstImage, usdstImage],
     eyebrow: "STRATO V3 Liquidity",
-    headline: "Put Your Assets To Work. Earn Trading Fees.",
+    headline: "Put your assets to work. Earn trading fees.",
     subhead:
       "Choose a pool, set your range and earn a share of trading fees while your liquidity is active.",
   },
@@ -30,14 +30,14 @@ export const liquidity: ProductLandingConfig = {
     {
       index: "01",
       tag: "Start here",
-      title: "Connect Wallet",
+      title: "Connect wallet",
       body: "Connect your wallet and keep full control of your assets.",
       cta: "Connect Wallet",
     },
     {
       index: "02",
       tag: "Final",
-      title: "Choose A Pool & Deposit",
+      title: "Choose a pool & deposit",
       body: "Pick the token pair, choose where your liquidity is active, then deposit both assets.",
       cta: "Add Liquidity",
     },
@@ -45,7 +45,7 @@ export const liquidity: ProductLandingConfig = {
 
   highlight: {
     eyebrow: "Active liquidity",
-    title: "Earn Fees While Your Range Is Active.",
+    title: "Earn fees while your range is active.",
     body: "When trades happen inside the price range you select, your position earns its share of the pool fee.",
     feature: {
       label: "You earn",
@@ -71,14 +71,14 @@ export const liquidity: ProductLandingConfig = {
     {
       images: [goldstImage, usdstImage],
       tag: "Your strategy",
-      title: "Choose Where Your Liquidity Works.",
+      title: "Choose where your liquidity works.",
       body: "Concentrate liquidity around the prices where you want it active. A tighter range can use capital more efficiently, but may need more attention.",
       link: { label: "Explore V3 Pools", href: "/dashboard/v3-liquidity" },
     },
     {
       icon: Percent,
       tag: "Fees from trades",
-      title: "Trades Generate Your Fees.",
+      title: "Trades generate your fees.",
       body: "When swaps happen inside your range, your position earns a share of the pool fee. Outside the range, earning pauses until the price returns.",
       link: { label: "Learn About Liquidity", href: `${EXTERNAL_LINKS.docs}/liquidity` },
     },
@@ -86,7 +86,7 @@ export const liquidity: ProductLandingConfig = {
 
   ctaBanner: {
     eyebrow: "STRATO V3 Liquidity",
-    title: "Choose A Pool. Start Earning Fees.",
+    title: "Choose a pool. Start earning fees.",
     body: "Open a V3 position and put your assets to work onchain.",
   },
 };

@@ -12,7 +12,7 @@ export const goldVault: ProductLandingConfig = {
   hero: {
     images: [goldVaultImage],
     eyebrow: "GOLDST Yield Vault",
-    headline: "Get Your Gold Onchain. Make It Productive.",
+    headline: "Get your gold onchain. Make it productive.",
     subhead:
       "Deposit GOLDST into the Yield Vault. Earn STRATO Reward Points while your position stays denominated in GOLDST.",
   },
@@ -27,7 +27,7 @@ export const goldVault: ProductLandingConfig = {
     {
       index: "01",
       tag: "Current",
-      title: "Connect Wallet",
+      title: "Connect wallet",
       body: "Connect your wallet and keep full control of your assets.",
       cta: "Connect Wallet",
     },
@@ -43,7 +43,7 @@ export const goldVault: ProductLandingConfig = {
     {
       index: "03",
       tag: "Final",
-      title: "Deposit & Earn",
+      title: "Deposit & earn",
       body: "Deposit GOLDST, receive yieldGOLDST and start earning Reward Points.",
       cta: "Deposit GOLDST",
     },
@@ -51,7 +51,7 @@ export const goldVault: ProductLandingConfig = {
 
   highlight: {
     eyebrow: "STRATO Reward Points",
-    title: "Earn Reward Points On Your GOLDST.",
+    title: "Earn Reward Points on your GOLDST.",
     body: "The full +8.20% APY shown here comes from STRATO Reward Points.",
     feature: {
       label: "Reward Points APY",
@@ -76,14 +76,14 @@ export const goldVault: ProductLandingConfig = {
       // (BlockApps-Token-images @ cdc93d30182125e05eec985b631c7c61b3f63ff0).
       images: [goldstImage],
       tag: "GOLDST",
-      title: "Real Gold. Onchain.",
+      title: "Real gold. Onchain.",
       body: "Own tokenized, vaulted physical gold. Trade it, transfer it or put it to work across STRATO without giving up your gold exposure.",
       link: { label: "Explore GOLDST", href: `${EXTERNAL_LINKS.website}/defi/gold` },
     },
     {
       images: [goldVaultImage],
       tag: "Yield Vault",
-      title: "Deposit GOLDST. Earn Points.",
+      title: "Deposit GOLDST. Earn points.",
       body: "Your deposit becomes yieldGOLDST while eligible STRATO Reward Points accrue alongside your vault position.",
       link: {
         label: "View Vault Details",
@@ -94,7 +94,7 @@ export const goldVault: ProductLandingConfig = {
 
   ctaBanner: {
     eyebrow: "GOLDST Yield Vault",
-    title: "Put Your GOLDST To Work.",
+    title: "Put your GOLDST to work.",
     body: "Keep gold exposure while your vault position earns STRATO Reward Points.",
   },
 };

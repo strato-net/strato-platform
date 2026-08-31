@@ -12,7 +12,7 @@ export const borrow: ProductLandingConfig = {
   hero: {
     images: [goldstImage, usdstImage],
     eyebrow: "STRATO Borrow",
-    headline: "Access USDST Without Selling Your Assets.",
+    headline: "Access USDST without selling your assets.",
     subhead:
       "Use supported gold, silver or crypto as collateral. Borrow USDST while keeping exposure to the assets you already own.",
   },
@@ -27,14 +27,14 @@ export const borrow: ProductLandingConfig = {
     {
       index: "01",
       tag: "Start here",
-      title: "Connect Wallet",
+      title: "Connect wallet",
       body: "Connect your wallet and keep full control of your position.",
       cta: "Connect Wallet",
     },
     {
       index: "02",
       tag: "Final",
-      title: "Add Collateral & Borrow",
+      title: "Add collateral & borrow",
       body: "Choose a supported asset and amount, then borrow USDST against it after reviewing your safety buffer.",
       cta: "Borrow USDST",
     },
@@ -42,7 +42,7 @@ export const borrow: ProductLandingConfig = {
 
   highlight: {
     eyebrow: "Collateral in. USDST out.",
-    title: "Keep Your Exposure. Unlock USDST.",
+    title: "Keep your exposure. Unlock USDST.",
     body: "Your collateral stays in the position while your USDST is free to use across STRATO.",
     flow: {
       fromLabel: "You provide",
@@ -69,12 +69,12 @@ export const borrow: ProductLandingConfig = {
     {
       tone: "navy",
       eyebrow: "One number to watch",
-      title: "Know When Your Position Needs Attention.",
+      title: "Know when your position needs attention.",
       body: "Your safety buffer changes with the value of your collateral. If it falls, add collateral or repay USDST to strengthen the position.",
       link: { label: "Understand Borrowing Risk", href: `${EXTERNAL_LINKS.docs}/borrowing` },
       aside: {
         kind: "status",
-        title: "Position Status",
+        title: "Position status",
         state: "Healthy",
         scale: ["At risk", "Watch", "Healthy"],
         note: "More collateral or less debt creates a larger safety buffer.",
@@ -86,14 +86,14 @@ export const borrow: ProductLandingConfig = {
     {
       images: [goldstImage],
       tag: "Your collateral",
-      title: "Your Asset Backs The Position.",
+      title: "Your asset backs the position.",
       body: "You keep its price exposure while it is locked as collateral. Repay the USDST and accrued costs before withdrawing it.",
       link: { label: "View Supported Assets", href: `${EXTERNAL_LINKS.app}/dashboard/explore` },
     },
     {
       images: [usdstImage],
       tag: "Your asset",
-      title: "Use USDST Across STRATO.",
+      title: "Use USDST across STRATO.",
       body: "Hold it, swap it, deposit it into a vault or provide liquidity. The borrowed USDST stays available in your wallet.",
       link: { label: "Explore USDST", href: `${EXTERNAL_LINKS.app}/dashboard/deposits` },
     },
@@ -101,7 +101,7 @@ export const borrow: ProductLandingConfig = {
 
   ctaBanner: {
     eyebrow: "STRATO Borrow",
-    title: "Keep Your Assets. Access USDST.",
+    title: "Keep your assets. Access USDST.",
     body: "Start with a supported asset and choose a comfortable safety buffer.",
   },
 };

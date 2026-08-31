@@ -12,7 +12,7 @@ export const usdstVault: ProductLandingConfig = {
   hero: {
     images: [savingsVaultImage],
     eyebrow: "USDST Savings Vault",
-    headline: "Earn More With USDST.",
+    headline: "Earn more with USDST.",
     subhead:
       "Deposit USDST and earn up to 8.60% APY through native vault yield and STRATO Reward Points—while keeping full control of your assets.",
   },
@@ -27,7 +27,7 @@ export const usdstVault: ProductLandingConfig = {
     {
       index: "01",
       tag: "Current",
-      title: "Connect Wallet",
+      title: "Connect wallet",
       body: "Your wallet. Your assets. Connect without giving up custody.",
       cta: "Connect Wallet",
     },
@@ -43,7 +43,7 @@ export const usdstVault: ProductLandingConfig = {
     {
       index: "03",
       tag: "Final",
-      title: "Deposit & Earn",
+      title: "Deposit & earn",
       body: "Deposit USDST, receive saveUSDST and start earning automatically.",
       cta: "Deposit USDST",
     },
@@ -51,7 +51,7 @@ export const usdstVault: ProductLandingConfig = {
 
   highlight: {
     eyebrow: "Current vault rate",
-    title: "One Deposit. Two Ways To Earn.",
+    title: "One deposit. Two ways to earn.",
     body: "Native vault yield and Reward Points accrue automatically.",
     feature: {
       label: "Best available APY",
@@ -74,14 +74,14 @@ export const usdstVault: ProductLandingConfig = {
     {
       images: [usdstImage],
       tag: "USDST",
-      title: "USDST, Built To Do More.",
+      title: "USDST, built to do more.",
       body: "Hold it. Trade it. Put it to work. USDST moves across STRATO—from everyday transactions to onchain yield.",
       link: { label: "Explore USDST", href: `${EXTERNAL_LINKS.docs}/usdst` },
     },
     {
       images: [savingsVaultImage],
       tag: "Savings Vault",
-      title: "Deposit Once. Earn Automatically.",
+      title: "Deposit once. Earn automatically.",
       body: "Your deposit becomes saveUSDST. Native yield accrues in the share value while eligible STRATO Reward Points build alongside it.",
       link: { label: "View Vault Details", href: `${EXTERNAL_LINKS.docs}/vaults` },
     },
@@ -89,7 +89,7 @@ export const usdstVault: ProductLandingConfig = {
 
   ctaBanner: {
     eyebrow: "USDST Savings Vault",
-    title: "Start Earning With USDST.",
+    title: "Start earning with USDST.",
     body: "Stay in control while your USDST works onchain.",
   },
 };
