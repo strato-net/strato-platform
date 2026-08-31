@@ -27,6 +27,9 @@ module Control.Monad.Composable.Kafka (
   getStreamEnv,
   -- Producing
   produceItems,
+  produceItemsBatched,
+  produceEncodedItems,
+  produceEncodedItemsBatched,
   produceItemsAsJSON,
   produceToTopics,
   -- Consuming
@@ -202,6 +205,50 @@ produceItems topicName events = do
       (TopicAndMessage topicName . makeMessage . BL.toStrict . encode) <$> events
   liftIO $ mapM_ parseKafkaResponse results
   return results
+
+produceItemsBatched :: (Binary a, HasStreaming m) => TopicName -> [a] -> m [ProduceResponse]
+produceItemsBatched topicName =
+  produceEncodedItemsBatched topicName . map (BL.toStrict . encode)
+
+-- | Produce already-serialized payloads with the same one-event synchronous
+-- request path as 'produceItems'.
+produceEncodedItems :: HasStreaming m => TopicName -> [B.ByteString] -> m [ProduceResponse]
+produceEncodedItems topicName payloads = do
+  results <-
+    execKafka $ produceMessagesAsSingletonSets $
+      (TopicAndMessage topicName . makeMessage) <$> payloads
+  liftIO $ mapM_ parseKafkaResponse results
+  return results
+
+-- | Produce bounded batches while preserving message order within the topic.
+-- Keeping requests below the broker's 2.5 MiB limit avoids replacing the
+-- singleton path with an unbounded request for event-heavy blocks.
+produceEncodedItemsBatched :: HasStreaming m => TopicName -> [B.ByteString] -> m [ProduceResponse]
+produceEncodedItemsBatched topicName payloads =
+  concat <$> mapM produceBatch (chunkPayloads payloads)
+  where
+    produceBatch batch = do
+      results <-
+        execKafka $ produceMessages $
+          (TopicAndMessage topicName . makeMessage) <$> batch
+      liftIO $ mapM_ parseKafkaResponse results
+      return results
+
+    chunkPayloads = go [] 0 0
+      where
+        go [] _ _ [] = []
+        go current _ _ [] = [reverse current]
+        go current count bytes remaining@(item : rest)
+          | not (null current)
+              && (count >= maxProduceBatchItems || bytes + B.length item > maxProduceBatchBytes) =
+              reverse current : go [] 0 0 remaining
+          | otherwise =
+              go (item : current) (count + 1) (bytes + B.length item) rest
+
+    maxProduceBatchItems :: Int
+    maxProduceBatchItems = 256
+    maxProduceBatchBytes :: Int
+    maxProduceBatchBytes = 2 * 1024 * 1024
 
 -- | Produce to several topics in a SINGLE Kafka request.
 --

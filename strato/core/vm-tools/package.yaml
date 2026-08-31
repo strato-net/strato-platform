@@ -29,6 +29,7 @@ library:
     - Blockchain.Timing
     - Blockchain.TxRunResultCache
     - Blockchain.MemVMContext
+    - Blockchain.PhaseProfile
     - Blockchain.VMContext
     - Blockchain.VMOptions
     - Blockchain.VM.VMException
@@ -50,6 +51,7 @@ library:
     - common-log
     - composable-monads-base
     - containers
+    - cryptonite
     - cross-monitoring
     - data-default
     - debugger
@@ -85,6 +87,7 @@ library:
     - transformers
     - unordered-containers
     - unliftio
+    - vector
 
 
 

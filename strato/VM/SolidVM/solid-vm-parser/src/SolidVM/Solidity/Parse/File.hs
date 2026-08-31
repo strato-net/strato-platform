@@ -17,6 +17,7 @@ import Control.Monad
 import Data.Either.Extra
 import Data.Maybe
 import Data.SemVer
+import Data.Source (SourceAnnotation, withPosition)
 import qualified Data.Text as T
 import GHC.Generics
 import SolidVM.Solidity.Parse.Alias
@@ -36,21 +37,41 @@ newtype File = File
 solidityFile :: SolidityParser File
 solidityFile = do
   whiteSpace
-  units <-
-    many
-      ( solidityPragma
-          <|> solidityImport
-          <|> solidityFLError
-          <|> solidityAlias
-          <|> solidityFreeFunction
-          <|> solidityFreeUsing
-          <|> solidityContract
-          <|> solidityFLConstant
-          <|> solidityFLStruct
-          <|> solidityFLEnum
-      )
+  units <- many soliditySourceUnit
   eof
   return . File $ units
+
+solidityFileUncached :: SolidityParser File
+solidityFileUncached = do
+  whiteSpace
+  units <- many soliditySourceUnit
+  eof
+  return . File $ units
+
+-- | Diagnostic parser that retains the complete source span consumed by each
+-- top-level unit. The annotations stored inside several AST nodes cover only
+-- their headers, so they cannot recover an exact unit from source.
+solidityFileSpanned :: SolidityParser [(SourceAnnotation (), SourceUnit)]
+solidityFileSpanned = do
+  whiteSpace
+  units <- many $ withPosition soliditySourceUnit
+  eof
+  pure units
+
+-- | One complete top-level source unit.  Keeping this separately named lets
+-- callers memoize successful units without changing the parser's grammar.
+soliditySourceUnit :: SolidityParser SourceUnit
+soliditySourceUnit =
+  solidityPragma
+    <|> solidityImport
+    <|> solidityFLError
+    <|> solidityAlias
+    <|> solidityFreeFunction
+    <|> solidityFreeUsing
+    <|> solidityContract
+    <|> solidityFLConstant
+    <|> solidityFLStruct
+    <|> solidityFLEnum
 
 decideVersion :: File -> SolcVersion
 decideVersion = maximum . (ZeroPointFour :) . mapMaybe go . unsourceUnits

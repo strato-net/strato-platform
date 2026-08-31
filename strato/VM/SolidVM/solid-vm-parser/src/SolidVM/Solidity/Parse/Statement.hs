@@ -27,44 +27,50 @@ statements :: SolidityParser [Statement]
 statements = braces $ many statement
 
 statement :: SolidityParser Statement
-statement =
-  ifStatement
-    <|> whileStatement
-    <|> ( do
-            reserved "try"
-            (solidityTryCatchStatement <|> tryCatchStatement) -- hack to get it to differentiate between the two before parsing to avoid ambiguity
+statement = do
+  firstToken <- optionMaybe $ lookAhead rawIdentifier
+  case firstToken of
+    Just "if" -> ifStatement
+    Just "while" -> whileStatement
+    Just "try" -> do
+      reserved "try"
+      solidityTryCatchStatement <|> tryCatchStatement
+    Just "do" -> doWhileStatement
+    Just "for" -> forStatement
+    Just "return" -> returnStatement
+    Just "emit" -> emitStatement
+    Just "throw" -> throwStatement
+    Just "continue" -> Continue <$> (position (reserved "continue") <* semi)
+    Just "break" -> Break <$> (position (reserved "break") <* semi)
+    Just "assembly" -> reserved "assembly" >> inlineAssembly
+    Just "_" -> ModifierExecutor <$> (position (reserved "_") <* semi)
+    Just "revert" -> revertStatement
+    Just "unchecked" -> uncheckedStatement
+    _ -> simpleStatement
+  where
+    returnStatement = do
+      ~(a, e) <- withPosition $ do
+        void $ reserved "return"
+        optionMaybe expression
+      _ <- semi
+      pure $ Return e a
+
+    emitStatement = do
+      ~(a, (i, e)) <- withPosition $ do
+        reserved "emit"
+        ident <- identifier
+        exps <- parens $ commaSep expression
+        pure (ident, exps)
+      _ <- semi
+      pure $ EmitStatement i (map ((,) Nothing) e) a
+
+    simpleStatement =
+      try
+        ( do
+            ~(a, e) <- (withPosition variableDefinitionStatement) <* semi
+            pure $ SimpleStatement e a
         )
-    <|> doWhileStatement
-    <|> forStatement
-    <|> ( do
-            ~(a, e) <- withPosition $ do
-              void $ reserved "return"
-              optionMaybe expression
-            _ <- semi
-            pure $ Return e a
-        )
-    <|> ( do
-            ~(a, (i, e)) <- withPosition $ do
-              reserved "emit"
-              ident <- identifier
-              exps <- parens $ commaSep expression
-              pure (ident, exps)
-            _ <- semi
-            pure $ EmitStatement i (map ((,) Nothing) e) a
-        )
-    <|> throwStatement
-    <|> try
-      ( do
-          ~(a, e) <- (withPosition variableDefinitionStatement) <* semi
-          pure $ SimpleStatement e a
-      )
-    <|> (Continue <$> (position (reserved "continue") <* semi))
-    <|> (Break <$> (position (reserved "break") <* semi))
-    <|> (reserved "assembly" >> inlineAssembly)
-    <|> (ModifierExecutor <$> (position (reserved "_") <* semi)) -- This parses the "_;" statement, which is used to signify when in a modifier the function should run
-    <|> revertStatement
-    <|> uncheckedStatement
-    <|> ((\(a, e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
+        <|> ((\(a, e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
 
 {-
 Statement = IfStatement | WhileStatement | ForStatement | Block | InlineAssemblyStatement |
@@ -241,37 +247,118 @@ variableDefinitionStatement = do
   VariableDefinition vardefs <$> optionMaybe (reservedOp "=" >> expression)
 
 expression :: SolidityParser Expression
-expression =
-  buildExpressionParser
-    [ [postfix $ choice [functionCall, memberAccess, arrayIndex]],
-      [Postfix (PlusPlus <$> position (reservedOp "++"))],
-      [Postfix (MinusMinus <$> position (reservedOp "--"))],
-      [prefix "!", prefix "~", prefix "delete", prefix "++", prefix "--", prefix "+", prefix "-"],
-      [binary "**"],
-      [binary "*", binary "/", binary "%"],
-      [binary "+", binary "-"],
-      [binary "<<", binary ">>", binary ">>>"],
-      [binary "&"],
-      [binary "^"],
-      [binary "|"],
-      [binary "==", binary "!="],
-      [binary "<", binary ">", binary "<=", binary ">="],
-      [ Postfix
-          ( do
-              ~(a, (e1, e2)) <- withPosition $ do
-                reservedOp "?"
-                e1 <- expression
-                reservedOp ":"
-                e2 <- expression
-                pure (e1, e2)
-              pure (\e -> Ternary (extractExpression e <> a) e e1 e2)
-          )
-      ],
-      [binary "=", binary "|=", binary "^=", binary "&=", binary "<<=", binary ">>=", binary ">>>=", binary "+=", binary "-=", binary "*=", binary "/=", binary "%="],
-      [binary "&&"],
-      [binary "||"]
+expression = expressionAt minimumBinaryPrecedence
+
+-- The previous buildExpressionParser path probed every operator spelling at
+-- every precedence boundary. Read the actual operator token once and retain
+-- the same high-to-low table and left associativity.
+expressionAt :: Int -> SolidityParser Expression
+expressionAt minimumPrecedence = do
+  left <- unaryExpression
+  continueExpression left
+  where
+    continueExpression left = do
+      maybeOperator <- optionMaybe . try $ do
+        operator <- binaryOperatorToken
+        guard $ operatorPrecedence operator >= minimumPrecedence
+        pure operator
+      case maybeOperator of
+        Nothing -> pure left
+        Just operator
+          | operatorName operator == "?" -> do
+              trueExpression <- expression
+              reservedOp ":"
+              falseExpression <- expression
+              end <- getSourcePosition
+              let annotation = SourceAnnotation (_sourceAnnotationStart $ operatorAnnotation operator) end ()
+                  ternary = Ternary (extractExpression left <> annotation) left trueExpression falseExpression
+              continueExpression ternary
+          | otherwise -> do
+              right <- expressionAt $ operatorPrecedence operator + 1
+              let combined = Binary (operatorAnnotation operator) (operatorName operator) left right
+              continueExpression combined
+
+data ParsedBinaryOperator = ParsedBinaryOperator
+  { operatorAnnotation :: SourceAnnotation (),
+    operatorName :: String,
+    operatorPrecedence :: Int
+  }
+
+minimumBinaryPrecedence :: Int
+minimumBinaryPrecedence = 2
+
+binaryOperatorToken :: SolidityParser ParsedBinaryOperator
+binaryOperatorToken = do
+  (annotation, name) <- withPosition . lexeme $ many1 (oneOf "!&|=<>^+-*/%?")
+  case Map.lookup name binaryOperatorPrecedences of
+    Just precedence -> pure $ ParsedBinaryOperator annotation name precedence
+    Nothing -> unexpected $ "operator " ++ show name
+
+binaryOperatorPrecedences :: Map.Map String Int
+binaryOperatorPrecedences =
+  Map.fromList
+    [ ("**", 14),
+      ("*", 13), ("/", 13), ("%", 13),
+      ("+", 12), ("-", 12),
+      ("<<", 11), (">>", 11), (">>>", 11),
+      ("&", 10),
+      ("^", 9),
+      ("|", 8),
+      ("==", 7), ("!=", 7),
+      ("<", 6), (">", 6), ("<=", 6), (">=", 6),
+      ("?", 5),
+      ("=", 4), ("|=", 4), ("^=", 4), ("&=", 4),
+      ("<<=", 4), (">>=", 4), (">>>=", 4),
+      ("+=", 4), ("-=", 4), ("*=", 4), ("/=", 4), ("%=", 4),
+      ("&&", 3),
+      ("||", 2)
     ]
-    (tuple <|> array <|> primaryExpression)
+
+unaryExpression :: SolidityParser Expression
+unaryExpression = do
+  maybeOperator <- optionMaybe . try $ do
+    first <- lookAhead anyChar
+    name <- case first of
+      '!' -> pure "!"
+      '~' -> pure "~"
+      '+' -> try ("++" <$ lookAhead (string "++")) <|> pure "+"
+      '-' -> try ("--" <$ lookAhead (string "--")) <|> pure "-"
+      'd' -> do
+        keyword <- lookAhead rawIdentifier
+        guard $ keyword == "delete"
+        pure "delete"
+      _ -> parserZero
+    withPosition $ name <$ reservedOp name
+  case maybeOperator of
+    Just (annotation, name) -> Unitary annotation name <$> unaryExpression
+    Nothing -> postfixExpression
+
+postfixExpression :: SolidityParser Expression
+postfixExpression = atomExpression >>= continuePostfix
+  where
+    continuePostfix left = do
+      next <- optionMaybe $ lookAhead anyChar
+      case next of
+        Just '(' -> functionCall >>= continuePostfix . ($ left)
+        Just '.' -> memberAccess >>= continuePostfix . ($ left)
+        Just '[' -> arrayIndex >>= continuePostfix . ($ left)
+        Just '+' ->
+          (do annotation <- try $ position $ reservedOp "++"
+              continuePostfix $ PlusPlus annotation left)
+            <|> pure left
+        Just '-' ->
+          (do annotation <- try $ position $ reservedOp "--"
+              continuePostfix $ MinusMinus annotation left)
+            <|> pure left
+        _ -> pure left
+
+atomExpression :: SolidityParser Expression
+atomExpression = do
+  next <- lookAhead anyChar
+  case next of
+    '(' -> tuple
+    '[' -> array
+    _ -> primaryExpression
 
 functionCall :: SolidityParser (Expression -> Expression)
 functionCall = do
@@ -370,38 +457,8 @@ objectE = do
       -}
 
 primaryExpression :: SolidityParser Expression
-primaryExpression = do
-  let res' a b = withPosition $ b <$ reserved a
-      res a = res' a a
-
+primaryExpression =
   myHexParser
-    <|> (uncurry Variable . fmap stringToLabel <$> res "msg")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "address")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "account")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "payable")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "bool")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "this")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "block")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "tx")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "uint")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "int")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "decimal")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "byte")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "bytes")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "string")
-    <|> (uncurry BoolLiteral <$> res' "false" False)
-    <|> (uncurry BoolLiteral <$> res' "true" True)
-    <|> (do
-          (a, (t, mSalt)) <- withPosition $ do
-            reserved "new"
-            t' <- simpleTypeExpression
-            mSalt' <- optionMaybe . braces $ do
-              reserved "salt"
-              void colon
-              expression
-            pure (t', mSalt')
-          pure $ NewExpression a t mSalt
-        )
     <|> ( try $ do
             ~(a, decimalNum) <- withPosition $ do
               num <- lexeme $ integer
@@ -412,7 +469,7 @@ primaryExpression = do
               pure (decimalNum)
             pure $ DecimalLiteral a $ WrappedDecimal decimalNum
           )
-    <|> (uncurry Variable <$> withPosition (stringToLabel <$> identifier))
+    <|> identifierPrimaryExpression
     <|> ( do
             ~(a, (val, nu)) <- withPosition $ do
               val <- scientificInteger
@@ -422,6 +479,32 @@ primaryExpression = do
         )
     <|> (uncurry StringLiteral <$> withPosition stringLiteral)
     <|> (uncurry AddressLiteral <$> withPosition accountLiteral)
+
+-- Most identifier expressions are ordinary variables. Previously they were
+-- scanned once for every special Solidity name before reaching 'identifier'.
+-- Parse the token once and dispatch those few semantic cases directly.
+identifierPrimaryExpression :: SolidityParser Expression
+identifierPrimaryExpression = do
+  start <- getSourcePosition
+  name <- rawIdentifier
+  case name of
+    "new" -> do
+      t <- simpleTypeExpression
+      mSalt <- optionMaybe . braces $ do
+        reserved "salt"
+        void colon
+        expression
+      end <- getSourcePosition
+      pure $ NewExpression (SourceAnnotation start end ()) t mSalt
+    "false" -> boolLiteral start False
+    "true" -> boolLiteral start True
+    _ -> do
+      end <- getSourcePosition
+      pure $ Variable (SourceAnnotation start end ()) (stringToLabel name)
+  where
+    boolLiteral start boolValue = do
+      end <- getSourcePosition
+      pure $ BoolLiteral (SourceAnnotation start end ()) boolValue
 
 myHexParser :: SolidityParser Expression
 myHexParser = try $ do

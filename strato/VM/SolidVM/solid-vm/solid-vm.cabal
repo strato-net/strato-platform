@@ -17,6 +17,8 @@ library
       Blockchain.SolidVM.GasInfo
       Blockchain.SolidVM.Simple
       Blockchain.SolidVM.SM
+      Blockchain.SolidVM.FastUIntIR
+      Blockchain.SolidVM.IREval
       Blockchain.SolidVM.BLS12381
       Blockchain.SolidVM.BLS12381.Compress
       Blockchain.SolidVM.BLS12381.HashToCurve
@@ -71,6 +73,7 @@ library
     , text
     , time
     , transformers
+    , unordered-containers
     , unliftio
     , utf8-string
     , vector

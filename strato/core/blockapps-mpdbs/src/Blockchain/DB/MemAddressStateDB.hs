@@ -29,6 +29,7 @@ import Blockchain.DB.HashDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import qualified Blockchain.Database.MerklePatricia as MP
+import Blockchain.Database.MerklePatricia.Profile
 import Blockchain.Strato.Model.Address
 import Control.DeepSeq
 import Data.Binary
@@ -92,39 +93,61 @@ getAddressStateMaybe ::
   Address ->
   m (Maybe AddressState)
 getAddressStateMaybe address = do
+  liftIO $ do
+    noteProfileAccount (show address)
+    bumpDBProfile AccountReadOps 1
   theMap <- getAddressStateTxDBMap
   case M.lookup address theMap of
-    Just (ASModification addressState) -> return $ Just addressState
-    Just ASDeleted -> return $ Just blankAddressState
+    Just (ASModification addressState) -> do
+      liftIO $ bumpDBProfile AccountTxCacheHits 1
+      return $ Just addressState
+    Just ASDeleted -> do
+      liftIO $ bumpDBProfile AccountTxCacheHits 1
+      return $ Just blankAddressState
     Nothing -> do
+      liftIO $ bumpDBProfile AccountTxCacheMisses 1
       theBMap <- getAddressStateBlockDBMap
       case M.lookup address theBMap of
-        Just (ASModification addressState) -> return $ Just addressState
-        Just ASDeleted -> return $ Just blankAddressState
+        Just (ASModification addressState) -> do
+          liftIO $ bumpDBProfile AccountBlockCacheHits 1
+          return $ Just addressState
+        Just ASDeleted -> do
+          liftIO $ bumpDBProfile AccountBlockCacheHits 1
+          return $ Just blankAddressState
         Nothing -> do
+          liftIO $ bumpDBProfile AccountBlockCacheMisses 1
           root <- getStateRoot Nothing
           cache <- liftIO $ readIORef accountReadCache
           case M.lookup (root, address) cache of
-            Just result -> pure result
+            Just result -> do
+              liftIO $ bumpDBProfile AccountReadCacheHits 1
+              pure result
             Nothing -> do
+              liftIO $ bumpDBProfile AccountReadCacheMisses 1
               result <- DB.getAddressStateMaybe address
               liftIO $ cacheAccountRead (root, address) result
               pure result
 
 putAddressState ::
-  (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
+  (MonadIO m, HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
   Address ->
   AddressState ->
   m ()
 putAddressState address newState = do
+  liftIO $ do
+    noteProfileAccount (show address)
+    bumpDBProfile AccountWriteOps 1
   theMap <- getAddressStateTxDBMap
   putAddressStateTxDBMap (M.insert address (ASModification newState) theMap)
 
 putAddressStates ::
-  (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
+  (MonadIO m, HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
   M.Map Address AddressStateModification ->
   m ()
 putAddressStates localMap = do
+  liftIO $ forM_ (M.keys localMap) $ \address -> do
+    noteProfileAccount (show address)
+    bumpDBProfile AccountWriteOps 1
   txMap <- getAddressStateTxDBMap
   putAddressStateTxDBMap $ localMap `M.union` txMap
 
@@ -149,17 +172,23 @@ flushMemAddressStateDB = do
   putAddressStateBlockDBMap M.empty
 
 deleteAddressState ::
-  (HasMemAddressStateDB m, HasStateDB m) =>
+  (MonadIO m, HasMemAddressStateDB m, HasStateDB m) =>
   Address ->
   m ()
 deleteAddressState address = do
+  liftIO $ do
+    noteProfileAccount (show address)
+    bumpDBProfile AccountDeleteOps 1
   theMap <- getAddressStateTxDBMap
   putAddressStateTxDBMap (M.insert address ASDeleted theMap)
 
 deleteAddressStates ::
-  (HasMemAddressStateDB m, HasStateDB m) =>
+  (MonadIO m, HasMemAddressStateDB m, HasStateDB m) =>
   [Address] ->
   m ()
 deleteAddressStates addresses = do
+  liftIO $ forM_ addresses $ \address -> do
+    noteProfileAccount (show address)
+    bumpDBProfile AccountDeleteOps 1
   theMap <- getAddressStateTxDBMap
   putAddressStateTxDBMap . M.difference theMap . M.fromList $ (,ASDeleted) <$> addresses

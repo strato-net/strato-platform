@@ -19,6 +19,7 @@ import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Strato.Model.Address
 import Control.Monad.Change.Alter (Alters)
+import Control.Monad.IO.Class (MonadIO)
 
 -- A thin layer around raw storage db for clients who expect to work on
 -- keys and values of Word256
@@ -38,5 +39,5 @@ type FullStorage m =
 flushMemStorageTxDBToBlockDB :: FullStorage m => m ()
 flushMemStorageTxDBToBlockDB = flushMemRawStorageTxDBToBlockDB
 
-flushMemStorageDB :: (MonadLogger m, FullStorage m) => m ()
+flushMemStorageDB :: (MonadIO m, MonadLogger m, FullStorage m) => m ()
 flushMemStorageDB = flushMemRawStorageDB

@@ -15,6 +15,7 @@ module SolidVM.Solidity.Parse.Lexer
     lexeme,
     dot,
     identifier,
+    rawIdentifier,
     stringLiteral,
     commaSep1,
     commaSep,
@@ -40,6 +41,12 @@ reserved = P.reserved solidityLexer
 reservedOp = P.reservedOp solidityLexer
 
 identifier = P.identifier solidityLexer
+
+-- | Parse one Solidity identifier token without rejecting reserved words.
+-- Callers that already dispatch the keyword themselves can avoid asking the
+-- token parser to rescan the same identifier once per possible keyword.
+rawIdentifier :: SolidityParser String
+rawIdentifier = lexeme $ (:) <$> (letter <|> oneOf "$_") <*> many (alphaNum <|> oneOf "$_")
 
 lexeme = P.lexeme solidityLexer
 

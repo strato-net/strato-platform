@@ -56,7 +56,8 @@ initializeBlankStateDB ::
 initializeBlankStateDB = initializeBlank >> setStateDBStateRoot Nothing emptyTriePtr
 
 putStorageTrie ::
-  ( MonadLogger m,
+  ( MonadIO m,
+    MonadLogger m,
     HasHashDB m,
     Mem.HasMemAddressStateDB m,
     HasStateDB m,
@@ -75,7 +76,8 @@ putStorageTrie account slots = do
   Mem.flushMemAddressStateDB
 
 putAccount ::
-  ( MonadLogger m,
+  ( MonadIO m,
+    MonadLogger m,
     HasHashDB m,
     Mem.HasMemAddressStateDB m,
     HasStateDB m,
@@ -107,7 +109,8 @@ putAccount acc = case acc of
     putStorageTrie address slots
 
 initializeStateDB ::
-  ( MonadLogger m,
+  ( MonadIO m,
+    MonadLogger m,
     HasHashDB m,
     Mem.HasMemAddressStateDB m,
     HasStateDB m,
@@ -137,7 +140,8 @@ initializeCodeDB "SolidVM" x = do
 initializeCodeDB invalidType _ = error $ "error, bad VM type: " ++ invalidType
 
 genesisInfoToGenesisBlock ::
-  ( MonadLogger m,
+  ( MonadIO m,
+    MonadLogger m,
     HasCodeDB m,
     HasHashDB m,
     Mem.HasMemAddressStateDB m,
@@ -234,6 +238,7 @@ populateMPTFromGenesis ::
     HasStateDB m,
     HasStorageDB m,
     HasMemStorageDB m,
+    MonadIO m,
     MonadLogger m,
     (Address `Alters` AddressState) m
   ) =>
@@ -253,4 +258,3 @@ populateMPTFromGenesis genesisInfo = do
         " differs from genesis.json stateRoot " ++ format expectedStateRoot ++
         ". The genesis.json file may have been created incorrectly."
   $logInfoS "strato-setup" $ T.pack $ "Genesis hash: " ++ format (blockHash genesisBlock)
-

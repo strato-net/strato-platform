@@ -47,6 +47,7 @@ library
     , conduit
     , containers
     , cross-monitoring
+    , deepseq
     , dlist
     , ethereum-rlp
     , evm-solidity
@@ -91,8 +92,13 @@ executable vm-replay
     , common-log
     , composable-monads-base
     , conduit
+    , containers
+    , cryptonite
+    , data-default
+    , deepseq
     , ethereum-rlp
     , hflags
+    , leveldb-haskell
     , merkle-patricia-db
     , process-monitor
     , prometheus-client
@@ -101,7 +107,9 @@ executable vm-replay
     , strato-conf
     , strato-genesis
     , strato-model
+    , solid-vm-compiler
     , streaming
+    , text
     , time
     , transformers
     , unliftio

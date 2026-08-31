@@ -11,6 +11,7 @@ module Main where
 import Blockchain.Data.RLP
 import Blockchain.Database.MerklePatricia
 import Blockchain.Database.MerklePatricia.Internal
+import Blockchain.Database.MerklePatricia.NodeData (emptyRef, ptrRef, smallRef)
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import Blockchain.Strato.Model.Util
 import Control.Monad.Change.Alter
@@ -90,6 +91,27 @@ testMultipleInserts = TestCase $ do
   sr2 <- runMP $ addAllKVs emptyTriePtr bigTest
 
   assertEqual "disk - mem multiple insert" sr sr2
+
+testSerializeNodeDataMatchesCanonicalRLP :: Test
+testSerializeNodeDataMatchesCanonicalRLP = TestCase $
+  mapM_ assertEquivalent representativeNodes
+  where
+    assertEquivalent node =
+      assertEqual
+        ("direct node serialization for " ++ take 80 (show node))
+        (rlpSerialize $ rlpEncode node)
+        (serializeNodeData node)
+    hashedChild = StateRoot $ B.replicate 32 0x42
+    inlineChild = rlpSerialize $ RLPArray [RLPString "inline"]
+    children = smallRef inlineChild : ptrRef hashedChild : replicate 14 emptyRef
+    representativeNodes =
+      [ EmptyNodeData,
+        ShortcutNodeData (N.pack [1, 2, 3]) (Right $ RLPString "value"),
+        ShortcutNodeData (N.pack [4, 5]) (Left $ smallRef inlineChild),
+        ShortcutNodeData (N.pack [6, 7, 8]) (Left $ ptrRef hashedChild),
+        FullNodeData children Nothing,
+        FullNodeData children (Just $ RLPString $ B.replicate 80 0xab)
+      ]
 
 key :: N.NibbleString
 key = (byteString2NibbleString "anyString")
@@ -274,7 +296,9 @@ spec = do
           TestLabel " get . put . put = id" testGetPutRepeated,
           TestLabel " get . putn = id" testGetPutRepeatedII,
           TestLabel " single insert" testSingleInsert,
-          TestLabel " multiple insert" testMultipleInserts
+          TestLabel " multiple insert" testMultipleInserts,
+          TestLabel " direct node serialization matches canonical RLP"
+            testSerializeNodeDataMatchesCanonicalRLP
         ]
   describe "getInclusionProof" $ do
     fromHUnitTest $

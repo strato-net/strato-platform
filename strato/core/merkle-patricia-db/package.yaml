@@ -10,6 +10,7 @@ description:
 license: Apache-2.0
 
 dependencies:
+  - array
   - base
   - bytestring
   - ethereum-rlp
@@ -22,6 +23,16 @@ dependencies:
 
 library:
   source-dirs: src
+  exposed-modules:
+  - Blockchain.Database.MerklePatricia
+  - Blockchain.Database.MerklePatricia.Diff
+  - Blockchain.Database.MerklePatricia.ForEach
+  - Blockchain.Database.MerklePatricia.Internal
+  - Blockchain.Database.MerklePatricia.Map
+  - Blockchain.Database.MerklePatricia.MPDB
+  - Blockchain.Database.MerklePatricia.NodeData
+  - Blockchain.Database.MerklePatricia.Profile
+  - Blockchain.Database.MerklePatricia.StateRoot
   dependencies:
   - base16-bytestring
   - binary

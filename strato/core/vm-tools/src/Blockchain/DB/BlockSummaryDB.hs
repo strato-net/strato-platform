@@ -17,11 +17,13 @@ where
 
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.RLP
+import Blockchain.Database.MerklePatricia.Profile
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.IO.Class
 import Data.Binary
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe
 import qualified Database.LevelDB as LDB
@@ -37,17 +39,36 @@ type HasBlockSummaryDB m = (Keccak256 `A.Alters` BlockSummary) m
 genericLookupBlockSummaryDB :: MonadIO m => m BlockSummaryDB -> Keccak256 -> m (Maybe BlockSummary)
 genericLookupBlockSummaryDB f blockHash = do
   db <- unBlockSummaryDB <$> f
-  fmap (rlpDecode . rlpDeserialize) <$> LDB.get db LDB.defaultReadOptions (BL.toStrict $ encode blockHash)
+  let key = BL.toStrict $ encode blockHash
+  result <- LDB.get db LDB.defaultReadOptions key
+  liftIO $ do
+    bumpDBProfile LevelDBGetOps 1
+    bumpDBProfile LevelDBGetKeyBytes $ fromIntegral (B.length key)
+    case result of
+      Nothing -> bumpDBProfile LevelDBGetMisses 1
+      Just bytes -> do
+        bumpDBProfile LevelDBGetHits 1
+        bumpDBProfile LevelDBReadBytes $ fromIntegral (B.length bytes)
+  pure $ fmap (rlpDecode . rlpDeserialize) result
 
 genericInsertBlockSummaryDB :: MonadIO m => m BlockSummaryDB -> Keccak256 -> BlockSummary -> m ()
 genericInsertBlockSummaryDB f blockHash bSum = do
   db <- unBlockSummaryDB <$> f
-  LDB.put db LDB.defaultWriteOptions (BL.toStrict $ encode blockHash) (rlpSerialize $ rlpEncode bSum)
+  let key = BL.toStrict $ encode blockHash
+      value = rlpSerialize $ rlpEncode bSum
+  LDB.put db LDB.defaultWriteOptions key value
+  liftIO $ do
+    bumpDBProfile LevelDBPutOps 1
+    bumpDBProfile LevelDBWriteBytes $ fromIntegral (B.length key + B.length value)
 
 genericDeleteBlockSummaryDB :: MonadIO m => m BlockSummaryDB -> Keccak256 -> m ()
 genericDeleteBlockSummaryDB f blockHash = do
   db <- unBlockSummaryDB <$> f
-  LDB.delete db LDB.defaultWriteOptions (BL.toStrict $ encode blockHash)
+  let key = BL.toStrict $ encode blockHash
+  LDB.delete db LDB.defaultWriteOptions key
+  liftIO $ do
+    bumpDBProfile LevelDBDeleteOps 1
+    bumpDBProfile LevelDBDeleteKeyBytes $ fromIntegral (B.length key)
 
 getBSum :: HasBlockSummaryDB m => Keccak256 -> m BlockSummary
 getBSum blockHash =

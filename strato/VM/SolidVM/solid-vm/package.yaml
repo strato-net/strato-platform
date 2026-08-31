@@ -13,6 +13,8 @@ library:
     - Blockchain.SolidVM.GasInfo
     - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
+    - Blockchain.SolidVM.FastUIntIR
+    - Blockchain.SolidVM.IREval
     # BLS12-381 internal modules. Exposed so the test target (and anyone
     # cross-checking against RFC 9380 vectors) can drive the pipeline
     # stages directly. Stable public API for bridge contracts is via the
@@ -64,6 +66,7 @@ library:
   - text
   - time
   - transformers
+  - unordered-containers
   - unliftio
   - utf8-string
   - vector

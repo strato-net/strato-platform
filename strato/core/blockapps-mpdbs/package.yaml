@@ -37,6 +37,7 @@ library:
   - solid-vm-model
   - strato-model
   - transformers
+  - unordered-containers
   - unliftio-core
   - monad-logger
 
@@ -62,6 +63,7 @@ tests:
       - solid-vm-model
       - strato-model
       - transformers
+      - unordered-containers
       - unix
       - unliftio
     ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N -dynamic

@@ -30,20 +30,23 @@ module Blockchain.Strato.Model.Address
 where
 
 import Blockchain.Data.RLP
-import Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
+import Blockchain.Strato.Model.ExtendedWord (Word160)
 import qualified Blockchain.Strato.Model.Keccak256 as SHA (hash, keccak256ToWord256)
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Util
 import Control.DeepSeq
 import Control.Lens.Operators
-import Control.Monad
 import qualified Data.Aeson as AS
 import qualified Data.Aeson.Encoding as Enc
 import qualified Data.Aeson.Key as DAK
 import Data.Aeson.Types
 import Data.Binary
+import Data.Binary.Get (getWord32be, getWord64be)
+import Data.Binary.Put (putWord32be, putWord64be)
+import Data.Bits ((.&.), shiftL, shiftR)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Lazy as BL
 import Data.Char
 import Data.Data
@@ -53,9 +56,12 @@ import Data.OpenApi hiding (Format, format, get, put)
 import qualified Data.OpenApi as OPENAPI
 import qualified Data.Text as T
 import Database.Persist.Sql hiding (get)
+import Foreign.Ptr (Ptr)
+import Foreign.Storable (pokeByteOff)
 -- import Debug.Trace
 import GHC.Generics
 import Numeric
+import Network.Haskoin.Crypto.BigWord (BigWord (..))
 import Servant.API
 import Servant.Docs
 import Test.QuickCheck (Arbitrary (..))
@@ -65,6 +71,7 @@ import Text.Printf
 import Text.Read (readMaybe)
 import Text.ShortDescription
 import Text.Tools (shorten)
+import System.IO.Unsafe (unsafePerformIO)
 import Web.FormUrlEncoded
 import Web.PathPieces
 
@@ -145,11 +152,15 @@ instance ShortDescription Address where
   shortDescription x = shorten 8 . padZeros 40 $ showHex x ""
 
 instance Binary Address where
-  put (Address x) = sequence_ $ fmap put $ word160ToBytes $ fromIntegral x
+  put (Address (BigWord integerValue)) = do
+    putWord32be $ fromIntegral (integerValue `shiftR` 128)
+    putWord64be $ fromIntegral (integerValue `shiftR` 64)
+    putWord64be $ fromIntegral integerValue
   get = do
-    bytes <- replicateM 20 get
-    let byteString = B.pack bytes
-    return (Address $ fromInteger $ byteString2Integer byteString)
+    high <- toInteger <$> getWord32be
+    middle <- toInteger <$> getWord64be
+    low <- toInteger <$> getWord64be
+    pure . Address . BigWord $ (high `shiftL` 128) + (middle `shiftL` 64) + low
 
 maybeToEither :: b -> Maybe a -> Either b a
 maybeToEither err m = maybe (Left err) Right m
@@ -276,7 +287,25 @@ formatAddressWithoutColor :: Address -> String
 formatAddressWithoutColor x = padZeros 40 $ showHex x ""
 
 addressToHex :: Address -> B.ByteString
-addressToHex = B16.encode . BL.toStrict . encode
+addressToHex (Address (BigWord integerValue)) = unsafePerformIO $
+  BI.create 40 $ \destination -> do
+    writeHexWord destination 0 8 $ fromIntegral (integerValue `shiftR` 128)
+    writeHexWord destination 8 16 $ fromIntegral (integerValue `shiftR` 64)
+    writeHexWord destination 24 16 $ fromIntegral integerValue
+  where
+    writeHexWord :: Ptr Word8 -> Int -> Int -> Word64 -> IO ()
+    writeHexWord destination offset width word = go 0
+      where
+        go index
+          | index == width = pure ()
+          | otherwise = do
+              let shift = 4 * (width - index - 1)
+                  nibble :: Word8
+                  nibble = fromIntegral ((word `shiftR` shift) .&. 0xf)
+                  ascii :: Word8
+                  ascii = if nibble < 10 then 48 + nibble else 87 + nibble
+              pokeByteOff destination (offset + index) ascii
+              go (index + 1)
 
 addressFromHex :: B.ByteString -> Either String Address
 addressFromHex hex = case B16.decode hex of

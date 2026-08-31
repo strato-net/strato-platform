@@ -24,7 +24,9 @@ import qualified Blockchain.Bagger as Bagger
 import qualified Blockchain.Bagger.BaggerState as B
 import Blockchain.BlockChain
 import Blockchain.Blockstanbul (PreprepareDecision(..))
+import Blockchain.DB.CodeDB (getCode)
 import Blockchain.DB.BlockSummaryDB
+import Blockchain.Data.AddressStateDB (AddressState (..), CodePtr (..))
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
@@ -33,9 +35,12 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Event hiding (selfAddress)
 import Blockchain.TraceReplay (runJsonRpcCommandTraced)
 import Blockchain.Model.WrappedBlock
+import Blockchain.PhaseProfile
 import Blockchain.Sequencer.Event
+import Blockchain.SolidVM.CodeCollectionDB (parseSource, prewarmCodeCollectionFromSource)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.Code (Code (..))
 import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.Model.MicroTime
 import Blockchain.VMContext
@@ -44,19 +49,26 @@ import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
 import qualified Blockchain.EthConf.Model as Conf
 import Conduit hiding (Flush)
 import Control.Arrow ((&&&), (***))
+import Control.Exception (evaluate)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import qualified Data.Aeson as Aeson
+import qualified Data.ByteString.Lazy as BL
 import Data.Foldable hiding (fold)
 import qualified Data.Map as M
 import Data.Maybe
+import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import Data.Traversable (for)
+import GHC.Conc (getNumCapabilities)
 import Prometheus
 import qualified Text.Colors as CL
 import Text.Format (format)
 import Text.Printf
 import Text.Tools
+import UnliftIO.Async (mapConcurrently_)
 
 microtimeCutoff :: Microtime
 microtimeCutoff = secondsToMicrotime (Conf.mempoolLivenessCutoff (quarryConfig ethConf))
@@ -197,8 +209,79 @@ processBlocks ::
   ConduitT a VmOutEvent m ()
 processBlocks blocks = do
   $logInfoS "evm/processBlocks" $ T.pack $ "Running " ++ show (length blocks) ++ " blocks"
+  liftIO $ prewarmCreationSourceParses blocks
+  lift $ prewarmExistingCallCodeCollections blocks
+  liftIO $ prewarmCreationCodeCollections blocks
   processBlockSummaries blocks
   addBlocks blocks
+
+-- Parsing contract source does not depend on chain state. An incoming VM batch
+-- already contains future creations, so multi-capability nodes can populate the
+-- normal bounded parse cache before the ordered import-resolution/execution
+-- path reaches them. Parse failures are intentionally ignored here and are
+-- reproduced by the authoritative compile at the original transaction.
+prewarmCreationSourceParses :: [OutputBlock] -> IO ()
+prewarmCreationSourceParses blocks = do
+  capabilities <- getNumCapabilities
+  when (capabilities > 1) $
+    mapConcurrently_ prewarmOne . S.toList . S.fromList $
+      [ sourceEntry
+      | block <- blocks,
+        tx <- obReceiptTransactions block,
+        Code source <- maybeToList $ txCode (otBaseTx tx),
+        sourceEntry <- sourceFiles source
+      ]
+  where
+    prewarmOne (fileName, source) =
+      void . evaluate $
+        case parseSource fileName source of
+          Left _ -> ()
+          Right _ -> ()
+
+    sourceFiles source =
+      M.toList . M.fromList $
+        case Aeson.decode bytes of
+          Just sourceList -> sourceList
+          Nothing ->
+            case Aeson.decode bytes of
+              Just sourceMap -> M.toList sourceMap
+              Nothing -> [(T.empty, source)]
+      where
+        bytes = BL.fromStrict $ TE.encodeUtf8 source
+
+-- Compilation after parsing is also pure for self-contained source bundles.
+-- Prewarm those bundles in parallel and leave creations with address/external
+-- imports to the authoritative ordered compiler.
+prewarmCreationCodeCollections :: [OutputBlock] -> IO ()
+prewarmCreationCodeCollections blocks = do
+  capabilities <- getNumCapabilities
+  when (capabilities > 1) $
+    mapConcurrently_ (prewarmCodeCollectionFromSource False True . TE.encodeUtf8)
+      . S.toList . S.fromList $
+        [ source
+        | block <- blocks,
+          tx <- obReceiptTransactions block,
+          Code source <- maybeToList $ txCode (otBaseTx tx)
+        ]
+
+-- Existing top-level call destinations are already known at the start of a
+-- batch. Read their canonical source from the ordered snapshot, then perform
+-- only self-contained compilation in parallel. Calls to contracts created in
+-- this same batch, and sources with live-state imports, safely fall through.
+prewarmExistingCallCodeCollections :: Bagger.MonadBagger m => [OutputBlock] -> m ()
+prewarmExistingCallCodeCollections blocks = do
+  payloads <- fmap catMaybes . for destinations $ \address ->
+    A.lookup (A.Proxy @AddressState) address >>= \case
+      Just AddressState {addressStateCodeHash = SolidVMCode _ hsh} -> getCode hsh
+      _ -> pure Nothing
+  liftIO . mapConcurrently_ (prewarmCodeCollectionFromSource False True) $ payloads
+  where
+    destinations = S.toList . S.fromList $
+      [ address
+      | block <- blocks,
+        tx <- obReceiptTransactions block,
+        address <- maybeToList $ txDestination (otBaseTx tx)
+      ]
 
 processBlockSummaries ::
   ( MonadIO m,
@@ -249,12 +332,12 @@ getNumPoolable txPairs = do
 outputTransactions :: [(Timestamp, OutputTx)] -> [VmOutEvent]
 outputTransactions = map $ OutIndexEvent . uncurry IndexTransaction
 
-writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
-writeBlockSummary block = do
-  let sha = outputBlockHash block
-      header = obBlockData block
-      txCnt = fromIntegral $ length (obReceiptTransactions block)
-  -- the parent's facts carry the round this height started at (none for genesis / legacy parents)
-  parentFacts <- maybe noProposalFacts bSumProposalFacts <$> A.lookup (A.Proxy @BlockSummary) (parentHash header)
-  putBSum sha (blockHeaderToBSum (Conf.networkID (networkConfig ethConf)) parentFacts header txCnt)
-
+writeBlockSummary :: (MonadIO m, HasBlockSummaryDB m) => OutputBlock -> m ()
+writeBlockSummary block =
+  profileDetachedPhase (number $ obBlockData block) BlockSetupHeaderParentProposer $ do
+    let sha = outputBlockHash block
+        header = obBlockData block
+        txCnt = fromIntegral $ length (obReceiptTransactions block)
+    -- the parent's facts carry the round this height started at (none for genesis / legacy parents)
+    parentFacts <- maybe noProposalFacts bSumProposalFacts <$> A.lookup (A.Proxy @BlockSummary) (parentHash header)
+    putBSum sha (blockHeaderToBSum (Conf.networkID (networkConfig ethConf)) parentFacts header txCnt)

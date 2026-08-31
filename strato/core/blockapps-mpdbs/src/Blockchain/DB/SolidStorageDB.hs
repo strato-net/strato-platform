@@ -7,6 +7,7 @@ module Blockchain.DB.SolidStorageDB
   ( HasSolidStorageDB,
     HasMemSolidStorageDB,
     putSolidStorageKeyVal',
+    putSolidStorageKeyVals',
     getSolidStorageKeyVal',
     deleteSolidStorageKeyVal',
     getAllSolidStorageKeyVals',
@@ -26,7 +27,10 @@ import Blockchain.Data.AddressStateDB
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Address
 import Control.Monad.Change.Alter (Alters)
+import qualified Control.Monad.Change.Alter as A
+import Control.Monad.IO.Class (MonadIO)
 import Data.Bifunctor (second)
+import qualified Data.Map as M
 import SolidVM.Model.Storable
 
 type HasSolidStorageDB m = HasRawStorageDB m
@@ -58,6 +62,9 @@ putSolidStorageKeyVal' :: HasSolidStorageDB m => Address -> StoragePath -> Basic
 putSolidStorageKeyVal' address key val = do
   putRawStorageKeyVal' (toKey address key) (toVal val)
 
+putSolidStorageKeyVals' :: HasSolidStorageDB m => M.Map (Address, StoragePath) BasicValue -> m ()
+putSolidStorageKeyVals' = A.insertMany A.Proxy . M.map toVal
+
 getSolidStorageKeyVal' :: HasSolidStorageDB m => Address -> StoragePath -> m BasicValue
 getSolidStorageKeyVal' address key = do
   v' <- fromVal <$> getRawStorageKeyVal' (toKey address key)
@@ -72,5 +79,5 @@ getAllSolidStorageKeyVals' acct = map (second fromVal) <$> getAllRawStorageKeyVa
 flushMemSolidStorageTxDBToBlockDB :: FullSolidStorage m => m ()
 flushMemSolidStorageTxDBToBlockDB = flushMemRawStorageTxDBToBlockDB
 
-flushMemSolidStorageDB :: (MonadLogger m, FullSolidStorage m) => m ()
+flushMemSolidStorageDB :: (MonadIO m, MonadLogger m, FullSolidStorage m) => m ()
 flushMemSolidStorageDB = flushMemRawStorageDB

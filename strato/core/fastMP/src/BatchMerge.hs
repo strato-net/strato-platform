@@ -6,6 +6,7 @@
 
 module BatchMerge
   ( putManyKeyVal,
+    putManySafeKeyVal,
   )
 where
 
@@ -32,9 +33,20 @@ putManyKeyVal ::
 putManyKeyVal sr listOfInserts = do
   let listOfInserts' = map (BF.first MP.keyToSafeKey) listOfInserts
 
-  nd <- MP.getNodeData $ MP.ptrRef sr
+  putManySafeKeyVal sr listOfInserts'
 
-  finalNd <- putManyKeyVal_nodeData nd $ orderTheKVs $ map (uncurry createKV) listOfInserts'
+-- | Batch-insert keys that have already passed through 'MP.keyToSafeKey'.
+-- This is intentionally separate from the public raw-key path so callers must
+-- opt in explicitly when they already needed the safe key for another store.
+putManySafeKeyVal ::
+  (MonadLogger m, (MP.StateRoot `A.Alters` MP.NodeData) m) =>
+  MP.StateRoot ->
+  [(MP.Key, MP.Val)] ->
+  m MP.StateRoot
+putManySafeKeyVal sr listOfInserts = do
+
+  nd <- MP.getNodeData $ MP.ptrRef sr
+  finalNd <- putManyKeyVal_nodeData nd $ orderTheKVs $ map (uncurry createKV) listOfInserts
 
   nr <- MP.nodeData2NodeRef finalNd
 
@@ -64,15 +76,15 @@ putManyKeyVal_nodeData ::
   m MP.NodeData
 putManyKeyVal_nodeData (MP.FullNodeData choices val) listOfInserts = do
   let kvsSplitByFirstNibble = splitKeysByPrefix (map Just [15, 14 .. 0] ++ [Nothing]) $ getTheKVs listOfInserts
+      updateChoice (newVals, oldVal) =
+        if null newVals
+          then return oldVal
+          else do
+            oldNd <- MP.getNodeData oldVal
+            nd <- putManyKeyVal_nodeData oldNd $ iPromiseTheseKVsAreOrdered newVals
+            MP.nodeData2NodeRef nd
 
-  choices' <-
-    forM (zip kvsSplitByFirstNibble $ reverse choices) $ \(newVals, oldVal) -> do
-      if null newVals
-        then return oldVal
-        else do
-          oldNd <- MP.getNodeData oldVal
-          nd <- putManyKeyVal_nodeData oldNd $ iPromiseTheseKVsAreOrdered newVals
-          MP.nodeData2NodeRef nd
+  choices' <- forM (zip kvsSplitByFirstNibble $ reverse choices) updateChoice
 
   let val' =
         case last kvsSplitByFirstNibble of

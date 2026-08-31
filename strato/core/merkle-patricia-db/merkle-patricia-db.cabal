@@ -23,6 +23,7 @@ library
       Blockchain.Database.MerklePatricia.Map
       Blockchain.Database.MerklePatricia.MPDB
       Blockchain.Database.MerklePatricia.NodeData
+      Blockchain.Database.MerklePatricia.Profile
       Blockchain.Database.MerklePatricia.StateRoot
   other-modules:
       Paths_merkle_patricia_db
@@ -31,6 +32,7 @@ library
   build-depends:
       QuickCheck
     , Ranged-sets
+    , array
     , base
     , base16-bytestring
     , binary

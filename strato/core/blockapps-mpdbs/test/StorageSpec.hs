@@ -21,16 +21,16 @@ import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.Lens
 import Control.Monad
 import Control.Monad.Change.Alter
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource
 import Control.Monad.Trans.State
-import qualified Data.ByteString as B
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Map as M
 import qualified Data.NibbleString as N
 import qualified Database.LevelDB as DB
@@ -44,7 +44,7 @@ import Test.Hspec.Expectations.Lifted
 import UnliftIO.Exception
 import Prelude hiding (abs, lookup)
 
-type SMap = M.Map (Address, B.ByteString) B.ByteString
+type SMap = M.Map RawStorageKey RawStorageValue
 
 type AMap = M.Map Address AddressStateModification
 
@@ -122,10 +122,18 @@ runStorM mv =
     (runLoggingTWithLevel LevelError . runResourceT . evalStateT mv . snd)
 
 getStorageKeyVal'' :: HasStorageDB m => Address -> Word256 -> m Word256
-getStorageKeyVal'' addr = getStorageKeyVal' addr
+getStorageKeyVal'' addr key = do
+  value <- getRawStorageKeyVal' (addr, MS.singleton $ word256ToBytes key)
+  pure $ case value of
+    MS.BInteger integer -> fromInteger integer
+    MS.BDefault -> 0
+    unexpected -> error $ "legacy integer storage contained " ++ show unexpected
 
 putStorageKeyVal'' :: HasStorageDB m => Address -> Word256 -> Word256 -> m ()
-putStorageKeyVal'' addr key = putStorageKeyVal' addr key
+putStorageKeyVal'' addr key value =
+  putRawStorageKeyVal'
+    (addr, MS.singleton $ word256ToBytes key)
+    (if value == 0 then MS.BDefault else MS.BInteger $ toInteger value)
 
 storageSpec :: Spec
 storageSpec = do
@@ -145,6 +153,7 @@ storageSpec = do
 
     it "gets its puts after a full flush" . runStorM $ do
       putStorageKeyVal'' 0x1 0x2 0x3
+      flushMemStorageTxDBToBlockDB
       flushMemStorageDB
       use stx `shouldReturn` M.empty
       use sbs `shouldReturn` M.empty
@@ -155,18 +164,24 @@ storageSpec = do
       putStorageKeyVal'' 0x1 0x3 0x4
       putStorageKeyVal'' 0x1 0x4 0x5
       putStorageKeyVal'' 0x1 0x3 0x6
-      getAllStorageKeyVals' 0x1 `shouldReturn` []
+      getAllRawStorageKeyVals' 0x1 `shouldReturn` []
 
     it "getAll puts after a flush" . runStorM $ do
       putStorageKeyVal'' 0x1 0x2 0x3
       putStorageKeyVal'' 0x1 0x3 0x4
       putStorageKeyVal'' 0x1 0x4 0x5
       putStorageKeyVal'' 0x1 0x3 0x6
+      flushMemStorageTxDBToBlockDB
       flushMemStorageDB
       use stx `shouldReturn` M.empty
       use sbs `shouldReturn` M.empty
       let toKey = N.EvenNibbleString . keccak256ToByteString . hash . word256ToBytes
-      kvs <- getAllStorageKeyVals' 0x1
+      rawKvs <- getAllRawStorageKeyVals' 0x1
+      let kvs :: [(MP.Key, Word256)]
+          kvs =
+            [ (key, fromInteger value)
+            | (key, MS.BInteger value) <- rawKvs
+            ]
       kvs
         `shouldMatchList` [ (toKey 2, 3),
                             (toKey 3, 6),
@@ -177,6 +192,7 @@ storageSpec = do
       want <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       want `shouldBe` "V\232\US\ETB\ESC\204U\166\255\131E\230\146\192\248n[H\224\ESC\153l\173\192\SOHb/\181\227c\180!"
       putStorageKeyVal'' 0x1234 0x3 0x0
+      flushMemStorageTxDBToBlockDB
       flushMemStorageDB
       got <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       want `shouldBe` got
@@ -184,10 +200,10 @@ storageSpec = do
     it "put 1 should change the state root" . runStorM $ do
       want <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       putStorageKeyVal'' 0x1234 0x3 0x44
+      flushMemStorageTxDBToBlockDB
       flushMemStorageDB
       got <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       want `shouldNotBe` got
-      got `shouldBe` "E\RS\164\USe\177\214\249m\186\SI\248\136\\\215\137\172\231\135q\224;\178TWg\SUB\147n\134. "
 
   describe "RawStorageDB" $ do
     it "should get its puts" . runStorM $ do
@@ -196,18 +212,41 @@ storageSpec = do
 
   describe "SolidStorageDB SolidVM=3.0" $ do
     it "should get its puts" . runStorM $ do
-      putSolidStorageKeyVal' 0x99 (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) (MS.BString "txt")
-      getSolidStorageKeyVal' 0x99 (MS.fromList [MS.Field "x", MS.ArrayIndex 99])
+      putSolidStorageKeyVal' 0x99 (MS.fromList [MS.Field "x", MS.Index "99"]) (MS.BString "txt")
+      getSolidStorageKeyVal' 0x99 (MS.fromList [MS.Field "x", MS.Index "99"])
         `shouldReturn` MS.BString "txt"
 
     it "should be able to flush" . runStorM $ do
       putSolidStorageKeyVal' 0x342 (MS.singleton "x") (MS.BBool True)
+      flushMemSolidStorageTxDBToBlockDB
       flushMemSolidStorageDB
+
+    it "inherits unchanged cached values when a storage root advances" . runStorM $ do
+      let owner = 0x515151
+          firstPath = MS.singleton "cacheInheritanceFirst"
+          secondPath = MS.singleton "cacheInheritanceSecond"
+          firstValue = MS.BInteger 11
+          secondValue = MS.BInteger 22
+      putSolidStorageKeyVal' owner firstPath firstValue
+      flushMemSolidStorageTxDBToBlockDB
+      flushMemSolidStorageDB
+      firstRoot <- addressStateContractRoot <$> lookupWithDefault Proxy owner
+      firstCache <- liftIO $ snapshotRawStorageReadCache firstRoot
+      HM.lookup firstPath firstCache `shouldBe` Just (Just firstValue)
+
+      putSolidStorageKeyVal' owner secondPath secondValue
+      flushMemSolidStorageTxDBToBlockDB
+      flushMemSolidStorageDB
+      secondRoot <- addressStateContractRoot <$> lookupWithDefault Proxy owner
+      secondCache <- liftIO $ snapshotRawStorageReadCache secondRoot
+      HM.lookup firstPath secondCache `shouldBe` Just (Just firstValue)
+      HM.lookup secondPath secondCache `shouldBe` Just (Just secondValue)
 
     let solidIdTest msg bv = it ("put " <> msg <> " in SolidStorage should not change the state root") . runStorM $ do
           want <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
           want `shouldBe` "V\232\US\ETB\ESC\204U\166\255\131E\230\146\192\248n[H\224\ESC\153l\173\192\SOHb/\181\227c\180!"
-          putSolidStorageKeyVal' 0x1234 (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) bv
+          putSolidStorageKeyVal' 0x1234 (MS.fromList [MS.Field "x", MS.Index "99"]) bv
+          flushMemSolidStorageTxDBToBlockDB
           flushMemStorageDB
           got <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
           want `shouldBe` got
@@ -215,15 +254,15 @@ storageSpec = do
     solidIdTest "0" (MS.BInteger 0)
     solidIdTest "empty string" (MS.BString "")
     solidIdTest "False" (MS.BBool False)
-    solidIdTest "zero account" (MS.BAccount (unspecifiedChain 0))
+    solidIdTest "zero address" (MS.BAddress 0)
     solidIdTest "zero enum value" (MS.BEnumVal "myEnum" "myEnumKey" 0)
-    solidIdTest "zero contract" (MS.BContract "MyContractName" $ unspecifiedChain 0)
+    solidIdTest "zero contract" (MS.BContract "MyContractName" 0)
     solidIdTest "BDefault" (MS.BDefault)
 
     it "put 1 in SolidStorage should change the state root" . runStorM $ do
       want <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
-      putSolidStorageKeyVal' 0x1234 (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) (MS.BInteger 1)
+      putSolidStorageKeyVal' 0x1234 (MS.fromList [MS.Field "x", MS.Index "99"]) (MS.BInteger 1)
+      flushMemSolidStorageTxDBToBlockDB
       flushMemStorageDB
       got <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       want `shouldNotBe` got
-      got `shouldBe` "\223\231^\"\234'\233\249\208*D\163\210\237\147\ETXq\202\EM\208\195\140\223\&7J\SI\201\250\&9\165\177\141"

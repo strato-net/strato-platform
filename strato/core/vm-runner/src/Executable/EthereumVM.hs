@@ -16,7 +16,9 @@ module Executable.EthereumVM
   ( ethereumVM,
     bootstrapIfFirstRun,
     initializeBestBlock,
+    routeOutEvents,
     seedDatabases,
+    sendOutEvent,
   )
 where
 
@@ -33,16 +35,18 @@ import Blockchain.Data.GenesisInfo (stateRoot, getGenesisInfo)
 import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Bootstrap
 import Blockchain.Database.MerklePatricia.NodeData ()
+import Blockchain.Database.MerklePatricia.Profile
 import Blockchain.EthConf
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Event
 import Blockchain.JsonRpcCommand
 import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
+import Blockchain.PhaseProfile
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.StateRootMismatch
-import Blockchain.Strato.Indexer.Kafka (produceIndexEvents)
+import Blockchain.Strato.Indexer.Kafka (produceEncodedIndexEvents, produceIndexEvents)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address ()
 import Blockchain.Strato.Model.Class
@@ -56,11 +60,15 @@ import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Wiring
 import Conduit hiding (Flush)
+import Control.DeepSeq (force)
+import Control.Exception (evaluate)
 import Control.Monad
 import Control.Monad.Change.Alter ()
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
-import Data.Conduit.List (mapMaybeM)
+import qualified Data.Binary as Bin
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import Data.Foldable hiding (fold)
 import Data.List
 import Data.Maybe
@@ -70,7 +78,7 @@ import Text.Format (format)
 
 ethereumVM :: LoggingT IO ()
 ethereumVM = runResourceT $ do
-  ctx <- initContext
+  ctx <- initBatchedContext
   void . runStreamMConfigured "ethereum-vm" $ execContextM' ctx $ do
 --    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
 
@@ -95,10 +103,18 @@ ethereumVM = runResourceT $ do
         logEventSummaries seqEvents
 
         let !vmInEventBatch = foldr insertInBatch newInBatch seqEvents
-        failures <- fmap concat . runConduit $
+        -- Keep the state/output/offset ordering crash-safe.  Merkle writes are
+        -- accumulated while this bounded input batch executes, made durable,
+        -- and only then are its outputs published.  runConsume advances the
+        -- input checkpoint after this callback returns.
+        outEvents <- runConduit $
           yield vmInEventBatch
             .| handleVmTasks
-            .| mapMaybeM routeOutEvent
+            .| sinkList
+        finalizePendingMPNodes
+        failures <- fmap concat . runConduit $
+          yieldMany outEvents
+            .| routeOutEvents
             .| sinkList
 
         loopTimeit "compactContextM" $ compactContextM
@@ -204,26 +220,89 @@ logEventSummaries evs = do
 
 -- KAFKA
 
-routeOutEvent :: (MonadLogger m, HasStreaming m, HasContext m) => VmOutEvent -> m (Maybe [BlockVerificationFailure])
-routeOutEvent (OutBlockVerificationFailure bvf) = pure $ Just bvf
-routeOutEvent oev = Nothing <$ sendOutEvent oev
+-- | Preserve the order within each Kafka topic while batching a VM input
+-- batch into bounded produce calls.  The old mapMaybeM route called the
+-- synchronous producer once for every RanBlock/NewAction, even though the
+-- producer already knows how to encode and chunk a list.  We flush before
+-- non-Kafka side effects and before returning to runConsume, so its offset is
+-- not advanced until every accumulated output has been acknowledged.
+routeOutEvents ::
+  (MonadLogger m, HasStreaming m, HasContext m) =>
+  ConduitT VmOutEvent [BlockVerificationFailure] m ()
+routeOutEvents = go [] [] 0
+  where
+    maxPendingItems = 256 :: Int
+
+    go vmEvents indexEvents pendingCount = await >>= \case
+      Nothing -> flush vmEvents indexEvents
+      Just event -> case event of
+        OutVMEvents events ->
+          continue (foldl' (flip (:)) vmEvents events) indexEvents (pendingCount + length events)
+        OutIndexEvent indexEvent ->
+          continue vmEvents (indexEvent : indexEvents) (pendingCount + 1)
+        OutStateDiff diff ->
+          continue vmEvents (StateDiffEntry diff : indexEvents) (pendingCount + 1)
+        OutLog logEntry ->
+          continue vmEvents (LogDBEntry logEntry : indexEvents) (pendingCount + 1)
+        OutEvent events ->
+          let entries = EventDBEntry <$> events
+           in continue vmEvents (foldl' (flip (:)) indexEvents entries) (pendingCount + length entries)
+        OutASM asm
+          | not (Conf.sqlDiff $ Conf.vmConfig ethConf) ->
+              continue vmEvents (AddressStateUpdates asm : indexEvents) (pendingCount + 1)
+        OutBlockVerificationFailure failures -> do
+          flush vmEvents indexEvents
+          yield failures
+          go [] [] 0
+        other -> do
+          flush vmEvents indexEvents
+          sendOutEvent other
+          go [] [] 0
+
+    continue vmEvents indexEvents pendingCount
+      | pendingCount >= maxPendingItems = flush vmEvents indexEvents >> go [] [] 0
+      | otherwise = go vmEvents indexEvents pendingCount
+
+    flush vmEvents indexEvents = do
+      unless (null vmEvents) $
+        sendProfiledItems "vmevents" produceVMEvents produceEncodedVMEvents $ reverse vmEvents
+      unless (null indexEvents) $
+        sendProfiledItems "indexevents" produceIndexEvents produceEncodedIndexEvents $ reverse indexEvents
 
 sendOutEvent :: (MonadLogger m, HasStreaming m, HasContext m) => VmOutEvent -> m ()
-sendOutEvent (OutVMEvents vmes) = void $ produceVMEvents vmes
-sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
-sendOutEvent (OutStateDiff diff) = void $ produceIndexEvents [StateDiffEntry diff]
-sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
-sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)
+sendOutEvent (OutVMEvents vmes) = sendProfiledItems "vmevents" produceVMEvents produceEncodedVMEvents vmes
+sendOutEvent (OutIndexEvent e) = sendProfiledItems "indexevents" produceIndexEvents produceEncodedIndexEvents [e]
+sendOutEvent (OutStateDiff diff) = sendProfiledItems "indexevents" produceIndexEvents produceEncodedIndexEvents [StateDiffEntry diff]
+sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ sendProfiledItems "indexevents" produceIndexEvents produceEncodedIndexEvents [LogDBEntry l]
+sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ sendProfiledItems "indexevents" produceIndexEvents produceEncodedIndexEvents (EventDBEntry <$> e)
 sendOutEvent (OutASM asm) =
   when (not $ Conf.sqlDiff $ Conf.vmConfig ethConf) $
     timeit "produceAddressStateUpdates" (Just vmBlockInsertionMined) $
-      void $ produceIndexEvents [AddressStateUpdates asm]
+      sendProfiledItems "indexevents" produceIndexEvents produceEncodedIndexEvents [AddressStateUpdates asm]
 sendOutEvent (OutJSONRPC r) = produceResponse r
 sendOutEvent (OutBlock o) = void $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
 sendOutEvent (OutBlockVerificationFailure _) = pure ()
 sendOutEvent (OutGetMPNodes mpNodes) = void $ writeUnseqEvents [IEGetMPNodes mpNodes]
 sendOutEvent (OutMPNodesResponse o nds) = void $ writeUnseqEvents [IEMPNodesResponse o nds]
 sendOutEvent (OutPreprepareResponse dec) = void $ writeUnseqEvents [IEPreprepareResponse dec]
+
+sendProfiledItems ::
+  (Bin.Binary a, HasStreaming m) =>
+  String ->
+  ([a] -> m [ProduceResponse]) ->
+  ([B.ByteString] -> m [ProduceResponse]) ->
+  [a] ->
+  m ()
+sendProfiledItems channel produceValues produceBytes values
+  | not phaseProfileEnabled = void $ produceValues values
+  | otherwise = do
+      payloads <- profilePhase SolidVMDiffActionConstructionSerialization $
+        liftIO $ evaluate $ force $ map (BL.toStrict . Bin.encode) values
+      liftIO $ do
+        noteProfileOutput channel payloads
+        bumpDBProfile SerializedEventCount $ fromIntegral (length payloads)
+        bumpDBProfile SerializedEventBytes . fromIntegral $ sum (map B.length payloads)
+      profilePhase EventKafkaEnqueue $ void $ produceBytes payloads
 
 consumerGroup :: ConsumerGroup
 consumerGroup = "ethereum-vm"

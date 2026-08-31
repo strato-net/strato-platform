@@ -25,6 +25,7 @@ module Blockchain.SolidVM
     create,
     callReturnEnv,
     createReturnEnv,
+    parseTransactionArgValueFast,
   )
 where
 
@@ -42,11 +43,16 @@ import Blockchain.Data.Util (integer2Bytes)
 import qualified Blockchain.Database.MerklePatricia as MP
 import BlockApps.Solidity.ABI.Codec (abiDecode)
 import qualified Blockchain.SolidVM.Builtins as Builtins
+import Blockchain.DB.RawStorageDB (HasMemRawStorageDB (..), getRawStorageKeyValForStateRootMaybe, snapshotRawStorageReadCache)
+import Blockchain.DB.SolidStorageDB (putSolidStorageKeyVal', putSolidStorageKeyVals')
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
+import Blockchain.SolidVM.FastUIntIR (DynamicCallKind (..), FastValue (..), HostArgKind (..), PendingStorageWrite (..), ScalarStorageEncoding (..), StorageHooks (..), StoragePathPiece (..), funcLowers, noteIRDecision, runAnyStorageIRArgs, runAnyUIntIR)
+import Blockchain.SolidVM.IREval (IRFrameOutcome (..), IRMissWhy (..), irDisabledRef, irFrameDisabled, recordIRFrameOutcome)
 import Blockchain.SolidVM.GasInfo
 import Blockchain.SolidVM.Metrics
+import Blockchain.PhaseProfile
 import Blockchain.SolidVM.SM
 import Blockchain.SolidVM.SetGet
 import Blockchain.SolidVM.TraceTools
@@ -92,6 +98,7 @@ import Data.Decimal
 import Data.Char (isDigit)
 import Data.Foldable (for_)
 import Data.Function (on)
+import qualified Data.HashMap.Strict as HM
 import Data.List
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
@@ -102,9 +109,11 @@ import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as DT
+import qualified Data.Text.Read as TR
 import Data.Time.Clock
 import Data.Time.Clock.POSIX
 import Data.Traversable
+import Data.Word (Word32)
 import qualified Data.Vector as V
 import Debugger
 import GHC.Exts hiding (breakpoint)
@@ -256,16 +265,27 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
 
   fmap (fmap $ either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
 
-    (hsh, cc) <- codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 initCode
+    (hsh, cc) <- profileRunCodeChild
+      RunCodeCallCodeCollectionLookupCompile
+      RunCodeCreationCodeCollectionLookupCompile $
+        codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 initCode
     addNewCodeCollection hsh cc
-    let eArgExps = traverse (runParser parseArg initialParserState "" . T.unpack) argsStrings
-        !argExps = either (parseError "create arguments") id eArgExps
-    argVals <- argsToVals argExps
+    argVals <- profileRunCodeChild
+      RunCodeCallArgumentReferencePreparation
+      RunCodeCreationArgumentReferencePreparation $ do
+        case traverse parseTransactionArgValueFast argsStrings of
+          Just argVals -> pure argVals
+          Nothing -> do
+            let eArgExps = traverse (runParser parseArg initialParserState "" . T.unpack) argsStrings
+                !argExps = either (parseError "create arguments") id eArgExps
+            argsToVals argExps
 
     create' sender' newAddress hsh cc (T.unpack contractName) argVals
 
 create' :: MonadSM m => Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> m ExecResults
-create' creator newAddress ch cc contractName' valList = do
+create' creator newAddress ch cc contractName' valList = profileRunCodeChild
+  RunCodeCallContractDispatchFrameSetup
+  RunCodeCreationContractDispatchFrameSetup $ do
 
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
@@ -306,28 +326,30 @@ create' creator newAddress ch cc contractName' valList = do
   -- I'm showing these strings because I like them to be in quotes in the logs :)
   multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName')]
 
-  stakeEventSource <- Conf.stakeEventSourceAt (Conf.networkConfig ethConf) . BlockHeader.number . Env.blockHeader <$> getEnv
-
-  finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
-  finalAct <- Mod.get (Mod.Proxy @Action)
-  let (newV, remV) = fromDelta . getDeltasFromEvents $ toList finalEvs
-  return
-    ExecResults
-      { erRemainingTxGas = 0, --Just use up all the allocated gas for now....
-        erRefund = 0,
-        erReturnVal = Nothing,
-        erTrace = [],
-        erLogs = [],
-        erEvents = toList finalEvs,
-        erNewContractAddress = Just newAddress,
-        erSuicideList = S.empty,
-        erAction = Just finalAct,
-        erException = Nothing,
-        erPragmas = CC._pragmas cc,
-        erNewValidators = newV,
-        erRemovedValidators = remV,
-        erStakeUpdates = getStakeDeltasFromEvents stakeEventSource $ toList finalEvs
-      }
+  profileRunCodeChild
+    RunCodeCallResultActionEventCollection
+    RunCodeCreationResultActionEventCollection $ do
+      stakeEventSource <- Conf.stakeEventSourceAt (Conf.networkConfig ethConf) . BlockHeader.number . Env.blockHeader <$> getEnv
+      finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
+      finalAct <- Mod.get (Mod.Proxy @Action)
+      let (newV, remV) = fromDelta . getDeltasFromEvents $ toList finalEvs
+      return
+        ExecResults
+          { erRemainingTxGas = 0, --Just use up all the allocated gas for now....
+            erRefund = 0,
+            erReturnVal = Nothing,
+            erTrace = [],
+            erLogs = [],
+            erEvents = toList finalEvs,
+            erNewContractAddress = Just newAddress,
+            erSuicideList = S.empty,
+            erAction = Just finalAct,
+            erException = Nothing,
+            erPragmas = CC._pragmas cc,
+            erNewValidators = newV,
+            erRemovedValidators = remV,
+            erStakeUpdates = getStakeDeltasFromEvents stakeEventSource $ toList finalEvs
+          }
 
 call ::
   SolidVMBase m =>
@@ -386,42 +408,50 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
 
   fmap (fmap $ either solidvmErrorResults id) . runSM Nothing env' gasInfo' $ do
     --requireOriginCert origin'
-    let -- maybeSrcLength = M.lookup "srcLength" =<< metadata
-        -- !srcLength = maybe 0 (\sl -> read (T.unpack sl) :: Int) maybeSrcLength
-        srcLength = 0
-        !argExps =
-          if null argsStrings
-            then []
-            else either (parseError "call arguments") id $
-              traverse (runParser parseArg (initialParserStateWithLength srcLength) "" . T.unpack) argsStrings
-    argVals <- argsToVals argExps
+    argVals <- profileRunCodeChild
+      RunCodeCallArgumentReferencePreparation
+      RunCodeCreationArgumentReferencePreparation $ do
+        case traverse parseTransactionArgValueFast argsStrings of
+          Just argVals -> pure argVals
+          Nothing -> do
+            let -- maybeSrcLength = M.lookup "srcLength" =<< metadata
+                -- !srcLength = maybe 0 (\sl -> read (T.unpack sl) :: Int) maybeSrcLength
+                srcLength = 0
+                !argExps =
+                  if null argsStrings
+                    then []
+                    else either (parseError "call arguments") id $
+                      traverse (runParser parseArg (initialParserStateWithLength srcLength) "" . T.unpack) argsStrings
+            argsToVals argExps
 
     maybeVal <-
       call' sender' codeAddress (fromMaybe CC.DefaultCall mFuncCallType) (textToLabel funcName) argVals
 
-    finalAct <- Mod.get (Mod.Proxy @Action)
-    finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
-    let (newV, remV) = fromDelta . getDeltasFromEvents $ toList finalEvs
-        stakeEventSource = Conf.stakeEventSourceAt (Conf.networkConfig ethConf) (BlockHeader.number blockData)
+    profileRunCodeChild
+      RunCodeCallResultActionEventCollection
+      RunCodeCreationResultActionEventCollection $ do
+        finalAct <- Mod.get (Mod.Proxy @Action)
+        finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
+        let (newV, remV) = fromDelta . getDeltasFromEvents $ toList finalEvs
+            stakeEventSource = Conf.stakeEventSourceAt (Conf.networkConfig ethConf) (BlockHeader.number blockData)
 
-    return $
-      ExecResults
-        { erRemainingTxGas = 0, --Just use up all the allocated gas for now....
-          erRefund = 0,
-          erReturnVal = maybeVal,
-          erTrace = [],
-          erLogs = [],
-          erEvents = toList finalEvs,
-          erNewContractAddress = Nothing,
-          erSuicideList = S.empty,
-          erAction = Just $ finalAct,
-          erException = Nothing, -- tells me if theres an exception
-          erPragmas = [],
-          erNewValidators = newV,
-          erRemovedValidators = remV,
-          erStakeUpdates = getStakeDeltasFromEvents stakeEventSource $ toList finalEvs
-        }
-
+        return $
+          ExecResults
+            { erRemainingTxGas = 0, --Just use up all the allocated gas for now....
+              erRefund = 0,
+              erReturnVal = maybeVal,
+              erTrace = [],
+              erLogs = [],
+              erEvents = toList finalEvs,
+              erNewContractAddress = Nothing,
+              erSuicideList = S.empty,
+              erAction = Just $ finalAct,
+              erException = Nothing, -- tells me if theres an exception
+              erPragmas = [],
+              erNewValidators = newV,
+              erRemovedValidators = remV,
+              erStakeUpdates = getStakeDeltasFromEvents stakeEventSource $ toList finalEvs
+            }
 call' ::
   MonadSM m =>
   Address ->
@@ -430,7 +460,9 @@ call' ::
   SolidString ->
   ValList ->
   m (Maybe Value)
-call' from to' fnCalltype functionName valList = do
+call' from to' fnCalltype functionName valList = profileRunCodeChild
+  RunCodeCallContractDispatchFrameSetup
+  RunCodeCreationContractDispatchFrameSetup $ do
   currentCall <- getCurrentCallInfoIfExists
   (isExternal, storageAddress, codeAddress) <- case fnCalltype of
     CC.DelegateCall -> return (True, from, to')
@@ -496,6 +528,24 @@ call' from to' fnCalltype functionName valList = do
         | shouldResolve = resolveArgRefs from contract cc (CC._funcArgs theFunction) args
         | otherwise     = pure args
 
+      runFallback fallbackFunc requestedName = do
+        resolvedValList <- resolveArgs shouldPushSender fallbackFunc valList
+        let runFallbackCall
+              | isCanonicalProxyFallback contract fallbackFunc =
+                  (fallbackFunc ^. CC.funcVals,) <$>
+                    runCanonicalProxyFallback
+                      storageAddress
+                      codeAddress
+                      contract
+                      requestedName
+                      hsh
+                      cc
+                      currentReadOnly
+                      resolvedValList
+              | otherwise =
+                  runTheCall storageAddress codeAddress contract requestedName hsh cc fallbackFunc resolvedValList currentReadOnly False
+        pure . bool id (pushSender from) shouldPushSender $ runFallbackCall
+
   f <- (nullifyRefs =<<) <$> case (lookupFunction functionName', fnCalltype) of
       -- Standard contract call
       -- (Just theFunction, _)
@@ -521,10 +571,7 @@ call' from to' fnCalltype functionName valList = do
             pure . bool id (pushSender from) shouldPushSender $
               runTheCallValidated validation storageAddress codeAddress contract functionName' hsh cc theFunction' resolvedValList currentReadOnly False
           _ -> case lookupFunction "fallback" of
-            Just fallbackFunc -> do
-              resolvedValList <- resolveArgs shouldPushSender fallbackFunc valList
-              pure . bool id (pushSender from) shouldPushSender $
-                runTheCall storageAddress codeAddress contract functionName' hsh cc fallbackFunc resolvedValList currentReadOnly False
+            Just fallbackFunc -> runFallback fallbackFunc functionName'
             _ -> unknownFunction "logFunctionCall" (functionName, valList) -- contract ^. CC.contractName)
       -- Maybe the function is actually a getter
       _ -> case M.lookup functionName $ contract ^. CC.storageDefs of
@@ -575,10 +622,7 @@ call' from to' fnCalltype functionName valList = do
                 SVMType.UnknownLabel s -> (<|>) <$> handleStruct s path <*> handleSimple path
                 _ -> handleSimple path
         _ -> case lookupFunction "fallback" of
-          Just fallbackFunc -> do
-            resolvedValList <- resolveArgs shouldPushSender fallbackFunc valList
-            pure . bool id (pushSender from) shouldPushSender $
-              runTheCall storageAddress codeAddress contract functionName hsh cc fallbackFunc resolvedValList currentReadOnly False
+          Just fallbackFunc -> runFallback fallbackFunc functionName
           _ -> unknownFunction "logFunctionCall" (functionName, "asdf5" :: String) -- ^. CC.contractName)
 
   when (fnCalltype == CC.DelegateCall) $
@@ -593,6 +637,56 @@ call' from to' fnCalltype functionName valList = do
         SAddress a _ -> Just $ MS.Index $ BC.pack $ show a
         SBool b -> Just $ MS.Index $ bool "false" "true" b
         _ -> Nothing
+
+isCanonicalProxyFallback :: CC.Contract -> CC.Func -> Bool
+isCanonicalProxyFallback contract fallbackFunc =
+  hasLogicContract && hasVariadicArgs && hasCanonicalBody
+  where
+    hasLogicContract = case M.lookup "logicContract" $ contract ^. CC.storageDefs of
+      Just CC.VariableDecl {_varType = SVMType.Address {}} -> True
+      Just CC.VariableDecl {_varType = SVMType.Contract {}} -> True
+      _ -> False
+    hasVariadicArgs = case fallbackFunc ^. CC.funcArgs of
+      [(Just "args", CC.IndexedType _ SVMType.Variadic _)] -> True
+      _ -> False
+    hasCanonicalBody = case fallbackFunc ^. CC.funcContents of
+      Just
+        [ CC.Return
+            ( Just
+                ( CC.FunctionCall
+                    _
+                    (CC.MemberAccess _ (CC.Variable _ "logicContract") "delegatecall")
+                    [ CC.MemberAccess _ (CC.Variable _ "msg") "sig",
+                      CC.Variable _ "args"
+                    ]
+                )
+            )
+            _
+          ] -> True
+      _ -> False
+
+runCanonicalProxyFallback ::
+  MonadSM m =>
+  Address ->
+  Address ->
+  CC.Contract ->
+  SolidString ->
+  Keccak256 ->
+  CC.CodeCollection ->
+  Bool ->
+  ValList ->
+  m (Maybe Value)
+runCanonicalProxyFallback storageAddress codeAddress contract functionName hsh cc ro args = do
+  decrementGas 5
+  let logicPath = MS.singleton "logicContract"
+  logicContract <- getStorageValue storageAddress logicPath
+  implementation <- case logicContract of
+    SAddress address _ -> pure address
+    SContract _ address -> pure address
+    value -> typeError "Proxy logicContract is not an address" $ show value
+  let !_ = noteIRDecision $ "fast-proxy " ++ labelToString functionName
+  withCallInfo storageAddress codeAddress contract functionName hsh cc M.empty ro False $
+    callWithResult storageAddress implementation CC.DelegateCall functionName args
 
 callWithResult :: MonadSM m => Address -> Address -> CC.FunctionCallType -> SolidString -> ValList -> m (Maybe Value)
 callWithResult from to fnCalltype functionName valList = call' from to fnCalltype functionName valList
@@ -616,6 +710,145 @@ logFunctionCall args address contract functionName f = do
     liftIO $ putStrLn $ box ["returning from " ++ labelToString functionName ++ ":", resultString]
 
   return result
+
+-- | Decode the conservative subset of transaction-argument literals emitted
+-- by the API marshaler without building an annotated Solidity expression tree
+-- and immediately interpreting it back into a 'Value'. Unsupported or
+-- hand-written forms return 'Nothing' and take the authoritative parser path.
+-- The fast path is deliberately all-or-nothing at each transaction call site.
+parseTransactionArgValueFast :: Text -> Maybe Value
+parseTransactionArgValueFast raw =
+  let input = T.strip raw
+   in parseCast input
+        <|> parseBool input
+        <|> parseHexArg input
+        <|> parseArray input
+        <|> parseQuotedAddressOrString input
+        <|> (SInteger <$> parseInteger input)
+        <|> (SDecimal <$> parseDecimal input)
+  where
+    parseCast input =
+      asum
+        [ SString <$> (castInner "string" input >>= parseQuoted),
+          do
+            inner <- castInner "address" input
+            addressText <- parseQuoted inner <|> pure (T.unpack $ T.strip inner)
+            SAddress <$> readMaybe addressText <*> pure False,
+          SInteger <$> (castInner "uint" input >>= parseInteger),
+          SInteger <$> (castInner "int" input >>= parseInteger),
+          SBool <$> (castInner "bool" input >>= parseBoolValue),
+          SDecimal <$> (castInner "decimal" input >>= parseDecimalCast),
+          SBytes <$> (castInner "bytes" input >>= parseQuotedText >>= decodeHex)
+        ]
+
+    parseBool "true" = Just $ SBool True
+    parseBool "false" = Just $ SBool False
+    parseBool _ = Nothing
+
+    parseBoolValue "true" = Just True
+    parseBoolValue "false" = Just False
+    parseBoolValue _ = Nothing
+
+    parseHexArg input = do
+      inner <- T.stripSuffix "\"" =<< T.stripPrefix "hex\"" input
+      SBytes <$> decodeHex inner
+
+    parseArray input = do
+      inner <- T.stripSuffix "]" =<< T.stripPrefix "[" input
+      pieces <- splitTopLevelCommas inner
+      values <- traverse parseTransactionArgValueFast pieces
+      pure . SArray . V.fromList $ Constant <$> values
+
+    parseQuotedAddressOrString input = do
+      value <- parseQuoted input
+      pure $ maybe (SString value) (`SAddress` False) (readMaybe value)
+
+    parseDecimalCast input = do
+      decimalText <- maybe (T.strip input) T.pack <$> optional (parseQuoted input)
+      parseDecimal decimalText <|> (fromInteger <$> parseInteger decimalText)
+
+    parseDecimal :: Text -> Maybe Decimal
+    parseDecimal input = do
+      let (whole, fractionWithDot) = T.breakOn "." input
+          fraction = T.drop 1 fractionWithDot
+      guard $ not (T.null fractionWithDot) && not (T.null fraction)
+      guard $ T.all isDigit fraction
+      void $ parseInteger whole
+      readMaybe $ T.unpack input
+
+    parseInteger :: Text -> Maybe Integer
+    parseInteger input = case TR.signed TR.decimal input of
+      Right (value, rest) | T.null rest -> Just value
+      _ -> Nothing
+
+    parseQuotedText input = T.pack <$> parseQuoted input
+
+    parseQuoted input = do
+      inner <- T.stripSuffix "\"" =<< T.stripPrefix "\"" (T.strip input)
+      decodeMarshaledString $ T.unpack inner
+
+    castInner name input =
+      T.strip <$> (T.stripSuffix ")" =<< T.stripPrefix (name <> "(") input)
+
+    decodeHex input = either (const Nothing) Just . B16.decode $ DT.encodeUtf8 input
+
+-- The transaction marshaler escapes only backslashes and double quotes. Any
+-- other escape is left to the full Solidity lexer so this optimization cannot
+-- silently broaden or alter legacy syntax.
+decodeMarshaledString :: String -> Maybe String
+decodeMarshaledString = go
+  where
+    go [] = Just []
+    go ('\\' : '\\' : rest) = ('\\' :) <$> go rest
+    go ('\\' : '"' : rest) = ('"' :) <$> go rest
+    go ('\\' : _) = Nothing
+    go ('"' : _) = Nothing
+    go (char : rest) = (char :) <$> go rest
+
+-- Split an array literal while respecting nested arrays, cast parentheses and
+-- quoted commas. Object literals are intentionally unsupported and force the
+-- original parser for the whole argument list.
+splitTopLevelCommas :: Text -> Maybe [Text]
+splitTopLevelCommas input
+  | T.null (T.strip input) = Just []
+  | otherwise = go [] [] 0 0 False False $ T.unpack input
+  where
+    go :: [Text] -> String -> Int -> Int -> Bool -> Bool -> String -> Maybe [Text]
+    go chunks current squareDepth parenDepth quoted escaped remaining =
+      case remaining of
+        [] -> do
+          guard $ squareDepth == 0 && parenDepth == 0 && not quoted && not escaped
+          piece <- finish current
+          pure . reverse $ piece : chunks
+        char : rest
+          | quoted ->
+              if escaped
+                then go chunks (char : current) squareDepth parenDepth True False rest
+                else case char of
+                  '\\' -> go chunks (char : current) squareDepth parenDepth True True rest
+                  '"' -> go chunks (char : current) squareDepth parenDepth False False rest
+                  _ -> go chunks (char : current) squareDepth parenDepth True False rest
+          | otherwise -> case char of
+              '"' -> go chunks (char : current) squareDepth parenDepth True False rest
+              '[' -> go chunks (char : current) (squareDepth + 1) parenDepth False False rest
+              ']' -> do
+                guard $ squareDepth > 0
+                go chunks (char : current) (squareDepth - 1) parenDepth False False rest
+              '(' -> go chunks (char : current) squareDepth (parenDepth + 1) False False rest
+              ')' -> do
+                guard $ parenDepth > 0
+                go chunks (char : current) squareDepth (parenDepth - 1) False False rest
+              '{' -> Nothing
+              '}' -> Nothing
+              ','
+                | squareDepth == 0 && parenDepth == 0 -> do
+                    piece <- finish current
+                    go (piece : chunks) [] squareDepth parenDepth False False rest
+              _ -> go chunks (char : current) squareDepth parenDepth False False rest
+
+    finish current =
+      let piece = T.strip . T.pack $ reverse current
+       in piece <$ guard (not $ T.null piece)
 
 argsToVals :: MonadSM m => CC.ArgList -> m ValList
 argsToVals args = do
@@ -643,14 +876,18 @@ zipStructFields ((name, _, _) : rest) (v : vs) = (name, v) : zipStructFields res
 zipStructFields _ [] = []
 
 runModifiersAndStatements :: MonadSM m => [[CC.Statement]] -> [CC.Statement] -> m (Maybe Value)
-runModifiersAndStatements []   stmts = runStatementBlock stmts
-runModifiersAndStatements mods stmts = withLocalVars $ go mods
+runModifiersAndStatements mods stmts =
+  runModifiersAndAction mods (runStatementBlock stmts)
+
+runModifiersAndAction :: MonadSM m => [[CC.Statement]] -> m (Maybe Value) -> m (Maybe Value)
+runModifiersAndAction [] bodyAction = bodyAction
+runModifiersAndAction mods bodyAction = withLocalVars $ go mods
   where go [] = pure Nothing
         go (ss:rest) = do
           (mv, ss') <- runStatements ss
           case mv of
             Just SContinue -> do
-              mv1 <- runModifiersAndStatements rest stmts
+              mv1 <- runModifiersAndAction rest bodyAction
               mv2 <- go $ ss':rest
               pure $ mv2 <|> mv1
             _ -> pure mv
@@ -684,11 +921,34 @@ runStatements (s : rest) = do
     liftIO $ putStrLn $ C.green $ labelToString funcName ++ "> " ++ unparseStatement s
 
   decrementGas 1
-  ret <- runStatement s
+  let (callPhase, creationPhase) = statementProfilePhases s
+  ret <- profileRunCodeStatementChild callPhase creationPhase $ runStatement s
 
   case ret of
     Nothing -> runStatements rest
     v -> return (v, rest)
+
+statementProfilePhases :: CC.Statement -> (Phase, Phase)
+statementProfilePhases stmt = case stmt of
+  CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" _ _)) _ ->
+    (RunCodeCallStatementAssignment, RunCodeCreationStatementAssignment)
+  CC.SimpleStatement (CC.VariableDefinition _ _) _ ->
+    (RunCodeCallStatementVariableDefinition, RunCodeCreationStatementVariableDefinition)
+  CC.SimpleStatement (CC.ExpressionStatement _) _ ->
+    (RunCodeCallStatementExpression, RunCodeCreationStatementExpression)
+  CC.IfStatement{} -> controlFlow
+  CC.WhileStatement{} -> controlFlow
+  CC.ForStatement{} -> controlFlow
+  CC.DoWhileStatement{} -> controlFlow
+  CC.Continue{} -> controlFlow
+  CC.Break{} -> controlFlow
+  CC.Return{} -> controlFlow
+  CC.SolidityTryCatchStatement{} -> controlFlow
+  CC.TryCatchStatement{} -> controlFlow
+  _ -> (RunCodeCallStatementOther, RunCodeCreationStatementOther)
+  where
+    controlFlow =
+      (RunCodeCallStatementControlFlow, RunCodeCreationStatementControlFlow)
 
 runStatement :: MonadSM m => CC.Statement -> m (Maybe Value)
 runStatement (CC.RevertStatement mString theArgs pos) = do
@@ -1092,12 +1352,101 @@ expToPath (CC.MemberAccess _ parent field) = do
   return . MS.snoc apt . MS.Field $ BC.pack $ labelToString field
 expToPath x = todo "expToPath/unhandled" x
 
+-- Compound storage values are represented by their leaf cells; a struct's
+-- parent path has no value of its own. Recover the static type of a reference
+-- from the contract storage schema so member access can extend proven struct
+-- references without performing a redundant read of that parent path.
+storageReferenceType :: CC.Contract -> CC.CodeCollection -> MS.StoragePath -> Maybe SVMType.Type
+storageReferenceType contract cc (MS.StoragePath pieces) =
+  case pieces of
+    MS.Field root : rest -> do
+      CC.VariableDecl {_varType = rootType} <-
+        M.lookup (stringToLabel $ BC.unpack root) (contract ^. CC.storageDefs)
+      foldM descend rootType rest
+    _ -> Nothing
+  where
+    descend typ piece =
+      case (unwrapUserDefined typ, piece) of
+        (SVMType.Mapping {SVMType.value = valueType}, MS.Index _) -> Just valueType
+        (SVMType.Array {SVMType.entry = entryType}, MS.Index _) -> Just entryType
+        (SVMType.Struct {SVMType.typedef = structName}, MS.Field field) ->
+          structFieldType structName field
+        (SVMType.UnknownLabel structName, MS.Field field) ->
+          structFieldType structName field
+        _ -> Nothing
+
+    unwrapUserDefined (SVMType.UserDefined {SVMType.actual = actualType}) =
+      unwrapUserDefined actualType
+    unwrapUserDefined typ = typ
+
+    structFieldType structName field = do
+      fields <- CC.structDef contract cc structName
+      (_, fieldType, _) <-
+        find ((== stringToLabel (BC.unpack field)) . \(name, _, _) -> name) fields
+      pure $ CC.fieldTypeType fieldType
+
+isStructStorageReference :: MonadSM m => MS.StoragePath -> m Bool
+isStructStorageReference path = do
+  callInfo <- getCurrentCallInfo
+  let contract = currentContract callInfo
+      cc = codeCollection callInfo
+      isStructType = \case
+        SVMType.Struct{} -> True
+        SVMType.UnknownLabel name -> isJust $ CC.structDef contract cc name
+        SVMType.UserDefined {SVMType.actual = actualType} -> isStructType actualType
+        _ -> False
+  pure . maybe False isStructType $ storageReferenceType contract cc path
+
 expToVar :: MonadSM m => CC.Expression -> m Variable
 expToVar x = do
+  let (callPhase, creationPhase) = expressionProfilePhases x
+  profileRunCodeStatementChild callPhase creationPhase $ do
   -- liftIO $ putStrLn $ C.cyan $ "expToVar: " ++ show x
-  v <- expToVar' x
-  decrementGas 1
-  return v
+    v <- expToVar' x
+    decrementGas 1
+    return v
+
+fastPureIntegerArg :: Value -> Maybe Integer
+fastPureIntegerArg (SInteger n) = Just n
+fastPureIntegerArg (SBool True) = Just 1
+fastPureIntegerArg (SBool False) = Just 0
+fastPureIntegerArg (SAddress a _) = Just (toInteger a)
+fastPureIntegerArg _ = Nothing
+
+fastIRArg :: MonadSM m => Value -> m (Maybe FastValue)
+fastIRArg (SArray values) = do
+  scalarValues <- traverse (fmap fastPureIntegerArg . getVar) (V.toList values)
+  case sequence scalarValues of
+    Just values' -> pure . Just $ FastArray values'
+    Nothing -> FastOpaque . SArray . V.fromList . map Constant <$> traverse getVar (V.toList values) >>= pure . Just
+fastIRArg value = pure . Just $ maybe (FastOpaque value) FastScalar (fastPureIntegerArg value)
+
+expressionProfilePhases :: CC.Expression -> (Phase, Phase)
+expressionProfilePhases expr = case expr of
+  CC.Variable{} -> variable
+  CC.BoolLiteral{} -> literalPhases
+  CC.NumberLiteral{} -> literalPhases
+  CC.DecimalLiteral{} -> literalPhases
+  CC.StringLiteral{} -> literalPhases
+  CC.AddressLiteral{} -> literalPhases
+  CC.HexaLiteral{} -> literalPhases
+  CC.IndexAccess{} -> indexMember
+  CC.MemberAccess{} -> indexMember
+  CC.FunctionCall{} -> functionCallPhases
+  CC.PlusPlus{} -> operator
+  CC.MinusMinus{} -> operator
+  CC.Unitary{} -> operator
+  CC.Binary{} -> operator
+  CC.Ternary{} -> operator
+  CC.InlineBoundsCheck{} -> operator
+  _ -> aggregateOther
+  where
+    variable = (RunCodeCallExpressionVariable, RunCodeCreationExpressionVariable)
+    literalPhases = (RunCodeCallExpressionLiteral, RunCodeCreationExpressionLiteral)
+    indexMember = (RunCodeCallExpressionIndexMember, RunCodeCreationExpressionIndexMember)
+    functionCallPhases = (RunCodeCallExpressionFunctionCall, RunCodeCreationExpressionFunctionCall)
+    operator = (RunCodeCallExpressionOperator, RunCodeCreationExpressionOperator)
+    aggregateOther = (RunCodeCallExpressionAggregateOther, RunCodeCreationExpressionAggregateOther)
 
 decrementGas :: MonadSM m => Gas -> m ()
 decrementGas !gas = do
@@ -1219,107 +1568,116 @@ expToVar' (CC.MemberAccess _ (CC.Variable _ "string") "concat") = do
   return $ Constant $ SStringConcat
 expToVar' x@(CC.MemberAccess _ expr name) = do
   var <- expToVar expr
-  val <- getVar var
-  case (val, name) of
-    (SEnum enumName, _) -> do
-      contract' <- getCurrentContract
-      let maybeEnumValues = M.lookup enumName $ contract' ^. CC.enums
-      case maybeEnumValues of
-        Nothing -> do
-          cc <- getCurrentCodeCollection
-          let maybeEnumValues' = M.lookup enumName $ (snd cc) ^. CC.flEnums
-              !enumVals' = fromMaybe (missingType "Enum nonexistent type" enumName) maybeEnumValues'
-              !num' = maybe (missingType "Enum nonexistent member" (enumName, name)) fromIntegral (name `elemIndex` fst enumVals')
-          return $ Constant $ SEnumVal enumName name num'
-        Just enumVals -> do
-          let !num = maybe (missingType "Enum nonexistent member" (enumName, name)) fromIntegral (name `elemIndex` fst enumVals)
-          return $ Constant $ SEnumVal enumName name num
-    (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAddress) False) . Env.sender) <$> getEnv
-    (SBuiltinVariable "msg", "data") -> do
-      contract' <- getCurrentContract
-      functionName <- getCurrentFunctionName
-      callInfo <- getCurrentCallInfo
-      let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
-          localVars = NE.head $ localVariables callInfo
-      argVals <- forM argList (\(n, _) -> getVar $ localVars M.! (fromMaybe "" n))
-      return . Constant $ SVariadic argVals
-    (SBuiltinVariable "msg", "sig") -> do
-      functionName <- getCurrentFunctionName
-      return . Constant $ SString functionName
-    (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAddress) False) . Env.origin) <$> getEnv
-    (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
-      Nothing -> missingField "struct member access" fieldName
-      Just v -> return v
-    (SContractDef contractName', constName) -> do
-      --TODO- move all variable name resolution by contract to a function
-      (_, cc) <- getCurrentCodeCollection
-      cont <- case M.lookup contractName' $ cc ^. CC.contracts of
-        Nothing -> missingType "contract function lookup" contractName'
-        Just ct -> pure ct
-      case constName `M.lookup` CC._functions cont of
-        Just _ -> return $ Constant . SFunction constName $ Just cont
-        Nothing -> case constName `M.lookup` CC._constants cont of
-          Nothing -> case constName `M.lookup` (cc ^. CC.flConstants) of
-            Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
-            Nothing -> case constName `M.lookup` CC._structs cont of
-              Just _ -> pure . Constant $ SStructDef constName
-              Nothing -> case constName `M.lookup` CC._storageDefs cont of
-                Just _ -> do
-                  -- Storage variables from parent contracts are stored in the current contract
-                  return . Constant . SReference $ MS.singleton $ BC.pack $ labelToString constName
-                Nothing -> unknownConstant "member access" (labelToString contractName' ++ "." ++ labelToString constName)
-          Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
-    (SBuiltinVariable "block", "proposer") -> do
-      env' <- getEnv
-      let acc = Env.proposer env'
-      return $ Constant (flip SAddress False acc)
-    (SBuiltinVariable "block", "timestamp") -> do
-      env' <- getEnv
-      let baseTimestamp = utcTimeToPOSIXSeconds $ BlockHeader.timestamp $ Env.blockHeader env'
-      return $ Constant $ SInteger $ round baseTimestamp
-    (SBuiltinVariable "block", "number") -> (Constant . SInteger . BlockHeader.number . Env.blockHeader) <$> getEnv
-    (SBuiltinVariable "block", "coinbase") -> Constant . flip SAddress False . Env.proposer <$> getEnv
-    (SBuiltinVariable "block", "prevProposer") -> Constant . flip SAddress False . pfProposer <$> getPrevBlockFacts
-    (SBuiltinVariable "block", "prevIntendedProposer") -> Constant . flip SAddress False . pfIntendedProposer <$> getPrevBlockFacts
-    (SBuiltinVariable "block", "prevRound") -> Constant . SInteger . pfRound <$> getPrevBlockFacts
-    (SBuiltinVariable "block", "difficulty") ->
-      (Constant . SInteger . BlockHeader.difficulty . Env.blockHeader) <$> getEnv
-    (SBuiltinVariable "block", "gaslimit") ->
-      (Constant . SInteger . BlockHeader.gasLimit . Env.blockHeader) <$> getEnv
-    (SBuiltinVariable "block", "chainid") ->
-      return $ Constant $ SInteger (Conf.networkID (networkConfig ethConf))
-    (SBuiltinVariable "abi", "encode") -> return $ Constant $ SFunction "abiEncode" Nothing
-    (SBuiltinVariable "abi", "decode") -> return $ Constant $ SFunction "abiDecode" Nothing
-    (SBuiltinVariable "abi", "encodePacked") -> return $ Constant $ SFunction "abiEncodePacked" Nothing
-    (SBuiltinVariable "super", method) -> do
-      ctract <- getCurrentContract
-      (_, cc) <- getCurrentCodeCollection
-      let parents' = either (throw . fst) id $ CC.getParents cc ctract
-      case filter (elem method . M.keys . CC._functions) parents' of
-        [] -> typeError "cannot use super without a parent contract" $ show (method, ctract)
-        (p:_) -> case M.lookup method $ CC._functions p of
-          Nothing -> internalError (concat
-            [ "Haskell has duped us - could not find "
-            , method
-            , " inside parent contract: "
-            ]) (p ^. CC.functions)
-          Just _ -> pure . Constant . SFunction method $ Just p
-    (SAddress a _, n) -> evaluateAddressMember a False n
-    (SContractItem a _, n) -> evaluateAddressMember a False n
-    (SContract _ a, n) -> evaluateAddressMember a True n
-    (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
-    (a@(SArray _), "push") -> return $ Constant $ SPush a (Just var)
-    (SNULL, "push") -> case var of
-      Constant r -> pure . Constant $ SPush r Nothing
-      _ -> pure . Constant $ SPush (SArray V.empty) (Just var)
-    (SArray theVector, "length") -> return $ Constant $ SInteger $ fromIntegral $ V.length theVector
-    (SString s, "length") -> return . Constant . SInteger . fromIntegral $ length s
-    (SBytes bs, "length") -> return . Constant . SInteger . fromIntegral $ B.length bs
-    (SNULL, "length") -> return . Constant $ SInteger 0
-    (SReference p, itemName) -> return . Constant . SReference $ MS.snoc p $ MS.Field $ BC.pack $ labelToString itemName
-    ((SUserDefined alias notSure actualType), "wrap") -> return . Constant $ (SUserDefined alias notSure actualType) -- return $ Constant . SUserDefined alias val actualType
-    (SNULL, _) -> return $ Constant SNULL
-    m -> typeError ("illegal member access: " ++ (unparseExpression x)) ("parsed as " ++ show m ++ "with full exp" ++ show x)
+  directStructMember <- case var of
+    Constant (SReference path) -> isStructStorageReference path
+    _ -> pure False
+  if directStructMember
+    then case var of
+      Constant (SReference path) ->
+        pure . Constant . SReference $ MS.snoc path (MS.Field $ BC.pack $ labelToString name)
+      _ -> internalError "typed storage reference changed during member access" x
+    else do
+      val <- getVar var
+      case (val, name) of
+        (SEnum enumName, _) -> do
+          contract' <- getCurrentContract
+          let maybeEnumValues = M.lookup enumName $ contract' ^. CC.enums
+          case maybeEnumValues of
+            Nothing -> do
+              cc <- getCurrentCodeCollection
+              let maybeEnumValues' = M.lookup enumName $ (snd cc) ^. CC.flEnums
+                  !enumVals' = fromMaybe (missingType "Enum nonexistent type" enumName) maybeEnumValues'
+                  !num' = maybe (missingType "Enum nonexistent member" (enumName, name)) fromIntegral (name `elemIndex` fst enumVals')
+              return $ Constant $ SEnumVal enumName name num'
+            Just enumVals -> do
+              let !num = maybe (missingType "Enum nonexistent member" (enumName, name)) fromIntegral (name `elemIndex` fst enumVals)
+              return $ Constant $ SEnumVal enumName name num
+        (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAddress) False) . Env.sender) <$> getEnv
+        (SBuiltinVariable "msg", "data") -> do
+          contract' <- getCurrentContract
+          functionName <- getCurrentFunctionName
+          callInfo <- getCurrentCallInfo
+          let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
+              localVars = NE.head $ localVariables callInfo
+          argVals <- forM argList (\(n, _) -> getVar $ localVars M.! (fromMaybe "" n))
+          return . Constant $ SVariadic argVals
+        (SBuiltinVariable "msg", "sig") -> do
+          functionName <- getCurrentFunctionName
+          return . Constant $ SString functionName
+        (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAddress) False) . Env.origin) <$> getEnv
+        (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
+          Nothing -> missingField "struct member access" fieldName
+          Just v -> return v
+        (SContractDef contractName', constName) -> do
+          --TODO- move all variable name resolution by contract to a function
+          (_, cc) <- getCurrentCodeCollection
+          cont <- case M.lookup contractName' $ cc ^. CC.contracts of
+            Nothing -> missingType "contract function lookup" contractName'
+            Just ct -> pure ct
+          case constName `M.lookup` CC._functions cont of
+            Just _ -> return $ Constant . SFunction constName $ Just cont
+            Nothing -> case constName `M.lookup` CC._constants cont of
+              Nothing -> case constName `M.lookup` (cc ^. CC.flConstants) of
+                Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
+                Nothing -> case constName `M.lookup` CC._structs cont of
+                  Just _ -> pure . Constant $ SStructDef constName
+                  Nothing -> case constName `M.lookup` CC._storageDefs cont of
+                    Just _ -> do
+                      -- Storage variables from parent contracts are stored in the current contract
+                      return . Constant . SReference $ MS.singleton $ BC.pack $ labelToString constName
+                    Nothing -> unknownConstant "member access" (labelToString contractName' ++ "." ++ labelToString constName)
+              Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
+        (SBuiltinVariable "block", "proposer") -> do
+          env' <- getEnv
+          let acc = Env.proposer env'
+          return $ Constant (flip SAddress False acc)
+        (SBuiltinVariable "block", "timestamp") -> do
+          env' <- getEnv
+          let baseTimestamp = utcTimeToPOSIXSeconds $ BlockHeader.timestamp $ Env.blockHeader env'
+          return $ Constant $ SInteger $ round baseTimestamp
+        (SBuiltinVariable "block", "number") -> (Constant . SInteger . BlockHeader.number . Env.blockHeader) <$> getEnv
+        (SBuiltinVariable "block", "coinbase") -> Constant . flip SAddress False . Env.proposer <$> getEnv
+        (SBuiltinVariable "block", "prevProposer") -> Constant . flip SAddress False . pfProposer <$> getPrevBlockFacts
+        (SBuiltinVariable "block", "prevIntendedProposer") -> Constant . flip SAddress False . pfIntendedProposer <$> getPrevBlockFacts
+        (SBuiltinVariable "block", "prevRound") -> Constant . SInteger . pfRound <$> getPrevBlockFacts
+        (SBuiltinVariable "block", "difficulty") ->
+          (Constant . SInteger . BlockHeader.difficulty . Env.blockHeader) <$> getEnv
+        (SBuiltinVariable "block", "gaslimit") ->
+          (Constant . SInteger . BlockHeader.gasLimit . Env.blockHeader) <$> getEnv
+        (SBuiltinVariable "block", "chainid") ->
+          return $ Constant $ SInteger (Conf.networkID (networkConfig ethConf))
+        (SBuiltinVariable "abi", "encode") -> return $ Constant $ SFunction "abiEncode" Nothing
+        (SBuiltinVariable "abi", "decode") -> return $ Constant $ SFunction "abiDecode" Nothing
+        (SBuiltinVariable "abi", "encodePacked") -> return $ Constant $ SFunction "abiEncodePacked" Nothing
+        (SBuiltinVariable "super", method) -> do
+          ctract <- getCurrentContract
+          (_, cc) <- getCurrentCodeCollection
+          let parents' = either (throw . fst) id $ CC.getParents cc ctract
+          case filter (elem method . M.keys . CC._functions) parents' of
+            [] -> typeError "cannot use super without a parent contract" $ show (method, ctract)
+            (p:_) -> case M.lookup method $ CC._functions p of
+              Nothing -> internalError (concat
+                [ "Haskell has duped us - could not find "
+                , method
+                , " inside parent contract: "
+                ]) (p ^. CC.functions)
+              Just _ -> pure . Constant . SFunction method $ Just p
+        (SAddress a _, n) -> evaluateAddressMember a False n
+        (SContractItem a _, n) -> evaluateAddressMember a False n
+        (SContract _ a, n) -> evaluateAddressMember a True n
+        (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
+        (a@(SArray _), "push") -> return $ Constant $ SPush a (Just var)
+        (SNULL, "push") -> case var of
+          Constant r -> pure . Constant $ SPush r Nothing
+          _ -> pure . Constant $ SPush (SArray V.empty) (Just var)
+        (SArray theVector, "length") -> return $ Constant $ SInteger $ fromIntegral $ V.length theVector
+        (SString s, "length") -> return . Constant . SInteger . fromIntegral $ length s
+        (SBytes bs, "length") -> return . Constant . SInteger . fromIntegral $ B.length bs
+        (SNULL, "length") -> return . Constant $ SInteger 0
+        (SReference p, itemName) -> return . Constant . SReference $ MS.snoc p $ MS.Field $ BC.pack $ labelToString itemName
+        ((SUserDefined alias notSure actualType), "wrap") -> return . Constant $ (SUserDefined alias notSure actualType) -- return $ Constant . SUserDefined alias val actualType
+        (SNULL, _) -> return $ Constant SNULL
+        m -> typeError ("illegal member access: " ++ (unparseExpression x)) ("parsed as " ++ show m ++ "with full exp" ++ show x)
 expToVar' x@(CC.IndexAccess _ _ (Nothing)) = missingField "index value cannot be empty" (unparseExpression x)
 -- TODO(tim): When this is a string constant, we can index into the string directly for SInteger
 expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
@@ -1546,13 +1904,20 @@ expToVar' (CC.FunctionCall _ e args) = do
       -- This avoids double-evaluation which could cause side effects
       argVarsRaw <- traverse expToVar args
       argVals <- argsToValsFromVars argVarsRaw
+      -- Scalar arguments are copied into callee variables, so only composite
+      -- memory arguments need their caller Variables for pass-by-reference.
       -- Helium network ID = 114784819836269
       -- Pass-by-reference for memory arrays/structs is only enabled after fork block on helium
       -- Set to high value until network upgrade is coordinated
-      currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
-      let heliumPassByRefForkBlock = 33918 :: Integer
-      let passByRefEnabled = not (Conf.networkID (networkConfig ethConf) == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
-      let argVars = if passByRefEnabled then argVarsRaw else []
+      let hasMemoryComposite = any (\case SArray {} -> True; SStruct {} -> True; _ -> False) argVals
+      argVars <-
+        if not hasMemoryComposite
+          then pure []
+          else do
+            currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
+            let heliumPassByRefForkBlock = 33918 :: Integer
+                passByRefEnabled = not (Conf.networkID (networkConfig ethConf) == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
+            pure $ if passByRefEnabled then argVarsRaw else []
       case e of -- FunctionCall Special Case when calling a function via Member Access
         (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall e argVals argVars Nothing --Because of the hardcoded Util functions
         (CC.MemberAccess ctx' expr name) -> do
@@ -1664,15 +2029,15 @@ expToVar' (CC.FunctionCall _ e args) = do
                 Just func -> if (CC._funcIsFree func)
                   then do
                     validateFunctionArguments cc contract' func argVals >>= \case
-                      Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars (validatedCallMode func argVals') ro True
+                      Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars (validatedInternalCallMode cc contract' funcName func mo argVals') ro True
                       Nothing -> runTheCallWithVars address codeAddr contract' funcName hsh cc func argVals argVars NeedsValidation ro True
                   else do
                     validateFunctionArguments cc contract' func argVals >>= \case
-                      Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars (validatedCallMode func argVals') ro False
+                      Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars (validatedInternalCallMode cc contract' funcName func mo argVals') ro False
                       Nothing -> case M.lookup funcName $ cc ^. CC.flFuncs of
                         Just ff -> do
                           validateFunctionArguments cc contract' ff argVals >>= \case
-                            Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars (validatedCallMode ff argVals') ro True
+                            Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars (validatedInternalCallMode cc contract' funcName ff mo argVals') ro True
                             Nothing -> runTheCallWithVars address codeAddr contract' funcName hsh cc func argVals argVars NeedsValidation ro False
                         Nothing -> runTheCallWithVars address codeAddr contract' funcName hsh cc func argVals argVars NeedsValidation ro False
                 Nothing -> unknownFunction "regularFunctionCall/SFunction" funcName
@@ -2262,7 +2627,64 @@ callBuiltinFunction n args' = do
   let args = case reverse args' of
         SVariadic vs : rest -> reverse rest ++ vs
         _ -> args'
-  callBuiltin n args
+      (callPhase, creationPhase) =
+        if isCryptographicBuiltin n
+          then (RunCodeCallStatementCryptoBuiltin, RunCodeCreationStatementCryptoBuiltin)
+          else (RunCodeCallStatementOtherBuiltin, RunCodeCreationStatementOtherBuiltin)
+  profileRunCodeStatementChild callPhase creationPhase $ do
+    result <- callBuiltin n args
+    -- Pure builtins can return lazy Strings, ByteStrings, or aggregate values.
+    -- In detail mode, force the result while the builtin timer is active so
+    -- its real work is not charged later to interpreter/expression residual.
+    let !_ = if runCodeDetailEnabled then forceProfileValue result else ()
+    pure result
+
+forceProfileVariable :: Variable -> ()
+forceProfileVariable (Constant value) = forceProfileValue value
+forceProfileVariable variable = variable `seq` ()
+
+forceProfileValue :: Value -> ()
+forceProfileValue value = case value of
+  SInteger n -> n `seq` ()
+  SDecimal n -> n `seq` ()
+  SString s -> length s `seq` ()
+  SBool b -> b `seq` ()
+  SAddress address payable -> address `seq` payable `seq` ()
+  SUserDefined name typ inner -> name `seq` typ `seq` forceProfileValue inner
+  SEnum name -> name `seq` ()
+  SEnumVal typ name ordinal -> typ `seq` name `seq` ordinal `seq` ()
+  SStruct name fields -> name `seq` M.foldl' (\done var -> done `seq` forceProfileVariable var) () fields
+  STuple values -> V.foldl' (\done var -> done `seq` forceProfileVariable var) () values
+  SArray values -> V.foldl' (\done var -> done `seq` forceProfileVariable var) () values
+  SMap values -> M.foldlWithKey' (\done key var -> done `seq` forceProfileValue key `seq` forceProfileVariable var) () values
+  SSetterGetter name inner -> length name `seq` maybe () forceProfileValue inner
+  SPush inner var -> forceProfileValue inner `seq` maybe () forceProfileVariable var
+  SBytes bytes -> B.length bytes `seq` ()
+  SVariadic values -> foldl' (\done inner -> done `seq` forceProfileValue inner) () values
+  _ -> value `seq` ()
+
+isCryptographicBuiltin :: SolidString -> Bool
+isCryptographicBuiltin name =
+  "bls12381" `isPrefixOf` name
+    || name
+      `elem` [ "keccak256",
+               "sha256",
+               "ripemd160",
+               "ecrecover",
+               "verifyP256",
+               "modExp",
+               "ecAdd",
+               "ecMul",
+               "ecPairing",
+               "poseidon",
+               "poseidon2",
+               "poseidon2Compress",
+               "poseidon2Permute",
+               "poseidon2Hash",
+               "poseidon2HashBytes",
+               "poseidon2gl",
+               "poseidon2glBytes"
+             ]
 
 -- | Charge for a Poseidon hash, then run it. Cost scales with the number
 -- of field elements absorbed; the arity bound is enforced after charging
@@ -2552,6 +2974,29 @@ callBuiltin name [arg]
             _ -> invalidArguments ("Could not convert to " ++ name) arg
 callBuiltin "decimal" args = return $ decimalBuiltin args
 callBuiltin "identity" [v] = return v
+callBuiltin "__solidvm_b16encode" [SBytes input] =
+  pure . SBytes $ B16.encode input
+callBuiltin "__solidvm_b16encode" args = typeError "b16encode" $ show args
+callBuiltin "__solidvm_b16decode" [SBytes input] =
+  let padded = if odd (B.length input) then B.cons 48 input else input
+   in case B16.decode padded of
+        Right decoded -> pure $ SBytes decoded
+        Left _ -> invalidArguments "b16decode: invalid hex string" input
+callBuiltin "__solidvm_b16decode" args = typeError "b16decode" $ show args
+callBuiltin "__solidvm_normalizeHex" [SString input] =
+  let hexPart = case input of
+        '0' : 'x' : rest -> rest
+        _ -> input
+      encoded = DT.encodeUtf8 $ T.pack hexPart
+      padded = if odd (B.length encoded) then B.cons 48 encoded else encoded
+   in case B16.decode padded of
+        Right decoded -> pure . SString $ "0x" ++ BC.unpack (B16.encode decoded)
+        Left _ -> invalidArguments "normalizeHex: invalid hex string" input
+callBuiltin "__solidvm_normalizeHex" args = typeError "normalizeHex" $ show args
+callBuiltin "__solidvm_length" [SString value] = pure . SInteger . fromIntegral $ length value
+callBuiltin "__solidvm_length" [SBytes value] = pure . SInteger . fromIntegral $ B.length value
+callBuiltin "__solidvm_length" [SArray value] = pure . SInteger . fromIntegral $ V.length value
+callBuiltin "__solidvm_length" args = typeError "length" $ show args
 callBuiltin "log" args = SNULL <$ traverse (liftIO . putStrLn <=< showSM) args
 callBuiltin "keccak256" [SBytes bs] = pure . SBytes . keccak256ToByteString $ hash bs
 callBuiltin "keccak256" args = pure . SString . keccak256ToHex . hash . rlpSerialize $ rlpEncodeValues args
@@ -2938,7 +3383,10 @@ runTheConstructors from to hsh cc contractName' argVals' = do
           Just cms -> pure cms
         -- let modifierArgs = map CC.modifierArgs theModifiers
         let !modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC._modifierContents m)) theModifiers
-        _ <- runModifiersAndStatements modContentsList commands
+        _ <- profileRunCodeStatement
+          RunCodeCallStatementExecution
+          RunCodeCreationStatementExecution $
+            runModifiersAndStatements modContentsList commands
         pure ()
       Nothing -> return ()
     addDelegatecall to hsh $ T.pack contractName'
@@ -3012,7 +3460,9 @@ resolveArgRefs ::
   [(Maybe SolidString, CC.IndexedType)] ->
   ValList ->
   m ValList
-resolveArgRefs src contract cc argDefs args =
+resolveArgRefs src contract cc argDefs args = profileRunCodeChild
+  RunCodeCallArgumentReferencePreparation
+  RunCodeCreationArgumentReferencePreparation $
   let go ts'@[(_, CC.IndexedType _ t@SVMType.Variadic _)] (v : vs') = (:) <$> resolveArgRef src contract cc t v <*> go ts' vs'
       go ((_, CC.IndexedType _ t _) : ts') (v : vs') = (:) <$> resolveArgRef src contract cc t v <*> go ts' vs'
       go _ vs' = pure vs'
@@ -3079,6 +3529,42 @@ validatedCallMode original vals
     isReference SReference{} = True
     isReference _ = False
 
+-- These exact library bodies already passed overload resolution immediately
+-- before entering this function.  Treat them as validated only when their
+-- structural IR matcher succeeds; that lets the existing host implementation
+-- run without weakening validation for any other internal call.
+validatedInternalCallMode ::
+  CC.CodeCollection ->
+  CC.Contract ->
+  SolidString ->
+  CC.Func ->
+  CC.Func ->
+  ValList ->
+  CallValidation
+validatedInternalCallMode cc contract' funcName original resolved vals
+  | canonicalOpaqueIRTarget cc contract' funcName resolved vals = AlreadyValidated
+  | otherwise = validatedCallMode original vals
+
+canonicalOpaqueIRTarget ::
+  CC.CodeCollection ->
+  CC.Contract ->
+  SolidString ->
+  CC.Func ->
+  ValList ->
+  Bool
+canonicalOpaqueIRTarget cc contract' funcName resolved vals =
+  isCanonicalOpaqueTarget
+    && not (any isReference vals)
+    && funcLowers cc contract' resolved
+  where
+    contractName = labelToString $ contract' ^. CC.contractName
+    functionName = labelToString funcName
+    isCanonicalOpaqueTarget =
+      (contractName == "StringUtils" && functionName == "normalizeHex")
+        || (contractName == "BytesUtils" && functionName `elem` ["b16encode", "b16decode"])
+    isReference SReference{} = True
+    isReference _ = False
+
 -- | Like runTheCall but accepts optional Variables for pass-by-reference semantics.
 -- For memory arrays/structs, if a Variable is provided, it's used directly instead
 -- of creating a new IORef wrapper. This allows modifications to propagate to caller.
@@ -3097,7 +3583,535 @@ runTheCallWithVars ::
   Bool ->
   Bool ->
   m (Maybe Value)
+-- Compact register execution for fully-lowered scalar frames. Anything that
+-- cannot be proven supported falls through to the consensus AST evaluator.
 runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVals' argVars validation ro ff = do
+  canonicalOwnerCatch <-
+    profileRunCodeChild
+      RunCodeCallOnlyOwnerGuard
+      RunCodeCreationOnlyOwnerGuard $
+        runCanonicalOnlyOwnerCatch address' contract' funcName theFunction argVals' ro
+  case canonicalOwnerCatch of
+    Just result -> pure result
+    Nothing -> do
+      disabled <- liftIO $ readIORef irDisabledRef
+      let fname = labelToString funcName
+          frameDisabled = irFrameDisabled (labelToString $ contract' ^. CC.contractName) fname
+          goInterpreted outcome = do
+            recordIRFrameOutcome outcome
+            profileRunCodeChild
+              RunCodeCallInterpretedFrame
+              RunCodeCreationInterpretedFrame $
+                runTheCallWithVarsInterpreted address' codeAddr contract' funcName hsh cc theFunction argVals' argVars validation ro ff
+      if Conf.svmTrace (Conf.debugConfig ethConf) || disabled || frameDisabled
+        then goInterpreted (IRMiss fname (if disabled || frameDisabled then WhyNoIRFlag else WhyGuard))
+        else case (validation, null argVars || canonicalOpaqueIRTarget cc contract' funcName theFunction argVals') of
+          (AlreadyValidated, True) ->
+            profileRunCodeChild
+              RunCodeCallFastIRGateExecution
+              RunCodeCreationFastIRGateExecution $ do
+                maybeFastArgs <- profileRunCodeChild
+                  RunCodeCallFastIRArgumentConversion
+                  RunCodeCreationFastIRArgumentConversion $
+                    sequence <$> traverse fastIRArg argVals'
+                case maybeFastArgs of
+                  Just fastArgs ->
+                    let scalarArgs = traverse (\case FastScalar n -> Just n; _ -> Nothing) fastArgs
+                     in profileRunCodeFunction
+                          ("FastIR.scalar." ++ labelToString (contract' ^. CC.contractName) ++ "." ++ fname)
+                          ( profileRunCodeChildForced
+                              RunCodeCallFastIRScalarExecution
+                              RunCodeCreationFastIRScalarExecution
+                              (pure $ scalarArgs >>= runAnyUIntIR cc contract' theFunction)
+                          ) >>= \case
+                      Just (values, cost) -> do
+                        recordIRFrameOutcome (IRHit fname cost False)
+                        decrementGas (Gas $ 5 + cost)
+                        pure $ packFastIRResult theFunction values
+                      Nothing -> do
+                        hooks <- storageHooks fname address' ro contract' cc
+                        profileRunCodeFunction
+                          ("FastIR.storage." ++ labelToString (contract' ^. CC.contractName) ++ "." ++ fname)
+                          ( profileRunCodeChildForced
+                              RunCodeCallFastIRStorageExecution
+                              RunCodeCreationFastIRStorageExecution
+                              (runAnyStorageIRArgs hooks cc contract' theFunction fastArgs)
+                          ) >>= \case
+                          Just (values, cost) -> do
+                            recordIRFrameOutcome (IRHit fname cost False)
+                            decrementGas (Gas $ 5 + cost)
+                            pure $ packFastIRStorageResult theFunction values
+                          Nothing -> do
+                            lowers <- profileRunCodeChild
+                              RunCodeCallFastIRFallbackProbe
+                              RunCodeCreationFastIRFallbackProbe $
+                                pure $! funcLowers cc contract' theFunction
+                            goInterpreted $
+                              if lowers then IRFallback fname else IRMiss fname WhyNoLower
+                  Nothing -> goInterpreted (IRMiss fname WhyGuard)
+          _ -> goInterpreted (IRMiss fname WhyGuard)
+
+-- Evaluation fast path for the canonical Ownable modifier bundled with the
+-- Helium contracts.  The ordinary evaluator first calls _checkOwner, throws,
+-- restores the call frame, and then evaluates this catch block.  When the
+-- exact modifier shape is present and the sender is already known not to be
+-- the owner, perform the same external governance call directly.  Any other
+-- modifier shape, owner call, or unexpected owner representation stays on the
+-- consensus evaluator.
+runCanonicalOnlyOwnerCatch ::
+  MonadSM m =>
+  Address ->
+  CC.Contract ->
+  SolidString ->
+  CC.Func ->
+  ValList ->
+  Bool ->
+  m (Maybe (Maybe Value))
+runCanonicalOnlyOwnerCatch address' contract' funcName theFunction argVals ro
+  | ro = pure Nothing
+  | not $ isCanonicalOnlyOwnerModifier contract' theFunction = pure Nothing
+  | otherwise = do
+      ownerValue <- getStorageValue address' $ MS.singleton "_owner"
+      currentSender <- Env.sender <$> getEnv
+      case ownerAddress ownerValue of
+        Just owner | owner /= currentSender -> do
+          decrementGas 5
+          let sender = if owner == address' then address' else currentSender
+              !_ = noteIRDecision $ "fast-only-owner-catch " ++ labelToString funcName
+          result <-
+            callWithResult
+              address'
+              owner
+              CC.DefaultCall
+              "castVoteOnIssue"
+              [ SAddress sender False,
+                SString $ labelToString funcName,
+                SVariadic argVals
+              ]
+          Just . Just <$> governanceReturn result
+        _ -> pure Nothing
+  where
+    ownerAddress (SAddress address _) = Just address
+    ownerAddress (SContract _ address) = Just address
+    ownerAddress _ = Nothing
+
+    governanceReturn (Just (STuple values))
+      | V.length values == 2 = getVar $ values V.! 1
+    governanceReturn other =
+      typeError "canonical onlyOwner governance return mismatch" $ show other
+
+isCanonicalOnlyOwnerModifier :: CC.Contract -> CC.Func -> Bool
+isCanonicalOnlyOwnerModifier contract' theFunction =
+  case (CC._funcModifiers theFunction, M.lookup "onlyOwner" $ contract' ^. CC.modifiers) of
+    ([("onlyOwner", [])], Just modifier) ->
+      case CC._modifierContents modifier of
+        Just [CC.TryCatchStatement tryStatements catchBlocks _] ->
+          canonicalTry tryStatements && any canonicalCatch (M.elems catchBlocks)
+        _ -> False
+    _ -> False
+  where
+    canonicalTry
+      [ CC.SimpleStatement
+          (CC.ExpressionStatement (CC.FunctionCall _ (CC.Variable _ "_checkOwner") []))
+          _,
+        CC.ModifierExecutor _
+        ] = True
+    canonicalTry _ = False
+
+    canonicalCatch (_, catchStatements) =
+      case reverse catchStatements of
+        CC.Return (Just (CC.Variable _ "ret")) _ :
+          CC.SimpleStatement
+            ( CC.VariableDefinition
+                entries
+                ( Just
+                    ( CC.FunctionCall
+                        _
+                        (CC.MemberAccess _ (CC.Variable _ "admin") "castVoteOnIssue")
+                        [ CC.Variable _ "sender",
+                          CC.MemberAccess _ (CC.Variable _ "msg") "sig",
+                          CC.MemberAccess _ (CC.Variable _ "msg") "data"
+                          ]
+                      )
+                  )
+              )
+            _ : _ -> map CC.vardefName entries == ["didExecute", "ret"]
+        _ -> False
+
+packFastIRResult :: CC.Func -> [Integer] -> Maybe Value
+packFastIRResult func values =
+  case (CC._funcVals func, values) of
+    (_, []) -> Nothing
+    ([(_, CC.IndexedType _ SVMType.Bool _)], [v]) -> Just $ SBool (v /= 0)
+    ([(_, CC.IndexedType _ ty _)], [v]) | isFastIRAddressType ty ->
+      Just $ SAddress (fromInteger v) False
+    (_, [v]) -> Just $ SInteger v
+    (_, vs) -> Just . STuple . V.fromList $ Constant . SInteger <$> vs
+  where
+    isFastIRAddressType (SVMType.Address {}) = True
+    isFastIRAddressType (SVMType.Contract {}) = True
+    isFastIRAddressType (SVMType.UnknownLabel {}) = True
+    isFastIRAddressType (SVMType.UserDefined _ t) = isFastIRAddressType t
+    isFastIRAddressType _ = False
+
+packFastIRStorageResult :: CC.Func -> [FastValue] -> Maybe Value
+packFastIRStorageResult func values = case (CC._funcVals func, values) of
+  (_, []) -> Nothing
+  (returns, [value]) -> fastReturnValue (returnType <$> listToMaybe returns) value
+  (returns, resultValues)
+    | length returns == length resultValues ->
+        Just . STuple . V.fromList . map Constant
+          =<< zipWithM (fastReturnValue . Just . returnType) returns resultValues
+  _ -> Nothing
+  where
+    returnType (_, CC.IndexedType _ ty _) = ty
+    fastReturnValue maybeTy = \case
+      FastOpaque value -> Just value
+      FastArray ints -> Just . SArray . V.fromList $ Constant . SInteger <$> ints
+      FastScalar n -> Just $ case maybeTy of
+        Just SVMType.Bool -> SBool (n /= 0)
+        Just ty | isFastIRAddressType ty -> SAddress (fromInteger n) False
+        _ -> SInteger n
+    isFastIRAddressType (SVMType.Address {}) = True
+    isFastIRAddressType (SVMType.Contract {}) = True
+    isFastIRAddressType (SVMType.UnknownLabel {}) = True
+    isFastIRAddressType (SVMType.UserDefined _ t) = isFastIRAddressType t
+    isFastIRAddressType _ = False
+
+data FastStorageReadSnapshot = FastStorageReadSnapshot
+  ![CallInfo]
+  !(M.Map (Address, MS.StoragePath) MS.BasicValue)
+  !(M.Map (Address, MS.StoragePath) MS.BasicValue)
+  !(Maybe MP.StateRoot)
+  !(HM.HashMap MS.StoragePath (Maybe MS.BasicValue))
+
+storageHooks :: MonadSM m => String -> Address -> Bool -> CC.Contract -> CC.CodeCollection -> m (StorageHooks m)
+storageHooks profiledFunctionName callee ro contract cc = do
+  snapshotsRef <- liftIO $ newIORef M.empty
+  pure $ StorageHooks
+    { shSender = profileHook "environment" $ toInteger . Env.sender <$> getEnv,
+      shMapGet = \mapName key isAddr ->
+        profileHook "storage_read" $ mapGet snapshotsRef callee mapName key isAddr,
+      shMapSet = mapSet callee,
+      shMapGetAt = \addrInt mapName key isAddr ->
+        profileHook "storage_read" $ mapGetTagged snapshotsRef (fromInteger addrInt) mapName key isAddr,
+      shMapSetAt = \addrInt mapName key val isAddr -> mapSet (fromInteger addrInt) mapName key val isAddr,
+      shMapGet2At = \addrInt mapName k1 ia1 k2 ia2 ->
+        profileHook "storage_read" $ mapGet2Tagged snapshotsRef (fromInteger addrInt) mapName k1 ia1 k2 ia2,
+      shMapSet2At = \addrInt mapName k1 ia1 k2 val ia2 -> mapSet2 (fromInteger addrInt) mapName k1 ia1 k2 val ia2,
+      shSloadAddr = \field ->
+        profileHook "storage_read" $ sloadAt snapshotsRef (toInteger callee) field,
+      shSloadAt = \addrInt field ->
+        profileHook "storage_read" $ sloadAtTagged snapshotsRef addrInt field,
+      shSstore = \field val -> sstoreAt (toInteger callee) field val,
+      shSstoreAt = sstoreAt,
+      shObjectSstoreAt = objectSstoreAt,
+      shPathGetAt = \addrInt root pieces ->
+        profileHook "storage_read" $ pathGetAtTagged snapshotsRef addrInt root pieces,
+      shPathSetAt = pathSetAt,
+      shPathDeleteAt = \addrInt root pieces ->
+        profileHook "storage_delete" $
+          writeAt (fromInteger addrInt) (storagePath root pieces) MS.BDefault,
+      shWriteMany = profileHook "storage_write_batch" . writeMany,
+      shInvalidateReads = profileHook "read_invalidation" . liftIO $ writeIORef snapshotsRef M.empty,
+      shThis = profileHook "environment" $ pure (toInteger callee),
+      shTimestamp = profileHook "environment" $ round . utcTimeToPOSIXSeconds . BlockHeader.timestamp . Env.blockHeader <$> getEnv,
+      shNumber = profileHook "environment" $ BlockHeader.number . Env.blockHeader <$> getEnv,
+      shDynamicCall = \catchFailures callKind target functionValue argsWithKinds ->
+        profileHook "dynamic_call" $ dynamicCall catchFailures callKind target functionValue argsWithKinds,
+      shBuiltin = \builtinName args ->
+        profileHook "builtin" $ runHostBuiltin builtinName args,
+      shEmit = \eventName ints -> profileHook "event" $ emitMany [(eventName, ints)],
+      shEmitMany = profileHook "event" . emitMany
+    }
+  where
+    profileHook name =
+      profileRunCodeFunction $
+        "FastIR.hook."
+          ++ labelToString (contract ^. CC.contractName)
+          ++ "."
+          ++ profiledFunctionName
+          ++ "."
+          ++ name
+    writeAt addr path b = do
+      when ro $ invalidWrite "Invalid write during read-only access" (show path)
+      markDiffForAction addr path b
+      putSolidStorageKeyVal' addr path b
+    writeMany pendingWrites = do
+      writes <- traverse prepareWrite pendingWrites
+      case writes of
+        [] -> pure ()
+        ((_, firstPath, _) : _) -> do
+          when ro $ invalidWrite "Invalid write during read-only access" (show firstPath)
+          markDiffsForAction writes
+          putSolidStorageKeyVals' . M.fromList $
+            [ ((addr, path), value)
+            | (addr, path, value) <- writes
+            ]
+    prepareWrite = \case
+      PendingMapSet addrInt mapName key val isAddr encoding ->
+        pure
+          ( fromInteger addrInt,
+            mapPath mapName key isAddr,
+            case encoding of
+              EncodeDeclared -> encodeStored mapName val
+              EncodeAddress -> MS.BAddress (fromInteger val)
+          )
+      PendingMapSet2 addrInt mapName k1 ia1 k2 val ia2 ->
+        pure
+          ( fromInteger addrInt,
+            mapPath2 mapName k1 ia1 k2 ia2,
+            encodeStored mapName val
+          )
+      PendingScalarSet addrInt field val ->
+        pure
+          ( fromInteger addrInt,
+            MS.singleton $ BC.pack $ labelToString field,
+            encodeStored field val
+          )
+      PendingObjectSet addrInt field value -> case value of
+        FastOpaque objectValue -> do
+          blockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
+          case toBasic blockNum objectValue of
+            Just basic ->
+              pure
+                ( fromInteger addrInt,
+                  MS.singleton $ BC.pack $ labelToString field,
+                  basic
+                )
+            Nothing -> typeError "IR unsupported opaque storage value" $ show objectValue
+        scalarValue -> typeError "IR opaque storage write received scalar value" $ show scalarValue
+      PendingPathSet addrInt root pieces val -> do
+        let path = storagePath root pieces
+            basic = maybe (MS.BInteger val) (\ty -> intToBasic ty val) (storageReferenceType contract cc path)
+        pure (fromInteger addrInt, path, basic)
+    lookupEv eventName nValues =
+      let hits c =
+            [ ev
+            | Just ev <- [M.lookup (stringToLabel eventName) (CC._events c)],
+              length (CC._eventLogs ev) == nValues
+            ]
+       in listToMaybe (hits contract ++ concatMap hits (M.elems (cc ^. CC.contracts)))
+    emitMany [] = pure ()
+    emitMany pairs = do
+      bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
+      tHash <- Env.txHash <$> getEnv
+      txSender <- Env.origin <$> getEnv
+      let contractName' = labelToString $ CC._contractName contract
+      evs <- forM pairs $ \(eventName, values) ->
+        case lookupEv eventName (length values) of
+          Nothing -> missingType "no corresponding event has been declared" eventName
+          Just ev -> do
+            let logs = CC._eventLogs ev
+            guardEmit (length values == length logs) eventName
+            let expVals = zipWith eventValue logs values
+            expStrs <- traverse jsonSM expVals
+            let evArgs =
+                  zipWith3
+                    (\(CC.EventLog name _ (CC.IndexedType _ idxType _)) value valStr ->
+                       (T.unpack name, value, valStr, idxType))
+                    logs
+                    expVals
+                    expStrs
+            pure $ Event bHash tHash txSender contractName' callee eventName evArgs
+      addEvents evs
+    snapshotFor snapshotsRef addr = profileHook "storage_snapshot" $ do
+      snapshots <- liftIO $ readIORef snapshotsRef
+      case M.lookup addr snapshots of
+        Just snapshot -> profileHook "storage_snapshot_hit" $ pure snapshot
+        Nothing -> profileHook "storage_snapshot_miss" $ do
+          frames <- Mod.get (Mod.Proxy @[CallInfo])
+          txMap <- getMemRawStorageTxDB
+          blockMap <- getMemRawStorageBlockDB
+          root <- fmap addressStateContractRoot <$> A.lookup (A.Proxy @AddressState) addr
+          rootCache <- maybe (pure HM.empty) (liftIO . snapshotRawStorageReadCache) root
+          let !snapshot = FastStorageReadSnapshot frames txMap blockMap root rootCache
+          liftIO $ modifyIORef' snapshotsRef (M.insert addr snapshot)
+          pure snapshot
+    fastStorageGet snapshotsRef addr path = profileHook "storage_value_lookup" $ do
+      FastStorageReadSnapshot frames txMap blockMap root rootCache <- snapshotFor snapshotsRef addr
+      let key = (addr, path)
+          frameValue = listToMaybe [value | frame <- frames, Just value <- [M.lookup key (storageMap frame)]]
+      case frameValue <|> M.lookup key txMap <|> M.lookup key blockMap of
+        Just value -> pure value
+        Nothing -> case HM.lookup path rootCache of
+          Just cached -> pure $ fromMaybe MS.BDefault cached
+          Nothing -> case root of
+            Nothing -> pure MS.BDefault
+            Just storageRoot ->
+              profileHook "storage_trie_read" $
+                fromMaybe MS.BDefault <$> getRawStorageKeyValForStateRootMaybe storageRoot path
+    sloadAt snapshotsRef addrInt field = do
+      v <- fastStorageGet snapshotsRef (fromInteger addrInt) (MS.singleton $ BC.pack $ labelToString field)
+      pure $ unpackInt v
+    sloadAtTagged snapshotsRef addrInt field =
+      unpackTagged <$> fastStorageGet snapshotsRef (fromInteger addrInt) (MS.singleton $ BC.pack $ labelToString field)
+    sstoreAt addrInt field val = do
+      let addr = fromInteger addrInt
+          path = MS.singleton $ BC.pack $ labelToString field
+          b = encodeStored field val
+      writeAt addr path b
+    objectSstoreAt addrInt field = \case
+      FastOpaque value -> do
+        blockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
+        case toBasic blockNum value of
+          Just basic ->
+            writeAt
+              (fromInteger addrInt)
+              (MS.singleton $ BC.pack $ labelToString field)
+              basic
+          Nothing -> typeError "IR unsupported opaque storage value" $ show value
+      value -> typeError "IR opaque storage write received scalar value" $ show value
+    pathGetAtTagged snapshotsRef addrInt root pieces =
+      unpackTagged <$> fastStorageGet snapshotsRef (fromInteger addrInt) (storagePath root pieces)
+    pathSetAt addrInt root pieces val = do
+      let addr = fromInteger addrInt
+          path = storagePath root pieces
+          b = maybe (MS.BInteger val) (\ty -> intToBasic ty val) (storageReferenceType contract cc path)
+      writeAt addr path b
+    storagePath root = foldl' appendPiece (MS.singleton $ BC.pack $ labelToString root)
+    appendPiece path = \case
+      StorageField field -> MS.snoc path (MS.Field $ BC.pack $ labelToString field)
+      StorageIndex key isAddr ->
+        MS.snoc path . MS.Index $ storageIndexKey key isAddr
+      StorageOpaqueIndex value -> MS.snoc path $ valueIndex value
+    storageIndexKey key isAddr =
+      if isAddr then addressToHex (fromInteger key :: Address) else BC.pack $ show key
+    valueIndex = \case
+      SString value -> MS.Index . DT.encodeUtf8 $ T.pack value
+      SBytes value -> MS.Index value
+      SAddress value _ -> MS.Index $ addressToHex value
+      SInteger value -> MS.Index . BC.pack $ show value
+      SBool value -> MS.Index $ bool "false" "true" value
+      value -> error $ "IR unsupported storage index: " ++ show value
+    unpackInt v = case v of
+      MS.BInteger i -> i
+      MS.BBool b -> if b then 1 else 0
+      MS.BEnumVal _ _ n -> toInteger n
+      MS.BAddress a -> toInteger a
+      MS.BContract _ a -> toInteger a
+      _ -> 0
+    unpackTagged v = (unpackInt v, v == MS.BDefault)
+    mapGet snapshotsRef addr mapName key isAddr =
+      unpackInt <$> fastStorageGet snapshotsRef addr (mapPath mapName key isAddr)
+    mapGetTagged snapshotsRef addr mapName key isAddr =
+      unpackTagged <$> fastStorageGet snapshotsRef addr (mapPath mapName key isAddr)
+    mapSet addr mapName key val isAddr = do
+      let path = mapPath mapName key isAddr
+          b = encodeStored mapName val
+      writeAt addr path b
+    mapPath mapName key isAddr =
+      MS.snoc
+        (MS.singleton $ BC.pack $ labelToString mapName)
+        (MS.Index $ storageIndexKey key isAddr)
+    mapGet2Tagged snapshotsRef addr mapName k1 ia1 k2 ia2 =
+      unpackTagged <$> fastStorageGet snapshotsRef addr (mapPath2 mapName k1 ia1 k2 ia2)
+    mapSet2 addr mapName k1 ia1 k2 val ia2 = do
+      let path = mapPath2 mapName k1 ia1 k2 ia2
+          b = encodeStored mapName val
+      writeAt addr path b
+    mapPath2 mapName k1 ia1 k2 ia2 =
+      MS.snoc (mapPath mapName k1 ia1) (MS.Index $ storageIndexKey k2 ia2)
+    eventValue (CC.EventLog _ _ (CC.IndexedType _ ty _)) = \case
+      FastScalar n -> scalarEventValue ty n
+      FastArray ns ->
+        let elementType = case unwrapTy ty of
+              SVMType.Array entry _ -> entry
+              _ -> SVMType.Int Nothing Nothing
+         in SArray . V.fromList $ Constant . scalarEventValue elementType <$> ns
+      FastOpaque value -> value
+    dynamicCall catchFailures callKind target functionValue argsWithKinds =
+      if catchFailures
+        then do
+          stackDepth <- getCallStackDepth
+          EUnsafe.try invoke >>= \case
+            Left (_ :: SolidException) -> trimCallStackToDepth stackDepth >> pure Nothing
+            Right result -> pure $ Just result
+        else Just <$> invoke
+      where
+        invoke = case functionValue of
+          FastOpaque (SString functionName) -> do
+            values <- traverse hostValue argsWithKinds
+            let args = concatMap (\case SVariadic vs -> vs; value -> [value]) values
+                callType = case callKind of
+                  CallDefault -> CC.DefaultCall
+                  CallRaw -> CC.RawCall
+                  CallDelegate -> CC.DelegateCall
+            result <- callWithResult callee (fromInteger target) callType (stringToLabel functionName) args
+            pure . FastOpaque $ fromMaybe SNULL result
+          other -> typeError "IR dynamic call function is not a string" $ show other
+    runHostBuiltin builtinName args = do
+      values <- traverse hostValue args
+      FastOpaque <$> callBuiltinFunction (stringToLabel builtinName) values
+    hostValue = \case
+      (HostOpaque, FastOpaque value) -> pure value
+      (HostAddress, FastScalar value) -> pure $ SAddress (fromInteger value) False
+      (HostBool, FastScalar value) -> pure $ SBool (value /= 0)
+      (HostInteger, FastScalar value) -> pure $ SInteger value
+      other -> typeError "IR host builtin argument mismatch" $ show other
+    scalarEventValue ty n
+      | isAddrTy ty = SAddress (fromInteger n) False
+      | unwrapTy ty == SVMType.Bool = SBool (n /= 0)
+      | otherwise = SInteger n
+    isAddrTy (SVMType.Address {}) = True
+    isAddrTy (SVMType.UserDefined _ t) = isAddrTy t
+    isAddrTy _ = False
+    encodeStored :: SolidString -> Integer -> MS.BasicValue
+    encodeStored name val = maybe (MS.BInteger val) (\decl -> intToBasic (CC._varType decl) val) (lookupStorageDecl name)
+    lookupStorageDecl name =
+      M.lookup name (contract ^. CC.storageDefs)
+        <|> listToMaybe
+          [ vd
+          | pName <- contract ^. CC.parents,
+            p <- maybeToList $ M.lookup pName (cc ^. CC.contracts),
+            vd <- maybeToList $ M.lookup name (p ^. CC.storageDefs)
+          ]
+    intToBasic :: SVMType.Type -> Integer -> MS.BasicValue
+    intToBasic ty n = case unwrapTy ty of
+      SVMType.Bool -> MS.BBool (n /= 0)
+      SVMType.Address {} -> MS.BAddress (fromInteger n)
+      SVMType.Contract tname -> MS.BContract tname (fromInteger n)
+      SVMType.Enum _ typedef mNames -> MS.BEnumVal typedef (enumMember typedef mNames n) (fromIntegral n :: Word32)
+      SVMType.UnknownLabel lab
+        | M.member lab (cc ^. CC.contracts) -> MS.BContract lab (fromInteger n)
+        | otherwise -> case enumNames lab Nothing of
+            [] -> MS.BInteger n
+            ns -> MS.BEnumVal lab (enumMember lab (Just ns) n) (fromIntegral n :: Word32)
+      SVMType.Mapping _ _ vty _ _ -> intToBasic vty n
+      SVMType.UserDefined _ inner -> intToBasic inner n
+      _ -> MS.BInteger n
+    unwrapTy (SVMType.UserDefined _ t) = unwrapTy t
+    unwrapTy t = t
+    enumNames typedef mNames = case mNames of
+      Just ns | not (null ns) -> ns
+      _ -> case fst <$> M.lookup typedef (contract ^. CC.enums) of
+        Just ns -> ns
+        Nothing -> maybe [] fst (M.lookup typedef (cc ^. CC.flEnums))
+    enumMember typedef mNames n =
+      let ns = enumNames typedef mNames
+          idx = fromInteger n
+       in if idx >= 0 && idx < length ns
+            then ns !! idx
+            else error $ "IR enum index out of range: " ++ labelToString typedef ++ " " ++ show n
+    guardEmit True _ = pure ()
+    guardEmit False name = invalidArguments "arguments to statement are inconsistent with those declared" name
+
+runTheCallWithVarsInterpreted ::
+  MonadSM m =>
+  Address ->
+  Address ->
+  CC.Contract ->
+  SolidString ->
+  Keccak256 ->
+  CC.CodeCollection ->
+  CC.Func ->
+  ValList ->
+  [Variable] ->
+  CallValidation ->
+  Bool ->
+  Bool ->
+  m (Maybe Value)
+runTheCallWithVarsInterpreted address' codeAddr contract' funcName hsh cc theFunction argVals' argVars validation ro ff = do
   decrementGas 5
   let !returnNamesAndTypes = [(n, t) | (Just n, CC.IndexedType _ t _) <- CC._funcVals theFunction]
       !theModifierNames = map fst $ (CC._funcModifiers theFunction)
@@ -3166,7 +4180,9 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
       return (n, newVar)
   let args = [(n, v) | (n, _, v) <- argsWithLoc]
 
-  val' <- withCallInfo address' codeAddr contract' funcName hsh cc (M.fromList localVars1) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+  val' <- profileRunCodeFunction
+    (labelToString (contract' ^. CC.contractName) ++ "." ++ labelToString funcName) $
+    withCallInfo address' codeAddr contract' funcName hsh cc (M.fromList localVars1) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
     matchedArgvals <- forM theModifiers $ \modi -> do
       let !margList =
               fromMaybe []
@@ -3192,7 +4208,46 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
     -- when (True || (not $ null matchedArgvals)) $ error (show theCallInfo)
     let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC._funcContents theFunction
     let modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC._modifierContents m)) theModifiers
-    val <- runModifiersAndStatements modContentsList commands
+    bodyIRDisabled <- liftIO $ readIORef irDisabledRef
+    let bodyFunction = theFunction & CC.funcModifiers .~ []
+        bodyLabel = labelToString funcName ++ "#body"
+        acceptBodyUInt (values, cost) = do
+          recordIRFrameOutcome (IRHit bodyLabel cost False)
+          decrementGas (Gas cost)
+          pure $ packFastIRResult bodyFunction values
+        acceptBodyStorage (values, cost) = do
+          recordIRFrameOutcome (IRHit bodyLabel cost False)
+          decrementGas (Gas cost)
+          pure $ packFastIRStorageResult bodyFunction values
+        tryStorageBody fastArgs = do
+          hooks <- storageHooks bodyLabel address' ro contract' cc
+          runAnyStorageIRArgs hooks cc contract' bodyFunction fastArgs >>= \case
+            Just result -> acceptBodyStorage result
+            Nothing -> do
+              let !_ = noteIRDecision ("body-storage-miss " ++ labelToString (contract' ^. CC.contractName) ++ "." ++ bodyLabel)
+              runStatementBlock commands
+        tryBodyIR = do
+          let !_ = noteIRDecision ("body-entry " ++ labelToString (contract' ^. CC.contractName) ++ "." ++ bodyLabel)
+          mFastArgs <- sequence <$> traverse fastIRArg argVals
+          case mFastArgs of
+            Nothing -> do
+              let !_ = noteIRDecision ("body-arg-miss " ++ labelToString (contract' ^. CC.contractName) ++ "." ++ bodyLabel ++ " " ++ show argVals)
+              runStatementBlock commands
+            Just fastArgs -> case traverse (\case FastScalar n -> Just n; _ -> Nothing) fastArgs of
+              Just scalarArgs -> case runAnyUIntIR cc contract' bodyFunction scalarArgs of
+                Just result -> acceptBodyUInt result
+                Nothing -> tryStorageBody fastArgs
+              Nothing -> tryStorageBody fastArgs
+        runBody
+          | null theModifiers = runStatementBlock commands
+          | Conf.svmTrace (Conf.debugConfig ethConf) = runStatementBlock commands
+          | bodyIRDisabled = runStatementBlock commands
+          | irFrameDisabled (labelToString $ contract' ^. CC.contractName) (labelToString funcName) = runStatementBlock commands
+          | otherwise = tryBodyIR
+    val <- profileRunCodeStatement
+      RunCodeCallStatementExecution
+      RunCodeCreationStatementExecution $
+        runModifiersAndAction modContentsList runBody
 
     let findNamedReturns = do
           case returns of
@@ -3737,7 +4792,10 @@ solidVMExceptionHandler catchBlockMap ex =
 
 -- checks if an argument list is valid for a given function signature
 validateFunctionArguments:: MonadSM m => CC.CodeCollection -> CC.Contract -> CC.Func -> ValList -> m (Maybe (CC.Func, ValList))
-validateFunctionArguments cc contract' func argVals = checkFunc $ func : CC._funcOverload func
+validateFunctionArguments cc contract' func argVals = profileRunCodeChild
+  RunCodeCallArgumentReferencePreparation
+  RunCodeCreationArgumentReferencePreparation $
+    checkFunc $ func : CC._funcOverload func
   where
     checkFunc [] = pure Nothing
     checkFunc (x:xs) = testMatch x >>= \case

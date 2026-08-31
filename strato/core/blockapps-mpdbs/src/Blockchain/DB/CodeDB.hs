@@ -31,6 +31,7 @@ module Blockchain.DB.CodeDB
 where
 
 import Blockchain.Database.MerklePatricia
+import Blockchain.Database.MerklePatricia.Profile
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import qualified Control.Monad.Change.Alter as A
@@ -82,17 +83,36 @@ dbCodeToValue = id
 genericLookupCodeDB :: MonadIO m => m CodeDB -> Keccak256 -> m (Maybe DBCode)
 genericLookupCodeDB f codeHash = do
   db <- unCodeDB <$> f
-  DB.get db def $ shaToKey codeHash
+  let key = shaToKey codeHash
+  result <- DB.get db def key
+  liftIO $ do
+    bumpDBProfile LevelDBGetOps 1
+    bumpDBProfile LevelDBGetKeyBytes $ fromIntegral (B.length key)
+    case result of
+      Nothing -> bumpDBProfile LevelDBGetMisses 1
+      Just bytes -> do
+        bumpDBProfile LevelDBGetHits 1
+        bumpDBProfile LevelDBReadBytes $ fromIntegral (B.length bytes)
+  pure result
 
 genericInsertCodeDB :: MonadIO m => m CodeDB -> Keccak256 -> DBCode -> m ()
 genericInsertCodeDB f codeHash code = do
   db <- unCodeDB <$> f
-  DB.put db def (shaToKey codeHash) (dbCodeToValue code)
+  let key = shaToKey codeHash
+      value = dbCodeToValue code
+  DB.put db def key value
+  liftIO $ do
+    bumpDBProfile LevelDBPutOps 1
+    bumpDBProfile LevelDBWriteBytes $ fromIntegral (B.length key + B.length value)
 
 genericDeleteCodeDB :: MonadIO m => m CodeDB -> Keccak256 -> m ()
 genericDeleteCodeDB f codeHash = do
   db <- unCodeDB <$> f
-  DB.delete db def (shaToKey codeHash)
+  let key = shaToKey codeHash
+  DB.delete db def key
+  liftIO $ do
+    bumpDBProfile LevelDBDeleteOps 1
+    bumpDBProfile LevelDBDeleteKeyBytes $ fromIntegral (B.length key)
 
 instance MonadIO m => (Keccak256 `A.Alters` DBCode) (ReaderT CodeDB m) where
   lookup _ = genericLookupCodeDB ask

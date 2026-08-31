@@ -37,9 +37,9 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
-import Blockchain.Data.RLP (rlpEncode, rlpSerialize)
 import Blockchain.Stream.VMEvent (VMEvent(..), produceVMEvents)
 import qualified Blockchain.Database.MerklePatricia as MP
+import Blockchain.Database.MerklePatricia.Profile
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.ExtendedWord
@@ -169,7 +169,16 @@ instance HasContext m => Mod.Modifiable BlockHashRoot m where
       Just sr -> pure . BlockHashRoot $ MP.StateRoot sr
       Nothing -> do
         db <- getStateDB
-        BlockHashRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBlockHashRootKey
+        result <- DB.get db def vmBlockHashRootKey
+        liftIO $ do
+          bumpDBProfile LevelDBGetOps 1
+          bumpDBProfile LevelDBGetKeyBytes $ fromIntegral (B.length vmBlockHashRootKey)
+          case result of
+            Nothing -> bumpDBProfile LevelDBGetMisses 1
+            Just bytes -> do
+              bumpDBProfile LevelDBGetHits 1
+              bumpDBProfile LevelDBReadBytes $ fromIntegral (B.length bytes)
+        pure . BlockHashRoot . maybe MP.emptyTriePtr MP.StateRoot $ result
   put _ (BlockHashRoot (MP.StateRoot sr)) = do
     pendingRef <- view mpPendingBlockHashRoot <$> accessEnv
     liftIO $ writeIORef pendingRef (Just sr)
@@ -186,34 +195,46 @@ instance HasContext m => HasMemAddressStateDB m where
 
 instance MonadUnliftIO m => (MP.StateRoot `A.Alters` MP.NodeData) (ReaderT Context m) where
   lookup _ sr@(MP.StateRoot key) = do
-    pendingRef <- view mpPendingNodes <$> ask
-    pending <- liftIO $ readIORef pendingRef
-    cacheRef <- view mpNodeCache <$> ask
-    cache <- liftIO $ readIORef cacheRef
+    liftIO $ bumpDBProfile TrieNodesRead 1
+    ctx <- ask
+    pending <- liftIO $ readIORef (ctx ^. mpPendingNodes)
     case HM.lookup key pending of
-      Just nd -> pure (Just nd)
-      Nothing -> case HM.lookup key cache of
-        Just nd -> pure (Just nd)
-        Nothing -> do
-          mnd <- MP.genericLookupDB getStateDB sr
-          liftIO $ for_ mnd $ \nd -> modifyIORef' cacheRef (HM.insert key nd)
-          pure mnd
+      Just nd -> do
+        liftIO $ bumpDBProfile TrieNodePendingCacheHits 1
+        pure (Just nd)
+      Nothing -> do
+        let cacheRef = ctx ^. mpNodeCache
+        cache <- liftIO $ readIORef cacheRef
+        case HM.lookup key cache of
+          Just nd -> do
+            liftIO $ bumpDBProfile TrieNodeCacheHits 1
+            pure (Just nd)
+          Nothing -> do
+            liftIO $ do
+              bumpDBProfile TrieNodeCacheMisses 1
+              bumpDBProfile TrieNodeLevelDBReads 1
+            mnd <- MP.genericLookupDB getStateDB sr
+            liftIO $ for_ mnd $ \nd -> modifyIORef' cacheRef (HM.insert key nd)
+            pure mnd
   insert _ (MP.StateRoot key) nd = do
     cacheRef <- view mpNodeCache <$> ask
     cache <- liftIO $ readIORef cacheRef
     case HM.lookup key cache of
       Just cached
-        | cached == nd -> pure ()
+        | cached == nd -> liftIO $ bumpDBProfile TrieNodesReused 1
         | otherwise -> error "MP node hash collision: cached node differs"
       Nothing -> do
         pendingRef <- view mpPendingNodes <$> ask
         pending <- liftIO $ readIORef pendingRef
         case HM.lookup key pending of
           Just staged
-            | staged == nd -> pure ()
+            | staged == nd -> liftIO $ bumpDBProfile TrieNodesReused 1
             | otherwise -> error "MP node hash collision: pending node differs"
-          Nothing -> liftIO $ modifyIORef' pendingRef (HM.insert key nd)
+          Nothing -> liftIO $ do
+            bumpDBProfile TrieNodesCreated 1
+            modifyIORef' pendingRef (HM.insert key nd)
   delete _ sr@(MP.StateRoot key) = do
+    liftIO $ bumpDBProfile TrieNodesDeleted 1
     cacheRef <- view mpNodeCache <$> ask
     liftIO $ modifyIORef' cacheRef (HM.delete key)
     pendingRef <- view mpPendingNodes <$> ask
@@ -222,6 +243,7 @@ instance MonadUnliftIO m => (MP.StateRoot `A.Alters` MP.NodeData) (ReaderT Conte
 
 instance HasContext m => HasPendingMPNodes m where
   flushPendingMPNodes = do
+    liftIO $ bumpDBProfile PendingMerkleFlushRequests 1
     ctx <- accessEnv
     count <- liftIO $ atomicModifyIORef' (ctx ^. mpFlushCount) $ \n -> let n' = n + 1 in (n', n')
     when (count >= ctx ^. mpFlushInterval) flushPendingMPNodesNow
@@ -240,12 +262,19 @@ flushPendingMPNodesNow = do
     rootRef <- view mpPendingBlockHashRoot <$> accessEnv
     pendingRoot <- liftIO $ readIORef rootRef
     db <- getStateDB
-    DB.write db def
-      ( [ DB.Put key (rlpSerialize $ rlpEncode node)
-        | (key, node) <- HM.toList pending
-        ]
-          ++ maybe [] (pure . DB.Put vmBlockHashRootKey) pendingRoot
-      )
+    let pendingWrites =
+          [ (key, MP.serializeNodeData node)
+          | (key, node) <- HM.toList pending
+          ]
+        rootWrites = maybe [] (pure . (vmBlockHashRootKey,)) pendingRoot
+        writes = pendingWrites ++ rootWrites
+    DB.write db def [DB.Put key value | (key, value) <- writes]
+    liftIO $ do
+      bumpDBProfile LevelDBWriteBatches 1
+      bumpDBProfile LevelDBBatchPutOps $ fromIntegral (length writes)
+      bumpDBProfile LevelDBWriteBytes . fromIntegral $
+        sum [B.length key + B.length value | (key, value) <- writes]
+      bumpDBProfile TrieNodesWritten $ fromIntegral (length pendingWrites)
     cacheRef <- view mpNodeCache <$> accessEnv
     liftIO $ do
       modifyIORef' cacheRef $ \cache ->
@@ -293,8 +322,11 @@ instance (MonadUnliftIO m, HasContext m) => (N.NibbleString `A.Alters` N.NibbleS
     cacheRef <- view hashCache <$> accessEnv
     cache <- liftIO $ readIORef cacheRef
     case HM.lookup (nibbleString2ByteString k) cache of
-      Just v -> pure (Just v)
+      Just v -> do
+        liftIO $ bumpDBProfile HashCacheHits 1
+        pure (Just v)
       Nothing -> do
+        liftIO $ bumpDBProfile HashCacheMisses 1
         mv <- genericLookupHashDB getHashDB k
         liftIO $ for_ mv $ \v -> modifyIORef' cacheRef (HM.insert (nibbleString2ByteString k) v)
         pure mv

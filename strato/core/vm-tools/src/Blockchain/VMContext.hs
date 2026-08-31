@@ -56,6 +56,7 @@ module Blockchain.VMContext
     runTestContextM,
     initContext,
     initContextWithLevelDBTuning,
+    initBatchedContext,
     initReplayContext,
     runContextM,
     runContextM',
@@ -102,6 +103,7 @@ import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.Strato.StateDiff (StateDiff)
+import Blockchain.PhaseProfile
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VM.SolidException
 import Blockchain.VMOptions
@@ -283,7 +285,8 @@ type VMBase m =
   )
 
 withCurrentBlockHash ::
-  ( MonadLogger m,
+  ( MonadIO m,
+    MonadLogger m,
     Mod.Modifiable MemDBs m,
     Mod.Modifiable CurrentBlockHash m,
     HasMemAddressStateDB m,
@@ -301,10 +304,10 @@ withCurrentBlockHash bh f = do
   cbh <- Mod.get (Mod.Proxy @CurrentBlockHash)
   Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash bh)
   a <- f
-  flushMemStorageTxDBToBlockDB
-  flushMemStorageDB
-  flushMemAddressStateTxToBlockDB
-  flushMemAddressStateDB
+  profilePhase TransactionOverlayToBlockOverlay flushMemStorageTxDBToBlockDB
+  profilePhase StorageTrieFlush flushMemStorageDB
+  profilePhase TransactionOverlayToBlockOverlay flushMemAddressStateTxToBlockDB
+  profilePhase AddressStateTrieFlush flushMemAddressStateDB
   Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots .= M.empty
   Mod.put (Mod.Proxy @CurrentBlockHash) cbh
   pure a
@@ -436,13 +439,21 @@ initContextWithLevelDBTuning ::
 initContextWithLevelDBTuning cacheBytes writeBufferBytes = do
   initContextWithOptions cacheBytes writeBufferBytes 1
 
-initReplayContext ::
+-- | Accumulate Merkle nodes across a bounded VM input batch.  Callers must
+-- invoke 'finalizePendingMPNodes' before publishing outputs or acknowledging
+-- the corresponding input offset.
+initBatchedContext ::
   (MonadUnliftIO m, MonadLoggerIO m, MonadResource m) =>
   m Context
-initReplayContext = initContextWithOptions
+initBatchedContext = initContextWithOptions
   (Conf.cacheSize $ levelDBConfig ethConf)
   (DB.writeBufferSize DB.defaultOptions)
   256
+
+initReplayContext ::
+  (MonadUnliftIO m, MonadLoggerIO m, MonadResource m) =>
+  m Context
+initReplayContext = initBatchedContext
 
 initContextWithOptions ::
   (MonadUnliftIO m, MonadLoggerIO m, MonadResource m) =>

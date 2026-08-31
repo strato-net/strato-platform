@@ -35,6 +35,7 @@ module Blockchain.Database.MerklePatricia
     StateRoot (..),
     NodeDataF (..),
     NodeData,
+    serializeNodeData,
     runMP,
     openMPDB,
     emptyTriePtr,
@@ -53,7 +54,8 @@ where
 
 import Blockchain.Data.RLP
 import Blockchain.Database.MerklePatricia.Internal
-import Blockchain.Database.MerklePatricia.NodeData (ptrRef)
+import Blockchain.Database.MerklePatricia.NodeData (ptrRef, serializeNodeData)
+import Blockchain.Database.MerklePatricia.Profile
 import Blockchain.Strato.Model.Util (byteString2NibbleString)
 import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Alter as A
@@ -68,7 +70,16 @@ import qualified Database.LevelDB as DB
 genericLookupDB :: MonadIO m => m DB.DB -> StateRoot -> m (Maybe NodeData)
 genericLookupDB f (StateRoot sr) = do
   db <- f
-  fmap bytes2NodeData <$> DB.get db def sr
+  result <- DB.get db def sr
+  liftIO $ do
+    bumpDBProfile LevelDBGetOps 1
+    bumpDBProfile LevelDBGetKeyBytes $ fromIntegral (B.length sr)
+    case result of
+      Nothing -> bumpDBProfile LevelDBGetMisses 1
+      Just bytes -> do
+        bumpDBProfile LevelDBGetHits 1
+        bumpDBProfile LevelDBReadBytes $ fromIntegral (B.length bytes)
+  pure $ fmap bytes2NodeData result
   where
     bytes2NodeData :: B.ByteString -> NodeData
     bytes2NodeData bytes | B.null bytes = EmptyNodeData
@@ -77,12 +88,19 @@ genericLookupDB f (StateRoot sr) = do
 genericInsertDB :: MonadIO m => m DB.DB -> StateRoot -> NodeData -> m ()
 genericInsertDB f (StateRoot sr) nd = do
   db <- f
-  DB.put db def sr $ rlpSerialize $ rlpEncode nd
+  let bytes = serializeNodeData nd
+  DB.put db def sr bytes
+  liftIO $ do
+    bumpDBProfile LevelDBPutOps 1
+    bumpDBProfile LevelDBWriteBytes $ fromIntegral (B.length sr + B.length bytes)
 
 genericDeleteDB :: MonadIO m => m DB.DB -> StateRoot -> m ()
 genericDeleteDB f (StateRoot sr) = do
   db <- f
   DB.delete db def sr
+  liftIO $ do
+    bumpDBProfile LevelDBDeleteOps 1
+    bumpDBProfile LevelDBDeleteKeyBytes $ fromIntegral (B.length sr)
 
 instance MonadIO m => (StateRoot `Alters` NodeData) (ReaderT DB.DB m) where
   lookup _ = genericLookupDB ask

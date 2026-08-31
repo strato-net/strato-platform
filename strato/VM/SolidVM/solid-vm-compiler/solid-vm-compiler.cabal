@@ -40,4 +40,5 @@ library
     , strato-model
     , text
     , transformers
+    , vm-tools
   default-language: Haskell2010

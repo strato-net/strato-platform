@@ -175,6 +175,15 @@ spec = do
       fastWord256LSB (BigWord (IS 0x93342434#)) `shouldBe` 0x34
 
   describe "Address serialization" $ do
+    it "matches the fixed-width Word160 Binary encoding" $
+      property $ \(address :: Address) ->
+        encode address `shouldBe` encode (unAddress address)
+    it "round trips every address through Binary" $
+      property $ \(address :: Address) ->
+        (decode $ encode address) `shouldBe` address
+    it "uses the same fixed-width lowercase text for Binary hex and Show" $
+      property $ \(address :: Address) ->
+        addressToHex address `shouldBe` C8.pack (show address)
     it "should be fixed width" $ do
       addressToHex 0xdeadbeef
         `shouldBe` "00000000000000000000000000000000deadbeef"

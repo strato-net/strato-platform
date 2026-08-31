@@ -228,7 +228,7 @@ getNodeData (Right sr) =
 
 putNodeData :: (StateRoot `Alters` NodeData) m => NodeData -> m StateRoot
 putNodeData nd = do
-  let bytes = rlpSerialize $ rlpEncode nd
+  let bytes = serializeNodeData nd
       ptr = StateRoot $ keccak256ToByteString $ hash bytes
   A.insert Proxy ptr nd
   return ptr
@@ -267,10 +267,16 @@ newShortcut "" (Left ref) = return ref
 newShortcut key val = nodeData2NodeRef $ ShortcutNodeData key val
 
 nodeData2NodeRef :: (StateRoot `Alters` NodeData) m => NodeData -> m NodeRef
-nodeData2NodeRef nodeData =
-  case rlpSerialize $ rlpEncode nodeData of
-    bytes | B.length bytes < 32 -> return $ smallRef bytes
-    _ -> ptrRef <$> putNodeData nodeData
+nodeData2NodeRef nodeData = do
+  let bytes = serializeNodeData nodeData
+  if B.length bytes < 32
+    then return $ smallRef bytes
+    else do
+      -- Reuse the bytes already forced for the inline-node check instead of
+      -- serializing the same large node again inside putNodeData.
+      let ptr = StateRoot $ keccak256ToByteString $ hash bytes
+      A.insert Proxy ptr nodeData
+      return $ ptrRef ptr
 
 list2Options :: N.Nibble -> [(N.Nibble, NodeRef)] -> [NodeRef]
 list2Options start [] = replicate (fromIntegral $ 0x10 - start) emptyRef

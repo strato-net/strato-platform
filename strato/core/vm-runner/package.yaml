@@ -34,6 +34,7 @@ library:
   - conduit
   - containers
   - cross-monitoring
+  - deepseq
   - dlist
   - ethereum-rlp
 #  - ethereum-vm
@@ -95,15 +96,22 @@ executables:
       - common-log
       - composable-monads-base
       - conduit
+      - containers
+      - cryptonite
+      - data-default
+      - deepseq
       - ethereum-rlp
       - hflags
+      - leveldb-haskell
       - process-monitor
       - prometheus-client
       - resourcet
       - seqevents
       - strato-conf
       - strato-model
+      - solid-vm-compiler
       - streaming
+      - text
       - time
       - transformers
       - unliftio

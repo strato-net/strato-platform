@@ -46,9 +46,11 @@ module Blockchain.SolidVM.SM
     pushSender,
     initializeAction,
     markDiffForAction,
+    markDiffsForAction,
     getBlockHashWithNumber,
     getBSum,
     addEvent,
+    addEvents,
     renderValueShallow,
     addDelegatecall,
     getUsername,
@@ -75,6 +77,7 @@ import Blockchain.Data.BlockSummary
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf (ethConf)
 import qualified Blockchain.EthConf.Model as Conf
+import Blockchain.PhaseProfile
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.SolidVM.Exception
@@ -103,6 +106,7 @@ import Control.Monad.Trans.Reader
 import qualified Data.ByteString.Char8 as BC
 import Data.Either (isLeft)
 import Data.Foldable (for_)
+import Data.List (foldl')
 import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
 import qualified Data.Map.Ordered as OMap
@@ -122,6 +126,8 @@ import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Model.Value
+import System.Environment (lookupEnv)
+import System.IO.Unsafe (unsafePerformIO)
 import qualified Text.Colors as CL
 import Text.Format
 import UnliftIO
@@ -912,13 +918,16 @@ popCallInfo :: MonadSM m => Bool -> m ()
 popCallInfo reverted = do
   popCallInfoState >>= \case
     Nothing -> internalError "popCallInfo was called on an already empty stack" ()
-    Just ci -> unless reverted $ do
-      A.insertMany (A.Proxy @RawStorageValue) $ storageMap ci
-      let fromASM ASDeleted = Left ()
-          fromASM (ASModification as) = Right as
-          (deletes, inserts) = M.mapEither fromASM $ stateMap ci
-      A.insertMany (A.Proxy @AddressState) $ inserts
-      A.deleteMany (A.Proxy @AddressState) $ M.keys deletes
+    Just ci -> unless reverted $
+      profileRunCodeChild
+        RunCodeCallFrameOverlayMaterialization
+        RunCodeCreationFrameOverlayMaterialization $ do
+          A.insertMany (A.Proxy @RawStorageValue) $ storageMap ci
+          let fromASM ASDeleted = Left ()
+              fromASM (ASModification as) = Right as
+              (deletes, inserts) = M.mapEither fromASM $ stateMap ci
+          A.insertMany (A.Proxy @AddressState) $ inserts
+          A.deleteMany (A.Proxy @AddressState) $ M.keys deletes
 
 withLocalVars :: MonadSM m => m a -> m a
 withLocalVars = bracket_ pushLocalVars popLocalVars
@@ -1057,19 +1066,59 @@ initializeAction acct = do
 
 markDiffForAction :: Mod.Modifiable Action m => Address -> MS.StoragePath -> MS.BasicValue -> m ()
 markDiffForAction owner key' val' = do
+  let !_ = traceStorageWrite owner key' val'
   let ins (Action.SolidVMDiff m) = Action.SolidVMDiff $ M.insert key' val' m
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %= ins
 
+markDiffsForAction :: Mod.Modifiable Action m => [(Address, MS.StoragePath, MS.BasicValue)] -> m ()
+markDiffsForAction [] = pure ()
+markDiffsForAction writes = do
+  for_ writes $ \(owner, key', val') -> do
+    let !_ = traceStorageWrite owner key' val'
+    pure ()
+  let grouped =
+        foldl'
+          (\acc (owner, key', val') ->
+             M.insertWith M.union owner (M.singleton key' val') acc)
+          M.empty
+          writes
+      applyOwner actionMap owner diffs =
+        Action.omapAdjust
+          (Action.mergeActionData $ Action.ActionData $ Action.SolidVMDiff diffs)
+          owner
+          actionMap
+  Mod.modifyStatefully_ (Mod.Proxy @Action) $
+    Action.actionData %= \actionMap -> M.foldlWithKey' applyOwner actionMap grouped
+
+traceStorageWrite :: Address -> MS.StoragePath -> MS.BasicValue -> ()
+traceStorageWrite owner path value =
+  unsafePerformIO $ case storageTracePath of
+    Just tracePath | not (null tracePath) ->
+      appendFile tracePath $ show owner ++ "\t" ++ show path ++ "\t" ++ show value ++ "\n"
+    _ -> pure ()
+
+{-# NOINLINE storageTracePath #-}
+storageTracePath :: Maybe FilePath
+storageTracePath = unsafePerformIO $ lookupEnv "SOLIDVM_STORAGE_TRACE"
+
 addEvent :: (MonadIO m, Mod.Modifiable (Q.Seq Event) m, Mod.Modifiable (Maybe VmTracer) m) => Event -> m ()
-addEvent newEvent = do
-  Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
+addEvent newEvent = addEvents [newEvent]
+
+addEvents :: (MonadIO m, Mod.Modifiable (Q.Seq Event) m, Mod.Modifiable (Maybe VmTracer) m) => [Event] -> m ()
+addEvents [] = pure ()
+addEvents newEvents = do
+  Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ \s -> pure (s <> Q.fromList newEvents)
   mTracer <- Mod.get (Mod.Proxy @(Maybe VmTracer))
-  traceAddLog mTracer $
-    TraceLog
-      (evContractAddress newEvent)
-      (T.pack $ evName newEvent)
-      [(T.pack n, T.pack v) | (n, _, v, _) <- evArgs newEvent]
+  case mTracer of
+    Nothing -> pure ()
+    Just _ ->
+      for_ newEvents $ \newEvent ->
+        traceAddLog mTracer $
+          TraceLog
+            (evContractAddress newEvent)
+            (T.pack $ evName newEvent)
+            [(T.pack n, T.pack v) | (n, _, v, _) <- evArgs newEvent]
 
 addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Keccak256 -> T.Text -> m ()
 addDelegatecall s c n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c n)
@@ -1167,7 +1216,9 @@ getContractNameAndHash address' = do
     _ -> missingCodeCollection ("contract call to address 0x" ++ formatAddressWithoutColor address' ++ " failed") ("no contract deployed at this address" :: String)
 
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
-getCodeAndCollection address' = do
+getCodeAndCollection address' = profileRunCodeChild
+  RunCodeCallCodeCollectionLookupCompile
+  RunCodeCreationCodeCollectionLookupCompile $ do
   (contractName', ch) <- getContractNameAndHash address'
   isRunningTests <- Env.runningTests <$> getEnv
   cc <- codeCollectionFromHash isRunningTests True ch

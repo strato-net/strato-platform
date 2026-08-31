@@ -7,85 +7,67 @@
 module SolidVM.Solidity.Parse.Types where
 
 import Control.Monad
+import Data.Char (isDigit)
 import Data.List
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.Parse.Expression
 import SolidVM.Solidity.Parse.Lexer
 import SolidVM.Solidity.Parse.ParserTypes
 import Text.Parsec
+import qualified Text.Parsec.Token as P
 
 --import SolidVM.Solidity.Parse.Lexer (identifier)
 
 -- | A type expression is either a composite type (arrays and mappings) or
 -- a simple type (builtins and user-defined names)
 simpleTypeExpression :: SolidityParser SVMType.Type
-simpleTypeExpression = try arrayType <|> simpleType <|> mappingType -- <|> userType
+simpleTypeExpression = do
+  baseElemType <- mappingType <|> simpleType
+  sizeList <- many $ brackets $ optionMaybe intExpr
+  pure $ combineArrayType baseElemType sizeList
 
 -- | Parses builtins and user-defined names
 simpleType :: SolidityParser SVMType.Type
-simpleType =
-  simple "bool" SVMType.Bool
-    <|> simple "address payable" (SVMType.Address True)
-    <|> simple "address" (SVMType.Address False)
-    <|> simple "string" (SVMType.String $ Just True)
-    <|> bytes'
-    <|> simple "decimal" SVMType.Decimal
-    <|> intSuffixed "uint" (SVMType.Int (Just False))
-    <|> intSuffixed "int" (SVMType.Int (Just True))
-    <|> simple "variadic" SVMType.Variadic
-    <|> unknownLabelMemberParser
-    <|> unknownLabelParser
+simpleType = try $ do
+  name <- rawIdentifier
+  case name of
+    "bool" -> pure SVMType.Bool
+    "address" -> do
+      payable <- option False $ True <$ reserved "payable"
+      pure $ SVMType.Address payable
+    "string" -> pure $ SVMType.String $ Just True
+    "byte" -> pure $ SVMType.Bytes Nothing $ Just 1
+    "bytes" -> pure $ SVMType.Bytes (Just True) Nothing
+    "decimal" -> pure SVMType.Decimal
+    "uint" -> pure $ SVMType.Int (Just False) Nothing
+    "int" -> pure $ SVMType.Int (Just True) Nothing
+    "variadic" -> pure SVMType.Variadic
+    _
+      | Just size <- sizedName "bytes" [1 .. 32] name -> pure $ SVMType.Bytes Nothing (Just size)
+      | Just size <- sizedName "uint" [8, 16 .. 256] name -> pure $ SVMType.Int (Just False) (Just $ size `quot` 8)
+      | Just size <- sizedName "int" [8, 16 .. 256] name -> pure $ SVMType.Int (Just True) (Just $ size `quot` 8)
+      | name `elem` P.reservedNames solidityLanguage -> unexpected $ "reserved word " ++ show name
+      | otherwise -> do
+          member <- optionMaybe . try $ dot *> identifier
+          case member of
+            Just memberName -> pure $ SVMType.UnknownLabel $ name ++ "." ++ memberName
+            Nothing -> do
+              isUserDefined <- isInUserDefinedTypes name
+              if isUserDefined
+                then SVMType.UserDefined name . userTypeHelper' <$> getUserDefinedType name
+                else pure $ SVMType.UnknownLabel name
   where
-    unknownLabelParser = try $ do
-      name <- identifier
-      isUserDefined <- isInUserDefinedTypes name
-      if isUserDefined
-        then do
-          typ <- getUserDefinedType name
-          return $ (SVMType.UserDefined name (userTypeHelper' typ))
-        else return $ (SVMType.UnknownLabel name)
-    unknownLabelMemberParser = try $ do
-      name <- concat <$> sequence [identifier, dot, identifier]
-      return $ SVMType.UnknownLabel name
-    simple name nameType = do
-      reserved name
-      return nameType
-    bytes' =
-      -- To avoid shadowing another "bytes"
-      simple "byte" (SVMType.Bytes Nothing $ Just 1)
-        <|> simple "bytes" (SVMType.Bytes (Just True) Nothing)
-        <|> lexeme
-          ( try $ do
-              let base = "bytes"
-              chars <- many1 alphaNum
+    sizedName typePrefix validSizes candidate = do
+      suffix <- stripPrefix typePrefix candidate
+      guard $ not $ null suffix
+      guard $ all isDigit suffix
+      size <- readMaybeExact suffix
+      guard $ size `elem` validSizes
+      pure size
 
-              when (not (base `isPrefixOf` chars)) $ fail "missing 'bytes'"
-
-              size <-
-                case reads (drop (length base) chars) of
-                  [] -> return Nothing
-                  [(number, "")] -> do
-                    when (not $ number `elem` [1 .. 32]) $ fail "invalid bytes size"
-                    return $ Just number
-                  _ -> fail "invalid bytes size"
-
-              return $ SVMType.Bytes Nothing size
-          )
-    intSuffixed base baseType = lexeme $
-      try $ do
-        chars <- many1 alphaNum
-
-        when (not (base `isPrefixOf` chars)) $ fail "missing base"
-
-        number <-
-          case reads (drop (length base) chars) of
-            [] -> return Nothing
-            [(number, "")] -> do
-              when (not $ number `elem` [8, 16 .. 256]) $ fail "invalid size"
-              return $ Just $ number `quot` 8 -- in bytes
-            _ -> fail "invalid size"
-
-        return $ baseType number
+    readMaybeExact digits = case reads digits of
+      [(number, "")] -> Just number
+      _ -> Nothing
 
 -- | Parses array types, allowing arithmetic expressions to specify the
 -- array length so long as they only reference explicit numbers.  Note that
@@ -93,13 +75,13 @@ simpleType =
 -- as in C.
 arrayType :: SolidityParser SVMType.Type
 arrayType = do
-  baseElemType <- simpleType <|> mappingType
+  baseElemType <- mappingType <|> simpleType
   sizeList <- many1 $ brackets $ optionMaybe intExpr
-  return $ combine baseElemType sizeList
-  where
-    combine :: SVMType.Type -> [Maybe Word] -> SVMType.Type
-    combine t [] = t
-    combine t (l : ls) = combine (SVMType.Array t l) ls
+  return $ combineArrayType baseElemType sizeList
+
+combineArrayType :: SVMType.Type -> [Maybe Word] -> SVMType.Type
+combineArrayType t [] = t
+combineArrayType t (l : ls) = combineArrayType (SVMType.Array t l) ls
 
 -- | Parses mapping types, ignoring possible restrictions on what the
 -- domain and codomain can be.

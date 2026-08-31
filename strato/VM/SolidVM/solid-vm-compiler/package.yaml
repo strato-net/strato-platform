@@ -30,3 +30,4 @@ library:
   - strato-model
   - text
   - transformers
+  - vm-tools

@@ -149,17 +149,24 @@ nodeData2NodeRef ::
   (MonadLogger m, (MP.StateRoot `A.Alters` MP.NodeData) m) =>
   MP.NodeData ->
   m MP.NodeRef
-nodeData2NodeRef nodeData =
-  case rlpSerialize $ rlpEncode nodeData of
-    bytes | BC.length bytes < 32 -> return $ MP.smallRef bytes
-    _ -> MP.ptrRef <$> putNodeData nodeData
+nodeData2NodeRef nodeData = do
+  let bytes = MP.serializeNodeData nodeData
+  if BC.length bytes < 32
+    then return $ MP.smallRef bytes
+    else do
+      -- Reuse the bytes already forced for the inline-node check. Calling
+      -- putNodeData here would serialize the same large node a second time.
+      let ptr = keccak256ToByteString $ hash bytes
+          sr = MP.StateRoot ptr
+      A.insert A.Proxy sr nodeData
+      return $ MP.ptrRef sr
 
 putNodeData ::
   (MonadLogger m, (MP.StateRoot `A.Alters` MP.NodeData) m) =>
   MP.NodeData ->
   m MP.StateRoot
 putNodeData nd = do
-  let bytes = rlpSerialize $ rlpEncode nd
+  let bytes = MP.serializeNodeData nd
       ptr = keccak256ToByteString $ hash bytes
       sr = MP.StateRoot ptr
   when debug $

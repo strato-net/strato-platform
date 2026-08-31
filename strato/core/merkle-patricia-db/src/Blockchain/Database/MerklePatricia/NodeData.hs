@@ -25,6 +25,7 @@ module Blockchain.Database.MerklePatricia.NodeData
     smallRef,
     ptrRef,
     emptyRef,
+    serializeNodeData,
     proveMP,
     verifyMP,
     module Data.Ranged,
@@ -245,6 +246,38 @@ instance RLPSerializable a => RLPSerializable (Proof a) where
   rlpDecode = rlpDecode1
 
 type NodeData = NodeDataF StateRoot
+
+-- | Serialize a trie node without decoding already-serialized inline child
+-- references into 'RLPObject' values and immediately serializing them again.
+-- The output is byte-for-byte identical to @rlpSerialize . rlpEncode@.
+serializeNodeData :: NodeData -> B.ByteString
+serializeNodeData EmptyNodeData = B.singleton 0x80
+serializeNodeData (FullNodeData cs val) = serializeArray $
+  map serializeChoice cs ++ [maybe (B.singleton 0x80) rlpSerialize val]
+  where
+    serializeChoice (Left encoded) = encoded
+    serializeChoice (Right sr) = rlpSerialize $ rlpEncode sr
+serializeNodeData (ShortcutNodeData key val) = serializeArray
+  [ rlpSerialize . rlpEncode $ termNibbleString2String terminator key,
+    case val of
+      Left (Left encoded) -> encoded
+      Left (Right sr) -> rlpSerialize $ rlpEncode sr
+      Right rawVal -> rlpSerialize rawVal
+  ]
+  where
+    terminator = case val of
+      Left _ -> False
+      Right _ -> True
+
+serializeArray :: [B.ByteString] -> B.ByteString
+serializeArray encodedItems =
+  let payload = B.concat encodedItems
+      payloadLength = B.length payload
+   in if payloadLength <= 55
+        then B.cons (0xc0 + fromIntegral payloadLength) payload
+        else
+          let lengthBytes = int2Bytes payloadLength
+           in B.pack (0xf7 + fromIntegral (length lengthBytes) : lengthBytes) <> payload
 
 type NodeDataProof = Compose Proof NodeDataF
 

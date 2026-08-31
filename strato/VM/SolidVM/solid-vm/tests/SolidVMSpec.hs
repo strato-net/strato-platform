@@ -68,6 +68,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Char
+import Data.Foldable (toList)
 import qualified Data.List as L
 import qualified Data.Map as M
 import Data.Maybe
@@ -80,8 +81,8 @@ import qualified LabeledError
 import qualified Numeric (readHex, showHex)
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
-import SolidVM.Model.Value (Value(..))
-import Test.Hspec (Selector, Spec, anyException, it, pendingWith, shouldThrow, xdescribe, xit)
+import SolidVM.Model.Value (Value(..), Variable (..))
+import Test.Hspec (Selector, Spec, anyException, describe, it, pendingWith, shouldThrow, xdescribe, xit)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -762,6 +763,29 @@ iAddress = IAccount . unspecifiedChain
 
 spec :: Spec
 spec = do
+  describe "transaction argument literal fast path" $ do
+    it "decodes the scalar forms emitted by the transaction marshaler" $ do
+      SVM.parseTransactionArgValueFast "42" `shouldBe` Just (SInteger 42)
+      SVM.parseTransactionArgValueFast "-5" `shouldBe` Just (SInteger (-5))
+      SVM.parseTransactionArgValueFast "true" `shouldBe` Just (SBool True)
+      SVM.parseTransactionArgValueFast "\"hello\"" `shouldBe` Just (SString "hello")
+      SVM.parseTransactionArgValueFast "string(\"123\")" `shouldBe` Just (SString "123")
+      SVM.parseTransactionArgValueFast "\"00000000000000000000000000000000deadbeef\""
+        `shouldBe` Just (SAddress 0xdeadbeef False)
+      SVM.parseTransactionArgValueFast "bytes(\"00ff\")" `shouldBe` Just (SBytes "\NUL\255")
+
+    it "decodes nested arrays without mistaking quoted commas for separators" $
+      case SVM.parseTransactionArgValueFast "[1,\"a,b\",[2,false]]" of
+        Just (SArray values) -> case toList values of
+          [Constant (SInteger 1), Constant (SString "a,b"), Constant (SArray nested)] ->
+            toList nested `shouldBe` [Constant (SInteger 2), Constant (SBool False)]
+          values' -> expectationFailure $ "unexpected fast array values: " ++ show values'
+        other -> expectationFailure $ "unexpected fast argument result: " ++ show other
+
+    it "fails closed so unsupported literals use the authoritative parser" $ do
+      SVM.parseTransactionArgValueFast "{x:1}" `shouldBe` Nothing
+      SVM.parseTransactionArgValueFast "\"unsupported\\nescape\"" `shouldBe` Nothing
+
   xdescribe "Ballot" $ do
     it "can be created" . runTest $ do
       runFileArgs ["\"a\"","\"b\"","\"c\""] "testdata/Ballot.sol"
@@ -5885,6 +5909,60 @@ contract qq {
   }
 }|]
       `shouldReturn` Just "(true)"
+
+  it "preserves an implicit address value written to a contract-valued mapping" . runTest $ do
+    runCall'
+      "setOracle"
+      ["[0x1002]"]
+      [r|
+
+contract PriceOracle {}
+
+contract qq {
+  mapping(address => PriceOracle) rateOracles;
+
+  function setOracle(address[] oracles) public {
+    address tokenAddr = address(0xc6c3e9881665d53ae8c222e24ca7a8d069aa56ca);
+    rateOracles[tokenAddr] = oracles[0];
+  }
+}|]
+      `shouldReturn` Just "()"
+    getAll
+      [ [ Field "rateOracles",
+          MapIndex (iAddress 0xc6c3e9881665d53ae8c222e24ca7a8d069aa56ca)
+        ]
+      ]
+      `shouldReturn` [BAddress 0x1002]
+
+  it "falls back before storage deletes can expose partial IR writes" . runTest $ do
+    runCall'
+      "cancel"
+      ["true"]
+      [r|
+
+contract qq {
+  mapping(uint => uint) requests;
+  uint queueHead = 1;
+  uint queueTail = 1;
+
+  function cancel(bool lastRequest) public {
+    requests[1] = 7;
+    delete requests[1];
+    if (lastRequest) {
+      delete queueHead;
+      queueTail = 0;
+    } else {
+      queueHead = 2;
+    }
+  }
+}|]
+      `shouldReturn` Just "()"
+    getAll
+      [ [Field "requests", MapIndex (INum 1)],
+        [Field "queueHead"],
+        [Field "queueTail"]
+      ]
+      `shouldReturn` [BDefault, BDefault, BDefault]
 
   it "can use string.concat(x,y) to concatenate any amount of strings" . runTest $ do
     runCall'

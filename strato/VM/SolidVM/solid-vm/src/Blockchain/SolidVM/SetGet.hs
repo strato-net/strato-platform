@@ -40,6 +40,7 @@ import Blockchain.Data.Util
 import Blockchain.DB.SolidStorageDB
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
+import Blockchain.PhaseProfile
 import Blockchain.SolidVM.SM
 import Blockchain.EthConf (ethConf, networkConfig)
 import qualified Blockchain.EthConf.Model as Conf
@@ -147,15 +148,22 @@ setVal dst@(SReference path) src = do
   case basicSrc of
     Nothing -> typeError "non basic solidity type cannot be stored atomically" $ show src
     Just b -> do
-      markDiffForAction addr path b
-      putSolidStorageKeyVal' addr path b
+      profileRunCodeStatementChild
+        RunCodeCallStatementStorageWrite
+        RunCodeCreationStatementStorageWrite $ do
+          markDiffForAction addr path b
+          putSolidStorageKeyVal' addr path b
 setVal (SInteger dst) (SInteger _) = immutableError "Cannot assign immutable or constants after assigned ->" dst -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)
 setVal (SNULL) _ = return ()
 setVal dst src = typeError "unknown case called in setVal (Probably tried to change the value of a constant):" ("src = " ++ show src ++ ", dst = " ++ show dst)
 
-getStorageValue :: HasSolidStorageDB m => Address -> MS.StoragePath -> m Value
+getStorageValue :: (MonadIO m, HasSolidStorageDB m) => Address -> MS.StoragePath -> m Value
 getStorageValue addr key = do
-  theValue <- getSolidStorageKeyVal' addr key
+  noteRunCodeStorageRead
+  theValue <- profileRunCodeStatementChild
+    RunCodeCallStatementStorageRead
+    RunCodeCreationStatementStorageRead $
+      getSolidStorageKeyVal' addr key
   case theValue of
     MS.BDefault -> pure $ SReference key
     _ -> pure $ fromBasic theValue
@@ -292,8 +300,11 @@ deleteVar (Constant (SReference path)) = do
   let ro = readOnly cci
       addr = currentAddress cci
   when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
-  markDiffForAction addr path $ MS.BDefault
-  putSolidStorageKeyVal' addr path $ MS.BDefault
+  profileRunCodeStatementChild
+    RunCodeCallStatementStorageWrite
+    RunCodeCreationStatementStorageWrite $ do
+      markDiffForAction addr path $ MS.BDefault
+      putSolidStorageKeyVal' addr path $ MS.BDefault
 deleteVar v = todo "deleteVar not yet supported for local variables" $ show v
 
 showSM :: MonadSM m => Value -> m String
