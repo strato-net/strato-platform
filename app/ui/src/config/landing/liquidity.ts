@@ -1,5 +1,6 @@
 import { Percent } from "lucide-react";
 import goldstImage from "@/assets/landing/goldst.png";
+import silvstImage from "@/assets/landing/silvst.png";
 import usdcImage from "@/assets/landing/usdc.png";
 import usdstImage from "@/assets/landing/usdst.png";
 import usdtImage from "@/assets/landing/usdt.png";
@@ -57,7 +58,8 @@ export const liquidity: ProductLandingConfig = {
       { label: "USDC / USDST", images: [usdcImage, usdstImage] },
       { label: "GOLDST / USDST", images: [goldstImage, usdstImage] },
       { label: "USDT / USDST", images: [usdtImage, usdstImage] },
-      "+2 more pools",
+      // Live SILVST token image from mainnet asset metadata (fileserver.mercata.blockapps.net).
+      { label: "SILVST / USDST", images: [silvstImage, usdstImage] },
     ],
   },
 
