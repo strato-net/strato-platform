@@ -55,6 +55,10 @@ semantic oracle, so every retained change still needs integration coverage.
 1. Move process-global caches into the VM context and bound them by memory, not
    only entry count. Include failure, reorg, no-commit, and concurrent-reader
    lifecycle tests.
+   *Partially done (strato-net/private#96): every cache is entry-bounded with
+   generational eviction, sized from `--vmCacheBudgetMB` using per-entry byte
+   estimates (see `Blockchain.VMCacheBudget`). The account/storage read caches
+   are still process-global, keyed by state root.*
 2. Restore or canonically compare every normal VM/index output when
    `sqlDiff=false`. If indexing is intentionally deferred, put suppression
    behind an explicit non-validator `catchupNoIndex` role with a rebuild path.

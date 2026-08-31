@@ -128,15 +128,16 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
     getStakeDeltasFromEvents (Just stakingAddr) evs `shouldBe` M.fromList [(v1, 7), (v2, 0)]
     getStakeDeltasFromEvents Nothing evs `shouldBe` M.empty
 
-  -- The test config is the default (upquark-shaped, staking not scheduled), so
-  -- the block-reward receipt fork must track the staking activation height
-  -- rather than switching on its own. Only helium carries a bespoke height.
+  -- The test config is the default (upquark-shaped, staking scheduled at
+  -- 1,000,000 since 3b5a4e0daf), so the block-reward receipt fork must track
+  -- the staking activation height rather than switching on its own. Only
+  -- helium carries a bespoke height.
   it "ties the block-reward receipt fork to staking activation off helium" $ do
-    let stakingNotScheduled = 2 ^ (62 :: Int) :: Integer
+    let upquarkStakingActivation = 1000000 :: Integer
     isBlockRewardReceiptForkActive 0 `shouldBe` False
     isBlockRewardReceiptForkActive 320000 `shouldBe` False
-    isBlockRewardReceiptForkActive (stakingNotScheduled - 1) `shouldBe` False
-    isBlockRewardReceiptForkActive stakingNotScheduled `shouldBe` True
+    isBlockRewardReceiptForkActive (upquarkStakingActivation - 1) `shouldBe` False
+    isBlockRewardReceiptForkActive upquarkStakingActivation `shouldBe` True
 
   it "reads ValidatorStakeUpdated once the source is governance" $ do
     let govAddr = Address 0x100

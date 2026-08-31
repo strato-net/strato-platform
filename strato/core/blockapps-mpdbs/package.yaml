@@ -39,11 +39,17 @@ library:
   - transformers
   - unliftio-core
   - monad-logger
+  - unordered-containers
+  - hashable
 
 tests:
   blockapps-mpdbs-test:
     source-dirs: test/
     main: Main.hs
+    # StorageSpec is excluded: it no longer compiles against the current
+    # model (Blockchain.Strato.Model.Account / BAccount are gone).
+    other-modules:
+      - GenerationalCacheSpec
     dependencies:
       - blockapps-mpdbs
       - blockapps-data

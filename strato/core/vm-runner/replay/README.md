@@ -76,7 +76,10 @@ for the frozen replay and live-sync measurements. See
 rejected experiments, and remaining PR gates.
 
 The current optimizer deliberately trades memory for fewer LevelDB reads and
-less repeated SolidVM compilation. The measured VM RSS increase is material.
-Process-global caches and unbounded code/reverse-hash caches must be made
-context-local and byte-bounded before this is presented as a production-ready
-general VM change.
+less repeated SolidVM compilation. Every cache is now entry-bounded with
+generational eviction (see `Blockchain.Cache.Generational`), sized from one
+`--vmCacheBudgetMB` flag that strato-setup picks per RAM tier
+(strato-net/private#96). The account and storage read caches remain
+process-global rather than context-local; that is acceptable because the keys
+carry the state root, but a second in-process Context still shares their
+capacity.
