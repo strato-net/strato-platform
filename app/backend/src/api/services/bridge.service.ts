@@ -15,6 +15,8 @@ import {
   executeParallelQueries,
   parseBridgeRouteMappings,
   parseNativeBridgeAssets,
+  parseNativeLockedBalances,
+  parseNativeTokenBridgeConfigs,
   QUERY_CONFIGS 
 } from "../helpers/bridge.helper";
 import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction } from "@strato/shared-types";
@@ -25,7 +27,15 @@ import { getSaveUsdstActionState, SaveUsdstActionState } from "./saveUsdst.servi
 import { getConfigs as getMetalForgeConfigs, Config as MetalForgeConfig } from "./metalForge.service";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 
-const { MercataBridge, StratoNativeBridge, Token, mercataBridge, DECIMALS, USDST } = constants;
+const {
+  MercataBridge,
+  StratoNativeBridge,
+  StratoNativeCustodyVault,
+  Token,
+  mercataBridge,
+  DECIMALS,
+  USDST,
+} = constants;
 
 const stripPagingParams = (
   params: Record<string, string | undefined>
@@ -147,6 +157,38 @@ export const requestWithdrawal = async (
   );
 };
 
+export const validateNativeWithdrawalRoute = (
+  nativeRoute: BridgeToken | undefined,
+  stratoTokenAmount: string
+): void => {
+  if (!nativeRoute || !nativeRoute.enabled) {
+    throw new Error("Native bridge route is unavailable");
+  }
+  if (nativeRoute.withdrawalsPaused) {
+    throw new Error("Native bridge withdrawals are paused");
+  }
+  if (nativeRoute.withdrawalsDisabled) {
+    throw new Error("Native token withdrawals are disabled");
+  }
+
+  const requestedAmount = BigInt(stratoTokenAmount);
+  const maxPerWithdrawal = BigInt(nativeRoute.maxPerWithdrawal || "0");
+  if (maxPerWithdrawal > 0n && requestedAmount > maxPerWithdrawal) {
+    throw new Error("Native withdrawal exceeds the per-withdrawal cap");
+  }
+
+  const maxOutstandingWithdrawal = BigInt(nativeRoute.maxOutstandingWithdrawal || "0");
+  const remainingOutstandingWithdrawal = BigInt(
+    nativeRoute.remainingOutstandingWithdrawal || "0"
+  );
+  if (
+    maxOutstandingWithdrawal > 0n
+    && requestedAmount > remainingOutstandingWithdrawal
+  ) {
+    throw new Error("Native withdrawal exceeds the remaining aggregate capacity");
+  }
+};
+
 export const requestNativeWithdrawal = async (
   accessToken: string,
   {
@@ -163,6 +205,14 @@ export const requestNativeWithdrawal = async (
   if (!constants.stratoNativeCustodyVault) {
     throw new Error("STRATO_NATIVE_CUSTODY_VAULT is not configured");
   }
+
+  const nativeRoute = (await getBridgeableTokens(accessToken, externalChainId)).find(
+    (token) =>
+      token.routeType === "native"
+      && token.stratoToken.toLowerCase().replace(/^0x/, "")
+        === stratoToken.toLowerCase().replace(/^0x/, "")
+  );
+  validateNativeWithdrawalRoute(nativeRoute, stratoTokenAmount);
 
   const tx = await buildFunctionTx(
     [
@@ -280,7 +330,13 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
   };
   if (chainId) nativeParams["key2"] = `eq.${chainId}`;
 
-  const [standardResponse, nativeResponse, nativeBridgeResponse] = await Promise.all([
+  const [
+    standardResponse,
+    nativeResponse,
+    nativeBridgeResponse,
+    nativeTokenConfigResponse,
+    nativeLockedBalanceResponse,
+  ] = await Promise.all([
     cirrus.get(accessToken, "/mapping", { params: standardParams }),
     constants.stratoNativeBridge
       ? cirrus.get(accessToken, `/${StratoNativeBridge}-assets`, { params: nativeParams })
@@ -294,6 +350,22 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
           }
         })
       : Promise.resolve({ data: [] }),
+    constants.stratoNativeBridge
+      ? cirrus.get(accessToken, `/${StratoNativeBridge}-tokenBridgeConfigs`, {
+          params: {
+            address: `eq.${constants.stratoNativeBridge}`,
+            select: "key,value",
+          }
+        })
+      : Promise.resolve({ data: [] }),
+    constants.stratoNativeCustodyVault
+      ? cirrus.get(accessToken, `/${StratoNativeCustodyVault}-lockedBalance`, {
+          params: {
+            address: `eq.${constants.stratoNativeCustodyVault}`,
+            select: "key,lockedBalance:value::text",
+          }
+        })
+      : Promise.resolve({ data: [] }),
   ]);
 
   const standardRoutes = Array.isArray(standardResponse.data)
@@ -302,11 +374,17 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
   const nativeBridgeState = Array.isArray(nativeBridgeResponse.data)
     ? nativeBridgeResponse.data[0]
     : undefined;
+  const nativeTokenConfigs = Array.isArray(nativeTokenConfigResponse.data)
+    ? parseNativeTokenBridgeConfigs(nativeTokenConfigResponse.data as NativeBridgeAssetRow[])
+    : new Map();
+  const nativeLockedBalances = Array.isArray(nativeLockedBalanceResponse.data)
+    ? parseNativeLockedBalances(nativeLockedBalanceResponse.data as NativeBridgeAssetRow[])
+    : new Map();
   const nativeRoutes = Array.isArray(nativeResponse.data)
     ? parseNativeBridgeAssets(nativeResponse.data as NativeBridgeAssetRow[], {
         depositsPaused: nativeBridgeState?.depositsPaused === true,
         withdrawalsPaused: nativeBridgeState?.withdrawalsPaused === true,
-      })
+      }, nativeTokenConfigs, nativeLockedBalances)
     : [];
   const routes = [...standardRoutes, ...nativeRoutes];
   if (!routes.length) return [];
