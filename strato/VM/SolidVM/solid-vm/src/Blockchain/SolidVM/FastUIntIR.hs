@@ -44,6 +44,7 @@ import Data.Function (on)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
 import GHC.Generics (Generic)
 
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Map.Strict as M
 import Data.Maybe (catMaybes, fromMaybe, isJust, isNothing, listToMaybe, mapMaybe)
 import qualified Data.Set as Set
@@ -54,6 +55,7 @@ import SolidVM.Model.CodeCollection (CodeCollection, Contract, Func)
 import qualified SolidVM.Model.CodeCollection as CC
 import qualified SolidVM.Model.CodeCollection.VariableDecl as VD
 import SolidVM.Model.SolidString (SolidString, labelToString)
+import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Model.Value (Value (..))
 import System.Environment (lookupEnv)
@@ -2050,7 +2052,18 @@ compileStmt cc current ret = \case
           Just slot -> pure $ arrayBinding slot
           Nothing -> case M.lookup name (csObjects s) of
             Just slot -> pure $ objectBinding slot
-            Nothing -> compileExpr cc current e
+            Nothing
+              -- The canonical evaluator retains a direct storage variable as
+              -- an SReference in Event.evArgs (jsonSM resolves it only for the
+              -- index event).  Receipt encoding intentionally drops that
+              -- reference-shaped value.  Materializing it as a scalar here
+              -- changes the post-fork receipts root even when state and the
+              -- externally rendered event are identical.
+              | M.notMember name (csNames s), isJust (storageDecl cc current name) -> do
+                  r <- fresh
+                  emit $ UObjectLit r (SReference . MS.singleton . BC.pack $ labelToString name)
+                  pure r
+              | otherwise -> compileExpr cc current e
       compileEventArg e = compileExpr cc current e
   CC.SimpleStatement
     (CC.ExpressionStatement (CC.Binary _ "=" (CC.TupleExpression _ dests) rhs))

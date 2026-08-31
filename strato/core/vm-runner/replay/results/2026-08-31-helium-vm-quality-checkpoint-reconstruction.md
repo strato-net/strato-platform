@@ -1,8 +1,8 @@
 # Helium VM quality-checkpoint reconstruction
 
 This document reconstructs the targeted Helium replay work after the host
-interruption on 2026-08-31. It distinguishes the recovered source checkpoint
-from performance that can still be reproduced.
+interruption on 2026-08-31. It records both the recovered source checkpoint
+and the subsequently reproduced quality-run performance.
 
 ## Recovered checkpoint
 
@@ -125,6 +125,47 @@ full-pipeline replay on the replacement corpus and checkpoint, blocks
 The terminal block hash, state root, 5,980 accounts, 47,759 storage entries,
 5,056 transactions, and two expected execution errors all matched the rebuilt
 checkpoint evidence exactly.
+
+### Controlled clean-service reproduction
+
+The exact recorded candidate-136-to-candidate-137 source and build sequence was
+then replayed in its original worktree path. It deterministically produced
+binary SHA-256
+`1cf986ccad86550d62df9747637101b2f5a68b613cd1f821ea4377cce9117c9e`,
+with source tree
+`1b86bc5f698d2a4256ebeb212d5970dac0569d82` and patch SHA-256
+`d6da7dd99c40b6918306dd1b8a1696f06e8049d483bcd6cd89b8f115f71e6b81`.
+The lost `f21e36b...` executable therefore remains non-byte-reproducible, but
+the exact source and build history are reproducible.
+
+A compact, audited block-29,999 checkpoint was built from genesis. Running the
+reconstructed binary against previously reused Redis/Kafka services produced
+only 146.23 blk/s over blocks 30,000-39,999 and allocated 195,101,108,920
+bytes. Repeating the same range and binary with an empty Redis database and a
+new Kafka broker restored the historical allocation fingerprint and
+throughput. Each subsequent range also used an empty Redis database and a new
+Kafka broker, with service resets disabled so no existing benchmark state was
+deleted.
+
+| Range | Blocks | Transactions | Reproduced rate | Process wall | Peak RSS | Allocated bytes | Audit |
+|---|---:|---:|---:|---:|---:|---:|---|
+| 30,000-39,999 | 10,000 | 24,553 | 273.15 blk/s | 36.80 s | 3,600,154,624 | 153,310,193,144 | exact |
+| 40,000-44,999 | 5,000 | 5,056 | 282.25 blk/s | 17.89 s | 2,689,646,592 | 80,284,846,352 | exact |
+| 45,000-97,125 | 52,126 | 96,522 | 203.12 blk/s | 257.12 s | 10,136,256,512 | 928,637,338,680 | exact |
+
+The corresponding result receipts are:
+
+- `cfgfallback137-recovery-fresh-services-contract-30000-39999-20260831-05.result.txt`
+- `cfgfallback137-recovery-fresh-services-ordinary-40000-44999-20260831-06.result.txt`
+- `cfgfallback137-recovery-fresh-services-checkpoint-45000-97125-20260831-07.result.txt`
+
+All three rates exceed the original 263.85, 269.05, and 194.19 blk/s
+checkpoints. Their terminal block hashes, state roots, account counts, storage
+entry counts, transaction counts, and expected execution-error counts match
+the historical receipts. The allocation differences from the historical runs
+are only 94,640 bytes, 3,920 bytes, and 279,328 bytes respectively. This
+isolates reused benchmark-service state, rather than a lost source
+optimization, as the cause of the misleading slow reconstruction result.
 
 ## Restored source checks
 
