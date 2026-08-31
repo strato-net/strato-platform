@@ -9,6 +9,7 @@ import { isAuthenticated, logout as authLogout, redirectToSignedOutLanding, WALL
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE, ADMIN_VOTE_OPEN_ISSUES_PER_PAGE } from "@/lib/constants";
 import { readAttribution, clearAttribution } from "@/lib/attribution";
 import { trackWalletConnected } from "@/lib/tracking";
+import { capture, identifyUser, resetUser } from "@/lib/analytics";
 import { ensureStratoChainInWallet } from "@/lib/stratoChain";
 import { clearExternalWalletActive } from "@/lib/stratoWallet";
 import { ensureHexPrefix } from "@/utils/numberUtils";
@@ -111,22 +112,34 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
               setIsAdmin(serverIsAdmin);
             }
 
-            // GA4 attribution: tag all subsequent events with user_id, and fire
-            // signup_completed exactly once for brand-new users.
-            const gtag = (window as any).gtag;
-            if (gtag && newUserAddress) {
-              gtag('set', { user_id: newUserAddress });
+            // Analytics attribution: tag all subsequent events with the user,
+            // and fire signup_completed exactly once for brand-new users.
+            // GA4 and PostHog are kept independent — PostHog must still
+            // identify when gtag failed to load (ad blockers, no GA id set) —
+            // and attribution is read once and cleared only after both have
+            // consumed it.
+            if (newUserAddress) {
+              const gtag = (window as any).gtag;
+              gtag?.('set', { user_id: newUserAddress });
+              identifyUser({
+                address: newUserAddress,
+                userName,
+                isAdmin: serverIsAdmin,
+              });
+
               if (data.isNewUser) {
-                const attribution = readAttribution() ?? {};
-                gtag('event', 'signup_completed', {
-                  utm_source: (attribution as any).utm_source ?? '(direct)',
-                  utm_medium: (attribution as any).utm_medium ?? '(none)',
-                  utm_campaign: (attribution as any).utm_campaign ?? '(none)',
-                  utm_content: (attribution as any).utm_content ?? '(none)',
-                  via: (attribution as any).via ?? '(none)',
-                  landing_url: (attribution as any).landing_url ?? null,
-                  referrer: (attribution as any).referrer ?? null,
-                });
+                const attribution = (readAttribution() ?? {}) as Record<string, unknown>;
+                const signupProps = {
+                  utm_source: attribution.utm_source ?? '(direct)',
+                  utm_medium: attribution.utm_medium ?? '(none)',
+                  utm_campaign: attribution.utm_campaign ?? '(none)',
+                  utm_content: attribution.utm_content ?? '(none)',
+                  via: attribution.via ?? '(none)',
+                  landing_url: attribution.landing_url ?? null,
+                  referrer: attribution.referrer ?? null,
+                };
+                gtag?.('event', 'signup_completed', signupProps);
+                capture('signup_completed', signupProps);
                 clearAttribution();
               }
             }
@@ -304,17 +317,29 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     setConnectedWalletAddress(externalWalletAddress);
   }, [externalWalletAddress]);
 
+  const walletConnectedCapturedRef = useRef<Set<string>>(new Set());
+
   // Tracking-links beacon: fires when a wallet or STRATO account becomes
   // available, whichever arrives first (guest wallet connects included).
   // Deduped per address inside trackWalletConnected, so the STRATO connector
   // surfacing the same address via wagmi and OAuth reports only once.
   useEffect(() => {
     if (!externalWalletAddress && !stratoAddress) return;
-    trackWalletConnected({
-      externalWalletAddress,
-      stratoAddress,
-      connector: account.connector?.id ?? account.connector?.name ?? null,
-    });
+    const connector = account.connector?.id ?? account.connector?.name ?? null;
+    trackWalletConnected({ externalWalletAddress, stratoAddress, connector });
+
+    // trackWalletConnected dedupes inside its own module, so the analytics
+    // event needs its own guard: this effect also re-runs when the connector id
+    // resolves after the address, which would otherwise double-count.
+    const key = (stratoAddress ?? externalWalletAddress ?? '').toLowerCase();
+    if (key && !walletConnectedCapturedRef.current.has(key)) {
+      walletConnectedCapturedRef.current.add(key);
+      capture('wallet_connected', {
+        connector,
+        has_external_wallet: !!externalWalletAddress,
+        has_strato_address: !!stratoAddress,
+      });
+    }
   }, [externalWalletAddress, stratoAddress, account.connector?.id]);
 
   useEffect(() => {
@@ -327,7 +352,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const openWalletConnect = () => {
-      if (!account.isConnected) openConnectModal?.();
+      if (!account.isConnected) {
+        capture('wallet_connect_requested');
+        openConnectModal?.();
+      }
     };
 
     window.addEventListener(WALLET_CONNECT_REQUEST_EVENT, openWalletConnect);
@@ -401,6 +429,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.removeItem("user");
     const gtag = (window as any).gtag;
     if (gtag) gtag('set', { user_id: null });
+    resetUser();
     authLogout();
   }, [disconnect]);
 

@@ -4,6 +4,7 @@ import App from './App.tsx'
 import './index.css'
 import { captureAttribution } from './lib/attribution'
 import { trackEngage } from './lib/tracking'
+import { registerEnvironment } from './lib/analytics'
 
 // Capture inbound UTM attribution BEFORE anything else. This must run before
 // React mounts and before any Keycloak redirect, which strips the query string.
@@ -26,6 +27,9 @@ if (posthogKey && posthogKey.trim() !== '') {
     capture_pageview: 'history_change',
     person_profiles: 'identified_only',
   });
+  // Stamp every event with the deployment's network so mainnet and testnet
+  // traffic can be separated in every insight.
+  registerEnvironment();
 }
 
 // Conditionally load Google Analytics
