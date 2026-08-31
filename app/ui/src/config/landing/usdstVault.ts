@@ -1,5 +1,5 @@
-import { PiggyBank, Vault } from "lucide-react";
 import usdstImage from "@/assets/landing/usdst.png";
+import savingsVaultImage from "@/assets/landing/usdst-savings-vault.png";
 import { EXTERNAL_LINKS } from "@/config/externalLinks";
 import type { ProductLandingConfig } from "./types";
 
@@ -10,7 +10,7 @@ export const usdstVault: ProductLandingConfig = {
   appPath: "/dashboard/earn-save",
 
   hero: {
-    icon: Vault,
+    images: [savingsVaultImage],
     eyebrow: "USDST Savings Vault",
     headline: "Earn More With USDST.",
     subhead:
@@ -79,7 +79,7 @@ export const usdstVault: ProductLandingConfig = {
       link: { label: "Explore USDST", href: `${EXTERNAL_LINKS.docs}/usdst` },
     },
     {
-      icon: PiggyBank,
+      images: [savingsVaultImage],
       tag: "Savings Vault",
       title: "Deposit Once. Earn Automatically.",
       body: "Your deposit becomes saveUSDST. Native yield accrues in the share value while eligible STRATO Reward Points build alongside it.",

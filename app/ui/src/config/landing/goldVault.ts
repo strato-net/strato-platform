@@ -1,5 +1,5 @@
-import { Vault } from "lucide-react";
 import goldstImage from "@/assets/landing/goldst.png";
+import goldVaultImage from "@/assets/landing/goldst-yield-vault.png";
 import { EXTERNAL_LINKS } from "@/config/externalLinks";
 import type { ProductLandingConfig } from "./types";
 
@@ -10,7 +10,7 @@ export const goldVault: ProductLandingConfig = {
   appPath: "/dashboard/earn-yield-vault?vault=goldst-yield",
 
   hero: {
-    images: [goldstImage],
+    images: [goldVaultImage],
     eyebrow: "GOLDST Yield Vault",
     headline: "Get Your Gold Onchain. Make It Productive.",
     subhead:
@@ -81,7 +81,7 @@ export const goldVault: ProductLandingConfig = {
       link: { label: "Explore GOLDST", href: `${EXTERNAL_LINKS.website}/defi/gold` },
     },
     {
-      icon: Vault,
+      images: [goldVaultImage],
       tag: "Yield Vault",
       title: "Deposit GOLDST. Earn Points.",
       body: "Your deposit becomes yieldGOLDST while eligible STRATO Reward Points accrue alongside your vault position.",
