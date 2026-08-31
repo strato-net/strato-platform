@@ -52,7 +52,7 @@ import Blockchain.SyncDB
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Validator
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import ClassyPrelude (atomically)
+import ClassyPrelude (atomically, deepseq)
 import Conduit
 import Control.Concurrent.AlarmClock
 import Control.Concurrent.STM.TMChan
@@ -84,7 +84,12 @@ data SequencerContext = SequencerContext
     _latestViewAndProposal :: IORef (View, Maybe Block),
     -- | The view a no-proposal timer is currently armed for, if any. Keeps
     -- 'createNewViewTimer' to one live AlarmClock per view.
-    _armedViewTimer :: IORef (Maybe View)
+    _armedViewTimer :: IORef (Maybe View),
+    -- | The round timer's one shared AlarmClock (allocated on first use), and
+    -- the (view, fire time) it is currently armed for. Keeps 'createNewTimer'
+    -- to a single live AlarmClock no matter how many times it is re-armed.
+    _roundTimerClock :: IORef (Maybe (AlarmClock UTCTime)),
+    _armedRoundTimer :: IORef (Maybe (View, UTCTime))
   }
 
 makeLenses ''SequencerContext
@@ -94,6 +99,8 @@ type MonadBlockstanbul m =
     HasBlockstanbulContext m,
     Mod.Accessible (IORef (View, Maybe Block)) m,
     Mod.Accessible (IORef (Maybe View)) m,
+    Mod.Accessible (IORef (Maybe (AlarmClock UTCTime))) m,
+    Mod.Accessible (IORef (Maybe (View, UTCTime))) m,
     Mod.Accessible (TMChan View) m,
     Mod.Accessible BlockPeriod m,
     Mod.Accessible RoundPeriod m,
@@ -149,6 +156,12 @@ instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (View, Maybe Block
 instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (Maybe View)) (StateT SequencerContext m) where
   access _ = use armedViewTimer
 
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (Maybe (AlarmClock UTCTime))) (StateT SequencerContext m) where
+  access _ = use roundTimerClock
+
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (Maybe (View, UTCTime))) (StateT SequencerContext m) where
+  access _ = use armedRoundTimer
+
 instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (TMChan View) (ReaderT SequencerConfig m) where
   access _ = asks blockstanbulTimeouts
 
@@ -171,7 +184,7 @@ instance Monad m => (Keccak256 `A.Alters` ()) (StateT SequencerContext m) where
 
 instance Monad m => HasBlockstanbulContext (StateT SequencerContext m) where
   getBlockstanbulContext = use blockstanbulContext
-  putBlockstanbulContext = modify' . (.~) blockstanbulContext
+  putBlockstanbulContext c = c `deepseq` modify' (blockstanbulContext .~ c)
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT SequencerConfig m) where
   get _ =
@@ -198,12 +211,16 @@ runSequencerM vaultUrl' c bc m = do
     depBlock <- DependentBlockDB <$> LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
     latestVandP <- liftIO $ newIORef (View 0 0, Nothing)
     armedVT <- liftIO $ newIORef Nothing
+    roundClock <- liftIO $ newIORef Nothing
+    armedRT <- liftIO $ newIORef Nothing
     flip runReaderT c{dependentBlockDB = depBlock} $ runStateT m
       SequencerContext
         { _seenTransactionDB = mkSeenTxDB stxSize,
           _blockstanbulContext = bc,
           _latestViewAndProposal = latestVandP,
-          _armedViewTimer = armedVT
+          _armedViewTimer = armedVT,
+          _roundTimerClock = roundClock,
+          _armedRoundTimer = armedRT
         }
   return $ fst a
 
@@ -218,12 +235,16 @@ runSequencerMTest c bc m = do
     depBlock <- DependentBlockDB <$> LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
     latestVandP <- liftIO $ newIORef (View 0 0, Nothing)
     armedVT <- liftIO $ newIORef Nothing
+    roundClock <- liftIO $ newIORef Nothing
+    armedRT <- liftIO $ newIORef Nothing
     flip runReaderT c{dependentBlockDB = depBlock} $ runStateT m
       SequencerContext
         { _seenTransactionDB = mkSeenTxDB stxSize,
           _blockstanbulContext = bc,
           _latestViewAndProposal = latestVandP,
-          _armedViewTimer = armedVT
+          _armedViewTimer = armedVT,
+          _roundTimerClock = roundClock,
+          _armedRoundTimer = armedRT
         }
   return $ fst a
 
@@ -242,6 +263,19 @@ createFirstTimer = do
 -- | Arm the round timer for the given view. It keeps re-firing every round
 -- period until the global view has moved past it (a later round at the same
 -- height, or a later height).
+--
+-- All arms share one AlarmClock. This used to allocate a fresh clock per
+-- call, but blockstanbul asks for a timer reset at every new height --
+-- including every historic block replayed during sync -- and each clock
+-- parked a green thread for a full round period (an hour on real networks)
+-- before it first fired and noticed it was stale. A from-genesis catch-up
+-- at ~300 blocks/s held ~400,000 such threads at once: 4.5GB of STACK in a
+-- heap census, all for timers on rounds that had finished long ago.
+--
+-- 'setAlarm' only ever moves a pending alarm earlier, so re-arming cannot
+-- postpone the clock directly. Instead the intended (view, fire time) lives
+-- in '_armedRoundTimer', and a wakeup before the stored fire time just puts
+-- the clock back to sleep until then.
 createNewTimer ::
   MonadBlockstanbul m =>
   View ->
@@ -251,19 +285,41 @@ createNewTimer vw = do
   liftIO $ atomicModifyIORef' vref (\(cur, mb) -> ((max vw cur, mb), ()))
   ch <- Mod.access (Mod.Proxy @(TMChan View))
   dt <- unRoundPeriod <$> Mod.access (Mod.Proxy @(RoundPeriod))
+  clockRef <- Mod.access (Mod.Proxy @(IORef (Maybe (AlarmClock UTCTime))))
+  armedRef <- Mod.access (Mod.Proxy @(IORef (Maybe (View, UTCTime))))
   let act :: AlarmClock UTCTime -> IO ()
-      act this' = do
-        atomically $ writeTMChan ch vw
-        globalView <- fst <$> readIORef vref
-        -- The first RoundChange for this message may have not
-        -- been seen, so we keep firing at the same interval
-        -- until an alarm lands and the view changes
-        unless (globalView > vw) $ do
-          next <- addUTCTime dt <$> getCurrentTime
-          setAlarm this' next
-  alarm <- liftIO $ newAlarmClock act
-  next <- addUTCTime dt <$> liftIO getCurrentTime
-  liftIO $ setAlarm alarm next
+      act this' =
+        readIORef armedRef >>= \case
+          Nothing -> return ()
+          Just (v, due) -> do
+            now <- getCurrentTime
+            if now < due
+              then setAlarm this' due -- re-armed since this wakeup was scheduled
+              else do
+                atomically $ writeTMChan ch v
+                globalView <- fst <$> readIORef vref
+                -- The first RoundChange for this message may have not
+                -- been seen, so we keep firing at the same interval
+                -- until an alarm lands and the view changes
+                unless (globalView > v) $ do
+                  next <- addUTCTime dt <$> getCurrentTime
+                  -- Yield to a concurrent re-arm: it already called 'setAlarm'.
+                  rearmed <- atomicModifyIORef' armedRef $ \armed ->
+                    if armed == Just (v, due)
+                      then (Just (v, next), True)
+                      else (armed, False)
+                  when rearmed $ setAlarm this' next
+  liftIO $ do
+    due <- addUTCTime dt <$> getCurrentTime
+    atomicModifyIORef' armedRef $ \_ -> (Just (vw, due), ())
+    alarm <-
+      readIORef clockRef >>= \case
+        Just alarm -> return alarm
+        Nothing -> do
+          alarm <- newAlarmClock act
+          atomicModifyIORef' clockRef $ \_ -> (Just alarm, ())
+          return alarm
+    setAlarm alarm due
 
 createNewViewTimer :: MonadBlockstanbul m => Block -> m ()
 createNewViewTimer b = do

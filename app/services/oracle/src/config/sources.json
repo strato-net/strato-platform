@@ -55,7 +55,7 @@
       "USDC": "usd-coin",
       "USDT": "tether",
       "TSLAX": "tesla-xstock",
-      "SPY": "sp500-xstock",
+      "SPY": "spdr-s-p-500-etf-trust-robinhood-tokenized-stock",
       "SPYX": "sp500-xstock",
       "NVDA": "nvidia-robinhood-tokenized-stock",
       "WEETH": "wrapped-eeth"
@@ -87,7 +87,7 @@
       "USDC": "coingecko:usd-coin",
       "USDT": "coingecko:tether",
       "TSLAX": "coingecko:tesla-xstock",
-      "SPY": "coingecko:sp500-xstock",
+      "SPY": "coingecko:spdr-s-p-500-etf-trust-robinhood-tokenized-stock",
       "SPYX": "coingecko:sp500-xstock",
       "NVDA": "coingecko:nvidia-robinhood-tokenized-stock",
       "WEETH": "coingecko:wrapped-eeth"
