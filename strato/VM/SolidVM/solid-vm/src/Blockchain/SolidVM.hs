@@ -3808,6 +3808,8 @@ storageHooks profiledFunctionName callee ro contract cc = do
         profileHook "storage_read" $ sloadAt snapshotsRef (toInteger callee) field,
       shSloadAt = \addrInt field ->
         profileHook "storage_read" $ sloadAtTagged snapshotsRef addrInt field,
+      shEventSloadAt = \addrInt field pending ->
+        profileHook "storage_read" $ eventSloadAt snapshotsRef addrInt field pending,
       shSstore = \field val -> sstoreAt (toInteger callee) field val,
       shSstoreAt = sstoreAt,
       shObjectSstoreAt = objectSstoreAt,
@@ -3951,6 +3953,14 @@ storageHooks profiledFunctionName callee ro contract cc = do
       pure $ unpackInt v
     sloadAtTagged snapshotsRef addrInt field =
       unpackTagged <$> fastStorageGet snapshotsRef (fromInteger addrInt) (MS.singleton $ BC.pack $ labelToString field)
+    eventSloadAt snapshotsRef addrInt field pending = do
+      let path = MS.singleton $ BC.pack $ labelToString field
+      basic <- case pending of
+        Just value -> pure $ encodeStored field value
+        Nothing -> fastStorageGet snapshotsRef (fromInteger addrInt) path
+      pure . FastOpaque $ case basic of
+        MS.BDefault -> SReference path
+        value -> fromBasic value
     sstoreAt addrInt field val = do
       let addr = fromInteger addrInt
           path = MS.singleton $ BC.pack $ labelToString field

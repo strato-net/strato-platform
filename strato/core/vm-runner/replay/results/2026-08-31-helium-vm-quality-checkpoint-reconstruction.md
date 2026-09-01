@@ -256,6 +256,46 @@ the prior identical-input receipt is
 `cfgfallback137-dacommit-candidate-125000-129999-20260901-48.result.txt`.
 This is a 2.48x iteration-segment speedup, not a genesis-to-tip qualification.
 
+The clean committed native build is banked as
+`vm-replay-cfgfallback137-native-bn254-c521b1cfa0-20260901-bin`, binary
+SHA-256 `c1b51bccb5f84d4fb7b5370fe5dce8d6f0df55b20a6e4045fcbb31e6fc92f6ce`.
+It repeated the 50-block slice at 45.87 blk/s and the 5,000-block segment at
+142.47 blk/s, allocating 133,662,353,992 bytes with 1,802,354,688 bytes peak
+RSS on the longer run. Both matched the same final state root, block hash, and
+audit as the prior candidate. The clean sustained result is therefore a 2.37x
+speedup over 60.04 blk/s. The receipts are
+`cfgfallback137-native-bn254-clean-128445-128494-20260901-60.result.txt` and
+`cfgfallback137-native-bn254-clean-125000-129999-20260901-61.result.txt`.
+
+### Storage-backed event correction
+
+The next full-pipeline boundary exposed a receipt-only FastIR mismatch at
+block 250,003: state and block execution matched, but `OfferCancelled` omitted
+its initialized storage-backed `maker` address. Canonical event evaluation has
+two distinct behaviors for a direct storage variable. An initialized slot is
+materialized as its typed value; a default slot remains an `SReference`, which
+receipt encoding intentionally drops. The previous FastIR correction always
+selected the latter behavior.
+
+FastIR now loads direct storage event arguments at emit time, preserving their
+stored type and consulting writes buffered earlier in the same IR execution.
+The same banked candidate passed both opposing full-pipeline gates:
+
+- block 112,830 retained the default-slot reference behavior and matched its
+  final state root, block hash, and audit;
+- block 250,003 materialized the initialized maker address and matched the
+  header receipt root, final state root, block hash, and audit.
+
+The correction did not regress the optimized segment. The identical 50-block
+slice completed at 46.07 blk/s, and blocks 125,000-129,999 completed at 145.31
+blk/s with exact terminal root/hash/audit and 133,746,763,896 allocated bytes.
+Their receipts are
+`cfgfallback137-event-storage-native-128445-128494-20260901-68.result.txt` and
+`cfgfallback137-event-storage-native-125000-129999-20260901-69.result.txt`.
+The exact correctness receipts are
+`cfgfallback137-event-storage-native-112830-20260901-67.result.txt` and
+`cfgfallback137-event-storage-native-250003-20260901-66.result.txt`.
+
 ## Qualification boundary
 
 The 40,000-44,999 range is an iteration benchmark only. Final validation

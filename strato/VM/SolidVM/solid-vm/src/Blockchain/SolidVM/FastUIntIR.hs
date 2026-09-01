@@ -44,7 +44,6 @@ import Data.Function (on)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
 import GHC.Generics (Generic)
 
-import qualified Data.ByteString.Char8 as BC
 import qualified Data.Map.Strict as M
 import Data.Maybe (catMaybes, fromMaybe, isJust, isNothing, listToMaybe, mapMaybe)
 import qualified Data.Set as Set
@@ -55,7 +54,6 @@ import SolidVM.Model.CodeCollection (CodeCollection, Contract, Func)
 import qualified SolidVM.Model.CodeCollection as CC
 import qualified SolidVM.Model.CodeCollection.VariableDecl as VD
 import SolidVM.Model.SolidString (SolidString, labelToString)
-import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Model.Value (Value (..))
 import System.Environment (lookupEnv)
@@ -119,6 +117,7 @@ data UOp
   | UMapSet2At !SolidString !Int !Bool !Int !Int !Bool !Int
   | USloadAddr !Int !SolidString
   | USloadAt !Int !SolidString !Int
+  | UEventSload !Int !SolidString !(Maybe Int)
   | USstore !SolidString !Int
   | USstoreAt !SolidString !Int !Int
   | UArrayNew !Int !Int
@@ -484,6 +483,7 @@ spliceablePure ops =
       UMapSet2At {} -> False
       USloadAddr {} -> False
       USloadAt {} -> False
+      UEventSload {} -> False
       USstore {} -> False
       USstoreAt {} -> False
       UArrayNew {} -> False
@@ -615,6 +615,11 @@ emitSload dest field = do
   case callee of
     Nothing -> emit $ USloadAddr dest field
     Just cr -> emit $ USloadAt dest field cr
+
+emitEventSload :: Int -> SolidString -> CM ()
+emitEventSload dest field = do
+  callee <- csCalleeReg <$> get
+  emit $ UEventSload dest field callee
 
 emitSstore :: SolidString -> Int -> CM ()
 emitSstore field v = do
@@ -2093,15 +2098,13 @@ compileStmt cc current ret = \case
           Nothing -> case M.lookup name (csObjects s) of
             Just slot -> pure $ objectBinding slot
             Nothing
-              -- The canonical evaluator retains a direct storage variable as
-              -- an SReference in Event.evArgs (jsonSM resolves it only for the
-              -- index event).  Receipt encoding intentionally drops that
-              -- reference-shaped value.  Materializing it as a scalar here
-              -- changes the post-fork receipts root even when state and the
-              -- externally rendered event are identical.
+              -- Canonical event evaluation loads direct storage variables at
+              -- emit time. An initialized slot becomes its typed Value, while
+              -- BDefault remains an SReference that receipt encoding drops.
+              -- Preserve both cases instead of choosing one at compile time.
               | M.notMember name (csNames s), isJust (storageDecl cc current name) -> do
                   r <- bindAnonymousObject
-                  emit $ UObjectLit r (SReference . MS.singleton . BC.pack $ labelToString name)
+                  emitEventSload r name
                   pure r
               | otherwise -> compileExpr cc current e
       compileEventArg e = compileExpr cc current e
@@ -2766,6 +2769,7 @@ runOpsWithStack reuseStack ops nregs argRegs argVals _retRegs =
             UMapSet2At {} -> pure Nothing
             USloadAddr {} -> pure Nothing
             USloadAt {} -> pure Nothing
+            UEventSload {} -> pure Nothing
             USstore {} -> pure Nothing
             USstoreAt {} -> pure Nothing
             UArrayNew {} -> pure Nothing
@@ -2963,6 +2967,7 @@ needsStorage = V.any $ \case
   UMapSet2At {} -> True
   USloadAddr {} -> True
   USloadAt {} -> True
+  UEventSload {} -> True
   USstore {} -> True
   USstoreAt {} -> True
   UArrayNew {} -> True
@@ -3119,6 +3124,7 @@ data StorageHooks m = StorageHooks
     shMapSet2At :: Integer -> SolidString -> Integer -> Bool -> Integer -> Integer -> Bool -> m (),
     shSloadAddr :: SolidString -> m Integer,
     shSloadAt :: Integer -> SolidString -> m (Integer, Bool),
+    shEventSloadAt :: Integer -> SolidString -> Maybe Integer -> m FastValue,
     shSstore :: SolidString -> Integer -> m (),
     shSstoreAt :: Integer -> SolidString -> Integer -> m (),
     shObjectSstoreAt :: Integer -> SolidString -> FastValue -> m (),
@@ -3834,6 +3840,23 @@ runOpsM tag hooks ops nregs argRegs argVals _retRegs = withRunInIO $ \run ->
                   MV.write regs' d v
                   MV.write defaults' d isDefault
                   execGo regs' defaults' ops' (pc + 1) (gas + 1)
+            UEventSload dest field calleeRef -> do
+              mAddr <- case calleeRef of
+                Nothing -> Just <$> getThis
+                Just cr -> do
+                  bad <- MV.read defaults' cr
+                  if bad then pure Nothing else Just <$> MV.read regs' cr
+              case mAddr of
+                Nothing -> pure Nothing
+                Just addr -> do
+                  pendingObjects <- readSTRef objectDirty
+                  value <- case M.lookup (addr, field) pendingObjects of
+                    Just pending -> pure pending
+                    Nothing -> do
+                      pendingScalars <- readSTRef sdirty
+                      io $ shEventSloadAt hooks addr field (M.lookup (addr, field) pendingScalars)
+                  ok <- writeFastValue regs' defaults' dest value
+                  if ok then execGo regs' defaults' ops' (pc + 1) (gas + 1) else pure Nothing
             USstore field v -> do
               bad <- MV.read defaults' v
               if bad
