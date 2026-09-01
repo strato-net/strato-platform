@@ -85,9 +85,8 @@ emitter.on(ON_SOCKET_PUBLISH_EVENTS, function (room, data) {
 
 function registerRoomAllocation(socket, room, preloadCb) {
   socket.on(`SUBSCRIBE/${room}`, (data) => {
-    socket.join(`ROOM_${room}`).then(() => {
-      preloadCb(socket)
-    })
+    socket.join(`ROOM_${room}`)
+    preloadCb(socket)
   })
   socket.on(`UNSUBSCRIBE/${room}`, (data) => {
     socket.leave(`ROOM_${room}`)
