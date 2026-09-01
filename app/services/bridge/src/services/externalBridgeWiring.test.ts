@@ -14,7 +14,13 @@ for (const name of [
   "PRICE_ORACLE_ADDRESS",
   "SAFE_ADDRESS",
   "SAFE_PROPOSER_ADDRESS",
-  "SAFE_PROPOSER_PRIVATE_KEY",
+  "SAFE_PROPOSER_KMS_URL",
+  "SAFE_PROPOSER_KMS_API_TOKEN",
+  "RELAYER_BA_USERNAME",
+  "RELAYER_BA_PASSWORD",
+  "RELAYER_CLIENT_ID",
+  "RELAYER_CLIENT_SECRET",
+  "RELAYER_OPENID_DISCOVERY_URL",
   "SENDGRID_API_KEY",
   "STRATO_NODE_URL",
   "VAULT_PROXY_ADDRESS",
@@ -28,9 +34,21 @@ const externalBridgeAddress = process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS!;
 
 test("atomically settles non-native deposits on ExternalAssetBridge", async () => {
   const stratoHelper = await import("../utils/stratoHelper");
-  const calls: any[] = [];
+  const settlementAttestationService = await import(
+    "./settlementAttestationService"
+  );
+  const operatorCalls: any[] = [];
+  const relayerCalls: any[] = [];
+  (settlementAttestationService as any).attestDepositSettlement =
+    async () => undefined;
+  (settlementAttestationService as any).attestWithdrawalRelease =
+    async () => undefined;
   (stratoHelper as any).execute = async (input: any) => {
-    calls.push(input);
+    operatorCalls.push(input);
+    return { status: "Success", hash: "test" };
+  };
+  (stratoHelper as any).executeAsRelayer = async (input: any) => {
+    relayerCalls.push(input);
     return { status: "Success", hash: "test" };
   };
 
@@ -53,7 +71,11 @@ test("atomically settles non-native deposits on ExternalAssetBridge", async () =
     targetStratoToken: "strato-token",
   });
 
-  assert.deepEqual(calls[0], {
+  assert.equal(
+    operatorCalls.some((call) => call.method === "settleDeposit"),
+    false,
+  );
+  assert.deepEqual(relayerCalls[0], {
     contractName: "ExternalAssetBridge",
     contractAddress: externalBridgeAddress,
     method: "settleDeposit",
@@ -70,6 +92,7 @@ test("atomically settles non-native deposits on ExternalAssetBridge", async () =
       action: "0",
       actionToken: "0000000000000000000000000000000000000000",
       minFinalOut: "0",
+      attestationProof: "0x",
     },
   });
 });
@@ -80,6 +103,7 @@ test("treats a duplicate identity as settled only when Cirrus confirms completio
   (stratoHelper as any).execute = async () => {
     throw new Error("EAB: duplicate deposit");
   };
+  (stratoHelper as any).executeAsRelayer = (stratoHelper as any).execute;
   const deposit = {
     externalChainId: 1,
     depositRouter: "router",
@@ -140,6 +164,7 @@ test("confirms reviewed deposits through the bridge operator", async () => {
     calls.push(input);
     return { status: "Success", hash: "confirm-hash" };
   };
+  (stratoHelper as any).executeAsRelayer = (stratoHelper as any).execute;
   (depositStateService as any).getByIdentity = async () => ({
     deposit,
     status: "review",
@@ -171,6 +196,7 @@ test("confirms reviewed deposits through the bridge operator", async () => {
       externalChainId: 1,
       depositRouter: "router",
       depositId: "7",
+      attestationProof: "0x",
     },
   });
   (cirrusService as any).getEnabledChains = originalGetEnabledChains;
@@ -264,7 +290,11 @@ test("reserves and releases before finalizing a routine withdrawal", async () =>
 
   (api.eth as any).get = async () => ({ networkID: "9001" });
   (stratoHelper as any).execute = async (input: any) => {
-    trace.push(`strato:${input.method}`);
+    trace.push(`operator:${input.method}`);
+    return { status: "Success", hash: `${input.method}-hash` };
+  };
+  (stratoHelper as any).executeAsRelayer = async (input: any) => {
+    trace.push(`relayer:${input.method}`);
     return { status: "Success", hash: `${input.method}-hash` };
   };
   (vaultService as any).buildWithdrawalAuthorization = async () => ({
@@ -312,11 +342,11 @@ test("reserves and releases before finalizing a routine withdrawal", async () =>
   });
 
   assert.deepEqual(trace, [
-    "strato:markWithdrawalReady",
+    "operator:markWithdrawalReady",
     "vault:reserve",
-    "strato:recordWithdrawalReservation",
+    "operator:recordWithdrawalReservation",
     "vault:release",
-    "strato:finalizeWithdrawal",
+    "relayer:finalizeWithdrawal",
   ]);
 });
 
@@ -329,6 +359,7 @@ test("cancels an expired reservation before allowing governance refund", async (
     trace.push(`strato:${input.method}`);
     return { status: "Success", hash: `${input.method}-hash` };
   };
+  (stratoHelper as any).executeAsRelayer = (stratoHelper as any).execute;
   (vaultService as any).getReservationState = async () => ({
     reservationId: "reservation",
     status: 1,
@@ -462,6 +493,10 @@ test("releases a large withdrawal only after Safe approval", async () => {
     trace.push(`strato:${input.method}`);
     return { status: "Success", hash: `${input.method}-hash` };
   };
+  (stratoHelper as any).executeAsRelayer = async (input: any) => {
+    trace.push(`relayer:${input.method}`);
+    return { status: "Success", hash: `${input.method}-hash` };
+  };
   (vaultService as any).buildWithdrawalAuthorization = async () => ({
     sourceChainId: "9001",
     sourceBridge: "0x1111111111111111111111111111111111111111",
@@ -515,7 +550,7 @@ test("releases a large withdrawal only after Safe approval", async () => {
     "vault:reserve",
     "strato:recordWithdrawalReservation",
     "vault:release",
-    "strato:finalizeWithdrawal",
+    "relayer:finalizeWithdrawal",
   ]);
 });
 

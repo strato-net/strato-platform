@@ -3,6 +3,7 @@ import { Contract, JsonRpcProvider, Wallet } from "ethers";
 import {
   getEnabledChains,
   getEnabledNativeChainIds,
+  getSettlementVerifierConfig,
   getTokenRouterWiring,
 } from "../services/cirrusService";
 import {
@@ -103,6 +104,9 @@ export const validateExternalBridgeExecutorConfig = (
 export async function validateBridgeConfig(): Promise<boolean> {
   const errors: string[] = [];
   const warnings: string[] = [];
+  let settlementVerifierAddresses: string[] = [];
+  let operatorAddress = "";
+  let relayerAddress = "";
 
   // Validate required environment variables
   const requiredEnvVars = [
@@ -111,13 +115,19 @@ export async function validateBridgeConfig(): Promise<boolean> {
     "CLIENT_SECRET",
     "CLIENT_ID",
     "OPENID_DISCOVERY_URL",
+    "RELAYER_BA_USERNAME",
+    "RELAYER_BA_PASSWORD",
+    "RELAYER_CLIENT_SECRET",
+    "RELAYER_CLIENT_ID",
+    "RELAYER_OPENID_DISCOVERY_URL",
     "BRIDGE_ADDRESS",
     "EXTERNAL_ASSET_BRIDGE_ADDRESS",
     "STRATO_APP_API_URL",
     "TOKEN_ROUTER",
     "SAFE_ADDRESS",
     "SAFE_PROPOSER_ADDRESS",
-    "SAFE_PROPOSER_PRIVATE_KEY",
+    "SAFE_PROPOSER_KMS_URL",
+    "SAFE_PROPOSER_KMS_API_TOKEN",
   ];
 
   requiredEnvVars.forEach((varName) => {
@@ -161,7 +171,12 @@ export async function validateBridgeConfig(): Promise<boolean> {
         } else {
           // Test actual user authentication
           try {
-            const { initOpenIdConfig, getBAUserToken } = await import(
+            const {
+              initOpenIdConfig,
+              getBAUserAddress,
+              getBAUserToken,
+              getRelayerToken,
+            } = await import(
               "../auth"
             );
 
@@ -171,9 +186,26 @@ export async function validateBridgeConfig(): Promise<boolean> {
 
             // Test user authentication by getting a token
             const token = await getBAUserToken();
+            const relayerToken = await getRelayerToken();
             if (!token) {
               errors.push("User authentication failed - no token received");
+            } else if (!relayerToken) {
+              errors.push("Relayer authentication failed - no token received");
             } else {
+              const { relayerStrato } = await import("./api");
+              const [operatorKey, relayerKey] = await Promise.all([
+                getBAUserAddress(),
+                relayerStrato.get<{ address: string }>("/key"),
+              ]);
+              operatorAddress = operatorKey.toLowerCase().replace(/^0x/, "");
+              relayerAddress = relayerKey.address
+                .toLowerCase()
+                .replace(/^0x/, "");
+              if (relayerAddress === operatorAddress) {
+                errors.push(
+                  "STRATO relayer and bridge operator must use different accounts",
+                );
+              }
               logInfo("ConfigValidator", "User authentication test passed");
             }
           } catch (authError) {
@@ -233,6 +265,42 @@ export async function validateBridgeConfig(): Promise<boolean> {
       );
     }
   }
+  if (oauthInitialized && config.externalAssetBridge.address) {
+    try {
+      const verifierConfig = await getSettlementVerifierConfig();
+      settlementVerifierAddresses = verifierConfig.verifiers;
+      if (verifierConfig.threshold !== 2) {
+        errors.push(
+          "ExternalAssetBridge settlement verifier threshold must be 2",
+        );
+      }
+      if (verifierConfig.count < 3) {
+        errors.push(
+          "ExternalAssetBridge must have at least 3 settlement verifiers",
+        );
+      }
+      if (
+        relayerAddress &&
+        settlementVerifierAddresses.includes(relayerAddress)
+      ) {
+        errors.push(
+          "STRATO relayer must not be an enabled settlement verifier",
+        );
+      }
+      if (
+        operatorAddress &&
+        settlementVerifierAddresses.includes(operatorAddress)
+      ) {
+        errors.push(
+          "STRATO bridge operator must not be an enabled settlement verifier",
+        );
+      }
+    } catch (error) {
+      errors.push(
+        `Settlement verifier validation failed: ${(error as Error).message}`,
+      );
+    }
+  }
   if (
     !Number.isSafeInteger(
       config.externalAssetBridge.manualReviewValiditySeconds,
@@ -259,12 +327,12 @@ export async function validateBridgeConfig(): Promise<boolean> {
     }
   }
 
-  if (config.safe.safeProposerPrivateKey) {
-    if (!isPrivateKey(config.safe.safeProposerPrivateKey)) {
-      errors.push(
-        "Invalid Safe proposer private key format",
-      );
-    }
+  if (
+    !["development", "test"].includes(process.env.NODE_ENV || "") &&
+    config.safe.safeProposerKmsUrl &&
+    !config.safe.safeProposerKmsUrl.startsWith("https://")
+  ) {
+    errors.push("SAFE_PROPOSER_KMS_URL must use HTTPS in production");
   }
 
   if (config.safe.apiKey) {
@@ -420,9 +488,9 @@ export async function validateBridgeConfig(): Promise<boolean> {
         errors.push(...executorValidation.errors);
         warnings.push(...executorValidation.warnings);
         const executorAddress = executorValidation.executorAddress;
-        if (signerUrls.length === 0) {
+        if (signerUrls.length < 3) {
           errors.push(
-            `Missing external bridge environment variable: CHAIN_${chainId}_EXTERNAL_BRIDGE_SIGNER_URLS`,
+            `CHAIN_${chainId}_EXTERNAL_BRIDGE_SIGNER_URLS must contain 3 independent signer services`,
           );
         }
         if (!chain.vault || !isAddress(chain.vault)) {
@@ -453,15 +521,40 @@ export async function validateBridgeConfig(): Promise<boolean> {
               }
               return (await response.json()) as {
                 signer: string;
+                settlementVerifier: string;
+                settlementVerifierConfirmations: number;
                 destinationChainId: string;
                 destinationVault: string;
               };
             }),
           );
           const signerAddresses = signerMetadata.map(({ signer }) => signer);
+          const verifierAddresses = signerMetadata.map(
+            ({ settlementVerifier }) => String(settlementVerifier || ""),
+          );
           if (new Set(signerAddresses.map((value) => value.toLowerCase())).size !== signerAddresses.length) {
             errors.push(`External bridge signer URLs for chain ${chainId} contain duplicate signers`);
           }
+          if (
+            verifierAddresses.some((value) => !isAddress(value)) ||
+            new Set(verifierAddresses.map((value) => value.toLowerCase()))
+              .size !== verifierAddresses.length
+          ) {
+            errors.push(
+              `External bridge signer URLs for chain ${chainId} must expose distinct STRATO settlement verifiers`,
+            );
+          }
+          verifierAddresses.forEach((verifier, index) => {
+            if (
+              !settlementVerifierAddresses.includes(
+                verifier.toLowerCase().replace(/^0x/, ""),
+              )
+            ) {
+              errors.push(
+                `External bridge signer ${signerUrls[index]} is not an enabled STRATO settlement verifier`,
+              );
+            }
+          });
           signerMetadata.forEach((metadata, index) => {
             if (
               metadata.destinationChainId !== String(chainId) ||
@@ -469,6 +562,19 @@ export async function validateBridgeConfig(): Promise<boolean> {
                 ensureHexPrefix(chain.vault!).toLowerCase()
             ) {
               errors.push(`External bridge signer ${signerUrls[index]} is configured for a different vault`);
+            }
+            if (
+              !Number.isSafeInteger(
+                metadata.settlementVerifierConfirmations,
+              ) ||
+              metadata.settlementVerifierConfirmations <= 0 ||
+              (confirmationValue &&
+                metadata.settlementVerifierConfirmations <
+                  Number(confirmationValue))
+            ) {
+              errors.push(
+                `External bridge signer ${signerUrls[index]} has an invalid or insufficient confirmation policy`,
+              );
             }
           });
           const [

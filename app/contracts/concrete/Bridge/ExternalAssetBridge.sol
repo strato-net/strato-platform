@@ -209,6 +209,20 @@ contract record ExternalAssetBridge is Ownable {
         address depositRouter,
         bool enabled
     );
+    event SettlementVerifierUpdated(
+        address verifier,
+        bool enabled,
+        uint256 verifierSetVersion
+    );
+    event SettlementVerifierThresholdUpdated(
+        uint8 threshold,
+        uint256 verifierSetVersion
+    );
+    event SettlementAttested(
+        bytes32 digest,
+        address verifier,
+        uint8 attestationCount
+    );
 
     uint256 public DECIMAL_PLACES = 18;
     uint256 public WITHDRAWAL_ABORT_DELAY = 172800;
@@ -246,6 +260,12 @@ contract record ExternalAssetBridge is Ownable {
     address public tokenRouter;
     mapping(uint256 => mapping(address => mapping(uint256 => mapping(uint256 => RouteStep)))) public record depositRouteSteps;
     mapping(uint256 => mapping(address => mapping(uint256 => uint256))) public record depositRouteStepCounts;
+    mapping(address => bool) public record settlementVerifiers;
+    uint8 public settlementVerifierCount;
+    uint8 public settlementVerifierThreshold;
+    uint256 public settlementVerifierSetVersion;
+    mapping(bytes32 => mapping(address => bool)) public record settlementAttestations;
+    mapping(bytes32 => uint8) public record settlementAttestationCounts;
 
     modifier onlyBridgeOperator() {
         require(
@@ -594,7 +614,56 @@ contract record ExternalAssetBridge is Ownable {
         MAX_AUTHORIZATION_VALIDITY_SECONDS = newValidity;
     }
 
-    function settleDeposit(
+    function setSettlementVerifier(
+        address verifier,
+        bool enabled
+    ) external onlyOwner {
+        require(verifier != address(0), "EAB: zero verifier");
+        bool currentlyEnabled = settlementVerifiers[verifier];
+        if (currentlyEnabled == enabled) {
+            return;
+        }
+        if (enabled) {
+            require(
+                settlementVerifierCount < 255,
+                "EAB: too many settlement verifiers"
+            );
+            settlementVerifierCount++;
+        } else {
+            require(
+                settlementVerifierThreshold < settlementVerifierCount,
+                "EAB: threshold exceeds verifiers"
+            );
+            settlementVerifierCount--;
+        }
+        settlementVerifiers[verifier] = enabled;
+        settlementVerifierSetVersion++;
+        emit SettlementVerifierUpdated(
+            verifier,
+            enabled,
+            settlementVerifierSetVersion
+        );
+    }
+
+    function setSettlementVerifierThreshold(
+        uint8 threshold
+    ) external onlyOwner {
+        require(
+            threshold > 1 && threshold <= settlementVerifierCount,
+            "EAB: invalid verifier threshold"
+        );
+        if (threshold == settlementVerifierThreshold) {
+            return;
+        }
+        settlementVerifierThreshold = threshold;
+        settlementVerifierSetVersion++;
+        emit SettlementVerifierThresholdUpdated(
+            threshold,
+            settlementVerifierSetVersion
+        );
+    }
+
+    function attestDepositSettlement(
         uint256 externalChainId,
         address depositRouter,
         uint256 depositId,
@@ -607,7 +676,83 @@ contract record ExternalAssetBridge is Ownable {
         uint256 action,
         address actionToken,
         uint256 minFinalOut
-    ) external onlyBridgeOperator whenDepositsOpen {
+    ) external {
+        _recordSettlementAttestation(
+            getDepositSettlementDigest(
+                externalChainId,
+                depositRouter,
+                depositId,
+                externalSender,
+                externalToken,
+                externalTokenAmount,
+                externalTxHash,
+                stratoRecipient,
+                stratoToken,
+                action,
+                actionToken,
+                minFinalOut
+            )
+        );
+    }
+
+    function attestWithdrawalRelease(
+        uint256 withdrawalId,
+        string reservationId,
+        string externalTxHash
+    ) external {
+        WithdrawalInfo withdrawal = withdrawals[withdrawalId];
+        require(withdrawal.status == Status.READY, "EAB: bad state");
+        require(
+            withdrawal.reservationId == reservationId.normalizeHex(),
+            "EAB: reservation mismatch"
+        );
+        _recordSettlementAttestation(
+            getWithdrawalReleaseDigest(
+                withdrawalId,
+                reservationId,
+                externalTxHash
+            )
+        );
+    }
+
+    function settleDeposit(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
+        address externalSender,
+        address externalToken,
+        uint256 externalTokenAmount,
+        string externalTxHash,
+        address stratoRecipient,
+        address stratoToken,
+        uint256 action,
+        address actionToken,
+        uint256 minFinalOut,
+        bytes attestationProof
+    ) external whenDepositsOpen {
+        _requireSettlementAttestations(
+            getDepositSettlementDigest(
+                externalChainId,
+                depositRouter,
+                depositId,
+                externalSender,
+                externalToken,
+                externalTokenAmount,
+                externalTxHash,
+                stratoRecipient,
+                stratoToken,
+                action,
+                actionToken,
+                minFinalOut
+            ),
+            attestationProof
+        );
+        require(
+            action == uint256(DepositAction.NONE) ||
+                msg.sender == owner() ||
+                msg.sender == bridgeOperator,
+            "EAB: routed settlement requires operator"
+        );
         _recordDeposit(
             externalChainId,
             depositRouter,
@@ -641,8 +786,26 @@ contract record ExternalAssetBridge is Ownable {
         address stratoToken,
         address expectedTokenOut,
         uint256 minFinalOut,
-        RouteStep[] steps
+        RouteStep[] steps,
+        bytes attestationProof
     ) external onlyBridgeOperator whenDepositsOpen {
+        _requireSettlementAttestations(
+            getDepositSettlementDigest(
+                externalChainId,
+                depositRouter,
+                depositId,
+                externalSender,
+                externalToken,
+                externalTokenAmount,
+                externalTxHash,
+                stratoRecipient,
+                stratoToken,
+                uint256(DepositAction.AUTO_ROUTE),
+                expectedTokenOut,
+                minFinalOut
+            ),
+            attestationProof
+        );
         _recordDeposit(
             externalChainId,
             depositRouter,
@@ -712,8 +875,38 @@ contract record ExternalAssetBridge is Ownable {
     function confirmReviewedDeposit(
         uint256 externalChainId,
         address depositRouter,
-        uint256 depositId
-    ) external onlyBridgeOperator whenDepositsOpen {
+        uint256 depositId,
+        bytes attestationProof
+    ) external whenDepositsOpen {
+        DepositInfo depositInfo = deposits[
+            externalChainId
+        ][depositRouter][depositId];
+        DepositActionIntent intent = depositActions[
+            externalChainId
+        ][depositRouter][depositId];
+        require(
+            intent.action == uint256(DepositAction.NONE) ||
+                msg.sender == owner() ||
+                msg.sender == bridgeOperator,
+            "EAB: routed settlement requires operator"
+        );
+        _requireSettlementAttestations(
+            getDepositSettlementDigest(
+                externalChainId,
+                depositRouter,
+                depositId,
+                depositInfo.externalSender,
+                depositInfo.externalToken,
+                depositInfo.externalTokenAmount,
+                depositInfo.externalTxHash,
+                depositInfo.stratoRecipient,
+                depositInfo.stratoToken,
+                intent.action,
+                intent.actionToken,
+                intent.minFinalOut
+            ),
+            attestationProof
+        );
         _confirmDeposit(
             externalChainId,
             depositRouter,
@@ -725,7 +918,8 @@ contract record ExternalAssetBridge is Ownable {
         uint256 externalChainId,
         address depositRouter,
         uint256 depositId,
-        RouteStep[] steps
+        RouteStep[] steps,
+        bytes attestationProof
     ) external onlyBridgeOperator whenDepositsOpen {
         DepositInfo depositInfo = deposits[
             externalChainId
@@ -733,6 +927,26 @@ contract record ExternalAssetBridge is Ownable {
         require(
             depositInfo.status == Status.PENDING_REVIEW,
             "EAB: bad state"
+        );
+        DepositActionIntent intent = depositActions[
+            externalChainId
+        ][depositRouter][depositId];
+        _requireSettlementAttestations(
+            getDepositSettlementDigest(
+                externalChainId,
+                depositRouter,
+                depositId,
+                depositInfo.externalSender,
+                depositInfo.externalToken,
+                depositInfo.externalTokenAmount,
+                depositInfo.externalTxHash,
+                depositInfo.stratoRecipient,
+                depositInfo.stratoToken,
+                intent.action,
+                intent.actionToken,
+                intent.minFinalOut
+            ),
+            attestationProof
         );
         _recordDepositRoute(
             externalChainId,
@@ -1137,8 +1351,9 @@ contract record ExternalAssetBridge is Ownable {
     function finalizeWithdrawal(
         uint256 withdrawalId,
         string reservationId,
-        string externalTxHash
-    ) public onlyBridgeOperator {
+        string externalTxHash,
+        bytes attestationProof
+    ) public {
         WithdrawalInfo withdrawal = withdrawals[
             withdrawalId
         ];
@@ -1157,6 +1372,14 @@ contract record ExternalAssetBridge is Ownable {
         require(
             withdrawalByExternalTxHash[normalizedExternalTxHash] == 0,
             "EAB: duplicate external tx"
+        );
+        _requireSettlementAttestations(
+            getWithdrawalReleaseDigest(
+                withdrawalId,
+                normalizedReservationId,
+                normalizedExternalTxHash
+            ),
+            attestationProof
         );
 
         _burnFunds(withdrawal.stratoToken, withdrawal.stratoTokenAmount);
@@ -1267,6 +1490,108 @@ contract record ExternalAssetBridge is Ownable {
         withdrawal.status = Status.ABORTED;
         withdrawal.timestamp = block.timestamp;
         emit WithdrawalAborted(withdrawalId);
+    }
+
+    function getDepositSettlementDigest(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
+        address externalSender,
+        address externalToken,
+        uint256 externalTokenAmount,
+        string externalTxHash,
+        address stratoRecipient,
+        address stratoToken,
+        uint256 action,
+        address actionToken,
+        uint256 minFinalOut
+    ) public view returns (bytes32) {
+        bytes32 sourceHash = keccak256(
+            abi.encode(
+                externalChainId,
+                depositRouter,
+                depositId,
+                externalSender,
+                externalToken,
+                externalTokenAmount,
+                keccak256(bytes(externalTxHash.normalizeHex()))
+            )
+        );
+        bytes32 destinationHash = keccak256(
+            abi.encode(
+                stratoRecipient,
+                stratoToken,
+                action,
+                actionToken,
+                minFinalOut
+            )
+        );
+        return keccak256(
+            abi.encode(
+                keccak256("EAB_DEPOSIT_SETTLEMENT_V1"),
+                block.chainid,
+                address(this),
+                settlementVerifierSetVersion,
+                sourceHash,
+                destinationHash
+            )
+        );
+    }
+
+    function getWithdrawalReleaseDigest(
+        uint256 withdrawalId,
+        string reservationId,
+        string externalTxHash
+    ) public view returns (bytes32) {
+        WithdrawalInfo withdrawal = withdrawals[withdrawalId];
+        return keccak256(
+            abi.encode(
+                keccak256("EAB_WITHDRAWAL_RELEASE_V1"),
+                block.chainid,
+                address(this),
+                settlementVerifierSetVersion,
+                withdrawalId,
+                withdrawal.externalChainId,
+                withdrawal.externalToken,
+                withdrawal.externalTokenAmount,
+                withdrawal.externalRecipient,
+                keccak256(bytes(reservationId.normalizeHex())),
+                keccak256(bytes(externalTxHash.normalizeHex()))
+            )
+        );
+    }
+
+    function _requireSettlementAttestations(
+        bytes32 digest,
+        bytes attestationProof
+    ) internal view {
+        require(
+            attestationProof.length == 0,
+            "EAB: unsupported attestation proof"
+        );
+        require(
+            settlementVerifierThreshold > 0,
+            "EAB: verifier threshold not set"
+        );
+        require(
+            settlementAttestationCounts[digest] >=
+                settlementVerifierThreshold,
+            "EAB: insufficient verifier attestations"
+        );
+    }
+
+    function _recordSettlementAttestation(bytes32 digest) internal {
+        require(
+            settlementVerifiers[msg.sender],
+            "EAB: not settlement verifier"
+        );
+        if (settlementAttestations[digest][msg.sender]) {
+            return;
+        }
+        settlementAttestations[digest][msg.sender] = true;
+        uint8 count = settlementAttestationCounts[digest] + 1;
+        settlementAttestationCounts[digest] = count;
+        emit SettlementAttested(digest, msg.sender, count);
     }
 
     function _recordDeposit(

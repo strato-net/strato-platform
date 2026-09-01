@@ -13,7 +13,7 @@ Key contracts:
 Non-native bridge-in:
 1. The service detects every router event independently, keyed by `(externalChainId, depositRouter, depositId)`.
 2. It waits for the configured confirmations, groups router events by external transaction, and verifies the canonical receipt and traces once. Every event must have one distinct sender/token/custody/amount movement in execution order; exact duplicate RPC evidence is deduplicated, while missing, reused, conflicting, or ambiguous evidence quarantines the entire transaction before any STRATO settlement.
-3. Plain deposits call `settleDeposit`. `AUTO_ROUTE` deposits receive a fresh backend quote and call `settleDepositWithRoute`; both operations atomically record and complete the deposit while preserving `DepositInitiated` and `DepositCompleted`. ExternalAssetBridge converts the verified raw external amount to STRATO decimals and applies any required inbound rebase factor on-chain.
+3. Three independent verifier services validate the external event and custody movement against their own RPC providers and record STRATO attestations. After any two attest, any relayer may settle a plain deposit. Routed and reviewed-routed deposits additionally require the bridge operator so an arbitrary relayer cannot select route steps or force source-token fallback. Both operations atomically record and complete the deposit while preserving `DepositInitiated` and `DepositCompleted`. ExternalAssetBridge converts the verified raw external amount to STRATO decimals and applies any required inbound rebase factor on-chain.
 4. Save and Forge remain user-facing destinations, but both are TokenRouter routes encoded as `AUTO_ROUTE = 4`. Legacy action ordinals 2 and 3 are not executed by ExternalAssetBridge.
 5. Before external submission the UI requires an authenticated STRATO account as recipient, connects the external wallet only as the external-chain signer, switches it to the selected chain, and states the exact STRATO source token and amount the recipient will receive if routing fails. DepositRouter accepts only `AUTO_ROUTE = 4` with a nonzero destination token and positive `minFinalOut`.
 6. Deterministic quote or route-execution errors settle through `DepositActionFallback`. Transport errors remain retryable because submission may be ambiguous; RPC conflicts, permanently missing receipts and expired settlement retries enter persistent review/quarantine.
@@ -23,18 +23,18 @@ Non-native bridge-in:
 
 Activity history enriches the canonical completion with `AutoRouted` or `DepositActionFallback` final-token data and labels it `Deposit & Trade` or `Deposit (Fallback)`. Direct STRATO routes are recorded from `TokenRouter.RouteExecuted`; Unified Trade displays those recent routes alongside pending and completed bridge deposits. Its STRATO source catalog includes every graph node with an outgoing route, including PSM-only assets, and reserves both STRATO call fees from maximum transferable USDST. Rewards continue to consume only `DepositCompleted` and its bridged source amount; action outcomes are presentation metadata and do not create a second reward.
 
-External action intent is not cryptographically signed by the external wallet. The bridge operator is trusted to submit the verified deposit identity, STRATO recipient, source route and action intent observed in the DepositRouter event. The absolute `minFinalOut` is preserved from that event, refreshed route-step minima are derived from it, and every submitted authority choice is logged. Contract route allowlists, on-chain rebase accounting, replay protection and source-token fallback bound the operator's effect, but a compromised operator remains able to choose settlement parameters within those controls.
+External action intent is not separately signed by the external wallet; it is emitted by DepositRouter in the externally signed transaction. Each settlement verifier independently binds the deposit identity, STRATO recipient, source route, action, destination token and `minFinalOut` to that canonical event. Route steps are selected by the bridge operator but must execute through TokenRouter's approved dependencies and satisfy the attested destination token and absolute `minFinalOut`. Arbitrary relayers cannot select route steps or force fallback. Contract route allowlists, on-chain rebase accounting, replay protection and source-token fallback remain the execution bounds.
 
 Non-native bridge-out:
 1. `requestWithdrawal` escrows the STRATO token.
 2. Routine withdrawals receive short-lived authorization from independent KMS/HSM signers.
 3. The unprivileged executor reserves and releases route-local vault liquidity.
-4. STRATO finalization burns escrow only after the external release is verified.
+4. Independent verifier services confirm the exact vault `WithdrawalReleased` event. Any relayer may finalize after two STRATO attestations, and only then is escrow burned.
 5. Large withdrawals additionally require Safe review. Expired reservations can be cancelled and refunded through governance.
 
 Operational controls:
 - Deposit and withdrawal pause controls are independent.
-- Safe/AdminRegistry owns governance; the bridge operator performs routine settlement and finalization.
+- Safe/AdminRegistry owns governance. The bridge operator coordinates detection, review and reservation state but cannot mint deposits or finalize withdrawal burns without the 2-of-3 verifier threshold.
 - Production requires explicit positive confirmation counts, independent signer RPCs, and authenticated webhook and review-operation endpoints.
 - Router rotation preserves prior router identities. A governance-aborted deposit ID remains final until owner governance separately calls `authorizeDepositReuse`.
 - Configure the bridge PriceOracle and mark the route rebase-required before enabling xStock. The flag is canonical for inbound division and outbound multiplication; required routes reject zero/missing factors.
@@ -43,7 +43,7 @@ Operational controls:
 - DepositRouter 3.2 or newer is required for native ETH `AUTO_ROUTE`.
 
 Follow-up TODO:
-- Full deployment/custody-verification/KMS increment: replace centralized STRATO bridge-operator authority with threshold authorization for deposit settlement and withdrawal finalization, independently verify external custody transfers and releases, and deploy executor and attestation keys behind isolated production KMS/HSM adapters with scoped access, rotation, and monitoring.
+- Deploy three isolated verifier instances per external chain with distinct RPC providers and STRATO identities. Complete production key isolation, scoped credentials, rotation, monitoring and incident-recovery procedures for verifier, executor and governance authorities.
 
 Testnet deployment:
 

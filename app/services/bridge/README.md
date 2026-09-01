@@ -51,6 +51,10 @@ cp .env.example .env
 - `CLIENT_SECRET` - OAuth client secret
 - `CLIENT_ID` - OAuth client ID
 - `OPENID_DISCOVERY_URL` - OpenID discovery endpoint
+- `RELAYER_BA_USERNAME`, `RELAYER_BA_PASSWORD` - Separate unprivileged STRATO settlement relayer account
+- `RELAYER_CLIENT_ID`, `RELAYER_CLIENT_SECRET`, `RELAYER_OPENID_DISCOVERY_URL` - OAuth client configuration for the relayer account
+
+The operator account records reviews, marks withdrawals ready and submits routed settlements. The relayer account can only submit threshold-attested plain deposit settlements and withdrawal finalizations. Startup rejects use of the same STRATO account for both roles or use of a settlement verifier as the relayer.
 
 #### Blockchain
 - `ALCHEMY_API_KEY` - Alchemy API key (used for all chains)
@@ -70,7 +74,12 @@ The service automatically validates that RPC URLs are configured for all enabled
 #### Safe Wallet
 - `SAFE_ADDRESS` - Gnosis Safe wallet address
 - `SAFE_PROPOSER_ADDRESS` - Safe Proposer address
-- `SAFE_PROPOSER_PRIVATE_KEY` - Safe Proposer private key
+- `SAFE_PROPOSER_KMS_URL` - Authenticated KMS/HSM digest-signing adapter
+- `SAFE_PROPOSER_KMS_API_TOKEN` - Bearer credential for the KMS/HSM adapter
+
+The Safe proposer private key is not loaded by the bridge service. The adapter receives `{ "digest": "0x..." }`, returns `{ "signature": "0x..." }`, and each returned signature is checked against `SAFE_PROPOSER_ADDRESS`.
+
+The separately run Ethereum `depositRouterSafeOps.js` deployment and upgrade tooling still accepts `SAFE_PROPOSER_PRIVATE_KEY`. This is an offline operational exception and must not share the bridge-service runtime or environment.
 
 #### Native Bridge Minting
 - `STRATO_NATIVE_BRIDGE_ADDRESS` - STRATO native bridge proxy address
@@ -90,9 +99,13 @@ Native withdrawal review delay and attestation validity are enforced by the nati
 
 Production executor deployments should use the KMS/HSM adapter rather than `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY`. The adapter receives `{ "digest": "0x..." }` and must return a recoverable 65-byte ECDSA signature in `{ "signature": "0x..." }`; the bridge service verifies the signature recovers to `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS` before broadcasting the transaction.
 
-Run each signer independently with `npm run start:signer`. Each process must use its own `SIGNER_RPC_URL`, authenticated KMS/HSM adapter (`KMS_SIGNER_URL`, `KMS_SIGNER_ADDRESS`, `KMS_SIGNER_API_TOKEN`), and read-only STRATO OAuth account (`SIGNER_OPENID_DISCOVERY_URL`, `SIGNER_CLIENT_ID`, `SIGNER_CLIENT_SECRET`, `SIGNER_BA_USERNAME`, `SIGNER_BA_PASSWORD`). Access tokens are refreshed before expiry and once after a 401 response. A signer verifies the source withdrawal, exact STRATO authorization timing/version and destination vault policy before requesting a digest signature; no attestation private key is held by the bridge executor.
+Run each signer independently with `npm run start:signer`. Each process must use its own `SIGNER_RPC_URL`, authenticated KMS/HSM adapter (`KMS_SIGNER_URL`, `KMS_SIGNER_ADDRESS`, `KMS_SIGNER_API_TOKEN`), and STRATO settlement-verifier OAuth account (`SIGNER_OPENID_DISCOVERY_URL`, `SIGNER_CLIENT_ID`, `SIGNER_CLIENT_SECRET`, `SIGNER_BA_USERNAME`, `SIGNER_BA_PASSWORD`). Register three independent STRATO accounts with `ExternalAssetBridge.setSettlementVerifier` and configure threshold 2 before starting the bridge service. Access tokens are refreshed before expiry and once after a 401 response. A signer independently verifies deposits and external vault releases before recording a STRATO settlement attestation; it also verifies the source withdrawal, exact STRATO authorization timing/version and destination vault policy before requesting a vault authorization signature. No attestation private key is held by the bridge executor.
 
 Production signer deployments use `docker-compose.bridge-signer.tpl.yml`. Deploy one isolated stack per signer with a distinct RPC provider, KMS/HSM key and API endpoint.
+
+`SETTLEMENT_VERIFIER_CONFIRMATIONS` controls the external-chain confirmation depth independently enforced by that verifier. Configure it per chain and risk policy. Deposit minting and withdrawal finalization require the on-chain verifier threshold; after that threshold is present, any STRATO account may submit the settlement transaction.
+
+For native ETH deposits, each verifier calls `trace_transaction` to prove the DepositRouter-to-vault custody movement. At least two of the three configured signer RPCs must support this method for settlement, and all three should support it to preserve one-verifier fault tolerance. Verify trace support with a real DepositRouter ETH transaction before enabling the route.
 
 Routine non-native withdrawals are marked ready on STRATO, reserved in the route-local vault, released externally, and only then finalized and burned on STRATO. Large withdrawals require an executed Safe approval over their stable review digest before receiving a fresh release authorization.
 Expired reservations are cancelled on the destination vault and recorded on STRATO; governance can then refund the escrowed representation with `npm run refund:external-withdrawal` from `app/contracts`.

@@ -136,7 +136,31 @@ function loadConfig(configPath) {
       input.externalAssetBridge?.priceOracle,
       "externalAssetBridge.priceOracle",
     ),
+    settlementVerifiers: (
+      input.externalAssetBridge?.settlementVerifiers || []
+    ).map((verifier, index) =>
+      address(
+        verifier,
+        `externalAssetBridge.settlementVerifiers[${index}]`,
+      ),
+    ),
+    settlementVerifierThreshold: uint(
+      input.externalAssetBridge?.settlementVerifierThreshold,
+      "externalAssetBridge.settlementVerifierThreshold",
+      { positive: true },
+    ),
   };
+  if (
+    BigInt(bridge.settlementVerifierThreshold) !== 2n ||
+    bridge.settlementVerifiers.length !== 3
+  ) {
+    throw new Error(
+      "externalAssetBridge requires exactly three settlement verifiers with threshold 2",
+    );
+  }
+  if (new Set(bridge.settlementVerifiers).size !== bridge.settlementVerifiers.length) {
+    throw new Error("externalAssetBridge settlement verifiers must be unique");
+  }
   const chains = (input.chains || []).map((chain, chainIndex) => ({
     chainName: String(chain.chainName || "").trim(),
     vault: address(chain.vault, `chains[${chainIndex}].vault`),
@@ -238,6 +262,15 @@ function buildPlan(settings, step) {
     ]);
     add(bridge.address, "setTokenRouter", [
       parameter("address", tokenRouter.address),
+    ]);
+    bridge.settlementVerifiers.forEach((verifier) =>
+      add(bridge.address, "setSettlementVerifier", [
+        parameter("address", verifier),
+        parameter("bool", true),
+      ]),
+    );
+    add(bridge.address, "setSettlementVerifierThreshold", [
+      parameter("uint8", bridge.settlementVerifierThreshold),
     ]);
   }
 

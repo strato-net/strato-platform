@@ -25,6 +25,12 @@ const settings = {
     guardian: ADDRESS,
     usdst: ADDRESS,
     priceOracle: ADDRESS,
+    settlementVerifiers: [
+      "a".repeat(40),
+      "b".repeat(40),
+      "c".repeat(40),
+    ],
+    settlementVerifierThreshold: "2",
   },
   chains: [{
     chainName: "sepolia",
@@ -67,6 +73,10 @@ test("builds initialization votes including every yield vault", () => {
       "initialize",
       "setPriceOracle",
       "setTokenRouter",
+      "setSettlementVerifier",
+      "setSettlementVerifier",
+      "setSettlementVerifier",
+      "setSettlementVerifierThreshold",
     ],
   );
 });

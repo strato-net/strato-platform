@@ -329,7 +329,8 @@ Native redemption recovery policy:
 The existing bridge service still also requires its normal Safe envs:
 - `SAFE_ADDRESS`
 - `SAFE_PROPOSER_ADDRESS`
-- `SAFE_PROPOSER_PRIVATE_KEY`
+- `SAFE_PROPOSER_KMS_URL`
+- `SAFE_PROPOSER_KMS_API_TOKEN`
 
 ### Step 8: Restart or redeploy the bridge service
 

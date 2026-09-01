@@ -1,5 +1,5 @@
 import axios, { AxiosRequestConfig } from "axios";
-import { getBAUserToken } from "../auth";
+import { getBAUserToken, getRelayerToken } from "../auth";
 import { config } from "../config";
 import { RetryConfig, ClientOptions, ApiClient } from "../types";
 
@@ -71,6 +71,7 @@ const createClient = (
     authenticated = true,
     timeout = config.api.defaults.timeout,
     logPrefix = "API",
+    tokenProvider = getBAUserToken,
   }: ClientOptions = {},
 ): ApiClient => {
   const request = async <T>(
@@ -87,7 +88,7 @@ const createClient = (
     };
 
     if (authenticated) {
-      const token = await getBAUserToken();
+      const token = await tokenProvider();
       if (!token) throw new Error("No access token available");
       headers["Authorization"] = `Bearer ${token}`;
     }
@@ -133,6 +134,17 @@ export const strato = createClient(`${config.api.nodeUrl}/strato/v2.3`, {
 export const bloc = createClient(`${config.api.nodeUrl}/bloc/v2.2`, {
   logPrefix: "Bloc",
 });
+export const relayerStrato = createClient(
+  `${config.api.nodeUrl}/strato/v2.3`,
+  {
+    logPrefix: "RelayerStrato",
+    tokenProvider: getRelayerToken,
+  },
+);
+export const relayerBloc = createClient(`${config.api.nodeUrl}/bloc/v2.2`, {
+  logPrefix: "RelayerBloc",
+  tokenProvider: getRelayerToken,
+});
 export const eth = createClient(`${config.api.nodeUrl}/strato-api/eth/v1.2`, {
   logPrefix: "Eth",
 });
@@ -154,6 +166,8 @@ export default {
   cirrus,
   strato,
   bloc,
+  relayerStrato,
+  relayerBloc,
   eth,
   app,
   fetch,

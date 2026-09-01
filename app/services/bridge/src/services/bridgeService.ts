@@ -4,7 +4,7 @@ import {
   getNativeRepresentationBridgeAddress,
 } from "../config";
 import { JsonRpcProvider } from "ethers";
-import { execute } from "../utils/stratoHelper";
+import { execute, executeAsRelayer } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
 import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, RouteDepositArgs, NativeDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
 import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
@@ -42,6 +42,10 @@ import {
 } from "./verificationService";
 import { fetchRouteSteps } from "./routeQuoteService";
 import { isTransportRouteError } from "../utils/routeFailure";
+import {
+  attestDepositSettlement,
+  attestWithdrawalRelease,
+} from "./settlementAttestationService";
 
 let cachedStratoNetworkId: bigint | null = null;
 const announcedManualNativeWithdrawals = new Map<string, string | null>();
@@ -224,7 +228,11 @@ export const settleDeposit = async (
 ): Promise<string | null> => {
   const actionDeposit = deposit as Partial<ActionDepositArgs>;
   try {
-    const result = await execute({
+    await attestDepositSettlement(deposit);
+    const submit = actionDeposit.action && actionDeposit.action !== "0"
+      ? execute
+      : executeAsRelayer;
+    const result = await submit({
       contractName: "ExternalAssetBridge",
       contractAddress: config.externalAssetBridge.address!,
       method: "settleDeposit",
@@ -241,6 +249,7 @@ export const settleDeposit = async (
         action: actionDeposit.action || "0",
         actionToken: actionDeposit.actionToken || "0000000000000000000000000000000000000000",
         minFinalOut: actionDeposit.minFinalOut || "0",
+        attestationProof: "0x",
       },
     });
     logInfo(
@@ -275,6 +284,7 @@ export const settleRoutedDeposit = async (
   deposit: RouteDepositArgs,
 ): Promise<string | null> => {
   try {
+    await attestDepositSettlement(deposit);
     const result = await execute({
       contractName: "ExternalAssetBridge",
       contractAddress: config.externalAssetBridge.address!,
@@ -292,6 +302,7 @@ export const settleRoutedDeposit = async (
         expectedTokenOut: deposit.actionToken,
         minFinalOut: deposit.minFinalOut,
         steps: deposit.steps,
+        attestationProof: "0x",
       },
     });
     logInfo(
@@ -399,12 +410,17 @@ export const confirmReviewedDeposit = async (
         : verification?.state || "unknown";
     throw new Error(`Reviewed deposit re-verification failed: ${reason}`);
   }
+  await attestDepositSettlement(pending.deposit);
   const actionDeposit = pending.deposit as Partial<ActionDepositArgs>;
+  const submit = actionDeposit.action && actionDeposit.action !== "0"
+    ? execute
+    : executeAsRelayer;
   let method = "confirmReviewedDeposit";
   let args: Record<string, unknown> = {
     externalChainId,
     depositRouter,
     depositId,
+    attestationProof: "0x",
   };
   if (actionDeposit.action === "4") {
     const settlementInfo = await getDepositSettlementInfoByIdentity(
@@ -433,7 +449,7 @@ export const confirmReviewedDeposit = async (
     }
   }
   try {
-    const result = await execute({
+    const result = await submit({
       contractName: "ExternalAssetBridge",
       contractAddress: config.externalAssetBridge.address!,
       method,
@@ -451,11 +467,16 @@ export const confirmReviewedDeposit = async (
       "BridgeService",
       `Reviewed routed settlement ${depositIdentity(pending.deposit)} failed deterministically; using source-token fallback: ${(error as Error).message}`,
     );
-    const result = await execute({
+    const result = await submit({
       contractName: "ExternalAssetBridge",
       contractAddress: config.externalAssetBridge.address!,
       method: "confirmReviewedDeposit",
-      args: { externalChainId, depositRouter, depositId },
+      args: {
+        externalChainId,
+        depositRouter,
+        depositId,
+        attestationProof: "0x",
+      },
     });
     return result.hash;
   }
@@ -727,7 +748,12 @@ export const processExternalWithdrawal = async (
   }
 
   const releaseTxHash = await releaseWithdrawal(authorization, reservationId);
-  const finalizeResult = await execute({
+  await attestWithdrawalRelease(
+    authorization,
+    reservationId,
+    releaseTxHash,
+  );
+  const finalizeResult = await executeAsRelayer({
     contractName: "ExternalAssetBridge",
     contractAddress: config.externalAssetBridge.address!,
     method: "finalizeWithdrawal",
@@ -735,6 +761,7 @@ export const processExternalWithdrawal = async (
       withdrawalId: withdrawal.withdrawalId,
       reservationId,
       externalTxHash: releaseTxHash,
+      attestationProof: "0x",
     },
   });
   if (finalizeResult.status !== "Success") {

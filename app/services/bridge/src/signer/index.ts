@@ -15,6 +15,11 @@ import {
   matchesSourceWithdrawalAuthorization,
   validateSignerKmsUrl,
 } from "./authorizationValidation";
+import {
+  DepositSettlementAttestation,
+  validateDepositSettlement,
+  validateWithdrawalRelease,
+} from "./settlementValidation";
 
 interface WithdrawalAuthorization {
   sourceChainId: string;
@@ -77,7 +82,18 @@ const signerClientId = required("SIGNER_CLIENT_ID");
 const signerClientSecret = required("SIGNER_CLIENT_SECRET");
 const signerBaUsername = required("SIGNER_BA_USERNAME");
 const signerBaPassword = required("SIGNER_BA_PASSWORD");
+const settlementVerifierConfirmations = Number(
+  required("SETTLEMENT_VERIFIER_CONFIRMATIONS"),
+);
 const port = Number(process.env.PORT || 3004);
+if (
+  !Number.isSafeInteger(settlementVerifierConfirmations) ||
+  settlementVerifierConfirmations <= 0
+) {
+  throw new Error(
+    "SETTLEMENT_VERIFIER_CONFIRMATIONS must be a positive integer",
+  );
+}
 
 const domain = (authorization: WithdrawalAuthorization) => ({
   name: "ExternalBridgeVault",
@@ -92,6 +108,7 @@ const authHeaders = (token?: string) =>
 let stratoToken: { value: string; expiresAt: number } | undefined;
 let stratoTokenPromise: Promise<string> | undefined;
 let tokenEndpoint: string | undefined;
+let settlementVerifierAddress: string | undefined;
 
 const getStratoToken = async (): Promise<string> => {
   if (stratoToken && stratoToken.expiresAt > Date.now() + 30_000) {
@@ -145,6 +162,114 @@ const stratoGet = async (path: string, params: Record<string, string>) => {
     stratoToken = undefined;
     return request();
   }
+};
+
+const submitStratoAttestation = async (
+  method: string,
+  args: Record<string, unknown>,
+): Promise<string> => {
+  const request = async () =>
+    axios.post(
+      `${stratoNodeUrl}/strato/v2.3/transaction/parallel?resolve=true`,
+      {
+        txs: [
+          {
+            type: "FUNCTION",
+            payload: {
+              contractName: "ExternalAssetBridge",
+              contractAddress: sourceBridge,
+              method,
+              args,
+            },
+          },
+        ],
+        txParams: { gasLimit: 32_100_000_000, gasPrice: 1 },
+      },
+      { headers: authHeaders(await getStratoToken()) },
+    );
+  let response;
+  try {
+    response = await request();
+  } catch (error: any) {
+    if (error?.response?.status !== 401) throw error;
+    stratoToken = undefined;
+    response = await request();
+  }
+  let result = response.data?.[0];
+  if (!result?.hash) {
+    throw new Error(
+      `STRATO settlement attestation failed: ${result?.status || "unknown"}`,
+    );
+  }
+  for (let attempt = 0; attempt < 12 && result?.status === "Pending"; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 5_000));
+    try {
+      const polled = await axios.post(
+        `${stratoNodeUrl}/bloc/v2.2/transactions/results`,
+        [result.hash],
+        { headers: authHeaders(await getStratoToken()) },
+      );
+      result = polled.data?.[0];
+    } catch (error: any) {
+      if (error?.response?.status !== 401) throw error;
+      stratoToken = undefined;
+    }
+  }
+  if (result?.status !== "Success") {
+    throw new Error(
+      `STRATO settlement attestation failed: ${result?.status || "unknown"}`,
+    );
+  }
+  return result.hash;
+};
+
+const getDepositChainConfig = async (
+  chainId: string,
+): Promise<{ vault: string; routers: string[] }> => {
+  const [chainResponse, routerResponse] = await Promise.all([
+    stratoGet(
+      "/cirrus/search/BlockApps-ExternalAssetBridge-chains",
+      {
+        address: `eq.${sourceBridge}`,
+        key: `eq.${chainId}`,
+        select: "value",
+      },
+    ),
+    stratoGet(
+      "/cirrus/search/BlockApps-ExternalAssetBridge-depositRouters",
+      {
+        address: `eq.${sourceBridge}`,
+        key: `eq.${chainId}`,
+        value: "eq.true",
+        select: "key2",
+      },
+    ),
+  ]);
+  const chain = chainResponse.data?.[0]?.value;
+  if (!chain?.enabled || !chain.vault) {
+    throw new Error("Deposit chain is not enabled by the source bridge");
+  }
+  const routers = (routerResponse.data || []).map((row: any) => row.key2);
+  return { vault: chain.vault, routers };
+};
+
+const validateSettlementVerifier = async (): Promise<string> => {
+  const keyResponse = await stratoGet("/strato/v2.3/key", {});
+  const address = normalize(keyResponse.data?.address || "");
+  if (!address) throw new Error("STRATO verifier address is unavailable");
+  const verifierResponse = await stratoGet(
+    "/cirrus/search/BlockApps-ExternalAssetBridge-settlementVerifiers",
+    {
+      address: `eq.${sourceBridge}`,
+      key: `eq.${address}`,
+      value: "eq.true",
+      select: "key",
+    },
+  );
+  if (!verifierResponse.data?.length) {
+    throw new Error(`STRATO account ${address} is not a settlement verifier`);
+  }
+  return address;
 };
 
 const normalize = (value: string): string => value.replace(/^0x/, "").toLowerCase();
@@ -280,6 +405,8 @@ app.get("/health", (_, res) => {
   res.json({
     status: "ok",
     signer: signerAddress,
+    settlementVerifier: settlementVerifierAddress,
+    settlementVerifierConfirmations,
     destinationChainId: destinationChainId.toString(),
     destinationVault,
   });
@@ -300,6 +427,100 @@ app.post("/v1/sign-withdrawal", async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`External bridge signer listening on port ${port}`);
+app.post("/v1/attest-deposit", async (req, res) => {
+  try {
+    const deposit = req.body as DepositSettlementAttestation;
+    if (BigInt(deposit.externalChainId) !== destinationChainId) {
+      throw new Error("Deposit destination chain mismatch");
+    }
+    const chain = await getDepositChainConfig(deposit.externalChainId);
+    if (!chain.routers.some((router) => normalize(router) === normalize(deposit.depositRouter))) {
+      throw new Error("Deposit router is not enabled by the source bridge");
+    }
+    await validateDepositSettlement(
+      provider,
+      deposit,
+      chain.vault,
+      chain.routers,
+      settlementVerifierConfirmations,
+    );
+    const transactionHash = await submitStratoAttestation(
+      "attestDepositSettlement",
+      {
+        externalChainId: deposit.externalChainId,
+        depositRouter: deposit.depositRouter,
+        depositId: deposit.depositId,
+        externalSender: deposit.externalSender,
+        externalToken: deposit.externalToken,
+        externalTokenAmount: deposit.externalTokenAmount,
+        externalTxHash: deposit.externalTxHash,
+        stratoRecipient: deposit.stratoRecipient,
+        stratoToken: deposit.stratoToken,
+        action: deposit.action,
+        actionToken: deposit.actionToken,
+        minFinalOut: deposit.minFinalOut,
+      },
+    );
+    res.json({ verifier: settlementVerifierAddress, transactionHash });
+  } catch (error) {
+    console.error("Deposit settlement attestation rejected", (error as Error).message);
+    res.status(422).json({ error: (error as Error).message });
+  }
 });
+
+app.post("/v1/attest-release", async (req, res) => {
+  try {
+    const authorization = req.body
+      .authorization as WithdrawalAuthorization;
+    const reservationId = String(req.body.reservationId || "");
+    const externalTxHash = String(req.body.externalTxHash || "");
+    await Promise.all([
+      validateSourceWithdrawal(authorization),
+      validateDestination(authorization),
+      validateWithdrawalRelease(
+        provider,
+        {
+          withdrawalId: authorization.sourceWithdrawalId,
+          reservationId,
+          externalTxHash,
+          token: authorization.token,
+          recipient: authorization.recipient,
+          amount: authorization.amount,
+        },
+        authorization.destinationVault,
+        settlementVerifierConfirmations,
+      ),
+    ]);
+    const transactionHash = await submitStratoAttestation(
+      "attestWithdrawalRelease",
+      {
+        withdrawalId: authorization.sourceWithdrawalId,
+        reservationId,
+        externalTxHash,
+      },
+    );
+    res.json({ verifier: settlementVerifierAddress, transactionHash });
+  } catch (error) {
+    console.error("Withdrawal release attestation rejected", (error as Error).message);
+    res.status(422).json({ error: (error as Error).message });
+  }
+});
+
+const start = async () => {
+  try {
+    settlementVerifierAddress = await validateSettlementVerifier();
+    app.listen(port, () => {
+      console.log(
+        `External bridge signer listening on port ${port}; settlement verifier ${settlementVerifierAddress}`,
+      );
+    });
+  } catch (error) {
+    console.error(
+      "External bridge signer configuration rejected",
+      (error as Error).message,
+    );
+    process.exit(1);
+  }
+};
+
+void start();

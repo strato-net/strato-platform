@@ -53,6 +53,7 @@ export interface ClientOptions {
   authenticated?: boolean;
   timeout?: number;
   logPrefix?: string;
+  tokenProvider?: () => Promise<string>;
 }
 
 export interface ApiClient {

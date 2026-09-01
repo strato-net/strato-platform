@@ -18,6 +18,7 @@ import { logError, logInfo } from "./logger";
 import { getRebaseFactors } from "../services/cirrusService";
 import { WithdrawalInfo, SafeTransactionData, NonEmptyArray } from "../types";
 import { retry } from "./api";
+import { KmsEip1193Provider } from "./kmsSigner";
 
 // Constants
 const NONCE_CONFLICT_CODES = [409, 422];
@@ -156,9 +157,19 @@ export async function proposeTransactions(
 
 export async function initializeSafeForChain(chainId: number, safeAddress?: string) {
   const rpcUrl = getChainRpcUrl(chainId);
+  const proposerAddress = config.safe.safeProposerAddress || "";
+  const kmsUrl = config.safe.safeProposerKmsUrl || "";
+  const kmsApiToken = config.safe.safeProposerKmsApiToken || "";
+  if (!proposerAddress || !kmsUrl || !kmsApiToken) {
+    throw new Error("Safe proposer KMS configuration is incomplete");
+  }
   const protocolKit = await Safe.init({
-    provider: rpcUrl,
-    signer: config.safe.safeProposerPrivateKey || "",
+    provider: new KmsEip1193Provider(rpcUrl, {
+      address: proposerAddress,
+      url: kmsUrl,
+      apiToken: kmsApiToken,
+    }),
+    signer: proposerAddress,
     safeAddress: safeAddress || config.safe.address || "",
   });
   const apiKit = new SafeApiKit({ chainId: safeToBigInt(chainId), apiKey: config.safe.apiKey });

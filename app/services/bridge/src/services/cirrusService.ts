@@ -519,6 +519,36 @@ export const getTokenRouterWiring = async (): Promise<{
   };
 };
 
+export const getSettlementVerifierConfig = async (): Promise<{
+  threshold: number;
+  count: number;
+  verifiers: string[];
+}> => {
+  const [rows, verifierRows] = await Promise.all([
+    cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}`, {
+      params: {
+        address: `eq.${externalAssetBridgeAddress}`,
+        select: "settlementVerifierThreshold,settlementVerifierCount",
+        limit: 1,
+      },
+    }),
+    cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-settlementVerifiers`, {
+      params: {
+        address: `eq.${externalAssetBridgeAddress}`,
+        value: "eq.true",
+        select: "key",
+      },
+    }),
+  ]);
+  return {
+    threshold: Number(rows?.[0]?.settlementVerifierThreshold || 0),
+    count: Number(rows?.[0]?.settlementVerifierCount || 0),
+    verifiers: (verifierRows || []).map((row: any) =>
+      String(row.key).toLowerCase().replace(/^0x/, ""),
+    ),
+  };
+};
+
 export const getExternalBridgeRebaseFactors = async (
   stratoTokenAddresses: string[],
 ): Promise<Map<string, bigint>> => {

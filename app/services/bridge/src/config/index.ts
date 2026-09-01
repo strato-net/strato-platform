@@ -39,6 +39,13 @@ const config = {
     clientId: process.env.CLIENT_ID,
     openIdDiscoveryUrl: process.env.OPENID_DISCOVERY_URL,
   },
+  relayerAuth: {
+    baUsername: process.env.RELAYER_BA_USERNAME,
+    baPassword: process.env.RELAYER_BA_PASSWORD,
+    clientSecret: process.env.RELAYER_CLIENT_SECRET,
+    clientId: process.env.RELAYER_CLIENT_ID,
+    openIdDiscoveryUrl: process.env.RELAYER_OPENID_DISCOVERY_URL,
+  },
   bridge: {
     address: process.env.BRIDGE_ADDRESS,
   },
@@ -65,7 +72,8 @@ const config = {
     address: process.env.SAFE_ADDRESS,
     hotWalletAddress: process.env.SAFE_HOT_WALLET_ADDRESS,
     safeProposerAddress: process.env.SAFE_PROPOSER_ADDRESS,
-    safeProposerPrivateKey: process.env.SAFE_PROPOSER_PRIVATE_KEY,
+    safeProposerKmsUrl: process.env.SAFE_PROPOSER_KMS_URL,
+    safeProposerKmsApiToken: process.env.SAFE_PROPOSER_KMS_API_TOKEN,
     apiKey: process.env.SAFE_API_KEY,
   },
   voucher: {
@@ -253,13 +261,19 @@ const requiredEnvVars = [
   "CLIENT_SECRET",
   "CLIENT_ID",
   "OPENID_DISCOVERY_URL",
+  "RELAYER_BA_USERNAME",
+  "RELAYER_BA_PASSWORD",
+  "RELAYER_CLIENT_SECRET",
+  "RELAYER_CLIENT_ID",
+  "RELAYER_OPENID_DISCOVERY_URL",
   "BRIDGE_ADDRESS",
   "EXTERNAL_ASSET_BRIDGE_ADDRESS",
   "EXTERNAL_BRIDGE_SIGNER_API_TOKEN",
   "PRICE_ORACLE_ADDRESS",
   "SAFE_ADDRESS",
   "SAFE_PROPOSER_ADDRESS",
-  "SAFE_PROPOSER_PRIVATE_KEY",
+  "SAFE_PROPOSER_KMS_URL",
+  "SAFE_PROPOSER_KMS_API_TOKEN",
 ];
 
 const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
