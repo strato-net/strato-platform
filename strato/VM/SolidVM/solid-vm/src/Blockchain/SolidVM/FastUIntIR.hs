@@ -2060,7 +2060,7 @@ compileStmt cc current ret = \case
               -- changes the post-fork receipts root even when state and the
               -- externally rendered event are identical.
               | M.notMember name (csNames s), isJust (storageDecl cc current name) -> do
-                  r <- fresh
+                  r <- bindAnonymousObject
                   emit $ UObjectLit r (SReference . MS.singleton . BC.pack $ labelToString name)
                   pure r
               | otherwise -> compileExpr cc current e
