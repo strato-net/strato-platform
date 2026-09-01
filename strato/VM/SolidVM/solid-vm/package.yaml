@@ -1,11 +1,41 @@
 name: solid-vm
 license: Apache-2.0
+build-type: Custom
+
+extra-source-files:
+  - native/Cargo.lock
+  - native/Cargo.toml
+  - native/rust-toolchain.toml
+  - native/src/lib.rs
+
+flags:
+  native-bn254:
+    description: Build the optional accelerated BN254 backend (requires Cargo)
+    manual: true
+    default: false
+
+custom-setup:
+  dependencies:
+    - base
+    - Cabal
+    - directory
+    - filepath
+    - process
 
 dependencies:
   - base
 
 library:
   source-dirs: src/
+  when:
+    - condition: flag(native-bn254)
+      cpp-options: -DSOLIDVM_NATIVE_BN254
+      extra-libraries:
+        - Csolid_vm_native
+      extra-bundled-libraries:
+        - Csolid_vm_native
+      other-modules:
+        - Blockchain.SolidVM.Native
   exposed-modules:
     - Blockchain.SolidVM
     - Blockchain.SolidVM.Builtins

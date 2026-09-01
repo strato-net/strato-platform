@@ -6066,6 +6066,36 @@ contract qq {
 |]
       `shouldReturn` Just "(true)"
 
+  it "keeps PLONK arithmetic host builtins equivalent in FastIR" . runTest $ do
+    runCall'
+      "check"
+      []
+      [r|
+library PlonkBuiltinIR {
+  function check() returns (bool) {
+    uint digest = uint(sha256(bytes(123)));
+    (uint mulX, uint mulY) = ecMul(1, 2, 1);
+    (uint addX, uint addY) = ecAdd(mulX, mulY, 0, 0);
+    return addmod(15, 5, 17) == 3
+      && mulmod(15, 5, 17) == 7
+      && modExp(5, 3, 17) == 6
+      && digest == 960651239372262155457909151379123018551187498045146330307848435673183387030
+      && mulX == 1
+      && mulY == 2
+      && addX == 1
+      && addY == 2
+      && int256(9) == 9;
+  }
+}
+
+contract qq {
+  function check() returns (bool) {
+    return PlonkBuiltinIR.check();
+  }
+}
+|]
+      `shouldReturn` Just "(true)"
+
   it "cant use  a commented pragma" . runTest $ do
     runCall'
       "a"

@@ -223,6 +223,39 @@ Exact diagnostic gates for that banked binary passed:
 
 A new genesis-to-tip full-pipeline run remains the final acceptance gate.
 
+## Slow-segment optimization checkpoint
+
+Profiling blocks 128,445-128,494 after the DA-commitment work attributed
+40.5% of profiled body time to cryptographic builtins. Eight calls each to
+`PlonkVerifier.verifyProof` and `PlonkVerifier.verify` dominated the Solidity
+function profile. Moving additional PLONK helper builtins into FastUIntIR was
+correct but improved the identical 50-block slice only from 26.01 to 26.48
+blk/s, so the remaining bottleneck was the legacy Haskell BN254 implementation.
+
+The optional `native-bn254` build flag links an Arkworks 0.5 Rust static
+library for EIP-196 addition/multiplication and EIP-197 pairing. Invalid native
+inputs fall back to the original Haskell functions so their exception behavior
+remains the oracle. The Rust suite passes its G1 identity checks, malformed
+input checks, and a two-pair Ethereum vector. The repository-wide SolidVM test
+target remains blocked by the pre-existing test-build failures listed above.
+
+The provenance-banked dirty candidate has binary SHA-256
+`f86bfefebc15da75e4dfcc3d29fcc25e7203a153446a1f805f5113ca57a0dbaf`
+and source tree `00492561a04c76e3aa3502b8ec577f42d4047a50`. Its static BN254
+symbols were independently confirmed in the executable before replay.
+
+| Identical diagnostic range | Prior candidate | Native BN254 | Allocation change | Correctness |
+|---|---:|---:|---:|---|
+| 128,445-128,494 | 26.01 blk/s | 33.43 blk/s | 11.05 GB to 8.74 GB | exact root/hash/audit |
+| 125,000-129,999 | 60.04 blk/s | 149.17 blk/s | 231.44 GB to 133.66 GB | exact root/hash/audit |
+
+The 5,000-block run also reduced peak RSS from 2,100,822,016 to
+1,834,844,160 bytes. Its receipt is
+`cfgfallback137-native-bn254-linkfix-125000-129999-20260901-59.result.txt`;
+the prior identical-input receipt is
+`cfgfallback137-dacommit-candidate-125000-129999-20260901-48.result.txt`.
+This is a 2.48x iteration-segment speedup, not a genesis-to-tip qualification.
+
 ## Qualification boundary
 
 The 40,000-44,999 range is an iteration benchmark only. Final validation

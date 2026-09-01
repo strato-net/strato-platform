@@ -4058,7 +4058,11 @@ storageHooks profiledFunctionName callee ro contract cc = do
             ("FastIR bytes index" :: String)
     runHostBuiltin builtinName args = do
       values <- traverse hostValue args
-      FastOpaque <$> callBuiltinFunction (stringToLabel builtinName) values
+      result <- callBuiltinFunction (stringToLabel builtinName) values
+      case (builtinName, result) of
+        ("ecAdd", STuple tupleValues) -> FastArray <$> traverse getInt (V.toList tupleValues)
+        ("ecMul", STuple tupleValues) -> FastArray <$> traverse getInt (V.toList tupleValues)
+        _ -> pure $ FastOpaque result
     hostValue = \case
       (HostOpaque, FastOpaque value) -> pure value
       (HostAddress, FastScalar value) -> pure $ SAddress (fromInteger value) False

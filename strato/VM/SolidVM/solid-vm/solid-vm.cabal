@@ -1,4 +1,4 @@
-cabal-version: 1.12
+cabal-version: 3.0
 
 -- This file has been generated from package.yaml by hpack version 0.38.1.
 --
@@ -7,7 +7,25 @@ cabal-version: 1.12
 name:           solid-vm
 version:        0.0.0
 license:        Apache-2.0
-build-type:     Simple
+build-type:     Custom
+extra-source-files:
+    native/Cargo.lock
+    native/Cargo.toml
+    native/rust-toolchain.toml
+    native/src/lib.rs
+
+custom-setup
+  setup-depends:
+      Cabal
+    , base
+    , directory
+    , filepath
+    , process
+
+flag native-bn254
+  description: Build the optional accelerated BN254 backend (requires Cargo)
+  manual: True
+  default: False
 
 library
   exposed-modules:
@@ -29,8 +47,18 @@ library
       Blockchain.SolidVM.SetGet
       Blockchain.SolidVM.TraceTools
       Paths_solid_vm
+  autogen-modules:
+      Paths_solid_vm
   hs-source-dirs:
       src/
+  if flag(native-bn254)
+    cpp-options: -DSOLIDVM_NATIVE_BN254
+    other-modules:
+        Blockchain.SolidVM.Native
+    extra-libraries:
+        Csolid_vm_native
+    extra-bundled-libraries:
+        Csolid_vm_native
   ghc-options: -Wall -O2 -fexpose-all-unfoldings -fspecialise-aggressively -fdicts-cheap -fsolve-constant-dicts
   build-depends:
       Decimal

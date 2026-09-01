@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -69,6 +70,9 @@ import Blockchain.SolidVM.BLS12381.HashToCurve
     mapFp2ToG2,
     mapFpToG1,
   )
+#ifdef SOLIDVM_NATIVE_BN254
+import qualified Blockchain.SolidVM.Native as Native
+#endif
 
 import BlockApps.Solidity.ABI.Codec
 import Blockchain.SolidVM.SM
@@ -224,7 +228,17 @@ unpoint (A x y) = (toInteger x, toInteger y)
 unpoint O       = (0, 0)
 
 ecAdd :: (Integer, Integer) -> (Integer, Integer) -> (Integer, Integer)
-ecAdd p1 p2 =
+#ifdef SOLIDVM_NATIVE_BN254
+ecAdd p1@(x1, y1) p2@(x2, y2) =
+  case encodeNativeIntegers [x1, y1, x2, y2] >>= eitherToMaybe . Native.bn254G1Add >>= decodeNativeG1 of
+    Just result -> result
+    Nothing -> ecAddOracle p1 p2
+#else
+ecAdd = ecAddOracle
+#endif
+
+ecAddOracle :: (Integer, Integer) -> (Integer, Integer) -> (Integer, Integer)
+ecAddOracle p1 p2 =
   let q1 = g1Point "ecAdd" p1
       q2 = g1Point "ecAdd" p2
       -- the affine `add` is incomplete addition (P + P yields O); Ethereum's
@@ -232,10 +246,49 @@ ecAdd p1 p2 =
    in unpoint (if q1 == q2 then dbl q1 else add q1 q2)
 
 ecMul :: (Integer, Integer) -> Integer -> (Integer, Integer)
-ecMul p s = unpoint (mul (g1Point "ecMul" p) (fromInteger s :: Fr))
+#ifdef SOLIDVM_NATIVE_BN254
+ecMul p@(x, y) scalar =
+  case encodeNativeIntegers [x, y, scalar] >>= eitherToMaybe . Native.bn254G1Mul >>= decodeNativeG1 of
+    Just result -> result
+    Nothing -> ecMulOracle p scalar
+#else
+ecMul = ecMulOracle
+#endif
+
+ecMulOracle :: (Integer, Integer) -> Integer -> (Integer, Integer)
+ecMulOracle p scalar = unpoint (mul (g1Point "ecMul" p) (fromInteger scalar :: Fr))
 
 ecPairing :: [Integer] -> Bool
-ecPairing = doPairing . toTrios
+#ifdef SOLIDVM_NATIVE_BN254
+ecPairing integers =
+  case encodeNativeIntegers integers >>= eitherToMaybe . Native.bn254Pairing of
+    Just result -> result
+    Nothing -> ecPairingOracle integers
+
+encodeNativeIntegers :: [Integer] -> Maybe B.ByteString
+encodeNativeIntegers = fmap B.concat . traverse integerToEip197
+
+integerToEip197 :: Integer -> Maybe B.ByteString
+integerToEip197 value
+  | value < 0 || value >= (1 `shiftL` 256) = Nothing
+  | otherwise = Just . B.pack $ [fromIntegral (value `shiftR` shift) | shift <- [248, 240 .. 0]]
+
+decodeNativeG1 :: B.ByteString -> Maybe (Integer, Integer)
+decodeNativeG1 bytes
+  | B.length bytes /= 64 = Nothing
+  | otherwise = Just (decodeInteger $ B.take 32 bytes, decodeInteger $ B.drop 32 bytes)
+  where
+    decodeInteger = B.foldl' (\acc byte -> (acc `shiftL` 8) + fromIntegral byte) 0
+
+eitherToMaybe :: Either a b -> Maybe b
+eitherToMaybe (Right value) = Just value
+eitherToMaybe (Left _) = Nothing
+#else
+ecPairing = ecPairingOracle
+#endif
+
+ecPairingOracle :: [Integer] -> Bool
+ecPairingOracle = doPairing . toTrios
   -- Ethereum orders the coordinates as x1, y1, x2Imag, x2Real, y2Imag, y2Real
   -- so toTrios regroups them to ((x1, y1), ((x2Real, x2Imag), (y2Real, y2Imag))),
   -- which is the order in which pairing library (and poly library under the hood) expects

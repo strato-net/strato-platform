@@ -138,6 +138,7 @@ data UOp
   | UObjectSstoreAt !SolidString !Int !Int
   | UDynamicCall !Int !DynamicCallKind !Int !Int ![(Int, HostArgKind)] !(Maybe Int)
   | UHostBuiltin !Int !String ![(Int, HostArgKind)]
+  | UHostTupleBuiltin ![Int] !String ![(Int, HostArgKind)]
   | UPathGet !Int !SolidString ![PathStep]
   | UPathGetAt !Int !SolidString ![PathStep] !Int
   | UPathSet !SolidString ![PathStep] !Int
@@ -502,6 +503,7 @@ spliceablePure ops =
       UObjectSstoreAt {} -> False
       UDynamicCall {} -> False
       UHostBuiltin {} -> False
+      UHostTupleBuiltin {} -> False
       UPathGet {} -> False
       UPathGetAt {} -> False
       UPathSet {} -> False
@@ -1302,12 +1304,26 @@ compileCallValues cc current callee args
       charge 1
       pure [dest]
   | CC.Variable _ builtinName <- callee
-  , builtinName `elem` ["keccak256", "decimal"] = do
+  , builtinName `elem` ["addmod", "mulmod", "modExp"] = do
+      refs <- mapM compileHostArg args
+      dest <- fresh
+      emit $ UHostBuiltin dest (labelToString builtinName) refs
+      charge 1
+      pure [dest]
+  | CC.Variable _ builtinName <- callee
+  , builtinName `elem` ["bytes", "keccak256", "sha256", "decimal"] = do
       refs <- mapM compileHostArg args
       dest <- bindAnonymousObject
       emit $ UHostBuiltin dest (labelToString builtinName) refs
       charge 1
       pure [dest]
+  | CC.Variable _ builtinName <- callee
+  , builtinName `elem` ["ecAdd", "ecMul"] = do
+      refs <- mapM compileHostArg args
+      dests <- forM [1 :: Int, 2] $ const fresh
+      emit $ UHostTupleBuiltin dests (labelToString builtinName) refs
+      charge 1
+      pure dests
   | CC.MemberAccess _ receiver "truncate" <- callee
   , [placesExpr] <- args = do
       source <- compileExpr cc current receiver
@@ -1384,10 +1400,16 @@ compileCallValues cc current callee args
       charge 2
       pure [r]
   | CC.Variable _ castName <- callee
-  , castName `elem` ["uint", "uint8", "uint256", "int", "address"]
+  , castName `elem` ["uint", "uint8", "uint256", "int", "int256", "address"]
   , [arg] <- args = do
       r <- compileExpr cc current arg
-      pure [r]
+      if isJust (objectSlot r)
+        then do
+          dest <- fresh
+          emit $ UHostBuiltin dest (labelToString castName) [(r, HostOpaque)]
+          charge 1
+          pure [dest]
+        else pure [r]
   | CC.Variable _ castName <- callee
   , M.member castName (cc ^. CC.contracts)
   , [arg] <- args = do
@@ -2763,6 +2785,7 @@ runOpsWithStack reuseStack ops nregs argRegs argVals _retRegs =
             UObjectSstoreAt {} -> pure Nothing
             UDynamicCall {} -> pure Nothing
             UHostBuiltin {} -> pure Nothing
+            UHostTupleBuiltin {} -> pure Nothing
             UPathGet {} -> pure Nothing
             UPathGetAt {} -> pure Nothing
             UPathSet {} -> pure Nothing
@@ -2957,6 +2980,7 @@ needsStorage = V.any $ \case
   UObjectSstoreAt {} -> True
   UDynamicCall {} -> True
   UHostBuiltin {} -> True
+  UHostTupleBuiltin {} -> True
   UPathGet {} -> True
   UPathGetAt {} -> True
   UPathSet {} -> True
@@ -3554,6 +3578,18 @@ runOpsM tag hooks ops nregs argRegs argVals _retRegs = withRunInIO $ \run ->
                   result <- io $ shBuiltin hooks builtinName argsWithKinds
                   ok <- writeFastValue regs' defaults' dest result
                   if ok then execGo regs' defaults' ops' (pc + 1) gas else pure Nothing
+            UHostTupleBuiltin dests builtinName refs -> do
+              values <- traverse (\(ref, kind) -> fmap ((,) kind) <$> readFastValue regs' defaults' ref) refs
+              case sequence values of
+                Nothing -> pure Nothing
+                Just argsWithKinds -> do
+                  result <- io $ shBuiltin hooks builtinName argsWithKinds
+                  case result of
+                    FastArray tupleValues
+                      | length dests == length tupleValues -> do
+                          zipWithM_ (\dest value -> MV.write regs' dest value >> MV.write defaults' dest False) dests tupleValues
+                          execGo regs' defaults' ops' (pc + 1) gas
+                    _ -> pure Nothing
             UAdd d a b -> bin d a b (+) (\x y -> 1 + (max `on` byteWidth) x y) (pc + 1) gas
             USub d a b -> bin d a b (-) (\x y -> 1 + (max `on` byteWidth) x y) (pc + 1) gas
             UMul d a b -> bin d a b (*) ((+) `on` byteWidth) (pc + 1) gas
