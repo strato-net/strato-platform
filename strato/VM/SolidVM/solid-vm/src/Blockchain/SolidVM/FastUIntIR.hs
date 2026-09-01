@@ -148,6 +148,9 @@ data UOp
   | UEmit !String ![Int]
   | UTimestamp !Int
   | UNumber !Int
+  | UProposer !Int
+  | UPrevProposer !Int
+  | UPrevIntendedProposer !Int
   | UFallback
   | -- Isolated pure helper: compiled once, then invoked from ST without
     -- walking the caller's op stream.
@@ -514,6 +517,9 @@ spliceablePure ops =
       UEmit {} -> False
       UTimestamp {} -> False
       UNumber {} -> False
+      UProposer {} -> False
+      UPrevProposer {} -> False
+      UPrevIntendedProposer {} -> False
       ULabel {} -> False
       _ -> True
 
@@ -991,6 +997,24 @@ compileExpr cc current = \case
     charge 1
     charge 1
     pure r
+  CC.MemberAccess _ (CC.Variable _ "block") "proposer" -> do
+    r <- fresh
+    emit $ UProposer r
+    charge 1
+    charge 1
+    pure r
+  CC.MemberAccess _ (CC.Variable _ "block") "prevProposer" -> do
+    r <- fresh
+    emit $ UPrevProposer r
+    charge 1
+    charge 1
+    pure r
+  CC.MemberAccess _ (CC.Variable _ "block") "prevIntendedProposer" -> do
+    r <- fresh
+    emit $ UPrevIntendedProposer r
+    charge 1
+    charge 1
+    pure r
   expr@(CC.IndexAccess _ (CC.IndexAccess _ (CC.Variable _ mapName) (Just k1e)) (Just k2e)) -> do
     (actual, callee) <- resolveMap mapName
     case nestedMapKeys cc current actual of
@@ -1437,7 +1461,8 @@ compileCallValues cc current callee args
         CC.MemberAccess _ (CC.FunctionCall _ (CC.Variable _ typeName) [obj]) methodName
           | Just tgt <- M.lookup typeName (cc ^. CC.contracts)
           , Just func <- M.lookup methodName (tgt ^. CC.functions)
-          , isJust (CC._funcContents func) -> do
+          , isJust (CC._funcContents func)
+              || (methodName == "decimals" && isJust (csCatch s)) -> do
               addrReg <- compileExpr cc current obj
               pure (tgt, func, 2, Just addrReg)
         CC.MemberAccess _ (CC.FunctionCall _ innerCallee innerArgs) methodName -> do
@@ -1687,7 +1712,12 @@ compileCallValues cc current callee args
       | otherwise = lift Nothing
 
     bindCallFormals _ [] [] = pure ()
-    bindCallFormals allowArrays ((Just name, CC.IndexedType _ ty _) : formals) (arg : rest)
+    bindCallFormals allowArrays ((Just name, CC.IndexedType _ ty location) : formals) (arg : rest)
+      | location == Just CC.Storage,
+        isJust (structTypeName ty) = do
+          ref <- lift =<< resolveStorageRef cc current arg
+          bindStorageRef name ref
+          bindCallFormals allowArrays formals rest
       | uintishType ty = do
           src <- compileExpr cc current arg
           dest <- fresh
@@ -2284,6 +2314,35 @@ compileStmt cc current ret = \case
     emitReq z
     charge 1
     pure Nothing
+  CC.SolidityTryCatchStatement tryExpr returnsDecl successStmts catchBlockMap _ -> do
+    -- Solidity's `try externalCall() returns (...) { ... } catch { ... }`
+    -- is represented separately from the STRATO `try { ... } catch` form
+    -- below.  Only lower the unambiguous catch-all form for now: selecting
+    -- between Error(string), Panic(uint), and bytes catch clauses requires
+    -- carrying the exception payload through UDynamicCall.
+    catchStmts <- case M.elems catchBlockMap of
+      [(Nothing, stmts)] -> pure stmts
+      _ -> lift Nothing
+    catchLbl <- freshPlaceholder
+    endLbl <- freshPlaceholder
+    old <- csCatch <$> get
+    modify' $ \st -> st {csCatch = Just catchLbl}
+    resultRegs <- compileRValues cc current tryExpr
+    modify' $ \st -> st {csCatch = old}
+    case returnsDecl of
+      Nothing -> guard $ null resultRegs
+      Just decls -> do
+        guard $ length decls == length resultRegs
+        forM_ (zip decls resultRegs) $ \((name, ty), r) -> do
+          guard $ uintishType ty || opaqueType ty
+          bindTyped name ty r
+    _ <- compileStatements cc current ret successStmts
+    emit $ UJmp endLbl
+    mark catchLbl
+    _ <- compileStatements cc current ret catchStmts
+    mark endLbl
+    charge 1
+    pure Nothing
   CC.TryCatchStatement tryBlock catchBlockMap _ -> do
     catchLbl <- freshPlaceholder
     endLbl <- freshPlaceholder
@@ -2866,6 +2925,9 @@ runOpsWithStack reuseStack ops nregs argRegs argVals _retRegs =
             UEmit {} -> pure Nothing
             UTimestamp {} -> pure Nothing
             UNumber {} -> pure Nothing
+            UProposer {} -> pure Nothing
+            UPrevProposer {} -> pure Nothing
+            UPrevIntendedProposer {} -> pure Nothing
             UFallback ->
               let !_ = logMiss "run-fallback-st"
                in pure Nothing
@@ -3063,6 +3125,9 @@ needsStorage = V.any $ \case
   UEmit {} -> True
   UTimestamp {} -> True
   UNumber {} -> True
+  UProposer {} -> True
+  UPrevProposer {} -> True
+  UPrevIntendedProposer {} -> True
   UFallback -> True
   UCallStorage {} -> True
   _ -> False
@@ -3204,6 +3269,9 @@ data StorageHooks m = StorageHooks
     shThis :: m Integer,
     shTimestamp :: m Integer,
     shNumber :: m Integer,
+    shProposer :: m Integer,
+    shPrevProposer :: m Integer,
+    shPrevIntendedProposer :: m Integer,
     shDynamicCall :: Bool -> DynamicCallKind -> Integer -> FastValue -> [(HostArgKind, FastValue)] -> m (Maybe FastValue),
     shBuiltin :: String -> [(HostArgKind, FastValue)] -> m FastValue,
     shBlsAggregateAbsentees :: FastValue -> FastValue -> m (FastValue, FastValue),
@@ -3342,6 +3410,9 @@ runOpsM tag hooks ops nregs argRegs argVals _retRegs = withRunInIO $ \run ->
   thisRef <- newSTRef (Nothing :: Maybe Integer)
   tsRef <- newSTRef (Nothing :: Maybe Integer)
   numRef <- newSTRef (Nothing :: Maybe Integer)
+  proposerRef <- newSTRef (Nothing :: Maybe Integer)
+  prevProposerRef <- newSTRef (Nothing :: Maybe Integer)
+  prevIntendedProposerRef <- newSTRef (Nothing :: Maybe Integer)
   let getSender = do
         m <- readSTRef senderRef
         case m of
@@ -3373,6 +3444,30 @@ runOpsM tag hooks ops nregs argRegs argVals _retRegs = withRunInIO $ \run ->
           Nothing -> do
             s <- io (shNumber hooks)
             writeSTRef numRef (Just s)
+            pure s
+      getProposer = do
+        m <- readSTRef proposerRef
+        case m of
+          Just s -> pure s
+          Nothing -> do
+            s <- io (shProposer hooks)
+            writeSTRef proposerRef (Just s)
+            pure s
+      getPrevProposer = do
+        m <- readSTRef prevProposerRef
+        case m of
+          Just s -> pure s
+          Nothing -> do
+            s <- io (shPrevProposer hooks)
+            writeSTRef prevProposerRef (Just s)
+            pure s
+      getPrevIntendedProposer = do
+        m <- readSTRef prevIntendedProposerRef
+        case m of
+          Just s -> pure s
+          Nothing -> do
+            s <- io (shPrevIntendedProposer hooks)
+            writeSTRef prevIntendedProposerRef (Just s)
             pure s
   regs <- MV.replicate nregs (0 :: Integer)
   defaults <- MV.replicate nregs False
@@ -4119,6 +4214,21 @@ runOpsM tag hooks ops nregs argRegs argVals _retRegs = withRunInIO $ \run ->
               execGo regs' defaults' ops' (pc + 1) gas
             UNumber d -> do
               s <- getNumber
+              MV.write regs' d s
+              MV.write defaults' d False
+              execGo regs' defaults' ops' (pc + 1) gas
+            UProposer d -> do
+              s <- getProposer
+              MV.write regs' d s
+              MV.write defaults' d False
+              execGo regs' defaults' ops' (pc + 1) gas
+            UPrevProposer d -> do
+              s <- getPrevProposer
+              MV.write regs' d s
+              MV.write defaults' d False
+              execGo regs' defaults' ops' (pc + 1) gas
+            UPrevIntendedProposer d -> do
+              s <- getPrevIntendedProposer
               MV.write regs' d s
               MV.write defaults' d False
               execGo regs' defaults' ops' (pc + 1) gas
