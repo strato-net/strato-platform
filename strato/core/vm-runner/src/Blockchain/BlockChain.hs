@@ -62,6 +62,7 @@ import qualified SolidVM.Model.Storable as MS
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.CodePtr (CodePtr)
 import SolidVM.Model.Delta
 import SolidVM.Model.Event
 import SolidVM.Model.Value (Value (SAddress))
@@ -74,7 +75,7 @@ import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 import Blockchain.TheDAOFork
 import Blockchain.Timing
-import Blockchain.VM.SolidException (SolidException(MissingCodeCollection, RevertError))
+import Blockchain.VM.SolidException (SolidException(MissingCodeCollection, RevertError, UnknownFunction))
 import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
@@ -111,6 +112,7 @@ import SolidVM.Model.SolidString (labelToText)
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
+import System.IO.Unsafe (unsafePerformIO)
 import Text.ShortDescription
 import Text.Tools
 import UnliftIO.IORef
@@ -407,7 +409,7 @@ addTransactions blockData txs proposer =
 
       afterMap <- getAddressStateTxDBMap
 
-      printTransactionMessage t result deltaT
+      printTransactionMessage blockData t result deltaT
       P.setGauge vmTxMined (realToFrac deltaT)
 
       trr <- setNewAddresses $ TxRunResult t result deltaT beforeMap afterMap []
@@ -441,7 +443,7 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
   (!time', !result) <- timeIt . runExceptT $ addTransaction header remGas tx mSelfAddress
   afterMap <- getAddressStateTxDBMap
   P.setGauge vmTxMining (realToFrac time')
-  printTransactionMessage tx result time'
+  printTransactionMessage header tx result time'
   trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
   case result of
     Right execResult -> do
@@ -654,6 +656,14 @@ payFees b availableGas tAddr t proposer = do
 -- ever commit.
 -- Returns the reward call's results so the caller can fold its events into the
 -- block's receipts; 'Nothing' when no rewards were paid.
+--
+-- On networks where rewards aren't configured, the target contract simply
+-- lacks the function, and constructing + failing + formatting a full VM call
+-- for it twice per block is measured waste. Function existence is a property
+-- of the content-addressed code hash, so a probe that threw UnknownFunction
+-- is remembered and the call skipped until the address points at different
+-- code (updatePayFeeContract changes the impl address or its code hash, which
+-- misses the set and probes again).
 payBlockRewards ::
   VMBase m =>
   BlockHeader ->
@@ -664,21 +674,47 @@ payBlockRewards b proposer = do
       availableGas = 400_000
       callIt addr fn =
         SolidVM.call b addr proposer proposer availableGas proposer bHash fn [] Nothing
-  implResult <- callIt (Address 0xDEC1DE02) "getImplContract"
-  case (erException implResult, erReturnVal implResult) of
-    (Just e, _) -> do
-      $logInfoS "payBlockRewards" . T.pack $
-        "could not read the fee contract, skipping block rewards: " ++ show e
-      pure Nothing
-    (Nothing, Just (SAddress impl _)) | impl /= Address 0 -> do
-      rewardResult <- callIt impl "payBlockRewards"
-      case erException rewardResult of
-        Just e -> do
-          $logInfoS "payBlockRewards" . T.pack $
-            "no block rewards paid by " ++ format impl ++ ": " ++ show e
-          pure Nothing
-        Nothing -> pure $ Just rewardResult
-    _ -> pure Nothing
+      -- Nothing = skipped without a VM call (no contract at the address, or a
+      -- prior probe of the same code found no such function) or probed and
+      -- found missing just now.
+      callIfDefined addr fn =
+        fmap addressStateCodeHash <$> A.lookup (Proxy @AddressState) addr >>= \case
+          Nothing -> pure Nothing
+          Just codePtr -> do
+            misses <- readIORef rewardCallMisses
+            if (codePtr, fn) `S.member` misses
+              then pure Nothing
+              else do
+                r <- callIt addr fn
+                case erException r of
+                  Just (Left UnknownFunction {}) -> do
+                    atomicModifyIORef' rewardCallMisses $ \s -> (S.insert (codePtr, fn) s, ())
+                    $logInfoS "payBlockRewards" . T.pack $
+                      "contract at " ++ format addr ++ " defines no " ++ T.unpack fn
+                        ++ ", skipping this call until its code changes"
+                    pure Nothing
+                  _ -> pure (Just r)
+  callIfDefined (Address 0xDEC1DE02) "getImplContract" >>= \case
+    Nothing -> pure Nothing
+    Just implResult -> case (erException implResult, erReturnVal implResult) of
+      (Just e, _) -> do
+        $logInfoS "payBlockRewards" . T.pack $
+          "could not read the fee contract, skipping block rewards: " ++ show e
+        pure Nothing
+      (Nothing, Just (SAddress impl _)) | impl /= Address 0 ->
+        callIfDefined impl "payBlockRewards" >>= \case
+          Nothing -> pure Nothing
+          Just rewardResult -> case erException rewardResult of
+            Just e -> do
+              $logInfoS "payBlockRewards" . T.pack $
+                "no block rewards paid by " ++ format impl ++ ": " ++ show e
+              pure Nothing
+            Nothing -> pure $ Just rewardResult
+      _ -> pure Nothing
+
+{-# NOINLINE rewardCallMisses #-}
+rewardCallMisses :: IORef (S.Set (CodePtr, T.Text))
+rewardCallMisses = unsafePerformIO $ newIORef S.empty
 
 -- (attachBlockRewards / attachBlockRewards' now live in Blockchain.Bagger, so
 -- the miner and the verifier cannot drift apart on how rewards reach receipts.)
@@ -808,12 +844,13 @@ extractCodeCollectionAddedMessages a =
   in map mkCCAnouncement . O.assocs $ _newCodeCollections a
 
 printTransactionMessage ::
-  MonadLogger m =>
+  (MonadIO m, MonadLogger m) =>
+  BlockHeader ->
   OutputTx ->
   Either TransactionFailureCause ExecResults ->
   NominalDiffTime ->
   m ()
-printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Left errMsg) deltaT = do
+printTransactionMessage _ ot@OutputTx {otSigner = tAddr, otHash = theHash} (Left errMsg) deltaT = do
   let tNonce = TD.nonce $ otBaseTx ot
   multilineLog "printTx/err" $
     boringBox
@@ -823,7 +860,7 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Left e
         CL.red "Transaction failure: " ++ CL.red (format errMsg),
         "t = " ++ printf "%.5f" (realToFrac deltaT :: Double) ++ "s"
       ]
-printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right results) deltaT = do
+printTransactionMessage bh ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right results) deltaT = do
   let t = otBaseTx ot
       tNonce = TD.nonce t
       extra =
@@ -831,7 +868,17 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right 
           then ""
           else fromMaybe (CL.blink "<failed>") $ fmap format $ erNewContractAddress results
 
-  multilineLog "printTx/ok" $
+  -- Per-tx box art at INFO is real formatting and I/O at catch-up rates
+  -- (~350 tx/s). A block whose timestamp is far behind the wall clock is
+  -- being replayed during sync, so its per-tx detail drops to DEBUG; blocks
+  -- near the head keep INFO. The per-block "Inserted block became #N" line
+  -- stays at INFO — sync monitors and benchmarks parse it.
+  now <- liftIO getCurrentTime
+  let logTx
+        | diffUTCTime now (blockHeaderTimestamp bh) > catchUpTxLogAge = multilineDebugLog
+        | otherwise = multilineLog
+
+  logTx "printTx/ok" $
     boringBox
       [ "Adding transaction signed by: " ++ format tAddr,
         "Tx hash:  " ++ format theHash,
@@ -839,6 +886,12 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right 
         shortDescription t ++ " " ++ extra,
         "t = " ++ printf "%.5f" (realToFrac deltaT :: Double) ++ "s"
       ]
+
+-- | A block this far behind the wall clock is catch-up replay, not head
+-- traffic. Generous on purpose: a head block's timestamp drifts seconds
+-- from now, a replayed one drifts hours.
+catchUpTxLogAge :: NominalDiffTime
+catchUpTxLogAge = 600
 
 indexMaybe :: [a] -> Int -> Maybe a
 indexMaybe _ i | i < 0 = error "indexMaybe called for i < 0"

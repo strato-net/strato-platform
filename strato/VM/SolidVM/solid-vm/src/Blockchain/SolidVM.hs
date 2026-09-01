@@ -579,7 +579,7 @@ call' from to' fnCalltype functionName valList = do
             resolvedValList <- resolveArgs shouldPushSender fallbackFunc valList
             pure . bool id (pushSender from) shouldPushSender $
               runTheCall storageAddress codeAddress contract functionName hsh cc fallbackFunc resolvedValList currentReadOnly False
-          _ -> unknownFunction "logFunctionCall" (functionName, "asdf5" :: String) -- ^. CC.contractName)
+          _ -> unknownFunction "logFunctionCall" (functionName, labelToString $ contract ^. CC.contractName)
 
   when (fnCalltype == CC.DelegateCall) $
     addDelegatecall storageAddress hsh (labelToText $ contract ^. CC.contractName)
