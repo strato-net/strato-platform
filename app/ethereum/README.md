@@ -112,10 +112,10 @@ npm run verify:sepolia -- 0xIMPLEMENTATION_ADDRESS
 
 ## External Asset Bridge Rollout
 
-`ExternalBridgeVault` holds route-local external liquidity. The Safe remains its
-administrator and the owner of the existing `DepositRouter`; validator private
-keys remain in the bridge service environment and are never written to rollout
-files.
+`ExternalBridgeVault` holds route-local external liquidity. Its initializer
+assigns default administration, upgrades, policy, pause, unpause, attestation
+administration, and large-withdrawal approval explicitly. The existing
+`DepositRouter` remains owned by the Safe.
 
 ### 1. Development
 
@@ -133,12 +133,13 @@ replace every sample value. Amounts are raw token units. Keep every
 
 ### 2. Testnet
 
-Deploy one vault proxy per external chain. The initializer assigns governance
-to the Safe and pause authority to the guardian:
+Deploy one vault proxy per external chain. Supply the default administrator,
+upgrader, policy administrator, guardian, unpauser, attestation administrator,
+and large-withdrawal approver in that order:
 
 ```bash
 CONTRACT_NAME=ExternalBridgeVault \
-INIT_PARAMS='["0xSAFE_ADDRESS","0xGUARDIAN_ADDRESS"]' \
+INIT_PARAMS='["0xDEFAULT_ADMIN","0xUPGRADER","0xPOLICY_ADMIN","0xGUARDIAN","0xUNPAUSER","0xATTESTATION_ADMIN","0xLARGE_WITHDRAWAL_APPROVER"]' \
 npm run deployWithProxy:sepolia
 ```
 
