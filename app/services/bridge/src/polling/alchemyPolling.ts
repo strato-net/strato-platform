@@ -1,12 +1,14 @@
 import { config, DEPOSIT_EVENT_SIGNATURES, WAD } from "../config";
 import {
   getEnabledChains,
+  getAssetInfo,
   getBridgeInfo,
   getRebaseFactors,
 } from "../services/cirrusService";
 import {
   depositBatch,
   depositBatchWithAction,
+  depositWithRoutes,
 } from "../services/bridgeService";
 import { blockTrackingService } from "../services/blockTrackingService";
 import {
@@ -14,6 +16,7 @@ import {
   ChainInfo,
   DepositArgs,
   NonEmptyArray,
+  RouteDepositArgs,
 } from "../types";
 import {
   getCurrentBlockNumber,
@@ -25,6 +28,10 @@ import {
   classifyDepositLogs,
   RawDepositLog,
 } from "../services/depositEventService";
+import { fetchRouteSteps } from "../services/routeQuoteService";
+import { convertToStratoDecimals } from "../utils/utils";
+
+const AUTO_ROUTE_ACTION = "4";
 
 const applyRebaseFactors = async (
   deposits: Array<DepositArgs | ActionDepositArgs>,
@@ -87,10 +94,59 @@ const pollChainForDeposits = async (chainInfo: ChainInfo) => {
       classified.standardDeposits as NonEmptyArray<DepositArgs>,
     );
   }
-  if (classified.actionDeposits.length > 0) {
+  const legacyActionDeposits = classified.actionDeposits.filter(
+    (deposit) => deposit.action !== AUTO_ROUTE_ACTION,
+  );
+  const routeActionDeposits = classified.actionDeposits.filter(
+    (deposit) => deposit.action === AUTO_ROUTE_ACTION,
+  );
+  if (legacyActionDeposits.length > 0) {
     await depositBatchWithAction(
-      classified.actionDeposits as NonEmptyArray<ActionDepositArgs>,
+      legacyActionDeposits as NonEmptyArray<ActionDepositArgs>,
     );
+  }
+  if (routeActionDeposits.length > 0) {
+    const externalTokens = [
+      ...new Set(routeActionDeposits.map((deposit) => deposit.externalToken)),
+    ] as NonEmptyArray<string>;
+    const assets = await getAssetInfo(externalTokens, externalChainId);
+    const routed: RouteDepositArgs[] = [];
+    const fallbacks: ActionDepositArgs[] = [];
+
+    for (const deposit of routeActionDeposits) {
+      const key = `${deposit.externalToken}:${externalChainId}`;
+      const keyWithoutPrefix = `${deposit.externalToken.replace(/^0x/i, "")}:${externalChainId}`;
+      const asset = assets.get(key) || assets.get(keyWithoutPrefix);
+      try {
+        if (!asset) throw new Error("Bridge asset metadata is unavailable");
+        const amountIn = convertToStratoDecimals(
+          deposit.externalTokenAmount,
+          asset.externalDecimals,
+        ).toString();
+        const steps = await fetchRouteSteps({
+          tokenIn: deposit.targetStratoToken,
+          tokenOut: deposit.actionToken,
+          amountIn,
+          minFinalOut: deposit.minFinalOut,
+        });
+        routed.push({ ...deposit, steps });
+      } catch (error) {
+        logInfo(
+          "AlchemyPolling",
+          `AUTO_ROUTE quote unavailable for ${deposit.externalTxHash}; recording source-token fallback: ${(error as Error).message}`,
+        );
+        fallbacks.push(deposit);
+      }
+    }
+
+    if (routed.length > 0) {
+      await depositWithRoutes(routed as NonEmptyArray<RouteDepositArgs>);
+    }
+    if (fallbacks.length > 0) {
+      await depositBatchWithAction(
+        fallbacks as NonEmptyArray<ActionDepositArgs>,
+      );
+    }
   }
   await blockTrackingService.updateLastProcessedBlockEverywhere(
     externalChainId,

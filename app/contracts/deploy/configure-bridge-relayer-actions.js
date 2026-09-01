@@ -17,7 +17,7 @@ const auth = require('./auth');
 const { rest, util } = require('blockapps-rest');
 
 const DEFAULT_ADMIN_REGISTRY = '000000000000000000000000000000000000100c';
-const METHODS = ['depositWithAction', 'depositBatchWithAction'];
+const METHODS = ['depositWithAction', 'depositBatchWithAction', 'depositWithRoute'];
 
 function parseArgs() {
   const parsed = {};

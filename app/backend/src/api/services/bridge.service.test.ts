@@ -53,7 +53,7 @@ test("builds actions only for eligible routes and configured products", () => {
         String(item.externalChainId),
         item.stratoToken.toLowerCase().replace(/^0x/, ""),
       ].join(":"),
-      { autoForge: true, autoSave: true },
+      { autoForge: true, autoSave: true, autoRoute: false },
     ])
   );
   const base = {
@@ -117,7 +117,7 @@ test("builds actions only for eligible routes and configured products", () => {
       String(usdcRoute.externalChainId),
       usdcRoute.stratoToken.toLowerCase().replace(/^0x/, ""),
     ].join(":"),
-    { autoForge: false, autoSave: true }
+    { autoForge: false, autoSave: true, autoRoute: false }
   );
   const saveOnlyActions = buildDepositActionCatalog({
     ...base,

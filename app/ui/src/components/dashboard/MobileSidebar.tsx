@@ -42,6 +42,7 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
       items: [
         { icon: <ArrowDownToLine size={20} />, label: 'Fund', path: '/dashboard/deposits' },
         { icon: <ArrowRightLeft size={20} />, label: 'Trade', path: '/dashboard/swap' },
+        { icon: <ArrowRightLeft size={20} />, label: 'Trade-New', path: '/dashboard/trade-new' },
         { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
         { icon: <Send size={20} />, label: 'Send', path: '/dashboard/transfer' },
         { icon: <Download size={20} />, label: 'Bridge Out', path: '/dashboard/withdrawals' },

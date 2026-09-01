@@ -49,6 +49,11 @@ export default defineConfig(({ mode }) => ({
     mode === 'development' &&
     componentTagger(),
   ].filter(Boolean),
+  build: {
+    commonjsOptions: {
+      include: [/node_modules/, /packages\/shared-types/],
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

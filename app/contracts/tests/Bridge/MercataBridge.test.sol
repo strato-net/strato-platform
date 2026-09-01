@@ -57,11 +57,14 @@ contract User {
 
 contract Describe_MercataBridge is Authorizable {
     using BridgeTypes for *;
+    using RouterTypes for *;
     using StringUtils for string;
 
     Mercata mercata;
     MercataBridge bridge;
     TokenFactory tokenFactory;
+    PoolFactory poolFactory;
+    PoolV3Factory poolV3Factory;
     AdminRegistry adminRegistry;
     LendingRegistry lendingRegistry;
     TestERC20 testToken;
@@ -73,6 +76,7 @@ contract Describe_MercataBridge is Authorizable {
     TestERC20 goldToken;
     DirectMintPSM directMintPsm;
     SaveUSDSTVault saveUsdstVault;
+    TokenRouter tokenRouter;
     User user1;
     User user2;
     User relayer;
@@ -107,6 +111,8 @@ contract Describe_MercataBridge is Authorizable {
         adminRegistry = mercata.adminRegistry();
         lendingRegistry = mercata.lendingRegistry();
         tokenFactory = mercata.tokenFactory();
+        poolFactory = mercata.poolFactory();
+        poolV3Factory = mercata.poolV3Factory();
         bridge = mercata.mercataBridge();
 
         // Whitelist relayer for all functions
@@ -115,6 +121,7 @@ contract Describe_MercataBridge is Authorizable {
         adminRegistry.addWhitelist(address(bridge), "depositBatch", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "depositWithAction", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "depositBatchWithAction", address(relayer));
+        adminRegistry.addWhitelist(address(bridge), "depositWithRoute", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "confirmDeposit", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "confirmDepositBatch", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "reviewDeposit", address(relayer));
@@ -209,8 +216,10 @@ contract Describe_MercataBridge is Authorizable {
         bridge.setSaveUsdstVault(address(saveUsdstVault));
         bridge.setDepositAction(address(0x5555), externalChainId, address(testToken), uint(DepositAction.AUTO_FORGE), true);
         bridge.setDepositAction(address(0x5555), externalChainId, address(testToken), uint(DepositAction.AUTO_SAVE), true);
+        bridge.setDepositAction(address(0x5555), externalChainId, address(testToken), uint(DepositAction.AUTO_ROUTE), true);
         bridge.setDepositAction(address(0x6666), externalChainId, address(usdstToken), uint(DepositAction.AUTO_FORGE), true);
         bridge.setDepositAction(address(0x6666), externalChainId, address(usdstToken), uint(DepositAction.AUTO_SAVE), true);
+        bridge.setDepositAction(address(0x6666), externalChainId, address(usdstToken), uint(DepositAction.AUTO_ROUTE), true);
     }
 
     // ============ CONSTRUCTOR TESTS ============
@@ -1788,10 +1797,11 @@ contract Describe_MercataBridge is Authorizable {
 
         require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Disabled action should return USDST");
         require(IERC20(address(saveUsdstVault)).balanceOf(recipient) == 0, "Disabled action should not mint shares");
-        (bool autoForgeEnabled, bool autoSaveEnabled) =
+        (bool autoForgeEnabled, bool autoSaveEnabled, bool autoRouteEnabled) =
             bridge.depositActionConfigs(address(0x6666), externalChainId, address(usdstToken));
         require(autoForgeEnabled, "AUTO_FORGE should remain enabled");
         require(!autoSaveEnabled, "AUTO_SAVE should be disabled");
+        require(autoRouteEnabled, "AUTO_ROUTE should remain enabled");
     }
 
     function it_bridge_non_usdst_autosave_uses_psm() {
@@ -2088,6 +2098,143 @@ contract Describe_MercataBridge is Authorizable {
 
         (uint256 action,,) = bridge.depositActions(externalChainId, txHash.normalizeHex());
         require(action == 0, "Abort should delete action intent");
+    }
+
+    function _configureTokenRouter() internal {
+        poolV3Factory = new PoolV3Factory(address(this));
+        poolV3Factory.initialize(address(tokenFactory), address(feeCollector));
+        tokenRouter = new TokenRouter(address(this));
+        tokenRouter.initialize(
+            address(poolFactory),
+            address(poolV3Factory),
+            address(directMintPsm),
+            address(metalForge),
+            address(saveUsdstVault)
+        );
+        bridge.setTokenRouter(address(tokenRouter));
+    }
+
+    function _saveRoute(uint256 minShares) internal view returns (RouteStep[] steps) {
+        steps = new RouteStep[](1);
+        steps[0] = RouteStep(
+            RouteAction.SAVE,
+            address(saveUsdstVault),
+            address(usdstToken),
+            address(saveUsdstVault),
+            minShares,
+            0,
+            0,
+            false,
+            0
+        );
+    }
+
+    function it_bridge_auto_route_delivers_save_shares() {
+        _configureTokenRouter();
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("auto route save");
+        RouteStep[] steps = _saveRoute(amount);
+
+        relayer.do(
+            address(bridge),
+            "depositWithRoute",
+            externalChainId,
+            externalSender,
+            address(0x6666),
+            amount,
+            txHash,
+            recipient,
+            address(usdstToken),
+            address(saveUsdstVault),
+            amount,
+            steps
+        );
+        require(bridge.depositRouteStepCounts(externalChainId, txHash.normalizeHex()) == 1, "Route should be stored");
+
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        require(IERC20(address(saveUsdstVault)).balanceOf(recipient) == amount, "Recipient should receive route output");
+        require(IERC20(address(usdstToken)).balanceOf(address(saveUsdstVault)) == amount, "Vault should receive route input");
+        require(bridge.depositRouteStepCounts(externalChainId, txHash.normalizeHex()) == 0, "Route should be deleted");
+    }
+
+    function it_bridge_auto_route_slippage_falls_back() {
+        _configureTokenRouter();
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("auto route slippage");
+        RouteStep[] steps = _saveRoute(amount + 1);
+
+        relayer.do(
+            address(bridge),
+            "depositWithRoute",
+            externalChainId,
+            externalSender,
+            address(0x6666),
+            amount,
+            txHash,
+            recipient,
+            address(usdstToken),
+            address(saveUsdstVault),
+            amount + 1,
+            steps
+        );
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Failed route should return source token");
+        require(IERC20(address(saveUsdstVault)).balanceOf(recipient) == 0, "Failed route should not deliver shares");
+        require(IERC20(address(usdstToken)).balanceOf(address(bridge)) == 0, "Failed route should restore bridge balance");
+        require(IERC20(address(usdstToken)).allowance(address(bridge), address(tokenRouter)) == 0, "Failed route should restore allowance");
+    }
+
+    function it_bridge_auto_route_without_steps_falls_back() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("auto route missing");
+
+        relayer.do(
+            address(bridge),
+            "depositWithAction",
+            externalChainId,
+            externalSender,
+            address(0x6666),
+            amount,
+            txHash,
+            recipient,
+            address(usdstToken),
+            uint(DepositAction.AUTO_ROUTE),
+            address(saveUsdstVault),
+            amount
+        );
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Missing route should return source token");
+    }
+
+    function it_bridge_abort_deletes_auto_route() {
+        uint256 amount = 1000e18;
+        string memory txHash = keccak256("aborted auto route");
+        RouteStep[] steps = _saveRoute(amount);
+
+        relayer.do(
+            address(bridge),
+            "depositWithRoute",
+            externalChainId,
+            externalSender,
+            address(0x6666),
+            amount,
+            txHash,
+            externalRecipient,
+            address(usdstToken),
+            address(saveUsdstVault),
+            amount,
+            steps
+        );
+        relayer.do(address(bridge), "reviewDeposit", externalChainId, txHash);
+        bridge.abortDeposit(externalChainId, txHash);
+
+        require(bridge.depositRouteStepCounts(externalChainId, txHash.normalizeHex()) == 0, "Abort should delete route");
     }
 
 }

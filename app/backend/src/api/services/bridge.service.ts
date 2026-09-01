@@ -537,7 +537,7 @@ const depositActionRouteKey = (
 ].join(":");
 const parseDepositActionFlags = (
   value: unknown
-): { autoForge: boolean; autoSave: boolean } => {
+): { autoForge: boolean; autoSave: boolean; autoRoute: boolean } => {
   let parsed = value;
   if (typeof value === "string") {
     try {
@@ -550,7 +550,28 @@ const parseDepositActionFlags = (
   return {
     autoForge: flags.autoForge === true || String(flags.autoForge).toLowerCase() === "true",
     autoSave: flags.autoSave === true || String(flags.autoSave).toLowerCase() === "true",
+    autoRoute: flags.autoRoute === true || String(flags.autoRoute).toLowerCase() === "true",
   };
+};
+
+export const isAutoRouteEnabled = async (
+  accessToken: string,
+  externalToken: string,
+  externalChainId: string,
+  targetStratoToken: string
+): Promise<boolean> => {
+  const { data } = await cirrus.get(accessToken, "/mapping", {
+    params: {
+      address: `eq.${mercataBridge}`,
+      collection_name: "eq.depositActionConfigs",
+      "key->>key": `eq.${normalizeCatalogAddress(externalToken)}`,
+      "key->>key2": `eq.${externalChainId}`,
+      "key->>key3": `eq.${normalizeCatalogAddress(targetStratoToken)}`,
+      select: "value",
+      limit: "1",
+    },
+  });
+  return parseDepositActionFlags(data?.[0]?.value).autoRoute;
 };
 
 const decodeAbiString = (value: unknown): string => {
@@ -614,7 +635,7 @@ export const buildDepositActionCatalog = ({
   saveState: SaveUsdstActionState | null;
   forgeConfigs: MetalForgeConfig;
   bridgeActionConfig: { directMintPsm?: string; saveUsdstVault?: string };
-  bridgeActionRoutes: Map<string, { autoForge: boolean; autoSave: boolean }>;
+  bridgeActionRoutes: Map<string, { autoForge: boolean; autoSave: boolean; autoRoute: boolean }>;
 }): DepositAction[] => {
   if (!actionChainIds.size) return [];
 
@@ -744,7 +765,7 @@ export const getDepositActions = async (accessToken: string): Promise<DepositAct
     }).then(({ data }) => data || []),
   ]);
 
-  const bridgeActionRoutes = new Map<string, { autoForge: boolean; autoSave: boolean }>(
+  const bridgeActionRoutes = new Map<string, { autoForge: boolean; autoSave: boolean; autoRoute: boolean }>(
     bridgeActionRouteRows.map((row: any) => [
       depositActionRouteKey(row.externalToken, String(row.externalChainId), row.targetStratoToken),
       parseDepositActionFlags(row.value),

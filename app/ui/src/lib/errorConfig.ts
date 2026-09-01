@@ -34,6 +34,9 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/trade/tokens": "Token Pair Error",
   "/trade/quote": "Trade Quote Error",
   "/trade/swap": "Trade Transaction Error",
+  "/trade/route/quote": "Route Quote Error",
+  "/trade/bridge-route/quote": "Bridge Route Quote Error",
+  "/trade/route": "Route Transaction Error",
   "/trade": "Trade Error",
   
   // Bridge operations 

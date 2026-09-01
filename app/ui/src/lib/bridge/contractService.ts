@@ -265,6 +265,9 @@ export async function simulateDeposit({
   const accountAddress = formatAddress(account);
 
   if (isNative) {
+    if (actionIntent?.action) {
+      throw new Error("Native ETH automatic routing is not supported");
+    }
     await client.simulateContract({
       address: routerAddress,
       abi: DEPOSIT_ROUTER_ABI,
