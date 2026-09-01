@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -79,6 +80,9 @@ import Data.Pairing.Ate (finalExponentiationBLS12, millerAlgorithmBLS12)
 import Data.Pairing.BLS12381 (Fq2, GT', parameterBin, parameterHex)
 import GHC.Exts (IsList (fromList, toList))
 import qualified Data.Word as W
+#ifdef SOLIDVM_NATIVE_BN254
+import qualified Blockchain.SolidVM.Native as Native
+#endif
 
 -- ============================================================================
 -- Encoding constants
@@ -339,7 +343,17 @@ safeAddG2 p1 p2
 -- | G1ADD: add two G1 points. Input is 256 bytes (two 128-byte G1 points),
 --   output is 128 bytes.
 bls12381G1Add :: B.ByteString -> Either String B.ByteString
-bls12381G1Add input
+bls12381G1Add input =
+#ifdef SOLIDVM_NATIVE_BN254
+  case Native.bls12381G1Add input of
+    Right output -> Right output
+    Left () -> bls12381G1AddLegacy input
+#else
+  bls12381G1AddLegacy input
+#endif
+
+bls12381G1AddLegacy :: B.ByteString -> Either String B.ByteString
+bls12381G1AddLegacy input
   | B.length input /= 2 * g1Size =
       Left $ "bls12381G1Add: expected " ++ show (2 * g1Size) ++ " bytes, got " ++ show (B.length input)
   | otherwise = do
@@ -506,7 +520,16 @@ g2ToInts (A x y) = (fromFp2 x, fromFp2 y)
 
 -- | G1ADD over integer tuples. @(x1, y1) + (x2, y2)@.
 bls12381G1AddInts :: G1Coords -> G1Coords -> G1Coords
+#ifdef SOLIDVM_NATIVE_BN254
+bls12381G1AddInts a@(x1, y1) b@(x2, y2)
+  | not (any outOfRange [x1, y1, x2, y2]),
+    Right output <- Native.bls12381G1Add (encodeFp x1 <> encodeFp y1 <> encodeFp x2 <> encodeFp y2),
+    B.length output == g1Size =
+      (beToInteger $ B.take fpSize output, beToInteger $ B.drop fpSize output)
+  | otherwise = g1ToInts $ safeAddG1 (g1FromInts a) (g1FromInts b)
+#else
 bls12381G1AddInts a b = g1ToInts $ safeAddG1 (g1FromInts a) (g1FromInts b)
+#endif
 
 -- | G1MSM over integer tuples: each input is @(x, y, k)@, computes
 --   @Σᵢ kᵢ · (xᵢ, yᵢ)@. An empty list returns the point at infinity --

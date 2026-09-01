@@ -2,6 +2,7 @@ module Blockchain.SolidVM.Native
   ( bn254G1Add,
     bn254G1Mul,
     bn254Pairing,
+    bls12381G1Add,
   )
 where
 
@@ -22,6 +23,9 @@ foreign import ccall unsafe "solidvm_bn254_g1_add"
 foreign import ccall unsafe "solidvm_bn254_g1_mul"
   c_bn254G1Mul :: Ptr Word8 -> CSize -> Ptr Word8 -> IO CInt
 
+foreign import ccall unsafe "solidvm_bls12381_g1_add"
+  c_bls12381G1Add :: Ptr Word8 -> CSize -> Ptr Word8 -> IO CInt
+
 -- Point operations copy their fixed 64-byte result before the Rust stack
 -- frame returns.
 bn254G1Add :: B.ByteString -> Either () B.ByteString
@@ -32,13 +36,20 @@ bn254G1Mul :: B.ByteString -> Either () B.ByteString
 bn254G1Mul = bn254PointOperation c_bn254G1Mul
 {-# NOINLINE bn254G1Mul #-}
 
+bls12381G1Add :: B.ByteString -> Either () B.ByteString
+bls12381G1Add = pointOperation 128 c_bls12381G1Add
+{-# NOINLINE bls12381G1Add #-}
+
 bn254PointOperation :: (Ptr Word8 -> CSize -> Ptr Word8 -> IO CInt) -> B.ByteString -> Either () B.ByteString
-bn254PointOperation operation input = unsafePerformIO $
+bn254PointOperation = pointOperation 64
+
+pointOperation :: Int -> (Ptr Word8 -> CSize -> Ptr Word8 -> IO CInt) -> B.ByteString -> Either () B.ByteString
+pointOperation outputBytes operation input = unsafePerformIO $
   BU.unsafeUseAsCStringLen input $ \(inputPointer, byteCount) ->
-    allocaBytes 64 $ \outputPointer -> do
+    allocaBytes outputBytes $ \outputPointer -> do
       result <- operation (castPtr inputPointer) (fromIntegral byteCount) outputPointer
       if result == 0
-        then Right <$> B.packCStringLen (castPtr outputPointer, 64)
+        then Right <$> B.packCStringLen (castPtr outputPointer, outputBytes)
         else pure $ Left ()
 
 -- | Run the native EIP-197 pairing check. A 'Left' indicates malformed

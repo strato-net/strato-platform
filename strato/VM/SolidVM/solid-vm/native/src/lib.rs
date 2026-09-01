@@ -1,3 +1,4 @@
+use ark_bls12_381::{Fq as BlsFq, G1Affine as BlsG1Affine, G1Projective as BlsG1Projective};
 use ark_bn254::{Bn254, Fq, Fq2, Fr, G1Affine, G1Projective, G2Affine};
 use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
 use ark_ff::{One, PrimeField, Zero};
@@ -9,9 +10,14 @@ const G1_LEN: usize = 64;
 const G2_LEN: usize = 128;
 const PAIR_LEN: usize = G1_LEN + G2_LEN;
 const G2_CACHE_SLOTS: usize = 64;
+const BLS_FQ_LEN: usize = 64;
+const BLS_FQ_VALUE_LEN: usize = 48;
+const BLS_G1_LEN: usize = 2 * BLS_FQ_LEN;
+const BLS_G1_CACHE_SLOTS: usize = 2048;
 
 type G2Prepared = <Bn254 as Pairing>::G2Prepared;
 type CachedG2 = ([u8; G2_LEN], G2Prepared);
+type CachedBlsG1 = ([u8; BLS_G1_LEN], BlsG1Affine);
 
 thread_local! {
     // A bounded per-capability cache avoids global contention in the threaded
@@ -19,6 +25,8 @@ thread_local! {
     // performance, never point identity or validation semantics.
     static G2_CACHE: RefCell<Vec<Option<CachedG2>>> =
         RefCell::new((0..G2_CACHE_SLOTS).map(|_| None).collect());
+    static BLS_G1_CACHE: RefCell<Vec<Option<CachedBlsG1>>> =
+        RefCell::new((0..BLS_G1_CACHE_SLOTS).map(|_| None).collect());
 }
 
 #[inline]
@@ -108,6 +116,81 @@ fn read_g2_cached(input: &[u8]) -> Result<G2Prepared, ()> {
     Ok(prepared)
 }
 
+#[inline]
+fn read_bls_fq(input: &[u8]) -> Result<BlsFq, ()> {
+    if input.len() != BLS_FQ_LEN
+        || input[..BLS_FQ_LEN - BLS_FQ_VALUE_LEN]
+            .iter()
+            .any(|b| *b != 0)
+    {
+        return Err(());
+    }
+    let mut input_le = [0_u8; BLS_FQ_VALUE_LEN];
+    input_le.copy_from_slice(&input[BLS_FQ_LEN - BLS_FQ_VALUE_LEN..]);
+    input_le.reverse();
+    BlsFq::deserialize_uncompressed(&input_le[..]).map_err(|_| ())
+}
+
+#[inline]
+fn bls_g1_cache_index(input: &[u8; BLS_G1_LEN]) -> usize {
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in input {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash as usize % BLS_G1_CACHE_SLOTS
+}
+
+#[inline]
+fn cache_bls_g1(key: [u8; BLS_G1_LEN], point: BlsG1Affine) {
+    let slot = bls_g1_cache_index(&key);
+    BLS_G1_CACHE.with(|cache| cache.borrow_mut()[slot] = Some((key, point)));
+}
+
+#[inline]
+fn read_bls_g1_cached(input: &[u8]) -> Result<BlsG1Affine, ()> {
+    let key: [u8; BLS_G1_LEN] = input.try_into().map_err(|_| ())?;
+    let slot = bls_g1_cache_index(&key);
+    if let Some(point) = BLS_G1_CACHE.with(|cache| {
+        cache.borrow()[slot]
+            .as_ref()
+            .filter(|(cached_key, _)| cached_key == &key)
+            .map(|(_, point)| *point)
+    }) {
+        return Ok(point);
+    }
+    let x = read_bls_fq(&key[..BLS_FQ_LEN])?;
+    let y = read_bls_fq(&key[BLS_FQ_LEN..])?;
+    let point = if x.is_zero() && y.is_zero() {
+        BlsG1Affine::zero()
+    } else {
+        let candidate = BlsG1Affine::new_unchecked(x, y);
+        if !candidate.is_on_curve() || !candidate.is_in_correct_subgroup_assuming_on_curve() {
+            return Err(());
+        }
+        candidate
+    };
+    cache_bls_g1(key, point);
+    Ok(point)
+}
+
+#[inline]
+fn encode_bls_g1(point: BlsG1Affine) -> [u8; BLS_G1_LEN] {
+    let mut output = [0_u8; BLS_G1_LEN];
+    let Some((x, y)) = point.xy() else {
+        return output;
+    };
+    let x_start = BLS_FQ_LEN - BLS_FQ_VALUE_LEN;
+    let y_start = BLS_FQ_LEN + x_start;
+    x.serialize_uncompressed(&mut output[x_start..BLS_FQ_LEN])
+        .expect("fixed-size BLS12-381 Fq output");
+    y.serialize_uncompressed(&mut output[y_start..])
+        .expect("fixed-size BLS12-381 Fq output");
+    output[x_start..BLS_FQ_LEN].reverse();
+    output[y_start..].reverse();
+    output
+}
+
 fn pairing_check(input: &[u8]) -> Result<bool, ()> {
     if input.len() % PAIR_LEN != 0 {
         return Err(());
@@ -190,6 +273,31 @@ pub unsafe extern "C" fn solidvm_bn254_g1_mul(
     let product = point.mul_bigint(scalar.into_bigint()).into_affine();
     let encoded = encode_g1(product);
     unsafe { ptr::copy_nonoverlapping(encoded.as_ptr(), output, G1_LEN) };
+    0
+}
+
+/// Add two EIP-2537 BLS12-381 G1 points encoded as padded x1 || y1 || x2 || y2.
+#[no_mangle]
+pub unsafe extern "C" fn solidvm_bls12381_g1_add(
+    input: *const u8,
+    len: usize,
+    output: *mut u8,
+) -> i32 {
+    if input.is_null() || output.is_null() || len != 2 * BLS_G1_LEN {
+        return -1;
+    }
+    let bytes = unsafe { slice::from_raw_parts(input, len) };
+    let Ok(first) = read_bls_g1_cached(&bytes[..BLS_G1_LEN]) else {
+        return -1;
+    };
+    let Ok(second) = read_bls_g1_cached(&bytes[BLS_G1_LEN..]) else {
+        return -1;
+    };
+    let sum: BlsG1Projective = first.into_group() + second;
+    let affine = sum.into_affine();
+    let encoded = encode_bls_g1(affine);
+    cache_bls_g1(encoded, affine);
+    unsafe { ptr::copy_nonoverlapping(encoded.as_ptr(), output, BLS_G1_LEN) };
     0
 }
 
@@ -293,5 +401,21 @@ mod tests {
         );
         assert_eq!(add_output, mul_output);
         assert_ne!(add_output, [0_u8; 64]);
+    }
+
+    #[test]
+    fn bls12381_g1_add_doubles_the_generator() {
+        let generator = BlsG1Affine::generator();
+        let encoded = encode_bls_g1(generator);
+        let mut input = [0_u8; 2 * BLS_G1_LEN];
+        input[..BLS_G1_LEN].copy_from_slice(&encoded);
+        input[BLS_G1_LEN..].copy_from_slice(&encoded);
+        let mut output = [0_u8; BLS_G1_LEN];
+        assert_eq!(
+            unsafe { solidvm_bls12381_g1_add(input.as_ptr(), input.len(), output.as_mut_ptr()) },
+            0
+        );
+        let expected = encode_bls_g1((generator.into_group() + generator).into_affine());
+        assert_eq!(output, expected);
     }
 }
