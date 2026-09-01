@@ -4,7 +4,12 @@ const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("ExternalBridgeVault", function () {
   let admin;
+  let upgrader;
+  let policyAdmin;
   let guardian;
+  let unpauser;
+  let attestationAdmin;
+  let largeWithdrawalApprover;
   let signerOne;
   let signerTwo;
   let executor;
@@ -94,7 +99,12 @@ describe("ExternalBridgeVault", function () {
   beforeEach(async function () {
     [
       admin,
+      upgrader,
+      policyAdmin,
       guardian,
+      unpauser,
+      attestationAdmin,
+      largeWithdrawalApprover,
       signerOne,
       signerTwo,
       executor,
@@ -111,16 +121,24 @@ describe("ExternalBridgeVault", function () {
     const Vault = await ethers.getContractFactory("ExternalBridgeVault");
     vault = await upgrades.deployProxy(
       Vault,
-      [admin.address, guardian.address],
+      [
+        admin.address,
+        upgrader.address,
+        policyAdmin.address,
+        guardian.address,
+        unpauser.address,
+        attestationAdmin.address,
+        largeWithdrawalApprover.address,
+      ],
       { initializer: "initialize" },
     );
     await vault.waitForDeployment();
 
-    await vault.setAttestationSigner(signerOne.address, true);
-    await vault.setAttestationSigner(signerTwo.address, true);
-    await vault.setAttestationThreshold(2);
-    await vault.setSourceBridge(sourceChainId, sourceBridge, true);
-    await vault.setTokenPolicy(
+    await vault.connect(attestationAdmin).setAttestationSigner(signerOne.address, true);
+    await vault.connect(attestationAdmin).setAttestationSigner(signerTwo.address, true);
+    await vault.connect(attestationAdmin).setAttestationThreshold(2);
+    await vault.connect(policyAdmin).setSourceBridge(sourceChainId, sourceBridge, true);
+    await vault.connect(policyAdmin).setTokenPolicy(
       await token.getAddress(),
       true,
       1_000n,
@@ -129,6 +147,24 @@ describe("ExternalBridgeVault", function () {
       500n,
     );
     await token.mint(await vault.getAddress(), 5_000n);
+  });
+
+  it("assigns each administrative role independently", async function () {
+    expect(await vault.hasRole(await vault.DEFAULT_ADMIN_ROLE(), admin.address)).to.equal(true);
+    expect(await vault.hasRole(await vault.UPGRADER_ROLE(), upgrader.address)).to.equal(true);
+    expect(await vault.hasRole(await vault.POLICY_ADMIN_ROLE(), policyAdmin.address)).to.equal(true);
+    expect(await vault.hasRole(await vault.PAUSER_ROLE(), guardian.address)).to.equal(true);
+    expect(await vault.hasRole(await vault.UNPAUSER_ROLE(), unpauser.address)).to.equal(true);
+    expect(
+      await vault.hasRole(await vault.ATTESTATION_ADMIN_ROLE(), attestationAdmin.address),
+    ).to.equal(true);
+    expect(
+      await vault.hasRole(
+        await vault.LARGE_WITHDRAWAL_APPROVER_ROLE(),
+        largeWithdrawalApprover.address,
+      ),
+    ).to.equal(true);
+    expect(await vault.hasRole(await vault.PAUSER_ROLE(), admin.address)).to.equal(false);
   });
 
   it("reserves and releases ERC-20 liquidity with threshold signatures", async function () {
@@ -245,7 +281,7 @@ describe("ExternalBridgeVault", function () {
     );
 
     const digest = await vault.withdrawalReviewDigest(authorization);
-    await vault.approveLargeWithdrawal(
+    await vault.connect(largeWithdrawalApprover).approveLargeWithdrawal(
       digest,
       authorization.deadline + 24n * 60n * 60n,
     );
@@ -277,7 +313,7 @@ describe("ExternalBridgeVault", function () {
   });
 
   it("reserves window capacity before external execution", async function () {
-    await vault.setTokenPolicy(
+    await vault.connect(policyAdmin).setTokenPolicy(
       await token.getAddress(),
       true,
       1_000n,
@@ -304,7 +340,7 @@ describe("ExternalBridgeVault", function () {
     const authorization = await buildAuthorization();
     const signatures = await thresholdSignatures(authorization);
 
-    await vault.setAttestationSigner(other.address, true);
+    await vault.connect(attestationAdmin).setAttestationSigner(other.address, true);
 
     await expect(
       vault.connect(executor).reserve(authorization, signatures),
@@ -335,13 +371,13 @@ describe("ExternalBridgeVault", function () {
       vault.connect(guardian).unpause(),
     ).to.be.revertedWithCustomError(vault, "AccessControlUnauthorizedAccount");
 
-    await vault.unpause();
+    await vault.connect(unpauser).unpause();
     await expect(vault.connect(executor).reserve(authorization, signatures)).to
       .emit(vault, "WithdrawalReserved");
   });
 
   it("reserves and releases native ETH", async function () {
-    await vault.setTokenPolicy(
+    await vault.connect(policyAdmin).setTokenPolicy(
       ethers.ZeroAddress,
       true,
       ethers.parseEther("2"),

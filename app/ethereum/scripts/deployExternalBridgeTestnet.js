@@ -38,7 +38,21 @@ async function main() {
     );
   }
   const safeAddress = requiredAddress("SAFE_ADDRESS");
+  const vaultDefaultAdminAddress = requiredAddress(
+    "VAULT_DEFAULT_ADMIN_ADDRESS",
+  );
+  const vaultUpgraderAddress = requiredAddress("VAULT_UPGRADER_ADDRESS");
+  const vaultPolicyAdminAddress = requiredAddress(
+    "VAULT_POLICY_ADMIN_ADDRESS",
+  );
   const guardianAddress = requiredAddress("GUARDIAN_ADDRESS");
+  const vaultUnpauserAddress = requiredAddress("VAULT_UNPAUSER_ADDRESS");
+  const vaultAttestationAdminAddress = requiredAddress(
+    "VAULT_ATTESTATION_ADMIN_ADDRESS",
+  );
+  const largeWithdrawalApproverAddress = requiredAddress(
+    "LARGE_WITHDRAWAL_APPROVER_ADDRESS",
+  );
   const permit2Address = requiredAddress("PERMIT2_ADDRESS", DEFAULT_PERMIT2);
   if ((await ethers.provider.getCode(permit2Address)) === "0x") {
     throw new Error(`PERMIT2_ADDRESS has no bytecode: ${permit2Address}`);
@@ -46,7 +60,15 @@ async function main() {
 
   const vault = await upgrades.deployProxy(
     await ethers.getContractFactory("ExternalBridgeVault"),
-    [safeAddress, guardianAddress],
+    [
+      vaultDefaultAdminAddress,
+      vaultUpgraderAddress,
+      vaultPolicyAdminAddress,
+      guardianAddress,
+      vaultUnpauserAddress,
+      vaultAttestationAdminAddress,
+      largeWithdrawalApproverAddress,
+    ],
     { kind: "uups" },
   );
   await vault.waitForDeployment();
@@ -69,11 +91,46 @@ async function main() {
     depositRouterVersion: await router.version(),
     depositRouterOwner: await router.owner(),
     depositRouterVault: await router.externalBridgeVault(),
+    vaultDefaultAdmin: await vault.hasRole(
+      await vault.DEFAULT_ADMIN_ROLE(),
+      vaultDefaultAdminAddress,
+    ),
+    vaultUpgrader: await vault.hasRole(
+      await vault.UPGRADER_ROLE(),
+      vaultUpgraderAddress,
+    ),
+    vaultPolicyAdmin: await vault.hasRole(
+      await vault.POLICY_ADMIN_ROLE(),
+      vaultPolicyAdminAddress,
+    ),
+    vaultGuardian: await vault.hasRole(
+      await vault.PAUSER_ROLE(),
+      guardianAddress,
+    ),
+    vaultUnpauser: await vault.hasRole(
+      await vault.UNPAUSER_ROLE(),
+      vaultUnpauserAddress,
+    ),
+    vaultAttestationAdmin: await vault.hasRole(
+      await vault.ATTESTATION_ADMIN_ROLE(),
+      vaultAttestationAdminAddress,
+    ),
+    vaultLargeWithdrawalApprover: await vault.hasRole(
+      await vault.LARGE_WITHDRAWAL_APPROVER_ROLE(),
+      largeWithdrawalApproverAddress,
+    ),
   };
   if (
     verification.depositRouterVersion !== "3.2.0" ||
     verification.depositRouterOwner !== safeAddress ||
-    verification.depositRouterVault !== vaultAddress
+    verification.depositRouterVault !== vaultAddress ||
+    !verification.vaultDefaultAdmin ||
+    !verification.vaultUpgrader ||
+    !verification.vaultPolicyAdmin ||
+    !verification.vaultGuardian ||
+    !verification.vaultUnpauser ||
+    !verification.vaultAttestationAdmin ||
+    !verification.vaultLargeWithdrawalApprover
   ) {
     throw new Error("Post-deployment verification failed");
   }
@@ -83,7 +140,13 @@ async function main() {
     chainId: network.chainId.toString(),
     deployedAt: new Date().toISOString(),
     safeAddress,
+    vaultDefaultAdminAddress,
+    vaultUpgraderAddress,
+    vaultPolicyAdminAddress,
     guardianAddress,
+    vaultUnpauserAddress,
+    vaultAttestationAdminAddress,
+    largeWithdrawalApproverAddress,
     permit2Address,
     externalBridgeVault: {
       proxy: vaultAddress,

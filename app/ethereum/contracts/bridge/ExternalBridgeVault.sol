@@ -163,8 +163,24 @@ contract ExternalBridgeVault is
         _disableInitializers();
     }
 
-    function initialize(address admin, address guardian) external initializer {
-        if (admin == address(0) || guardian == address(0)) {
+    function initialize(
+        address defaultAdmin,
+        address upgrader,
+        address policyAdmin,
+        address guardian,
+        address unpauser,
+        address attestationAdmin,
+        address largeWithdrawalApprover
+    ) external initializer {
+        if (
+            defaultAdmin == address(0) ||
+            upgrader == address(0) ||
+            policyAdmin == address(0) ||
+            guardian == address(0) ||
+            unpauser == address(0) ||
+            attestationAdmin == address(0) ||
+            largeWithdrawalApprover == address(0)
+        ) {
             revert InvalidAddress();
         }
 
@@ -174,14 +190,16 @@ contract ExternalBridgeVault is
         __EIP712_init("ExternalBridgeVault", "1");
         __UUPSUpgradeable_init();
 
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(UPGRADER_ROLE, admin);
-        _grantRole(POLICY_ADMIN_ROLE, admin);
-        _grantRole(PAUSER_ROLE, admin);
+        _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
+        _grantRole(UPGRADER_ROLE, upgrader);
+        _grantRole(POLICY_ADMIN_ROLE, policyAdmin);
         _grantRole(PAUSER_ROLE, guardian);
-        _grantRole(UNPAUSER_ROLE, admin);
-        _grantRole(ATTESTATION_ADMIN_ROLE, admin);
-        _grantRole(LARGE_WITHDRAWAL_APPROVER_ROLE, admin);
+        _grantRole(UNPAUSER_ROLE, unpauser);
+        _grantRole(ATTESTATION_ADMIN_ROLE, attestationAdmin);
+        _grantRole(
+            LARGE_WITHDRAWAL_APPROVER_ROLE,
+            largeWithdrawalApprover
+        );
 
         signerSetVersion = 1;
         maxAuthorizationValiditySeconds = 30 minutes;
