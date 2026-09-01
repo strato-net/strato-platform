@@ -3870,6 +3870,7 @@ storageHooks profiledFunctionName callee ro contract cc = do
       shThis = profileHook "environment" $ pure (toInteger callee),
       shTimestamp = profileHook "environment" $ round . utcTimeToPOSIXSeconds . BlockHeader.timestamp . Env.blockHeader <$> getEnv,
       shNumber = profileHook "environment" $ BlockHeader.number . Env.blockHeader <$> getEnv,
+      shMsgSig = profileHook "environment" $ FastOpaque . SString <$> getCurrentFunctionName,
       shProposer = profileHook "environment" $ toInteger . Env.proposer <$> getEnv,
       shPrevProposer = profileHook "environment" $ toInteger . pfProposer <$> getPrevBlockFacts,
       shPrevIntendedProposer = profileHook "environment" $ toInteger . pfIntendedProposer <$> getPrevBlockFacts,

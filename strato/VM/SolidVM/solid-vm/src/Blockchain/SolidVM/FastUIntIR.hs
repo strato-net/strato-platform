@@ -148,6 +148,7 @@ data UOp
   | UEmit !String ![Int]
   | UTimestamp !Int
   | UNumber !Int
+  | UMsgSig !Int
   | UProposer !Int
   | UPrevProposer !Int
   | UPrevIntendedProposer !Int
@@ -517,6 +518,7 @@ spliceablePure ops =
       UEmit {} -> False
       UTimestamp {} -> False
       UNumber {} -> False
+      UMsgSig {} -> False
       UProposer {} -> False
       UPrevProposer {} -> False
       UPrevIntendedProposer {} -> False
@@ -721,6 +723,40 @@ typedMethod cc current receiverName methodName = do
             ]
         )
   methodOnType cc (decl ^. VD.varType) methodName
+
+-- Public mapping accessors have no Solidity function body in the code
+-- collection. Resolve a call such as `registry.whitelist(a, sig, sender)`
+-- from the declared local receiver type and lower it to one remote storage
+-- path read. A user-defined function with the same name always wins.
+typedPublicStorageGetter ::
+  CodeCollection ->
+  CState ->
+  CC.Expression ->
+  CC.ArgList ->
+  Maybe (SolidString, SolidString, [SVMType.Type])
+typedPublicStorageGetter cc s callee args = do
+  (receiverName, fieldName) <- case callee of
+    CC.MemberAccess _ (CC.Variable _ receiver) field -> Just (receiver, field)
+    _ -> Nothing
+  receiverTy <- M.lookup receiverName (csTypes s)
+  typeName <- contractTypeName receiverTy
+  target <- M.lookup typeName (cc ^. CC.contracts)
+  decl <- storageDecl cc target fieldName
+  guard $ decl ^. VD.varVisibility == Just CC.Public
+  guard $ maybe True (isNothing . CC._funcContents) (M.lookup fieldName (target ^. CC.functions))
+  keyTypes <- getterKeyTypes (decl ^. VD.varType) (length args)
+  pure (receiverName, fieldName, keyTypes)
+  where
+    getterKeyTypes ty count = go (unwrap ty) count
+    go ty 0 = do
+      guard $ uintishType ty
+      pure []
+    go (SVMType.Mapping _ keyTy valueTy _ _) count =
+      (keyTy :) <$> go (unwrap valueTy) (count - 1)
+    go _ _ = Nothing
+
+    unwrap (SVMType.UserDefined _ ty) = unwrap ty
+    unwrap ty = ty
 
 mostDerivedMethod :: CodeCollection -> SolidString -> Maybe (Contract, Func)
 mostDerivedMethod cc methodName =
@@ -982,6 +1018,12 @@ compileExpr cc current = \case
   CC.MemberAccess _ (CC.Variable _ "msg") "sender" -> do
     r <- fresh
     emitMsgSender r
+    charge 1
+    charge 1
+    pure r
+  CC.MemberAccess _ (CC.Variable _ "msg") "sig" -> do
+    r <- bindAnonymousObject
+    emit $ UMsgSig r
     charge 1
     charge 1
     pure r
@@ -1450,71 +1492,88 @@ compileCallValues cc current callee args
       when (csDepth s >= 64) $ do
         let !_ = logMiss "depth"
         lift Nothing
-      (target, original, receiverCost, mCallee) <- case callee of
-        CC.MemberAccess _ (CC.Variable _ "super") methodName ->
-          case [ (p, f)
-               | p <- ancestors cc current,
-                 Just f <- [M.lookup methodName (p ^. CC.functions)]
-               ] of
-            (tgt, func) : _ -> pure (tgt, func, 2, Nothing)
-            _ -> lift Nothing
-        CC.MemberAccess _ (CC.FunctionCall _ (CC.Variable _ typeName) [obj]) methodName
-          | Just tgt <- M.lookup typeName (cc ^. CC.contracts)
-          , Just func <- M.lookup methodName (tgt ^. CC.functions)
-          , isJust (CC._funcContents func)
-              || (methodName == "decimals" && isJust (csCatch s)) -> do
-              addrReg <- compileExpr cc current obj
+      case typedPublicStorageGetter cc s callee args of
+        Just (receiverName, fieldName, keyTypes) -> do
+          addrReg <- compileVar cc current receiverName
+          steps <- zipWithM compileGetterKey keyTypes args
+          dest <- fresh
+          emitPathGet dest $ StorageRef fieldName steps (Just addrReg)
+          charge 2
+          pure [dest]
+        Nothing -> do
+          (target, original, receiverCost, mCallee) <- case callee of
+            CC.MemberAccess _ (CC.Variable _ "super") methodName ->
+              case [ (p, f)
+                   | p <- ancestors cc current,
+                     Just f <- [M.lookup methodName (p ^. CC.functions)]
+                   ] of
+                (tgt, func) : _ -> pure (tgt, func, 2, Nothing)
+                _ -> lift Nothing
+            CC.MemberAccess _ (CC.FunctionCall _ (CC.Variable _ typeName) [obj]) methodName
+              | Just tgt <- M.lookup typeName (cc ^. CC.contracts)
+              , Just func <- M.lookup methodName (tgt ^. CC.functions)
+              , isJust (CC._funcContents func)
+                  || (methodName == "decimals" && isJust (csCatch s)) -> do
+                  addrReg <- compileExpr cc current obj
+                  pure (tgt, func, 2, Just addrReg)
+            CC.MemberAccess _ (CC.FunctionCall _ innerCallee innerArgs) methodName -> do
+              rs <- compileCallValues cc current innerCallee innerArgs
+              case rs of
+                [addrReg] ->
+                  case (callReturnType cc current innerCallee >>= \ty -> methodOnType cc ty methodName)
+                    <|> mostDerivedMethod cc methodName of
+                    Just (tgt, func) -> pure (tgt, func, 2, Just addrReg)
+                    Nothing -> do
+                      let !_ = logMiss ("nomethod-ret " ++ labelToString methodName)
+                      lift Nothing
+                _ -> lift Nothing
+            CC.MemberAccess _ receiver@(CC.IndexAccess _ (CC.Variable _ collectionName) (Just _)) methodName -> do
+              valueTy <- lift $ storageIndexedType cc current collectionName
+              (tgt, func) <- lift $ methodOnType cc valueTy methodName
+              addrReg <- compileExpr cc current receiver
               pure (tgt, func, 2, Just addrReg)
-        CC.MemberAccess _ (CC.FunctionCall _ innerCallee innerArgs) methodName -> do
-          rs <- compileCallValues cc current innerCallee innerArgs
-          case rs of
-            [addrReg] ->
-              case (callReturnType cc current innerCallee >>= \ty -> methodOnType cc ty methodName)
-                <|> mostDerivedMethod cc methodName of
-                Just (tgt, func) -> pure (tgt, func, 2, Just addrReg)
-                Nothing -> do
-                  let !_ = logMiss ("nomethod-ret " ++ labelToString methodName)
+            CC.MemberAccess _ (CC.Variable _ receiverName) methodName ->
+              case M.lookup receiverName (cc ^. CC.contracts) of
+                Just lib | lib ^. CC.contractType == CC.LibraryType -> do
+                  guard $ not (nameShadowed receiverName current cc (csNames s))
+                  func <- lift $ M.lookup methodName (lib ^. CC.functions)
+                  pure (lib, func, 2, Nothing)
+                _ -> do
+                  addrReg <- compileVar cc current receiverName
+                  st <- get
+                  let byLocal =
+                        M.lookup receiverName (csTypes st) >>= \ty -> methodOnType cc ty methodName
+                  case byLocal <|> typedMethod cc current receiverName methodName <|> mostDerivedMethod cc methodName of
+                    Just (tgt, func) -> pure (tgt, func, 2, Just addrReg)
+                    Nothing -> do
+                      let !_ = logMiss ("nomethod " ++ labelToString receiverName ++ "." ++ labelToString methodName)
+                      lift Nothing
+            CC.Variable _ functionName -> do
+              guard $ isNothing $ M.lookup functionName (csNames s)
+              let hits =
+                    [ (c, f)
+                    | c <- current : ancestors cc current,
+                      Just f <- [M.lookup functionName (c ^. CC.functions)]
+                    ]
+              case hits of
+                (tgt, func) : _ -> pure (tgt, func, 0, Nothing)
+                _ -> do
+                  let !_ = logMiss ("nofunc " ++ labelToString functionName)
                   lift Nothing
-            _ -> lift Nothing
-        CC.MemberAccess _ receiver@(CC.IndexAccess _ (CC.Variable _ collectionName) (Just _)) methodName -> do
-          valueTy <- lift $ storageIndexedType cc current collectionName
-          (tgt, func) <- lift $ methodOnType cc valueTy methodName
-          addrReg <- compileExpr cc current receiver
-          pure (tgt, func, 2, Just addrReg)
-        CC.MemberAccess _ (CC.Variable _ receiverName) methodName ->
-          case M.lookup receiverName (cc ^. CC.contracts) of
-            Just lib | lib ^. CC.contractType == CC.LibraryType -> do
-              guard $ not (nameShadowed receiverName current cc (csNames s))
-              func <- lift $ M.lookup methodName (lib ^. CC.functions)
-              pure (lib, func, 2, Nothing)
-            _ -> do
-              addrReg <- compileVar cc current receiverName
-              st <- get
-              let byLocal =
-                    M.lookup receiverName (csTypes st) >>= \ty -> methodOnType cc ty methodName
-              case byLocal <|> typedMethod cc current receiverName methodName <|> mostDerivedMethod cc methodName of
-                Just (tgt, func) -> pure (tgt, func, 2, Just addrReg)
-                Nothing -> do
-                  let !_ = logMiss ("nomethod " ++ labelToString receiverName ++ "." ++ labelToString methodName)
-                  lift Nothing
-        CC.Variable _ functionName -> do
-          guard $ isNothing $ M.lookup functionName (csNames s)
-          let hits =
-                [ (c, f)
-                | c <- current : ancestors cc current,
-                  Just f <- [M.lookup functionName (c ^. CC.functions)]
-                ]
-          case hits of
-            (tgt, func) : _ -> pure (tgt, func, 0, Nothing)
-            _ -> do
-              let !_ = logMiss ("nofunc " ++ labelToString functionName)
+            other -> do
+              let !_ = logMiss ("callee " ++ take 2000 (show other))
               lift Nothing
-        other -> do
-          let !_ = logMiss ("callee " ++ take 2000 (show other))
-          lift Nothing
-      charge receiverCost
-      tryFuncs mCallee target (original : CC._funcOverload original)
+          charge receiverCost
+          tryFuncs mCallee target (original : CC._funcOverload original)
   where
+    compileGetterKey keyTy expr = do
+      sourceReg <- compileExpr cc current expr
+      case objectSlot sourceReg of
+        Just _ | opaqueType keyTy -> pure $ PObjectIndex sourceReg
+        _ -> do
+          isAddr <- lift $ keyIsAddr keyTy
+          pure $ PIndex sourceReg isAddr
+
     compileHostArg expr = do
       ref <- compileExpr cc current expr
       kind <- case expr of
@@ -2925,6 +2984,7 @@ runOpsWithStack reuseStack ops nregs argRegs argVals _retRegs =
             UEmit {} -> pure Nothing
             UTimestamp {} -> pure Nothing
             UNumber {} -> pure Nothing
+            UMsgSig {} -> pure Nothing
             UProposer {} -> pure Nothing
             UPrevProposer {} -> pure Nothing
             UPrevIntendedProposer {} -> pure Nothing
@@ -3125,6 +3185,7 @@ needsStorage = V.any $ \case
   UEmit {} -> True
   UTimestamp {} -> True
   UNumber {} -> True
+  UMsgSig {} -> True
   UProposer {} -> True
   UPrevProposer {} -> True
   UPrevIntendedProposer {} -> True
@@ -3269,6 +3330,7 @@ data StorageHooks m = StorageHooks
     shThis :: m Integer,
     shTimestamp :: m Integer,
     shNumber :: m Integer,
+    shMsgSig :: m FastValue,
     shProposer :: m Integer,
     shPrevProposer :: m Integer,
     shPrevIntendedProposer :: m Integer,
@@ -4217,6 +4279,10 @@ runOpsM tag hooks ops nregs argRegs argVals _retRegs = withRunInIO $ \run ->
               MV.write regs' d s
               MV.write defaults' d False
               execGo regs' defaults' ops' (pc + 1) gas
+            UMsgSig d -> do
+              value <- io $ shMsgSig hooks
+              ok <- writeFastValue regs' defaults' d value
+              if ok then execGo regs' defaults' ops' (pc + 1) gas else pure Nothing
             UProposer d -> do
               s <- getProposer
               MV.write regs' d s
