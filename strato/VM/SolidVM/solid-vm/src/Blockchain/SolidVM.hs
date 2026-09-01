@@ -592,9 +592,19 @@ call' from to' fnCalltype functionName valList = profileRunCodeChild
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
         when (isExternal && isForbidden) $
           unknownFunction "logFunctionCall" (functionName, "asdf2" :: String) -- contract) -- ^. CC.contractName)
-        resolvedValList <- resolveArgs shouldPushSender theFunction valList
-        pure . bool id (pushSender from) shouldPushSender $
-          runTheCall storageAddress codeAddress contract functionName' hsh cc theFunction resolvedValList currentReadOnly False
+        validateFunctionArguments cc contract theFunction valList >>= \case
+          Just (theFunction', valList') -> do
+            resolvedValList <- resolveArgs shouldPushSender theFunction' valList'
+            let validation = validatedCallMode theFunction valList'
+            pure . bool id (pushSender from) shouldPushSender $
+              runTheCallValidated validation storageAddress codeAddress contract functionName' hsh cc theFunction' resolvedValList currentReadOnly False
+          Nothing -> do
+            -- Preserve the authoritative interpreter's argument-mismatch error
+            -- for invalid or unresolved overloads.  Only a successfully checked,
+            -- simple call may bypass the duplicate validation inside the frame.
+            resolvedValList <- resolveArgs shouldPushSender theFunction valList
+            pure . bool id (pushSender from) shouldPushSender $
+              runTheCall storageAddress codeAddress contract functionName' hsh cc theFunction resolvedValList currentReadOnly False
       -- Handles .call() and .delegatecall() logic
       (Just theFunction, _) -> do
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
