@@ -62,7 +62,6 @@ import qualified SolidVM.Model.Storable as MS
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.CodePtr (CodePtr)
 import SolidVM.Model.Delta
 import SolidVM.Model.Event
 import SolidVM.Model.Value (Value (SAddress))
