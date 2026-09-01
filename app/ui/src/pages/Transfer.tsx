@@ -28,6 +28,7 @@ import {
 import { ChevronDown, Upload, AlertTriangle } from "lucide-react";
 import { handleRecipientAddress, handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { sortTokensCompareFn } from "@/lib/tokenPriority";
+import { captureApi } from "@/lib/analytics";
 
 const erc20TransferAbi = [
   {
@@ -147,6 +148,12 @@ const Transfer = () => {
           value: weiValue,
         });
       } else {
+        // External-wallet transfers are signed via wagmi and never reach the
+        // axios interceptor; the vault branch above is instrumented there.
+        captureApi("token_transfer", "started", {
+          transport: "wagmi",
+          token_symbol: fromAsset?.token?._symbol,
+        });
         await ensureStratoChainInWallet(walletClient);
         const nonceRes = await fetch("/rpc", {
           method: "POST",
@@ -164,6 +171,10 @@ const Transfer = () => {
           gas: 1000000n,
           type: "legacy",
           gasPrice: 0n,
+        });
+        captureApi("token_transfer", "succeeded", {
+          transport: "wagmi",
+          token_symbol: fromAsset?.token?._symbol,
         });
       }
 
@@ -184,6 +195,13 @@ const Transfer = () => {
       fetchUsdstBalance();
     } catch (error) {
       console.error("Transfer error:", error);
+      if (!isVaultUser) {
+        captureApi("token_transfer", "failed", {
+          transport: "wagmi",
+          token_symbol: fromAsset?.token?._symbol,
+          error_message: error instanceof Error ? error.message : "Transfer failed",
+        });
+      }
       setSwapLoading(false);
     }
   };
