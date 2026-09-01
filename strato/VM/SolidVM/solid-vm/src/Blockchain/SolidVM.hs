@@ -3956,9 +3956,13 @@ storageHooks profiledFunctionName callee ro contract cc = do
     eventSloadAt snapshotsRef addrInt field pending = do
       let path = MS.singleton $ BC.pack $ labelToString field
       basic <- case pending of
-        Just value -> pure $ encodeStored field value
+        Just (FastScalar value) -> pure $ encodeStored field value
+        Just (FastOpaque value) -> do
+          blockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
+          maybe (typeError "IR unsupported opaque event storage value" $ show value) pure $ toBasic blockNum value
+        Just value -> typeError "IR unsupported event storage value" $ show value
         Nothing -> fastStorageGet snapshotsRef (fromInteger addrInt) path
-      pure . FastOpaque $ case basic of
+      pure . FastOpaque $ case if MS.isDefault basic then MS.BDefault else basic of
         MS.BDefault -> SReference path
         value -> fromBasic value
     sstoreAt addrInt field val = do

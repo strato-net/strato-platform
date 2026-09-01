@@ -3124,7 +3124,7 @@ data StorageHooks m = StorageHooks
     shMapSet2At :: Integer -> SolidString -> Integer -> Bool -> Integer -> Integer -> Bool -> m (),
     shSloadAddr :: SolidString -> m Integer,
     shSloadAt :: Integer -> SolidString -> m (Integer, Bool),
-    shEventSloadAt :: Integer -> SolidString -> Maybe Integer -> m FastValue,
+    shEventSloadAt :: Integer -> SolidString -> Maybe FastValue -> m FastValue,
     shSstore :: SolidString -> Integer -> m (),
     shSstoreAt :: Integer -> SolidString -> Integer -> m (),
     shObjectSstoreAt :: Integer -> SolidString -> FastValue -> m (),
@@ -3850,11 +3850,11 @@ runOpsM tag hooks ops nregs argRegs argVals _retRegs = withRunInIO $ \run ->
                 Nothing -> pure Nothing
                 Just addr -> do
                   pendingObjects <- readSTRef objectDirty
-                  value <- case M.lookup (addr, field) pendingObjects of
-                    Just pending -> pure pending
-                    Nothing -> do
-                      pendingScalars <- readSTRef sdirty
-                      io $ shEventSloadAt hooks addr field (M.lookup (addr, field) pendingScalars)
+                  pendingScalars <- readSTRef sdirty
+                  let pending =
+                        M.lookup (addr, field) pendingObjects
+                          <|> (FastScalar <$> M.lookup (addr, field) pendingScalars)
+                  value <- io $ shEventSloadAt hooks addr field pending
                   ok <- writeFastValue regs' defaults' dest value
                   if ok then execGo regs' defaults' ops' (pc + 1) (gas + 1) else pure Nothing
             USstore field v -> do

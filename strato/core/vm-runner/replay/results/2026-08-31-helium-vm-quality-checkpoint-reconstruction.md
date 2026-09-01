@@ -296,6 +296,35 @@ The exact correctness receipts are
 `cfgfallback137-event-storage-native-112830-20260901-67.result.txt` and
 `cfgfallback137-event-storage-native-250003-20260901-66.result.txt`.
 
+The clean pushed binary then completed the first 255,000 blocks of a new
+genesis replay in 1,277.115 seconds: 199.67 blk/s, 330,527 transactions,
+3,862,633,337,216 allocated bytes, and 12,649,168,896 bytes peak RSS. Exact
+verification stopped at block 254,918 on a receipt-only mismatch; the partial
+rate is therefore performance evidence, not a completed qualification.
+
+Receipt tracing at that block isolated a second form of the same storage-event
+rule. `StratoStaking.setUsdstToken` buffered a zero write to `trackedUsdst`.
+FastIR emitted that pending value as `TAInt 0`, while the storage layer
+normalizes typed zeroes to `BDefault`, so canonical execution emitted an
+`SReference` that receipt encoding dropped. Pending event values now pass
+through the same `MS.isDefault` normalization as persisted storage; opaque
+pending values use the same path as scalars.
+
+The corrected candidate passes all three opposing full-pipeline gates at
+blocks 112,830, 250,003, and 254,918 with exact receipt root, state root, block
+hash, and audit. The corresponding receipts are
+`cfgfallback137-event-default-normalized-112830-20260901-75.result.txt`,
+`cfgfallback137-event-default-normalized-250003-20260901-76.result.txt`, and
+`cfgfallback137-event-default-normalized-254918-20260901-74.result.txt`.
+It also repeated blocks 125,000-129,999 at 151.69 blk/s with exact terminal
+root/hash/audit and 133,749,262,528 allocated bytes; that receipt is
+`cfgfallback137-event-default-normalized-125000-129999-20260901-77.result.txt`.
+
+An audited block-254,917 checkpoint was retained after an exact 4,915-block
+full-pipeline continuation at 225.28 blk/s. It permits continued semantic
+discovery toward corpus tip without weakening the required final
+genesis-to-tip rerun.
+
 ## Qualification boundary
 
 The 40,000-44,999 range is an iteration benchmark only. Final validation
