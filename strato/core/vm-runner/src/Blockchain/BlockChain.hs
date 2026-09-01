@@ -705,13 +705,18 @@ payBlockRewards b proposer
             "could not read the fee contract, skipping block rewards: " ++ show e
           pure Nothing
         (Nothing, Just (SAddress impl _)) | impl /= Address 0 -> do
-          rewardResult <- callIt impl "payBlockRewards"
-          case erException rewardResult of
-            Just e -> do
-              $logInfoS "payBlockRewards" . T.pack $
-                "no block rewards paid by " ++ format impl ++ ": " ++ show e
-              pure Nothing
-            Nothing -> pure $ Just rewardResult
+          hasRewardFunction <-
+            SolidVM.contractHasFunction b impl proposer bHash "payBlockRewards"
+          if not hasRewardFunction
+            then pure Nothing
+            else do
+              rewardResult <- callIt impl "payBlockRewards"
+              case erException rewardResult of
+                Just e -> do
+                  $logInfoS "payBlockRewards" . T.pack $
+                    "no block rewards paid by " ++ format impl ++ ": " ++ show e
+                  pure Nothing
+                Nothing -> pure $ Just rewardResult
         _ -> pure Nothing
 
 -- (attachBlockRewards / attachBlockRewards' now live in Blockchain.Bagger, so

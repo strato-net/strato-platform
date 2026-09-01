@@ -3139,7 +3139,7 @@ data StorageHooks m = StorageHooks
     shDynamicCall :: Bool -> DynamicCallKind -> Integer -> FastValue -> [(HostArgKind, FastValue)] -> m (Maybe FastValue),
     shBuiltin :: String -> [(HostArgKind, FastValue)] -> m FastValue,
     shEmit :: String -> [FastValue] -> m (),
-    shEmitMany :: [(String, [FastValue])] -> m ()
+    shEmitMany :: [(Integer, String, [FastValue])] -> m ()
   }
 
 type ScalarK = (Integer, SolidString)
@@ -3336,7 +3336,10 @@ runOpsM tag hooks ops nregs argRegs argVals _retRegs = withRunInIO $ \run ->
   objectDirty <- newSTRef (M.empty :: M.Map ScalarK FastValue)
   pathCache <- newSTRef (M.empty :: M.Map PathK (Integer, Bool))
   pathDirty <- newSTRef (M.empty :: M.Map PathK Integer)
-  evs <- newSTRef ([] :: [(String, [FastValue])])
+  -- UCallStorage temporarily switches 'this' while executing a statically
+  -- known external callee. Preserve that address with each buffered event so
+  -- the later batched hook does not attribute nested events to the caller.
+  evs <- newSTRef ([] :: [(Integer, String, [FastValue])])
   let flushPending = do
         d <- readSTRef dirty
         d2 <- readSTRef dirty2
@@ -4028,7 +4031,8 @@ runOpsM tag hooks ops nregs argRegs argVals _retRegs = withRunInIO $ \run ->
               readFastValues regs' defaults' rs >>= \case
                 Nothing -> pure Nothing
                 Just vs -> do
-                  modifySTRef' evs ((name, vs) :)
+                  this <- getThis
+                  modifySTRef' evs ((this, name, vs) :)
                   execGo regs' defaults' ops' (pc + 1) (gas + 1)
             UTimestamp d -> do
               s <- getTimestamp

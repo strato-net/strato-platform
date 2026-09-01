@@ -22,6 +22,7 @@
 module Blockchain.SolidVM
   ( SolidVMBase,
     call,
+    contractHasFunction,
     create,
     callReturnEnv,
     createReturnEnv,
@@ -368,6 +369,44 @@ call ::
 --       (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 call blockData codeAddress sender' proposer' availableGas origin' txHash' funcName argsStrings mFuncCallType = do
   snd <$> callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHash' funcName argsStrings mFuncCallType
+
+-- | Test whether the deployed SolidVM contract exposes a named function
+-- without constructing a call frame or taking the missing-function exception
+-- path. Code loading remains inside 'SM', where imported collections and the
+-- normal compiled-code cache have exactly the same behavior as 'call'.
+contractHasFunction ::
+  SolidVMBase m =>
+  BlockHeader ->
+  Address ->
+  Address ->
+  Keccak256 ->
+  Text ->
+  m Bool
+contractHasFunction blockData codeAddress caller txHash' functionName = do
+  isRunningTests <- checkIfRunningTests
+  let env' =
+        Env.Environment
+          { Env.blockHeader = blockData,
+            Env.sender = caller,
+            Env.origin = caller,
+            Env.proposer = caller,
+            Env.txHash = txHash',
+            Env.src = Nothing,
+            Env.name = Nothing,
+            Env.runningTests = isRunningTests,
+            Env.prevBlock = Nothing
+          }
+      gasInfo' =
+        GasInfo
+          { _gasLeft = 0,
+            _gasUsed = 0,
+            _gasInitialAllotment = 0,
+            _gasMetadata = ""
+          }
+  (_, result) <- runSM Nothing env' gasInfo' $ do
+    (contract, _, _) <- getCodeAndCollection codeAddress
+    pure $ M.member (textToLabel functionName) (contract ^. CC.functions)
+  pure $ either (const False) id result
 
 callReturnEnv ::
   SolidVMBase m =>
@@ -3828,7 +3867,7 @@ storageHooks profiledFunctionName callee ro contract cc = do
         profileHook "dynamic_call" $ dynamicCall catchFailures callKind target functionValue argsWithKinds,
       shBuiltin = \builtinName args ->
         profileHook "builtin" $ runHostBuiltin builtinName args,
-      shEmit = \eventName ints -> profileHook "event" $ emitMany [(eventName, ints)],
+      shEmit = \eventName ints -> profileHook "event" $ emitMany [(toInteger callee, eventName, ints)],
       shEmitMany = profileHook "event" . emitMany
     }
   where
@@ -3905,7 +3944,7 @@ storageHooks profiledFunctionName callee ro contract cc = do
       tHash <- Env.txHash <$> getEnv
       txSender <- Env.origin <$> getEnv
       let contractName' = labelToString $ CC._contractName contract
-      evs <- forM pairs $ \(eventName, values) ->
+      evs <- forM pairs $ \(eventAddress, eventName, values) ->
         case lookupEv eventName (length values) of
           Nothing -> missingType "no corresponding event has been declared" eventName
           Just ev -> do
@@ -3920,7 +3959,7 @@ storageHooks profiledFunctionName callee ro contract cc = do
                     logs
                     expVals
                     expStrs
-            pure $ Event bHash tHash txSender contractName' callee eventName evArgs
+            pure $ Event bHash tHash txSender contractName' (fromInteger eventAddress) eventName evArgs
       addEvents evs
     snapshotFor snapshotsRef addr = profileHook "storage_snapshot" $ do
       snapshots <- liftIO $ readIORef snapshotsRef

@@ -759,19 +759,44 @@ applyBlocksStreamed fullPipeline chunkSize inPath mRange = do
           seedDatabases genesisBlock
         initializeBestBlock
         let processChunk [] = pure ([] :: [BlockVerificationFailure])
-            processChunk reversedBlocks
-              | fullPipeline = do
-                  outEvents <- runConduit $
-                    processBlocks (reverse reversedBlocks)
-                      .| sinkList
-                  finalizePendingMPNodes
-                  runConduit $
-                    yieldMany outEvents
-                      .| collectFailuresPublishing
-              | otherwise =
-                  runConduit $
-                    processBlocks (reverse reversedBlocks)
-                      .| collectFailures
+            processChunk reversedBlocks@(newestChunkBlock : remainingBlocks) = do
+              let blocks = reverse reversedBlocks
+                  oldestChunkBlock = foldl' (\_ block -> block) newestChunkBlock remainingBlocks
+                  blockCount = length blocks
+                  firstN = number $ obBlockData oldestChunkBlock
+                  lastN = number $ obBlockData newestChunkBlock
+                  txCount = sum $ map (length . obReceiptTransactions) blocks
+              chunkStart <- liftIO getCurrentTime
+              chunkFailures <-
+                if fullPipeline
+                  then do
+                    outEvents <- runConduit $
+                      processBlocks blocks
+                        .| sinkList
+                    finalizePendingMPNodes
+                    runConduit $
+                      yieldMany outEvents
+                        .| collectFailuresPublishing
+                  else
+                    runConduit $
+                      processBlocks blocks
+                        .| collectFailures
+              chunkEnd <- liftIO getCurrentTime
+              let seconds = realToFrac (diffUTCTime chunkEnd chunkStart) :: Double
+                  blockRate = fromIntegral blockCount / max seconds 1e-9
+                  txRate = fromIntegral txCount / max seconds 1e-9
+              liftIO . hPutStrLn stderr $
+                printf
+                  "CHUNK_RESULT first=%d last=%d blocks=%d txs=%d seconds=%.3f blk_s=%.2f tx_s=%.2f failures=%d"
+                  firstN
+                  lastN
+                  blockCount
+                  txCount
+                  seconds
+                  blockRate
+                  txRate
+                  (length chunkFailures)
+              pure chunkFailures
             finish source reversedBlocks stats = do
               chunkFailures <- processChunk reversedBlocks
               pure (chunkFailures, stats, source)
