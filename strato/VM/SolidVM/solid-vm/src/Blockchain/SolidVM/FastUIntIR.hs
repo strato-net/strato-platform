@@ -998,14 +998,20 @@ compileExpr cc current = \case
       Nothing -> compileStoragePathGet expr
   expr@(CC.IndexAccess _ (CC.Variable _ mapName) (Just idx)) -> do
     s <- get
-    case M.lookup mapName (csArrays s) of
-      Just slot -> do
+    case (M.lookup mapName (csTypes s), M.lookup mapName (csObjects s), M.lookup mapName (csArrays s)) of
+      (Just SVMType.Bytes {}, Just objectSlot', _) -> do
+        k <- compileExpr cc current idx
+        r <- fresh
+        emit $ UHostBuiltin r "__solidvm_bytesIndex" [(objectBinding objectSlot', HostOpaque), (k, HostInteger)]
+        charge 1
+        pure r
+      (_, _, Just slot) -> do
         k <- compileExpr cc current idx
         r <- fresh
         emit $ UArrayGet r slot k
         charge 1
         pure r
-      Nothing -> do
+      _ -> do
         (actual, _) <- resolveMap mapName
         case mappingAddrKey cc current actual of
           Just isAddr -> do
@@ -1018,8 +1024,13 @@ compileExpr cc current = \case
   expr@CC.IndexAccess {} -> compileStoragePathGet expr
   expr@(CC.MemberAccess _ (CC.Variable _ receiverName) memberName) -> do
     s <- get
-    case M.lookup receiverName (csArrays s) of
-      Just slot | memberName == "length" -> do
+    case (M.lookup receiverName (csTypes s), M.lookup receiverName (csObjects s), M.lookup receiverName (csArrays s)) of
+      (Just SVMType.Bytes {}, Just objectSlot', _) | memberName == "length" -> do
+        r <- fresh
+        emit $ UHostBuiltin r "__solidvm_bytesLength" [(objectBinding objectSlot', HostOpaque)]
+        charge 2
+        pure r
+      (_, _, Just slot) | memberName == "length" -> do
         r <- fresh
         emit $ UArrayLen r slot
         charge 2
@@ -1284,6 +1295,13 @@ namedFastReturns func = traverse namedFast (CC._funcVals func)
 compileCallValues :: CodeCollection -> Contract -> CC.Expression -> CC.ArgList -> CM [Int]
 compileCallValues cc current callee args
   | CC.Variable _ builtinName <- callee
+  , builtinName == "poseidon2Compress" = do
+      refs <- mapM compileHostArg args
+      dest <- fresh
+      emit $ UHostBuiltin dest (labelToString builtinName) refs
+      charge 1
+      pure [dest]
+  | CC.Variable _ builtinName <- callee
   , builtinName `elem` ["keccak256", "decimal"] = do
       refs <- mapM compileHostArg args
       dest <- bindAnonymousObject
@@ -1366,7 +1384,7 @@ compileCallValues cc current callee args
       charge 2
       pure [r]
   | CC.Variable _ castName <- callee
-  , (castName == "uint" || castName == "int" || castName == "address")
+  , castName `elem` ["uint", "uint8", "uint256", "int", "address"]
   , [arg] <- args = do
       r <- compileExpr cc current arg
       pure [r]
@@ -3126,7 +3144,7 @@ runAnyStorageIRArgs ::
   m (Maybe ([FastValue], Integer))
 runAnyStorageIRArgs hooks cc contract func args
   | any isOpaque args
-  , labelToString (contract ^. CC.contractName) `notElem` ["AdminRegistry", "StringUtils", "BytesUtils"] = pure Nothing
+  , not opaqueArgsEnabled = pure Nothing
   | otherwise = case cachedCompile cc contract func of
     Just (ops, nregs, argRegs, retRegs)
       | length argRegs == length args
@@ -3196,6 +3214,8 @@ runAnyStorageIRArgs hooks cc contract func args
               )
        in pure Nothing
   where
+    opaqueArgsEnabled =
+      labelToString (contract ^. CC.contractName) `elem` ["AdminRegistry", "StringUtils", "BytesUtils", "DACommitment"]
     bindingsMatch bindings values = and $ zipWith matches bindings values
     isOpaque FastOpaque {} = True
     isOpaque _ = False

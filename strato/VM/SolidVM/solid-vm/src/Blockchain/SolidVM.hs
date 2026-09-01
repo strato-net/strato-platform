@@ -3562,6 +3562,7 @@ canonicalOpaqueIRTarget cc contract' funcName resolved vals =
     isCanonicalOpaqueTarget =
       (contractName == "StringUtils" && functionName == "normalizeHex")
         || (contractName == "BytesUtils" && functionName `elem` ["b16encode", "b16decode"])
+        || (contractName == "DACommitment" && functionName `elem` ["commit", "commitWithLength"])
     isReference SReference{} = True
     isReference _ = False
 
@@ -4044,6 +4045,17 @@ storageHooks profiledFunctionName callee ro contract cc = do
             result <- callWithResult callee (fromInteger target) callType (stringToLabel functionName) args
             pure . FastOpaque $ fromMaybe SNULL result
           other -> typeError "IR dynamic call function is not a string" $ show other
+    runHostBuiltin "__solidvm_bytesLength" [(HostOpaque, FastOpaque (SBytes bytes))] =
+      pure . FastScalar . fromIntegral $ B.length bytes
+    runHostBuiltin "__solidvm_bytesIndex" [(HostOpaque, FastOpaque (SBytes bytes)), (HostInteger, FastScalar byteIndex)]
+      | byteIndex >= 0,
+        byteIndex <= toInteger (maxBound :: Int),
+        Just value <- bytes B.!? fromInteger byteIndex =
+          pure . FastScalar $ fromIntegral value
+      | otherwise =
+          indexOutOfBounds
+            ("index value was " ++ show byteIndex ++ ", but the bytes length was " ++ show (B.length bytes))
+            ("FastIR bytes index" :: String)
     runHostBuiltin builtinName args = do
       values <- traverse hostValue args
       FastOpaque <$> callBuiltinFunction (stringToLabel builtinName) values

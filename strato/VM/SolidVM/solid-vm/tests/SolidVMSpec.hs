@@ -5995,6 +5995,77 @@ contract qq {
 }|]
       `shouldReturn` Just "(\"2a4aec41b4652949f203748247b8b6f20f70f24b5a2a94c77eaa5167635186cd\")"
 
+  it "keeps DACommitment FastIR byte packing equivalent to the interpreter" . runTest $ do
+    runCall'
+      "check"
+      ["bytes(\"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f\")"]
+      [r|
+library DACommitment {
+  uint256 constant BYTES_PER_FIELD_ELEMENT = 31;
+
+  function commit(bytes memory payload) returns (uint256) {
+    uint256 acc = 0;
+    uint256 len = payload.length;
+    uint256 i = 0;
+    while (i < len) {
+      uint256 word = 0;
+      uint256 j = 0;
+      while (j < BYTES_PER_FIELD_ELEMENT && i + j < len) {
+        word = word * 256 + uint256(uint8(payload[i + j]));
+        j = j + 1;
+      }
+      while (j < BYTES_PER_FIELD_ELEMENT) {
+        word = word * 256;
+        j = j + 1;
+      }
+      acc = poseidon2Compress(acc, word);
+      i = i + BYTES_PER_FIELD_ELEMENT;
+    }
+    return acc;
+  }
+
+  function commitWithLength(bytes memory payload) returns (uint256) {
+    return poseidon2Compress(commit(payload), payload.length);
+  }
+}
+
+library ReferenceCommitment {
+  uint256 constant BYTES_PER_FIELD_ELEMENT = 31;
+
+  function commit(bytes memory payload) returns (uint256) {
+    uint256 acc = 0;
+    uint256 len = payload.length;
+    uint256 i = 0;
+    while (i < len) {
+      uint256 word = 0;
+      uint256 j = 0;
+      while (j < BYTES_PER_FIELD_ELEMENT && i + j < len) {
+        word = word * 256 + uint256(uint8(payload[i + j]));
+        j = j + 1;
+      }
+      while (j < BYTES_PER_FIELD_ELEMENT) {
+        word = word * 256;
+        j = j + 1;
+      }
+      acc = poseidon2Compress(acc, word);
+      i = i + BYTES_PER_FIELD_ELEMENT;
+    }
+    return acc;
+  }
+
+  function commitWithLength(bytes memory payload) returns (uint256) {
+    return poseidon2Compress(commit(payload), payload.length);
+  }
+}
+
+contract qq {
+  function check(bytes memory payload) returns (bool) {
+    return DACommitment.commitWithLength(payload) == ReferenceCommitment.commitWithLength(payload);
+  }
+}
+|]
+      `shouldReturn` Just "(true)"
+
   it "cant use  a commented pragma" . runTest $ do
     runCall'
       "a"
