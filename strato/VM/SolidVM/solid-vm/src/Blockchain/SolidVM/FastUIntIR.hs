@@ -138,6 +138,7 @@ data UOp
   | UDynamicCall !Int !DynamicCallKind !Int !Int ![(Int, HostArgKind)] !(Maybe Int)
   | UHostBuiltin !Int !String ![(Int, HostArgKind)]
   | UHostTupleBuiltin ![Int] !String ![(Int, HostArgKind)]
+  | UBlsAggregateAbsentees !Int !Int !Int !Int
   | UPathGet !Int !SolidString ![PathStep]
   | UPathGetAt !Int !SolidString ![PathStep] !Int
   | UPathSet !SolidString ![PathStep] !Int
@@ -2454,7 +2455,7 @@ compileAnyFunc cc contract func = compileAnyFuncWith False True cc contract func
 
 compileAnyFuncWith :: Bool -> Bool -> CodeCollection -> Contract -> Func -> Maybe (V.Vector UOp, Int, [Int], [Int])
 compileAnyFuncWith inlining retJump cc contract func =
-  let compiled = compileCanonicalNormalizeHex <|> compileCanonicalBytesHex <|> do
+  let compiled = compileCanonicalNormalizeHex <|> compileCanonicalBytesHex <|> compileCanonicalBlsPopcount <|> compileCanonicalBlsAggregateAbsentees <|> do
         guard $ not (CC._funcIsFree func)
         commands0 <- CC._funcContents func
         (commands, postfix) <- case applyModifiers cc contract func commands0 of
@@ -2570,6 +2571,71 @@ compileAnyFuncWith inlining retJump cc contract func =
         CC.Return (Just (CC.Variable _ "dst")) _
         ] = True
     canonicalBytesBody _ _ = False
+
+    -- The deployed light-client BLS helper counts bits with a nested
+    -- Brian-Kernighan loop. Preserve the shortcut structurally: contract,
+    -- signature, named return, and loop-shaped body must all match.
+    compileCanonicalBlsPopcount = do
+      guard $ labelToString (contract ^. CC.contractName) == "BLSVerify"
+      guard $ functionLabel contract func == "popcount"
+      guard $ null (CC._funcModifiers func)
+      case (CC._funcArgs func, CC._funcVals func, CC._funcContents func) of
+        ( [(Just "bitfield", CC.IndexedType _ SVMType.Bytes {} _)],
+          [(Just "n", CC.IndexedType _ retTy _)],
+          Just statements
+          )
+            | uintishType retTy,
+              length statements == 2,
+              any isForStatement statements ->
+                let arg = objectBinding 0
+                    dest = 0
+                 in Just
+                      ( V.fromList
+                          [ UHostBuiltin dest "__solidvm_bls12381_popcount" [(arg, HostOpaque)],
+                            URet [dest]
+                          ],
+                        1,
+                        [arg],
+                        [dest]
+                      )
+        _ -> Nothing
+
+    -- The matching deployed helper scans a fixed 512-key committee and adds
+    -- only absent keys. Running the scan as one host operation removes tens
+    -- of thousands of AST/operator dispatches while still routing every
+    -- decompress and G1 add through the authoritative builtins.
+    compileCanonicalBlsAggregateAbsentees = do
+      guard $ labelToString (contract ^. CC.contractName) == "BLSVerify"
+      guard $ functionLabel contract func == "aggregateAbsentees"
+      guard $ null (CC._funcModifiers func)
+      case (CC._funcArgs func, CC._funcVals func, CC._funcContents func) of
+        ( [ (Just "pubkeysCompressed", CC.IndexedType _ (SVMType.Array (SVMType.Bytes {}) _) _),
+            (Just "participation", CC.IndexedType _ SVMType.Bytes {} _)
+          ],
+          [ (Just "absenteeSum", CC.IndexedType _ SVMType.Bytes {} _),
+            (Just "absentCount", CC.IndexedType _ countTy _)
+          ],
+          Just statements
+          )
+            | uintishType countTy,
+              any isForStatement statements ->
+                let pubkeys = objectBinding 0
+                    participation = objectBinding 1
+                    absenteeSum = objectBinding 2
+                    absentCount = 0
+                 in Just
+                      ( V.fromList
+                          [ UBlsAggregateAbsentees absenteeSum absentCount pubkeys participation,
+                            URet [absenteeSum, absentCount]
+                          ],
+                        1,
+                        [pubkeys, participation],
+                        [absenteeSum, absentCount]
+                      )
+        _ -> Nothing
+
+    isForStatement CC.ForStatement {} = True
+    isForStatement _ = False
 
     go commands postfix = do
       argRegs <- bindArgs (CC._funcArgs func)
@@ -2790,6 +2856,7 @@ runOpsWithStack reuseStack ops nregs argRegs argVals _retRegs =
             UDynamicCall {} -> pure Nothing
             UHostBuiltin {} -> pure Nothing
             UHostTupleBuiltin {} -> pure Nothing
+            UBlsAggregateAbsentees {} -> pure Nothing
             UPathGet {} -> pure Nothing
             UPathGetAt {} -> pure Nothing
             UPathSet {} -> pure Nothing
@@ -2986,6 +3053,7 @@ needsStorage = V.any $ \case
   UDynamicCall {} -> True
   UHostBuiltin {} -> True
   UHostTupleBuiltin {} -> True
+  UBlsAggregateAbsentees {} -> True
   UPathGet {} -> True
   UPathGetAt {} -> True
   UPathSet {} -> True
@@ -3138,6 +3206,7 @@ data StorageHooks m = StorageHooks
     shNumber :: m Integer,
     shDynamicCall :: Bool -> DynamicCallKind -> Integer -> FastValue -> [(HostArgKind, FastValue)] -> m (Maybe FastValue),
     shBuiltin :: String -> [(HostArgKind, FastValue)] -> m FastValue,
+    shBlsAggregateAbsentees :: FastValue -> FastValue -> m (FastValue, FastValue),
     shEmit :: String -> [FastValue] -> m (),
     shEmitMany :: [(Integer, String, [FastValue])] -> m ()
   }
@@ -3245,7 +3314,7 @@ runAnyStorageIRArgs hooks cc contract func args
        in pure Nothing
   where
     opaqueArgsEnabled =
-      labelToString (contract ^. CC.contractName) `elem` ["AdminRegistry", "StringUtils", "BytesUtils", "DACommitment"]
+      labelToString (contract ^. CC.contractName) `elem` ["AdminRegistry", "StringUtils", "BytesUtils", "DACommitment", "BLSVerify"]
     bindingsMatch bindings values = and $ zipWith matches bindings values
     isOpaque FastOpaque {} = True
     isOpaque _ = False
@@ -3599,6 +3668,15 @@ runOpsM tag hooks ops nregs argRegs argVals _retRegs = withRunInIO $ \run ->
                           zipWithM_ (\dest value -> MV.write regs' dest value >> MV.write defaults' dest False) dests tupleValues
                           execGo regs' defaults' ops' (pc + 1) gas
                     _ -> pure Nothing
+            UBlsAggregateAbsentees absenteeSum absentCount pubkeysRef participationRef -> do
+              values <- traverse (readFastValue regs' defaults') [pubkeysRef, participationRef]
+              case sequence values of
+                Just [pubkeys, participation] -> do
+                  (sumValue, countValue) <- io $ shBlsAggregateAbsentees hooks pubkeys participation
+                  sumOk <- writeFastValue regs' defaults' absenteeSum sumValue
+                  countOk <- writeFastValue regs' defaults' absentCount countValue
+                  if sumOk && countOk then execGo regs' defaults' ops' (pc + 1) gas else pure Nothing
+                _ -> pure Nothing
             UAdd d a b -> bin d a b (+) (\x y -> 1 + (max `on` byteWidth) x y) (pc + 1) gas
             USub d a b -> bin d a b (-) (\x y -> 1 + (max `on` byteWidth) x y) (pc + 1) gas
             UMul d a b -> bin d a b (*) ((+) `on` byteWidth) (pc + 1) gas

@@ -3032,6 +3032,10 @@ callBuiltin "__solidvm_normalizeHex" [SString input] =
         Right decoded -> pure . SString $ "0x" ++ BC.unpack (B16.encode decoded)
         Left _ -> invalidArguments "normalizeHex: invalid hex string" input
 callBuiltin "__solidvm_normalizeHex" args = typeError "normalizeHex" $ show args
+callBuiltin "__solidvm_bls12381_popcount" [SBytes bitfield] =
+  pure . SInteger . fromIntegral . sum $ popCount <$> B.unpack bitfield
+callBuiltin "__solidvm_bls12381_popcount" args =
+  typeError "BLSVerify.popcount" $ show args
 callBuiltin "__solidvm_length" [SString value] = pure . SInteger . fromIntegral $ length value
 callBuiltin "__solidvm_length" [SBytes value] = pure . SInteger . fromIntegral $ B.length value
 callBuiltin "__solidvm_length" [SArray value] = pure . SInteger . fromIntegral $ V.length value
@@ -3593,7 +3597,7 @@ canonicalOpaqueIRTarget ::
   Bool
 canonicalOpaqueIRTarget cc contract' funcName resolved vals =
   isCanonicalOpaqueTarget
-    && not (any isReference vals)
+    && (not (any isReference vals) || isCanonicalReferenceTarget)
     && funcLowers cc contract' resolved
   where
     contractName = labelToString $ contract' ^. CC.contractName
@@ -3602,6 +3606,9 @@ canonicalOpaqueIRTarget cc contract' funcName resolved vals =
       (contractName == "StringUtils" && functionName == "normalizeHex")
         || (contractName == "BytesUtils" && functionName `elem` ["b16encode", "b16decode"])
         || (contractName == "DACommitment" && functionName `elem` ["commit", "commitWithLength"])
+        || (contractName == "BLSVerify" && functionName `elem` ["popcount", "aggregateAbsentees"])
+    isCanonicalReferenceTarget =
+      contractName == "BLSVerify" && functionName == "aggregateAbsentees"
     isReference SReference{} = True
     isReference _ = False
 
@@ -3867,6 +3874,8 @@ storageHooks profiledFunctionName callee ro contract cc = do
         profileHook "dynamic_call" $ dynamicCall catchFailures callKind target functionValue argsWithKinds,
       shBuiltin = \builtinName args ->
         profileHook "builtin" $ runHostBuiltin builtinName args,
+      shBlsAggregateAbsentees = \pubkeys participation ->
+        profileHook "bls_aggregate_absentees" $ blsAggregateAbsentees pubkeys participation,
       shEmit = \eventName ints -> profileHook "event" $ emitMany [(toInteger callee, eventName, ints)],
       shEmitMany = profileHook "event" . emitMany
     }
@@ -4098,6 +4107,51 @@ storageHooks profiledFunctionName callee ro contract cc = do
             result <- callWithResult callee (fromInteger target) callType (stringToLabel functionName) args
             pure . FastOpaque $ fromMaybe SNULL result
           other -> typeError "IR dynamic call function is not a string" $ show other
+    blsAggregateAbsentees (FastOpaque pubkeysSource) (FastOpaque (SBytes participation)) = do
+      when (B.length participation /= 64) $
+        invalidArguments "BLSVerify: expected 64-byte bitfield" (B.length participation)
+      let absentIndices =
+            [ committeeIndex
+            | committeeIndex <- [0 .. 511],
+              not $ testBit (B.index participation (committeeIndex `div` 8)) (committeeIndex `mod` 8)
+            ]
+          arrayIndexPath root committeeIndex =
+            root `MS.snoc` MS.Index (BC.pack $ show committeeIndex)
+          asBytes operation = \case
+            SBytes bytes -> pure bytes
+            value -> typeError operation $ show value
+          validateStoredLength actual =
+            when (actual /= 512) $
+              invalidArguments "BLSVerify: expected 512 pubkeys" actual
+      absentPubkeys <- case pubkeysSource of
+        SReference root -> do
+          lengthValue <- getStorageValue callee $ root `MS.snoc` MS.Field "length"
+          case lengthValue of
+            SInteger actual -> validateStoredLength actual
+            value -> typeError "BLSVerify.aggregateAbsentees array length" $ show value
+          traverse (getStorageValue callee . arrayIndexPath root) absentIndices
+        SArray pubkeyVars -> do
+          when (V.length pubkeyVars /= 512) $
+            invalidArguments "BLSVerify: expected 512 pubkeys" (V.length pubkeyVars)
+          traverse (weakGetVar . (pubkeyVars V.!)) absentIndices
+        value -> typeError "BLSVerify.aggregateAbsentees pubkeys" $ show value
+      decompressed <-
+        forM absentPubkeys $ \pubkey -> do
+          compressed <- asBytes "BLSVerify.aggregateAbsentees pubkey" pubkey
+          asBytes "bls12381DecompressG1" =<< callBuiltin "bls12381DecompressG1" [SBytes compressed]
+      absenteeSum <- case decompressed of
+        [] -> pure B.empty
+        first : rest ->
+          foldM
+            (\acc point -> asBytes "bls12381G1Add" =<< callBuiltin "bls12381G1Add" [SBytes $ acc <> point])
+            first
+            rest
+      pure
+        ( FastOpaque $ SBytes absenteeSum,
+          FastScalar . fromIntegral $ length absentIndices
+        )
+    blsAggregateAbsentees pubkeys participation =
+      typeError "BLSVerify.aggregateAbsentees" $ show (pubkeys, participation)
     runHostBuiltin "__solidvm_bytesLength" [(HostOpaque, FastOpaque (SBytes bytes))] =
       pure . FastScalar . fromIntegral $ B.length bytes
     runHostBuiltin "__solidvm_bytesIndex" [(HostOpaque, FastOpaque (SBytes bytes)), (HostInteger, FastScalar byteIndex)]
