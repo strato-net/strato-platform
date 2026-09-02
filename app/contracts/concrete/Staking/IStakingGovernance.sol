@@ -7,6 +7,11 @@ interface IStakingGovernance {
     function removeValidatorFromStaking(address validator) external returns (bool);
     function validatorMap(address validator) external view returns (uint256);
     function stakingContract() external view returns (address);
+    // Admin overrides of stake-weighted selection. Newer than some deployed
+    // governance logic, so every call site reads them through a try/catch and
+    // treats an older contract as "no override".
+    function forcedInByAdmins(address validator) external view returns (bool);
+    function forcedOutByAdmins(address validator) external view returns (bool);
 }
 
 // Genesis AdminRegistry (0x100c) vote surface: a whitelisted caller's

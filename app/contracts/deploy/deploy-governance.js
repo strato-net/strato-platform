@@ -4,7 +4,10 @@
 // 0x100 is a Proxy, so its logic can be replaced; its storage (validators,
 // admins, and the vote maps) is name-keyed and survives, and the V2 fields
 // (stakingContract, validatorStake, stakingManaged, hardCapValidators) start
-// empty.
+// empty. So do the admin-override fields (forcedInByAdmins, forcedOutByAdmins,
+// stakingIntent, stakingWeight, validatorVoteDirection): no validator carries a
+// designation until the admins vote one on, and an empty stakingIntent reads as
+// "staking has not spoken", which leaves every existing validator where it is.
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');

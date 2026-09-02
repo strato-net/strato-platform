@@ -119,6 +119,11 @@ contract  StratoStaking is Ownable {
     mapping(address => address) public  validatorOf;
     mapping(address => address) public  operatorOf;
     mapping(address => bool) public  isValidator;
+    // Governance would not seat this operator's validator: the admins have voted
+    // it out, whatever its stake. Cached so the hot paths and the waiter scan do
+    // not each have to ask governance; refreshed on every call that does ask,
+    // and pushed by governance the moment a designation changes.
+    mapping(address => bool) public  governanceBarred;
     mapping(address => uint256) public  lastSyncedWeight;
     mapping(address => uint256) public  jailedUntil;
 
@@ -334,8 +339,10 @@ contract  StratoStaking is Ownable {
     }
 
     // A waiter is eligible but not in the set; promotion is explicit (tryActivate / reconcileSet).
+    // A validator the admins have voted out is never a waiter: it would be picked
+    // as the best candidate on every pass and refused on every pass.
     function isWaiter(address operator) public view returns (bool) {
-        return eligible(operator) && !isValidator[operator];
+        return eligible(operator) && !isValidator[operator] && !governanceBarred[operator];
     }
 
     // More than a third of the rewardable stake: can stall a stake-weighted quorum.
@@ -361,7 +368,54 @@ contract  StratoStaking is Ownable {
         setMutationsThisBlock += n;
     }
 
-    function _activate(address operator) internal {
+    // Governance holds the set consensus reads, so it is the authority on who is
+    // in it and this contract's isValidator is a mirror. These two read that
+    // authority back rather than assuming the call did what was asked.
+    //
+    // Both overrides are newer than some deployed governance logic, so a contract
+    // that predates them reads as "no override" instead of breaking staking. That
+    // is what lets the two be upgraded in either order.
+    function _governanceBars(address validator) internal returns (bool) {
+        bool barred = false;
+        try IStakingGovernance(governance).forcedOutByAdmins(validator) returns (bool b) {
+            barred = b;
+        } catch {
+        }
+        return barred;
+    }
+
+    function _governancePins(address validator) internal returns (bool) {
+        bool pinned = false;
+        try IStakingGovernance(governance).forcedInByAdmins(validator) returns (bool b) {
+            pinned = b;
+        } catch {
+        }
+        return pinned;
+    }
+
+    function _governanceSeated(address validator) internal returns (bool) {
+        return IStakingGovernance(governance).validatorMap(validator) > 0;
+    }
+
+    // Join this contract's view of the set. Paired with _dropValidator so every
+    // path that moves isValidator also moves validatorCount and the weight cache.
+    function _seatValidator(address operator, address validator, uint256 weight) internal {
+        isValidator[operator] = true;
+        lastSyncedWeight[operator] = weight;
+        validatorCount += 1;
+        emit ValidatorSynced(operator, validator, true, weight);
+    }
+
+    function _dropValidator(address operator, address validator) internal {
+        isValidator[operator] = false;
+        lastSyncedWeight[operator] = 0;
+        validatorCount -= 1;
+        exitReadyTime[operator] = 0;
+        emit ValidatorSynced(operator, validator, false, 0);
+    }
+
+    // Returns whether governance actually seated the validator.
+    function _activate(address operator) internal returns (bool) {
         address validator = validatorOf[operator];
         uint256 weight = _validatorWeight(operators[operator]);
         // Straight to governance: it is the staking contract's own call (the
@@ -370,26 +424,59 @@ contract  StratoStaking is Ownable {
         // already tolerates a validator that is in the set but not yet
         // staking-managed, which is how the genesis validators arrive.
         IStakingGovernance(governance).addValidatorFromStaking(validator, weight);
-        isValidator[operator] = true;
-        lastSyncedWeight[operator] = weight;
-        validatorCount += 1;
-        emit ValidatorSynced(operator, validator, true, weight);
+
+        // It can also decline, silently, when the admins have voted the validator
+        // out. Taking the seat on trust is what would leave this contract holding
+        // a validator consensus does not have -- one that occupies a slot and
+        // keeps accruing rewards while it can neither propose nor vote.
+        if (!_governanceSeated(validator)) {
+            governanceBarred[operator] = true;
+            return false;
+        }
+        governanceBarred[operator] = false;
+        _seatValidator(operator, validator, weight);
+        return true;
     }
 
-    // Governance never drops its last validator; then the operator stays registered.
+    // Governance never drops its last validator, and never drops one the admins
+    // have pinned in; then the operator stays registered.
     function _deactivate(address operator) internal returns (bool) {
         address validator = validatorOf[operator];
-        // Governance refuses to drop its last validator, and reports that by
-        // returning false rather than reverting.
+        // Governance refuses by returning false rather than reverting.
         bool removed = IStakingGovernance(governance).removeValidatorFromStaking(validator);
         if (removed) {
-            isValidator[operator] = false;
-            lastSyncedWeight[operator] = 0;
-            validatorCount -= 1;
-            exitReadyTime[operator] = 0;
-            emit ValidatorSynced(operator, validator, false, 0);
+            _dropValidator(operator, validator);
         }
         return removed;
+    }
+
+    // Governance decided the set without going through this contract -- an admin
+    // vote moved a validator in or out. Copy that decision here so the two do not
+    // disagree about who is validating.
+    //
+    // Permissionless and idempotent by design: it only ever reads governance and
+    // matches it, so anyone may call it to repair a drift, and governance itself
+    // calls it on every designation change. Deliberately not charged to the
+    // block's mutation budget -- governance already made the change, and charging
+    // it would let an unrelated stake in the same block revert an admin vote.
+    function reconcileWithGovernance(address validator) public onlyInitialized {
+        if (!governanceSyncEnabled || governance == address(0)) return;
+        address operator = operatorOf[validator];
+        if (operator == address(0) || !operators[operator].exists) return;
+
+        governanceBarred[operator] = _governanceBars(validator);
+        bool seated = _governanceSeated(validator);
+        if (seated == isValidator[operator]) return;
+
+        if (seated) {
+            uint256 weight = _validatorWeight(operators[operator]);
+            _seatValidator(operator, validator, weight);
+            // Governance seated it from the weight it last heard, which predates
+            // any stake that moved while it was held out of the set. Republish.
+            IStakingGovernance(governance).addValidatorFromStaking(validator, weight);
+        } else {
+            _dropValidator(operator, validator);
+        }
     }
 
     // Keep governance in step with an operator already in the set: leave when no
@@ -397,10 +484,20 @@ contract  StratoStaking is Ownable {
     // otherwise. Joining is never implicit.
     function _syncValidator(address operator) internal {
         if (!governanceSyncEnabled || !isValidator[operator]) return;
+        address validator = validatorOf[operator];
         if (!eligible(operator)) {
-            _consumeMutations(1);
-            _deactivate(operator);
-            return;
+            // Only a removal that actually happens is a set mutation. Charging
+            // refusals would let one pinned validator whose stake has collapsed
+            // exhaust the block's budget, because it lands here on every stake
+            // and unstake and is refused every time.
+            if (_deactivate(operator)) {
+                _consumeMutations(1);
+                return;
+            }
+            // Refused: governance is keeping it, either as the last validator or
+            // because the admins pinned it in. It is still in the set, so fall
+            // through and keep its weight current rather than leaving governance
+            // with the weight it held when it stopped qualifying.
         }
         uint256 weight = _validatorWeight(operators[operator]);
 
@@ -417,6 +514,17 @@ contract  StratoStaking is Ownable {
         // propagate out of stake() and unstake() and break staking for users. The
         // former reconciles that case instead of failing on it.
         IStakingGovernance(governance).addValidatorFromStaking(validatorOf[operator], weight);
+
+        // Governance owns the set. If it did not seat the validator the admins
+        // have voted it out, so adopt that here instead of carrying a validator
+        // consensus does not have. Not a mutation of ours -- see
+        // reconcileWithGovernance.
+        if (!_governanceSeated(validator)) {
+            governanceBarred[operator] = true;
+            _dropValidator(operator, validator);
+            return;
+        }
+        governanceBarred[operator] = false;
 
         // ValidatorSynced stays change-gated: consensus consumes it as a delta
         // before the switch height, so its emission pattern must not change.
@@ -464,10 +572,15 @@ contract  StratoStaking is Ownable {
         _requireJoinsOpen();
         require(!isValidator[operator], "SS: already active");
         require(eligible(operator), "SS: not eligible");
+        require(!governanceBarred[operator], "SS: barred by governance");
 
+        // _activate reports whether governance took the validator; a bar is
+        // caught there too, so a stale cache costs a clear revert, not a seat
+        // this contract holds and consensus does not. The eviction path reverts
+        // as a whole, so a refused join never leaves the evicted one out.
         if (validatorCount < effectiveCap()) {
             _consumeMutations(1);
-            _activate(operator);
+            require(_activate(operator), "SS: barred by governance");
         } else {
             (address lowest, uint256 lowestWeight) = _lowestValidator();
             uint256 weight = _validatorWeight(operators[operator]);
@@ -475,7 +588,7 @@ contract  StratoStaking is Ownable {
             _consumeMutations(2);
             require(_deactivate(lowest), "SS: cannot evict");
             emit ValidatorEvicted(lowest, validatorOf[lowest], operator);
-            _activate(operator);
+            require(_activate(operator), "SS: barred by governance");
         }
         _requireWithinStakeCap(operator);
     }
@@ -488,8 +601,11 @@ contract  StratoStaking is Ownable {
             if (mutationBlock == block.number && setMutationsThisBlock >= maxSetMutationsPerBlock) break;
             (address best,) = _bestWaiter();
             if (best == address(0)) break;
+            // A refusal marks the waiter barred, so it is skipped from the next
+            // call on. Stopping here rather than rescanning bounds the work one
+            // call can do when several waiters are barred at once.
+            if (!_activate(best)) break;
             _consumeMutations(1);
-            _activate(best);
         }
     }
 
@@ -543,7 +659,11 @@ contract  StratoStaking is Ownable {
         bool wasValidator = isValidator[operator] && governanceSyncEnabled;
         if (oldValidator != address(0)) {
             if (wasValidator) {
-                require(_deactivate(operator), "SS: cannot retire last validator");
+                // Two reasons governance can refuse, and they need different
+                // fixes: clear the designation, or wait for another validator.
+                bool retired = _deactivate(operator);
+                require(retired || !_governancePins(oldValidator), "SS: validator pinned by governance");
+                require(retired, "SS: cannot retire last validator");
             }
             delete operatorOf[oldValidator];
         }
