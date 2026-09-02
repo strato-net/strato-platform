@@ -736,6 +736,49 @@ the first large fork. Chunk 46,080-47,103 improved from 1.02 blk/s (1,004.226
 s) to 197.41 blk/s (5.187 s), while the full genesis gate remained above the
 200 blk/s soft target.
 
+### Full SQL-on baseline and dead-output cleanup
+
+Commit `8a5db21809` was then run from genesis through the complete 361,200-block
+corpus with `sqlDiff=true`, `-N2`, `-A128m`, the PostgreSQL indexer consuming
+concurrently, and the final acceptance audit enabled. It completed exactly,
+but the denser tail established that the 47,104-block gate was not a whole-
+corpus throughput estimate:
+
+| Mode/candidate | Range | Blocks | Transactions | Elapsed | blk/s | tx/s | Audit |
+|---|---|---:|---:|---:|---:|---:|---|
+| Accepted SQL-off reference | 0-361,199 | 361,200 | 448,649 | 2,123.554 s | 170.09 | 211.2727 | exact |
+| SQL-on full baseline (`8a5db21809`) | 0-361,199 | 361,200 | 448,649 | 2,959.063 s | 122.07 | 151.6186 | exact |
+| SQL-on short baseline (`8a5db21809`) | 0-47,103 | 47,104 | 61,900 | 220.226 s | 213.89 | 281.0749 | exact |
+| Dead-output cleanup candidate | 0-47,103 | 47,104 | 61,900 | 188.651 s | 249.69 | 328.1191 | exact |
+| Rejected parallel serializer | 0-47,103 | 47,104 | 61,900 | 210.750 s | 223.51 | 293.7129 | exact |
+
+The accepted cleanup removes an `OutASM` construction that could never be
+published: `addTransactions` built it only when `sqlDiff=true`, while both
+output routers intentionally publish `OutASM` only when `sqlDiff=false`. The
+fold over every transaction's address-state map was therefore guaranteed dead
+work. The same change passes the already-read per-block storage update map to
+the Slipstream action constructor instead of fetching it a second time. On the
+matched genesis gate this improved SQL-on throughput by 16.74% and reduced
+elapsed time by 31.575 seconds.
+
+The parallel serializer was discarded because it introduced repeatable long
+GC/publication stalls (including 20-second chunks at 31,744 and 33,792) and
+was 10.48% slower than the single-threaded cleanup candidate. Its measured
+receipt is retained as rejection evidence, but none of its code remains.
+
+The full SQL database reached Kafka lag zero with blocks 0-361,199, 448,649
+distinct raw transactions and block-transaction rows, 79,905 distinct address
+rows, 1,233,685 distinct storage keys, and zero orphaned storage or block-
+transaction rows. The VM terminal audit was 80,716 accounts and 1,256,107
+storage entries; the SQL counts are not expected to equal the VM counts because
+the genesis bootstrap is not published as ordinary state-update messages.
+
+The authoritative receipts are:
+
+- `artifacts/vm-target-400/results/sqldiff-quality-full-genesis-0-361199-8a5db21-02.result.txt`
+- `artifacts/vm-target-400/results/sqldiff-dead-output-cleanup-genesis-0-47103-01.result.txt`
+- `artifacts/vm-target-400/results/sqldiff-parallel-encode-genesis-0-47103-01.result.txt` (rejected)
+
 The fixed-corpus VM receipt is
 `artifacts/vm-target-400/results/sqldiff-quality-compact-reorg-genesis-0-47103-01.result.txt`.
 The isolated indexer logs are
@@ -768,7 +811,7 @@ VM_REPLAY_BASELINE_BLOCK=-1 \
 VM_REPLAY_CORPUS="$workspace/artifacts/vm-target-400/corpus/helium-vm-tasks-0-361199.bin" \
 VM_REPLAY_CORPUS_SHA256=6c3dc85770faeacc164b87843e28beaf65ad4bd46ed64e4942a53ac104a88609 \
 VM_REPLAY_SQL_DIFF=true \
-VM_REPLAY_RTS_CAPS=1 \
+VM_REPLAY_RTS_CAPS=2 \
 VM_REPLAY_CHUNK_SIZE=1024 \
   "$workspace/artifacts/vm-target-400/run-target.sh" \
   sql-on-genesis-0-47103 "$banked_vm_replay" plain full 0 47103

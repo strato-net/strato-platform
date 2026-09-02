@@ -370,7 +370,7 @@ addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = tr
   storageUpdates <- getMemRawStorageBlockDB
 
   when (Conf.sqlDiff $ vmConfig ethConf) $
-    yield . OutVMEvents =<< profilePhase SolidVMDiffActionConstructionSerialization (sendNewActionMessage b trrs)
+    yield . OutVMEvents =<< profilePhase SolidVMDiffActionConstructionSerialization (sendNewActionMessage b trrs storageUpdates)
 
   lift . profilePhase StorageTrieFlush $
     timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
@@ -403,13 +403,11 @@ addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = tr
     timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
   pure (trrs, directStateUpdates)
 
-sendNewActionMessage :: (MonadIO m, HasMemRawStorageDB m) =>
-                        OutputBlock -> [TxRunResult] -> m [VMEvent]
-sendNewActionMessage b trrs = do
+sendNewActionMessage :: MonadIO m =>
+                        OutputBlock -> [TxRunResult] -> Map RawStorageKey RawStorageValue -> m [VMEvent]
+sendNewActionMessage b trrs theMap = do
   let bd = obBlockData b
-  theMap <- getMemRawStorageBlockDB
-
-  let recombined :: Map Address ActionData
+      recombined :: Map Address ActionData
       recombined =
         fmap (ActionData . SolidVMDiff)
         $ M.fromListWith M.union
@@ -447,9 +445,8 @@ addTransactions blockData txs proposer =
   timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
     rewardResult <- lift . profilePhase PayBlockRewards $ payBlockRewards blockData proposer
     trrs <- Bagger.attachBlockRewards blockData rewardResult <$> lift (go (getBlockGasLimit blockData) txs DL.empty)
-    when (Conf.sqlDiff $ vmConfig ethConf) $ do
+    when (Conf.sqlDiff $ vmConfig ethConf) $
       mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
-      yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
     pure trrs
   where
     go :: (VMBase m, MonadMonitor m) =>
