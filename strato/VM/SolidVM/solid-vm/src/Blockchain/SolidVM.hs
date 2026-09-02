@@ -48,6 +48,7 @@ import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.GasInfo
 import Blockchain.SolidVM.Metrics
 import Blockchain.SolidVM.SM
+import qualified Blockchain.SolidVM.Precompile as Precompile
 import Blockchain.SolidVM.SetGet
 import Blockchain.SolidVM.TraceTools
 import SolidVM.Solidity.StaticAnalysis.Typechecker (showType)
@@ -496,7 +497,59 @@ call' from to' fnCalltype functionName valList = do
         | shouldResolve = resolveArgRefs from contract cc (CC._funcArgs theFunction) args
         | otherwise     = pure args
 
-  f <- (nullifyRefs =<<) <$> case (lookupFunction functionName', fnCalltype) of
+  -- Precompiled fast path: a native implementation registered for this exact
+  -- (code collection hash, contract, function). Declines (Nothing) whenever the
+  -- state or arguments fall outside the shape it was written for, in which case
+  -- the interpreter runs the function as usual.
+  mPre <-
+    if Precompile.precompilesEnabled
+      then case ( Precompile.lookupPrecompile hsh (contract ^. CC.contractName) functionName',
+                  lookupFunction functionName'
+                ) of
+        (Just impl, Just theFunction) -> do
+          resolvedValList <- resolveArgs shouldPushSender theFunction valList
+          -- runTheCallWithVars coerces each argument to its declared type
+          -- before binding it as a local. A precompile that reads the
+          -- uncoerced value can put a different Value constructor into an
+          -- event, and event arguments reach the receipts root.
+          let argTypes = map (CC.indexedTypeType . snd) $ CC._funcArgs theFunction
+              coercedValList
+                | any isVariadicType argTypes = resolvedValList
+                | length argTypes == length resolvedValList =
+                    zipWith (coerceType contract cc) argTypes resolvedValList
+                | otherwise = resolvedValList
+              isVariadicType SVMType.Variadic = True
+              isVariadicType _ = False
+          bool id (pushSender from) shouldPushSender $
+            withCallInfo storageAddress codeAddress contract functionName' hsh cc M.empty currentReadOnly False $
+              impl contract coercedValList
+        -- Proxy passthrough: the interpreter would reach the fallback here and
+        -- interpret `logicContract.delegatecall(msg.sig, args)`. Re-dispatch
+        -- directly instead. Only taken when the interpreter would have gone to
+        -- the fallback, i.e. no matching function and no storage getter.
+        _
+          | Nothing <- lookupFunction functionName',
+            Nothing <- M.lookup functionName (contract ^. CC.storageDefs),
+            Just slot <- Precompile.proxyPassthroughSlot hsh contract ->
+              Precompile.readProxyLogic storageAddress slot >>= \case
+                Nothing -> pure Nothing
+                Just logicAddr ->
+                  -- Two things the skipped fallback frame was doing:
+                  --   * it pushed the sender, and the nested delegatecall
+                  --     inherited it - without the push, msg.sender arrives at
+                  --     the logic contract as the proxy's caller's caller;
+                  --   * its `variadic args` parameter was spliced back into a
+                  --     positional list by argsToVals at the delegatecall site,
+                  --     so the logic contract sees valList as-is, not wrapped.
+                  fmap Just
+                    . bool id (pushSender from) shouldPushSender
+                    $ call' storageAddress logicAddr CC.DelegateCall functionName valList
+        _ -> pure Nothing
+      else pure Nothing
+
+  f <- case mPre of
+   Just preVal -> pure (pure preVal)
+   Nothing -> (nullifyRefs =<<) <$> case (lookupFunction functionName', fnCalltype) of
       -- Standard contract call
       -- (Just theFunction, _)
       (Just theFunction, CC.DefaultCall) -> do
