@@ -58,21 +58,22 @@ migrateAll = migrateAuto
 indexAll :: Migration
 indexAll = do
   let exec = lift . lift . flip rawExecute []
-  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (number);"
-  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (hash);"
-  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (parent_hash);"
-  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbase);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS block_data_ref_number_idx ON block_data_ref (number);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS block_data_ref_hash_idx ON block_data_ref (hash);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS block_data_ref_parent_hash_idx ON block_data_ref (parent_hash);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS block_data_ref_coinbase_idx ON block_data_ref (coinbase);"
 
-  exec "CREATE INDEX CONCURRENTLY ON address_state_ref (address);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS address_state_ref_address_idx ON address_state_ref (address);"
 
-  exec "CREATE INDEX CONCURRENTLY ON raw_transaction (from_address);"
-  exec "CREATE INDEX CONCURRENTLY ON raw_transaction (to_address);"
-  exec "CREATE INDEX CONCURRENTLY ON raw_transaction (block_number);"
-  exec "CREATE INDEX CONCURRENTLY ON raw_transaction (tx_hash);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS raw_transaction_from_address_idx ON raw_transaction (from_address);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS raw_transaction_to_address_idx ON raw_transaction (to_address);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS raw_transaction_block_number_idx ON raw_transaction (block_number);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS raw_transaction_tx_hash_idx ON raw_transaction (tx_hash);"
 
-  exec "CREATE INDEX CONCURRENTLY ON storage (key);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS storage_key_idx ON storage (key);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS storage_address_state_ref_id_key_idx ON storage (address_state_ref_id, key);"
 
-  exec "CREATE INDEX CONCURRENTLY ON transaction_result (transaction_hash);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS transaction_result_transaction_hash_idx ON transaction_result (transaction_hash);"
 
 -- todo newtype me
 type Difficulty = Integer

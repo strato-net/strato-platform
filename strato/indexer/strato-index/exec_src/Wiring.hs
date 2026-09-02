@@ -58,4 +58,8 @@ instance (MonadIO m, HasRedis m) => (Keccak256 `A.Alters` P2P OutputBlock) m whe
       . execRedis
       . putBlock
       . unP2P
-
+  insertMany _ =
+    void
+      . execRedis
+      . insertBlocks
+      . M.map unP2P

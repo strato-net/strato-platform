@@ -255,7 +255,29 @@ insertBlock sha b = do
 insertBlocks ::
   M.Map Keccak256 OutputBlock ->
   Redis (M.Map Keccak256 (Either Reply Status))
-insertBlocks = sequenceA . M.mapWithKey insertBlock
+insertBlocks blocks
+  | M.null blocks = pure M.empty
+  | otherwise = do
+      result <- multiExec $
+        last <$> forM (M.toList blocks) (\(sha, outputBlock) -> do
+          let header = blockHeader outputBlock
+              number' = blockHeaderBlockNumber header
+              parent = blockHeaderParentHash header
+              header' = morphBlockHeader header :: RedisHeader
+              txs = RedisTxs (morphTx <$> blockTransactions outputBlock :: [Models.RedisTx])
+              uncles = RedisUncles (morphBlockHeader <$> blockUncleHeaders outputBlock)
+              inNS' = flip inNamespace sha
+          void $ setnx (inNS' Headers) (toValue header')
+          void $ setnx (inNS' Transactions) (toValue txs)
+          void $ setnx (inNS' Uncles) (toValue uncles)
+          void $ setnx (inNS' Parent) (toValue parent)
+          void $ sadd (inNamespace Children parent) [toKey sha]
+          sadd (inNamespace Numbers number') [toKey sha])
+      let blockResult = case result of
+            TxSuccess _ -> Right Ok
+            TxAborted -> Left $ SingleLine (S8.pack "Aborted")
+            TxError err -> Left $ SingleLine (S8.pack err)
+      pure $ blockResult <$ blocks
 
 deleteBlock ::
   Keccak256 ->

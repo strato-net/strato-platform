@@ -60,7 +60,7 @@ import Blockchain.Model.WrappedBlock
 import Blockchain.PhaseProfile
 import qualified Blockchain.SolidVM as SolidVM
 import qualified SolidVM.Model.Storable as MS
-import Blockchain.Strato.Indexer.Model (IndexEvent (..))
+import Blockchain.Strato.Indexer.Model (IndexEvent (..), StateUpdates (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import SolidVM.Model.Delta
@@ -167,7 +167,7 @@ addBlocks unfiltered = do
   case (filtered, bbi) of
     ([], _) -> return ()
     (_, Unspecified) -> return ()
-    (firstBlock : _, ContextBestBlockInfo _ oldHeader _) -> do
+    (firstBlock : _, ContextBestBlockInfo _ _ _) -> do
       $logInfoS "addBlocks" $
         T.pack
           ( "Inserting " ++ show (length filtered) ++ " blocks(s) starting with "
@@ -180,12 +180,26 @@ addBlocks unfiltered = do
                 !txCount = length $ obReceiptTransactions block
             beginProfileBlock blockNo txCount
             failures <- timeit (printf "Block #%d (%d TXs insertion)" blockNo txCount) timerToUse $ do
-              failures <- lift $ addBlock block
+              (failures, directStateUpdates) <- lift $ addBlock block
               when (null failures) $ do
+                oldBestInfo <- lift . lift $ getContextBestBlockInfo
                 (didReplaceThisTime, replacedBits@(hsh, num)) <- lift . lift $ replaceBestIfBetter block
                 when didReplaceThisTime $ do
                   writeIORef didReplaceBest True
                   writeIORef replacedBest replacedBits
+                  case oldBestInfo of
+                    ContextBestBlockInfo oldBestHash oldHeader _
+                      | parentHash (obBlockData block) == oldBestHash ->
+                          forM_ directStateUpdates $ \updates ->
+                            lift . yield . OutIndexEvent $ StateUpdatesEntry updates
+                      | otherwise ->
+                          lift $
+                            timeit "calculateAndEmitStateDiffs/reorg" timerToUse $
+                              profilePhase SolidVMDiffActionConstructionSerialization $
+                                calculateAndEmitStateDiffs
+                                  (Just (stateRoot $ obBlockData block, hsh, num))
+                                  oldHeader
+                    Unspecified -> pure ()
                   -- Gather a chain of better block stateroots. The last one found should be the best block,
                   -- and the intermediate ones increase the granularity at which we can compute a sequence
                   -- of diffs. The number of blocks to skip between stateroots is determined by the cost of
@@ -208,12 +222,8 @@ addBlocks unfiltered = do
           $logDebugLS "addBlocks/srLog" srLog
           didReplaceBest' <- readIORef didReplaceBest
           when didReplaceBest' $ do
-            $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
+            $logInfoS "addBlocks" "done inserting, now will publish the new best block"
             nbb <- readIORef replacedBest
-            when (Conf.sqlDiff $ vmConfig ethConf) $
-              timeit "calculateAndEmitStateDiffs" timerToUse $
-                profilePhase SolidVMDiffActionConstructionSerialization $
-                  calculateAndEmitStateDiffs srLog oldHeader
             yield . OutIndexEvent $ NewBestBlock nbb
       when finalProfileOpen endProfileBlock
 
@@ -235,7 +245,7 @@ setParentStateRoot OutputBlock {..} = do
   -- setTitle every block is a TTY OSC write on the apply hot path; skip it.
   BSDB.getBSum (parentHash obBlockData)
 
-addBlock :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m [BlockVerificationFailure]
+addBlock :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ([BlockVerificationFailure], Maybe StateUpdates)
 addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
   let obh = outputBlockHash b
    in withCurrentBlockHash obh $ do
@@ -258,7 +268,7 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
           proposer <- either error pure $ recoverProposer bd
           pure (bSum, proposer)
 
-        trrs <- addBlockTransactions b proposer
+        (trrs, directStateUpdates) <- addBlockTransactions b proposer
 
         (postRewardSR, verifyBlockResult) <- profilePhase StateReceiptValidatorStakingVerification $ do
           postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
@@ -274,7 +284,7 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             -- These values are what the mismatch logs print and what the
             -- StateRootMismatch handler passes to stateDiff', so getting them
             -- wrong sends whoever is debugging to the wrong block.
-            pure $ map (BlockVerificationFailure (number bd) obh) failures
+            pure (map (BlockVerificationFailure (number bd) obh) failures, Nothing)
           _ -> do
             profilePhase PendingMerkleNodesLevelDBCommit $ do
               forM_ postRewardSR $ putChainStateRoot Nothing obh
@@ -294,7 +304,7 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
                 then traverse (fmap (rlpSerialize . rlpEncode) . txRunResultToReceipt) trrs
                 else pure []
             yield . OutIndexEvent $ RanBlock b receiptsBytes
-            pure []
+            pure ([], directStateUpdates)
 
 -- TODO: If we add more verifications, refactor tuple into a proper data type
 verifyBlock ::
@@ -348,7 +358,7 @@ verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
     3 | stakingActive -> catMaybes [srCheck, validatorCheck, receiptsRootCheck, stakeCheck, roundCheck]
     v -> [VersionMismatch $ BlockDelta v expectedVersion]
 
-addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> Address -> ConduitT a VmOutEvent m [TxRunResult]
+addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> Address -> ConduitT a VmOutEvent m ([TxRunResult], Maybe StateUpdates)
 addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = transactions} proposer = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
   trrs <- addTransactions bd transactions proposer
@@ -357,15 +367,41 @@ addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = tr
     lift $ runPatches bd
     flushMemStorageTxDBToBlockDB
 
+  storageUpdates <- getMemRawStorageBlockDB
+
   when (Conf.sqlDiff $ vmConfig ethConf) $
     yield . OutVMEvents =<< profilePhase SolidVMDiffActionConstructionSerialization (sendNewActionMessage b trrs)
 
   lift . profilePhase StorageTrieFlush $
     timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   profilePhase TransactionOverlayToBlockOverlay flushMemAddressStateTxToBlockDB
+
+  directStateUpdates <-
+    if Conf.sqlDiff $ vmConfig ethConf
+      then do
+        addressUpdates <- getAddressStateBlockDBMap
+        let codeHashes =
+              S.fromList
+                [ codeHash
+                | address <- concatMap trrNewAddresses trrs,
+                  Just (ASModification addressState) <- [M.lookup address addressUpdates],
+                  Just codeHash <- [codePtrHash $ addressStateCodeHash addressState]
+                ]
+        codeUpdates <-
+          fmap M.fromList . forM (S.toList codeHashes) $ \codeHash ->
+            (\codeBytes -> (codeHash, fromMaybe B.empty codeBytes)) <$> getCode codeHash
+        pure . Just $
+          StateUpdates
+            { stateUpdatesBlockNumber = blockHeaderBlockNumber bd,
+              stateUpdatesAddresses = addressUpdates,
+              stateUpdatesStorage = storageUpdates,
+              stateUpdatesCode = codeUpdates
+            }
+      else pure Nothing
+
   lift . profilePhase AddressStateTrieFlush $
     timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
-  pure trrs
+  pure (trrs, directStateUpdates)
 
 sendNewActionMessage :: (MonadIO m, HasMemRawStorageDB m) =>
                         OutputBlock -> [TxRunResult] -> m [VMEvent]

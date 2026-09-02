@@ -22,6 +22,7 @@ import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
+import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Text.Format
 
@@ -45,12 +46,18 @@ indexP2P ::
   [IndexEvent] ->
   m ()
 indexP2P idxEvents = do
+  let blocks =
+        M.fromList
+          [ (blockHash block, P2P block)
+          | RanBlock block _ <- idxEvents
+          ]
+  unless (M.null blocks) $ do
+    $logDebugS "p2pIndexer" . T.pack $
+      "Inserting " ++ show (M.size blocks) ++ " Redis blocks"
+    A.insertMany (A.Proxy @(P2P OutputBlock)) blocks
   forM_ idxEvents $ \case
-    RanBlock b _receipts -> do
-      $logInfoS "p2pIndexer" . T.pack $ "Inserting Redis block with sha: " ++ format (blockHash b)
-      A.insert (A.Proxy @(P2P OutputBlock)) (blockHash b) $ P2P b
     NewBestBlock (sha, num) -> do
-      $logInfoS "p2pIndexer" . T.pack $
+      $logDebugS "p2pIndexer" . T.pack $
         "Updating RedisBestBlock as (" ++ format sha ++ ", " ++ show num ++ ")"
       Mod.put (Mod.Proxy @(P2P BestBlock)) . P2P $ BestBlock sha num
     _ -> return ()

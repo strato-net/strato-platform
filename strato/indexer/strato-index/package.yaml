@@ -26,6 +26,7 @@ library:
   - monad-alter
   - persistent-postgresql
   - seqevents
+  - solid-vm-model
   - strato-conf
   - strato-model
   - strato-statediff
@@ -54,4 +55,3 @@ executables:
       - streaming
     other-modules:
       - Wiring
-
