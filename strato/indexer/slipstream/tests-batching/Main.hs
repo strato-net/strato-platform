@@ -6,7 +6,9 @@ import Blockchain.Slipstream.MessageConsumer (sinkSlipstreamOutputChunks, slipst
 import Blockchain.Slipstream.SQL
 import Conduit
 import Data.IORef
+import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
+import qualified BlockApps.Solidity.Value as V
 import Test.Hspec
 
 main :: IO ()
@@ -52,6 +54,22 @@ main = hspec $ do
       isRecoverableSqlState "40001" `shouldBe` False
       isRecoverableSqlState "57014" `shouldBe` False
 
+  describe "question mark escaping" $ do
+    it "escapes question marks embedded in struct JSON for Persistent" $
+      valueToSQLText'
+        True
+        ( V.ValueStruct $
+            Map.singleton
+              "description"
+              (V.SimpleValue $ V.ValueString "https://example.com/a?b=c")
+        )
+        `shouldBe` Just "{\"description\":\"https://example.com/a??b=c\"}"
+
+    it "escapes question marks embedded in array JSON for Persistent" $
+      valueToSQLText'
+        True
+        (V.ValueVariadic [V.SimpleValue $ V.ValueString "is this safe?"])
+        `shouldBe` Just "[\"is this safe??\"]"
   describe "history triggers" $ do
     it "retains baseline behavior for same-block updates" $ do
       case initialSlipstreamQueries of

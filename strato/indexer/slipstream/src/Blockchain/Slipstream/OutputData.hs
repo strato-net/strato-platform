@@ -1132,8 +1132,8 @@ solidityValueToText (SolidityValueAsString x) = escapeQuestionMarks . escapeQuot
 solidityValueToText (SolidityBool x) = tshow x
 solidityValueToText (SolidityNum x) = tshow x
 solidityValueToText (SolidityBytes x) = escapeQuestionMarks . escapeQuotes $ tshow x
-solidityValueToText (SolidityArray x) = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
-solidityValueToText x@(SolidityObject _) = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
+solidityValueToText (SolidityArray x) = escapeQuestionMarks . escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
+solidityValueToText x@(SolidityObject _) = escapeQuestionMarks . escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
 
 valueToSQLText' :: Bool -> Value -> Maybe Text
 valueToSQLText' _ (SimpleValue (ValueBool x)) = Just $ if x then "true" else "false"

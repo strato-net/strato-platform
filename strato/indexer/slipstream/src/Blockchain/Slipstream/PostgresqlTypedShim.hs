@@ -8,14 +8,20 @@ module Blockchain.Slipstream.PostgresqlTypedShim
   , PGDatabase(..)
   , PGTlsMode(..)
   , pgQuery
+  , withStatementCacheCleanup
   ) where
 
+import           Control.Monad.IO.Class (liftIO)
+import           Control.Monad.Trans.Reader (ask)
 import           Data.Int (Int64)
 import           Data.ByteString (ByteString)
 import           Data.Pool
 import           Network.Socket (HostName, ServiceName, SockAddr(..))
 import           Database.Persist.Postgresql
+import           Database.Persist.SqlBackend.Internal (connStmtMap)
+import           Database.Persist.SqlBackend.Internal.StatementCache (statementCacheClear)
 import           Data.Text.Encoding (decodeUtf8)
+import           UnliftIO (MonadUnliftIO, finally)
 
 -- libpq-backed connection
 --type PGConnection = S.Connection
@@ -44,4 +50,11 @@ data PGDatabase = PGDatabase
 
 pgQuery :: PGConnection -> ByteString -> IO Int64
 pgQuery pool q =
-  runSqlPool (rawExecuteCount (decodeUtf8 q) []) pool
+  runSqlPool
+    (withStatementCacheCleanup $ rawExecuteCount (decodeUtf8 q) [])
+    pool
+
+withStatementCacheCleanup :: MonadUnliftIO m => SqlPersistT m a -> SqlPersistT m a
+withStatementCacheCleanup action = do
+  backend <- ask
+  action `finally` liftIO (statementCacheClear $ connStmtMap backend)
