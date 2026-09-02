@@ -18,6 +18,9 @@ module Blockchain.VMContext
     MemDBs (..),
     ContextState (..),
     QueueEvent (..),
+    StateDiffTarget (..),
+    stateDiffTarget,
+    publishStateDiffTarget,
     Context (..),
     ContextBestBlockInfo (..),
     ContextM,
@@ -132,6 +135,7 @@ import SolidVM.Model.Storable
 import SolidVM.Model.Value
 import System.Directory
 import Text.Format
+import Control.Monad.Composable.Base (AccessibleEnv, accessEnv)
 import UnliftIO
 
 {-# NOINLINE knownFailedTxs #-}
@@ -231,10 +235,34 @@ data QueueEvent
   | SD StateDiff
   | Flush
 
+-- | The newest state the main thread has committed as best, handed to the
+-- statediff worker.
+--
+-- This is a TVar rather than a queue on purpose. A statediff can be taken
+-- between any two state roots, so a worker that falls behind should skip
+-- straight to the newest root rather than working through a backlog of
+-- intermediate ones. Overwrites coalesce: the main thread never blocks on a
+-- slow diff, and a diff already in flight is never invalidated or restarted -
+-- it simply picks up whatever is current when it next comes free.
+data StateDiffTarget = StateDiffTarget
+  { -- | Best root before the batch that produced this target. Only used for
+    -- the worker's very first diff, where it has no root of its own yet; from
+    -- then on the worker diffs from whatever it last finished. Carrying it
+    -- means the worker needs no startup seeding, and the first diff after a
+    -- restart spans exactly what the old inline call would have.
+    sdtBaseStateRoot :: !MP.StateRoot,
+    sdtStateRoot :: !MP.StateRoot,
+    sdtBlockHash :: !Keccak256,
+    sdtBlockNumber :: !Integer
+  }
+  deriving (Eq, Show)
+
 data Context = Context
   { _dbs :: ContextDBs,
     _state :: IORef ContextState,
     _stateDiffQueue :: (TQueue QueueEvent),
+    -- | Latest best state for the statediff worker; see 'StateDiffTarget'.
+    _stateDiffTarget :: TVar (Maybe StateDiffTarget),
     -- In-process Merkle Patricia node cache. Lookups hit here before LevelDB.
     -- Inserts stay in RAM; SR verification uses the same nodes. Persistence is
     -- durability, not the hash. Timed apply does not need a mid-run disk write.
@@ -397,6 +425,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               _selfAddress = Address 0
             }
       que <- newTQueueIO
+      sdTarget <- newTVarIO Nothing
       nodeCache <- newIORef HM.empty
       pendingNodes <- newIORef HM.empty
       pendingBlockHashRoot <- newIORef Nothing
@@ -407,6 +436,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               { _dbs = cdbs,
                 _state = cstate,
                 _stateDiffQueue = que,
+                _stateDiffTarget = sdTarget,
                 _mpNodeCache = nodeCache,
                 _mpPendingNodes = pendingNodes,
                 _mpPendingBlockHashRoot = pendingBlockHashRoot,
@@ -479,6 +509,7 @@ initContextWithOptions cacheBytes writeBufferBytes flushInterval = do
       def
         & txRunResultsCache .~ cache
   que <- newTQueueIO
+  sdTarget <- newTVarIO Nothing
   nodeCache <- newIORef HM.empty
   pendingNodes <- newIORef HM.empty
   pendingBlockHashRoot <- newIORef Nothing
@@ -489,6 +520,7 @@ initContextWithOptions cacheBytes writeBufferBytes flushInterval = do
       { _dbs = cdbs,
         _state = cstate,
         _stateDiffQueue = que,
+        _stateDiffTarget = sdTarget,
         _mpNodeCache = nodeCache,
         _mpPendingNodes = pendingNodes,
         _mpPendingBlockHashRoot = pendingBlockHashRoot,
@@ -575,6 +607,14 @@ purgeStorageMap :: HasMemStorageDB m => Address -> m ()
 purgeStorageMap address = do
   storageMap <- getMemRawStorageTxDB
   putMemRawStorageTxMap $ M.filterWithKey (const . (/= address) . fst) storageMap
+
+-- | Hand the statediff worker the newest committed state. Never blocks: an
+-- unread target is simply replaced, which is what lets the worker skip
+-- intermediate roots when it falls behind.
+publishStateDiffTarget :: (MonadIO m, AccessibleEnv Context m) => StateDiffTarget -> m ()
+publishStateDiffTarget t = do
+  ctx <- accessEnv
+  liftIO . atomically $ writeTVar (ctx ^. stateDiffTarget) (Just t)
 
 getContextBestBlockInfo :: (Functor m, Mod.Accessible ContextState m) => m ContextBestBlockInfo
 getContextBestBlockInfo = _bestBlockInfo <$> Mod.access Mod.Proxy

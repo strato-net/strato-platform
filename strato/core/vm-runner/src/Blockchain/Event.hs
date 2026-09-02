@@ -29,6 +29,7 @@ import Blockchain.Data.ExecResults
 import Blockchain.Database.MerklePatricia.NodeData (NodeData)
 import Blockchain.Data.TXOrigin
 import Blockchain.Model.WrappedBlock
+import Blockchain.VMContext (StateDiffTarget)
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Keccak256
@@ -97,6 +98,8 @@ data VmOutEvent
   | OutBlock OutputBlock
   | OutIndexEvent IndexEvent
   | OutStateDiff StateDiff
+  | -- | Newest committed state for the statediff worker to pick up.
+    OutStateDiffTarget StateDiffTarget
   | OutLog LogDB
   | OutEvent [EventDB]
   | OutASM (Map Address AddressStateModification)
@@ -112,6 +115,7 @@ data VmOutEventBatch = OutBatch
     outBlocks :: DL.DList OutputBlock,
     outIndexEvents :: DL.DList IndexEvent,
     outStateDiffs :: DL.DList StateDiff,
+    outStateDiffTargets :: DL.DList StateDiffTarget,
     outLogs :: DL.DList LogDB,
     outEvents :: DL.DList EventDB,
     outASMs :: DL.DList (Map Address AddressStateModification),
@@ -134,6 +138,7 @@ newOutBatch =
     DL.empty
     DL.empty
     DL.empty
+    DL.empty
     []
     DL.empty
     DL.empty
@@ -145,6 +150,7 @@ insertOutBatch e b = case e of
   OutBlock a -> b {outBlocks = outBlocks b `DL.snoc` a}
   OutIndexEvent a -> b {outIndexEvents = outIndexEvents b `DL.snoc` a}
   OutStateDiff a -> b {outStateDiffs = outStateDiffs b `DL.snoc` a}
+  OutStateDiffTarget a -> b {outStateDiffTargets = outStateDiffTargets b `DL.snoc` a}
   OutLog a -> b {outLogs = outLogs b `DL.snoc` a}
   OutEvent a -> b {outEvents = outEvents b `DL.append` DL.fromList a}
   OutASM a -> b {outASMs = outASMs b `DL.snoc` a}

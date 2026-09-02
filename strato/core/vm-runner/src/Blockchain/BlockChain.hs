@@ -32,8 +32,8 @@ import Blockchain.Bagger.Transactions
 import qualified Blockchain.DB.AddressStateDB as NoCache
 import qualified Blockchain.DB.BlockSummaryDB as BSDB
 import Blockchain.DB.ChainDB
-import Blockchain.DB.CodeDB
-import Blockchain.DB.HashDB
+import Blockchain.DB.CodeDB ()
+import Blockchain.DB.HashDB ()
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.ModifyStateDB
 import Blockchain.DB.RawStorageDB
@@ -68,7 +68,6 @@ import SolidVM.Model.Value (Value (SAddress))
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
-import qualified Blockchain.Strato.StateDiff as SD
 import Blockchain.Stream.Action hiding (blockHash)
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
@@ -76,6 +75,7 @@ import Blockchain.TheDAOFork
 import Blockchain.Timing
 import Blockchain.VM.SolidException (SolidException(MissingCodeCollection, RevertError))
 import Blockchain.VMContext
+import Data.Foldable (for_)
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
@@ -201,9 +201,15 @@ addBlocks unfiltered = do
           when didReplaceBest' $ do
             $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
             nbb <- readIORef replacedBest
+            -- Hand the newest committed state to the statediff worker instead
+            -- of diffing inline. The worker keeps its own notion of the last
+            -- root it diffed, so it does not need `oldHeader` - and when it is
+            -- behind, the overwrite here means it skips the intermediate roots
+            -- and takes one larger diff rather than several small ones.
             when (Conf.sqlDiff $ vmConfig ethConf) $
-              timeit "calculateAndEmitStateDiffs" timerToUse $
-                calculateAndEmitStateDiffs srLog oldHeader
+              for_ srLog $ \(next, hsh, num) ->
+                yield . OutStateDiffTarget $
+                  StateDiffTarget (MP.StateRoot $ blockHeaderStateRoot oldHeader) next hsh num
             yield . OutIndexEvent $ NewBestBlock nbb
 
 -- | Recover the proposer address from a block header's proposer seal.
@@ -893,40 +899,6 @@ replaceBestIfBetter b@OutputBlock {obBlockData = bd, obReceiptTransactions = txs
           bestNum = if shouldReplace then newNumber else oldNumber
 
       return (shouldReplace, bbi')
-
-calculateAndEmitStateDiffs ::
-  VMBase m =>
-  Maybe (MP.StateRoot, Keccak256, Integer) ->
-  BlockHeader ->
-  ConduitT a VmOutEvent m ()
-calculateAndEmitStateDiffs Nothing _ = pure ()
-calculateAndEmitStateDiffs (Just (next, hsh, num)) oldHeader =
-  let base = MP.StateRoot $ blockHeaderStateRoot oldHeader
-   in completeDiff base next hsh num
-
-completeDiff ::
-  ( MonadLogger m,
-    HasCodeDB m,
-    HasHashDB m,
-    Mod.Modifiable MemDBs m,
-    Mod.Modifiable CurrentBlockHash m,
-    HasMemAddressStateDB m,
-    (MP.StateRoot `A.Alters` MP.NodeData) m,
-    (Address `A.Alters` AddressState) m,
-    (Maybe Word256 `A.Alters` MP.StateRoot) m,
-    HasMemRawStorageDB m,
-    (RawStorageKey `A.Alters` RawStorageValue) m
-  ) =>
-  MP.StateRoot ->
-  MP.StateRoot ->
-  Keccak256 ->
-  Integer ->
-  ConduitT a VmOutEvent m ()
-completeDiff src' dst hsh num = withCurrentBlockHash hsh $ do
-  multilineLog "calculateAndEmiteStateDiffs" $ boringBox ["Calculating StateDiff from", format src', "to", format dst]
-  runConduit $
-    SD.stateDiff Nothing num hsh src' dst
-      .| mapM_C (yield . OutStateDiff)
 
 runPatches :: (MonadLogger m, HasRawStorageDB m) => BlockHeader -> m ()
 runPatches bh = case Conf.networkID (networkConfig ethConf) of

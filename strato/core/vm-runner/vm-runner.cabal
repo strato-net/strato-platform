@@ -17,6 +17,7 @@ library
   exposed-modules:
       Blockchain.BlockChain
       Blockchain.Event
+      Blockchain.StateDiffWorker
       Blockchain.TraceReplay
       Executable.EthereumVM
       Executable.EthereumVM2
@@ -60,6 +61,7 @@ library
     , solid-vm
     , solid-vm-compiler
     , solid-vm-model
+    , stm
     , strato-conf
     , strato-genesis
     , strato-index

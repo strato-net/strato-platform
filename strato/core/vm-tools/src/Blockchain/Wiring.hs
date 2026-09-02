@@ -196,7 +196,10 @@ instance MonadUnliftIO m => (MP.StateRoot `A.Alters` MP.NodeData) (ReaderT Conte
         Just nd -> pure (Just nd)
         Nothing -> do
           mnd <- MP.genericLookupDB getStateDB sr
-          liftIO $ for_ mnd $ \nd -> modifyIORef' cacheRef (HM.insert key nd)
+          -- atomic: the statediff worker reads the trie on its own thread, so
+          -- this cache now has two writers. Every entry is recoverable from
+          -- LevelDB, but a lost update here is still a race worth not having.
+          liftIO $ for_ mnd $ \nd -> atomicModifyIORef' cacheRef ((,()) . HM.insert key nd)
           pure mnd
   insert _ (MP.StateRoot key) nd = do
     cacheRef <- view mpNodeCache <$> ask
@@ -248,8 +251,8 @@ flushPendingMPNodesNow = do
       )
     cacheRef <- view mpNodeCache <$> accessEnv
     liftIO $ do
-      modifyIORef' cacheRef $ \cache ->
-        HM.union pending $ if HM.size cache > 200000 then HM.empty else cache
+      atomicModifyIORef' cacheRef $ \cache ->
+        (HM.union pending $ if HM.size cache > 200000 then HM.empty else cache, ())
       writeIORef pendingRef HM.empty
       writeIORef rootRef Nothing
     countRef <- view mpFlushCount <$> accessEnv

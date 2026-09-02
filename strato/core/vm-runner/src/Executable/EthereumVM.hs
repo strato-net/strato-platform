@@ -53,6 +53,9 @@ import Blockchain.Stream.VMEvent
 import Blockchain.SyncDB
 import Blockchain.Timing
 import Blockchain.VMContext
+import Blockchain.StateDiffWorker (stateDiffWorker)
+import Control.Lens ((^.))
+import UnliftIO.Async (link, withAsync)
 import Blockchain.VMMetrics
 import Blockchain.Wiring
 import Conduit hiding (Flush)
@@ -71,7 +74,10 @@ import Text.Format (format)
 ethereumVM :: LoggingT IO ()
 ethereumVM = runResourceT $ do
   ctx <- initContext
-  void . runStreamMConfigured "ethereum-vm" $ execContextM' ctx $ do
+  -- Statediff runs on its own thread against its own Kafka producer, so a slow
+  -- diff neither stalls block processing nor shares a flush with it. It reads
+  -- historical trie state only, which the main thread never mutates.
+  withStateDiffWorker ctx $ void . runStreamMConfigured "ethereum-vm" $ execContextM' ctx $ do
 --    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
 
     bootstrapIfFirstRun
@@ -156,6 +162,26 @@ bootstrapIfFirstRun = do
       populateStorageDBs genesisInfo genesisBlock Nothing
     Just _ -> $logInfoS "bootstrap" "Bootstrapping not needed"
 
+
+-- | Run @f@ with the statediff worker alive alongside it.
+--
+-- 'link' means a worker that dies takes the vm-runner with it rather than
+-- leaving Cirrus silently stalled; the worker itself already catches and
+-- retries per-diff failures, so this only fires on something unrecoverable.
+withStateDiffWorker ::
+  Context ->
+  ResourceT (LoggingT IO) a ->
+  ResourceT (LoggingT IO) a
+withStateDiffWorker ctx f
+  | not (Conf.sqlDiff $ vmConfig ethConf) = f
+  | otherwise =
+      withAsync worker $ \a -> link a >> f
+  where
+    worker =
+      runStreamMConfigured "ethereum-vm-statediff" . void $
+        execContextM' ctx (stateDiffWorker $ ctx ^. stateDiffTarget)
+
+
 initializeBestBlock :: (HasContext m, Mod.Accessible RedisConnection m, Bagger.MonadBagger m) => m ()
 initializeBestBlock = do
   maybeRedisBestBlockHash <- fmap (fmap bestBlockHash) (withRedisBlockDB getBestBlockInfo)
@@ -212,6 +238,11 @@ sendOutEvent :: (MonadLogger m, HasStreaming m, HasContext m) => VmOutEvent -> m
 sendOutEvent (OutVMEvents vmes) = void $ produceVMEvents vmes
 sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
 sendOutEvent (OutStateDiff diff) = void $ produceIndexEvents [StateDiffEntry diff]
+-- Hand off to the statediff worker rather than diffing here. Note the
+-- consequence: NewBestBlock and RanBlock now reach the indexer ahead of the
+-- StateDiff covering the same blocks, so Cirrus trails the block data by
+-- however long the worker is behind.
+sendOutEvent (OutStateDiffTarget t) = publishStateDiffTarget t
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)
 sendOutEvent (OutASM asm) =

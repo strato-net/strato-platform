@@ -15,6 +15,7 @@ library:
   exposed-modules:
     - Blockchain.BlockChain
     - Blockchain.Event
+    - Blockchain.StateDiffWorker
     - Blockchain.TraceReplay
     - Executable.EthereumVM
     - Executable.EthereumVM2
@@ -54,6 +55,7 @@ library:
   - strato-model
   - strato-redis-blockdb
   - strato-statediff
+  - stm
   - text
   - time
   - transformers
