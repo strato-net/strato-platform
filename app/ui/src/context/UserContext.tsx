@@ -1,7 +1,7 @@
 "use client";
 
 // context/UserContext.tsx
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useWalletClient } from "wagmi";
 import { api, setAppAuthenticated, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
@@ -313,7 +313,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const userAddress = isLoggedIn ? stratoAddressHex : externalWalletAddress ?? stratoAddressHex;
   const effectiveLoggedIn = isLoggedIn || shouldUseExternalWallet;
 
-  useEffect(() => {
+  // Layout effect, not a passive one: React runs children's passive effects
+  // before the parent's, so a consumer (e.g. the dashboard's member-benefit
+  // hook) that fires a request in the same commit that the wallet connects
+  // would otherwise go out without X-Wallet-Address. For guest wallets that
+  // silently drops the my_activity filter and returns everyone's history.
+  useLayoutEffect(() => {
     setConnectedWalletAddress(externalWalletAddress);
   }, [externalWalletAddress]);
 
@@ -346,7 +351,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     externalEvmConnectedRef.current = isExternalEvmWalletConnected;
   }, [isExternalEvmWalletConnected]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setAppAuthenticated(isLoggedIn);
   }, [isLoggedIn]);
 

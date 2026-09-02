@@ -4,6 +4,8 @@ import { capture } from '@/lib/analytics';
 import {
   fetchActionCompletion,
   fetchHasAnyActivity,
+  hasSeenPopup,
+  markPopupSeen,
   selectPopup,
   type MemberBenefitPopup,
 } from '@/lib/memberBenefits';
@@ -28,7 +30,8 @@ function forcedPopup(): MemberBenefitPopup | null {
 /**
  * Drives the returning-user member-benefit dialog on the dashboard. Fetches
  * the user's on-chain action history (via lib/memberBenefits -> Cirrus) and
- * picks at most one popup per session.
+ * shows the popup once per progress state: closing it or acting on it marks
+ * it seen, and it only comes back after the user completes another action.
  */
 export function useMemberBenefitPopup(): {
   popup: MemberBenefitPopup | null;
@@ -54,6 +57,7 @@ export function useMemberBenefitPopup(): {
       if (!selected) {
         const completion = await fetchActionCompletion(userAddress);
         if (cancelled) return;
+        if (hasSeenPopup(userAddress, completion)) return;
         // The "returning user at all?" probe is only needed to tell a fresh
         // account (no popup) from an active one at 0 of 4 milestone actions.
         const noneDone = Object.values(completion).every((done) => !done);
@@ -85,16 +89,18 @@ export function useMemberBenefitPopup(): {
   const dismiss = useCallback(() => {
     setOpen(false);
     if (popup) {
+      if (userAddress) markPopupSeen(userAddress, popup.completion);
       capture('benefit_popup_dismissed', { popup: popup.kind });
     }
-  }, [popup]);
+  }, [popup, userAddress]);
 
   const acknowledgeCta = useCallback(() => {
     setOpen(false);
     if (popup) {
+      if (userAddress) markPopupSeen(userAddress, popup.completion);
       capture('benefit_popup_cta_clicked', { popup: popup.kind });
     }
-  }, [popup]);
+  }, [popup, userAddress]);
 
   return { popup, open, dismiss, acknowledgeCta };
 }
