@@ -55,6 +55,7 @@ library
     , ordered-containers
     , persistent
     , persistent-postgresql
+    , postgresql-simple
     , prometheus-client
     , resource-pool
     , scientific
@@ -96,6 +97,24 @@ executable slipstream
     , unliftio
     , wai-middleware-prometheus
     , warp
+  default-language: Haskell2010
+
+test-suite slipstream-batching-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Paths_slipstream
+  hs-source-dirs:
+      tests-batching/
+  ghc-options: -Wall -Werror -rtsopts
+  build-depends:
+      base
+    , bytestring
+    , common-log
+    , conduit
+    , hspec
+    , slipstream
+    , text
   default-language: Haskell2010
 
 test-suite slipstream-test
