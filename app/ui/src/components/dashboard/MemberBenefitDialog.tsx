@@ -34,8 +34,10 @@ const HexToken = ({ className, size }: { className: string; size: number }) => (
 
 /**
  * Returning-user milestone popup ("One More Move Unlocks 500 Points", mock
- * slide 3). Shown on the dashboard when the user has completed some but not
- * all of the milestone actions — see lib/memberBenefits for the selection.
+ * slide 3). Shown on the dashboard to returning users who have not completed
+ * all four milestone actions (0–3 of 4) — see lib/memberBenefits for the
+ * selection. The reward is for the *next* action, so the UI must never read
+ * as "complete all four".
  */
 const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDialogProps) => {
   const navigate = useNavigate();
@@ -43,8 +45,6 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
   const logo = resolvedTheme === "dark" ? STRATOLOGODARK : STRATOLOGO;
 
   if (!popup) return null;
-
-  const totalActions = MILESTONE_ACTIONS.length;
 
   const goTo = (route: string) => {
     onCta();
@@ -99,15 +99,19 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
 
               {/* Next-move picker. The milestone completes on the *next* eligible
                   action, so this is a list of choices, not a 0–100% progress bar
-                  (which read as "2 more to go" and contradicted the headline). */}
+                  (which read as "2 more to go" and contradicted the headline).
+                  Likewise no "0 of 4 done" counter: it implied all four were
+                  required. Already-done actions are marked inline instead. */}
               <div className="mt-7 rounded-xl border border-border bg-card p-5">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-strato-blue dark:text-foreground">
                     Pick any one to unlock your bonus
                   </span>
-                  <span className="text-sm font-semibold text-muted-foreground">
-                    {popup.completedCount} of {totalActions} done
-                  </span>
+                  {popup.completedCount > 0 && (
+                    <span className="text-sm font-semibold text-muted-foreground">
+                      {popup.completedCount} already done
+                    </span>
+                  )}
                 </div>
                 <ul className="mt-4 grid gap-2 sm:grid-cols-2">
                   {MILESTONE_ACTIONS.map((a) => {
