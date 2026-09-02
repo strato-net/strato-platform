@@ -468,3 +468,90 @@ VM_REPLAY_BUILD_TOOLCHAIN="stack ghc-9.8.4 rust arkworks-0.5" \
   "$workspace/artifacts/vm-target-400/bank-vm-replay.sh" \
   "$bank_label" "$install_root/bin/vm-replay"
 ```
+
+## Integrated VM, Kafka, Redis, and PostgreSQL checkpoint
+
+The isolated VM acceptance run does not include the normal node's SQL and
+Redis consumers. A fresh-node integrated run showed that the VM could sustain
+about 124-126 processed blocks per second through 50,000 blocks while the
+indexer accumulated more than 14,000 Kafka messages of lag. Redis batching
+reduced logging and transaction overhead but did not remove that backlog.
+
+The dominant growth-sensitive SQL path was direct storage indexing. For every
+set of touched contracts, it selected and decoded every existing storage row
+for those contracts before replacing only the touched keys. The `storage`
+table had no index beginning with `address_state_ref_id`; one measured contract
+already had 11,826 storage rows. On the copied benchmark database, the old
+lookup scanned 83,005 rows and returned 11,826 in 4.095 ms. The exact
+`(address_state_ref_id, key)` lookup used the new composite index and completed
+in 0.167 ms.
+
+The indexer now deletes only the exact touched composite keys, bulk-inserts
+their replacement values, bounds large batches below PostgreSQL's parameter
+limit, and creates its indexes idempotently. The VM emits its already
+materialized write set only after a block becomes the direct canonical child;
+nonlinear best-block replacement retains the original trie-diff fallback.
+Block SQL and Redis writes are also batched by Kafka input batch.
+
+| Fresh genesis run | Elapsed | VM processed | Processed blk/s | Final indexer lag | SQL state height | Audit |
+|---|---:|---:|---:|---:|---:|---|
+| Canonical direct state, prior Redis path | 405 s | 50,226 | 124.01 | 15,659 | 47,021 | exact |
+| Batched Redis block writes | 400 s | 50,366 | 125.92 | 14,609 | 47,904 | exact |
+| Exact indexed storage writes | 412 s | 51,828 | 125.80 | 2 | 51,693 | exact |
+
+The final row reduced terminal indexer lag by 99.986% relative to the Redis
+batch candidate while leaving VM throughput essentially unchanged. These are
+live-testnet input runs, so the VM-rate columns include startup and differing
+network arrival bursts; the meaningful SQL result is that the indexer reached
+the cutoff with only two messages of lag. Its stopped-state audit matched SQL
+exactly at block 51,693: 6,191 accounts, 49,847 storage entries, zero orphaned
+storage rows, and zero duplicate storage keys.
+
+The locally committed do-not-merge source checkpoint is
+`6cf91abca1ac65ffd69021538692ef4dc91e3918`, tree
+`9a951a6634eb8592f0e60681e9b03e65e20bcfb7`. The measured candidate already
+contained the exact-key algorithm and composite index; the commit additionally
+bounds unusually large batches and makes all index creation idempotent. Both
+executables compiled after those mechanical hardening changes, but the longer
+committed-binary run is recorded separately rather than being inferred from
+the dirty-candidate measurement. The committed provenance-banked binaries are:
+
+- `vm-runner`: `bf93173a2e7be92c4cfa31f47cf6af6badffa5d70bb00254f31c01112f0589b7`
+- `strato-indexer`: `160a0141b35e23c8b214769724782d4051c6c7f9efb1b0d59668112b29e10ff2`
+
+### Reproduce the integrated run
+
+Use a new node and bootstrap directory for every run. The wrapper refuses to
+reuse an existing node directory and records binary hashes, source provenance,
+Kafka lag, component memory, SQL counts, and the exact launch command. Stop a
+completed node only with `strato-down` before running the offline VM audit.
+
+```bash
+workspace=/Users/kierenjameslubin/software/clean-clone-ii
+artifacts="$workspace/artifacts/helium-direct-state-updates-20260902"
+bin="$artifacts/bin-integrated-sql-6cf91ab"
+node="$artifacts/node-integrated-sql-6cf91ab-0-50000-01"
+bootstrap="$artifacts/bootstrap-integrated-sql-6cf91ab-0-50000-01"
+
+caffeinate -dimsu env \
+  HELIUM_SYNC_VM_BINARY="$bin/vm-runner" \
+  HELIUM_SYNC_INDEX_BINARY="$bin/strato-indexer" \
+  HELIUM_SYNC_NODE_DIR="$node" \
+  HELIUM_SYNC_BOOTSTRAP_DIR="$bootstrap" \
+  HELIUM_SYNC_STOP_VM_PROCESSED=50000 \
+  HELIUM_SYNC_SQL_DIFF=true \
+  HELIUM_SYNC_MIN_LOG_LEVEL=LevelError \
+  HELIUM_SYNC_AB_VARIANT=integrated-canonical-state-sql \
+  HELIUM_SYNC_OPTIMIZED_CODE_SHA=9a951a6634eb8592f0e60681e9b03e65e20bcfb7 \
+  HELIUM_SYNC_EXPECTED_VM_SHA=bf93173a2e7be92c4cfa31f47cf6af6badffa5d70bb00254f31c01112f0589b7 \
+  HELIUM_SYNC_EXPECTED_INDEX_SHA=160a0141b35e23c8b214769724782d4051c6c7f9efb1b0d59668112b29e10ff2 \
+  HELIUM_SYNC_VERSION=18.4-helium-integrated-sql-6cf91ab \
+  "$workspace/artifacts/helium-full-sync-20260902/run-helium-full-sync-optimized.sh"
+
+"$workspace/strato-platform-helium-rerun/bin/strato-down" "$node"
+```
+
+The exact 50,000-block receipts are under
+`artifacts/helium-direct-state-updates-20260902/node-storage-exact-index-levelerror-0-50000-02/sync-timing`.
+This checkpoint qualifies the integrated short gate; a fresh longer
+genesis-to-tip sync remains the final live-node acceptance run.
