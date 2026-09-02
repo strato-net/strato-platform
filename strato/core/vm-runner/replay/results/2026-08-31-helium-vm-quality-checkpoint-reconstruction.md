@@ -844,7 +844,7 @@ indexing, Slipstream, and Cirrus have all caught up.
 | Network | Measured source | VM at end-to-end catch-up | VM catch-up | End-to-end catch-up | Terminal gate |
 |---|---|---:|---:|---:|---|
 | Helium testnet, earlier | VM/index `6cf91abca1`; Slipstream restored through `cf461ce2388` | 492,340 | 66.85 blk/s at 7,360 s | 58.10 blk/s at 8,474 s | Primary and Slipstream lag 0; exact VM/SQL root audit at 492,358 |
-| Helium testnet, production-binary rerun | Production VM/index from `739ee9a042`; repaired Slipstream `52ad8f7704` | 496,510 | 72.49 blk/s at 6,848 s | 54.00 blk/s at 9,195 s | All component heights 496,510; primary and Slipstream lag 0; SQL integrity/digests captured at 496,518 |
+| Helium testnet, production-binary rerun | Production VM/index from `739ee9a042`; repaired Slipstream `52ad8f7704` | 496,510 | 72.49 wall-clock / 86.77 host-active blk/s at 6,848 / 5,721 s | 54.00 wall-clock / 61.54 host-active blk/s at 9,195 / 8,068 s | All component heights 496,510; primary and Slipstream lag 0; SQL integrity/digests captured at 496,518 |
 | STRATO production (`upquark`) | `739ee9a042` checkout; optimized code through `c085f13f63` | 188,044 | 120.77 blk/s at 1,557 s | 81.90 blk/s at 2,296 s | Primary and Slipstream lag 0; all observed component heights 188,044 |
 
 The production VM crossed the run's initial live tip at block 188,039. The
@@ -859,21 +859,34 @@ not a like-for-like VM comparison. At almost the same corpus height, the new
 Helium run sampled VM block 187,614 at 1,565 seconds, or 119.88 blk/s from
 launch. Production sampled block 188,039 at 1,557 seconds, or 120.77 blk/s.
 That is only a 0.74% difference with the production VM/index executables held
-constant. The lower complete-Helium VM average comes from the later, heavier
-corpus: canonical VM height remained 317,472 for 1,191 seconds while the VM
-slowly processed approximately 2,324 tasks, after which an expected out-of-gas
-burst appeared and normal 120-150 blk/s active intervals resumed.
+constant. This comparison occurs before the host sleep described below and is
+therefore unaffected by that correction.
 
-Across the whole Helium corpus, the production-binary rerun improved VM
-catch-up from 66.85 to 72.49 blk/s (+8.43%) versus the earlier Helium run. It
-was slower end to end, 54.00 versus 58.10 blk/s (-7.06%), because the
-Slipstream/Cirrus drain took 2,347 seconds after VM catch-up rather than 1,114
-seconds. At VM catch-up the primary indexer was already at zero lag, but
-Slipstream still had 349,606 vmevents queued and Cirrus was at block 328,360.
-The post-completion SQL capture contained 594,047 raw transactions, implying
-approximately 64.60 end-to-end tx/s. This separates the remaining Cirrus SQL
-cost from VM execution rather than attributing the entire full-node gap to the
-VM.
+The raw full-run clock includes a confirmed lid-closed interval and must not be
+interpreted as continuous VM work. macOS `pmset` records clamshell sleep at
+2026-09-02 21:06:36Z, exactly after the sample at VM block 317,472, and full
+wake at 21:25:45Z. Four intervening sleep intervals total 1,127 seconds; the
+remaining 22 seconds were brief dark wakes. The sampler consequently has gaps
+of 122 and 1,049 seconds. `caffeinate` still held its sleep assertions, but it
+does not override clamshell sleep.
+
+Subtracting only those operating-system-confirmed sleep seconds changes VM
+catch-up from 6,848 to 5,721 host-active seconds, or from 72.49 wall-clock to
+86.77 host-active blk/s. End-to-end time changes from 9,195 to 8,068 seconds,
+or from 54.00 to 61.54 blk/s. The nearby post-completion SQL capture contained
+594,047 raw transactions, implying approximately 73.63 host-active tx/s rather
+than the uncorrected 64.60 wall-clock tx/s. The corresponding 310,000-319,999
+height window is 58.25 active blk/s, not the misleading 7.70 wall-clock blk/s.
+
+The Slipstream/Cirrus drain still took 2,347 seconds after VM catch-up; that
+entire interval occurred after full wake. At VM catch-up the primary indexer
+was already at zero lag, but Slipstream still had 349,606 vmevents queued and
+Cirrus was at block 328,360. This separates the remaining Cirrus SQL cost from
+VM execution. There is also a real post-320,000 slowdown: most 10,000-block
+host-active VM windows are 54-81 blk/s versus approximately 90-230 blk/s over
+much of the earlier corpus. The integrated run shows simultaneous VM,
+PostgreSQL, and Kafka load, but it does not by itself separate heavier block
+content, growing state, and shared-host contention.
 
 Production's 120.77 VM blk/s and 81.90 end-to-end blk/s are still higher than
 the complete Helium averages, but those complete-corpus figures are not a
@@ -918,6 +931,8 @@ The exact current receipts are under:
 
 - `artifacts/helium-current-full-sync-20260902/node-helium-prod-binaries-739ee9a-slipfix-52ad8f7-sqlon-02/sync-timing`
 - `artifacts/helium-current-full-sync-20260902/bin-helium-prod-vm-index-slipfix-52ad8f7/metadata.txt`
+- `artifacts/helium-current-full-sync-20260902/host-sleep-intervals.csv`
+- `artifacts/helium-current-full-sync-20260902/helium-full-sync-vm-blks-by-height-20260902.csv`
 
 The immutable executable hashes are VM
 `977febc64299b8b12658abd9b8036096e0d9a542f95d2efde3938befe296bde8`,
