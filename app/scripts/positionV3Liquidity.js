@@ -3,7 +3,8 @@
   Purpose: Reposition corporate laddered liquidity in a V3 (concentrated-liquidity) pool.
            Exits every position the corporate account holds in the pool (principal + fees),
            then re-mints an N-layer ladder of ranges centered on the oracle price (or --price),
-           distributing the given per-token budgets across the layers by weight.
+           distributing the per-token budgets across the layers by weight. Budgets come from
+           --amount flags, or default to whatever the exited positions recover.
 
   Dry-run by default: prints the current positions, the drift vs the new center, and the
   exact per-layer deposits the mint would pull. Re-run with --execute to submit.
@@ -28,7 +29,9 @@
        submits via /rpc/submit, then polls /rpc/results until confirmed.
 
   Usage:
-    node positionV3Liquidity.js --pool <address> --amount SYMBOL=AMOUNT [--amount SYMBOL=AMOUNT]
+    node positionV3Liquidity.js --pool <address>
+      [--amount SYMBOL=AMOUNT ...]    per-token budgets; default: reinvest whatever the
+                                      exited positions recover (principal + fees)
       [--price <token1-per-token0>]   center price; default: pool's oracle price
       [--widths 1,3,7,15,35]          layer half-widths, in percent around the center
       [--weights 10,15,20,25,30]      budget share per layer, in percent (sums to 100)
@@ -63,7 +66,7 @@ const MAX_TICK = 887272;
 const usageAndExit = (msg) => {
   if (msg) console.error(`Error: ${msg}\n`);
   console.error(
-    "Usage: node positionV3Liquidity.js --pool <address> --amount SYM=AMT [--amount SYM=AMT]\n" +
+    "Usage: node positionV3Liquidity.js --pool <address> [--amount SYM=AMT ...]\n" +
       "         [--price N] [--widths 1,3,7,15,35] [--weights 10,15,20,25,30]\n" +
       "         [--slippage 1] [--keep-existing] [--auth keycloak|wallet] [--execute]"
   );
@@ -99,7 +102,8 @@ const parseArgs = (argv) => {
     else usageAndExit(`unknown flag ${a}`);
   }
   if (!args.pool) usageAndExit("--pool is required");
-  if (args.amounts.length === 0) usageAndExit("at least one --amount SYM=AMT is required");
+  if (args.keepExisting && args.amounts.length === 0)
+    usageAndExit("--keep-existing skips the exit, so there is nothing to reinvest — pass --amount");
   if (args.widths.length !== args.weights.length)
     usageAndExit("--widths and --weights must have the same number of layers");
   if (args.widths.some((w) => !(w > 0 && w < 100)) )
@@ -317,8 +321,30 @@ const fmtPrice = (n) => fmt(n, Number(n) >= 1000 ? 2 : Number(n) >= 1 ? 4 : 8);
   if (pool.isDisabled) throw new Error(`pool ${pair} is disabled — minting would fail; aborting before exiting anything`);
   if (pool.isPaused) throw new Error(`pool ${pair} is paused — minting would fail; aborting before exiting anything`);
 
-  // ---- budgets (symbol- or address-keyed, mapped onto the pool's token0/token1) ----
+  // ---- existing positions (fetched early — they fund the ladder when --amount is omitted) ----
+  const positions = await api
+    .get("/poolv3/positions", { params: { poolAddress: args.pool } })
+    .then((r) => r.data, (e) => apiError(e, "fetch positions"));
+  const live = positions.filter(
+    (p) =>
+      BigInt(p.liquidity) > 0n ||
+      BigInt(p.tokensOwed0) + BigInt(p.pendingFees0) > 0n ||
+      BigInt(p.tokensOwed1) + BigInt(p.pendingFees1) > 0n
+  );
+  let exit0 = 0n, exit1 = 0n;
+  for (const p of live) {
+    exit0 += BigInt(p.amount0) + BigInt(p.tokensOwed0) + BigInt(p.pendingFees0);
+    exit1 += BigInt(p.amount1) + BigInt(p.tokensOwed1) + BigInt(p.pendingFees1);
+  }
+
+  // ---- budgets: --amount flags (symbol- or address-keyed), else reinvest the exit ----
   const budgets = { 0: 0n, 1: 0n };
+  const reinvesting = args.amounts.length === 0;
+  if (reinvesting) {
+    if (live.length === 0) usageAndExit("no positions to exit in this pool — pass --amount to seed a ladder");
+    budgets[0] = exit0;
+    budgets[1] = exit1;
+  }
   for (const spec of args.amounts) {
     const [sym, amt] = spec.split("=");
     if (!sym || amt === undefined) usageAndExit(`--amount must be SYMBOL=AMOUNT (got "${spec}")`);
@@ -351,20 +377,11 @@ const fmtPrice = (n) => fmt(n, Number(n) >= 1000 ? 2 : Number(n) >= 1 ? 4 : 8);
   console.log(`Center used:  ${fmt(center, 6)} ${args.price !== undefined ? "(--price)" : "(oracle)"}  — pool spot is ${fmt(driftPct, 2)}% off center`);
   if (Math.abs(driftPct) > 5)
     console.warn(`⚠ pool spot deviates >5% from the chosen center — ranges near the center will mint single-sided until arbitrage converges`);
-  console.log(`Budgets:      ${fromWei(budgets[0], token0.decimals)} ${token0.symbol} + ${fromWei(budgets[1], token1.decimals)} ${token1.symbol}`);
-
-  // ---- existing positions ----
-  const positions = await api
-    .get("/poolv3/positions", { params: { poolAddress: args.pool } })
-    .then((r) => r.data, (e) => apiError(e, "fetch positions"));
-  const live = positions.filter(
-    (p) =>
-      BigInt(p.liquidity) > 0n ||
-      BigInt(p.tokensOwed0) + BigInt(p.pendingFees0) > 0n ||
-      BigInt(p.tokensOwed1) + BigInt(p.pendingFees1) > 0n
+  console.log(
+    `Budgets:      ${fromWei(budgets[0], token0.decimals)} ${token0.symbol} + ${fromWei(budgets[1], token1.decimals)} ${token1.symbol} ` +
+      (reinvesting ? "(reinvesting exited principal + fees)" : "(--amount)")
   );
 
-  let exit0 = 0n, exit1 = 0n;
   console.log(`\n--- Existing positions (${live.length}) ${args.keepExisting ? "— kept (--keep-existing)" : "— will be exited"} ---`);
   if (live.length > 0) {
     printTable(
@@ -372,8 +389,6 @@ const fmtPrice = (n) => fmt(n, Number(n) >= 1000 ? 2 : Number(n) >= 1 ? 4 : 8);
       live.map((p, i) => {
         const fees0 = BigInt(p.tokensOwed0) + BigInt(p.pendingFees0);
         const fees1 = BigInt(p.tokensOwed1) + BigInt(p.pendingFees1);
-        exit0 += BigInt(p.amount0) + fees0;
-        exit1 += BigInt(p.amount1) + fees1;
         return [
           i + 1,
           p.kind || "nft",
