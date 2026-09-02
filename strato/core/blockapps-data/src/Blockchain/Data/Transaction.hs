@@ -18,6 +18,7 @@ module Blockchain.Data.Transaction
     insertTX',
     insertTXIfNew,
     insertTXIfNew',
+    insertTXsIfNew',
     isContractCreationTX,
     whoSignedThisTransaction,
     transactionHash,
@@ -200,6 +201,18 @@ insertTXIfNew' ::
   [Transaction] ->
   ReaderT SQL.SqlBackend m ()
 insertTXIfNew' origin blockNum time = insertTX' Fail origin blockNum time
+
+insertTXsIfNew' ::
+  MonadUnliftIO m =>
+  [(TXOrigin, Maybe Integer, UTCTime, [Transaction])] ->
+  ReaderT SQL.SqlBackend m ()
+insertTXsIfNew' groups =
+  insertRawTX' Fail $
+    concat
+      [ [txAndTime2RawTX origin tx blockNum' time | tx <- txs]
+      | (origin, blockNum, time, txs) <- groups,
+        let blockNum' = fromMaybe (-1) blockNum
+      ]
 
 insertTX' ::
   MonadUnliftIO m =>

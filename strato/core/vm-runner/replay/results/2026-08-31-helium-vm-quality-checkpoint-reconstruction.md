@@ -699,3 +699,82 @@ The authoritative receipts are in
 They include the continuation samples, final barometer and Kafka offsets, SQL
 digests, PostgreSQL relation statistics, Slipstream phase metrics, error
 summary, and the exact block-492,358 VM audit.
+
+## Fixed-corpus SQL-on restoration
+
+The quality-checkpoint branch was retested on 2026-09-02 against the fixed
+Helium corpus after restoring SQL output. Two additional bottlenecks were
+removed:
+
+- Nonlinear best-block replacement now converts its authoritative trie diff
+  to the same compact `StateUpdates` representation used by the canonical
+  path. `sqlDiff=false` retains the legacy `StateDiff` output.
+- Raw transactions are deduplicated and inserted in bounded SQL batches for
+  the complete consumed block batch instead of one `insertBy` round trip per
+  transaction.
+
+The trustworthy VM gate starts from genesis. Partial-range replays are not
+used for acceptance because their first selected block includes a synthetic
+genesis-to-height diff.
+
+| Gate | Blocks | Transactions | Elapsed | blk/s | tx/s | Result |
+|---|---:|---:|---:|---:|---:|---|
+| VM and Kafka, `sqlDiff=true` | 47,104 | 61,900 | 220.226 s | 213.89 | 281.0749 | exact root audit |
+| PostgreSQL indexer before transaction batching | 47,104 | 61,900 | 251.557 s | 187.25 | 246.0675 | lag 0, integrity checks pass |
+| PostgreSQL indexer after transaction batching | 47,104 | 61,900 | 93.229 s | 505.25 | 663.9565 | lag 0, integrity checks pass |
+
+The indexer elapsed intervals run from process start through the timestamp of
+the final consumed batch. `/usr/bin/time` is not used for this comparison
+because the daemon intentionally remained alive until the external lag poll
+observed zero. The optimized database contained blocks 0-47,103, 61,900
+distinct raw transactions and block-transaction rows, 5,187 distinct address
+states, 25,547 distinct storage keys, and no orphaned storage or block-
+transaction rows.
+
+The compact reorg representation also removed the pathological replay cost at
+the first large fork. Chunk 46,080-47,103 improved from 1.02 blk/s (1,004.226
+s) to 197.41 blk/s (5.187 s), while the full genesis gate remained above the
+200 blk/s soft target.
+
+The fixed-corpus VM receipt is
+`artifacts/vm-target-400/results/sqldiff-quality-compact-reorg-genesis-0-47103-01.result.txt`.
+The isolated indexer logs are
+`/private/tmp/strato-indexer-compact-audit/indexer.stdout` and
+`indexer-batched.stdout`; these are diagnostic machine-local artifacts, not
+repository fixtures.
+
+### Reproduce the fixed-corpus gate
+
+Build both executables with the native BN254 backend, bank `vm-replay` with
+the repository provenance wrapper, and run from the protected genesis
+checkpoint with SQL output enabled:
+
+```bash
+workspace=/Users/kierenjameslubin/software/clean-clone-ii
+repo="$workspace/strato-platform-vm-quality-checkpoint"
+cd "$repo"
+
+stack --stack-yaml strato/stack.yaml build \
+  vm-runner:exe:vm-replay strato-index:exe:strato-indexer \
+  --flag solid-vm:native-bn254
+
+vm_replay="$(stack --stack-yaml strato/stack.yaml path --local-install-root)/bin/vm-replay"
+"$workspace/artifacts/vm-target-400/bank-vm-replay.sh" \
+  sql-on-candidate "$vm_replay"
+banked_vm_replay="$workspace/artifacts/vm-target-400/binary-bank/vm-replay-sql-on-candidate-bin/vm-replay"
+
+VM_REPLAY_BASELINE="$workspace/artifacts/vm-target-400/checkpoints/genesis-cfgfallback137-v2-helium-361199" \
+VM_REPLAY_BASELINE_BLOCK=-1 \
+VM_REPLAY_CORPUS="$workspace/artifacts/vm-target-400/corpus/helium-vm-tasks-0-361199.bin" \
+VM_REPLAY_CORPUS_SHA256=6c3dc85770faeacc164b87843e28beaf65ad4bd46ed64e4942a53ac104a88609 \
+VM_REPLAY_SQL_DIFF=true \
+VM_REPLAY_RTS_CAPS=1 \
+VM_REPLAY_CHUNK_SIZE=1024 \
+  "$workspace/artifacts/vm-target-400/run-target.sh" \
+  sql-on-genesis-0-47103 "$banked_vm_replay" plain full 0 47103
+```
+
+For the SQL consumer comparison, retain that run's `indexevents` topic, reset
+only the isolated `eth` database and `strato-indexer` consumer offset, seed the
+isolated Redis database from block 0, and run the corresponding
+`strato-indexer` from a directory containing the benchmark `.ethereumH`.

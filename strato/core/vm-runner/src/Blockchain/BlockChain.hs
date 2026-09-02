@@ -1000,9 +1000,67 @@ completeDiff ::
   ConduitT a VmOutEvent m ()
 completeDiff src' dst hsh num = withCurrentBlockHash hsh $ do
   multilineLog "calculateAndEmiteStateDiffs" $ boringBox ["Calculating StateDiff from", format src', "to", format dst]
-  runConduit $
-    SD.stateDiff Nothing num hsh src' dst
-      .| mapM_C (yield . OutStateDiff)
+  if Conf.sqlDiff $ vmConfig ethConf
+    then
+      runConduit $
+        SD.stateDiff Nothing num hsh src' dst
+          .| mapM_C (stateDiffToStateUpdates >=> yield . OutIndexEvent . StateUpdatesEntry)
+    else
+      runConduit $
+        SD.stateDiff Nothing num hsh src' dst
+          .| mapM_C (yield . OutStateDiff)
+
+stateDiffToStateUpdates :: (Address `A.Alters` AddressState) m => SD.StateDiff -> m StateUpdates
+stateDiffToStateUpdates diff = do
+  modifiedAddresses <-
+    fmap M.fromList . forM (S.toList addressesToLoad) $ \address -> do
+      addressState <-
+        A.lookup (A.Proxy @AddressState) address >>= \case
+          Just value -> pure value
+          Nothing -> error $ "stateDiffToStateUpdates: destination state is missing address " ++ show address
+      pure (address, ASModification addressState)
+  pure $
+    StateUpdates
+      { stateUpdatesBlockNumber = SD.blockNumber diff,
+        stateUpdatesAddresses = M.union modifiedAddresses deletedAddresses,
+        stateUpdatesStorage = M.fromList $ createdStorage ++ updatedStorage,
+        stateUpdatesCode = M.fromList createdCode
+      }
+  where
+    created = SD.createdAccounts diff
+    deleted = SD.deletedAccounts diff
+    updated = SD.updatedAccounts diff
+    addressesToLoad = M.keysSet created `S.union` M.keysSet updated
+    deletedAddresses = ASDeleted <$ deleted
+
+    createdStorage =
+      [ ((address, path), value)
+      | (address, accountDiff) <- M.toList created,
+        (path, value) <- eventualStorageValues $ SD.storage accountDiff
+      ]
+    updatedStorage =
+      [ ((address, path), value)
+      | (address, accountDiff) <- M.toList updated,
+        (path, value) <- incrementalStorageValues $ SD.storage accountDiff
+      ]
+    createdCode =
+      [ (codeHash, codeBytes)
+      | accountDiff <- M.elems created,
+        Just codeHash <- [codePtrHash $ SD.codeHash accountDiff],
+        Just (SD.Value codeBytes) <- [SD.code accountDiff]
+      ]
+
+    eventualStorageValues (SD.EVMDiff _) = []
+    eventualStorageValues (SD.SolidVMDiff values) =
+      [(path, value) | (path, SD.Value value) <- M.toList values]
+
+    incrementalStorageValues (SD.EVMDiff _) = []
+    incrementalStorageValues (SD.SolidVMDiff values) =
+      [(path, incrementalValue value) | (path, value) <- M.toList values]
+
+    incrementalValue (SD.Create value) = value
+    incrementalValue (SD.Delete _) = MS.BDefault
+    incrementalValue (SD.Update _ value) = value
 
 runPatches :: (MonadLogger m, HasRawStorageDB m) => BlockHeader -> m ()
 runPatches bh = case Conf.networkID (networkConfig ethConf) of
