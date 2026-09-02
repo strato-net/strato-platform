@@ -623,6 +623,16 @@ target. Removing history semantics or its keys is not an acceptable shortcut;
 any further candidate needs fixed-input baseline/candidate table hashes and a
 fresh full-node zero-lag confirmation.
 
+Two obvious index-only candidates were tested and rejected on the isolated
+6.8-GB Cirrus snapshot. Partial indexes containing only the active
+`valid_to = 'infinity'` history rows were small (38 MB for mapping and 480 kB
+for storage), but warm 2,000-update trigger medians were 389.665 ms versus
+261.041 ms for mapping and 237.455 ms versus 233.077 ms for storage. Removing
+the duplicate nonunique live `mapping(address,path)` index changed the median
+from 261.041 to 255.415 ms, only 2.15% and within run noise. All trials ended in
+rollback, both partial indexes were dropped, and the original live index was
+restored. No schema candidate was retained from this probe.
+
 ### Slipstream source restoration
 
 The measured full run used Slipstream binary SHA-256
