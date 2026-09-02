@@ -1,8 +1,7 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { CheckCircle2, Circle, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
-import { Progress } from "@/components/ui/progress";
 import {
   MILESTONE_ACTIONS,
   nextMoveRoute,
@@ -46,12 +45,12 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
   if (!popup) return null;
 
   const totalActions = MILESTONE_ACTIONS.length;
-  const percent = Math.round((popup.completedCount / totalActions) * 100);
 
-  const handleCta = () => {
+  const goTo = (route: string) => {
     onCta();
-    navigate(nextMoveRoute(popup.completion));
+    navigate(route);
   };
+  const handleCta = () => goTo(nextMoveRoute(popup.completion));
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(next) => !next && onDismiss()}>
@@ -98,37 +97,46 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
                 Complete one eligible action to finish this milestone and collect your bonus.
               </p>
 
-              {/* Progress card */}
+              {/* Next-move picker. The milestone completes on the *next* eligible
+                  action, so this is a list of choices, not a 0–100% progress bar
+                  (which read as "2 more to go" and contradicted the headline). */}
               <div className="mt-7 rounded-xl border border-border bg-card p-5">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-strato-blue dark:text-foreground">
-                    {popup.completedCount} of {totalActions} actions complete
+                    Pick any one to unlock your bonus
                   </span>
-                  <span className="text-sm font-semibold text-strato-lightblue">{percent}%</span>
+                  <span className="text-sm font-semibold text-muted-foreground">
+                    {popup.completedCount} of {totalActions} done
+                  </span>
                 </div>
-                <Progress
-                  value={percent}
-                  className="mt-3 h-2 bg-muted [&>div]:bg-strato-lightblue"
-                />
                 <ul className="mt-4 grid gap-2 sm:grid-cols-2">
                   {MILESTONE_ACTIONS.map((a) => {
                     const done = popup.completion[a.key];
-                    return (
-                      <li key={a.key} className="flex items-center gap-2 text-sm">
-                        {done ? (
-                          <CheckCircle2 className="h-4 w-4 shrink-0 text-strato-lightblue" />
-                        ) : (
-                          <Circle className="h-4 w-4 shrink-0 text-muted-foreground/40" />
-                        )}
-                        <span
-                          className={
-                            done
-                              ? "font-medium text-strato-blue line-through decoration-strato-lightblue/60 dark:text-foreground"
-                              : "font-medium text-muted-foreground"
-                          }
+                    if (done) {
+                      return (
+                        <li
+                          key={a.key}
+                          className="flex items-center gap-2 rounded-lg border border-transparent px-3 py-2.5 text-sm"
                         >
-                          {a.label}
-                        </span>
+                          <CheckCircle2 className="h-4 w-4 shrink-0 text-strato-lightblue" />
+                          <span className="font-medium text-strato-blue line-through decoration-strato-lightblue/60 dark:text-foreground">
+                            {a.label}
+                          </span>
+                          <span className="ml-auto text-xs text-muted-foreground">Done</span>
+                        </li>
+                      );
+                    }
+                    return (
+                      <li key={a.key}>
+                        <button
+                          type="button"
+                          onClick={() => goTo(a.route)}
+                          className="group flex w-full items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-left text-sm transition-colors hover:border-strato-lightblue hover:bg-strato-lightblue/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-strato-lightblue"
+                        >
+                          <span className="h-4 w-4 shrink-0 rounded-full border-2 border-strato-lightblue/60 group-hover:border-strato-lightblue" />
+                          <span className="font-medium text-strato-blue dark:text-foreground">{a.label}</span>
+                          <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-strato-lightblue" />
+                        </button>
                       </li>
                     );
                   })}
@@ -136,11 +144,11 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
               </div>
 
               {/* CTAs */}
-              <div className="mt-8 flex items-center gap-6 lg:mt-auto lg:pt-10">
+              <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 lg:mt-auto lg:pt-10">
                 <button
                   type="button"
                   onClick={handleCta}
-                  className="rounded-lg bg-strato-blue px-7 py-3.5 text-sm font-semibold text-white shadow-md transition-colors hover:bg-strato-blue/90 dark:bg-strato-lightblue dark:hover:bg-strato-lightblue/90"
+                  className="w-full rounded-lg bg-strato-blue px-7 py-3.5 text-sm font-semibold sm:w-auto text-white shadow-md transition-colors hover:bg-strato-blue/90 dark:bg-strato-lightblue dark:hover:bg-strato-lightblue/90"
                 >
                   Choose Your Next Move
                 </button>
@@ -158,8 +166,10 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
             </div>
 
             {/* Right column: illustration — deep blue panel with the ascending
-                hexagon "staircase" from the mockup, approximated in CSS. */}
-            <div className="relative min-h-[300px] overflow-hidden rounded-2xl bg-gradient-to-br from-[#2F3DF2] via-[#2430D8] to-[#1A23A8] lg:min-h-[440px]">
+                hexagon "staircase" from the mockup, approximated in CSS. On
+                mobile it sits above the copy at a fixed height so it's visible
+                without scrolling the dialog. */}
+            <div className="relative order-first h-[200px] overflow-hidden rounded-2xl bg-gradient-to-br from-[#2F3DF2] via-[#2430D8] to-[#1A23A8] sm:h-[260px] lg:order-none lg:h-auto lg:min-h-[440px]">
               {/* faint grid, as in the mock's backdrop */}
               <div
                 className="absolute inset-0 opacity-[0.06]"
@@ -171,15 +181,15 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
               />
               {/* dark plinths stepping up to the right */}
               <div
-                className="absolute bottom-[4%] left-[6%] h-28 w-28 bg-[#101B7E]/90 lg:h-36 lg:w-36"
+                className="absolute bottom-[4%] left-[6%] h-20 w-20 bg-[#101B7E]/90 sm:h-28 sm:w-28 lg:h-36 lg:w-36"
                 style={{ clipPath: HEX_CLIP }}
               />
               <div
-                className="absolute bottom-[22%] left-[34%] h-32 w-32 bg-[#0E1874]/90 lg:h-40 lg:w-40"
+                className="absolute bottom-[22%] left-[34%] h-24 w-24 bg-[#0E1874]/90 sm:h-32 sm:w-32 lg:h-40 lg:w-40"
                 style={{ clipPath: HEX_CLIP }}
               />
               <div
-                className="absolute bottom-[42%] right-[8%] h-36 w-36 bg-[#0C156A]/90 lg:h-44 lg:w-44"
+                className="absolute bottom-[42%] right-[8%] h-28 w-28 bg-[#0C156A]/90 sm:h-36 sm:w-36 lg:h-44 lg:w-44"
                 style={{ clipPath: HEX_CLIP }}
               />
               {/* glowing path connecting the plinths */}
@@ -202,16 +212,16 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
               <HexToken className="bottom-[9%] left-[11%] rotate-[8deg]" size={44} />
               <HexToken className="bottom-[30%] left-[40%] -rotate-[6deg]" size={52} />
               <HexToken className="right-[24%] top-[36%] rotate-[4deg]" size={40} />
-              <HexToken className="right-[6%] top-[16%] -rotate-[8deg]" size={92} />
+              <HexToken className="right-[6%] top-[16%] -rotate-[8deg] scale-75 sm:scale-100" size={92} />
               <div className="absolute right-[30%] top-[24%] h-3 w-3 rounded-full bg-[#5FD0FF]" />
               <div className="absolute bottom-[16%] right-[16%] h-2 w-2 rounded-full bg-[#5FD0FF]/80" />
 
               {/* milestone bonus card */}
-              <div className="absolute left-[7%] top-[9%] -rotate-6 rounded-2xl bg-white px-6 py-4 shadow-2xl">
+              <div className="absolute left-[7%] top-[9%] -rotate-6 rounded-2xl bg-white px-4 py-3 shadow-2xl sm:px-6 sm:py-4">
                 <div className="text-[10px] font-bold tracking-[0.18em] text-gray-500">
                   MILESTONE BONUS
                 </div>
-                <div className="mt-1 text-3xl font-extrabold tracking-tight text-strato-blue">
+                <div className="mt-1 text-2xl font-extrabold tracking-tight text-strato-blue sm:text-3xl">
                   <span className="text-strato-lightblue">+500</span> PTS
                 </div>
               </div>
