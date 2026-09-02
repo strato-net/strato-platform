@@ -654,11 +654,24 @@ payFees b availableGas tAddr t proposer = do
 -- ever commit.
 -- Returns the reward call's results so the caller can fold its events into the
 -- block's receipts; 'Nothing' when no rewards were paid.
+--
+-- Nothing is even attempted before staking activates. There are no block
+-- rewards to pay then -- no fee contract implements the hook until the admins
+-- vote one in, which they do as part of switching staking on -- so every block
+-- was paying for a getImplContract call, a call that throws, and a log line,
+-- all to commit nothing. Gating skips the work rather than discarding it.
+--
+-- Safe for state roots because it can only elide calls that had no state to
+-- commit, and safe for consensus because it keys off the same predicate
+-- 'verifyBlock' uses to decide that stake-weighted selection is in force: the
+-- proposer and the verifier flip on the same block or the chain has already
+-- lost agreement on something larger than this.
 payBlockRewards ::
   VMBase m =>
   BlockHeader ->
   Address ->
   m (Maybe ExecResults)
+payBlockRewards b _ | not (Conf.stakingActiveAt (networkConfig ethConf) (blockHeaderBlockNumber b)) = pure Nothing
 payBlockRewards b proposer = do
   let bHash = blockHeaderHash b
       availableGas = 400_000
