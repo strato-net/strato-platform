@@ -81,8 +81,7 @@ const PoolV3Liquidity = () => {
         <DashboardHeader title="Liquidity" />
         <main className="p-4 md:p-6">
           {!isLoggedIn && <GuestSignInBanner message="Sign in to provide concentrated liquidity" />}
-          <div className="max-w-6xl mx-auto">
-            <Tabs value={tab} onValueChange={selectTab}>
+          <Tabs value={tab} onValueChange={selectTab}>
               <TabsList className="mb-4">
                 <TabsTrigger value="pools">Pools</TabsTrigger>
                 <TabsTrigger value="positions">
@@ -117,7 +116,6 @@ const PoolV3Liquidity = () => {
                 />
               </TabsContent>
             </Tabs>
-          </div>
         </main>
       </div>
 

@@ -264,7 +264,6 @@ const StratoStats = () => {
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="STRATO Stats" />
         <main className="p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">
             {!isLoggedIn && (
               <GuestSignInBanner message="Sign in to view detailed statistics and analytics" />
             )}
@@ -752,7 +751,6 @@ const StratoStats = () => {
                 </Card>
               </TabsContent>
             </Tabs>
-          </div>
         </main>
       </div>
 

@@ -128,7 +128,7 @@ const DashboardSidebar = () => {
   return (
     <aside className="hidden md:flex flex-col fixed left-0 top-0 h-screen w-[250px] bg-sidebar-background border-r border-sidebar-border z-40">
       {/* Logo */}
-      <div className="p-5 border-b border-sidebar-border">
+      <div className="h-20 flex items-center px-5 border-b border-sidebar-border">
         <img src={resolvedTheme === 'dark' ? STRATOLOGODARK : STRATOLOGO} alt="STRATO" className="h-10" />
       </div>
 
