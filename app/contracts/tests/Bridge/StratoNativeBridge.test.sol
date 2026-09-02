@@ -5,6 +5,7 @@ import "../../concrete/BaseCodeCollection.sol";
 import "../../concrete/Bridge/StratoNativeBridge.sol";
 import "../../concrete/Bridge/StratoNativeCustodyVault.sol";
 import "../../concrete/Proxy/Proxy.sol";
+import "../../concrete/Savings/SaveUSDSTVault.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/Tokens/TokenFactory.sol";
 
@@ -96,9 +97,7 @@ contract Describe_StratoNativeBridge is Authorizable {
 
         adminRegistry.addWhitelist(address(nativeBridge), "abortWithdrawal", address(relayer));
 
-        nativeToken = new Token(address(this));
-        nativeTokenAddress = address(nativeToken);
-        nativeToken.initialize(
+        nativeTokenAddress = tokenFactory.createToken(
             "Native STRATO",
             "NST",
             [],
@@ -106,9 +105,9 @@ contract Describe_StratoNativeBridge is Authorizable {
             [],
             "NST",
             0,
-            18,
-            address(this)
+            18
         );
+        nativeToken = Token(nativeTokenAddress);
         nativeToken.setStatus(2);
         nativeToken.mint(address(user1), 1000e18);
 
@@ -155,6 +154,71 @@ contract Describe_StratoNativeBridge is Authorizable {
         require(stratoTokenAmount == 50e18, "Locked amount should match request");
         require(useInstantPath, "Amount under threshold should use instant path");
         require(custodyVault.lockedBalance(nativeTokenAddress) == 50e18, "Vault should lock requested amount");
+    }
+
+    function it_native_withdrawal_locks_non_factory_saveusdst_shares() {
+        Token usdst = new Token(address(this));
+        usdst.initialize("USDST", "USDST", [], [], [], "USDST", 0, 18, address(this));
+        usdst.setStatus(2);
+        usdst.mint(address(user1), 100e18);
+
+        SaveUSDSTVault saveUsdst = new SaveUSDSTVault(address(this));
+        saveUsdst.initialize(address(usdst), "Save USDST", "saveUSDST");
+
+        user1.do(address(usdst), "approve", address(saveUsdst), 100e18);
+        uint256 shares = user1.do(
+            address(saveUsdst),
+            "deposit(uint256,address)",
+            100e18,
+            address(user1)
+        );
+
+        nativeBridge.setAsset(
+            true,
+            externalChainId,
+            externalBridge,
+            address(0x6666),
+            "Wrapped Save USDST",
+            "wsaveUSDST",
+            500e18,
+            100e18,
+            address(saveUsdst)
+        );
+
+        user1.do(address(saveUsdst), "approve", custodyVaultAddress, shares);
+        uint256 withdrawalId = user1.do(
+            nativeBridgeAddress,
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            address(saveUsdst),
+            shares
+        );
+
+        require(withdrawalId > 0, "Withdrawal should be created");
+        require(custodyVault.lockedBalance(address(saveUsdst)) == shares, "Vault should lock saveUSDST shares");
+        require(saveUsdst.balanceOf(address(user1)) == 0, "User shares should be locked");
+    }
+
+    function it_native_withdrawal_rejects_inactive_factory_token() {
+        nativeToken.setStatus(1);
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
+
+        bool reverted = false;
+        try user1.do(
+            nativeBridgeAddress,
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            nativeTokenAddress,
+            50e18
+        ) {
+        } catch {
+            reverted = true;
+        }
+
+        require(reverted, "Inactive factory token should not bridge out");
+        require(custodyVault.lockedBalance(nativeTokenAddress) == 0, "Inactive token should not be locked");
     }
 
     function it_owner_can_update_instant_withdrawal_delay() {

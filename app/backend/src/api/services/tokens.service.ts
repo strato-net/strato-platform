@@ -273,9 +273,14 @@ export const getBalance = async (
     key: `eq.${address}`,
     select: rawParams.select || tokenBalanceSelectFields.join(","),
   };
+  const includeSaveUsdstVault = !rawParams.address
+    || normalizeAddress(rawParams.address).includes(normalizeAddress(config.saveUsdstVault));
 
-  const [balances, collaterals, cdps, rawPrices] = await Promise.all([
+  const [balances, saveUsdstVaultTokens, collaterals, cdps, rawPrices] = await Promise.all([
     cirrus.get(accessToken, "/" + Token + "-_balances", { params }),
+    includeSaveUsdstVault
+      ? getSaveUsdstVaultTransferableTokens(accessToken, address)
+      : Promise.resolve([]),
     cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
       params: {
         select: "user:key,asset:key2,amount:value::text",
@@ -327,6 +332,11 @@ export const getBalance = async (
       collateralBalance: (collateralMap.get(a) || 0n).toString(),
       token: tokenDetails.get(a),
     })),
+    ...saveUsdstVaultTokens.map((t: any) => ({
+      ...t,
+      price: (rawPrices.get(t.address) || 0n).toString(),
+      marketCap: "0",
+    })),
   ];
 
   return allTokens.filter(
@@ -339,14 +349,13 @@ export const getBalance = async (
  * Returns tokens with positive balance that are not paused
  */
 export const getTransferableTokens = async (accessToken: string, userAddress: string) => {
-  const [tokens, yieldVaultTokens, saveUsdstVaultTokens] = await Promise.all([
+  const [tokens, yieldVaultTokens] = await Promise.all([
     getBalance(accessToken, userAddress),
     getYieldVaultTransferableTokens(accessToken, userAddress),
-    getSaveUsdstVaultTransferableTokens(accessToken, userAddress),
   ]);
 
   // Filter out paused tokens and ensure nonzero balance
-  return [...tokens, ...yieldVaultTokens, ...saveUsdstVaultTokens].filter((tokenData: any) => {
+  return [...tokens, ...yieldVaultTokens].filter((tokenData: any) => {
     const hasBalance = tokenData.balance !== "0";
     const isNotPaused = tokenData.token?._paused !== true;
     return hasBalance && isNotPaused;

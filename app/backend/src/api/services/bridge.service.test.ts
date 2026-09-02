@@ -5,6 +5,7 @@ import { constants } from "../../config/constants";
 import * as rpcConfig from "../../config/rpc.config";
 import {
   buildDepositActionCatalog,
+  getBridgeTransferContractName,
   getDepositRouterMajor,
   validateNativeWithdrawalRoute,
 } from "./bridge.service";
@@ -186,6 +187,19 @@ test("rejects native withdrawals that are disabled or exceed remaining capacity"
   assert.throws(
     () => validateNativeWithdrawalRoute({ ...nativeRoute, withdrawalsDisabled: true }, "1"),
     /withdrawals are disabled/
+  );
+});
+
+test("uses the saveUSDST vault ABI for native withdrawal approvals", () => {
+  const saveUsdstVault = "0x1111111111111111111111111111111111111111";
+
+  assert.equal(
+    getBridgeTransferContractName(saveUsdstVault, saveUsdstVault.slice(2)),
+    "SaveUSDSTVault"
+  );
+  assert.equal(
+    getBridgeTransferContractName("0x2222222222222222222222222222222222222222", saveUsdstVault),
+    "Token"
   );
 });
 

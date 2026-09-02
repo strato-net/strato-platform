@@ -1,7 +1,7 @@
 import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 
-const { Token } = constants;
+const { SaveUSDSTVault, Token } = constants;
 
 export const toUTCTime = (d: Date) => d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC');
 
@@ -101,12 +101,42 @@ export const fetchTokenBalances = (accessToken: string, userAddress: string, tok
 
 export const getTokenMetadata = async (accessToken: string, tokenAddresses: string[]) => {
   if (!tokenAddresses.length) return new Map();
-  
-  const { data: tokenData } = await cirrus.get(accessToken, `/${Token}`, {
-    params: { select: `address,_name,_symbol,status,images:${Token}-images(value)`, address: `in.(${tokenAddresses.join(",")})` }
-  });
-  
-  return new Map(tokenData.map((token: any) => [token.address, { name: token._name, symbol: token._symbol, status: token.status, image: token.images?.[0]?.value }]));
+
+  const normalizedAddresses = tokenAddresses.map((address) => address.toLowerCase().replace(/^0x/, ""));
+  const saveUsdstVault = constants.saveUsdstVault?.toLowerCase().replace(/^0x/, "");
+  const [tokenResponse, saveUsdstResponse] = await Promise.all([
+    cirrus.get(accessToken, `/${Token}`, {
+      params: { select: `address,_name,_symbol,status,images:${Token}-images(value)`, address: `in.(${normalizedAddresses.join(",")})` }
+    }),
+    saveUsdstVault && normalizedAddresses.includes(saveUsdstVault)
+      ? cirrus.get(accessToken, `/${SaveUSDSTVault}`, {
+          params: {
+            address: `eq.${saveUsdstVault}`,
+            select: "address,_name,_symbol,vaultInitialized",
+            limit: "1",
+          }
+        })
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const metadata = new Map(
+    (tokenResponse.data || []).map((token: any) => [
+      token.address.toLowerCase().replace(/^0x/, ""),
+      { name: token._name, symbol: token._symbol, status: token.status, image: token.images?.[0]?.value }
+    ])
+  );
+
+  for (const vault of saveUsdstResponse.data || []) {
+    const initialized = vault.vaultInitialized === true || vault.vaultInitialized === "true";
+    metadata.set(vault.address.toLowerCase().replace(/^0x/, ""), {
+      name: vault._name || "Save USDST Vault",
+      symbol: vault._symbol || "saveUSDST",
+      status: initialized ? "2" : "1",
+      image: undefined,
+    });
+  }
+
+  return metadata;
 };
 
 export const getTokenDetails = async (
