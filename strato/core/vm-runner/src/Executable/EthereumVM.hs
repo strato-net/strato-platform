@@ -264,10 +264,43 @@ routeOutEvents = go [] [] 0
       | otherwise = go vmEvents indexEvents pendingCount
 
     flush vmEvents indexEvents = do
-      unless (null vmEvents) $
-        sendProfiledItems "vmevents" produceVMEvents produceEncodedVMEvents $ reverse vmEvents
-      unless (null indexEvents) $
-        sendProfiledItems "indexevents" produceIndexEvents produceEncodedIndexEvents $ reverse indexEvents
+      unless (null vmEvents && null indexEvents) $
+        sendProfiledTopicItems (reverse vmEvents) (reverse indexEvents)
+
+sendProfiledTopicItems ::
+  (MonadLogger m, HasStreaming m) =>
+  [VMEvent] ->
+  [IndexEvent] ->
+  m ()
+sendProfiledTopicItems vmEvents indexEvents = do
+  vmPayloads <- encodeProfiledItems "vmevents" vmEvents
+  indexPayloads <- encodeProfiledItems "indexevents" indexEvents
+  let taggedPayloads = map Left vmPayloads ++ map Right indexPayloads
+  profilePhase EventKafkaEnqueue . mapM_ produceBatch $ chunkPayloads taggedPayloads
+  where
+    produceBatch payloads =
+      void $
+        produceToTopics
+          [ ("vmevents", [payload | Left payload <- payloads]),
+            ("indexevents", [payload | Right payload <- payloads])
+          ]
+
+    chunkPayloads = go [] 0 0
+      where
+        go [] _ _ [] = []
+        go current _ _ [] = [reverse current]
+        go current count bytes remaining@(item : rest)
+          | not (null current)
+              && (count >= maxProduceBatchItems || bytes + payloadLength item > maxProduceBatchBytes) =
+              reverse current : go [] 0 0 remaining
+          | otherwise =
+              go (item : current) (count + 1) (bytes + payloadLength item) rest
+
+    payloadLength = either B.length B.length
+    maxProduceBatchItems :: Int
+    maxProduceBatchItems = 256
+    maxProduceBatchBytes :: Int
+    maxProduceBatchBytes = 2 * 1024 * 1024
 
 sendOutEvent :: (MonadLogger m, HasStreaming m, HasContext m) => VmOutEvent -> m ()
 sendOutEvent (OutVMEvents vmes) = sendProfiledItems "vmevents" produceVMEvents produceEncodedVMEvents vmes
@@ -296,13 +329,20 @@ sendProfiledItems ::
 sendProfiledItems channel produceValues produceBytes values
   | not phaseProfileEnabled = void $ produceValues values
   | otherwise = do
+      payloads <- encodeProfiledItems channel values
+      profilePhase EventKafkaEnqueue $ void $ produceBytes payloads
+
+encodeProfiledItems :: (Bin.Binary a, MonadIO m) => String -> [a] -> m [B.ByteString]
+encodeProfiledItems channel values
+  | not phaseProfileEnabled = pure $ map (BL.toStrict . Bin.encode) values
+  | otherwise = do
       payloads <- profilePhase SolidVMDiffActionConstructionSerialization $
         liftIO $ evaluate $ force $ map (BL.toStrict . Bin.encode) values
       liftIO $ do
         noteProfileOutput channel payloads
         bumpDBProfile SerializedEventCount $ fromIntegral (length payloads)
         bumpDBProfile SerializedEventBytes . fromIntegral $ sum (map B.length payloads)
-      profilePhase EventKafkaEnqueue $ void $ produceBytes payloads
+      pure payloads
 
 consumerGroup :: ConsumerGroup
 consumerGroup = "ethereum-vm"
