@@ -830,3 +830,86 @@ For the SQL consumer comparison, retain that run's `indexevents` topic, reset
 only the isolated `eth` database and `strato-indexer` consumer offset, seed the
 isolated Redis database from block 0, and run the corresponding
 `strato-indexer` from a directory containing the benchmark `.ethereumH`.
+
+## Helium testnet and STRATO production full-sync summary
+
+Two fresh-genesis, full-stack runs reached the live chain and terminal Kafka
+lag zero. The rates below include startup time and chain growth during the run.
+The VM rate stops at the first sampled VM catch-up point; the end-to-end rate
+stops only when VM, primary ETH-state indexing, Slipstream, and Cirrus have all
+caught up.
+
+| Network | Measured source | VM at end-to-end catch-up | VM catch-up | End-to-end catch-up | Terminal gate |
+|---|---|---:|---:|---:|---|
+| Helium testnet | VM/index `6cf91abca1`; Slipstream restored through `cf461ce2388` | 492,340 | 66.85 blk/s at 7,360 s | 58.10 blk/s at 8,474 s | Primary and Slipstream lag 0; exact VM/SQL root audit at 492,358 |
+| STRATO production (`upquark`) | `739ee9a042` checkout; optimized code through `c085f13f63` | 188,044 | 120.77 blk/s at 1,557 s | 81.90 blk/s at 2,296 s | Primary and Slipstream lag 0; all observed component heights 188,044 |
+
+The production VM crossed the run's initial live tip at block 188,039. The
+chain advanced to 188,044 while the remaining consumers drained, so the final
+end-to-end calculation is 188,045 blocks from genesis in 2,296 seconds. At VM
+catch-up, the primary indexer was already at zero lag, but Slipstream still had
+192,573 records of lag and Cirrus was at block 105,447. Full completion followed
+739 seconds later. This is a downstream SQL-path gap, not unprocessed VM work.
+
+Production was observably 80.66% faster at the VM catch-up milestone and
+40.97% faster end to end than the earlier Helium run. Those percentages are
+not a causal A/B result: the networks, corpora, live tips, and measured binary
+sets differ. The valid same-corpus code comparison is the fixed Helium SQL-on
+replay above, where the committed cleanup improved the complete 361,200-block
+run from 122.07 to 143.27 blk/s (+17.37%) with the exact audit still passing.
+
+The Helium run has the stronger content-correctness receipt: its stopped-state
+snapshot was audited against the canonical header root and SQL digests. The
+production receipt proves synchronized terminal heights and zero consumer lag,
+but its live-completion path did not capture a stopped-state SQL content audit.
+The operator-stopped `node-prod-equivalent-739ee9a-sqlon-01` Helium attempt has
+no completion marker and is deliberately excluded from this summary.
+
+### Production receipt and reproduction
+
+The production run used `HELIUM_SYNC_NETWORK=upquark`, `sqlDiff=true`, and the
+same full-stack wrapper as the Helium acceptance run. Its source and binary
+provenance is recorded in:
+
+- `artifacts/strato-mainnet-sync-20260902/node-upquark-prod-739ee9a-sqlon-01/sync-timing/run-metadata.json`
+- `artifacts/strato-mainnet-sync-20260902/node-upquark-prod-739ee9a-sqlon-01/sync-timing/binary-sha256.txt`
+- `artifacts/strato-mainnet-sync-20260902/node-upquark-prod-739ee9a-sqlon-01/sync-timing/milestones.csv`
+- `artifacts/strato-mainnet-sync-20260902/node-upquark-prod-739ee9a-sqlon-01/sync-timing/samples.csv`
+- `artifacts/strato-mainnet-sync-20260902/node-upquark-prod-739ee9a-sqlon-01/sync-timing/complete.json`
+
+To reproduce it, fully clear the node as required by the wrapper, supply the
+three banked binaries recorded in `run-metadata.json`, omit every fixed-height
+stop variable, and run:
+
+```bash
+workspace=/Users/kierenjameslubin/software/clean-clone-ii
+repo="$workspace/strato-platform-vm-quality-checkpoint"
+bank="$workspace/artifacts/strato-mainnet-sync-20260902/bin-upquark-prod-739ee9a"
+node="$workspace/artifacts/strato-mainnet-sync-20260902/node-upquark-prod-repro-01"
+
+caffeinate -dimsu env \
+  HELIUM_SYNC_NETWORK=upquark \
+  HELIUM_SYNC_SQL_DIFF=true \
+  HELIUM_SYNC_MIN_LOG_LEVEL=LevelError \
+  HELIUM_SYNC_VM_SOURCE_DIR="$repo" \
+  HELIUM_SYNC_VM_GIT_SHA=739ee9a042612e3191f352ee324f329a517d9b35 \
+  HELIUM_SYNC_OPTIMIZED_CODE_SHA=c085f13f63 \
+  HELIUM_SYNC_VM_BINARY="$bank/vm-runner" \
+  HELIUM_SYNC_INDEX_BINARY="$bank/strato-indexer" \
+  HELIUM_SYNC_SLIPSTREAM_BINARY="$bank/slipstream" \
+  HELIUM_SYNC_EXPECTED_VM_SHA=977febc64299b8b12658abd9b8036096e0d9a542f95d2efde3938befe296bde8 \
+  HELIUM_SYNC_EXPECTED_INDEX_SHA=ca8ed351980c2cc1201fbfad992bd3aaa48b48fffc26c65f0fc14f7b03d0c54a \
+  HELIUM_SYNC_EXPECTED_SLIPSTREAM_SHA=e0130bfc58609b44801227e3f03d0a1d4edc4bcb5712a31c4bcd32583a43c98f \
+  HELIUM_SYNC_VERSION=18.4-upquark-prod-739ee9a \
+  HELIUM_SYNC_AB_VARIANT=upquark-prod-sqlon-739ee9a \
+  HELIUM_SYNC_NODE_DIR="$node" \
+  "$workspace/artifacts/helium-full-sync-20260902/run-helium-full-sync-optimized.sh"
+```
+
+The next performance unit is the Slipstream/Cirrus PostgreSQL insert path. A
+dedicated PostgreSQL host is a reasonable controlled candidate if local CPU,
+memory, or SSD contention dominates, but added network round trips could hurt
+unless batching amortizes them. Test local versus dedicated PostgreSQL against
+the same corpus and fresh database, retaining Kafka lag, vmevents/s, SQL phase
+timings, relation hashes, and VM/root correctness. Keep that database work in a
+separate change from this recovered VM quality checkpoint.
