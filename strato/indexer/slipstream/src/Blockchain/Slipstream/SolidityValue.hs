@@ -23,6 +23,7 @@ import Data.Aeson hiding (Value)
 import qualified Data.Aeson.Key as DAK
 import qualified Data.Bifunctor as BF
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16 as Base16
 import Data.Foldable (toList)
 import qualified Data.IntMap as I
 import Data.List
@@ -31,7 +32,7 @@ import Data.Maybe (mapMaybe)
 import Data.Scientific (floatingOrInteger)
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Data.Text.Encoding (decodeUtf8)
+import Data.Text.Encoding (decodeUtf8, decodeUtf8')
 import GHC.Generics
 import Text.Printf
 
@@ -81,12 +82,12 @@ valueToSolidityValue = \case
   SimpleValue (ValueBool x) -> Just $ SolidityBool x
   SimpleValue (ValueInt _ _ v) -> Just $ SolidityNum $ toInteger v
   SimpleValue (ValueString s) -> Just $ SolidityValueAsString s
-  SimpleValue (ValueDecimal v) -> Just $ SolidityValueAsString $ decodeUtf8 v
+  SimpleValue (ValueDecimal v) -> Just $ SolidityValueAsString $ decodeValueBytes v
   SimpleValue (ValueAddress (Address addr)) ->
     Just $ SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr :: Integer)
   ValueContract acct ->
     Just $ SolidityValueAsString $ Text.pack $ show acct
-  SimpleValue (ValueBytes _ bytes) -> Just $ SolidityValueAsString $ decodeUtf8 bytes
+  SimpleValue (ValueBytes _ bytes) -> Just $ SolidityValueAsString $ decodeValueBytes bytes
   ValueEnum _ _ index -> Just $ SolidityValueAsString $ Text.pack $ show index
   ValueFunction _ paramTypes returnTypes ->
     Just $
@@ -110,3 +111,9 @@ valueToSolidityValue = \case
   where
     convertBoth :: (SimpleValue, Value) -> Maybe (Text, SolidityValue)
     convertBoth (sv, v) = (simpleValueToText sv,) <$> valueToSolidityValue v
+
+decodeValueBytes :: B.ByteString -> Text
+decodeValueBytes bytes =
+  case decodeUtf8' bytes of
+    Left _ -> decodeUtf8 $ Base16.encode bytes
+    Right text -> text
