@@ -221,7 +221,8 @@ Exact diagnostic gates for that banked binary passed:
   157.04 blk/s over 2,874 blocks. This is a diagnostic continuation, not a
   full-pipeline qualification rate.
 
-A new genesis-to-tip full-pipeline run remains the final acceptance gate.
+At this stage, a new genesis-to-tip full-pipeline run remained the final
+acceptance gate. The completed acceptance replay is recorded below.
 
 ## Slow-segment optimization checkpoint
 
@@ -338,4 +339,132 @@ requires a genesis-to-tip `apply-stream-full` replay of the available
 - exact source, executable, corpus, genesis, `ethconf.yaml`, RTS, and checkpoint
   provenance banked before the run.
 
-Until that completes, this branch is deliberately named `donotmerge`.
+That acceptance run has now completed. The branch remains deliberately named
+`donotmerge` because the optimization series still needs normal review before
+any production merge.
+
+## Final optimized acceptance checkpoint
+
+The final clean code checkpoint is commit
+`c8d81d5f3adad4e3280ee7371c3a9a2cb93e4c1a`. Its provenance-banked
+`vm-replay` executable has SHA-256
+`cba1b3eae3a69e6ccebdb7b183e849a9df3377d7aa63c2a1505c36dfea220e97`.
+The build used Stack with GHC 9.8.4, the repository release/O2 settings, and
+`--flag solid-vm:native-bn254`; the native cryptography dependency used the
+Arkworks 0.5 Rust implementation.
+
+The following table separates the historical quality receipts from the
+accepted optimization-series measurements. The first two optimized short
+ranges were measured at `01428f4f82`, the expanded range at `0a2def7359`, and
+the tail and full replay at the final `c8d81d5f3a` checkpoint. All rows are
+plain, `-N2`, `-A128m`, full-pipeline runs with exact terminal audit. The
+full-corpus reference is the prior accepted genesis-to-tip candidate at
+`0a2def7359`; the other references are the original pre-crash
+`cfgfallback137` quality receipts.
+
+| Range | Reference blk/s | Optimized blk/s | Change | Optimized tx/s | Process wall | Allocated bytes | Audit |
+|---|---:|---:|---:|---:|---:|---:|---|
+| 30,000-39,999 | 263.85 | 278.39 | +5.51% | 683.5277 | 36.13 s | 151,939,435,144 | exact |
+| 40,000-44,999 | 269.05 | 280.07 | +4.10% | 283.2017 | 18.04 s | 80,515,591,624 | exact |
+| 45,000-97,125 | 194.19 | 205.69 | +5.92% | 380.8731 | 253.93 s | 934,065,550,064 | exact |
+| 315,969-361,199 | - | 133.69 | - | 149.7231 | 339.33 s | 968,058,756,696 | exact |
+| 0-361,199 | 167.60 | 170.09 | +1.49% | 211.2727 | 2,125.08 s | 5,969,387,281,120 | exact |
+
+The authoritative full replay processed 361,200 blocks, 448,649 transactions,
+and 294 expected execution errors. It ended with the same block hash and state
+root as the prior accepted full run and audited 80,716 accounts and 1,256,107
+storage entries. Peak process RSS was 16,520,200,192 bytes. An earlier raw
+full-run receipt with suffix `-158` also reached the exact final audit, but the
+laptop slept during it; its timing is not accepted. The `-159` repeat ran
+under `caffeinate` and is the authoritative performance result.
+
+The exact receipts are stored under `artifacts/vm-target-400/results` in the
+workspace root:
+
+- `cfgfallback137-fees-rewards-contract-30000-39999-01428f4f82-20260901-110.result.txt`
+- `cfgfallback137-fees-rewards-ordinary-40000-44999-01428f4f82-20260901-109.result.txt`
+- `cfgfallback137-public-map-getter-msgsig-checkpoint-45000-97125-0a2def7359-20260901-135.result.txt`
+- `cfgfallback137-canonical-block-reward-call-tail-315969-361199-c8d81d5f3a-20260901-157.result.txt`
+- `cfgfallback137-canonical-block-reward-call-final-repeat-0-361199-c8d81d5f3a-20260901-159.result.txt`
+
+### Reproduce the accepted full replay
+
+The accepted executable remains banked locally at the path below. The replay
+harness verifies the banked provenance, checkpoint manifest, corpus hash, and
+benchmark configuration hash before it starts. Use a new result label because
+the harness refuses to overwrite an existing receipt.
+
+```bash
+workspace=/Users/kierenjameslubin/software/clean-clone-ii
+runner="$workspace/artifacts/vm-target-400"
+bank=/private/tmp/vm-replay-vm-replay-cfgfallback137-canonical-block-reward-call-c8d81d5f3a-clean-20260901-bin
+baseline="$runner/checkpoints/genesis-cfgfallback137-v2-helium-361199"
+corpus="$runner/corpus/helium-vm-tasks-0-361199.bin"
+bench_ethconf=/private/tmp/vm-recovery-bench-config.FuTRf6/ethconf-full-quality-db5-kafka4.yaml
+label=cfgfallback137-canonical-block-reward-call-final-repro
+
+"$runner/verify-vm-replay-provenance.sh" \
+  "$bank/vm-replay" "$bank/provenance"
+shasum -a 256 "$bank/vm-replay" "$corpus" "$bench_ethconf"
+
+caffeinate -dimsu env \
+  VM_REPLAY_BASELINE="$baseline" \
+  VM_REPLAY_BASELINE_BLOCK=-1 \
+  VM_REPLAY_CORPUS="$corpus" \
+  VM_REPLAY_CORPUS_SHA256=6c3dc85770faeacc164b87843e28beaf65ad4bd46ed64e4942a53ac104a88609 \
+  VM_REPLAY_BENCH_ETHCONF="$bench_ethconf" \
+  VM_REPLAY_BENCH_ETHCONF_SHA256=5483aee90b68ff17534e9f6875371b29d95a889d4448dcbadb1eb0fe64180320 \
+  VM_REPLAY_RTS_CAPS=2 \
+  VM_REPLAY_RTS_ALLOC_AREA=128m \
+  VM_REPLAY_CHUNK_SIZE=1024 \
+  VM_REPLAY_ACTIVE_GROUP_ID=helium-fastir-opt \
+  VM_REPLAY_RESET_KAFKA=1 \
+  VM_REPLAY_RESET_REDIS=1 \
+  VM_REPLAY_KEEP_STATE=0 \
+  VM_REPLAY_FINAL_ACCEPTANCE=1 \
+  "$runner/run-target.sh" "$label" "$bank/vm-replay" plain full 0 361199
+```
+
+The three hashes printed before the run must be, in order:
+
+```text
+cba1b3eae3a69e6ccebdb7b183e849a9df3377d7aa63c2a1505c36dfea220e97
+6c3dc85770faeacc164b87843e28beaf65ad4bd46ed64e4942a53ac104a88609
+5483aee90b68ff17534e9f6875371b29d95a889d4448dcbadb1eb0fe64180320
+```
+
+Acceptance requires both `RESULT ok` for blocks 0-361,199 and the following
+`AUDIT ok`, including 80,716 accounts and 1,256,107 storage entries. A partial
+rate, a diagnostic-pipeline result, or a run without the exact final audit is
+not a replacement for this checkpoint.
+
+If the banked executable is lost, rebuild the code checkpoint from a clean
+worktree with the recorded recipe, then bank the resulting executable before
+running it. A different worktree or toolchain can change executable bytes, so
+the rebuilt binary must be treated as a new candidate and pass the same exact
+full replay rather than being assumed equivalent.
+
+```bash
+workspace=/Users/kierenjameslubin/software/clean-clone-ii
+repo="$workspace/strato-platform-vm-quality-checkpoint"
+build_parent=$(mktemp -d /private/tmp/strato-vm-build.XXXXXX)
+build_tree="$build_parent/strato-vm-c8d81d5f3a"
+code_commit=c8d81d5f3adad4e3280ee7371c3a9a2cb93e4c1a
+bank_label=vm-replay-c8d81d5f3a-rebuild
+
+git -C "$repo" worktree add --detach "$build_tree" "$code_commit"
+stack --stack-yaml "$build_tree/strato/stack.yaml" build \
+  vm-runner:exe:vm-replay --flag solid-vm:native-bn254
+install_root=$(stack --stack-yaml "$build_tree/strato/stack.yaml" \
+  path --local-install-root)
+
+VM_REPLAY_SOURCE_REPO="$build_tree" \
+VM_REPLAY_SOURCE_PATHSPEC=strato \
+VM_REPLAY_EXPECTED_SOURCE_HEAD="$code_commit" \
+VM_REPLAY_EXPECTED_SOURCE_TREE=2d62953f54a6b75ffb34bf6409607f31e43f411d \
+VM_REPLAY_BUILD_PROFILE=stack-release-O2-native-bn254-bls12381-fastir-canonical-block-reward-call-clean-v17 \
+VM_REPLAY_BUILD_RECIPE="stack build vm-runner:exe:vm-replay --flag solid-vm:native-bn254" \
+VM_REPLAY_BUILD_TOOLCHAIN="stack ghc-9.8.4 rust arkworks-0.5" \
+  "$workspace/artifacts/vm-target-400/bank-vm-replay.sh" \
+  "$bank_label" "$install_root/bin/vm-replay"
+```
