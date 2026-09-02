@@ -35,9 +35,9 @@ export const MILESTONE_ACTIONS: MilestoneAction[] = [
   {
     key: 'liquidity',
     label: 'Provide Liquidity',
-    // Swap Pools tab lists every pool; /dashboard/earn-pools is a per-pool
-    // detail page that renders empty without a ?pool= address.
-    route: '/dashboard/advanced?tab=swap',
+    // V3 Liquidity page; /dashboard/earn-pools is a per-pool detail page
+    // that renders empty without a ?pool= address.
+    route: '/dashboard/v3-liquidity',
     pairs: [
       { contract_name: 'Pool', event_name: 'AddLiquidity' },
       { contract_name: 'PoolV3', event_name: 'Mint' },
