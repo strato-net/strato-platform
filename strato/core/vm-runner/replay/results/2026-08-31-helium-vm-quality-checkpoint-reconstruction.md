@@ -833,15 +833,18 @@ isolated Redis database from block 0, and run the corresponding
 
 ## Helium testnet and STRATO production full-sync summary
 
-Two fresh-genesis, full-stack runs reached the live chain and terminal Kafka
-lag zero. The rates below include startup time and chain growth during the run.
-The VM rate stops at the first sampled VM catch-up point; the end-to-end rate
-stops only when VM, primary ETH-state indexing, Slipstream, and Cirrus have all
-caught up.
+Three fresh-genesis, full-stack runs reached the live chain and terminal Kafka
+lag zero. The latest Helium run reused the exact VM and primary-indexer
+executables measured on production, removing the most important binary drift
+from the earlier network comparison. The rates below include startup time and
+chain growth during the run. The VM rate stops at the first sampled VM
+catch-up point; the end-to-end rate stops only when VM, primary ETH-state
+indexing, Slipstream, and Cirrus have all caught up.
 
 | Network | Measured source | VM at end-to-end catch-up | VM catch-up | End-to-end catch-up | Terminal gate |
 |---|---|---:|---:|---:|---|
-| Helium testnet | VM/index `6cf91abca1`; Slipstream restored through `cf461ce2388` | 492,340 | 66.85 blk/s at 7,360 s | 58.10 blk/s at 8,474 s | Primary and Slipstream lag 0; exact VM/SQL root audit at 492,358 |
+| Helium testnet, earlier | VM/index `6cf91abca1`; Slipstream restored through `cf461ce2388` | 492,340 | 66.85 blk/s at 7,360 s | 58.10 blk/s at 8,474 s | Primary and Slipstream lag 0; exact VM/SQL root audit at 492,358 |
+| Helium testnet, production-binary rerun | Production VM/index from `739ee9a042`; repaired Slipstream `52ad8f7704` | 496,510 | 72.49 blk/s at 6,848 s | 54.00 blk/s at 9,195 s | All component heights 496,510; primary and Slipstream lag 0; SQL integrity/digests captured at 496,518 |
 | STRATO production (`upquark`) | `739ee9a042` checkout; optimized code through `c085f13f63` | 188,044 | 120.77 blk/s at 1,557 s | 81.90 blk/s at 2,296 s | Primary and Slipstream lag 0; all observed component heights 188,044 |
 
 The production VM crossed the run's initial live tip at block 188,039. The
@@ -851,19 +854,105 @@ catch-up, the primary indexer was already at zero lag, but Slipstream still had
 192,573 records of lag and Cirrus was at block 105,447. Full completion followed
 739 seconds later. This is a downstream SQL-path gap, not unprocessed VM work.
 
-Production was observably 80.66% faster at the VM catch-up milestone and
-40.97% faster end to end than the earlier Helium run. Those percentages are
-not a causal A/B result: the networks, corpora, live tips, and measured binary
-sets differ. The valid same-corpus code comparison is the fixed Helium SQL-on
-replay above, where the committed cleanup improved the complete 361,200-block
-run from 122.07 to 143.27 blk/s (+17.37%) with the exact audit still passing.
+The new Helium run shows that the earlier production-versus-Helium headline was
+not a like-for-like VM comparison. At almost the same corpus height, the new
+Helium run sampled VM block 187,614 at 1,565 seconds, or 119.88 blk/s from
+launch. Production sampled block 188,039 at 1,557 seconds, or 120.77 blk/s.
+That is only a 0.74% difference with the production VM/index executables held
+constant. The lower complete-Helium VM average comes from the later, heavier
+corpus: canonical VM height remained 317,472 for 1,191 seconds while the VM
+slowly processed approximately 2,324 tasks, after which an expected out-of-gas
+burst appeared and normal 120-150 blk/s active intervals resumed.
 
-The Helium run has the stronger content-correctness receipt: its stopped-state
-snapshot was audited against the canonical header root and SQL digests. The
-production receipt proves synchronized terminal heights and zero consumer lag,
-but its live-completion path did not capture a stopped-state SQL content audit.
-The operator-stopped `node-prod-equivalent-739ee9a-sqlon-01` Helium attempt has
-no completion marker and is deliberately excluded from this summary.
+Across the whole Helium corpus, the production-binary rerun improved VM
+catch-up from 66.85 to 72.49 blk/s (+8.43%) versus the earlier Helium run. It
+was slower end to end, 54.00 versus 58.10 blk/s (-7.06%), because the
+Slipstream/Cirrus drain took 2,347 seconds after VM catch-up rather than 1,114
+seconds. At VM catch-up the primary indexer was already at zero lag, but
+Slipstream still had 349,606 vmevents queued and Cirrus was at block 328,360.
+The post-completion SQL capture contained 594,047 raw transactions, implying
+approximately 64.60 end-to-end tx/s. This separates the remaining Cirrus SQL
+cost from VM execution rather than attributing the entire full-node gap to the
+VM.
+
+Production's 120.77 VM blk/s and 81.90 end-to-end blk/s are still higher than
+the complete Helium averages, but those complete-corpus figures are not a
+causal network A/B: production stops at 188 thousand blocks, before Helium's
+expensive tail, and its Cirrus history is much smaller. The valid same-corpus
+code comparison remains the fixed Helium SQL-on replay above, where the
+committed cleanup improved the complete 361,200-block run from 122.07 to
+143.27 blk/s (+17.37%) with the exact audit still passing.
+
+The earlier Helium run has the strongest content-correctness receipt: its
+stopped-state snapshot was audited against the canonical header root and SQL
+digests. The production-binary Helium rerun adds terminal barometer/hash
+agreement, zero consumer lag, and deterministic SQL state captures: 496,519
+blocks numbered 0-496,518, 124,125 addresses, 2,000,573 storage rows, zero
+orphan storage rows, and zero duplicate composite storage keys. Its address
+and storage digests are `dcb0c63676c832e022782bde1544ce85` and
+`d81e9f3a972a915bdc1005bac542230a`. The production receipt proves synchronized
+terminal heights and zero consumer lag, but its live-completion path did not
+capture a stopped-state SQL content audit. The operator-stopped
+`node-prod-equivalent-739ee9a-sqlon-01` Helium attempt has no completion marker
+and is deliberately excluded from this summary.
+
+### Production-binary Helium rerun receipt and reproduction
+
+The first attempt with the exact production binaries reached VM block 281,256
+but failed at 2,474 seconds because the production Slipstream executable
+decoded an arbitrary byte value with strict UTF-8:
+
+```text
+slipstream: Cannot decode byte '\xeb': Data.Text.Encoding: Invalid UTF-8 stream
+```
+
+The quality branch was missing the existing non-UTF8 safeguard. Commit
+`52ad8f7704` restores it by retaining valid UTF-8 and hex-encoding invalid byte
+sequences, with focused valid/invalid byte tests. The focused Slipstream suite
+passes with 10 examples and zero failures. The rebuilt Slipstream crossed the
+prior fatal consumer offset, finished the full sync at zero lag, and logged no
+UTF-8 decode failure. Its 51 SQL error lines are the existing handled
+SQLSTATE-42703 missing-column compatibility class.
+
+The exact current receipts are under:
+
+- `artifacts/helium-current-full-sync-20260902/node-helium-prod-binaries-739ee9a-slipfix-52ad8f7-sqlon-02/sync-timing`
+- `artifacts/helium-current-full-sync-20260902/bin-helium-prod-vm-index-slipfix-52ad8f7/metadata.txt`
+
+The immutable executable hashes are VM
+`977febc64299b8b12658abd9b8036096e0d9a542f95d2efde3938befe296bde8`,
+primary indexer
+`ca8ed351980c2cc1201fbfad992bd3aaa48b48fffc26c65f0fc14f7b03d0c54a`,
+and repaired Slipstream
+`52da054c9a5cafbd84f07b19b0911191d2077d53afaef0692425ac1a2f98e352`.
+To reproduce from a completely new node directory:
+
+```bash
+workspace=/Users/kierenjameslubin/software/clean-clone-ii
+repo="$workspace/strato-platform-vm-quality-checkpoint"
+support="$workspace/strato-platform-helium-rerun"
+bank="$workspace/artifacts/helium-current-full-sync-20260902/bin-helium-prod-vm-index-slipfix-52ad8f7"
+node="$workspace/artifacts/helium-current-full-sync-20260902/node-helium-prod-binaries-repro-03"
+
+caffeinate -dimsu env \
+  HELIUM_SYNC_NETWORK=helium \
+  HELIUM_SYNC_SQL_DIFF=true \
+  HELIUM_SYNC_MIN_LOG_LEVEL=LevelError \
+  HELIUM_SYNC_SOURCE_DIR="$support" \
+  HELIUM_SYNC_VM_SOURCE_DIR="$repo" \
+  HELIUM_SYNC_VM_GIT_SHA=52ad8f77040e996b1d151c4b91c50ec9bf2856df \
+  HELIUM_SYNC_OPTIMIZED_CODE_SHA=c085f13f63+52ad8f7704 \
+  HELIUM_SYNC_VM_BINARY="$bank/vm-runner" \
+  HELIUM_SYNC_INDEX_BINARY="$bank/strato-indexer" \
+  HELIUM_SYNC_SLIPSTREAM_BINARY="$bank/slipstream" \
+  HELIUM_SYNC_EXPECTED_VM_SHA=977febc64299b8b12658abd9b8036096e0d9a542f95d2efde3938befe296bde8 \
+  HELIUM_SYNC_EXPECTED_INDEX_SHA=ca8ed351980c2cc1201fbfad992bd3aaa48b48fffc26c65f0fc14f7b03d0c54a \
+  HELIUM_SYNC_EXPECTED_SLIPSTREAM_SHA=52da054c9a5cafbd84f07b19b0911191d2077d53afaef0692425ac1a2f98e352 \
+  HELIUM_SYNC_VERSION=18.4-helium-prod-binaries-slipfix-52ad8f7 \
+  HELIUM_SYNC_AB_VARIANT=helium-prod-vm-index-slipfix-52ad8f7 \
+  HELIUM_SYNC_NODE_DIR="$node" \
+  "$workspace/artifacts/helium-full-sync-20260902/run-helium-full-sync-optimized.sh"
+```
 
 ### Production receipt and reproduction
 
