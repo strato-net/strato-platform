@@ -555,3 +555,137 @@ The exact 50,000-block receipts are under
 `artifacts/helium-direct-state-updates-20260902/node-storage-exact-index-levelerror-0-50000-02/sync-timing`.
 This checkpoint qualifies the integrated short gate; a fresh longer
 genesis-to-tip sync remains the final live-node acceptance run.
+
+## Full integrated live-node acceptance
+
+That longer run completed on 2026-09-02 from a new node directory with the
+committed VM and primary-indexer binaries above, Kafka, Redis, PostgreSQL, and
+the batched Slipstream/Cirrus path enabled. The initial controller stopped at
+250,163 processed blocks, but that metric included 1,901 replayed or
+noncanonical blocks: canonical VM height was only 248,262. The result was not
+mislabelled. The same untouched node continued to the fixed start-tip target
+of 491,153 and then to terminal consumer lag zero.
+
+| Observed milestone | Elapsed from launch | VM | ETH SQL | Cirrus | Primary lag | Slipstream lag | Average rate |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| VM first sampled beyond fixed target | 7,360 s | 492,038 | 492,038 | 419,701 | 0 | 150,967 | 66.85 blk/s to observed VM height |
+| All integrated consumers caught up | 8,474 s | 492,340 | 492,340 | 492,341 | 0 | 0 | 58.10 blk/s to observed VM height |
+
+The chain remained live while the backlog drained. A barometer capture after
+completion reported best block, best sequenced block, and world best block all
+at 492,348, with both sync flags true. The nearby stopped-state SQL capture at
+block 492,358 contained 589,572 raw transactions, implying approximately
+69.57 end-to-end tx/s over the 8,474-second synchronized run. Its block join
+had 589,571 rows because the capture raced one live transaction; this is not
+reported as exact transaction-table equality.
+
+The primary indexer repeatedly accumulated bursts of tens of thousands of
+Kafka records, but drained them and ended at committed offset 3,515,526 with
+zero lag. Slipstream ended at committed offset 1,086,030 with zero lag. The VM
+reached the fixed target 1,114 seconds before Cirrus drained, so the remaining
+end-to-end cost is downstream of VM execution and primary ETH-state indexing.
+
+### Full-range correctness and bottleneck receipts
+
+The stopped node was copied into an isolated audit environment and dumped as
+492,386 blocks, numbers 0-492,385, containing 589,602 transactions:
+
+```text
+corpus=artifacts/vm-target-400/corpus/helium-vm-tasks-0-492385.bin
+bytes=1007953820
+sha256=b46074d64e834e40aa058f011111fc90eadee91a679f7253e509a250904c7c94
+```
+
+An exact audit at the SQL snapshot height 492,358 matched the canonical header
+state root and the SQL state counts: 122,935 accounts and 1,977,791 storage
+entries. SQL also had zero orphan storage rows, zero duplicate composite
+storage keys, address digest `a8194a9d5ea362e83a9ece39d496d085`, and
+storage digest `6f2e2c50d269c0dacfe2f970826d7517`. The primary
+indexer logged no errors. Slipstream logged only 41 handled missing-column
+compatibility errors of the same class retained by its controlled baseline;
+no other SQL or decode errors were found.
+
+The full run confirms the next optimization boundary rather than hiding it.
+Slipstream recorded 8,163.396 seconds of batch time, of which Cirrus SQL used
+7,600.879 seconds, or 93.11%. At rest, `cirrus` occupied 19 GB versus 3,086 MB
+for `eth`. The largest Cirrus relations were:
+
+| Relation | Approximate rows | Total size |
+|---|---:|---:|
+| `history@mapping` | 8.05 million | 11 GB |
+| `history@storage` | 3.40 million | 3.3 GB |
+| `event` | 2.53 million | 2.7 GB |
+| `mapping` | 710 thousand | 817 MB |
+| `event_array` | 1.40 million | 760 MB |
+
+This makes the row-history trigger and index volume the next isolated SQL
+target. Removing history semantics or its keys is not an acceptable shortcut;
+any further candidate needs fixed-input baseline/candidate table hashes and a
+fresh full-node zero-lag confirmation.
+
+### Slipstream source restoration
+
+The measured full run used Slipstream binary SHA-256
+`cf487171ce5581bdb2a48644c96e26fb325a1e086434c670ec2730c21db80502`.
+Its six performance-critical source modules are byte-identical to the modules
+now committed here. Commit `b718b928f18b79710181b00039ad24a65e508752`
+restores the bounded batching implementation whose controlled 20,000-event
+replay improved from a 267.240 to a 316.800 vmevents/s median (+18.55%), ended
+at Kafka lag zero, and matched every baseline table hash. Commit
+`cf461ce23889a2b63b44b8a76833f72ccb17f5f2` additionally restores the measured
+dynamic-statement-cache cleanup and JSON-value escaping safeguards.
+
+The exact committed source passes the focused suite with 8 examples and zero
+failures. Its rebuilt executable is banked at
+`artifacts/helium-direct-state-updates-20260902/bin-integrated-full-cf461ce/slipstream`,
+SHA-256
+`7aee6bcd61e0dd6ad5f6011197ed6a1ec718f101fc259f638e755e8924ba4735`.
+This rebuilt binary is a post-run reproducibility artifact, not a relabeling of
+the measured `cf487171...` executable.
+
+### Reproduce the full integrated checkpoint
+
+The wrapper now accepts explicit VM, primary-indexer, and Slipstream binaries
+and stops by canonical VM height only after both Kafka consumer lags are zero.
+Do not use `HELIUM_SYNC_STOP_VM_PROCESSED` for a height-qualified run.
+
+```bash
+workspace=/Users/kierenjameslubin/software/clean-clone-ii
+repo="$workspace/strato-platform-vm-quality-checkpoint"
+artifacts="$workspace/artifacts/helium-direct-state-updates-20260902"
+node="$artifacts/node-integrated-full-cf461ce-0-491153-02"
+bootstrap="$artifacts/bootstrap-integrated-full-cf461ce-0-491153-02"
+vm_source_parent=$(mktemp -d /private/tmp/helium-full-source.XXXXXX)
+vm_source="$vm_source_parent/strato-platform"
+git -C "$repo" worktree add --detach "$vm_source" \
+  cf461ce23889a2b63b44b8a76833f72ccb17f5f2
+
+caffeinate -dimsu env \
+  HELIUM_SYNC_VM_SOURCE_DIR="$vm_source" \
+  HELIUM_SYNC_VM_GIT_SHA=cf461ce23889a2b63b44b8a76833f72ccb17f5f2 \
+  HELIUM_SYNC_VM_BINARY="$artifacts/bin-integrated-sql-6cf91ab/vm-runner" \
+  HELIUM_SYNC_INDEX_BINARY="$artifacts/bin-integrated-sql-6cf91ab/strato-indexer" \
+  HELIUM_SYNC_SLIPSTREAM_BINARY="$artifacts/bin-integrated-full-cf461ce/slipstream" \
+  HELIUM_SYNC_EXPECTED_VM_SHA=bf93173a2e7be92c4cfa31f47cf6af6badffa5d70bb00254f31c01112f0589b7 \
+  HELIUM_SYNC_EXPECTED_INDEX_SHA=160a0141b35e23c8b214769724782d4051c6c7f9efb1b0d59668112b29e10ff2 \
+  HELIUM_SYNC_EXPECTED_SLIPSTREAM_SHA=7aee6bcd61e0dd6ad5f6011197ed6a1ec718f101fc259f638e755e8924ba4735 \
+  HELIUM_SYNC_NODE_DIR="$node" \
+  HELIUM_SYNC_BOOTSTRAP_DIR="$bootstrap" \
+  HELIUM_SYNC_STOP_VM_HEIGHT=491153 \
+  HELIUM_SYNC_SQL_DIFF=true \
+  HELIUM_SYNC_MIN_LOG_LEVEL=LevelError \
+  HELIUM_SYNC_AB_VARIANT=integrated-full-cf461ce \
+  HELIUM_SYNC_OPTIMIZED_CODE_SHA=9a951a6634eb8592f0e60681e9b03e65e20bcfb7 \
+  HELIUM_SYNC_VERSION=18.4-helium-integrated-full-cf461ce \
+  "$workspace/artifacts/helium-full-sync-20260902/run-helium-full-sync-optimized.sh"
+
+"$workspace/strato-platform-helium-rerun/bin/strato-down" "$node"
+git -C "$repo" worktree remove "$vm_source"
+rmdir "$vm_source_parent"
+```
+
+The authoritative receipts are in
+`artifacts/helium-direct-state-updates-20260902/node-integrated-sql-6cf91ab-0-250003-01/sync-timing`.
+They include the continuation samples, final barometer and Kafka offsets, SQL
+digests, PostgreSQL relation statistics, Slipstream phase metrics, error
+summary, and the exact block-492,358 VM audit.
