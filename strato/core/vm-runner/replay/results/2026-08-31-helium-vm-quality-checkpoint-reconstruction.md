@@ -748,6 +748,7 @@ corpus throughput estimate:
 |---|---|---:|---:|---:|---:|---:|---|
 | Accepted SQL-off reference | 0-361,199 | 361,200 | 448,649 | 2,123.554 s | 170.09 | 211.2727 | exact |
 | SQL-on full baseline (`8a5db21809`) | 0-361,199 | 361,200 | 448,649 | 2,959.063 s | 122.07 | 151.6186 | exact |
+| Dead-output cleanup, committed (`c085f13f63`) | 0-361,199 | 361,200 | 448,649 | 2,521.139 s | 143.27 | 177.9549 | exact |
 | SQL-on short baseline (`8a5db21809`) | 0-47,103 | 47,104 | 61,900 | 220.226 s | 213.89 | 281.0749 | exact |
 | Dead-output cleanup candidate | 0-47,103 | 47,104 | 61,900 | 188.651 s | 249.69 | 328.1191 | exact |
 | Rejected parallel serializer | 0-47,103 | 47,104 | 61,900 | 210.750 s | 223.51 | 293.7129 | exact |
@@ -760,6 +761,13 @@ work. The same change passes the already-read per-block storage update map to
 the Slipstream action constructor instead of fetching it a second time. On the
 matched genesis gate this improved SQL-on throughput by 16.74% and reduced
 elapsed time by 31.575 seconds.
+
+The clean committed full replay confirmed that the gain survives the entire
+corpus: 143.27 blk/s is 17.37% faster than the 122.07 blk/s SQL-on baseline,
+and its elapsed interval is 437.924 seconds shorter. It remains 15.77% slower
+than the 170.09 blk/s SQL-off reference. Consequently, a whole-corpus
+SQL-on rate above 200 blk/s cannot be reached by eliminating SQL publication
+overhead alone: the same optimized VM is already below 200 with SQL disabled.
 
 The parallel serializer was discarded because it introduced repeatable long
 GC/publication stalls (including 20-second chunks at 31,744 and 33,792) and
@@ -776,6 +784,7 @@ the genesis bootstrap is not published as ordinary state-update messages.
 The authoritative receipts are:
 
 - `artifacts/vm-target-400/results/sqldiff-quality-full-genesis-0-361199-8a5db21-02.result.txt`
+- `artifacts/vm-target-400/results/sqldiff-quality-full-genesis-0-361199-c085f13-01.result.txt`
 - `artifacts/vm-target-400/results/sqldiff-dead-output-cleanup-genesis-0-47103-01.result.txt`
 - `artifacts/vm-target-400/results/sqldiff-parallel-encode-genesis-0-47103-01.result.txt` (rejected)
 
