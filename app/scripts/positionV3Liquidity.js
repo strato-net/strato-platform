@@ -360,23 +360,23 @@ const fmtPrice = (n) => fmt(n, Number(n) >= 1000 ? 2 : Number(n) >= 1 ? 4 : 8);
     console.warn(`⚠ only one token budgeted — layers spanning the current price will be limited by the zero side\n`);
 
   // ---- center price ----
-  const spot = Number(pool.priceWad) / 1e18;
+  const poolPrice = Number(pool.priceWad) / 1e18;
   const oracle = Number(pool.oraclePriceWad) / 1e18;
   let center = args.price;
   if (center === undefined) {
     if (!(oracle > 0)) throw new Error(`pool has no oracle price — pass --price <${token1.symbol} per ${token0.symbol}>`);
     center = oracle;
   }
-  const driftPct = spot > 0 ? ((spot - center) / center) * 100 : 0;
+  const driftPct = poolPrice > 0 ? ((poolPrice - center) / center) * 100 : 0;
 
   console.log(`\n=== positionV3Liquidity — ${pair} (fee ${pool.fee / 10000}%) ===`);
   console.log(`Backend:      ${API}${who ? `  (as ${who})` : ""}`);
   console.log(`Pool:         ${pool.address}  tickSpacing ${pool.tickSpacing}  currentTick ${pool.currentTick}`);
-  console.log(`Pool spot:    1 ${token0.symbol} = ${fmt(spot, 6)} ${token1.symbol}`);
+  console.log(`Pool price:   1 ${token0.symbol} = ${fmt(poolPrice, 6)} ${token1.symbol}`);
   console.log(`Oracle:       ${oracle > 0 ? `1 ${token0.symbol} = ${fmt(oracle, 6)} ${token1.symbol}` : "n/a"}`);
-  console.log(`Center used:  ${fmt(center, 6)} ${args.price !== undefined ? "(--price)" : "(oracle)"}  — pool spot is ${fmt(driftPct, 2)}% off center`);
+  console.log(`Center used:  ${fmt(center, 6)} ${args.price !== undefined ? "(--price)" : "(oracle)"}  — pool price is ${fmt(driftPct, 2)}% off center`);
   if (Math.abs(driftPct) > 5)
-    console.warn(`⚠ pool spot deviates >5% from the chosen center — ranges near the center will mint single-sided until arbitrage converges`);
+    console.warn(`⚠ pool price deviates >5% from the chosen center — ranges near the center will mint single-sided until arbitrage converges`);
   console.log(
     `Budgets:      ${fromWei(budgets[0], token0.decimals)} ${token0.symbol} + ${fromWei(budgets[1], token1.decimals)} ${token1.symbol} ` +
       (reinvesting ? "(reinvesting exited principal + fees)" : "(--amount)")
