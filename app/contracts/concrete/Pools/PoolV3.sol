@@ -34,22 +34,36 @@ import "../../libraries/PoolV3/Position.sol";
  *
  * Deliberate divergences from canonical UniswapV3Pool.sol (platform extensions):
  * - Payment: approve + transferFrom (platform token model) instead of mint/swap callbacks;
- *   consequently flash() does not exist and users may call the pool directly, so mint/swap/burn
- *   carry trailing slippage/deadline parameters that canonical V3 delegates to its periphery
+ *   users may call the pool directly, so mint/swap/burn carry trailing slippage/deadline
+ *   parameters that canonical V3 delegates to its periphery. flash() keeps its callback (the
+ *   borrower must act between receiving and repaying): IPoolV3FlashCallback replaces
+ *   IUniswapV3FlashCallback, and repayment is a transfer back to the pool inside the callback,
+ *   verified by balance delta exactly as canonical. The fee is a flash-specific flashFee
+ *   (canonical charges the swap fee tier) that starts at zero until admins set it
  * - Protocol fees: canonical feeProtocol model (setFeeProtocol 1/x denominators per direction,
  *   per-step accrual into protocolFees0/1, collectProtocol withdrawal). Access is the factory
  *   or the pool owner (canonical: the factory owner); the factory's collectPoolProtocol wrapper
  *   routes proceeds to its feeCollector
  * - Admin: initialize carries the token/fee/factory wiring (proxy pattern); pause/disable,
  *   token-active gating, sync/skim and factory migration mirror the platform's V2 Pool
- * - Guard semantics: paused blocks mint+swap (exit stays open); disabled blocks everything;
- *   inactive tokens block mint+swap but never burn/collect
+ * - Guard semantics: paused blocks mint+swap+flash (exit stays open); disabled blocks everything;
+ *   inactive tokens block mint+swap+flash but never burn/collect; flashPaused blocks flash only
  * - Locking: as canonical, pools are born locked (slot0.unlocked == false in fresh proxied
  *   storage) and unlock at the end of initialize, so nothing runs before initialization
  *
  * @author Mercata Protocol
  * @version 1.0.0
  */
+/// @notice Callback for PoolV3.flash (canonical IUniswapV3FlashCallback). Any contract that
+///         calls flash must implement this and, before returning, transfer the borrowed amounts
+///         plus fee0/fee1 back to the pool
+interface IPoolV3FlashCallback {
+    /// @param fee0 The fee amount in token0 due to the pool by the end of the flash
+    /// @param fee1 The fee amount in token1 due to the pool by the end of the flash
+    /// @param data Any data passed through by the caller via the flash call
+    function poolV3FlashCallback(uint fee0, uint fee1, variadic data) external;
+}
+
 contract record PoolV3 is Ownable {
 
     // ============ EVENTS (canonical Uniswap V3 shapes) ============
@@ -69,8 +83,14 @@ contract record PoolV3 is Ownable {
     /// @notice Emitted on every swap; amounts are the pool's signed token deltas
     event Swap(address sender, address recipient, int amount0, int amount1, uint sqrtPriceX96, uint liquidity, int tick);
 
+    /// @notice Emitted by flash; paid0/paid1 are the amounts repaid over the borrowed principal
+    event Flash(address sender, address recipient, uint amount0, uint amount1, uint paid0, uint paid1);
+
     /// @notice Emitted when the observation ring buffer growth is scheduled
     event IncreaseObservationCardinalityNext(uint observationCardinalityNextOld, uint observationCardinalityNextNew);
+
+    /// @notice Emitted when the flash-specific fee is changed (platform extension)
+    event SetFlashFee(uint flashFeeOld, uint flashFeeNew);
 
     /// @notice Emitted when the protocol fee denominators are changed (canonical shape)
     event SetFeeProtocol(uint feeProtocol0Old, uint feeProtocol1Old, uint feeProtocol0New, uint feeProtocol1New);
@@ -105,6 +125,10 @@ contract record PoolV3 is Ownable {
 
     /// @notice Swap fee in hundredths of a bip (pips, 1e6 denominator; e.g. 3000 = 0.30%)
     uint public fee;
+
+    /// @notice Fee charged by flash in pips (platform extension). 0 = free flash loans, which is
+    ///         the default for new pools and for pools deployed before this field existed
+    uint public flashFee;
 
     /// @notice Ticks usable by positions must be multiples of this spacing
     int public tickSpacing;
@@ -172,6 +196,9 @@ contract record PoolV3 is Ownable {
 
     bool public isDisabled = false;
 
+    /// @notice Pauses flash() only; swaps and liquidity operations are unaffected
+    bool public isFlashPaused = false;
+
     /// @notice Whether the pool is unlocked (canonical slot0.unlocked). Pools are born locked —
     ///         false in fresh (proxied) storage — and unlock at the end of initialize, so no
     ///         lock-guarded call works before initialization, as canonical
@@ -208,6 +235,11 @@ contract record PoolV3 is Ownable {
         _;
     }
 
+    modifier whenFlashNotPaused() {
+        require(!isFlashPaused, "Flash is paused");
+        _;
+    }
+
     modifier onlyActiveTokens() {
         require(_tokenFactory().isTokenActive(address(token0)), "Token0 is not active");
         require(_tokenFactory().isTokenActive(address(token1)), "Token1 is not active");
@@ -226,6 +258,11 @@ contract record PoolV3 is Ownable {
         isDisabled = _isDisabled;
     }
 
+    /// @notice Pause or resume flash() without touching the pool-wide pause
+    function setFlashPaused(bool _isFlashPaused) external onlyOwner {
+        isFlashPaused = _isFlashPaused;
+    }
+
     /// @notice Set the denominator of the protocol's share of the swap fee (canonical setFeeProtocol)
     /// @param feeProtocol0 New protocol fee denominator for token0-input swaps (0, or 4..10)
     /// @param feeProtocol1 New protocol fee denominator for token1-input swaps (0, or 4..10)
@@ -238,6 +275,16 @@ contract record PoolV3 is Ownable {
         uint feeProtocolOld = feeProtocol;
         feeProtocol = feeProtocol0 + (feeProtocol1 << 4);
         emit SetFeeProtocol(feeProtocolOld % 16, feeProtocolOld >> 4, feeProtocol0, feeProtocol1);
+    }
+
+    /// @notice Set the flash-specific fee (platform extension)
+    /// @param _flashFee Fee charged by flash in pips (1e6 denominator); 0 = free flash loans
+    /// @dev Callable by the factory or the pool owner, like setFeeProtocol
+    function setFlashFee(uint _flashFee) external lock onlyPoolV3Factory {
+        require(_flashFee < 1000000, "Invalid flash fee");
+        uint flashFeeOld = flashFee;
+        flashFee = _flashFee;
+        emit SetFlashFee(flashFeeOld, _flashFee);
     }
 
     /// @notice Collect the protocol fee accrued to the pool (canonical collectProtocol)
@@ -1005,6 +1052,68 @@ contract record PoolV3 is Ownable {
 
         emit Swap(msg.sender, recipient, amount0, amount1, state.sqrtPriceX96, state.liquidity, state.tick);
         return (amount0, amount1);
+    }
+
+    // ============ FLASH ============
+
+    /// @notice Receive token0 and/or token1 and pay it back, plus a fee, in the callback
+    /// @param recipient The address which will receive the token0 and token1 amounts
+    /// @param amount0 The amount of token0 to send
+    /// @param amount1 The amount of token1 to send
+    /// @param data Any data to be passed through to the callback
+    /// @dev The caller of this method receives a callback in the form of
+    ///      IPoolV3FlashCallback.poolV3FlashCallback and must transfer amount0 + fee0 / amount1 +
+    ///      fee1 back to the pool before it returns. Fees are flashFee applied to the borrowed
+    ///      amounts, rounded up; anything repaid above the principal is split between
+    ///      the protocol (per feeProtocol) and in-range liquidity, as canonical. Reentering the
+    ///      pool from the callback reverts (lock)
+    function flash(
+        address recipient,
+        uint amount0,
+        uint amount1,
+        variadic data
+    ) external lock whenNotPaused whenFlashNotPaused onlyActiveTokens {
+        require(recipient != address(0), "Zero recipient");
+        uint _liquidity = liquidity;
+        require(_liquidity > 0, "L");
+
+        uint fee0 = FullMath.mulDivRoundingUp(amount0, flashFee, 1e6);
+        uint fee1 = FullMath.mulDivRoundingUp(amount1, flashFee, 1e6);
+        uint balance0Before = token0.balanceOf(address(this));
+        uint balance1Before = token1.balanceOf(address(this));
+
+        if (amount0 > 0) require(token0.transfer(recipient, amount0), "Token0 transfer failed");
+        if (amount1 > 0) require(token1.transfer(recipient, amount1), "Token1 transfer failed");
+
+        IPoolV3FlashCallback(msg.sender).poolV3FlashCallback(fee0, fee1, data);
+
+        uint balance0After = token0.balanceOf(address(this));
+        uint balance1After = token1.balanceOf(address(this));
+
+        require(balance0Before + fee0 <= balance0After, "F0");
+        require(balance1Before + fee1 <= balance1After, "F1");
+
+        // sub is safe because we know balanceAfter is gt balanceBefore by at least fee
+        uint paid0 = balance0After - balance0Before;
+        uint paid1 = balance1After - balance1Before;
+
+        // the principal came back, so only the overage moves the tracked balances (platform)
+        if (paid0 > 0) {
+            uint feeProtocol0 = feeProtocol % 16;
+            uint fees0 = feeProtocol0 == 0 ? 0 : paid0 / feeProtocol0;
+            if (fees0 > 0) protocolFees0 += fees0;
+            feeGrowthGlobal0X128 += int(FullMath.mulDiv(paid0 - fees0, FixedPoint128.Q128, _liquidity));
+            token0Balance += paid0;
+        }
+        if (paid1 > 0) {
+            uint feeProtocol1 = feeProtocol >> 4;
+            uint fees1 = feeProtocol1 == 0 ? 0 : paid1 / feeProtocol1;
+            if (fees1 > 0) protocolFees1 += fees1;
+            feeGrowthGlobal1X128 += int(FullMath.mulDiv(paid1 - fees1, FixedPoint128.Q128, _liquidity));
+            token1Balance += paid1;
+        }
+
+        emit Flash(msg.sender, recipient, amount0, amount1, paid0, paid1);
     }
 
     // ============ BALANCE RECONCILIATION (platform extension, mirrors Pool.sol) ============

@@ -156,6 +156,16 @@ contract record PoolFactory is Ownable {
         emit FeeParametersUpdated(newSwapFeeRate, newLpSharePercent);
     }
 
+    /// @notice Set the flash fee rate for a specific pool (owner or admin)
+    /// @param poolAddress The address of the pool to update
+    /// @param newFlashFeeRate Flash fee rate in basis points; 0 = free flash loans
+    /// @dev The pool must be owned by this factory (i.e., created by this factory)
+    function setPoolFlashFeeRate(address poolAddress, uint256 newFlashFeeRate) external onlyOwner {
+        require(poolAddress != address(0), "Zero pool address");
+        require(address(Pool(poolAddress).poolFactory()) == address(this), "Pool does not belong to this factory");
+        Pool(poolAddress).setFlashFeeRate(newFlashFeeRate);
+    }
+
     /// @notice Update fee parameters for a specific pool (owner or admin)
     /// @param poolAddress The address of the pool to update
     /// @param newSwapFeeRate New swap fee rate in basis points

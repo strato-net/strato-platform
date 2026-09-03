@@ -133,6 +133,15 @@ contract record PoolV3Factory is Ownable {
         PoolV3(poolAddress).setFeeProtocol(feeProtocol0, feeProtocol1);
     }
 
+    /// @notice Set a pool's flash-specific fee (owner only)
+    /// @param poolAddress The pool to configure
+    /// @param flashFee Fee charged by flash in pips (1e6 denominator); 0 = free flash loans
+    function setPoolFlashFee(address poolAddress, uint flashFee) external onlyOwner {
+        require(poolAddress != address(0), "Zero pool address");
+        require(address(PoolV3(poolAddress).poolV3Factory()) == address(this), "Pool does not belong to this factory");
+        PoolV3(poolAddress).setFlashFee(flashFee);
+    }
+
     /// @notice Collect a pool's accrued protocol fees to the factory's fee collector (owner only)
     /// @param poolAddress The pool to collect from
     /// @param amount0Requested The maximum amount of token0 to collect
