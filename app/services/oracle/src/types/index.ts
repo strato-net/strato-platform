@@ -21,7 +21,7 @@ export interface ExchangeRateConfig {
 
 export interface Asset {
     targetAssetAddress: string;
-    targetAssetAddressTestnet?: string; // used when ORACLE_IS_TESTNET=true
+    targetAssetAddressTestnet?: string; // used when STRATO metadata network is helium
     constantPrice?: number;
     weekendProxy?: string; // Proxy symbol for weekend/market-closed pricing (e.g., "PAXG" for XAU)
     equivalentAssets?: string[]; // Assets with equivalent prices (e.g., ["XAUT"] for XAU)
