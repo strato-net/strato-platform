@@ -32,12 +32,16 @@ const HexToken = ({ className, size }: { className: string; size: number }) => (
   </div>
 );
 
+const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four'];
+const numberWord = (n: number) => NUMBER_WORDS[n] ?? String(n);
+
 /**
- * Returning-user milestone popup ("One More Move Unlocks 500 Points", mock
- * slide 3). Shown on the dashboard to returning users who have not completed
- * all four milestone actions (0–3 of 4) — see lib/memberBenefits for the
- * selection. The reward is for the *next* action, so the UI must never read
- * as "complete all four".
+ * Returning-user milestone popup (mock slide 3). Shown on the dashboard to
+ * returning users who have not completed all four milestone actions (0–3 of
+ * 4) — see lib/memberBenefits for the selection. The 500-point bonus unlocks
+ * when *all four* actions are done, so the copy counts how many remain:
+ * "Complete All 4 Actions…" at 0 done, "2 More Moves Unlock…" at 2 done,
+ * "One More Move Unlocks…" at 3 done.
  */
 const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDialogProps) => {
   const navigate = useNavigate();
@@ -52,6 +56,28 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
   };
   const handleCta = () => goTo(nextMoveRoute(popup.completion));
 
+  const total = MILESTONE_ACTIONS.length;
+  const remaining = total - popup.completedCount;
+  const lastOne = remaining === 1;
+  const headline = lastOne
+    ? 'One More Move Unlocks 500 Points.'
+    : popup.completedCount === 0
+      ? `Complete All ${total} Actions to Unlock 500 Points.`
+      : `${remaining} More Moves Unlock 500 Points.`;
+  const subtitle = lastOne
+    ? 'Complete one more eligible action to finish this milestone and collect your bonus.'
+    : popup.completedCount === 0
+      ? `Complete all ${numberWord(total)} eligible actions to finish this milestone and collect your bonus.`
+      : `Complete the remaining ${numberWord(remaining)} eligible actions to finish this milestone and collect your bonus.`;
+  const pickerLabel = lastOne
+    ? 'Finish your last one to unlock your bonus'
+    : popup.completedCount === 0
+      ? `Complete all ${numberWord(total)} to unlock your bonus`
+      : `Complete the remaining ${numberWord(remaining)} to unlock your bonus`;
+  const footnote = lastOne
+    ? 'Complete the remaining eligible action to unlock the campaign reward. Terms apply.'
+    : `Complete all ${numberWord(total)} eligible actions to unlock the campaign reward. Terms apply.`;
+
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(next) => !next && onDismiss()}>
       <DialogPrimitive.Portal>
@@ -60,9 +86,7 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
           className="fixed left-1/2 top-1/2 z-50 max-h-[92vh] w-[calc(100vw-2rem)] max-w-[1180px] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 dark:bg-background"
           aria-describedby={undefined}
         >
-          <DialogPrimitive.Title className="sr-only">
-            One More Move Unlocks 500 Points.
-          </DialogPrimitive.Title>
+          <DialogPrimitive.Title className="sr-only">{headline}</DialogPrimitive.Title>
 
           {/* Header: logo | MEMBER BENEFIT pill + circled close */}
           <div className="flex items-center justify-between border-b border-border px-6 py-4 sm:px-10">
@@ -90,26 +114,22 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
               </div>
 
               <h2 className="mt-5 text-4xl font-bold leading-[1.08] tracking-tight text-strato-blue dark:text-foreground sm:text-[44px]">
-                One More Move Unlocks 500 Points.
+                {headline}
               </h2>
 
-              <p className="mt-5 max-w-[34rem] text-lg text-muted-foreground">
-                Complete one eligible action to finish this milestone and collect your bonus.
-              </p>
+              <p className="mt-5 max-w-[34rem] text-lg text-muted-foreground">{subtitle}</p>
 
-              {/* Next-move picker. The milestone completes on the *next* eligible
-                  action, so this is a list of choices, not a 0–100% progress bar
-                  (which read as "2 more to go" and contradicted the headline).
-                  Likewise no "0 of 4 done" counter: it implied all four were
-                  required. Already-done actions are marked inline instead. */}
+              {/* Action checklist. All four are required, so each remaining
+                  action is a clickable row and already-done actions are ticked
+                  inline. */}
               <div className="mt-7 rounded-xl border border-border bg-card p-5">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-strato-blue dark:text-foreground">
-                    Pick any one to unlock your bonus
+                    {pickerLabel}
                   </span>
                   {popup.completedCount > 0 && (
                     <span className="text-sm font-semibold text-muted-foreground">
-                      {popup.completedCount} already done
+                      {popup.completedCount} of {total} done
                     </span>
                   )}
                 </div>
@@ -164,9 +184,7 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
                   Maybe Later
                 </button>
               </div>
-              <p className="mt-4 text-xs text-muted-foreground/80">
-                Complete one eligible action to unlock the campaign reward. Terms apply.
-              </p>
+              <p className="mt-4 text-xs text-muted-foreground/80">{footnote}</p>
             </div>
 
             {/* Right column: illustration — deep blue panel with the ascending
