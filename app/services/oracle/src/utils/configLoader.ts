@@ -1,5 +1,16 @@
 import { SourceConfig, Asset } from '../types';
 
+export function isOracleTestnet(): boolean {
+    return process.env.ORACLE_IS_TESTNET === 'true';
+}
+
+export function resolveTargetAssetAddress(asset: Asset): string {
+    if (isOracleTestnet() && asset.targetAssetAddressTestnet) {
+        return asset.targetAssetAddressTestnet;
+    }
+    return asset.targetAssetAddress;
+}
+
 type SourcesConfig = Record<string, SourceConfig>;
 
 export class ConfigLoader {
@@ -56,5 +67,9 @@ export class ConfigLoader {
 
     public getAllAssets(): Record<string, Asset> {
         return this.assets;
+    }
+
+    public resolveTargetAddress(asset: Asset): string {
+        return resolveTargetAssetAddress(asset);
     }
 }

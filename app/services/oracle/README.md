@@ -21,6 +21,7 @@ Fetches asset prices from multiple sources and pushes them to the STRATO blockch
 # STRATO Configuration
 STRATO_NODE_URL=https://node1.testnet.strato.nexus/
 PRICE_ORACLE_ADDRESS=0000000000000000000000000000000000001002
+ORACLE_IS_TESTNET=true  # testnet nodes: true; prod: false or omit
 
 # OAuth Configuration
 OAUTH_CLIENT_ID=your-client-id

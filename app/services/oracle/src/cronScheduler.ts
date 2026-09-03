@@ -182,14 +182,14 @@ function aggregatePrices(
         if (isValid) {
             checkSourceDivergence(assetKey, sources, medianPrice);
             // Check for significant price change vs previous on-chain price
-            const previousPrice = previousPrices.get(asset.targetAssetAddress.toLowerCase()) || 0;
+            const previousPrice = previousPrices.get(configLoader.resolveTargetAddress(asset).toLowerCase()) || 0;
             checkPriceChange(assetKey, medianPrice, previousPrice);
         }
         
         return {
             assetKey,
             medianPrice,
-            targetAddress: asset.targetAssetAddress,
+            targetAddress: configLoader.resolveTargetAddress(asset),
             sources,
             expectedSourceCount: expectedCount,
             ...(isValid ? {} : { failed: true, error: `Not enough sources (${sources.length}/${requiredSources})` })
@@ -271,18 +271,19 @@ async function applyRebaseFactors(
             const rebasedPrice = Number(BigInt(underlying.medianPrice) * rawFactor / precision);
             const sourceName = `${rebase.underlyingAsset}×rebaseFactor (${Number(rawFactor * 10000n / precision) / 10000})`;
 
-            const previousPrice = previousPrices.get(asset.targetAssetAddress.toLowerCase()) || 0;
+            const targetAddress = configLoader.resolveTargetAddress(asset);
+            const previousPrice = previousPrices.get(targetAddress.toLowerCase()) || 0;
             checkPriceChange(assetKey, rebasedPrice, previousPrice);
 
             prices.push({
                 assetKey,
                 medianPrice: rebasedPrice,
-                targetAddress: asset.targetAssetAddress,
+                targetAddress,
                 sources: [{ name: sourceName, price: rebasedPrice }],
                 expectedSourceCount: 1,
             });
 
-            collectedFactors.push({ targetAddress: asset.targetAssetAddress, factor: wadFactor });
+            collectedFactors.push({ targetAddress, factor: wadFactor });
 
             logInfo('CronScheduler', `${assetKey}: rebased price $${(rebasedPrice / 1e18).toFixed(4)} (underlying=$${(underlying.medianPrice / 1e18).toFixed(4)}, wadFactor=${wadFactor})`);
         } catch (err) {
@@ -320,7 +321,7 @@ async function collectExchangeRates(configLoader: ConfigLoader): Promise<Exchang
             if (wadRate <= 0n) return null;
 
             logInfo('CronScheduler', `${assetKey}: exchangeRate=${wadRate} (raw=${rawRate})`);
-            return { targetAddress: asset.targetAssetAddress, rate: wadRate };
+            return { targetAddress: configLoader.resolveTargetAddress(asset), rate: wadRate };
         } catch (err) {
             logError('CronScheduler', new Error(
                 `${assetKey}: exchange rate fetch failed: ${(err as Error).message}`

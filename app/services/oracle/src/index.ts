@@ -17,6 +17,7 @@ async function main(): Promise<void> {
         logInfo('Main', 'Starting Price Oracle Service...');
         logInfo('Main', `STRATO Node: ${process.env.STRATO_NODE_URL}`);
         logInfo('Main', `Oracle Address: ${process.env.PRICE_ORACLE_ADDRESS}`);
+        logInfo('Main', `ORACLE_IS_TESTNET: ${process.env.ORACLE_IS_TESTNET === 'true'}`);
         
         await startCronScheduler();
         
