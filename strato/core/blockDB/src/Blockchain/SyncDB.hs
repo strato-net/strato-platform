@@ -117,12 +117,43 @@ forceBestBlockInfo sha i =
 forceBestBlockInfo' :: RedisCtx m f => S8.ByteString -> BestBlock -> m (f REDIS.Status)
 forceBestBlockInfo' key = REDIS.set key . toValue
 
+-- | Redis answers almost every command with @-LOADING@ while it reads its
+-- dump back into memory after a restart; on a node with a multi-GB dataset
+-- that window is tens of seconds. It is a transient startup state, not a
+-- failure, so wait it out rather than propagating it: convoke kills every
+-- other process when any single one exits, so failing here turns a slow Redis
+-- start into a full node outage that needs manual recovery.
+redisLoadingBackoff :: Int
+redisLoadingBackoff = 2 {- s -} * 1000000 {- us/s -}
+
+maxRedisLoadingRetries :: Int
+maxRedisLoadingRetries = 150 -- ~5 minutes at redisLoadingBackoff
+
+isLoadingReply :: REDIS.Reply -> Bool
+isLoadingReply (REDIS.Error e) = "LOADING" `S8.isPrefixOf` e
+isLoadingReply _               = False
+
+-- | Retry for as long as Redis reports it is still loading its dataset. Every
+-- other reply, errors included, is handed back untouched.
+retryWhileRedisLoading :: T.Text -> Redis (Either REDIS.Reply a) -> Redis (Either REDIS.Reply a)
+retryWhileRedisLoading src act = withRetryCount 0
+  where
+    withRetryCount theRetryCount = act >>= \case
+      Left err | isLoadingReply err && theRetryCount < maxRedisLoadingRetries -> do
+        when (theRetryCount `mod` 5 == 0) . liftLog $
+          $logWarnS src . T.pack $
+            "Redis is still loading its dataset, waiting (attempt "
+              ++ show (theRetryCount + 1) ++ "/" ++ show maxRedisLoadingRetries ++ ")"
+        liftIO $ threadDelay redisLoadingBackoff
+        withRetryCount (theRetryCount + 1)
+      res -> return res
+
 getBestBlockInfo :: Redis (Maybe BestBlock)
 getBestBlockInfo = getBestBlockInfo' bestBlockInfoKey
 
 getBestSequencedBlockInfo :: Redis (Maybe BestSequencedBlock)
 getBestSequencedBlockInfo =
-  REDIS.get bestSequencedBlockInfoKey >>= \case
+  retryWhileRedisLoading "getBestSequencedBlockInfo" (REDIS.get bestSequencedBlockInfoKey) >>= \case
     Left e  -> error $ "error trying to get BestSequencedBlock: " ++ show e
     Right v ->  return $ fmap fromValue v
 
@@ -131,7 +162,7 @@ putBestSequencedBlockInfo = REDIS.set bestSequencedBlockInfoKey . toValue
 
 getBestBlockInfo' :: S8.ByteString -> Redis (Maybe BestBlock)
 getBestBlockInfo' key =
-  REDIS.get key >>= \case
+  retryWhileRedisLoading "getBestBlockInfo'" (REDIS.get key) >>= \case
     Left x -> do
       liftLog $ $logErrorS "getBestBlockInfo'" . T.pack $ "got Left " ++ show x
       return Nothing
