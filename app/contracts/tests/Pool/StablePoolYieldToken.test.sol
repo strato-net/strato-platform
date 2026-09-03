@@ -1,6 +1,37 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/access/Authorizable.sol";
 
+/// @notice Minimal flash borrower: repays principal + fee of every coin from its own balance
+contract YieldFlashBorrower {
+    StablePool pool;
+    address[] tokens;
+    uint[] amounts;
+    uint[] lastFees;
+
+    function init(address _pool, address[] _tokens) public {
+        pool = StablePool(_pool);
+        tokens = _tokens;
+    }
+
+    function go(address recipient, uint[] _amounts) public {
+        amounts = _amounts;
+        pool.flash(recipient, _amounts, "note");
+    }
+
+    function lastFee(uint i) public view returns (uint) {
+        return lastFees[i];
+    }
+
+    function stablePoolFlashCallback(uint[] fees, variadic data) external {
+        require(msg.sender == address(pool), "YieldFlashBorrower: bad pool");
+        lastFees = fees;
+        for (uint i = 0; i < tokens.length; i++) {
+            uint repay = amounts[i] + fees[i];
+            if (repay > 0) require(ERC20(tokens[i]).transfer(address(pool), repay), "repay failed");
+        }
+    }
+}
+
 contract Describe_StablePool_YieldToken is Authorizable {
 
     Mercata m;
@@ -297,5 +328,45 @@ contract Describe_StablePool_YieldToken is Authorizable {
         ERC20(vaultAddress).approve(address(triPool), 100e18);
         uint outSUSDS = triPool.exchange(2, 1, 100e18, 1, address(0));
         require(outSUSDS > 99e18, "saveUSDST ($1.10) should buy roughly equal sUSDS ($1.08)");
+    }
+
+    // =====================================================================
+    // Flash on a yield-token pool: the assetType-3 _storedRates path (exchangeRate + asset
+    // calls on the vault) runs after the callback and must settle the fee like any other coin
+    // =====================================================================
+
+    function it_flash_works_on_a_yield_token_pool() {
+        Token(tokenBAddress).approve(address(pool), 2000e18);
+        ERC20(vaultAddress).approve(address(pool), 2000e18);
+        pool.addLiquidityGeneral([uint(2000e18), uint(2000e18)], 1, address(0));
+        pool.setFlashFee(30000000); // 0.3%
+
+        // rate 1.2: saveUSDST is worth more than tokenB, so the type-3 rate branch is non-trivial
+        Token(usdstAddress).transfer(vaultAddress, 20000e18);
+        vault.recordRewardTransfer(20000e18);
+        require(vault.exchangeRate() == 12e17, "exchange rate should be 1.2e18");
+
+        YieldFlashBorrower b = new YieldFlashBorrower();
+        b.init(address(pool), [tokenBAddress, vaultAddress]);
+        Token(usdstAddress).approve(vaultAddress, 120e18);
+        vault.deposit(120e18, address(b)); // saveUSDST float for the fee
+        require(ERC20(vaultAddress).balanceOf(address(b)) >= 1e18, "Borrower needs saveUSDST float");
+
+        uint d0 = pool.computeInvariant();
+        uint poolBeforeV = ERC20(vaultAddress).balanceOf(address(pool));
+        uint poolBeforeB = ERC20(tokenBAddress).balanceOf(address(pool));
+        uint zero = 0;
+        uint amountV = 100e18;
+
+        b.go(address(b), [zero, amountV]);
+
+        require(b.lastFee(0) == 0, "Unborrowed coin carries no fee");
+        require(b.lastFee(1) == 300000000000000000, "Fee should be 0.3% of the borrowed saveUSDST: " + string(b.lastFee(1)));
+        require(ERC20(vaultAddress).balanceOf(address(pool)) == poolBeforeV + 300000000000000000, "Pool should hold the fee");
+        require(ERC20(tokenBAddress).balanceOf(address(pool)) == poolBeforeB, "Token B must be untouched");
+        require(pool.tokenBalances(vaultAddress) == ERC20(vaultAddress).balanceOf(address(pool)), "Tracked saveUSDST balance out of sync");
+        require(pool.adminBalances(vaultAddress) == 150000000000000000, "Admin half mismatch: " + string(pool.adminBalances(vaultAddress)));
+        require(pool.computeInvariant() > d0, "D must grow by the LP share of the fee");
+        require(pool.aToBRatio() > 0.0 && pool.bToARatio() > 0.0, "Ratios must be refreshed with the yield-token rate");
     }
 }

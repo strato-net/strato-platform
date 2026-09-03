@@ -8,6 +8,15 @@ import "../../abstract/ERC20/ERC20.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
 
+/// @notice Callback for StablePool.flash (the multi-coin analogue of IPoolV3FlashCallback). Any
+///         contract that calls flash must implement this and, before returning, transfer the
+///         borrowed amounts plus fees[i] of every coin back to the pool
+interface IStablePoolFlashCallback {
+    /// @param fees The fee amount of each coin (indexed like coins) due to the pool by the end of the flash
+    /// @param data Any data passed through by the caller via the flash call
+    function stablePoolFlashCallback(uint[] fees, variadic data) external;
+}
+
 contract record StablePool is Ownable {
 
     // ============ EVENTS ============
@@ -32,9 +41,14 @@ contract record StablePool is Ownable {
 
     event ApplyNewFee(uint fee, uint offpegFeeMultiplier);
 
+    event ApplyNewFlashFee(uint flashFee);
+
     event SetNewMATime(uint maExpTime, uint DMaTime);
 
     event CoinAdded(address indexed coin, uint assetType, uint rateMultiplier, address oracle, uint initialAmount, uint lpMinted);
+
+    /// @notice Emitted by flash; paid[i] is the amount of coin i repaid over the borrowed principal
+    event Flash(address indexed sender, address recipient, uint[] amounts, uint[] paid);
 
     uint constant MAX_COINS = 8;
 
@@ -57,6 +71,9 @@ contract record StablePool is Ownable {
     uint public fee;
 
     uint public offpegFeeMultiplier;
+
+    /// @notice Fee charged by flash on the borrowed amounts, in FEE_DENOMINATOR units; independent of the swap fee, 0 (the default) = free
+    uint public flashFee;
 
     uint public constant adminFee = 5e9;
 
@@ -124,6 +141,9 @@ contract record StablePool is Ownable {
 
     bool public isDisabled = false;
 
+    /// @notice Pauses flash() only; swaps and liquidity operations are unaffected
+    bool public isFlashPaused = false;
+
     // ============ STATE VARIABLES ============
     /// @notice Reentrancy guard to prevent recursive calls
     bool private locked;
@@ -154,6 +174,11 @@ contract record StablePool is Ownable {
         _;
     }
 
+    modifier whenFlashNotPaused() {
+        require(!isFlashPaused, "Flash is paused");
+        _;
+    }
+
     // ============ OWNER FUNCTIONS ============
 
     function setPaused(bool _isPaused) external onlyOwner {
@@ -164,6 +189,11 @@ contract record StablePool is Ownable {
     function setDisabled(bool _isDisabled) external onlyOwner {
         isPaused = _isDisabled ? true : isPaused;
         isDisabled = _isDisabled;
+    }
+
+    /// @notice Pause or resume flash() without touching the pool-wide pause
+    function setFlashPaused(bool _isFlashPaused) external onlyOwner {
+        isFlashPaused = _isFlashPaused;
     }
 
     function setUsdst(address _usdst) external onlyOwner {
@@ -627,7 +657,7 @@ contract record StablePool is Ownable {
         uint256 minTokenBAmount,
         uint256 minTokenAAmount,
         uint256 deadline
-    ) external whenNotDisabled returns (uint256, uint256) {
+    ) external whenNotDisabled nonReentrant returns (uint256, uint256) {
         require(lpTokenAmount > 0 && minTokenBAmount > 0 && minTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
         uint256 totalLiquidity = lpToken.totalSupply();
@@ -703,6 +733,60 @@ contract record StablePool is Ownable {
 
     function withdrawAdminFees() external nonReentrant {
         _withdrawAdminFees();
+    }
+
+    // ============ FLASH ============
+
+    /// @notice Receive any combination of the pool's coins and pay them back, plus a fee, in the callback
+    /// @param recipient The address which will receive the borrowed amounts
+    /// @param amounts The amount of each coin to send (indexed like coins)
+    /// @param data Any data to be passed through to the callback
+    /// @dev The caller receives a callback in the form of IStablePoolFlashCallback.stablePoolFlashCallback
+    ///      and must transfer amounts[i] + fees[i] of every coin back to the pool before it returns;
+    ///      repayment is verified by balance delta, as PoolV3.flash. Fees are flashFee (owner-set via
+    ///      setFlashFee, zero until set) applied to the borrowed amounts, rounded up; anything
+    ///      repaid above the principal is split like a swap fee: adminFee of it to adminBalances, the
+    ///      rest stays with the LPs. Reentering the pool from the callback reverts (nonReentrant)
+    function flash(address recipient, uint[] amounts, variadic data) external whenNotPaused whenFlashNotPaused nonReentrant {
+        require(recipient != address(0), "Zero recipient");
+        require(amounts.length == coins.length, "Invalid array length for amounts");
+        require(lpToken.totalSupply() > 0, "POOL_EMPTY");
+
+        uint[] fees;
+        uint[] balancesBefore;
+        for (uint i = 0; i < coins.length; i++) {
+            address tokenAddr = address(coins[i]);
+            fees.push((amounts[i] * flashFee + FEE_DENOMINATOR - 1) / FEE_DENOMINATOR);
+            balancesBefore.push(ERC20(tokenAddr).balanceOf(this));
+            if (amounts[i] > 0) ERC20(tokenAddr).transfer(recipient, amounts[i]);
+        }
+
+        IStablePoolFlashCallback(msg.sender).stablePoolFlashCallback(fees, data);
+
+        uint[] paid;
+        for (uint j = 0; j < coins.length; j++) {
+            address tokenAddr = address(coins[j]);
+            uint balanceAfter = ERC20(tokenAddr).balanceOf(this);
+            require(balancesBefore[j] + fees[j] <= balanceAfter, "Flash loan not repaid");
+            paid.push(balanceAfter - balancesBefore[j]);
+
+            // the principal came back, so only the overage moves the tracked balances
+            if (paid[j] > 0) {
+                adminBalances[tokenAddr] += (paid[j] * adminFee) / FEE_DENOMINATOR;
+                tokenBalances[tokenAddr] += paid[j];
+                if (j == 0) tokenABalance = tokenBalances[tokenAddr];
+                else if (j == 1) tokenBBalance = tokenBalances[tokenAddr];
+            }
+        }
+
+        uint amp = _A();
+        uint[] rates = _storedRates();
+        uint[] xp = _xpMem(rates, _balances());
+        uint d = getD(xp, amp);
+        upkeepOracles(xp, amp, d);
+        _updateRatios(rates, xp, amp, d);
+
+        emit Flash(msg.sender, recipient, amounts, paid);
     }
 
     function _dynamicFee(uint xpi, uint xpj, uint _fee) internal view returns (uint) {
@@ -1186,6 +1270,14 @@ contract record StablePool is Ownable {
         emit ApplyNewFee(_newFee, _newOffpegFeeMultiplier);
     }
 
+    /// @notice Set the fee charged on flash loans, independent of the swap fee (0 = free flash loans)
+    function setFlashFee(uint _newFlashFee) external onlyOwner {
+        require(_newFlashFee <= MAX_FEE, "Cannot set flash fee higher than MAX_FEE");
+        flashFee = _newFlashFee;
+
+        emit ApplyNewFlashFee(_newFlashFee);
+    }
+
     function setMaExpTime(uint _maExpTime, uint _DMaTime) external onlyOwner {
         require(_maExpTime * _DMaTime > 0, "0 in input values");
 
@@ -1315,7 +1407,7 @@ contract record StablePool is Ownable {
     /// @param receiver The address to receive the tokens
     /// @dev Withdraws admin fees first, then transfers all remaining tokens
     /// @dev Only callable by the pool factory or pool owner
-    function migrateAllTokens(address receiver) external onlyPoolFactory {
+    function migrateAllTokens(address receiver) external onlyPoolFactory nonReentrant {
         require(receiver != address(0), "Cannot migrate to address 0");
         _withdrawAdminFees();
         for (uint i = 0; i < coins.length; i++) {
