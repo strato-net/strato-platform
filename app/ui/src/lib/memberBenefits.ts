@@ -155,7 +155,7 @@ export async function fetchHasAnyActivity(): Promise<boolean> {
  * not on every dashboard visit.
  *
  * - 4 of 4: nothing to nudge — the milestone is complete.
- * - 0–3 of 4: the milestone popup ("Complete All 4 Actions to Unlock 500
+ * - 0–3 of 4: the milestone popup ("Complete All 4 Actions to Unlock 5
  *   Points", counting down to "One More Move" at 3 of 4). At
  *   0 of 4 the caller must confirm the user is returning at all
  *   (hasAnyActivity) — brand-new accounts get nothing; these are

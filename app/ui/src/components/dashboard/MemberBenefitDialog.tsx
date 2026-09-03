@@ -38,7 +38,7 @@ const numberWord = (n: number) => NUMBER_WORDS[n] ?? String(n);
 /**
  * Returning-user milestone popup (mock slide 3). Shown on the dashboard to
  * returning users who have not completed all four milestone actions (0–3 of
- * 4) — see lib/memberBenefits for the selection. The 500-point bonus unlocks
+ * 4) — see lib/memberBenefits for the selection. The 5-point bonus unlocks
  * when *all four* actions are done, so the copy counts how many remain:
  * "Complete All 4 Actions…" at 0 done, "2 More Moves Unlock…" at 2 done,
  * "One More Move Unlocks…" at 3 done.
@@ -60,10 +60,10 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
   const remaining = total - popup.completedCount;
   const lastOne = remaining === 1;
   const headline = lastOne
-    ? 'One More Move Unlocks 500 Points.'
+    ? 'One More Move Unlocks 5 Points.'
     : popup.completedCount === 0
-      ? `Complete All ${total} Actions to Unlock 500 Points.`
-      : `${remaining} More Moves Unlock 500 Points.`;
+      ? `Complete All ${total} Actions to Unlock 5 Points.`
+      : `${remaining} More Moves Unlock 5 Points.`;
   const subtitle = lastOne
     ? 'Complete one more eligible action to finish this milestone and collect your bonus.'
     : popup.completedCount === 0
@@ -244,7 +244,7 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
                   MILESTONE BONUS
                 </div>
                 <div className="mt-1 text-2xl font-extrabold tracking-tight text-strato-blue sm:text-3xl">
-                  <span className="text-strato-lightblue">+500</span> PTS
+                  <span className="text-strato-lightblue">+5</span> PTS
                 </div>
               </div>
             </div>
