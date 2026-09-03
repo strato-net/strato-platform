@@ -976,7 +976,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     // instrumentation.
     captureApi("bridge_in", "started", {
       transport: "wagmi",
-      network: selectedNetwork,
+      source_network: selectedNetwork,
       token_symbol: selectedToken.externalSymbol,
       route_type: selectedToken.routeType,
     });
@@ -1281,7 +1281,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       setAmount("");
       captureApi("bridge_in", "succeeded", {
         transport: "wagmi",
-        network: selectedNetwork,
+        source_network: selectedNetwork,
         token_symbol: selectedToken.externalSymbol,
         tx_hash: txHash,
       });
@@ -1296,7 +1296,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       setProgressError(bridgeError.userMessage);
       captureApi("bridge_in", "failed", {
         transport: "wagmi",
-        network: selectedNetwork,
+        source_network: selectedNetwork,
         token_symbol: selectedToken.externalSymbol,
         error_message: bridgeError.userMessage,
       });

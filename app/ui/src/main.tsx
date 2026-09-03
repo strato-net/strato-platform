@@ -19,7 +19,11 @@ trackEngage();
 // Use runtime config (from /config.js) if available, fallback to build-time env var
 const posthogKey = (window as any).ENV?.POSTHOG_KEY || import.meta.env.VITE_POSTHOG_KEY;
 const posthogHost = (window as any).ENV?.POSTHOG_HOST || import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com';
-if (posthogKey && posthogKey.trim() !== '') {
+// The per-node healthcheck hostnames (app-<n>-healthcheck-internal-*.strato.nexus)
+// are reached only by ops and team members, never by customers, so analytics from
+// them would only pollute the production project.
+const isInternalHost = /healthcheck-internal/.test(window.location.hostname);
+if (posthogKey && posthogKey.trim() !== '' && !isInternalHost) {
   posthog.init(posthogKey, {
     api_host: posthogHost,
     // SPA: PostHog's default pageview capture only fires on full page loads, so

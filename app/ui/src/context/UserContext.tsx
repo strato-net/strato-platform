@@ -323,6 +323,27 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   }, [externalWalletAddress]);
 
   const walletConnectedCapturedRef = useRef<Set<string>>(new Set());
+  const WALLET_CONNECTED_CAPTURED_KEY = 'ph_wallet_connected_captured';
+  const hasCapturedWalletConnected = (key: string): boolean => {
+    if (walletConnectedCapturedRef.current.has(key)) return true;
+    try {
+      const stored: string[] = JSON.parse(sessionStorage.getItem(WALLET_CONNECTED_CAPTURED_KEY) ?? '[]');
+      return stored.includes(key);
+    } catch {
+      return false;
+    }
+  };
+  const markWalletConnectedCaptured = (key: string): void => {
+    walletConnectedCapturedRef.current.add(key);
+    try {
+      const stored: string[] = JSON.parse(sessionStorage.getItem(WALLET_CONNECTED_CAPTURED_KEY) ?? '[]');
+      if (!stored.includes(key)) {
+        sessionStorage.setItem(WALLET_CONNECTED_CAPTURED_KEY, JSON.stringify([...stored, key]));
+      }
+    } catch {
+      // sessionStorage unavailable: fall back to the in-memory guard
+    }
+  };
 
   // Tracking-links beacon: fires when a wallet or STRATO account becomes
   // available, whichever arrives first (guest wallet connects included).
@@ -335,10 +356,14 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
     // trackWalletConnected dedupes inside its own module, so the analytics
     // event needs its own guard: this effect also re-runs when the connector id
-    // resolves after the address, which would otherwise double-count.
-    const key = (stratoAddress ?? externalWalletAddress ?? '').toLowerCase();
-    if (key && !walletConnectedCapturedRef.current.has(key)) {
-      walletConnectedCapturedRef.current.add(key);
+    // resolves after the address, which would otherwise double-count. The key
+    // strips the 0x prefix because the STRATO connector surfaces the same
+    // account prefixed via wagmi and unprefixed via /user/me. The guard is
+    // persisted in sessionStorage so a full reload mid-session does not
+    // re-report a connection that already happened.
+    const key = (stratoAddress ?? externalWalletAddress ?? '').toLowerCase().replace(/^0x/, '');
+    if (key && !hasCapturedWalletConnected(key)) {
+      markWalletConnectedCaptured(key);
       capture('wallet_connected', {
         connector,
         has_external_wallet: !!externalWalletAddress,

@@ -58,6 +58,12 @@ export type ApiAction =
   | 'stake_self_unbond'
   | 'stake_operator_claim'
   | 'stake_commission'
+  | 'stake_activate'
+  | 'stake_register'
+  | 'stake_exit'
+  | 'stake_exit_cancel'
+  | 'stake_claim_fees'
+  | 'stake_operator_claim_fees'
   | 'safety_stake'
   | 'safety_cooldown'
   | 'safety_redeem'
@@ -87,6 +93,10 @@ export type ApiAction =
   // money in / rewards / referral
   | 'onramp_session'
   | 'credit_card_top_up'
+  | 'credit_card_add'
+  | 'credit_card_update'
+  | 'credit_card_remove'
+  | 'contact_submit'
   | 'rewards_claim'
   | 'rewards_claim_all'
   | 'refer_deposit'
@@ -188,6 +198,12 @@ const API_EVENT_MAP: Record<string, ApiAction> = {
   'POST /staking/self-unbond': 'stake_self_unbond',
   'POST /staking/operator/claim': 'stake_operator_claim',
   'POST /staking/commission': 'stake_commission',
+  'POST /staking/activate': 'stake_activate',
+  'POST /staking/register': 'stake_register',
+  'POST /staking/exit': 'stake_exit',
+  'POST /staking/exit/cancel': 'stake_exit_cancel',
+  'POST /staking/claim-fees': 'stake_claim_fees',
+  'POST /staking/operator/claim-fees': 'stake_operator_claim_fees',
 
   // earn
   'POST /earn/save-usdst/deposit': 'save_deposit',
@@ -216,6 +232,10 @@ const API_EVENT_MAP: Record<string, ApiAction> = {
   // money in / rewards / referral
   'POST /onramp/session': 'onramp_session',
   'POST /credit-card/manual-top-up': 'credit_card_top_up',
+  'POST /credit-card/add-card': 'credit_card_add',
+  'POST /credit-card/update-card': 'credit_card_update',
+  'POST /credit-card/remove-card': 'credit_card_remove',
+  'POST /contact': 'contact_submit',
   'POST /rewards/claim-all': 'rewards_claim_all',
   'POST /rewards/claim/*': 'rewards_claim',
   'POST /refer/deposit': 'refer_deposit',
