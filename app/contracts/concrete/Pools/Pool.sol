@@ -14,8 +14,11 @@ import "../../abstract/ERC20/access/Ownable.sol";
  * - Automated market making using x * y = k formula
  * - Liquidity provision and removal with LP token rewards
  * - Swap functionality with configurable fees
+ * - Flash loans of either reserve, repaid plus a fee inside a callback (see flash); the flash
+ *   fee rate is configurable per pool and starts at zero
  * - Fee distribution between protocol and liquidity providers
- * - Reentrancy protection for security
+ * - Reentrancy protection: one lock shared by every reserve-moving entry point, so a flash
+ *   callback cannot re-enter the pool
  *
  * Fee Structure:
  * - Total swap fee is split between protocol and LP providers
@@ -25,6 +28,16 @@ import "../../abstract/ERC20/access/Ownable.sol";
  * @author Mercata Protocol
  * @version 1.0.0
  */
+/// @notice Callback for Pool.flash (the V2 analogue of IPoolV3FlashCallback). Any contract that
+///         calls flash must implement this and, before returning, transfer the borrowed amounts
+///         plus feeA/feeB back to the pool
+interface IPoolFlashCallback {
+    /// @param feeA The fee amount in tokenA due to the pool by the end of the flash
+    /// @param feeB The fee amount in tokenB due to the pool by the end of the flash
+    /// @param data Any data passed through by the caller via the flash call
+    function poolFlashCallback(uint256 feeA, uint256 feeB, variadic data) external;
+}
+
 contract record Pool is Ownable {
 
     // ============ EVENTS ============
@@ -48,6 +61,15 @@ contract record Pool is Ownable {
     /// @param tokenBAmount The amount of tokenB received
     /// @param tokenAAmount The amount of tokenA received
     event RemoveLiquidity(address provider, uint256 tokenBAmount, uint256 tokenAAmount);
+
+    /// @notice Emitted by flash
+    /// @param sender The address that initiated the flash (and received the callback)
+    /// @param recipient The address that received the borrowed amounts
+    /// @param amountA The amount of tokenA lent
+    /// @param amountB The amount of tokenB lent
+    /// @param paidA The amount of tokenA repaid over the borrowed principal
+    /// @param paidB The amount of tokenB repaid over the borrowed principal
+    event Flash(address sender, address recipient, uint256 amountA, uint256 amountB, uint256 paidA, uint256 paidB);
 
     /// @notice Emitted when excess tokens are skimmed from the pool
     /// @param to The address that received the excess tokens
@@ -75,6 +97,9 @@ contract record Pool is Ownable {
     Token public lpToken;
 
     /// @notice Reentrancy guard to prevent recursive calls
+    /// @dev Shared by swap, addLiquidity, removeLiquidity, addLiquiditySingleToken, flash,
+    ///      sync and skim: a flash callback must not be able to reach any other reserve-moving
+    ///      function (Uniswap V2 lock on mint/burn/swap/skim/sync)
     bool private locked;
 
     /// @notice Current exchange rate from tokenA to tokenB
@@ -95,6 +120,9 @@ contract record Pool is Ownable {
     /// @notice Pool-specific LP share percentage in basis points (0 = use factory default)
     uint256 public lpSharePercent;
 
+    /// @notice Fee charged by flash in basis points (0 = free flash loans, the default)
+    uint256 public flashFeeRate;
+
     /// @notice Whether to charge swap fees on internal zap swaps (default: true)
     bool public zapSwapFeesEnabled = true;
 
@@ -103,6 +131,9 @@ contract record Pool is Ownable {
     bool public isPaused = false;
 
     bool public isDisabled = false;
+
+    /// @notice Pauses flash() only; swaps and liquidity operations are unaffected
+    bool public isFlashPaused = false;
 
     // ============ MODIFIERS ============
 
@@ -134,6 +165,11 @@ contract record Pool is Ownable {
         _;
     }
 
+    modifier whenFlashNotPaused() {
+        require(!isFlashPaused, "Flash is paused");
+        _;
+    }
+
     modifier onlyActiveTokens() {
         require(_tokenFactory().isTokenActive(address(tokenA)), "TokenA is not active");
         require(_tokenFactory().isTokenActive(address(tokenB)), "TokenB is not active");
@@ -150,6 +186,11 @@ contract record Pool is Ownable {
     function setDisabled(bool _isDisabled) external onlyOwner {
         isPaused = _isDisabled ? true : isPaused;
         isDisabled = _isDisabled;
+    }
+
+    /// @notice Pause or resume flash() without touching the pool-wide pause
+    function setFlashPaused(bool _isFlashPaused) external onlyOwner {
+        isFlashPaused = _isFlashPaused;
     }
 
     // ============ INTERNAL FUNCTIONS ============
@@ -292,7 +333,7 @@ contract record Pool is Ownable {
         uint256 tokenBAmount,
         uint256 maxTokenAAmount,
         uint256 deadline
-    ) external whenNotPaused onlyActiveTokens returns (uint256) {
+    ) external whenNotPaused onlyActiveTokens nonReentrant returns (uint256) {
         require(tokenBAmount > 0 && maxTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
 
@@ -335,7 +376,7 @@ contract record Pool is Ownable {
         uint256 minTokenBAmount,
         uint256 minTokenAAmount,
         uint256 deadline
-    ) external whenNotDisabled onlyActiveTokens returns (uint256, uint256) {
+    ) external whenNotDisabled onlyActiveTokens nonReentrant returns (uint256, uint256) {
         require(lpTokenAmount > 0 && minTokenBAmount > 0 && minTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
         uint256 totalLiquidity = lpToken.totalSupply();
@@ -426,6 +467,79 @@ contract record Pool is Ownable {
         emit Swap(msg.sender, address(inputToken), address(outputToken), amountIn, amountOut);
     }
 
+    // ============ FLASH ============
+
+    /// @notice Receive tokenA and/or tokenB and pay it back, plus a fee, in the callback
+    /// @param recipient The address which will receive the tokenA and tokenB amounts
+    /// @param amountA The amount of tokenA to send
+    /// @param amountB The amount of tokenB to send
+    /// @param data Any data to be passed through to the callback
+    /// @dev The caller of this method receives a callback in the form of
+    ///      IPoolFlashCallback.poolFlashCallback and must transfer amountA + feeA / amountB + feeB
+    ///      back to the pool before it returns; repayment is verified by balance delta, as
+    ///      PoolV3.flash. Fees are flashFeeRate (zero until set via setFlashFeeRate) applied to
+    ///      the borrowed amounts, rounded up; anything repaid above the principal is split like a
+    ///      swap fee: the protocol
+    ///      share goes to the fee collector, the LP share stays in the reserves (raising every LP
+    ///      token's claim, as swap fees do). Reentering the pool from the callback reverts
+    ///      (nonReentrant): in particular the borrowed principal cannot be re-deposited as
+    ///      liquidity while the pool still counts it as its own
+    function flash(
+        address recipient,
+        uint256 amountA,
+        uint256 amountB,
+        variadic data
+    ) external whenNotPaused whenFlashNotPaused onlyActiveTokens nonReentrant {
+        require(recipient != address(0), "Zero recipient");
+        require(lpToken.totalSupply() > 0, "POOL_EMPTY");
+
+        // ceil(amount * flashFeeRate / 10000): dust borrows still pay at least 1 wei once a fee is set
+        uint256 feeA = (amountA * flashFeeRate + 10000 - 1) / 10000;
+        uint256 feeB = (amountB * flashFeeRate + 10000 - 1) / 10000;
+        uint256 balanceABefore = tokenA.balanceOf(address(this));
+        uint256 balanceBBefore = tokenB.balanceOf(address(this));
+
+        if (amountA > 0) require(tokenA.transfer(recipient, amountA), "TokenA transfer failed");
+        if (amountB > 0) require(tokenB.transfer(recipient, amountB), "TokenB transfer failed");
+
+        IPoolFlashCallback(msg.sender).poolFlashCallback(feeA, feeB, data);
+
+        uint256 balanceAAfter = tokenA.balanceOf(address(this));
+        uint256 balanceBAfter = tokenB.balanceOf(address(this));
+
+        require(balanceABefore + feeA <= balanceAAfter, "TokenA flash not repaid");
+        require(balanceBBefore + feeB <= balanceBAfter, "TokenB flash not repaid");
+
+        // sub is safe because balanceAfter is at least balanceBefore + fee
+        uint256 paidA = balanceAAfter - balanceABefore;
+        uint256 paidB = balanceBAfter - balanceBBefore;
+
+        // the principal came back, so only the LP share of the overage moves the reserves
+        uint256 lpFeeA = _settleFlashFee(address(tokenA), paidA);
+        uint256 lpFeeB = _settleFlashFee(address(tokenB), paidB);
+        _updateStateVars(tokenABalance + lpFeeA, tokenBBalance + lpFeeB);
+
+        emit Flash(msg.sender, recipient, amountA, amountB, paidA, paidB);
+    }
+
+    /// @notice Split a flash repayment overage like a swap fee
+    /// @param tokenAddr The token the overage was paid in
+    /// @param paid The amount repaid over the borrowed principal
+    /// @return lpFee The LP share, left in the pool for the caller to add to the reserves
+    /// @dev The protocol share (paid - lpFee) is sent to the fee collector immediately, so the
+    ///      pool's actual balance grows by exactly lpFee and stays in step with the tracked reserve
+    function _settleFlashFee(address tokenAddr, uint256 paid) internal returns (uint256 lpFee) {
+        if (paid == 0) {
+            return 0;
+        }
+        lpFee = (paid * _lpSharePercent()) / 10000;
+        uint256 protocolFee = paid - lpFee;
+        if (protocolFee > 0) {
+            require(Token(tokenAddr).transfer(_feeCollector(), protocolFee), "Protocol fee transfer failed");
+        }
+        return lpFee;
+    }
+
     /// @notice Transfer the pool to a new factory
     /// @param newFactory The address of the new factory
     /// @dev This function can only be called by the current PoolFactory contract
@@ -451,6 +565,14 @@ contract record Pool is Ownable {
 
         swapFeeRate = newSwapFeeRate;
         lpSharePercent = newLpSharePercent;
+    }
+
+    /// @notice Set the flash fee rate for this pool (factory only)
+    /// @param newFlashFeeRate Flash fee rate in basis points; 0 = free flash loans
+    /// @dev Maximum flash fee rate is 10% (1000 basis points), as the swap fee rate
+    function setFlashFeeRate(uint256 newFlashFeeRate) external onlyPoolFactory {
+        require(newFlashFeeRate <= 1000, "Invalid flash fee rate"); // Max 10%
+        flashFeeRate = newFlashFeeRate;
     }
 
     /// @notice Toggle swap fees for internal zap swaps (owner only)
@@ -501,7 +623,7 @@ contract record Pool is Ownable {
         bool isAToB,
         uint256 amountIn,
         uint256 deadline
-    ) external whenNotPaused onlyActiveTokens returns (uint256 liquidityMinted) {
+    ) external whenNotPaused onlyActiveTokens nonReentrant returns (uint256 liquidityMinted) {
         require(amountIn > 0, "Invalid input");
         require(block.timestamp <= deadline, "EXPIRED");
         require(lpToken.totalSupply() > 0, "POOL_EMPTY");

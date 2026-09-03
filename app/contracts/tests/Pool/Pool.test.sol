@@ -8,6 +8,85 @@ contract User {
     }
 }
 
+/// @notice flash() borrower fixture. `mode` selects how the callback settles:
+///         0 repay principal + fee, 1 repay principal only (short the fee), 2 repay principal +
+///         fee + 1e18 tokenA (overpay), 3 re-enter flash, 4 re-enter swap, 5 re-enter addLiquidity,
+///         6 re-enter removeLiquidity, 7 re-enter addLiquiditySingleToken, 8 re-enter sync,
+///         9 re-enter skim, 10 spend the borrowed tokenA on `other` (another Pool) and repay from float
+contract FlashBorrower {
+    Pool pool;
+    address tokenA;
+    address tokenB;
+    uint public mode;
+    uint public amountA;
+    uint public amountB;
+    uint public lastFeeA;
+    uint public lastFeeB;
+    string public lastNote;
+    /// @dev another Pool the callback trades on in mode 10 (flash-funded cross-pool swap)
+    address public other;
+    /// @dev set by goNoData: the flash carried no variadic data, so the callback must not index it
+    bool public noData;
+
+    function init(address _pool, address _tokenA, address _tokenB) public {
+        pool = Pool(_pool);
+        tokenA = _tokenA;
+        tokenB = _tokenB;
+    }
+
+    function setOther(address _other) public {
+        other = _other;
+    }
+
+    function go(address recipient, uint _amountA, uint _amountB, uint _mode) public {
+        mode = _mode;
+        noData = false;
+        amountA = _amountA;
+        amountB = _amountB;
+        pool.flash(recipient, _amountA, _amountB, "note");
+    }
+
+    /// @dev flash with no pass-through data at all (mode 0 settlement)
+    function goNoData(address recipient, uint _amountA, uint _amountB) public {
+        mode = 0;
+        noData = true;
+        amountA = _amountA;
+        amountB = _amountB;
+        pool.flash(recipient, _amountA, _amountB);
+    }
+
+    function poolFlashCallback(uint feeA, uint feeB, variadic data) external {
+        require(msg.sender == address(pool), "FlashBorrower: bad pool");
+        lastFeeA = feeA;
+        lastFeeB = feeB;
+        if (noData) {
+            lastNote = "";
+        } else {
+            lastNote = string(data[0]);
+        }
+
+        if (mode == 10) {
+            // spend the borrowed tokenA on another pool, then repay out of our own float
+            require(Token(tokenA).approve(other, amountA), "approve other failed");
+            Pool(other).swap(true, amountA, 1, block.timestamp + 3600);
+        }
+
+        if (mode == 3) pool.flash(address(this), 1, 0, "nested");
+        if (mode == 4) pool.swap(true, 1, 1, block.timestamp + 3600);
+        if (mode == 5) pool.addLiquidity(1, 1, block.timestamp + 3600);
+        if (mode == 6) pool.removeLiquidity(1, 1, 1, block.timestamp + 3600);
+        if (mode == 7) pool.addLiquiditySingleToken(true, 1, block.timestamp + 3600);
+        if (mode == 8) pool.sync();
+        if (mode == 9) pool.skim(address(this));
+
+        uint repayA = mode == 1 ? amountA : amountA + feeA;
+        uint repayB = mode == 1 ? amountB : amountB + feeB;
+        if (mode == 2) repayA += 1e18;
+        if (repayA > 0) require(Token(tokenA).transfer(address(pool), repayA), "repayA failed");
+        if (repayB > 0) require(Token(tokenB).transfer(address(pool), repayB), "repayB failed");
+    }
+}
+
 contract Describe_Pool is Authorizable {
 
     Mercata m;
@@ -2001,6 +2080,614 @@ function it_single_token_a_zap_matches_swap_then_add_with_fees() {
         require(pool.isPaused() == false, "Pool should be unpaused");
     }
 
+    // ============ FLASH TESTS (PoolV3.flash parity) ============
 
+    uint constant FLASH_LIQ = 2000e18;
+
+    /// @dev Seed the pool 1:1 so flash has something to lend and fees have LPs to accrue to, and
+    ///      pin the flash fee at the 30 bps swap rate the pinned numbers assume (the contract
+    ///      default is zero, see it_flash_fee_defaults_to_zero)
+    function _seedFlashLiquidity() internal returns (uint256) {
+        require(ERC20(tokenAAddress).approve(address(pool), FLASH_LIQ), "Token A approval failed");
+        require(ERC20(tokenBAddress).approve(address(pool), FLASH_LIQ), "Token B approval failed");
+        m.poolFactory().setPoolFlashFeeRate(poolAddress, 30);
+        return pool.addLiquidity(FLASH_LIQ, FLASH_LIQ, block.timestamp + 3600);
+    }
+
+    /// @dev Create a flash borrower holding enough of both tokens to pay any fee
+    function _newBorrower() internal returns (FlashBorrower) {
+        FlashBorrower b = new FlashBorrower();
+        b.init(poolAddress, tokenAAddress, tokenBAddress);
+        Token(tokenAAddress).mint(address(b), 100e18);
+        Token(tokenBAddress).mint(address(b), 100e18);
+        return b;
+    }
+
+    function _requireTrackedBalancesInSync() internal {
+        require(pool.tokenABalance() == ERC20(tokenAAddress).balanceOf(poolAddress), "Token A tracked balance out of sync");
+        require(pool.tokenBBalance() == ERC20(tokenBAddress).balanceOf(poolAddress), "Token B tracked balance out of sync");
+    }
+
+    function it_flash_fee_is_swap_fee_rounded_up_and_split_with_protocol() {
+        // fee = ceil(amount * 30 / 10000); 0.30% of 100e18 = 3e17, of 50e18 = 1.5e17.
+        // Like a swap fee, lpSharePercent (70%) of what is repaid over the principal stays in the
+        // reserves and the rest (30%) goes to the fee collector
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+        address feeCollector = m.poolFactory().feeCollector();
+        uint poolBeforeA = ERC20(tokenAAddress).balanceOf(poolAddress);
+        uint poolBeforeB = ERC20(tokenBAddress).balanceOf(poolAddress);
+        uint lpSupply = ERC20(pool.lpToken()).totalSupply();
+        require(pool.aToBRatio() == 1.000000000000000000, "Pool should start at parity");
+
+        b.go(address(b), 100e18, 50e18, 0);
+
+        require(b.lastFeeA() == 300000000000000000, "feeA mismatch: " + string(b.lastFeeA()));
+        require(b.lastFeeB() == 150000000000000000, "feeB mismatch: " + string(b.lastFeeB()));
+        require(b.lastNote() == "note", "Callback data should be forwarded");
+        require(ERC20(tokenAAddress).balanceOf(poolAddress) == poolBeforeA + 210000000000000000, "Pool should keep the LP share of fee A");
+        require(ERC20(tokenBAddress).balanceOf(poolAddress) == poolBeforeB + 105000000000000000, "Pool should keep the LP share of fee B");
+        require(ERC20(tokenAAddress).balanceOf(feeCollector) == 90000000000000000, "FeeCollector share of fee A mismatch: " + string(ERC20(tokenAAddress).balanceOf(feeCollector)));
+        require(ERC20(tokenBAddress).balanceOf(feeCollector) == 45000000000000000, "FeeCollector share of fee B mismatch: " + string(ERC20(tokenBAddress).balanceOf(feeCollector)));
+        require(ERC20(pool.lpToken()).totalSupply() == lpSupply, "Flash must not change LP supply");
+        // reserves grew asymmetrically (more A than B), so the refreshed ratio must have moved off parity
+        require(pool.aToBRatio() < 1.000000000000000000, "Ratios should be refreshed after a flash");
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_dust_fee_rounds_up() {
+        // 1 wei -> 1 wei fee; 333 -> 1; 334 -> 2; 1000 -> 3
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+
+        b.go(address(b), 1, 0, 0);
+        require(b.lastFeeA() == 1 && b.lastFeeB() == 0, "1 wei should cost 1 wei");
+        b.go(address(b), 333, 334, 0);
+        require(b.lastFeeA() == 1, "333 wei should cost 1 wei: " + string(b.lastFeeA()));
+        require(b.lastFeeB() == 2, "334 wei should cost 2 wei: " + string(b.lastFeeB()));
+        b.go(address(b), 1000, 0, 0);
+        require(b.lastFeeA() == 3, "1000 wei should cost 3 wei: " + string(b.lastFeeA()));
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_uses_the_pool_specific_fee_rate() {
+        // flash fee 100 bps with a 50% LP share: 100e18 -> 1e18 fee, 5e17 to LPs, 5e17 to protocol
+        _seedFlashLiquidity();
+        m.poolFactory().setPoolFlashFeeRate(address(pool), 100);
+        m.poolFactory().setPoolFeeParameters(address(pool), 100, 5000);
+        FlashBorrower b = _newBorrower();
+        address feeCollector = m.poolFactory().feeCollector();
+        uint poolBeforeA = ERC20(tokenAAddress).balanceOf(poolAddress);
+
+        b.go(address(b), 100e18, 0, 0);
+
+        require(b.lastFeeA() == 1000000000000000000, "feeA mismatch: " + string(b.lastFeeA()));
+        require(ERC20(tokenAAddress).balanceOf(poolAddress) == poolBeforeA + 500000000000000000, "Pool should keep 50% of the fee");
+        require(ERC20(tokenAAddress).balanceOf(feeCollector) == 500000000000000000, "FeeCollector should get 50% of the fee");
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_fee_defaults_to_zero() {
+        // A fresh pool lends for free until an admin sets flashFeeRate
+        require(ERC20(tokenAAddress).approve(address(pool), FLASH_LIQ), "Token A approval failed");
+        require(ERC20(tokenBAddress).approve(address(pool), FLASH_LIQ), "Token B approval failed");
+        pool.addLiquidity(FLASH_LIQ, FLASH_LIQ, block.timestamp + 3600);
+        FlashBorrower b = _newBorrower();
+        require(pool.flashFeeRate() == 0, "flashFeeRate should default to 0");
+        uint poolBeforeA = ERC20(tokenAAddress).balanceOf(poolAddress);
+
+        b.go(address(b), 100e18, 50e18, 0);
+
+        require(b.lastFeeA() == 0 && b.lastFeeB() == 0, "Default flash must be free");
+        require(ERC20(tokenAAddress).balanceOf(poolAddress) == poolBeforeA, "Free flash should leave the pool balance unchanged");
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_fee_is_configurable_independently_of_the_swap_fee() {
+        // _seedFlashLiquidity pins the flash fee at the 30 bps swap rate (3e17 on 100e18)
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+        require(pool.flashFeeRate() == 30, "flashFeeRate should be pinned at the swap rate");
+        b.go(address(b), 100e18, 0, 0);
+        require(b.lastFeeA() == 300000000000000000, "Pinned flash fee should match the swap rate");
+
+        // 5 bps flash fee: flash charges 0.05% while swaps still charge 0.30%
+        m.poolFactory().setPoolFlashFeeRate(address(pool), 5);
+        require(pool.flashFeeRate() == 5, "flashFeeRate should be set");
+        b.go(address(b), 100e18, 0, 0);
+        require(b.lastFeeA() == 50000000000000000, "Tuned flash fee mismatch: " + string(b.lastFeeA()));
+
+        address feeCollector = m.poolFactory().feeCollector();
+        uint collectorBefore = ERC20(tokenAAddress).balanceOf(feeCollector);
+        require(ERC20(tokenAAddress).approve(address(pool), 100e18), "Swap approval failed");
+        pool.swap(true, 100e18, 1, block.timestamp + 3600);
+        // 30% protocol share of a 30 bps swap fee on 100e18 = 9e16
+        require(ERC20(tokenAAddress).balanceOf(feeCollector) == collectorBefore + 90000000000000000, "Swap must still charge the swap fee");
+
+        // Setting 0 makes flash free again
+        m.poolFactory().setPoolFlashFeeRate(address(pool), 0);
+        uint poolBeforeA = ERC20(tokenAAddress).balanceOf(poolAddress);
+        b.go(address(b), 100e18, 0, 0);
+        require(b.lastFeeA() == 0, "Zero flashFeeRate should cost nothing");
+        require(ERC20(tokenAAddress).balanceOf(poolAddress) == poolBeforeA, "Free flash should leave the pool balance unchanged");
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_fee_rate_is_capped_and_admin_only() {
+        string err;
+        try m.poolFactory().setPoolFlashFeeRate(address(pool), 1001) { } catch Error(string e) { err = e; }
+        require(err == "Invalid flash fee rate", "Flash fee above 10% must revert, got: " + err);
+        m.poolFactory().setPoolFlashFeeRate(address(pool), 1000);
+        require(pool.flashFeeRate() == 1000, "10% should be accepted");
+
+        User stranger = new User();
+        bool thrown = false;
+        try stranger.do(address(m.poolFactory()), "setPoolFlashFeeRate", address(pool), uint(5)) { } catch { thrown = true; }
+        require(thrown, "Non-owner setPoolFlashFeeRate should revert");
+        thrown = false;
+        try stranger.do(poolAddress, "setFlashFeeRate", uint(5)) { } catch { thrown = true; }
+        require(thrown, "Non-factory setFlashFeeRate should revert");
+        require(pool.flashFeeRate() == 1000, "Strangers must not change the flash fee rate");
+    }
+
+    function it_flash_overpayment_is_split_like_a_fee() {
+        // paid is the balance delta, so a borrower repaying 1e18 over the fee donates it:
+        // 1.3e18 paid -> 9.1e17 to LPs, 3.9e17 to the fee collector
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+        address feeCollector = m.poolFactory().feeCollector();
+        uint poolBeforeA = ERC20(tokenAAddress).balanceOf(poolAddress);
+        uint poolBeforeB = ERC20(tokenBAddress).balanceOf(poolAddress);
+
+        b.go(address(b), 100e18, 0, 2);
+
+        require(ERC20(tokenAAddress).balanceOf(poolAddress) == poolBeforeA + 910000000000000000, "Pool should keep the LP share of fee + overpayment");
+        require(ERC20(tokenAAddress).balanceOf(feeCollector) == 390000000000000000, "FeeCollector share mismatch: " + string(ERC20(tokenAAddress).balanceOf(feeCollector)));
+        require(ERC20(tokenBAddress).balanceOf(poolAddress) == poolBeforeB, "Token B must be untouched");
+        require(ERC20(tokenBAddress).balanceOf(feeCollector) == 0, "No token B fee expected");
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_lp_fee_accrues_to_liquidity_providers() {
+        // the LP share sits in the reserves, so the sole LP withdraws principal + 70% of the fee
+        uint liquidity = _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+        uint meBeforeA = ERC20(tokenAAddress).balanceOf(address(this));
+        uint meBeforeB = ERC20(tokenBAddress).balanceOf(address(this));
+
+        b.go(address(b), 100e18, 0, 0);
+
+        require(ERC20(pool.lpToken()).approve(address(pool), liquidity), "LP token approval failed");
+        pool.removeLiquidity(liquidity, 1, 1, block.timestamp + 3600);
+        require(ERC20(tokenAAddress).balanceOf(address(this)) == meBeforeA + FLASH_LIQ + 210000000000000000, "LP should withdraw principal + LP share of the fee");
+        require(ERC20(tokenBAddress).balanceOf(address(this)) == meBeforeB + FLASH_LIQ, "Token B principal should be intact");
+        require(pool.tokenABalance() == 0 && pool.tokenBBalance() == 0, "Reserves should be fully withdrawn");
+    }
+
+    function it_flash_pays_recipient_and_charges_caller() {
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+        User recipient = new User();
+        uint borrowerBeforeA = ERC20(tokenAAddress).balanceOf(address(b));
+
+        b.go(address(recipient), 10e18, 0, 0);
+
+        require(ERC20(tokenAAddress).balanceOf(address(recipient)) == 10e18, "Recipient should receive the principal");
+        // the caller repaid principal + fee out of its own float
+        require(ERC20(tokenAAddress).balanceOf(address(b)) == borrowerBeforeA - 10e18 - 30000000000000000, "Caller pays principal + fee");
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_zero_amounts_is_a_callback_only_noop() {
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+        address feeCollector = m.poolFactory().feeCollector();
+        uint poolBeforeA = ERC20(tokenAAddress).balanceOf(poolAddress);
+        decimal ratioBefore = pool.aToBRatio();
+
+        b.go(address(b), 0, 0, 0);
+
+        require(b.lastFeeA() == 0 && b.lastFeeB() == 0, "Zero principal, zero fee");
+        require(ERC20(tokenAAddress).balanceOf(poolAddress) == poolBeforeA, "Nothing should move");
+        require(ERC20(tokenAAddress).balanceOf(feeCollector) == 0, "No protocol fee");
+        require(pool.aToBRatio() == ratioBefore, "Ratio should be unchanged");
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_reverts_when_underpaid() {
+        // repaying the principal without the fee unwinds the whole call
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+        address feeCollector = m.poolFactory().feeCollector();
+        uint poolBeforeA = ERC20(tokenAAddress).balanceOf(poolAddress);
+        uint borrowerBeforeA = ERC20(tokenAAddress).balanceOf(address(b));
+
+        string err;
+        try b.go(address(b), 100e18, 0, 1) { } catch Error(string e) { err = e; }
+        require(err == "TokenA flash not repaid", "Shorting the token A fee must revert, got: " + err);
+
+        err = "";
+        try b.go(address(b), 0, 100e18, 1) { } catch Error(string e) { err = e; }
+        require(err == "TokenB flash not repaid", "Shorting the token B fee must revert, got: " + err);
+
+        require(ERC20(tokenAAddress).balanceOf(poolAddress) == poolBeforeA, "Pool balance must be untouched");
+        require(ERC20(tokenAAddress).balanceOf(address(b)) == borrowerBeforeA, "Borrower balance must be untouched");
+        require(ERC20(tokenAAddress).balanceOf(feeCollector) == 0, "No protocol fee on a failed flash");
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_reverts_when_pool_is_empty() {
+        // nothing to pay fees to, so no flash
+        FlashBorrower b = _newBorrower();
+        Token(tokenAAddress).mint(poolAddress, 10e18); // pool has tokens but no LPs
+
+        string err;
+        try b.go(address(b), 1e18, 0, 0) { } catch Error(string e) { err = e; }
+        require(err == "POOL_EMPTY", "Flash on an empty pool must revert POOL_EMPTY, got: " + err);
+    }
+
+    function it_flash_rejects_more_than_the_pool_holds() {
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+
+        bool thrown = false;
+        try b.go(address(b), 1e30, 0, 0) { } catch { thrown = true; }
+        require(thrown, "Borrowing more than the reserves must revert");
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_cannot_reenter_the_pool() {
+        // one lock for everything: the callback can neither flash, swap, nor touch liquidity.
+        // The liquidity paths matter most: re-depositing the borrowed principal as liquidity
+        // would mint LP against reserves the pool still counts as its own
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+
+        string err;
+        try b.go(address(b), 1e18, 0, 3) { } catch Error(string e) { err = e; }
+        require(err == "REENTRANT", "Nested flash must revert REENTRANT, got: " + err);
+
+        err = "";
+        try b.go(address(b), 1e18, 0, 4) { } catch Error(string e) { err = e; }
+        require(err == "REENTRANT", "Swap from the callback must revert REENTRANT, got: " + err);
+
+        err = "";
+        try b.go(address(b), 1e18, 0, 5) { } catch Error(string e) { err = e; }
+        require(err == "REENTRANT", "addLiquidity from the callback must revert REENTRANT, got: " + err);
+
+        err = "";
+        try b.go(address(b), 1e18, 0, 6) { } catch Error(string e) { err = e; }
+        require(err == "REENTRANT", "removeLiquidity from the callback must revert REENTRANT, got: " + err);
+
+        err = "";
+        try b.go(address(b), 1e18, 0, 7) { } catch Error(string e) { err = e; }
+        require(err == "REENTRANT", "addLiquiditySingleToken from the callback must revert REENTRANT, got: " + err);
+
+        // skim/sync are owner-callable; hand the borrower the owner key so the lock is what fires
+        pool.transferOwnership(address(b));
+
+        err = "";
+        try b.go(address(b), 1e18, 0, 8) { } catch Error(string e) { err = e; }
+        require(err == "REENTRANT", "sync from the callback must revert REENTRANT, got: " + err);
+
+        err = "";
+        try b.go(address(b), 1e18, 0, 9) { } catch Error(string e) { err = e; }
+        require(err == "REENTRANT", "skim from the callback must revert REENTRANT, got: " + err);
+
+        // the lock is released again after the failed attempts
+        b.go(address(b), 1e18, 0, 0);
+        require(b.lastFeeA() == 3000000000000000, "Flash should work after failed reentry");
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_caller_without_callback_reverts() {
+        _seedFlashLiquidity();
+        User stranger = new User();
+        uint poolBeforeA = ERC20(tokenAAddress).balanceOf(poolAddress);
+
+        bool thrown = false;
+        try {
+            stranger.do(poolAddress, "flash", address(stranger), 1e18, 0, "x");
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "A caller without poolFlashCallback must revert");
+        require(ERC20(tokenAAddress).balanceOf(poolAddress) == poolBeforeA, "Pool balance must be untouched");
+    }
+
+    function it_flash_respects_pause_disable_and_input_guards() {
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+
+        pool.setPaused(true);
+        string err;
+        try b.go(address(b), 1e18, 0, 0) { } catch Error(string e) { err = e; }
+        require(err == "Pool is paused", "Paused pool should reject flash, got: " + err);
+        pool.setPaused(false);
+
+        pool.setDisabled(true);
+        err = "";
+        try b.go(address(b), 1e18, 0, 0) { } catch Error(string e) { err = e; }
+        require(err == "Pool is paused", "Disabled pool should reject flash, got: " + err);
+        pool.setDisabled(false);
+        pool.setPaused(false);
+
+        err = "";
+        try b.go(address(0), 1e18, 0, 0) { } catch Error(string e) { err = e; }
+        require(err == "Zero recipient", "Zero recipient should revert, got: " + err);
+
+        b.go(address(b), 1e18, 0, 0);
+        require(b.lastFeeA() == 3000000000000000, "Flash should work once guards clear");
+    }
+
+    function it_flash_pause_blocks_only_flash() {
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+
+        pool.setFlashPaused(true);
+        require(pool.isFlashPaused() && !pool.isPaused(), "Flash pause must not pause the pool");
+        string err;
+        try b.go(address(b), 1e18, 0, 0) { } catch Error(string e) { err = e; }
+        require(err == "Flash is paused", "Flash-paused pool should reject flash, got: " + err);
+
+        // swaps are unaffected
+        require(ERC20(tokenAAddress).approve(address(pool), 1e18), "Token A approval failed");
+        require(pool.swap(true, 1e18, 1, block.timestamp + 3600) > 0, "Swap should work while flash is paused");
+
+        User stranger = new User();
+        bool thrown = false;
+        try {
+            stranger.do(poolAddress, "setFlashPaused", false);
+        } catch {
+            thrown = true;
+        }
+        require(thrown, "Non-owner setFlashPaused should revert");
+        require(pool.isFlashPaused(), "Stranger must not change the flash pause");
+
+        pool.setFlashPaused(false);
+        b.go(address(b), 1e18, 0, 0);
+        require(b.lastFeeA() == 3000000000000000, "Flash should work once resumed");
+    }
+
+    function it_flash_rejects_inactive_tokens() {
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+
+        Token(tokenAAddress).setStatus(1); // not ACTIVE
+        string err;
+        try b.go(address(b), 1e18, 0, 0) { } catch Error(string e) { err = e; }
+        require(err == "TokenA is not active", "Inactive token should reject flash, got: " + err);
+
+        Token(tokenAAddress).setStatus(2);
+        b.go(address(b), 1e18, 0, 0);
+        require(b.lastFeeA() == 3000000000000000, "Flash should work once the token is active again");
+    }
+
+    // ============ FLASH INVARIANT TESTS (review additions) ============
+
+    function it_flash_keeps_k_and_ratios_consistent_and_never_dilutes_lps() {
+        // k = A*B may only grow, the stored ratios must equal B/A of the new reserves, LP supply
+        // is untouched, so every LP token's claim on both reserves is non-decreasing
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+        uint lpSupply = ERC20(pool.lpToken()).totalSupply();
+        uint kBefore = pool.tokenABalance() * pool.tokenBBalance();
+        uint claimABefore = pool.tokenABalance() * 1e18 / lpSupply;
+        uint claimBBefore = pool.tokenBBalance() * 1e18 / lpSupply;
+
+        b.go(address(b), 100e18, 50e18, 0);
+
+        require(pool.tokenABalance() == 2000210000000000000000, "Reserve A should grow by the LP share of fee A: " + string(pool.tokenABalance()));
+        require(pool.tokenBBalance() == 2000105000000000000000, "Reserve B should grow by the LP share of fee B: " + string(pool.tokenBBalance()));
+        require(pool.tokenABalance() * pool.tokenBBalance() > kBefore, "k must not decrease");
+        decimal expectedAToB = decimal((decimal(pool.tokenBBalance()) * 1.000000000000000000) / decimal(pool.tokenABalance())) / 1.000000000000000000;
+        decimal expectedBToA = decimal((decimal(pool.tokenABalance()) * 1.000000000000000000) / decimal(pool.tokenBBalance())) / 1.000000000000000000;
+        require(pool.aToBRatio() == expectedAToB, "aToBRatio must be recomputed from the new reserves");
+        require(pool.bToARatio() == expectedBToA, "bToARatio must be recomputed from the new reserves");
+        require(ERC20(pool.lpToken()).totalSupply() == lpSupply, "Flash must not change LP supply");
+        require(pool.tokenABalance() * 1e18 / lpSupply > claimABefore, "Per-LP claim on A must grow");
+        require(pool.tokenBBalance() * 1e18 / lpSupply > claimBBefore, "Per-LP claim on B must grow");
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_fee_accrues_pro_rata_across_multiple_lps() {
+        // two LPs at 2:1; one flash of 100e18 tokenA leaves 2.1e17 in reserve A, so on exit the
+        // 1000e18-LP holder gets 7e16 and the 2000e18-LP holder 1.4e17, and the pool drains to zero
+        _seedFlashLiquidity();
+        User lp2 = new User();
+        uint k = 1000e18;
+        uint one = 1;
+        uint deadline = block.timestamp + 3600;
+        Token(tokenAAddress).mint(address(lp2), k);
+        Token(tokenBAddress).mint(address(lp2), k);
+        lp2.do(tokenAAddress, "approve", poolAddress, k);
+        lp2.do(tokenBAddress, "approve", poolAddress, k);
+        lp2.do(poolAddress, "addLiquidity", k, k, deadline);
+        require(ERC20(pool.lpToken()).balanceOf(address(lp2)) == k, "Second LP should hold 1000e18 LP");
+        require(ERC20(pool.lpToken()).totalSupply() == 3000e18, "LP supply should be 3000e18");
+        FlashBorrower b = _newBorrower();
+        uint meBeforeA = ERC20(tokenAAddress).balanceOf(address(this));
+        uint meBeforeB = ERC20(tokenBAddress).balanceOf(address(this));
+
+        b.go(address(b), 100e18, 0, 0);
+        require(pool.tokenABalance() == 3000210000000000000000, "Reserve A mismatch: " + string(pool.tokenABalance()));
+
+        lp2.do(poolAddress, "removeLiquidity", k, one, one, deadline);
+        require(ERC20(tokenAAddress).balanceOf(address(lp2)) == 1000070000000000000000, "Second LP should get principal + 1/3 of the LP fee: " + string(ERC20(tokenAAddress).balanceOf(address(lp2))));
+        require(ERC20(tokenBAddress).balanceOf(address(lp2)) == k, "Second LP token B principal should be intact");
+
+        require(ERC20(pool.lpToken()).approve(address(pool), FLASH_LIQ), "LP token approval failed");
+        pool.removeLiquidity(FLASH_LIQ, 1, 1, deadline);
+        require(ERC20(tokenAAddress).balanceOf(address(this)) == meBeforeA + 2000140000000000000000, "First LP should get principal + 2/3 of the LP fee");
+        require(ERC20(tokenBAddress).balanceOf(address(this)) == meBeforeB + FLASH_LIQ, "First LP token B principal should be intact");
+        require(pool.tokenABalance() == 0 && pool.tokenBBalance() == 0, "Reserves should be fully withdrawn");
+        require(ERC20(tokenAAddress).balanceOf(poolAddress) == 0 && ERC20(tokenBAddress).balanceOf(poolAddress) == 0, "Pool should hold nothing after both LPs exit");
+    }
+
+    function it_flash_leaves_pre_existing_excess_untouched_and_skimmable() {
+        // live pools carry actual > tracked; a flash must neither absorb nor grow that excess,
+        // and skim must still pay out exactly the excess afterwards
+        _seedFlashLiquidity();
+        Token(tokenAAddress).mint(poolAddress, 5e18);
+        Token(tokenBAddress).mint(poolAddress, 3e18);
+        FlashBorrower b = _newBorrower();
+        require(ERC20(tokenAAddress).balanceOf(poolAddress) - pool.tokenABalance() == 5e18, "Excess A should be 5e18 before");
+
+        b.go(address(b), 100e18, 50e18, 0);
+
+        require(ERC20(tokenAAddress).balanceOf(poolAddress) - pool.tokenABalance() == 5e18, "Excess A must be unchanged by a flash");
+        require(ERC20(tokenBAddress).balanceOf(poolAddress) - pool.tokenBBalance() == 3e18, "Excess B must be unchanged by a flash");
+        require(pool.tokenABalance() == 2000210000000000000000, "Tracked A should only grow by the LP fee");
+
+        uint meBeforeA = ERC20(tokenAAddress).balanceOf(address(this));
+        uint meBeforeB = ERC20(tokenBAddress).balanceOf(address(this));
+        m.poolFactory().skimPools([poolAddress], address(this)); // skim is factory-gated
+        require(ERC20(tokenAAddress).balanceOf(address(this)) == meBeforeA + 5e18, "Skim should pay exactly the A excess");
+        require(ERC20(tokenBAddress).balanceOf(address(this)) == meBeforeB + 3e18, "Skim should pay exactly the B excess");
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_can_borrow_the_entire_balance_but_not_a_wei_more() {
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+        address feeCollector = m.poolFactory().feeCollector();
+        uint whole = ERC20(tokenAAddress).balanceOf(poolAddress);
+        require(whole == FLASH_LIQ, "Pool should hold exactly the seeded A");
+
+        b.go(address(b), whole, 0, 0);
+
+        require(b.lastFeeA() == 6000000000000000000, "Fee on the whole reserve should be 6e18: " + string(b.lastFeeA()));
+        require(pool.tokenABalance() == 2004200000000000000000, "Reserve A should be principal + LP share: " + string(pool.tokenABalance()));
+        require(ERC20(tokenAAddress).balanceOf(feeCollector) == 1800000000000000000, "Protocol share mismatch");
+        _requireTrackedBalancesInSync();
+
+        uint tooMuch = ERC20(tokenAAddress).balanceOf(poolAddress) + 1;
+        string err;
+        try b.go(address(b), tooMuch, 0, 0) { } catch Error(string e) { err = e; }
+        require(err == "ERC20: insufficient balance", "One wei over the balance must revert in the token, got: " + err);
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_with_full_lp_share_keeps_the_whole_fee_in_the_pool() {
+        // lpSharePercent 100%: protocolFee is zero and no transfer to the collector is attempted
+        _seedFlashLiquidity();
+        m.poolFactory().setPoolFeeParameters(address(pool), 30, 10000);
+        FlashBorrower b = _newBorrower();
+        address feeCollector = m.poolFactory().feeCollector();
+
+        b.go(address(b), 100e18, 0, 0);
+
+        require(pool.tokenABalance() == 2000300000000000000000, "Whole fee should stay in reserve A: " + string(pool.tokenABalance()));
+        require(ERC20(tokenAAddress).balanceOf(feeCollector) == 0, "Collector must receive nothing at 100% LP share");
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_fee_is_priced_into_the_next_swap() {
+        // the LP fee sits in the tracked reserve A, so a B->A swap right after must quote off the
+        // post-flash reserves, not the pre-flash ones
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+        b.go(address(b), 100e18, 0, 0);
+        uint reserveA = pool.tokenABalance();
+        uint reserveB = pool.tokenBBalance();
+        require(reserveA == 2000210000000000000000 && reserveB == FLASH_LIQ, "Post-flash reserves mismatch");
+
+        uint netInput = 100e18 - 300000000000000000; // 30 bps swap fee
+        uint expectedOut = (netInput * reserveA) / (reserveB + netInput);
+        uint staleOut = (netInput * FLASH_LIQ) / (FLASH_LIQ + netInput);
+        require(expectedOut != staleOut, "Test setup: post-flash quote must differ from the stale quote");
+
+        require(ERC20(tokenBAddress).approve(address(pool), 100e18), "Token B approval failed");
+        uint meBeforeA = ERC20(tokenAAddress).balanceOf(address(this));
+        uint out = pool.swap(false, 100e18, 1, block.timestamp + 3600);
+        require(out == expectedOut, "Swap must quote off post-flash reserves: " + string(out) + " vs " + string(expectedOut));
+        require(ERC20(tokenAAddress).balanceOf(address(this)) == meBeforeA + expectedOut, "Swapper should receive the quoted amount");
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_funds_a_swap_on_another_pool() {
+        // the point of a flash loan: borrow here, trade elsewhere, repay from proceeds/float. Also
+        // proves the reentrancy lock is per pool, not global
+        _seedFlashLiquidity();
+        address tokenCAddress = m.tokenFactory().createToken(
+            "Token C", "Test Token C", emptyArray, emptyArray, emptyArray, "TKC", 10000000e18, 18
+        );
+        Token(tokenCAddress).setStatus(2);
+        Token(tokenCAddress).mint(address(this), 100000000e18);
+        address pool2Address = m.poolFactory().createPool(tokenAAddress, tokenCAddress);
+        Pool pool2 = Pool(pool2Address);
+        AdminRegistry adminRegistry = m.adminRegistry();
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(pool2.lpToken()), "mint", pool2Address);
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(pool2.lpToken()), "burn", pool2Address);
+        require(ERC20(tokenAAddress).approve(pool2Address, FLASH_LIQ), "Token A approval failed");
+        require(ERC20(tokenCAddress).approve(pool2Address, FLASH_LIQ), "Token C approval failed");
+        pool2.addLiquidity(FLASH_LIQ, FLASH_LIQ, block.timestamp + 3600);
+
+        FlashBorrower b = _newBorrower();
+        b.setOther(pool2Address);
+        address feeCollector = m.poolFactory().feeCollector();
+        // pool2 swap of the borrowed 10e18 A: 30 bps fee, 9.97e18 net into 2000/2000 reserves
+        uint netInput = 9970000000000000000;
+        uint expectedC = (netInput * FLASH_LIQ) / (FLASH_LIQ + netInput);
+
+        b.go(address(b), 10e18, 0, 10);
+
+        require(b.lastFeeA() == 30000000000000000, "Flash fee mismatch");
+        require(ERC20(tokenCAddress).balanceOf(address(b)) == expectedC, "Borrower should hold the swap proceeds: " + string(ERC20(tokenCAddress).balanceOf(address(b))));
+        require(ERC20(tokenAAddress).balanceOf(address(b)) == 89970000000000000000, "Borrower pays principal + fee out of its float: " + string(ERC20(tokenAAddress).balanceOf(address(b))));
+        require(pool.tokenABalance() == 2000021000000000000000, "Lending pool keeps the LP share of the flash fee");
+        require(pool2.tokenABalance() == 2009991000000000000000, "Trading pool keeps the swap input net of protocol fee");
+        require(pool2.tokenBBalance() == FLASH_LIQ - expectedC, "Trading pool paid out the swap");
+        require(ERC20(tokenAAddress).balanceOf(feeCollector) == 18000000000000000, "Collector gets the flash and the swap protocol shares");
+        _requireTrackedBalancesInSync();
+        require(pool2.tokenABalance() == ERC20(tokenAAddress).balanceOf(pool2Address), "Pool2 tracked A out of sync");
+        require(pool2.tokenBBalance() == ERC20(tokenCAddress).balanceOf(pool2Address), "Pool2 tracked C out of sync");
+    }
+
+    function it_flash_callback_works_with_no_pass_through_data() {
+        // integrators may pass nothing; the variadic must arrive empty, not break the call
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+
+        b.goNoData(address(b), 1e18, 0);
+
+        require(b.lastFeeA() == 3000000000000000, "Fee should be charged as usual");
+        require(b.lastNote() == "", "No data should have been forwarded");
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_to_the_pool_itself_only_costs_the_caller() {
+        // recipient == pool: the principal never leaves, so the whole repayment counts as overage
+        // and is split like a fee. Nothing to gain and everything to lose for the caller
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+        address feeCollector = m.poolFactory().feeCollector();
+
+        b.go(poolAddress, 10e18, 0, 0);
+
+        // paid = 10e18 principal (never left) + 3e16 fee = 10.03e18; 70% to reserves, 30% to protocol
+        require(pool.tokenABalance() == 2007021000000000000000, "Reserve A should absorb the LP share of the whole repayment: " + string(pool.tokenABalance()));
+        require(ERC20(tokenAAddress).balanceOf(feeCollector) == 3009000000000000000, "Collector share mismatch: " + string(ERC20(tokenAAddress).balanceOf(feeCollector)));
+        require(ERC20(tokenAAddress).balanceOf(address(b)) == 89970000000000000000, "Caller loses principal + fee");
+        _requireTrackedBalancesInSync();
+    }
+
+    function it_flash_reverts_while_a_pool_token_is_paused() {
+        // the token-level emergency pause is a second kill switch for flash
+        _seedFlashLiquidity();
+        FlashBorrower b = _newBorrower();
+        uint poolBeforeA = ERC20(tokenAAddress).balanceOf(poolAddress);
+
+        Token(tokenAAddress).pause();
+        string err;
+        try b.go(address(b), 1e18, 0, 0) { } catch Error(string e) { err = e; }
+        require(err == "not whitelisted", "Paused token must stop the pool's transfer, got: " + err);
+        require(ERC20(tokenAAddress).balanceOf(poolAddress) == poolBeforeA, "Pool balance must be untouched");
+
+        Token(tokenAAddress).unpause();
+        b.go(address(b), 1e18, 0, 0);
+        require(b.lastFeeA() == 3000000000000000, "Flash should work once the token is unpaused");
+        _requireTrackedBalancesInSync();
+    }
 
 }
