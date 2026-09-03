@@ -135,10 +135,6 @@ contract Describe_PoolV3 is Authorizable {
         // Create pool at the 0.30% tier (3000 pips) with initial price 1.0 (sqrtPriceX96 = 2^96, tick 0)
         poolAddress = factory.createPoolV3(token0Address, token1Address, 3000, Q96);
         pool = PoolV3(poolAddress);
-
-        // Flash tests pin fees at the swap tier; the contract default is zero
-        // (see it_flash_fee_defaults_to_zero)
-        factory.setPoolFlashFee(poolAddress, 3000);
     }
 
     // ============ HELPERS ============
@@ -1665,94 +1661,29 @@ contract Describe_PoolV3 is Authorizable {
         require(b.lastFee0() == 3000000000000000, "Flash should work once resumed");
     }
 
-    function it_flash_fee_defaults_to_zero() {
-        // A fresh pool lends for free until an admin sets flashFee
-        address freshAddr = factory.createPoolV3(token0Address, token1Address, 10000, Q96);
-        PoolV3 fresh = PoolV3(freshAddr);
-        require(fresh.flashFee() == 0, "flashFee should default to 0");
-        require(ERC20(token0Address).approve(freshAddr, BIG) && ERC20(token1Address).approve(freshAddr, BIG), "Approval failed");
-        fresh.mint(address(this), -6000, 6000, 100000e18, BIG, BIG, block.timestamp + DEADLINE_OFFSET);
+    function it_flash_fee_follows_the_pool_fee_tier() {
+        // CANONICAL: flash charges the pool's swap fee tier; there is no separate flash fee to
+        // configure. A 1.00% tier pool charges 1e18 on 100e18 and 5e17 on 50e18
+        address tierAddr = factory.createPoolV3(token0Address, token1Address, 10000, Q96);
+        PoolV3 tier = PoolV3(tierAddr);
+        require(tier.fee() == 10000, "Pool should be at the 1.00% tier");
+        require(ERC20(token0Address).approve(tierAddr, BIG) && ERC20(token1Address).approve(tierAddr, BIG), "Approval failed");
+        tier.mint(address(this), -6000, 6000, 100000e18, BIG, BIG, block.timestamp + DEADLINE_OFFSET);
         FlashBorrower b = new FlashBorrower();
-        b.init(freshAddr, token0Address, token1Address);
-        uint poolBefore0 = ERC20(token0Address).balanceOf(freshAddr);
+        b.init(tierAddr, token0Address, token1Address);
+        Token(token0Address).mint(address(b), 100e18); // float to pay the fees from
+        Token(token1Address).mint(address(b), 100e18);
+        uint poolBefore0 = ERC20(token0Address).balanceOf(tierAddr);
+        uint poolBefore1 = ERC20(token1Address).balanceOf(tierAddr);
 
         b.go(address(b), 100e18, 50e18, 0);
 
-        require(b.lastFee0() == 0 && b.lastFee1() == 0, "Default flash must be free");
-        require(ERC20(token0Address).balanceOf(freshAddr) == poolBefore0, "Free flash should leave the pool balance unchanged");
-        require(fresh.feeGrowthGlobal0X128() == 0 && fresh.feeGrowthGlobal1X128() == 0, "No fee growth on a free flash");
-        require(ERC20(token0Address).balanceOf(freshAddr) == fresh.token0Balance(), "Token0 tracked balance out of sync");
-    }
-
-    function it_flash_fee_is_admin_tunable_independent_of_swap_fee() {
-        // beforeEach pins flashFee at the swap tier (0.30% of 100e18 = 3e17)
-        _mintRange(-6000, 6000, 100000e18);
-        FlashBorrower b = _newBorrower();
-        require(pool.flashFee() == 3000, "flashFee should be pinned at the swap tier");
-        b.go(address(b), 100e18, 0, 0);
-        require(b.lastFee0() == 300000000000000000, "Pinned flash fee should match the swap tier");
-
-        // Admin sets 500 pips: flash charges 0.05% while swaps still charge 0.30%
-        factory.setPoolFlashFee(poolAddress, 500);
-        require(pool.flashFee() == 500 && pool.fee() == 3000, "Only flashFee should change");
-        b.go(address(b), 100e18, 0, 0);
-        require(b.lastFee0() == 50000000000000000, "Tuned flash fee mismatch: " + string(b.lastFee0()));
-        uint protocolBefore = pool.protocolFees0();
-        _swap(true, 100e18);
-        pool.burn(-6000, 6000, 0, block.timestamp + DEADLINE_OFFSET);
-        (, uint owed0, ) = pool.getPosition(address(this), -6000, 6000);
-        // 3e17 (first flash) + 5e16 (tuned flash) + 3e17 (swap), each floor-rounded through Q128
-        require(owed0 == 649999999999999999, "LP should earn both flash fees plus the swap fee: " + string(owed0));
-        require(pool.protocolFees0() == protocolBefore, "No protocol fee by default");
-
-        // Setting 0 makes flash free again
-        factory.setPoolFlashFee(poolAddress, 0);
-        uint poolBefore0 = ERC20(token0Address).balanceOf(poolAddress);
-        b.go(address(b), 100e18, 0, 0);
-        require(b.lastFee0() == 0, "Zero flashFee should cost nothing");
-        require(ERC20(token0Address).balanceOf(poolAddress) == poolBefore0, "Free flash should leave the pool balance unchanged");
-    }
-
-    function it_flash_fee_admin_bounds_and_access() {
-        bool thrown = false;
-        try {
-            factory.setPoolFlashFee(poolAddress, 1000000); // must be < 1e6, like the swap fee
-        } catch {
-            thrown = true;
-        }
-        require(thrown, "Flash fee of 100% should revert");
-
-        factory.setPoolFlashFee(poolAddress, 999999);
-        require(pool.flashFee() == 999999, "Max valid flash fee should be accepted");
-
-        User stranger = new User();
-        thrown = false;
-        try {
-            stranger.do(address(factory), "setPoolFlashFee", poolAddress, 100);
-        } catch {
-            thrown = true;
-        }
-        require(thrown, "Non-owner setPoolFlashFee should revert");
-
-        thrown = false;
-        try {
-            stranger.do(poolAddress, "setFlashFee", 100);
-        } catch {
-            thrown = true;
-        }
-        require(thrown, "Non-factory setFlashFee should revert");
-        require(pool.flashFee() == 999999, "Strangers must not change flashFee");
-
-        // A pool owned by another factory cannot be configured through this one
-        PoolV3Factory factory2 = new PoolV3Factory(address(this));
-        factory2.initialize(address(m.tokenFactory()), address(m.feeCollector()));
-        thrown = false;
-        try {
-            factory2.setPoolFlashFee(poolAddress, 100);
-        } catch {
-            thrown = true;
-        }
-        require(thrown, "Foreign factory should not configure the pool");
+        require(b.lastFee0() == 1000000000000000000, "fee0 should be 1% of 100e18: " + string(b.lastFee0()));
+        require(b.lastFee1() == 500000000000000000, "fee1 should be 1% of 50e18: " + string(b.lastFee1()));
+        require(ERC20(token0Address).balanceOf(tierAddr) == poolBefore0 + 1000000000000000000, "Pool should hold the token0 fee");
+        require(ERC20(token1Address).balanceOf(tierAddr) == poolBefore1 + 500000000000000000, "Pool should hold the token1 fee");
+        require(ERC20(token0Address).balanceOf(tierAddr) == tier.token0Balance(), "Token0 tracked balance out of sync");
+        require(ERC20(token1Address).balanceOf(tierAddr) == tier.token1Balance(), "Token1 tracked balance out of sync");
     }
 
     // ============ FLASH INVARIANT TESTS (review additions) ============

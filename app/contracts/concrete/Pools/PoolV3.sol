@@ -38,8 +38,8 @@ import "../../libraries/PoolV3/Position.sol";
  *   parameters that canonical V3 delegates to its periphery. flash() keeps its callback (the
  *   borrower must act between receiving and repaying): IPoolV3FlashCallback replaces
  *   IUniswapV3FlashCallback, and repayment is a transfer back to the pool inside the callback,
- *   verified by balance delta exactly as canonical. The fee is a flash-specific flashFee
- *   (canonical charges the swap fee tier) that starts at zero until admins set it
+ *   verified by balance delta exactly as canonical. The fee is the pool's swap fee tier,
+ *   as canonical
  * - Protocol fees: canonical feeProtocol model (setFeeProtocol 1/x denominators per direction,
  *   per-step accrual into protocolFees0/1, collectProtocol withdrawal). Access is the factory
  *   or the pool owner (canonical: the factory owner); the factory's collectPoolProtocol wrapper
@@ -89,9 +89,6 @@ contract record PoolV3 is Ownable {
     /// @notice Emitted when the observation ring buffer growth is scheduled
     event IncreaseObservationCardinalityNext(uint observationCardinalityNextOld, uint observationCardinalityNextNew);
 
-    /// @notice Emitted when the flash-specific fee is changed (platform extension)
-    event SetFlashFee(uint flashFeeOld, uint flashFeeNew);
-
     /// @notice Emitted when the protocol fee denominators are changed (canonical shape)
     event SetFeeProtocol(uint feeProtocol0Old, uint feeProtocol1Old, uint feeProtocol0New, uint feeProtocol1New);
 
@@ -125,10 +122,6 @@ contract record PoolV3 is Ownable {
 
     /// @notice Swap fee in hundredths of a bip (pips, 1e6 denominator; e.g. 3000 = 0.30%)
     uint public fee;
-
-    /// @notice Fee charged by flash in pips (platform extension). 0 = free flash loans, which is
-    ///         the default for new pools and for pools deployed before this field existed
-    uint public flashFee;
 
     /// @notice Ticks usable by positions must be multiples of this spacing
     int public tickSpacing;
@@ -275,16 +268,6 @@ contract record PoolV3 is Ownable {
         uint feeProtocolOld = feeProtocol;
         feeProtocol = feeProtocol0 + (feeProtocol1 << 4);
         emit SetFeeProtocol(feeProtocolOld % 16, feeProtocolOld >> 4, feeProtocol0, feeProtocol1);
-    }
-
-    /// @notice Set the flash-specific fee (platform extension)
-    /// @param _flashFee Fee charged by flash in pips (1e6 denominator); 0 = free flash loans
-    /// @dev Callable by the factory or the pool owner, like setFeeProtocol
-    function setFlashFee(uint _flashFee) external lock onlyPoolV3Factory {
-        require(_flashFee < 1000000, "Invalid flash fee");
-        uint flashFeeOld = flashFee;
-        flashFee = _flashFee;
-        emit SetFlashFee(flashFeeOld, _flashFee);
     }
 
     /// @notice Collect the protocol fee accrued to the pool (canonical collectProtocol)
@@ -1063,10 +1046,10 @@ contract record PoolV3 is Ownable {
     /// @param data Any data to be passed through to the callback
     /// @dev The caller of this method receives a callback in the form of
     ///      IPoolV3FlashCallback.poolV3FlashCallback and must transfer amount0 + fee0 / amount1 +
-    ///      fee1 back to the pool before it returns. Fees are flashFee applied to the borrowed
-    ///      amounts, rounded up; anything repaid above the principal is split between
-    ///      the protocol (per feeProtocol) and in-range liquidity, as canonical. Reentering the
-    ///      pool from the callback reverts (lock)
+    ///      fee1 back to the pool before it returns. Fees are the pool's swap fee tier applied
+    ///      to the borrowed amounts, rounded up; anything repaid above the principal is split
+    ///      between the protocol (per feeProtocol) and in-range liquidity, all as canonical.
+    ///      Reentering the pool from the callback reverts (lock)
     function flash(
         address recipient,
         uint amount0,
@@ -1077,8 +1060,8 @@ contract record PoolV3 is Ownable {
         uint _liquidity = liquidity;
         require(_liquidity > 0, "L");
 
-        uint fee0 = FullMath.mulDivRoundingUp(amount0, flashFee, 1e6);
-        uint fee1 = FullMath.mulDivRoundingUp(amount1, flashFee, 1e6);
+        uint fee0 = FullMath.mulDivRoundingUp(amount0, fee, 1e6);
+        uint fee1 = FullMath.mulDivRoundingUp(amount1, fee, 1e6);
         uint balance0Before = token0.balanceOf(address(this));
         uint balance1Before = token1.balanceOf(address(this));
 
