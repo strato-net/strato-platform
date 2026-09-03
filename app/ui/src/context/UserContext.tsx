@@ -170,6 +170,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         const hadStratoSession = !!storedUser || !!stratoAddress || isLoggedIn;
         if (hadStratoSession) {
           sessionExpiryLogoutStartedRef.current = true;
+          capture('session_expired', { had_external_wallet: externalEvmConnectedRef.current });
           localStorage.removeItem("user");
           setStratoAddress(null);
           setIsLoggedIn(false);

@@ -349,9 +349,9 @@ api.interceptors.response.use(
         error_message: extractApiErrorMessage(error),
       });
     }
-    if (status === 401) {
-      capture("session_expired", { path: normalizePath(url) });
-    }
+    // Note: `session_expired` is not captured here. A 401 also arrives for
+    // guests probing endpoints that need a vault session, so the event is fired
+    // from UserContext only when a real STRATO session was torn down.
 
     // Handle CSRF validation errors (403 with CSRF message)
     if (error.response?.status === 403) {
