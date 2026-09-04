@@ -1,6 +1,22 @@
 [
   {
-    "sourceContract": "${STRATO_NATIVE_CUSTODY_VAULT}",
+    "sourceContract": "8cfe7b576f69260673e9a1a9517137f12a49ed93",
+    "targetActivitySourceAttribute": "token",
+    "events": {
+      "Locked": {
+        "action": "Withdraw",
+        "userAttribute": "from",
+        "amountAttribute": "amount"
+      },
+      "Unlocked": {
+        "action": "Deposit",
+        "userAttribute": "to",
+        "amountAttribute": "amount"
+      }
+    }
+  },
+  {
+    "sourceContract": "db967ac5c497e6a2bd6f89036d2b63851760318f",
     "targetActivitySourceAttribute": "token",
     "events": {
       "Locked": {

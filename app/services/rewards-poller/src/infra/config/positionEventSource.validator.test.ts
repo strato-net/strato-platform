@@ -4,7 +4,7 @@ import { parsePositionEventSources } from "./positionEventSource.validator";
 
 const custodyVault = "1111111111111111111111111111111111111111";
 const rawSource = {
-  sourceContract: "${CUSTODY_VAULT}",
+  sourceContract: `0x${custodyVault}`,
   targetActivitySourceAttribute: "token",
   events: {
     Locked: {
@@ -15,11 +15,8 @@ const rawSource = {
   },
 };
 
-test("resolves and validates configured position event sources", () => {
-  const sources = parsePositionEventSources(
-    [rawSource],
-    (name) => name === "CUSTODY_VAULT" ? `0x${custodyVault}` : undefined
-  );
+test("normalizes and validates configured position event sources", () => {
+  const sources = parsePositionEventSources([rawSource]);
 
   assert.deepEqual(sources, [{
     ...rawSource,
@@ -27,27 +24,23 @@ test("resolves and validates configured position event sources", () => {
   }]);
 });
 
-test("rejects missing source environment variables", () => {
+test("rejects invalid source addresses", () => {
   assert.throws(
-    () => parsePositionEventSources([rawSource], () => undefined),
-    /environment variable CUSTODY_VAULT is required/
+    () => parsePositionEventSources([{ ...rawSource, sourceContract: "invalid" }]),
+    /Invalid position event sourceContract/
   );
 });
 
 test("rejects duplicate source and event mappings", () => {
   assert.throws(
-    () => parsePositionEventSources(
-      [rawSource, rawSource],
-      () => custodyVault
-    ),
+    () => parsePositionEventSources([rawSource, rawSource]),
     /Duplicate position event source mapping/
   );
 });
 
 test("rejects unsupported position actions", () => {
   assert.throws(
-    () => parsePositionEventSources(
-      [{
+    () => parsePositionEventSources([{
         ...rawSource,
         events: {
           Locked: {
@@ -55,9 +48,7 @@ test("rejects unsupported position actions", () => {
             action: "Occurred",
           },
         },
-      }],
-      () => custodyVault
-    ),
+      }]),
     /must be Deposit or Withdraw/
   );
 });

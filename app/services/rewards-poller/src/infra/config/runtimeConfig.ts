@@ -13,7 +13,7 @@ import {
 import { getBigIntEnvOrDefault, getEnv, getNumberEnvOrDefault, validateRequiredEnvVars } from "./env";
 
 const bonusTokenConfigs = parseBonusTokenConfigs(bonusTokenConfigsRaw);
-const positionEventSources = parsePositionEventSources(positionEventSourcesRaw, getEnv);
+const positionEventSources = parsePositionEventSources(positionEventSourcesRaw);
 
 const config = {
   auth: {

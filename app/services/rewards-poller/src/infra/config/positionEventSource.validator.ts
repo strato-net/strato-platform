@@ -5,8 +5,6 @@ type RawPositionEventSource = Omit<PositionEventSource, "events"> & {
   events: Record<string, PositionEventRule>;
 };
 
-const ENV_REFERENCE = /^\$\{([A-Z0-9_]+)\}$/;
-
 const requireString = (value: unknown, label: string): string => {
   const normalized = String(value ?? "").trim();
   if (!normalized) {
@@ -15,18 +13,11 @@ const requireString = (value: unknown, label: string): string => {
   return normalized;
 };
 
-const resolveSourceContract = (
-  value: unknown,
-  getEnv: (name: string) => string | undefined
-): string => {
+const resolveSourceContract = (value: unknown): string => {
   const configured = requireString(value, "position event sourceContract");
-  const envMatch = configured.match(ENV_REFERENCE);
-  const resolved = envMatch
-    ? requireString(getEnv(envMatch[1]), `environment variable ${envMatch[1]}`)
-    : configured;
-  const address = normalizeAddressNoPrefix(resolved);
+  const address = normalizeAddressNoPrefix(configured);
   if (!/^[a-f0-9]{40}$/.test(address)) {
-    throw new Error(`Invalid position event sourceContract: ${resolved}`);
+    throw new Error(`Invalid position event sourceContract: ${configured}`);
   }
   return address;
 };
@@ -42,8 +33,7 @@ const requireAction = (
 };
 
 export const parsePositionEventSources = (
-  rawSources: unknown,
-  getEnv: (name: string) => string | undefined
+  rawSources: unknown
 ): PositionEventSource[] => {
   if (!Array.isArray(rawSources)) {
     throw new Error("Position event source configuration must be an array");
@@ -79,7 +69,7 @@ export const parsePositionEventSources = (
     ]));
 
     return {
-      sourceContract: resolveSourceContract(source?.sourceContract, getEnv),
+      sourceContract: resolveSourceContract(source?.sourceContract),
       targetActivitySourceAttribute,
       events,
     };

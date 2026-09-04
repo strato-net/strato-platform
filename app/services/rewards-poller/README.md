@@ -50,7 +50,6 @@ cp .env.example .env
 - `NODE_URL` - STRATO node URL
 - `REWARDS_CONTRACT_ADDRESS` - Rewards contract address
 - `PRICE_ORACLE_ADDRESS` - Price Oracle contract address (required for Swap event USD conversion)
-- `STRATO_NATIVE_CUSTODY_VAULT` - Native bridge custody vault used by configured position event sources
 
 ### Optional Environment Variables
 
@@ -92,7 +91,6 @@ OPENID_DISCOVERY_URL=https://your-openid-provider/.well-known/openid-configurati
 # Contract Addresses
 REWARDS_CONTRACT_ADDRESS=0000000000000000000000000000000000000000
 PRICE_ORACLE_ADDRESS=0000000000000000000000000000000000000000
-STRATO_NATIVE_CUSTODY_VAULT=0000000000000000000000000000000000000000
 USDST_ADDRESS=937efa7e3a77e20bbdbd7c0d32b6514f368c1010
 VOUCHER_ADDRESS=000000000000000000000000000000000000100e
 
@@ -129,7 +127,8 @@ The service uses configured event mappings to convert protocol events to Rewards
 - `LendingPool.Borrowed` → `rewards.occurred(activityId: 3, user, amount)`
 - `LendingPool.Repaid` → `rewards.occurred(activityId: 4, user, amount)`
 
-Position event sources are configured in `src/infra/config/positionEventSourceConfig.json`.
+Position event source addresses and mappings are configured in
+`src/infra/config/positionEventSourceConfig.json`.
 The native custody configuration maps `Locked` and `Unlocked` events to the token's
 existing Position activity:
 
