@@ -443,8 +443,9 @@ export const getWithdrawalSummary = async (
   userAddress: string
 ): Promise<WithdrawalSummaryResponse> => {
   const routes = await getBridgeableTokens(accessToken);
-  const stratoTokens = [...new Set(routes.map((route) => route.stratoToken).filter(Boolean))];
+  const stratoTokens = [...new Set(routes.map((route) => normalizeAddress(route.stratoToken)).filter(Boolean))];
   const thirtyDaysAgoUTC = toUTCTime(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+  const saveUsdstVaultAddress = normalizeAddress(constants.saveUsdstVault);
 
   const nativeWithdrawalsTable = `/${StratoNativeBridge}-withdrawals`;
   const [
@@ -465,13 +466,13 @@ export const getWithdrawalSummary = async (
           }
         })
       : Promise.resolve({ data: [] }),
-    constants.saveUsdstVault
-      && stratoTokens.some((token) => normalizeAddress(token) === normalizeAddress(constants.saveUsdstVault))
+    saveUsdstVaultAddress
+      && stratoTokens.some((token) => normalizeAddress(token) === saveUsdstVaultAddress)
       ? cirrus.get(accessToken, `/${SaveUSDSTVault}-_balances`, {
           params: {
             select: "address,balance:value::text",
             key: `eq.${userAddress}`,
-            address: `eq.${constants.saveUsdstVault}`,
+            address: `eq.${saveUsdstVaultAddress}`,
           }
         })
       : Promise.resolve({ data: [] }),
@@ -521,7 +522,7 @@ export const getWithdrawalSummary = async (
     const balance = BigInt(b.balance || "0");
     const price = BigInt(prices.get(b.address) || "0");
     if (balance > 0n && price > 0n) {
-      availableUSD += (balance * price) / DECIMALS / DECIMALS;
+      availableUSD += (balance * price) / DECIMALS;
     }
   }
 

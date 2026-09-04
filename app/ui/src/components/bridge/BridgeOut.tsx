@@ -25,6 +25,7 @@ import {
 } from "@/lib/bridge/constants";
 import { useUser } from "@/context/UserContext";
 import AdvancedOptionsDropdown from "./AdvancedOptionsDropdown";
+import { normBridgeAddr } from "@/lib/bridgeLinks";
 
 // Constants
 const FEE_WEI = safeParseUnits(BRIDGE_OUT_FEE).toString();
@@ -78,6 +79,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       availableNetworks.find((n) => n.chainName === selectedNetwork) || null
     );
   }, [availableNetworks, selectedNetwork]);
+  const isSelectedUsdToken = normBridgeAddr(selectedToken?.stratoToken || "") === normBridgeAddr(usdstAddress);
 
   const balancePollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -92,7 +94,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
 
     const maxTransferable = computeMaxTransferable(
       tokenBalanceWei,
-      selectedToken?.stratoToken === usdstAddress,
+      isSelectedUsdToken,
       voucherBalance,
       usdstBalance,
       FEE_WEI,
@@ -118,7 +120,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
     return max.toString();
   }, [
     balanceData?.balance,
-    selectedToken?.stratoToken,
+    isSelectedUsdToken,
     selectedToken?.routeType,
     selectedToken?.maxPerWithdrawal,
     selectedToken?.maxOutstandingWithdrawal,
@@ -132,7 +134,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       const tokenBalanceWei = balanceData?.balance?.toString() || "0";
       const actualBalance = computeMaxTransferable(
         tokenBalanceWei,
-        selectedToken?.stratoToken === usdstAddress,
+        isSelectedUsdToken,
         voucherBalance,
         usdstBalance,
         FEE_WEI,
@@ -145,7 +147,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
     } catch {
       return { before: "0", after: "0" };
     }
-  }, [balanceData?.balance, selectedToken?.stratoToken, usdstBalance, voucherBalance, amount]);
+  }, [balanceData?.balance, isSelectedUsdToken, usdstBalance, voucherBalance, amount]);
 
   const hasValidAmount = !!amount && !amountError && !feeError;
 

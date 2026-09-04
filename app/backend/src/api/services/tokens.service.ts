@@ -28,6 +28,27 @@ const {
 const normalizeAddress = (address?: string | null) =>
   (address || "").toLowerCase().replace(/^0x/, "");
 
+const addressFilterIncludes = (
+  filter: string | undefined,
+  address: string | undefined | null
+) => {
+  const target = normalizeAddress(address);
+  if (!target) return false;
+  if (!filter) return true;
+
+  const raw = filter.toLowerCase();
+  if (raw.startsWith("eq.")) {
+    return normalizeAddress(raw.slice(3)) === target;
+  }
+  if (raw.startsWith("in.(") && raw.endsWith(")")) {
+    return raw
+      .slice(4, -1)
+      .split(",")
+      .some((value) => normalizeAddress(value.trim()) === target);
+  }
+  return normalizeAddress(raw) === target;
+};
+
 /**
  * Market cap in USD = (price_wei * totalSupply_wei) / 10^36.
  * Divided by 10^36 because both values carry 18 decimals.
@@ -130,7 +151,7 @@ const getYieldVaultTransferableTokens = async (accessToken: string, userAddress:
 };
 
 const getSaveUsdstVaultTransferableTokens = async (accessToken: string, userAddress: string) => {
-  const vaultAddress = config.saveUsdstVault;
+  const vaultAddress = normalizeAddress(config.saveUsdstVault);
   if (!vaultAddress) return [];
 
   try {
@@ -139,11 +160,11 @@ const getSaveUsdstVaultTransferableTokens = async (accessToken: string, userAddr
         address: `eq.${vaultAddress}`,
         key: `eq.${userAddress}`,
         value: "gt.0",
-        select: "address,user:key,value::text",
+        select: "address,user:key,balance:value::text",
       },
     });
 
-    const balances = (balanceRows || []).filter((row: any) => row.value && row.value !== "0");
+    const balances = (balanceRows || []).filter((row: any) => row.balance && row.balance !== "0");
     if (balances.length === 0) return [];
 
     const { data: vaultRows } = await cirrus.get(accessToken, `/${SaveUSDSTVault}`, {
@@ -159,7 +180,7 @@ const getSaveUsdstVaultTransferableTokens = async (accessToken: string, userAddr
     return balances.map((row: any) => ({
       address: row.address || vaultAddress,
       user: row.user || userAddress,
-      balance: row.value,
+      balance: row.balance,
       collateralBalance: "0",
       token: {
         address: row.address || vaultAddress,
@@ -169,7 +190,11 @@ const getSaveUsdstVaultTransferableTokens = async (accessToken: string, userAddr
         _paused: paused,
       },
     }));
-  } catch {
+  } catch (error) {
+    console.warn("Failed to fetch saveUSDST vault balance:", {
+      vaultAddress,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 };
@@ -273,8 +298,7 @@ export const getBalance = async (
     key: `eq.${address}`,
     select: rawParams.select || tokenBalanceSelectFields.join(","),
   };
-  const includeSaveUsdstVault = !rawParams.address
-    || normalizeAddress(rawParams.address).includes(normalizeAddress(config.saveUsdstVault));
+  const includeSaveUsdstVault = addressFilterIncludes(rawParams.address, config.saveUsdstVault);
 
   const [balances, saveUsdstVaultTokens, collaterals, cdps, rawPrices] = await Promise.all([
     cirrus.get(accessToken, "/" + Token + "-_balances", { params }),
