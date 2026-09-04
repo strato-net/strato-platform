@@ -117,6 +117,42 @@ assigns default administration, upgrades, policy, pause, unpause, attestation
 administration, and large-withdrawal approval explicitly. The existing
 `DepositRouter` remains owned by the Safe.
 
+### Pair deployment
+
+The pair deployer creates one `ExternalBridgeVault` proxy and one
+`DepositRouter` proxy, verifies their initial wiring and roles, and records the
+DepositRouter deployment block in a network-specific artifact.
+
+```bash
+npm run deployExternalBridge:sepolia
+npm run deployExternalBridge:baseSepolia
+npm run deployExternalBridge:lineaSepolia
+npm run deployExternalBridge:mainnet
+npm run deployExternalBridge:base
+npm run deployExternalBridge:linea
+```
+
+Each command is preflight-only unless `--execute` is supplied. Production
+execution also requires the exact destination chain ID:
+
+```bash
+npm run deployExternalBridge:sepolia -- --execute
+npm run deployExternalBridge:baseSepolia -- --execute
+npm run deployExternalBridge:lineaSepolia -- --execute
+CONFIRM_EXTERNAL_BRIDGE_DEPLOY=1 npm run deployExternalBridge:mainnet -- --execute
+CONFIRM_EXTERNAL_BRIDGE_DEPLOY=8453 npm run deployExternalBridge:base -- --execute
+CONFIRM_EXTERNAL_BRIDGE_DEPLOY=59144 npm run deployExternalBridge:linea -- --execute
+```
+
+Set the network RPC URL and `PRIVATE_KEY`. Safe, vault-role, and Permit2
+variables are prefixed with the destination chain ID, for example
+`CHAIN_11155111_SAFE_ADDRESS` and
+`CHAIN_11155111_VAULT_DEFAULT_ADMIN_ADDRESS`. Preflight checks the network,
+signer balance, Safe and Permit2 bytecode, and UUPS implementation safety
+without submitting transactions. Production output is written to
+`deployments/ExternalBridgePair_<network>_*.json`; testnets use
+`ExternalBridgeTestnetPair_<network>_*.json`.
+
 ### 1. Development
 
 Compile and run the contract and rollout-plan tests:
@@ -124,6 +160,7 @@ Compile and run the contract and rollout-plan tests:
 ```bash
 npm run compile
 npx hardhat test test/ExternalBridgeVault.js test/DepositRouter.test.js
+npm run external:deploy:test
 npm run external:vault:ops:test
 npm run external:rollout:test
 ```

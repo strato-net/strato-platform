@@ -1,65 +1,139 @@
 const { ethers, upgrades } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
+const {
+  getChainEnvName,
+  getDeploymentProfile,
+  parseDeployArgs,
+} = require("./lib/externalBridgeDeploymentConfig");
 
-const SEPOLIA_CHAIN_ID = 11155111n;
 const DEFAULT_PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 
-function requiredAddress(name, fallback) {
-  const value = process.env[name] || fallback;
+function requiredChainAddress(chainId, name, fallback) {
+  const envName = getChainEnvName(chainId, name);
+  const value = process.env[envName] || fallback;
   if (!value || !ethers.isAddress(value) || value === ethers.ZeroAddress) {
-    throw new Error(`${name} must be a nonzero address`);
+    throw new Error(`${envName} must be a nonzero address`);
   }
   return ethers.getAddress(value);
 }
 
-function writeOutput(payload) {
+function writeOutput(payload, artifactPrefix) {
   const directory = path.resolve(__dirname, "../deployments");
   fs.mkdirSync(directory, { recursive: true });
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const outputPath = path.join(
     directory,
-    `ExternalBridgeTestnetPair_sepolia_${timestamp}.json`,
+    `${artifactPrefix}_${timestamp}.json`,
   );
-  const latestPath = path.join(
-    directory,
-    "ExternalBridgeTestnetPair_sepolia_latest.json",
-  );
+  const latestPath = path.join(directory, `${artifactPrefix}_latest.json`);
   fs.writeFileSync(outputPath, JSON.stringify(payload, null, 2));
   fs.writeFileSync(latestPath, JSON.stringify(payload, null, 2));
   return { outputPath, latestPath };
 }
 
 async function main() {
+  const { execute } = parseDeployArgs(process.argv.slice(2));
   const network = await ethers.provider.getNetwork();
-  if (network.chainId !== SEPOLIA_CHAIN_ID) {
-    throw new Error(
-      `This script only deploys to Sepolia (${SEPOLIA_CHAIN_ID}); connected to ${network.chainId}`,
-    );
-  }
-  const safeAddress = requiredAddress("SAFE_ADDRESS");
-  const vaultDefaultAdminAddress = requiredAddress(
+  const profile = getDeploymentProfile(network.chainId, process.env, {
+    execute,
+  });
+  const chainId = profile.chainId;
+  const safeAddress = requiredChainAddress(chainId, "SAFE_ADDRESS");
+  const vaultDefaultAdminAddress = requiredChainAddress(
+    chainId,
     "VAULT_DEFAULT_ADMIN_ADDRESS",
   );
-  const vaultUpgraderAddress = requiredAddress("VAULT_UPGRADER_ADDRESS");
-  const vaultPolicyAdminAddress = requiredAddress(
+  const vaultUpgraderAddress = requiredChainAddress(
+    chainId,
+    "VAULT_UPGRADER_ADDRESS",
+  );
+  const vaultPolicyAdminAddress = requiredChainAddress(
+    chainId,
     "VAULT_POLICY_ADMIN_ADDRESS",
   );
-  const guardianAddress = requiredAddress("GUARDIAN_ADDRESS");
-  const vaultUnpauserAddress = requiredAddress("VAULT_UNPAUSER_ADDRESS");
-  const vaultAttestationAdminAddress = requiredAddress(
+  const guardianAddress = requiredChainAddress(chainId, "GUARDIAN_ADDRESS");
+  const vaultUnpauserAddress = requiredChainAddress(
+    chainId,
+    "VAULT_UNPAUSER_ADDRESS",
+  );
+  const vaultAttestationAdminAddress = requiredChainAddress(
+    chainId,
     "VAULT_ATTESTATION_ADMIN_ADDRESS",
   );
-  const largeWithdrawalApproverAddress = requiredAddress(
+  const largeWithdrawalApproverAddress = requiredChainAddress(
+    chainId,
     "LARGE_WITHDRAWAL_APPROVER_ADDRESS",
   );
-  const permit2Address = requiredAddress("PERMIT2_ADDRESS", DEFAULT_PERMIT2);
-  if ((await ethers.provider.getCode(permit2Address)) === "0x") {
+  const permit2Address = requiredChainAddress(
+    chainId,
+    "PERMIT2_ADDRESS",
+    DEFAULT_PERMIT2,
+  );
+  const [deployer] = await ethers.getSigners();
+  if (!deployer) {
+    throw new Error("PRIVATE_KEY must configure a deployment signer");
+  }
+  const deployerAddress = await deployer.getAddress();
+  const [
+    deployerBalance,
+    safeCode,
+    permit2Code,
+    vaultFactory,
+    routerFactory,
+  ] = await Promise.all([
+    ethers.provider.getBalance(deployerAddress),
+    ethers.provider.getCode(safeAddress),
+    ethers.provider.getCode(permit2Address),
+    ethers.getContractFactory("ExternalBridgeVault"),
+    ethers.getContractFactory("DepositRouter"),
+  ]);
+  if (deployerBalance === 0n) {
+    throw new Error(`Deployment signer ${deployerAddress} has zero balance`);
+  }
+  if (safeCode === "0x") {
+    throw new Error(`SAFE_ADDRESS has no bytecode: ${safeAddress}`);
+  }
+  if (permit2Code === "0x") {
     throw new Error(`PERMIT2_ADDRESS has no bytecode: ${permit2Address}`);
+  }
+  await Promise.all([
+    upgrades.validateImplementation(vaultFactory, { kind: "uups" }),
+    upgrades.validateImplementation(routerFactory, { kind: "uups" }),
+  ]);
+
+  const preflight = {
+    mode: execute ? "execute" : "preflight",
+    network: profile.network,
+    chainId: network.chainId.toString(),
+    production: profile.production,
+    deployerAddress,
+    deployerBalanceWei: deployerBalance.toString(),
+    safeAddress,
+    permit2Address,
+    roles: {
+      vaultDefaultAdminAddress,
+      vaultUpgraderAddress,
+      vaultPolicyAdminAddress,
+      guardianAddress,
+      vaultUnpauserAddress,
+      vaultAttestationAdminAddress,
+      largeWithdrawalApproverAddress,
+    },
+    checks: {
+      safeHasBytecode: true,
+      permit2HasBytecode: true,
+      implementationsAreUupsSafe: true,
+    },
+  };
+  console.log(JSON.stringify(preflight, null, 2));
+  if (!execute) {
+    console.log("Preflight passed. Re-run with --execute to deploy.");
+    return;
   }
 
   const vault = await upgrades.deployProxy(
-    await ethers.getContractFactory("ExternalBridgeVault"),
+    vaultFactory,
     [
       vaultDefaultAdminAddress,
       vaultUpgraderAddress,
@@ -78,11 +152,16 @@ async function main() {
   );
 
   const router = await upgrades.deployProxy(
-    await ethers.getContractFactory("DepositRouter"),
+    routerFactory,
     [permit2Address, vaultAddress, safeAddress],
     { kind: "uups" },
   );
   await router.waitForDeployment();
+  const routerDeploymentReceipt =
+    await router.deploymentTransaction()?.wait();
+  if (!routerDeploymentReceipt) {
+    throw new Error("DepositRouter deployment receipt is unavailable");
+  }
   const depositRouterAddress = await router.getAddress();
   const depositRouterImplementation =
     await upgrades.erc1967.getImplementationAddress(depositRouterAddress);
@@ -136,8 +215,9 @@ async function main() {
   }
 
   const payload = {
-    network: network.name,
+    network: profile.network,
     chainId: network.chainId.toString(),
+    production: profile.production,
     deployedAt: new Date().toISOString(),
     safeAddress,
     vaultDefaultAdminAddress,
@@ -148,6 +228,7 @@ async function main() {
     vaultAttestationAdminAddress,
     largeWithdrawalApproverAddress,
     permit2Address,
+    depositRouterDeploymentBlock: routerDeploymentReceipt.blockNumber,
     externalBridgeVault: {
       proxy: vaultAddress,
       implementation: vaultImplementation,
@@ -158,13 +239,17 @@ async function main() {
     },
     verification,
   };
-  const paths = writeOutput(payload);
+  const paths = writeOutput(payload, profile.artifactPrefix);
   console.log(JSON.stringify(payload, null, 2));
   console.log(`Output: ${paths.outputPath}`);
   console.log(`Latest: ${paths.latestPath}`);
 }
 
-main().catch((error) => {
-  console.error(`deployExternalBridgeTestnet failed: ${error.message}`);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(`deployExternalBridge failed: ${error.message}`);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = main;

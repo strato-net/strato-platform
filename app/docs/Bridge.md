@@ -115,10 +115,16 @@ cd app/contracts && node deploy/upgrade.js --proxy-address <EXTERNAL_ASSET_BRIDG
 
 Approve each generated AdminRegistry upgrade issue before continuing.
 
-3. Deploy a new Sepolia vault and a separate DepositRouter 3.2 proxy in one operation:
+3. Set the `CHAIN_11155111_*` deployment variables from
+   `app/ethereum/env.example`, run preflight, then deploy a new Sepolia vault
+   and separate DepositRouter 3.2 proxy:
 
 ```bash
-SAFE_ADDRESS=<TESTNET_SAFE_ADDRESS> GUARDIAN_ADDRESS=<TESTNET_GUARDIAN_ADDRESS> npm --prefix app/ethereum run deployExternalBridge:testnet
+npm --prefix app/ethereum run deployExternalBridge:sepolia
+```
+
+```bash
+npm --prefix app/ethereum run deployExternalBridge:sepolia -- --execute
 ```
 
 The script checks the network and Permit2 bytecode, initializes the router directly against the new vault, verifies version/owner/vault, and writes both proxy and implementation addresses to `app/ethereum/deployments/ExternalBridgeTestnetPair_sepolia_latest.json`.
