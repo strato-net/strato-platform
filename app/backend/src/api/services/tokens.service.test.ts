@@ -9,6 +9,7 @@ import { getBalance } from "./tokens.service";
 test("returns saveUSDST balances for exact address filters", async (t) => {
   const saveUsdstVault = "1111111111111111111111111111111111111111";
   const user = "2222222222222222222222222222222222222222";
+  const collateralToken = "3333333333333333333333333333333333333333";
   const balance = "123000000000000000000";
 
   const previousSaveUsdstVault = config.saveUsdstVault;
@@ -51,11 +52,22 @@ test("returns saveUSDST balances for exact address filters", async (t) => {
       };
     }
 
-    if (
-      path === `/${constants.CollateralVault}-userCollaterals`
-      || path === `/${constants.CDPEngine}-vaults`
-    ) {
+    if (path === `/${constants.CollateralVault}-userCollaterals`) {
+      return {
+        status: 200,
+        data: [{ asset: collateralToken, amount: "1" }],
+      };
+    }
+
+    if (path === `/${constants.CDPEngine}-vaults`) {
       return { status: 200, data: [] };
+    }
+
+    if (path === `/${constants.Token}`) {
+      return {
+        status: 200,
+        data: [{ address: collateralToken, _symbol: "OTHER" }],
+      };
     }
 
     assert.fail(`Unexpected Cirrus path: ${path}`);

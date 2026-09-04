@@ -363,8 +363,12 @@ export const getBalance = async (
     })),
   ];
 
-  return allTokens.filter(
-    (t) => t.balance !== "0" || t.collateralBalance !== "0"
+  const isExactSaveUsdstFilter = rawParams.address?.toLowerCase().startsWith("eq.")
+    && addressFilterIncludes(rawParams.address, config.saveUsdstVault);
+
+  return allTokens.filter((t) =>
+    (t.balance !== "0" || t.collateralBalance !== "0")
+    && (!isExactSaveUsdstFilter || isConfiguredSaveUsdstVault(t.address))
   );
 };
 
