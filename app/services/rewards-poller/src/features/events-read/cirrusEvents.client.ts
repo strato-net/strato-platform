@@ -295,7 +295,8 @@ export const getEventsBatch = async (
   eventNames: string[],
   cursor: EventCursor,
   validPairs: ValidEventPairs,
-  positionActivityRoutes: PositionActivityRoutes
+  positionActivityRoutes: PositionActivityRoutes,
+  positionEventSources: PositionEventSource[]
 ): Promise<ProtocolEvent[]> => {
   if (contractAddresses.length === 0 || eventNames.length === 0) {
     return [];
@@ -314,7 +315,7 @@ export const getEventsBatch = async (
       validPairs
     ),
     getLPTokenTransferEvents(lpTokenAddresses, lpEventNames, cursor),
-    getPositionSourceEvents(config.positionEventSources, cursor, positionActivityRoutes),
+    getPositionSourceEvents(positionEventSources, cursor, positionActivityRoutes),
   ]);
 
   const allEvents = sortEventsByBlock([

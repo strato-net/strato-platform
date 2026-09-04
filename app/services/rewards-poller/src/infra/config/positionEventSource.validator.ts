@@ -41,6 +41,13 @@ export const parsePositionEventSources = (
 
   const sources = rawSources.map((raw, sourceIndex) => {
     const source = raw as RawPositionEventSource;
+    const networkId = requireString(
+      source?.networkId,
+      `position event source ${sourceIndex} networkId`
+    );
+    if (!/^[0-9]+$/.test(networkId)) {
+      throw new Error(`Invalid position event source networkId: ${networkId}`);
+    }
     const targetActivitySourceAttribute = requireString(
       source?.targetActivitySourceAttribute,
       `position event source ${sourceIndex} targetActivitySourceAttribute`
@@ -69,6 +76,7 @@ export const parsePositionEventSources = (
     ]));
 
     return {
+      networkId,
       sourceContract: resolveSourceContract(source?.sourceContract),
       targetActivitySourceAttribute,
       events,
@@ -78,7 +86,7 @@ export const parsePositionEventSources = (
   const sourceEventPairs = new Set<string>();
   for (const source of sources) {
     for (const eventName of Object.keys(source.events)) {
-      const pair = `${source.sourceContract}:${eventName}`;
+      const pair = `${source.networkId}:${source.sourceContract}:${eventName}`;
       if (sourceEventPairs.has(pair)) {
         throw new Error(`Duplicate position event source mapping: ${pair}`);
       }
@@ -87,4 +95,16 @@ export const parsePositionEventSources = (
   }
 
   return sources;
+};
+
+export const selectPositionEventSources = (
+  sources: PositionEventSource[],
+  networkId: unknown
+): PositionEventSource[] => {
+  const normalizedNetworkId = String(networkId ?? "").trim();
+  const selected = sources.filter((source) => source.networkId === normalizedNetworkId);
+  if (!selected.length) {
+    throw new Error(`No position event sources configured for network ${normalizedNetworkId}`);
+  }
+  return selected;
 };

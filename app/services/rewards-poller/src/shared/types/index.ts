@@ -73,6 +73,7 @@ export interface PositionEventRule {
 }
 
 export interface PositionEventSource {
+  networkId: string;
   sourceContract: string;
   targetActivitySourceAttribute: string;
   events: Record<string, PositionEventRule>;

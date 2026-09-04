@@ -6,12 +6,18 @@ import {
 } from "../events-read/cirrusEvents.client";
 import { batchHandleAction } from "../rewards-cycle/rewardsBatch.writer";
 import { checkBalances } from "../rewards-cycle/rewardsBalance.guard";
-import { RewardsAction, NonEmptyArray } from "../../shared/types";
+import {
+  RewardsAction,
+  NonEmptyArray,
+  PositionEventSource,
+} from "../../shared/types";
 import { blockTrackingService } from "../../infra/state/blockTracking.repo";
 import { nextCursorAfter } from "../events-read/eventRecord.mapper";
 import { isContractExecutionFailure } from "../../shared/core/errors";
 
-export const processRewardsCycle = async (): Promise<void> => {
+export const processRewardsCycle = async (
+  positionEventSources: PositionEventSource[]
+): Promise<void> => {
   try {
     logInfo("RewardsPolling", "Starting polling cycle");
     await checkBalances();
@@ -33,7 +39,8 @@ export const processRewardsCycle = async (): Promise<void> => {
       eventNames,
       cursor,
       validPairs,
-      positionActivityRoutes
+      positionActivityRoutes,
+      positionEventSources
     );
 
     const allActions: RewardsAction[] = allEvents.map((event) => ({

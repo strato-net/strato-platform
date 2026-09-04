@@ -129,6 +129,8 @@ The service uses configured event mappings to convert protocol events to Rewards
 
 Position event source addresses and mappings are configured in
 `src/infra/config/positionEventSourceConfig.json`.
+At startup, the poller reads the node metadata and selects only entries matching
+the node's `networkID`.
 The native custody configuration maps `Locked` and `Unlocked` events to the token's
 existing Position activity:
 

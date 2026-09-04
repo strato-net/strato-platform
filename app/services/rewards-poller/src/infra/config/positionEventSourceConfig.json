@@ -1,5 +1,6 @@
 [
   {
+    "networkId": "114784819836269",
     "sourceContract": "8cfe7b576f69260673e9a1a9517137f12a49ed93",
     "targetActivitySourceAttribute": "token",
     "events": {
@@ -16,6 +17,7 @@
     }
   },
   {
+    "networkId": "33056204878082667",
     "sourceContract": "db967ac5c497e6a2bd6f89036d2b63851760318f",
     "targetActivitySourceAttribute": "token",
     "events": {

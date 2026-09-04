@@ -11,6 +11,7 @@ const saveUsdst = "2222222222222222222222222222222222222222";
 const user = "3333333333333333333333333333333333333333";
 
 const sources: PositionEventSource[] = [{
+  networkId: "114784819836269",
   sourceContract: custodyVault,
   targetActivitySourceAttribute: "token",
   events: {
