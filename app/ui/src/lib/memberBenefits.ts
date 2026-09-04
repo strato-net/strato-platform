@@ -150,11 +150,13 @@ export async function fetchHasAnyActivity(): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 /**
- * Decide whether the returning user should see the milestone popup. There is
- * no snooze: eligible users see it once per dashboard visit.
+ * Decide whether the returning user is eligible for the milestone popup. The
+ * caller separately checks hasSeenPopup so it shows once per progress state,
+ * not on every dashboard visit.
  *
  * - 4 of 4: nothing to nudge — the milestone is complete.
- * - 0–3 of 4: the milestone popup ("One More Move Unlocks 500 Points"). At
+ * - 0–3 of 4: the milestone popup ("Complete All 4 Actions to Unlock 5
+ *   Points", counting down to "One More Move" at 3 of 4). At
  *   0 of 4 the caller must confirm the user is returning at all
  *   (hasAnyActivity) — brand-new accounts get nothing; these are
  *   returning-user campaigns (the mockups' slide 1, the STRATO Odds credit,
@@ -170,6 +172,43 @@ export function selectPopup(
   if (completedCount === 0 && !hasAnyActivity) return null;
 
   return { kind: 'milestone', completion, completedCount };
+}
+
+// ---------------------------------------------------------------------------
+// Seen state
+// ---------------------------------------------------------------------------
+
+const SEEN_PREFIX = 'memberBenefitSeen_';
+
+/** Stable fingerprint of which actions are done; new progress re-arms the popup. */
+function completionSignature(completion: ActionCompletion): string {
+  return MILESTONE_ACTIONS.map((a) => (completion[a.key] ? '1' : '0')).join('');
+}
+
+/**
+ * Has this user already seen (closed or acted on) the popup for their current
+ * progress? Once seen it stays hidden until they complete another action,
+ * at which point the "next move" nudge is fresh again.
+ */
+export function hasSeenPopup(userAddress: string, completion: ActionCompletion): boolean {
+  try {
+    const seen = localStorage.getItem(`${SEEN_PREFIX}${userAddress.toLowerCase()}`);
+    return seen === completionSignature(completion);
+  } catch {
+    return false;
+  }
+}
+
+/** Record that the user closed or acted on the popup at this progress. */
+export function markPopupSeen(userAddress: string, completion: ActionCompletion): void {
+  try {
+    localStorage.setItem(
+      `${SEEN_PREFIX}${userAddress.toLowerCase()}`,
+      completionSignature(completion)
+    );
+  } catch {
+    // storage full/blocked: the popup may show again next visit
+  }
 }
 
 /** First incomplete milestone action — the "Choose Your Next Move" target. */
