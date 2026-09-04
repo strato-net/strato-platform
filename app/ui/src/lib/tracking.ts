@@ -1,8 +1,10 @@
 // Fire-and-forget beacons for the tracking-links feature. The tracking session
 // cookie is HttpOnly and set by the /t/<slug> resolver, so the SPA cannot see
 // it — both beacons are sent unconditionally. Nothing here may ever call gtag
-// or include prospect labels. Wallet addresses stay first-party; PostHog gets
-// only a wallet-connected event and its own anonymous session context.
+// or include prospect labels. Wallet addresses stay first-party; PostHog is
+// only read here (session + distinct id) so the tracking service can join its
+// row to the PostHog session. The `wallet_connected` analytics event itself is
+// captured once, in UserContext, via `lib/analytics.capture`.
 
 import posthog from 'posthog-js';
 import { getCsrfToken } from './csrf';
@@ -38,19 +40,15 @@ export interface WalletConnectedArgs {
   connector?: string | null;
 }
 
-function posthogContext(args: WalletConnectedArgs): {
+function posthogContext(): {
   posthogSessionId?: string;
   posthogDistinctId?: string;
 } {
   try {
+    if (!(posthog as { __loaded?: boolean }).__loaded) return {};
     const posthogSessionId = posthog.get_session_id();
     const posthogDistinctId = posthog.get_distinct_id();
     if (!posthogSessionId) return {};
-    posthog.capture('wallet_connected', {
-      connector: args.connector ?? undefined,
-      has_external_wallet: !!args.externalWalletAddress,
-      has_strato_account: !!args.stratoAddress,
-    });
     return {
       posthogSessionId,
       posthogDistinctId: posthogDistinctId || undefined,
@@ -71,7 +69,7 @@ export function trackWalletConnected(args: WalletConnectedArgs): void {
   const newAddresses = addresses.filter((a) => !reportedAddresses.has(a));
   if (newAddresses.length === 0) return;
   newAddresses.forEach((a) => reportedAddresses.add(a));
-  const context = posthogContext(args);
+  const context = posthogContext();
   try {
     fetch('/tracking-api/wallet-connected', {
       method: 'POST',
