@@ -125,11 +125,38 @@ Compile and run the contract and rollout-plan tests:
 npm run compile
 npx hardhat test test/ExternalBridgeVault.js test/DepositRouter.test.js
 npm run external:vault:ops:test
+npm run external:rollout:test
 ```
 
 Copy `externalBridgeVault.config.example.json` outside the repository and
 replace every sample value. Amounts are raw token units. Keep every
 `migrateAmount` at `0` until configuration and router verification pass.
+
+### All-token configuration generator
+
+First run `router:ops:testnet -- --step setters` as a dry run. Its audit JSON
+contains every enabled legacy route and the external token metadata needed by
+the generator. Generate a fail-closed policy skeleton:
+
+```bash
+npm run external:rollout:generate -- --deposit-plan /absolute/path/deposit-router-setters.json --chain 11155111 --output-dir /secure/path/eab-rollout
+```
+
+Replace every `REVIEW_REQUIRED` value and explicitly decide deposit,
+withdrawal, rebase, and AUTO_ROUTE enablement for every route. Then generate
+the synchronized EAB config, external-vault config, and DepositRouter Safe
+Transaction Builder batches:
+
+```bash
+npm run external:rollout:generate -- --deposit-plan /absolute/path/deposit-router-setters.json --chain 11155111 --bridge-template /secure/path/external-bridge.base.json --vault-template /secure/path/external-bridge-vault.base.json --policy /secure/path/eab-rollout/external-bridge-rollout-policy-11155111.json --output-dir /secure/path/eab-rollout
+```
+
+The generator fails if token metadata, risk policy, or bridge/vault deployment
+addresses are missing or inconsistent. It never copies legacy withdrawal
+limits automatically and never submits transactions. It writes Safe
+Transaction Builder JSON for DepositRouter pause, synchronized token setters,
+and unpause. `external:vault:ops` separately writes Safe Transaction Builder
+JSON for vault configuration and later liquidity migration.
 
 ### 2. Testnet
 

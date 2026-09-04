@@ -372,6 +372,12 @@ function buildSetterConfigFromMappings(rows, selectedChains) {
         externalToken,
         stratoToken,
         enabled: parseBool(row.value?.enabled),
+        externalDecimals: String(row.value?.externalDecimals ?? ""),
+        externalName: String(row.value?.externalName ?? "").trim(),
+        externalSymbol: String(row.value?.externalSymbol ?? "").trim(),
+        legacyStratoMaxPerWithdrawal: String(
+          row.value?.maxPerWithdrawal ?? "",
+        ),
         blockNumber: toBlockNumber(row),
       };
 
@@ -418,6 +424,10 @@ function buildSetterConfigFromMappings(rows, selectedChains) {
       externalToken: asset.externalToken,
       targetStratoToken: asset.stratoToken,
       enabled: asset.enabled,
+      externalDecimals: asset.externalDecimals,
+      externalName: asset.externalName,
+      externalSymbol: asset.externalSymbol,
+      legacyStratoMaxPerWithdrawal: asset.legacyStratoMaxPerWithdrawal,
     });
   }
 
@@ -441,6 +451,10 @@ function buildSetterConfigFromMappings(rows, selectedChains) {
       externalToken: explicitRoute.externalToken,
       targetStratoToken: explicitRoute.targetStratoToken,
       enabled,
+      externalDecimals: asset.externalDecimals,
+      externalName: asset.externalName,
+      externalSymbol: asset.externalSymbol,
+      legacyStratoMaxPerWithdrawal: asset.legacyStratoMaxPerWithdrawal,
     });
   }
 
@@ -458,6 +472,10 @@ function buildSetterConfigFromMappings(rows, selectedChains) {
       target: route.targetStratoToken,
       minAmount: 0,
       isPermitted: true,
+      externalDecimals: route.externalDecimals,
+      externalName: route.externalName,
+      externalSymbol: route.externalSymbol,
+      legacyStratoMaxPerWithdrawal: route.legacyStratoMaxPerWithdrawal,
     });
   }
 
@@ -493,6 +511,10 @@ function buildTransactions(proxyAddress, chainConfig, chunkSize) {
         target: row.target,
         minAmount: row.minAmount,
         isPermitted: !!row.isPermitted,
+        externalDecimals: row.externalDecimals,
+        externalName: row.externalName,
+        externalSymbol: row.externalSymbol,
+        legacyStratoMaxPerWithdrawal: row.legacyStratoMaxPerWithdrawal,
       })),
     },
   }));
