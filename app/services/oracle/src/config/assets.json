@@ -85,11 +85,13 @@
     },
     "SPY": {
       "targetAssetAddress": "19a7ebee83ed53cb5917aad3f2b1c2cd37da771d",
-      "comment": "Robinhood SPY bridge token"
+      "targetAssetAddressTestnet": "3132c60e0fc30e58c03181a3d9c56904a37099f1",
+      "comment": "Robinhood SPY bridge token. Testnet address used when STRATO metadata network is helium."
     },
     "NVDA": {
       "targetAssetAddress": "b8fa2db41236b1421eb8aea8a52826ba32096fbf",
-      "comment": "Robinhood NVDA bridge token"
+      "targetAssetAddressTestnet": "d7fe8f62a5efbd8dd0f59ac94b13e022818178fc",
+      "comment": "Robinhood NVDA bridge token. Testnet address used when STRATO metadata network is helium."
     },
     "SPYX": {
       "targetAssetAddress": "00000000000000000000000000000000deadbeef",

@@ -65,6 +65,12 @@ export async function validateConfig(): Promise<boolean> {
             } else if (!/^[a-fA-F0-9]{40}$/.test(asset.targetAssetAddress)) {
                 errors.push(`${assetPrefix} Invalid targetAssetAddress format: ${asset.targetAssetAddress}`);
             }
+
+            if (asset.targetAssetAddressTestnet !== undefined) {
+                if (typeof asset.targetAssetAddressTestnet !== 'string' || !/^[a-fA-F0-9]{40}$/.test(asset.targetAssetAddressTestnet)) {
+                    errors.push(`${assetPrefix} Invalid targetAssetAddressTestnet format: ${asset.targetAssetAddressTestnet}`);
+                }
+            }
             
             // Validate constantPrice is a number (if present)
             if (asset.constantPrice !== undefined && typeof asset.constantPrice !== 'number') {

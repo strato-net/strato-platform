@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import { startCronScheduler } from './cronScheduler';
 import { logInfo, logError } from './utils/logger';
 import { validateConfig } from './utils/validateConfig';
+import { initOracleNetwork } from './utils/configLoader';
 import { healthMonitor } from './utils/healthMonitor';
 import express from 'express';
 
@@ -17,6 +18,8 @@ async function main(): Promise<void> {
         logInfo('Main', 'Starting Price Oracle Service...');
         logInfo('Main', `STRATO Node: ${process.env.STRATO_NODE_URL}`);
         logInfo('Main', `Oracle Address: ${process.env.PRICE_ORACLE_ADDRESS}`);
+
+        await initOracleNetwork();
         
         await startCronScheduler();
         

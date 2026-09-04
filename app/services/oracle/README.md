@@ -2,6 +2,8 @@
 
 Fetches asset prices from multiple sources and pushes them to the STRATO blockchain.
 
+On startup the service reads `GET {STRATO_NODE_URL}/eth/v1.2/metadata` (falls back to `/strato-api/eth/v1.2/metadata`). Helium uses `targetAssetAddressTestnet` when set; upquark uses `targetAssetAddress`.
+
 ## Features
 
 - **Median Aggregation**: Robust price calculation using median of all valid sources
