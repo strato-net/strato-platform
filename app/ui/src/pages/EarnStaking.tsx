@@ -1399,7 +1399,7 @@ const EarnStaking = () => {
       >
         <DashboardHeader title="Stake STRATO" />
 
-        <main className="mx-auto max-w-7xl px-4 py-6">
+        <main className="p-4 md:p-6">
           <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate("/dashboard/earn")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Earn

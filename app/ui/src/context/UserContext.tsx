@@ -1,7 +1,7 @@
 "use client";
 
 // context/UserContext.tsx
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useWalletClient } from "wagmi";
 import { api, setAppAuthenticated, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
@@ -9,6 +9,7 @@ import { isAuthenticated, logout as authLogout, redirectToSignedOutLanding, WALL
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE, ADMIN_VOTE_OPEN_ISSUES_PER_PAGE } from "@/lib/constants";
 import { readAttribution, clearAttribution } from "@/lib/attribution";
 import { trackWalletConnected } from "@/lib/tracking";
+import { capture, identifyUser, resetUser } from "@/lib/analytics";
 import { ensureStratoChainInWallet } from "@/lib/stratoChain";
 import { clearExternalWalletActive } from "@/lib/stratoWallet";
 import { ensureHexPrefix } from "@/utils/numberUtils";
@@ -111,22 +112,34 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
               setIsAdmin(serverIsAdmin);
             }
 
-            // GA4 attribution: tag all subsequent events with user_id, and fire
-            // signup_completed exactly once for brand-new users.
-            const gtag = (window as any).gtag;
-            if (gtag && newUserAddress) {
-              gtag('set', { user_id: newUserAddress });
+            // Analytics attribution: tag all subsequent events with the user,
+            // and fire signup_completed exactly once for brand-new users.
+            // GA4 and PostHog are kept independent — PostHog must still
+            // identify when gtag failed to load (ad blockers, no GA id set) —
+            // and attribution is read once and cleared only after both have
+            // consumed it.
+            if (newUserAddress) {
+              const gtag = (window as any).gtag;
+              gtag?.('set', { user_id: newUserAddress });
+              identifyUser({
+                address: newUserAddress,
+                userName,
+                isAdmin: serverIsAdmin,
+              });
+
               if (data.isNewUser) {
-                const attribution = readAttribution() ?? {};
-                gtag('event', 'signup_completed', {
-                  utm_source: (attribution as any).utm_source ?? '(direct)',
-                  utm_medium: (attribution as any).utm_medium ?? '(none)',
-                  utm_campaign: (attribution as any).utm_campaign ?? '(none)',
-                  utm_content: (attribution as any).utm_content ?? '(none)',
-                  via: (attribution as any).via ?? '(none)',
-                  landing_url: (attribution as any).landing_url ?? null,
-                  referrer: (attribution as any).referrer ?? null,
-                });
+                const attribution = (readAttribution() ?? {}) as Record<string, unknown>;
+                const signupProps = {
+                  utm_source: attribution.utm_source ?? '(direct)',
+                  utm_medium: attribution.utm_medium ?? '(none)',
+                  utm_campaign: attribution.utm_campaign ?? '(none)',
+                  utm_content: attribution.utm_content ?? '(none)',
+                  via: attribution.via ?? '(none)',
+                  landing_url: attribution.landing_url ?? null,
+                  referrer: attribution.referrer ?? null,
+                };
+                gtag?.('event', 'signup_completed', signupProps);
+                capture('signup_completed', signupProps);
                 clearAttribution();
               }
             }
@@ -157,6 +170,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         const hadStratoSession = !!storedUser || !!stratoAddress || isLoggedIn;
         if (hadStratoSession) {
           sessionExpiryLogoutStartedRef.current = true;
+          capture('session_expired', { had_external_wallet: externalEvmConnectedRef.current });
           localStorage.removeItem("user");
           setStratoAddress(null);
           setIsLoggedIn(false);
@@ -300,9 +314,37 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const userAddress = isLoggedIn ? stratoAddressHex : externalWalletAddress ?? stratoAddressHex;
   const effectiveLoggedIn = isLoggedIn || shouldUseExternalWallet;
 
-  useEffect(() => {
+  // Layout effect, not a passive one: React runs children's passive effects
+  // before the parent's, so a consumer (e.g. the dashboard's member-benefit
+  // hook) that fires a request in the same commit that the wallet connects
+  // would otherwise go out without X-Wallet-Address. For guest wallets that
+  // silently drops the my_activity filter and returns everyone's history.
+  useLayoutEffect(() => {
     setConnectedWalletAddress(externalWalletAddress);
   }, [externalWalletAddress]);
+
+  const walletConnectedCapturedRef = useRef<Set<string>>(new Set());
+  const WALLET_CONNECTED_CAPTURED_KEY = 'ph_wallet_connected_captured';
+  const hasCapturedWalletConnected = (key: string): boolean => {
+    if (walletConnectedCapturedRef.current.has(key)) return true;
+    try {
+      const stored: string[] = JSON.parse(sessionStorage.getItem(WALLET_CONNECTED_CAPTURED_KEY) ?? '[]');
+      return stored.includes(key);
+    } catch {
+      return false;
+    }
+  };
+  const markWalletConnectedCaptured = (key: string): void => {
+    walletConnectedCapturedRef.current.add(key);
+    try {
+      const stored: string[] = JSON.parse(sessionStorage.getItem(WALLET_CONNECTED_CAPTURED_KEY) ?? '[]');
+      if (!stored.includes(key)) {
+        sessionStorage.setItem(WALLET_CONNECTED_CAPTURED_KEY, JSON.stringify([...stored, key]));
+      }
+    } catch {
+      // sessionStorage unavailable: fall back to the in-memory guard
+    }
+  };
 
   // Tracking-links beacon: fires when a wallet or STRATO account becomes
   // available, whichever arrives first (guest wallet connects included).
@@ -310,24 +352,41 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   // surfacing the same address via wagmi and OAuth reports only once.
   useEffect(() => {
     if (!externalWalletAddress && !stratoAddress) return;
-    trackWalletConnected({
-      externalWalletAddress,
-      stratoAddress,
-      connector: account.connector?.id ?? account.connector?.name ?? null,
-    });
+    const connector = account.connector?.id ?? account.connector?.name ?? null;
+    trackWalletConnected({ externalWalletAddress, stratoAddress, connector });
+
+    // trackWalletConnected dedupes inside its own module, so the analytics
+    // event needs its own guard: this effect also re-runs when the connector id
+    // resolves after the address, which would otherwise double-count. The key
+    // strips the 0x prefix because the STRATO connector surfaces the same
+    // account prefixed via wagmi and unprefixed via /user/me. The guard is
+    // persisted in sessionStorage so a full reload mid-session does not
+    // re-report a connection that already happened.
+    const key = (stratoAddress ?? externalWalletAddress ?? '').toLowerCase().replace(/^0x/, '');
+    if (key && !hasCapturedWalletConnected(key)) {
+      markWalletConnectedCaptured(key);
+      capture('wallet_connected', {
+        connector,
+        has_external_wallet: !!externalWalletAddress,
+        has_strato_address: !!stratoAddress,
+      });
+    }
   }, [externalWalletAddress, stratoAddress, account.connector?.id]);
 
   useEffect(() => {
     externalEvmConnectedRef.current = isExternalEvmWalletConnected;
   }, [isExternalEvmWalletConnected]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setAppAuthenticated(isLoggedIn);
   }, [isLoggedIn]);
 
   useEffect(() => {
     const openWalletConnect = () => {
-      if (!account.isConnected) openConnectModal?.();
+      if (!account.isConnected) {
+        capture('wallet_connect_requested');
+        openConnectModal?.();
+      }
     };
 
     window.addEventListener(WALLET_CONNECT_REQUEST_EVENT, openWalletConnect);
@@ -401,6 +460,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.removeItem("user");
     const gtag = (window as any).gtag;
     if (gtag) gtag('set', { user_id: null });
+    resetUser();
     authLogout();
   }, [disconnect]);
 

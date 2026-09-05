@@ -68,7 +68,7 @@ const DepositsPage = () => {
             <div className="xl:col-span-7">
               <BridgeIn guestMode={!isLoggedIn} fundingMode={fundingMode} initialMetalAddress={metalParam} onFundingModeChange={setFundingMode} onMetalPurchase={handleMetalPurchase} />
             </div>
-            <div className="xl:col-span-5">
+            <div className="xl:col-span-5 xl:mt-9">
               <RecentTransactions fundingMode={fundingMode} metalRefreshKey={metalRefreshKey} />
             </div>
           </div>

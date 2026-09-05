@@ -264,7 +264,6 @@ const StratoStats = () => {
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="STRATO Stats" />
         <main className="p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">
             {!isLoggedIn && (
               <GuestSignInBanner message="Sign in to view detailed statistics and analytics" />
             )}
@@ -662,7 +661,7 @@ const StratoStats = () => {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} yield vault fees
+                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} yield vault net revenue
                       </p>
                       {!revenueLoading && BigInt(yieldVaultPendingRevenue || '0') > 0n && (
                         <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
@@ -752,7 +751,6 @@ const StratoStats = () => {
                 </Card>
               </TabsContent>
             </Tabs>
-          </div>
         </main>
       </div>
 
