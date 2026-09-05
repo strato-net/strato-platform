@@ -149,7 +149,8 @@ spec = do
                 evArgs =
                   [ ("nonce", SInteger 1, "1", SVMType.Int (Just False) Nothing),
                     ("recipient", SAddress 0xdead False, "0xdead", SVMType.Address False)
-                  ]
+                  ],
+                evTopics = []
               }
           trr = successTrr {trrResult = Right (successResults {erEvents = [ev]})}
       rec <- txRunResultToReceipt trr
@@ -173,7 +174,8 @@ spec = do
                 evContractName = "C",
                 evContractAddress = testAddr,
                 evName = "BatchSent",
-                evArgs = [("ids", arrVal, "[11,22]", SVMType.Array (SVMType.Int (Just False) Nothing) Nothing)]
+                evArgs = [("ids", arrVal, "[11,22]", SVMType.Array (SVMType.Int (Just False) Nothing) Nothing)],
+                evTopics = []
               }
           trr = successTrr {trrResult = Right (successResults {erEvents = [ev]})}
       rec <- txRunResultToReceipt trr

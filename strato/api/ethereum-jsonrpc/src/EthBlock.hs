@@ -14,6 +14,7 @@
 -- as a list of full transaction objects.
 module EthBlock
   ( EthBlock(..)
+  , txToEthValue
   ) where
 
 import Blockchain.Data.Block (Block(..))
@@ -33,27 +34,29 @@ import Data.Word (Word64)
 import Numeric (showHex)
 
 data EthBlock
-  = EthBlockWithTxHashes Block  -- ^ @transactions@ rendered as tx hashes (@fullTransactions = false@)
-  | EthBlockWithFullTxs  Block  -- ^ @transactions@ rendered as full tx objects (@fullTransactions = true@)
+  = EthBlockWithTxHashes B.ByteString Block  -- ^ @transactions@ rendered as tx hashes (@fullTransactions = false@)
+  | EthBlockWithFullTxs  B.ByteString Block  -- ^ @transactions@ rendered as full tx objects (@fullTransactions = true@)
+  -- ^ The 'B.ByteString' is the resolved 256-byte @logsBloom@ (stored value when
+  -- real, otherwise a null bloom); see 'Commands.blockBloom'.
 
 instance ToJSON EthBlock where
-  toJSON (EthBlockWithTxHashes blk@(Block _ txs _)) =
-    object $ headerPairs blk ++ [ "transactions" .= map (hexHash . txHash) txs ]
-  toJSON (EthBlockWithFullTxs blk@(Block bd txs _)) =
-    object $ headerPairs blk ++
+  toJSON (EthBlockWithTxHashes bloom blk@(Block _ txs _)) =
+    object $ headerPairs bloom blk ++ [ "transactions" .= map (hexHash . txHash) txs ]
+  toJSON (EthBlockWithFullTxs bloom blk@(Block bd txs _)) =
+    object $ headerPairs bloom blk ++
       [ "transactions" .=
           zipWith (txToEthValue (blockHeaderHash bd) (blockHeaderBlockNumber bd)) [0 ..] txs
       ]
 
 -- | Shared Ethereum block header fields, identical for both representations.
-headerPairs :: Block -> [Pair]
-headerPairs blk@(Block bd _ uncles) =
+headerPairs :: B.ByteString -> Block -> [Pair]
+headerPairs bloom blk@(Block bd _ uncles) =
   [ "number"           .= hexQuantity (blockHeaderBlockNumber bd)
   , "hash"             .= hexHash (blockHeaderHash bd)
   , "parentHash"       .= hexHash (blockHeaderParentHash bd)
   , "nonce"            .= hexNonce (blockHeaderNonce bd)
   , "sha3Uncles"       .= hexHash (blockHeaderOmmersHash bd)
-  , "logsBloom"        .= hexBytes nullBloom
+  , "logsBloom"        .= hexBytes bloom
   , "transactionsRoot" .= hexBytes (blockHeaderTransactionsRoot bd)
   , "stateRoot"        .= hexBytes (blockHeaderStateRoot bd)
   , "receiptsRoot"     .= hexBytes (blockHeaderReceiptsRoot bd)
@@ -88,11 +91,6 @@ txToEthValue blkHash blkNum idx tx = object
   ]
 
 -- Dummy values for fields STRATO does not maintain in an Ethereum-compatible form.
-
--- | STRATO does not maintain a 256-byte Ethereum bloom, so report an empty
--- ("null") bloom of the exact size alloy requires (256 bytes of zeros).
-nullBloom :: B.ByteString
-nullBloom = B.replicate 256 0
 
 -- | The real network gas limit used to reject oversized txs. Sourced from
 -- config, not from the meaningless 'getBlockGasLimit' V2 sentinel.

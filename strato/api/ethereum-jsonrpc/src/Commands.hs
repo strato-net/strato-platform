@@ -12,8 +12,9 @@ where
 
 import Binary
 import CallTrace (BlockTrace(..), mkCallFrame)
-import EthBlock (EthBlock(..))
-import EthLog (eventRowToLog, matchesTopics)
+import EthBlock (EthBlock(..), txToEthValue)
+import EthLog (EthLog, eventRowToLogMaybe, ethLogsBloom, matchesTopics)
+import Blockchain.Data.LogsBloom (emptyLogsBloom)
 import TransactionReceipt (TransactionReceipt, EthHex(..), mkTransactionReceipt, transactionIndex)
 import Strato.Version (stratoVersion)
 import Blockchain.CommunicationConduit (ethVersion)
@@ -62,7 +63,8 @@ import Data.Time.Clock (UTCTime(..))
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Data.Char (toLower)
 import Data.Word (Word64)
-import Data.List (find)
+import Data.List (find, findIndex)
+import Data.Maybe (catMaybes)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Aeson (FromJSON(..), Value(..), decodeStrict, withObject, (.:), (.:?), (.!=))
@@ -75,7 +77,7 @@ import Network.HTTP.Client (Manager, newManager, defaultManagerSettings)
 import Network.HTTP.Types.Status (statusCode, statusMessage)
 import Servant.Client (BaseUrl (..), ClientError(..), ClientM, ResponseF(..), Scheme (Http), mkClientEnv, runClientM)
 import System.IO.Unsafe (unsafePerformIO)
-import Control.Monad.Composable.CodeDB (runCodeDBM, queryEvents)
+import Control.Monad.Composable.CodeDB (runCodeDBM, queryEvents, queryEventsByTxHash)
 
 type Server = IO
 
@@ -519,8 +521,8 @@ traceBlockVia idPrefix blk mTarget opts = do
 strato_traceTransaction :: Method Server
 strato_traceTransaction = toMethod "strato_traceTransaction" f (Required "txHash" :+: Optional "traceConfig" (TraceOptions False) :+: ())
   where
-    f :: Keccak256 -> TraceOptions -> RpcResult Server Value
-    f txHash opts = do
+    f :: EthHex Keccak256 -> TraceOptions -> RpcResult Server Value
+    f (EthHex txHash) opts = do
       response <- liftIO $ runLocal $ TxResults.getTransactionResultClient txHash
       case response of
         Right (tr : _) -> do
@@ -539,12 +541,13 @@ strato_traceTransaction = toMethod "strato_traceTransaction" f (Required "txHash
 strato_traceBlockByHash :: Method Server
 strato_traceBlockByHash = toMethod "strato_traceBlockByHash" f (Required "blockHash" :+: Optional "traceConfig" (TraceOptions False) :+: ())
   where
-    f :: String -> TraceOptions -> RpcResult Server Value
-    f blockHash opts = do
-      mBlk <- liftIO $ fetchBlockByHash blockHash
+    f :: EthHex Keccak256 -> TraceOptions -> RpcResult Server Value
+    f (EthHex blockHash) opts = do
+      let bh = keccak256ToHex blockHash
+      mBlk <- liftIO $ fetchBlockByHash bh
       case mBlk of
-        Just blk -> traceBlockVia ("strato_traceBlockByHash_" ++ take 24 blockHash) (bPrimeToB blk) Nothing opts
-        Nothing -> throwError $ rpcError (-32602) (T.pack $ "block not found: " ++ blockHash)
+        Just blk -> traceBlockVia ("strato_traceBlockByHash_" ++ take 24 bh) (bPrimeToB blk) Nothing opts
+        Nothing -> throwError $ rpcError (-32602) (T.pack $ "block not found: " ++ bh)
 
 strato_traceBlockByNumber :: Method Server
 strato_traceBlockByNumber = toMethod "strato_traceBlockByNumber" f (Required "blockNumber" :+: Optional "traceConfig" (TraceOptions False) :+: ())
@@ -612,9 +615,9 @@ fetchBlockByHash hashStr = do
 eth_getBlockTransactionCountByHash :: Method Server
 eth_getBlockTransactionCountByHash = toMethod "eth_getBlockTransactionCountByHash" f (Required "blockHash" :+: ())
   where
-    f :: String -> RpcResult Server String
-    f blockHash = do
-      mBlk <- liftIO $ fetchBlockByHash blockHash
+    f :: EthHex Keccak256 -> RpcResult Server String
+    f (EthHex blockHash) = do
+      mBlk <- liftIO $ fetchBlockByHash (keccak256ToHex blockHash)
       case mBlk of
         Just blk -> return $ "0x" ++ showHex (length $ blockReceiptTransactions $ bPrimeToB blk) ""
         _ -> return "0x0"
@@ -680,10 +683,10 @@ eth_estimateGas = toMethod "eth_estimateGas" f (Required "txObject" :+: ())
 eth_getBlockByHash :: Method Server
 eth_getBlockByHash = toMethod "eth_getBlockByHash" f (Required "blockHash" :+: Required "fullTransactions" :+: ())
   where
-    f :: String -> Bool -> RpcResult Server (Maybe EthBlock)
-    f blockHash fullTxs = do
-      mBlk <- liftIO $ fetchBlockByHash blockHash
-      return $ toEthBlock fullTxs <$> mBlk
+    f :: EthHex Keccak256 -> Bool -> RpcResult Server (Maybe EthBlock)
+    f (EthHex blockHash) fullTxs = do
+      mBlk <- liftIO $ fetchBlockByHash (keccak256ToHex blockHash)
+      return $ (\blk -> toEthBlock (blockBloom blk) fullTxs blk) <$> mBlk
 
 eth_getBlockByNumber :: Method Server
 eth_getBlockByNumber = toMethod "eth_getBlockByNumber" f (Required "blockNumber" :+: Required "fullTransactions" :+: ())
@@ -691,29 +694,66 @@ eth_getBlockByNumber = toMethod "eth_getBlockByNumber" f (Required "blockNumber"
     f :: String -> Bool -> RpcResult Server (Maybe EthBlock)
     f blockNumber fullTxs = do
       mBlk <- liftIO $ fetchBlockByNumber blockNumber
-      return $ toEthBlock fullTxs <$> mBlk
+      return $ (\blk -> toEthBlock (blockBloom blk) fullTxs blk) <$> mBlk
 
 -- | Select the Ethereum block representation based on the @fullTransactions@ flag.
-toEthBlock :: Bool -> Block' -> EthBlock
-toEthBlock fullTxs = (if fullTxs then EthBlockWithFullTxs else EthBlockWithTxHashes) . bPrimeToB
+toEthBlock :: B.ByteString -> Bool -> Block' -> EthBlock
+toEthBlock bloom fullTxs = (if fullTxs then EthBlockWithFullTxs else EthBlockWithTxHashes) bloom . bPrimeToB
 
--- TODO: blockHash field in tx response needs the actual block hash, not the tx hash.
--- STRATO tx JSON doesn't include the block hash, so we'd need an extra lookup.
+-- | Resolve a block's @logsBloom@ for the Ethereum RPC shape. STRATO
+-- historically stored a dummy bloom in block headers; serve the stored value
+-- only when it is a real 256-byte non-empty bloom (as written by the block
+-- producer going forward), otherwise a null bloom. Receipts (not blocks) carry
+-- the compute-at-read bloom for historical blocks, so this stays a cheap pure
+-- check and does not add a Cirrus round-trip to every block lookup.
+blockBloom :: Block' -> B.ByteString
+blockBloom blk =
+  let stored = Class.blockHeaderLogsBloom (blockBlockData (bPrimeToB blk))
+  in if B.length stored == 256 && B.any (/= 0) stored then stored else emptyLogsBloom
+
+-- | Reconstruct a transaction's logs from the Cirrus @event@ table, skipping any
+-- event that cannot be resolved (missing code / event def) so one bad event does
+-- not fail the whole receipt.
+txEthLogs :: Keccak256 -> RpcResult Server [EthLog]
+txEthLogs txHash = do
+  rows <- runCodeDBM $ queryEventsByTxHash (T.pack (keccak256ToHex txHash)) (maxLogResults + 1)
+  catMaybes <$> runCodeDBM (mapM eventRowToLogMaybe rows)
+
+-- | Hex-encoded (@0x@-prefixed) Ethereum logs bloom for a set of logs.
+logsBloomHex :: [EthLog] -> String
+logsBloomHex ls = "0x" ++ BC.unpack (B16.encode (ethLogsBloom ls))
+
+-- | The bare STRATO transaction carries no block context, so the Ethereum
+-- @blockHash@/@blockNumber@/@transactionIndex@ fields are resolved the same way
+-- the receipt path does: look up the transaction result for its block hash,
+-- fetch that block, and locate the transaction's index within it.
 eth_getTransactionByHash :: Method Server
 eth_getTransactionByHash = toMethod "eth_getTransactionByHash" f (Required "txHash" :+: ())
   where
-    f :: String -> RpcResult Server String
-    f _txHash = throwError $ rpcError (-32601) "eth_getTransactionByHash not yet implemented - blockHash field needs fix"
+    f :: EthHex Keccak256 -> RpcResult Server (Maybe Value)
+    f (EthHex txHash) = do
+      response <- liftIO $ runLocal $ TxResults.getTransactionResultClient txHash
+      case response of
+        Right (tr : _) -> do
+          let blkHash = transactionResultBlockHash tr
+          mBlk <- liftIO $ fetchBlockByHash (keccak256ToHex blkHash)
+          let blkNum = maybe 0 getBlockNumber mBlk
+              txs    = maybe [] (blockReceiptTransactions . bPrimeToB) mBlk
+          return $ case findIndex (\t -> transactionHash t == transactionResultTransactionHash tr) txs of
+            Just idx -> Just $ txToEthValue blkHash blkNum (fromIntegral idx) (txs !! idx)
+            Nothing  -> Nothing
+        Right [] -> return Nothing
+        Left err -> throwError $ rpcError (-32603) (formatClientError err)
 
 eth_getTransactionByBlockHashAndIndex :: Method Server
 eth_getTransactionByBlockHashAndIndex = toMethod "eth_getTransactionByBlockHashAndIndex" f (Required "blockHash" :+: Required "index" :+: ())
   where
-    f :: String -> String -> RpcResult Server (Maybe Transaction')
-    f blockHash indexStr = do
+    f :: EthHex Keccak256 -> String -> RpcResult Server (Maybe Transaction')
+    f (EthHex blockHash) indexStr = do
       let idx = case parseBlockNum indexStr of
             Just n -> fromIntegral n
             Nothing -> 0 :: Int
-      mBlk <- liftIO $ fetchBlockByHash blockHash
+      mBlk <- liftIO $ fetchBlockByHash (keccak256ToHex blockHash)
       return $ case mBlk of
         Just blk ->
           let txs = blockReceiptTransactions $ bPrimeToB blk
@@ -742,8 +782,8 @@ eth_getTransactionByBlockNumberAndIndex = toMethod "eth_getTransactionByBlockNum
 eth_getTransactionReceipt :: Method Server
 eth_getTransactionReceipt = toMethod "eth_getTransactionReceipt" f (Required "txHash" :+: ())
   where
-    f :: Keccak256 -> RpcResult Server (Maybe TransactionReceipt)
-    f txHash = do
+    f :: EthHex Keccak256 -> RpcResult Server (Maybe TransactionReceipt)
+    f (EthHex txHash) = do
       response <- liftIO $ runLocal $ TxResults.getTransactionResultClient txHash
       case response of
         Right (tr : _) -> Just <$> buildReceipt tr
@@ -756,7 +796,9 @@ eth_getTransactionReceipt = toMethod "eth_getTransactionReceipt" f (Required "tx
       let blkNum = maybe 0 getBlockNumber mBlk
           txs = maybe [] (blockReceiptTransactions . bPrimeToB) mBlk
       case find (\t -> transactionHash t == transactionResultTransactionHash tr) txs of
-        Just tx -> return $ mkTransactionReceipt tr tx blkNum
+        Just tx -> do
+          ethLogs <- txEthLogs (transactionResultTransactionHash tr)
+          return $ mkTransactionReceipt tr tx blkNum (map toJSON ethLogs) (logsBloomHex ethLogs)
         Nothing -> throwError $ rpcError (-32603) "Transaction not found in block"
 
 -- | All transaction receipts for a block. The block parameter is a 32-byte
@@ -789,7 +831,9 @@ eth_getBlockReceipts = toMethod "eth_getBlockReceipts" f (Required "block" :+: (
     buildBlockReceipt blkNum idx tx = do
       response <- liftIO $ runLocal $ TxResults.getTransactionResultClient (transactionHash tx)
       case response of
-        Right (tr : _) -> return $ (mkTransactionReceipt tr tx blkNum) { transactionIndex = EthHex idx }
+        Right (tr : _) -> do
+          ethLogs <- txEthLogs (transactionHash tx)
+          return $ (mkTransactionReceipt tr tx blkNum (map toJSON ethLogs) (logsBloomHex ethLogs)) { transactionIndex = EthHex idx }
         Right []       -> throwError $ rpcError (-32603) "receipt not found for transaction in block"
         Left err       -> throwError $ rpcError (-32603) (formatClientError err)
 
@@ -956,7 +1000,9 @@ eth_getLogs = toMethod "eth_getLogs" f (Required "filter" :+: ())
         throwError $ rpcError (-32602) $
           T.pack $
             "eth_getLogs result exceeds " ++ show maxLogResults ++ " candidate events; use smaller ranges or narrower filters"
-      logs <- runCodeDBM $ mapM eventRowToLog rows
+      -- Skip any event that cannot be resolved (missing code / event def)
+      -- rather than failing the whole request, matching the receipt path.
+      logs <- catMaybes <$> runCodeDBM (mapM eventRowToLogMaybe rows)
       let filtered = filter (matchesTopics (lfTopics filt)) logs
       return $ map toJSON filtered
 
