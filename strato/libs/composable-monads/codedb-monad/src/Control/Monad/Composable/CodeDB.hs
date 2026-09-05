@@ -13,6 +13,7 @@ module Control.Monad.Composable.CodeDB
     lookupCodeCollection,
     lookupCodeHash,
     queryEvents,
+    queryEventsByTxHash,
     EventRow (..),
   )
 where
@@ -154,6 +155,19 @@ queryEvents mAddr fromBlock toBlock mEventName limit = do
                SQL.PersistInt64 (fromIntegral limit)
              ]
   rows <- cirrusQuery $ SQL.rawSql (T.pack baseQuery) params
+  return $ map toEventRow rows
+
+-- | All events emitted by a single transaction, ordered by event index. The
+-- Cirrus @event@ table stores @transaction_hash@ without a @0x@ prefix, so any
+-- prefix on the argument is stripped before comparison.
+queryEventsByTxHash :: Text -> Int -> CodeDBM IO [EventRow]
+queryEventsByTxHash txHash limit = do
+  let norm = if T.isPrefixOf "0x" txHash then T.drop 2 txHash else txHash
+      q =
+        "SELECT address, block_hash, transaction_hash, block_number, transaction_sender, event_index::int, event_name, attributes::text \
+        \FROM \"event\" WHERE LOWER(transaction_hash) = LOWER(?) ORDER BY event_index LIMIT ?"
+      params = [SQL.PersistText norm, SQL.PersistInt64 (fromIntegral limit)]
+  rows <- cirrusQuery $ SQL.rawSql (T.pack q) params
   return $ map toEventRow rows
 
 toEventRow :: (SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Int, SQL.Single Text, SQL.Single Text) -> EventRow

@@ -51,8 +51,8 @@ instance ToJSON TransactionReceipt where
       fixType "type_" = "type"
       fixType name    = name
 
-mkTransactionReceipt :: TransactionResult -> Transaction -> Integer -> TransactionReceipt
-mkTransactionReceipt tr tx blkNum = TransactionReceipt
+mkTransactionReceipt :: TransactionResult -> Transaction -> Integer -> [Value] -> String -> TransactionReceipt
+mkTransactionReceipt tr tx blkNum theLogs theLogsBloom = TransactionReceipt
   { transactionHash   = EthHex (transactionResultTransactionHash tr)
   , blockHash         = EthHex (transactionResultBlockHash tr)
   , blockNumber       = EthHex blkNum
@@ -66,8 +66,8 @@ mkTransactionReceipt tr tx blkNum = TransactionReceipt
       else case transactionResultContractsCreated tr of
         (a:_) -> Just (EthHex a)
         []    -> Nothing
-  , logs              = []
-  , logsBloom         = "0x" ++ replicate 512 '0'
+  , logs              = theLogs
+  , logsBloom         = theLogsBloom
   , status            = EthHex $ if transactionResultStatus tr == Just TRS.Success then 1 else 0
   , type_             = EthHex 0
   }
