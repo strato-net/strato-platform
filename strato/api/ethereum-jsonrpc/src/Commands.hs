@@ -12,7 +12,7 @@ where
 
 import Binary
 import CallTrace (BlockTrace(..), mkCallFrame)
-import EthBlock (EthBlock(..))
+import EthBlock (EthBlock(..), txToEthValue)
 import EthLog (EthLog, eventRowToLogMaybe, ethLogsBloom, matchesTopics)
 import Blockchain.Data.LogsBloom (emptyLogsBloom)
 import TransactionReceipt (TransactionReceipt, EthHex(..), mkTransactionReceipt, transactionIndex)
@@ -63,7 +63,7 @@ import Data.Time.Clock (UTCTime(..))
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Data.Char (toLower)
 import Data.Word (Word64)
-import Data.List (find)
+import Data.List (find, findIndex)
 import Data.Maybe (catMaybes)
 import qualified Data.Map as M
 import qualified Data.Text as T
@@ -723,13 +723,27 @@ txEthLogs txHash = do
 logsBloomHex :: [EthLog] -> String
 logsBloomHex ls = "0x" ++ BC.unpack (B16.encode (ethLogsBloom ls))
 
--- TODO: blockHash field in tx response needs the actual block hash, not the tx hash.
--- STRATO tx JSON doesn't include the block hash, so we'd need an extra lookup.
+-- | The bare STRATO transaction carries no block context, so the Ethereum
+-- @blockHash@/@blockNumber@/@transactionIndex@ fields are resolved the same way
+-- the receipt path does: look up the transaction result for its block hash,
+-- fetch that block, and locate the transaction's index within it.
 eth_getTransactionByHash :: Method Server
 eth_getTransactionByHash = toMethod "eth_getTransactionByHash" f (Required "txHash" :+: ())
   where
-    f :: String -> RpcResult Server String
-    f _txHash = throwError $ rpcError (-32601) "eth_getTransactionByHash not yet implemented - blockHash field needs fix"
+    f :: EthHex Keccak256 -> RpcResult Server (Maybe Value)
+    f (EthHex txHash) = do
+      response <- liftIO $ runLocal $ TxResults.getTransactionResultClient txHash
+      case response of
+        Right (tr : _) -> do
+          let blkHash = transactionResultBlockHash tr
+          mBlk <- liftIO $ fetchBlockByHash (keccak256ToHex blkHash)
+          let blkNum = maybe 0 getBlockNumber mBlk
+              txs    = maybe [] (blockReceiptTransactions . bPrimeToB) mBlk
+          return $ case findIndex (\t -> transactionHash t == transactionResultTransactionHash tr) txs of
+            Just idx -> Just $ txToEthValue blkHash blkNum (fromIntegral idx) (txs !! idx)
+            Nothing  -> Nothing
+        Right [] -> return Nothing
+        Left err -> throwError $ rpcError (-32603) (formatClientError err)
 
 eth_getTransactionByBlockHashAndIndex :: Method Server
 eth_getTransactionByBlockHashAndIndex = toMethod "eth_getTransactionByBlockHashAndIndex" f (Required "blockHash" :+: Required "index" :+: ())
