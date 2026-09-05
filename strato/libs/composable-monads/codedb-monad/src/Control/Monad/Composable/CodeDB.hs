@@ -130,9 +130,13 @@ data EventRow = EventRow
   , erAttributes        :: Map.Map Text Value
   } deriving (Show)
 
+-- | The Cirrus @event@ table stores @address@ without a @0x@ prefix, so any
+-- prefix on the address filter is stripped before comparison (mirroring
+-- 'queryEventsByTxHash').
 queryEvents :: Maybe Text -> Integer -> Integer -> Maybe Text -> Int -> CodeDBM IO [EventRow]
-queryEvents mAddr fromBlock toBlock mEventName limit = do
-  let addressFilter = case mAddr of
+queryEvents mAddr0 fromBlock toBlock mEventName limit = do
+  let mAddr = fmap (\a -> if T.isPrefixOf "0x" a then T.drop 2 a else a) mAddr0
+      addressFilter = case mAddr of
         Just _addr -> ["LOWER(address) = LOWER(?)"]
         Nothing -> []
       eventNameFilter = case mEventName of
