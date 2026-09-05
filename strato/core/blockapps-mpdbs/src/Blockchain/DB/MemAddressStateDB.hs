@@ -21,9 +21,11 @@ module Blockchain.DB.MemAddressStateDB
     flushMemAddressStateDB,
     deleteAddressState,
     deleteAddressStates,
+    setAccountReadCacheLimit,
   )
 where
 
+import Blockchain.Cache.Generational
 import qualified Blockchain.DB.AddressStateDB as DB
 import Blockchain.DB.HashDB
 import Blockchain.DB.StateDB
@@ -37,6 +39,7 @@ import qualified Control.Monad.Change.Alter as A
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
+import qualified Data.ByteString as B
 import qualified Data.Map as M
 import Data.IORef
 import GHC.Generics
@@ -44,12 +47,24 @@ import System.IO.Unsafe (unsafePerformIO)
 import Text.Format
 
 {-# NOINLINE accountReadCache #-}
-accountReadCache :: IORef (M.Map (MP.StateRoot, Address) (Maybe AddressState))
-accountReadCache = unsafePerformIO $ newIORef M.empty
+accountReadCache :: IORef (GenCache (MP.StateRoot, Address) (Maybe AddressState))
+accountReadCache = unsafePerformIO $ newIORef $ gcEmpty 100000
+
+-- | Resize the account read cache (entry count). vm-runner sets this from
+-- its memory budget at startup; other executables keep the default.
+setAccountReadCacheLimit :: Int -> IO ()
+setAccountReadCacheLimit n = atomicModifyIORef' accountReadCache $ \c -> (gcSetLimit n c, ())
 
 cacheAccountRead :: (MP.StateRoot, Address) -> Maybe AddressState -> IO ()
-cacheAccountRead key value = modifyIORef' accountReadCache $ \cache ->
-  M.insert key value $ if M.size cache >= 100000 then M.empty else cache
+cacheAccountRead (root, address) value =
+  -- Copy the root's bytes so the key doesn't pin the decode buffer it was
+  -- sliced from, and force the value so the entry doesn't retain decoder
+  -- thunks.
+  let key = (copyStateRoot root, address)
+   in key `deepseq` value `deepseq` modifyIORef' accountReadCache (gcInsert key value)
+
+copyStateRoot :: MP.StateRoot -> MP.StateRoot
+copyStateRoot (MP.StateRoot bytes) = MP.StateRoot (B.copy bytes)
 
 newtype MemAddressStateDB m a = MemAddressStateDB {unMemAddressStateDB :: StateT (M.Map Address AddressState) m a}
   deriving (Functor, Applicative, Monad, MonadIO)
@@ -104,7 +119,7 @@ getAddressStateMaybe address = do
         Nothing -> do
           root <- getStateRoot Nothing
           cache <- liftIO $ readIORef accountReadCache
-          case M.lookup (root, address) cache of
+          case gcLookup (root, address) cache of
             Just result -> pure result
             Nothing -> do
               result <- DB.getAddressStateMaybe address

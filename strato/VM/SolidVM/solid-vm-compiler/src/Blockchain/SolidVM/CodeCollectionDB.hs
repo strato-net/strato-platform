@@ -22,9 +22,11 @@ module Blockchain.SolidVM.CodeCollectionDB
     compileSourceWithAnnotationsWithoutImports,
     codeCollectionFromSource,
     codeCollectionFromHash,
+    setCodeCacheLimit,
   )
 where
 
+import Blockchain.Cache.Generational
 import Blockchain.DB.CodeDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.Data.AddressStateDB
@@ -98,10 +100,26 @@ runMemCompilerT :: Monad m => MemCompilerT m a -> m a
 runMemCompilerT = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT . unMemCompilerT
 
 -- Apply/catchup touches far more than 10 contracts (DEC1DE, USDST, voucher,
--- oracles, user code). A 10-entry LRU evicts and re-typechecks on the hot path.
+-- oracles, user code), so the limit must stay well above the hot set — an
+-- eviction here costs a full re-parse and re-typecheck. It still needs a
+-- bound: entries are whole compiled CodeCollections (megabytes each), and an
+-- unbounded map grows for every code hash ever uploaded.
 {-# NOINLINE unsafeCodeCacheIORef #-}
-unsafeCodeCacheIORef :: IORef (M.Map Keccak256 CodeCollection)
-unsafeCodeCacheIORef = unsafePerformIO $ newIORef M.empty
+unsafeCodeCacheIORef :: IORef (GenCache Keccak256 CodeCollection)
+unsafeCodeCacheIORef = unsafePerformIO $ newIORef $ gcEmpty 128
+
+-- | Resize the code-collection cache (entry count). vm-runner sets this from
+-- its memory budget at startup; other executables keep the default.
+setCodeCacheLimit :: Int -> IO ()
+setCodeCacheLimit n = atomicModifyIORef' unsafeCodeCacheIORef $ \c -> (gcSetLimit n c, ())
+
+cacheCodeCollection :: Keccak256 -> CodeCollection -> IO ()
+cacheCodeCollection hsh cc =
+  -- Copy the hash's bytes (a tx-decode slice must not be pinned by the
+  -- cache) and force the collection so the entry doesn't retain parser
+  -- thunks over the source text.
+  let key = unsafeCreateKeccak256FromByteString . B.copy $ keccak256ToByteString hsh
+   in modifyIORef' unsafeCodeCacheIORef (gcInsert key $! force cc)
 
 withAnnotations :: Monad m => (a -> m (Either CompilationError b)) -> a -> m (Either [SourceAnnotation T.Text] b)
 withAnnotations f = fmap (first unwind) . f
@@ -230,7 +248,7 @@ codeCollectionFromSource isRunningTests typeCheck initCode = do
         _ -> BL.toStrict $ Aeson.encode initList
       hsh = hash canonicalInitCode
   codeCache <- liftIO $ readIORef unsafeCodeCacheIORef
-  case M.lookup hsh codeCache of
+  case gcLookup hsh codeCache of
     Just cc -> do
       recordCacheEvent CacheHit
       return (hsh, cc)
@@ -244,7 +262,7 @@ codeCollectionFromSource isRunningTests typeCheck initCode = do
             Left (IEx p) -> typeError "codeCollectionFromSource" $ show p
             Left (SVMEx (s, _)) -> throw s
             Left (TCEx xs) -> typeError "Typechecker" $ T.unpack (typeErrorToAnnotation xs)
-      liftIO $ modifyIORef' unsafeCodeCacheIORef (M.insert hsh cc)
+      liftIO $ cacheCodeCollection hsh cc
       return $ assert (hsh == hsh') (hsh, cc)
 
 codeCollectionFromHash ::
@@ -259,14 +277,14 @@ codeCollectionFromHash ::
   m CodeCollection
 codeCollectionFromHash isRunningTests typeCheck hsh = do
   codeCache <- liftIO $ readIORef unsafeCodeCacheIORef
-  case M.lookup hsh codeCache of
+  case gcLookup hsh codeCache of
     Just cc -> do
       recordCacheEvent CacheHit
       return cc
     Nothing -> do
       recordCacheEvent CacheMiss
       cc <- codeCollectionFromHashNoCache isRunningTests True typeCheck hsh
-      liftIO $ modifyIORef' unsafeCodeCacheIORef (M.insert hsh cc)
+      liftIO $ cacheCodeCollection hsh cc
       return cc
 
 codeCollectionFromHashNoCache ::

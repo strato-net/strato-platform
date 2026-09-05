@@ -27,6 +27,7 @@ module Blockchain.Init.RtsFlags
   ( MachineResources (..),
     detectMachineResources,
     vmRunnerRtsFlags,
+    vmCacheBudgetMB,
     sequencerRtsFlags,
     renderRtsFlags,
     describeMachineResources,
@@ -157,6 +158,18 @@ vmNurseryPoolMB memMB
   | memMB <= 8 * 1024 = 128
   | memMB <= 16 * 1024 = 256
   | otherwise = 512
+
+-- | Budget (MB) for the vm-runner's in-process read caches
+-- (@--vmCacheBudgetMB@, see Blockchain.VMCacheBudget), by RAM tier. 1024
+-- reproduces the entry caps the 2026-08 throughput work was benchmarked
+-- with; smaller tiers shrink the caches so catch-up fits under the @-M@
+-- heap cap below, trading LevelDB re-reads for memory.
+vmCacheBudgetMB :: Integer -> Integer
+vmCacheBudgetMB memMB
+  | memMB <= 4 * 1024 = 128
+  | memMB <= 8 * 1024 = 256
+  | memMB <= 16 * 1024 = 512
+  | otherwise = 1024
 
 -- | Heap cap for the vm-runner on small-RAM machines: @-M@ at 60% of RAM
 -- converts an OOM-kill into bounded behavior (the RTS auto-enables compacting

@@ -16,6 +16,7 @@ build-type:     Simple
 
 library
   exposed-modules:
+      Blockchain.Cache.Generational
       Blockchain.Data.AddressStateDB
       Blockchain.DB.AddressStateDB
       Blockchain.DB.ChainDB
@@ -45,6 +46,7 @@ library
     , ethereum-rlp
     , fastMP
     , format
+    , hashable
     , leveldb-haskell
     , merkle-patricia-db
     , monad-alter
@@ -55,14 +57,14 @@ library
     , strato-model
     , transformers
     , unliftio-core
+    , unordered-containers
   default-language: Haskell2010
 
 test-suite blockapps-mpdbs-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      StorageSpec
-      Paths_blockapps_mpdbs
+      GenerationalCacheSpec
   hs-source-dirs:
       test/
   ghc-options: -Wall -O2 -Wall -Werror -threaded -rtsopts -with-rtsopts=-N -dynamic

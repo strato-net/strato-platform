@@ -27,6 +27,7 @@ where
 import BlockApps.Init ()
 import BlockApps.Logging
 import Blockchain.Bagger.BaggerState (BaggerState)
+import Blockchain.Cache.Generational
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB
@@ -192,16 +193,18 @@ instance MonadUnliftIO m => (MP.StateRoot `A.Alters` MP.NodeData) (ReaderT Conte
     cache <- liftIO $ readIORef cacheRef
     case HM.lookup key pending of
       Just nd -> pure (Just nd)
-      Nothing -> case HM.lookup key cache of
+      Nothing -> case ghLookup key cache of
         Just nd -> pure (Just nd)
         Nothing -> do
           mnd <- MP.genericLookupDB getStateDB sr
-          liftIO $ for_ mnd $ \nd -> modifyIORef' cacheRef (HM.insert key nd)
+          -- B.copy: the looked-up root is usually a slice of the parent
+          -- node's decode buffer; a copied key pins 32 bytes instead.
+          liftIO $ for_ mnd $ \nd -> modifyIORef' cacheRef (ghInsert (B.copy key) nd)
           pure mnd
   insert _ (MP.StateRoot key) nd = do
     cacheRef <- view mpNodeCache <$> ask
     cache <- liftIO $ readIORef cacheRef
-    case HM.lookup key cache of
+    case ghLookup key cache of
       Just cached
         | cached == nd -> pure ()
         | otherwise -> error "MP node hash collision: cached node differs"
@@ -215,7 +218,7 @@ instance MonadUnliftIO m => (MP.StateRoot `A.Alters` MP.NodeData) (ReaderT Conte
           Nothing -> liftIO $ modifyIORef' pendingRef (HM.insert key nd)
   delete _ sr@(MP.StateRoot key) = do
     cacheRef <- view mpNodeCache <$> ask
-    liftIO $ modifyIORef' cacheRef (HM.delete key)
+    liftIO $ modifyIORef' cacheRef (ghDelete key)
     pendingRef <- view mpPendingNodes <$> ask
     liftIO $ modifyIORef' pendingRef (HM.delete key)
     MP.genericDeleteDB getStateDB sr
@@ -248,8 +251,11 @@ flushPendingMPNodesNow = do
       )
     cacheRef <- view mpNodeCache <$> accessEnv
     liftIO $ do
+      -- The nodes just written are the hottest reads for the next blocks;
+      -- move them into the (bounded, generational) node cache. B.copy so a
+      -- cached key can't pin a buffer the node hash was sliced from.
       modifyIORef' cacheRef $ \cache ->
-        HM.union pending $ if HM.size cache > 200000 then HM.empty else cache
+        HM.foldlWithKey' (\c k nd -> ghInsert (B.copy k) nd c) cache pending
       writeIORef pendingRef HM.empty
       writeIORef rootRef Nothing
     countRef <- view mpFlushCount <$> accessEnv
@@ -292,27 +298,39 @@ instance (MonadUnliftIO m, HasContext m) => (N.NibbleString `A.Alters` N.NibbleS
   lookup _ k = do
     cacheRef <- view hashCache <$> accessEnv
     cache <- liftIO $ readIORef cacheRef
-    case HM.lookup (nibbleString2ByteString k) cache of
+    case ghLookup (nibbleString2ByteString k) cache of
       Just v -> pure (Just v)
       Nothing -> do
         mv <- genericLookupHashDB getHashDB k
-        liftIO $ for_ mv $ \v -> modifyIORef' cacheRef (HM.insert (nibbleString2ByteString k) v)
+        liftIO $ for_ mv $ \v -> modifyIORef' cacheRef (cacheHashPreimage k v)
         pure mv
   insert _ k v = do
     cacheRef <- view hashCache <$> accessEnv
     let key = nibbleString2ByteString k
     cache <- liftIO $ readIORef cacheRef
-    case HM.lookup key cache of
+    case ghLookup key cache of
       Just cached
         | cached == v -> pure ()
         | otherwise -> error "hash reverse-index collision: cached value differs"
       Nothing -> do
         genericInsertHashDB getHashDB k v
-        liftIO $ modifyIORef' cacheRef (HM.insert key v)
+        liftIO $ modifyIORef' cacheRef (cacheHashPreimage k v)
   delete _ k = do
     cacheRef <- view hashCache <$> accessEnv
-    liftIO $ modifyIORef' cacheRef (HM.delete (nibbleString2ByteString k))
+    liftIO $ modifyIORef' cacheRef (ghDelete (nibbleString2ByteString k))
     genericDeleteHashDB getHashDB k
+
+-- B.copy at the cache boundary: both the hashed key and the preimage can be
+-- slices of a larger decode buffer, and a cached entry must not pin it.
+cacheHashPreimage ::
+  N.NibbleString ->
+  N.NibbleString ->
+  GenCacheHM B.ByteString N.NibbleString ->
+  GenCacheHM B.ByteString N.NibbleString
+cacheHashPreimage k v = ghInsert (B.copy $ nibbleString2ByteString k) (copyNibbles v)
+  where
+    copyNibbles (N.EvenNibbleString s) = N.EvenNibbleString (B.copy s)
+    copyNibbles (N.OddNibbleString c s) = N.OddNibbleString c (B.copy s)
 
 instance (HasContext m) => HasMemRawStorageDB m where
   getMemRawStorageTxDB = gets $ view $ memDBs . storageTxMap

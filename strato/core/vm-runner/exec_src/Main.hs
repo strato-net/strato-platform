@@ -13,6 +13,7 @@ import BlockApps.Init
 import BlockApps.Logging
 -- HFlags
 import Blockchain.Strato.Model.Options ()
+import Blockchain.VMCacheBudget (applyVmCacheBudget)
 import Blockchain.VMOptions ()
 import Control.Concurrent.Async as Async
 import Control.Monad
@@ -29,6 +30,7 @@ main = do
   blockappsInit "vm_main"
   runInstrumentation "vm-runner"
   void $ $initHFlags "Ethereum VM"
+  applyVmCacheBudget
   let metricsRunner = run 8009 metricsApp
       runVM = runLoggingT ethereumVM
   race_ metricsRunner runVM
