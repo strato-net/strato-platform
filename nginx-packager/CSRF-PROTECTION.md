@@ -301,6 +301,15 @@ Should succeed without CSRF token (but may fail auth if not properly authenticat
 - **Token Generation**: Automatic on first GET request to protected endpoint
 - **Token Expiry**: 30 minutes (matches session idle timeout)
 - **Token Refresh**: Automatic on any GET request to protected endpoint
+- **Session Rotation**: When the OAuth session cookie rotates (the access token
+  is refreshed roughly every 5 minutes), a new token is generated for the new
+  session and set as a cookie on the rotating response. The old session's
+  server-side token is **not** deleted immediately: it is kept alive for a
+  60-second grace period (`ROTATION_GRACE_TTL` in `csrf.lua`) so requests
+  already in flight with pre-rotation cookies still validate instead of
+  403-ing. Grace entries are never TTL-refreshed, so they expire at most 60
+  seconds after the rotation. Logout is unaffected: it invalidates the
+  session's token immediately (`/auth/logout` in `nginx.tpl.conf`)
 - **Token Storage**: 
   - Client: `CSRF-TOKEN` cookie (readable by JavaScript)
   - Server: Nginx shared memory (10MB `csrf_tokens` dict), keyed by **sha256 of the session cookie**, can store ~50k tokens. Keys must never be the raw `strato_session` cookie: encrypted session cookies run 4-7KB each, which exhausts the zone within days ("no memory" on every store → 403 on every browser POST)
@@ -319,11 +328,20 @@ Should succeed without CSRF token (but may fail auth if not properly authenticat
 1. Token not included in `X-CSRF-Token` header
 2. Token cookie was deleted or expired
 3. Token doesn't match cookie value
-4. Server-side token expired
+4. Server-side token expired (30-minute idle TTL, or an nginx restart wiping
+   the `csrf_tokens` shared dict)
+5. Request was sent with pre-rotation cookies more than 60 seconds after a
+   session rotation (within the grace window the old token is still accepted —
+   see **Session Rotation** under Token Lifecycle)
 
 **Solutions**:
-1. Ensure you're reading the token from cookie correctly
-2. Make a GET request to refresh the token
+1. Ensure you're reading the token from cookie correctly (read it at send
+   time, not once at page load)
+2. Make a GET request to refresh the token. A stale or crossed `CSRF-TOKEN`
+   cookie (e.g. two concurrent responses both rotated the session and their
+   `Set-Cookie` headers landed out of order) is automatically re-synced on the
+   next GET to any protected endpoint: nginx re-sends the cookie whenever the
+   presented value doesn't match the token stored for the session
 3. Check browser dev tools for cookie presence
 4. Verify the header name is exactly `X-CSRF-Token`
 
