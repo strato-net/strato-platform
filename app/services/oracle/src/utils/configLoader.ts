@@ -10,13 +10,6 @@ export function parseNetworkAssetKey(assetKey: string): { sourceAsset: string; n
     return { sourceAsset: match[1], networkId: match[2] };
 }
 
-export function getTestnetNetworkIds(): string[] {
-    return (process.env.ORACLE_TESTNET_NETWORK_IDS || '')
-        .split(',')
-        .map(id => id.trim())
-        .filter(Boolean);
-}
-
 export class ConfigLoader {
     private assets: Record<string, Asset> = {};
     private sources: SourcesConfig = {};
@@ -28,16 +21,18 @@ export class ConfigLoader {
     private loadConfigurations(): void {
         // Load assets registry
         const assetsConfig = require('../config/assets.json') as { assets: Record<string, Asset> };
-        const testnetNetworkIds = new Set(getTestnetNetworkIds());
+        const heliumNetworkId = process.env.ORACLE_HELIUM_TESTNET_NETWORK_ID;
         this.assets = Object.fromEntries(
             Object.entries(assetsConfig.assets).filter(([assetKey]) => !parseNetworkAssetKey(assetKey))
         );
-        Object.entries(assetsConfig.assets).forEach(([assetKey, asset]) => {
-            const networkAsset = parseNetworkAssetKey(assetKey);
-            if (networkAsset && testnetNetworkIds.has(networkAsset.networkId)) {
-                this.assets[networkAsset.sourceAsset] = asset;
-            }
-        });
+        if (heliumNetworkId) {
+            Object.entries(assetsConfig.assets).forEach(([assetKey, asset]) => {
+                const networkAsset = parseNetworkAssetKey(assetKey);
+                if (networkAsset && networkAsset.networkId === heliumNetworkId) {
+                    this.assets[networkAsset.sourceAsset] = asset;
+                }
+            });
+        }
 
         // Load sources configuration and resolve API keys
         const rawSources = require('../config/sources.json') as SourcesConfig;
