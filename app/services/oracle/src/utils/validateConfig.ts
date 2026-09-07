@@ -66,9 +66,16 @@ export async function validateConfig(): Promise<boolean> {
                 errors.push(`${assetPrefix} Invalid targetAssetAddress format: ${asset.targetAssetAddress}`);
             }
 
-            if (asset.targetAssetAddressTestnet !== undefined) {
-                if (typeof asset.targetAssetAddressTestnet !== 'string' || !/^[a-fA-F0-9]{40}$/.test(asset.targetAssetAddressTestnet)) {
-                    errors.push(`${assetPrefix} Invalid targetAssetAddressTestnet format: ${asset.targetAssetAddressTestnet}`);
+            if (asset.networkId !== undefined && (typeof asset.networkId !== 'string' || !/^\d+$/.test(asset.networkId))) {
+                errors.push(`${assetPrefix} networkId must be a numeric string`);
+            }
+
+            if (asset.sourceAsset !== undefined) {
+                if (typeof asset.sourceAsset !== 'string' || !assetsConfig.assets[asset.sourceAsset]) {
+                    errors.push(`${assetPrefix} sourceAsset must reference an existing asset`);
+                }
+                if (!asset.networkId) {
+                    errors.push(`${assetPrefix} sourceAsset requires networkId`);
                 }
             }
             
@@ -164,7 +171,8 @@ export async function validateConfig(): Promise<boolean> {
     const assetKeys = Object.keys(assetsConfig.assets);
     assetKeys.forEach(assetKey => {
         const asset = assetsConfig.assets[assetKey];
-        const sources = assetSourceCount[assetKey] || [];
+        const sourceAssetKey = asset.sourceAsset || assetKey;
+        const sources = assetSourceCount[sourceAssetKey] || [];
         
         // Skip validation for assets not submitted (e.g., proxy-only assets like KAG)
         if (asset.submit === false) {

@@ -2,7 +2,7 @@
 
 Fetches asset prices from multiple sources and pushes them to the STRATO blockchain.
 
-On startup the service reads `GET {STRATO_NODE_URL}/eth/v1.2/metadata` (falls back to `/strato-api/eth/v1.2/metadata`). Helium uses `targetAssetAddressTestnet` when set; upquark uses `targetAssetAddress`.
+Network-specific asset entries are selected using `ORACLE_TESTNET_NETWORK_ID`. Set it to the Helium network ID on testnet; leave it unset on production.
 
 ## Features
 
@@ -23,6 +23,7 @@ On startup the service reads `GET {STRATO_NODE_URL}/eth/v1.2/metadata` (falls ba
 # STRATO Configuration
 STRATO_NODE_URL=https://node1.testnet.strato.nexus/
 PRICE_ORACLE_ADDRESS=0000000000000000000000000000000000001002
+ORACLE_TESTNET_NETWORK_ID=114784819836269  # testnet only; omit on production
 
 # OAuth Configuration
 OAUTH_CLIENT_ID=your-client-id
