@@ -21,18 +21,13 @@ export class ConfigLoader {
     private loadConfigurations(): void {
         // Load assets registry
         const assetsConfig = require('../config/assets.json') as { assets: Record<string, Asset> };
-        const heliumNetworkId = process.env.ORACLE_HELIUM_TESTNET_NETWORK_ID;
-        this.assets = Object.fromEntries(
-            Object.entries(assetsConfig.assets).filter(([assetKey]) => !parseNetworkAssetKey(assetKey))
-        );
-        if (heliumNetworkId) {
-            Object.entries(assetsConfig.assets).forEach(([assetKey, asset]) => {
-                const networkAsset = parseNetworkAssetKey(assetKey);
-                if (networkAsset && networkAsset.networkId === heliumNetworkId) {
-                    this.assets[networkAsset.sourceAsset] = asset;
-                }
-            });
-        }
+        const networkId = process.env.ORACLE_NETWORK_ID;
+        this.assets = {};
+        Object.entries(assetsConfig.assets).forEach(([assetKey, asset]) => {
+            if (parseNetworkAssetKey(assetKey)) return;
+            const networkAsset = networkId ? assetsConfig.assets[`${assetKey}_${networkId}`] : undefined;
+            this.assets[assetKey] = networkAsset || asset;
+        });
 
         // Load sources configuration and resolve API keys
         const rawSources = require('../config/sources.json') as SourcesConfig;
