@@ -31,11 +31,23 @@ const {
   MercataBridge,
   StratoNativeBridge,
   StratoNativeCustodyVault,
+  SaveUSDSTVault,
   Token,
   mercataBridge,
   DECIMALS,
   USDST,
 } = constants;
+
+const normalizeAddress = (value?: string): string =>
+  (value || "").toLowerCase().replace(/^0x/, "");
+
+export const getBridgeTransferContractName = (
+  address: string,
+  saveUsdstVault = constants.saveUsdstVault
+): string =>
+  normalizeAddress(address) === normalizeAddress(saveUsdstVault)
+    ? extractContractName(SaveUSDSTVault)
+    : extractContractName(Token);
 
 const stripPagingParams = (
   params: Record<string, string | undefined>
@@ -217,7 +229,7 @@ export const requestNativeWithdrawal = async (
   const tx = await buildFunctionTx(
     [
       {
-        contractName: extractContractName(Token),
+        contractName: getBridgeTransferContractName(stratoToken),
         contractAddress: stratoToken,
         method: "approve",
         args: {
@@ -431,17 +443,36 @@ export const getWithdrawalSummary = async (
   userAddress: string
 ): Promise<WithdrawalSummaryResponse> => {
   const routes = await getBridgeableTokens(accessToken);
-  const stratoTokens = [...new Set(routes.map((route) => route.stratoToken).filter(Boolean))];
+  const stratoTokens = [...new Set(routes.map((route) => normalizeAddress(route.stratoToken)).filter(Boolean))];
   const thirtyDaysAgoUTC = toUTCTime(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+  const saveUsdstVaultAddress = normalizeAddress(constants.saveUsdstVault);
 
   const nativeWithdrawalsTable = `/${StratoNativeBridge}-withdrawals`;
-  const [balances, prices, pending, completed, nativePending, nativeCompleted] = await Promise.all([
+  const [
+    balances,
+    saveUsdstBalances,
+    prices,
+    pending,
+    completed,
+    nativePending,
+    nativeCompleted,
+  ] = await Promise.all([
     stratoTokens.length > 0
       ? cirrus.get(accessToken, `/${Token}-_balances`, {
           params: {
             select: "address,balance:value::text",
             key: `eq.${userAddress}`,
             address: `in.(${stratoTokens.join(",")})`
+          }
+        })
+      : Promise.resolve({ data: [] }),
+    saveUsdstVaultAddress
+      && stratoTokens.some((token) => normalizeAddress(token) === saveUsdstVaultAddress)
+      ? cirrus.get(accessToken, `/${SaveUSDSTVault}-_balances`, {
+          params: {
+            select: "address,balance:value::text",
+            key: `eq.${userAddress}`,
+            address: `eq.${saveUsdstVaultAddress}`,
           }
         })
       : Promise.resolve({ data: [] }),
@@ -487,11 +518,11 @@ export const getWithdrawalSummary = async (
   ]);
 
   let availableUSD = 0n;
-  for (const b of balances.data || []) {
+  for (const b of [...(balances.data || []), ...(saveUsdstBalances.data || [])]) {
     const balance = BigInt(b.balance || "0");
     const price = BigInt(prices.get(b.address) || "0");
     if (balance > 0n && price > 0n) {
-      availableUSD += (balance * price) / DECIMALS / DECIMALS;
+      availableUSD += (balance * price) / DECIMALS;
     }
   }
 
