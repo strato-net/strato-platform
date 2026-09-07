@@ -3,6 +3,8 @@ import {
   ProtocolEvent,
   CirrusEvent,
   EventCursor,
+  PositionActivityRoutes,
+  PositionEventSource,
 } from "../../shared/types";
 import { logInfo } from "../../infra/observability/logger";
 import { config } from "../../infra/config/runtimeConfig";
@@ -24,9 +26,14 @@ import {
   parseActionableEventsForActivities,
 } from "./actionableEvents.parser";
 import {
+  isPositionActivityType,
   reassembleStructArrayRows,
   shouldTrackActivity,
 } from "./mappingRow.parser";
+import {
+  addPositionActivityRoute,
+  mapPositionSourceEvent,
+} from "./positionEvent.adapter";
 
 const STRATO_PREFIX = "BlockApps-";
 
@@ -108,6 +115,7 @@ export const getEventQueryParams = async (): Promise<{
   eventNames: string[];
   cursor: EventCursor;
   validPairs: ValidEventPairs;
+  positionActivityRoutes: PositionActivityRoutes;
 }> => {
   // Each activity is spread over several /mapping rows: the struct row holds
   // the scalar fields (emissionRate, sourceContract, ...) and each
@@ -124,6 +132,7 @@ export const getEventQueryParams = async (): Promise<{
   const contractAddresses = new Set<string>();
   const eventNames = new Set<string>();
   const validPairs: ValidEventPairs = new Set<string>();
+  const positionActivityRoutes: PositionActivityRoutes = new Map();
 
   const activities = reassembleStructArrayRows(
     Array.isArray(activitiesData) ? activitiesData : []
@@ -147,6 +156,15 @@ export const getEventQueryParams = async (): Promise<{
         contractAddresses.add(item.sourceContract);
         eventNames.add(evt.eventName);
         validPairs.add(makeEventPairKey(item.sourceContract, evt.eventName));
+
+        if (isPositionActivityType(item.activityType)) {
+          addPositionActivityRoute(
+            positionActivityRoutes,
+            item.sourceContract,
+            evt.eventName,
+            evt.actionType
+          );
+        }
       }
     }
   }
@@ -162,6 +180,7 @@ export const getEventQueryParams = async (): Promise<{
     eventNames: [...eventNames],
     cursor,
     validPairs,
+    positionActivityRoutes,
   };
 };
 
@@ -224,11 +243,60 @@ export const getLPTokenTransferEvents = async (
     });
 };
 
+export const getPositionSourceEvents = async (
+  sources: PositionEventSource[],
+  cursor: EventCursor,
+  activityRoutes: PositionActivityRoutes
+): Promise<ProtocolEvent[]> => {
+  if (!sources.length) return [];
+
+  const events: ProtocolEvent[] = [];
+  for (const source of sources) {
+    const requiredActions = new Set(
+      Object.values(source.events).map((event) => event.action)
+    );
+    const targetActivitySources = [...activityRoutes.entries()]
+      .filter(([, routes]) => [...requiredActions].every((action) => routes[action]))
+      .map(([sourceContract]) => sourceContract);
+    if (!targetActivitySources.length) continue;
+
+    const data = await cirrus.get("/event", {
+      params: {
+        address: `eq.${source.sourceContract}`,
+        event_name: buildFilter(Object.keys(source.events)),
+        [`attributes->>${source.targetActivitySourceAttribute}`]: buildFilter(targetActivitySources),
+        block_timestamp: `gte.${cursor.block_timestamp}`,
+        order: "id.asc",
+        select:
+          "address,block_number,event_name,attributes,event_index,transaction_sender,block_timestamp",
+      },
+    });
+    if (!Array.isArray(data)) continue;
+
+    for (const item of data as CirrusEvent[]) {
+      const blockNumber = Number(item.block_number);
+      const eventIndex = Number(item.event_index || 0);
+      if (
+        blockNumber < cursor.blockNumber
+        || (blockNumber === cursor.blockNumber && eventIndex <= cursor.eventIndex)
+      ) {
+        continue;
+      }
+
+      const event = mapPositionSourceEvent(item, sources, activityRoutes);
+      if (event) events.push(event);
+    }
+  }
+  return events;
+};
+
 export const getEventsBatch = async (
   contractAddresses: string[],
   eventNames: string[],
   cursor: EventCursor,
-  validPairs: ValidEventPairs
+  validPairs: ValidEventPairs,
+  positionActivityRoutes: PositionActivityRoutes,
+  positionEventSources: PositionEventSource[]
 ): Promise<ProtocolEvent[]> => {
   if (contractAddresses.length === 0 || eventNames.length === 0) {
     return [];
@@ -238,7 +306,7 @@ export const getEventsBatch = async (
   const { eventAddresses, lpTokenAddresses, eventEventNames, lpEventNames } =
     splitAddressesAndEvents(contractAddresses, eventNames, mapping);
 
-  const [regularEvents, lpTransferEvents] = await Promise.all([
+  const [regularEvents, lpTransferEvents, positionSourceEvents] = await Promise.all([
     queryRegularEvents(
       eventAddresses,
       eventEventNames,
@@ -247,13 +315,18 @@ export const getEventsBatch = async (
       validPairs
     ),
     getLPTokenTransferEvents(lpTokenAddresses, lpEventNames, cursor),
+    getPositionSourceEvents(positionEventSources, cursor, positionActivityRoutes),
   ]);
 
-  const allEvents = sortEventsByBlock([...regularEvents, ...lpTransferEvents]);
+  const allEvents = sortEventsByBlock([
+    ...regularEvents,
+    ...lpTransferEvents,
+    ...positionSourceEvents,
+  ]);
 
   logInfo(
     "CirrusService",
-    `Fetched ${allEvents.length} events (${regularEvents.length} regular, ${lpTransferEvents.length} LP transfers)`,
+    `Fetched ${allEvents.length} events (${regularEvents.length} regular, ${lpTransferEvents.length} LP transfers, ${positionSourceEvents.length} position source events)`,
     {
       contractAddresses: contractAddresses.length,
       eventNames: eventNames.length,
