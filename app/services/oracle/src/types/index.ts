@@ -21,8 +21,6 @@ export interface ExchangeRateConfig {
 
 export interface Asset {
     targetAssetAddress: string;
-    networkId?: string; // only use this variant when ORACLE_TESTNET_NETWORK_ID matches
-    sourceAsset?: string; // source symbol and default asset key replaced by this variant
     constantPrice?: number;
     weekendProxy?: string; // Proxy symbol for weekend/market-closed pricing (e.g., "PAXG" for XAU)
     equivalentAssets?: string[]; // Assets with equivalent prices (e.g., ["XAUT"] for XAU)

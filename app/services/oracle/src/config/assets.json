@@ -91,16 +91,12 @@
       "targetAssetAddress": "b8fa2db41236b1421eb8aea8a52826ba32096fbf",
       "comment": "Robinhood NVDA bridge token"
     },
-    "SPY_TESTNET": {
+    "SPY_114784819836269": {
       "targetAssetAddress": "3132c60e0fc30e58c03181a3d9c56904a37099f1",
-      "networkId": "114784819836269",
-      "sourceAsset": "SPY",
       "comment": "Robinhood SPY bridge token on Helium"
     },
-    "NVDA_TESTNET": {
+    "NVDA_114784819836269": {
       "targetAssetAddress": "d7fe8f62a5efbd8dd0f59ac94b13e022818178fc",
-      "networkId": "114784819836269",
-      "sourceAsset": "NVDA",
       "comment": "Robinhood NVDA bridge token on Helium"
     },
     "SPYX": {

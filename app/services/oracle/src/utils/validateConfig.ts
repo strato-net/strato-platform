@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import { oauthClient } from './oauth';
 import { logInfo, logError } from './logger';
 import { ORACLE_CONFIG } from './constants';
+import { parseNetworkAssetKey } from './configLoader';
 
 const sourcesConfig = require('../config/sources.json');
 const assetsConfig = require('../config/assets.json');
@@ -66,19 +67,6 @@ export async function validateConfig(): Promise<boolean> {
                 errors.push(`${assetPrefix} Invalid targetAssetAddress format: ${asset.targetAssetAddress}`);
             }
 
-            if (asset.networkId !== undefined && (typeof asset.networkId !== 'string' || !/^\d+$/.test(asset.networkId))) {
-                errors.push(`${assetPrefix} networkId must be a numeric string`);
-            }
-
-            if (asset.sourceAsset !== undefined) {
-                if (typeof asset.sourceAsset !== 'string' || !assetsConfig.assets[asset.sourceAsset]) {
-                    errors.push(`${assetPrefix} sourceAsset must reference an existing asset`);
-                }
-                if (!asset.networkId) {
-                    errors.push(`${assetPrefix} sourceAsset requires networkId`);
-                }
-            }
-            
             // Validate constantPrice is a number (if present)
             if (asset.constantPrice !== undefined && typeof asset.constantPrice !== 'number') {
                 errors.push(`${assetPrefix} constantPrice must be a number`);
@@ -171,7 +159,7 @@ export async function validateConfig(): Promise<boolean> {
     const assetKeys = Object.keys(assetsConfig.assets);
     assetKeys.forEach(assetKey => {
         const asset = assetsConfig.assets[assetKey];
-        const sourceAssetKey = asset.sourceAsset || assetKey;
+        const sourceAssetKey = parseNetworkAssetKey(assetKey)?.sourceAsset || assetKey;
         const sources = assetSourceCount[sourceAssetKey] || [];
         
         // Skip validation for assets not submitted (e.g., proxy-only assets like KAG)
