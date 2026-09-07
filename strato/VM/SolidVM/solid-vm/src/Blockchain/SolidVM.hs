@@ -40,6 +40,7 @@ import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import Blockchain.Data.Util (integer2Bytes)
 import qualified Blockchain.Database.MerklePatricia as MP
+import BlockApps.Solidity.ABI.Bridge (encodeEventToLog)
 import BlockApps.Solidity.ABI.Codec (abiDecode)
 import qualified Blockchain.SolidVM.Builtins as Builtins
 import Blockchain.SolidVM.CodeCollectionDB
@@ -1009,7 +1010,17 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
           tHash <- Env.txHash <$> getEnv
           txSender <- Env.origin <$> getEnv
           let contractName' = labelToString $ CC._contractName curCnct
-          addEvent $ Event bHash tHash txSender contractName' address eventName evArgs
+          -- Derive the Ethereum log topics (topic0 + indexed args) from the event
+          -- ABI now, while the CodeCollection is in hand, so the block producer can
+          -- build a real logsBloom without re-deriving them. Uses the same encoder
+          -- and the same (name -> rendered value) attributes the JSON-RPC layer
+          -- reconstructs from Cirrus, so producer and RPC blooms agree.
+          let (evTopicBytes, _) =
+                encodeEventToLog
+                  (stringToLabel eventName)
+                  ev
+                  (M.fromList [(T.pack n, T.pack v) | (n, _, v, _) <- evArgs])
+          addEvent $ Event bHash tHash txSender contractName' address eventName evArgs evTopicBytes
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos

@@ -58,3 +58,12 @@ library:
   - transformers
   - unliftio
   - unliftio-core
+
+tests:
+  blockapps-data-tests:
+    source-dirs: test/
+    main: Spec.hs
+    dependencies:
+      - blockapps-data
+      - bytestring
+      - hspec
