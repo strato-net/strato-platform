@@ -74,7 +74,7 @@ contract Describe_StablePool_Migration is Authorizable {
         require(ERC20(t0).balanceOf(address(0xdead)) == 100000e18, "F8: coins moved to the destination");
         require(p.isDisabled(), "F8: the emptied pool is locked");
         require(p.isPaused(), "F8: ...and paused");
-        require(ERC20(lpAddr).totalSupply() == minted, "F8: supply left readable for the re-mint");
+        require(ERC20(lpAddr).totalSupply() == minted + 1000, "F8: supply (incl. locked MINIMUM_LIQUIDITY) left readable for the re-mint");
 
         // nothing can trade or withdraw against the emptied reserve
         bool traded = false;

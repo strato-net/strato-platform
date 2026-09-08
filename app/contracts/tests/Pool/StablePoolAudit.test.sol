@@ -124,10 +124,13 @@ contract Describe_StablePool_Audit is Authorizable {
         uint adminB = pool.adminBalances(tB);
         require(adminA > 0 && adminB > 0, "F2: protocol fees should have accrued");
 
-        uint fairA = (pool.tokenBalances(tA) - adminA) / 2;
-        uint fairB = (pool.tokenBalances(tB) - adminB) / 2;
+        // pro-rata over the whole supply, which includes the locked MINIMUM_LIQUIDITY
+        uint burn = myLp / 2;
+        uint total = ERC20(address(lp)).totalSupply();
+        uint fairA = (pool.tokenBalances(tA) - adminA) * burn / total;
+        uint fairB = (pool.tokenBalances(tB) - adminB) * burn / total;
 
-        uint[] got = pool.removeLiquidityGeneral(myLp / 2, [uint(0), uint(0)], address(this), false);
+        uint[] got = pool.removeLiquidityGeneral(burn, [uint(0), uint(0)], address(this), false);
 
         require(got[0] == fairA, "F2: coin0 payout must be the _balances() share exactly");
         require(got[1] == fairB, "F2: coin1 payout must be the _balances() share exactly");
@@ -161,7 +164,7 @@ contract Describe_StablePool_Audit is Authorizable {
         require(exited, "F2b: the last LP must be able to withdraw");
         require(ERC20(address(lp)).balanceOf(address(lastLp)) == 0, "F2b: position closed");
         require(ERC20(tA).balanceOf(address(lastLp)) > 0, "F2b: coins actually received");
-        require(ERC20(address(lp)).totalSupply() == 0, "F2b: pool fully wound down");
+        require(ERC20(address(lp)).totalSupply() == 1000, "F2b: pool fully wound down (only MINIMUM_LIQUIDITY remains)");
     }
 
     // =========================================================================
@@ -182,7 +185,7 @@ contract Describe_StablePool_Audit is Authorizable {
         (uint gotB, uint gotA) = pool.removeLiquidity(funded, 1, 1, block.timestamp + 1);
 
         require(gotA > 0 && gotB > 0, "F2c: full exit paid out");
-        require(ERC20(address(lp)).totalSupply() == 0, "F2c: supply fully burned");
+        require(ERC20(address(lp)).totalSupply() == 1000, "F2c: supply fully burned (only MINIMUM_LIQUIDITY remains)");
         require(ERC20(tA).balanceOf(collector) == collectorBefore + adminA,
             "F2c: the fee collector received exactly the accrued fee");
         require(pool.adminBalances(tA) == 0, "F2c: fee ledger cleared");
