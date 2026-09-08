@@ -9,12 +9,21 @@ const {
 const {
   collectInventory,
   buildPolicyTemplate,
+  buildRolloutTemplates,
   buildSynchronizedRollout,
+  validateInitialRollout,
 } = require("./lib/externalBridgeRolloutPlan");
+
+const BRIDGE_DEFAULTS_PATH = path.resolve(
+  __dirname,
+  "../../contracts/deploy/external-bridge.helium.example.json",
+);
 
 function parseArgs(argv = process.argv.slice(2)) {
   const args = {};
   const allowed = new Set([
+    "mode",
+    "settings",
     "deposit-plan",
     "bridge-template",
     "vault-template",
@@ -34,14 +43,27 @@ function parseArgs(argv = process.argv.slice(2)) {
     args[item.slice(2)] = value;
     index += 1;
   }
-  for (const required of ["deposit-plan", "chain", "output-dir"]) {
+  const mode = args.mode || "generate";
+  if (!["generate", "prepare", "finalize"].includes(mode)) {
+    throw new Error("--mode must be generate|prepare|finalize");
+  }
+  const requiredArgs =
+    mode === "generate"
+      ? ["deposit-plan", "chain", "output-dir"]
+      : mode === "prepare"
+        ? ["settings", "output-dir"]
+        : ["settings", "policy", "output-dir"];
+  for (const required of requiredArgs) {
     if (!args[required]) throw new Error(`--${required} is required`);
   }
-  const chainId = Number(args.chain);
-  if (!Number.isSafeInteger(chainId) || chainId <= 0) {
-    throw new Error("--chain must be a positive safe integer");
+  if (mode === "generate") {
+    const chainId = Number(args.chain);
+    if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+      throw new Error("--chain must be a positive safe integer");
+    }
+    return { ...args, mode, chainId };
   }
-  return { ...args, chainId };
+  return { ...args, mode };
 }
 
 const readJson = (file, label) => {
@@ -57,6 +79,38 @@ const writeJson = (directory, name, value) => {
   fs.writeFileSync(outputPath, `${JSON.stringify(value, null, 2)}\n`);
   return outputPath;
 };
+
+const resolveFrom = (directory, file) =>
+  path.resolve(directory, String(file || ""));
+
+function loadSettingsInputs(settingsPath) {
+  const absoluteSettingsPath = path.resolve(settingsPath);
+  const settings = readJson(absoluteSettingsPath, "rollout settings");
+  const settingsDirectory = path.dirname(absoluteSettingsPath);
+  for (const required of ["externalDeployment", "depositPlan"]) {
+    if (!settings[required]) {
+      throw new Error(`Rollout settings require ${required}`);
+    }
+  }
+  const deploymentPath = resolveFrom(
+    settingsDirectory,
+    settings.externalDeployment,
+  );
+  const depositPlanPath = resolveFrom(settingsDirectory, settings.depositPlan);
+  const templates = buildRolloutTemplates({
+    settings,
+    deployment: readJson(deploymentPath, "external deployment"),
+    bridgeDefaults: readJson(
+      BRIDGE_DEFAULTS_PATH,
+      "Helium ExternalAssetBridge defaults",
+    ),
+  });
+  return {
+    depositPlanPath,
+    depositPlan: readJson(depositPlanPath, "DepositRouter plan"),
+    ...templates,
+  };
+}
 
 function buildDepositRouterBatches(rollout) {
   return chunkArray(rollout.depositRouter.updates, 20).map((updates, index) => {
@@ -114,25 +168,95 @@ function main() {
   const outputDirectory = path.resolve(args["output-dir"]);
   fs.mkdirSync(outputDirectory, { recursive: true });
 
-  const depositPlan = readJson(args["deposit-plan"], "DepositRouter plan");
-  const inventory = collectInventory(depositPlan, args.chainId);
-
-  if (!args.policy) {
-    const policyPath = writeJson(
+  if (args.mode === "prepare") {
+    const inputs = loadSettingsInputs(args.settings);
+    const inventory = collectInventory(inputs.depositPlan, inputs.chainId);
+    const policyName =
+      `external-bridge-rollout-policy-${inputs.chainId}.json`;
+    const policyPath = path.join(outputDirectory, policyName);
+    if (fs.existsSync(policyPath)) {
+      throw new Error(
+        `Policy already exists and was not overwritten: ${policyPath}`,
+      );
+    }
+    const bridgeTemplatePath = writeJson(
       outputDirectory,
-      `external-bridge-rollout-policy-${args.chainId}.json`,
-      buildPolicyTemplate(inventory, args.chainId),
+      `external-bridge-base-${inputs.chainId}.json`,
+      inputs.bridgeTemplate,
+    );
+    const vaultTemplatePath = writeJson(
+      outputDirectory,
+      `external-bridge-vault-base-${inputs.chainId}.json`,
+      inputs.vaultTemplate,
+    );
+    writeJson(
+      outputDirectory,
+      policyName,
+      buildPolicyTemplate(
+        inventory,
+        inputs.chainId,
+        inputs.lastProcessedBlock,
+      ),
     );
     const inventoryPath = writeJson(
       outputDirectory,
-      `external-bridge-inventory-${args.chainId}.json`,
+      `external-bridge-inventory-${inputs.chainId}.json`,
+      inventory,
+    );
+    console.log(
+      JSON.stringify(
+        {
+          mode: "prepare",
+          chainId: inputs.chainId,
+          routeCount: inventory.length,
+          bridgeTemplatePath,
+          vaultTemplatePath,
+          inventoryPath,
+          policyPath,
+          next: "Fill every REVIEW_REQUIRED policy value, then run external:rollout:finalize.",
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  let chainId;
+  let depositPlan;
+  let depositPlanPath;
+  let bridgeTemplate;
+  let vaultTemplate;
+  if (args.mode === "finalize") {
+    const inputs = loadSettingsInputs(args.settings);
+    chainId = inputs.chainId;
+    depositPlan = inputs.depositPlan;
+    depositPlanPath = inputs.depositPlanPath;
+    bridgeTemplate = inputs.bridgeTemplate;
+    vaultTemplate = inputs.vaultTemplate;
+  } else {
+    chainId = args.chainId;
+    depositPlanPath = path.resolve(args["deposit-plan"]);
+    depositPlan = readJson(depositPlanPath, "DepositRouter plan");
+  }
+
+  const inventory = collectInventory(depositPlan, chainId);
+  if (!args.policy) {
+    const policyPath = writeJson(
+      outputDirectory,
+      `external-bridge-rollout-policy-${chainId}.json`,
+      buildPolicyTemplate(inventory, chainId),
+    );
+    const inventoryPath = writeJson(
+      outputDirectory,
+      `external-bridge-inventory-${chainId}.json`,
       inventory,
     );
     console.log(
       JSON.stringify(
         {
           mode: "inventory",
-          chainId: args.chainId,
+          chainId,
           routeCount: inventory.length,
           inventoryPath,
           policyPath,
@@ -145,60 +269,68 @@ function main() {
     return;
   }
 
-  for (const required of ["bridge-template", "vault-template"]) {
-    if (!args[required]) {
-      throw new Error(`--${required} is required when --policy is provided`);
+  if (args.mode === "generate") {
+    for (const required of ["bridge-template", "vault-template"]) {
+      if (!args[required]) {
+        throw new Error(`--${required} is required when --policy is provided`);
+      }
     }
+    bridgeTemplate = readJson(
+      args["bridge-template"],
+      "ExternalAssetBridge template",
+    );
+    vaultTemplate = readJson(
+      args["vault-template"],
+      "ExternalBridgeVault template",
+    );
   }
   const rollout = buildSynchronizedRollout({
     depositPlan,
-    bridgeTemplate: readJson(
-      args["bridge-template"],
-      "ExternalAssetBridge template",
-    ),
-    vaultTemplate: readJson(
-      args["vault-template"],
-      "ExternalBridgeVault template",
-    ),
+    bridgeTemplate,
+    vaultTemplate,
     policy: readJson(args.policy, "rollout policy"),
-    chainId: args.chainId,
+    chainId,
   });
+  if (args.mode === "finalize") validateInitialRollout(rollout);
   const bridgeConfigPath = writeJson(
     outputDirectory,
-    `external-bridge-${args.chainId}.json`,
+    `external-bridge-${chainId}.json`,
     rollout.bridgeConfig,
   );
   const vaultConfigPath = writeJson(
     outputDirectory,
-    `external-bridge-vault-${args.chainId}.json`,
+    `external-bridge-vault-${chainId}.json`,
     rollout.vaultConfig,
   );
   const batches = buildDepositRouterBatches(rollout);
   const depositRouterPausePath = writeJson(
     outputDirectory,
-    `deposit-router-pause-${args.chainId}.json`,
+    `deposit-router-pause-${chainId}.json`,
     buildDepositRouterControl(rollout, "pause"),
   );
   const depositRouterBatchPaths = batches.map(({ index, transactionBuilder }) =>
     writeJson(
       outputDirectory,
-      `deposit-router-all-token-${args.chainId}-${index}.json`,
+      `deposit-router-all-token-${chainId}-${index}.json`,
       transactionBuilder,
     ),
   );
   const depositRouterUnpausePath = writeJson(
     outputDirectory,
-    `deposit-router-unpause-${args.chainId}.json`,
+    `deposit-router-unpause-${chainId}.json`,
     buildDepositRouterControl(rollout, "unpause"),
   );
   const manifestPath = writeJson(
     outputDirectory,
-    `external-bridge-rollout-manifest-${args.chainId}.json`,
+    `external-bridge-rollout-manifest-${chainId}.json`,
     {
       generatedAt: new Date().toISOString(),
-      chainId: args.chainId,
-      sourceDepositPlan: path.resolve(args["deposit-plan"]),
+      chainId,
+      sourceDepositPlan: depositPlanPath,
       sourcePolicy: path.resolve(args.policy),
+      ...(args.settings
+        ? { sourceSettings: path.resolve(args.settings) }
+        : {}),
       summary: rollout.summary,
       inventory: rollout.inventory,
       depositRouterUpdates: rollout.depositRouter.updates,
@@ -214,8 +346,8 @@ function main() {
   console.log(
     JSON.stringify(
       {
-        mode: "rollout",
-        chainId: args.chainId,
+        mode: args.mode === "finalize" ? "finalize" : "rollout",
+        chainId,
         ...rollout.summary,
         bridgeConfigPath,
         vaultConfigPath,

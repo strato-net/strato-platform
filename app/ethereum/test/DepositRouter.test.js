@@ -1,5 +1,11 @@
 const { expect } = require("chai");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const { ethers, upgrades } = require("hardhat");
+const {
+  verifyFromManifest,
+} = require("../scripts/scanTokenConfig");
 
 describe("DepositRouter", function () {
   async function deployFixture() {
@@ -20,6 +26,7 @@ describe("DepositRouter", function () {
     await token.connect(user).approve(await permit2.getAddress(), amount * 2n);
 
     return {
+      owner,
       router,
       token,
       vault,
@@ -237,5 +244,78 @@ describe("DepositRouter", function () {
 
     expect(await token.balanceOf(vault.address)).to.equal(0);
     expect(await token.balanceOf(replacementVault.address)).to.equal(amount);
+  });
+
+  it("verifies deployed configuration against a rollout manifest", async function () {
+    const { owner, router, token, vault, targetStratoToken } =
+      await deployFixture();
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "router-scan-"));
+    const chainId = Number((await ethers.provider.getNetwork()).chainId);
+    const deploymentBlock = (
+      await router.deploymentTransaction().wait()
+    ).blockNumber;
+    const routerAddress = await router.getAddress();
+    const tokenAddress = await token.getAddress();
+    const bridgeConfigPath = path.join(directory, "bridge.json");
+    const vaultConfigPath = path.join(directory, "vault.json");
+    const manifestPath = path.join(directory, "manifest.json");
+    fs.writeFileSync(
+      bridgeConfigPath,
+      JSON.stringify({
+        chains: [{
+          externalChainId: String(chainId),
+          lastProcessedBlock: String(deploymentBlock),
+        }],
+      }),
+    );
+    fs.writeFileSync(
+      vaultConfigPath,
+      JSON.stringify({
+        chains: [{
+          chainId,
+          depositRouterAddress: routerAddress,
+          safeAddress: owner.address,
+          vaultAddress: vault.address,
+        }],
+      }),
+    );
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify({
+        chainId,
+        depositRouterUpdates: [{
+          token: tokenAddress,
+          targetStratoToken,
+          minDepositAmount: "0",
+          permitted: true,
+        }],
+        outputs: { bridgeConfigPath, vaultConfigPath },
+      }),
+    );
+    await router.pause();
+
+    const originalLog = console.log;
+    console.log = () => {};
+    try {
+      const report = await verifyFromManifest(manifestPath);
+      expect(report.status).to.equal("PASSED");
+
+      await router.setRoutePermitted(
+        tokenAddress,
+        ethers.Wallet.createRandom().address,
+        true,
+      );
+      let verificationError;
+      try {
+        await verifyFromManifest(manifestPath);
+      } catch (error) {
+        verificationError = error;
+      }
+      expect(verificationError.message).to.include(
+        "DepositRouter verification failed",
+      );
+    } finally {
+      console.log = originalLog;
+    }
   });
 });

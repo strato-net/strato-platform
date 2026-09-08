@@ -7,8 +7,13 @@ const test = require("node:test");
 const {
   collectInventory,
   buildPolicyTemplate,
+  buildRolloutTemplates,
   buildSynchronizedRollout,
+  validateInitialRollout,
 } = require("../scripts/lib/externalBridgeRolloutPlan");
+const {
+  buildExpectedConfiguration,
+} = require("../scripts/scanTokenConfig");
 
 const safe = "0x1111111111111111111111111111111111111111";
 const vault = "0x2222222222222222222222222222222222222222";
@@ -111,6 +116,27 @@ const policy = {
   },
 };
 
+const deployment = {
+  network: "sepolia",
+  chainId: "11155111",
+  safeAddress: safe,
+  guardianAddress: safe,
+  depositRouterDeploymentBlock: 1234,
+  externalBridgeVault: { proxy: vault },
+  depositRouter: { proxy: router },
+};
+
+const settings = {
+  sourceChainId: "114784819836269",
+  externalDeployment: "deployment.json",
+  depositPlan: "deposit-plan.json",
+  tokenRouter: usdst,
+  externalAssetBridge: bridge,
+  bridgeOperator: safe,
+  guardian: vault,
+  settlementVerifiers: [safe, vault, router],
+};
+
 test("builds one synchronized all-token rollout from DepositRouter inventory", () => {
   const rollout = buildSynchronizedRollout({
     depositPlan,
@@ -139,6 +165,34 @@ test("builds one synchronized all-token rollout from DepositRouter inventory", (
   );
 });
 
+test("orders route permissions so the token remains enabled when any route is enabled", () => {
+  const selectivePolicy = {
+    ...policy,
+    routes: {
+      ...policy.routes,
+      [`${tokenKey}:${usdcSt.toLowerCase()}`]: {
+        ...policy.routes[`${tokenKey}:${usdcSt.toLowerCase()}`],
+        depositsEnabled: false,
+      },
+    },
+  };
+  const rollout = buildSynchronizedRollout({
+    depositPlan,
+    bridgeTemplate,
+    vaultTemplate,
+    policy: selectivePolicy,
+    chainId: 11155111,
+  });
+  assert.deepEqual(
+    rollout.depositRouter.updates.map((update) => update.permitted),
+    [false, true],
+  );
+  assert.equal(
+    rollout.depositRouter.updates[0].targetStratoToken,
+    usdcSt,
+  );
+});
+
 test("generates a fail-closed policy template for every token and route", () => {
   const inventory = collectInventory(depositPlan, 11155111);
   const generated = buildPolicyTemplate(inventory, 11155111);
@@ -152,6 +206,82 @@ test("generates a fail-closed policy template for every token and route", () => 
   assert.equal(
     generated.routes[`${tokenKey}:${usdcSt.toLowerCase()}`].autoRouteEnabled,
     false,
+  );
+});
+
+test("derives synchronized templates from deployment output and settings", () => {
+  const generated = buildRolloutTemplates({
+    settings,
+    deployment,
+    bridgeDefaults: bridgeTemplate,
+  });
+
+  assert.equal(generated.chainId, 11155111);
+  assert.equal(generated.lastProcessedBlock, "1234");
+  assert.equal(generated.bridgeTemplate.chains[0].vault, vault.slice(2));
+  assert.equal(
+    generated.bridgeTemplate.externalAssetBridge.settlementVerifierThreshold,
+    "2",
+  );
+  assert.equal(generated.vaultTemplate.chains[0].safeAddress, safe);
+  assert.deepEqual(generated.vaultTemplate.chains[0].attestationSigners, []);
+  const existingDeployment = buildRolloutTemplates({
+    settings: { ...settings, depositRouterDeploymentBlock: "11634261" },
+    deployment: { ...deployment, depositRouterDeploymentBlock: undefined },
+    bridgeDefaults: bridgeTemplate,
+  });
+  assert.equal(existingDeployment.lastProcessedBlock, "11634261");
+});
+
+test("rejects withdrawals, AUTO_ROUTE, and migration during finalization", () => {
+  const baseRollout = buildSynchronizedRollout({
+    depositPlan,
+    bridgeTemplate,
+    vaultTemplate,
+    policy: {
+      ...policy,
+      routes: Object.fromEntries(
+        Object.entries(policy.routes).map(([key, value]) => [
+          key,
+          { ...value, autoRouteEnabled: false },
+        ]),
+      ),
+    },
+    chainId: 11155111,
+  });
+  assert.equal(validateInitialRollout(baseRollout), baseRollout);
+  assert.throws(
+    () =>
+      validateInitialRollout({
+        ...baseRollout,
+        summary: { ...baseRollout.summary, withdrawalsEnabledCount: 1 },
+      }),
+    /withdrawal route disabled/,
+  );
+  assert.throws(
+    () =>
+      validateInitialRollout({
+        ...baseRollout,
+        summary: { ...baseRollout.summary, autoRouteEnabledCount: 1 },
+      }),
+    /AUTO_ROUTE route disabled/,
+  );
+  assert.throws(
+    () =>
+      validateInitialRollout({
+        ...baseRollout,
+        vaultConfig: {
+          ...baseRollout.vaultConfig,
+          chains: [{
+            ...baseRollout.vaultConfig.chains[0],
+            tokens: [{
+              ...baseRollout.vaultConfig.chains[0].tokens[0],
+              migrateAmount: "1",
+            }],
+          }],
+        },
+      }),
+    /migrateAmount at zero/,
   );
 });
 
@@ -265,4 +395,109 @@ test("CLI preserves the completed policy and writes synchronized artifacts", () 
     fs.existsSync(path.join(directory, "deposit-router-unpause-11155111.json")),
     true,
   );
+});
+
+test("prepare and finalize derive templates and enforce initial policy", () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "eab-prepare-"));
+  const depositPlanPath = path.join(directory, "deposit-plan.json");
+  const deploymentPath = path.join(directory, "deployment.json");
+  const settingsPath = path.join(directory, "settings.json");
+  const policyPath = path.join(
+    directory,
+    "external-bridge-rollout-policy-11155111.json",
+  );
+  fs.writeFileSync(depositPlanPath, JSON.stringify(depositPlan));
+  fs.writeFileSync(deploymentPath, JSON.stringify(deployment));
+  fs.writeFileSync(settingsPath, JSON.stringify(settings));
+
+  const script = path.resolve(
+    __dirname,
+    "../scripts/generateExternalBridgeRollout.js",
+  );
+  const prepareRun = spawnSync(
+    process.execPath,
+    [
+      script,
+      "--mode",
+      "prepare",
+      "--settings",
+      settingsPath,
+      "--output-dir",
+      directory,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(prepareRun.status, 0, prepareRun.stderr);
+  assert.equal(
+    JSON.parse(fs.readFileSync(policyPath, "utf8")).lastProcessedBlock,
+    "1234",
+  );
+  assert.equal(
+    fs.existsSync(path.join(directory, "external-bridge-base-11155111.json")),
+    true,
+  );
+  assert.equal(
+    fs.existsSync(
+      path.join(directory, "external-bridge-vault-base-11155111.json"),
+    ),
+    true,
+  );
+  const repeatedPrepare = spawnSync(
+    process.execPath,
+    [
+      script,
+      "--mode",
+      "prepare",
+      "--settings",
+      settingsPath,
+      "--output-dir",
+      directory,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(repeatedPrepare.status, 1);
+  assert.match(repeatedPrepare.stderr, /Policy already exists/);
+
+  const initialPolicy = {
+    ...policy,
+    routes: Object.fromEntries(
+      Object.entries(policy.routes).map(([key, value]) => [
+        key,
+        { ...value, autoRouteEnabled: false },
+      ]),
+    ),
+  };
+  fs.writeFileSync(policyPath, JSON.stringify(initialPolicy));
+  const finalizeRun = spawnSync(
+    process.execPath,
+    [
+      script,
+      "--mode",
+      "finalize",
+      "--settings",
+      settingsPath,
+      "--policy",
+      policyPath,
+      "--output-dir",
+      directory,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(finalizeRun.status, 0, finalizeRun.stderr);
+  const manifest = JSON.parse(
+    fs.readFileSync(
+      path.join(directory, "external-bridge-rollout-manifest-11155111.json"),
+      "utf8",
+    ),
+  );
+  assert.equal(manifest.summary.routeCount, 2);
+  assert.equal(manifest.summary.withdrawalsEnabledCount, 0);
+  assert.equal(manifest.summary.autoRouteEnabledCount, 0);
+  assert.equal(manifest.sourceSettings, settingsPath);
+  const expected = buildExpectedConfiguration(manifest, directory);
+  assert.equal(expected.depositRouterAddress, router);
+  assert.equal(expected.ownerAddress, safe);
+  assert.equal(expected.vaultAddress, vault);
+  assert.equal(expected.routes.size, 2);
+  assert.equal(expected.tokens.get(tokenKey).permitted, true);
 });

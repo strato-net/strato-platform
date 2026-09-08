@@ -1,6 +1,14 @@
 const { ethers } = require("ethers");
 
 const ZERO_ADDRESS = ethers.ZeroAddress;
+const CHAIN_NAMES = {
+  1: "mainnet",
+  8453: "base",
+  59144: "linea",
+  59141: "lineaSepolia",
+  84532: "baseSepolia",
+  11155111: "sepolia",
+};
 
 const address = (value, label) => {
   try {
@@ -68,7 +76,11 @@ function collectInventory(depositPlan, chainId) {
   );
 }
 
-function buildPolicyTemplate(inventory, chainId) {
+function buildPolicyTemplate(
+  inventory,
+  chainId,
+  lastProcessedBlock = "REVIEW_REQUIRED",
+) {
   const tokens = {};
   const routes = {};
   for (const route of inventory) {
@@ -91,9 +103,117 @@ function buildPolicyTemplate(inventory, chainId) {
   }
   return {
     chainId: Number(chainId),
-    lastProcessedBlock: "REVIEW_REQUIRED",
+    lastProcessedBlock,
     tokens,
     routes,
+  };
+}
+
+function buildRolloutTemplates({
+  settings,
+  deployment,
+  bridgeDefaults,
+}) {
+  const chainId = Number(deployment.chainId);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+    throw new Error(
+      "External deployment chainId must be a positive safe integer",
+    );
+  }
+  const chainName =
+    CHAIN_NAMES[chainId] || String(deployment.network || "").trim();
+  if (!chainName) {
+    throw new Error(`No chain name configured for ${chainId}`);
+  }
+  const sourceChainId = uint(settings.sourceChainId, "sourceChainId");
+  if (BigInt(sourceChainId) === 0n) {
+    throw new Error("sourceChainId must be positive");
+  }
+  const tokenRouter = address(settings.tokenRouter, "tokenRouter");
+  const externalAssetBridge = address(
+    settings.externalAssetBridge,
+    "externalAssetBridge",
+  );
+  const bridgeOperator = address(settings.bridgeOperator, "bridgeOperator");
+  const guardian = address(settings.guardian, "guardian");
+  const settlementVerifiers = (settings.settlementVerifiers || []).map(
+    (verifier, index) =>
+      address(verifier, `settlementVerifiers[${index}]`),
+  );
+  if (
+    settlementVerifiers.length !== 3 ||
+    new Set(settlementVerifiers.map(keyAddress)).size !== 3
+  ) {
+    throw new Error("Exactly three distinct settlementVerifiers are required");
+  }
+  const safeAddress = address(deployment.safeAddress, "deployment.safeAddress");
+  const vaultAddress = address(
+    deployment.externalBridgeVault?.proxy,
+    "deployment.externalBridgeVault.proxy",
+  );
+  const depositRouterAddress = address(
+    deployment.depositRouter?.proxy,
+    "deployment.depositRouter.proxy",
+  );
+  const vaultGuardian = address(
+    deployment.guardianAddress || deployment.safeAddress,
+    "deployment.guardianAddress",
+  );
+  const lastProcessedBlock = uint(
+    settings.depositRouterDeploymentBlock ??
+      deployment.depositRouterDeploymentBlock,
+    "depositRouterDeploymentBlock",
+  );
+  const maxAuthorizationValiditySeconds = uint(
+    settings.maxAuthorizationValiditySeconds ?? "1800",
+    "maxAuthorizationValiditySeconds",
+  );
+
+  return {
+    chainId,
+    lastProcessedBlock,
+    bridgeTemplate: {
+      ...bridgeDefaults,
+      tokenRouter: {
+        ...bridgeDefaults.tokenRouter,
+        address: tokenRouter.slice(2),
+      },
+      externalAssetBridge: {
+        ...bridgeDefaults.externalAssetBridge,
+        address: externalAssetBridge.slice(2),
+        bridgeOperator: bridgeOperator.slice(2),
+        guardian: guardian.slice(2),
+        settlementVerifiers: settlementVerifiers.map((value) =>
+          value.slice(2),
+        ),
+        settlementVerifierThreshold: "2",
+      },
+      chains: [{
+        chainName,
+        externalChainId: String(chainId),
+        vault: vaultAddress.slice(2),
+        depositRouter: depositRouterAddress.slice(2),
+        enabled: true,
+        lastProcessedBlock,
+        routes: [],
+      }],
+    },
+    vaultTemplate: {
+      sourceChainId,
+      sourceBridge: externalAssetBridge,
+      chains: [{
+        chainId,
+        safeAddress,
+        guardianAddress: vaultGuardian,
+        vaultAddress,
+        depositRouterAddress,
+        attestationSigners: [],
+        disabledAttestationSigners: [],
+        attestationThreshold: 2,
+        maxAuthorizationValiditySeconds,
+        tokens: [],
+      }],
+    },
   };
 }
 
@@ -215,7 +335,7 @@ function buildSynchronizedRollout({
       token: route.externalToken,
       targetStratoToken: route.stratoToken,
       minDepositAmount: token.minDepositAmount,
-      permitted: true,
+      permitted: routeSettings.depositsEnabled,
     });
     bridgeRoutes.push({
       externalToken: route.externalToken.slice(2).toLowerCase(),
@@ -243,6 +363,18 @@ function buildSynchronizedRollout({
       migrateAmount: token.migrateAmount,
     });
   }
+  depositRouterUpdates.sort((left, right) => {
+    const tokenOrder = keyAddress(left.token).localeCompare(
+      keyAddress(right.token),
+    );
+    if (tokenOrder) return tokenOrder;
+    if (left.permitted !== right.permitted) {
+      return Number(left.permitted) - Number(right.permitted);
+    }
+    return keyAddress(left.targetStratoToken).localeCompare(
+      keyAddress(right.targetStratoToken),
+    );
+  });
 
   const bridgeConfig = {
     ...bridgeTemplate,
@@ -290,8 +422,27 @@ function buildSynchronizedRollout({
   };
 }
 
+function validateInitialRollout(rollout) {
+  if (rollout.summary.withdrawalsEnabledCount !== 0) {
+    throw new Error("Initial rollout must keep every withdrawal route disabled");
+  }
+  if (rollout.summary.autoRouteEnabledCount !== 0) {
+    throw new Error("Initial rollout must keep every AUTO_ROUTE route disabled");
+  }
+  const chain = rollout.vaultConfig.chains.find(
+    (item) => Number(item.chainId) === rollout.chainId,
+  );
+  if (!chain) throw new Error("Generated vault chain is missing");
+  if (chain.tokens.some((token) => BigInt(token.migrateAmount) !== 0n)) {
+    throw new Error("Initial rollout must keep every migrateAmount at zero");
+  }
+  return rollout;
+}
+
 module.exports = {
   collectInventory,
   buildPolicyTemplate,
+  buildRolloutTemplates,
   buildSynchronizedRollout,
+  validateInitialRollout,
 };

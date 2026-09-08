@@ -1,0 +1,405 @@
+const normalizeAddress = (value) =>
+  String(value || "").toLowerCase().replace(/^0x/, "");
+
+const parseBool = (value) =>
+  value === true || String(value).toLowerCase() === "true";
+
+const parseValue = (value) => {
+  if (value && typeof value === "object") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+};
+
+const routeKey = (externalToken, chainId, stratoToken) =>
+  [
+    normalizeAddress(externalToken),
+    String(chainId),
+    normalizeAddress(stratoToken),
+  ].join(":");
+
+function compareInitialization(settings, state) {
+  const errors = [];
+  const compareAddress = (label, actual, expected) => {
+    if (normalizeAddress(actual) !== normalizeAddress(expected)) {
+      errors.push(`${label} mismatch: expected ${expected}, got ${actual}`);
+    }
+  };
+  if (!parseBool(state.tokenRouter.initialized)) {
+    errors.push("TokenRouter is not initialized");
+  }
+  compareAddress(
+    "TokenRouter.poolFactory",
+    state.tokenRouter.poolFactory,
+    settings.tokenRouter.poolFactory,
+  );
+  compareAddress(
+    "TokenRouter.poolV3Factory",
+    state.tokenRouter.poolV3Factory,
+    settings.tokenRouter.poolV3Factory,
+  );
+  compareAddress(
+    "TokenRouter.directMintPsm",
+    state.tokenRouter.directMintPsm,
+    settings.tokenRouter.directMintPsm,
+  );
+  compareAddress(
+    "TokenRouter.metalForge",
+    state.tokenRouter.metalForge,
+    settings.tokenRouter.metalForge,
+  );
+  compareAddress(
+    "TokenRouter.saveUsdstVault",
+    state.tokenRouter.saveUsdstVault,
+    settings.tokenRouter.saveUsdstVault,
+  );
+  for (const vault of settings.tokenRouter.yieldVaults) {
+    if (!state.approvedYieldVaults.has(normalizeAddress(vault))) {
+      errors.push(`TokenRouter yield vault is not approved: ${vault}`);
+    }
+  }
+
+  if (!parseBool(state.bridge.initialized)) {
+    errors.push("ExternalAssetBridge is not initialized");
+  }
+  for (const [label, actual, expected] of [
+    [
+      "ExternalAssetBridge.tokenFactory",
+      state.bridge.tokenFactory,
+      settings.bridge.tokenFactory,
+    ],
+    [
+      "ExternalAssetBridge.bridgeOperator",
+      state.bridge.bridgeOperator,
+      settings.bridge.bridgeOperator,
+    ],
+    [
+      "ExternalAssetBridge.guardian",
+      state.bridge.guardian,
+      settings.bridge.guardian,
+    ],
+    [
+      "ExternalAssetBridge.USDST_ADDRESS",
+      state.bridge.USDST_ADDRESS,
+      settings.bridge.usdst,
+    ],
+    [
+      "ExternalAssetBridge.priceOracle",
+      state.bridge.priceOracle,
+      settings.bridge.priceOracle,
+    ],
+    [
+      "ExternalAssetBridge.tokenRouter",
+      state.bridge.tokenRouter,
+      settings.tokenRouter.address,
+    ],
+  ]) {
+    compareAddress(label, actual, expected);
+  }
+  if (Number(state.bridge.settlementVerifierCount) !== 3) {
+    errors.push(
+      `Settlement verifier count must be 3, got ${state.bridge.settlementVerifierCount}`,
+    );
+  }
+  if (
+    String(state.bridge.settlementVerifierThreshold) !==
+    String(settings.bridge.settlementVerifierThreshold)
+  ) {
+    errors.push(
+      `Settlement verifier threshold mismatch: expected ${settings.bridge.settlementVerifierThreshold}, got ${state.bridge.settlementVerifierThreshold}`,
+    );
+  }
+  for (const verifier of settings.bridge.settlementVerifiers) {
+    if (!state.settlementVerifiers.has(normalizeAddress(verifier))) {
+      errors.push(`Settlement verifier is not enabled: ${verifier}`);
+    }
+  }
+  return errors;
+}
+
+function compareRoutes(settings, state) {
+  const errors = [];
+  for (const expectedChain of settings.chains) {
+    const actualChain = state.chains.get(String(expectedChain.externalChainId));
+    if (!actualChain) {
+      errors.push(`Missing chain ${expectedChain.externalChainId}`);
+      continue;
+    }
+    const addressFields = [
+      ["vault", expectedChain.vault],
+      ["depositRouter", expectedChain.depositRouter],
+    ];
+    for (const [field, expected] of addressFields) {
+      if (normalizeAddress(actualChain[field]) !== normalizeAddress(expected)) {
+        errors.push(
+          `Chain ${expectedChain.externalChainId} ${field} mismatch: expected ${expected}, got ${actualChain[field]}`,
+        );
+      }
+    }
+    for (const field of ["chainName", "lastProcessedBlock"]) {
+      if (String(actualChain[field]) !== String(expectedChain[field])) {
+        errors.push(
+          `Chain ${expectedChain.externalChainId} ${field} mismatch: expected ${expectedChain[field]}, got ${actualChain[field]}`,
+        );
+      }
+    }
+    if (parseBool(actualChain.enabled) !== expectedChain.enabled) {
+      errors.push(`Chain ${expectedChain.externalChainId} enabled mismatch`);
+    }
+
+    const expectedRoutes = new Set();
+    for (const expectedRoute of expectedChain.routes) {
+      const key = routeKey(
+        expectedRoute.externalToken,
+        expectedChain.externalChainId,
+        expectedRoute.stratoToken,
+      );
+      expectedRoutes.add(key);
+      const actualRoute = state.routes.get(key);
+      if (!actualRoute) {
+        errors.push(`Missing route ${key}`);
+        continue;
+      }
+      for (const field of [
+        "depositsEnabled",
+        "withdrawalsEnabled",
+        "externalName",
+        "externalSymbol",
+        "externalDecimals",
+        "maxPerWithdrawal",
+        "manualReviewThreshold",
+      ]) {
+        const actual =
+          field.endsWith("Enabled")
+            ? parseBool(actualRoute[field])
+            : String(actualRoute[field]);
+        const expected =
+          field.endsWith("Enabled")
+            ? expectedRoute[field]
+            : String(expectedRoute[field]);
+        if (actual !== expected) {
+          errors.push(
+            `${key} ${field} mismatch: expected ${expected}, got ${actual}`,
+          );
+        }
+      }
+      const actualRebase = state.rebaseRequired.has(key);
+      if (actualRebase !== expectedRoute.rebaseRequired) {
+        errors.push(
+          `${key} rebaseRequired mismatch: expected ${expectedRoute.rebaseRequired}, got ${actualRebase}`,
+        );
+      }
+    }
+    for (const [key, route] of state.routes) {
+      if (
+        key.split(":")[1] === String(expectedChain.externalChainId) &&
+        !expectedRoutes.has(key) &&
+        (parseBool(route.depositsEnabled) || parseBool(route.withdrawalsEnabled))
+      ) {
+        errors.push(`Unexpected enabled route ${key}`);
+      }
+    }
+    for (const key of state.rebaseRequired) {
+      if (
+        key.split(":")[1] === String(expectedChain.externalChainId) &&
+        !expectedRoutes.has(key)
+      ) {
+        errors.push(`Unexpected rebase requirement ${key}`);
+      }
+    }
+    for (const key of state.autoRoutes) {
+      if (key.split(":")[1] === String(expectedChain.externalChainId)) {
+        errors.push(`AUTO_ROUTE must remain disabled: ${key}`);
+      }
+    }
+  }
+  return errors;
+}
+
+async function cirrusSearch(nodeUrl, token, table, params, fetchImpl = fetch) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  }
+  const response = await fetchImpl(
+    `${nodeUrl.replace(/\/$/, "")}/cirrus/search/${table}?${query}`,
+    {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      `${table} query failed (${response.status}): ${(await response.text()).slice(0, 300)}`,
+    );
+  }
+  const body = await response.json();
+  return Array.isArray(body) ? body : [];
+}
+
+async function fetchInitializationState(settings, nodeUrl, token, fetchImpl) {
+  const bridgeAddress = normalizeAddress(settings.bridge.address);
+  const routerAddress = normalizeAddress(settings.tokenRouter.address);
+  const [bridgeRows, routerRows, verifierRows, yieldVaultRows] =
+    await Promise.all([
+      cirrusSearch(
+        nodeUrl,
+        token,
+        "BlockApps-ExternalAssetBridge",
+        {
+          address: `eq.${bridgeAddress}`,
+          select:
+            "initialized,tokenFactory,bridgeOperator,guardian,USDST_ADDRESS,priceOracle,tokenRouter,settlementVerifierCount,settlementVerifierThreshold",
+          limit: 1,
+        },
+        fetchImpl,
+      ),
+      cirrusSearch(
+        nodeUrl,
+        token,
+        "BlockApps-TokenRouter",
+        {
+          address: `eq.${routerAddress}`,
+          select:
+            "initialized,poolFactory,poolV3Factory,directMintPsm,metalForge,saveUsdstVault",
+          limit: 1,
+        },
+        fetchImpl,
+      ),
+      cirrusSearch(
+        nodeUrl,
+        token,
+        "BlockApps-ExternalAssetBridge-settlementVerifiers",
+        {
+          address: `eq.${bridgeAddress}`,
+          value: "eq.true",
+          select: "key",
+          limit: 20000,
+        },
+        fetchImpl,
+      ),
+      cirrusSearch(
+        nodeUrl,
+        token,
+        "BlockApps-TokenRouter-approvedYieldVaults",
+        {
+          address: `eq.${routerAddress}`,
+          value: "eq.true",
+          select: "key",
+          limit: 20000,
+        },
+        fetchImpl,
+      ),
+    ]);
+  if (!bridgeRows[0] || !routerRows[0]) {
+    throw new Error("Initialized bridge or TokenRouter state is unavailable");
+  }
+  return {
+    bridge: bridgeRows[0],
+    tokenRouter: routerRows[0],
+    settlementVerifiers: new Set(
+      verifierRows.map((row) => normalizeAddress(row.key)),
+    ),
+    approvedYieldVaults: new Set(
+      yieldVaultRows.map((row) => normalizeAddress(row.key)),
+    ),
+  };
+}
+
+async function fetchRouteState(settings, nodeUrl, token, fetchImpl) {
+  const bridgeAddress = normalizeAddress(settings.bridge.address);
+  const chainIds = settings.chains.map((chain) => chain.externalChainId);
+  const filters = {
+    address: `eq.${bridgeAddress}`,
+    key2: `in.(${chainIds.join(",")})`,
+    select: "key,key2,key3,value",
+    limit: 20000,
+  };
+  const [chainRows, routeRows, rebaseRows, actionRows] = await Promise.all([
+    cirrusSearch(
+      nodeUrl,
+      token,
+      "BlockApps-ExternalAssetBridge-chains",
+      {
+        address: `eq.${bridgeAddress}`,
+        key: `in.(${chainIds.join(",")})`,
+        select: "key,value",
+        limit: 20000,
+      },
+      fetchImpl,
+    ),
+    cirrusSearch(
+      nodeUrl,
+      token,
+      "BlockApps-ExternalAssetBridge-routes",
+      filters,
+      fetchImpl,
+    ),
+    cirrusSearch(
+      nodeUrl,
+      token,
+      "BlockApps-ExternalAssetBridge-routeRebaseRequired",
+      { ...filters, value: "eq.true" },
+      fetchImpl,
+    ),
+    cirrusSearch(
+      nodeUrl,
+      token,
+      "BlockApps-ExternalAssetBridge-depositActionConfigs",
+      filters,
+      fetchImpl,
+    ),
+  ]);
+  return {
+    chains: new Map(
+      chainRows.map((row) => [String(row.key), parseValue(row.value)]),
+    ),
+    routes: new Map(
+      routeRows.map((row) => [
+        routeKey(row.key, row.key2, row.key3),
+        parseValue(row.value),
+      ]),
+    ),
+    rebaseRequired: new Set(
+      rebaseRows.map((row) => routeKey(row.key, row.key2, row.key3)),
+    ),
+    autoRoutes: new Set(
+      actionRows
+        .filter((row) => parseBool(parseValue(row.value).autoRoute))
+        .map((row) => routeKey(row.key, row.key2, row.key3)),
+    ),
+  };
+}
+
+async function verifyConfiguration(settings, step, options) {
+  const state =
+    step === "verify-initialize"
+      ? await fetchInitializationState(
+          settings,
+          options.nodeUrl,
+          options.token,
+          options.fetchImpl,
+        )
+      : await fetchRouteState(
+          settings,
+          options.nodeUrl,
+          options.token,
+          options.fetchImpl,
+        );
+  const errors =
+    step === "verify-initialize"
+      ? compareInitialization(settings, state)
+      : compareRoutes(settings, state);
+  return {
+    step,
+    status: errors.length ? "FAILED" : "PASSED",
+    errors,
+  };
+}
+
+module.exports = {
+  compareInitialization,
+  compareRoutes,
+  verifyConfiguration,
+};

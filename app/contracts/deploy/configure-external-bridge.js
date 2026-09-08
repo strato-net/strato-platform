@@ -2,7 +2,7 @@
  * Build or submit every AdminRegistry-governed ExternalAssetBridge setup call.
  *
  * Usage:
- *   node configure-external-bridge.js --config <json> --step initialize|routes|actions [--execute]
+ *   node configure-external-bridge.js --config <json> --step initialize|routes|actions|verify-initialize|verify-routes [--execute]
  *
  * Dry-run is the default. Every run writes the full governance payload to JSON.
  */
@@ -12,6 +12,9 @@ const path = require("path");
 const config = require("./config");
 const auth = require("./auth");
 const { rest, util } = require("blockapps-rest");
+const {
+  verifyConfiguration,
+} = require("./external-bridge-verification");
 
 const DEFAULT_ADMIN_REGISTRY =
   "000000000000000000000000000000000000100c";
@@ -35,8 +38,20 @@ function parseArgs(argv = process.argv.slice(2)) {
     index += 1;
   }
   if (!args.config) throw new Error("--config is required");
-  if (!["initialize", "routes", "actions"].includes(args.step)) {
-    throw new Error("--step must be initialize|routes|actions");
+  const steps = [
+    "initialize",
+    "routes",
+    "actions",
+    "verify-initialize",
+    "verify-routes",
+  ];
+  if (!steps.includes(args.step)) {
+    throw new Error(
+      "--step must be initialize|routes|actions|verify-initialize|verify-routes",
+    );
+  }
+  if (args.execute && args.step.startsWith("verify-")) {
+    throw new Error("--execute is not valid for verification steps");
   }
   return args;
 }
@@ -373,6 +388,41 @@ function writeOutput(payload) {
 async function main() {
   const args = parseArgs();
   const settings = loadConfig(args.config);
+  if (args.step.startsWith("verify-")) {
+    const required = [
+      "GLOBAL_ADMIN_NAME",
+      "GLOBAL_ADMIN_PASSWORD",
+      "OAUTH_CLIENT_SECRET",
+      "OAUTH_CLIENT_ID",
+      "OAUTH_URL",
+      "NODE_URL",
+    ];
+    const missing = required.filter((name) => !process.env[name]);
+    if (missing.length) {
+      throw new Error(`Missing environment variables: ${missing.join(", ")}`);
+    }
+    const token = await auth.getUserToken(
+      process.env.GLOBAL_ADMIN_NAME,
+      process.env.GLOBAL_ADMIN_PASSWORD,
+    );
+    const verification = await verifyConfiguration(settings, args.step, {
+      nodeUrl: process.env.NODE_URL,
+      token,
+    });
+    const output = {
+      config: settings.absolutePath,
+      ...verification,
+    };
+    const outputPath = writeOutput(output);
+    console.log(JSON.stringify(output, null, 2));
+    console.log(`Output: ${outputPath}`);
+    if (verification.errors.length) {
+      throw new Error(
+        `${args.step} failed with ${verification.errors.length} error(s)`,
+      );
+    }
+    return;
+  }
   const plan = buildPlan(settings, args.step);
   const output = {
     config: settings.absolutePath,

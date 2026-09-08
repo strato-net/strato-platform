@@ -42,26 +42,22 @@ Modular Hardhat setup for deploying STRATO contracts to Ethereum networks with U
 
 ## Utility Scripts
 
-### Token Configuration Scanner
+### DepositRouter configuration verification
 
-The `scanTokenConfig.js` script allows you to view all configured tokens in a DepositRouter contract:
+Pass the finalized rollout manifest to verify the deployed DepositRouter
+against every generated token and route:
 
 ```bash
-# Using npm script (recommended)
-npm run scan:sepolia
-
-# Or manually with environment variable
-DEPOSIT_ROUTER_ADDRESS=0x1234567890123456789012345678901234567890 npx hardhat run scripts/scanTokenConfig.js --network sepolia
+ROLLOUT_MANIFEST=/secure/path/eab-rollout/external-bridge-rollout-manifest-11155111.json npm run scan:sepolia
 ```
 
-**Prerequisites:**
-- Run `npm run compile` first to generate the contract ABI
-- Set `DEPOSIT_ROUTER_ADDRESS` in your `.env` file
-
-**Permission values:**
-- `1` = WRAP only (0b01)
-- `2` = MINT only (0b10)  
-- `3` = Both WRAP and MINT (0b11)
+The command checks the chain, deployed bytecode, paused state, Safe owner,
+vault, token minimums, token permissions, every expected route, and every
+route observed since deployment. It exits nonzero on missing, mismatched, or
+unexpected enabled routes. `DEPOSIT_ROUTER_ADDRESS` is optional in manifest
+mode; when supplied, it must match the manifest. Without
+`ROLLOUT_MANIFEST`, the command prints a non-validating token summary for the
+address in `DEPOSIT_ROUTER_ADDRESS`.
 
 ## Environment Setup
 
@@ -165,35 +161,51 @@ npm run external:vault:ops:test
 npm run external:rollout:test
 ```
 
-Copy `externalBridgeVault.config.example.json` outside the repository and
-replace every sample value. Amounts are raw token units. Keep every
-`migrateAmount` at `0` until configuration and router verification pass.
-
 ### All-token configuration generator
 
 First run `router:ops:testnet -- --step setters` as a dry run. Its audit JSON
 contains every enabled legacy route and the external token metadata needed by
-the generator. Generate a fail-closed policy skeleton:
+the generator. Create a settings file containing `sourceChainId`,
+`externalDeployment`, `depositPlan`, `tokenRouter`, `externalAssetBridge`,
+`bridgeOperator`, `guardian`, and exactly three `settlementVerifiers`.
+
+Prepare the derived bridge/vault templates, inventory, and fail-closed policy:
 
 ```bash
-npm run external:rollout:generate -- --deposit-plan /absolute/path/deposit-router-setters.json --chain 11155111 --output-dir /secure/path/eab-rollout
+npm run external:rollout:prepare -- --settings /secure/path/eab-settings.json --output-dir /secure/path/eab-rollout
 ```
 
-Replace every `REVIEW_REQUIRED` value and explicitly decide deposit,
-withdrawal, rebase, and AUTO_ROUTE enablement for every route. Then generate
-the synchronized EAB config, external-vault config, and DepositRouter Safe
-Transaction Builder batches:
+The external deployment artifact supplies the chain ID, Safe, vault,
+DepositRouter, guardian, and initial block. For deployments created before
+`depositRouterDeploymentBlock` was recorded, set that field in the settings
+file. Preparation never overwrites an existing policy.
+
+Replace every `REVIEW_REQUIRED` risk amount. Then finalize:
 
 ```bash
-npm run external:rollout:generate -- --deposit-plan /absolute/path/deposit-router-setters.json --chain 11155111 --bridge-template /secure/path/external-bridge.base.json --vault-template /secure/path/external-bridge-vault.base.json --policy /secure/path/eab-rollout/external-bridge-rollout-policy-11155111.json --output-dir /secure/path/eab-rollout
+npm run external:rollout:finalize -- --settings /secure/path/eab-settings.json --policy /secure/path/eab-rollout/external-bridge-rollout-policy-11155111.json --output-dir /secure/path/eab-rollout
 ```
 
-The generator fails if token metadata, risk policy, or bridge/vault deployment
-addresses are missing or inconsistent. It never copies legacy withdrawal
-limits automatically and never submits transactions. It writes Safe
-Transaction Builder JSON for DepositRouter pause, synchronized token setters,
-and unpause. `external:vault:ops` separately writes Safe Transaction Builder
-JSON for vault configuration and later liquidity migration.
+Finalization fails if token metadata, risk policy, deployment addresses, or
+chain IDs are missing or inconsistent. It also requires withdrawals and
+AUTO_ROUTE to remain disabled and every `migrateAmount` to remain zero. It
+never copies legacy withdrawal limits or submits transactions. The existing
+`external:rollout:generate` command remains available for manually supplied
+bridge and vault templates.
+
+After Safe configuration, verify DepositRouter against the generated manifest:
+
+```bash
+cd app/ethereum && ROLLOUT_MANIFEST=/secure/path/eab-rollout/external-bridge-rollout-manifest-11155111.json npm run scan:sepolia
+```
+
+After the corresponding AdminRegistry votes execute, verify STRATO
+initialization and routes:
+
+```bash
+cd app/contracts && npm run configure:external-bridge -- --config /secure/path/eab-rollout/external-bridge-11155111.json --step verify-initialize
+cd app/contracts && npm run configure:external-bridge -- --config /secure/path/eab-rollout/external-bridge-11155111.json --step verify-routes
+```
 
 ### 2. Testnet
 
