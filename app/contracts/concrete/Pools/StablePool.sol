@@ -36,6 +36,10 @@ contract record StablePool is Ownable {
 
     event CoinAdded(address indexed coin, uint assetType, uint rateMultiplier, address oracle, uint initialAmount, uint lpMinted);
 
+    event SetMaxDepositSlippage(uint maxDepositSlippage);
+
+    event TokensMigrated(address indexed receiver, uint[] amounts, uint lpSupplyAtMigration);
+
     uint constant MAX_COINS = 8;
 
     uint constant PRECISION = 1e18;
@@ -118,6 +122,13 @@ contract record StablePool is Ownable {
     /// @notice Current balance of tokenB in the pool
     uint public tokenBBalance;
 
+    /// @notice Max tolerated shortfall for the deposit wrappers that take no
+    ///         explicit minimum, in FEE_DENOMINATOR units. 0 means "use the
+    ///         default", so pools upgraded in place stay protected.
+    uint public maxDepositSlippage;
+
+    uint constant DEFAULT_MAX_DEPOSIT_SLIPPAGE = 1e8; // 1% of FEE_DENOMINATOR
+
     bool public isStable = true;
 
     bool public isPaused = false;
@@ -127,6 +138,10 @@ contract record StablePool is Ownable {
     // ============ STATE VARIABLES ============
     /// @notice Reentrancy guard to prevent recursive calls
     bool private locked;
+
+    /// @notice Set once by _initialize so a pool cannot be re-initialised over
+    ///         a live position set.
+    bool private initialized;
 
     modifier nonReentrant() {
         require(!locked, "REENTRANT");
@@ -164,6 +179,12 @@ contract record StablePool is Ownable {
     function setDisabled(bool _isDisabled) external onlyOwner {
         isPaused = _isDisabled ? true : isPaused;
         isDisabled = _isDisabled;
+    }
+
+    function setMaxDepositSlippage(uint _maxDepositSlippage) external onlyOwner {
+        require(_maxDepositSlippage <= FEE_DENOMINATOR / 10, "Tolerance above 10%");
+        maxDepositSlippage = _maxDepositSlippage;
+        emit SetMaxDepositSlippage(_maxDepositSlippage);
     }
 
     function setUsdst(address _usdst) external onlyOwner {
@@ -206,8 +227,13 @@ contract record StablePool is Ownable {
         address[] _oracles,
         address _lpTokenAddr
     ) internal {
+        require(!initialized, "Already initialized");
         require(_lpTokenAddr != address(0), "Zero lpToken address");
         require(_coins.length >= 2, "Pool must have at least 2 tokens");
+        require(_rateMultipliers.length == _coins.length, "rateMultipliers length mismatch");
+        require(_assetTypes.length == _coins.length, "assetTypes length mismatch");
+        require(_oracles.length == _coins.length, "oracles length mismatch");
+        initialized = true;
 
         for (uint i = 0; i < _coins.length; i++) {
             require(_coins[i] != address(0), "Zero token address");
@@ -243,8 +269,11 @@ contract record StablePool is Ownable {
         maLastTime = pack2(block.timestamp, block.timestamp);
 
         for (uint j = 0; j < coins.length; j++) {
-            callAmount[j] = 0;
-            scaleFactor[j] = 0;
+            // push, not index-assign: SolidVM silently discards out-of-bounds
+            // writes, so `callAmount[j] = 0` on an empty array was a no-op and
+            // left these permanently out of step with addCoin's pushes.
+            callAmount.push(0);
+            scaleFactor.push(0);
 
             if (j < coins.length - 1) {
                 lastPricesPacked.push(pack2(1e18, 1e18));
@@ -403,6 +432,7 @@ contract record StablePool is Ownable {
     }
 
     function _addLiquidityGeneral(uint[] _amounts, uint _minMintAmount, address _receiver) internal returns (uint) {
+        require(_amounts.length == coins.length, "Invalid array length for _amounts");
         address receiver = _receiver == address(0) ? msg.sender : _receiver;
         uint amp = _A();
 
@@ -455,7 +485,7 @@ contract record StablePool is Ownable {
                     difference = newBalance - idealBalance;
                 }
 
-                xs = (oldBalances[k] * newBalance) / PRECISION;
+                xs = (rates[k] * (oldBalances[k] + newBalance)) / PRECISION;
                 dynamicFee_i = _dynamicFee(xs, ys, baseFee);
                 fees.push((dynamicFee_i * difference) / FEE_DENOMINATOR);
                 adminBalances[address(coins[k])] += (fees[k] * adminFee) / FEE_DENOMINATOR;
@@ -475,7 +505,7 @@ contract record StablePool is Ownable {
             }
         }
 
-        require(mintAmount >= _minMintAmount, "Slippage screwed you");
+        require(mintAmount >= _minMintAmount, "Slippage: fewer LP tokens minted than the minimum");
 
         totalSupply += mintAmount;
         lpToken.mint(receiver, mintAmount);
@@ -496,13 +526,40 @@ contract record StablePool is Ownable {
     ) external whenNotPaused nonReentrant returns (uint256) {
         require(tokenBAmount > 0 && maxTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
+        uint[] amounts = _dualAmounts(tokenBAmount, maxTokenAAmount);
+        return _addLiquidityGeneral(amounts, _minMintFloor(amounts), msg.sender);
+    }
+
+    /// @notice addLiquidity with a caller-supplied floor on the LP minted.
+    function addLiquidityWithMin(
+        uint256 tokenBAmount,
+        uint256 maxTokenAAmount,
+        uint256 minLpOut,
+        uint256 deadline
+    ) external whenNotPaused nonReentrant returns (uint256) {
+        require(tokenBAmount > 0 && maxTokenAAmount > 0, "Invalid inputs");
+        require(block.timestamp <= deadline, "EXPIRED");
+        return _addLiquidityGeneral(_dualAmounts(tokenBAmount, maxTokenAAmount), minLpOut, msg.sender);
+    }
+
+    /// @dev Sizes a balanced deposit: tokenA is derived from the pool ratio and
+    ///      maxTokenAAmount is enforced as the cap its name promises (F7).
+    function _dualAmounts(uint256 tokenBAmount, uint256 maxTokenAAmount) internal view returns (uint[]) {
         uint[] amounts;
         for (uint i = 0; i < coins.length; i++) {
             amounts.push(0);
         }
-        amounts[0] = maxTokenAAmount;
+        if (lpToken.totalSupply() > 0) {
+            uint[] balances = _balances();
+            require(balances[1] > 0, "Pool has no tokenB");
+            uint tokenAAmount = (tokenBAmount * balances[0]) / balances[1];
+            require(maxTokenAAmount >= tokenAAmount, "Insufficient tokenA amount");
+            amounts[0] = tokenAAmount;
+        } else {
+            amounts[0] = maxTokenAAmount;
+        }
         amounts[1] = tokenBAmount;
-        return _addLiquidityGeneral(amounts, 1, msg.sender);
+        return amounts;
     }
 
     function addLiquiditySingleToken(
@@ -513,6 +570,24 @@ contract record StablePool is Ownable {
         require(amountIn > 0, "Invalid input");
         require(block.timestamp <= deadline, "EXPIRED");
         require(lpToken.totalSupply() > 0, "POOL_EMPTY");
+        uint[] amounts = _singleAmounts(isAToB, amountIn);
+        return _addLiquidityGeneral(amounts, _minMintFloor(amounts), msg.sender);
+    }
+
+    /// @notice addLiquiditySingleToken with a caller-supplied floor on the LP minted.
+    function addLiquiditySingleTokenWithMin(
+        bool isAToB,
+        uint256 amountIn,
+        uint256 minLpOut,
+        uint256 deadline
+    ) external whenNotPaused nonReentrant returns (uint256) {
+        require(amountIn > 0, "Invalid input");
+        require(block.timestamp <= deadline, "EXPIRED");
+        require(lpToken.totalSupply() > 0, "POOL_EMPTY");
+        return _addLiquidityGeneral(_singleAmounts(isAToB, amountIn), minLpOut, msg.sender);
+    }
+
+    function _singleAmounts(bool isAToB, uint256 amountIn) internal view returns (uint[]) {
         uint[] amounts;
         for (uint i = 0; i < coins.length; i++) {
             amounts.push(0);
@@ -522,27 +597,55 @@ contract record StablePool is Ownable {
         } else {
             amounts[1] = amountIn;
         }
+        return amounts;
+    }
 
-        return _addLiquidityGeneral(amounts, 1, msg.sender);
+    /// @dev Default slippage floor for the wrappers that take no explicit
+    ///      minimum (F7). Values the deposit at the pool's own virtual price
+    ///      (D / totalSupply) and allows maxDepositSlippage below that, so a
+    ///      front-run that moves the price against the depositor reverts
+    ///      instead of silently minting whatever is left.
+    function _minMintFloor(uint[] amounts) internal view returns (uint) {
+        uint totalSupply = lpToken.totalSupply();
+        if (totalSupply == 0) {
+            return 0; // first deposit defines the price; nothing to compare against
+        }
+
+        uint[] rates = _storedRates();
+        uint d0 = getDMem(rates, _balances(), _A());
+        if (d0 == 0) {
+            return 0;
+        }
+
+        uint depositValue = 0;
+        for (uint i = 0; i < coins.length; i++) {
+            depositValue += (rates[i] * amounts[i]) / PRECISION;
+        }
+
+        uint idealMint = (depositValue * totalSupply) / d0;
+        uint tolerance = maxDepositSlippage == 0 ? DEFAULT_MAX_DEPOSIT_SLIPPAGE : maxDepositSlippage;
+        return (idealMint * (FEE_DENOMINATOR - tolerance)) / FEE_DENOMINATOR;
     }
 
     function removeliquidityOneCoin(uint _burnAmount, uint i, uint _minReceived, address _receiver) external whenNotDisabled nonReentrant returns (uint) {
-        require(i < coins.length, "Cannot remove 0 liquidity");
+        require(i < coins.length, "Coin index out of range");
         require(_burnAmount > 0, "Cannot remove 0 liquidity");
         address receiver = _receiver == address(0) ? msg.sender : _receiver;
         uint dy = 0;
-        uint fee = 0;
+        uint withdrawFee = 0;
         uint[] xp;
         uint amp = 0;
         uint d = 0;
 
-        (dy, fee, xp, amp, d) = _calcWithdrawOneCoin(_burnAmount, i);
+        (dy, withdrawFee, xp, amp, d) = _calcWithdrawOneCoin(_burnAmount, i);
 
         require(dy >= _minReceived, "Not enough coins removed");
 
-        adminBalances[address(coins[i])] += (fee * adminFee) / FEE_DENOMINATOR;
+        adminBalances[address(coins[i])] += (withdrawFee * adminFee) / FEE_DENOMINATOR;
 
-        lpToken.burn(receiver, _burnAmount);
+        // F1: burn the caller's LP, never the receiver's. `_receiver` chooses
+        // where the withdrawn coin lands, it must not choose whose position closes.
+        lpToken.burn(msg.sender, _burnAmount);
 
         _transferOut(i, dy, receiver);
 
@@ -560,11 +663,12 @@ contract record StablePool is Ownable {
         uint[] rates = _storedRates();
         uint[] oldBalances = _balances();
         uint[] newBalances = _balances();
+        require(_amounts.length == coins.length, "Invalid array length for _amounts");
         uint d0 = getDMem(rates, oldBalances, amp);
         for (uint j = 0; j < coins.length; j++) {
             if (_amounts[j] > 0) {
+                require(_amounts[j] <= newBalances[j], "Withdrawal exceeds pool balance");
                 newBalances[j] -= _amounts[j];
-                _transferOut(j, _amounts[j], receiver);
             }
         }
 
@@ -606,7 +710,14 @@ contract record StablePool is Ownable {
         require(burnAmount > 1, "Zero tokens burned");
         require(burnAmount <= _maxBurnAmount, "Slippage screwed you");
 
+        // F9: burn before the coins leave the contract.
         lpToken.burn(msg.sender, burnAmount);
+
+        for (uint t = 0; t < coins.length; t++) {
+            if (_amounts[t] > 0) {
+                _transferOut(t, _amounts[t], receiver);
+            }
+        }
 
         uint[] xp = _xpMem(rates, _balances());
         _updateRatios(rates, xp, amp, d1);
@@ -627,7 +738,7 @@ contract record StablePool is Ownable {
         uint256 minTokenBAmount,
         uint256 minTokenAAmount,
         uint256 deadline
-    ) external whenNotDisabled returns (uint256, uint256) {
+    ) external whenNotDisabled nonReentrant returns (uint256, uint256) {
         require(lpTokenAmount > 0 && minTokenBAmount > 0 && minTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
         uint256 totalLiquidity = lpToken.totalSupply();
@@ -648,22 +759,41 @@ contract record StablePool is Ownable {
 
     function _removeLiquidityGeneral(uint _burnAmount, uint[] _minAmounts, address _receiver, bool _claimAdminFees) internal returns (uint[]) {
         address receiver = _receiver == address(0) ? msg.sender : _receiver;
-        uint totalSupply = lpToken.totalSupply();
         require(_burnAmount > 0, "Invalid burn amount");
         require(_minAmounts.length == coins.length, "Invalid array length for _minAmounts");
+
+        // F2c: sweep the protocol fees to the collector *before* the payout is
+        // sized, not after. Sweeping afterwards tried to pay the collector out
+        // of coins that had already been handed to the exiting LP.
+        if (_claimAdminFees) {
+            _withdrawAdminFees();
+        }
+
+        uint totalSupply = lpToken.totalSupply();
+        require(totalSupply > 0, "No liquidity");
+
+        // F2: pro-rate over _balances() (net of any protocol fees still owed),
+        // not the raw tokenBalances ledger.
+        uint[] balances = _balances();
 
         uint[] amounts;
         uint[] fees;
 
         uint value = 0;
         for (uint i = 0; i < coins.length; i++) {
-            value = (tokenBalances[address(coins[i])] * _burnAmount) / totalSupply;
+            value = (balances[i] * _burnAmount) / totalSupply;
             require(value >= _minAmounts[i], "Withdrawal resulted in fewer coins than expected");
             amounts.push(value);
-            _transferOut(i, value, receiver);
             fees.push(0);
         }
+
+        // F9: burn first, pay out second, so a re-entrant call can never see the
+        // pool drained while totalSupply is still stale.
         lpToken.burn(msg.sender, _burnAmount);
+
+        for (uint t = 0; t < coins.length; t++) {
+            _transferOut(t, amounts[t], receiver);
+        }
 
         uint[2] maLastTimeUnpacked = unpack2(maLastTime);
         uint lastDPackedCurrent = lastDPacked;
@@ -689,10 +819,6 @@ contract record StablePool is Ownable {
             fees,
             totalSupply - _burnAmount
         );
-
-        if (_claimAdminFees) {
-            _withdrawAdminFees();
-        }
 
         uint[] rates = _storedRates();
         uint[] xp = _xpMem(rates, _balances());
@@ -950,10 +1076,9 @@ contract record StablePool is Ownable {
     function _calcWithdrawOneCoin(uint _burnAmount, uint i) internal view returns (uint, uint, uint[], uint, uint) {
         uint amp = _A();
         uint[] rates = _storedRates();
-        uint[] balances;
-        for (uint _b = 0; _b < coins.length; _b++) {
-            balances.push(tokenBalances[address(coins[_b])]);
-        }
+        // F2: value the pool at _balances(), which nets off the unclaimed protocol
+        // fees. tokenBalances still contains them and would pay them to the LP.
+        uint[] balances = _balances();
         uint[] xp = _xpMem(rates, balances);
         uint d0 = getD(xp, amp);
 
@@ -1005,11 +1130,18 @@ contract record StablePool is Ownable {
         return [p & ((1<<128) - 1), p >> 128];
     }
 
+    /// @notice Marginal price of each coin quoted in coin 0, scaled to 1e18.
+    /// @return An array of length coins.length - 1, where entry i is the price
+    ///         of coin i+1. Coin 0 priced in coin 0 is trivially 1e18 and is
+    ///         deliberately not returned - emitting it (F3) shifted every real
+    ///         price one slot away from the consumers that read this.
     function _getP(uint[] xp, uint amp, uint d) internal view returns (uint[]) {
         uint[] p;
         bool anyZero = false;
         for (uint x = 0; x < coins.length; x++) {
-            p.push(0);
+            if (x > 0) {
+                p.push(0);
+            }
             if (xp[x] == 0) {
                 anyZero = true;
             }
@@ -1020,7 +1152,7 @@ contract record StablePool is Ownable {
         }
 
         uint ann = amp * coins.length;
-        uint dr = d / (coins.length * coins.length);
+        uint dr = d / (coins.length ** coins.length);
 
         for (uint i = 0; i < coins.length; i++) {
             dr = (dr * d) / xp[i];
@@ -1028,8 +1160,8 @@ contract record StablePool is Ownable {
 
         uint xp0A = (ann * xp[0]) / A_PRECISION;
 
-        for (uint j = 0; j < coins.length; j++) {
-            p[j] = 1e18 * (xp0A + (dr * xp[0] / xp[j])) / (xp0A + dr);
+        for (uint j = 1; j < coins.length; j++) {
+            p[j - 1] = 1e18 * (xp0A + (dr * xp[0] / xp[j])) / (xp0A + dr);
         }
 
         return p;
@@ -1090,32 +1222,48 @@ contract record StablePool is Ownable {
 
     function _updateRatios(uint[] rates, uint[] xp, uint amp, uint d) internal {
         uint[] ps = _getP(xp, amp, d);
-        decimal priceA = decimal(ps[0] * rates[0]).truncate(18);
-        decimal priceB = decimal(ps[1] * rates[1]).truncate(18);
+        // ps[0] is now the price of coin 1 in coin 0. Coin 0's own price is the
+        // implicit 1e18 that _getP no longer returns, so state it here.
+        if (ps.length == 0 || ps[0] == 0) {
+            aToBRatio = 0.0;
+            bToARatio = 0.0;
+            return;
+        }
+        decimal priceA = decimal(PRECISION * rates[0]).truncate(18);
+        decimal priceB = decimal(ps[0] * rates[1]).truncate(18);
         aToBRatio = priceB == 0.0 ? 0.0 : priceA / priceB;
         bToARatio = priceA == 0.0 ? 0.0 : priceB / priceA;
     }
 
+    /// @notice Last recorded spot price of coin i+1 quoted in coin 0.
     function lastPrice(uint i) external view returns (uint) {
+        require(i < coins.length - 1, "Price index out of range");
         return lastPricesPacked[i] & ((1 << 128) - 1);
     }
 
+    /// @notice Moving average of coin i+1's price as of the last write.
     function emaPrice(uint i) external view returns (uint) {
+        require(i < coins.length - 1, "Price index out of range");
         return lastPricesPacked[i] >> 128;
     }
 
+    /// @notice Spot price of coin i+1 quoted in coin 0, scaled to 1e18.
+    /// @param i Index into the price array: 0 .. coins.length - 2.
     function getP(uint i) external view returns (uint) {
+        require(i < coins.length - 1, "Price index out of range");
         uint amp = _A();
         uint[] xp = _xpMem(_storedRates(), _balances());
         uint d = getD(xp, amp);
         return _getP(xp, amp, d)[i];
     }
 
-    function priceOracle(uint i) external view nonReentrant returns (uint) {
+    /// @notice Time-weighted price of coin i+1 quoted in coin 0.
+    function priceOracle(uint i) external view returns (uint) {
+        require(i < coins.length - 1, "Price index out of range");
         return _calcMovingAverage(lastPricesPacked[i], maExpTime, maLastTime & ((1 << 128) - 1));
     }
 
-    function dOracle() external view nonReentrant returns (uint) {
+    function dOracle() external view returns (uint) {
         return _calcMovingAverage(lastDPacked, DMaTime, maLastTime >> 128);
     }
 
@@ -1228,11 +1376,15 @@ contract record StablePool is Ownable {
         uint totalSupply = lpToken.totalSupply();
         require(totalSupply > 0, "Pool must have existing liquidity");
 
+        // Value the pool at _storedRates(), which folds in the oracle price and
+        // the assetType 3 exchange rate. rateMultipliers alone mis-prices any
+        // coin whose value is not fixed at its multiplier.
+        uint[] existingRates = _storedRates();
         uint existingValue = 0;
         for (uint i = 0; i < coins.length; i++) {
             address tokenAddr = address(coins[i]);
             uint balance = tokenBalances[tokenAddr] - adminBalances[tokenAddr];
-            existingValue += (balance * rateMultipliers[tokenAddr]) / PRECISION;
+            existingValue += (balance * existingRates[i]) / PRECISION;
         }
         require(existingValue > 0, "Pool has no value");
 
@@ -1253,8 +1405,10 @@ contract record StablePool is Ownable {
         // Transfer in initial deposit (new coin is at index coins.length - 1)
         uint dx = _transferIn(coins.length - 1, _initialAmount, _depositor, false);
 
-        // Calculate LP tokens to mint proportional to value added
-        uint newValue = (dx * _rateMultiplier) / PRECISION;
+        // Calculate LP tokens to mint proportional to value added, priced the
+        // same way the existing reserves were.
+        uint[] newRates = _storedRates();
+        uint newValue = (dx * newRates[coins.length - 1]) / PRECISION;
         uint mintAmount = (totalSupply * newValue) / existingValue;
         require(mintAmount > 0, "Deposit too small to mint LP tokens");
 
@@ -1317,20 +1471,36 @@ contract record StablePool is Ownable {
     /// @dev Only callable by the pool factory or pool owner
     function migrateAllTokens(address receiver) external onlyPoolFactory {
         require(receiver != address(0), "Cannot migrate to address 0");
+        require(!isDisabled, "Pool has already been migrated");
         _withdrawAdminFees();
+
+        uint[] amounts;
         for (uint i = 0; i < coins.length; i++) {
             address tokenAddr = address(coins[i]);
             uint balance = tokenBalances[tokenAddr];
+            amounts.push(balance);
             if (balance > 0) {
                 _transferOut(i, balance, receiver);
             }
         }
+
+        // F8: the LP supply is deliberately left standing so the factory can read
+        // holder balances while re-minting on the destination pool. Lock the pool
+        // so nothing can trade or withdraw against an emptied reserve in the
+        // meantime, and put the drain on-chain next to the supply it orphaned.
+        isPaused = true;
+        isDisabled = true;
+
+        emit TokensMigrated(receiver, amounts, lpToken.totalSupply());
     }
 
     /// @notice Syncs internal pool state after tokens have been transferred in via migration
     /// @dev Updates tokenBalances from actual ERC20 balances and initializes oracle state
     /// @dev Only callable by the pool factory or pool owner
     function syncAfterMigration() external onlyPoolFactory {
+        for (uint i = 0; i < coins.length; i++) {
+            adminBalances[address(coins[i])] = 0;
+        }
         for (uint i = 0; i < coins.length; i++) {
             address tokenAddr = address(coins[i]);
             uint balance = ERC20(tokenAddr).balanceOf(address(this));
