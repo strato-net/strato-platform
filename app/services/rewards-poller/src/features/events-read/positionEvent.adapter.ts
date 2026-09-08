@@ -6,6 +6,7 @@ import {
 } from "../../shared/types";
 import { normalizeAddressNoPrefix } from "../../shared/core/address";
 import { parseJson } from "./eventRecord.mapper";
+import { isZeroCirrusValue } from "./mappingRow.parser";
 
 export const addPositionActivityRoute = (
   routesBySource: PositionActivityRoutes,
@@ -14,7 +15,7 @@ export const addPositionActivityRoute = (
   actionType: unknown
 ): void => {
   const normalizedAction = String(actionType ?? "").trim().toLowerCase();
-  const action = normalizedAction === "0" || normalizedAction === "deposit"
+  const action = isZeroCirrusValue(normalizedAction) || normalizedAction === "deposit"
     ? "Deposit"
     : normalizedAction === "1" || normalizedAction === "withdraw"
       ? "Withdraw"

@@ -43,7 +43,12 @@ const event = (
 
 test("builds routes from existing Position activity action types", () => {
   const routes = new Map();
-  addPositionActivityRoute(routes, `0x${saveUsdst}`, "Deposit", "0");
+  addPositionActivityRoute(
+    routes,
+    `0x${saveUsdst}`,
+    "Deposit",
+    "0000000000000000000000000000000000000000"
+  );
   addPositionActivityRoute(routes, saveUsdst, "Withdraw", 1);
 
   assert.deepEqual(routes.get(saveUsdst), {
