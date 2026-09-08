@@ -2,12 +2,17 @@ import { SourceConfig, Asset } from '../types';
 
 type SourcesConfig = Record<string, SourceConfig>;
 
-const NETWORK_ASSET_KEY = /^(.+)_(\d+)$/;
+interface NetworkOracleConfig {
+    assets: Record<string, Asset>;
+    sources: SourcesConfig;
+}
 
-export function parseNetworkAssetKey(assetKey: string): { sourceAsset: string; networkId: string } | null {
-    const match = assetKey.match(NETWORK_ASSET_KEY);
-    if (!match) return null;
-    return { sourceAsset: match[1], networkId: match[2] };
+interface NetworksConfig {
+    networks: Record<string, NetworkOracleConfig>;
+}
+
+export function getOracleNetworkId(): string {
+    return process.env.ORACLE_NETWORK_ID || '';
 }
 
 export class ConfigLoader {
@@ -19,21 +24,18 @@ export class ConfigLoader {
     }
 
     private loadConfigurations(): void {
-        // Load assets registry
-        const assetsConfig = require('../config/assets.json') as { assets: Record<string, Asset> };
-        const networkId = process.env.ORACLE_NETWORK_ID;
-        this.assets = {};
-        Object.entries(assetsConfig.assets).forEach(([assetKey, asset]) => {
-            if (parseNetworkAssetKey(assetKey)) return;
-            const networkAsset = networkId ? assetsConfig.assets[`${assetKey}_${networkId}`] : undefined;
-            this.assets[assetKey] = networkAsset || asset;
-        });
+        const { networks } = require('../config/assets.json') as NetworksConfig;
+        const networkId = getOracleNetworkId();
+        const network = networks[networkId];
+        if (!network?.assets || !network?.sources) {
+            throw new Error(
+                `No oracle assets/sources for network "${networkId || '(default)'}". Add a networks["${networkId}"] block in assets.json.`
+            );
+        }
 
-        // Load sources configuration and resolve API keys
-        const rawSources = require('../config/sources.json') as SourcesConfig;
+        this.assets = network.assets;
         this.sources = {};
-        
-        Object.entries(rawSources).forEach(([name, config]) => {
+        Object.entries(network.sources).forEach(([name, config]) => {
             this.sources[name] = {
                 ...config,
                 apiKey: config.apiKeyEnvVar ? process.env[config.apiKeyEnvVar] || '' : '',

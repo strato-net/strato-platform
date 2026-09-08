@@ -2,7 +2,7 @@
 
 Fetches asset prices from multiple sources and pushes them to the STRATO blockchain.
 
-Network-specific asset keys use `{TOKEN}_{ORACLE_NETWORK_ID}` (for example `SPY_114784819836269`). Set `ORACLE_NETWORK_ID` on testnet; leave it unset on production. If that key is missing, `{TOKEN}` is used.
+Oracle config is keyed by network in `assets.json` (`networks[ORACLE_NETWORK_ID]`). Unset `ORACLE_NETWORK_ID` uses the default `""` block (production). Helium uses `114784819836269`. Each block has complete `assets` and `sources`.
 
 ## Features
 
@@ -23,7 +23,7 @@ Network-specific asset keys use `{TOKEN}_{ORACLE_NETWORK_ID}` (for example `SPY_
 # STRATO Configuration
 STRATO_NODE_URL=https://node1.testnet.strato.nexus/
 PRICE_ORACLE_ADDRESS=0000000000000000000000000000000000001002
-ORACLE_NETWORK_ID=114784819836269  # testnet network id; omit on production
+ORACLE_NETWORK_ID=114784819836269  # selects networks["114784819836269"]; omit on production for networks[""]
 
 # OAuth Configuration
 OAUTH_CLIENT_ID=your-client-id
