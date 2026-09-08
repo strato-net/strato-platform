@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const {
   getChainEnvName,
+  getDeploymentConfirmations,
   getDeploymentProfile,
   parseDeployArgs,
 } = require("./lib/externalBridgeDeploymentConfig");
@@ -27,8 +28,12 @@ function writeOutput(payload, artifactPrefix) {
     `${artifactPrefix}_${timestamp}.json`,
   );
   const latestPath = path.join(directory, `${artifactPrefix}_latest.json`);
-  fs.writeFileSync(outputPath, JSON.stringify(payload, null, 2));
-  fs.writeFileSync(latestPath, JSON.stringify(payload, null, 2));
+  const serialized = `${JSON.stringify(payload, null, 2)}\n`;
+  for (const file of [outputPath, latestPath]) {
+    const temporaryPath = `${file}.${process.pid}.tmp`;
+    fs.writeFileSync(temporaryPath, serialized);
+    fs.renameSync(temporaryPath, file);
+  }
   return { outputPath, latestPath };
 }
 
@@ -39,6 +44,10 @@ async function main() {
     execute,
   });
   const chainId = profile.chainId;
+  const deploymentConfirmations = getDeploymentConfirmations(
+    chainId,
+    process.env,
+  );
   const safeAddress = requiredChainAddress(chainId, "SAFE_ADDRESS");
   const vaultDefaultAdminAddress = requiredChainAddress(
     chainId,
@@ -109,6 +118,7 @@ async function main() {
     production: profile.production,
     deployerAddress,
     deployerBalanceWei: deployerBalance.toString(),
+    deploymentConfirmations,
     safeAddress,
     permit2Address,
     roles: {
@@ -146,6 +156,11 @@ async function main() {
     { kind: "uups" },
   );
   await vault.waitForDeployment();
+  const vaultDeploymentReceipt =
+    await vault.deploymentTransaction()?.wait(deploymentConfirmations);
+  if (!vaultDeploymentReceipt) {
+    throw new Error("ExternalBridgeVault deployment receipt is unavailable");
+  }
   const vaultAddress = await vault.getAddress();
   const vaultImplementation = await upgrades.erc1967.getImplementationAddress(
     vaultAddress,
@@ -158,7 +173,7 @@ async function main() {
   );
   await router.waitForDeployment();
   const routerDeploymentReceipt =
-    await router.deploymentTransaction()?.wait();
+    await router.deploymentTransaction()?.wait(deploymentConfirmations);
   if (!routerDeploymentReceipt) {
     throw new Error("DepositRouter deployment receipt is unavailable");
   }
@@ -228,6 +243,8 @@ async function main() {
     vaultAttestationAdminAddress,
     largeWithdrawalApproverAddress,
     permit2Address,
+    deploymentConfirmations,
+    externalBridgeVaultDeploymentBlock: vaultDeploymentReceipt.blockNumber,
     depositRouterDeploymentBlock: routerDeploymentReceipt.blockNumber,
     externalBridgeVault: {
       proxy: vaultAddress,

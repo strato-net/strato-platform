@@ -6,15 +6,15 @@ export interface SourceWithdrawalAuthorization {
 
 export const validateSignerKmsUrl = (
   url: string,
-  production: boolean,
+  requireHttps: boolean,
 ): string => {
-  if (!production) return url;
+  if (!requireHttps) return url;
   try {
     if (new URL(url).protocol === "https:") return url;
   } catch {
     // Use the same configuration error for malformed and insecure URLs.
   }
-  throw new Error("KMS_SIGNER_URL must use HTTPS in production");
+  throw new Error("KMS_SIGNER_URL must use HTTPS");
 };
 
 export const matchesSourceWithdrawalAuthorization = (

@@ -9,7 +9,6 @@ import {
   TypedDataEncoder,
   Transaction,
   type TransactionRequest,
-  Wallet,
   keccak256,
   recoverAddress,
   verifyTypedData,
@@ -19,7 +18,6 @@ import {
   config,
   getExternalBridgeExecutorKmsConfig,
   type ExternalBridgeExecutorKmsConfig,
-  getExternalBridgeExecutorPrivateKey,
   getExternalBridgeSignerUrls,
   getChainRpcUrl,
 } from "../config";
@@ -91,14 +89,6 @@ const WITHDRAWAL_REVIEW_TYPES = {
 };
 
 const vaultInterface = new Interface(EXTERNAL_VAULT_ABI);
-
-const normalizePrivateKey = (privateKey: string): string => {
-  const prefixed = ensureHexPrefix(privateKey.trim());
-  if (!/^0x[a-fA-F0-9]{64}$/.test(prefixed)) {
-    throw new Error("Invalid external bridge executor private key format");
-  }
-  return prefixed;
-};
 
 const authHeaders = (token?: string): Record<string, string> | undefined =>
   token ? { Authorization: `Bearer ${token}` } : undefined;
@@ -491,27 +481,18 @@ const getVaultWithSigner = (
   const chainId = BigInt(authorization.destinationChainId);
   const provider = new JsonRpcProvider(getChainRpcUrl(chainId));
   const kmsConfig = getExternalBridgeExecutorKmsConfig(chainId);
-  if (kmsConfig) {
-    return {
-      provider,
-      vault: new Contract(
-        authorization.destinationVault,
-        EXTERNAL_VAULT_ABI,
-        new ExternalBridgeExecutorKmsSigner(kmsConfig, provider),
-      ),
-    };
-  }
-
-  const privateKey = getExternalBridgeExecutorPrivateKey(chainId);
-  if (!privateKey) {
+  if (!kmsConfig) {
     throw new Error(
-      `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY or CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_KMS_URL is not configured`,
+      `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_KMS_URL is not configured`,
     );
   }
-  const wallet = new Wallet(normalizePrivateKey(privateKey), provider);
   return {
     provider,
-    vault: new Contract(authorization.destinationVault, EXTERNAL_VAULT_ABI, wallet),
+    vault: new Contract(
+      authorization.destinationVault,
+      EXTERNAL_VAULT_ABI,
+      new ExternalBridgeExecutorKmsSigner(kmsConfig, provider),
+    ),
   };
 };
 

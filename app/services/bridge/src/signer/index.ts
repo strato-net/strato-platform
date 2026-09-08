@@ -73,7 +73,7 @@ const sourceChainId = BigInt(required("SOURCE_CHAIN_ID"));
 const sourceBridge = required("EXTERNAL_ASSET_BRIDGE_ADDRESS").replace(/^0x/, "");
 const kmsSignerUrl = validateSignerKmsUrl(
   required("KMS_SIGNER_URL"),
-  process.env.NODE_ENV === "production",
+  true,
 );
 const kmsSignerApiToken = required("KMS_SIGNER_API_TOKEN");
 const signerApiToken = required("EXTERNAL_BRIDGE_SIGNER_API_TOKEN");
@@ -392,6 +392,7 @@ const signWithKms = async (
 };
 
 const app = express();
+app.set("env", "production");
 app.use(express.json());
 app.use((req, res, next) => {
   if (req.headers.authorization !== `Bearer ${signerApiToken}`) {

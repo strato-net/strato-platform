@@ -42,11 +42,24 @@ interface ExternalBridgeExecutorValidationResult {
   warnings: string[];
 }
 
+export const validateExternalBridgeSignerUrls = (
+  urls: string[],
+): string[] =>
+  urls.flatMap((url) => {
+    try {
+      return new URL(url).protocol === "https:"
+        ? []
+        : [`External bridge signer URL must use HTTPS: ${url}`];
+    } catch {
+      return [`Invalid external bridge signer URL: ${url}`];
+    }
+  });
+
 export const validateExternalBridgeExecutorConfig = (
   chainId: number | bigint,
   kmsConfig: ReturnType<typeof getExternalBridgeExecutorKmsConfig>,
   privateKey: string | undefined,
-  production: boolean,
+  deployed: boolean,
 ): ExternalBridgeExecutorValidationResult => {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -54,11 +67,11 @@ export const validateExternalBridgeExecutorConfig = (
   let executorAddress: string | undefined;
 
   if (!kmsConfig) {
-    if (production) {
+    if (deployed) {
       errors.push(
         privateKey
-          ? `${prefix}_PRIVATE_KEY must not be configured in production; configure ${prefix}_ADDRESS and ${prefix}_KMS_URL`
-          : `Production external bridge executor requires ${prefix}_ADDRESS and ${prefix}_KMS_URL`,
+          ? `${prefix}_PRIVATE_KEY must not be configured for a deployed bridge service; configure ${prefix}_ADDRESS and ${prefix}_KMS_URL`
+          : `Deployed external bridge executor requires ${prefix}_ADDRESS and ${prefix}_KMS_URL`,
       );
     } else if (!privateKey || !isPrivateKey(privateKey)) {
       errors.push(
@@ -79,18 +92,20 @@ export const validateExternalBridgeExecutorConfig = (
   }
   if (!kmsConfig.url) {
     errors.push(`Missing external bridge executor KMS URL: ${prefix}_KMS_URL`);
-  } else if (production) {
+  } else if (deployed) {
     try {
       if (new URL(kmsConfig.url).protocol !== "https:") {
-        errors.push(`${prefix}_KMS_URL must use HTTPS in production`);
+        errors.push(`${prefix}_KMS_URL must use HTTPS`);
       }
     } catch {
-      errors.push(`${prefix}_KMS_URL must use HTTPS in production`);
+      errors.push(`${prefix}_KMS_URL must use HTTPS`);
     }
   }
   if (privateKey) {
-    if (production) {
-      errors.push(`${prefix}_PRIVATE_KEY must not be configured in production`);
+    if (deployed) {
+      errors.push(
+        `${prefix}_PRIVATE_KEY must not be configured for a deployed bridge service`,
+      );
     } else {
       warnings.push(
         `Both KMS and private-key executor config are set for chain ${chainId}; KMS executor signing will be used`,
@@ -135,16 +150,10 @@ export async function validateBridgeConfig(): Promise<boolean> {
       errors.push(`Missing required environment variable: ${varName}`);
     }
   });
-  if (
-    !["development", "test"].includes(process.env.NODE_ENV || "") &&
-    !process.env.DEPOSIT_WEBHOOK_TOKEN
-  ) {
+  if (!process.env.DEPOSIT_WEBHOOK_TOKEN) {
     errors.push("Missing required environment variable: DEPOSIT_WEBHOOK_TOKEN");
   }
-  if (
-    !["development", "test"].includes(process.env.NODE_ENV || "") &&
-    !process.env.DEPOSIT_OPERATIONS_TOKEN
-  ) {
+  if (!process.env.DEPOSIT_OPERATIONS_TOKEN) {
     errors.push("Missing required environment variable: DEPOSIT_OPERATIONS_TOKEN");
   }
 
@@ -328,11 +337,10 @@ export async function validateBridgeConfig(): Promise<boolean> {
   }
 
   if (
-    !["development", "test"].includes(process.env.NODE_ENV || "") &&
     config.safe.safeProposerKmsUrl &&
     !config.safe.safeProposerKmsUrl.startsWith("https://")
   ) {
-    errors.push("SAFE_PROPOSER_KMS_URL must use HTTPS in production");
+    errors.push("SAFE_PROPOSER_KMS_URL must use HTTPS");
   }
 
   if (config.safe.apiKey) {
@@ -467,13 +475,12 @@ export async function validateBridgeConfig(): Promise<boolean> {
         const confirmationValue =
           process.env[`CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS`];
         if (
-          process.env.NODE_ENV === "production" &&
-          (!confirmationValue ||
-            !Number.isSafeInteger(Number(confirmationValue)) ||
-            Number(confirmationValue) <= 0)
+          !confirmationValue ||
+          !Number.isSafeInteger(Number(confirmationValue)) ||
+          Number(confirmationValue) <= 0
         ) {
           errors.push(
-            `CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS must be an explicit positive integer in production`,
+            `CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS must be an explicit positive integer`,
           );
         }
         const signerUrls = getExternalBridgeSignerUrls(chainId);
@@ -483,7 +490,7 @@ export async function validateBridgeConfig(): Promise<boolean> {
           chainId,
           executorKmsConfig,
           executorPrivateKey,
-          process.env.NODE_ENV === "production",
+          true,
         );
         errors.push(...executorValidation.errors);
         warnings.push(...executorValidation.warnings);
@@ -493,6 +500,7 @@ export async function validateBridgeConfig(): Promise<boolean> {
             `CHAIN_${chainId}_EXTERNAL_BRIDGE_SIGNER_URLS must contain 3 independent signer services`,
           );
         }
+        errors.push(...validateExternalBridgeSignerUrls(signerUrls));
         if (!chain.vault || !isAddress(chain.vault)) {
           errors.push(`Invalid external bridge vault for chain ${chainId}`);
           continue;

@@ -7,6 +7,7 @@ const {
 const {
   compareInitialization,
   compareRoutes,
+  compareActions,
   verifyConfiguration,
 } = require("./external-bridge-verification");
 
@@ -69,6 +70,10 @@ test("parses an explicit dry-run step", () => {
     parseArgs(["--config", "setup.json", "--step", "verify-initialize"]),
     { execute: false, config: "setup.json", step: "verify-initialize" },
   );
+  assert.deepEqual(
+    parseArgs(["--config", "setup.json", "--step", "verify-actions"]),
+    { execute: false, config: "setup.json", step: "verify-actions" },
+  );
   assert.throws(
     () =>
       parseArgs([
@@ -106,13 +111,22 @@ test("keeps action enablement in a separate plan", () => {
   const actions = buildPlan(settings, "actions");
   assert.deepEqual(
     routes.map((call) => call.args._func),
-    ["setChain", "setRoute"],
+    ["setChain", "setRoute", "setRouteRebaseRequired"],
   );
+  assert.equal(routes[2].args._args[3].value, false);
   assert.deepEqual(
     actions.map((call) => call.args._func),
     ["setDepositAction"],
   );
   assert.equal(actions[0].args._args[3].value, "4");
+  assert.equal(actions[0].args._args[4].value, true);
+
+  const disabledSettings = structuredClone(settings);
+  disabledSettings.chains[0].routes[0].autoRouteEnabled = false;
+  assert.equal(
+    buildPlan(disabledSettings, "actions")[0].args._args[4].value,
+    false,
+  );
 });
 
 test("verifies initialized bridge and TokenRouter state", () => {
@@ -151,7 +165,7 @@ test("verifies initialized bridge and TokenRouter state", () => {
   assert.match(compareInitialization(settings, state)[0], /count must be 3/);
 });
 
-test("verifies chains, routes, rebase policy, and disabled actions", () => {
+test("verifies chains, routes, and rebase policy independently of actions", () => {
   const route = settings.chains[0].routes[0];
   const key = `${route.externalToken}:11155111:${route.stratoToken}`;
   const state = {
@@ -174,11 +188,38 @@ test("verifies chains, routes, rebase policy, and disabled actions", () => {
       manualReviewThreshold: "5",
     }]]),
     rebaseRequired: new Set(),
-    autoRoutes: new Set(),
   };
   assert.deepEqual(compareRoutes(settings, state), []);
-  state.autoRoutes.add(key);
-  assert.match(compareRoutes(settings, state)[0], /AUTO_ROUTE/);
+});
+
+test("verifies configured actions and rejects unexpected actions", () => {
+  const route = settings.chains[0].routes[0];
+  const key = `${route.externalToken}:11155111:${route.stratoToken}`;
+  const state = {
+    actionConfigs: new Map([
+      [key, { autoForge: false, autoSave: false, autoRoute: true }],
+    ]),
+  };
+  assert.deepEqual(compareActions(settings, state), []);
+
+  state.actionConfigs.set(key, {
+    autoForge: true,
+    autoSave: true,
+    autoRoute: false,
+  });
+  assert.match(
+    compareActions(settings, state).join("\n"),
+    /AUTO_ROUTE mismatch.*Unexpected AUTO_SAVE.*Unexpected AUTO_FORGE/s,
+  );
+
+  state.actionConfigs.set(
+    `${"f".repeat(40)}:11155111:${"e".repeat(40)}`,
+    { autoRoute: true },
+  );
+  assert.match(
+    compareActions(settings, state).join("\n"),
+    /Unexpected enabled deposit action/,
+  );
 });
 
 test("loads verification state from Cirrus", async () => {
@@ -186,6 +227,7 @@ test("loads verification state from Cirrus", async () => {
     ok: true,
     json: async () => body,
   });
+  let actionsEnabled = false;
   const fetchImpl = async (url) => {
     if (url.includes("ExternalAssetBridge-settlementVerifiers")) {
       return response([
@@ -228,11 +270,24 @@ test("loads verification state from Cirrus", async () => {
         },
       }]);
     }
-    if (
-      url.includes("routeRebaseRequired") ||
-      url.includes("depositActionConfigs")
-    ) {
+    if (url.includes("routeRebaseRequired")) {
       return response([]);
+    }
+    if (url.includes("depositActionConfigs")) {
+      return response(
+        actionsEnabled
+          ? [{
+              key: "0".repeat(40),
+              key2: "11155111",
+              key3: "9".repeat(40),
+              value: {
+                autoForge: false,
+                autoSave: false,
+                autoRoute: true,
+              },
+            }]
+          : [],
+      );
     }
     if (url.includes("BlockApps-ExternalAssetBridge?")) {
       return response([{
@@ -273,6 +328,17 @@ test("loads verification state from Cirrus", async () => {
   assert.equal(
     (
       await verifyConfiguration(settings, "verify-routes", {
+        nodeUrl: "https://strato.example",
+        token: "token",
+        fetchImpl,
+      })
+    ).status,
+    "PASSED",
+  );
+  actionsEnabled = true;
+  assert.equal(
+    (
+      await verifyConfiguration(settings, "verify-actions", {
         nodeUrl: "https://strato.example",
         token: "token",
         fetchImpl,

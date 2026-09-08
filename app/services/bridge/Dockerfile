@@ -38,8 +38,6 @@ COPY --from=builder /build/dist ./dist
 
 EXPOSE 3003
 
-ENV NODE_ENV=production
-
 ENV PORT=3003
 
 CMD ["node", "dist/index.js"] 

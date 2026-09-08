@@ -93,15 +93,14 @@ Native withdrawal review delay and attestation validity are enforced by the nati
 - `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS` - Unprivileged destination-chain gas executor address
 - `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_KMS_URL` - KMS/HSM adapter URL for executor transaction digest signing
 - `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_KMS_API_TOKEN` - Optional bearer token for the executor KMS adapter
-- `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY` - Local/dev fallback destination-chain gas key used only to submit reserve/release/cancel transactions
-- `CHAIN_${chainId}_EXTERNAL_BRIDGE_SIGNER_URLS` - Comma-separated independent signer service URLs
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_SIGNER_URLS` - Comma-separated HTTPS URLs for three independent signer services
 - `EXTERNAL_BRIDGE_SIGNER_API_TOKEN` - Shared authentication token for signer service requests
 
-Production executor deployments should use the KMS/HSM adapter rather than `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY`. The adapter receives `{ "digest": "0x..." }` and must return a recoverable 65-byte ECDSA signature in `{ "signature": "0x..." }`; the bridge service verifies the signature recovers to `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS` before broadcasting the transaction.
+Testnet and production executor deployments require the KMS/HSM adapter. The adapter receives `{ "digest": "0x..." }` and must return a recoverable 65-byte ECDSA signature in `{ "signature": "0x..." }`; the bridge service verifies the signature recovers to `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS` before broadcasting the transaction.
 
 Run each signer independently with `npm run start:signer`. Each process must use its own `SIGNER_RPC_URL`, authenticated KMS/HSM adapter (`KMS_SIGNER_URL`, `KMS_SIGNER_ADDRESS`, `KMS_SIGNER_API_TOKEN`), and STRATO settlement-verifier OAuth account (`SIGNER_OPENID_DISCOVERY_URL`, `SIGNER_CLIENT_ID`, `SIGNER_CLIENT_SECRET`, `SIGNER_BA_USERNAME`, `SIGNER_BA_PASSWORD`). Register three independent STRATO accounts with `ExternalAssetBridge.setSettlementVerifier` and configure threshold 2 before starting the bridge service. Access tokens are refreshed before expiry and once after a 401 response. A signer independently verifies deposits and external vault releases before recording a STRATO settlement attestation; it also verifies the source withdrawal, exact STRATO authorization timing/version and destination vault policy before requesting a vault authorization signature. No attestation private key is held by the bridge executor.
 
-Production signer deployments use `docker-compose.bridge-signer.tpl.yml`. Deploy one isolated stack per signer with a distinct RPC provider, KMS/HSM key and API endpoint.
+Testnet and production signer deployments use `docker-compose.bridge-signer.tpl.yml`. Deploy one isolated stack per signer with a distinct RPC provider, KMS/HSM key and HTTPS API endpoint.
 
 `SETTLEMENT_VERIFIER_CONFIRMATIONS` controls the external-chain confirmation depth independently enforced by that verifier. Configure it per chain and risk policy. Deposit minting and withdrawal finalization require the on-chain verifier threshold; after that threshold is present, any STRATO account may submit the settlement transaction.
 

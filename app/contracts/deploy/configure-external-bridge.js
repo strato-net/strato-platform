@@ -2,7 +2,7 @@
  * Build or submit every AdminRegistry-governed ExternalAssetBridge setup call.
  *
  * Usage:
- *   node configure-external-bridge.js --config <json> --step initialize|routes|actions|verify-initialize|verify-routes [--execute]
+ *   node configure-external-bridge.js --config <json> --step initialize|routes|actions|verify-initialize|verify-routes|verify-actions [--execute]
  *
  * Dry-run is the default. Every run writes the full governance payload to JSON.
  */
@@ -44,10 +44,11 @@ function parseArgs(argv = process.argv.slice(2)) {
     "actions",
     "verify-initialize",
     "verify-routes",
+    "verify-actions",
   ];
   if (!steps.includes(args.step)) {
     throw new Error(
-      "--step must be initialize|routes|actions|verify-initialize|verify-routes",
+      "--step must be initialize|routes|actions|verify-initialize|verify-routes|verify-actions",
     );
   }
   if (args.execute && args.step.startsWith("verify-")) {
@@ -312,14 +313,12 @@ function buildPlan(settings, step) {
           parameter("uint256", route.maxPerWithdrawal),
           parameter("uint256", route.manualReviewThreshold),
         ]);
-        if (route.rebaseRequired) {
-          add(bridge.address, "setRouteRebaseRequired", [
-            parameter("address", route.externalToken),
-            parameter("uint256", chain.externalChainId),
-            parameter("address", route.stratoToken),
-            parameter("bool", true),
-          ]);
-        }
+        add(bridge.address, "setRouteRebaseRequired", [
+          parameter("address", route.externalToken),
+          parameter("uint256", chain.externalChainId),
+          parameter("address", route.stratoToken),
+          parameter("bool", route.rebaseRequired),
+        ]);
       });
     });
   }
@@ -327,14 +326,13 @@ function buildPlan(settings, step) {
   if (step === "actions") {
     chains.forEach((chain) =>
       chain.routes
-        .filter((route) => route.autoRouteEnabled)
         .forEach((route) =>
           add(bridge.address, "setDepositAction", [
             parameter("address", route.externalToken),
             parameter("uint256", chain.externalChainId),
             parameter("address", route.stratoToken),
             parameter("uint256", "4"),
-            parameter("bool", true),
+            parameter("bool", route.autoRouteEnabled),
           ]),
         ),
     );

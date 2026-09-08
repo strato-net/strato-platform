@@ -117,7 +117,10 @@ administration, and large-withdrawal approval explicitly. The existing
 
 The pair deployer creates one `ExternalBridgeVault` proxy and one
 `DepositRouter` proxy, verifies their initial wiring and roles, and records the
-DepositRouter deployment block in a network-specific artifact.
+deployment blocks in a network-specific artifact. Set
+`CHAIN_<ID>_DEPLOYMENT_CONFIRMATIONS` to the approved finality depth for each
+network; deployment artifacts are written only after both transactions reach
+that depth.
 
 ```bash
 npm run deployExternalBridge:sepolia
@@ -143,7 +146,8 @@ CONFIRM_EXTERNAL_BRIDGE_DEPLOY=59144 npm run deployExternalBridge:linea -- --exe
 Set the network RPC URL and `PRIVATE_KEY`. Safe, vault-role, and Permit2
 variables are prefixed with the destination chain ID, for example
 `CHAIN_11155111_SAFE_ADDRESS` and
-`CHAIN_11155111_VAULT_DEFAULT_ADMIN_ADDRESS`. Preflight checks the network,
+`CHAIN_11155111_VAULT_DEFAULT_ADMIN_ADDRESS`. Confirmation depth uses the same
+prefix, for example `CHAIN_11155111_DEPLOYMENT_CONFIRMATIONS`. Preflight checks the network,
 signer balance, Safe and Permit2 bytecode, and UUPS implementation safety
 without submitting transactions. Production output is written to
 `deployments/ExternalBridgePair_<network>_*.json`; testnets use
@@ -199,13 +203,27 @@ After Safe configuration, verify DepositRouter against the generated manifest:
 cd app/ethereum && ROLLOUT_MANIFEST=/secure/path/eab-rollout/external-bridge-rollout-manifest-11155111.json npm run scan:sepolia
 ```
 
+Use the matching scanner for the manifest network:
+`scan:sepolia`, `scan:baseSepolia`, `scan:lineaSepolia`, `scan:mainnet`,
+`scan:base`, or `scan:linea`.
+
 After the corresponding AdminRegistry votes execute, verify STRATO
-initialization and routes:
+initialization, routes and approved actions:
+
+Commands using `--execute` or a `verify-*` step require
+`GLOBAL_ADMIN_NAME`, `GLOBAL_ADMIN_PASSWORD`, `OAUTH_CLIENT_SECRET`,
+`OAUTH_CLIENT_ID`, `OAUTH_URL`, and `NODE_URL`.
 
 ```bash
 cd app/contracts && npm run configure:external-bridge -- --config /secure/path/eab-rollout/external-bridge-11155111.json --step verify-initialize
 cd app/contracts && npm run configure:external-bridge -- --config /secure/path/eab-rollout/external-bridge-11155111.json --step verify-routes
+cd app/contracts && npm run configure:external-bridge -- --config /secure/path/eab-rollout/external-bridge-11155111.json --step verify-actions
 ```
+
+Route and action plans are symmetric: they emit explicit true or false values
+for rebase requirements and AUTO_ROUTE settings, so the same commands support
+initial rollout, policy changes and rollback. Route and action verification are
+independent, so `verify-routes` remains valid after AUTO_ROUTE activation.
 
 ### 2. Testnet
 

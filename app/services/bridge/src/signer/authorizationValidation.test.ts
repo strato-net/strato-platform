@@ -33,14 +33,14 @@ test("requires exact STRATO withdrawal authorization timing and version", () => 
   assert.equal(matchesSourceWithdrawalAuthorization(undefined, requested), false);
 });
 
-test("requires HTTPS for withdrawal attestation KMS in production", () => {
+test("requires HTTPS for withdrawal attestation KMS when enforced", () => {
   assert.throws(
     () => validateSignerKmsUrl("http://attestation-kms", true),
-    /must use HTTPS in production/,
+    /must use HTTPS/,
   );
   assert.throws(
     () => validateSignerKmsUrl("not-a-url", true),
-    /must use HTTPS in production/,
+    /must use HTTPS/,
   );
   assert.equal(
     validateSignerKmsUrl("https://attestation-kms", true),

@@ -29,9 +29,17 @@
     "external:vault:ops": "node scripts/externalBridgeVaultOps.js",
     "external:vault:ops:test": "node --test test/ExternalBridgeVaultOps.test.js",
     "verify:sepolia": "hardhat verify --network sepolia",
+    "verify:baseSepolia": "hardhat verify --network baseSepolia",
+    "verify:lineaSepolia": "hardhat verify --network lineaSepolia",
     "verify:mainnet": "hardhat verify --network mainnet",
+    "verify:base": "hardhat verify --network base",
+    "verify:linea": "hardhat verify --network linea",
     "scan:sepolia": "npx hardhat run scripts/scanTokenConfig.js --network sepolia",
-    "scan:mainnet": "npx hardhat run scripts/scanTokenConfig.js --network mainnet"
+    "scan:baseSepolia": "npx hardhat run scripts/scanTokenConfig.js --network baseSepolia",
+    "scan:lineaSepolia": "npx hardhat run scripts/scanTokenConfig.js --network lineaSepolia",
+    "scan:mainnet": "npx hardhat run scripts/scanTokenConfig.js --network mainnet",
+    "scan:base": "npx hardhat run scripts/scanTokenConfig.js --network base",
+    "scan:linea": "npx hardhat run scripts/scanTokenConfig.js --network linea"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",

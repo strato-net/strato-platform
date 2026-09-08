@@ -76,7 +76,12 @@ const readJson = (file, label) => {
 
 const writeJson = (directory, name, value) => {
   const outputPath = path.join(directory, name);
-  fs.writeFileSync(outputPath, `${JSON.stringify(value, null, 2)}\n`);
+  const temporaryPath = `${outputPath}.${process.pid}.tmp`;
+  fs.writeFileSync(
+    temporaryPath,
+    `${JSON.stringify(value, null, 2)}\n`,
+  );
+  fs.renameSync(temporaryPath, outputPath);
   return outputPath;
 };
 

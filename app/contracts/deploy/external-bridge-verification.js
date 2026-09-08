@@ -209,12 +209,53 @@ function compareRoutes(settings, state) {
         errors.push(`Unexpected rebase requirement ${key}`);
       }
     }
-    for (const key of state.autoRoutes) {
-      if (key.split(":")[1] === String(expectedChain.externalChainId)) {
-        errors.push(`AUTO_ROUTE must remain disabled: ${key}`);
+  }
+  return errors;
+}
+
+function compareActions(settings, state) {
+  const errors = [];
+  const expectedRoutes = new Set();
+  const expectedChainIds = new Set(
+    settings.chains.map((chain) => String(chain.externalChainId)),
+  );
+
+  for (const chain of settings.chains) {
+    for (const route of chain.routes) {
+      const key = routeKey(
+        route.externalToken,
+        chain.externalChainId,
+        route.stratoToken,
+      );
+      expectedRoutes.add(key);
+      const actual = state.actionConfigs.get(key) || {};
+      const actualAutoRoute = parseBool(actual.autoRoute);
+      if (actualAutoRoute !== route.autoRouteEnabled) {
+        errors.push(
+          `${key} AUTO_ROUTE mismatch: expected ${route.autoRouteEnabled}, got ${actualAutoRoute}`,
+        );
+      }
+      if (parseBool(actual.autoSave)) {
+        errors.push(`Unexpected AUTO_SAVE action ${key}`);
+      }
+      if (parseBool(actual.autoForge)) {
+        errors.push(`Unexpected AUTO_FORGE action ${key}`);
       }
     }
   }
+
+  for (const [key, actual] of state.actionConfigs) {
+    if (
+      expectedChainIds.has(key.split(":")[1]) &&
+      !expectedRoutes.has(key) &&
+      (parseBool(actual.autoRoute) ||
+        parseBool(actual.autoSave) ||
+        parseBool(actual.autoForge))
+    ) {
+      errors.push(`Unexpected enabled deposit action ${key}`);
+    }
+  }
+
   return errors;
 }
 
@@ -316,7 +357,7 @@ async function fetchRouteState(settings, nodeUrl, token, fetchImpl) {
     select: "key,key2,key3,value",
     limit: 20000,
   };
-  const [chainRows, routeRows, rebaseRows, actionRows] = await Promise.all([
+  const [chainRows, routeRows, rebaseRows] = await Promise.all([
     cirrusSearch(
       nodeUrl,
       token,
@@ -343,13 +384,6 @@ async function fetchRouteState(settings, nodeUrl, token, fetchImpl) {
       { ...filters, value: "eq.true" },
       fetchImpl,
     ),
-    cirrusSearch(
-      nodeUrl,
-      token,
-      "BlockApps-ExternalAssetBridge-depositActionConfigs",
-      filters,
-      fetchImpl,
-    ),
   ]);
   return {
     chains: new Map(
@@ -364,33 +398,53 @@ async function fetchRouteState(settings, nodeUrl, token, fetchImpl) {
     rebaseRequired: new Set(
       rebaseRows.map((row) => routeKey(row.key, row.key2, row.key3)),
     ),
-    autoRoutes: new Set(
-      actionRows
-        .filter((row) => parseBool(parseValue(row.value).autoRoute))
-        .map((row) => routeKey(row.key, row.key2, row.key3)),
+  };
+}
+
+async function fetchActionState(settings, nodeUrl, token, fetchImpl) {
+  const bridgeAddress = normalizeAddress(settings.bridge.address);
+  const chainIds = settings.chains.map((chain) => chain.externalChainId);
+  const actionRows = await cirrusSearch(
+    nodeUrl,
+    token,
+    "BlockApps-ExternalAssetBridge-depositActionConfigs",
+    {
+      address: `eq.${bridgeAddress}`,
+      key2: `in.(${chainIds.join(",")})`,
+      select: "key,key2,key3,value",
+      limit: 20000,
+    },
+    fetchImpl,
+  );
+  return {
+    actionConfigs: new Map(
+      actionRows.map((row) => [
+        routeKey(row.key, row.key2, row.key3),
+        parseValue(row.value),
+      ]),
     ),
   };
 }
 
 async function verifyConfiguration(settings, step, options) {
-  const state =
-    step === "verify-initialize"
-      ? await fetchInitializationState(
-          settings,
-          options.nodeUrl,
-          options.token,
-          options.fetchImpl,
-        )
-      : await fetchRouteState(
-          settings,
-          options.nodeUrl,
-          options.token,
-          options.fetchImpl,
-        );
-  const errors =
-    step === "verify-initialize"
-      ? compareInitialization(settings, state)
-      : compareRoutes(settings, state);
+  const args = [
+    settings,
+    options.nodeUrl,
+    options.token,
+    options.fetchImpl,
+  ];
+  let state;
+  let errors;
+  if (step === "verify-initialize") {
+    state = await fetchInitializationState(...args);
+    errors = compareInitialization(settings, state);
+  } else if (step === "verify-actions") {
+    state = await fetchActionState(...args);
+    errors = compareActions(settings, state);
+  } else {
+    state = await fetchRouteState(...args);
+    errors = compareRoutes(settings, state);
+  }
   return {
     step,
     status: errors.length ? "FAILED" : "PASSED",
@@ -401,5 +455,6 @@ async function verifyConfiguration(settings, step, options) {
 module.exports = {
   compareInitialization,
   compareRoutes,
+  compareActions,
   verifyConfiguration,
 };

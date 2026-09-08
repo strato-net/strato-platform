@@ -837,7 +837,7 @@ test("rejects external vault executor KMS signatures from the wrong key", async 
   }
 });
 
-test("rejects private-key external vault executor config in production", async () => {
+test("rejects private-key external vault executor config when deployed", async () => {
   const { validateExternalBridgeExecutorConfig } = await import(
     "../utils/configValidator"
   );
@@ -851,7 +851,7 @@ test("rejects private-key external vault executor config in production", async (
   );
   assert.match(
     production.errors.join("\n"),
-    /must not be configured in production/,
+    /must not be configured for a deployed bridge service/,
   );
 
   const development = validateExternalBridgeExecutorConfig(
@@ -864,7 +864,7 @@ test("rejects private-key external vault executor config in production", async (
   assert.ok(development.executorAddress);
 });
 
-test("requires HTTPS for external vault executor KMS in production", async () => {
+test("requires HTTPS for external vault executor KMS when deployed", async () => {
   const { validateExternalBridgeExecutorConfig } = await import(
     "../utils/configValidator"
   );
@@ -876,7 +876,7 @@ test("requires HTTPS for external vault executor KMS in production", async () =>
     undefined,
     true,
   );
-  assert.match(insecure.errors.join("\n"), /must use HTTPS in production/);
+  assert.match(insecure.errors.join("\n"), /must use HTTPS/);
 
   const secure = validateExternalBridgeExecutorConfig(
     1,
@@ -885,4 +885,24 @@ test("requires HTTPS for external vault executor KMS in production", async () =>
     true,
   );
   assert.deepEqual(secure.errors, []);
+});
+
+test("requires HTTPS for every external verifier service", async () => {
+  const { validateExternalBridgeSignerUrls } = await import(
+    "../utils/configValidator"
+  );
+  assert.deepEqual(
+    validateExternalBridgeSignerUrls([
+      "https://verifier-one.example",
+      "https://verifier-two.example",
+    ]),
+    [],
+  );
+  assert.match(
+    validateExternalBridgeSignerUrls([
+      "http://verifier-one.example",
+      "not-a-url",
+    ]).join("\n"),
+    /must use HTTPS.*Invalid external bridge signer URL/s,
+  );
 });

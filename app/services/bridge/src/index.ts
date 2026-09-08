@@ -22,6 +22,7 @@ import { getDepositStatusByIdentity } from "./services/cirrusService";
 const app = express();
 const port = process.env.PORT || 3003;
 
+app.set("env", "production");
 app.use(cors());
 app.use(bodyParser.json());
 
@@ -53,17 +54,11 @@ app.get("/metrics/deposits", (_, res) => {
 
 app.post("/webhooks/deposits/:chainId", async (req, res) => {
   const webhookToken = process.env.DEPOSIT_WEBHOOK_TOKEN;
-  const tokenRequired = !["development", "test"].includes(
-    process.env.NODE_ENV || "",
-  );
-  if (tokenRequired && !webhookToken) {
+  if (!webhookToken) {
     res.status(503).json({ error: "Webhook authentication is not configured" });
     return;
   }
-  if (
-    webhookToken &&
-    req.headers.authorization !== `Bearer ${webhookToken}`
-  ) {
+  if (req.headers.authorization !== `Bearer ${webhookToken}`) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }

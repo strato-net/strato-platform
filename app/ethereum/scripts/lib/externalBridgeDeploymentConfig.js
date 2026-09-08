@@ -19,6 +19,15 @@ function getChainEnvName(chainId, name) {
   return `CHAIN_${Number(chainId)}_${name}`;
 }
 
+function getDeploymentConfirmations(chainId, env = process.env) {
+  const envName = getChainEnvName(chainId, "DEPLOYMENT_CONFIRMATIONS");
+  const value = String(env[envName] || "");
+  if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(Number(value))) {
+    throw new Error(`${envName} must be a positive safe integer`);
+  }
+  return Number(value);
+}
+
 function getDeploymentProfile(
   chainId,
   env = process.env,
@@ -52,5 +61,6 @@ module.exports = {
   DEPLOYMENT_PROFILES,
   parseDeployArgs,
   getChainEnvName,
+  getDeploymentConfirmations,
   getDeploymentProfile,
 };

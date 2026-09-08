@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const {
   getChainEnvName,
+  getDeploymentConfirmations,
   getDeploymentProfile,
   parseDeployArgs,
 } = require("../scripts/lib/externalBridgeDeploymentConfig");
@@ -21,6 +22,26 @@ test("builds chain-prefixed deployment variable names", () => {
   assert.equal(
     getChainEnvName(59144, "VAULT_POLICY_ADMIN_ADDRESS"),
     "CHAIN_59144_VAULT_POLICY_ADMIN_ADDRESS",
+  );
+});
+
+test("requires explicit chain-prefixed deployment confirmations", () => {
+  assert.equal(
+    getDeploymentConfirmations(84532, {
+      CHAIN_84532_DEPLOYMENT_CONFIRMATIONS: "3",
+    }),
+    3,
+  );
+  assert.throws(
+    () => getDeploymentConfirmations(84532, {}),
+    /CHAIN_84532_DEPLOYMENT_CONFIRMATIONS/,
+  );
+  assert.throws(
+    () =>
+      getDeploymentConfirmations(84532, {
+        CHAIN_84532_DEPLOYMENT_CONFIRMATIONS: "0",
+      }),
+    /positive safe integer/,
   );
 });
 
