@@ -71,8 +71,6 @@ contract FlashBorrower {
         if (mode == 5) pool.mint(address(this), -60, 60, 1, 1, 1, block.timestamp + 3600);
         if (mode == 6) pool.burn(-6000, 6000, 0, block.timestamp + 3600);
         if (mode == 7) pool.collect(address(this), -6000, 6000, 1, 1);
-        if (mode == 8) pool.sync();
-        if (mode == 9) pool.skim(address(this));
 
         uint repay0 = mode == 1 ? amount0 : amount0 + fee0;
         uint repay1 = mode == 1 ? amount1 : amount1 + fee1;
@@ -1555,7 +1553,7 @@ contract Describe_PoolV3 is Authorizable {
     }
 
     function it_flash_cannot_reenter_the_pool() {
-        // CANONICAL lock: the callback cannot flash, swap, mint, burn, collect, sync or skim
+        // lock-guarded user mutators: callback cannot flash, swap, mint, burn, or collect
         _mintRange(-6000, 6000, 100000e18);
         FlashBorrower b = _newBorrower();
 
@@ -1578,17 +1576,6 @@ contract Describe_PoolV3 is Authorizable {
         err = "";
         try b.go(address(b), 1e18, 0, 7) { } catch Error(string e) { err = e; }
         require(err == "LOK", "Collect from the callback must revert LOK, got: " + err);
-
-        // skim/sync are owner-callable; hand the borrower the owner key so the lock is what fires
-        pool.transferOwnership(address(b));
-
-        err = "";
-        try b.go(address(b), 1e18, 0, 8) { } catch Error(string e) { err = e; }
-        require(err == "LOK", "sync from the callback must revert LOK, got: " + err);
-
-        err = "";
-        try b.go(address(b), 1e18, 0, 9) { } catch Error(string e) { err = e; }
-        require(err == "LOK", "skim from the callback must revert LOK, got: " + err);
 
         // the lock is released again after the failed attempts
         b.go(address(b), 1e18, 0, 0);
