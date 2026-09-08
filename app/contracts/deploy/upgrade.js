@@ -13,7 +13,13 @@ const path = require('path');
 const DEFAULT_CONSTRUCTOR_ARGS = {"initialOwner": "deadbeef"};
 
 const BATCH_TARGETS = [
-    "----proxy-address----",
+    "841f9a25db4ffc3c15be9b55ee4bb76af06d5ac1", // ETH / USDST 0.30%
+    "db20c022c4f6a00c322ed3338d91b47d5dc6b460", // USDC / USDST 0.05%
+    "146c58bed7f819a43bc8ee49366353fb30cd2b6a", // USDT / USDST 0.05%
+    "528f8b6134d7bbca7d7c44f2adc306b67c86d156", // GOLDST / USDST 0.30%
+    "32bf396e3c9fd0dc4e1bed2f53f22aa243f4f1de", // ETH / USDST 1.00%
+    "eb148fe1407e0340e7a3ee6931d8e56b22237b50", // BOOE / USDST 1.00%
+    "074239f5d943734a45a0f31fa249da1c3d8ff919", // SILVST / USDST 0.30%
 ];
 
 /**
