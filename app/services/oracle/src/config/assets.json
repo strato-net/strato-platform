@@ -1,271 +1,1028 @@
 {
-  "assets": {
-    "ETH": {
-      "targetAssetAddress": "93fb7295859b2d70199e0a4883b7c320cf874e6c"
-    },
-    "KAG": {
-      "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",
-      "submit": false
-    },
-    "PAXG": {
-      "targetAssetAddress": "491cdfe98470bfe69b662ab368826dca0fc2f24d"
-    },
-    "RETH": {
-      "targetAssetAddress": "2e4789eb7db143576da25990a3c0298917a8a87d",
-      "exchangeRate": {
-        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "rateMethod": "POST",
-        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0xae78736Cd615f374D3085123A210448E74Fc6393\",\"data\":\"0xe6aa216c\"},\"latest\"]}",
-        "rateParse": "result",
-        "ratePrecision": "1000000000000000000",
-        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
-        "comment": "Rocket Pool rETH: getExchangeRate() returns rETH/ETH rate in WAD"
-      }
-    },
-    "SUSDS": {
-      "targetAssetAddress": "6e2d93d323edf1b3cc4672a909681b6a430cae64",
-      "exchangeRate": {
-        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "rateMethod": "POST",
-        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0xa3931d71877C0E7a3148CB7Eb4463524FEc27fbD\",\"data\":\"0x07a2d13a0000000000000000000000000000000000000000000000000de0b6b3a7640000\"},\"latest\"]}",
-        "rateParse": "result",
-        "ratePrecision": "1000000000000000000",
-        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
-        "comment": "Sky sUSDS: convertToAssets(1e18) returns sUSDS/USDS rate in WAD"
-      }
-    },
-    "SYRUPUSDC": {
-      "targetAssetAddress": "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca",
-      "exchangeRate": {
-        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "rateMethod": "POST",
-        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x80ac24aA929eaF5013f6436cdA2a7ba190f5Cc0b\",\"data\":\"0x07a2d13a00000000000000000000000000000000000000000000000000000000000f4240\"},\"latest\"]}",
-        "rateParse": "result",
-        "ratePrecision": "1000000",
-        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
-        "comment": "Maple syrupUSDC: convertToAssets(1e6) returns syrupUSDC/USDC rate in 6-decimal"
-      }
-    },
-    "USDC": {
-      "targetAssetAddress": "6aeacaa19c68e53035bf495d15e0a328fc600ba8"
-    },
-    "USDT": {
-      "targetAssetAddress": "5ed0bdfb378ac0d06249d70759536d7a41906216"
-    },
-    "USDST": {
-      "targetAssetAddress": "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
-      "constantPrice": 1000000000000000000
-    },
-    "WBTC": {
-      "targetAssetAddress": "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9"
-    },
-    "WSTETH":{
-      "targetAssetAddress": "f2aa370405030a434ae07e7826178325c675e925",
-      "exchangeRate": {
-        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "rateMethod": "POST",
-        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0\",\"data\":\"0x035faf82\"},\"latest\"]}",
-        "rateParse": "result",
-        "ratePrecision": "1000000000000000000",
-        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
-        "comment": "Lido wstETH: stEthPerToken() returns wstETH/stETH rate in WAD"
-      }
-    },
-    "XAG": {
-      "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",
-      "comment": "Weekend fallback intentionally disabled. To restore, set weekendProxy to KAG and equivalentAssets to [\"KAG\"] once KAG feeds are reliable again."
-    },
-    "XAU": {
-      "targetAssetAddress": "cdc93d30182125e05eec985b631c7c61b3f63ff0",
-      "weekendProxy": "PAXG",
-      "equivalentAssets": ["XAUT"]
-    },
-    "XAUT": {
-      "targetAssetAddress": "47de839c03a3b014c0cc4f3b9352979a5038f910"
-    },
-    "SPY": {
-      "targetAssetAddress": "19a7ebee83ed53cb5917aad3f2b1c2cd37da771d",
-      "comment": "Robinhood SPY bridge token"
-    },
-    "NVDA": {
-      "targetAssetAddress": "b8fa2db41236b1421eb8aea8a52826ba32096fbf",
-      "comment": "Robinhood NVDA bridge token"
-    },
-    "SPYX": {
-      "targetAssetAddress": "00000000000000000000000000000000deadbeef",
-      "submit": false,
-      "comment": "SPY stock price feed for SPYX rebase. submit=false: only used as underlying, not pushed directly."
-    },
-    "TSLAX": {
-      "targetAssetAddress": "00000000000000000000000000000000deadbeef",
-      "submit": false,
-      "comment": "TSLA stock price feed for TSLAX rebase. submit=false: only used as underlying, not pushed directly."
-    },
-    "WEETH": {
-      "targetAssetAddress": "00000000000000000000000000000000deadbeef",
-      "submit": false,
-      "exchangeRate": {
-        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "rateMethod": "POST",
-        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee\",\"data\":\"0x679aefce\"},\"latest\"]}",
-        "rateParse": "result",
-        "ratePrecision": "1000000000000000000",
-        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
-        "comment": "EtherFi weETH: getRate() returns weETH/eETH rate in WAD"
+  "networks": {
+    "33056204878082667": {
+      "assets": {
+        "ETH": {
+          "targetAssetAddress": "93fb7295859b2d70199e0a4883b7c320cf874e6c"
+        },
+        "KAG": {
+          "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",
+          "submit": false
+        },
+        "PAXG": {
+          "targetAssetAddress": "491cdfe98470bfe69b662ab368826dca0fc2f24d"
+        },
+        "RETH": {
+          "targetAssetAddress": "2e4789eb7db143576da25990a3c0298917a8a87d",
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0xae78736Cd615f374D3085123A210448E74Fc6393\",\"data\":\"0xe6aa216c\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "Rocket Pool rETH: getExchangeRate() returns rETH/ETH rate in WAD"
+          }
+        },
+        "SUSDS": {
+          "targetAssetAddress": "6e2d93d323edf1b3cc4672a909681b6a430cae64",
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0xa3931d71877C0E7a3148CB7Eb4463524FEc27fbD\",\"data\":\"0x07a2d13a0000000000000000000000000000000000000000000000000de0b6b3a7640000\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "Sky sUSDS: convertToAssets(1e18) returns sUSDS/USDS rate in WAD"
+          }
+        },
+        "SYRUPUSDC": {
+          "targetAssetAddress": "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca",
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x80ac24aA929eaF5013f6436cdA2a7ba190f5Cc0b\",\"data\":\"0x07a2d13a00000000000000000000000000000000000000000000000000000000000f4240\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "Maple syrupUSDC: convertToAssets(1e6) returns syrupUSDC/USDC rate in 6-decimal"
+          }
+        },
+        "USDC": {
+          "targetAssetAddress": "6aeacaa19c68e53035bf495d15e0a328fc600ba8"
+        },
+        "USDT": {
+          "targetAssetAddress": "5ed0bdfb378ac0d06249d70759536d7a41906216"
+        },
+        "USDST": {
+          "targetAssetAddress": "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
+          "constantPrice": 1000000000000000000
+        },
+        "WBTC": {
+          "targetAssetAddress": "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9"
+        },
+        "WSTETH": {
+          "targetAssetAddress": "f2aa370405030a434ae07e7826178325c675e925",
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0\",\"data\":\"0x035faf82\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "Lido wstETH: stEthPerToken() returns wstETH/stETH rate in WAD"
+          }
+        },
+        "XAG": {
+          "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",
+          "comment": "Weekend fallback intentionally disabled. To restore, set weekendProxy to KAG and equivalentAssets to [\"KAG\"] once KAG feeds are reliable again."
+        },
+        "XAU": {
+          "targetAssetAddress": "cdc93d30182125e05eec985b631c7c61b3f63ff0",
+          "weekendProxy": "PAXG",
+          "equivalentAssets": [
+            "XAUT"
+          ]
+        },
+        "XAUT": {
+          "targetAssetAddress": "47de839c03a3b014c0cc4f3b9352979a5038f910"
+        },
+        "SPY": {
+          "targetAssetAddress": "19a7ebee83ed53cb5917aad3f2b1c2cd37da771d",
+          "comment": "Robinhood SPY bridge token"
+        },
+        "NVDA": {
+          "targetAssetAddress": "b8fa2db41236b1421eb8aea8a52826ba32096fbf",
+          "comment": "Robinhood NVDA bridge token"
+        },
+        "SPYX": {
+          "targetAssetAddress": "00000000000000000000000000000000deadbeef",
+          "submit": false,
+          "comment": "SPY stock price feed for SPYX rebase. submit=false: only used as underlying, not pushed directly."
+        },
+        "TSLAX": {
+          "targetAssetAddress": "00000000000000000000000000000000deadbeef",
+          "submit": false,
+          "comment": "TSLA stock price feed for TSLAX rebase. submit=false: only used as underlying, not pushed directly."
+        },
+        "WEETH": {
+          "targetAssetAddress": "00000000000000000000000000000000deadbeef",
+          "submit": false,
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee\",\"data\":\"0x679aefce\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "EtherFi weETH: getRate() returns weETH/eETH rate in WAD"
+          },
+          "comment": "weETH price feed for AWEETH rebase. submit=false: only used as underlying, not pushed directly."
+        },
+        "AWETH": {
+          "targetAssetAddress": "6d40952f0895d21d2bf20cd088f0eb9a1574583f",
+          "rebase": {
+            "underlyingAsset": "ETH",
+            "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "factorMethod": "POST",
+            "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2\"},\"latest\"]}",
+            "factorParse": "result",
+            "factorPrecision": "1000000000000000000000000000",
+            "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+          },
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "AAVE V3 aWETH: getReserveNormalizedIncome(WETH) in RAY"
+          }
+        },
+        "AWBTC": {
+          "targetAssetAddress": "5f46258f73c405a58331c1a19e54add394637b06",
+          "rebase": {
+            "underlyingAsset": "WBTC",
+            "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "factorMethod": "POST",
+            "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000002260FAC5E5542a773Aa44fBCfeDf7C193bc2C599\"},\"latest\"]}",
+            "factorParse": "result",
+            "factorPrecision": "1000000000000000000000000000",
+            "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+          },
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000002260FAC5E5542a773Aa44fBCfeDf7C193bc2C599\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "AAVE V3 aWBTC: getReserveNormalizedIncome(WBTC) in RAY"
+          }
+        },
+        "AWEETH": {
+          "targetAssetAddress": "6f247ad55cb444e3e8db0fe225aea2cf1ed62fe1",
+          "rebase": {
+            "underlyingAsset": "WEETH",
+            "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "factorMethod": "POST",
+            "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000Cd5fE23C85820F7B72D0926FC9b05b43E359b7ee\"},\"latest\"]}",
+            "factorParse": "result",
+            "factorPrecision": "1000000000000000000000000000",
+            "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+          },
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000Cd5fE23C85820F7B72D0926FC9b05b43E359b7ee\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "AAVE V3 aweETH: getReserveNormalizedIncome(weETH) in RAY"
+          }
+        },
+        "AWSTETH": {
+          "targetAssetAddress": "2c33aa5f8bbfe3c15e356a5e87464310db12376e",
+          "rebase": {
+            "underlyingAsset": "WSTETH",
+            "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "factorMethod": "POST",
+            "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000007f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0\"},\"latest\"]}",
+            "factorParse": "result",
+            "factorPrecision": "1000000000000000000000000000",
+            "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+          },
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000007f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "AAVE V3 awstETH: getReserveNormalizedIncome(wstETH) in RAY"
+          }
+        },
+        "AUSDC": {
+          "targetAssetAddress": "465c7e3061bc239df88c37d315be52f5487959ec",
+          "rebase": {
+            "underlyingAsset": "USDC",
+            "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "factorMethod": "POST",
+            "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\"},\"latest\"]}",
+            "factorParse": "result",
+            "factorPrecision": "1000000000000000000000000000",
+            "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+          },
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "AAVE V3 aUSDC: getReserveNormalizedIncome(USDC) in RAY"
+          }
+        },
+        "AUSDT": {
+          "targetAssetAddress": "7d2a2b963e1fa273b60f9b7891392903de5e66b8",
+          "rebase": {
+            "underlyingAsset": "USDT",
+            "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "factorMethod": "POST",
+            "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000dAC17F958D2ee523a2206206994597C13D831ec7\"},\"latest\"]}",
+            "factorParse": "result",
+            "factorPrecision": "1000000000000000000000000000",
+            "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+          },
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000dAC17F958D2ee523a2206206994597C13D831ec7\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "AAVE V3 aUSDT: getReserveNormalizedIncome(USDT) in RAY"
+          }
+        },
+        "WSPYX": {
+          "targetAssetAddress": "1ac696799624c75050b10b7ee3e6fcf6f1f39aa1",
+          "rebase": {
+            "underlyingAsset": "SPYX",
+            "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "factorMethod": "POST",
+            "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x90a2a4c76b5d8c0bc892a69ea28aa775a8f2dd48\",\"data\":\"0x2b63c300\"},\"latest\"]}",
+            "factorParse": "result",
+            "factorPrecision": "1000000000000000000",
+            "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+          },
+          "comment": "xStock: price = SPY price * getCurrentMultiplier() on Ethereum / 1e18"
+        },
+        "WTSLAX": {
+          "targetAssetAddress": "f147e193fd1a629aa75aedd4758444ec0c969ca8",
+          "rebase": {
+            "underlyingAsset": "TSLAX",
+            "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "factorMethod": "POST",
+            "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x8ad3c73f833d3f9a523ab01476625f269aeb7cf0\",\"data\":\"0x2b63c300\"},\"latest\"]}",
+            "factorParse": "result",
+            "factorPrecision": "1000000000000000000",
+            "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+          },
+          "comment": "xStock: price = TSLA price * getCurrentMultiplier() on Ethereum / 1e18"
+        }
       },
-      "comment": "weETH price feed for AWEETH rebase. submit=false: only used as underlying, not pushed directly."
-    },
-    "AWETH": {
-      "targetAssetAddress": "6d40952f0895d21d2bf20cd088f0eb9a1574583f",
-      "rebase": {
-        "underlyingAsset": "ETH",
-        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "factorMethod": "POST",
-        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2\"},\"latest\"]}",
-        "factorParse": "result",
-        "factorPrecision": "1000000000000000000000000000",
-        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
-      },
-      "exchangeRate": {
-        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "rateMethod": "POST",
-        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2\"},\"latest\"]}",
-        "rateParse": "result",
-        "ratePrecision": "1000000000000000000000000000",
-        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
-        "comment": "AAVE V3 aWETH: getReserveNormalizedIncome(WETH) in RAY"
+      "sources": {
+        "Alchemy": {
+          "url": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/by-symbol",
+          "params": "symbols[]",
+          "parse": "data[].prices[0].value",
+          "timestamp": "data[0].prices[0].lastUpdatedAt",
+          "apiKeyEnvVar": "ALCHEMY_API_KEY",
+          "assets": [
+            "ETH",
+            "WBTC",
+            "PAXG",
+            "XAUT",
+            "SUSDS",
+            "WSTETH",
+            "SYRUPUSDC",
+            "RETH",
+            "USDC",
+            "USDT",
+            "TSLAX",
+            "WEETH"
+          ]
+        },
+        "CoinMarketCap": {
+          "url": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
+          "params": "symbol,convert=USD",
+          "headers": "X-CMC_PRO_API_KEY",
+          "parse": "data.{symbol}[0].quote.USD.price",
+          "timestamp": "data.{firstSymbol}[0].quote.USD.last_updated",
+          "apiKeyEnvVar": "COINMARKETCAP_API_KEY",
+          "assets": [
+            "ETH",
+            "WBTC",
+            "PAXG",
+            "XAUT",
+            "WSTETH",
+            "SYRUPUSDC",
+            "RETH",
+            "USDC",
+            "USDT",
+            "WEETH"
+          ]
+        },
+        "Metals.dev": {
+          "url": "https://api.metals.dev/v1/latest",
+          "params": "api_key,currency=USD,unit=toz,metals",
+          "parse": "metals.{metal}",
+          "timestamp": "timestamps.metal",
+          "apiKeyEnvVar": "METALS_DEV_API_KEY",
+          "assets": [
+            "XAU",
+            "XAG"
+          ],
+          "symbolMapping": {
+            "XAU": "gold",
+            "XAG": "silver"
+          }
+        },
+        "MetalsAPI": {
+          "url": "https://metals-api.com/api/latest",
+          "params": "access_key,base=USD,symbols",
+          "parse": "rates.USD{symbol}",
+          "timestamp": "timestamp",
+          "apiKeyEnvVar": "METALS_API_API_KEY",
+          "assets": [
+            "XAU",
+            "XAG"
+          ]
+        },
+        "CoinGecko": {
+          "url": "https://pro-api.coingecko.com/api/v3/simple/price",
+          "params": "x_cg_pro_api_key,ids,vs_currencies=usd,include_last_updated_at=true",
+          "parse": "{id}.usd",
+          "timestamp": "{id}.last_updated_at",
+          "apiKeyEnvVar": "COINGECKO_API_KEY",
+          "assets": [
+            "ETH",
+            "WBTC",
+            "PAXG",
+            "XAUT",
+            "SUSDS",
+            "WSTETH",
+            "SYRUPUSDC",
+            "RETH",
+            "USDC",
+            "USDT",
+            "TSLAX",
+            "SPY",
+            "SPYX",
+            "NVDA",
+            "WEETH"
+          ],
+          "symbolMapping": {
+            "ETH": "ethereum",
+            "WBTC": "wrapped-bitcoin",
+            "PAXG": "pax-gold",
+            "XAUT": "tether-gold",
+            "SUSDS": "susds",
+            "WSTETH": "wrapped-steth",
+            "SYRUPUSDC": "syrupusdc",
+            "RETH": "rocket-pool-eth",
+            "USDC": "usd-coin",
+            "USDT": "tether",
+            "TSLAX": "tesla-xstock",
+            "SPY": "spdr-s-p-500-etf-trust-robinhood-tokenized-stock",
+            "SPYX": "sp500-xstock",
+            "NVDA": "nvidia-robinhood-tokenized-stock",
+            "WEETH": "wrapped-eeth"
+          }
+        },
+        "CoinAPI": {
+          "url": "https://rest.coinapi.io/v1/assets",
+          "params": "filter_asset_id",
+          "headers": "X-CoinAPI-Key",
+          "parse": "assets",
+          "timestamp": "data_quote_start",
+          "apiKeyEnvVar": "COINAPI_API_KEY",
+          "assets": [
+            "ETH",
+            "WBTC",
+            "PAXG",
+            "XAUT",
+            "USDC",
+            "USDT",
+            "TSLAX",
+            "SPY",
+            "SPYX",
+            "NVDA",
+            "WEETH"
+          ]
+        },
+        "DefiLlama": {
+          "url": "https://pro-api.llama.fi/${API_KEY}/coins/prices/current/${SYMBOLS}",
+          "parse": "defiLlama",
+          "apiKeyEnvVar": "DEFILLAMA_API_KEY",
+          "assets": [
+            "ETH",
+            "WBTC",
+            "PAXG",
+            "XAUT",
+            "SUSDS",
+            "WSTETH",
+            "SYRUPUSDC",
+            "RETH",
+            "USDC",
+            "USDT",
+            "TSLAX",
+            "SPY",
+            "SPYX",
+            "NVDA",
+            "WEETH"
+          ],
+          "symbolMapping": {
+            "ETH": "coingecko:ethereum",
+            "WBTC": "coingecko:wrapped-bitcoin",
+            "PAXG": "coingecko:pax-gold",
+            "XAUT": "coingecko:tether-gold",
+            "SUSDS": "coingecko:susds",
+            "WSTETH": "coingecko:wrapped-steth",
+            "SYRUPUSDC": "coingecko:syrupusdc",
+            "RETH": "coingecko:rocket-pool-eth",
+            "USDC": "coingecko:usd-coin",
+            "USDT": "coingecko:tether",
+            "TSLAX": "coingecko:tesla-xstock",
+            "SPY": "coingecko:spdr-s-p-500-etf-trust-robinhood-tokenized-stock",
+            "SPYX": "coingecko:sp500-xstock",
+            "NVDA": "coingecko:nvidia-robinhood-tokenized-stock",
+            "WEETH": "coingecko:wrapped-eeth"
+          }
+        },
+        "DexScreener": {
+          "url": "https://api.dexscreener.com/latest/dex/tokens/${SYMBOLS}",
+          "parse": "dexscreener",
+          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
+          "assets": [
+            "SUSDS"
+          ],
+          "symbolMapping": {
+            "SUSDS": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd"
+          }
+        },
+        "CommodityPriceAPI": {
+          "url": "https://api.commoditypriceapi.com/v2/rates/latest",
+          "params": "symbols",
+          "headers": "x-api-key",
+          "parse": "rates.{symbol}",
+          "timestamp": "timestamp",
+          "apiKeyEnvVar": "COMMODITY_PRICE_API_KEY",
+          "assets": [
+            "XAU",
+            "XAG"
+          ]
+        },
+        "TwelveData": {
+          "url": "https://api.twelvedata.com/price",
+          "params": "apikey,symbol",
+          "parse": "{symbol}.price",
+          "apiKeyEnvVar": "TWELVEDATA_API_KEY",
+          "comment": "Uses stock price feeds as a proxy for xStock / Robinhood stock assets (SPY, SPYX, NVDA, TSLAX).",
+          "assets": [
+            "XAU",
+            "XAG",
+            "SPY",
+            "SPYX",
+            "NVDA",
+            "TSLAX"
+          ],
+          "symbolMapping": {
+            "XAU": "XAU/USD",
+            "XAG": "XAG/USD",
+            "SPY": "SPY",
+            "SPYX": "SPY",
+            "NVDA": "NVDA",
+            "TSLAX": "TSLA"
+          }
+        },
+        "OANDA": {
+          "url": "https://api-fxpractice.oanda.com/v3/accounts/${ACCOUNT_ID}/pricing",
+          "params": "instruments",
+          "headers": "Authorization",
+          "parse": "oanda.prices",
+          "apiKeyEnvVar": "OANDA_API_KEY",
+          "accountIdEnvVar": "OANDA_ACCOUNT_ID",
+          "comment": "Practice API. Use api-fxtrade.oanda.com for live",
+          "assets": [
+            "XAU",
+            "XAG"
+          ],
+          "symbolMapping": {
+            "XAU": "XAU_USD",
+            "XAG": "XAG_USD"
+          }
+        },
+        "constant": {
+          "parse": "constant",
+          "assets": [
+            "USDST"
+          ]
+        }
       }
     },
-    "AWBTC": {
-      "targetAssetAddress": "5f46258f73c405a58331c1a19e54add394637b06",
-      "rebase": {
-        "underlyingAsset": "WBTC",
-        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "factorMethod": "POST",
-        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000002260FAC5E5542a773Aa44fBCfeDf7C193bc2C599\"},\"latest\"]}",
-        "factorParse": "result",
-        "factorPrecision": "1000000000000000000000000000",
-        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+    "114784819836269": {
+      "assets": {
+        "ETH": {
+          "targetAssetAddress": "93fb7295859b2d70199e0a4883b7c320cf874e6c"
+        },
+        "KAG": {
+          "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",
+          "submit": false
+        },
+        "PAXG": {
+          "targetAssetAddress": "491cdfe98470bfe69b662ab368826dca0fc2f24d"
+        },
+        "RETH": {
+          "targetAssetAddress": "2e4789eb7db143576da25990a3c0298917a8a87d",
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0xae78736Cd615f374D3085123A210448E74Fc6393\",\"data\":\"0xe6aa216c\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "Rocket Pool rETH: getExchangeRate() returns rETH/ETH rate in WAD"
+          }
+        },
+        "SUSDS": {
+          "targetAssetAddress": "6e2d93d323edf1b3cc4672a909681b6a430cae64",
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0xa3931d71877C0E7a3148CB7Eb4463524FEc27fbD\",\"data\":\"0x07a2d13a0000000000000000000000000000000000000000000000000de0b6b3a7640000\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "Sky sUSDS: convertToAssets(1e18) returns sUSDS/USDS rate in WAD"
+          }
+        },
+        "SYRUPUSDC": {
+          "targetAssetAddress": "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca",
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x80ac24aA929eaF5013f6436cdA2a7ba190f5Cc0b\",\"data\":\"0x07a2d13a00000000000000000000000000000000000000000000000000000000000f4240\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "Maple syrupUSDC: convertToAssets(1e6) returns syrupUSDC/USDC rate in 6-decimal"
+          }
+        },
+        "USDC": {
+          "targetAssetAddress": "6aeacaa19c68e53035bf495d15e0a328fc600ba8"
+        },
+        "USDT": {
+          "targetAssetAddress": "5ed0bdfb378ac0d06249d70759536d7a41906216"
+        },
+        "USDST": {
+          "targetAssetAddress": "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
+          "constantPrice": 1000000000000000000
+        },
+        "WBTC": {
+          "targetAssetAddress": "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9"
+        },
+        "WSTETH": {
+          "targetAssetAddress": "f2aa370405030a434ae07e7826178325c675e925",
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0\",\"data\":\"0x035faf82\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "Lido wstETH: stEthPerToken() returns wstETH/stETH rate in WAD"
+          }
+        },
+        "XAG": {
+          "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",
+          "comment": "Weekend fallback intentionally disabled. To restore, set weekendProxy to KAG and equivalentAssets to [\"KAG\"] once KAG feeds are reliable again."
+        },
+        "XAU": {
+          "targetAssetAddress": "cdc93d30182125e05eec985b631c7c61b3f63ff0",
+          "weekendProxy": "PAXG",
+          "equivalentAssets": [
+            "XAUT"
+          ]
+        },
+        "XAUT": {
+          "targetAssetAddress": "47de839c03a3b014c0cc4f3b9352979a5038f910"
+        },
+        "SPY": {
+          "targetAssetAddress": "3132c60e0fc30e58c03181a3d9c56904a37099f1",
+          "comment": "Robinhood SPY bridge token on Helium"
+        },
+        "NVDA": {
+          "targetAssetAddress": "d7fe8f62a5efbd8dd0f59ac94b13e022818178fc",
+          "comment": "Robinhood NVDA bridge token on Helium"
+        },
+        "SPYX": {
+          "targetAssetAddress": "00000000000000000000000000000000deadbeef",
+          "submit": false,
+          "comment": "SPY stock price feed for SPYX rebase. submit=false: only used as underlying, not pushed directly."
+        },
+        "TSLAX": {
+          "targetAssetAddress": "00000000000000000000000000000000deadbeef",
+          "submit": false,
+          "comment": "TSLA stock price feed for TSLAX rebase. submit=false: only used as underlying, not pushed directly."
+        },
+        "WEETH": {
+          "targetAssetAddress": "00000000000000000000000000000000deadbeef",
+          "submit": false,
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee\",\"data\":\"0x679aefce\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "EtherFi weETH: getRate() returns weETH/eETH rate in WAD"
+          },
+          "comment": "weETH price feed for AWEETH rebase. submit=false: only used as underlying, not pushed directly."
+        },
+        "AWETH": {
+          "targetAssetAddress": "6d40952f0895d21d2bf20cd088f0eb9a1574583f",
+          "rebase": {
+            "underlyingAsset": "ETH",
+            "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "factorMethod": "POST",
+            "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2\"},\"latest\"]}",
+            "factorParse": "result",
+            "factorPrecision": "1000000000000000000000000000",
+            "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+          },
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "AAVE V3 aWETH: getReserveNormalizedIncome(WETH) in RAY"
+          }
+        },
+        "AWBTC": {
+          "targetAssetAddress": "5f46258f73c405a58331c1a19e54add394637b06",
+          "rebase": {
+            "underlyingAsset": "WBTC",
+            "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "factorMethod": "POST",
+            "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000002260FAC5E5542a773Aa44fBCfeDf7C193bc2C599\"},\"latest\"]}",
+            "factorParse": "result",
+            "factorPrecision": "1000000000000000000000000000",
+            "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+          },
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000002260FAC5E5542a773Aa44fBCfeDf7C193bc2C599\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "AAVE V3 aWBTC: getReserveNormalizedIncome(WBTC) in RAY"
+          }
+        },
+        "AWEETH": {
+          "targetAssetAddress": "6f247ad55cb444e3e8db0fe225aea2cf1ed62fe1",
+          "rebase": {
+            "underlyingAsset": "WEETH",
+            "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "factorMethod": "POST",
+            "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000Cd5fE23C85820F7B72D0926FC9b05b43E359b7ee\"},\"latest\"]}",
+            "factorParse": "result",
+            "factorPrecision": "1000000000000000000000000000",
+            "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+          },
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000Cd5fE23C85820F7B72D0926FC9b05b43E359b7ee\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "AAVE V3 aweETH: getReserveNormalizedIncome(weETH) in RAY"
+          }
+        },
+        "AWSTETH": {
+          "targetAssetAddress": "2c33aa5f8bbfe3c15e356a5e87464310db12376e",
+          "rebase": {
+            "underlyingAsset": "WSTETH",
+            "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "factorMethod": "POST",
+            "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000007f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0\"},\"latest\"]}",
+            "factorParse": "result",
+            "factorPrecision": "1000000000000000000000000000",
+            "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+          },
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000007f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "AAVE V3 awstETH: getReserveNormalizedIncome(wstETH) in RAY"
+          }
+        },
+        "AUSDC": {
+          "targetAssetAddress": "465c7e3061bc239df88c37d315be52f5487959ec",
+          "rebase": {
+            "underlyingAsset": "USDC",
+            "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "factorMethod": "POST",
+            "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\"},\"latest\"]}",
+            "factorParse": "result",
+            "factorPrecision": "1000000000000000000000000000",
+            "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+          },
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "AAVE V3 aUSDC: getReserveNormalizedIncome(USDC) in RAY"
+          }
+        },
+        "AUSDT": {
+          "targetAssetAddress": "7d2a2b963e1fa273b60f9b7891392903de5e66b8",
+          "rebase": {
+            "underlyingAsset": "USDT",
+            "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "factorMethod": "POST",
+            "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000dAC17F958D2ee523a2206206994597C13D831ec7\"},\"latest\"]}",
+            "factorParse": "result",
+            "factorPrecision": "1000000000000000000000000000",
+            "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+          },
+          "exchangeRate": {
+            "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000dAC17F958D2ee523a2206206994597C13D831ec7\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000000000000",
+            "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+            "comment": "AAVE V3 aUSDT: getReserveNormalizedIncome(USDT) in RAY"
+          }
+        },
+        "WSPYX": {
+          "targetAssetAddress": "1ac696799624c75050b10b7ee3e6fcf6f1f39aa1",
+          "rebase": {
+            "underlyingAsset": "SPYX",
+            "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "factorMethod": "POST",
+            "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x90a2a4c76b5d8c0bc892a69ea28aa775a8f2dd48\",\"data\":\"0x2b63c300\"},\"latest\"]}",
+            "factorParse": "result",
+            "factorPrecision": "1000000000000000000",
+            "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+          },
+          "comment": "xStock: price = SPY price * getCurrentMultiplier() on Ethereum / 1e18"
+        },
+        "WTSLAX": {
+          "targetAssetAddress": "f147e193fd1a629aa75aedd4758444ec0c969ca8",
+          "rebase": {
+            "underlyingAsset": "TSLAX",
+            "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+            "factorMethod": "POST",
+            "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x8ad3c73f833d3f9a523ab01476625f269aeb7cf0\",\"data\":\"0x2b63c300\"},\"latest\"]}",
+            "factorParse": "result",
+            "factorPrecision": "1000000000000000000",
+            "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+          },
+          "comment": "xStock: price = TSLA price * getCurrentMultiplier() on Ethereum / 1e18"
+        }
       },
-      "exchangeRate": {
-        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "rateMethod": "POST",
-        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000002260FAC5E5542a773Aa44fBCfeDf7C193bc2C599\"},\"latest\"]}",
-        "rateParse": "result",
-        "ratePrecision": "1000000000000000000000000000",
-        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
-        "comment": "AAVE V3 aWBTC: getReserveNormalizedIncome(WBTC) in RAY"
+      "sources": {
+        "Alchemy": {
+          "url": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/by-symbol",
+          "params": "symbols[]",
+          "parse": "data[].prices[0].value",
+          "timestamp": "data[0].prices[0].lastUpdatedAt",
+          "apiKeyEnvVar": "ALCHEMY_API_KEY",
+          "assets": [
+            "ETH",
+            "WBTC",
+            "PAXG",
+            "XAUT",
+            "SUSDS",
+            "WSTETH",
+            "SYRUPUSDC",
+            "RETH",
+            "USDC",
+            "USDT",
+            "TSLAX",
+            "WEETH"
+          ]
+        },
+        "CoinMarketCap": {
+          "url": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
+          "params": "symbol,convert=USD",
+          "headers": "X-CMC_PRO_API_KEY",
+          "parse": "data.{symbol}[0].quote.USD.price",
+          "timestamp": "data.{firstSymbol}[0].quote.USD.last_updated",
+          "apiKeyEnvVar": "COINMARKETCAP_API_KEY",
+          "assets": [
+            "ETH",
+            "WBTC",
+            "PAXG",
+            "XAUT",
+            "WSTETH",
+            "SYRUPUSDC",
+            "RETH",
+            "USDC",
+            "USDT",
+            "WEETH"
+          ]
+        },
+        "Metals.dev": {
+          "url": "https://api.metals.dev/v1/latest",
+          "params": "api_key,currency=USD,unit=toz,metals",
+          "parse": "metals.{metal}",
+          "timestamp": "timestamps.metal",
+          "apiKeyEnvVar": "METALS_DEV_API_KEY",
+          "assets": [
+            "XAU",
+            "XAG"
+          ],
+          "symbolMapping": {
+            "XAU": "gold",
+            "XAG": "silver"
+          }
+        },
+        "MetalsAPI": {
+          "url": "https://metals-api.com/api/latest",
+          "params": "access_key,base=USD,symbols",
+          "parse": "rates.USD{symbol}",
+          "timestamp": "timestamp",
+          "apiKeyEnvVar": "METALS_API_API_KEY",
+          "assets": [
+            "XAU",
+            "XAG"
+          ]
+        },
+        "CoinGecko": {
+          "url": "https://pro-api.coingecko.com/api/v3/simple/price",
+          "params": "x_cg_pro_api_key,ids,vs_currencies=usd,include_last_updated_at=true",
+          "parse": "{id}.usd",
+          "timestamp": "{id}.last_updated_at",
+          "apiKeyEnvVar": "COINGECKO_API_KEY",
+          "assets": [
+            "ETH",
+            "WBTC",
+            "PAXG",
+            "XAUT",
+            "SUSDS",
+            "WSTETH",
+            "SYRUPUSDC",
+            "RETH",
+            "USDC",
+            "USDT",
+            "TSLAX",
+            "SPY",
+            "SPYX",
+            "NVDA",
+            "WEETH"
+          ],
+          "symbolMapping": {
+            "ETH": "ethereum",
+            "WBTC": "wrapped-bitcoin",
+            "PAXG": "pax-gold",
+            "XAUT": "tether-gold",
+            "SUSDS": "susds",
+            "WSTETH": "wrapped-steth",
+            "SYRUPUSDC": "syrupusdc",
+            "RETH": "rocket-pool-eth",
+            "USDC": "usd-coin",
+            "USDT": "tether",
+            "TSLAX": "tesla-xstock",
+            "SPY": "spdr-s-p-500-etf-trust-robinhood-tokenized-stock",
+            "SPYX": "sp500-xstock",
+            "NVDA": "nvidia-robinhood-tokenized-stock",
+            "WEETH": "wrapped-eeth"
+          }
+        },
+        "CoinAPI": {
+          "url": "https://rest.coinapi.io/v1/assets",
+          "params": "filter_asset_id",
+          "headers": "X-CoinAPI-Key",
+          "parse": "assets",
+          "timestamp": "data_quote_start",
+          "apiKeyEnvVar": "COINAPI_API_KEY",
+          "assets": [
+            "ETH",
+            "WBTC",
+            "PAXG",
+            "XAUT",
+            "USDC",
+            "USDT",
+            "TSLAX",
+            "SPY",
+            "SPYX",
+            "NVDA",
+            "WEETH"
+          ]
+        },
+        "DefiLlama": {
+          "url": "https://pro-api.llama.fi/${API_KEY}/coins/prices/current/${SYMBOLS}",
+          "parse": "defiLlama",
+          "apiKeyEnvVar": "DEFILLAMA_API_KEY",
+          "assets": [
+            "ETH",
+            "WBTC",
+            "PAXG",
+            "XAUT",
+            "SUSDS",
+            "WSTETH",
+            "SYRUPUSDC",
+            "RETH",
+            "USDC",
+            "USDT",
+            "TSLAX",
+            "SPY",
+            "SPYX",
+            "NVDA",
+            "WEETH"
+          ],
+          "symbolMapping": {
+            "ETH": "coingecko:ethereum",
+            "WBTC": "coingecko:wrapped-bitcoin",
+            "PAXG": "coingecko:pax-gold",
+            "XAUT": "coingecko:tether-gold",
+            "SUSDS": "coingecko:susds",
+            "WSTETH": "coingecko:wrapped-steth",
+            "SYRUPUSDC": "coingecko:syrupusdc",
+            "RETH": "coingecko:rocket-pool-eth",
+            "USDC": "coingecko:usd-coin",
+            "USDT": "coingecko:tether",
+            "TSLAX": "coingecko:tesla-xstock",
+            "SPY": "coingecko:spdr-s-p-500-etf-trust-robinhood-tokenized-stock",
+            "SPYX": "coingecko:sp500-xstock",
+            "NVDA": "coingecko:nvidia-robinhood-tokenized-stock",
+            "WEETH": "coingecko:wrapped-eeth"
+          }
+        },
+        "DexScreener": {
+          "url": "https://api.dexscreener.com/latest/dex/tokens/${SYMBOLS}",
+          "parse": "dexscreener",
+          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
+          "assets": [
+            "SUSDS"
+          ],
+          "symbolMapping": {
+            "SUSDS": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd"
+          }
+        },
+        "CommodityPriceAPI": {
+          "url": "https://api.commoditypriceapi.com/v2/rates/latest",
+          "params": "symbols",
+          "headers": "x-api-key",
+          "parse": "rates.{symbol}",
+          "timestamp": "timestamp",
+          "apiKeyEnvVar": "COMMODITY_PRICE_API_KEY",
+          "assets": [
+            "XAU",
+            "XAG"
+          ]
+        },
+        "TwelveData": {
+          "url": "https://api.twelvedata.com/price",
+          "params": "apikey,symbol",
+          "parse": "{symbol}.price",
+          "apiKeyEnvVar": "TWELVEDATA_API_KEY",
+          "comment": "Uses stock price feeds as a proxy for xStock / Robinhood stock assets (SPY, SPYX, NVDA, TSLAX).",
+          "assets": [
+            "XAU",
+            "XAG",
+            "SPY",
+            "SPYX",
+            "NVDA",
+            "TSLAX"
+          ],
+          "symbolMapping": {
+            "XAU": "XAU/USD",
+            "XAG": "XAG/USD",
+            "SPY": "SPY",
+            "SPYX": "SPY",
+            "NVDA": "NVDA",
+            "TSLAX": "TSLA"
+          }
+        },
+        "OANDA": {
+          "url": "https://api-fxpractice.oanda.com/v3/accounts/${ACCOUNT_ID}/pricing",
+          "params": "instruments",
+          "headers": "Authorization",
+          "parse": "oanda.prices",
+          "apiKeyEnvVar": "OANDA_API_KEY",
+          "accountIdEnvVar": "OANDA_ACCOUNT_ID",
+          "comment": "Practice API. Use api-fxtrade.oanda.com for live",
+          "assets": [
+            "XAU",
+            "XAG"
+          ],
+          "symbolMapping": {
+            "XAU": "XAU_USD",
+            "XAG": "XAG_USD"
+          }
+        },
+        "constant": {
+          "parse": "constant",
+          "assets": [
+            "USDST"
+          ]
+        }
       }
-    },
-    "AWEETH": {
-      "targetAssetAddress": "6f247ad55cb444e3e8db0fe225aea2cf1ed62fe1",
-      "rebase": {
-        "underlyingAsset": "WEETH",
-        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "factorMethod": "POST",
-        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000Cd5fE23C85820F7B72D0926FC9b05b43E359b7ee\"},\"latest\"]}",
-        "factorParse": "result",
-        "factorPrecision": "1000000000000000000000000000",
-        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
-      },
-      "exchangeRate": {
-        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "rateMethod": "POST",
-        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000Cd5fE23C85820F7B72D0926FC9b05b43E359b7ee\"},\"latest\"]}",
-        "rateParse": "result",
-        "ratePrecision": "1000000000000000000000000000",
-        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
-        "comment": "AAVE V3 aweETH: getReserveNormalizedIncome(weETH) in RAY"
-      }
-    },
-    "AWSTETH": {
-      "targetAssetAddress": "2c33aa5f8bbfe3c15e356a5e87464310db12376e",
-      "rebase": {
-        "underlyingAsset": "WSTETH",
-        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "factorMethod": "POST",
-        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000007f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0\"},\"latest\"]}",
-        "factorParse": "result",
-        "factorPrecision": "1000000000000000000000000000",
-        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
-      },
-      "exchangeRate": {
-        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "rateMethod": "POST",
-        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000007f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0\"},\"latest\"]}",
-        "rateParse": "result",
-        "ratePrecision": "1000000000000000000000000000",
-        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
-        "comment": "AAVE V3 awstETH: getReserveNormalizedIncome(wstETH) in RAY"
-      }
-    },
-    "AUSDC": {
-      "targetAssetAddress": "465c7e3061bc239df88c37d315be52f5487959ec",
-      "rebase": {
-        "underlyingAsset": "USDC",
-        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "factorMethod": "POST",
-        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\"},\"latest\"]}",
-        "factorParse": "result",
-        "factorPrecision": "1000000000000000000000000000",
-        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
-      },
-      "exchangeRate": {
-        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "rateMethod": "POST",
-        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\"},\"latest\"]}",
-        "rateParse": "result",
-        "ratePrecision": "1000000000000000000000000000",
-        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
-        "comment": "AAVE V3 aUSDC: getReserveNormalizedIncome(USDC) in RAY"
-      }
-    },
-    "AUSDT": {
-      "targetAssetAddress": "7d2a2b963e1fa273b60f9b7891392903de5e66b8",
-      "rebase": {
-        "underlyingAsset": "USDT",
-        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "factorMethod": "POST",
-        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000dAC17F958D2ee523a2206206994597C13D831ec7\"},\"latest\"]}",
-        "factorParse": "result",
-        "factorPrecision": "1000000000000000000000000000",
-        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
-      },
-      "exchangeRate": {
-        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "rateMethod": "POST",
-        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000dAC17F958D2ee523a2206206994597C13D831ec7\"},\"latest\"]}",
-        "rateParse": "result",
-        "ratePrecision": "1000000000000000000000000000",
-        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
-        "comment": "AAVE V3 aUSDT: getReserveNormalizedIncome(USDT) in RAY"
-      }
-    },
-    "WSPYX": {
-      "targetAssetAddress": "1ac696799624c75050b10b7ee3e6fcf6f1f39aa1",
-      "rebase": {
-        "underlyingAsset": "SPYX",
-        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "factorMethod": "POST",
-        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x90a2a4c76b5d8c0bc892a69ea28aa775a8f2dd48\",\"data\":\"0x2b63c300\"},\"latest\"]}",
-        "factorParse": "result",
-        "factorPrecision": "1000000000000000000",
-        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
-      },
-      "comment": "xStock: price = SPY price * getCurrentMultiplier() on Ethereum / 1e18"
-    },
-    "WTSLAX": {
-      "targetAssetAddress": "f147e193fd1a629aa75aedd4758444ec0c969ca8",
-      "rebase": {
-        "underlyingAsset": "TSLAX",
-        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
-        "factorMethod": "POST",
-        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x8ad3c73f833d3f9a523ab01476625f269aeb7cf0\",\"data\":\"0x2b63c300\"},\"latest\"]}",
-        "factorParse": "result",
-        "factorPrecision": "1000000000000000000",
-        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
-      },
-      "comment": "xStock: price = TSLA price * getCurrentMultiplier() on Ethereum / 1e18"
     }
   }
 }

@@ -2,6 +2,19 @@ import { SourceConfig, Asset } from '../types';
 
 type SourcesConfig = Record<string, SourceConfig>;
 
+interface NetworkOracleConfig {
+    assets: Record<string, Asset>;
+    sources: SourcesConfig;
+}
+
+interface NetworksConfig {
+    networks: Record<string, NetworkOracleConfig>;
+}
+
+export function getOracleNetworkId(): string {
+    return process.env.ORACLE_NETWORK_ID || '';
+}
+
 export class ConfigLoader {
     private assets: Record<string, Asset> = {};
     private sources: SourcesConfig = {};
@@ -11,15 +24,18 @@ export class ConfigLoader {
     }
 
     private loadConfigurations(): void {
-        // Load assets registry
-        const assetsConfig = require('../config/assets.json') as { assets: Record<string, Asset> };
-        this.assets = assetsConfig.assets;
+        const { networks } = require('../config/assets.json') as NetworksConfig;
+        const networkId = getOracleNetworkId();
+        const network = networks[networkId];
+        if (!network?.assets || !network?.sources) {
+            throw new Error(
+                `No oracle assets/sources for network "${networkId || '(default)'}". Add a networks["${networkId}"] block in assets.json.`
+            );
+        }
 
-        // Load sources configuration and resolve API keys
-        const rawSources = require('../config/sources.json') as SourcesConfig;
+        this.assets = network.assets;
         this.sources = {};
-        
-        Object.entries(rawSources).forEach(([name, config]) => {
+        Object.entries(network.sources).forEach(([name, config]) => {
             this.sources[name] = {
                 ...config,
                 apiKey: config.apiKeyEnvVar ? process.env[config.apiKeyEnvVar] || '' : '',
