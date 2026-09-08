@@ -407,17 +407,6 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
                     Min: {isSaving ? MIN_USDST_WITHDRAWAL : "0"}
                   </p>
                 </div>
-                {withdrawalCapacity !== null && (
-                  <p className="text-xs text-muted-foreground text-right">
-                    Bridge capacity available: {formatBalance(
-                      withdrawalCapacity.toString(),
-                      undefined,
-                      DECIMAL,
-                      2,
-                      6
-                    )} {selectedToken?.stratoTokenSymbol || ""}
-                  </p>
-                )}
                 {selectedToken?.rebaseFactor && BigInt(maxAmount) > 0n && (() => {
                   try {
                     const equiv = (BigInt(maxAmount) * BigInt(selectedToken.rebaseFactor!) / WAD).toString();
