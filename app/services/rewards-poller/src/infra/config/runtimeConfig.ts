@@ -1,5 +1,7 @@
 import bonusTokenConfigsRaw from "./bonusTokenConfig.json";
+import positionEventSourcesRaw from "./positionEventSourceConfig.json";
 import { parseBonusTokenConfigs } from "../../features/bonus-cycle/bonusConfig.validator";
+import { parsePositionEventSources } from "./positionEventSource.validator";
 import {
   API_ERROR_CODES,
   BLOCK_TRACKING_FILE,
@@ -11,6 +13,7 @@ import {
 import { getBigIntEnvOrDefault, getEnv, getNumberEnvOrDefault, validateRequiredEnvVars } from "./env";
 
 const bonusTokenConfigs = parseBonusTokenConfigs(bonusTokenConfigsRaw);
+const positionEventSources = parsePositionEventSources(positionEventSourcesRaw);
 
 const config = {
   auth: {
@@ -40,6 +43,7 @@ const config = {
     cron: getEnv("BONUS_CRON_SCHEDULE") || DEFAULTS.bonusCronSchedule,
     tokenConfigs: bonusTokenConfigs,
   },
+  positionEventSources,
   balance: {
     gasFeeUSDST: getBigIntEnvOrDefault("GAS_FEE_USDST", DEFAULTS.gasFeeUsdstUnits) * DEFAULTS.gasUnitScale,
     gasFeeVoucher: getBigIntEnvOrDefault("GAS_FEE_VOUCHER", DEFAULTS.gasFeeVoucherUnits) * DEFAULTS.gasUnitScale,

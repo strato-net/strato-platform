@@ -2738,4 +2738,168 @@ contract Describe_CDPEngine is Authorizable {
         require(minCR == 150e16, "minCR should be set to 150%");
         require(liquidationRatio == 150e16, "liquidationRatio should be set to 150%");
     }
+
+    // ============ COLLATERAL ENUMERATION & AGGREGATE DEBT VIEW TESTS ============
+    // The engine instance is shared across tests, so all count/debt assertions are
+    // delta-based to stay independent of test ordering.
+
+    function _createConfiguredCollateral(string symbol) internal returns (address) {
+        address tokenAddress = m.tokenFactory().createToken(
+            "Extra Collateral",
+            "Extra Test Collateral",
+            emptyArray,
+            emptyArray,
+            emptyArray,
+            symbol,
+            10000000e18,
+            18
+        );
+        Token(tokenAddress).setStatus(2); // ACTIVE
+        Token(tokenAddress).mint(address(this), 100000e18);
+        cdpEngine.setCollateralAssetParams(
+            tokenAddress,
+            LIQUIDATION_RATIO,
+            160e16,
+            LIQUIDATION_PENALTY_BPS,
+            CLOSE_FACTOR_BPS,
+            STABILITY_FEE_RATE,
+            DEBT_FLOOR,
+            DEBT_CEILING,
+            UNIT_SCALE,
+            false
+        );
+        priceOracle.setAssetPrice(tokenAddress, 5e18);
+        return tokenAddress;
+    }
+
+    function it_cdp_engine_enumerates_assets_on_configure() {
+        uint256 countBefore = cdpEngine.collateralAssetCount();
+        // beforeEach configured collateralTokenAddress, so it is already enumerated:
+        // reconfiguring it must not create a duplicate entry
+        cdpEngine.setCollateralAssetParams(
+            collateralTokenAddress,
+            LIQUIDATION_RATIO,
+            160e16,
+            LIQUIDATION_PENALTY_BPS,
+            CLOSE_FACTOR_BPS,
+            STABILITY_FEE_RATE,
+            DEBT_FLOOR,
+            DEBT_CEILING,
+            UNIT_SCALE,
+            false
+        );
+        require(cdpEngine.collateralAssetCount() == countBefore, "reconfigure should not duplicate");
+
+        // A newly configured asset lands at the end of the enumeration
+        address extra = _createConfiguredCollateral("ENUM1");
+        require(cdpEngine.collateralAssetCount() == countBefore + 1, "count should grow by 1 on new asset");
+        require(cdpEngine.collateralAssetAt(countBefore) == extra, "new asset should be at the last index");
+
+        // Out-of-range index reverts
+        bool reverted = false;
+        try cdpEngine.collateralAssetAt(countBefore + 1) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "collateralAssetAt past end should revert");
+    }
+
+    function it_cdp_engine_total_debt_tracks_mint_and_repay() {
+        uint256 mintAmount = 100e18;
+        require(cdpEngine.totalDebt(collateralTokenAddress) == 0, "fresh asset should have zero debt");
+
+        uint256 allBefore = cdpEngine.totalDebtAll();
+        _openPositionForStabilityFeeMath(1000e18, mintAmount);
+
+        // Stored-index debt: exact at rate == RAY, at most a wei or two above if a
+        // timestamp boundary was crossed between accruals (scaledAdd rounds up).
+        uint256 debt = cdpEngine.totalDebt(collateralTokenAddress);
+        require(debt >= mintAmount, "totalDebt should cover minted amount");
+        require(debt <= mintAmount + 2, "totalDebt should not exceed mint by more than rounding");
+
+        // totalDebtAll must reflect the same delta
+        uint256 allAfter = cdpEngine.totalDebtAll();
+        require(allAfter - allBefore == debt, "totalDebtAll delta should equal asset debt");
+
+        cdpEngine.repayAll(collateralTokenAddress);
+        require(cdpEngine.totalDebt(collateralTokenAddress) == 0, "totalDebt should be zero after repayAll");
+        require(cdpEngine.totalDebtAll() == allBefore, "totalDebtAll should return to baseline");
+    }
+
+    function it_cdp_engine_total_debt_all_sums_across_assets() {
+        uint256 allBefore = cdpEngine.totalDebtAll();
+
+        // Open a position on the beforeEach asset
+        _openPositionForStabilityFeeMath(1000e18, 100e18);
+
+        // And a second position on a separate collateral asset
+        address extra = _createConfiguredCollateral("ENUM2");
+        require(
+            ERC20(extra).approve(address(cdpVault), 1000e18),
+            "Extra collateral approval failed"
+        );
+        cdpEngine.deposit(extra, 1000e18);
+        cdpEngine.mint(extra, 250e18);
+
+        uint256 debtA = cdpEngine.totalDebt(collateralTokenAddress);
+        uint256 debtB = cdpEngine.totalDebt(extra);
+        require(debtA >= 100e18 && debtB >= 250e18, "per-asset debts should cover mints");
+        require(
+            cdpEngine.totalDebtAll() - allBefore == debtA + debtB,
+            "totalDebtAll delta should equal sum of per-asset debts"
+        );
+    }
+
+    function it_cdp_engine_collateral_params_view() {
+        (uint256 lr, uint256 mcr, uint256 sfr, uint256 floor, uint256 ceil, bool paused) =
+            cdpEngine.collateralParams(collateralTokenAddress);
+        require(lr == LIQUIDATION_RATIO, "liquidationRatio should match config");
+        require(mcr == 160e16, "minCR should match config");
+        require(sfr == STABILITY_FEE_RATE, "stabilityFeeRate should match config");
+        require(floor == DEBT_FLOOR, "debtFloor should match config");
+        require(ceil == DEBT_CEILING, "debtCeiling should match config");
+        require(!paused, "asset should not be paused");
+
+        // Per-asset pause is reflected
+        cdpEngine.setPaused(collateralTokenAddress, true);
+        (, , , , , bool pausedAsset) = cdpEngine.collateralParams(collateralTokenAddress);
+        require(pausedAsset, "paused should be true when asset is paused");
+        cdpEngine.setPaused(collateralTokenAddress, false);
+
+        // Global pause is reflected too (restored so later tests are unaffected)
+        cdpEngine.setPausedGlobal(true);
+        (, , , , , bool pausedGlobal) = cdpEngine.collateralParams(collateralTokenAddress);
+        require(pausedGlobal, "paused should be true under global pause");
+        cdpEngine.setPausedGlobal(false);
+    }
+
+    function it_cdp_engine_register_collateral_assets_backfill() {
+        // Re-registering an already-enumerated asset is a no-op, not a revert
+        uint256 countBefore = cdpEngine.collateralAssetCount();
+        address[] memory known = new address[](1);
+        known[0] = collateralTokenAddress;
+        cdpEngine.registerCollateralAssets(known);
+        require(cdpEngine.collateralAssetCount() == countBefore, "re-register should not duplicate");
+
+        // An address with no collateral config is rejected
+        address unconfigured = m.tokenFactory().createToken(
+            "Unconfigured Token",
+            "Never configured as collateral",
+            emptyArray,
+            emptyArray,
+            emptyArray,
+            "NOCFG",
+            1000e18,
+            18
+        );
+        address[] memory bad = new address[](1);
+        bad[0] = unconfigured;
+        bool reverted = false;
+        try cdpEngine.registerCollateralAssets(bad) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "registering an unconfigured asset should revert");
+        require(cdpEngine.collateralAssetCount() == countBefore, "unconfigured asset must not be enumerated");
+    }
 }

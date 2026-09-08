@@ -97,7 +97,7 @@ const Rewards = () => {
         </div>
         <CardTitle className="text-xl">Start Earning Rewards</CardTitle>
         <CardDescription className="text-base">
-          Connect a wallet to start earning CATA tokens and track your rewards.
+          Connect a wallet to start earning reward points and track your rewards.
         </CardDescription>
       </CardHeader>
       <CardContent className="text-center space-y-4">
@@ -122,7 +122,7 @@ const Rewards = () => {
 
         <main className="p-4 md:p-6">
           {!isLoggedIn && (
-            <GuestSignInBanner message="Sign in to start earning CATA tokens and track your rewards" />
+            <GuestSignInBanner message="Sign in to start earning reward points and track your rewards" />
           )}
           {/* Personal summary cards at top for logged-in users; guests see the global overview here */}
           {isLoggedIn ? (

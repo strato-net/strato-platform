@@ -12,12 +12,18 @@ import qualified Blockchain.Data.TransactionResultStatus as TRS
 import Blockchain.Data.Transaction (Transaction, whoSignedThisTransaction)
 import qualified Blockchain.Data.Transaction as TX
 import Blockchain.Strato.Model.Address (Address)
-import Blockchain.Strato.Model.Keccak256 (Keccak256, keccak256ToHex)
+import Blockchain.Strato.Model.Keccak256 (Keccak256, keccak256ToHex, stringKeccak256)
 import Data.Aeson
 import qualified Data.ByteString as B
+import qualified Data.Text as T
 import GHC.Generics (Generic)
 import Numeric (showHex)
 
+-- | The single (de)serialization boundary for Ethereum JSON-RPC hex values:
+-- ToJSON always emits the @0x@-prefixed form, FromJSON accepts it (with or
+-- without the prefix). Keeping the @0x@ convention here means the internal
+-- types (Keccak256, Address, ...) stay in their bare STRATO form and no
+-- handler has to massage prefixes by hand.
 newtype EthHex a = EthHex a
 
 instance ToJSON (EthHex Integer) where
@@ -28,6 +34,14 @@ instance ToJSON (EthHex Keccak256) where
 
 instance ToJSON (EthHex Address) where
   toJSON (EthHex a) = toJSON $ "0x" ++ show a
+
+instance FromJSON (EthHex Keccak256) where
+  parseJSON = withText "EthHex Keccak256" $ \t ->
+    let s = case T.unpack t of
+              '0':'x':rest -> rest
+              '0':'X':rest -> rest
+              rest         -> rest
+     in maybe (fail $ "error parsing Keccak256: " ++ show t) (pure . EthHex) (stringKeccak256 s)
 
 data TransactionReceipt = TransactionReceipt
   { transactionHash   :: EthHex Keccak256
@@ -51,8 +65,8 @@ instance ToJSON TransactionReceipt where
       fixType "type_" = "type"
       fixType name    = name
 
-mkTransactionReceipt :: TransactionResult -> Transaction -> Integer -> TransactionReceipt
-mkTransactionReceipt tr tx blkNum = TransactionReceipt
+mkTransactionReceipt :: TransactionResult -> Transaction -> Integer -> [Value] -> String -> TransactionReceipt
+mkTransactionReceipt tr tx blkNum theLogs theLogsBloom = TransactionReceipt
   { transactionHash   = EthHex (transactionResultTransactionHash tr)
   , blockHash         = EthHex (transactionResultBlockHash tr)
   , blockNumber       = EthHex blkNum
@@ -66,8 +80,8 @@ mkTransactionReceipt tr tx blkNum = TransactionReceipt
       else case transactionResultContractsCreated tr of
         (a:_) -> Just (EthHex a)
         []    -> Nothing
-  , logs              = []
-  , logsBloom         = "0x" ++ replicate 512 '0'
+  , logs              = theLogs
+  , logsBloom         = theLogsBloom
   , status            = EthHex $ if transactionResultStatus tr == Just TRS.Success then 1 else 0
   , type_             = EthHex 0
   }
