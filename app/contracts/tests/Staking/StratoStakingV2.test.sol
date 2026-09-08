@@ -29,6 +29,19 @@ contract UpgradedInPlaceStaking is StratoStaking {
     }
 }
 
+// MercataGovernance seeds its admin list at genesis, which a unit test cannot do.
+// Seeding this test contract as the only admin puts the vote threshold at one, so
+// each admin vote below decides on its own.
+contract record AdminGovernance is MercataGovernance {
+    constructor(address _initialOwner) MercataGovernance(_initialOwner) { }
+
+    function seedAdmin(address a) public {
+        require(adminMap[a] == 0, "already an admin");
+        admins.push(a);
+        adminMap[a] = admins.length;
+    }
+}
+
 contract Describe_StratoStakingV2 {
     uint256 public INFINITY = 2 ** 256 - 1;
     address constant VALIDATOR_A = address(0xaaaa);
@@ -39,7 +52,7 @@ contract Describe_StratoStakingV2 {
     Token usdst;
     StratoStaking staking;
     ValidatorRegistry registry;
-    MercataGovernance gov;
+    AdminGovernance gov;
 
     User user1;
     User user2;
@@ -90,7 +103,7 @@ contract Describe_StratoStakingV2 {
         registry.initialize(address(staking));
         staking.setValidatorRegistry(address(registry));
 
-        gov = new MercataGovernance(address(this));
+        gov = new AdminGovernance(address(this));
         gov.setStakingContract(address(staking));
         staking.setGovernance(address(gov), true);
         // minStake 1000 (self + delegated), no self-bond floor, 50% proposer fee share,
@@ -660,5 +673,142 @@ contract Describe_StratoStakingV2 {
         StratoStaking fresh = new StratoStaking(address(this));
         fresh.processBlock();
         require(fresh.lastProcessedBlock() == 0, "nothing processed");
+    }
+
+    // ---- registry, staking and governance agreeing on one validator set ----
+    //
+    // Governance owns the set consensus reads; staking mirrors it for accounting
+    // and admission; the registry owns operator identity. An admin override moves
+    // the set behind staking's back, so these check the three end up agreeing.
+
+    function it_drops_a_barred_validator_from_staking_and_governance_together() public {
+        gov.seedAdmin(address(this));
+        _bondBoth();
+        require(gov.validatorCount() == 2, "two seated in governance");
+        require(staking.validatorCount() == 2, "and two in staking");
+        require(staking.isValidator(address(operatorA)), "A seated");
+
+        gov.voteToRemoveValidator(VALIDATOR_A);
+
+        require(!gov.isValidator(VALIDATOR_A), "governance dropped it");
+        require(!staking.isValidator(address(operatorA)), "staking followed in the same transaction");
+        require(staking.validatorCount() == 1, "and so did its count");
+        require(staking.governanceBarred(address(operatorA)), "recorded as barred");
+        require(!staking.isWaiter(address(operatorA)), "so it is not a promotion candidate");
+        require(gov.isValidator(VALIDATOR_B), "B untouched");
+        require(staking.isValidator(address(operatorB)), "on both sides");
+    }
+
+    function it_refuses_to_activate_a_barred_operator() public {
+        gov.seedAdmin(address(this));
+        gov.voteToRemoveValidator(VALIDATOR_A);
+        _selfBond(operatorA, 1000e18);
+
+        try staking.tryActivate(address(operatorA)) {
+            require(false, "a barred operator cannot join the set");
+        } catch {
+        }
+        require(!gov.isValidator(VALIDATOR_A), "still out of governance");
+        require(!staking.isValidator(address(operatorA)), "and staking did not seat it either");
+        require(staking.validatorCount() == 0, "no phantom slot");
+    }
+
+    function it_skips_barred_waiters_when_filling_the_set() public {
+        gov.seedAdmin(address(this));
+        _selfBond(operatorA, 1000e18);
+        _selfBond(operatorB, 2000e18);
+        gov.voteToRemoveValidator(VALIDATOR_A);
+
+        staking.reconcileSet();
+
+        require(gov.isValidator(VALIDATOR_B), "B promoted");
+        require(staking.isValidator(address(operatorB)), "on both sides");
+        require(!gov.isValidator(VALIDATOR_A), "A stayed out");
+        require(staking.validatorCount() == 1, "one seat taken");
+    }
+
+    function it_readmits_a_cleared_validator_at_its_current_weight() public {
+        gov.seedAdmin(address(this));
+        _bondBoth();
+        gov.voteToRemoveValidator(VALIDATOR_A);
+        require(!staking.isValidator(address(operatorA)), "barred");
+
+        // Stake moves while it is held out, so governance never hears the new weight.
+        _stake(user1, address(operatorA), 500e18);
+        require(gov.validatorStake(VALIDATOR_A) == 0, "nothing published while it is out");
+
+        gov.voteToClearValidatorDesignation(VALIDATOR_A);
+
+        require(gov.isValidator(VALIDATOR_A), "back in governance");
+        require(staking.isValidator(address(operatorA)), "and in staking");
+        require(staking.validatorCount() == 2, "counted again");
+        require(!staking.governanceBarred(address(operatorA)), "no longer barred");
+        require(gov.validatorStake(VALIDATOR_A) == 1500e18, "republished at the weight it has now");
+    }
+
+    function it_keeps_a_pinned_validator_that_staking_would_drop() public {
+        gov.seedAdmin(address(this));
+        _bondBoth();
+        gov.voteToAddValidator(VALIDATOR_A);
+        require(gov.forcedInByAdmins(VALIDATOR_A), "pinned in");
+
+        // Falls under minStake: staking asks governance to drop it and is refused.
+        operatorA.do(address(staking), "unbondSelf(uint256)", 500e18);
+
+        require(gov.isValidator(VALIDATOR_A), "governance kept it");
+        require(staking.isValidator(address(operatorA)), "and staking still agrees it is seated");
+        require(staking.validatorCount() == 2, "both still counted");
+        require(gov.validatorStake(VALIDATOR_A) == 500e18, "with a weight that still tracks reality");
+    }
+
+    function it_refuses_to_rotate_a_pinned_validator_address() public {
+        gov.seedAdmin(address(this));
+        _bondBoth();
+        gov.voteToAddValidator(VALIDATOR_A);
+
+        try registry.setValidatorAddress(address(operatorA), address(0xa9)) {
+            require(false, "a pinned validator address cannot be rotated");
+        } catch {
+        }
+        require(gov.isValidator(VALIDATOR_A), "still seated under its old address");
+        require(staking.validatorOf(address(operatorA)) == VALIDATOR_A, "staking kept the binding");
+        require(registry.validatorOperators(VALIDATOR_A) == address(operatorA), "and so did the registry");
+    }
+
+    // The bar is normally cached before anyone can act on it, because governance
+    // pushes it. Barring an address no operator is bound to yet skips that push,
+    // which is what leaves a stale cache for _activate's read-back to catch.
+    function it_catches_a_bar_the_cache_missed() public {
+        gov.seedAdmin(address(this));
+        gov.voteToRemoveValidator(address(0xc1));
+
+        _register(user1, address(0xc1));
+        require(!staking.governanceBarred(address(user1)), "the bar predates the binding, so it was not cached");
+
+        user1.do(address(staking), "selfBond(uint256)", 1000e18);
+        try staking.tryActivate(address(user1)) {
+            require(false, "governance refused the seat, so activation must fail");
+        } catch {
+        }
+
+        require(staking.validatorCount() == 0, "and no seat is held that governance does not have");
+        require(gov.validatorCount() == 0, "governance is still empty");
+        require(!staking.isValidator(address(user1)), "not seated in staking either");
+    }
+
+    function it_lets_anyone_repair_a_drift_and_moves_nothing_when_there_is_none() public {
+        gov.seedAdmin(address(this));
+        _bondBoth();
+
+        user1.doSuccessfully(address(staking), "reconcileWithGovernance(address)", VALIDATOR_A);
+        user1.doSuccessfully(address(staking), "reconcileWithGovernance(address)", VALIDATOR_A);
+
+        require(staking.validatorCount() == 2, "already in step, so nothing moved");
+        require(staking.isValidator(address(operatorA)), "still seated in staking");
+        require(gov.isValidator(VALIDATOR_A), "and in governance");
+
+        // An address no operator is bound to is simply not ours to reconcile.
+        user1.doSuccessfully(address(staking), "reconcileWithGovernance(address)", address(0xdead));
+        require(staking.validatorCount() == 2, "unknown validators are ignored");
     }
 }
