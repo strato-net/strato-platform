@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ApySource, DepositAction } from "@strato/shared-types";
+import { DepositAction } from "@strato/shared-types";
 import { metalForgeService, MetalConfig, PayTokenConfig } from "@/services/metalForgeService";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -34,7 +34,7 @@ import {
 } from "@/lib/bridge/contractService";
 import { normalizeError } from "@/lib/bridge/utils";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
-import { buildEarnApyMap } from "@/utils/earnUtils";
+import { buildEarnApyMap, pathForApyInfo } from "@/utils/earnUtils";
 import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits, truncateAddress, truncateDecimals } from "@/utils/numberUtils";
 import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { useBridgeContext } from "@/context/BridgeContext";
@@ -103,24 +103,6 @@ const combinedActionFeeBps = (action: DepositAction): string => {
     return (BPS - ((BPS - psmFee) * (BPS - forgeFee) / BPS)).toString();
   } catch {
     return action.feeBps || "0";
-  }
-};
-
-const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: string }): string => {
-  switch (info.source) {
-    case "lending":
-      return "/dashboard/earn-lending";
-    case "vault":
-      return "/dashboard/earn-vault";
-    case "swap":
-    case "weighted_swap":
-      return info.poolAddress ? `/dashboard/earn-pools?pool=${info.poolAddress}` : "/dashboard/earn-pools";
-    case "safety":
-      return "/dashboard/advanced?tab=safety";
-    case "staking":
-      return "/dashboard/earn-staking";
-    default:
-      return "/dashboard/earn";
   }
 };
 

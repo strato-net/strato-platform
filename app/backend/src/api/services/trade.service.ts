@@ -447,6 +447,34 @@ const quoteCandidate = async (
   };
 };
 
+export const selectBestTradeQuote = (
+  quotes: TradeQuote[],
+  activeByAddress: Map<string, boolean>,
+  exactOut: boolean
+): TradeQuote | null => {
+  const executable = quotes.filter(
+    (quote) =>
+      !quote.error &&
+      activeByAddress.get(quote.poolAddress) &&
+      !quote.partialFill &&
+      BigInt(quote.amountOut) > 0n &&
+      BigInt(quote.amountIn) > 0n
+  );
+
+  let best: TradeQuote | null = null;
+  for (const quote of executable) {
+    if (!best) {
+      best = quote;
+      continue;
+    }
+    const better = exactOut
+      ? BigInt(quote.amountIn) < BigInt(best.amountIn)
+      : BigInt(quote.amountOut) > BigInt(best.amountOut);
+    if (better) best = quote;
+  }
+  return best;
+};
+
 export const getTradeQuotes = async (
   accessToken: string,
   tokenIn: string,
@@ -481,23 +509,7 @@ export const getTradeQuotes = async (
   );
 
   const activeByAddress = new Map(candidates.map((c) => [c.pool.address, !c.pool.isPaused && !c.pool.isDisabled]));
-  const executable = quotes.filter(
-    (q) =>
-      !q.error &&
-      activeByAddress.get(q.poolAddress) &&
-      !(exactOut && q.partialFill) &&
-      BigInt(q.amountOut) > 0n &&
-      BigInt(q.amountIn) > 0n
-  );
-
-  let best: TradeQuote | null = null;
-  for (const quote of executable) {
-    if (!best) { best = quote; continue; }
-    const better = exactOut
-      ? BigInt(quote.amountIn) < BigInt(best.amountIn)
-      : BigInt(quote.amountOut) > BigInt(best.amountOut);
-    if (better) best = quote;
-  }
+  const best = selectBestTradeQuote(quotes, activeByAddress, exactOut);
 
   return {
     tokenIn: normalizeAddress(tokenIn),

@@ -21,12 +21,13 @@ const metal = "0x5555555555555555555555555555555555555555";
 const makeLog = (
   eventName: "DepositRouted" | "DepositRoutedWithAction",
   transactionHash: string,
+  action = 2,
 ): RawDepositLog => {
   const encoded = events.encodeEventLog(
     events.getEvent(eventName)!,
     eventName === "DepositRouted"
       ? [token, 100n, sender, recipient, target, 1]
-      : [token, 100n, sender, recipient, target, 1, 2, metal, 90n],
+      : [token, 100n, sender, recipient, target, 1, action, metal, 90n],
   );
   return {
     address: "0x6666666666666666666666666666666666666666",
@@ -99,4 +100,15 @@ test("preserves every action field in batch arguments", () => {
   assert.deepEqual(args.actions, ["2"]);
   assert.deepEqual(args.actionTokens, [metal]);
   assert.deepEqual(args.minFinalOuts, ["90"]);
+});
+
+test("parses AUTO_ROUTE action intent without changing its fields", () => {
+  const actionDeposit = classifyDepositLogs(
+    [makeLog("DepositRoutedWithAction", `0x${"ff".repeat(32)}`, 4)],
+    1,
+  ).actionDeposits[0];
+
+  assert.equal(actionDeposit.action, "4");
+  assert.equal(actionDeposit.actionToken, metal);
+  assert.equal(actionDeposit.minFinalOut, "90");
 });

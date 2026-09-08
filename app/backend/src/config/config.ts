@@ -242,6 +242,7 @@ export let saveUsdstVault: string = '';
 export let ethCarryVault: string = '';
 export let wbtcCarryVault: string = '';
 export let directMintPsm: string = '';
+export let tokenRouter: string = '';
 export let stratoNativeBridge: string = '';
 export let stratoNativeCustodyVault: string = '';
 export let stratoToken: string = '';
@@ -379,6 +380,10 @@ export function setDirectMintPsmConfig(networkId: string) {
   }
 }
 
+export function setTokenRouterConfig() {
+  tokenRouter = process.env.TOKEN_ROUTER || "";
+}
+
 export function setVaultConfig(networkId: string) {
   if (process.env.VAULT) {
     vault = process.env.VAULT;
@@ -432,6 +437,7 @@ export async function initNetworkConfig() {
   setVaultConfig(networkId);
   setCarryVaultConfig(networkId);
   setDirectMintPsmConfig(networkId);
+  setTokenRouterConfig();
   setUsdcYieldVaultConfig(networkId);
   setMetalYieldVaultConfig(networkId);
   setExecutedIssuesLookbackConfig(networkId);

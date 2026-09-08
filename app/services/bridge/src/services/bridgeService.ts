@@ -6,7 +6,7 @@ import {
 import { JsonRpcProvider } from "ethers";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
-import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, NativeDepositArgs, ConfirmDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
+import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, RouteDepositArgs, NativeDepositArgs, ConfirmDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
 import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
 import { mintVouchersForDeposits } from "./voucherService";
@@ -232,6 +232,26 @@ const recordActionDeposit = async (deposit: ActionDepositArgs) => {
   });
 };
 
+const recordRouteDeposit = async (deposit: RouteDepositArgs) => {
+  await execute({
+    contractName: "MercataBridge",
+    contractAddress: config.bridge.address!,
+    method: "depositWithRoute",
+    args: {
+      externalChainId: deposit.externalChainId,
+      externalSender: deposit.externalSender,
+      externalToken: deposit.externalToken,
+      externalTokenAmount: deposit.externalTokenAmount,
+      externalTxHash: deposit.externalTxHash,
+      stratoRecipient: deposit.stratoRecipient,
+      targetStratoToken: deposit.targetStratoToken,
+      expectedTokenOut: deposit.actionToken,
+      minFinalOut: deposit.minFinalOut,
+      steps: deposit.steps,
+    },
+  });
+};
+
 const recoverMixedDuplicateBatch = async <T extends DepositArgs>(
   deposits: NonEmptyArray<T>,
   recordOne: (deposit: T) => Promise<void>,
@@ -318,6 +338,16 @@ export const depositBatchWithAction = async (
     }
     throw error;
   }
+};
+
+export const depositWithRoutes = async (
+  depositArgs: NonEmptyArray<RouteDepositArgs>,
+) => {
+  await recoverMixedDuplicateBatch(depositArgs, recordRouteDeposit);
+  logInfo(
+    "BridgeService",
+    `Successfully recorded ${depositArgs.length} routed deposits`,
+  );
 };
 
 export const recordNativeDepositBatch = async (

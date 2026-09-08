@@ -6,6 +6,7 @@ export const METAL_ACTIVITY_PAIR = [
 ];
 
 export interface MetalTx {
+  id: string;
   block_timestamp: string;
   payAmount: string;
   paySymbol: string;
@@ -45,6 +46,7 @@ export function mapEventsToMetalTxs(events: Event[], symbolMap: Map<string, stri
   return events.map((e) => {
     const a = e.attributes || {};
     return {
+      id: String(e.id || `${e.transaction_hash || ""}:${e.block_timestamp || ""}`),
       block_timestamp: e.block_timestamp || "",
       payAmount: a.payAmount || "0",
       paySymbol: symbolMap.get(a.payToken) || symbolMap.get(a.payToken?.toLowerCase()) || "-",

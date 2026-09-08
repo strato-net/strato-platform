@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 interface RewardsWidgetProps {
   userRewards: UserRewardsData | null;
   activityName: string;
+  activityId?: number;
   inputAmount?: string;
   isWithdrawal?: boolean;
   poolData?: Pool | null;
@@ -212,6 +213,7 @@ const calculatePercentageChange = (
 export const RewardsWidget = ({
   userRewards,
   activityName,
+  activityId,
   inputAmount,
   isWithdrawal = false,
   poolData,
@@ -230,7 +232,9 @@ export const RewardsWidget = ({
   // ─────────────────────────────────────────────────────────────────────────
   const filteredActivities =
     userRewards?.activities.filter(
-      (item) => item.activity.name.toLowerCase() === activityName.toLowerCase()
+      (item) => activityId !== undefined
+        ? item.activity.activityId === activityId
+        : item.activity.name.toLowerCase() === activityName.toLowerCase()
     ) || [];
 
   const stakeDenomination = filteredActivities[0]?.activity?.stakeDenomination;

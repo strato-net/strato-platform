@@ -7,12 +7,13 @@
     "start": "ts-node src/index.ts",
     "dev": "nodemon src/index.ts",
     "build": "tsc",
-    "test": "npm run build && node --test dist/polling/alchemyPolling.test.js"
+    "test": "npm run build && node --test dist/polling/alchemyPolling.test.js dist/services/routeQuoteService.test.js"
   },
   "engines": {
     "node": ">=22.12 <23.0"
   },
   "dependencies": {
+    "@strato/shared-types": "file:../../packages/shared-types",
     "@safe-global/api-kit": "^5.0.2",
     "@safe-global/protocol-kit": "^8.0.5",
     "@safe-global/types-kit": "^4.0.1",

@@ -56,7 +56,7 @@ export interface TradeQuote {
   priceImpact: number;
   /** fee-less marginal rate at quote time, tokenOut per tokenIn, 1e18 */
   spotRateWad?: string;
-  /** v3 exact-out only: pool could not fill the full requested amount */
+  /** V3 pool reached its price/liquidity boundary before filling the specified amount */
   partialFill?: boolean;
   poolTvlUsd: number;
   /** set when this pool could not be quoted (no liquidity, rebasing pool, …);
@@ -83,4 +83,88 @@ export interface TradeSwapParams {
   tokenOut: string;
   amountIn: string;
   minAmountOut: string;
+}
+
+/** Ordinals must remain aligned with RouterTypes.RouteAction. */
+export enum RouteAction {
+  NONE = 0,
+  SWAP_V2 = 1,
+  SWAP_STABLE = 2,
+  SWAP_V3 = 3,
+  PSM_MINT = 4,
+  FORGE = 5,
+  SAVE = 6,
+  YIELD_VAULT_DEPOSIT = 7,
+}
+
+export interface RouteStep {
+  action: RouteAction;
+  target: string;
+  tokenIn: string;
+  tokenOut: string;
+  minAmountOut: string;
+  parameter1: string;
+  parameter2: string;
+  direction: boolean;
+  factoryPoolIndex: string;
+}
+
+export interface RouteStepQuote extends RouteStep {
+  amountIn: string;
+  amountOut: string;
+  feeAmount: string;
+  feeBps: number;
+  priceImpact: number;
+  label: string;
+}
+
+export interface RouteQuoteResponse {
+  tokenIn: string;
+  tokenOut: string;
+  amountIn: string;
+  amountOut: string;
+  minFinalOut: string;
+  slippageBps: number;
+  deadline: number;
+  steps: RouteStepQuote[];
+}
+
+export interface RouteExecuteParams {
+  tokenIn: string;
+  tokenOut: string;
+  amountIn: string;
+  minFinalOut: string;
+  slippageBps?: number;
+  recipient?: string;
+}
+
+/** Ordinals must remain aligned with BridgeTypes.DepositAction. */
+export enum BridgeDepositAction {
+  NONE = 0,
+  AUTO_FORGE = 2,
+  AUTO_SAVE = 3,
+  AUTO_ROUTE = 4,
+}
+
+export interface BridgeRouteLegQuote {
+  bridgeRouteId: string;
+  routeType: "standard";
+  externalChainId: string;
+  externalToken: string;
+  externalSymbol: string;
+  externalDecimals: string;
+  targetStratoToken: string;
+  targetStratoSymbol: string;
+  externalAmount: string;
+  bridgedAmount: string;
+  rebaseFactor?: string;
+}
+
+export interface CompositeRouteQuoteResponse extends RouteQuoteResponse {
+  bridge: BridgeRouteLegQuote;
+  depositAction: {
+    action: BridgeDepositAction.NONE | BridgeDepositAction.AUTO_ROUTE;
+    actionToken: string;
+    minFinalOut: string;
+  };
 }

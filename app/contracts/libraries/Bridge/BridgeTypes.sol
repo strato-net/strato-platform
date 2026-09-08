@@ -60,7 +60,8 @@ library BridgeTypes {
         NONE,                    // default — mint directly to recipient
         DEPRECATED_AUTO_SAVE_V1, // retired lending-pool action
         AUTO_FORGE,              // forge metal via MetalForge
-        AUTO_SAVE                 // deposit USDST into SaveUSDSTVault
+        AUTO_SAVE,                // deposit USDST into SaveUSDSTVault
+        AUTO_ROUTE                // execute a stored TokenRouter route
     }
 
     /// @notice Request for a post-deposit action, stored until confirmDeposit executes it

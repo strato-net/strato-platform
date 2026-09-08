@@ -59,7 +59,7 @@ export type BridgeRouteType = "standard" | "native";
  */
 export interface DepositAction {
   id: string;
-  action: number;                // 2 = AUTO_FORGE, 3 = AUTO_SAVE
+  action: number;                // 2 = AUTO_FORGE, 3 = AUTO_SAVE, 4 = AUTO_ROUTE
   stratoToken: string;           // final output token (metal or saveUSDST)
   stratoTokenSymbol: string;
   stratoTokenName: string;
@@ -103,7 +103,7 @@ export interface BridgeTransaction {
   externalSymbol?: string;
   externalToken?: string;
   // Deposit action outcome (only for deposits with AUTO_SAVE or AUTO_FORGE)
-  depositOutcome?: "bridge" | "save" | "forge" | "fallback";
+  depositOutcome?: "bridge" | "save" | "forge" | "route" | "fallback";
   finalToken?: string;
   finalTokenSymbol?: string;
   finalAmount?: string;

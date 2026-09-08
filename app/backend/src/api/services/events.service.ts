@@ -1,6 +1,7 @@
 import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import { getInternalAddresses } from "../../config/config";
+import { enrichDepositCompletedActivities } from "../helpers/bridge.helper";
 import type {
   EventData,
   EventResponse,
@@ -304,7 +305,10 @@ export const getActivitiesByTypes = async (
   });
 
   // Apply global pagination: slice [offset, offset + limit]
-  const events = allEvents.slice(offset, offset + limit);
+  const events = await enrichDepositCompletedActivities(
+    accessToken,
+    allEvents.slice(offset, offset + limit)
+  );
 
   return { events, total };
 };

@@ -36,6 +36,10 @@ export interface Event {
   contract_name: string;
   event_name: string;
   attributes: Record<string, string>;
+  depositOutcome?: "bridge" | "save" | "forge" | "route" | "fallback";
+  finalToken?: string;
+  finalAmount?: string;
+  finalTokenSymbol?: string;
 }
 
 /**

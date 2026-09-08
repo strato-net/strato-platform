@@ -76,6 +76,9 @@ import "YieldVault/YieldVault.sol";
 //Direct Mint PSM
 import "./Pools/DirectMintPSM.sol";
 
+//Router
+import "./Router/TokenRouter.sol";
+
 //Flash mint
 import "./Flash/FlashMint.sol";
 

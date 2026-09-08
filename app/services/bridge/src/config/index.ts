@@ -90,6 +90,8 @@ const config = {
   },
   api: {
     nodeUrl: process.env.NODE_URL,
+    appUrl: process.env.STRATO_APP_API_URL,
+    routeQuoteSlippageBps: Number(process.env.ROUTE_QUOTE_SLIPPAGE_BPS || "50"),
     errorCodes: {
       ECONNREFUSED: "Connection refused",
       ENOTFOUND: "DNS lookup failed",

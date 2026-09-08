@@ -144,8 +144,10 @@ interface TokenInputPanelProps {
   amountError?: string;
   loading: boolean;
   disabled?: boolean;
+  amountReadOnly?: boolean;
   /** hide the user-balance line and Max button (e.g. signed-out guests) */
   showUserBalance?: boolean;
+  showPoolBalance?: boolean;
 }
 
 export const TokenInputPanel = ({
@@ -163,7 +165,9 @@ export const TokenInputPanel = ({
   amountError,
   loading,
   disabled = false,
+  amountReadOnly = false,
   showUserBalance = true,
+  showPoolBalance = true,
 }: TokenInputPanelProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -177,13 +181,13 @@ export const TokenInputPanel = ({
           <input
             type="text"
             value={amount}
-            onChange={e => { if (!disabled) onChange(e.target.value); }}
+            onChange={e => { if (!disabled && !amountReadOnly) onChange(e.target.value); }}
             placeholder="0.00"
             inputMode="decimal"
-            disabled={disabled}
+            disabled={disabled || amountReadOnly}
             className={`p-1 md:p-2 bg-transparent border-none text-sm md:text-lg font-medium focus:outline-none text-foreground placeholder:text-muted-foreground w-full ${
               amountError ? " border border-red-500 rounded-md" : ""
-              } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+              } ${disabled || amountReadOnly ? "opacity-50 cursor-not-allowed" : ""}`}
           />
           {amountError && (
             <p className="text-red-600 text-xs md:text-sm mt-1">{amountError}</p>
@@ -233,7 +237,7 @@ export const TokenInputPanel = ({
               </span>
             </span>
           ))}
-          <span className={`text-xs md:text-sm text-muted-foreground flex flex-wrap items-center gap-1 ${
+          {showPoolBalance && <span className={`text-xs md:text-sm text-muted-foreground flex flex-wrap items-center gap-1 ${
             showUserBalance ? "" : "sm:ml-auto"
           }`}>
             <span className="whitespace-nowrap">Pool Balance:</span>
@@ -244,7 +248,7 @@ export const TokenInputPanel = ({
                   hideLoader={disabled}
                 />
               </span>
-          </span>
+          </span>}
         </div>
       )}
     </div>
