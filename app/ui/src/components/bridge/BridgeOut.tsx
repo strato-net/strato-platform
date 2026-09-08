@@ -87,6 +87,21 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
     refetch: refetchBalance,
   } = useBalance(selectedToken?.stratoToken || null);
 
+  const withdrawalCapacity = useMemo(() => {
+    if (
+      selectedToken?.routeType !== "native" ||
+      BigInt(selectedToken.maxOutstandingWithdrawal || "0") === 0n
+    ) {
+      return null;
+    }
+    return BigInt(selectedToken.remainingOutstandingWithdrawal || "0");
+  }, [
+    selectedToken?.routeType,
+    selectedToken?.maxOutstandingWithdrawal,
+    selectedToken?.remainingOutstandingWithdrawal,
+  ]);
+  const isWithdrawalCapacityExhausted = withdrawalCapacity === 0n;
+
   const maxAmount = useMemo(() => {
     const tokenBalanceWei = balanceData?.balance?.toString() || "0";
 
@@ -168,6 +183,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       !selectedToken ||
       !hasExternalRecipient ||
       !currentNetwork ||
+      isWithdrawalCapacityExhausted ||
       isBalanceLoading,
     [
       guestMode,
@@ -176,6 +192,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       selectedToken,
       hasExternalRecipient,
       currentNetwork,
+      isWithdrawalCapacityExhausted,
       isBalanceLoading,
     ]
   );
@@ -369,6 +386,10 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
               <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
               <p className="text-xs md:text-sm text-muted-foreground">Fetching balance...</p>
             </div>
+          ) : isWithdrawalCapacityExhausted ? (
+            <p className="text-xs md:text-sm text-yellow-600">
+              Withdrawals temporarily unavailable — bridge capacity reached.
+            </p>
           ) : (
             maxAmount && (
               <div>
@@ -386,6 +407,17 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
                     Min: {isSaving ? MIN_USDST_WITHDRAWAL : "0"}
                   </p>
                 </div>
+                {withdrawalCapacity !== null && (
+                  <p className="text-xs text-muted-foreground text-right">
+                    Bridge capacity available: {formatBalance(
+                      withdrawalCapacity.toString(),
+                      undefined,
+                      DECIMAL,
+                      2,
+                      6
+                    )} {selectedToken?.stratoTokenSymbol || ""}
+                  </p>
+                )}
                 {selectedToken?.rebaseFactor && BigInt(maxAmount) > 0n && (() => {
                   try {
                     const equiv = (BigInt(maxAmount) * BigInt(selectedToken.rebaseFactor!) / WAD).toString();
@@ -405,13 +437,19 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
           type="text"
           inputMode="decimal"
           pattern="[0-9]*\.?[0-9]*"
-          placeholder={hasExternalRecipient ? "0.00" : "Connect external wallet to enter amount"}
+          placeholder={
+            isWithdrawalCapacityExhausted
+              ? "Bridge capacity reached"
+              : hasExternalRecipient
+                ? "0.00"
+                : "Connect external wallet to enter amount"
+          }
           className={`w-full ${
             amountError ? "border-red-500 focus:ring-red-400" : ""
           }`}
           value={amount}
           onChange={(e) => { if (!guestMode) handleAmountChange(e.target.value); }}
-          disabled={guestMode || !hasExternalRecipient || isLoading}
+          disabled={guestMode || !hasExternalRecipient || isLoading || isWithdrawalCapacityExhausted}
         />
         {amountError && <p className="text-sm text-red-500">{amountError}</p>}
         {feeError && <p className="text-sm text-yellow-600">{feeError}</p>}
@@ -422,7 +460,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
             maxValue={maxAmount}
             onChange={handleAmountChange}
             className="mt-2"
-            disabled={guestMode || isLoading}
+            disabled={guestMode || isLoading || isWithdrawalCapacityExhausted}
           />
         )}
       </div>
