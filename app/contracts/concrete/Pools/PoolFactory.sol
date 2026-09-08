@@ -294,7 +294,7 @@ contract record PoolFactory is Ownable {
             1e10,
             MA_EXP_TIME,
             [address(tokenA), address(tokenB)],
-            [1e18, 1e18],
+            [_rateMultiplierFor(tokenA), _rateMultiplierFor(tokenB)],
             [1, 1],
             [address(0), address(0)],
             lpTokenAddress
@@ -677,6 +677,18 @@ contract record PoolFactory is Ownable {
         emit NewPool(_coin, address(pool.coins(0)), poolAddress);
 
         return mintAmount;
+    }
+
+    /// @dev G6: the Curve convention, 10**(36 - decimals), so every coin's
+    ///      balance scales to 1e18 units inside the pool. A flat 1e18 priced a
+    ///      6-decimal coin 1e12 times too low.
+    ///      NB: called through the IERC20Metadata interface on purpose. From an
+    ///      internal function SolidVM binds `ERC20(t).decimals()` to ERC20's own
+    ///      body (18) instead of dispatching to Token's external override.
+    function _rateMultiplierFor(address token) internal view returns (uint) {
+        uint dec = uint(IERC20Metadata(token).decimals());
+        require(dec <= 36, "Unsupported token decimals");
+        return 10 ** (36 - dec);
     }
 
     function updatePoolImplementation() external onlyOwner {

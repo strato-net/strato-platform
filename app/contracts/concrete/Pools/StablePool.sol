@@ -44,6 +44,11 @@ contract record StablePool is Ownable {
 
     uint constant PRECISION = 1e18;
 
+    /// @notice LP locked forever at address(0xdead) on the first deposit, so no
+    ///         first depositor can inflate the LP price (rebasing pools value
+    ///         donations) and round every later depositor down to nothing.
+    uint public constant MINIMUM_LIQUIDITY = 1000;
+
     PoolFactory private poolFactory;
 
     Token[] public record coins;
@@ -237,9 +242,17 @@ contract record StablePool is Ownable {
 
         for (uint i = 0; i < _coins.length; i++) {
             require(_coins[i] != address(0), "Zero token address");
+            for (uint k = 0; k < i; k++) {
+                require(_coins[k] != _coins[i], "Duplicate token address");
+            }
             coins.push(Token(_coins[i]));
             assetTypes.push(_assetTypes[i]);
-            poolContainsRebasingTokens = poolContainsRebasingTokens || (_assetTypes[i] == 2);
+            // G3: written as an `if`, not `flag = flag || (...)`. SolidVM parses
+            // that assignment as `(flag = flag) || (...)` and never stores the
+            // right-hand side, which left rebasing support permanently off.
+            if (_assetTypes[i] == 2) {
+                poolContainsRebasingTokens = true;
+            }
             tokenBalances[_coins[i]] = 0;
             adminBalances[_coins[i]] = 0;
             rateMultipliers[_coins[i]] = _rateMultipliers[i];
@@ -421,6 +434,11 @@ contract record StablePool is Ownable {
         return _exchange(msg.sender, i, j, amountIn, minAmountOut, msg.sender, false);
     }
 
+    /// @notice Swap coins that were transferred to the pool earlier in the SAME
+    ///         transaction (router / zap pattern).
+    /// @dev The entire surplus of coin i above the pool's ledger is treated as
+    ///      the swap input and is claimable by ANY caller. Never transfer coins
+    ///      to the pool and call this in a separate transaction.
     function exchangeReceived(uint i, uint j, uint _dx, uint _minDy, address _receiver) external whenNotPaused nonReentrant returns (uint) {
         require(!poolContainsRebasingTokens, "Cannot call exchangeReceived when the pool contains rebasing tokens");
         address receiver = _receiver == address(0) ? msg.sender : _receiver;
@@ -495,8 +513,15 @@ contract record StablePool is Ownable {
             uint[] xp = _xpMem(rates, newBalances);
             d1 = getD(xp, amp);
             mintAmount = (totalSupply * (d1 - d0)) / d0;
+            // G4: deposits move the price too; keep the spot/EMA/D oracles
+            // current the way Curve's add_liquidity does.
+            upkeepOracles(xp, amp, d1);
         } else {
-            mintAmount = d1;
+            // L1: the first deposit permanently locks MINIMUM_LIQUIDITY.
+            require(d1 > MINIMUM_LIQUIDITY, "Initial deposit too small");
+            lpToken.mint(address(0xdead), MINIMUM_LIQUIDITY);
+            totalSupply = MINIMUM_LIQUIDITY;
+            mintAmount = d1 - MINIMUM_LIQUIDITY;
             lastDPacked = pack2(d1, d1);
             uint[2] maLastTimeUnpacked = unpack2(maLastTime);
             if (maLastTimeUnpacked[1] < block.timestamp) {
@@ -627,7 +652,10 @@ contract record StablePool is Ownable {
         return (idealMint * (FEE_DENOMINATOR - tolerance)) / FEE_DENOMINATOR;
     }
 
-    function removeliquidityOneCoin(uint _burnAmount, uint i, uint _minReceived, address _receiver) external whenNotDisabled nonReentrant returns (uint) {
+    /// @dev G5: whenNotPaused as well as whenNotDisabled. A one-coin exit is a
+    ///      swap priced by the curve; a paused (mispricing) pool must not honour
+    ///      it. Proportional removeLiquidityGeneral stays open while paused.
+    function removeliquidityOneCoin(uint _burnAmount, uint i, uint _minReceived, address _receiver) external whenNotPaused whenNotDisabled nonReentrant returns (uint) {
         require(i < coins.length, "Coin index out of range");
         require(_burnAmount > 0, "Cannot remove 0 liquidity");
         address receiver = _receiver == address(0) ? msg.sender : _receiver;
@@ -657,7 +685,8 @@ contract record StablePool is Ownable {
         return dy;
     }
 
-    function removeLiquidityImbalance(uint[] _amounts, uint _maxBurnAmount, address _receiver) external whenNotDisabled nonReentrant returns (uint) {
+    /// @dev G5: see removeliquidityOneCoin.
+    function removeLiquidityImbalance(uint[] _amounts, uint _maxBurnAmount, address _receiver) external whenNotPaused whenNotDisabled nonReentrant returns (uint) {
         address receiver = _receiver == address(0) ? msg.sender : _receiver;
         uint amp = _A();
         uint[] rates = _storedRates();
@@ -1100,7 +1129,11 @@ contract record StablePool is Ownable {
             xpJ = xp[j];
 
             if (j == i) {
-                dxExpected = (xpJ * d1) / (d0 - newY);
+                // G1: Curve's `xp_j * D1 / D0 - new_y`, the imbalance this
+                // withdrawal creates on coin i. The previous
+                // `(xpJ * d1) / (d0 - newY)` was roughly the whole reserve, so
+                // the fee was charged on the entire reserve of coin i.
+                dxExpected = (xpJ * d1) / d0 - newY;
                 xAvg = (xpJ + newY) / 2;
             } else {
                 dxExpected = xpJ - (xpJ * d1 / d0);
@@ -1292,7 +1325,7 @@ contract record StablePool is Ownable {
         return (uint(r) * 3822833074963236453042738258902158003155416615667) >> uint(195 - k);
     }
 
-    function rampA(uint _futureA, uint _futureTime) onlyOwner {
+    function rampA(uint _futureA, uint _futureTime) external onlyOwner {
         require(block.timestamp >= initialATime + MIN_RAMP_TIME, "Not time to ramp A yet");
         require(_futureTime >= block.timestamp + MIN_RAMP_TIME, "Insufficient time");
 
@@ -1350,9 +1383,11 @@ contract record StablePool is Ownable {
     /// @param _rateMultiplier The rate multiplier for the new token
     /// @param _assetType The asset type (1=normal, 2=rebasing)
     /// @param _oracle The price oracle address for the new token (address(0) if none)
-    /// @param _initialAmount The initial deposit amount for the new token
+    /// @param _initialAmount The initial deposit amount for the new token. Must be
+    ///        large enough to raise the pool invariant (about 4% of the per-coin
+    ///        balance at A = 100) or the call reverts.
     /// @param _depositor The address providing the initial deposit (must have approved this pool)
-    /// @return mintAmount The amount of LP tokens minted to the depositor
+    /// @return mintAmount LP minted to the depositor, proportional to the invariant increase
     function addCoin(
         address _coin,
         uint _rateMultiplier,
@@ -1372,26 +1407,25 @@ contract record StablePool is Ownable {
             require(address(coins[i]) != _coin, "Coin already in pool");
         }
 
-        // Calculate existing pool value before adding coin
         uint totalSupply = lpToken.totalSupply();
         require(totalSupply > 0, "Pool must have existing liquidity");
 
-        // Value the pool at _storedRates(), which folds in the oracle price and
-        // the assetType 3 exchange rate. rateMultipliers alone mis-prices any
-        // coin whose value is not fixed at its multiplier.
-        uint[] existingRates = _storedRates();
-        uint existingValue = 0;
-        for (uint i = 0; i < coins.length; i++) {
-            address tokenAddr = address(coins[i]);
-            uint balance = tokenBalances[tokenAddr] - adminBalances[tokenAddr];
-            existingValue += (balance * existingRates[i]) / PRECISION;
-        }
-        require(existingValue > 0, "Pool has no value");
+        // G2: LP is minted by the change in the invariant, exactly like every
+        // other deposit path. Valuing the deposit at its nominal rate paid the
+        // depositor for a small, scarce balance that *lowered* D and left the
+        // new coin quoted at a premium anyone could sell into. The initial
+        // amount therefore has to be large enough to raise D (roughly 4% of the
+        // per-coin balance at A = 100); anything smaller reverts.
+        uint amp = _A();
+        uint d0 = getDMem(_storedRates(), _balances(), amp);
+        require(d0 > 0, "Pool has no value");
 
         // Add coin metadata
         coins.push(Token(_coin));
         assetTypes.push(_assetType);
-        poolContainsRebasingTokens = poolContainsRebasingTokens || (_assetType == 2);
+        if (_assetType == 2) {
+            poolContainsRebasingTokens = true;   // G3: see _initialize
+        }
         tokenBalances[_coin] = 0;
         adminBalances[_coin] = 0;
         rateMultipliers[_coin] = _rateMultiplier;
@@ -1400,36 +1434,39 @@ contract record StablePool is Ownable {
         // Extend internal arrays
         callAmount.push(0);
         scaleFactor.push(0);
-        lastPricesPacked.push(pack2(1e18, 1e18));
 
         // Transfer in initial deposit (new coin is at index coins.length - 1)
         uint dx = _transferIn(coins.length - 1, _initialAmount, _depositor, false);
 
-        // Calculate LP tokens to mint proportional to value added, priced the
-        // same way the existing reserves were.
-        uint[] newRates = _storedRates();
-        uint newValue = (dx * newRates[coins.length - 1]) / PRECISION;
-        uint mintAmount = (totalSupply * newValue) / existingValue;
+        uint[] rates = _storedRates();
+        uint[] xp = _xpMem(rates, _balances());
+        uint d1 = getD(xp, amp);
+        require(d1 > d0, "Initial amount too small: invariant did not increase");
+        uint mintAmount = (totalSupply * (d1 - d0)) / d0;
         require(mintAmount > 0, "Deposit too small to mint LP tokens");
 
         lpToken.mint(_depositor, mintAmount);
 
-        // Update oracle state with new pool composition
-        uint amp = _A();
-        uint[] rates = _storedRates();
-        uint[] balances = _balances();
-        uint[] xp = _xpMem(rates, balances);
-        uint d = getD(xp, amp);
+        // Seed the new coin's oracle slot at its actual spot price (clamped the
+        // way upkeepOracles clamps) rather than a flat 1e18.
+        uint[] spot = _getP(xp, amp, d1);
+        uint seed = spot[coins.length - 2];
+        if (seed == 0) {
+            seed = 1e18;
+        } else if (seed > 2e18) {
+            seed = 2e18;
+        }
+        lastPricesPacked.push(pack2(seed, seed));
 
-        lastDPacked = pack2(d, d);
+        lastDPacked = pack2(d1, d1);
         uint[2] maLastTimeUnpacked = unpack2(maLastTime);
         if (maLastTimeUnpacked[1] < block.timestamp) {
             maLastTimeUnpacked[1] = block.timestamp;
             maLastTime = pack2(maLastTimeUnpacked[0], maLastTimeUnpacked[1]);
         }
 
-        upkeepOracles(xp, amp, d);
-        _updateRatios(rates, xp, amp, d);
+        upkeepOracles(xp, amp, d1);
+        _updateRatios(rates, xp, amp, d1);
 
         emit CoinAdded(_coin, _assetType, _rateMultiplier, _oracle, dx, mintAmount);
 
@@ -1474,10 +1511,14 @@ contract record StablePool is Ownable {
         require(!isDisabled, "Pool has already been migrated");
         _withdrawAdminFees();
 
+        // _balances() is balanceOf-based on rebasing pools, so the migrated
+        // amount is what the pool actually holds; any protocol fee that could
+        // not be swept (no collector) travels with the reserves as before.
+        uint[] balances = _balances();
         uint[] amounts;
         for (uint i = 0; i < coins.length; i++) {
             address tokenAddr = address(coins[i]);
-            uint balance = tokenBalances[tokenAddr];
+            uint balance = balances[i] + adminBalances[tokenAddr];
             amounts.push(balance);
             if (balance > 0) {
                 _transferOut(i, balance, receiver);
