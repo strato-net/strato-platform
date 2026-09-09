@@ -10,7 +10,8 @@ import {
   config,
   getExternalBridgeExecutorKmsConfig,
   getExternalBridgeExecutorPrivateKey,
-  getExternalBridgeSignerUrls,
+  getExternalBridgeVerifierApiTokens,
+  getExternalBridgeVerifierUrls,
   getNativeBridgePrivateKeys,
 } from "../config";
 import { ensureHexPrefix } from "./utils";
@@ -42,16 +43,16 @@ interface ExternalBridgeExecutorValidationResult {
   warnings: string[];
 }
 
-export const validateExternalBridgeSignerUrls = (
+export const validateExternalBridgeVerifierUrls = (
   urls: string[],
 ): string[] =>
   urls.flatMap((url) => {
     try {
       return new URL(url).protocol === "https:"
         ? []
-        : [`External bridge signer URL must use HTTPS: ${url}`];
+        : [`External bridge verifier URL must use HTTPS: ${url}`];
     } catch {
-      return [`Invalid external bridge signer URL: ${url}`];
+      return [`Invalid external bridge verifier URL: ${url}`];
     }
   });
 
@@ -59,7 +60,7 @@ export const validateExternalBridgeExecutorConfig = (
   chainId: number | bigint,
   kmsConfig: ReturnType<typeof getExternalBridgeExecutorKmsConfig>,
   privateKey: string | undefined,
-  deployed: boolean,
+  _deployed: boolean,
 ): ExternalBridgeExecutorValidationResult => {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -67,50 +68,25 @@ export const validateExternalBridgeExecutorConfig = (
   let executorAddress: string | undefined;
 
   if (!kmsConfig) {
-    if (deployed) {
-      errors.push(
-        privateKey
-          ? `${prefix}_PRIVATE_KEY must not be configured for a deployed bridge service; configure ${prefix}_ADDRESS and ${prefix}_KMS_URL`
-          : `Deployed external bridge executor requires ${prefix}_ADDRESS and ${prefix}_KMS_URL`,
-      );
-    } else if (!privateKey || !isPrivateKey(privateKey)) {
-      errors.push(
-        `Missing or invalid external bridge executor signing config: set ${prefix}_KMS_URL plus ${prefix}_ADDRESS, or ${prefix}_PRIVATE_KEY`,
-      );
-    } else {
-      executorAddress = new Wallet(normalizePrivateKey(privateKey)).address;
-    }
+    errors.push(
+      `External bridge executor requires ${prefix}_ADDRESS, ${prefix}_KMS_KEY_ID, and ${prefix}_KMS_REGION`,
+    );
     return { executorAddress, errors, warnings };
   }
 
   if (!kmsConfig.address || !isAddress(kmsConfig.address)) {
     errors.push(
-      `Missing or invalid external bridge executor KMS address: ${prefix}_ADDRESS`,
+      `Missing or invalid external bridge executor address: ${prefix}_ADDRESS`,
     );
   } else {
     executorAddress = ensureHexPrefix(kmsConfig.address);
   }
-  if (!kmsConfig.url) {
-    errors.push(`Missing external bridge executor KMS URL: ${prefix}_KMS_URL`);
-  } else if (deployed) {
-    try {
-      if (new URL(kmsConfig.url).protocol !== "https:") {
-        errors.push(`${prefix}_KMS_URL must use HTTPS`);
-      }
-    } catch {
-      errors.push(`${prefix}_KMS_URL must use HTTPS`);
-    }
-  }
+  if (!kmsConfig.keyId) errors.push(`Missing ${prefix}_KMS_KEY_ID`);
+  if (!kmsConfig.region) errors.push(`Missing ${prefix}_KMS_REGION`);
   if (privateKey) {
-    if (deployed) {
-      errors.push(
-        `${prefix}_PRIVATE_KEY must not be configured for a deployed bridge service`,
-      );
-    } else {
-      warnings.push(
-        `Both KMS and private-key executor config are set for chain ${chainId}; KMS executor signing will be used`,
-      );
-    }
+    errors.push(
+      `${prefix}_PRIVATE_KEY must not be configured; use AWS workload-identity KMS`,
+    );
   }
 
   return { executorAddress, errors, warnings };
@@ -141,8 +117,8 @@ export async function validateBridgeConfig(): Promise<boolean> {
     "TOKEN_ROUTER",
     "SAFE_ADDRESS",
     "SAFE_PROPOSER_ADDRESS",
-    "SAFE_PROPOSER_KMS_URL",
-    "SAFE_PROPOSER_KMS_API_TOKEN",
+    "SAFE_PROPOSER_KMS_KEY_ID",
+    "SAFE_PROPOSER_KMS_REGION",
   ];
 
   requiredEnvVars.forEach((varName) => {
@@ -336,13 +312,6 @@ export async function validateBridgeConfig(): Promise<boolean> {
     }
   }
 
-  if (
-    config.safe.safeProposerKmsUrl &&
-    !config.safe.safeProposerKmsUrl.startsWith("https://")
-  ) {
-    errors.push("SAFE_PROPOSER_KMS_URL must use HTTPS");
-  }
-
   if (config.safe.apiKey) {
     if (!/^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/.test(config.safe.apiKey)) {
       errors.push(
@@ -483,7 +452,8 @@ export async function validateBridgeConfig(): Promise<boolean> {
             `CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS must be an explicit positive integer`,
           );
         }
-        const signerUrls = getExternalBridgeSignerUrls(chainId);
+        const signerUrls = getExternalBridgeVerifierUrls(chainId);
+        const signerApiTokens = getExternalBridgeVerifierApiTokens(chainId);
         const executorKmsConfig = getExternalBridgeExecutorKmsConfig(chainId);
         const executorPrivateKey = getExternalBridgeExecutorPrivateKey(chainId);
         const executorValidation = validateExternalBridgeExecutorConfig(
@@ -497,17 +467,38 @@ export async function validateBridgeConfig(): Promise<boolean> {
         const executorAddress = executorValidation.executorAddress;
         if (signerUrls.length < 3) {
           errors.push(
-            `CHAIN_${chainId}_EXTERNAL_BRIDGE_SIGNER_URLS must contain 3 independent signer services`,
+            `CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS must contain 3 independent verifier services`,
           );
         }
-        errors.push(...validateExternalBridgeSignerUrls(signerUrls));
+        if (new Set(signerUrls).size !== signerUrls.length) {
+          errors.push(
+            `CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS must contain distinct URLs`,
+          );
+        }
+        if (signerApiTokens.length !== signerUrls.length) {
+          errors.push(
+            `CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS must contain one token per verifier URL`,
+          );
+        } else if (new Set(signerApiTokens).size !== signerApiTokens.length) {
+          errors.push(
+            `CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS must contain distinct tokens`,
+          );
+        }
+        errors.push(...validateExternalBridgeVerifierUrls(signerUrls));
         if (!chain.vault || !isAddress(chain.vault)) {
           errors.push(`Invalid external bridge vault for chain ${chainId}`);
           continue;
         }
 
         const rpcUrl = process.env[`CHAIN_${chainId}_RPC_URL`];
-        if (!rpcUrl || signerUrls.length === 0 || !executorAddress) continue;
+        if (
+          !rpcUrl ||
+          signerUrls.length === 0 ||
+          signerApiTokens.length !== signerUrls.length ||
+          !executorAddress
+        ) {
+          continue;
+        }
 
         try {
           const vault = new Contract(
@@ -516,30 +507,71 @@ export async function validateBridgeConfig(): Promise<boolean> {
             new JsonRpcProvider(rpcUrl),
           );
           const signerMetadata = await Promise.all(
-            signerUrls.map(async (url) => {
+            signerUrls.map(async (url, index) => {
               const response = await fetch(`${url}/health`, {
-                headers: process.env.EXTERNAL_BRIDGE_SIGNER_API_TOKEN
-                  ? {
-                      Authorization: `Bearer ${process.env.EXTERNAL_BRIDGE_SIGNER_API_TOKEN}`,
-                    }
-                  : undefined,
+                headers: {
+                  Authorization: `Bearer ${signerApiTokens[index]}`,
+                },
               });
               if (!response.ok) {
                 throw new Error(`Signer ${url} health returned ${response.status}`);
               }
               return (await response.json()) as {
-                signer: string;
-                settlementVerifier: string;
-                settlementVerifierConfirmations: number;
+                authorizationSigner: string;
+                settlementAttestor: string;
+                verifierConfirmations: number;
                 destinationChainId: string;
                 destinationVault: string;
+                policyVersion: string;
+                policyDigest: string;
+                baselinePolicyHash: string;
+                verifierIndex: number;
               };
             }),
           );
-          const signerAddresses = signerMetadata.map(({ signer }) => signer);
-          const verifierAddresses = signerMetadata.map(
-            ({ settlementVerifier }) => String(settlementVerifier || ""),
+          const signerAddresses = signerMetadata.map(
+            ({ authorizationSigner }) => authorizationSigner,
           );
+          const verifierAddresses = signerMetadata.map(
+            ({ settlementAttestor }) => String(settlementAttestor || ""),
+          );
+          if (
+            signerMetadata.some(
+              ({
+                policyVersion,
+                policyDigest,
+                baselinePolicyHash,
+                verifierIndex,
+              }) =>
+                !policyVersion ||
+                !/^sha256:[0-9a-f]{64}$/.test(policyDigest) ||
+                !/^sha256:[0-9a-f]{64}$/.test(baselinePolicyHash) ||
+                !Number.isSafeInteger(verifierIndex) ||
+                verifierIndex <= 0,
+            )
+          ) {
+            errors.push(
+              `External bridge signer metadata for chain ${chainId} is missing a valid local policy version or digest`,
+            );
+          }
+          if (
+            new Set(
+              signerMetadata.map(({ baselinePolicyHash }) => baselinePolicyHash),
+            ).size !== 1
+          ) {
+            errors.push(
+              `External bridge verifiers for chain ${chainId} do not share one baseline policy hash`,
+            );
+          }
+          if (
+            new Set(
+              signerMetadata.map(({ verifierIndex }) => verifierIndex),
+            ).size !== signerMetadata.length
+          ) {
+            errors.push(
+              `External bridge verifiers for chain ${chainId} contain duplicate policy indexes`,
+            );
+          }
           if (new Set(signerAddresses.map((value) => value.toLowerCase())).size !== signerAddresses.length) {
             errors.push(`External bridge signer URLs for chain ${chainId} contain duplicate signers`);
           }
@@ -573,11 +605,11 @@ export async function validateBridgeConfig(): Promise<boolean> {
             }
             if (
               !Number.isSafeInteger(
-                metadata.settlementVerifierConfirmations,
+                metadata.verifierConfirmations,
               ) ||
-              metadata.settlementVerifierConfirmations <= 0 ||
+              metadata.verifierConfirmations <= 0 ||
               (confirmationValue &&
-                metadata.settlementVerifierConfirmations <
+                metadata.verifierConfirmations <
                   Number(confirmationValue))
             ) {
               errors.push(

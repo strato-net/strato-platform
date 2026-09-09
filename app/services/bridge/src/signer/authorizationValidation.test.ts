@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  matchesSourceWithdrawalAuthorization,
-  validateSignerKmsUrl,
-} from "./authorizationValidation";
+import { matchesSourceWithdrawalAuthorization } from "./authorizationValidation";
 
 const requested = {
   notBefore: "100",
@@ -31,23 +28,4 @@ test("requires exact STRATO withdrawal authorization timing and version", () => 
     false,
   );
   assert.equal(matchesSourceWithdrawalAuthorization(undefined, requested), false);
-});
-
-test("requires HTTPS for withdrawal attestation KMS when enforced", () => {
-  assert.throws(
-    () => validateSignerKmsUrl("http://attestation-kms", true),
-    /must use HTTPS/,
-  );
-  assert.throws(
-    () => validateSignerKmsUrl("not-a-url", true),
-    /must use HTTPS/,
-  );
-  assert.equal(
-    validateSignerKmsUrl("https://attestation-kms", true),
-    "https://attestation-kms",
-  );
-  assert.equal(
-    validateSignerKmsUrl("http://localhost:9000", false),
-    "http://localhost:9000",
-  );
 });

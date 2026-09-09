@@ -1,20 +1,26 @@
 import axios from "axios";
-import { getExternalBridgeSignerUrls } from "../config";
+import {
+  getExternalBridgeVerifierApiTokens,
+  getExternalBridgeVerifierUrls,
+} from "../config";
 import { ActionDepositArgs, DepositArgs } from "../types";
 import { logError, logInfo } from "../utils/logger";
 import { WithdrawalAuthorization } from "./externalWithdrawalService";
 import { getSettlementVerifierConfig } from "./cirrusService";
 
-const signerHeaders = () => ({
-  Authorization: `Bearer ${process.env.EXTERNAL_BRIDGE_SIGNER_API_TOKEN}`,
+const signerHeaders = (token: string) => ({
+  Authorization: `Bearer ${token}`,
 });
+
+export class SettlementVerifierManualReviewRequired extends Error {}
 
 const requestAllVerifiers = async (
   chainId: string | number,
   path: string,
   payload: unknown,
 ): Promise<void> => {
-  const urls = getExternalBridgeSignerUrls(BigInt(chainId));
+  const urls = getExternalBridgeVerifierUrls(BigInt(chainId));
+  const apiTokens = getExternalBridgeVerifierApiTokens(BigInt(chainId));
   const { threshold } = await getSettlementVerifierConfig();
   if (urls.length === 0) {
     throw new Error(
@@ -26,9 +32,16 @@ const requestAllVerifiers = async (
       `Invalid settlement verifier threshold ${threshold} for ${urls.length} verifier services`,
     );
   }
+  if (apiTokens.length !== urls.length) {
+    throw new Error(
+      `External bridge signer API token count does not match signer URL count for chain ${chainId}`,
+    );
+  }
   const results = await Promise.allSettled(
-    urls.map((url) =>
-      axios.post(`${url}${path}`, payload, { headers: signerHeaders() }),
+    urls.map((url, index) =>
+      axios.post(`${url}${path}`, payload, {
+        headers: signerHeaders(apiTokens[index]),
+      }),
     ),
   );
   const succeeded = results.filter(
@@ -36,6 +49,13 @@ const requestAllVerifiers = async (
       result.status === "fulfilled" &&
       typeof result.value.data?.transactionHash === "string" &&
       result.value.data.transactionHash.length > 0,
+  ).length;
+  const manualReviewRequired = results.filter(
+    (result) =>
+      result.status === "rejected" &&
+      axios.isAxiosError(result.reason) &&
+      result.reason.response?.status === 409 &&
+      result.reason.response?.data?.decision === "manual_review",
   ).length;
   results.forEach((result, index) => {
     if (result.status === "rejected") {
@@ -47,6 +67,11 @@ const requestAllVerifiers = async (
     }
   });
   if (succeeded < threshold) {
+    if (manualReviewRequired > 0) {
+      throw new SettlementVerifierManualReviewRequired(
+        `Settlement verifier manual review required for ${path}: ${manualReviewRequired}/${urls.length}`,
+      );
+    }
     throw new Error(
       `Settlement verifier threshold not reached for ${path}: ${succeeded}/${threshold}`,
     );

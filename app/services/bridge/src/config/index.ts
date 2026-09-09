@@ -72,8 +72,8 @@ const config = {
     address: process.env.SAFE_ADDRESS,
     hotWalletAddress: process.env.SAFE_HOT_WALLET_ADDRESS,
     safeProposerAddress: process.env.SAFE_PROPOSER_ADDRESS,
-    safeProposerKmsUrl: process.env.SAFE_PROPOSER_KMS_URL,
-    safeProposerKmsApiToken: process.env.SAFE_PROPOSER_KMS_API_TOKEN,
+    safeProposerKmsKeyId: process.env.SAFE_PROPOSER_KMS_KEY_ID,
+    safeProposerKmsRegion: process.env.SAFE_PROPOSER_KMS_REGION,
     apiKey: process.env.SAFE_API_KEY,
   },
   voucher: {
@@ -223,12 +223,20 @@ export const getNativeBridgePrivateKeys = (
   return keys;
 };
 
-export const getExternalBridgeSignerUrls = (
+export const getExternalBridgeVerifierUrls = (
   chainId: number | bigint,
 ): string[] =>
-  (process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_SIGNER_URLS`] || "")
+  (process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS`] || "")
     .split(",")
     .map((url) => url.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+
+export const getExternalBridgeVerifierApiTokens = (
+  chainId: number | bigint,
+): string[] =>
+  (process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS`] || "")
+    .split(",")
+    .map((token) => token.trim())
     .filter(Boolean);
 
 export const getExternalBridgeExecutorPrivateKey = (
@@ -238,8 +246,8 @@ export const getExternalBridgeExecutorPrivateKey = (
 
 export interface ExternalBridgeExecutorKmsConfig {
   address: string;
-  url: string;
-  apiToken?: string;
+  keyId: string;
+  region: string;
 }
 
 export const getExternalBridgeExecutorKmsConfig = (
@@ -247,11 +255,11 @@ export const getExternalBridgeExecutorKmsConfig = (
 ): ExternalBridgeExecutorKmsConfig | undefined => {
   const prefix = `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR`;
   const address = process.env[`${prefix}_ADDRESS`]?.trim();
-  const url = process.env[`${prefix}_KMS_URL`]?.trim();
-  const apiToken = process.env[`${prefix}_KMS_API_TOKEN`]?.trim();
+  const keyId = process.env[`${prefix}_KMS_KEY_ID`]?.trim();
+  const region = process.env[`${prefix}_KMS_REGION`]?.trim();
 
-  if (!address && !url && !apiToken) return undefined;
-  return { address: address || "", url: url || "", apiToken };
+  if (!address && !keyId && !region) return undefined;
+  return { address: address || "", keyId: keyId || "", region: region || "" };
 };
 
 // Validate required environment variables
@@ -268,12 +276,11 @@ const requiredEnvVars = [
   "RELAYER_OPENID_DISCOVERY_URL",
   "BRIDGE_ADDRESS",
   "EXTERNAL_ASSET_BRIDGE_ADDRESS",
-  "EXTERNAL_BRIDGE_SIGNER_API_TOKEN",
   "PRICE_ORACLE_ADDRESS",
   "SAFE_ADDRESS",
   "SAFE_PROPOSER_ADDRESS",
-  "SAFE_PROPOSER_KMS_URL",
-  "SAFE_PROPOSER_KMS_API_TOKEN",
+  "SAFE_PROPOSER_KMS_KEY_ID",
+  "SAFE_PROPOSER_KMS_REGION",
 ];
 
 const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);

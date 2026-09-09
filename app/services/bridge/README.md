@@ -74,10 +74,10 @@ The service automatically validates that RPC URLs are configured for all enabled
 #### Safe Wallet
 - `SAFE_ADDRESS` - Gnosis Safe wallet address
 - `SAFE_PROPOSER_ADDRESS` - Safe Proposer address
-- `SAFE_PROPOSER_KMS_URL` - Authenticated KMS/HSM digest-signing adapter
-- `SAFE_PROPOSER_KMS_API_TOKEN` - Bearer credential for the KMS/HSM adapter
+- `SAFE_PROPOSER_KMS_KEY_ID` - AWS KMS key ID or alias for the Safe proposer
+- `SAFE_PROPOSER_KMS_REGION` - AWS region containing the Safe proposer key
 
-The Safe proposer private key is not loaded by the bridge service. The adapter receives `{ "digest": "0x..." }`, returns `{ "signature": "0x..." }`, and each returned signature is checked against `SAFE_PROPOSER_ADDRESS`.
+The bridge workload calls AWS KMS directly with its IAM role. No AWS access key, bearer-authenticated signing adapter, or Safe proposer private key is loaded by the service. The KMS public key and every returned signature are checked against `SAFE_PROPOSER_ADDRESS`.
 
 The separately run Ethereum `depositRouterSafeOps.js` deployment and upgrade tooling still accepts `SAFE_PROPOSER_PRIVATE_KEY`. This is an offline operational exception and must not share the bridge-service runtime or environment.
 
@@ -91,18 +91,18 @@ Native withdrawal review delay and attestation validity are enforced by the nati
 
 #### External Vault Releases
 - `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS` - Unprivileged destination-chain gas executor address
-- `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_KMS_URL` - KMS/HSM adapter URL for executor transaction digest signing
-- `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_KMS_API_TOKEN` - Optional bearer token for the executor KMS adapter
-- `CHAIN_${chainId}_EXTERNAL_BRIDGE_SIGNER_URLS` - Comma-separated HTTPS URLs for three independent signer services
-- `EXTERNAL_BRIDGE_SIGNER_API_TOKEN` - Shared authentication token for signer service requests
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID` - AWS KMS key ID or alias for executor signing
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION` - AWS region containing the executor key
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS` - Comma-separated HTTPS URLs for three independent verifier services
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS` - Comma-separated distinct tokens in the same order as the verifier URLs
 
-Testnet and production executor deployments require the KMS/HSM adapter. The adapter receives `{ "digest": "0x..." }` and must return a recoverable 65-byte ECDSA signature in `{ "signature": "0x..." }`; the bridge service verifies the signature recovers to `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS` before broadcasting the transaction.
+The executor workload calls AWS KMS directly through workload identity and verifies each signature against `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS` before broadcasting.
 
-Run each signer independently with `npm run start:signer`. Each process must use its own `SIGNER_RPC_URL`, authenticated KMS/HSM adapter (`KMS_SIGNER_URL`, `KMS_SIGNER_ADDRESS`, `KMS_SIGNER_API_TOKEN`), and STRATO settlement-verifier OAuth account (`SIGNER_OPENID_DISCOVERY_URL`, `SIGNER_CLIENT_ID`, `SIGNER_CLIENT_SECRET`, `SIGNER_BA_USERNAME`, `SIGNER_BA_PASSWORD`). Register three independent STRATO accounts with `ExternalAssetBridge.setSettlementVerifier` and configure threshold 2 before starting the bridge service. Access tokens are refreshed before expiry and once after a 401 response. A signer independently verifies deposits and external vault releases before recording a STRATO settlement attestation; it also verifies the source withdrawal, exact STRATO authorization timing/version and destination vault policy before requesting a vault authorization signature. No attestation private key is held by the bridge executor.
+Run each verifier independently with `npm run start:verifier`. Each process must use its own `VERIFIER_RPC_URL`, AWS workload identity (`KMS_KEY_ID`, `KMS_REGION`, `VAULT_AUTHORIZATION_SIGNER_ADDRESS`), local `VERIFIER_POLICY_PATH`, inbound `EXTERNAL_BRIDGE_VERIFIER_API_TOKEN`, and STRATO settlement-attestor OAuth account (`SETTLEMENT_ATTESTOR_OPENID_DISCOVERY_URL`, `SETTLEMENT_ATTESTOR_CLIENT_ID`, `SETTLEMENT_ATTESTOR_CLIENT_SECRET`, `SETTLEMENT_ATTESTOR_BA_USERNAME`, `SETTLEMENT_ATTESTOR_BA_PASSWORD`). Register three independent STRATO accounts with `ExternalAssetBridge.setSettlementVerifier` and configure threshold 2 before starting the bridge service. Each verifier independently validates chain evidence, source state, contract limits, and its local policy. Amounts above a local automatic limit require the existing on-chain review approval before signing. Decision logs include the local policy version and SHA-256 digest.
 
-Testnet and production signer deployments use `docker-compose.bridge-signer.tpl.yml`. Deploy one isolated stack per signer with a distinct RPC provider, KMS/HSM key and HTTPS API endpoint.
+Verifier deployments use `docker-compose.bridge-signer.tpl.yml`. Deploy one isolated stack per verifier organization with a distinct RPC provider, AWS account or role, KMS key, policy file, API token, and HTTPS endpoint. Finalization generates `external-bridge-verifier-policy-<chainId>-1.json` through `-3.json`, each bound to one STRATO settlement attestor and one shared baseline hash. Each organization may tighten its local limits but must not raise them above the contract policy.
 
-`SETTLEMENT_VERIFIER_CONFIRMATIONS` controls the external-chain confirmation depth independently enforced by that verifier. Configure it per chain and risk policy. Deposit minting and withdrawal finalization require the on-chain verifier threshold; after that threshold is present, any STRATO account may submit the settlement transaction.
+`VERIFIER_CONFIRMATIONS` controls the external-chain confirmation depth independently enforced by that verifier. Configure it per chain and risk policy. Deposit minting and withdrawal finalization require the on-chain verifier threshold; after that threshold is present, any STRATO account may submit the settlement transaction.
 
 For native ETH deposits, each verifier calls `trace_transaction` to prove the DepositRouter-to-vault custody movement. At least two of the three configured signer RPCs must support this method for settlement, and all three should support it to preserve one-verifier fault tolerance. Verify trace support with a real DepositRouter ETH transaction before enabling the route.
 

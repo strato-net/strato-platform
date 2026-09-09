@@ -186,8 +186,10 @@ DepositRouter, guardian, and initial block. For deployments created before
 `depositRouterDeploymentBlock` was recorded, set that field in the settings
 file. Preparation never overwrites an existing policy.
 
-Replace every `REVIEW_REQUIRED` risk amount and every route's
-`rebaseRequired` value with an explicitly reviewed boolean. Then finalize:
+Replace every `REVIEW_REQUIRED` value. This includes each route's
+`maxAutoDepositAmount` and each token's `maxAutoWithdrawalAmount`; both use raw
+external-token units. Set `rebaseRequired` to an explicitly reviewed boolean.
+Then finalize:
 
 ```bash
 npm run external:rollout:finalize -- --settings /secure/path/eab-settings.json --policy /secure/path/eab-rollout/external-bridge-rollout-policy-11155111.json --output-dir /secure/path/eab-rollout
@@ -196,6 +198,10 @@ npm run external:rollout:finalize -- --settings /secure/path/eab-settings.json -
 Finalization fails if token metadata, risk policy, deployment addresses, or
 chain IDs are missing or inconsistent. It also requires withdrawals and
 AUTO_ROUTE to remain disabled and every `migrateAmount` to remain zero. It
+emits three `external-bridge-verifier-policy-<chainId>-<index>.json` files,
+each bound to one configured STRATO settlement attestor and one shared baseline
+hash. Each verifier organization may lower its local limits, but must not raise
+them above contract policy. It
 never copies legacy withdrawal limits or submits transactions. The existing
 `external:rollout:generate` command remains available for manually supplied
 bridge and vault templates.
@@ -297,11 +303,12 @@ addresses from STRATO and requires these environment variables per chain:
 
 ```bash
 CHAIN_11155111_RPC_URL=https://...
-CHAIN_11155111_EXTERNAL_BRIDGE_SIGNER_ADDRESSES=0x...,0x...
-CHAIN_11155111_EXTERNAL_BRIDGE_SIGNER_URLS=https://signer-1.example,https://signer-2.example
+CHAIN_11155111_VAULT_AUTHORIZATION_SIGNER_ADDRESSES=0x...,0x...
+CHAIN_11155111_EXTERNAL_BRIDGE_VERIFIER_URLS=https://verifier-1.example,https://verifier-2.example,https://verifier-3.example
+CHAIN_11155111_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS=verifier-1-token,verifier-2-token,verifier-3-token
 CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS=0x...
-CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_URL=https://kms-signing-adapter.example/sign-transaction
-CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_API_TOKEN=...
+CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID=alias/eab-executor
+CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION=us-east-1
 ```
 
 Production deployments must use the KMS/HSM executor configuration above. The

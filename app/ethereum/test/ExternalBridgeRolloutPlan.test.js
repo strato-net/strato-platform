@@ -58,7 +58,10 @@ const depositPlan = {
 const bridgeTemplate = {
   adminRegistry: "8888888888888888888888888888888888888888",
   tokenRouter: {},
-  externalAssetBridge: { address: bridge },
+  externalAssetBridge: {
+    address: bridge,
+    settlementVerifiers: [safe.slice(2), vault.slice(2), router.slice(2)],
+  },
   chains: [{
     chainName: "sepolia",
     externalChainId: "11155111",
@@ -98,6 +101,7 @@ const policy = {
       manualReviewThreshold: "100000000",
       windowLimit: "1000000000",
       windowSeconds: "86400",
+      maxAutoWithdrawalAmount: "100000000",
       migrateAmount: "0",
       enabled: true,
     },
@@ -108,12 +112,14 @@ const policy = {
       withdrawalsEnabled: false,
       rebaseRequired: false,
       autoRouteEnabled: true,
+      maxAutoDepositAmount: "250000000",
     },
     [`${tokenKey}:${usdst.toLowerCase()}`]: {
       depositsEnabled: true,
       withdrawalsEnabled: false,
       rebaseRequired: false,
       autoRouteEnabled: false,
+      maxAutoDepositAmount: "250000000",
     },
   },
 };
@@ -181,6 +187,27 @@ test("builds one synchronized all-token rollout from DepositRouter inventory", (
     rollout.vaultConfig.chains[0].tokens[0].manualReviewThreshold,
     "100000000",
   );
+  assert.equal(rollout.verifierPolicies.length, 3);
+  assert.equal(
+    rollout.verifierPolicies[0].routes[0].maxAutoDepositAmount,
+    "250000000",
+  );
+  assert.equal(
+    rollout.verifierPolicies[0].tokens[0].maxAutoWithdrawalAmount,
+    "100000000",
+  );
+  assert.equal(
+    new Set(
+      rollout.verifierPolicies.map(({ baselinePolicyHash }) =>
+        baselinePolicyHash,
+      ),
+    ).size,
+    1,
+  );
+  assert.deepEqual(
+    rollout.verifierPolicies.map(({ verifierIndex }) => verifierIndex),
+    [1, 2, 3],
+  );
 });
 
 test("orders route permissions so the token remains enabled when any route is enabled", () => {
@@ -217,6 +244,10 @@ test("generates a fail-closed policy template for every token and route", () => 
 
   assert.equal(generated.tokens[tokenKey].maxPerWithdrawal, "REVIEW_REQUIRED");
   assert.equal(
+    generated.tokens[tokenKey].maxAutoWithdrawalAmount,
+    "REVIEW_REQUIRED",
+  );
+  assert.equal(
     generated.routes[`${tokenKey}:${usdcSt.toLowerCase()}`]
       .withdrawalsEnabled,
     false,
@@ -227,6 +258,11 @@ test("generates a fail-closed policy template for every token and route", () => 
   );
   assert.equal(
     generated.routes[`${tokenKey}:${usdcSt.toLowerCase()}`].rebaseRequired,
+    "REVIEW_REQUIRED",
+  );
+  assert.equal(
+    generated.routes[`${tokenKey}:${usdcSt.toLowerCase()}`]
+      .maxAutoDepositAmount,
     "REVIEW_REQUIRED",
   );
   assert.throws(
@@ -411,6 +447,12 @@ test("CLI preserves the completed policy and writes synchronized artifacts", () 
   assert.equal(
     fs.existsSync(
       path.join(directory, "external-bridge-vault-11155111.json"),
+    ),
+    true,
+  );
+  assert.equal(
+    fs.existsSync(
+      path.join(directory, "external-bridge-verifier-policy-11155111-1.json"),
     ),
     true,
   );

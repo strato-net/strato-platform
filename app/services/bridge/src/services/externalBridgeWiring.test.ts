@@ -10,12 +10,11 @@ for (const name of [
   "OPENID_DISCOVERY_URL",
   "BRIDGE_ADDRESS",
   "EXTERNAL_ASSET_BRIDGE_ADDRESS",
-  "EXTERNAL_BRIDGE_SIGNER_API_TOKEN",
   "PRICE_ORACLE_ADDRESS",
   "SAFE_ADDRESS",
   "SAFE_PROPOSER_ADDRESS",
-  "SAFE_PROPOSER_KMS_URL",
-  "SAFE_PROPOSER_KMS_API_TOKEN",
+  "SAFE_PROPOSER_KMS_KEY_ID",
+  "SAFE_PROPOSER_KMS_REGION",
   "RELAYER_BA_USERNAME",
   "RELAYER_BA_PASSWORD",
   "RELAYER_CLIENT_ID",
@@ -697,11 +696,13 @@ test("restores ready withdrawal authorization state from Cirrus", async () => {
 
 test("collects threshold signatures from independent signer services", async () => {
   const { Wallet } = await import("ethers");
-  const api = await import("../utils/api");
+  const axios = (await import("axios")).default;
   const signerOne = new Wallet(`0x${"31".repeat(32)}`);
   const signerTwo = new Wallet(`0x${"32".repeat(32)}`);
-  process.env.CHAIN_1_EXTERNAL_BRIDGE_SIGNER_URLS =
-    "https://signer-one,https://signer-two";
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS =
+    "https://signer-one,https://signer-two,https://signer-three";
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS =
+    "token-one,token-two,token-three";
 
   const authorization = {
     sourceChainId: "9001",
@@ -731,113 +732,39 @@ test("collects threshold signatures from independent signer services", async () 
       { name: "signerSetVersion", type: "uint256" },
     ],
   };
-  (api.fetch as any).post = async (url: string) => {
+  const originalPost = axios.post;
+  (axios as any).post = async (url: string) => {
+    if (url.includes("three")) throw new Error("verifier unavailable");
     const signer = url.includes("one") ? signerOne : signerTwo;
     return {
-      signer: signer.address,
-      signature: await signer.signTypedData(
-        {
-          name: "ExternalBridgeVault",
-          version: "1",
-          chainId: 1,
-          verifyingContract: authorization.destinationVault,
-        },
-        types,
-        authorization,
-      ),
+      data: {
+        authorizationSigner: signer.address,
+        signature: await signer.signTypedData(
+          {
+            name: "ExternalBridgeVault",
+            version: "1",
+            chainId: 1,
+            verifyingContract: authorization.destinationVault,
+          },
+          types,
+          authorization,
+        ),
+      },
     };
   };
 
-  const { signWithdrawalAuthorization } = await import(
-    "./externalWithdrawalService"
-  );
-  const signatures = await signWithdrawalAuthorization(authorization);
-  assert.equal(signatures.length, 2);
-});
-
-test("signs external vault executor transactions through KMS", async () => {
-  const { JsonRpcProvider, Transaction, Wallet } = await import("ethers");
-  const api = await import("../utils/api");
-  const executor = new Wallet(`0x${"41".repeat(32)}`);
-  const calls: any[] = [];
-  const originalPost = (api.fetch as any).post;
-  (api.fetch as any).post = async (url: string, body: any, options: any) => {
-    calls.push({ url, body, options });
-    return { signature: executor.signingKey.sign(body.digest).serialized };
-  };
-
   try {
-    const { ExternalBridgeExecutorKmsSigner } = await import(
+    const { signWithdrawalAuthorization } = await import(
       "./externalWithdrawalService"
     );
-    const signer = new ExternalBridgeExecutorKmsSigner(
-      {
-        address: executor.address,
-        url: "https://executor-kms",
-        apiToken: "executor-token",
-      },
-      new JsonRpcProvider("http://127.0.0.1:1"),
-    );
-    const signed = await signer.signTransaction({
-      to: "0x2222222222222222222222222222222222222222",
-      value: 0,
-      nonce: 1,
-      gasLimit: 100000,
-      gasPrice: 1,
-      chainId: 1,
-      data: "0x1234",
-    });
-    const transaction = Transaction.from(signed);
-
-    assert.equal(transaction.from, executor.address);
-    assert.equal(calls[0].url, "https://executor-kms");
-    assert.equal(
-      calls[0].options.headers.Authorization,
-      "Bearer executor-token",
-    );
+    const signatures = await signWithdrawalAuthorization(authorization);
+    assert.equal(signatures.length, 2);
   } finally {
-    (api.fetch as any).post = originalPost;
+    axios.post = originalPost;
   }
 });
 
-test("rejects external vault executor KMS signatures from the wrong key", async () => {
-  const { JsonRpcProvider, Wallet } = await import("ethers");
-  const api = await import("../utils/api");
-  const executor = new Wallet(`0x${"42".repeat(32)}`);
-  const wrongSigner = new Wallet(`0x${"43".repeat(32)}`);
-  const originalPost = (api.fetch as any).post;
-  (api.fetch as any).post = async (_url: string, body: any) => ({
-    signature: wrongSigner.signingKey.sign(body.digest).serialized,
-  });
-
-  try {
-    const { ExternalBridgeExecutorKmsSigner } = await import(
-      "./externalWithdrawalService"
-    );
-    const signer = new ExternalBridgeExecutorKmsSigner(
-      { address: executor.address, url: "https://executor-kms" },
-      new JsonRpcProvider("http://127.0.0.1:1"),
-    );
-
-    await assert.rejects(
-      () =>
-        signer.signTransaction({
-          to: "0x2222222222222222222222222222222222222222",
-          value: 0,
-          nonce: 1,
-          gasLimit: 100000,
-          gasPrice: 1,
-          chainId: 1,
-          data: "0x1234",
-        }),
-      /unexpected key/,
-    );
-  } finally {
-    (api.fetch as any).post = originalPost;
-  }
-});
-
-test("rejects private-key external vault executor config when deployed", async () => {
+test("requires workload-identity KMS for the external vault executor", async () => {
   const { validateExternalBridgeExecutorConfig } = await import(
     "../utils/configValidator"
   );
@@ -851,7 +778,7 @@ test("rejects private-key external vault executor config when deployed", async (
   );
   assert.match(
     production.errors.join("\n"),
-    /must not be configured for a deployed bridge service/,
+    /requires .*KMS_KEY_ID.*KMS_REGION/,
   );
 
   const development = validateExternalBridgeExecutorConfig(
@@ -860,49 +787,52 @@ test("rejects private-key external vault executor config when deployed", async (
     privateKey,
     false,
   );
-  assert.deepEqual(development.errors, []);
-  assert.ok(development.executorAddress);
+  assert.match(
+    development.errors.join("\n"),
+    /requires .*KMS_KEY_ID.*KMS_REGION/,
+  );
 });
 
-test("requires HTTPS for external vault executor KMS when deployed", async () => {
+test("validates external vault executor workload-identity KMS config", async () => {
   const { validateExternalBridgeExecutorConfig } = await import(
     "../utils/configValidator"
   );
   const address = "0x5555555555555555555555555555555555555555";
 
-  const insecure = validateExternalBridgeExecutorConfig(
+  const incomplete = validateExternalBridgeExecutorConfig(
     1,
-    { address, url: "http://executor-kms" },
+    { address, keyId: "", region: "" },
     undefined,
     true,
   );
-  assert.match(insecure.errors.join("\n"), /must use HTTPS/);
+  assert.match(incomplete.errors.join("\n"), /KMS_KEY_ID/);
+  assert.match(incomplete.errors.join("\n"), /KMS_REGION/);
 
-  const secure = validateExternalBridgeExecutorConfig(
+  const complete = validateExternalBridgeExecutorConfig(
     1,
-    { address, url: "https://executor-kms" },
+    { address, keyId: "alias/eab-executor", region: "us-east-1" },
     undefined,
     true,
   );
-  assert.deepEqual(secure.errors, []);
+  assert.deepEqual(complete.errors, []);
 });
 
 test("requires HTTPS for every external verifier service", async () => {
-  const { validateExternalBridgeSignerUrls } = await import(
+  const { validateExternalBridgeVerifierUrls } = await import(
     "../utils/configValidator"
   );
   assert.deepEqual(
-    validateExternalBridgeSignerUrls([
+    validateExternalBridgeVerifierUrls([
       "https://verifier-one.example",
       "https://verifier-two.example",
     ]),
     [],
   );
   assert.match(
-    validateExternalBridgeSignerUrls([
+    validateExternalBridgeVerifierUrls([
       "http://verifier-one.example",
       "not-a-url",
     ]).join("\n"),
-    /must use HTTPS.*Invalid external bridge signer URL/s,
+    /must use HTTPS.*Invalid external bridge verifier URL/s,
   );
 });

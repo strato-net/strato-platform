@@ -42,6 +42,7 @@ import {
   classifyDepositLogs,
   RawDepositLog,
 } from "../services/depositEventService";
+import { SettlementVerifierManualReviewRequired } from "../services/settlementAttestationService";
 import {
   quarantineDeposit,
   quarantineDepositLog,
@@ -375,7 +376,9 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
       const failed = await depositStateService.markSettlementFailed(
         deposit,
         settlementError,
-        getSettlementRetryGraceMs(),
+        settlementError instanceof SettlementVerifierManualReviewRequired
+          ? 0
+          : getSettlementRetryGraceMs(),
       );
       if (failed?.transitioned) {
         await quarantineDeposit(deposit, failed.pending.reviewReason!);

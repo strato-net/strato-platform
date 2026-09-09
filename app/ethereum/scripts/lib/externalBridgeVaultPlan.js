@@ -240,7 +240,7 @@ function buildOperations(config, chain) {
 }
 
 function getServiceSignerAddresses(chainId, env = process.env) {
-  const envVar = `CHAIN_${chainId}_EXTERNAL_BRIDGE_SIGNER_ADDRESSES`;
+  const envVar = `CHAIN_${chainId}_VAULT_AUTHORIZATION_SIGNER_ADDRESSES`;
   return String(env[envVar] || "")
     .split(",")
     .map((address) => address.trim())
@@ -254,56 +254,24 @@ function getServiceSignerAddresses(chainId, env = process.env) {
 function getServiceExecutor(chainId, env = process.env) {
   const prefix = `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR`;
   const kmsAddress = String(env[`${prefix}_ADDRESS`] || "").trim();
-  const kmsUrl = String(env[`${prefix}_KMS_URL`] || "").trim();
-  const kmsApiToken = String(env[`${prefix}_KMS_API_TOKEN`] || "").trim();
-  const privateKey = String(env[`${prefix}_PRIVATE_KEY`] || "").trim();
-
-  if (kmsAddress || kmsUrl || kmsApiToken) {
-    const errors = [];
-    if (!kmsAddress) errors.push(`${prefix}_ADDRESS`);
-    if (!kmsUrl) errors.push(`${prefix}_KMS_URL`);
-    let address = null;
-    if (kmsAddress) {
-      try {
-        address = ethers.getAddress(kmsAddress);
-      } catch {
-        errors.push(`${prefix}_ADDRESS`);
-      }
-    }
-    return {
-      source: "kms",
-      address,
-      valid: errors.length === 0,
-      errors,
-    };
-  }
-
-  if (!privateKey) {
-    return {
-      source: "privateKey",
-      address: null,
-      valid: false,
-      errors: [`${prefix}_PRIVATE_KEY`],
-    };
-  }
-
+  const kmsKeyId = String(env[`${prefix}_KMS_KEY_ID`] || "").trim();
+  const kmsRegion = String(env[`${prefix}_KMS_REGION`] || "").trim();
+  const errors = [];
+  if (!kmsAddress) errors.push(`${prefix}_ADDRESS`);
+  if (!kmsKeyId) errors.push(`${prefix}_KMS_KEY_ID`);
+  if (!kmsRegion) errors.push(`${prefix}_KMS_REGION`);
+  let address = null;
   try {
-    return {
-      source: "privateKey",
-      address: new ethers.Wallet(
-        privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`,
-      ).address,
-      valid: true,
-      errors: [],
-    };
+    if (kmsAddress) address = ethers.getAddress(kmsAddress);
   } catch {
-    return {
-      source: "privateKey",
-      address: null,
-      valid: false,
-      errors: [`${prefix}_PRIVATE_KEY`],
-    };
+    errors.push(`${prefix}_ADDRESS`);
   }
+  return {
+    source: "kms",
+    address,
+    valid: errors.length === 0,
+    errors,
+  };
 }
 
 function validateServiceSigners(chain, env = process.env) {

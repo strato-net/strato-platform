@@ -1,6 +1,12 @@
-import axios from "axios";
+import {
+  GetPublicKeyCommand,
+  KMSClient,
+  SignCommand,
+} from "@aws-sdk/client-kms";
+import { createPublicKey } from "node:crypto";
 import {
   AbstractSigner,
+  computeAddress,
   JsonRpcProvider,
   Provider,
   Signature,
@@ -9,42 +15,165 @@ import {
   TypedDataEncoder,
   getBytes,
   hashMessage,
+  hexlify,
   recoverAddress,
+  toBeHex,
 } from "ethers";
 import { safeChecksum } from "./utils";
 
-export interface DigestKmsConfig {
-  address: string;
-  url: string;
-  apiToken: string;
+interface KmsClient {
+  send(command: SignCommand | GetPublicKeyCommand): Promise<any>;
 }
 
+export interface AwsKmsConfig {
+  address: string;
+  keyId: string;
+  region: string;
+  client?: KmsClient;
+}
+
+const CURVE_ORDER =
+  0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+const HALF_CURVE_ORDER = CURVE_ORDER / 2n;
+const clients = new Map<string, KMSClient>();
+
+const getClient = (config: AwsKmsConfig): KmsClient => {
+  if (config.client) return config.client;
+  const existing = clients.get(config.region);
+  if (existing) return existing;
+  const client = new KMSClient({ region: config.region });
+  clients.set(config.region, client);
+  return client;
+};
+
+const readDerLength = (
+  bytes: Uint8Array,
+  offset: number,
+): { length: number; next: number } => {
+  const first = bytes[offset];
+  if (first === undefined) throw new Error("KMS returned malformed DER");
+  if (first < 0x80) return { length: first, next: offset + 1 };
+  const octets = first & 0x7f;
+  if (octets === 0 || octets > 2 || offset + octets >= bytes.length) {
+    throw new Error("KMS returned malformed DER");
+  }
+  let length = 0;
+  for (let index = 0; index < octets; index += 1) {
+    length = length * 256 + bytes[offset + 1 + index];
+  }
+  return { length, next: offset + 1 + octets };
+};
+
+const readDerInteger = (
+  bytes: Uint8Array,
+  offset: number,
+): { value: bigint; next: number } => {
+  if (bytes[offset] !== 0x02) throw new Error("KMS returned malformed DER");
+  const { length, next } = readDerLength(bytes, offset + 1);
+  const end = next + length;
+  if (length === 0 || end > bytes.length || (bytes[next] & 0x80) !== 0) {
+    throw new Error("KMS returned malformed DER");
+  }
+  const valueBytes =
+    length > 1 && bytes[next] === 0 ? bytes.slice(next + 1, end) : bytes.slice(next, end);
+  if (valueBytes.length > 32) throw new Error("KMS returned oversized ECDSA value");
+  const hex = Buffer.from(valueBytes).toString("hex") || "0";
+  return { value: BigInt(`0x${hex}`), next: end };
+};
+
+export const decodeKmsSignature = (
+  der: Uint8Array,
+): { r: bigint; s: bigint } => {
+  if (der[0] !== 0x30) throw new Error("KMS returned malformed DER");
+  const sequence = readDerLength(der, 1);
+  if (sequence.next + sequence.length !== der.length) {
+    throw new Error("KMS returned malformed DER");
+  }
+  const r = readDerInteger(der, sequence.next);
+  const s = readDerInteger(der, r.next);
+  if (
+    s.next !== der.length ||
+    r.value === 0n ||
+    s.value === 0n ||
+    r.value >= CURVE_ORDER ||
+    s.value >= CURVE_ORDER
+  ) {
+    throw new Error("KMS returned malformed DER");
+  }
+  return {
+    r: r.value,
+    s: s.value > HALF_CURVE_ORDER ? CURVE_ORDER - s.value : s.value,
+  };
+};
+
+const recoverKmsSignature = (
+  digest: string,
+  der: Uint8Array,
+  expectedAddress: string,
+): string => {
+  const { r, s } = decodeKmsSignature(der);
+  for (const yParity of [0, 1] as const) {
+    const signature = Signature.from({
+      r: toBeHex(r, 32),
+      s: toBeHex(s, 32),
+      yParity,
+    });
+    if (
+      safeChecksum(recoverAddress(digest, signature)) ===
+      safeChecksum(expectedAddress)
+    ) {
+      return signature.serialized;
+    }
+  }
+  throw new Error("KMS returned a signature from an unexpected key");
+};
+
 const signDigest = async (
-  config: DigestKmsConfig,
+  config: AwsKmsConfig,
   digest: string,
 ): Promise<string> => {
-  const response = await axios.post<{ signature: string }>(
-    config.url,
-    { digest },
-    {
-      headers: {
-        Authorization: `Bearer ${config.apiToken}`,
-      },
-    },
+  const response = await getClient(config).send(
+    new SignCommand({
+      KeyId: config.keyId,
+      Message: getBytes(digest),
+      MessageType: "DIGEST",
+      SigningAlgorithm: "ECDSA_SHA_256",
+    }),
   );
-  const signature = Signature.from(response.data.signature).serialized;
+  if (!response.Signature) throw new Error("AWS KMS returned no signature");
+  return recoverKmsSignature(digest, response.Signature, config.address);
+};
+
+export const validateAwsKmsAddress = async (
+  config: AwsKmsConfig,
+): Promise<void> => {
+  const response = await getClient(config).send(
+    new GetPublicKeyCommand({ KeyId: config.keyId }),
+  );
+  if (!response.PublicKey) throw new Error("AWS KMS returned no public key");
+  const jwk = createPublicKey({
+    key: Buffer.from(response.PublicKey),
+    format: "der",
+    type: "spki",
+  }).export({ format: "jwk" });
+  if (!jwk.x || !jwk.y) throw new Error("AWS KMS returned an invalid EC public key");
+  const decode = (value: string) => Buffer.from(value, "base64url");
+  const publicKey = Buffer.concat([
+    Buffer.from([4]),
+    decode(jwk.x),
+    decode(jwk.y),
+  ]);
   if (
-    safeChecksum(recoverAddress(digest, signature)) !==
+    safeChecksum(computeAddress(hexlify(publicKey))) !==
     safeChecksum(config.address)
   ) {
-    throw new Error("KMS returned a signature from an unexpected key");
+    throw new Error("AWS KMS public key does not match configured address");
   }
-  return signature;
 };
 
 export class DigestKmsSigner extends AbstractSigner<Provider> {
   constructor(
-    private readonly kmsConfig: DigestKmsConfig,
+    private readonly kmsConfig: AwsKmsConfig,
     provider: Provider,
   ) {
     super(provider);
@@ -90,7 +219,7 @@ export class KmsEip1193Provider {
 
   constructor(
     rpcUrl: string,
-    private readonly kmsConfig: DigestKmsConfig,
+    private readonly kmsConfig: AwsKmsConfig,
   ) {
     this.rpc = new JsonRpcProvider(rpcUrl);
     this.signer = new DigestKmsSigner(kmsConfig, this.rpc);

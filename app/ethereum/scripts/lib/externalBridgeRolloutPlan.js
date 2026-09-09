@@ -1,4 +1,5 @@
 const { ethers } = require("ethers");
+const { createHash } = require("node:crypto");
 
 const ZERO_ADDRESS = ethers.ZeroAddress;
 const CHAIN_NAMES = {
@@ -102,6 +103,7 @@ function buildPolicyTemplate(
       manualReviewThreshold: "REVIEW_REQUIRED",
       windowLimit: "REVIEW_REQUIRED",
       windowSeconds: "86400",
+      maxAutoWithdrawalAmount: "REVIEW_REQUIRED",
       migrateAmount: "0",
       enabled: true,
     };
@@ -110,6 +112,7 @@ function buildPolicyTemplate(
       withdrawalsEnabled: false,
       rebaseRequired: "REVIEW_REQUIRED",
       autoRouteEnabled: false,
+      maxAutoDepositAmount: "REVIEW_REQUIRED",
     };
   }
   return {
@@ -247,6 +250,10 @@ function tokenPolicy(policy, token) {
     ),
     windowLimit: uint(value.windowLimit, `${key}.windowLimit`),
     windowSeconds: uint(value.windowSeconds, `${key}.windowSeconds`),
+    maxAutoWithdrawalAmount: uint(
+      value.maxAutoWithdrawalAmount,
+      `${key}.maxAutoWithdrawalAmount`,
+    ),
     migrateAmount: uint(value.migrateAmount ?? 0, `${key}.migrateAmount`),
     enabled: value.enabled !== false,
   };
@@ -258,6 +265,24 @@ function tokenPolicy(policy, token) {
     BigInt(normalized.windowSeconds) === 0n
   ) {
     throw new Error(`${key}.windowSeconds must be positive`);
+  }
+  if (
+    BigInt(normalized.maxPerWithdrawal) > 0n &&
+    BigInt(normalized.maxAutoWithdrawalAmount) >
+      BigInt(normalized.maxPerWithdrawal)
+  ) {
+    throw new Error(
+      `${key}.maxAutoWithdrawalAmount exceeds maxPerWithdrawal`,
+    );
+  }
+  if (
+    BigInt(normalized.manualReviewThreshold) > 0n &&
+    BigInt(normalized.maxAutoWithdrawalAmount) >
+      BigInt(normalized.manualReviewThreshold)
+  ) {
+    throw new Error(
+      `${key}.maxAutoWithdrawalAmount exceeds manualReviewThreshold`,
+    );
   }
   return normalized;
 }
@@ -276,7 +301,13 @@ function routePolicy(policy, route) {
       throw new Error(`${key}.${field} must be boolean`);
     }
   }
-  return value;
+  return {
+    ...value,
+    maxAutoDepositAmount: uint(
+      value.maxAutoDepositAmount,
+      `${key}.maxAutoDepositAmount`,
+    ),
+  };
 }
 
 function selectedChain(config, chainId, label) {
@@ -317,6 +348,8 @@ function buildSynchronizedRollout({
   const depositRouterUpdates = [];
   const bridgeRoutes = [];
   const vaultTokens = new Map();
+  const verifierTokens = new Map();
+  const verifierRoutes = [];
   if (
     keyAddress(bridgeChain.vault) !== keyAddress(vaultChain.vaultAddress) ||
     keyAddress(bridgeChain.depositRouter) !==
@@ -329,6 +362,16 @@ function buildSynchronizedRollout({
     keyAddress(bridgeTemplate.externalAssetBridge?.address)
   ) {
     throw new Error("Vault sourceBridge does not match ExternalAssetBridge");
+  }
+  const settlementAttestors =
+    bridgeTemplate.externalAssetBridge?.settlementVerifiers || [];
+  if (
+    settlementAttestors.length !== 3 ||
+    new Set(settlementAttestors.map(keyAddress)).size !== 3
+  ) {
+    throw new Error(
+      "ExternalAssetBridge template requires three distinct settlement verifiers",
+    );
   }
 
   for (const route of inventory) {
@@ -360,6 +403,28 @@ function buildSynchronizedRollout({
       manualReviewThreshold: token.manualReviewThreshold,
       rebaseRequired: routeSettings.rebaseRequired,
       autoRouteEnabled: routeSettings.autoRouteEnabled,
+    });
+    verifierRoutes.push({
+      externalToken:
+        route.externalToken === ZERO_ADDRESS
+          ? ZERO_ADDRESS
+          : route.externalToken,
+      stratoToken: route.stratoToken.slice(2).toLowerCase(),
+      depositsEnabled: routeSettings.depositsEnabled,
+      autoRouteEnabled: routeSettings.autoRouteEnabled,
+      maxAutoDepositAmount: routeSettings.maxAutoDepositAmount,
+    });
+    const verifierTokenKey = keyAddress(route.externalToken);
+    const existingVerifierToken = verifierTokens.get(verifierTokenKey);
+    verifierTokens.set(verifierTokenKey, {
+      token:
+        route.externalToken === ZERO_ADDRESS
+          ? ZERO_ADDRESS
+          : route.externalToken,
+      withdrawalsEnabled:
+        Boolean(existingVerifierToken?.withdrawalsEnabled) ||
+        routeSettings.withdrawalsEnabled,
+      maxAutoWithdrawalAmount: token.maxAutoWithdrawalAmount,
     });
     vaultTokens.set(keyAddress(route.externalToken), {
       token:
@@ -403,6 +468,27 @@ function buildSynchronizedRollout({
         : chain,
     ),
   };
+  const verifierPolicyBaseline = {
+    version: String(policy.verifierPolicyVersion || "1"),
+    sourceChainId: String(vaultTemplate.sourceChainId),
+    sourceBridge: bridgeTemplate.externalAssetBridge.address,
+    destinationChainId: String(chainId),
+    destinationVault: vaultChain.vaultAddress,
+    routes: verifierRoutes,
+    tokens: [...verifierTokens.values()],
+  };
+  const baselinePolicyHash = `sha256:${createHash("sha256")
+    .update(JSON.stringify(verifierPolicyBaseline))
+    .digest("hex")}`;
+  const verifierPolicies =
+    settlementAttestors.map(
+      (settlementAttestor, index) => ({
+        ...verifierPolicyBaseline,
+        baselinePolicyHash,
+        verifierIndex: index + 1,
+        settlementAttestor,
+      }),
+    );
 
   return {
     chainId: Number(chainId),
@@ -417,6 +503,8 @@ function buildSynchronizedRollout({
     },
     bridgeConfig,
     vaultConfig,
+    verifierPolicies,
+    baselinePolicyHash,
     summary: {
       routeCount: inventory.length,
       externalTokenCount: vaultTokens.size,

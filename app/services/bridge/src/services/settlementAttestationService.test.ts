@@ -11,12 +11,11 @@ for (const name of [
   "OPENID_DISCOVERY_URL",
   "BRIDGE_ADDRESS",
   "EXTERNAL_ASSET_BRIDGE_ADDRESS",
-  "EXTERNAL_BRIDGE_SIGNER_API_TOKEN",
   "PRICE_ORACLE_ADDRESS",
   "SAFE_ADDRESS",
   "SAFE_PROPOSER_ADDRESS",
-  "SAFE_PROPOSER_KMS_URL",
-  "SAFE_PROPOSER_KMS_API_TOKEN",
+  "SAFE_PROPOSER_KMS_KEY_ID",
+  "SAFE_PROPOSER_KMS_REGION",
   "RELAYER_BA_USERNAME",
   "RELAYER_BA_PASSWORD",
   "RELAYER_CLIENT_ID",
@@ -63,8 +62,10 @@ test("requires two independent verifier services before settlement", async () =>
   const { attestDepositSettlement } = await import(
     "./settlementAttestationService"
   );
-  process.env.CHAIN_1_EXTERNAL_BRIDGE_SIGNER_URLS =
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS =
     "https://one,https://two,https://three";
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS =
+    "token-one,token-two,token-three";
   const originalPost = axios.post;
   const requests: any[] = [];
   (axios as any).post = async (url: string, payload: unknown) => {
@@ -96,6 +97,44 @@ test("requires two independent verifier services before settlement", async () =>
     await assert.rejects(
       () => attestDepositSettlement(deposit),
       /2\/3/,
+    );
+  } finally {
+    axios.post = originalPost;
+  }
+});
+
+test("reports verifier manual review when automatic threshold is not reached", async () => {
+  const cirrusService = await import("./cirrusService");
+  (cirrusService as any).getSettlementVerifierConfig = async () => ({
+    threshold: 2,
+    count: 3,
+    verifiers: [],
+  });
+  const {
+    attestDepositSettlement,
+    SettlementVerifierManualReviewRequired,
+  } = await import("./settlementAttestationService");
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS =
+    "https://one,https://two,https://three";
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS =
+    "token-one,token-two,token-three";
+  const originalPost = axios.post;
+  (axios as any).post = async (url: string) => {
+    if (url.startsWith("https://one")) {
+      return { data: { transactionHash: "accepted" } };
+    }
+    const error: any = new Error("manual review");
+    error.isAxiosError = true;
+    error.response = {
+      status: 409,
+      data: { decision: "manual_review" },
+    };
+    throw error;
+  };
+  try {
+    await assert.rejects(
+      () => attestDepositSettlement(deposit),
+      (error) => error instanceof SettlementVerifierManualReviewRequired,
     );
   } finally {
     axios.post = originalPost;

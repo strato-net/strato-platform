@@ -6,20 +6,21 @@ import express from "express";
 import {
   Contract,
   JsonRpcProvider,
-  Signature,
   TypedDataEncoder,
   getAddress,
-  verifyTypedData,
 } from "ethers";
-import {
-  matchesSourceWithdrawalAuthorization,
-  validateSignerKmsUrl,
-} from "./authorizationValidation";
+import { matchesSourceWithdrawalAuthorization } from "./authorizationValidation";
 import {
   DepositSettlementAttestation,
   validateDepositSettlement,
   validateWithdrawalRelease,
 } from "./settlementValidation";
+import { DigestKmsSigner, validateAwsKmsAddress } from "../utils/kmsSigner";
+import {
+  evaluateDepositPolicy,
+  evaluateWithdrawalPolicy,
+  loadVerifierPolicy,
+} from "./verifierPolicy";
 
 interface WithdrawalAuthorization {
   sourceChainId: string;
@@ -55,7 +56,22 @@ const VAULT_ABI = [
   "function attestationSigners(address) view returns (bool)",
   "function maxAuthorizationValiditySeconds() view returns (uint256)",
   "function signerSetVersion() view returns (uint256)",
+  "function tokenPolicies(address) view returns (bool enabled,uint256 maxPerWithdrawal,uint256 windowLimit,uint256 windowSeconds,uint256 windowStartedAt,uint256 releasedInWindow,uint256 manualReviewThreshold)",
+  "function largeWithdrawalApprovalDeadline(bytes32) view returns (uint256)",
 ];
+
+const WITHDRAWAL_REVIEW_TYPES = {
+  WithdrawalReview: [
+    { name: "sourceChainId", type: "uint256" },
+    { name: "sourceBridge", type: "address" },
+    { name: "sourceWithdrawalId", type: "uint256" },
+    { name: "destinationChainId", type: "uint256" },
+    { name: "destinationVault", type: "address" },
+    { name: "token", type: "address" },
+    { name: "recipient", type: "address" },
+    { name: "amount", type: "uint256" },
+  ],
+};
 
 const required = (name: string): string => {
   const value = process.env[name]?.trim();
@@ -65,34 +81,50 @@ const required = (name: string): string => {
 
 const destinationChainId = BigInt(required("DESTINATION_CHAIN_ID"));
 const destinationVault = getAddress(required("DESTINATION_VAULT_ADDRESS"));
-const signerAddress = getAddress(required("KMS_SIGNER_ADDRESS"));
-const provider = new JsonRpcProvider(required("SIGNER_RPC_URL"));
+const authorizationSignerAddress = getAddress(
+  required("VAULT_AUTHORIZATION_SIGNER_ADDRESS"),
+);
+const provider = new JsonRpcProvider(required("VERIFIER_RPC_URL"));
 const vault = new Contract(destinationVault, VAULT_ABI, provider);
+const kmsConfig = {
+  address: authorizationSignerAddress,
+  keyId: required("KMS_KEY_ID"),
+  region: required("KMS_REGION"),
+};
+const kmsSigner = new DigestKmsSigner(kmsConfig, provider);
 const stratoNodeUrl = required("STRATO_NODE_URL").replace(/\/$/, "");
 const sourceChainId = BigInt(required("SOURCE_CHAIN_ID"));
 const sourceBridge = required("EXTERNAL_ASSET_BRIDGE_ADDRESS").replace(/^0x/, "");
-const kmsSignerUrl = validateSignerKmsUrl(
-  required("KMS_SIGNER_URL"),
-  true,
+const verifierApiToken = required("EXTERNAL_BRIDGE_VERIFIER_API_TOKEN");
+const { policy: verifierPolicy, digest: verifierPolicyDigest } =
+  loadVerifierPolicy(required("VERIFIER_POLICY_PATH"));
+const signerOpenIdDiscoveryUrl = required(
+  "SETTLEMENT_ATTESTOR_OPENID_DISCOVERY_URL",
 );
-const kmsSignerApiToken = required("KMS_SIGNER_API_TOKEN");
-const signerApiToken = required("EXTERNAL_BRIDGE_SIGNER_API_TOKEN");
-const signerOpenIdDiscoveryUrl = required("SIGNER_OPENID_DISCOVERY_URL");
-const signerClientId = required("SIGNER_CLIENT_ID");
-const signerClientSecret = required("SIGNER_CLIENT_SECRET");
-const signerBaUsername = required("SIGNER_BA_USERNAME");
-const signerBaPassword = required("SIGNER_BA_PASSWORD");
-const settlementVerifierConfirmations = Number(
-  required("SETTLEMENT_VERIFIER_CONFIRMATIONS"),
+const signerClientId = required("SETTLEMENT_ATTESTOR_CLIENT_ID");
+const signerClientSecret = required("SETTLEMENT_ATTESTOR_CLIENT_SECRET");
+const signerBaUsername = required("SETTLEMENT_ATTESTOR_BA_USERNAME");
+const signerBaPassword = required("SETTLEMENT_ATTESTOR_BA_PASSWORD");
+const verifierConfirmations = Number(
+  required("VERIFIER_CONFIRMATIONS"),
 );
 const port = Number(process.env.PORT || 3004);
 if (
-  !Number.isSafeInteger(settlementVerifierConfirmations) ||
-  settlementVerifierConfirmations <= 0
+  !Number.isSafeInteger(verifierConfirmations) ||
+  verifierConfirmations <= 0
 ) {
   throw new Error(
-    "SETTLEMENT_VERIFIER_CONFIRMATIONS must be a positive integer",
+    "VERIFIER_CONFIRMATIONS must be a positive integer",
   );
+}
+if (
+  BigInt(verifierPolicy.sourceChainId) !== sourceChainId ||
+  verifierPolicy.sourceBridge.replace(/^0x/, "").toLowerCase() !==
+    sourceBridge.replace(/^0x/, "").toLowerCase() ||
+  BigInt(verifierPolicy.destinationChainId) !== destinationChainId ||
+  getAddress(verifierPolicy.destinationVault) !== destinationVault
+) {
+  throw new Error("Verifier policy bridge or chain binding does not match");
 }
 
 const domain = (authorization: WithdrawalAuthorization) => ({
@@ -108,7 +140,7 @@ const authHeaders = (token?: string) =>
 let stratoToken: { value: string; expiresAt: number } | undefined;
 let stratoTokenPromise: Promise<string> | undefined;
 let tokenEndpoint: string | undefined;
-let settlementVerifierAddress: string | undefined;
+let settlementAttestorAddress: string | undefined;
 
 const getStratoToken = async (): Promise<string> => {
   if (stratoToken && stratoToken.expiresAt > Date.now() + 30_000) {
@@ -334,6 +366,55 @@ const validateSourceWithdrawal = async (
   }
 };
 
+const validateSourceDepositRoute = async (
+  deposit: DepositSettlementAttestation,
+): Promise<void> => {
+  const filters = {
+      address: `eq.${sourceBridge}`,
+      key: `eq.${normalize(deposit.externalToken)}`,
+      key2: `eq.${deposit.externalChainId}`,
+      key3: `eq.${normalize(deposit.stratoToken)}`,
+      select: "value",
+  };
+  const [routeResponse, actionResponse] = await Promise.all([
+    stratoGet("/cirrus/search/BlockApps-ExternalAssetBridge-routes", {
+      ...filters,
+      value: "eq.true",
+    }),
+    Number(deposit.action) === 4
+      ? stratoGet(
+          "/cirrus/search/BlockApps-ExternalAssetBridge-depositActionConfigs",
+          filters,
+        )
+      : Promise.resolve(undefined),
+  ]);
+  if (!routeResponse.data?.length) {
+    throw new Error("Deposit route is not enabled by the source bridge");
+  }
+  if (
+    Number(deposit.action) === 4 &&
+    !actionResponse?.data?.[0]?.value?.autoRoute
+  ) {
+    throw new Error("AUTO_ROUTE is not enabled by the source bridge");
+  }
+};
+
+const isDepositPendingReview = async (
+  deposit: DepositSettlementAttestation,
+): Promise<boolean> => {
+  const response = await stratoGet(
+    "/cirrus/search/BlockApps-ExternalAssetBridge-deposits",
+    {
+      address: `eq.${sourceBridge}`,
+      key: `eq.${deposit.externalChainId}`,
+      key2: `eq.${normalize(deposit.depositRouter)}`,
+      key3: `eq.${deposit.depositId}`,
+      select: "value",
+    },
+  );
+  return Number(response.data?.[0]?.value?.status) === 2;
+};
+
 const validateDestination = async (
   authorization: WithdrawalAuthorization,
 ): Promise<void> => {
@@ -347,7 +428,7 @@ const validateDestination = async (
     provider.getBlock("latest"),
     vault.maxAuthorizationValiditySeconds(),
     vault.signerSetVersion(),
-    vault.attestationSigners(signerAddress),
+    vault.attestationSigners(authorizationSignerAddress),
   ]);
   if (!latestBlock) throw new Error("Destination latest block unavailable");
   if (!enabled) throw new Error("KMS signer is not enabled on the vault");
@@ -368,34 +449,127 @@ const validateDestination = async (
 const signWithKms = async (
   authorization: WithdrawalAuthorization,
 ): Promise<string> => {
-  const digest = TypedDataEncoder.hash(
+  return kmsSigner.signTypedData(
     domain(authorization),
     AUTHORIZATION_TYPES,
     authorization,
   );
-  const response = await axios.post(
-    kmsSignerUrl,
-    { digest },
-    { headers: authHeaders(kmsSignerApiToken) },
-  );
-  const signature = Signature.from(response.data?.signature).serialized;
-  const recovered = verifyTypedData(
+};
+
+class ManualReviewRequiredError extends Error {}
+
+const reviewDigest = (authorization: WithdrawalAuthorization): string =>
+  TypedDataEncoder.hash(
     domain(authorization),
-    AUTHORIZATION_TYPES,
+    WITHDRAWAL_REVIEW_TYPES,
     authorization,
-    signature,
   );
-  if (getAddress(recovered) !== signerAddress) {
-    throw new Error("KMS returned a signature from an unexpected key");
+
+const enforceWithdrawalPolicy = async (
+  authorization: WithdrawalAuthorization,
+): Promise<string> => {
+  const local = evaluateWithdrawalPolicy(verifierPolicy, authorization);
+  const contractPolicy = await vault.tokenPolicies(authorization.token);
+  const enabled = Boolean(contractPolicy.enabled ?? contractPolicy[0]);
+  const maxPerWithdrawal = BigInt(
+    (contractPolicy.maxPerWithdrawal ?? contractPolicy[1]).toString(),
+  );
+  const manualReviewThreshold = BigInt(
+    (contractPolicy.manualReviewThreshold ?? contractPolicy[6]).toString(),
+  );
+  const amount = BigInt(authorization.amount);
+  if (!enabled) throw new Error("Destination vault token is disabled");
+  if (maxPerWithdrawal !== 0n && amount > maxPerWithdrawal) {
+    throw new Error("Withdrawal exceeds destination vault maximum");
   }
-  return signature;
+  const requiresManualReview =
+    local.decision === "manual_review" ||
+    (manualReviewThreshold !== 0n && amount > manualReviewThreshold);
+  if (!requiresManualReview) return local.reason;
+  const approvalDeadline = BigInt(
+    (await vault.largeWithdrawalApprovalDeadline(
+      reviewDigest(authorization),
+    )).toString(),
+  );
+  if (approvalDeadline < BigInt(authorization.deadline)) {
+    throw new ManualReviewRequiredError(local.reason);
+  }
+  return "executed Safe approval satisfies manual review";
+};
+
+const validatePolicyAgainstContracts = async (): Promise<void> => {
+  await Promise.all([
+    ...verifierPolicy.routes
+      .filter(({ depositsEnabled }) => depositsEnabled)
+      .map((route) =>
+        validateSourceDepositRoute({
+          externalChainId: destinationChainId.toString(),
+          externalToken: route.externalToken,
+          stratoToken: route.stratoToken,
+          action: route.autoRouteEnabled ? "4" : "0",
+        } as DepositSettlementAttestation),
+      ),
+    ...verifierPolicy.tokens
+      .filter(({ withdrawalsEnabled }) => withdrawalsEnabled)
+      .map(async (token) => {
+        const contractPolicy = await vault.tokenPolicies(token.token);
+        const enabled = Boolean(contractPolicy.enabled ?? contractPolicy[0]);
+        const maxPerWithdrawal = BigInt(
+          (contractPolicy.maxPerWithdrawal ?? contractPolicy[1]).toString(),
+        );
+        const manualReviewThreshold = BigInt(
+          (contractPolicy.manualReviewThreshold ?? contractPolicy[6]).toString(),
+        );
+        const localMaximum = BigInt(token.maxAutoWithdrawalAmount);
+        if (!enabled) {
+          throw new Error(
+            `Local policy enables a disabled vault token: ${token.token}`,
+          );
+        }
+        if (maxPerWithdrawal !== 0n && localMaximum > maxPerWithdrawal) {
+          throw new Error(
+            `Local automatic withdrawal limit exceeds vault maximum: ${token.token}`,
+          );
+        }
+        if (
+          manualReviewThreshold !== 0n &&
+          localMaximum > manualReviewThreshold
+        ) {
+          throw new Error(
+            `Local automatic withdrawal limit exceeds vault review threshold: ${token.token}`,
+          );
+        }
+      }),
+  ]);
+};
+
+const auditDecision = (
+  operation: string,
+  requestId: string,
+  decision: string,
+  reason: string,
+) => {
+  console.log(
+    JSON.stringify({
+      event: "external_bridge_verifier_decision",
+      operation,
+      requestId,
+      decision,
+      reason,
+      policyVersion: verifierPolicy.version,
+      policyDigest: verifierPolicyDigest,
+      authorizationSigner: authorizationSignerAddress,
+      settlementAttestor: settlementAttestorAddress,
+      timestamp: new Date().toISOString(),
+    }),
+  );
 };
 
 const app = express();
 app.set("env", "production");
 app.use(express.json());
 app.use((req, res, next) => {
-  if (req.headers.authorization !== `Bearer ${signerApiToken}`) {
+  if (req.headers.authorization !== `Bearer ${verifierApiToken}`) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
@@ -405,11 +579,15 @@ app.use((req, res, next) => {
 app.get("/health", (_, res) => {
   res.json({
     status: "ok",
-    signer: signerAddress,
-    settlementVerifier: settlementVerifierAddress,
-    settlementVerifierConfirmations,
+    authorizationSigner: authorizationSignerAddress,
+    settlementAttestor: settlementAttestorAddress,
+    verifierConfirmations,
     destinationChainId: destinationChainId.toString(),
     destinationVault,
+    policyVersion: verifierPolicy.version,
+    policyDigest: verifierPolicyDigest,
+    baselinePolicyHash: verifierPolicy.baselinePolicyHash,
+    verifierIndex: verifierPolicy.verifierIndex,
   });
 });
 
@@ -420,11 +598,28 @@ app.post("/v1/sign-withdrawal", async (req, res) => {
       validateSourceWithdrawal(authorization),
       validateDestination(authorization),
     ]);
+    const policyReason = await enforceWithdrawalPolicy(authorization);
     const signature = await signWithKms(authorization);
-    res.json({ signer: signerAddress, signature });
+    auditDecision(
+      "sign_withdrawal",
+      authorization.sourceWithdrawalId,
+      "approve",
+      policyReason,
+    );
+    res.json({ authorizationSigner: authorizationSignerAddress, signature });
   } catch (error) {
+    const manualReview = error instanceof ManualReviewRequiredError;
+    auditDecision(
+      "sign_withdrawal",
+      String(req.body?.sourceWithdrawalId || ""),
+      manualReview ? "manual_review" : "reject",
+      (error as Error).message,
+    );
     console.error("Withdrawal authorization rejected", (error as Error).message);
-    res.status(422).json({ error: (error as Error).message });
+    res.status(manualReview ? 409 : 422).json({
+      decision: manualReview ? "manual_review" : "reject",
+      error: (error as Error).message,
+    });
   }
 });
 
@@ -438,13 +633,21 @@ app.post("/v1/attest-deposit", async (req, res) => {
     if (!chain.routers.some((router) => normalize(router) === normalize(deposit.depositRouter))) {
       throw new Error("Deposit router is not enabled by the source bridge");
     }
+    const policyDecision = evaluateDepositPolicy(verifierPolicy, deposit);
+    const manuallyReviewed =
+      policyDecision.decision === "manual_review" &&
+      (await isDepositPendingReview(deposit));
+    if (policyDecision.decision === "manual_review" && !manuallyReviewed) {
+      throw new ManualReviewRequiredError(policyDecision.reason);
+    }
     await validateDepositSettlement(
       provider,
       deposit,
       chain.vault,
       chain.routers,
-      settlementVerifierConfirmations,
+      verifierConfirmations,
     );
+    await validateSourceDepositRoute(deposit);
     const transactionHash = await submitStratoAttestation(
       "attestDepositSettlement",
       {
@@ -462,10 +665,28 @@ app.post("/v1/attest-deposit", async (req, res) => {
         minFinalOut: deposit.minFinalOut,
       },
     );
-    res.json({ verifier: settlementVerifierAddress, transactionHash });
+    auditDecision(
+      "attest_deposit",
+      `${deposit.externalChainId}:${deposit.depositId}`,
+      "approve",
+      manuallyReviewed
+        ? "STRATO operator review satisfies local deposit policy"
+        : policyDecision.reason,
+    );
+    res.json({ settlementAttestor: settlementAttestorAddress, transactionHash });
   } catch (error) {
+    const manualReview = error instanceof ManualReviewRequiredError;
+    auditDecision(
+      "attest_deposit",
+      `${req.body?.externalChainId || ""}:${req.body?.depositId || ""}`,
+      manualReview ? "manual_review" : "reject",
+      (error as Error).message,
+    );
     console.error("Deposit settlement attestation rejected", (error as Error).message);
-    res.status(422).json({ error: (error as Error).message });
+    res.status(manualReview ? 409 : 422).json({
+      decision: manualReview ? "manual_review" : "reject",
+      error: (error as Error).message,
+    });
   }
 });
 
@@ -489,7 +710,7 @@ app.post("/v1/attest-release", async (req, res) => {
           amount: authorization.amount,
         },
         authorization.destinationVault,
-        settlementVerifierConfirmations,
+        verifierConfirmations,
       ),
     ]);
     const transactionHash = await submitStratoAttestation(
@@ -500,7 +721,7 @@ app.post("/v1/attest-release", async (req, res) => {
         externalTxHash,
       },
     );
-    res.json({ verifier: settlementVerifierAddress, transactionHash });
+    res.json({ settlementAttestor: settlementAttestorAddress, transactionHash });
   } catch (error) {
     console.error("Withdrawal release attestation rejected", (error as Error).message);
     res.status(422).json({ error: (error as Error).message });
@@ -509,10 +730,22 @@ app.post("/v1/attest-release", async (req, res) => {
 
 const start = async () => {
   try {
-    settlementVerifierAddress = await validateSettlementVerifier();
+    [settlementAttestorAddress] = await Promise.all([
+      validateSettlementVerifier(),
+      validateAwsKmsAddress(kmsConfig),
+      validatePolicyAgainstContracts(),
+    ]);
+    if (
+      normalize(verifierPolicy.settlementAttestor) !==
+      normalize(settlementAttestorAddress)
+    ) {
+      throw new Error(
+        "Verifier policy settlement attestor does not match STRATO account",
+      );
+    }
     app.listen(port, () => {
       console.log(
-        `External bridge signer listening on port ${port}; settlement verifier ${settlementVerifierAddress}`,
+        `External bridge verifier listening on port ${port}; settlement attestor ${settlementAttestorAddress}`,
       );
     });
   } catch (error) {

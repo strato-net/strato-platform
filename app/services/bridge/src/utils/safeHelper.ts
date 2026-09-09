@@ -18,7 +18,7 @@ import { logError, logInfo } from "./logger";
 import { getRebaseFactors } from "../services/cirrusService";
 import { WithdrawalInfo, SafeTransactionData, NonEmptyArray } from "../types";
 import { retry } from "./api";
-import { KmsEip1193Provider } from "./kmsSigner";
+import { KmsEip1193Provider, validateAwsKmsAddress } from "./kmsSigner";
 
 // Constants
 const NONCE_CONFLICT_CODES = [409, 422];
@@ -158,17 +158,15 @@ export async function proposeTransactions(
 export async function initializeSafeForChain(chainId: number, safeAddress?: string) {
   const rpcUrl = getChainRpcUrl(chainId);
   const proposerAddress = config.safe.safeProposerAddress || "";
-  const kmsUrl = config.safe.safeProposerKmsUrl || "";
-  const kmsApiToken = config.safe.safeProposerKmsApiToken || "";
-  if (!proposerAddress || !kmsUrl || !kmsApiToken) {
+  const keyId = config.safe.safeProposerKmsKeyId || "";
+  const region = config.safe.safeProposerKmsRegion || "";
+  if (!proposerAddress || !keyId || !region) {
     throw new Error("Safe proposer KMS configuration is incomplete");
   }
+  const kmsConfig = { address: proposerAddress, keyId, region };
+  await validateAwsKmsAddress(kmsConfig);
   const protocolKit = await Safe.init({
-    provider: new KmsEip1193Provider(rpcUrl, {
-      address: proposerAddress,
-      url: kmsUrl,
-      apiToken: kmsApiToken,
-    }),
+    provider: new KmsEip1193Provider(rpcUrl, kmsConfig),
     signer: proposerAddress,
     safeAddress: safeAddress || config.safe.address || "",
   });

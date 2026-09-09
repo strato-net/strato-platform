@@ -1,30 +1,28 @@
 import {
   AbiCoder,
-  AbstractSigner,
   Contract,
   Interface,
   JsonRpcProvider,
-  type Provider,
   Signature,
   TypedDataEncoder,
-  Transaction,
-  type TransactionRequest,
   keccak256,
-  recoverAddress,
   verifyTypedData,
 } from "ethers";
 import { OperationType } from "@safe-global/types-kit";
+import axios from "axios";
 import {
   config,
   getExternalBridgeExecutorKmsConfig,
-  type ExternalBridgeExecutorKmsConfig,
-  getExternalBridgeSignerUrls,
+  getExternalBridgeVerifierApiTokens,
+  getExternalBridgeVerifierUrls,
   getChainRpcUrl,
 } from "../config";
 import { WithdrawalInfo } from "../types";
 import { ensureHexPrefix, safeChecksum } from "../utils/utils";
 import { fetch as http, retry } from "../utils/api";
 import { initializeSafeForChain } from "../utils/safeHelper";
+import { DigestKmsSigner } from "../utils/kmsSigner";
+import { logError } from "../utils/logger";
 
 export interface WithdrawalAuthorization {
   sourceChainId: string;
@@ -89,71 +87,7 @@ const WITHDRAWAL_REVIEW_TYPES = {
 };
 
 const vaultInterface = new Interface(EXTERNAL_VAULT_ABI);
-
-const authHeaders = (token?: string): Record<string, string> | undefined =>
-  token ? { Authorization: `Bearer ${token}` } : undefined;
-
-export class ExternalBridgeExecutorKmsSigner extends AbstractSigner<Provider> {
-  private readonly executorAddress: string;
-  private readonly kmsUrl: string;
-  private readonly kmsApiToken?: string;
-
-  constructor(kmsConfig: ExternalBridgeExecutorKmsConfig, provider: Provider) {
-    super(provider);
-    if (!kmsConfig.url) {
-      throw new Error("External bridge executor KMS URL is not configured");
-    }
-    this.executorAddress = safeChecksum(kmsConfig.address);
-    this.kmsUrl = kmsConfig.url;
-    this.kmsApiToken = kmsConfig.apiToken;
-  }
-
-  async getAddress(): Promise<string> {
-    return this.executorAddress;
-  }
-
-  connect(provider: null | Provider): ExternalBridgeExecutorKmsSigner {
-    if (!provider) {
-      throw new Error("External bridge executor KMS signer requires a provider");
-    }
-    return new ExternalBridgeExecutorKmsSigner(
-      {
-        address: this.executorAddress,
-        url: this.kmsUrl,
-        apiToken: this.kmsApiToken,
-      },
-      provider,
-    );
-  }
-
-  async signTransaction(tx: TransactionRequest): Promise<string> {
-    const transaction = Transaction.from(tx as any);
-    const response = await http.post<{ signature: string }>(
-      this.kmsUrl,
-      { digest: transaction.unsignedHash },
-      { headers: authHeaders(this.kmsApiToken) },
-    );
-    const signature = Signature.from(response.signature).serialized;
-    if (
-      safeChecksum(recoverAddress(transaction.unsignedHash, signature)) !==
-      this.executorAddress
-    ) {
-      throw new Error(
-        "External bridge executor KMS returned a signature from an unexpected key",
-      );
-    }
-    transaction.signature = signature;
-    return transaction.serialized;
-  }
-
-  async signMessage(): Promise<string> {
-    throw new Error("External bridge executor KMS signer cannot sign messages");
-  }
-
-  async signTypedData(): Promise<string> {
-    throw new Error("External bridge executor KMS signer cannot sign typed data");
-  }
-}
+const localReviewProposals = new Set<string>();
 
 const authorizationDomain = (authorization: WithdrawalAuthorization) => ({
   name: "ExternalBridgeVault",
@@ -276,29 +210,35 @@ export const proposeWithdrawalReview = async (
 export const signWithdrawalAuthorization = async (
   authorization: WithdrawalAuthorization,
 ): Promise<string[]> => {
-  const signerUrls = getExternalBridgeSignerUrls(
+  const signerUrls = getExternalBridgeVerifierUrls(
+    BigInt(authorization.destinationChainId),
+  );
+  const signerApiTokens = getExternalBridgeVerifierApiTokens(
     BigInt(authorization.destinationChainId),
   );
   if (signerUrls.length === 0) {
     throw new Error(
-      `CHAIN_${authorization.destinationChainId}_EXTERNAL_BRIDGE_SIGNER_URLS is not configured`,
+      `CHAIN_${authorization.destinationChainId}_EXTERNAL_BRIDGE_VERIFIER_URLS is not configured`,
+    );
+  }
+  if (signerApiTokens.length !== signerUrls.length) {
+    throw new Error(
+      `External bridge signer API token count does not match signer URL count for chain ${authorization.destinationChainId}`,
     );
   }
 
-  const responses = await Promise.all(
-    signerUrls.map(async (url) => {
-      const response: any = await http.post(
+  const results = await Promise.allSettled(
+    signerUrls.map(async (url, index) => {
+      const response = await axios.post(
         `${url}/v1/sign-withdrawal`,
         authorization,
         {
-          headers: process.env.EXTERNAL_BRIDGE_SIGNER_API_TOKEN
-            ? {
-                Authorization: `Bearer ${process.env.EXTERNAL_BRIDGE_SIGNER_API_TOKEN}`,
-              }
-            : undefined,
+          headers: {
+            Authorization: `Bearer ${signerApiTokens[index]}`,
+          },
         },
       );
-      const signature = Signature.from(response.signature).serialized;
+      const signature = Signature.from(response.data.signature).serialized;
       const recovered = verifyTypedData(
         authorizationDomain(authorization),
         WITHDRAWAL_AUTHORIZATION_TYPES,
@@ -306,8 +246,8 @@ export const signWithdrawalAuthorization = async (
         signature,
       ).toLowerCase();
       if (
-        typeof response.signer !== "string" ||
-        recovered !== response.signer.toLowerCase()
+        typeof response.data.authorizationSigner !== "string" ||
+        recovered !== response.data.authorizationSigner.toLowerCase()
       ) {
         throw new Error(`Signer ${url} returned an invalid signature`);
       }
@@ -319,15 +259,62 @@ export const signWithdrawalAuthorization = async (
   );
 
   const signatures = new Map<string, string>();
-  for (const response of responses) {
+  const manualReviewRequired = results.filter(
+    (result) =>
+      result.status === "rejected" &&
+      axios.isAxiosError(result.reason) &&
+      result.reason.response?.status === 409 &&
+      result.reason.response?.data?.decision === "manual_review",
+  ).length;
+  results.forEach((result, index) => {
+    if (result.status === "rejected") {
+      logError("ExternalWithdrawal", result.reason as Error, {
+        operation: "signWithdrawalAuthorization",
+        verifierUrl: signerUrls[index],
+        withdrawalId: authorization.sourceWithdrawalId,
+      });
+    }
+  });
+  for (const result of results) {
+    if (result.status !== "fulfilled") continue;
+    const response = result.value;
     if (signatures.has(response.signer)) {
-      throw new Error(`Duplicate external bridge signer ${response.signer}`);
+      logError(
+        "ExternalWithdrawal",
+        new Error(`Duplicate external bridge signer ${response.signer}`),
+        {
+          operation: "signWithdrawalAuthorization",
+          withdrawalId: authorization.sourceWithdrawalId,
+        },
+      );
+      continue;
     }
     signatures.set(response.signer, response.signature);
   }
-  return [...signatures.entries()]
+  const sorted = [...signatures.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, signature]) => signature);
+  if (manualReviewRequired > 0) {
+    const provider = new JsonRpcProvider(
+      getChainRpcUrl(BigInt(authorization.destinationChainId)),
+    );
+    const vault = new Contract(
+      authorization.destinationVault,
+      EXTERNAL_VAULT_ABI,
+      provider,
+    );
+    const threshold = Number(await vault.attestationThreshold());
+    if (sorted.length >= threshold) return sorted;
+    const digest = getWithdrawalReviewDigest(authorization);
+    if (!localReviewProposals.has(digest)) {
+      await proposeWithdrawalReview(authorization);
+      localReviewProposals.add(digest);
+    }
+    throw new Error(
+      `Local verifier manual review requires executed Safe approval for withdrawal ${authorization.sourceWithdrawalId}`,
+    );
+  }
+  return sorted;
 };
 
 export const buildWithdrawalAuthorization = async (
@@ -483,7 +470,7 @@ const getVaultWithSigner = (
   const kmsConfig = getExternalBridgeExecutorKmsConfig(chainId);
   if (!kmsConfig) {
     throw new Error(
-      `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_KMS_URL is not configured`,
+      `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR workload-identity KMS is not configured`,
     );
   }
   return {
@@ -491,7 +478,7 @@ const getVaultWithSigner = (
     vault: new Contract(
       authorization.destinationVault,
       EXTERNAL_VAULT_ABI,
-      new ExternalBridgeExecutorKmsSigner(kmsConfig, provider),
+      new DigestKmsSigner(kmsConfig, provider),
     ),
   };
 };

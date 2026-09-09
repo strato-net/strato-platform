@@ -93,16 +93,20 @@ test("builds governance, router, and explicit liquidity migration operations", (
 test("validates independent signer addresses against the configured threshold", () => {
   const chain = config().chains[0];
   const valid = validateServiceSigners(chain, {
-    CHAIN_11155111_EXTERNAL_BRIDGE_SIGNER_ADDRESSES: `${signerOne},${signerTwo}`,
-    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY: executorKey,
+    CHAIN_11155111_VAULT_AUTHORIZATION_SIGNER_ADDRESSES: `${signerOne},${signerTwo}`,
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS: executor,
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID: "alias/eab-executor",
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION: "us-east-1",
   });
   assert.equal(valid.valid, true);
   assert.equal(valid.missingSignerCount, 0);
-  assert.equal(valid.executorConfigSource, "privateKey");
+  assert.equal(valid.executorConfigSource, "kms");
 
   const incomplete = validateServiceSigners(chain, {
-    CHAIN_11155111_EXTERNAL_BRIDGE_SIGNER_ADDRESSES: signerOne,
-    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY: executorKey,
+    CHAIN_11155111_VAULT_AUTHORIZATION_SIGNER_ADDRESSES: signerOne,
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS: executor,
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID: "alias/eab-executor",
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION: "us-east-1",
   });
   assert.equal(incomplete.valid, false);
   assert.equal(incomplete.missingSignerCount, 1);
@@ -111,9 +115,10 @@ test("validates independent signer addresses against the configured threshold", 
 test("validates KMS-only executor config against the signer threshold", () => {
   const chain = config().chains[0];
   const valid = validateServiceSigners(chain, {
-    CHAIN_11155111_EXTERNAL_BRIDGE_SIGNER_ADDRESSES: `${signerOne},${signerTwo}`,
+    CHAIN_11155111_VAULT_AUTHORIZATION_SIGNER_ADDRESSES: `${signerOne},${signerTwo}`,
     CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS: executor,
-    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_URL: "https://executor-kms",
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID: "alias/eab-executor",
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION: "us-east-1",
   });
 
   assert.equal(valid.valid, true);
@@ -123,19 +128,22 @@ test("validates KMS-only executor config against the signer threshold", () => {
 
 test("rejects incomplete KMS executor config", () => {
   const result = getServiceExecutor(11155111, {
-    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_URL: "https://executor-kms",
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID: "alias/eab-executor",
   });
 
   assert.equal(result.valid, false);
   assert.deepEqual(result.errors, [
     "CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS",
+    "CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION",
   ]);
 });
 
 test("rejects an executor that is also an attestation signer", () => {
   const result = validateServiceSigners(config().chains[0], {
-    CHAIN_11155111_EXTERNAL_BRIDGE_SIGNER_ADDRESSES: `${signerOne},${signerTwo}`,
-    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY: signerOneKey,
+    CHAIN_11155111_VAULT_AUTHORIZATION_SIGNER_ADDRESSES: `${signerOne},${signerTwo}`,
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS: signerOne,
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID: "alias/eab-executor",
+    CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION: "us-east-1",
   });
   assert.equal(result.valid, false);
   assert.equal(result.executorIsSigner, true);

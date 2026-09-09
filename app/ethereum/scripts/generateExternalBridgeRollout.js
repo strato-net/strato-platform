@@ -307,6 +307,14 @@ function main() {
     `external-bridge-vault-${chainId}.json`,
     rollout.vaultConfig,
   );
+  const verifierPolicyPaths = rollout.verifierPolicies.map(
+    (verifierPolicy, index) =>
+      writeJson(
+        outputDirectory,
+        `external-bridge-verifier-policy-${chainId}-${index + 1}.json`,
+        verifierPolicy,
+      ),
+  );
   const batches = buildDepositRouterBatches(rollout);
   const depositRouterPausePath = writeJson(
     outputDirectory,
@@ -342,6 +350,8 @@ function main() {
       outputs: {
         bridgeConfigPath,
         vaultConfigPath,
+        verifierPolicyPaths,
+        baselinePolicyHash: rollout.baselinePolicyHash,
         depositRouterPausePath,
         depositRouterBatchPaths,
         depositRouterUnpausePath,
@@ -356,6 +366,8 @@ function main() {
         ...rollout.summary,
         bridgeConfigPath,
         vaultConfigPath,
+        verifierPolicyPaths,
+        baselinePolicyHash: rollout.baselinePolicyHash,
         depositRouterPausePath,
         depositRouterBatchPaths,
         depositRouterUnpausePath,
