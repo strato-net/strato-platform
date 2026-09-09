@@ -17,12 +17,15 @@ so that they could be properly moved to their respective version's subsection.
 ## [Unrealeased]
 ### Added
 - Partial support for ipv6
+- `Blockchain.Forks.isOperatorPrecedenceForkActive`: the SolidVM parser's operator table is now a fork-gated choice. Live networks (helium, upquark, forktest) keep the legacy table until a height is scheduled; every other network gets Solidity's precedence from genesis. The code-collection cache is keyed by the choice.
 
 ### Changed
 - Total difficulty now refers to block number (corresponds to ethVersion now being 63)
 
 ### Fixed
 - Ethereum-discovery now looks at udp_enable_time instead of enable_time for bonded/available peers 
+- SolidVM parsed expressions with the wrong operator precedence: assignment bound tighter than `&&`/`||` (so `flag = flag || cond` only ever stored `flag`), the ternary bound tighter than `&&`/`||`, equality bound tighter than the relational operators, and `**`/assignment associated to the left. Fixed behind the operator-precedence fork (see Added).
+- SolidVM typechecker rejected any contract inheriting a modifier that references a `private` state variable of the base ("Unknown variable"). Inherited modifiers are now checked only in the contract that declares them.
 
 ### Removed
 - Removed private chain endpoints

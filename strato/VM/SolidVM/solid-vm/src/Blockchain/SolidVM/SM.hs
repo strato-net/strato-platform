@@ -16,7 +16,8 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module Blockchain.SolidVM.SM
-  ( CallInfo (..),
+  ( parseOptionsForCurrentBlock,
+    CallInfo (..),
     SState (..),
     SM,
     MonadSM,
@@ -77,6 +78,7 @@ import Blockchain.EthConf (ethConf)
 import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
+import Blockchain.Forks (isOperatorPrecedenceForkActive)
 import Blockchain.SolidVM.Exception
 import Blockchain.Data.VmTrace
 import Blockchain.SolidVM.GasInfo
@@ -1166,11 +1168,19 @@ getContractNameAndHash address' = do
     SolidVMCode cn ch' -> return (stringToLabel cn, ch')
     _ -> missingCodeCollection ("contract call to address 0x" ++ formatAddressWithoutColor address' ++ " failed") ("no contract deployed at this address" :: String)
 
+-- | How source must be parsed for the block being executed. Consensus-visible:
+-- see 'isOperatorPrecedenceForkActive'.
+parseOptionsForCurrentBlock :: MonadSM m => m ParseOptions
+parseOptionsForCurrentBlock = do
+  blockNum <- blockHeaderBlockNumber . Env.blockHeader <$> getEnv
+  pure defaultParseOptions {parseLegacyOperatorPrecedence = not (isOperatorPrecedenceForkActive blockNum)}
+
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
 getCodeAndCollection address' = do
   (contractName', ch) <- getContractNameAndHash address'
   isRunningTests <- Env.runningTests <$> getEnv
-  cc <- codeCollectionFromHash isRunningTests True ch
+  opts <- parseOptionsForCurrentBlock
+  cc <- codeCollectionFromHashWith opts isRunningTests True ch
   let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
   return (contract', ch, cc)
 
