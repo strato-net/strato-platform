@@ -2,7 +2,7 @@
  * Build or submit every AdminRegistry-governed ExternalAssetBridge setup call.
  *
  * Usage:
- *   node configure-external-bridge.js --config <json> --step initialize|routes|actions|verify-initialize|verify-routes|verify-actions [--execute]
+ *   node configure-external-bridge.js --config <json> --step initialize|routes|actions|verify-initialize|verify-routes|verify-actions [--start-call <number>] [--output-dir <path>] [--execute]
  *
  * Dry-run is the default. Every run writes the full governance payload to JSON.
  */
@@ -13,6 +13,7 @@ const config = require("./config");
 const auth = require("./auth");
 const { rest, util } = require("blockapps-rest");
 const {
+  validateActiveRouteTokens,
   verifyConfiguration,
 } = require("./external-bridge-verification");
 
@@ -27,7 +28,7 @@ function parseArgs(argv = process.argv.slice(2)) {
       args.execute = true;
       continue;
     }
-    if (!["--config", "--step"].includes(value)) {
+    if (!["--config", "--step", "--start-call", "--output-dir"].includes(value)) {
       throw new Error(`Unsupported option ${value}`);
     }
     const next = argv[index + 1];
@@ -53,6 +54,15 @@ function parseArgs(argv = process.argv.slice(2)) {
   }
   if (args.execute && args.step.startsWith("verify-")) {
     throw new Error("--execute is not valid for verification steps");
+  }
+  if (
+    args["start-call"] !== undefined &&
+    (!/^[1-9][0-9]*$/.test(args["start-call"]) ||
+      args.step.startsWith("verify-"))
+  ) {
+    throw new Error(
+      "--start-call must be a positive integer and is not valid for verification steps",
+    );
   }
   return args;
 }
@@ -340,6 +350,19 @@ function buildPlan(settings, step) {
   return calls;
 }
 
+function selectPlanCalls(plan, startCall = "1") {
+  const firstCall = Number(startCall);
+  if (!Number.isSafeInteger(firstCall) || firstCall < 1 || firstCall > plan.length) {
+    throw new Error(
+      `--start-call must be between 1 and ${plan.length} for this plan`,
+    );
+  }
+  return {
+    firstCall,
+    calls: plan.slice(firstCall - 1),
+  };
+}
+
 async function submit(tokenObj, call) {
   const response = await rest.call(
     tokenObj,
@@ -371,15 +394,19 @@ async function submit(tokenObj, call) {
   return { transactionHash: final.hash, status: final.status };
 }
 
-function writeOutput(payload) {
-  const directory = path.resolve(__dirname, "deployment-logs");
+function writeOutput(payload, outputDirectory) {
+  const directory = outputDirectory
+    ? path.resolve(outputDirectory)
+    : path.resolve(__dirname, "deployment-logs");
   fs.mkdirSync(directory, { recursive: true });
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const outputPath = path.join(
     directory,
     `external-bridge-governance-${payload.step}-${timestamp}.json`,
   );
-  fs.writeFileSync(outputPath, JSON.stringify(payload, null, 2));
+  const temporaryPath = `${outputPath}.${process.pid}.tmp`;
+  fs.writeFileSync(temporaryPath, `${JSON.stringify(payload, null, 2)}\n`);
+  fs.renameSync(temporaryPath, outputPath);
   return outputPath;
 }
 
@@ -411,7 +438,7 @@ async function main() {
       config: settings.absolutePath,
       ...verification,
     };
-    const outputPath = writeOutput(output);
+    const outputPath = writeOutput(output, args["output-dir"]);
     console.log(JSON.stringify(output, null, 2));
     console.log(`Output: ${outputPath}`);
     if (verification.errors.length) {
@@ -422,12 +449,15 @@ async function main() {
     return;
   }
   const plan = buildPlan(settings, args.step);
+  const selectedPlan = selectPlanCalls(plan, args["start-call"]);
   const output = {
     config: settings.absolutePath,
     step: args.step,
     execute: args.execute,
+    startCall: selectedPlan.firstCall,
+    totalCallCount: plan.length,
     adminRegistry: settings.adminRegistry,
-    calls: plan,
+    calls: selectedPlan.calls,
     results: [],
   };
   if (args.execute) {
@@ -447,15 +477,44 @@ async function main() {
       process.env.GLOBAL_ADMIN_NAME,
       process.env.GLOBAL_ADMIN_PASSWORD,
     );
-    for (const call of plan) {
-      output.results.push({
-        target: call.args._target,
-        function: call.args._func,
-        ...(await submit({ token }, call)),
-      });
+    if (args.step === "routes") {
+      const inactiveTokens = await validateActiveRouteTokens(
+        settings,
+        process.env.NODE_URL,
+        token,
+      );
+      if (inactiveTokens.length) {
+        throw new Error(
+          `Route preflight found inactive STRATO tokens: ${inactiveTokens.join(", ")}`,
+        );
+      }
+    }
+    for (let index = 0; index < selectedPlan.calls.length; index += 1) {
+      const call = selectedPlan.calls[index];
+      const callNumber = selectedPlan.firstCall + index;
+      try {
+        output.results.push({
+          callNumber,
+          target: call.args._target,
+          function: call.args._func,
+          ...(await submit({ token }, call)),
+        });
+      } catch (error) {
+        output.results.push({
+          callNumber,
+          target: call.args._target,
+          function: call.args._func,
+          status: "Failure",
+          error: error.message,
+        });
+        const outputPath = writeOutput(output, args["output-dir"]);
+        throw new Error(
+          `Governance call ${callNumber}/${plan.length} (${call.args._func}) failed; partial output: ${outputPath}: ${error.message}`,
+        );
+      }
     }
   }
-  const outputPath = writeOutput(output);
+  const outputPath = writeOutput(output, args["output-dir"]);
   console.log(JSON.stringify(output, null, 2));
   console.log(`Output: ${outputPath}`);
   if (!args.execute) {
@@ -470,4 +529,10 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, loadConfig, buildPlan };
+module.exports = {
+  parseArgs,
+  loadConfig,
+  buildPlan,
+  selectPlanCalls,
+  writeOutput,
+};

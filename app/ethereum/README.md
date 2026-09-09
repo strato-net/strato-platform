@@ -169,7 +169,9 @@ npm run external:rollout:test
 
 First run `router:ops:testnet -- --step setters` as a dry run. Its audit JSON
 contains every enabled legacy route and the external token metadata needed by
-the generator. Create a settings file containing `sourceChainId`,
+the generator. Discovery fails if any enabled legacy route references a STRATO
+token that is not currently `ACTIVE`; activate that token or disable the stale
+legacy route before continuing. Create a settings file containing `sourceChainId`,
 `externalDeployment`, `depositPlan`, `tokenRouter`, `externalAssetBridge`,
 `bridgeOperator`, `guardian`, and exactly three `settlementVerifiers`.
 
@@ -184,7 +186,8 @@ DepositRouter, guardian, and initial block. For deployments created before
 `depositRouterDeploymentBlock` was recorded, set that field in the settings
 file. Preparation never overwrites an existing policy.
 
-Replace every `REVIEW_REQUIRED` risk amount. Then finalize:
+Replace every `REVIEW_REQUIRED` risk amount and every route's
+`rebaseRequired` value with an explicitly reviewed boolean. Then finalize:
 
 ```bash
 npm run external:rollout:finalize -- --settings /secure/path/eab-settings.json --policy /secure/path/eab-rollout/external-bridge-rollout-policy-11155111.json --output-dir /secure/path/eab-rollout
@@ -213,11 +216,16 @@ initialization, routes and approved actions:
 Commands using `--execute` or a `verify-*` step require
 `GLOBAL_ADMIN_NAME`, `GLOBAL_ADMIN_PASSWORD`, `OAUTH_CLIENT_SECRET`,
 `OAUTH_CLIENT_ID`, `OAUTH_URL`, and `NODE_URL`.
+Before a `routes --execute` run submits any vote, it verifies that every
+deposit- or withdrawal-enabled route references an `ACTIVE` STRATO token.
+If execution stops after earlier calls succeeded, resolve the failure and rerun
+the same administrator with `--start-call <FAILED_CALL_NUMBER>`. The failure
+message and partial output JSON record that one-based call number.
 
 ```bash
-cd app/contracts && npm run configure:external-bridge -- --config /secure/path/eab-rollout/external-bridge-11155111.json --step verify-initialize
-cd app/contracts && npm run configure:external-bridge -- --config /secure/path/eab-rollout/external-bridge-11155111.json --step verify-routes
-cd app/contracts && npm run configure:external-bridge -- --config /secure/path/eab-rollout/external-bridge-11155111.json --step verify-actions
+cd app/contracts && npm run configure:external-bridge -- --config <EAB_ROLLOUT_DIRECTORY>/external-bridge-11155111.json --step verify-initialize --output-dir <EAB_ROLLOUT_DIRECTORY>
+cd app/contracts && npm run configure:external-bridge -- --config <EAB_ROLLOUT_DIRECTORY>/external-bridge-11155111.json --step verify-routes --output-dir <EAB_ROLLOUT_DIRECTORY>
+cd app/contracts && npm run configure:external-bridge -- --config <EAB_ROLLOUT_DIRECTORY>/external-bridge-11155111.json --step verify-actions --output-dir <EAB_ROLLOUT_DIRECTORY>
 ```
 
 Route and action plans are symmetric: they emit explicit true or false values

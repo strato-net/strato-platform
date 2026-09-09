@@ -37,6 +37,7 @@ const depositPlan = {
             externalName: "USD Coin",
             externalSymbol: "USDC",
             legacyStratoMaxPerWithdrawal: "100",
+            stratoTokenStatus: 2,
           },
           {
             token: usdc,
@@ -46,6 +47,7 @@ const depositPlan = {
             externalName: "USD Coin",
             externalSymbol: "USDC",
             legacyStratoMaxPerWithdrawal: "100",
+            stratoTokenStatus: 2,
           },
         ],
       },
@@ -137,6 +139,22 @@ const settings = {
   settlementVerifiers: [safe, vault, router],
 };
 
+test("rejects enabled legacy routes with inactive STRATO tokens", () => {
+  const inactivePlan = structuredClone(depositPlan);
+  inactivePlan.operations[0].transactions[0].meta.items[0].stratoTokenStatus = 1;
+  assert.throws(
+    () => collectInventory(inactivePlan, 11155111),
+    /requires an active STRATO token; status=1/,
+  );
+
+  delete inactivePlan.operations[0].transactions[0].meta.items[0]
+    .stratoTokenStatus;
+  assert.throws(
+    () => collectInventory(inactivePlan, 11155111),
+    /requires an active STRATO token; status=NOT_RECORDED/,
+  );
+});
+
 test("builds one synchronized all-token rollout from DepositRouter inventory", () => {
   const rollout = buildSynchronizedRollout({
     depositPlan,
@@ -195,7 +213,7 @@ test("orders route permissions so the token remains enabled when any route is en
 
 test("generates a fail-closed policy template for every token and route", () => {
   const inventory = collectInventory(depositPlan, 11155111);
-  const generated = buildPolicyTemplate(inventory, 11155111);
+  const generated = buildPolicyTemplate(inventory, 11155111, "1234");
 
   assert.equal(generated.tokens[tokenKey].maxPerWithdrawal, "REVIEW_REQUIRED");
   assert.equal(
@@ -206,6 +224,21 @@ test("generates a fail-closed policy template for every token and route", () => 
   assert.equal(
     generated.routes[`${tokenKey}:${usdcSt.toLowerCase()}`].autoRouteEnabled,
     false,
+  );
+  assert.equal(
+    generated.routes[`${tokenKey}:${usdcSt.toLowerCase()}`].rebaseRequired,
+    "REVIEW_REQUIRED",
+  );
+  assert.throws(
+    () =>
+      buildSynchronizedRollout({
+        depositPlan,
+        bridgeTemplate,
+        vaultTemplate,
+        policy: { ...policy, routes: generated.routes },
+        chainId: 11155111,
+      }),
+    /rebaseRequired must be boolean/,
   );
 });
 

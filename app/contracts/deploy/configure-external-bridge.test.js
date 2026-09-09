@@ -1,13 +1,19 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const test = require("node:test");
 const {
   parseArgs,
   buildPlan,
+  selectPlanCalls,
+  writeOutput,
 } = require("./configure-external-bridge");
 const {
   compareInitialization,
   compareRoutes,
   compareActions,
+  validateActiveRouteTokens,
   verifyConfiguration,
 } = require("./external-bridge-verification");
 
@@ -74,6 +80,25 @@ test("parses an explicit dry-run step", () => {
     parseArgs(["--config", "setup.json", "--step", "verify-actions"]),
     { execute: false, config: "setup.json", step: "verify-actions" },
   );
+  assert.deepEqual(
+    parseArgs([
+      "--config",
+      "setup.json",
+      "--step",
+      "routes",
+      "--start-call",
+      "4",
+      "--output-dir",
+      "/secure/eab",
+    ]),
+    {
+      execute: false,
+      config: "setup.json",
+      step: "routes",
+      "start-call": "4",
+      "output-dir": "/secure/eab",
+    },
+  );
   assert.throws(
     () =>
       parseArgs([
@@ -85,6 +110,36 @@ test("parses an explicit dry-run step", () => {
       ]),
     /not valid for verification/,
   );
+  assert.throws(
+    () =>
+      parseArgs([
+        "--config",
+        "setup.json",
+        "--step",
+        "verify-routes",
+        "--start-call",
+        "1",
+      ]),
+    /--start-call must be a positive integer/,
+  );
+});
+
+test("selects a one-based governance resume point", () => {
+  const plan = buildPlan(settings, "routes");
+  const selected = selectPlanCalls(plan, "2");
+  assert.equal(selected.firstCall, 2);
+  assert.deepEqual(selected.calls, plan.slice(1));
+  assert.throws(
+    () => selectPlanCalls(plan, String(plan.length + 1)),
+    /must be between 1 and/,
+  );
+});
+
+test("writes governance output to the requested directory", () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "eab-governance-"));
+  const outputPath = writeOutput({ step: "verify-actions" }, directory);
+  assert.equal(path.dirname(outputPath), directory);
+  assert.equal(JSON.parse(fs.readFileSync(outputPath, "utf8")).step, "verify-actions");
 });
 
 test("builds initialization votes including every yield vault", () => {
@@ -220,6 +275,25 @@ test("verifies configured actions and rejects unexpected actions", () => {
     compareActions(settings, state).join("\n"),
     /Unexpected enabled deposit action/,
   );
+});
+
+test("rejects inactive STRATO tokens before route voting", async () => {
+  const errors = await validateActiveRouteTokens(
+    settings,
+    "https://strato.example",
+    "token",
+    async () => ({
+      ok: true,
+      json: async () => [{
+        address: settings.chains[0].routes[0].stratoToken,
+        status: 1,
+        _symbol: "ETH",
+      }],
+    }),
+  );
+  assert.deepEqual(errors, [
+    `${settings.chains[0].routes[0].stratoToken} (ETH): status=1`,
+  ]);
 });
 
 test("loads verification state from Cirrus", async () => {

@@ -279,6 +279,52 @@ async function cirrusSearch(nodeUrl, token, table, params, fetchImpl = fetch) {
   return Array.isArray(body) ? body : [];
 }
 
+async function validateActiveRouteTokens(
+  settings,
+  nodeUrl,
+  token,
+  fetchImpl = fetch,
+) {
+  const routes = settings.chains.flatMap((chain) =>
+    chain.routes.filter(
+      (route) => route.depositsEnabled || route.withdrawalsEnabled,
+    ),
+  );
+  const addresses = [
+    ...new Set(routes.map((route) => normalizeAddress(route.stratoToken))),
+  ];
+  if (!addresses.length) return [];
+  const rows = await cirrusSearch(
+    nodeUrl,
+    token,
+    "BlockApps-Token",
+    {
+      address: `in.(${addresses.join(",")})`,
+      select: "address,status,_symbol",
+      limit: addresses.length,
+    },
+    fetchImpl,
+  );
+  const statuses = new Map(
+    rows.map((row) => [
+      normalizeAddress(row.address),
+      {
+        status: Number(row.status),
+        symbol: String(row._symbol || "").trim(),
+      },
+    ]),
+  );
+  return addresses.flatMap((tokenAddress) => {
+    const tokenState = statuses.get(tokenAddress);
+    if (tokenState?.status === 2) return [];
+    return [
+      `${tokenAddress}${tokenState?.symbol ? ` (${tokenState.symbol})` : ""}: status=${
+        tokenState?.status ?? "NOT_FOUND"
+      }`,
+    ];
+  });
+}
+
 async function fetchInitializationState(settings, nodeUrl, token, fetchImpl) {
   const bridgeAddress = normalizeAddress(settings.bridge.address);
   const routerAddress = normalizeAddress(settings.tokenRouter.address);
@@ -456,5 +502,6 @@ module.exports = {
   compareInitialization,
   compareRoutes,
   compareActions,
+  validateActiveRouteTokens,
   verifyConfiguration,
 };

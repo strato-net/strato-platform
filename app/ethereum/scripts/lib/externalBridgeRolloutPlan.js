@@ -45,6 +45,16 @@ function collectInventory(depositPlan, chainId) {
       if (!item.isPermitted) continue;
       const token = address(item.token, "DepositRouter token");
       const target = address(item.target, "DepositRouter target");
+      const stratoTokenStatus = Number(item.stratoTokenStatus);
+      if (stratoTokenStatus !== 2) {
+        throw new Error(
+          `Enabled route ${routeKey(token, target)} requires an active STRATO token; status=${
+            Number.isFinite(stratoTokenStatus)
+              ? stratoTokenStatus
+              : "NOT_RECORDED"
+          }`,
+        );
+      }
       const externalDecimals = uint(
         item.externalDecimals,
         `externalDecimals for ${token}`,
@@ -60,6 +70,7 @@ function collectInventory(depositPlan, chainId) {
         externalDecimals,
         externalName,
         externalSymbol,
+        stratoTokenStatus,
         legacyStratoMaxPerWithdrawal: String(
           item.legacyStratoMaxPerWithdrawal ?? "",
         ),
@@ -97,7 +108,7 @@ function buildPolicyTemplate(
     routes[routeKey(route.externalToken, route.stratoToken)] = {
       depositsEnabled: true,
       withdrawalsEnabled: false,
-      rebaseRequired: false,
+      rebaseRequired: "REVIEW_REQUIRED",
       autoRouteEnabled: false,
     };
   }

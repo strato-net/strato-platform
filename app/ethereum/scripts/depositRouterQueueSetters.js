@@ -31,7 +31,9 @@ const {
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const MAPPINGS_TABLE = "BlockApps-MercataBridge-mappings";
 const CHAINS_TABLE = "BlockApps-MercataBridge-chains";
+const TOKENS_TABLE = "BlockApps-Token";
 const DEFAULT_BRIDGE_ADDRESS = "0x0000000000000000000000000000000000001008";
+const ACTIVE_TOKEN_STATUS = 2;
 
 function parseArgs() {
   const argv = process.argv.slice(2);
@@ -490,6 +492,50 @@ function buildSetterConfigFromMappings(rows, selectedChains) {
   return byChain;
 }
 
+async function addStratoTokenStatuses(nodeUrl, token, configByChain) {
+  const addresses = [
+    ...new Set(
+      Object.values(configByChain)
+        .flatMap((chain) => chain.tokenUpdates)
+        .map((route) => route.target.replace(/^0x/, "").toLowerCase()),
+    ),
+  ];
+  if (!addresses.length) return;
+  const rows = await cirrusSearch(nodeUrl, token, TOKENS_TABLE, {
+    address: `in.(${addresses.join(",")})`,
+    select: "address,status,_symbol",
+    limit: String(addresses.length),
+  });
+  const statuses = new Map(
+    rows.map((row) => [
+      normalizeHexAddress(row.address),
+      {
+        status: Number(row.status),
+        symbol: String(row._symbol || "").trim(),
+      },
+    ]),
+  );
+  const inactive = [];
+  for (const chain of Object.values(configByChain)) {
+    for (const route of chain.tokenUpdates) {
+      const tokenState = statuses.get(normalizeHexAddress(route.target));
+      route.stratoTokenStatus = tokenState?.status ?? null;
+      if (route.stratoTokenStatus !== ACTIVE_TOKEN_STATUS) {
+        inactive.push(
+          `${route.target}${tokenState?.symbol ? ` (${tokenState.symbol})` : ""}: status=${
+            route.stratoTokenStatus ?? "NOT_FOUND"
+          }`,
+        );
+      }
+    }
+  }
+  if (inactive.length) {
+    throw new Error(
+      `Enabled legacy routes reference inactive STRATO tokens: ${inactive.join(", ")}`,
+    );
+  }
+}
+
 function buildTransactions(proxyAddress, chainConfig, chunkSize) {
   const batches = chunkArray(chainConfig.tokenUpdates || [], chunkSize);
 
@@ -515,6 +561,7 @@ function buildTransactions(proxyAddress, chainConfig, chunkSize) {
         externalName: row.externalName,
         externalSymbol: row.externalSymbol,
         legacyStratoMaxPerWithdrawal: row.legacyStratoMaxPerWithdrawal,
+        stratoTokenStatus: row.stratoTokenStatus,
       })),
     },
   }));
@@ -551,6 +598,7 @@ async function main() {
     topology.bridgeAddress,
   );
   const configByChain = buildSetterConfigFromMappings(mappingRows, chains);
+  await addStratoTokenStatuses(nodeUrl, token, configByChain);
 
   const summary = {
     env: envProfile.profile,
