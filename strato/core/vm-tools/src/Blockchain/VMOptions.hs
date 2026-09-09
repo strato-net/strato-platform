@@ -8,6 +8,7 @@ module Blockchain.VMOptions
     flags_sqlDiff,
     flags_diffPublish,
     flags_queryBlocks,
+    flags_vmCacheBudgetMB,
   )
 where
 import HFlags
@@ -27,3 +28,9 @@ defineFlag "diffPublish" False "publishes all state changes to kafka"
 defineFlag "queryBlocks" (10000 :: Int) "Number of blocks to query from SQL to process in one batch"
 defineFlag "svmDev" (False :: Bool) "Whether to crash on SolidVM exceptions"
 defineFlag "svmTrace" (False :: Bool) "Whether to have verbose logging in SolidVM"
+defineFlag "vmCacheBudgetMB" (1024 :: Int)
+  "Approximate memory budget (MB) for the VM's in-process read caches \
+  \(accounts, contract storage, MP nodes, hash preimages, compiled code). \
+  \Entry limits scale linearly with the budget; 1024 reproduces the caps the \
+  \throughput work was benchmarked with. strato-setup sizes this to the \
+  \machine's RAM in commands.txt."

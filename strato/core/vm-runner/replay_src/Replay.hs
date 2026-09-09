@@ -23,6 +23,7 @@ import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.Sequencer.Event (VmTask (..))
 import Blockchain.Sequencer.Kafka (seqVmTasksTopicName)
 import Blockchain.Strato.Model.Options ()
+import Blockchain.VMCacheBudget (applyVmCacheBudget)
 import Blockchain.VMContext (evalContextM', finalizePendingMPNodes, initReplayContext)
 import Blockchain.VMOptions ()
 import Conduit
@@ -47,6 +48,7 @@ main :: IO ()
 main = do
   blockappsInit "vm_replay"
   args <- $initHFlags "vm-replay: isolated processBlocks harness"
+  applyVmCacheBudget
   case args of
     ("dump" : nStr : outPath : _) -> dumpBlocks (read nStr) outPath
     ("apply" : inPath : fromStr : toStr : _) -> applyBlocksStreamed defaultStreamChunkSize inPath (Just (read fromStr, read toStr))

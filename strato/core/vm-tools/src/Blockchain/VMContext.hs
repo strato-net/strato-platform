@@ -72,12 +72,15 @@ module Blockchain.VMContext
     checkIfRunningTests,
     knownFailedTxs,
     knownExpensiveTxs,
+    setMpNodeCacheLimit,
+    setHashCacheLimit,
   )
 where
 
 import BlockApps.Init ()
 import BlockApps.Logging
 import Blockchain.Bagger.BaggerState (BaggerState, defaultBaggerState)
+import Blockchain.Cache.Generational
 import Blockchain.Constants
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.ChainDB
@@ -131,6 +134,7 @@ import GHC.Generics
 import SolidVM.Model.Storable
 import SolidVM.Model.Value
 import System.Directory
+import System.IO.Unsafe (unsafePerformIO)
 import Text.Format
 import UnliftIO
 
@@ -238,14 +242,37 @@ data Context = Context
     -- In-process Merkle Patricia node cache. Lookups hit here before LevelDB.
     -- Inserts stay in RAM; SR verification uses the same nodes. Persistence is
     -- durability, not the hash. Timed apply does not need a mid-run disk write.
-    _mpNodeCache :: IORef (HM.HashMap B.ByteString MP.NodeData),
+    _mpNodeCache :: IORef (GenCacheHM B.ByteString MP.NodeData),
     _mpPendingNodes :: IORef (HM.HashMap B.ByteString MP.NodeData),
     _mpPendingBlockHashRoot :: IORef (Maybe B.ByteString),
     _mpFlushInterval :: !Int,
     _mpFlushCount :: IORef Int,
-    _hashCache :: IORef (HM.HashMap B.ByteString N.NibbleString)
+    _hashCache :: IORef (GenCacheHM B.ByteString N.NibbleString)
   }
   deriving (Generic)
+
+-- Entry limits for the two Context-held caches, applied when a Context is
+-- created. vm-runner resizes them from its memory budget flag before
+-- initContext runs; other executables keep the defaults.
+{-# NOINLINE mpNodeCacheLimit #-}
+mpNodeCacheLimit :: IORef Int
+mpNodeCacheLimit = unsafePerformIO $ newIORef 200000
+
+{-# NOINLINE hashCacheLimit #-}
+hashCacheLimit :: IORef Int
+hashCacheLimit = unsafePerformIO $ newIORef 500000
+
+setMpNodeCacheLimit :: Int -> IO ()
+setMpNodeCacheLimit = writeIORef mpNodeCacheLimit
+
+setHashCacheLimit :: Int -> IO ()
+setHashCacheLimit = writeIORef hashCacheLimit
+
+newMpNodeCacheRef :: MonadIO m => m (IORef (GenCacheHM B.ByteString MP.NodeData))
+newMpNodeCacheRef = newIORef . ghEmpty =<< readIORef mpNodeCacheLimit
+
+newHashCacheRef :: MonadIO m => m (IORef (GenCacheHM B.ByteString N.NibbleString))
+newHashCacheRef = newIORef . ghEmpty =<< readIORef hashCacheLimit
 
 makeLenses ''Context
 
@@ -397,11 +424,11 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               _selfAddress = Address 0
             }
       que <- newTQueueIO
-      nodeCache <- newIORef HM.empty
+      nodeCache <- newMpNodeCacheRef
       pendingNodes <- newIORef HM.empty
       pendingBlockHashRoot <- newIORef Nothing
       flushCount <- newIORef 0
-      hCache <- newIORef HM.empty
+      hCache <- newHashCacheRef
       let ctx =
             Context
               { _dbs = cdbs,
@@ -479,11 +506,11 @@ initContextWithOptions cacheBytes writeBufferBytes flushInterval = do
       def
         & txRunResultsCache .~ cache
   que <- newTQueueIO
-  nodeCache <- newIORef HM.empty
+  nodeCache <- newMpNodeCacheRef
   pendingNodes <- newIORef HM.empty
   pendingBlockHashRoot <- newIORef Nothing
   flushCount <- newIORef 0
-  hCache <- newIORef HM.empty
+  hCache <- newHashCacheRef
   pure
     Context
       { _dbs = cdbs,

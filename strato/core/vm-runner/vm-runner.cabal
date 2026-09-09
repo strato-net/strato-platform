@@ -18,6 +18,7 @@ library
       Blockchain.BlockChain
       Blockchain.Event
       Blockchain.TraceReplay
+      Blockchain.VMCacheBudget
       Executable.EthereumVM
       Executable.EthereumVM2
   other-modules:

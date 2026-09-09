@@ -22,12 +22,14 @@ module Blockchain.DB.RawStorageDB
     getAllRawStorageKeyVals',
     deleteRawStorageKey',
     flushMemRawStorageTxDBToBlockDB,
-    flushMemRawStorageDB
+    flushMemRawStorageDB,
+    setStorageReadCacheLimit
   )
 where
 
 import BatchMerge
 import BlockApps.Logging
+import Blockchain.Cache.Generational
 import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.StateDB
@@ -37,10 +39,12 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.Strato.Model.Address
 import Control.Arrow ((***))
+import Control.DeepSeq (deepseq)
 import Control.Monad (forM_, join)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Loops
+import qualified Data.ByteString as B
 import Data.Default
 import Data.Foldable (for_)
 import Data.List
@@ -60,12 +64,24 @@ type RawStorageKey = (Address, StoragePath)
 type RawStorageValue = BasicValue
 
 {-# NOINLINE storageReadCache #-}
-storageReadCache :: IORef (M.Map (MP.StateRoot, StoragePath) (Maybe RawStorageValue))
-storageReadCache = unsafePerformIO $ newIORef M.empty
+storageReadCache :: IORef (GenCache (MP.StateRoot, StoragePath) (Maybe RawStorageValue))
+storageReadCache = unsafePerformIO $ newIORef $ gcEmpty 500000
+
+-- | Resize the storage read cache (entry count). vm-runner sets this from
+-- its memory budget at startup; other executables keep the default.
+setStorageReadCacheLimit :: Int -> IO ()
+setStorageReadCacheLimit n = atomicModifyIORef' storageReadCache $ \c -> (gcSetLimit n c, ())
 
 cacheStorageRead :: (MP.StateRoot, StoragePath) -> Maybe RawStorageValue -> IO ()
-cacheStorageRead key value = modifyIORef' storageReadCache $ \cache ->
-  M.insert key value $ if M.size cache >= 500000 then M.empty else cache
+cacheStorageRead (root, path) value =
+  -- Copy the root's bytes so the key doesn't pin the decode buffer it was
+  -- sliced from, and force the value so the entry doesn't retain decoder
+  -- thunks.
+  let key = (copyStateRoot root, path)
+   in key `deepseq` value `deepseq` modifyIORef' storageReadCache (gcInsert key value)
+
+copyStateRoot :: MP.StateRoot -> MP.StateRoot
+copyStateRoot (MP.StateRoot bytes) = MP.StateRoot (B.copy bytes)
 
 type HasRawStorageDB m = (RawStorageKey `A.Alters` RawStorageValue) m
 
@@ -273,7 +289,7 @@ getRawStorageKeyValDBMaybe (owner, key) = do
   mContractRoot <- fmap addressStateContractRoot <$> A.lookup (A.Proxy @AddressState) owner
   fmap join . for mContractRoot $ \cr -> do
     cache <- liftIO $ readIORef storageReadCache
-    case M.lookup (cr, key) cache of
+    case gcLookup (cr, key) cache of
       Just result -> pure result
       Nothing -> do
         result <- fmap rlpDecode <$> MP.getKeyVal cr (N.EvenNibbleString $ unparsePath key)

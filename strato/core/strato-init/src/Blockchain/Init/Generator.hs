@@ -100,11 +100,16 @@ createCommandsFile = do
     sequencerRtsFlags (mrCores resources) (mrMemMB resources)
   (vmRunnerRts, vmNote) <- rtsWithOverride "STRATO_VMRUNNER_RTS" $
     vmRunnerRtsFlags (mrCores resources) (mrMemMB resources)
+  -- The vm-runner's read caches are sized alongside its heap: same tiers,
+  -- same time (setup), same escape hatch (edit commands.txt).
+  let vmRunnerArgs =
+        "--vmCacheBudgetMB=" ++ show (vmCacheBudgetMB (mrMemMB resources))
+          ++ " " ++ vmRunnerRts
   let sizingReport =
         [ "RTS sizing: " ++ describeMachineResources resources ]
         ++ seqNote ++ vmNote ++
         [ "strato-sequencer: " ++ sequencerRts
-        , "vm-runner: " ++ vmRunnerRts
+        , "vm-runner: " ++ vmRunnerArgs
         ]
   mapM_ (putStrLn . ("  " ++)) sizingReport
   -- Persist the decision where support can find it later: setup's terminal
@@ -119,7 +124,7 @@ createCommandsFile = do
         [ "ethereum-discover +RTS -T -RTS"
         , "strato-p2p +RTS -T -RTS"
         , "strato-sequencer " ++ sequencerRts
-        , "vm-runner " ++ vmRunnerRts
+        , "vm-runner " ++ vmRunnerArgs
         , "strato-indexer"
         , "slipstream +RTS -T -RTS"
         , "strato-api +RTS -T -N -maxN4 -RTS"

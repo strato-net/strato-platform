@@ -564,6 +564,11 @@ runSM maybeCode envBefore gi f = do
             Nothing -> InternalError "Uncaught internal exception" (show e)
       case se of
         Require _ -> $logDebugLS "runSM/error" se
+        -- Like Require, an unknown function is a caller-level failure, not a
+        -- VM fault: it is already reported through the transaction result,
+        -- and the per-block rewards probe hits it on every network where
+        -- rewards aren't configured. ERROR here was ~50K log lines/hour.
+        UnknownFunction _ _ -> $logDebugLS "runSM/error" se
         _ -> $logErrorLS "runSM/error" se
       if flags_svmDev
         then do
