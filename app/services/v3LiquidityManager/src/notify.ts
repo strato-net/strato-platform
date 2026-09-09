@@ -25,10 +25,16 @@ export async function notify(cfg: Config, subject: string, body: string): Promis
     }
   }
 
-  if (cfg.slackWebhookUrl) {
+  if (cfg.slack) {
     try {
-      await axios.post(cfg.slackWebhookUrl, { text: `*${subject}*\n${body}` });
-      log("slack sent");
+      const { data } = await axios.post(
+        "https://slack.com/api/chat.postMessage",
+        { channel: cfg.slack.channelId, text: `*${subject}*\n${body}` },
+        { headers: { Authorization: `Bearer ${cfg.slack.token}` } }
+      );
+      // the Slack Web API answers HTTP 200 even on failure — the body's ok field is the verdict
+      if (!data.ok) throw new Error(data.error || "unknown Slack error");
+      log(`slack sent to ${cfg.slack.channelId}`);
     } catch (err: any) {
       log(`slack failed: ${err.response ? JSON.stringify(err.response.data) : err.message}`);
     }

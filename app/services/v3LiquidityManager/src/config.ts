@@ -28,7 +28,7 @@ export interface Config {
    *  reconstructed from chain, which drifts wider by up to one tick-spacing per cycle) */
   ladderWidths: Record<string, string>;
   email?: EmailConfig;
-  slackWebhookUrl?: string;
+  slack?: { token: string; channelId: string };
 }
 
 const required = (name: string): string => {
@@ -100,11 +100,16 @@ export function loadConfig(): Config {
     stateFile: (process.env.STATE_FILE || `${__dirname}/../.state.json`).trim(),
     ladderWidths,
     email,
-    slackWebhookUrl: process.env.SLACK_WEBHOOK_URL?.trim() || undefined,
   };
 
-  if (!cfg.email && !cfg.slackWebhookUrl) {
-    console.warn("[config] no notification channel configured (SENDGRID_API_KEY / SLACK_WEBHOOK_URL) — alerts will only be logged");
+  const slackToken = process.env.SLACK_TOKEN?.trim();
+  const slackChannelId = process.env.SLACK_CHANNEL_ID?.trim();
+  if (!!slackToken !== !!slackChannelId)
+    throw new Error("SLACK_TOKEN and SLACK_CHANNEL_ID must be set together");
+  if (slackToken && slackChannelId) cfg.slack = { token: slackToken, channelId: slackChannelId };
+
+  if (!cfg.email && !cfg.slack) {
+    console.warn("[config] no notification channel configured (SENDGRID_API_KEY / SLACK_TOKEN+SLACK_CHANNEL_ID) — alerts will only be logged");
   }
   return cfg;
 }

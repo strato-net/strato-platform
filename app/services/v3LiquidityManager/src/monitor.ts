@@ -205,10 +205,6 @@ export class Monitor {
         `Reposition — run as account ${account} (exits all its layers, reinvests principal + fees, recenters on the oracle):`,
         `  cd app/scripts && node positionV3Liquidity.js --pool ${pool} --widths ${configuredWidths ?? widths.join(",")} --execute`
       );
-      if (!configuredWidths)
-        lines.push(
-          "  (widths reconstructed from chain include tick-snapping — set LADDER_WIDTHS to pin the canonical ladder and avoid it widening over repeated repositions)"
-        );
     }
     await notify(this.cfg, subject, lines.join("\n"));
     for (const f of due) state.record(pairKey, f.kind, { mu, driftPct });

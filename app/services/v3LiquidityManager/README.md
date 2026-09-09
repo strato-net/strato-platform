@@ -22,7 +22,7 @@ Hysteresis: while a condition persists, it re-alerts only after `ALERT_COOLDOWN_
 Configure either or both (see `env.example`):
 
 - **Email** — SendGrid HTTP API (`SENDGRID_API_KEY`, same key the backend contact form uses), `ALERT_EMAIL_FROM`/`ALERT_EMAIL_TO`.
-- **Slack** — incoming webhook (`SLACK_WEBHOOK_URL`).
+- **Slack** — bot token + channel id via `chat.postMessage` (`SLACK_TOKEN` + `SLACK_CHANNEL_ID`, the same pattern as the org's other services). The bot must be a member of the target channel.
 
 Every alert includes μ, oracle, pool price, the drift vs ε, all current findings, and a copy-paste reposition command. The command's `--widths` come from `LADDER_WIDTHS` when configured, otherwise they are reconstructed from the live positions (see Notes).
 
@@ -45,8 +45,27 @@ docker build -t v3-liquidity-manager .
 docker run -d --name v3-liquidity-manager --restart unless-stopped \
   --env-file .env -p 3007:3007 \
   -e STATE_FILE=/data/state.json -v v3lm-state:/data \
+  --log-opt max-size=10m --log-opt max-file=3 \
   v3-liquidity-manager
 ```
+
+The `--log-opt` flags cap Docker's log capture at 3 × 10 MB — without them the default `json-file` driver grows unbounded.
+
+### Upgrading (redeploying after changes)
+
+```bash
+ssh -A <box>                          # agent forwarding: git pull needs your GitHub key
+cd ~/strato-platform && git pull      # respects the sparse checkout
+cd app/services/v3LiquidityManager
+docker build -t v3-liquidity-manager .   # old container keeps running during the build
+docker rm -f v3-liquidity-manager
+# ...then the docker run command above. Downtime is the seconds between rm and run.
+docker logs -f v3-liquidity-manager   # watch the first cycle come up clean
+```
+
+- `.env` (host) and the alert-cooldown state (`v3lm-state` volume) survive the swap — a redeploy does not re-send alerts already sent.
+- Config-only change (edited `.env`, no code): skip the pull/build, just `docker rm -f` + `docker run`.
+- Old images accumulate across builds; reclaim disk occasionally with `docker image prune -f`.
 
 ## Notes
 
