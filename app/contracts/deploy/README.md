@@ -366,14 +366,12 @@ node deploy/upgrade-stablepools.js --env prod --execute --with-factory
 Options: `--with-factory` also upgrades the PoolFactory proxy so pools created afterwards use the patched source (without it, `createStablePool` keeps using the factory's embedded, old StablePool); `--pools a,b,c` restricts the run; `--pool-impl` / `--factory-impl` reuse implementations you already deployed; `--skip-disabled` leaves migrated pools alone; `--env-file` selects the credentials file (default `app/contracts/.env`). Every address is verified to be a Proxy whose current logic is a StablePool before it is touched. Implementation addresses and in-flight vote issues are recorded in `deploy/upgrade-stablepools.state.<env>.json`.
 
 #### `sweep-withdrawal.js`
-Incident response for the MercataBridge (0x1008): cancels in-flight withdrawals (`INITIATED` or `PENDING_REVIEW`) and moves their escrow to a triage wallet via `cancelAndSweepWithdrawalBatch`, so stolen funds cannot bridge out and can be returned to victims. Requires the bridge implementation that carries that function (deploy it with `upgrade.js`, see the table above). Dry run by default.
+One-command incident response for the MercataBridge (0x1008): cancels in-flight withdrawals (`INITIATED` or `PENDING_REVIEW`) and moves their escrow to a triage wallet, so stolen funds cannot bridge out and can be returned to victims. With `--execute` it also upgrades the bridge logic to the sweep-capable implementation if needed (deploying it, or reusing one another admin already deployed), then prints the custody Safe proposals to reject. Dry run by default; safe to re-run; on multi-admin networks every admin runs the same command until it reports done. Full steps: `deploy/RUNBOOK-sweep-withdrawal.md`.
 
 ```bash
-node deploy/sweep-withdrawal.js --env testnet --ids 12,13 --triage <addr>            # show what would be swept
-node deploy/sweep-withdrawal.js --env prod    --ids 12,13 --triage <addr> --execute  # cast the governance call
+node deploy/sweep-withdrawal.js --env prod --ids 274 --triage <addr>            # dry run
+node deploy/sweep-withdrawal.js --env prod --ids 274 --triage <addr> --execute  # sweep, then reject in the Safe app
 ```
-
-On a multi-admin network the call records a vote (exit code 2 with the issue id); every admin must submit the same ids and triage wallet. For `PENDING_REVIEW` withdrawals the proposed custody (Safe) transaction on the external chain must be rejected as well; the script prints its hash. Never whitelist the relayer for `cancelAndSweepWithdrawal`.
 
 ## Directory Structure
 
