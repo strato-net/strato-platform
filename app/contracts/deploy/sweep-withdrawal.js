@@ -52,7 +52,7 @@ const PROFILES = {
   prod: { nodeUrl: 'https://app.strato.nexus', cirrusUrl: 'https://app.strato.nexus' },
 };
 const DEFAULT_BRIDGE = '0000000000000000000000000000000000001008';
-const BRIDGE_IMPL = { name: 'MercataBridge', file: 'Bridge/MercataBridge.sol' };
+const BRIDGE_IMPL = { name: 'MercataBridge', file: 'BaseCodeCollection.sol' };
 // MercataBridge's constructor parameter is `_owner`; the value is ignored in favour of the proxy owner.
 const BRIDGE_CONSTRUCTOR_ARGS = { _owner: 'deadbeef' };
 const SWEEP_FUNCTION = 'cancelAndSweepWithdrawal';
