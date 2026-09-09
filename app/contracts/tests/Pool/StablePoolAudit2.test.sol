@@ -192,18 +192,18 @@ contract Describe_StablePool_Audit2 is Authorizable {
     // `flag = flag || (...)` as `(flag = flag) || (...)`.
     // =========================================================================
 
-    /// @dev Canary for the VM behaviour the fix works around. If this test ever
-    ///      fails, SolidVM has fixed its parser; the `if` in the contract stays
-    ///      correct either way.
-    function it_g3_solidvm_or_assignment_only_stores_the_left_operand() {
+    /// @dev The VM side of G3. SolidVM's parser ranked assignment above `||`
+    ///      and `&&`, so `a = a || cond` stored only `a`; that is fixed in the VM
+    ///      behind the operator-precedence fork (Blockchain.Forks), and the CLI
+    ///      runs post-fork. This fails on a solid-vm-cli built before the fix,
+    ///      which is the point. The `if` in the contract is correct either way.
+    function it_g3_solidvm_assignment_binds_looser_than_or_and_and() {
         bool a = false;
         a = a || (1 == 1);
-        require(!a, "G3: `a = a || true` leaves a false");
-        a = (a || (1 == 1));
-        require(a, "G3: ...while `a = (a || true)` sets it");
+        require(a, "G3: `a = a || true` must store true");
         bool b = true;
         b = b && (1 == 2);
-        require(b, "G3: `b = b && false` leaves b true");
+        require(!b, "G3: `b = b && false` must store false");
     }
 
     function it_g3_rebasing_pool_reads_live_balances() {
