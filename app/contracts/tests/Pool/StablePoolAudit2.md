@@ -47,7 +47,7 @@ Fixes are in `StablePool.sol` and `PoolFactory.sol`; the proof-of-concept suite 
 
 **Knock-on test changes for the liquidity lock:** `StablePool.test.sol` (supply is `liquidity + 1000` after the first deposit and `1000` after a full exit), `StablePoolAudit.test.sol` (F2 pro-rates over the real total supply; F2b/F2c expect `1000` left), `StablePoolMigration.test.sol` (F8 expects `minted + 1000`).
 
-**One more SolidVM gotcha, found while fixing G6.** From an `internal` function, `ERC20(t).decimals()` returns ERC20's own body (18) instead of dispatching to Token's `external` override; the same expression in a `public` function, and `IERC20Metadata(t).decimals()` or `Token(t).decimals()` from anywhere, return the real value. The factory helper therefore calls through `IERC20Metadata`. Internal helpers elsewhere that call a base-typed function which a concrete contract overrides as `external` deserve a look.
+**A note on the VM used for this audit.** The `solid-vm-cli` installed in `~/.local/bin` at the time (built 2026-09-04, most likely from the `speed` branch) mis-dispatches typed calls made from nested call frames: `T(addr).f()` runs `T`'s own body instead of the override deployed at `addr`. That is what made `ERC20(t).decimals()` return 18 from an internal helper while fixing G6. A CLI built from this branch dispatches correctly, and every suite above was re-run against it. The factory helper calls through `IERC20Metadata` regardless, which is the right dependency. The `||`-assignment bug (G3) is real on this branch and is fixed in the VM separately, behind a fork height.
 
 | Suite | Result |
 |---|---:|
