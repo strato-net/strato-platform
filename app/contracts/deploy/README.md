@@ -348,6 +348,23 @@ Disable:
 node configure-bridge-deposit-actions.js --env testnet --operation disable --execute
 ```
 
+#### `upgrade-stablepools.js`
+Points every deployed StablePool proxy at a fresh implementation built from the current `concrete/Pools/StablePool.sol`. Dry run by default; idempotent; governance-aware (exit code 2 while votes are pending, re-run after voting).
+
+Dry run (no credentials needed; discovery uses the public Cirrus endpoint `.../cirrus/search/BlockApps-StablePool?DMaTime=gt.0`):
+```bash
+node deploy/upgrade-stablepools.js --env testnet
+node deploy/upgrade-stablepools.js --env prod
+```
+
+Apply:
+```bash
+node deploy/upgrade-stablepools.js --env testnet --execute
+node deploy/upgrade-stablepools.js --env prod --execute --with-factory
+```
+
+Options: `--with-factory` also upgrades the PoolFactory proxy so pools created afterwards use the patched source (without it, `createStablePool` keeps using the factory's embedded, old StablePool); `--pools a,b,c` restricts the run; `--pool-impl` / `--factory-impl` reuse implementations you already deployed; `--skip-disabled` leaves migrated pools alone; `--env-file` selects the credentials file (default `app/contracts/.env`). Every address is verified to be a Proxy whose current logic is a StablePool before it is touched. Implementation addresses and in-flight vote issues are recorded in `deploy/upgrade-stablepools.state.<env>.json`.
+
 ## Directory Structure
 
 ```
