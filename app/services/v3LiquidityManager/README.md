@@ -4,6 +4,8 @@ Monitors the corporate laddered liquidity positions in V3 (concentrated-liquidit
 
 Supports multiple corporate accounts, each with its own pool list (`ACCOUNT_POOLS`). Every account-pool pair is checked, tracked, and alerted on independently — the alert names the account so you know whose credentials to reposition with.
 
+`WATCH_POOLS` additionally monitors pools **without** holding liquidity in them: pool-level checks only (pool price vs oracle dislocation, stale oracle, paused/disabled) — no positions read, no μ/ε, no `no-ladder` warning, no reposition command. Watched pools appear in `/health` and alert subjects tagged `[watch]`.
+
 ## How it decides
 
 For each configured account-pool pair, every poll:
@@ -24,7 +26,7 @@ Configure either or both (see `env.example`):
 - **Email** — SendGrid HTTP API (`SENDGRID_API_KEY`, same key the backend contact form uses), `ALERT_EMAIL_FROM`/`ALERT_EMAIL_TO`.
 - **Slack** — bot token + channel id via `chat.postMessage` (`SLACK_TOKEN` + `SLACK_CHANNEL_ID`, the same pattern as the org's other services). The bot must be a member of the target channel.
 
-Every alert includes μ, oracle, pool price, the drift vs ε, all current findings, and a copy-paste reposition command. The command's `--widths` come from `LADDER_WIDTHS` when configured, otherwise they are reconstructed from the live positions (see Notes).
+All alerts due in a cycle are combined into **one email and one Slack message** (one section per account-pool pair / watched pool, most severe first in the subject). Each section includes μ, oracle, pool price, the drift vs ε, all current findings, and — for recenter alerts — a copy-paste reposition command. The command's `--widths` come from `LADDER_WIDTHS` when configured, otherwise they are reconstructed from the live positions (see Notes). Hysteresis stays per pair per finding-kind, so a pair joins the digest only when it has something newly due.
 
 ## Run
 

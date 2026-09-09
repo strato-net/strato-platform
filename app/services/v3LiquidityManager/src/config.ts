@@ -14,6 +14,8 @@ export interface AccountConfig {
 export interface Config {
   apiBase: string;
   accounts: AccountConfig[];
+  /** pools watched for pool-level conditions only (dislocation, oracle, paused) — no ladder expected */
+  watchPools: string[];
   /** ε as a multiple of the innermost layer's half-width (used unless EPSILON_ABS_PCT is set) */
   epsilonFactor: number;
   /** absolute ε override, in percent (e.g. 1.5 = alert at ±1.5% drift) */
@@ -54,7 +56,7 @@ export function loadConfig(): Config {
 
   // ACCOUNT_POOLS="<account>=<pool>,<pool>; <account2>=<pool>"
   const accounts: AccountConfig[] = [];
-  for (const entry of required("ACCOUNT_POOLS").split(";")) {
+  for (const entry of (process.env.ACCOUNT_POOLS || "").split(";")) {
     if (!entry.trim()) continue;
     const [addr, poolsStr] = entry.split("=").map((s) => s.trim());
     if (!addr || !poolsStr)
@@ -67,7 +69,13 @@ export function loadConfig(): Config {
     if (bad) throw new Error(`ACCOUNT_POOLS: "${bad}" is not a valid pool address`);
     accounts.push({ account, pools });
   }
-  if (accounts.length === 0) throw new Error("ACCOUNT_POOLS is empty");
+  // WATCH_POOLS="<pool>,<pool>" — dislocation/oracle/paused checks only, no ladder expected
+  const watchPools = (process.env.WATCH_POOLS || "").split(",").map(normalize).filter(Boolean);
+  const badWatch = watchPools.find((p) => !ADDR.test(p));
+  if (badWatch) throw new Error(`WATCH_POOLS: "${badWatch}" is not a valid pool address`);
+
+  if (accounts.length === 0 && watchPools.length === 0)
+    throw new Error("configure at least one of ACCOUNT_POOLS or WATCH_POOLS");
 
   const email: EmailConfig | undefined = process.env.SENDGRID_API_KEY
     ? {
@@ -91,6 +99,7 @@ export function loadConfig(): Config {
   const cfg: Config = {
     apiBase,
     accounts,
+    watchPools,
     epsilonFactor: num("EPSILON_FACTOR", 0.75),
     epsilonAbsPct: process.env.EPSILON_ABS_PCT ? num("EPSILON_ABS_PCT", 0) : undefined,
     dislocationPct: num("DISLOCATION_PCT", 3),
