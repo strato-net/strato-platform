@@ -76,4 +76,9 @@ handled and moves on. No action needed.
   new wallet; votes are per (ids, wallet) combination.
 - `--no-upgrade` makes the command fail instead of upgrading the bridge, if you prefer to run
   `deploy/upgrade.js` separately (see the README table, proxy 1008).
+- `--force-upgrade` redeploys the bridge logic from the current `BaseCodeCollection.sol` even if the
+  deployed logic can already sweep. The command compares the on-chain code hash of the proxy's logic
+  with the hash of the local source (shown in the dry run) and only redeploys on a mismatch, so
+  re-running it later is still a no-op. Use it when the earlier deployment was built from the wrong
+  file or an older source.
 - Never whitelist the relayer for `cancelAndSweepWithdrawal`.

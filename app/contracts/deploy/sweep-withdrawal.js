@@ -8,8 +8,11 @@
  *
  *   1. Makes sure the bridge proxy runs logic that has cancelAndSweepWithdrawal.
  *      If it does not, a MercataBridge implementation is deployed from the current
- *      concrete/Bridge/MercataBridge.sol (or one another admin already deployed is
- *      reused) and the proxy is pointed at it.
+ *      concrete/BaseCodeCollection.sol (or one another admin already deployed is
+ *      reused) and the proxy is pointed at it. With --force-upgrade the proxy must
+ *      run an implementation whose on-chain code hash equals the hash of that local
+ *      source, so a redeploy from changed source happens even if the deployed logic
+ *      can already sweep.
  *   2. Calls cancelAndSweepWithdrawalBatch(ids, triageWallet).
  *   3. Prints the custody (Safe) proposals that must now be REJECTED on the
  *      external chain, one per swept withdrawal that was already PENDING_REVIEW.
@@ -31,6 +34,7 @@
  *   --execute              Submit transactions.
  *   --impl <addr>          Reuse a specific sweep-capable MercataBridge implementation.
  *   --no-upgrade           Fail instead of upgrading if the deployed logic cannot sweep.
+ *   --force-upgrade        Require logic built from the local source (by code hash); redeploy otherwise.
  *   --allow-hot-wallet     Sweep withdrawals flagged useHotWallet (read the warning first).
  *   --bridge <addr>        MercataBridge proxy (default 0x1008).
  *   --poll-timeout <ms>    How long to wait for each on-chain effect (default 180000).
@@ -46,6 +50,7 @@ const path = require('path');
 const fs = require('fs-extra');
 const axios = require('axios');
 const dotenv = require('dotenv');
+const { keccak256, toUtf8Bytes } = require('ethers');
 
 const PROFILES = {
   testnet: { nodeUrl: 'https://node1.testnet.strato.nexus', cirrusUrl: 'https://app.testnet.strato.nexus' },
@@ -72,13 +77,13 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function printUsage() {
   console.error('Usage: node deploy/sweep-withdrawal.js --env testnet|prod --ids a,b,c --triage <addr> [--execute]');
-  console.error('       [--impl <addr>] [--no-upgrade] [--allow-hot-wallet] [--bridge <addr>] [--poll-timeout <ms>] [--env-file <path>]');
+  console.error('       [--impl <addr>] [--no-upgrade | --force-upgrade] [--allow-hot-wallet] [--bridge <addr>] [--poll-timeout <ms>] [--env-file <path>]');
 }
 
 function parseArgs() {
   const args = process.argv.slice(2);
   const parsed = { execute: false };
-  const flags = new Set(['execute', 'dry-run', 'no-upgrade', 'allow-hot-wallet']);
+  const flags = new Set(['execute', 'dry-run', 'no-upgrade', 'force-upgrade', 'allow-hot-wallet']);
   for (let i = 0; i < args.length; i++) {
     if (!args[i].startsWith('--')) throw new Error(`Unexpected argument: ${args[i]}`);
     const key = args[i].slice(2);
@@ -89,6 +94,7 @@ function parseArgs() {
     i++;
   }
   if (parsed['dry-run'] && parsed.execute) throw new Error('--dry-run and --execute are mutually exclusive');
+  if (parsed['no-upgrade'] && parsed['force-upgrade']) throw new Error('--no-upgrade and --force-upgrade are mutually exclusive');
   if (!parsed.env || !PROFILES[parsed.env]) throw new Error('--env must be testnet or prod');
   if (!parsed.ids) throw new Error('--ids is required');
   parsed.ids = [...new Set(parsed.ids.split(',').map((s) => s.trim()).filter(Boolean))];
@@ -133,6 +139,22 @@ async function getChains(cirrus, bridge, chainIds) {
   const byId = new Map();
   for (const row of rows) byId.set(String(row.key), row.value || {});
   return byId;
+}
+
+/** On-chain code-collection hash of an address (public STRATO API; no credentials). */
+async function getCodeHash(profile, address) {
+  try {
+    const { data } = await axios.get(`${profile.cirrusUrl}/strato-api/eth/v1.2/account`, { params: { address } });
+    const row = Array.isArray(data) ? data[0] : data;
+    return row && row.codeHash ? String(row.codeHash).toLowerCase().replace(/^0x/, '') : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/** STRATO hashes the uploaded source verbatim, so keccak256 of what we would upload is the expected code hash. */
+function codeHashOf(source) {
+  return keccak256(toUtf8Bytes(source)).replace(/^0x/, '');
 }
 
 // ---------------------------------------------------------------------------
@@ -209,6 +231,13 @@ const stripComments = (str) => {
   }).join('\n');
   return out;
 };
+
+/** Combined, comment-stripped source exactly as it would be uploaded. Usable in dry runs (no credentials). */
+async function localSource(contractFile) {
+  const config = require('./config');
+  const { importer } = require('blockapps-rest');
+  return combineSource(config, importer, contractFile);
+}
 
 async function combineSource(config, importer, contractFile) {
   const contractFilePath = path.join(config.resolvePath(config.contractsDir), contractFile);
@@ -315,49 +344,78 @@ async function issueExecutedAddress(chain, cirrus, issueId) {
 }
 
 /**
- * Find or create a sweep-capable implementation, in this order: the proxy's current
- * logic (already upgraded), --impl, the state file, the newest MercataBridge on the
- * network that can sweep (another admin deployed it), else deploy. Returns null while
- * a create-issue is awaiting votes.
+ * Find or create the implementation the proxy must run, and return its address, or
+ * null while a create-issue is awaiting votes.
+ *
+ * Normal mode: any logic that has cancelAndSweepWithdrawal is good enough, starting
+ * with what the proxy already runs. Force mode: the logic must have been built from
+ * the local source, judged by code hash, so a changed source is redeployed even if
+ * the deployed logic can already sweep. In both modes an implementation another
+ * admin already deployed is reused: it is matched by code hash on the network, so
+ * two admins on the same commit converge without sharing anything.
  */
-async function ensureSweepCapableImpl(chain, cirrus, args, state, currentLogic) {
-  if (await isSweepCapable(chain, currentLogic)) {
+async function ensureImpl(chain, cirrus, profile, args, state, currentLogic, source, expectedHash) {
+  const force = !!args['force-upgrade'];
+  if (!force && await isSweepCapable(chain, currentLogic)) {
     console.log(`  Bridge logic ${currentLogic} already has ${SWEEP_FUNCTION}.`);
     return currentLogic;
   }
   if (args['no-upgrade']) {
     throw new Error(`Bridge logic ${currentLogic} cannot sweep and --no-upgrade was given. Upgrade it first (deploy/upgrade.js).`);
   }
+  const currentHash = await getCodeHash(profile, currentLogic);
+  if (currentHash === expectedHash) {
+    console.log(`  Bridge logic ${currentLogic} was built from the local ${BRIDGE_IMPL.file} (code hash ${expectedHash}).`);
+    return currentLogic;
+  }
+  if (force) console.log(`  Bridge logic ${currentLogic} has code hash ${currentHash || '?'}; local source hashes to ${expectedHash}: redeploy required.`);
+
+  // Something already deployed from this exact source? --impl, the state file, then the network.
   const candidates = [];
   if (args.impl) candidates.push({ addr: normalizeAddr(args.impl), why: '--impl' });
   if (state.bridgeImpl) candidates.push({ addr: state.bridgeImpl, why: 'recorded in the state file' });
   const recent = await cirrus('BlockApps-MercataBridge', {
-    address: `neq.${args.bridge}`, select: 'address,block_number', order: 'block_number.desc', limit: '5',
+    address: `neq.${args.bridge}`, select: 'address,block_number', order: 'block_number.desc', limit: '8',
   });
-  for (const row of recent) candidates.push({ addr: normalizeAddr(row.address), why: 'newest implementation on the network' });
+  for (const row of recent) candidates.push({ addr: normalizeAddr(row.address), why: 'found on the network' });
+  const seen = new Set();
   for (const c of candidates) {
-    if (await isSweepCapable(chain, c.addr)) {
-      console.log(`  Reusing sweep-capable implementation ${c.addr} (${c.why}).`);
+    if (seen.has(c.addr)) continue;
+    seen.add(c.addr);
+    const hashMatches = (await getCodeHash(profile, c.addr)) === expectedHash;
+    const usable = force ? hashMatches : (hashMatches || await isSweepCapable(chain, c.addr));
+    if (usable) {
+      console.log(`  Reusing implementation ${c.addr} (${c.why}${hashMatches ? ', same code hash as the local source' : ''}).`);
       state.bridgeImpl = c.addr;
+      state.bridgeImplHash = hashMatches ? expectedHash : state.bridgeImplHash;
       saveState(args.env, chain.nodeUrl, state);
       return c.addr;
     }
-    if (c.why === '--impl') throw new Error(`--impl ${c.addr} is not a MercataBridge with ${SWEEP_FUNCTION}.`);
+    if (c.why === '--impl') {
+      throw new Error(`--impl ${c.addr} ${force ? 'was not built from the local source (code hash differs)' : `is not a MercataBridge with ${SWEEP_FUNCTION}`}.`);
+    }
   }
 
+  // A pending create-issue only counts if it was raised for this very source.
+  if (state.bridgeImplIssue && state.bridgeImplIssueHash !== expectedHash) {
+    console.log(`  Ignoring recorded create-issue ${state.bridgeImplIssue}: it was raised for a different source.`);
+    delete state.bridgeImplIssue;
+    delete state.bridgeImplIssueHash;
+  }
   if (!state.bridgeImplIssue) {
-    const source = await combineSource(chain.config, chain.importer, BRIDGE_IMPL.file);
     if (!source.includes(`function ${SWEEP_FUNCTION}(`)) {
       throw new Error(`Local ${BRIDGE_IMPL.file} does not contain ${SWEEP_FUNCTION}; check out the branch that has it.`);
     }
     const submitted = await submitImplementationDeploy(chain, source);
     if (submitted.address) {
       state.bridgeImpl = submitted.address;
+      state.bridgeImplHash = expectedHash;
       saveState(args.env, chain.nodeUrl, state);
       console.log(`  -> implementation ${submitted.address}`);
       return submitted.address;
     }
     state.bridgeImplIssue = submitted.issueId;
+    state.bridgeImplIssueHash = expectedHash;
     saveState(args.env, chain.nodeUrl, state);
     console.log(`  Deployment raised governance issue ${submitted.issueId}; waiting for votes...`);
   } else {
@@ -368,6 +426,9 @@ async function ensureSweepCapableImpl(chain, cirrus, args, state, currentLogic) 
     const address = await issueExecutedAddress(chain, cirrus, state.bridgeImplIssue);
     if (address) {
       state.bridgeImpl = address;
+      state.bridgeImplHash = expectedHash;
+      delete state.bridgeImplIssue;
+      delete state.bridgeImplIssueHash;
       saveState(args.env, chain.nodeUrl, state);
       console.log(`  -> implementation ${address} (create-issue executed)`);
       return address;
@@ -447,7 +508,18 @@ async function main() {
     printRejections(rejections);
     return;
   }
-  console.log(`Plan: ${args['no-upgrade'] ? 'require' : 'ensure'} sweep-capable bridge logic, then sweep ${targets.length} withdrawal(s) [${targets.join(', ')}] to ${triage}.`);
+  // The local source is what a redeploy would upload; its hash is what the proxy's logic is compared against.
+  const source = args['no-upgrade'] ? null : await localSource(BRIDGE_IMPL.file);
+  const expectedHash = source ? codeHashOf(source) : null;
+  if (source) {
+    const currentHash = await getCodeHash(profile, proxy.logic);
+    const same = currentHash === expectedHash;
+    console.log(`Bridge logic:   code hash ${currentHash || '?'}; local ${BRIDGE_IMPL.file} hashes to ${expectedHash} (${same ? 'SAME source' : 'different source'})`);
+    if (args['force-upgrade']) {
+      console.log(same ? 'Plan: logic already built from the local source; no redeploy needed.' : `Plan: redeploy the bridge logic from ${BRIDGE_IMPL.file} (or reuse a matching deployment) and repoint the proxy.`);
+    }
+  }
+  console.log(`Plan: ${args['no-upgrade'] ? 'require' : (args['force-upgrade'] ? 'require source-matching' : 'ensure')} sweep-capable bridge logic, then sweep ${targets.length} withdrawal(s) [${targets.join(', ')}] to ${triage}.`);
   if (alreadySwept.length > 0) console.log(`(${alreadySwept.length} already swept and skipped: ${alreadySwept.join(', ')})`);
   if (!args.execute) {
     console.log('\nDry run only. Re-run with --execute to do it.');
@@ -474,7 +546,7 @@ async function main() {
 
   // -------- Step 1: sweep-capable logic on the proxy --------
   console.log('Step 1/3: bridge logic');
-  const impl = await ensureSweepCapableImpl(chain, cirrus, args, state, proxy.logic);
+  const impl = await ensureImpl(chain, cirrus, profile, args, state, proxy.logic, source, expectedHash);
   let logicReady = false;
   if (!impl) {
     pending.push(`MercataBridge implementation — vote on create-issue ${state.bridgeImplIssue}`);
