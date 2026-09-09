@@ -12,6 +12,15 @@ interface Finding {
   line: string;
 }
 
+/** one pair's contribution to the cycle's combined notification */
+interface AlertSection {
+  /** e.g. "RECENTER SILVST/USDST [3b23…7c1d]" — for the combined subject line */
+  short: string;
+  /** short + the primary finding's gist — the subject when it's the only section */
+  headline: string;
+  body: string;
+}
+
 export interface PoolStatus {
   account: string;
   pool: string;
@@ -45,7 +54,10 @@ export class Monitor {
   constructor(private cfg: Config, private state: AlertState) {}
 
   private get pairKeys(): string[] {
-    return this.cfg.accounts.flatMap((a) => a.pools.map((p) => `${a.account}:${p}`));
+    return [
+      ...this.cfg.accounts.flatMap((a) => a.pools.map((p) => `${a.account}:${p}`)),
+      ...this.cfg.watchPools.map((p) => `watch:${p}`),
+    ];
   }
 
   get healthy(): boolean {
@@ -57,10 +69,12 @@ export class Monitor {
   }
 
   async runCycle(): Promise<void> {
+    const sections: AlertSection[] = [];
     for (const { account, pools } of this.cfg.accounts) {
       for (const pool of pools) {
         try {
-          await this.checkPool(account, pool);
+          const section = await this.checkPool(account, pool);
+          if (section) sections.push(section);
         } catch (err: any) {
           const detail = err.response ? JSON.stringify(err.response.data) : err.message;
           this.statuses[`${account}:${pool}`] = {
@@ -74,19 +88,48 @@ export class Monitor {
         }
       }
     }
+    // watch-only pools: pool-level checks (dislocation, oracle, paused), no ladder expectations
+    for (const pool of this.cfg.watchPools) {
+      try {
+        const section = await this.checkPool(null, pool);
+        if (section) sections.push(section);
+      } catch (err: any) {
+        const detail = err.response ? JSON.stringify(err.response.data) : err.message;
+        this.statuses[`watch:${pool}`] = {
+          account: "watch",
+          pool,
+          checkedAt: new Date().toISOString(),
+          error: detail,
+          findings: [],
+        };
+        log(`ERROR checking watched pool ${pool}: ${detail}`);
+      }
+    }
+
+    // one combined notification per cycle, however many pairs have something due
+    if (sections.length > 0) {
+      const subject =
+        sections.length === 1
+          ? `[v3-liquidity] ${sections[0].headline}`
+          : `[v3-liquidity] ${sections.length} alerts — ${sections.map((s) => s.short).join("; ")}`.slice(0, 200);
+      await notify(this.cfg, subject, sections.map((s) => s.body).join(`\n\n${"─".repeat(40)}\n\n`));
+    }
     this.lastCycleAt = Date.now();
   }
 
-  private async checkPool(account: string, pool: string): Promise<void> {
+  private async checkPool(account: string | null, pool: string): Promise<AlertSection | null> {
     const { cfg, state } = this;
-    const pairKey = `${account}:${pool}`;
+    const pairKey = account ? `${account}:${pool}` : `watch:${pool}`;
     const { data: p } = await axios.get(`${cfg.apiBase}/poolv3/pools/${pool}`);
     const pair = `${p.token0.symbol}/${p.token1.symbol}`;
-    const { data: positions } = await axios.get(`${cfg.apiBase}/poolv3/positions`, {
-      params: { poolAddress: pool },
-      headers: { "X-Wallet-Address": account },
-    });
-    const live = (positions as any[]).filter((pos) => BigInt(pos.liquidity) > 0n);
+    let live: any[] = [];
+    if (account) {
+      const { data: positions } = await axios.get(`${cfg.apiBase}/poolv3/positions`, {
+        params: { poolAddress: pool },
+        headers: { "X-Wallet-Address": account },
+      });
+      live = (positions as any[]).filter((pos) => BigInt(pos.liquidity) > 0n);
+    }
 
     const oracle = Number(p.oraclePriceWad) / WAD;
     const poolPrice = Number(p.priceWad) / WAD;
@@ -96,7 +139,9 @@ export class Monitor {
       findings.push({
         kind: "pool-paused",
         severity: "warn",
-        line: `pool is ${p.isDisabled ? "DISABLED" : "PAUSED"} — minting is blocked, a reposition would fail`,
+        line: account
+          ? `pool is ${p.isDisabled ? "DISABLED" : "PAUSED"} — minting is blocked, a reposition would fail`
+          : `pool is ${p.isDisabled ? "DISABLED" : "PAUSED"} — trading halted`,
       });
     } else {
       state.clear(pairKey, "pool-paused");
@@ -112,14 +157,16 @@ export class Monitor {
       state.clear(pairKey, "oracle-stale");
     }
 
-    if (live.length === 0) {
-      findings.push({
-        kind: "no-ladder",
-        severity: "warn",
-        line: `no live positions held by ${account} in this pool`,
-      });
-    } else {
-      state.clear(pairKey, "no-ladder");
+    if (account) {
+      if (live.length === 0) {
+        findings.push({
+          kind: "no-ladder",
+          severity: "warn",
+          line: `no live positions held by ${account} in this pool`,
+        });
+      } else {
+        state.clear(pairKey, "no-ladder");
+      }
     }
 
     // μ = median of the layers' geometric centers; ε from the innermost layer's half-width
@@ -157,7 +204,7 @@ export class Monitor {
         findings.push({
           kind: "dislocation",
           severity: "warn",
-          line: `pool price is ${fmt(dislocationPct, 2)}% off the oracle (threshold ±${fmt(cfg.dislocationPct, 2)}%) — arbitrage is not keeping up or the oracle is stale`,
+          line: `pool price is ${fmt(dislocationPct, 2)}% off the oracle (threshold ±${fmt(cfg.dislocationPct, 2)}%) — arbitrage opportunity`,
         });
       } else {
         state.clear(pairKey, "dislocation");
@@ -165,11 +212,11 @@ export class Monitor {
     }
 
     this.statuses[pairKey] = {
-      account,
+      account: account ?? "watch",
       pool,
       pair,
       checkedAt: new Date().toISOString(),
-      layers: live.length,
+      layers: account ? live.length : undefined,
       mu,
       oracle,
       poolPrice,
@@ -178,20 +225,26 @@ export class Monitor {
       findings: findings.map((f) => `${f.kind}: ${f.line}`),
     };
     log(
-      `${pair} acct=${shortAddr(account)} layers=${live.length} μ=${mu !== undefined ? fmt(mu) : "-"} oracle=${fmt(oracle)} poolPrice=${fmt(poolPrice)} ` +
+      `${pair} acct=${account ? shortAddr(account) : "watch"} layers=${account ? live.length : "-"} μ=${mu !== undefined ? fmt(mu) : "-"} oracle=${fmt(oracle)} poolPrice=${fmt(poolPrice)} ` +
         `drift=${driftPct !== undefined ? fmt(driftPct, 2) + "%" : "-"} findings=${findings.length}`
     );
 
-    // one message per account-pool pair per cycle, gated per finding-kind by the hysteresis state
+    // gate per finding-kind by the hysteresis state; due findings become one section
+    // of the cycle's combined notification (sent once by runCycle)
     const due = findings.filter((f) => state.shouldAlert(pairKey, f.kind, { mu, driftPct }));
-    if (due.length === 0) return;
+    if (due.length === 0) return null;
 
     const primary = due.find((f) => f.severity === "alert") ?? due[0];
-    const subject = `[v3-liquidity] ${primary.kind.toUpperCase()} ${pair} [${shortAddr(account)}]: ${primary.line.split(" — ")[0]}`;
+    const short = `${primary.kind.toUpperCase()} ${pair} [${account ? shortAddr(account) : "watch"}]`;
+    const headline = `${short}: ${primary.line.split(" — ")[0]}`;
     const lines = [
-      `Account:    ${account}`,
+      headline,
+      "",
+      ...(account ? [`Account:    ${account}`] : ["Watch-only pool"]),
       `Pool:       ${pool} (${pair}, fee ${p.fee / 10000}%)`,
-      `Ladder μ:   ${mu !== undefined ? fmt(mu) : "n/a"} (${live.length} layers${widths.length ? `, inner ±${widths[0]}%` : ""})`,
+      ...(account
+        ? [`Ladder μ:   ${mu !== undefined ? fmt(mu) : "n/a"} (${live.length} layers${widths.length ? `, inner ±${widths[0]}%` : ""})`]
+        : []),
       `Oracle:     ${fmt(oracle)}${driftPct !== undefined ? ` → drift ${fmt(driftPct, 2)}% (ε ±${fmt(epsilonPct!, 2)}%)` : ""}`,
       `Pool price: ${fmt(poolPrice)}${oracle > 0 && poolPrice > 0 ? ` (${fmt((poolPrice / oracle - 1) * 100, 2)}% vs oracle)` : ""}`,
       "",
@@ -205,12 +258,8 @@ export class Monitor {
         `Reposition — run as account ${account} (exits all its layers, reinvests principal + fees, recenters on the oracle):`,
         `  cd app/scripts && node positionV3Liquidity.js --pool ${pool} --widths ${configuredWidths ?? widths.join(",")} --execute`
       );
-      if (!configuredWidths)
-        lines.push(
-          "  (widths reconstructed from chain include tick-snapping — set LADDER_WIDTHS to pin the canonical ladder and avoid it widening over repeated repositions)"
-        );
     }
-    await notify(this.cfg, subject, lines.join("\n"));
     for (const f of due) state.record(pairKey, f.kind, { mu, driftPct });
+    return { short, headline, body: lines.join("\n") };
   }
 }
