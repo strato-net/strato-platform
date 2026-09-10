@@ -8,7 +8,8 @@
     "start:verifier": "ts-node src/signer/index.ts",
     "dev": "nodemon src/index.ts",
     "build": "tsc",
-    "test": "npm run build && node --test dist/polling/alchemyPolling.test.js dist/services/depositRecoveryService.test.js dist/services/depositStateService.test.js dist/services/externalBridgeWiring.test.js dist/services/withdrawalRecovery.test.js dist/services/routeQuoteService.test.js dist/services/verificationService.test.js dist/services/settlementAttestationService.test.js dist/signer/authorizationValidation.test.js dist/signer/settlementValidation.test.js dist/signer/verifierPolicy.test.js dist/utils/kmsSigner.test.js"
+    "test": "npm run build && node --test dist/polling/alchemyPolling.test.js dist/services/depositRecoveryService.test.js dist/services/depositStateService.test.js dist/services/externalBridgeWiring.test.js dist/services/withdrawalRecovery.test.js dist/services/routeQuoteService.test.js dist/services/verificationService.test.js dist/services/settlementAttestationService.test.js dist/signer/authorizationValidation.test.js dist/signer/settlementValidation.test.js dist/signer/verifierPolicy.test.js dist/utils/kmsSigner.test.js",
+    "postinstall": "(if [ \"$npm_config_omit\" != dev ]; then cd ../../packages/shared-types && npm install && npm run build; fi)"
   },
   "engines": {
     "node": ">=22.12 <23.0"
@@ -19,6 +20,7 @@
     "@safe-global/protocol-kit": "^8.0.5",
     "@safe-global/types-kit": "^4.0.1",
     "@sendgrid/mail": "^8.1.5",
+    "@strato/shared-types": "file:../../packages/shared-types",
     "axios": "^1.13.6",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
