@@ -35,6 +35,7 @@ packages:
 - core/strato-p2p
 - core/strato-redis-blockdb
 - core/strato-sequencer
+- core/strato-ingest
 - core/strato-statediff
 - core/vm-runner/
 - core/vm-tools/

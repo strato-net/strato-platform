@@ -28,6 +28,8 @@ executables:
     - ethereum-discovery
     - format
     - hedis
+    - streaming-kafka-hw
+    - time
     - http-types
     - insert-ordered-containers
     - lens

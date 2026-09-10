@@ -48,6 +48,14 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.HashMap.Strict.InsOrd as H
 import qualified Database.Redis as Redis
+import Control.Concurrent (forkIO, threadDelay)
+import Control.Monad (forever)
+import Control.Monad.Composable.Streaming.Bus (BusSettings (..), createBusEnv)
+import qualified Control.Monad.Composable.Streaming.Kafka as Bus
+import qualified Data.Aeson as JSON
+import qualified Data.Map.Strict as Map
+import Data.Time (UTCTime, addUTCTime, getCurrentTime)
+import Data.Traversable (for)
 import Data.Map (fromList, traverseWithKey)
 import Data.Maybe (listToMaybe)
 import Data.Source.Map
@@ -206,6 +214,15 @@ main = do
   -- unreachable Redis surfaces on the first signed transaction, not here.
   nonceStore' <- Redis.connect edgeRedisConnectInfo
   simCounter <- newTVarIO 0
+
+  -- The message bus, when configured: submits may go to it, and its results
+  -- stream wakes resolve=true waiters. The subscriber only records hashes;
+  -- the result itself is still read from Postgres.
+  initBusSubmit
+  feed <- for (Conf.busConfig ethConf) $ \bus -> do
+    tv <- newTVarIO Map.empty
+    _ <- forkIO $ runLoggingT $ subscribeResults bus tv
+    pure tv
   sqlDb <- runLoggingT $ createSQLDB sqlPoolSize
   cirrusDb <- runLoggingT $ createCirrusDB sqlPoolSize
 
@@ -218,7 +235,8 @@ main = do
             Bloc.Monad.nonceTtlSeconds = nonceCounterTimeout,
             Bloc.Monad.vmJsonRpcUrl = Conf.vmJsonRpcUrl (Conf.vmConfig ethConf),
             Bloc.Monad.simInFlight = simCounter,
-            Bloc.Monad.simMaxConcurrent = Conf.simMaxConcurrent (Conf.vmConfig ethConf)
+            Bloc.Monad.simMaxConcurrent = Conf.simMaxConcurrent (Conf.vmConfig ethConf),
+            Bloc.Monad.resultsFeed = feed
           }
   let bindHost' = Conf.apiListenAddress (Conf.apiConfig ethConf)
       bindPort = Conf.apiPort (Conf.apiConfig ethConf)
@@ -321,3 +339,31 @@ instance HasOpenApi a => HasOpenApi (MultipartForm Mem (MultipartData Mem) :> a)
   toOpenApi _ = toOpenApi (Proxy :: Proxy a)
 
 -----------
+
+-- | Follow the bus's results topic from its tip and remember the announced
+-- transaction hashes for a couple of minutes. Reconnects on failure.
+subscribeResults :: Conf.BusConf -> TVar (Map.Map Keccak256 UTCTime) -> LoggingT IO ()
+subscribeResults bus tv = forever $ do
+  r <- try $ do
+    env <- createBusEnv "strato-api-results" (BusSettings (Conf.busHost bus) (Conf.busPort bus) (Conf.busSecurity bus) (Conf.busSaslUsername bus) (Conf.busSaslPassword bus))
+    Bus.runStreamMUsingEnv env $
+      Bus.consumeFromLatestRaw (fromString (Conf.busResultsTopic bus)) $ \payloads -> do
+        now <- liftIO getCurrentTime
+        let hashes = [h | Just (ResultEnvelope h) <- map JSON.decodeStrict payloads]
+            cutoff = addUTCTime (-120) now
+        atomically . modifyTVar' tv $ \m ->
+          foldr (\h -> Map.insert h now) (Map.filter (> cutoff) m) hashes
+        pure (Nothing :: Maybe ())
+  case r of
+    Right () -> pure ()
+    Left (e :: SomeException) -> do
+      $logWarnS "strato-api/bus" . T.pack $ "results subscriber failed, reconnecting in 5s: " ++ show e
+      liftIO $ threadDelay 5000000
+
+-- | Just the hash out of a tx_results message ({"version":1,"result":{...}}).
+newtype ResultEnvelope = ResultEnvelope Keccak256
+
+instance JSON.FromJSON ResultEnvelope where
+  parseJSON = JSON.withObject "tx_results" $ \o -> do
+    result <- o JSON..: "result"
+    ResultEnvelope <$> result JSON..: "transactionHash"

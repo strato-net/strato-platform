@@ -18,6 +18,7 @@ import BlockApps.Logging
 import Blockchain.Data.TransactionResult
 -- import Blockchain.EthConf  -- UNUSED: was for solidvmevents
 -- import Blockchain.Slipstream.Data.Action (AggregateEvent)  -- UNUSED: was for solidvmevents
+import Blockchain.Slipstream.Bus (BusPublisher (..))
 import Blockchain.Slipstream.Metrics
 import Blockchain.Slipstream.Processor
 import Blockchain.Slipstream.OutputData
@@ -43,8 +44,9 @@ getAndProcessMessages ::
     HasSQL m
   ) =>
   PGConnection ->
+  Maybe BusPublisher ->
   m ()
-getAndProcessMessages conn = do
+getAndProcessMessages conn mBus = do
   -- createTopicAndWait solidVmEventsTopicName  -- UNUSED: no consumer
 
   consume "slipstream" "vmevents" $ \messages -> timeSlipstreamPhase "batch" $ do
@@ -54,11 +56,12 @@ getAndProcessMessages conn = do
     -- lands in the last chunk and commits in the same transaction as the
     -- batch's final Cirrus writes: the marker never claims a block whose
     -- rows are still uncommitted.
-    (_emittedEvents, ()) <- runConduit $
+    (emittedEvents, ()) <- runConduit $
       ((processTheMessages messages <* for_ mTip (yield . Right . cirrusProgressQuery)) `fuseUpstream` dedupC) `fuseBoth`
-        sinkSlipstreamOutputChunks slipstreamOutputChunkSize (writeOutputChunk conn)
+        sinkSlipstreamOutputChunks slipstreamOutputChunkSize (writeOutputChunk conn mBus)
     recordProcessedKafkaMessages messages
-    -- _ <- produceSolidVmEvents _emittedEvents  -- UNUSED: no consumer for solidvmevents
+    -- Egress: the batch's events go out after everything above committed.
+    for_ mBus $ \bus -> publishEvents bus emittedEvents
     -- Publish the high-water mark only after the conduit above has committed
     -- the batch's rows, so it never claims blocks Cirrus hasn't indexed yet.
     for_ mTip publishCirrusHighWaterMark
@@ -67,14 +70,17 @@ getAndProcessMessages conn = do
 writeOutputChunk ::
   (MonadLogger m, HasSQL m) =>
   PGConnection ->
+  Maybe BusPublisher ->
   [SlipstreamQuery] ->
   [TransactionResult] ->
   m ()
-writeOutputChunk conn slipstreamQueries transactionResults = do
+writeOutputChunk conn mBus slipstreamQueries transactionResults = do
   recordOutputBatch slipstreamQueries transactionResults
   timeSlipstreamPhase "cirrus" $ performSlipstreamQueries conn slipstreamQueries
-  unless (null transactionResults) $
+  unless (null transactionResults) $ do
     timeSlipstreamPhase "transaction_results" . void $ putTransactionResults transactionResults
+    -- Results reach the bus only once Postgres has them.
+    for_ mBus $ \bus -> publishResults bus transactionResults
 
 sinkSlipstreamOutputChunks ::
   MonadIO m =>

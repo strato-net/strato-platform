@@ -34,6 +34,7 @@ library:
     - format
     - lens
     - streaming
+    - streaming-kafka-hw
     - network
     - persistent
     - persistent-postgresql
@@ -63,6 +64,7 @@ executables:
       - blockapps-init
       - hflags
       - streaming
+      - streaming-kafka-hw
       - persistent-postgresql
       - process-monitor
       - resourcet

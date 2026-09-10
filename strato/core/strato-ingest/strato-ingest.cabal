@@ -1,0 +1,34 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           strato-ingest
+version:        0.1.0.0
+synopsis:       Forwards transactions from the shared message bus into this core's broker
+license:        Apache-2.0
+build-type:     Simple
+
+executable strato-ingest
+  main-is: Main.hs
+  other-modules:
+      Paths_strato_ingest
+  hs-source-dirs:
+      exec_src
+  ghc-options: -Wall -Werror -threaded -rtsopts
+  build-depends:
+      base
+    , blockapps-init
+    , common-log
+    , containers
+    , hflags
+    , process
+    , process-monitor
+    , seqevents
+    , strato-conf
+    , streaming
+    , streaming-kafka-hw
+    , text
+    , unliftio
+  default-language: Haskell2010

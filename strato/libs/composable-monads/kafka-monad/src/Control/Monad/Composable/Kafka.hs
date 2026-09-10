@@ -39,6 +39,7 @@ module Control.Monad.Composable.Kafka (
   createBroadcastTopic,
   -- Conduit
   conduitBatchSource,
+  conduitGroupBatchSource,
   -- Deprecated/internal (for migration)
   KafkaM,
   HasKafka,
@@ -308,6 +309,28 @@ conduitBatchSource clientId streamAddress topicName = do
       items <- runStreamMUsingEnv env $ fetchItems topicName offset
       yield items
       return $ offset + fromIntegral (length items)
+
+-- | Like 'conduitBatchSource' but durable: starts at the group's committed
+-- offset (the beginning for a new group) and commits after each batch has
+-- been handed downstream. At-least-once, with at most the batch in flight
+-- lost to a crash before its commit; consumers of this source must accept
+-- redelivery. Empty fetches (the long-poll timing out on an idle topic) are
+-- not yielded.
+conduitGroupBatchSource :: (MonadIO m, Binary a) =>
+                           ClientId -> StreamAddress -> ConsumerGroup -> TopicName -> ConduitT i [a] m b
+conduitGroupBatchSource clientId streamAddress consumerGroup topicName = do
+  env <- createStreamEnv clientId streamAddress
+  startingOffset <- runStreamMUsingEnv env $ getKafkaCheckpoint consumerGroup topicName
+
+  flip iterateM_ startingOffset $ \offset -> do
+      items <- runStreamMUsingEnv env $ fetchItems topicName offset
+      if null items
+        then return offset
+        else do
+          yield items
+          let next = offset + fromIntegral (length items)
+          runStreamMUsingEnv env $ setKafkaCheckpoint consumerGroup topicName next
+          return next
 
 createTopic :: HasStreaming m =>
                TopicName -> m ()

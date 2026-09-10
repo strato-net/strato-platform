@@ -12,6 +12,7 @@ import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.EthConf (cirrusConnStr, ethConf, runStreamMConfigured)
 import qualified Blockchain.EthConf.Model as EC
+import Blockchain.Slipstream.Bus (newBusPublisher)
 import Blockchain.Slipstream.Data.CirrusTables
 import Blockchain.Slipstream.MessageConsumer
 import Blockchain.Slipstream.Options ()
@@ -68,5 +69,8 @@ main = do
       -- 1. `conn` connects slipstream to the cirrus database
       -- 2. The `pool` in the BlocEnv connects slipstream to the eth database
 
+      -- Egress to the shared message bus, when the node has one.
+      mBus <- traverse newBusPublisher (EC.busConfig ethConf)
+
       runSQLM $
-        getAndProcessMessages conn
+        getAndProcessMessages conn mBus

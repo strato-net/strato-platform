@@ -50,6 +50,7 @@ data EthConf = EthConf
     -- must see the latest commit.
     sqlReaderConfig :: Maybe SqlConf,
     cirrusConfig :: SqlConf,
+    busConfig :: Maybe BusConf,
     redisBlockDBConfig :: RedisBlockDBConf,
     -- | The edge tier's Redis (nonce counters, CSRF tokens, sessions),
     -- shared by every API instance and separate from the core's block DB.
@@ -78,6 +79,7 @@ instance FromJSON EthConf where
     <$> v .: "sqlConfig"
     <*> v .:? "sqlReaderConfig"
     <*> v .: "cirrusConfig"
+    <*> v .:? "busConfig"
     <*> v .: "redisBlockDBConfig"
     <*> v .:? "edgeRedisConfig" .!= defaultEdgeRedisConf
     <*> (v .:? "streamingConfig" .!= def <|> v .: "kafkaConfig")
@@ -163,6 +165,43 @@ kafkaHost = streamingHost
 kafkaPort :: StreamingConf -> Int
 kafkaPort = streamingPort
 {-# DEPRECATED kafkaPort "Use streamingPort instead" #-}
+
+-- | The shared message bus (Phase 4 of the tiered deployment): an external
+-- Kafka-compatible cluster carrying transactions inbound to the core
+-- (@ingest_tx@) and results and events outbound (@tx_results@,
+-- @chain_events@). Absent (Nothing) on a node that still submits straight
+-- into its own broker.
+data BusConf = BusConf
+  { busHost :: String,
+    busPort :: Int,
+    -- | "plaintext", "ssl" or "sasl_ssl" (librdkafka's security.protocol)
+    busSecurity :: String,
+    -- | SCRAM-SHA-512 credentials for "sasl_ssl"
+    busSaslUsername :: Maybe String,
+    busSaslPassword :: Maybe String,
+    busIngestTopic :: String,
+    busResultsTopic :: String,
+    busEventsTopic :: String,
+    -- | Where the API tier sends submitted transactions: "core" (the node's
+    -- own broker, as before), "bus", or "shadow" (both, while validating).
+    busSubmitMode :: String
+  }
+  deriving (Show, Eq, Generic, ToJSON)
+
+instance FromJSON BusConf where
+  parseJSON = withObject "BusConf" $ \v -> BusConf
+    <$> v .: "busHost"
+    <*> v .:? "busPort" .!= 9092
+    <*> v .:? "busSecurity" .!= "plaintext"
+    <*> v .:? "busSaslUsername"
+    <*> v .:? "busSaslPassword"
+    <*> v .:? "busIngestTopic" .!= "ingest_tx"
+    <*> v .:? "busResultsTopic" .!= "tx_results"
+    <*> v .:? "busEventsTopic" .!= "chain_events"
+    <*> v .:? "busSubmitMode" .!= "core"
+
+instance Default BusConf where
+  def = BusConf "" 9092 "plaintext" Nothing Nothing "ingest_tx" "tx_results" "chain_events" "core"
 
 data RedisBlockDBConf = RedisBlockDBConf
   { redisHost :: String,
@@ -472,6 +511,7 @@ instance Default EthConf where
     { sqlConfig = def
     , sqlReaderConfig = Nothing
     , cirrusConfig = def { database = "cirrus" }
+    , busConfig = Nothing
     , redisBlockDBConfig = def
     , edgeRedisConfig = defaultEdgeRedisConf
     , streamingConfig = def

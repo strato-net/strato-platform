@@ -10,6 +10,7 @@ RUN apt -y update && apt install -y \
       libleveldb-dev \
       libpcre3-dev \
       libpq-dev \
+      librdkafka1 \
       libsodium-dev \
       libsecp256k1-dev \
       libstdc++6 \
@@ -37,6 +38,7 @@ COPY \
   ./usr/local/bin/convoke \
   ./usr/local/bin/ethereum-discover \
   ./usr/local/bin/ethereum-jsonrpc \
+  ./usr/local/bin/strato-ingest \
   ./usr/local/bin/forced-config-change \
   ./usr/local/bin/ghc-debug \
   ./usr/local/bin/strato-barometer \

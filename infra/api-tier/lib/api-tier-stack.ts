@@ -61,6 +61,8 @@ export class ApiTierStack extends Stack {
     const postgres = secretsmanager.Secret.fromSecretNameV2(this, "PostgresSecret", config.secrets.postgres);
     const oauthYaml = secretsmanager.Secret.fromSecretNameV2(this, "OauthYamlSecret", config.secrets.oauthCredentialsYaml);
     const session = secretsmanager.Secret.fromSecretNameV2(this, "SessionSecret", config.secrets.session);
+    // MSK SASL/SCRAM secret: JSON {username, password}, name prefixed AmazonMSK_.
+    const busSecret = config.busHost ? secretsmanager.Secret.fromSecretNameV2(this, "BusSecret", config.busSecretName) : undefined;
     const ethconf = ssm.StringParameter.fromStringParameterAttributes(this, "EthconfParam", {
       parameterName: config.ethconfParameterName,
       // Read at task start by ECS, not at synth: the value is the node's
@@ -96,11 +98,17 @@ export class ApiTierStack extends Stack {
         kafkaPort: String(config.kafkaPort),
         EDGE_REDIS_HOST: redis.attrPrimaryEndPointAddress,
         EDGE_REDIS_PORT: redis.attrPrimaryEndPointPort,
+        ...(config.busHost
+          ? { BUS_HOST: config.busHost, BUS_PORT: String(config.busPort), BUS_SECURITY: "sasl_ssl", BUS_SUBMIT_MODE: config.busSubmitMode }
+          : {}),
       },
       secrets: {
         ...ethconfEnv,
         postgres_password: ecs.Secret.fromSecretsManager(postgres, "password"),
         OAUTH_CREDENTIALS_YAML: ecs.Secret.fromSecretsManager(oauthYaml),
+        ...(busSecret
+          ? { BUS_SASL_USERNAME: ecs.Secret.fromSecretsManager(busSecret, "username"), BUS_SASL_PASSWORD: ecs.Secret.fromSecretsManager(busSecret, "password") }
+          : {}),
       },
       healthCheck: {
         command: ["CMD-SHELL", "pgrep strato-api && pgrep ethereum-jsonrpc || exit 1"],

@@ -18,6 +18,7 @@ import Strato.Auth.Client (AuthEnv, newAuthEnv, runWithAuth)
 import qualified Strato.Strato23.API.Types as VC
 import Strato.Strato23.Client
 import System.Info (os)
+import System.Environment (lookupEnv)
 import System.Process (readProcess)
 import Text.ShortDescription
 
@@ -173,8 +174,25 @@ genEthConf role = do
         , password = pgPass
         }
 
+  envSaslPassword <- lookupEnv "bus_sasl_password"
+  let saslPassword = case (flags_busSaslPassword, envSaslPassword) of
+        (p, _) | not (null p) -> Just p
+        (_, Just p) | not (null p) -> Just p
+        _ -> Nothing
+      busConf
+        | null flags_busHost = Nothing
+        | otherwise = Just def
+            { busHost = flags_busHost
+            , busPort = flags_busPort
+            , busSecurity = flags_busSecurity
+            , busSaslUsername = if null flags_busSaslUsername then Nothing else Just flags_busSaslUsername
+            , busSaslPassword = saslPassword
+            , busSubmitMode = flags_busSubmitMode
+            }
+
   return runtimeConfig
     { apiConfig = roleApiConfig
+    , busConfig = busConf
     , vmConfig = roleVmConfig
     , sqlConfig = writerSql
     , sqlReaderConfig = (\h -> writerSql { host = h }) <$> readerHost

@@ -26,6 +26,7 @@ module Control.Monad.Composable.Streaming.Kafka (
   runStreamM,
   runStreamMUsingEnv,
   createStreamEnv,
+  createStreamEnvWith,
   getStreamEnv,
   -- Producing
   produceItems,
@@ -36,6 +37,7 @@ module Control.Monad.Composable.Streaming.Kafka (
   consumeBroadcast,
   runConsume,
   consumeFromLatest,
+  consumeFromLatestRaw,
   -- Topics
   createTopicAndWait,
   createBroadcastTopic,
@@ -123,18 +125,28 @@ data StreamEnv = StreamEnv
   { seProducer    :: KP.KafkaProducer
   , seBroker      :: Text
   , seClientId    :: Text
+    -- | librdkafka properties applied to every producer and consumer made
+    -- from this environment: security.protocol, sasl.* for a cluster.
+  , seExtraProps  :: Map.Map Text Text
   }
 
 createStreamEnv :: MonadIO m => ClientId -> StreamAddress -> m StreamEnv
-createStreamEnv clientId (host, port) = do
+createStreamEnv clientId addr = createStreamEnvWith clientId addr Map.empty
+
+-- | An environment for a cluster that needs more than a broker address:
+-- TLS ("security.protocol" = "SSL"), or SASL/SCRAM over TLS
+-- ("security.protocol" = "SASL_SSL", "sasl.mechanisms" = "SCRAM-SHA-512",
+-- "sasl.username", "sasl.password"). The map is passed through to librdkafka.
+createStreamEnvWith :: MonadIO m => ClientId -> StreamAddress -> Map.Map Text Text -> m StreamEnv
+createStreamEnvWith clientId (host, port) extra = do
   let broker = T.pack host <> ":" <> T.pack (show port)
       props = KP.brokersList [BrokerAddress broker]
            <> KP.logLevel KafkaLogErr
-           <> KP.extraProps (Map.singleton "client.id" clientId)
+           <> KP.extraProps (Map.insert "client.id" clientId extra)
   result <- liftIO $ KP.newProducer props
   case result of
     Left err -> error $ "Failed to create Kafka producer: " ++ show err
-    Right prod -> return $ StreamEnv prod broker clientId
+    Right prod -> return $ StreamEnv prod broker clientId extra
 
 -- Deprecated alias
 createKafkaEnv :: MonadIO m => KafkaClientId -> KafkaAddress -> m StreamEnv
@@ -233,12 +245,12 @@ mkConsumerProps env grpId =
   <> KC.groupId (KC.ConsumerGroupId grpId)
   <> KC.noAutoCommit
   <> KC.logLevel KafkaLogErr
-  <> KC.extraProps (Map.fromList
+  <> KC.extraProps (Map.union (Map.fromList
        [ ("enable.partition.eof", "true")
        , ("client.id", seClientId env <> "-" <> grpId)
        , ("fetch.wait.max.ms", "50000")
        , ("fetch.min.bytes", "1")
-       ])
+       ]) (seExtraProps env))
 
 uniqueGroupId :: Text -> IO Text
 uniqueGroupId prefix = do
@@ -353,6 +365,29 @@ consumeFromLatest topicName initAction f = do
       msgs <- liftIO $ KC.pollMessageBatch kc (KC.Timeout 50000) (KC.BatchSize 500)
       let payloads = mapMaybe extractPayload msgs
       return $ map (decode . BL.fromStrict) payloads
+
+    extractPayload (Left _) = Nothing
+    extractPayload (Right cr) = KC.crValue cr
+
+-- | 'consumeFromLatest' for topics carrying an encoding other than
+-- 'Binary' (the bus's JSON topics): hands the raw payloads over.
+consumeFromLatestRaw :: HasStreaming m =>
+                        TopicName -> ([B.ByteString] -> m (Maybe b)) -> m b
+consumeFromLatestRaw topicName f = do
+  startOffset <- getLatestOffset topicName
+  env <- getStreamEnv
+  kc <- liftIO $ newConsumerAt env (seClientId env <> "-latest-raw") topicName startOffset
+  consumeLoop kc
+  where
+    consumeLoop kc = do
+      msgs <- liftIO $ KC.pollMessageBatch kc (KC.Timeout 50000) (KC.BatchSize 500)
+      let payloads = mapMaybe extractPayload msgs
+      result <- if null payloads then pure Nothing else f payloads
+      case result of
+        Just val -> do
+          liftIO $ void $ KC.closeConsumer kc
+          return val
+        Nothing -> consumeLoop kc
 
     extractPayload (Left _) = Nothing
     extractPayload (Right cr) = KC.crValue cr

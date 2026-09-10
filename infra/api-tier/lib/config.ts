@@ -19,6 +19,11 @@ export interface ApiTierConfig {
   kafkaPort: number;
   /** The node's networkConfig.httpPort: nginx listens on it inside the container. */
   httpPort: number;
+  /** Shared message bus (infra/data-plane MSK stack): bootstrap host, SASL/SCRAM secret, submit mode. */
+  busHost?: string;
+  busPort: number;
+  busSubmitMode: string;
+  busSecretName: string;
   /** Secrets Manager names: the Aurora master secret (JSON, "password" field), the node's
    * OAuth client credentials (YAML file contents), the nginx session secret, and the SSM
    * parameter holding the node's ethconf.yaml base64-encoded. */
@@ -64,6 +69,10 @@ export function loadConfig(app: App): ApiTierConfig {
     kafkaHost: ctx(app, "kafkaHost"),
     kafkaPort: Number(ctx(app, "kafkaPort", "9094")),
     httpPort: Number(ctx(app, "httpPort", "8081")),
+    busHost: optional(app, "busHost"),
+    busPort: Number(ctx(app, "busPort", "9096")),
+    busSubmitMode: ctx(app, "busSubmitMode", "shadow"),
+    busSecretName: ctx(app, "busSecretName", `AmazonMSK_strato-${envName}-api`),
     secrets: {
       postgres: ctx(app, "postgresSecretName", `strato/${envName}/postgres`),
       oauthCredentialsYaml: ctx(app, "oauthCredentialsSecretName", `strato/${envName}/api/oauth-credentials`),

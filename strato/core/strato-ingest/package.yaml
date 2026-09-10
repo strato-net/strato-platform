@@ -1,0 +1,26 @@
+name:                strato-ingest
+version:             0.1.0.0
+license:             Apache-2.0
+synopsis:            Forwards transactions from the shared message bus into this core's broker
+
+dependencies:
+- base
+
+executables:
+  strato-ingest:
+    main: Main.hs
+    source-dirs: exec_src
+    ghc-options: -Wall -Werror -threaded -rtsopts
+    dependencies:
+    - blockapps-init
+    - common-log
+    - containers
+    - hflags
+    - process
+    - process-monitor
+    - seqevents
+    - strato-conf
+    - streaming
+    - streaming-kafka-hw
+    - text
+    - unliftio

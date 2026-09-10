@@ -18,7 +18,7 @@ import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_password, flags_pghost, flags_regenerate, flags_sslDir)
+import Blockchain.Init.Options (flags_busHost, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_password, flags_pghost, flags_regenerate, flags_sslDir)
 import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
@@ -123,7 +123,7 @@ createCommandsFile role = do
       putStrLn $ "\ESC[1;33mWarning: " ++ show (mrMemMB resources) ++ " MB RAM is not enough "
         ++ "for from-genesis sync (vm-runner live data alone is ~3.5GB). "
         ++ "Restore this node from a snapshot instead (strato-up --snapshot).\ESC[0m"
-    return
+    return $
       [ restartable "ethereum-discover +RTS -T -RTS"
       , "strato-p2p +RTS -T -RTS"
       , "strato-sequencer " ++ sequencerRts
@@ -132,6 +132,8 @@ createCommandsFile role = do
       , restartable "slipstream +RTS -T -RTS"
       , restartable "strato-network-monitor"
       ]
+      -- With a message bus, the pre-sequencer forwards its transactions here.
+      ++ [restartable "strato-ingest +RTS -T -RTS" | not (null flags_busHost)]
 
   let apiCommands
         | roleRunsApi role =

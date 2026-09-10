@@ -12,6 +12,8 @@
 #   postgres_host, postgres_port, postgres_user   writer endpoint (host required)
 #   postgres_reader_host                          replica endpoint for reads
 #   ETHCONF_BASE64                                the node config, when not mounted
+#   BUS_HOST, BUS_PORT, BUS_SECURITY, BUS_SASL_USERNAME, BUS_SASL_PASSWORD,
+#   BUS_SUBMIT_MODE (core|bus|shadow)             the shared message bus
 #   postgres_password | /run/secrets/postgres_password
 #   kafkaHost, kafkaPort                          broker for tx submission
 #   EDGE_REDIS_HOST, EDGE_REDIS_PORT              nonce counters
@@ -74,6 +76,17 @@ override_num '.streamingConfig.streamingPort'  "${kafkaPort:-}"
 override     '.edgeRedisConfig.redisHost'      "${EDGE_REDIS_HOST:-}"
 override_num '.edgeRedisConfig.redisPort'      "${EDGE_REDIS_PORT:-}"
 override     '.urlConfig.vaultUrl'             "${VAULT_URL:-}"
+# The shared message bus (Phase 4). BUS_HOST empty means no bus: the API
+# submits to the core's broker (kafkaHost) as before.
+if [[ -n "${BUS_HOST:-}" ]]; then
+  yq -i '.busConfig = {}' "$CONF"
+  override     '.busConfig.busHost'            "$BUS_HOST"
+  override_num '.busConfig.busPort'            "${BUS_PORT:-9096}"
+  override     '.busConfig.busSecurity'        "${BUS_SECURITY:-sasl_ssl}"
+  override     '.busConfig.busSaslUsername'    "${BUS_SASL_USERNAME:-}"
+  override     '.busConfig.busSaslPassword'    "${BUS_SASL_PASSWORD:-}"
+  override     '.busConfig.busSubmitMode'      "${BUS_SUBMIT_MODE:-shadow}"
+fi
 # General eth reads go to the replica endpoint; writes and the resolve poll
 # stay on the writer (see Blockchain.DB.SQLDB).
 if [[ -n "${postgres_reader_host:-}" ]]; then

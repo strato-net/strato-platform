@@ -28,6 +28,7 @@ export interface PostgresStackProps extends StackProps {
  */
 export class PostgresStack extends Stack {
   readonly cluster: rds.DatabaseCluster;
+  readonly vpc: ec2.IVpc;
 
   constructor(scope: Construct, id: string, props: PostgresStackProps) {
     super(scope, id, props);
@@ -43,6 +44,7 @@ export class PostgresStack extends Stack {
             { name: "private", subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS, cidrMask: 24 },
           ],
         });
+    this.vpc = vpc;
 
     const engine = rds.DatabaseClusterEngine.auroraPostgres({
       version: rds.AuroraPostgresEngineVersion.of(props.engineVersion, props.engineVersion.split(".")[0]),
