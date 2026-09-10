@@ -10,7 +10,7 @@ import { buildEarnApyMap } from "@/utils/earnUtils";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { getEarningAssetSymbolRank } from "@/lib/tokenPriority";
-import { stratoTokenAddresses } from "@/lib/constants";
+import { getStratoTokenAddress } from "@/lib/constants";
 
 const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | undefined): boolean => {
   const symbol = asset?._symbol?.toLowerCase?.() || "";
@@ -54,8 +54,10 @@ interface AssetsProps {
 
 const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
 
-const isStratoAsset = (asset: { address?: string } | null | undefined): boolean =>
-  stratoTokenAddresses.includes(normAddr(asset?.address || ""));
+const isStratoAsset = (asset: { address?: string } | null | undefined): boolean => {
+  const strato = getStratoTokenAddress();
+  return !!strato && normAddr(asset?.address || "") === strato;
+};
 
 const AssetsList = ({
   loading,
