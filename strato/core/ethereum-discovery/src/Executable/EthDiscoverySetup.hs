@@ -17,8 +17,13 @@ import Data.Maybe (isNothing)
 import qualified Data.Text as T
 import Database.Persist.Postgresql
 
+-- | Peers live in the peer store: this cell's own database when the node
+-- shares a Postgres cluster with other cores (created here on first use),
+-- else the eth database.
 setup :: (MonadLoggerIO m, MonadUnliftIO m) => [String] -> m ()
-setup = withPostgresqlConn connStr . setupSQL
+setup nodes = do
+  liftIO $ mapM_ ensureDatabaseExists (peerDbConfig ethConf)
+  withPostgresqlConn peerConnStr (setupSQL nodes)
 
 setupSQL :: (MonadLoggerIO m, MonadUnliftIO m) => [String] -> SqlBackend -> m ()
 setupSQL nodes = runSqlConn $ do

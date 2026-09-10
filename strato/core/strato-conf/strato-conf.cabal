@@ -28,6 +28,7 @@ library
     , data-default
     , hedis
     , postgresql-simple
+    , process
     , resource-pool
     , strato-model
     , streaming

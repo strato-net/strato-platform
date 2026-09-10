@@ -21,6 +21,7 @@ where
 import BlockApps.Logging
 import Blockchain.DB.SQLDB
 import Blockchain.Data.NodeStatus
+import Blockchain.Data.WriterLease (holdsWriterLease)
 import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
 import Blockchain.SyncDB
   ( getBestBlockInfo,
@@ -34,6 +35,7 @@ import Control.Monad (unless)
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map.Strict as Map
+import Data.Text (Text)
 import qualified Data.Text as T
 import UnliftIO (SomeException, liftIO, try)
 
@@ -46,12 +48,20 @@ type Written = Map.Map NodeStatusKey BL.ByteString
 
 -- | Runs forever. A failure in one pass (Redis still loading, Postgres
 -- briefly unavailable) is logged and retried on the next tick; the last
--- written values are kept so the retry only writes what changed.
-nodeStatusMirrorLoop :: (MonadLogger m, HasSQLDB m) => m ()
-nodeStatusMirrorLoop = go Map.empty
+-- written values are kept so the retry only writes what changed. Only the
+-- cell holding the writer lease mirrors: node_status describes the writer
+-- core, and a standby sharing the cluster must not overwrite it. A cell
+-- that regains the lease forgets what it last wrote, so it rewrites every
+-- key on its first pass as writer.
+nodeStatusMirrorLoop :: (MonadLogger m, HasSQLDB m) => Text -> m ()
+nodeStatusMirrorLoop cell = go Map.empty
   where
     go written = do
-      result <- try $ mirrorNodeStatusOnce written
+      holds <- try $ holdsWriterLease cell
+      result <- case holds of
+        Right True -> try $ mirrorNodeStatusOnce written
+        Right False -> pure $ Right Map.empty
+        Left (e :: SomeException) -> pure $ Left e
       written' <- case result of
         Right w -> pure w
         Left (e :: SomeException) -> do

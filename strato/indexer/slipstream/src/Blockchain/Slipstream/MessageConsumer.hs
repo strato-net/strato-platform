@@ -16,6 +16,8 @@ where
 
 import BlockApps.Logging
 import Blockchain.Data.TransactionResult
+import Blockchain.Data.WriterLease (holdsWriterLease)
+import Blockchain.Slipstream.Data.CirrusTables
 -- import Blockchain.EthConf  -- UNUSED: was for solidvmevents
 -- import Blockchain.Slipstream.Data.Action (AggregateEvent)  -- UNUSED: was for solidvmevents
 import Blockchain.Slipstream.Bus (BusPublisher (..))
@@ -28,9 +30,12 @@ import qualified Blockchain.Stream.Action as A
 import Blockchain.Stream.VMEvent (VMEvent (..))
 import Blockchain.SyncDB (updateCirrusBestBlockNumber)
 import Conduit
+import Control.Concurrent (threadDelay)
 import Control.Monad
 import Control.Monad.Composable.Streaming
 import Control.Monad.Composable.SQL
+import Data.Text (Text)
+import Database.Persist.Postgresql (entityVal, getBy, runSqlPool)
 -- import Data.String  -- UNUSED: was for solidvmevents
 import Blockchain.Slipstream.PostgresqlTypedShim
 import Data.Either (partitionEithers)
@@ -38,19 +43,80 @@ import Data.Foldable (for_)
 import qualified Data.Text as T
 import Prelude hiding (lookup)
 
+-- | Consumes @vmevents@ forever. Only the cell holding the writer lease
+-- writes Cirrus, transaction results and the bus; a standby follows the
+-- writer through @cirrus_progress@, committing each batch's offset once the
+-- writer has that batch's blocks, so a promoted cell resumes within a batch
+-- of where the writer stopped.
 getAndProcessMessages ::
+  ( MonadLogger m,
+    HasStreaming m,
+    HasSQL m
+  ) =>
+  Text ->
+  PGConnection ->
+  Maybe BusPublisher ->
+  m ()
+getAndProcessMessages cell conn mBus = do
+  -- createTopicAndWait solidVmEventsTopicName  -- UNUSED: no consumer
+
+  consume "slipstream" "vmevents" $ \messages -> do
+    holds <- holdsWriterLease cell
+    if holds
+      then processBatch conn mBus messages
+      else case cirrusTip messages of
+        -- No block in the batch (code collections, results): the writer
+        -- applies those; returning commits the offset past them.
+        Nothing -> return ()
+        Just tip -> follow messages tip False
+  where
+    follow messages tip logged = do
+      progress <- liftIO $ getCirrusProgress conn
+      if maybe False (>= tip) progress
+        then publishCirrusHighWaterMark tip
+        else do
+          holds <- holdsWriterLease cell
+          if holds
+            then do
+              $logInfoS "slipstream" . T.pack $ "cell " ++ T.unpack cell ++ " holds the writer lease now; resuming Cirrus indexing at block " ++ show tip
+              processBatch conn mBus messages
+            else do
+              unless logged $
+                $logInfoS "slipstream" . T.pack $
+                  "standby: waiting for the writer to pass block " ++ show tip
+                    ++ " (cirrus_progress is " ++ maybe "unset" show progress ++ ")"
+              liftIO $ threadDelay 1000000
+              follow messages tip True
+
+-- | The current Cirrus tip, from the durable progress row.
+getCirrusProgress :: PGConnection -> IO (Maybe Integer)
+getCirrusProgress conn =
+  fmap (cirrusProgressBlockNumber . entityVal)
+    <$> runSqlPool (getBy (UniqueCirrusProgressName "slipstream")) conn
+
+-- | Write a batch as the lease holder. Actions for blocks the cluster
+-- already has (the first batch after a promotion, a redelivery after a
+-- crash) are dropped; code collections and results are idempotent and stay.
+processBatch ::
   ( MonadLogger m,
     HasStreaming m,
     HasSQL m
   ) =>
   PGConnection ->
   Maybe BusPublisher ->
+  [VMEvent] ->
   m ()
-getAndProcessMessages conn mBus = do
-  -- createTopicAndWait solidVmEventsTopicName  -- UNUSED: no consumer
-
-  consume "slipstream" "vmevents" $ \messages -> timeSlipstreamPhase "batch" $ do
-    recordKafkaMessages messages
+processBatch conn mBus allMessages = timeSlipstreamPhase "batch" $ do
+    recordKafkaMessages allMessages
+    progress <- liftIO $ getCirrusProgress conn
+    let committed n = maybe False (>= n) progress
+        keep (NewAction a) = not . committed $ A._blockNumber a
+        keep _ = True
+        messages = filter keep allMessages
+        skipped = length allMessages - length messages
+    when (skipped > 0) $
+      $logInfoS "slipstream" . T.pack $
+        "skipping " ++ show skipped ++ " actions at or below cirrus_progress " ++ maybe "unset" show progress
     let mTip = cirrusTip messages
     -- The progress upsert is appended as the batch's final query, so it
     -- lands in the last chunk and commits in the same transaction as the

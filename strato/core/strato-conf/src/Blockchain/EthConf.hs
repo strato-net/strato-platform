@@ -10,6 +10,9 @@ module Blockchain.EthConf
     lookupRedisBlockDBConfig,
     edgeRedisConnectInfo,
     cirrusConnStr,
+    peerConnStr,
+    currentCellId,
+    ensureDatabaseExists,
     runStreamMConfigured,
     runStreamMPooled,
     ethConfPath,
@@ -20,6 +23,9 @@ where
 import Blockchain.EthConf.Model
 import Control.Concurrent.MVar
 import Control.Exception (catch, IOException)
+import Control.Monad (void, when)
+import qualified Database.PostgreSQL.Simple as PG
+import System.Process (readProcess)
 import Control.Monad.Composable.Streaming
 import Control.Monad.IO.Unlift (liftIO, withRunInIO)
 import qualified Data.ByteString as B
@@ -63,6 +69,29 @@ cirrusConnStr = postgreSQLConnectionString . cirrusConfig $ ethConf
 -- configured.
 readerConnStr :: B.ByteString
 readerConnStr = maybe connStr postgreSQLConnectionString (sqlReaderConfig ethConf)
+
+-- | The peer store (p_peer, sync_task) of strato-p2p and ethereum-discover:
+-- this cell's own database when 'peerDbConfig' is set, else the eth database.
+peerConnStr :: B.ByteString
+peerConnStr = maybe connStr postgreSQLConnectionString (peerDbConfig ethConf)
+
+-- | This core's name among the cores sharing a Postgres cluster: 'cellId'
+-- from ethconf, or the hostname.
+currentCellId :: IO String
+currentCellId = case cellId ethConf of
+  Just c | not (null c) -> return c
+  _ -> filter (`notElem` ("\n\r" :: String)) <$> readProcess "hostname" [] ""
+
+-- | Create the configured database if it does not exist yet, through the
+-- maintenance database. Idempotent, and a concurrent creator's win is fine.
+ensureDatabaseExists :: SqlConf -> IO ()
+ensureDatabaseExists conf = do
+  conn <- PG.connectPostgreSQL (postgreSQLConnectionString conf {database = "postgres"})
+  found <- PG.query conn "SELECT 1 FROM pg_database WHERE datname = ?" (PG.Only (database conf)) :: IO [PG.Only Int]
+  when (null found) $
+    void (PG.execute_ conn (fromString ("CREATE DATABASE \"" ++ database conf ++ "\"")))
+      `catch` (\(_ :: PG.SqlError) -> return ())
+  PG.close conn
 
 -- | Run against a fresh stream environment (and so a fresh broker
 -- connection) each time. Right for a long-lived consumer loop that calls it

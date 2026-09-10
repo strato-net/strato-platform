@@ -36,6 +36,7 @@ library
       Blockchain.Data.Transaction
       Blockchain.Data.TransactionDef
       Blockchain.Data.TransactionResult
+      Blockchain.Data.WriterLease
       Blockchain.DB.DetailsDB
       Blockchain.DB.SQLDB
       Blockchain.DBM

@@ -18,7 +18,7 @@ import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_busHost, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior)
+import Blockchain.Init.Options (flags_busHost, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_writer)
 import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
@@ -132,7 +132,7 @@ createCommandsFile role = do
       , "strato-p2p +RTS -T -RTS"
       , "strato-sequencer " ++ sequencerRts ++ followerFlag
       , "vm-runner " ++ vmRunnerRts
-      , restartable "strato-indexer"
+      , restartable ("strato-indexer" ++ (if flags_writer then "" else " --writer=false"))
       , restartable "slipstream +RTS -T -RTS"
       , restartable "strato-network-monitor"
       ]

@@ -21,5 +21,9 @@ newtype DBs = DBs
   { sqlDB' :: SQLDB
   }
 
+-- | The peer store of strato-p2p and ethereum-discover (p_peer, sync_task):
+-- this cell's own database when 'peerDbConfig' is set, created on first use.
 openDBs :: MonadUnliftIO m => m DBs
-openDBs = fmap DBs . runNoLoggingT $ createPostgresqlPool connStr 20
+openDBs = do
+  liftIO $ mapM_ ensureDatabaseExists (peerDbConfig ethConf)
+  fmap DBs . runNoLoggingT $ createPostgresqlPool peerConnStr 20

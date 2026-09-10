@@ -194,6 +194,8 @@ genEthConf role = do
   return runtimeConfig
     { apiConfig = roleApiConfig
     , busConfig = busConf
+    , cellId = if null flags_cellId then Nothing else Just flags_cellId
+    , peerDbConfig = if null flags_peerDatabase then Nothing else Just writerSql { database = flags_peerDatabase }
     , vmConfig = roleVmConfig
     , sqlConfig = writerSql
     , sqlReaderConfig = (\h -> writerSql { host = h }) <$> readerHost

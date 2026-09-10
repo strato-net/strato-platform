@@ -30,6 +30,7 @@ library:
   - strato-model
   - strato-statediff
   - text
+  - time
   - transformers
   - unliftio
 
@@ -52,6 +53,21 @@ executables:
       - strato-index
       - strato-model
       - streaming
+      - text
+      - time
+      - unliftio
     other-modules:
       - Wiring
+  strato-promote:
+    main: PromoteMain.hs
+    source-dirs: exec_src
+    dependencies:
+      - blockapps-data
+      - common-log
+      - hflags
+      - sql-monad
+      - strato-conf
+      - text
+      - time
+    other-modules: []
 

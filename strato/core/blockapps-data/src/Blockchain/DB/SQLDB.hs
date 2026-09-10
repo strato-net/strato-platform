@@ -24,7 +24,7 @@ module Blockchain.DB.SQLDB
 where
 
 import BlockApps.Logging (runNoLoggingT)
-import Blockchain.EthConf (connStr)
+import Blockchain.EthConf (peerConnStr)
 import Control.DeepSeq
 import Control.Monad.Composable.Base
 import Control.Monad.IO.Class
@@ -98,9 +98,12 @@ createPostgresqlPool ::
   m SQLDB
 createPostgresqlPool cString n = sqlDB <$> PSQL.createPostgresqlPool cString n
 
+-- | Only ethereum-discover and strato-p2p use this pool, for the peer
+-- tables, so it opens the peer store (this cell's own database when the
+-- node shares a Postgres cluster with other cores).
 globalSQLPool :: IORef SQLDB
 globalSQLPool = unsafePerformIO $ do
-  pool <- runNoLoggingT $ createPostgresqlPool connStr 5
+  pool <- runNoLoggingT $ createPostgresqlPool peerConnStr 5
   newIORef pool
 {-# NOINLINE globalSQLPool #-}
 

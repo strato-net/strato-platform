@@ -195,3 +195,11 @@ NodeStatus
     updatedAt UTCTime
     UniqueNodeStatusName name
     deriving Eq Show Generic
+
+WriterLease
+    name Text
+    holder Text
+    claimedAt UTCTime
+    heartbeatAt UTCTime
+    UniqueWriterLeaseName name
+    deriving Eq Show Generic

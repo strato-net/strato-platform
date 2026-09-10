@@ -51,6 +51,15 @@ data EthConf = EthConf
     sqlReaderConfig :: Maybe SqlConf,
     cirrusConfig :: SqlConf,
     busConfig :: Maybe BusConf,
+    -- | This core's name among the cores that share one Postgres cluster:
+    -- the writer lease is held by a cell, and cell-local consumer groups
+    -- carry the name. Missing means the hostname.
+    cellId :: Maybe String,
+    -- | Where strato-p2p and ethereum-discover keep peers and sync tasks.
+    -- strato-p2p resets every peer's active state at startup, so cores that
+    -- share a cluster each need their own; missing means the eth database,
+    -- as on a monolith.
+    peerDbConfig :: Maybe SqlConf,
     redisBlockDBConfig :: RedisBlockDBConf,
     -- | The edge tier's Redis (nonce counters, CSRF tokens, sessions),
     -- shared by every API instance and separate from the core's block DB.
@@ -80,6 +89,8 @@ instance FromJSON EthConf where
     <*> v .:? "sqlReaderConfig"
     <*> v .: "cirrusConfig"
     <*> v .:? "busConfig"
+    <*> v .:? "cellId"
+    <*> v .:? "peerDbConfig"
     <*> v .: "redisBlockDBConfig"
     <*> v .:? "edgeRedisConfig" .!= defaultEdgeRedisConf
     <*> (v .:? "streamingConfig" .!= def <|> v .: "kafkaConfig")
@@ -517,6 +528,8 @@ instance Default EthConf where
     , sqlReaderConfig = Nothing
     , cirrusConfig = def { database = "cirrus" }
     , busConfig = Nothing
+    , cellId = Nothing
+    , peerDbConfig = Nothing
     , redisBlockDBConfig = def
     , edgeRedisConfig = defaultEdgeRedisConf
     , streamingConfig = def
