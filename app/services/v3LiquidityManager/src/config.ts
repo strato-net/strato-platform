@@ -14,6 +14,8 @@ export interface AccountConfig {
 export interface Config {
   apiBase: string;
   accounts: AccountConfig[];
+  /** pools watched for pool-level conditions only (dislocation, oracle, paused) — no ladder expected */
+  watchPools: string[];
   /** ε as a multiple of the innermost layer's half-width (used unless EPSILON_ABS_PCT is set) */
   epsilonFactor: number;
   /** absolute ε override, in percent (e.g. 1.5 = alert at ±1.5% drift) */
@@ -28,7 +30,7 @@ export interface Config {
    *  reconstructed from chain, which drifts wider by up to one tick-spacing per cycle) */
   ladderWidths: Record<string, string>;
   email?: EmailConfig;
-  slackWebhookUrl?: string;
+  slack?: { token: string; channelId: string };
 }
 
 const required = (name: string): string => {
@@ -54,7 +56,7 @@ export function loadConfig(): Config {
 
   // ACCOUNT_POOLS="<account>=<pool>,<pool>; <account2>=<pool>"
   const accounts: AccountConfig[] = [];
-  for (const entry of required("ACCOUNT_POOLS").split(";")) {
+  for (const entry of (process.env.ACCOUNT_POOLS || "").split(";")) {
     if (!entry.trim()) continue;
     const [addr, poolsStr] = entry.split("=").map((s) => s.trim());
     if (!addr || !poolsStr)
@@ -67,7 +69,13 @@ export function loadConfig(): Config {
     if (bad) throw new Error(`ACCOUNT_POOLS: "${bad}" is not a valid pool address`);
     accounts.push({ account, pools });
   }
-  if (accounts.length === 0) throw new Error("ACCOUNT_POOLS is empty");
+  // WATCH_POOLS="<pool>,<pool>" — dislocation/oracle/paused checks only, no ladder expected
+  const watchPools = (process.env.WATCH_POOLS || "").split(",").map(normalize).filter(Boolean);
+  const badWatch = watchPools.find((p) => !ADDR.test(p));
+  if (badWatch) throw new Error(`WATCH_POOLS: "${badWatch}" is not a valid pool address`);
+
+  if (accounts.length === 0 && watchPools.length === 0)
+    throw new Error("configure at least one of ACCOUNT_POOLS or WATCH_POOLS");
 
   const email: EmailConfig | undefined = process.env.SENDGRID_API_KEY
     ? {
@@ -91,6 +99,7 @@ export function loadConfig(): Config {
   const cfg: Config = {
     apiBase,
     accounts,
+    watchPools,
     epsilonFactor: num("EPSILON_FACTOR", 0.75),
     epsilonAbsPct: process.env.EPSILON_ABS_PCT ? num("EPSILON_ABS_PCT", 0) : undefined,
     dislocationPct: num("DISLOCATION_PCT", 3),
@@ -100,11 +109,16 @@ export function loadConfig(): Config {
     stateFile: (process.env.STATE_FILE || `${__dirname}/../.state.json`).trim(),
     ladderWidths,
     email,
-    slackWebhookUrl: process.env.SLACK_WEBHOOK_URL?.trim() || undefined,
   };
 
-  if (!cfg.email && !cfg.slackWebhookUrl) {
-    console.warn("[config] no notification channel configured (SENDGRID_API_KEY / SLACK_WEBHOOK_URL) — alerts will only be logged");
+  const slackToken = process.env.SLACK_TOKEN?.trim();
+  const slackChannelId = process.env.SLACK_CHANNEL_ID?.trim();
+  if (!!slackToken !== !!slackChannelId)
+    throw new Error("SLACK_TOKEN and SLACK_CHANNEL_ID must be set together");
+  if (slackToken && slackChannelId) cfg.slack = { token: slackToken, channelId: slackChannelId };
+
+  if (!cfg.email && !cfg.slack) {
+    console.warn("[config] no notification channel configured (SENDGRID_API_KEY / SLACK_TOKEN+SLACK_CHANNEL_ID) — alerts will only be logged");
   }
   return cfg;
 }

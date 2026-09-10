@@ -32,7 +32,8 @@ async function main(): Promise<void> {
 
   const pairCount = cfg.accounts.reduce((n, a) => n + a.pools.length, 0);
   log(
-    `watching ${pairCount} account-pool pair(s) across ${cfg.accounts.length} account(s) every ${cfg.pollIntervalSeconds}s ` +
+    `watching ${pairCount} account-pool pair(s) across ${cfg.accounts.length} account(s)` +
+      `${cfg.watchPools.length ? ` + ${cfg.watchPools.length} watch-only pool(s)` : ""} every ${cfg.pollIntervalSeconds}s ` +
       `(ε = ${cfg.epsilonAbsPct !== undefined ? `±${cfg.epsilonAbsPct}% abs` : `${cfg.epsilonFactor} × inner layer width`}, ` +
       `cooldown ${cfg.alertCooldownHours}h)`
   );

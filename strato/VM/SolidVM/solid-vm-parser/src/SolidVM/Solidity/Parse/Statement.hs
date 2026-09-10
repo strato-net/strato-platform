@@ -241,7 +241,44 @@ variableDefinitionStatement = do
   VariableDefinition vardefs <$> optionMaybe (reservedOp "=" >> expression)
 
 expression :: SolidityParser Expression
-expression =
+expression = do
+  legacy <- getLegacyOperatorPrecedence
+  if legacy then legacyExpression else solidityExpression
+
+-- | Solidity's operator precedence, tightest first. Notable orderings that the
+-- legacy table below got wrong: relational operators bind tighter than
+-- equality, @&&@ tighter than @||@, both tighter than the ternary, and
+-- assignment is the loosest of all (so @a = b || c@ assigns @b || c@).
+-- @**@ and the assignment operators associate to the right.
+solidityExpression :: SolidityParser Expression
+solidityExpression =
+  buildExpressionParser
+    [ [postfix $ choice [functionCall, memberAccess, arrayIndex]],
+      [Postfix (PlusPlus <$> position (reservedOp "++"))],
+      [Postfix (MinusMinus <$> position (reservedOp "--"))],
+      [prefix "!", prefix "~", prefix "delete", prefix "++", prefix "--", prefix "+", prefix "-"],
+      [binaryR "**"],
+      [binary "*", binary "/", binary "%"],
+      [binary "+", binary "-"],
+      [binary "<<", binary ">>", binary ">>>"],
+      [binary "&"],
+      [binary "^"],
+      [binary "|"],
+      [binary "<", binary ">", binary "<=", binary ">="],
+      [binary "==", binary "!="],
+      [binary "&&"],
+      [binary "||"],
+      [ternary],
+      [binaryR "=", binaryR "|=", binaryR "^=", binaryR "&=", binaryR "<<=", binaryR ">>=", binaryR ">>>=", binaryR "+=", binaryR "-=", binaryR "*=", binaryR "/=", binaryR "%="]
+    ]
+    (tuple <|> array <|> primaryExpression)
+
+-- | The operator table SolidVM shipped with before the operator-precedence
+-- fork. Kept verbatim so blocks produced under it still replay identically:
+-- assignment binds tighter than @&&@ and @||@, which is why
+-- @flag = flag || cond@ only ever stored @flag@.
+legacyExpression :: SolidityParser Expression
+legacyExpression =
   buildExpressionParser
     [ [postfix $ choice [functionCall, memberAccess, arrayIndex]],
       [Postfix (PlusPlus <$> position (reservedOp "++"))],
@@ -256,22 +293,25 @@ expression =
       [binary "|"],
       [binary "==", binary "!="],
       [binary "<", binary ">", binary "<=", binary ">="],
-      [ Postfix
-          ( do
-              ~(a, (e1, e2)) <- withPosition $ do
-                reservedOp "?"
-                e1 <- expression
-                reservedOp ":"
-                e2 <- expression
-                pure (e1, e2)
-              pure (\e -> Ternary (extractExpression e <> a) e e1 e2)
-          )
-      ],
+      [ternary],
       [binary "=", binary "|=", binary "^=", binary "&=", binary "<<=", binary ">>=", binary ">>>=", binary "+=", binary "-=", binary "*=", binary "/=", binary "%="],
       [binary "&&"],
       [binary "||"]
     ]
     (tuple <|> array <|> primaryExpression)
+
+ternary :: Operator String ParserState Identity Expression
+ternary =
+  Postfix
+    ( do
+        ~(a, (e1, e2)) <- withPosition $ do
+          reservedOp "?"
+          e1 <- expression
+          reservedOp ":"
+          e2 <- expression
+          pure (e1, e2)
+        pure (\e -> Ternary (extractExpression e <> a) e e1 e2)
+    )
 
 functionCall :: SolidityParser (Expression -> Expression)
 functionCall = do
@@ -301,6 +341,9 @@ arrayIndex = do
 
 binary :: String -> Operator String u Identity Expression
 binary x = Infix (uncurry Binary <$> withPosition (x <$ reservedOp x)) AssocLeft
+
+binaryR :: String -> Operator String u Identity Expression
+binaryR x = Infix (uncurry Binary <$> withPosition (x <$ reservedOp x)) AssocRight
 
 prefix :: String -> Operator String u Identity Expression
 prefix x = Prefix (uncurry Unitary <$> withPosition (x <$ reservedOp x))
