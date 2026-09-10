@@ -143,7 +143,7 @@ describe("ExternalBridgeVault", function () {
       true,
       1_000n,
       2_000n,
-      24n * 60n * 60n,
+      1n,
       500n,
     );
     await token.mint(await vault.getAddress(), 5_000n);
@@ -312,13 +312,13 @@ describe("ExternalBridgeVault", function () {
     ).to.be.revertedWithCustomError(vault, "AccessControlUnauthorizedAccount");
   });
 
-  it("reserves window capacity before external execution", async function () {
+  it("reserves bucket capacity before external execution", async function () {
     await vault.connect(policyAdmin).setTokenPolicy(
       await token.getAddress(),
       true,
-      1_000n,
       150n,
-      24n * 60n * 60n,
+      150n,
+      1n,
       0n,
     );
 
@@ -333,7 +333,92 @@ describe("ExternalBridgeVault", function () {
 
     await expect(
       vault.connect(executor).reserve(second, signatures),
-    ).to.be.revertedWithCustomError(vault, "WindowLimitExceeded");
+    ).to.be.revertedWithCustomError(vault, "BucketCapacityExceeded");
+  });
+
+  it("refills spent capacity gradually with rounded-up retry times", async function () {
+    const asset = await token.getAddress();
+    await vault.connect(policyAdmin).setTokenPolicy(asset, true, 100n, 100n, 3n, 0n);
+    await vault.release(await reserve(await buildAuthorization()));
+    const start = (await vault.tokenPolicies(asset)).lastRefillAt;
+    expect(await vault.withdrawalCapacity(asset, 100n)).to.deep.equal([0n, 34n]);
+    await time.increaseTo(start + 10n);
+    expect(await vault.withdrawalCapacity(asset, 100n)).to.deep.equal([30n, 24n]);
+    await time.increaseTo(start + 34n);
+    expect(await vault.withdrawalCapacity(asset, 100n)).to.deep.equal([100n, 0n]);
+    await reserve(await buildAuthorization({ sourceWithdrawalId: sourceWithdrawalId + 1n }));
+  });
+
+  it("holds capacity across time and frees cancelled reservations exactly once", async function () {
+    const asset = await token.getAddress();
+    await vault.connect(policyAdmin).setTokenPolicy(asset, true, 100n, 100n, 1n, 0n);
+    const authorization = await buildAuthorization({ amount: 90n });
+    const id = await reserve(authorization);
+    await time.increase(500);
+    expect(await vault.withdrawalCapacity(asset, 20n)).to.deep.equal([10n, ethers.MaxUint256]);
+    await time.increaseTo(authorization.deadline + 1n);
+    await vault.cancelExpired(id);
+    expect(await vault.withdrawalCapacity(asset, 100n)).to.deep.equal([100n, 0n]);
+    await expect(vault.cancelExpired(id)).to.be.revertedWithCustomError(vault, "InvalidReservationState");
+  });
+
+  it("converts concurrent holds into consumption without replenishing held capacity", async function () {
+    const asset = await token.getAddress();
+    await vault.connect(policyAdmin).setTokenPolicy(asset, true, 100n, 100n, 1n, 0n);
+    const first = await reserve(await buildAuthorization({ amount: 60n }));
+    const second = await reserve(await buildAuthorization({ amount: 40n, sourceWithdrawalId: sourceWithdrawalId + 1n }));
+    await time.increase(500);
+    expect((await vault.withdrawalCapacity(asset, 1n)).available).to.equal(0n);
+    await vault.release(first);
+    const start = (await vault.tokenPolicies(asset)).lastRefillAt;
+    expect(await vault.totalReserved(asset)).to.equal(40n);
+    expect((await vault.withdrawalCapacity(asset, 1n)).available).to.equal(0n);
+    await time.increaseTo(start + 10n);
+    expect((await vault.withdrawalCapacity(asset, 1n)).available).to.equal(10n);
+    await vault.release(second);
+    expect(await vault.totalReserved(asset)).to.equal(0n);
+    expect((await vault.tokenPolicies(asset)).consumedCapacity).to.equal(89n);
+  });
+
+  it("requires Safe-approved withdrawals to fit the same bucket", async function () {
+    const asset = await token.getAddress();
+    await vault.connect(policyAdmin).setTokenPolicy(asset, true, 100n, 100n, 1n, 50n);
+    const first = await buildAuthorization({ amount: 60n });
+    await vault.connect(largeWithdrawalApprover).approveLargeWithdrawal(await vault.withdrawalReviewDigest(first), first.deadline);
+    await reserve(first);
+    const second = await buildAuthorization({ amount: 60n, sourceWithdrawalId: sourceWithdrawalId + 1n });
+    await vault.connect(largeWithdrawalApprover).approveLargeWithdrawal(await vault.withdrawalReviewDigest(second), second.deadline);
+    await expect(reserve(second)).to.be.revertedWithCustomError(vault, "BucketCapacityExceeded");
+  });
+
+  it("preserves spent capacity on immediate policy changes and protects holds", async function () {
+    const asset = await token.getAddress();
+    await vault.connect(policyAdmin).setTokenPolicy(asset, true, 100n, 100n, 1n, 0n);
+    await vault.release(await reserve(await buildAuthorization()));
+    await vault.connect(policyAdmin).setTokenPolicy(asset, true, 50n, 50n, 2n, 0n);
+    const policy = await vault.tokenPolicies(asset);
+    expect(policy.consumedCapacity).to.equal(99n);
+    expect(await vault.withdrawalCapacity(asset, 50n)).to.deep.equal([0n, 50n]);
+    await time.increaseTo(policy.lastRefillAt + 50n);
+    await reserve(await buildAuthorization({ amount: 50n, sourceWithdrawalId: sourceWithdrawalId + 1n }));
+    await expect(vault.connect(policyAdmin).setTokenPolicy(asset, true, 49n, 49n, 1n, 0n))
+      .to.be.revertedWithCustomError(vault, "InvalidAuthorization");
+    await expect(vault.connect(other).setTokenPolicy(asset, true, 100n, 100n, 1n, 0n))
+      .to.be.revertedWithCustomError(vault, "AccessControlUnauthorizedAccount");
+  });
+
+  it("rejects impossible policies and safely bounds refill arithmetic", async function () {
+    const asset = await token.getAddress();
+    for (const [maximum, capacity, rate] of [[100n, 0n, 1n], [100n, 100n, 0n], [100n, 100n, 101n], [101n, 100n, 1n]]) {
+      await expect(vault.connect(policyAdmin).setTokenPolicy(asset, true, maximum, capacity, rate, 0n))
+        .to.be.revertedWithCustomError(vault, "InvalidAuthorization");
+    }
+    await vault.connect(policyAdmin).setTokenPolicy(asset, true, 0n, 100n, 1n, 0n);
+    await expect(vault.withdrawalCapacity(asset, 101n)).to.be.revertedWithCustomError(vault, "BucketCapacityExceeded");
+    await vault.connect(policyAdmin).setTokenPolicy(asset, true, 100n, ethers.MaxUint256, ethers.MaxUint256, 0n);
+    await vault.release(await reserve(await buildAuthorization()));
+    await time.increase(1000);
+    expect((await vault.withdrawalCapacity(asset, 100n)).available).to.equal(ethers.MaxUint256);
   });
 
   it("invalidates unsigned authorizations when the signer set changes", async function () {
@@ -382,7 +467,7 @@ describe("ExternalBridgeVault", function () {
       true,
       ethers.parseEther("2"),
       ethers.parseEther("5"),
-      24n * 60n * 60n,
+      1n,
       ethers.parseEther("1"),
     );
     await admin.sendTransaction({

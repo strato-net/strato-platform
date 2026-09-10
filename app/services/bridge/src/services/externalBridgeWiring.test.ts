@@ -31,6 +31,11 @@ process.env.SENDGRID_API_KEY = "SG.test.test";
 
 const externalBridgeAddress = process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS!;
 
+test.before(async () => {
+  const vaultService = await import("./externalWithdrawalService");
+  (vaultService as any).getWithdrawalCapacity = async () => ({ available: 1000000000000000000n, retryAfterSeconds: 0n });
+});
+
 test("atomically settles non-native deposits on ExternalAssetBridge", async () => {
   const stratoHelper = await import("../utils/stratoHelper");
   const settlementAttestationService = await import(
@@ -950,4 +955,23 @@ test("recovers withdrawal events in bounded ranges from the authorization time",
     provider.getLogs = async () => [];
     await assert.rejects(getEventTransactionHash(provider, vault, eventName, reservationId, "12000"), /event not found/);
   }
+});
+
+test("waits for capacity before authorizing either withdrawal path and leaves recovery unblocked", async (t) => {
+  const vaultService = await import("./externalWithdrawalService");
+  const { processExternalWithdrawal } = await import("./bridgeService");
+  const requested: string[] = [];
+  t.mock.method(vaultService, "getWithdrawalCapacity", async (withdrawal: any) => {
+    requested.push(withdrawal.bridgeStatus);
+    return { available: 99n, retryAfterSeconds: 1n };
+  });
+  t.mock.method(vaultService, "buildWithdrawalAuthorization", async () => {
+    throw new Error("authorization reached");
+  });
+  for (const bridgeStatus of ["1", "2"]) {
+    await processExternalWithdrawal({ bridgeStatus, withdrawalId: "7", externalTokenAmount: "100" } as any, true);
+  }
+  assert.deepEqual(requested, ["1", "2"]);
+  await assert.rejects(processExternalWithdrawal({ bridgeStatus: "3" } as any), /authorization reached/);
+  assert.deepEqual(requested, ["1", "2"], "already-authorized recovery must bypass the capacity wait");
 });

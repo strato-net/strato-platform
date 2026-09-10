@@ -1,7 +1,7 @@
 import { cirrus, strato } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { StratoPaths, constants } from "../../config/constants";
+import { StratoPaths, constants, MAX_UINT256 } from "../../config/constants";
 import * as config from "../../config/config";
 import { getOraclePrices } from "./oracle.service";
 import { FunctionInput } from "../../types/types";
@@ -16,6 +16,7 @@ const RAY = 10n ** 27n;
 export interface SaveUsdstInfo {
   configured: boolean;
   deployed: boolean;
+  initialized: boolean;
   vaultAddress: string;
   assetAddress: string;
   assetSymbol: string;
@@ -57,6 +58,9 @@ export interface SaveUsdstHistoryPoint {
 }
 
 export interface SaveUsdstActionState {
+  totalShares: string;
+  pricingAssets: string;
+  maxDeposit: string;
   vaultAddress: string;
   assetAddress: string;
   shareSymbol: string;
@@ -67,6 +71,7 @@ export interface SaveUsdstActionState {
 const emptyInfo = (): SaveUsdstInfo => ({
   configured: Boolean(config.saveUsdstVault),
   deployed: false,
+  initialized: false,
   vaultAddress: config.saveUsdstVault || "",
   assetAddress: USDST,
   assetSymbol: "USDST",
@@ -196,13 +201,18 @@ export const getSaveUsdstActionState = async (
   accessToken: string
 ): Promise<SaveUsdstActionState | null> => {
   const info = await getSaveUsdstInfo(accessToken);
-  if (!info.deployed) return null;
+  if (!info.deployed || !info.initialized) return null;
 
   return {
     vaultAddress: info.vaultAddress,
     assetAddress: info.assetAddress,
     shareSymbol: info.shareSymbol,
     projectedExchangeRate: info.projectedExchangeRate,
+    totalShares: info.totalShares,
+    pricingAssets: info.projectedPricingAssets,
+    maxDeposit: info.paused ||
+      (BigInt(info.totalShares) === 0n && BigInt(info.totalManagedAssets) !== 0n)
+      ? "0" : MAX_UINT256.toString(),
     paused: info.paused,
   };
 };
@@ -271,7 +281,7 @@ const getVaultState = async (accessToken: string): Promise<Record<string, any> |
     cirrus.get(accessToken, `/${SaveUSDSTVault}`, {
       params: {
         address: `eq.${config.saveUsdstVault}`,
-        select: "address,assetToken,_managedAssets::text,_paused,_symbol,_totalSupply::text",
+        select: "address,vaultInitialized,assetToken,_managedAssets::text,_paused,_symbol,_totalSupply::text",
       },
     }),
     cirrus.get(accessToken, "/storage", {
@@ -443,6 +453,7 @@ export const getSaveUsdstInfo = async (accessToken: string): Promise<SaveUsdstIn
   return {
     configured: true,
     deployed: true,
+    initialized: vaultState.vaultInitialized === true || vaultState.vaultInitialized === "true",
     vaultAddress,
     assetAddress,
     assetSymbol: assetToken?.data?.[0]?._symbol || "USDST",
@@ -459,7 +470,7 @@ export const getSaveUsdstInfo = async (accessToken: string): Promise<SaveUsdstIn
     pendingAccrual: pendingAccrual.fundedAmount.toString(),
     pendingAccrualTarget: pendingAccrual.targetAmount.toString(),
     apy,
-    paused: Boolean(vaultState._paused),
+    paused: vaultState._paused === true || vaultState._paused === "true",
   };
 };
 

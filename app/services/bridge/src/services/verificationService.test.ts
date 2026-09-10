@@ -226,7 +226,7 @@ test("invalidates every deposit in a transaction when one transfer is reused", a
   assert.equal(results.get(depositIdentity(first))?.state, "invalid");
   assert.equal(results.get(depositIdentity(second))?.state, "invalid");
   assert.equal(receiptRequests, 1);
-  assert.equal(traceRequests, 1);
+  assert.equal(traceRequests, 0);
 });
 
 test("rejects a duplicated deposit identity in the receipt", async () => {
@@ -694,4 +694,51 @@ test("accepts a router deposit invoked through a smart wallet", async () => {
     custodyAddress,
   );
   assert.equal(results.get(depositIdentity(detected))?.state, "verified");
+});
+
+test("reuses providers and batches concurrent reads without caching mutable results", async () => {
+  const { getChainProvider, closeChainProviders } = await import("./rpcService");
+  process.env[`CHAIN_${chainId}_RPC_URL`] = "https://primary-rpc";
+  const provider = getChainProvider(chainId);
+  assert.equal(provider, getChainProvider(String(chainId)));
+  const batches: any[][] = [];
+  let height = 20;
+  (provider as any)._send = async (payload: any) => {
+    const requests = Array.isArray(payload) ? payload : [payload];
+    batches.push(requests);
+    return requests.map((request: any) => ({ id: request.id, jsonrpc: "2.0",
+      result: request.method === "eth_chainId" ? ethers.toBeHex(chainId) : ethers.toBeHex(height),
+    }));
+  };
+  try {
+    await Promise.all([provider.getBlockNumber(), provider.getBalance(sender)]);
+    assert(batches.some((batch) => batch.some((request) => request.method === "eth_blockNumber") &&
+      batch.some((request) => request.method === "eth_getBalance")));
+    height = 21;
+    assert.equal(await provider.getBlockNumber(), 21);
+    process.env[`CHAIN_${chainId}_RPC_URL`] = "https://replacement-rpc";
+    assert.notEqual(provider, getChainProvider(chainId));
+  } finally {
+    closeChainProviders();
+    process.env[`CHAIN_${chainId}_RPC_URL`] = "https://primary-rpc";
+  }
+});
+
+test("fetches ETH traces from the full receipt even when only the ERC-20 deposit was observed", async () => {
+  const api = await import("../utils/api");
+  const token = detectedDeposit("1", 1);
+  const native = detectedDeposit("2", 2, { externalToken: ZERO_ADDRESS });
+  let traces = 0;
+  (api.fetch as any).post = async (_url: string, requests: any[]) => requests.map((request) => {
+    if (request.method === "trace_transaction") traces++;
+    return { id: request.id, result: request.method === "eth_getTransactionReceipt" ? {
+      transactionHash: token.externalTxHash, blockHash: token.externalBlockHash,
+      blockNumber: "0x10", status: "0x1", to: depositRouter,
+      logs: [transferLog(0), depositReceiptLog(token), depositReceiptLog(native)],
+    } : ethTracePair(0) };
+  });
+  const { depositIdentity, verifyDetectedDepositsBatch } = await verificationService;
+  const results = await verifyDetectedDepositsBatch([token], 100, custodyAddress);
+  assert.equal(traces, 1);
+  assert.equal(results.get(depositIdentity(token))?.state, "verified");
 });

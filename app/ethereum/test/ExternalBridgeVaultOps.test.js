@@ -39,8 +39,8 @@ function config(overrides = {}) {
           token: ethers.ZeroAddress,
           enabled: true,
           maxPerWithdrawal: "100",
-          windowLimit: "1000",
-          windowSeconds: "86400",
+          bucketCapacity: "1000",
+          refillRate: "1",
           manualReviewThreshold: "50",
           migrateAmount: "500",
         },
@@ -48,8 +48,8 @@ function config(overrides = {}) {
           token: "0x6666666666666666666666666666666666666666",
           enabled: true,
           maxPerWithdrawal: "200",
-          windowLimit: "2000",
-          windowSeconds: "86400",
+          bucketCapacity: "2000",
+          refillRate: "1",
           manualReviewThreshold: "100",
           migrateAmount: "750",
         },
@@ -183,4 +183,16 @@ test("builds standalone Safe Transaction Builder JSON", () => {
     contractMethod: null,
     contractInputsValues: null,
   });
+});
+
+test("rejects zero buckets, excessive refill rates, and withdrawals larger than capacity", () => {
+  const token = { token: ethers.ZeroAddress, enabled: true, maxPerWithdrawal: "100",
+    bucketCapacity: "1000", refillRate: "1", manualReviewThreshold: "50", migrateAmount: "0" };
+  for (const invalid of [{ bucketCapacity: "0" }, { refillRate: "0" }, { refillRate: "1001" }, { maxPerWithdrawal: "1001" }]) {
+    assert.throws(() => config({ tokens: [{ ...token, ...invalid }] }), /requires positive bucketCapacity\/refillRate/);
+  }
+  const legacy = { ...token, windowLimit: "1000", windowSeconds: "86400" };
+  delete legacy.bucketCapacity;
+  delete legacy.refillRate;
+  assert.throws(() => config({ tokens: [legacy] }), /bucketCapacity/);
 });

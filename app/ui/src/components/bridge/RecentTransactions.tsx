@@ -9,7 +9,6 @@ import { ExternalBridgeStatus, mergePendingDeposits } from '@/lib/bridge/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { activityFeedApi } from '@/lib/activityFeed';
 import { METAL_ACTIVITY_PAIR, resolveTokenSymbols, collectMetalTokenAddrs, mapEventsToMetalTxs } from '@/lib/metalActivity';
-import { api } from '@/lib/axios';
 
 type RecentTx = {
   _type: 'deposit' | 'withdrawal' | 'metal' | 'route';
@@ -181,20 +180,13 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0, inclu
       const routeEvents = routeResult.events || [];
       const routeSymbols = new Map<string, string>();
       if (routeEvents.length > 0) {
-        try {
-          const { data: routeAssets } = await api.get("/trade/route/assets");
-          for (const asset of routeAssets || []) {
-            routeSymbols.set(normalizeAddress(asset.address), asset._symbol);
-          }
-        } catch {
-          const addresses = routeEvents.flatMap((event) => [
-            event.attributes.tokenIn,
-            event.attributes.tokenOut,
-          ]);
-          const resolved = await resolveTokenSymbols(addresses);
-          for (const [address, symbol] of resolved) {
-            routeSymbols.set(normalizeAddress(address), symbol);
-          }
+        const addresses = routeEvents.flatMap((event) => [
+          event.attributes.tokenIn,
+          event.attributes.tokenOut,
+        ]);
+        const resolved = await resolveTokenSymbols(addresses);
+        for (const [address, symbol] of resolved) {
+          routeSymbols.set(normalizeAddress(address), symbol);
         }
       }
       const all = [

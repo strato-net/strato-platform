@@ -1,6 +1,25 @@
+import { JsonRpcProvider } from "ethers";
 import { fetch } from "../utils/api";
 import { getChainRpcUrl, getChainRpcUrls } from "../config";
 import { ensureHexPrefix, decimalToHex } from "../utils/utils";
+
+const chainProviders = new Map<string, JsonRpcProvider>();
+
+export const getChainProvider = (chainId: number | bigint | string): JsonRpcProvider => {
+  const url = getChainRpcUrl(BigInt(chainId));
+  const key = `${BigInt(chainId)}:${url}`;
+  let provider = chainProviders.get(key);
+  if (!provider) {
+    provider = new JsonRpcProvider(url, undefined, { cacheTimeout: -1 });
+    chainProviders.set(key, provider);
+  }
+  return provider;
+};
+
+export const closeChainProviders = (): void => {
+  for (const provider of chainProviders.values()) provider.destroy();
+  chainProviders.clear();
+};
 
 const normalizeHex = (value: unknown): unknown =>
   typeof value === "string" && value.toLowerCase().startsWith("0x")
@@ -132,6 +151,7 @@ export const getInternalTransactionsBatch = async (
   chainId: number,
   txHashes: string[],
 ): Promise<Map<string, any[]>> => {
+  if (txHashes.length === 0) return new Map();
   const batchRequest = txHashes.map((txHash, index) => ({
     jsonrpc: "2.0",
     id: index + 1,

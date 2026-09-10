@@ -206,15 +206,15 @@ async function readState(config, chain, vaultArtifact, routerArtifact) {
         policy: {
           enabled: policy.enabled,
           maxPerWithdrawal: policy.maxPerWithdrawal.toString(),
-          windowLimit: policy.windowLimit.toString(),
-          windowSeconds: policy.windowSeconds.toString(),
+          bucketCapacity: policy.bucketCapacity.toString(),
+          refillRate: policy.refillRate.toString(),
           manualReviewThreshold: policy.manualReviewThreshold.toString(),
         },
         policyMatches:
           policy.enabled === token.enabled &&
           policy.maxPerWithdrawal === token.maxPerWithdrawal &&
-          policy.windowLimit === token.windowLimit &&
-          policy.windowSeconds === token.windowSeconds &&
+          policy.bucketCapacity === token.bucketCapacity &&
+          policy.refillRate === token.refillRate &&
           policy.manualReviewThreshold === token.manualReviewThreshold,
         vaultBalance: vaultBalance.toString(),
         safeBalance: safeBalance.toString(),

@@ -28,11 +28,11 @@ const enrichRoutedDepositEvents = async (
     {
       params: {
         address: `eq.${constants.externalAssetBridge}`,
-        event_name: "in.(AutoRouted,DepositActionFallback)",
+        event_name: "in.(AutoRouted,DepositActionFallback,DepositCompleted)",
         transaction_hash: `in.(${[
           ...new Set(routedDepositTxHashes),
         ].join(",")})`,
-        select: "transaction_hash,event_name,attributes",
+        select: "address,event_index,transaction_hash,event_name,attributes",
       },
     }
   );

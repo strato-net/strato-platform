@@ -162,3 +162,6 @@ export function isOkStatus(receipt: any): boolean {
   return receipt.status === 1 || receipt.status === true || 
     (typeof receipt.status === "string" && receipt.status.toLowerCase() === "0x1");
 }
+
+export const normalizeHex = (value: string): string =>
+  value.replace(/^0x/i, "").toLowerCase();

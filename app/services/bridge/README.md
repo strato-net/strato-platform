@@ -289,3 +289,5 @@ The service logs important events and errors using Winston logger:
 ## License
 
 MIT 
+
+Withdrawal capacity is enforced by per-token buckets in the external vault for both routine and Safe-approved withdrawals. The service checks `withdrawalCapacity` before issuing a new authorization, leaves capacity-constrained requests pending, and logs available units and estimated retry seconds. Outstanding reservations hold capacity until release or cancellation; only released consumption refills. Existing READY withdrawals continue through the original expiry/recovery flow. Configure `bucketCapacity` in raw token units and `refillRate` in raw units per second; Safe policy changes remain immediate.

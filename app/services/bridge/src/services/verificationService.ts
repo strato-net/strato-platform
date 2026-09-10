@@ -290,10 +290,19 @@ export const verifyDetectedDepositsBatch = async (
         ]),
       ).values(),
     ];
-    const [receipts, traces] = await Promise.all([
-      getTransactionReceiptsBatch(chainId, txHashes),
-      getInternalTransactionsBatch(chainId, txHashes),
-    ]);
+    const receipts = await getTransactionReceiptsBatch(chainId, txHashes);
+    const routers = new Set(chainDeposits.map((deposit) => normalizeAddress(deposit.depositRouter)));
+    const nativeTxHashes = txHashes.filter((hash) => {
+      const receipt = receipts.get(hash);
+      if (!receipt || receipt.__rpcDisagreement || !isOkStatus(receipt)) return false;
+      try {
+        const parsed = parseReceiptDeposits(receipt, chainId, routers);
+        return parsed.deposits.some((deposit) => deposit.externalToken === ZERO_ADDRESS);
+      } catch {
+        return false;
+      }
+    });
+    const traces = await getInternalTransactionsBatch(chainId, nativeTxHashes);
 
     const depositsByTransaction = new Map<
       string,
@@ -433,7 +442,9 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
     // Batch fetch receipts and internal transactions
     const [receipts, internalTxsMap] = await Promise.all([
       getTransactionReceiptsBatch(chainId, txHashes),
-      getInternalTransactionsBatch(chainId, txHashes)
+      getInternalTransactionsBatch(chainId, [...new Set(chainDeposits
+        .filter((deposit) => normalizeAddress(deposit.externalToken) === ZERO_ADDRESS)
+        .map((deposit) => deposit.externalTxHash))])
     ]);
 
     // Verify each deposit using the batched data

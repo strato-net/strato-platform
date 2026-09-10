@@ -15,18 +15,24 @@ export interface MetalTx {
 
 export async function resolveTokenSymbols(addresses: string[]): Promise<Map<string, string>> {
   const map = new Map<string, string>();
-  if (!addresses.length) return map;
-  const results = await Promise.all(
-    addresses.map(async (addr) => {
-      try {
-        const res = await api.get(`/tokens/${addr}`);
-        const token = Array.isArray(res.data) ? res.data[0] : res.data;
-        return { addr, symbol: token?._symbol || "" };
-      } catch { return { addr, symbol: "" }; }
-    })
-  );
-  for (const { addr, symbol } of results) {
-    if (symbol) { map.set(addr, symbol); map.set(addr.toLowerCase(), symbol); }
+  const normalized = [...new Set(addresses.filter(Boolean).map((address) => address.toLowerCase().replace(/^0x/, "")))];
+  const results = await Promise.all(Array.from({ length: Math.ceil(normalized.length / 100) }, async (_, index) => {
+    try {
+      const { data } = await api.get("/tokens/symbols", {
+        params: { addresses: normalized.slice(index * 100, (index + 1) * 100).join(",") },
+      });
+      return data as Array<{ address: string; _symbol: string }>;
+    } catch { return []; }
+  }));
+  for (const token of results.flat()) {
+    if (!token._symbol) continue;
+    const address = token.address.toLowerCase().replace(/^0x/, "");
+    map.set(address, token._symbol);
+    map.set(`0x${address}`, token._symbol);
+  }
+  for (const address of addresses.filter(Boolean)) {
+    const symbol = map.get(address.toLowerCase());
+    if (symbol) map.set(address, symbol);
   }
   return map;
 }

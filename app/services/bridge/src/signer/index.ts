@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import axios from "axios";
+import { normalizeHex as normalize } from "../utils/utils";
 import express from "express";
 import {
   Contract,
@@ -58,7 +59,7 @@ const VAULT_ABI = [
   "function attestationSigners(address) view returns (bool)",
   "function maxAuthorizationValiditySeconds() view returns (uint256)",
   "function signerSetVersion() view returns (uint256)",
-  "function tokenPolicies(address) view returns (bool enabled,uint256 maxPerWithdrawal,uint256 windowLimit,uint256 windowSeconds,uint256 windowStartedAt,uint256 releasedInWindow,uint256 manualReviewThreshold)",
+  "function tokenPolicies(address) view returns (bool enabled,uint256 maxPerWithdrawal,uint256 bucketCapacity,uint256 refillRate,uint256 lastRefillAt,uint256 consumedCapacity,uint256 manualReviewThreshold)",
   "function largeWithdrawalApprovalDeadline(bytes32) view returns (uint256)",
 ];
 
@@ -305,8 +306,6 @@ const validateSettlementVerifier = async (): Promise<string> => {
   }
   return address;
 };
-
-const normalize = (value: string): string => value.replace(/^0x/, "").toLowerCase();
 
 const validateSourceWithdrawal = async (
   authorization: WithdrawalAuthorization,

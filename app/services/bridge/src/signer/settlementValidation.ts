@@ -1,5 +1,5 @@
 import { verifyEthTransactionCustody } from "../utils/custodyValidation";
-import { normalizeAddress } from "../utils/utils";
+import { normalizeAddress, normalizeHex as normalize } from "../utils/utils";
 import { Interface, JsonRpcProvider, ZeroAddress, getAddress } from "ethers";
 
 export interface DepositSettlementAttestation {
@@ -38,9 +38,6 @@ const transferInterface = new Interface([
 const vaultInterface = new Interface([
   "event WithdrawalReleased(bytes32 indexed reservationId,address indexed token,address indexed recipient,uint256 amount)",
 ]);
-
-const normalize = (value: string): string =>
-  value.replace(/^0x/, "").toLowerCase();
 
 const logIndex = (log: any): number =>
   Number(log.index ?? log.logIndex);

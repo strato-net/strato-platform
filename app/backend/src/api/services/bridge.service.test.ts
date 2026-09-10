@@ -105,6 +105,9 @@ test("builds actions only for eligible routes and configured products", () => {
       assetAddress: constants.USDST,
       shareSymbol: "saveUSDST",
       projectedExchangeRate: "1000000000000000000",
+      totalShares: "1000",
+      pricingAssets: "1000",
+      maxDeposit: "1000000000000000000",
       paused: false,
     },
     forgeConfigs: {

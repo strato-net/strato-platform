@@ -2,62 +2,45 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { applyDepositActionOutcomes } from "../helpers/events.helper";
 
-test("enriches only the matching routed deposit completion", () => {
-  const events: any[] = [
-    {
-      transaction_hash: "0xsettlement",
-      event_name: "DepositCompleted",
-    },
-    {
-      transaction_hash: "0xsettlement",
-      event_name: "WithdrawalCompleted",
-    },
-  ];
-
-  applyDepositActionOutcomes(events, [
-    {
-      transaction_hash: "0xsettlement",
-      event_name: "AutoRouted",
-      attributes: {
-        finalToken: "0xfinal",
-        finalAmount: "42",
-      },
-    },
-  ]);
-
-  assert.deepEqual(events[0], {
-    transaction_hash: "0xsettlement",
-    event_name: "DepositCompleted",
-    depositOutcome: "route",
-    finalToken: "0xfinal",
-    finalAmount: "42",
-  });
-  assert.deepEqual(events[1], {
-    transaction_hash: "0xsettlement",
-    event_name: "WithdrawalCompleted",
-  });
+const event = (index: number, name: string, attributes = {}): any => ({
+  address: "bridge", transaction_hash: "settlement", event_index: index,
+  event_name: name, attributes: {
+    externalChainId: "1", externalTxHash: "external", recipient: "user",
+    stratoRecipient: "user", ...attributes,
+  },
 });
 
-test("enriches source-token fallback completion", () => {
-  const events: any[] = [
-    {
-      transaction_hash: "0xfallback",
-      event_name: "DepositCompleted",
-    },
+test("matches separate routed, fallback and plain deposits in one transaction", () => {
+  const routed = event(1, "DepositCompleted");
+  const fallback = event(3, "DepositCompleted");
+  const plain = event(4, "DepositCompleted");
+  const history = [
+    event(0, "AutoRouted", { finalToken: "route", finalAmount: "42" }), routed,
+    event(2, "DepositActionFallback", { fallbackToken: "source", fallbackAmount: "100" }), fallback, plain,
   ];
+  applyDepositActionOutcomes([routed, fallback, plain], history.reverse());
+  assert.equal(routed.depositOutcome, "route");
+  assert.equal(routed.finalAmount, "42");
+  assert.equal(fallback.depositOutcome, "fallback");
+  assert.equal(fallback.finalToken, "source");
+  assert.equal(plain.depositOutcome, undefined);
+});
 
-  applyDepositActionOutcomes(events, [
-    {
-      transaction_hash: "0xfallback",
-      event_name: "DepositActionFallback",
-      attributes: {
-        fallbackToken: "0xsource",
-        fallbackAmount: "100",
-      },
-    },
-  ]);
+test("pagination does not reuse an earlier deposit outcome", () => {
+  const plain = event(2, "DepositCompleted");
+  applyDepositActionOutcomes([plain], [event(0, "AutoRouted"), event(1, "DepositCompleted"), plain]);
+  assert.equal(plain.depositOutcome, undefined);
+});
 
-  assert.equal(events[0].depositOutcome, "fallback");
-  assert.equal(events[0].finalToken, "0xsource");
-  assert.equal(events[0].finalAmount, "100");
+test("rejects mismatched identity, contract and ambiguous event ordering", () => {
+  for (const outcome of [
+    event(0, "AutoRouted", { externalTxHash: "different" }),
+    { ...event(0, "AutoRouted"), address: "other" },
+    event(1, "AutoRouted"),
+    { ...event(0, "AutoRouted"), event_index: undefined },
+  ]) {
+    const completion = event(1, "DepositCompleted");
+    applyDepositActionOutcomes([completion], [outcome, completion]);
+    assert.equal(completion.depositOutcome, undefined);
+  }
 });

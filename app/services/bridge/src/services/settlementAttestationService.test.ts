@@ -51,13 +51,13 @@ const deposit = {
   minFinalOut: "90",
 };
 
-test("settles with two verifiers when the third stalls until the deadline", async () => {
+test("settles before a stalled verifier deadline and cancels the remaining request", async () => {
   const cirrusService = await import("./cirrusService");
   let threshold = 2;
   (cirrusService as any).getSettlementVerifierConfig = async () => ({
     threshold,
     count: 3,
-    verifiers: [],
+    verifiers: ["one", "two", "three"],
   });
   const { attestDepositSettlement } = await import(
     "./settlementAttestationService"
@@ -68,10 +68,12 @@ test("settles with two verifiers when the third stalls until the deadline", asyn
     "token-one,token-two,token-three";
   const originalPost = axios.post;
   const originalTimeout = AbortSignal.timeout;
+  let deadlineFired = false;
+  let cancelled = false;
   AbortSignal.timeout = (milliseconds) => {
     assert.equal(milliseconds, 60_000);
     const controller = new AbortController();
-    setTimeout(() => controller.abort(new Error("verifier deadline exceeded")), 10);
+    setTimeout(() => { deadlineFired = true; controller.abort(new Error("verifier deadline exceeded")); }, 10);
     return controller.signal;
   };
   const requests: any[] = [];
@@ -80,13 +82,15 @@ test("settles with two verifiers when the third stalls until the deadline", asyn
     assert.equal(options.timeout, 60_000);
     if (url.startsWith("https://three")) {
       return new Promise((_, reject) => {
-        options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+        options.signal.addEventListener("abort", () => { cancelled = true; reject(options.signal.reason); }, { once: true });
       });
     }
-    return { data: { transactionHash: url } };
+    return { data: { transactionHash: url, settlementAttestor: url.split("/")[2] } };
   };
   try {
     await attestDepositSettlement(deposit);
+    assert.equal(deadlineFired, false);
+    assert.equal(cancelled, true);
     assert.equal(requests.length, 3);
     assert.deepEqual(requests[0].payload, {
       externalChainId: "1",
@@ -121,7 +125,7 @@ test("reports verifier manual review when automatic threshold is not reached", a
   (cirrusService as any).getSettlementVerifierConfig = async () => ({
     threshold: 2,
     count: 3,
-    verifiers: [],
+    verifiers: ["one", "two", "three"],
   });
   const {
     attestDepositSettlement,
@@ -134,7 +138,7 @@ test("reports verifier manual review when automatic threshold is not reached", a
   const originalPost = axios.post;
   (axios as any).post = async (url: string) => {
     if (url.startsWith("https://one")) {
-      return { data: { transactionHash: "accepted" } };
+      return { data: { transactionHash: "accepted", settlementAttestor: "one" } };
     }
     const error: any = new Error("manual review");
     error.isAxiosError = true;
@@ -152,4 +156,43 @@ test("reports verifier manual review when automatic threshold is not reached", a
   } finally {
     axios.post = originalPost;
   }
+});
+
+test("duplicate identities cannot trigger early quorum; a later distinct verifier can", async (t) => {
+  const cirrusService = await import("./cirrusService");
+  const { attestDepositSettlement } = await import("./settlementAttestationService");
+  t.mock.method(cirrusService, "getSettlementVerifierConfig", async () => ({ threshold: 2, count: 3, verifiers: ["one", "two", "three"] }));
+  let finishThird!: (value: any) => void;
+  const third = new Promise((resolve) => { finishThird = resolve; });
+  t.mock.method(axios, "post", async (url: string) => url.startsWith("https://three")
+    ? third : { data: { transactionHash: "tx", settlementAttestor: "one" } });
+  let completed = false;
+  const pending = attestDepositSettlement(deposit).then(() => { completed = true; });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(completed, false);
+  finishThird({ data: { transactionHash: "tx-three", settlementAttestor: "three" } });
+  await pending;
+  assert.equal(completed, true);
+});
+
+test("ignores unregistered identities and preserves a late manual-review decision without quorum", async (t) => {
+  const cirrusService = await import("./cirrusService");
+  const { attestDepositSettlement, SettlementVerifierManualReviewRequired } = await import("./settlementAttestationService");
+  t.mock.method(cirrusService, "getSettlementVerifierConfig", async () => ({ threshold: 2, count: 3, verifiers: ["one", "two", "three"] }));
+  let rejectThird!: (error: any) => void;
+  const third = new Promise((_, reject) => { rejectThird = reject; });
+  t.mock.method(axios, "post", async (url: string) => {
+    if (url.startsWith("https://three")) return third;
+    return { data: { transactionHash: "tx", settlementAttestor: url.startsWith("https://one") ? "one" : "unregistered" } };
+  });
+  let completed = false;
+  const pending = attestDepositSettlement(deposit).finally(() => { completed = true; });
+  const rejected = assert.rejects(pending, (error) => error instanceof SettlementVerifierManualReviewRequired);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(completed, false);
+  const error: any = new Error("manual review");
+  error.isAxiosError = true;
+  error.response = { status: 409, data: { decision: "manual_review" } };
+  rejectThird(error);
+  await rejected;
 });

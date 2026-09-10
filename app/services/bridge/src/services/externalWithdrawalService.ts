@@ -1,3 +1,4 @@
+import { getChainProvider } from "./rpcService";
 import {
   AbiCoder,
   Contract,
@@ -17,7 +18,6 @@ import {
   getExternalBridgeExecutorKmsConfig,
   getExternalBridgeVerifierApiTokens,
   getExternalBridgeVerifierUrls,
-  getChainRpcUrl,
 } from "../config";
 import { WithdrawalInfo } from "../types";
 import { ensureHexPrefix, safeChecksum } from "../utils/utils";
@@ -52,6 +52,7 @@ export interface WithdrawalReview {
 }
 
 const EXTERNAL_VAULT_ABI = [
+  "function withdrawalCapacity(address token,uint256 amount) view returns (uint256 available,uint256 retryAfterSeconds)",
   "function attestationThreshold() view returns (uint8)",
   "function maxAuthorizationValiditySeconds() view returns (uint256)",
   "function signerSetVersion() view returns (uint256)",
@@ -135,7 +136,7 @@ export const getWithdrawalReviewDigest = (review: WithdrawalReview): string =>
 export const getExternalChainLatestTimestamp = async (
   chainId: string | number,
 ): Promise<bigint> => {
-  const provider = new JsonRpcProvider(getChainRpcUrl(BigInt(chainId)));
+  const provider = getChainProvider(BigInt(chainId));
   const latestBlock = await provider.getBlock("latest");
   if (!latestBlock) {
     throw new Error(`Latest block not found for chain ${chainId}`);
@@ -156,7 +157,7 @@ export const proposeWithdrawalReview = async (
       `Unsupported external review chain id: ${review.destinationChainId}`,
     );
   }
-  const provider = new JsonRpcProvider(getChainRpcUrl(chainId));
+  const provider = getChainProvider(chainId);
   const latestBlock = await provider.getBlock("latest");
   if (!latestBlock) {
     throw new Error(`Latest block not found for chain ${chainId}`);
@@ -299,9 +300,7 @@ export const signWithdrawalAuthorization = async (
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, signature]) => signature);
   if (manualReviewRequired > 0) {
-    const provider = new JsonRpcProvider(
-      getChainRpcUrl(BigInt(authorization.destinationChainId)),
-    );
+    const provider = getChainProvider(BigInt(authorization.destinationChainId));
     const vault = new Contract(
       authorization.destinationVault,
       EXTERNAL_VAULT_ABI,
@@ -321,6 +320,16 @@ export const signWithdrawalAuthorization = async (
   return sorted;
 };
 
+export const getWithdrawalCapacity = async (withdrawal: WithdrawalInfo) => {
+  if (!withdrawal.vault) throw new Error(`Withdrawal ${withdrawal.withdrawalId} is missing its vault`);
+  const provider = getChainProvider(BigInt(withdrawal.externalChainId));
+  const vault = new Contract(safeChecksum(withdrawal.vault), EXTERNAL_VAULT_ABI, provider);
+  const capacity = await vault.withdrawalCapacity(
+    safeChecksum(withdrawal.externalToken), withdrawal.externalTokenAmount,
+  );
+  return { available: BigInt(capacity.available), retryAfterSeconds: BigInt(capacity.retryAfterSeconds) };
+};
+
 export const buildWithdrawalAuthorization = async (
   withdrawal: WithdrawalInfo,
   sourceChainId: bigint,
@@ -331,7 +340,7 @@ export const buildWithdrawalAuthorization = async (
   }
 
   const destinationChainId = BigInt(withdrawal.externalChainId);
-  const provider = new JsonRpcProvider(getChainRpcUrl(destinationChainId));
+  const provider = getChainProvider(destinationChainId);
   const vault = new Contract(
     safeChecksum(withdrawal.vault),
     EXTERNAL_VAULT_ABI,
@@ -452,9 +461,7 @@ export const getReservationState = async (
   latestTimestamp: bigint;
   reservationTxHash?: string;
 }> => {
-  const provider = new JsonRpcProvider(
-    getChainRpcUrl(BigInt(authorization.destinationChainId)),
-  );
+  const provider = getChainProvider(BigInt(authorization.destinationChainId));
   const vault = new Contract(
     authorization.destinationVault,
     EXTERNAL_VAULT_ABI,
@@ -495,7 +502,7 @@ const getVaultWithSigner = (
   vault: Contract;
 } => {
   const chainId = BigInt(authorization.destinationChainId);
-  const provider = new JsonRpcProvider(getChainRpcUrl(chainId));
+  const provider = getChainProvider(chainId);
   const kmsConfig = getExternalBridgeExecutorKmsConfig(chainId);
   if (!kmsConfig) {
     throw new Error(

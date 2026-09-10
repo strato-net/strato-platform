@@ -8,9 +8,9 @@ import {
   TransactionResponse,
   TradeQuote,
 } from "@strato/shared-types";
-import { constants } from "../../config/constants";
+import { constants, ROUTE_TOPOLOGY_TTL_MS, MAX_UINT256 } from "../../config/constants";
 import * as config from "../../config/config";
-import { FunctionInput } from "../../types/types";
+import { FunctionInput, RouteEdge, RouteTopologyCache } from "../../types/types";
 import { cirrus } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { executeTransaction } from "../../utils/txHelper";
@@ -21,6 +21,7 @@ import {
   fetchPoolCoins,
   fetchPoolTokenAddresses,
 } from "../helpers/swapping.helper";
+import { previewVaultDeposit } from "../helpers/vault.helper";
 import { getConfigs } from "./metalForge.service";
 import { getPoolTokenPairs } from "./poolV3.service";
 import { getPsmMintState } from "./psm.service";
@@ -37,30 +38,6 @@ const DEFAULT_SLIPPAGE_BPS = 50;
 
 const normalizeAddress = (address: string): string =>
   address.toLowerCase().replace(/^0x/, "");
-
-type EdgeKind =
-  | "SWAP"
-  | "PSM_MINT"
-  | "FORGE"
-  | "SAVE"
-  | "YIELD_VAULT_DEPOSIT";
-
-interface RouteEdge {
-  kind: EdgeKind;
-  tokenIn: string;
-  tokenOut: string;
-  target?: string;
-  feeBps?: number;
-  maxBalance?: string;
-  mintCap?: string;
-  totalMinted?: string;
-  priceIn?: string;
-  priceOut?: string;
-  exchangeRate?: string;
-  outputName?: string;
-  outputSymbol?: string;
-  outputDecimals?: number;
-}
 
 interface GraphPoolRow {
   address: string;
@@ -231,6 +208,28 @@ const getSwapEdges = async (accessToken: string): Promise<RouteEdge[]> => {
   );
 };
 
+let swapTopologyCache: RouteTopologyCache | undefined;
+
+const getCachedSwapEdges = (accessToken: string): Promise<RouteEdge[]> => {
+  const key = JSON.stringify([
+    config.nodeUrl, config.networkId, constants.poolFactory,
+    config.poolV3Factory, [...config.hiddenSwapPools].sort(),
+  ]);
+  if (swapTopologyCache?.key === key && swapTopologyCache.expiresAt > Date.now()) {
+    return swapTopologyCache.edges;
+  }
+  const entry: RouteTopologyCache = {
+    key,
+    expiresAt: Date.now() + ROUTE_TOPOLOGY_TTL_MS,
+    edges: getSwapEdges(accessToken),
+  };
+  swapTopologyCache = entry;
+  entry.edges.catch(() => {
+    if (swapTopologyCache === entry) swapTopologyCache = undefined;
+  });
+  return entry.edges;
+};
+
 const getPsmEdges = async (accessToken: string): Promise<RouteEdge[]> => {
   if (!constants.directMintPsm) return [];
   const state = await getPsmMintState(accessToken);
@@ -273,14 +272,14 @@ const getForgeEdges = async (accessToken: string): Promise<RouteEdge[]> => {
 const getSaveEdges = async (accessToken: string): Promise<RouteEdge[]> => {
   if (!constants.saveUsdstVault) return [];
   const state = await getSaveUsdstActionState(accessToken);
-  if (!state || state.paused) return [];
+  if (!state || state.paused || BigInt(state.maxDeposit) === 0n) return [];
   return [
     {
       kind: "SAVE",
       tokenIn: normalizeAddress(state.assetAddress),
       tokenOut: normalizeAddress(state.vaultAddress),
       target: normalizeAddress(state.vaultAddress),
-      exchangeRate: state.projectedExchangeRate,
+      vaultDeposit: { totalShares: state.totalShares, pricingAssets: state.pricingAssets, maxDeposit: state.maxDeposit },
       outputName: "Save USDST",
       outputSymbol: state.shareSymbol,
       outputDecimals: 18,
@@ -326,7 +325,7 @@ const getYieldVaultEdges = async (
       tokenIn: normalizeAddress(info.assetAddress),
       tokenOut: normalizeAddress(info.vaultAddress),
       target: normalizeAddress(info.vaultAddress),
-      exchangeRate: info.projectedExchangeRate,
+      vaultDeposit: { totalShares: info.totalShares, pricingAssets: info.projectedActiveAssets, maxDeposit: MAX_UINT256.toString() },
       outputName: info.name,
       outputSymbol: info.shareSymbol,
       outputDecimals: info.decimals,
@@ -347,7 +346,7 @@ const buildRouteEdges = async (
   accessToken: string
 ): Promise<RouteEdge[]> => {
   const groups = await Promise.all([
-    getSwapEdges(accessToken),
+    getCachedSwapEdges(accessToken),
     safely(() => getPsmEdges(accessToken)),
     safely(() => getForgeEdges(accessToken)),
     safely(() => getSaveEdges(accessToken)),
@@ -667,11 +666,8 @@ const quoteEdge = async (
         ? RouteAction.SAVE
         : RouteAction.YIELD_VAULT_DEPOSIT;
     label = edge.kind === "SAVE" ? "Save USDST" : "Yield Vault";
-    const exchangeRate = BigInt(edge.exchangeRate || "0");
-    if (exchangeRate <= 0n) {
-      throw new Error("Vault exchange rate is unavailable");
-    }
-    amountOut = (amountIn * WAD) / exchangeRate;
+    if (!edge.vaultDeposit) throw new Error("Vault deposit state is unavailable");
+    amountOut = previewVaultDeposit(amountIn, edge.vaultDeposit);
   }
 
   const minAmountOut = applyRouteSlippage(amountOut, slippageBps);
@@ -701,17 +697,23 @@ const quotePath = async (
   accessToken: string,
   path: RouteEdge[],
   amountIn: bigint,
-  slippageBps: number
+  slippageBps: number,
+  quotes: Map<RouteEdge, Map<bigint, Promise<RouteStepQuote>>>
 ): Promise<RouteStepQuote[]> => {
   const steps: RouteStepQuote[] = [];
   let currentAmount = amountIn;
   for (const edge of path) {
-    const step = await quoteEdge(
-      accessToken,
-      edge,
-      currentAmount,
-      slippageBps
-    );
+    let edgeQuotes = quotes.get(edge);
+    if (!edgeQuotes) {
+      edgeQuotes = new Map();
+      quotes.set(edge, edgeQuotes);
+    }
+    let pending = edgeQuotes.get(currentAmount);
+    if (!pending) {
+      pending = quoteEdge(accessToken, edge, currentAmount, slippageBps);
+      edgeQuotes.set(currentAmount, pending);
+    }
+    const step = await pending;
     steps.push(step);
     currentAmount = BigInt(step.amountOut);
   }
@@ -740,9 +742,10 @@ export const getRouteQuote = async (
     throw new Error(`No route found for ${input} -> ${output}`);
   }
 
+  const quotes = new Map<RouteEdge, Map<bigint, Promise<RouteStepQuote>>>();
   const quoted = await Promise.all(
     paths.map((path) =>
-      quotePath(accessToken, path, amountIn, slippageBps).catch(() => null)
+      quotePath(accessToken, path, amountIn, slippageBps, quotes).catch(() => null)
     )
   );
   const best = quoted

@@ -72,10 +72,10 @@ contract ExternalBridgeVault is
     struct TokenPolicy {
         bool enabled;
         uint256 maxPerWithdrawal;
-        uint256 windowLimit;
-        uint256 windowSeconds;
-        uint256 windowStartedAt;
-        uint256 releasedInWindow;
+        uint256 bucketCapacity;
+        uint256 refillRate;
+        uint256 lastRefillAt;
+        uint256 consumedCapacity;
         uint256 manualReviewThreshold;
     }
 
@@ -95,8 +95,8 @@ contract ExternalBridgeVault is
         address indexed token,
         bool enabled,
         uint256 maxPerWithdrawal,
-        uint256 windowLimit,
-        uint256 windowSeconds,
+        uint256 bucketCapacity,
+        uint256 refillRate,
         uint256 manualReviewThreshold
     );
     event WithdrawalReserved(
@@ -151,7 +151,7 @@ contract ExternalBridgeVault is
     error SourceBridgeDisabled();
     error TokenDisabled();
     error PerWithdrawalLimitExceeded();
-    error WindowLimitExceeded();
+    error BucketCapacityExceeded();
     error InsufficientLiquidity();
     error LargeWithdrawalApprovalRequired();
     error InvalidReservationState();
@@ -223,16 +223,11 @@ contract ExternalBridgeVault is
         _verifyAttestationSignatures(digest, signatures);
 
         TokenPolicy storage policy = tokenPolicies[authorization.token];
-        _refreshWindow(policy);
+        _refillBucket(policy);
 
-        if (
-            policy.windowLimit != 0 &&
-            policy.releasedInWindow +
-                totalReserved[authorization.token] +
-                authorization.amount >
-            policy.windowLimit
-        ) {
-            revert WindowLimitExceeded();
+        uint256 available = _availableCapacity(policy, totalReserved[authorization.token]);
+        if (authorization.amount > available) {
+            revert BucketCapacityExceeded();
         }
 
         if (
@@ -290,17 +285,11 @@ contract ExternalBridgeVault is
 
         TokenPolicy storage policy = tokenPolicies[reservation.token];
         if (!policy.enabled) revert TokenDisabled();
-        _refreshWindow(policy);
-        if (
-            policy.windowLimit != 0 &&
-            policy.releasedInWindow + reservation.amount > policy.windowLimit
-        ) {
-            revert WindowLimitExceeded();
-        }
+        _refillBucket(policy);
 
         reservation.status = ReservationStatus.RELEASED;
         totalReserved[reservation.token] -= reservation.amount;
-        policy.releasedInWindow += reservation.amount;
+        policy.consumedCapacity += reservation.amount;
 
         if (reservation.token == address(0)) {
             (bool success, ) = reservation.recipient.call{
@@ -362,31 +351,31 @@ contract ExternalBridgeVault is
         address token,
         bool enabled,
         uint256 maxPerWithdrawal,
-        uint256 windowLimit,
-        uint256 windowSeconds,
+        uint256 bucketCapacity,
+        uint256 refillRate,
         uint256 manualReviewThreshold
     ) external onlyRole(POLICY_ADMIN_ROLE) {
-        if (windowLimit != 0 && windowSeconds == 0) {
+        if (
+            bucketCapacity == 0 || refillRate == 0 || refillRate > bucketCapacity ||
+            maxPerWithdrawal > bucketCapacity || totalReserved[token] > bucketCapacity
+        ) {
             revert InvalidAuthorization();
         }
 
         TokenPolicy storage policy = tokenPolicies[token];
-        if (policy.windowSeconds != windowSeconds) {
-            policy.windowStartedAt = block.timestamp;
-            policy.releasedInWindow = 0;
-        }
+        _refillBucket(policy);
         policy.enabled = enabled;
         policy.maxPerWithdrawal = maxPerWithdrawal;
-        policy.windowLimit = windowLimit;
-        policy.windowSeconds = windowSeconds;
+        policy.bucketCapacity = bucketCapacity;
+        policy.refillRate = refillRate;
         policy.manualReviewThreshold = manualReviewThreshold;
 
         emit TokenPolicyUpdated(
             token,
             enabled,
             maxPerWithdrawal,
-            windowLimit,
-            windowSeconds,
+            bucketCapacity,
+            refillRate,
             manualReviewThreshold
         );
     }
@@ -597,14 +586,37 @@ contract ExternalBridgeVault is
         }
     }
 
-    function _refreshWindow(TokenPolicy storage policy) internal {
-        if (
-            policy.windowSeconds != 0 &&
-            block.timestamp >= policy.windowStartedAt + policy.windowSeconds
-        ) {
-            policy.windowStartedAt = block.timestamp;
-            policy.releasedInWindow = 0;
-        }
+    function _remainingConsumption(TokenPolicy storage policy) internal view returns (uint256) {
+        uint256 elapsed = block.timestamp - policy.lastRefillAt;
+        if (policy.refillRate == 0) return policy.consumedCapacity;
+        if (elapsed > policy.consumedCapacity / policy.refillRate) return 0;
+        return policy.consumedCapacity - elapsed * policy.refillRate;
+    }
+
+    function _refillBucket(TokenPolicy storage policy) internal {
+        policy.consumedCapacity = _remainingConsumption(policy);
+        policy.lastRefillAt = block.timestamp;
+    }
+
+    function _availableCapacity(TokenPolicy storage policy, uint256 reserved) internal view returns (uint256) {
+        uint256 consumed = _remainingConsumption(policy);
+        if (consumed >= policy.bucketCapacity || reserved >= policy.bucketCapacity - consumed) return 0;
+        return policy.bucketCapacity - consumed - reserved;
+    }
+
+    /// @notice Retry time assumes no new withdrawals. uint256.max means reservations must clear first.
+    function withdrawalCapacity(address token, uint256 amount) external view returns (uint256 available, uint256 retryAfterSeconds) {
+        TokenPolicy storage policy = tokenPolicies[token];
+        if (!policy.enabled) revert TokenDisabled();
+        if (amount == 0) revert InvalidAmount();
+        if (policy.maxPerWithdrawal != 0 && amount > policy.maxPerWithdrawal) revert PerWithdrawalLimitExceeded();
+        if (amount > policy.bucketCapacity) revert BucketCapacityExceeded();
+        uint256 reserved = totalReserved[token];
+        available = _availableCapacity(policy, reserved);
+        if (amount <= available) return (available, 0);
+        if (amount > policy.bucketCapacity - reserved) return (available, type(uint256).max);
+        uint256 deficit = _remainingConsumption(policy) - (policy.bucketCapacity - reserved - amount);
+        retryAfterSeconds = deficit / policy.refillRate + (deficit % policy.refillRate == 0 ? 0 : 1);
     }
 
     function _assetBalance(address token) internal view returns (uint256) {

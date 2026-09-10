@@ -105,13 +105,13 @@ function normalizeConfig(input) {
           token.maxPerWithdrawal,
           `${tokenPrefix}.maxPerWithdrawal`,
         ),
-        windowLimit: asUint(
-          token.windowLimit,
-          `${tokenPrefix}.windowLimit`,
+        bucketCapacity: asUint(
+          token.bucketCapacity,
+          `${tokenPrefix}.bucketCapacity`,
         ),
-        windowSeconds: asUint(
-          token.windowSeconds,
-          `${tokenPrefix}.windowSeconds`,
+        refillRate: asUint(
+          token.refillRate,
+          `${tokenPrefix}.refillRate`,
         ),
         manualReviewThreshold: asUint(
           token.manualReviewThreshold,
@@ -123,11 +123,12 @@ function normalizeConfig(input) {
         ),
       };
       if (
-        normalizedToken.windowLimit > 0n &&
-        normalizedToken.windowSeconds === 0n
+        normalizedToken.bucketCapacity === 0n || normalizedToken.refillRate === 0n ||
+        normalizedToken.refillRate > normalizedToken.bucketCapacity ||
+        normalizedToken.maxPerWithdrawal > normalizedToken.bucketCapacity
       ) {
         throw new Error(
-          `${tokenPrefix}.windowSeconds must be positive when windowLimit is set`,
+          `${tokenPrefix} requires positive bucketCapacity/refillRate, with refillRate and maxPerWithdrawal <= bucketCapacity`,
         );
       }
       return normalizedToken;
@@ -205,8 +206,8 @@ function buildOperations(config, chain) {
         token.token,
         token.enabled,
         token.maxPerWithdrawal,
-        token.windowLimit,
-        token.windowSeconds,
+        token.bucketCapacity,
+        token.refillRate,
         token.manualReviewThreshold,
       ],
       value: 0n,

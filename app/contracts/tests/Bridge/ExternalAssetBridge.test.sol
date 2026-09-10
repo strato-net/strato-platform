@@ -1565,6 +1565,13 @@ contract Describe_ExternalAssetBridge is Authorizable {
             stratoToken.balanceOf(address(bridge)) == 0,
             "Escrow should burn only after release"
         );
+        bool replayReverted = false;
+        try {
+            bridge.finalizeWithdrawal(withdrawalId, "0xaaaa", "0xcccc", bytes(""));
+        } catch {
+            replayReverted = true;
+        }
+        require(replayReverted, "Completed withdrawal settlement must not replay");
         bool refundReverted = false;
         try
             adminRegistry.castVoteOnIssue(

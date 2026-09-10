@@ -15,14 +15,14 @@ const signerHeaders = (token: string) => ({
 
 export class SettlementVerifierManualReviewRequired extends Error {}
 
-const requestAllVerifiers = async (
+const requestVerifierQuorum = async (
   chainId: string | number,
   path: string,
   payload: unknown,
 ): Promise<void> => {
   const urls = getExternalBridgeVerifierUrls(BigInt(chainId));
   const apiTokens = getExternalBridgeVerifierApiTokens(BigInt(chainId));
-  const { threshold } = await getSettlementVerifierConfig();
+  const { threshold, verifiers } = await getSettlementVerifierConfig();
   if (urls.length === 0) {
     throw new Error(
       `No external bridge settlement verifiers configured for chain ${chainId}`,
@@ -38,58 +38,56 @@ const requestAllVerifiers = async (
       `External bridge signer API token count does not match signer URL count for chain ${chainId}`,
     );
   }
-  const results = await Promise.allSettled(
-    urls.map((url, index) =>
-      axios.post(`${url}${path}`, payload, {
-        timeout: VERIFIER_REQUEST_TIMEOUT_MS,
-        signal: AbortSignal.timeout(VERIFIER_REQUEST_TIMEOUT_MS),
-        headers: signerHeaders(apiTokens[index]),
-      }),
-    ),
-  );
-  const succeeded = results.filter(
-    (result) =>
-      result.status === "fulfilled" &&
-      typeof result.value.data?.transactionHash === "string" &&
-      result.value.data.transactionHash.length > 0,
-  ).length;
-  const manualReviewRequired = results.filter(
-    (result) =>
-      result.status === "rejected" &&
-      axios.isAxiosError(result.reason) &&
-      result.reason.response?.status === 409 &&
-      result.reason.response?.data?.decision === "manual_review",
-  ).length;
-  results.forEach((result, index) => {
-    if (result.status === "rejected") {
-      logError("SettlementAttestation", result.reason as Error, {
-        chainId,
-        verifierUrl: urls[index],
-        path,
-      });
-    }
+  const eligible = new Set(verifiers.map((address) => address.toLowerCase().replace(/^0x/, "")));
+  if (eligible.size < threshold) throw new Error("Insufficient distinct settlement verifiers configured");
+  const accepted = new Set<string>();
+  const controller = new AbortController();
+  let completed = false;
+  let manualReviewRequired = 0;
+  await new Promise<void>((resolve, reject) => {
+    void Promise.allSettled(urls.map(async (url, index) => {
+      try {
+        const response = await axios.post(`${url}${path}`, payload, {
+          timeout: VERIFIER_REQUEST_TIMEOUT_MS,
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(VERIFIER_REQUEST_TIMEOUT_MS)]),
+          headers: signerHeaders(apiTokens[index]),
+        });
+        if (completed) return;
+        const attestor = String(response.data?.settlementAttestor || "").toLowerCase().replace(/^0x/, "");
+        if (typeof response.data?.transactionHash !== "string" || !response.data.transactionHash.length || !eligible.has(attestor)) {
+          throw new Error(`Verifier ${url} returned no valid settlement attestation`);
+        }
+        accepted.add(attestor);
+        if (accepted.size >= threshold) {
+          completed = true;
+          logInfo("SettlementAttestation", `${accepted.size}/${urls.length} settlement verifiers accepted ${path}`);
+          resolve();
+          controller.abort();
+        }
+      } catch (error) {
+        if (completed) return;
+        if (axios.isAxiosError(error) && error.response?.status === 409 && error.response?.data?.decision === "manual_review") {
+          manualReviewRequired++;
+        }
+        logError("SettlementAttestation", error as Error, { chainId, verifierUrl: url, path });
+      }
+    })).then(() => {
+      if (completed) return;
+      completed = true;
+      reject(manualReviewRequired > 0
+        ? new SettlementVerifierManualReviewRequired(
+          `Settlement verifier manual review required for ${path}: ${manualReviewRequired}/${urls.length}`,
+        )
+        : new Error(`Settlement verifier threshold not reached for ${path}: ${accepted.size}/${threshold}`));
+    });
   });
-  if (succeeded < threshold) {
-    if (manualReviewRequired > 0) {
-      throw new SettlementVerifierManualReviewRequired(
-        `Settlement verifier manual review required for ${path}: ${manualReviewRequired}/${urls.length}`,
-      );
-    }
-    throw new Error(
-      `Settlement verifier threshold not reached for ${path}: ${succeeded}/${threshold}`,
-    );
-  }
-  logInfo(
-    "SettlementAttestation",
-    `${succeeded}/${urls.length} settlement verifiers accepted ${path}`,
-  );
 };
 
 export const attestDepositSettlement = async (
   deposit: DepositArgs | ActionDepositArgs,
 ): Promise<void> => {
   const actionDeposit = deposit as Partial<ActionDepositArgs>;
-  await requestAllVerifiers(
+  await requestVerifierQuorum(
     deposit.externalChainId,
     "/v1/attest-deposit",
     {
@@ -118,7 +116,7 @@ export const attestWithdrawalRelease = async (
   reservationId: string,
   externalTxHash: string,
 ): Promise<void> =>
-  requestAllVerifiers(
+  requestVerifierQuorum(
     authorization.destinationChainId,
     "/v1/attest-release",
     { authorization, reservationId, externalTxHash },

@@ -1596,7 +1596,7 @@ export const getYieldVaultInfo = async (
 
   const vaultState = await getVaultState(serviceToken, def.address);
   if (!vaultState) return fallback;
-  if (!vaultState.vaultInitialized) return { ...fallback, configured: true };
+  if (!parseBooleanLike(vaultState.vaultInitialized)) return { ...fallback, configured: true };
 
   const assetAddress = vaultState._asset || "";
   if (!assetAddress) return fallback;
@@ -1629,7 +1629,7 @@ export const getYieldVaultInfo = async (
     assetAddress,
     totalShares
   );
-  const projectedActiveAssets = activeAssets + pendingAccrual.fundedAmount;
+  const projectedActiveAssets = getActiveAssets(totalAssets + pendingAccrual.fundedAmount, totalClaimableAssets);
   const decimals = Number(vaultState._underlyingDecimals ?? 18);
   const exchangeRate = getExchangeRate(activeAssets, totalShares);
   const projectedExchangeRate = getExchangeRate(projectedActiveAssets, totalShares);
@@ -1717,7 +1717,7 @@ export const getYieldVaultInfo = async (
     fundedApy,
     pendingAccrual: pendingAccrual.fundedAmount.toString(),
     pendingAccrualTarget: pendingAccrual.targetAmount.toString(),
-    paused: Boolean(vaultState._paused),
+    paused: parseBooleanLike(vaultState._paused),
     minIdleBps: String(vaultState.minIdleBps || "0"),
     totalQueuedShares: String(vaultState.totalQueuedShares || "0"),
     totalClaimableAssets: totalClaimableAssets.toString(),

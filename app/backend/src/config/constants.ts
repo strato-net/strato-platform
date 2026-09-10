@@ -7,6 +7,10 @@ import {
   SWAP_HISTORY_SELECT_FIELDS
 } from "./swapConstants";
 
+export const MAX_UINT256 = (1n << 256n) - 1n;
+
+export const ROUTE_TOPOLOGY_TTL_MS = 5_000;
+
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
   key = "/key",

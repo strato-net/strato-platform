@@ -4,7 +4,7 @@ import {
   getChainRpcUrl,
   getNativeRepresentationBridgeAddress,
 } from "../config";
-import { JsonRpcProvider } from "ethers";
+import { JsonRpcProvider, MaxUint256 } from "ethers";
 import { execute, executeAsRelayer } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
 import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, RouteDepositArgs, NativeDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
@@ -26,6 +26,7 @@ import {
   getExternalChainLatestTimestamp,
   getReservationId,
   getReservationState,
+  getWithdrawalCapacity,
   proposeWithdrawalReview,
   releaseWithdrawal,
   reserveWithdrawal,
@@ -639,6 +640,18 @@ export const processExternalWithdrawal = async (
     throw new Error(
       `Withdrawal ${withdrawal.withdrawalId} requires manual review`,
     );
+  }
+
+  if (String(withdrawal.bridgeStatus) === "1" || String(withdrawal.bridgeStatus) === "2") {
+    const capacity = await getWithdrawalCapacity(withdrawal);
+    if (capacity.available < BigInt(withdrawal.externalTokenAmount)) {
+      logInfo("BridgeService", `Withdrawal ${withdrawal.withdrawalId} is waiting for vault capacity`, {
+        available: capacity.available.toString(),
+        retryAfterSeconds: capacity.retryAfterSeconds === MaxUint256
+          ? "pending reservations must clear" : capacity.retryAfterSeconds.toString(),
+      });
+      return;
+    }
   }
 
   const sourceChainId = await getStratoNetworkId();

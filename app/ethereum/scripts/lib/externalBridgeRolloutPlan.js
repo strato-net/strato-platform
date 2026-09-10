@@ -101,8 +101,8 @@ function buildPolicyTemplate(
       minDepositAmount: "REVIEW_REQUIRED",
       maxPerWithdrawal: "REVIEW_REQUIRED",
       manualReviewThreshold: "REVIEW_REQUIRED",
-      windowLimit: "REVIEW_REQUIRED",
-      windowSeconds: "86400",
+      bucketCapacity: "REVIEW_REQUIRED",
+      refillRate: "REVIEW_REQUIRED",
       maxAutoWithdrawalAmount: "REVIEW_REQUIRED",
       migrateAmount: "0",
       enabled: true,
@@ -248,8 +248,8 @@ function tokenPolicy(policy, token) {
       value.manualReviewThreshold,
       `${key}.manualReviewThreshold`,
     ),
-    windowLimit: uint(value.windowLimit, `${key}.windowLimit`),
-    windowSeconds: uint(value.windowSeconds, `${key}.windowSeconds`),
+    bucketCapacity: uint(value.bucketCapacity, `${key}.bucketCapacity`),
+    refillRate: uint(value.refillRate, `${key}.refillRate`),
     maxAutoWithdrawalAmount: uint(
       value.maxAutoWithdrawalAmount,
       `${key}.maxAutoWithdrawalAmount`,
@@ -261,10 +261,11 @@ function tokenPolicy(policy, token) {
     throw new Error(`${key}.minDepositAmount exceeds uint96`);
   }
   if (
-    BigInt(normalized.windowLimit) > 0n &&
-    BigInt(normalized.windowSeconds) === 0n
+    BigInt(normalized.bucketCapacity) === 0n || BigInt(normalized.refillRate) === 0n ||
+    BigInt(normalized.refillRate) > BigInt(normalized.bucketCapacity) ||
+    BigInt(normalized.maxPerWithdrawal) > BigInt(normalized.bucketCapacity)
   ) {
-    throw new Error(`${key}.windowSeconds must be positive`);
+    throw new Error(`${key} requires positive bucketCapacity/refillRate, with refillRate and maxPerWithdrawal <= bucketCapacity`);
   }
   if (
     BigInt(normalized.maxPerWithdrawal) > 0n &&
@@ -433,8 +434,8 @@ function buildSynchronizedRollout({
           : route.externalToken,
       enabled: token.enabled,
       maxPerWithdrawal: token.maxPerWithdrawal,
-      windowLimit: token.windowLimit,
-      windowSeconds: token.windowSeconds,
+      bucketCapacity: token.bucketCapacity,
+      refillRate: token.refillRate,
       manualReviewThreshold: token.manualReviewThreshold,
       migrateAmount: token.migrateAmount,
     });
