@@ -9,7 +9,7 @@ import Blockchain.EthConf.Model (apiConfig, apiPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Role
-import Blockchain.Init.Options (flags_jsonrpc, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
+import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_jsonrpc, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
@@ -27,6 +27,9 @@ roleHasService RoleApi name = name `elem` ["nginx", "postgrest", "edge-redis", "
 
 generateDockerCompose :: Role -> IO ()
 generateDockerCompose role = do
+  -- app-backend and app-ui ride along only with a full node that has not
+  -- moved its app tier out.
+  let bundledApp = role == RoleNode && flags_bundledApp
   uid <- show <$> getEffectiveUserID
   gid <- show <$> getEffectiveGroupID
   
@@ -244,19 +247,18 @@ generateDockerCompose role = do
         , extra_hosts = hostGateway
         , depends_on = Just $
             if flags_localAuth
-              then DependsOnMap $ Map.fromList
+              then DependsOnMap $ Map.fromList $
                 [ ("apex", DependsOnCondition "service_started")
                 , ("docs", DependsOnCondition "service_started")
                 , ("postgrest", DependsOnCondition "service_started")
                 , ("prometheus", DependsOnCondition "service_started")
                 , ("smd", DependsOnCondition "service_started")
-                , ("app-backend", DependsOnCondition "service_started")
-                , ("app-ui", DependsOnCondition "service_started")
                 , ("edge-redis", DependsOnCondition "service_healthy")
                 , ("local-auth", DependsOnCondition "service_healthy")
-                ]
-              else DependsOnList
-                ["apex", "docs", "postgrest", "prometheus", "smd", "app-backend", "app-ui", "edge-redis"]
+                ] ++ [ (svc, DependsOnCondition "service_started") | bundledApp, svc <- ["app-backend", "app-ui"] ]
+              else DependsOnList $
+                ["apex", "docs", "postgrest", "prometheus", "smd", "edge-redis"]
+                  ++ [ svc | bundledApp, svc <- ["app-backend", "app-ui"] ]
         
         , environment = Just $ Map.fromList $
             [ ("STRATO_PORT_API", stratoApiPort)
@@ -268,6 +270,8 @@ generateDockerCompose role = do
             , ("TRACKING_URL", "https://go.strato.nexus")
             , ("EDGE_REDIS_HOST", "edge-redis")
             , ("EDGE_REDIS_PORT", "6379")
+            , ("BUNDLED_APP", if bundledApp then "true" else "false")
+            , ("APP_URL", flags_appUrl)
             , ("ssl", if ssl then "true" else "false")
             ]
             ++ if flags_localAuth
@@ -420,6 +424,7 @@ generateDockerCompose role = do
         [ (name, if role == RoleApi && name == "nginx" then apiOnlyNginx else svc)
         | (name, svc) <- allServices
         , roleHasService role name
+        , bundledApp || name `notElem` ["app-backend", "app-ui"]
         ]
 
   let composeFile = ComposeFile

@@ -16,13 +16,29 @@ local verify_opts = {
 local theme = ngx.var.arg_theme
 local auth_params = (theme == "dark" or theme == "light") and { theme = theme } or nil
 
+-- Honor a same-origin returnTo for the post-logout landing page. Lets the SMD
+-- return to /smd/ (logged-out/guest mode) instead of the app root. Validated to
+-- prevent open redirects / header injection. Falls back to the node root.
+local post_logout_uri = node_host_with_protocol
+local logout_return_to = ngx.var.arg_returnTo
+if logout_return_to then
+  logout_return_to = ngx.unescape_uri(logout_return_to)
+  if logout_return_to:sub(1, 1) == "/"
+      and logout_return_to:sub(1, 2) ~= "//"
+      and not logout_return_to:find("://", 1, true)
+      and not logout_return_to:find("[\r\n]")
+  then
+    post_logout_uri = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://%s%s", ngx.var.http_host, logout_return_to)
+  end
+end
+
 local authenticate_opts = {
   redirect_uri = "/auth/openidc/return",
   discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
   client_id = "<CLIENT_ID_PLACEHOLDER>",
   client_secret = "<CLIENT_SECRET_PLACEHOLDER>",
   scope = "<OAUTH_SCOPE_PLACEHOLDER>",
-  token_endpoint_auth_method = "client_secret_post",
+  token_endpoint_auth_method = "client_secret_basic",
   ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
   redirect_uri_scheme = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
   -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token), enc_id_token (required for https://openid.net/specs/openid-connect-rpinitiated-1_0.html, strictly followed by Keycloak 26.0.2+)
@@ -31,12 +47,91 @@ local authenticate_opts = {
   access_token_expires_in = 300,
   access_token_expires_leeway = 3,
   logout_path = "/auth/logout",
-  post_logout_redirect_uri = node_host_with_protocol,
+  post_logout_redirect_uri = post_logout_uri,
   -- redirect_after_logout_uri = "/", -- URI to redirect after app and oauth provider logouts, otherwise show "Logged Out" text message on logout_path URI
   revoke_tokens_on_logout = true,
   use_pkce = true,
   authorization_params = auth_params
 }
+
+local wallet_auth_routes = {
+  ["/api/credit-card/add-card"] = true,
+  ["/api/credit-card/approve"] = true,
+  ["/api/credit-card/config"] = true,
+  ["/api/credit-card/manual-top-up"] = true,
+  ["/api/credit-card/remove-card"] = true,
+  ["/api/credit-card/update-card"] = true,
+  ["/api/bridge/requestNativeWithdrawal"] = true,
+  ["/api/bridge/requestWithdrawal"] = true,
+  ["/api/metal-forge/buy"] = true,
+  ["/api/oracle/price"] = true,
+  ["/api/rpc/results"] = true,
+  ["/api/rpc/submit"] = true,
+  ["/api/swap"] = true,
+  ["/api/swap/multi-token"] = true,
+  ["/api/swap-pools"] = true,
+  ["/api/tokens"] = true,
+  ["/api/user/admin"] = true
+}
+
+local wallet_auth_route_prefixes = {
+  "/api/cdp/",
+  "/api/credit-card/config/",
+  "/api/earn/",
+  "/api/lend/",
+  "/api/lending/",
+  "/api/nfts/",
+  "/api/poolv3/",
+  "/api/psm/",
+  "/api/refer/",
+  "/api/rewards/",
+  "/api/staking/",
+  "/api/swap-pools/",
+  "/api/tokens/",
+  "/api/trade/",
+  "/api/user/admin/",
+  "/api/vault/"
+}
+
+local wallet_auth_methods = {
+  DELETE = true,
+  PATCH = true,
+  POST = true,
+  PUT = true
+}
+
+-- Backend only proxies allow-listed read-only JSON-RPC methods on these routes.
+local function allow_rpc_proxy_request()
+  return ngx.req.get_method() == "POST" and (ngx.var.uri or ""):match("^/api/rpc/%d+$") ~= nil
+end
+
+local function is_valid_wallet_address(addr)
+  if type(addr) ~= "string" then
+    return false
+  end
+
+  local normalized = addr:match("^0[xX](%x+)$") or addr
+  return #normalized == 40 and normalized:match("^%x+$") ~= nil
+end
+
+local function allow_wallet_auth_request()
+  if not wallet_auth_methods[ngx.req.get_method()] then
+    return false
+  end
+
+  local uri = ngx.var.uri
+  local route_allowed = wallet_auth_routes[uri] == true
+  if not route_allowed then
+    for _, prefix in ipairs(wallet_auth_route_prefixes) do
+      if uri:sub(1, #prefix) == prefix then
+        route_allowed = true
+        break
+      end
+    end
+  end
+
+  return route_allowed and is_valid_wallet_address(ngx.req.get_headers()["X-Wallet-Address"])
+end
 
 -- Clear any x-user-access-token header coming from the client, for security reasons
 ngx.req.clear_header("X-USER-ACCESS-TOKEN")
@@ -58,7 +153,18 @@ if ngx.req.get_headers()["Authorization"] then
 else
   -- Else - use the openidc authenticate flow
 
-  local authenticate_res, authenticate_err
+  local authenticate_res, authenticate_err, authenticate_session
+  -- Allow anonymous access:
+  --   "true" -> only safe/read-only methods (GET/HEAD/OPTIONS)
+  --   "all"  -> any method (for permissionless endpoints that don't sign server-side,
+  --             e.g. /transaction/unsigned and submitting an already-signed tx)
+  local method = ngx.req.get_method()
+  local anon_mode = ngx.var.allow_optional_anon_access
+  local allow_anonymous_request =
+    (anon_mode == "true" and (method == "GET" or method == "HEAD" or method == "OPTIONS"))
+    or (anon_mode == "all")
+    or allow_rpc_proxy_request()
+  local allow_wallet_request = allow_wallet_auth_request()
   -- if requested_uri is the UI page (like SMD), else the API call
   if ngx.var.is_ui == "true" then
     -- authenticate with browser UI flow (Authorization Code grant, token exchange) - authenticate(opts) with no additional params will 302-Redirect if unauthorized
@@ -72,15 +178,49 @@ else
     end
   else
     -- only validate the session (do not redirect automatically for Auth Code Grant flow)
-    authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts, nil, "deny")
+    -- 4th return value is the session object, needed to detect dead refresh tokens below
+    authenticate_res, authenticate_err, _, authenticate_session = openidc.authenticate(authenticate_opts, nil, "deny")
     if (authenticate_res == nil or authenticate_err ~= nil) then
       if (authenticate_err ~= nil) then
         ngx.log(ngx.DEBUG, 'User authentication error: ', authenticate_err)
       end
+
+      -- If the session had a refresh token but authenticate() still failed, the
+      -- refresh token is dead. Destroy the session to prevent every subsequent
+      -- request from retrying it and flooding Keycloak with REFRESH_TOKEN_ERROR.
+      -- We check session state because lua-resty-openidc swallows the token
+      -- endpoint error (sets err=nil) and returns generic "unauthorized request".
+      if authenticate_session
+          and authenticate_session.data
+          and authenticate_session.data.authenticated
+          and authenticate_session.data.refresh_token
+      then
+        ngx.log(ngx.DEBUG, "Destroying stale session due to failed token refresh: ", authenticate_err)
+        authenticate_session:destroy()
+      end
+
+      -- Handle OIDC callback state mismatch (multi-tab race condition):
+      -- When multiple tabs initiate auth flows, each overwrites the OIDC state in the shared
+      -- session cookie. The tab whose callback arrives with the old state gets this error.
+      -- Recovery: destroy the stale session and redirect to start a fresh auth flow.
+      -- Since Keycloak already has an active SSO session, the user won't need to re-enter credentials.
+      local args = ngx.req.get_uri_args()
+      if ngx.var.uri == authenticate_opts.redirect_uri
+          and args.code
+          and authenticate_err
+          and string.find(authenticate_err, "does not match state restored from session", 1, true)
+      then
+        ngx.log(ngx.WARN, "OIDC state mismatch on callback (multi-tab race condition), restarting auth flow: ", authenticate_err)
+        local session = require("resty.session").open()
+        if session then
+          session:destroy()
+        end
+        return ngx.redirect("/")
+      end
+
       -- Let client know in the response that client is not (or no longer) authenticated (so that the UI could notify user that he's been signed out)
       ngx.header['WWW-Authenticate'] = string.format('realm="%s"', node_host_with_protocol)
-      -- Respond with 401 Unauthorized if the requested endpoint does not allow anonymous access
-      if (ngx.var.allow_optional_anon_access ~= "true") then
+      if not allow_anonymous_request and not allow_wallet_request then
         -- respond with 401 if not authorized (if API called by UI client (e.g. SMD) - client should refresh page)
         ngx.exit(ngx.HTTP_UNAUTHORIZED)
       end
@@ -90,8 +230,8 @@ else
   if authenticate_res ~= nil and authenticate_res.access_token then
     user_access_token = authenticate_res.access_token
   else
-    -- not expected to get here if not allow_optional_anon_access
-    if ngx.var.allow_optional_anon_access ~= "true" then
+    -- not expected to get here if anonymous access is not allowed for this request
+    if not allow_anonymous_request and not allow_wallet_request then
       ngx.status = 500
       ngx.log(ngx.ERR, 'Unexpected error: not expected to be here if the endpoint does not allow anonymous access')
       ngx.say('Unexpected server error occurred during authentication (#1010)')
@@ -102,6 +242,29 @@ end
 
 if user_access_token ~= '' then
   ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
+  -- Also store in nginx variable for proxy_set_header usage
+  if ngx.var.user_access_token ~= nil then
+    ngx.var.user_access_token = user_access_token
+  end
 end
+
+-- Check if session was rotated during authentication and mark for CSRF token regeneration
+local old_session_id = ngx.var.cookie_strato_session
+local set_cookie_header = ngx.header["Set-Cookie"]
+
+if set_cookie_header then
+  local cookies = type(set_cookie_header) == "table" and set_cookie_header or {set_cookie_header}
+  for _, cookie in ipairs(cookies) do
+    local new_session_id = cookie:match("^strato_session=([^;]+)")
+    if new_session_id and new_session_id ~= old_session_id then
+      -- Session rotated, store info for CSRF handler in header_filter phase
+      ngx.ctx.session_rotated = true
+      ngx.ctx.new_session_id = new_session_id
+      ngx.ctx.old_session_id = old_session_id
+      break
+    end
+  end
+end
+
 -- removing the Authorization header FROM REQUEST to prevent upstream services from using it (e.g. PostgresT's built-in JWT-based access)
 ngx.req.clear_header("Authorization")

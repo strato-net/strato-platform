@@ -12,7 +12,8 @@ HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
   CMD curl  --silent --output /dev/null --fail localhost:80/_ping || \
         exit 1
 
-COPY nginx.tpl.conf openid.tpl.lua /tmp/
+# openid.tpl.lua and csrf.lua are copies of nginx-packager's (refreshed by `make app-nginx`).
+COPY nginx.tpl.conf openid.tpl.lua csrf.lua /tmp/
 
 COPY docker-run.sh /
 

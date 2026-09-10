@@ -295,6 +295,8 @@ generateDockerComposeAllDocker = do
             [ ("APEX_HOST", "${APEX_HOST:-}")
             , ("EDGE_REDIS_HOST", "${EDGE_REDIS_HOST:-edge-redis}")
             , ("EDGE_REDIS_PORT", "${EDGE_REDIS_PORT:-6379}")
+            , ("BUNDLED_APP", "${BUNDLED_APP:-true}")
+            , ("APP_URL", "${APP_URL:-}")
             , ("blockTime", "${blockTime:-}")
             , ("DOCS_HOST", "${DOCS_HOST:-}")
             , ("NGINX_TRUST_PROXY_CIDRS", "${NGINX_TRUST_PROXY_CIDRS:-}")

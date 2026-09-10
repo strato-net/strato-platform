@@ -115,6 +115,9 @@ services:
       - PROMETHEUS_HOST=${PROMETHEUS_HOST:-127.0.0.1:1}
       - EDGE_REDIS_HOST=${EDGE_REDIS_HOST:-edge-redis}
       - EDGE_REDIS_PORT=${EDGE_REDIS_PORT:-6379}
+      # The app runs on its own tier; "/" redirects there (404 if unset).
+      - BUNDLED_APP=false
+      - APP_URL=${APP_URL:-}
       - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-}
       - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-}
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-}

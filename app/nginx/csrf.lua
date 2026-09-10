@@ -1,0 +1,539 @@
+-- CSRF Protection: Double-Submit Cookie + Server-Side Storage
+-- Browser requests only; API clients (curl/Postman) exempt via User-Agent + Sec-Fetch validation
+-- GET: Generate token | POST/PUT/PATCH/DELETE: Validate token | HEAD/OPTIONS: Skip
+
+local _M = {}
+
+local resty_random = require "resty.random"
+local resty_sha256 = require "resty.sha256"
+local str = require "resty.string"
+
+local CSRF_TOKEN_TTL = 1800
+-- How long the previous session's token stays valid after a session rotation,
+-- so requests already in flight with pre-rotation cookies still validate
+local ROTATION_GRACE_TTL = 60
+
+-- Token store backends. Both expose the same interface:
+--   get(key) -> value|nil
+--   set(key, value, ttl) -> ok, err
+--   add(key, value, ttl) -> ok, err   (err == "exists" when already present)
+--   ttl(key) -> seconds remaining|nil
+--   delete(key)
+--   expire_at_most(key, ttl)         (shorten a key's life; never extend it)
+--
+-- The Redis backend is what makes several nginx instances interchangeable:
+-- a token issued by one is valid at all of them. The shared-dict backend is
+-- the single-instance fallback, used when no edge Redis is configured.
+
+local REDIS_CONNECT_TIMEOUT_MS = 200
+local REDIS_RW_TIMEOUT_MS = 500
+local REDIS_KEEPALIVE_MS = 10000
+local REDIS_POOL_SIZE = 50
+local REDIS_KEY_PREFIX = "csrf:"
+
+local function new_dict_store(dict)
+    local store = {}
+    function store.get(_, key) return dict:get(key) end
+    function store.set(_, key, value, ttl) return dict:set(key, value, ttl) end
+    function store.add(_, key, value, ttl) return dict:add(key, value, ttl) end
+    function store.ttl(_, key) return dict:ttl(key) end
+    function store.delete(_, key) return dict:delete(key) end
+    function store.expire_at_most(_, key, ttl)
+        local value = dict:get(key)
+        local remaining = dict:ttl(key)
+        if value and remaining and remaining > ttl then
+            dict:set(key, value, ttl)
+        end
+    end
+    return store
+end
+
+local function new_redis_store(host, port)
+    local store = { host = host, port = tonumber(port) or 6379 }
+
+    local function with_redis(fn)
+        local redis = require "resty.redis"
+        local red = redis:new()
+        red:set_timeouts(REDIS_CONNECT_TIMEOUT_MS, REDIS_RW_TIMEOUT_MS, REDIS_RW_TIMEOUT_MS)
+        local ok, err = red:connect(store.host, store.port)
+        if not ok then
+            ngx.log(ngx.ERR, "CSRF: cannot reach edge redis ", store.host, ":", store.port, ": ", err)
+            return nil, err
+        end
+        local results = { fn(red) }
+        red:set_keepalive(REDIS_KEEPALIVE_MS, REDIS_POOL_SIZE)
+        return unpack(results)
+    end
+
+    -- Cosockets are unavailable in the header_filter and log phases, where
+    -- session rotation runs. Writes issued there are deferred to a zero-delay
+    -- timer, which runs with socket access as soon as the handler yields;
+    -- the response carrying the new cookie has not left the server by then.
+    local function write(fn)
+        local phase = ngx.get_phase()
+        if phase == "header_filter" or phase == "body_filter" or phase == "log" then
+            local ok, err = ngx.timer.at(0, function(premature)
+                if premature then return end
+                with_redis(fn)
+            end)
+            if not ok then
+                ngx.log(ngx.ERR, "CSRF: cannot schedule deferred redis write: ", err)
+                return false, err
+            end
+            return true
+        end
+        local ok, err = with_redis(fn)
+        if ok == nil and err then
+            return false, err
+        end
+        return true
+    end
+
+    function store.get(_, key)
+        local value = with_redis(function(red) return red:get(REDIS_KEY_PREFIX .. key) end)
+        if value == nil or value == ngx.null then
+            return nil
+        end
+        return value
+    end
+
+    function store.set(_, key, value, ttl)
+        return write(function(red) return red:set(REDIS_KEY_PREFIX .. key, value, "EX", ttl) end)
+    end
+
+    function store.add(_, key, value, ttl)
+        local res, err = with_redis(function(red) return red:set(REDIS_KEY_PREFIX .. key, value, "EX", ttl, "NX") end)
+        if res == nil and err then
+            return false, err
+        end
+        if res == ngx.null then
+            return false, "exists"
+        end
+        return true
+    end
+
+    function store.ttl(_, key)
+        local remaining = with_redis(function(red) return red:ttl(REDIS_KEY_PREFIX .. key) end)
+        if remaining == nil or remaining == ngx.null or remaining < 0 then
+            return nil
+        end
+        return remaining
+    end
+
+    function store.delete(_, key)
+        return write(function(red) return red:del(REDIS_KEY_PREFIX .. key) end)
+    end
+
+    function store.expire_at_most(_, key, ttl)
+        -- EXPIRE ... LT only shortens the remaining life (Redis 7+).
+        return write(function(red) return red:expire(REDIS_KEY_PREFIX .. key, ttl, "LT") end)
+    end
+
+    return store
+end
+
+-- redis_host empty: keep tokens in the shared dict (single nginx only).
+function _M.init(redis_host, redis_port, csrf_tokens_dict)
+    if redis_host and redis_host ~= "" then
+        _M.csrf_tokens = new_redis_store(redis_host, redis_port)
+        _M.backend = "redis"
+    else
+        _M.csrf_tokens = new_dict_store(csrf_tokens_dict)
+        _M.backend = "dict"
+    end
+end
+
+function _M.generate_csrf_token()
+    local random_bytes = resty_random.bytes(32)
+    if not random_bytes then
+        ngx.log(ngx.ERR, "CSRF: Failed to generate random bytes")
+        return nil
+    end
+    return str.to_hex(random_bytes)
+end
+
+function _M.build_csrf_cookie(token)
+    local cookie = "CSRF-TOKEN=" .. token .. "; Path=/; SameSite=Strict"
+    if ngx.var.https == "on" then
+        cookie = cookie .. "; Secure"
+    end
+    return cookie
+end
+
+function _M.validate_csrf_token(header_token, cookie_token, session_id)
+    if not header_token or not cookie_token or not session_id then
+        return false
+    end
+    
+    if header_token ~= cookie_token then
+        return false
+    end
+    
+    local stored_token = _M.csrf_tokens:get(session_id)
+    if not stored_token or stored_token ~= cookie_token then
+        return false
+    end
+    
+    -- Refresh token TTL on successful validation, but never resurrect an
+    -- entry that is winding down under the rotation grace period
+    local remaining = _M.csrf_tokens:ttl(session_id)
+    if remaining and remaining > ROTATION_GRACE_TTL then
+        _M.csrf_tokens:set(session_id, stored_token, CSRF_TOKEN_TTL)
+    end
+
+    return true
+end
+
+-- Dict keys must be sha256(session cookie), never the raw cookie: encrypted
+-- session cookies run 4-7KB each, so raw-cookie keys exhaust the 10M
+-- csrf_tokens zone within days of uptime ("no memory" on every store, which
+-- 403s every browser POST). Hashing keeps entries at a fixed ~100 bytes.
+function _M.hash_session_id(session_cookie)
+    if not session_cookie then
+        return nil
+    end
+    local sha256 = resty_sha256:new()
+    sha256:update(session_cookie)
+    return str.to_hex(sha256:final())
+end
+
+-- Session ID = sha256 of the encrypted session cookie value (unique and stable per user)
+function _M.get_session_id()
+    return _M.hash_session_id(ngx.var.cookie_strato_session)
+end
+
+-- Whitelist known API clients; validate Sec-Fetch headers for modern browsers
+-- Note: JS cannot modify User-Agent or Sec-Fetch-* headers
+function _M.is_browser_request()
+    local user_agent = ngx.var.http_user_agent or ""
+
+    local api_client_patterns = {
+        "curl/", "Wget/", "python%-requests/", "python%-urllib", "Go%-http%-client",
+        "PostmanRuntime/", "insomnia/", "HTTPie/", "node%-fetch", "axios/",
+        "okhttp/", "Java/", "Apache%-HttpClient", "Dart/", "Ruby", "PHP/", "RestSharp/",
+        "restish", "Stripe/"
+    }
+
+    for _, pattern in ipairs(api_client_patterns) do
+        if user_agent:find(pattern) then
+            return false  -- API client, skip CSRF
+        end
+    end
+
+    -- Validate Sec-Fetch headers (modern browsers only)
+    local sec_fetch_site = ngx.var.http_sec_fetch_site
+    local sec_fetch_mode = ngx.var.http_sec_fetch_mode
+
+    if sec_fetch_site == "cross-site" and sec_fetch_mode ~= "navigate" then
+        ngx.log(ngx.WARN, "CSRF: Suspicious Sec-Fetch headers (cross-site non-navigation)")
+    end
+
+    return true  -- Treat as browser, enforce CSRF
+end
+
+function _M.regenerate_token_for_new_session(new_session_id, old_session_id)
+    -- Callers pass raw cookie values (from ngx.ctx set in openid.lua)
+    new_session_id = _M.hash_session_id(new_session_id)
+    old_session_id = _M.hash_session_id(old_session_id)
+
+    if not new_session_id then
+        return nil
+    end
+
+    if old_session_id and old_session_id ~= new_session_id then
+        -- Keep the old session's token alive briefly instead of deleting it:
+        -- a request sent with pre-rotation cookies while another request
+        -- rotated the session would otherwise 403 (private issue #88).
+        -- Logout still deletes immediately (nginx.tpl.conf /auth/logout).
+        -- Expressed as "shorten to the grace period" so it needs no read:
+        -- this runs in header_filter, where the Redis backend can only
+        -- queue writes.
+        _M.csrf_tokens:expire_at_most(old_session_id, ROTATION_GRACE_TTL)
+    end
+
+    local new_token = _M.generate_csrf_token()
+    if not new_token then
+        return nil
+    end
+
+    local success, err = _M.csrf_tokens:set(new_session_id, new_token, CSRF_TOKEN_TTL)
+    if not success then
+        ngx.log(ngx.ERR, "CSRF: Failed to store token during rotation: ", err)
+        return nil
+    end
+    
+    return new_token
+end
+
+-- Ensure CSRF token exists and is sent to client
+function _M.ensure_csrf_token_for_session(session_id, context)
+    if not session_id then
+        return false
+    end
+    
+    local existing_token = _M.csrf_tokens:get(session_id)
+    local cookie_token = ngx.var.cookie_csrf_token or ngx.var["cookie_CSRF-TOKEN"]
+    
+    if not existing_token then
+        local new_token = _M.generate_csrf_token()
+        if not new_token then
+            return false
+        end
+        
+        local success, err = _M.csrf_tokens:add(session_id, new_token, CSRF_TOKEN_TTL)
+        if success then
+            ngx.header["Set-Cookie"] = _M.build_csrf_cookie(new_token)
+            return true
+        elseif err == "exists" then
+            existing_token = _M.csrf_tokens:get(session_id)
+            if existing_token and not cookie_token then
+                ngx.header["Set-Cookie"] = _M.build_csrf_cookie(existing_token)
+                return true
+            end
+        else
+            ngx.log(ngx.ERR, "CSRF: Failed to store token (", context, "): ", err)
+        end
+        return false
+    else
+        -- Token exists, refresh its TTL to extend the session, but never
+        -- resurrect an entry that is winding down under the rotation grace
+        -- period
+        local remaining = _M.csrf_tokens:ttl(session_id)
+        if remaining and remaining > ROTATION_GRACE_TTL then
+            _M.csrf_tokens:set(session_id, existing_token, CSRF_TOKEN_TTL)
+        end
+
+        if not cookie_token then
+            ngx.header["Set-Cookie"] = _M.build_csrf_cookie(existing_token)
+            return true
+        elseif cookie_token ~= existing_token then
+            -- Browser holds a stale or crossed CSRF cookie (e.g. two
+            -- concurrent responses both rotated the session and their
+            -- Set-Cookie headers landed out of order). Resync so the next
+            -- state-changing request validates.
+            ngx.header["Set-Cookie"] = _M.build_csrf_cookie(existing_token)
+            return true
+        end
+    end
+    
+    return false
+end
+
+function _M.handle_session_rotation()
+    -- Prevent double-processing (header_filter can be called multiple times)
+    if ngx.ctx.csrf_rotation_handled then
+        return
+    end
+    
+    if not _M.is_browser_request() then
+        return
+    end
+    
+    -- Check if openid.lua detected session rotation during access phase
+    if not ngx.ctx.session_rotated then
+        return
+    end
+    
+    local new_session_id = ngx.ctx.new_session_id
+    local old_session_id = ngx.ctx.old_session_id
+    
+    if not new_session_id then
+        ngx.log(ngx.WARN, "CSRF: Session rotation flagged but no new session ID")
+        return
+    end
+    
+    local new_csrf_token = _M.regenerate_token_for_new_session(new_session_id, old_session_id)
+    if not new_csrf_token then
+        ngx.log(ngx.ERR, "CSRF: Failed to regenerate token during session rotation")
+        return
+    end
+    
+    -- Add CSRF token cookie to response
+    local csrf_cookie = _M.build_csrf_cookie(new_csrf_token)
+    local existing_cookies = ngx.header["Set-Cookie"]
+    
+    if existing_cookies then
+        if type(existing_cookies) == "table" then
+            table.insert(existing_cookies, csrf_cookie)
+            -- CRITICAL: Must reassign the table back to ngx.header for changes to take effect
+            ngx.header["Set-Cookie"] = existing_cookies
+        else
+            ngx.header["Set-Cookie"] = {existing_cookies, csrf_cookie}
+        end
+    else
+        ngx.header["Set-Cookie"] = csrf_cookie
+    end
+    
+    -- Mark that we've handled this rotation to prevent double-processing
+    ngx.ctx.csrf_rotation_handled = true
+end
+
+function _M.initialize_token()
+    if not _M.is_browser_request() then
+        return
+    end
+
+    local session_id = _M.get_session_id()
+    if session_id then
+        _M.ensure_csrf_token_for_session(session_id, "/csrf-init")
+    end
+end
+
+local wallet_auth_routes = {
+    ["/api/credit-card/add-card"] = true,
+    ["/api/credit-card/approve"] = true,
+    ["/api/credit-card/config"] = true,
+    ["/api/credit-card/manual-top-up"] = true,
+    ["/api/credit-card/remove-card"] = true,
+    ["/api/credit-card/update-card"] = true,
+    ["/api/bridge/requestNativeWithdrawal"] = true,
+    ["/api/bridge/requestWithdrawal"] = true,
+    ["/api/metal-forge/buy"] = true,
+    ["/api/oracle/price"] = true,
+    ["/api/rpc/results"] = true,
+    ["/api/rpc/submit"] = true,
+    ["/api/swap"] = true,
+    ["/api/swap/multi-token"] = true,
+    ["/api/swap-pools"] = true,
+    ["/api/tokens"] = true,
+    ["/api/user/admin"] = true
+}
+
+local wallet_auth_route_prefixes = {
+    "/api/cdp/",
+    "/api/credit-card/config/",
+    "/api/earn/",
+    "/api/lend/",
+    "/api/lending/",
+    "/api/nfts/",
+    "/api/poolv3/",
+    "/api/psm/",
+    "/api/refer/",
+    "/api/rewards/",
+    "/api/staking/",
+    "/api/swap-pools/",
+    "/api/tokens/",
+    "/api/trade/",
+    "/api/user/admin/",
+    "/api/vault/"
+}
+
+-- STRATO node endpoints used by self-custody (external wallet) signing flows,
+-- POSTed directly from the browser by guests with no session (SMD's walletTx):
+--   /transaction/unsigned    only computes a signable payload (no state change)
+--   /eth/v1.2/transaction    submits a SIGNED tx — authenticated by its ECDSA
+--                            signature, replay-protected by the nonce
+--   /transactions/results    read-only lookup by hash
+--   /transaction/simulate    dry-run in a sandbox (rate-limited in nginx)
+-- CSRF adds nothing to these (an attacker cannot forge the signature and the
+-- rest are effect-free), so like wallet_auth_routes they are exempt when the
+-- request carries the X-Wallet-Address marker header.
+local wallet_tx_routes = {
+    ["/bloc/v2.2/transaction/unsigned"] = true,
+    ["/bloc/v2.2/transactions/results"] = true,
+    ["/bloc/v2.2/transaction/simulate"] = true,
+    ["/strato-api/eth/v1.2/transaction"] = true
+}
+
+local wallet_auth_methods = {
+    DELETE = true,
+    PATCH = true,
+    POST = true,
+    PUT = true
+}
+
+-- Backend only proxies allow-listed read-only JSON-RPC methods on these routes.
+function _M.allow_rpc_proxy_request()
+    local uri = ngx.var.uri or ""
+    return ngx.var.request_method == "POST" and uri:match("^/api/rpc/%d+$") ~= nil
+end
+
+function _M.is_valid_wallet_address(addr)
+    if type(addr) ~= "string" then
+        return false
+    end
+
+    local normalized = addr:match("^0[xX](%x+)$") or addr
+    return #normalized == 40 and normalized:match("^%x+$") ~= nil
+end
+
+function _M.allow_wallet_auth_request()
+    if not wallet_auth_methods[ngx.var.request_method] then
+        return false
+    end
+
+    local uri = ngx.var.uri
+    local route_allowed = wallet_auth_routes[uri] == true or wallet_tx_routes[uri] == true
+    if not route_allowed then
+        for _, prefix in ipairs(wallet_auth_route_prefixes) do
+            if uri:sub(1, #prefix) == prefix then
+                route_allowed = true
+                break
+            end
+        end
+    end
+
+    return route_allowed and _M.is_valid_wallet_address(ngx.var.http_x_wallet_address)
+end
+
+function _M.protect_api()
+    local method = ngx.var.request_method
+    local session_id = _M.get_session_id()
+    local request_uri = ngx.var.request_uri or ""
+
+    if request_uri:find("^/auth/", 1, true) then
+        return
+    end
+    
+    if not _M.is_browser_request() then
+        return
+    end
+
+    if method == "OPTIONS" or method == "HEAD" then
+        return
+    end
+
+    if method == "GET" then
+        if session_id then
+            _M.ensure_csrf_token_for_session(session_id, "GET")
+        end
+        return
+    end
+
+    if method == "POST" or method == "PUT" or method == "DELETE" or method == "PATCH" then
+        if _M.allow_rpc_proxy_request() then
+            return
+        end
+
+        if _M.allow_wallet_auth_request() then
+            return
+        end
+
+        local header_token = ngx.var.http_x_csrf_token
+        local cookie_token = ngx.var.cookie_csrf_token or ngx.var["cookie_CSRF-TOKEN"]
+
+        if not session_id then
+            ngx.log(ngx.WARN, "CSRF: No session for ", method, " ", request_uri)
+            ngx.status = 403
+            ngx.header.content_type = "application/json"
+            ngx.say('{"error": "Authentication required. Please log in and try again."}')
+            ngx.exit(403)
+            return
+        end
+
+        if not _M.validate_csrf_token(header_token, cookie_token, session_id) then
+            ngx.log(ngx.WARN, "CSRF: Validation failed for ", method, " ", request_uri, " from ", ngx.var.remote_addr or "unknown")
+            ngx.status = 403
+            ngx.header.content_type = "application/json"
+            ngx.say('{"error": "Security validation failed. Please refresh the page and try again."}')
+            ngx.exit(403)
+            return
+        end
+    end
+end
+
+if csrf and csrf.protect_api then
+    csrf.protect_api()
+else
+    return _M
+end

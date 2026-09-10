@@ -36,6 +36,12 @@ RPC_PORT=${RPC_PORT:-8545}
 # connector signs transactions client-side and submits via eth_sendRawTransaction
 # over /rpc, so deployments that expose the SMD wallet must set JSONRPC_ENABLED=true.
 JSONRPC_ENABLED=${JSONRPC_ENABLED:-false}
+# Whether app-backend and app-ui run next to this nginx (the bundled node) or
+# on their own tier. Unbundled, the app locations are dropped (their upstreams
+# would not resolve and nginx would refuse to start) and "/" redirects to
+# APP_URL, or answers 404 when no APP_URL is known.
+BUNDLED_APP=${BUNDLED_APP:-true}
+APP_URL=${APP_URL:-}
 # Edge Redis for CSRF tokens and sessions, shared by every nginx instance in
 # front of the API tier. Empty EDGE_REDIS_HOST keeps both in this instance's
 # memory (fine for a single node, wrong behind a load balancer).
@@ -187,6 +193,18 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i 's/<BLOC_TIMEOUT>/'"$BLOC_TIMEOUT"'/g' /tmp/nginx.conf
 
   # Replacing HOST NAME PLACEHOLDERS
+  if [[ "$BUNDLED_APP" == "true" ]]; then
+    sed -i '/#TEMPLATE_MARK_EXTERNAL_APP/d' /tmp/nginx.conf
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_BUNDLED_APP//g' /tmp/nginx.conf
+  else
+    sed -i '/#TEMPLATE_MARK_BUNDLED_APP/d' /tmp/nginx.conf
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_EXTERNAL_APP//g' /tmp/nginx.conf
+    if [[ -z "$APP_URL" ]]; then
+      sed -i 's|return 302 __APP_URL__$request_uri;|return 404;|' /tmp/nginx.conf
+    else
+      sed -i "s|__APP_URL__|${APP_URL%/}|g" /tmp/nginx.conf
+    fi
+  fi
   if [[ -z "$EDGE_REDIS_HOST" ]]; then
     sed -i '/#TEMPLATE_MARK_EDGE_REDIS/d' /tmp/nginx.conf
   else
