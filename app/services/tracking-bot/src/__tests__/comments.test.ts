@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { renderPlan, statusComment } from "../pipeline/comments";
+import { clarifyComment, parseClarifyQuestions, renderPlan, statusComment } from "../pipeline/comments";
 
 describe("comment rendering", () => {
   it("renders a plan with all sections", () => {
@@ -16,6 +16,14 @@ describe("comment rendering", () => {
     for (const needle of ["**Summary.** Add X", "1. one", "`a.ts` — add", "003_x adds col", "- covers X", "- none", "- y"]) {
       assert.ok(md.includes(needle), `missing ${needle}`);
     }
+  });
+  it("round-trips the questions of a clarify comment", () => {
+    const questions = ["Which columns should the table show?", "Should it respect the date filter?"];
+    const md = clarifyComment(questions, "not specified yet");
+    assert.deepEqual(parseClarifyQuestions(md), questions);
+  });
+  it("ignores comments that are not clarify comments", () => {
+    assert.deepEqual(parseClarifyQuestions("### 🤖 Tracking bot\n\n1. a plan step"), []);
   });
   it("renders status lines", () => {
     const md = statusComment({ branch: "b", sha: "0123456789abcdef", prUrl: "http://pr", buildUrl: "http://b", phase: "x", lines: ["l1"] });

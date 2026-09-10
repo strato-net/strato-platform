@@ -51,7 +51,7 @@ ${ALLOWED_AREA}
 
 2) DECISION — when inScope:
    - "implement": the request is clear enough to build and test. Prefer this whenever a competent engineer could proceed with reasonable assumptions; state those assumptions.
-   - "clarify": genuinely ambiguous or contradictory requirements where guessing would likely produce the wrong feature. Ask precise questions (max 5).
+   - "clarify": genuinely ambiguous or contradictory requirements where guessing would likely produce the wrong feature. Ask precise questions (max 5). Only choose this when you can name at least one specific, answerable question that has NOT already been asked on the issue — never re-ask a question the humans have already answered, and never fall back to a generic "please describe it in more detail". If the author has asked you to stop asking questions and proceed, or has already answered your earlier questions, choose "implement" and record what you are assuming instead.
    - "decline": already implemented (verify from the conversation), harmful or clearly wrong (e.g. remove authentication, leak raw IPs/PII, disable tests), or explicitly withdrawn by the author.
    - "reply": the newest human comment is a question or remark addressed to the bot that deserves an answer but requests no code change (put the answer in "reply", markdown, concise, factual, based on the conversation).
    - "none": the newest human comments need no action at all (acknowledgements, discussion between humans, "thanks").
@@ -96,8 +96,10 @@ export const renderConversation = (issue: IssueSummary, comments: IssueComment[]
   return parts.join("\n");
 };
 
-export const screeningUser = (issue: IssueSummary, comments: IssueComment[], botLogin: string, imageCount = 0): string =>
-  `${renderConversation(issue, comments, botLogin, imageCount)}\n\nEvaluate the scope criterion and make the decision.`;
+export const screeningUser = (issue: IssueSummary, comments: IssueComment[], botLogin: string, imageCount = 0, askedQuestions: string[] = []): string =>
+  `${renderConversation(issue, comments, botLogin, imageCount)}
+${askedQuestions.length ? `\nClarifying questions already asked on this issue (do NOT ask any of these again):\n${askedQuestions.map((q) => `- ${q}`).join("\n")}\n` : ""}
+Evaluate the scope criterion and make the decision.`;
 
 // ---------------------------------------------------------------------------
 // Planning (read-only tools) → submit_plan

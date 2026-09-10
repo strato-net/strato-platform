@@ -85,6 +85,9 @@ export const config = {
     triageLookbackDays: num("TRIAGE_LOOKBACK_DAYS", 14),
     // Optional restriction to specific issue numbers (staged rollouts / smoke tests)
     issueAllowlist: list(optional("ISSUE_ALLOWLIST")).map(Number).filter((n) => Number.isFinite(n)),
+    // Clarify rounds allowed per issue before the bot implements with
+    // assumptions instead of asking again
+    maxClarifyRounds: num("MAX_CLARIFY_ROUNDS", 2),
     // Labels the bot maintains on issues it owns (created on demand)
     labelPrefix: env("BOT_LABEL_PREFIX", "tracking-bot"),
   },

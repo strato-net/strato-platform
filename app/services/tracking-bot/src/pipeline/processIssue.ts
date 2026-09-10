@@ -7,6 +7,8 @@ import { issueLog, log } from "../log";
 import { IssueState, IssueStatus, ScreeningRecord, StateStore } from "../state/store";
 import { generatePlan, runCiFix, runImplementation, ImplementOutcome } from "../agent/runner";
 import { SCREENING_SCHEMA, SCREENING_SYSTEM, screeningUser } from "../agent/prompts";
+import { sanitizeStrings } from "../agent/sanitize";
+import { applyClarifyGuard } from "./screening";
 import { truncate } from "../agent/tools";
 import { evaluateBuild, failureContext, findBuildForSha, branchJobExists, isJenkinsConfigured, triggerBranchBuild, triggerBranchScan } from "../ci/jenkins";
 import { deployToTrackingServer, isDeployConfigured } from "../deploy/ssh";
@@ -15,6 +17,8 @@ import { failureDetails } from "../workspace/checks";
 import {
   CRITERIA,
   clarifyComment,
+  isClarifyComment,
+  parseClarifyQuestions,
   declineCriterionComment,
   declineDecisionComment,
   doneComment,
@@ -83,24 +87,36 @@ const wakeIfCommented = async (ctx: IssueContext, issue: IssueSummary, state: Is
 // ---------------------------------------------------------------------------
 // Screening
 // ---------------------------------------------------------------------------
-const screen = async (issue: IssueSummary, comments: IssueComment[], botLogin: string, images: ImageInput[]): Promise<Screening> =>
+const SCREENING_FIELDS = Object.keys(SCREENING_SCHEMA.properties);
+
+const screen = async (issue: IssueSummary, comments: IssueComment[], botLogin: string, images: ImageInput[], askedQuestions: string[]): Promise<Screening> =>
   triageClient().structured<Screening>({
     system: SCREENING_SYSTEM,
-    user: screeningUser(issue, comments, botLogin, images.length),
+    user: screeningUser(issue, comments, botLogin, images.length, askedQuestions),
     images,
     name: "record_screening",
     description: "Record the scope verdict and the implement/clarify/decline decision",
     schema: SCREENING_SCHEMA,
-    validate: (v: any) => ({
-      inScope: Boolean(v?.inScope),
-      scopeReason: String(v?.scopeReason ?? ""),
-      decision: (["implement", "clarify", "decline", "reply", "none"].includes(v?.decision) ? v.decision : "clarify") as Screening["decision"],
-      decisionReason: String(v?.decisionReason ?? ""),
-      reply: String(v?.reply ?? ""),
-      assumptions: Array.isArray(v?.assumptions) ? v.assumptions.map(String) : [],
-      questions: Array.isArray(v?.questions) ? v.questions.map(String) : [],
-      isFollowUp: Boolean(v?.isFollowUp),
-    }),
+    // A verdict whose decision is missing or unrecognised falls back to
+    // "clarify"; applyClarifyGuard() then stops that becoming a question loop.
+    validate: (v: any) => {
+      const known = ["implement", "clarify", "decline", "reply", "none"].includes(v?.decision);
+      if (!known) log.warn("Issue", `screening returned an unrecognised decision ${JSON.stringify(v?.decision)}; treating it as "clarify"`);
+      // Strings may carry leaked tool-call markup — never post that verbatim
+      return sanitizeStrings(
+        {
+          inScope: Boolean(v?.inScope),
+          scopeReason: String(v?.scopeReason ?? ""),
+          decision: (known ? v.decision : "clarify") as Screening["decision"],
+          decisionReason: String(v?.decisionReason ?? ""),
+          reply: String(v?.reply ?? ""),
+          assumptions: Array.isArray(v?.assumptions) ? v.assumptions.map(String) : [],
+          questions: Array.isArray(v?.questions) ? v.questions.map(String) : [],
+          isFollowUp: Boolean(v?.isFollowUp),
+        },
+        SCREENING_FIELDS
+      );
+    },
   });
 
 const coreTeamCheck = async (ctx: IssueContext, login: string): Promise<{ member: boolean; detail: string } | null> => {
@@ -145,8 +161,24 @@ export const slowStep = async (ctx: IssueContext, issueNumber: number): Promise<
       return;
     }
 
-    const screening = await screen(issue, comments, ctx.botLogin, images);
-    issueLog(issue.number, "screening", JSON.stringify(screening, null, 2));
+    // Merge what the state file remembers with what the issue itself shows the
+    // bot has already asked (state may predate this bookkeeping)
+    const botComments = comments.filter((c) => c.user.login === ctx.botLogin);
+    const priorRounds = botComments.filter((c) => isClarifyComment(c.body)).length;
+    const askedQuestions = [...new Set([...(state.askedQuestions ?? []), ...botComments.flatMap((c) => parseClarifyQuestions(c.body))])];
+    const clarifyRounds = Math.max(state.clarifyRounds ?? 0, priorRounds);
+    const verdict = await screen(issue, comments, ctx.botLogin, images, askedQuestions);
+    issueLog(issue.number, "screening", JSON.stringify(verdict, null, 2));
+    // Never ask the same (or an empty) question again — implement with
+    // assumptions instead of looping on clarification
+    const guard = applyClarifyGuard({
+      screening: verdict,
+      askedQuestions,
+      clarifyRounds,
+      maxClarifyRounds: config.github.maxClarifyRounds,
+    });
+    const screening = guard.screening;
+    if (guard.overrideReason) log.info("Issue", `#${issue.number}: clarify overridden — ${guard.overrideReason}`);
     if (!screening.inScope) {
       await ctx.gh.createComment(issue.number, declineCriterionComment(CRITERIA.scope, screening.scopeReason || "The request needs changes outside the tracking server."));
       await setStatus(ctx, issue, state, "declined", "criterion 3 unmet", { lastSeenCommentId: seen, declinedFor: "scope", wokenFrom: undefined });
@@ -166,8 +198,13 @@ export const slowStep = async (ctx: IssueContext, issueNumber: number): Promise<
       return;
     }
     if (screening.decision === "clarify") {
-      await ctx.gh.createComment(issue.number, clarifyComment(screening.questions.length ? screening.questions : ["Could you describe the expected behaviour in more detail?"], screening.decisionReason));
-      await setStatus(ctx, issue, state, "clarifying", "asked for clarification", { lastSeenCommentId: seen, wokenFrom: undefined });
+      await ctx.gh.createComment(issue.number, clarifyComment(guard.questions, screening.decisionReason));
+      await setStatus(ctx, issue, state, "clarifying", `asked for clarification (round ${clarifyRounds + 1})`, {
+        lastSeenCommentId: seen,
+        wokenFrom: undefined,
+        clarifyRounds: clarifyRounds + 1,
+        askedQuestions: [...askedQuestions, ...guard.questions],
+      });
       return;
     }
     state = await setStatus(ctx, issue, state, "planning", "screening passed", {

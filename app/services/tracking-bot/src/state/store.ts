@@ -54,6 +54,9 @@ export interface IssueState {
   // comment needs no work)
   wokenFrom?: IssueStatus;
   declinedFor?: "core-team" | "scope" | "decision";
+  // Clarification history, so the bot never re-asks or loops forever
+  clarifyRounds?: number;
+  askedQuestions?: string[];
   ciRounds: number;
   ciFix?: boolean; // implementing state entered because Jenkins failed
   buildUrl?: string;

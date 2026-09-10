@@ -9,7 +9,11 @@ about the tracking server, and for every issue it owns:
    the tracking UI, API, server code, or tracking DB migrations. A failed
    criterion gets a comment naming the criterion and why it failed.
 2. **Decides** whether to implement (or asks clarifying questions / declines
-   with a reason) after reading the whole conversation.
+   with a reason) after reading the whole conversation. Clarification is
+   bounded: questions it has already asked (or an empty/generic question set,
+   e.g. from a malformed model verdict) never go out again, and after
+   `MAX_CLARIFY_ROUNDS` rounds it implements with stated assumptions instead
+   of asking a third time.
 3. **Plans** the change with read-only access to the repo and posts the plan
    on the issue.
 4. **Implements** it on `tracking-bot/issue-<n>-<slug>` with an LLM agent
@@ -60,8 +64,10 @@ All providers share the same tool set (`read_file`, `list_files`, `search`,
 - `DRY_RUN=true` reads GitHub and runs models but never assigns, comments,
   pushes, or deploys.
 - Bounded retries everywhere (`AGENT_MAX_FIX_ROUNDS`, `CI_MAX_FIX_ROUNDS`,
-  Jenkins/deploy timeouts) — the bot posts a "needs a human" comment and
-  parks the issue rather than looping.
+  `MAX_CLARIFY_ROUNDS`, Jenkins/deploy timeouts) — the bot posts a "needs a
+  human" comment and parks the issue rather than looping.
+- Model-produced strings are stripped of leaked tool-call markup before they
+  are posted on an issue.
 
 ## Running
 

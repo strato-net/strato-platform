@@ -52,6 +52,19 @@ ${questions.map((q, i) => `${i + 1}. ${q}`).join("\n")}
 
 _Answer in a comment and I will pick this up again._`;
 
+// Recover the questions the bot has already asked straight from the issue, so
+// the clarify guard also works for issues that were already looping before the
+// bot started recording them in its state file.
+export const parseClarifyQuestions = (body: string): string[] => {
+  if (!body.includes(MARK.clarify)) return [];
+  return body
+    .split("\n")
+    .map((line) => /^\s*\d+\.\s+(.*\S)\s*$/.exec(line)?.[1])
+    .filter((q): q is string => Boolean(q));
+};
+
+export const isClarifyComment = (body: string): boolean => body.includes(MARK.clarify);
+
 export interface PlanBody {
   summary: string;
   steps: string[];
