@@ -86,6 +86,7 @@ runtimeConfig = def
   , contractsConfig = ContractsConf
       { railgunProxy = getRailgunProxyForNetwork flags_network
       , nativeTokenAddress = getNativeTokenForNetwork flags_network
+      , nativeTokenBalancesField = Nothing
       }
   , debugConfig = def { svmTrace = flags_svmTrace }
   , vmConfig = def { sqlDiff = flags_sqlDiff, diffPublish = flags_diffPublish }

@@ -20,7 +20,7 @@ import Strato.Version (stratoVersion)
 import Blockchain.CommunicationConduit (ethVersion)
 import Blockchain.EthConf (runStreamMPooled, ethConf)
 import qualified Blockchain.EthConf.Model as EthConf
-import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID, contractsConfig, nativeTokenAddress)
+import Blockchain.EthConf.Model (networkConfig, networkID, contractsConfig, nativeTokenAddress)
 import Blockchain.Data.Block (Block, blockBlockData, blockReceiptTransactions)
 import qualified Blockchain.Strato.Model.Class as Class
 import Blockchain.Data.BlockHeader (BlockHeader (..), clearBlockSignatures, getBlockSignatures)
@@ -73,10 +73,8 @@ import GHC.Generics (Generic)
 import Network.JsonRpc.Server
 import Numeric (showHex)
 import Prelude
-import Network.HTTP.Client (Manager, newManager, defaultManagerSettings)
-import Network.HTTP.Types.Status (statusCode, statusMessage)
-import Servant.Client (BaseUrl (..), ClientError(..), ClientM, ResponseF(..), Scheme (Http), mkClientEnv, runClientM)
-import System.IO.Unsafe (unsafePerformIO)
+import LocalApi (formatClientError, runLocal)
+import SqlState (NativeBalance (..), nativeBalanceFromSql, storageAtFromSql)
 import Control.Monad.Composable.CodeDB (runCodeDBM, queryEvents, queryEventsByTxHash)
 
 type Server = IO
@@ -84,33 +82,6 @@ type Server = IO
 protocolVersion :: Integer
 protocolVersion = fromIntegral ethVersion
 
-apiBaseUrl :: BaseUrl
-apiBaseUrl =
-  BaseUrl
-    Http
-    (apiListenAddress $ apiConfig ethConf)
-    (apiPort $ apiConfig ethConf)
-    "/eth/v1.2"
-
--- | A single, process-wide HTTP connection manager. An http-client 'Manager'
--- is a connection pool and is designed to be created once and shared for the
--- lifetime of the process. Creating a new one per request (as this used to do)
--- leaks keep-alive sockets to the backend until GC finalizers run, exhausting
--- file descriptors under load. NOINLINE keeps this a single CAF.
-{-# NOINLINE sharedManager #-}
-sharedManager :: Manager
-sharedManager = unsafePerformIO $ newManager defaultManagerSettings
-
-runLocal :: ClientM a -> IO (Either ClientError a)
-runLocal action = runClientM action (mkClientEnv sharedManager apiBaseUrl)
-
-formatClientError :: ClientError -> T.Text
-formatClientError (FailureResponse _ resp) =
-  let s = responseStatusCode resp
-  in T.pack $ "HTTP " ++ show (statusCode s) ++ " " ++ BC.unpack (statusMessage s)
-formatClientError (ConnectionError _) = "connection error"
-formatClientError (DecodeFailure msg _) = "decode error: " <> msg
-formatClientError _ = "request failed"
 
 methods :: [Method Server]
 methods =
@@ -328,6 +299,17 @@ eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "b
 
     f :: Address -> String -> RpcResult Server String
     f addr _blockString = do
+      -- Served from the SQL state mirror (latest block); the vm-runner round
+      -- trip remains only as a fallback for chains the mirror cannot answer.
+      fromSql <- liftIO $ nativeBalanceFromSql addr
+      case fromSql of
+        NativeBalance n -> return $ "0x" ++ showHex n ""
+        NativeBalanceUnavailable why -> do
+          liftIO . putStrLn $ "eth_getBalance: falling back to vm-runner: " ++ why
+          viaVm addr
+
+    viaVm :: Address -> RpcResult Server String
+    viaVm addr = do
           let padding = BC.replicate 24 '0'
               calldataHex = balanceOfSelector <> padding <> addressToHex addr
               calldata = case B16.decode calldataHex of
@@ -383,8 +365,15 @@ eth_getStorageAt :: Method Server
 eth_getStorageAt = toMethod "eth_getStorageAt" f (Required "address" :+: Required "key" :+: Required "block" :+: ())
   where
     f :: String -> String -> String -> RpcResult Server String
-    f _addressString _key _blockString = do
-      throwError $ rpcError (-32601) "eth_getStorageAt not yet implemented"
+    f addressString key _blockString = case strToAddress addressString of
+      Left err -> throwError $ rpcError (-32602) (T.pack err)
+      Right addr -> do
+        -- Served from the SQL state mirror (latest block). The key is an EVM
+        -- slot or, as a STRATO extension, a SolidVM storage path.
+        r <- liftIO $ storageAtFromSql addr key
+        case r of
+          Right word -> return word
+          Left err -> throwError $ rpcError (-32000) (T.pack err)
 
 eth_call :: Method Server
 eth_call = toMethod "eth_call" f (Required "txObject" :+: Optional "blockTag" "latest" :+: ())

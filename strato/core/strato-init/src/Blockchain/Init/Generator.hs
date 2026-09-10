@@ -18,7 +18,7 @@ import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_busHost, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_password, flags_pghost, flags_regenerate, flags_sslDir)
+import Blockchain.Init.Options (flags_busHost, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior)
 import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
@@ -123,10 +123,14 @@ createCommandsFile role = do
       putStrLn $ "\ESC[1;33mWarning: " ++ show (mrMemMB resources) ++ " MB RAM is not enough "
         ++ "for from-genesis sync (vm-runner live data alone is ~3.5GB). "
         ++ "Restore this node from a snapshot instead (strato-up --snapshot).\ESC[0m"
+    -- A follower core (an RPC cell) runs the whole pipeline but its sequencer
+    -- never votes, proposes or drives round changes, even if its key is in
+    -- the validator set.
+    let followerFlag = if flags_validatorBehavior then "" else " --validatorBehavior=false"
     return $
       [ restartable "ethereum-discover +RTS -T -RTS"
       , "strato-p2p +RTS -T -RTS"
-      , "strato-sequencer " ++ sequencerRts
+      , "strato-sequencer " ++ sequencerRts ++ followerFlag
       , "vm-runner " ++ vmRunnerRts
       , restartable "strato-indexer"
       , restartable "slipstream +RTS -T -RTS"

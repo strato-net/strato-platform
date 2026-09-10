@@ -59,6 +59,7 @@ defineFlag "notificationServerUrl" "" "URL of the notification server for market
 
 defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
 defineFlag "jsonrpc" (True :: Bool) "Start the Ethereum JSON-RPC server (port 8545) for wallet integration"
+defineFlag "validatorBehavior" (True :: Bool) "Whether this node votes and proposes when its key is in the validator set. Pass --validatorBehavior=false for a read-only follower core (an RPC cell) that executes blocks and serves reads but never takes part in consensus"
 defineFlag "publicStratoRpc" (False :: Bool) "Expose the strato_* simulation/trace methods on the public /rpc endpoint (default: blocked; the bloc simulate endpoint is unaffected)"
 defineFlag "localAuth" (False :: Bool) "Use local auth (Kratos/Hydra) instead of external Keycloak"
 defineFlag "sslDir" ("" :: String) "Path to directory containing server.pem and server.key (enables SSL)"

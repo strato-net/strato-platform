@@ -231,6 +231,10 @@ data QuarryConf = QuarryConf
 data ContractsConf = ContractsConf
   { railgunProxy :: Maybe Address  -- ^ RailgunSmartWallet proxy contract address
   , nativeTokenAddress :: Address  -- ^ ERC20 treated as native token (e.g. USDST)
+  , nativeTokenBalancesField :: Maybe String
+    -- ^ Name of the native token's balances mapping in SolidVM storage, so
+    -- eth_getBalance can be answered from the SQL state mirror instead of a
+    -- vm-runner round trip. Missing means "_balances" (OpenZeppelin ERC20).
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
@@ -470,6 +474,7 @@ instance Default ContractsConf where
   def = ContractsConf
     { railgunProxy = Nothing
     , nativeTokenAddress = 0
+    , nativeTokenBalancesField = Nothing
     }
 
 instance Default UrlConfig where

@@ -19,8 +19,10 @@ executable ethereum-jsonrpc
       Commands
       EthBlock
       EthLog
+      LocalApi
       RPC
       Server
+      SqlState
       TransactionReceipt
       Paths_ethereum_jsonrpc
   hs-source-dirs:
