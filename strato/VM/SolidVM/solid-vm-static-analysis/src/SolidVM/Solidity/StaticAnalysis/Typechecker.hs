@@ -871,6 +871,9 @@ typecheckMember (Static (SVMType.UnknownLabel "block") x) "difficulty" = pure $ 
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "gaslimit" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "chainid" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "proposer" = pure $ Static (SVMType.Address False) x
+typecheckMember (Static (SVMType.UnknownLabel "block") x) "prevProposer" = pure $ Static (SVMType.Address False) x
+typecheckMember (Static (SVMType.UnknownLabel "block") x) "prevIntendedProposer" = pure $ Static (SVMType.Address False) x
+typecheckMember (Static (SVMType.UnknownLabel "block") x) "prevRound" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "abi") x) "encode" = pure $ Function (Static SVMType.Variadic x) (bytesType' x) x [] [] False
 typecheckMember (Static (SVMType.UnknownLabel "abi") x) "encodePacked" = pure $ Function (Static SVMType.Variadic x) (bytesType' x) x [] [] False
 typecheckMember (Static (SVMType.UnknownLabel "abi") x) "decode" = pure $ Function (bytesType' x) (Static SVMType.Variadic x) x [] [] False
@@ -1049,7 +1052,19 @@ contractHelper test cc c =
       constTypes' = reduceType' (_contractContext c) $ constDeclHelper test cc c <$> M.elems (_constants c)
       constTypes'' = reduceType' (_contractContext c) $ constDeclHelper test cc c <$> M.elems (_flConstants cc)
       funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper test cc c) <$> M.toList funcsAndConstr
-      modifierTypes' = reduceType' (_contractContext c) $ modifierHelper test cc c <$> M.elems (_modifiers c)
+      -- Inherited modifiers are typechecked once, in the contract that declares
+      -- them, where any private state they touch is in scope. The merged copy a
+      -- child carries would be checked against the child's storage, which has
+      -- had the parent's private variables filtered out, and every such
+      -- modifier came back as "Unknown variable".
+      spanOf a = (_sourceAnnotationStart a, _sourceAnnotationEnd a)
+      inheritedModifierSpans = S.fromList
+        [ spanOf (_modifierContext m)
+        | p <- fromMaybe [] (getParentsAnnotated cc c),
+          m <- M.elems (_modifiers p)
+        ]
+      ownModifiers = filter ((`S.notMember` inheritedModifierSpans) . spanOf . _modifierContext) $ M.elems (_modifiers c)
+      modifierTypes' = reduceType' (_contractContext c) $ modifierHelper test cc c <$> ownModifiers
   in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'', modifierTypes']
 
 varDeclHelper ::
@@ -1671,6 +1686,10 @@ saltCreateArgs x = Product (stringType' x, stringType' x, [stringType' x, Static
 fastForwardArgs :: SourceAnnotation Text -> Type'
 fastForwardArgs x = Sum $ intType' x :| [Product (intType' x, intType' x, []) x]
 
+-- setBlockContext(address proposer, address prevProposer, address prevIntendedProposer, uint prevRound)
+setBlockContextArgs :: SourceAnnotation Text -> Type'
+setBlockContextArgs x = Product (addressType' x, addressType' x, [addressType' x, intType' x]) x
+
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
 getVarType' "this" ctx = pure $ Static (SVMType.Address False) ctx
 getVarType' s@('u' : 'i' : 'n' : 't' : n) ctx = case n of
@@ -1755,6 +1774,11 @@ getVarType' "fastForward" ctx = do
   if test
     then pure $ Function (fastForwardArgs ctx) (Unit ctx) ctx [] [] False
     else pure . bottom $ "fastForward can only be called while running tests" <$ ctx
+getVarType' "setBlockContext" ctx = do
+  test <- asks isRunningTests
+  if test
+    then pure $ Function (setBlockContextArgs ctx) (Unit ctx) ctx [] [] False
+    else pure . bottom $ "setBlockContext can only be called while running tests" <$ ctx
 getVarType' "Util" ctx = pure $ Static (SVMType.UnknownLabel "Util") ctx
 getVarType' "msg" ctx = pure $ Static (SVMType.UnknownLabel "msg") ctx
 getVarType' "tx" ctx = pure $ Static (SVMType.UnknownLabel "tx") ctx

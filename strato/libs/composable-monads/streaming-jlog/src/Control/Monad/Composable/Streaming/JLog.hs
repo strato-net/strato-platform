@@ -34,6 +34,7 @@ module Control.Monad.Composable.Streaming.JLog (
   -- Producing
   produceItems,
   produceItemsAsJSON,
+  produceToTopics,
   -- Consuming
   consume,
   consumeBroadcast,
@@ -149,13 +150,35 @@ produceItems topicName events = do
   let topicPath = seBasePath env </> T.unpack (unTopicName topicName)
   liftIO $ do
     ctx <- getOrCreateWriter env topicName topicPath
-    mapM_ (writeMessage ctx) events
+    mapM_ (writeRawMessage ctx . LBS.toStrict . encode) events
+  return [ProduceResponse]
+
+-- | Append an already-serialized payload to an open writer.
+writeRawMessage :: Ptr JLogCtx -> BS.ByteString -> IO ()
+writeRawMessage ctx bs =
+  BSU.unsafeUseAsCStringLen bs $ \(ptr, len) ->
+    void $ jlog_ctx_write ctx (castPtr ptr) (fromIntegral len)
+
+-- | Append already-encoded payloads to several topics in one call.
+--
+-- This exists so callers can stay backend-agnostic: on the Kafka backend the
+-- equivalent collapses N synchronous acks=all round trips into one, which is
+-- the whole point of the entry point. JLog writes are local appends with no
+-- round trip to save, so this is just a loop -- it is here for interface
+-- parity, not for a speedup.
+--
+-- Callers encode their own payloads because the topics generally carry
+-- different types.
+produceToTopics :: HasStreaming m => [(TopicName, [BS.ByteString])] -> m [ProduceResponse]
+produceToTopics groups = do
+  env <- getStreamEnv
+  liftIO $ mapM_ (writeGroup env) groups
   return [ProduceResponse]
   where
-    writeMessage ctx e = do
-      let bs = LBS.toStrict $ encode e
-      BSU.unsafeUseAsCStringLen bs $ \(ptr, len) ->
-        void $ jlog_ctx_write ctx (castPtr ptr) (fromIntegral len)
+    writeGroup env (topicName, raws) = do
+      let topicPath = seBasePath env </> T.unpack (unTopicName topicName)
+      ctx <- getOrCreateWriter env topicName topicPath
+      mapM_ (writeRawMessage ctx) raws
 
 getOrCreateWriter :: StreamEnv -> TopicName -> FilePath -> IO (Ptr JLogCtx)
 getOrCreateWriter env topicName topicPath = do

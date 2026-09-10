@@ -38,6 +38,7 @@ import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.Strato.Model.Address
 import Control.Arrow ((***))
 import Control.Monad (forM_, join)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Loops
 import Data.Default
@@ -45,9 +46,11 @@ import Data.Foldable (for_)
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as M
+import Data.IORef
 import qualified Data.NibbleString as N
 import Data.Traversable (for)
 import SolidVM.Model.Storable
+import System.IO.Unsafe (unsafePerformIO)
 
 instance Default BasicValue where
   def = blankVal
@@ -55,6 +58,14 @@ instance Default BasicValue where
 type RawStorageKey = (Address, StoragePath)
 
 type RawStorageValue = BasicValue
+
+{-# NOINLINE storageReadCache #-}
+storageReadCache :: IORef (M.Map (MP.StateRoot, StoragePath) (Maybe RawStorageValue))
+storageReadCache = unsafePerformIO $ newIORef M.empty
+
+cacheStorageRead :: (MP.StateRoot, StoragePath) -> Maybe RawStorageValue -> IO ()
+cacheStorageRead key value = modifyIORef' storageReadCache $ \cache ->
+  M.insert key value $ if M.size cache >= 500000 then M.empty else cache
 
 type HasRawStorageDB m = (RawStorageKey `A.Alters` RawStorageValue) m
 
@@ -97,7 +108,8 @@ deleteRawStorageKeyMC :: HasRawStorageDB m => RawStorageKey -> m ()
 deleteRawStorageKeyMC = A.delete (A.Proxy @RawStorageValue)
 
 genericLookupRawStorageDB ::
-  ( HasMemRawStorageDB m,
+  ( MonadIO m,
+    HasMemRawStorageDB m,
     (Address `A.Alters` AddressState) m,
     (MP.StateRoot `A.Alters` MP.NodeData) m
   ) =>
@@ -110,15 +122,15 @@ genericLookupRawStorageDB key = do
     Nothing -> do
       theBMap <- getMemRawStorageBlockDB
       case M.lookup key theBMap of
-        Just val' -> return $ Just val'
+        Just val -> return $ Just val
         Nothing -> do
           mVal <- getRawStorageKeyValDBMaybe key
-          --put in the TX cache for fast future lookups
-          for_ mVal $ \v -> putMemRawStorageTxMap $ M.insert key v theMap
+          for_ mVal $ \value -> putMemRawStorageTxMap $ M.insert key value theMap
           return mVal
 
 genericLookupWithDefaultRawStorageDB ::
-  ( HasMemRawStorageDB m,
+  ( MonadIO m,
+    HasMemRawStorageDB m,
     (Address `A.Alters` AddressState) m,
     (MP.StateRoot `A.Alters` MP.NodeData) m
   ) =>
@@ -131,12 +143,11 @@ genericLookupWithDefaultRawStorageDB key = do
     Nothing -> do
       theBMap <- getMemRawStorageBlockDB
       case M.lookup key theBMap of
-        Just val' -> return val'
+        Just val -> return val
         Nothing -> do
-          v <- getRawStorageKeyValDB key
-          --put in the TX cache for fast future lookups
-          putMemRawStorageTxMap $ M.insert key v theMap
-          return v
+          value <- getRawStorageKeyValDB key
+          putMemRawStorageTxMap $ M.insert key value theMap
+          return value
 
 genericInsertRawStorageDB ::
   HasMemRawStorageDB m =>
@@ -252,24 +263,31 @@ deleteRawStorageKeyValDB :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateR
 deleteRawStorageKeyValDB sr key = MP.deleteKey sr key
 
 getRawStorageKeyValDBMaybe ::
-  ( (Address `A.Alters` AddressState) m,
+  ( MonadIO m,
+    (Address `A.Alters` AddressState) m,
     (MP.StateRoot `A.Alters` MP.NodeData) m
   ) =>
   RawStorageKey ->
   m (Maybe RawStorageValue)
 getRawStorageKeyValDBMaybe (owner, key) = do
   mContractRoot <- fmap addressStateContractRoot <$> A.lookup (A.Proxy @AddressState) owner
-  fmap (fmap rlpDecode . join) . for mContractRoot $ \cr -> MP.getKeyVal cr (N.EvenNibbleString $ unparsePath key)
+  fmap join . for mContractRoot $ \cr -> do
+    cache <- liftIO $ readIORef storageReadCache
+    case M.lookup (cr, key) cache of
+      Just result -> pure result
+      Nothing -> do
+        result <- fmap rlpDecode <$> MP.getKeyVal cr (N.EvenNibbleString $ unparsePath key)
+        liftIO $ cacheStorageRead (cr, key) result
+        pure result
 
 getRawStorageKeyValDB ::
-  ( (Address `A.Alters` AddressState) m,
+  ( MonadIO m,
+    (Address `A.Alters` AddressState) m,
     (MP.StateRoot `A.Alters` MP.NodeData) m
   ) =>
   RawStorageKey ->
   m RawStorageValue
-getRawStorageKeyValDB (owner, key) = do
-  contractRoot <- addressStateContractRoot <$> A.lookupWithDefault (A.Proxy @AddressState) owner
-  maybe def rlpDecode <$> MP.getKeyVal contractRoot (N.EvenNibbleString $ unparsePath key)
+getRawStorageKeyValDB key = maybe def id <$> getRawStorageKeyValDBMaybe key
 
 getAllRawStorageKeyValsDB :: FullRawStorage m => Address -> m [(MP.Key, RawStorageValue)]
 getAllRawStorageKeyValsDB owner = do

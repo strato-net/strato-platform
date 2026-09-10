@@ -20,6 +20,29 @@ router.post("/self-bond", walletAuth, StakingController.selfBond);
 router.post("/self-unbond", walletAuth, StakingController.unbondSelf);
 
 router.post("/rewards/deposit", walletAuth, StakingController.depositRewards);
+
+// proposer fees (USDST)
+router.post("/claim-fees", walletAuth, StakingController.claimFees);
+router.post("/operator/claim-fees", walletAuth, StakingController.claimOperatorFees);
+
+// validator lifecycle
+router.post("/register", walletAuth, StakingController.register);
+router.post("/profile", walletAuth, StakingController.updateProfile);
+router.post("/activate", walletAuth, StakingController.activate);
+router.post("/reconcile", walletAuth, StakingController.reconcile);
+router.post("/sync", walletAuth, StakingController.sync);
+router.post("/exit", walletAuth, StakingController.requestExit);
+router.post("/exit/cancel", walletAuth, StakingController.cancelExit);
+
+// admin (owner votes)
+router.patch("/admin/operators/validator-address", walletAuth, StakingController.setValidatorAddress);
+router.patch("/admin/validator-params", walletAuth, StakingController.setValidatorParams);
+router.patch("/admin/set-params", walletAuth, StakingController.setSetParams);
+router.patch("/admin/governance", walletAuth, StakingController.setGovernance);
+router.post("/admin/recover-fees", walletAuth, StakingController.recoverUnattributedFees);
+router.patch("/admin/emergency-kicker", walletAuth, StakingController.setEmergencyKicker);
+router.patch("/admin/governance/staking-contract", walletAuth, StakingController.setGovernanceStakingContract);
+router.patch("/admin/governance/hard-cap", walletAuth, StakingController.setGovernanceHardCap);
 router.post("/admin/operators", walletAuth, StakingController.addOperator);
 router.delete("/admin/operators", walletAuth, StakingController.removeOperator);
 router.patch("/admin/operators/commission", walletAuth, StakingController.setOperatorCommission);

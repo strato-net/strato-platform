@@ -252,6 +252,11 @@ const StratoStats = () => {
     return `${cr.toFixed(2)}%`;
   };
 
+  const formatSince = (ts: number): string => {
+    const hours = Math.round((Date.now() / 1000 - ts) / 3600);
+    return hours >= 48 ? `${Math.round(hours / 24)}d ago` : `${hours}h ago`;
+  };
+
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
@@ -259,7 +264,6 @@ const StratoStats = () => {
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="STRATO Stats" />
         <main className="p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">
             {!isLoggedIn && (
               <GuestSignInBanner message="Sign in to view detailed statistics and analytics" />
             )}
@@ -657,14 +661,14 @@ const StratoStats = () => {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} yield vault fees
+                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} yield vault net revenue
                       </p>
                       {!revenueLoading && BigInt(yieldVaultPendingRevenue || '0') > 0n && (
                         <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
                           +${formatLargeNumber(parseFloat(formatUnits(BigInt(yieldVaultPendingRevenue), 18)))} pending
                           {yieldVaultLastAccrual > 0 && (
                             <span className="text-muted-foreground">
-                              {' '}(since {Math.round((Date.now() / 1000 - yieldVaultLastAccrual) / 3600)}h ago)
+                              {' '}(since last sweep {formatSince(yieldVaultLastAccrual)})
                             </span>
                           )}
                         </div>
@@ -747,7 +751,6 @@ const StratoStats = () => {
                 </Card>
               </TabsContent>
             </Tabs>
-          </div>
         </main>
       </div>
 

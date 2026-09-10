@@ -28,7 +28,12 @@ describe("service bootstrap", () => {
       "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name"
     );
     const tables = rows.map((r) => r.table_name);
-    for (const expected of ["tracking_links", "tracking_sessions", "wallet_connections"]) {
+    for (const expected of [
+      "tracking_links",
+      "tracking_sessions",
+      "wallet_connections",
+      "posthog_wallet_connections",
+    ]) {
       assert.ok(tables.includes(expected), `${expected} missing from ${tables}`);
     }
     const cols = (await sql<{ column_name: string }>("SELECT column_name FROM information_schema.columns WHERE table_name = 'tracking_links'")).rows.map((r) => r.column_name);
@@ -43,5 +48,19 @@ describe("service bootstrap", () => {
     assert.ok(sessionCols.includes("bot_reason"), `bot_reason column missing (migration 005): ${sessionCols}`);
     const connectionCols = (await sql<{ column_name: string }>("SELECT column_name FROM information_schema.columns WHERE table_name = 'wallet_connections'")).rows.map((r) => r.column_name);
     assert.ok(connectionCols.includes("session_source"), `session_source column missing (migration 005): ${connectionCols}`);
+    const posthogConnectionCols = (
+      await sql<{ column_name: string }>(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = 'posthog_wallet_connections'"
+      )
+    ).rows.map((r) => r.column_name);
+    for (const expected of [
+      "posthog_session_id",
+      "posthog_distinct_id",
+      "external_wallet_address",
+      "strato_address",
+      "connected_at",
+    ]) {
+      assert.ok(posthogConnectionCols.includes(expected), `${expected} missing from ${posthogConnectionCols}`);
+    }
   });
 });

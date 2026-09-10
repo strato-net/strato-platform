@@ -101,12 +101,20 @@ handleEvents peer = awaitForever $ \case
   MsgEvt Status {} -> error "A status message appeared after the handshake"
   MsgEvt Ping -> yieldR Pong
   MsgEvt (Transactions txs) -> do
-    $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s) from" ++ peerString peer ++ ", they are " ++ intercalate "\n" (format <$> txs)
     lift stampActionTimestamp
-    let txo = Origin.PeerString (peerString peer)
-    ts <- liftIO getCurrentMicrotime
-    let ingestTxs = IETx ts . IngestTx txo <$> txs
-    yieldL $ ToUnseq ingestTxs
+    WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+    BestSequencedBlock _ myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
+    if worldNumber - myNumber > txGossipCatchupWindow
+      then
+        $logDebugS "handleEvents/Transactions" . T.pack $
+          "Ignoring " ++ show (length txs) ++ " gossiped transaction(s) from " ++ peerString peer
+            ++ "; still " ++ show (worldNumber - myNumber) ++ " blocks behind the tip"
+      else do
+        $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s) from" ++ peerString peer ++ ", they are " ++ intercalate "\n" (format <$> txs)
+        let txo = Origin.PeerString (peerString peer)
+        ts <- liftIO getCurrentMicrotime
+        let ingestTxs = IETx ts . IngestTx txo <$> txs
+        yieldL $ ToUnseq ingestTxs
   MsgEvt (NewBlock block' _) -> do
     lift stampActionTimestamp
     $logInfoS "handleEvents/NewBlock" "newBlock"
@@ -119,20 +127,27 @@ handleEvents peer = awaitForever $ \case
     parentHeader <- lift $ lookup (Proxy @BlockHeader) parentHash'
     case parentHeader of
       Nothing -> do
-        BestSequencedBlock _ bestBlockNum _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
-        let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
-        $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
-        $logInfoS "handleEvents/NewBlock" "#### New block is missing its parent, I am resyncing"
-        syncFetch Forward fetchNumber
+        BestSequencedBlock _ bestBlockNum _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
+        let fetchNumber = alignFetchNumber $ if bestBlockNum < 2 then 1 else bestBlockNum - 1
+        -- Debounced: while we are far behind, every gossiped block misses its
+        -- parent, and one 500-header request per gossiped block buries the
+        -- BlockBodies responses we actually need.
+        shouldFetch <- lift $ tryResyncFrom fetchNumber
+        when shouldFetch $ do
+          $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
+          $logInfoS "handleEvents/NewBlock" "#### New block is missing its parent, I am resyncing"
+          syncFetch Forward fetchNumber
       Just _ -> do
         let ingestBlock = IEBlock $ blockToIngestBlock (Origin.PeerString $ peerString peer) block'
         yieldL $ ToUnseq [ingestBlock]
   MsgEvt (NewBlockHashes _) -> do
     lift stampActionTimestamp
-    BestSequencedBlock _ bestBlockNum _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
-    let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
-    $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
-    syncFetch Forward fetchNumber
+    BestSequencedBlock _ bestBlockNum _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
+    let fetchNumber = alignFetchNumber $ if bestBlockNum < 2 then 1 else bestBlockNum - 1
+    shouldFetch <- lift $ tryResyncFrom fetchNumber
+    when shouldFetch $ do
+      $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
+      syncFetch Forward fetchNumber
   MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> do
     lift stampActionTimestamp
     start' <- case dir of
@@ -180,7 +195,10 @@ handleEvents peer = awaitForever $ \case
 
     unless bodyRequestAlreadyActive $ do
       bodyHashes' <- lift getBodiesToFetch
-      yieldR $ GetBlockBodies bodyHashes'
+      -- An empty fetch list means nothing was queued; asking a peer for zero
+      -- bodies just burns a round trip (it dutifully answers BlockBodies []),
+      -- which is why the BlockBodies handler below already guards on this.
+      unless (null bodyHashes') . yieldR $ GetBlockBodies bodyHashes'
 
 
 
@@ -312,7 +330,9 @@ handleEvents peer = awaitForever $ \case
     P2pBlock b -> do
       when (shouldSend peer $ obOrigin b) $ do
         WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
-        $logInfoS "handleEvents/P2pBlock" . T.pack $ "World Number: " ++ show worldNumber
+        -- Debug: this fires once per (committed block x peer connection); a
+        -- from-genesis sync logged 594k of these lines.
+        $logDebugS "handleEvents/P2pBlock" . T.pack $ "World Number: " ++ show worldNumber
         when (BlockHeader.number (obBlockData b) >= worldNumber) $ do
           $logInfoS "handleEvents/P2pBlock" . T.pack $ "yielding new block: " ++ show (BlockHeader.number . blockBlockData . outputBlockToBlock $ b)
           yieldR $ NewBlock (outputBlockToBlock b) 0
@@ -369,8 +389,18 @@ handleEvents peer = awaitForever $ \case
                   lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (ip, msgHash) Proxy
                   yieldR outbound
     P2pAskForBlocks start _ _ -> do
-      $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start
-      syncFetch Forward start
+      -- Debounced for the same reason as the missing-parent resync: while the
+      -- sequencer sits at block N, every blockstanbul message from an ahead
+      -- peer makes it emit GapFound, and this handler fans an identical
+      -- 500-header request out to EVERY connection. Measured on a syncing
+      -- node: 8k header requests covering only 118 distinct numbers, the worst
+      -- repeated 1,422 times. The longer a stall lasted, the harder p2p
+      -- flooded itself, which is what kept the stall going.
+      let start' = alignFetchNumber start
+      shouldFetch <- lift $ tryResyncFrom start'
+      when shouldFetch $ do
+        $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start'
+        syncFetch Forward start'
     P2pPushBlocks start end p -> do
       ss <- lift $ shouldSendToPeer p
       when ss $ do
@@ -389,7 +419,7 @@ handleEvents peer = awaitForever $ \case
     P2pMPNodesResponse o nds -> when (shouldRespond peer o) . yieldR $ MPNodes nds
   TimerEvt -> do
     WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
-    BestSequencedBlock _ myNumber _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
+    BestSequencedBlock _ myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
     let syncDone = if worldNumber >= 0 then Just (myNumber >= worldNumber) else Nothing
     unless (syncDone == Just True) $ do
       maybeSyncTask <- lift $ getCurrentSyncTask $ pPeerHost peer
@@ -421,6 +451,41 @@ handleEvents peer = awaitForever $ \case
     $logInfoS "handleEvents/AbortEvt" . T.pack $ "Received AbortEvt: " ++ reason
     yieldR $ Disconnect AlreadyConnected
   event -> liftIO . error $ "unrecognized event: " ++ show event
+
+-- | How close to the tip we have to be before gossiped transactions are worth
+-- forwarding to the sequencer.
+--
+-- While a node is far behind, every gossiped transaction is one the sequencer
+-- cannot use yet: it will arrive again inside a block during sync, and in the
+-- meantime the sequencer pays an ECDSA signer recovery and a dedup lookup for
+-- each one (plus this handler formatting every transaction into the log).
+-- Being a block from the tip is not required — the mempool only has to be warm
+-- by the time we actually catch up.
+txGossipCatchupWindow :: Integer
+txGossipCatchupWindow = 1000
+
+-- | Snap a gossip-driven fetch start down to a fixed 'maxReturnedHeaders'
+-- boundary.
+--
+-- The entry points below each derive a start from live local state (our
+-- sequenced tip, or the sequencer's gap), so two connections entering the same
+-- region a moment apart ask for e.g. 295466 and 295478. Those are different
+-- numbers, so 'tryResyncFrom' sees them as different work and lets BOTH
+-- through, and both then download almost exactly the same 500 blocks —
+-- observed as ranges (295466:295965) and (295478:295946) fetched side by side.
+-- Snapping to a boundary turns them into the same request, which is what lets
+-- the gate actually collapse them.
+--
+-- Aligning downwards is cheap: 'addToHeaderCache' prunes headers at or below
+-- the sequenced tip, so the few hundred extra headers are dropped before they
+-- can turn into extra body fetches. Only these gossip entry points are
+-- aligned; the BlockBodies continuation is a per-connection forward walk that
+-- does not collide with other peers, and snapping it backwards would re-fetch
+-- the batch it just finished.
+alignFetchNumber :: Integer -> Integer
+alignFetchNumber n = (max 0 n `div` step) * step
+  where
+    step = fromIntegral . max 1 $ Conf.maxReturnedHeaders (p2pConfig ethConf)
 
 syncFetch ::
   ( MonadIO m,

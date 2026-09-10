@@ -6,17 +6,29 @@ import {
 } from "../events-read/cirrusEvents.client";
 import { batchHandleAction } from "../rewards-cycle/rewardsBatch.writer";
 import { checkBalances } from "../rewards-cycle/rewardsBalance.guard";
-import { RewardsAction, NonEmptyArray } from "../../shared/types";
+import {
+  RewardsAction,
+  NonEmptyArray,
+  PositionEventSource,
+} from "../../shared/types";
 import { blockTrackingService } from "../../infra/state/blockTracking.repo";
 import { nextCursorAfter } from "../events-read/eventRecord.mapper";
 import { isContractExecutionFailure } from "../../shared/core/errors";
 
-export const processRewardsCycle = async (): Promise<void> => {
+export const processRewardsCycle = async (
+  positionEventSources: PositionEventSource[]
+): Promise<void> => {
   try {
     logInfo("RewardsPolling", "Starting polling cycle");
     await checkBalances();
 
-    const { contractAddresses, eventNames, cursor, validPairs } = await getEventQueryParams();
+    const {
+      contractAddresses,
+      eventNames,
+      cursor,
+      validPairs,
+      positionActivityRoutes,
+    } = await getEventQueryParams();
 
     if (contractAddresses.length === 0 || eventNames.length === 0) {
       throw new Error("No event mappings found");
@@ -26,7 +38,9 @@ export const processRewardsCycle = async (): Promise<void> => {
       contractAddresses,
       eventNames,
       cursor,
-      validPairs
+      validPairs,
+      positionActivityRoutes,
+      positionEventSources
     );
 
     const allActions: RewardsAction[] = allEvents.map((event) => ({

@@ -38,7 +38,7 @@ module Blockchain.Stream.Action (
 
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Event
+import SolidVM.Model.Event
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import Control.Lens hiding ((.=))

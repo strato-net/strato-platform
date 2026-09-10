@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -46,18 +47,22 @@ module Blockchain.Database.MerklePatricia
     initializeBlank,
     blankStateRoot,
     addAllKVs,
+    getInclusionProof,
   )
 where
 
 import Blockchain.Data.RLP
 import Blockchain.Database.MerklePatricia.Internal
+import Blockchain.Database.MerklePatricia.NodeData (ptrRef)
 import Blockchain.Strato.Model.Util (byteString2NibbleString)
 import Control.Monad.Change.Alter
+import qualified Control.Monad.Change.Alter as A
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import qualified Data.ByteString as B
 import Data.Default
 import Data.Maybe (isJust, listToMaybe)
+import qualified Data.NibbleString as N
 import qualified Database.LevelDB as DB
 
 genericLookupDB :: MonadIO m => m DB.DB -> StateRoot -> m (Maybe NodeData)
@@ -142,3 +147,61 @@ addAllKVs sr [] = return sr
 addAllKVs sr (x : rest) = do
   sr' <- unsafePutKeyVal sr (byteString2NibbleString $ rlpSerialize $ rlpEncode $ fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
   addAllKVs sr' rest
+
+-- | Generate an inclusion proof for a key under the given trie root.
+--
+-- Returns @Just (valueBytes, proofNodes)@ if the key is present, @Nothing@
+-- if absent. The shape is what the on-chain MerklePatricia.verifyInclusion
+-- verifier consumes:
+--
+--   * @valueBytes@ is the raw byte string the verifier compares against the
+--     trie leaf. For tries built via 'addAllKVs', the trie stores the user
+--     value as @RLPString (rlpSerialize (rlpEncode v))@; this function
+--     extracts the inner bytes, i.e. @rlpSerialize (rlpEncode v)@.
+--
+--   * @proofNodes@ is the list of @rlpSerialize (rlpEncode node)@ from root
+--     to leaf. Inlined sub-nodes (small refs whose RLP serialization is
+--     <32 bytes and is embedded directly in the parent) do NOT contribute
+--     their own entry; the on-chain walker descends into them inline.
+--
+-- The trie nodes must already be present in the @StateRoot \`Alters\` NodeData@
+-- backing store. Callers using @addAllKVs@ in a fresh @runMP@ context
+-- already have this; production callers (e.g. the JSON-RPC handler for
+-- strato_getReceiptProof) need to either persist the receipts trie at block
+-- construction time or rebuild it on demand before calling.
+getInclusionProof ::
+  (StateRoot `Alters` NodeData) m =>
+  StateRoot ->
+  -- | Pre-encoded key. For receipts: @byteString2NibbleString (rlpSerialize (rlpEncode txIndex))@.
+  Key ->
+  m (Maybe (B.ByteString, [B.ByteString]))
+getInclusionProof rootSr key = walkRef (ptrRef rootSr) key []
+  where
+    -- Recurse into a referenced node. Pointer refs (Right StateRoot) require
+    -- a DB lookup and contribute the looked-up node's bytes to the proof.
+    -- Inlined refs (Left bytes) are part of the parent's encoded form and
+    -- contribute nothing -- we just deserialize the bytes back into a
+    -- NodeData and continue walking.
+    walkRef (Right sr) k acc = do
+      mNd <- A.lookup (Proxy @NodeData) sr
+      case mNd of
+        Nothing -> return Nothing
+        Just nd ->
+          walkNode nd k (acc ++ [rlpSerialize (rlpEncode nd)])
+    walkRef (Left bytes) k acc =
+      walkNode (rlpDecode (rlpDeserialize bytes) :: NodeData) k acc
+
+    walkNode EmptyNodeData _ _ = return Nothing
+    walkNode (FullNodeData _ (Just val)) k acc
+      | N.null k = return $ Just (rlpDecode val, acc)
+    walkNode (FullNodeData _ Nothing) k _
+      | N.null k = return Nothing
+    walkNode (FullNodeData cs _) k acc =
+      let n = fromIntegral $ N.head k
+       in walkRef (cs !! n) (N.tail k) acc
+    walkNode (ShortcutNodeData s (Right val)) k acc
+      | s == k = return $ Just (rlpDecode val, acc)
+      | otherwise = return Nothing
+    walkNode (ShortcutNodeData s (Left ref)) k acc
+      | s `N.isPrefixOf` k = walkRef ref (N.drop (N.length s) k) acc
+      | otherwise = return Nothing

@@ -163,7 +163,9 @@ export type SupportedChainId =
   | 42161
   | 42170
   | 56
-  | 43114;
+  | 43114
+  | 4663
+  | 46630;
 
 // Error handling types
 export interface BridgeError {

@@ -4,6 +4,7 @@ import { toast } from "@/hooks/use-toast";
 import { getErrorTitle } from "./errorConfig";
 import { getCsrfToken } from "./csrf";
 import { redirectToLogin } from "./auth";
+import { capture, captureApi, normalizePath, resolveApiAction, type ApiAction } from "./analytics";
 
 const api = axios.create({
   baseURL: "/api",
@@ -92,7 +93,7 @@ async function pollTxResult(
     const { data: results } = await api.post("/rpc/results", hashes);
     results.forEach((result: any, index: number) => {
       if (result?.status === "Pending") {
-        onProgress?.({ index, total: hashes.length, status: "confirming", hash: hashes[index] });
+        emitProgress(onProgress, { index, total: hashes.length, status: "confirming", hash: hashes[index] });
       }
     });
     const allDone = results.every((r: any) => r?.status !== "Pending");
@@ -100,6 +101,38 @@ async function pollTxResult(
     if (Date.now() - start >= timeout) return results;
     await new Promise((resolve) => setTimeout(resolve, interval));
   }
+}
+
+// Mirrors every wallet-tx progress transition into analytics. This is the only
+// place in the app that sees the real on-chain outcome of a wallet-signed
+// action -- the HTTP 200 that preceded it only means the backend built the tx.
+// Every progress modal in the app consumes this same handler, so instrumenting
+// here covers all of them at once.
+// pollTxResult re-emits "confirming" for every pending tx on every 3s poll,
+// which is right for driving a progress modal but would multiply the event by
+// the confirmation time. Analytics only wants the first one per hash.
+const confirmingCaptured = new Set<string>();
+
+function emitProgress(
+  onProgress: WalletTxProgressHandler | undefined,
+  event: WalletTxProgressEvent
+): void {
+  onProgress?.(event);
+
+  if (event.status === "confirming") {
+    const key = event.hash ?? `${event.index}`;
+    if (confirmingCaptured.has(key)) return;
+    confirmingCaptured.add(key);
+  }
+
+  capture(`tx_${event.status}` as const, {
+    function_name: event.functionName,
+    tx_hash: event.hash,
+    index: event.index,
+    total: event.total,
+    // A chain revert reason or wallet rejection, not user data.
+    error_message: event.error,
+  });
 }
 
 async function signAndSubmitUnsignedTxs(
@@ -115,18 +148,18 @@ async function signAndSubmitUnsignedTxs(
     const functionName = txForWallet.data?.functionName;
 
     try {
-      onProgress?.({ index, total: unsignedTxs.length, status: "signing", functionName, hash: tx.hash });
+      emitProgress(onProgress, { index, total: unsignedTxs.length, status: "signing", functionName, hash: tx.hash });
       const signature = await _walletSignFn(txForWallet);
       const sig = parseSignature(signature);
       const signedTx = buildSignedTx(txForWallet.data, sig);
 
-      onProgress?.({ index, total: unsignedTxs.length, status: "submitting", functionName, hash: tx.hash });
+      emitProgress(onProgress, { index, total: unsignedTxs.length, status: "submitting", functionName, hash: tx.hash });
       const submittedHash = await api.post("/rpc/submit", signedTx);
       const hash = typeof submittedHash.data === "string" ? submittedHash.data : tx.hash;
       hashes.push(hash);
-      onProgress?.({ index, total: unsignedTxs.length, status: "submitted", functionName, hash });
+      emitProgress(onProgress, { index, total: unsignedTxs.length, status: "submitted", functionName, hash });
     } catch (error) {
-      onProgress?.({
+      emitProgress(onProgress, {
         index,
         total: unsignedTxs.length,
         status: "failed",
@@ -142,7 +175,7 @@ async function signAndSubmitUnsignedTxs(
   const failed = results.find((r: any) => r?.status === "Failure");
   if (failed) {
     const failedIndex = results.indexOf(failed);
-    onProgress?.({
+    emitProgress(onProgress, {
       index: failedIndex,
       total: hashes.length,
       status: "failed",
@@ -153,7 +186,7 @@ async function signAndSubmitUnsignedTxs(
   }
   const pendingIndex = results.findIndex((r: any) => r?.status === "Pending");
   if (pendingIndex >= 0) {
-    onProgress?.({
+    emitProgress(onProgress, {
       index: pendingIndex,
       total: hashes.length,
       status: "submitted",
@@ -162,7 +195,7 @@ async function signAndSubmitUnsignedTxs(
     return { status: "Pending", hash: hashes[0] };
   }
   results.forEach((result: any, index: number) => {
-    onProgress?.({
+    emitProgress(onProgress, {
       index,
       total: hashes.length,
       status: "completed",
@@ -192,6 +225,16 @@ api.interceptors.request.use(
 
     const method = (config.method || "get").toLowerCase();
     const needsCsrf = ["post", "put", "delete", "patch"].includes(method);
+
+    // Product analytics: every write action in the app funnels through this
+    // instance, so resolving the action here instruments all of them at once.
+    // Only the method and normalized path are recorded -- request bodies carry
+    // signatures, nonces and raw tx data and must never be sent.
+    const action = resolveApiAction(method, config.url || "");
+    if (action) {
+      (config as any)._analytics = { action, startedAt: Date.now() };
+      captureApi(action, "started", { path: normalizePath(config.url || "") });
+    }
 
     if (needsCsrf) {
       const csrfToken = getCsrfToken();
@@ -245,10 +288,40 @@ function extractApiErrorMessage(error: any): string {
 // Response interceptor to catch 401, 403 (CSRF), and show global toast for all APIs
 api.interceptors.response.use(
   async (response) => {
-    if (response.data?._unsigned && response.data?._unsignedTxs) {
+    const meta = (response.config as any)._analytics as
+      | { action: ApiAction; startedAt: number }
+      | undefined;
+    const walletSigned = !!(response.data?._unsigned && response.data?._unsignedTxs);
+
+    if (walletSigned) {
       const onProgress = (response.config as any).walletTxProgress as WalletTxProgressHandler | undefined;
-      const result = await signAndSubmitUnsignedTxs(response.data._unsignedTxs, onProgress);
-      response.data = { ...response.data, ...result, _unsigned: undefined, _unsignedTxs: undefined };
+      try {
+        const result = await signAndSubmitUnsignedTxs(response.data._unsignedTxs, onProgress);
+        response.data = { ...response.data, ...result, _unsigned: undefined, _unsignedTxs: undefined };
+      } catch (signError) {
+        // A throw from this fulfilled handler does not reach the rejection
+        // handler below, so wallet-rejection and on-chain-revert failures have
+        // to be recorded here or they would be invisible.
+        if (meta) {
+          captureApi(meta.action, "failed", {
+            path: normalizePath(response.config.url || ""),
+            duration_ms: Date.now() - meta.startedAt,
+            wallet_signed: true,
+            stage: "wallet_tx",
+            error_message:
+              signError instanceof Error ? signError.message : "Transaction failed",
+          });
+        }
+        throw signError;
+      }
+    }
+
+    if (meta) {
+      captureApi(meta.action, "succeeded", {
+        path: normalizePath(response.config.url || ""),
+        duration_ms: Date.now() - meta.startedAt,
+        wallet_signed: walletSigned,
+      });
     }
     return response;
   },
@@ -259,7 +332,27 @@ api.interceptors.response.use(
     }
     
     const url = error?.config?.url || "";
-    
+    const meta = (error?.config as any)?._analytics as
+      | { action: ApiAction; startedAt: number }
+      | undefined;
+    const status = error.response?.status;
+
+    // Deliberately below the abort/cancel early-return above: a superseded
+    // quote request is not a failed user action.
+    if (meta) {
+      captureApi(meta.action, "failed", {
+        path: normalizePath(url),
+        duration_ms: Date.now() - meta.startedAt,
+        status,
+        stage: "http",
+        error_title: getErrorTitle(url),
+        error_message: extractApiErrorMessage(error),
+      });
+    }
+    // Note: `session_expired` is not captured here. A 401 also arrives for
+    // guests probing endpoints that need a vault session, so the event is fired
+    // from UserContext only when a real STRATO session was torn down.
+
     // Handle CSRF validation errors (403 with CSRF message)
     if (error.response?.status === 403) {
       const errorMessage = extractApiErrorMessage(error);

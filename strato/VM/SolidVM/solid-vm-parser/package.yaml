@@ -61,4 +61,5 @@ tests:
       - solid-vm-model
       - solid-vm-parser
       - source-tools
+      - strato-model
       - vm-tools

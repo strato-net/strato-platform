@@ -70,6 +70,13 @@ export function SendTokensDialog({ disabled }: { disabled?: boolean }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<{ to?: string; amount?: string }>({});
 
+  // A stale dry-run is misleading once the transfer inputs change (or the
+  // dialog is reopened); clear the panel on any edit.
+  const simReset = sim.reset;
+  useEffect(() => {
+    simReset();
+  }, [simReset, fromWallet, symbol, recipient, recipientAddress, amount, open]);
+
   const resolvedTo = recipientAddress;
 
   const setPercent = (pct: number) => {

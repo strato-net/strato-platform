@@ -47,6 +47,18 @@ router.post("/pools", walletAuth, PoolV3Controller.create);
 
 /**
  * @openapi
+ * /poolv3/fee-tiers:
+ *   get:
+ *     summary: Fee tiers currently enabled on the PoolV3Factory
+ *     tags: [PoolV3]
+ *     responses:
+ *       200:
+ *         description: Enabled tiers (fee in pips with its tick spacing), ascending by fee
+ */
+router.get("/fee-tiers", authHandler.authorizeRequest(true), PoolV3Controller.feeTiers);
+
+/**
+ * @openapi
  * /poolv3/pools/{poolAddress}:
  *   get:
  *     summary: Fetch a V3 pool by address

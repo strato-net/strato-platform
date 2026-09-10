@@ -676,7 +676,7 @@ const Earn = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
+    <div className="min-h-screen bg-background">
       <DashboardSidebar />
       <MobileSidebar
         isOpen={isMobileSidebarOpen}
@@ -689,7 +689,7 @@ const Earn = () => {
       >
         <DashboardHeader title="Earn Opportunities" />
 
-        <main className="p-4 md:p-6 pb-16 md:pb-6 space-y-8">
+        <main className="p-4 md:p-6 pb-16 md:pb-6 space-y-8 overflow-x-hidden">
           {guestMode && (
             <GuestSignInBanner message="Sign in to view your positions and deposit to earn" />
           )}

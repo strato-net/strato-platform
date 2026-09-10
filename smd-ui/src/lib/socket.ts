@@ -1,11 +1,11 @@
-import io from "socket.io-client";
+import { io, type Socket } from "socket.io-client";
 
-// Singleton connection to the apex websocket (socket.io v2, served at /apex-ws).
+// Singleton connection to the apex websocket (socket.io v4, served at /apex-ws).
 // Rooms are subscribed via `SUBSCRIBE/<room>` and deliver `PRELOAD_<room>` (initial)
 // then `EVENT_<room>` (updates).
-let _socket: SocketIOClient.Socket | null = null;
+let _socket: Socket | null = null;
 
-export function getSocket(): SocketIOClient.Socket {
+export function getSocket(): Socket {
   if (!_socket) {
     _socket = io({ path: "/apex-ws", transports: ["websocket"] });
   }

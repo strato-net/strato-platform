@@ -1,10 +1,12 @@
 // Fire-and-forget beacons for the tracking-links feature. The tracking session
 // cookie is HttpOnly and set by the /t/<slug> resolver, so the SPA cannot see
-// it — both beacons are sent unconditionally and the tracking service no-ops
-// when no session cookie rides along. Nothing here may ever call gtag or
-// include prospect labels: only wallet addresses and connector ids are sent,
-// first-party, to our own tracking service.
+// it — both beacons are sent unconditionally. Nothing here may ever call gtag
+// or include prospect labels. Wallet addresses stay first-party; PostHog is
+// only read here (session + distinct id) so the tracking service can join its
+// row to the PostHog session. The `wallet_connected` analytics event itself is
+// captured once, in UserContext, via `lib/analytics.capture`.
 
+import posthog from 'posthog-js';
 import { getCsrfToken } from './csrf';
 
 let engageFired = false;
@@ -38,6 +40,24 @@ export interface WalletConnectedArgs {
   connector?: string | null;
 }
 
+function posthogContext(): {
+  posthogSessionId?: string;
+  posthogDistinctId?: string;
+} {
+  try {
+    if (!(posthog as { __loaded?: boolean }).__loaded) return {};
+    const posthogSessionId = posthog.get_session_id();
+    const posthogDistinctId = posthog.get_distinct_id();
+    if (!posthogSessionId) return {};
+    return {
+      posthogSessionId,
+      posthogDistinctId: posthogDistinctId || undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 // Reports a wallet/STRATO account becoming available. Deduped per lowercase
 // address for the app session: the STRATO connector publishes the same address
 // through wagmi and OAuth, and this guard collapses the two paths into one
@@ -49,6 +69,7 @@ export function trackWalletConnected(args: WalletConnectedArgs): void {
   const newAddresses = addresses.filter((a) => !reportedAddresses.has(a));
   if (newAddresses.length === 0) return;
   newAddresses.forEach((a) => reportedAddresses.add(a));
+  const context = posthogContext();
   try {
     fetch('/tracking-api/wallet-connected', {
       method: 'POST',
@@ -59,6 +80,7 @@ export function trackWalletConnected(args: WalletConnectedArgs): void {
         externalWalletAddress: args.externalWalletAddress ?? undefined,
         stratoAddress: args.stratoAddress ?? undefined,
         connector: args.connector ?? undefined,
+        ...context,
       }),
     }).catch(() => {});
   } catch {

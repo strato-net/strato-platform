@@ -76,6 +76,9 @@ import "YieldVault/YieldVault.sol";
 //Direct Mint PSM
 import "./Pools/DirectMintPSM.sol";
 
+//Flash mint
+import "./Flash/FlashMint.sol";
+
 contract record Mercata is Authorizable {
     RateStrategy public rateStrategy;
     PriceOracle public priceOracle;
@@ -103,6 +106,7 @@ contract record Mercata is Authorizable {
     Escrow public escrow;
     MetalForge public metalForge;
     DirectMintPSM public directMintPSM;
+    FlashMint public flashMint;
 
     constructor() public {
         // The owner of the implementation contract is ignored in favor of the proxy owner

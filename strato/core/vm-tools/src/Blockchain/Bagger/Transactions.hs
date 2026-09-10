@@ -5,20 +5,26 @@ module Blockchain.Bagger.Transactions where
 
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.Data.ExecResults
+import Blockchain.Data.Receipt
 import Blockchain.Data.TXOrigin
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResultStatus
 import Blockchain.Database.MerklePatricia (StateRoot (..))
 import Blockchain.Model.WrappedBlock (OutputTx (..))
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Delta
+import SolidVM.Model.Delta
+import SolidVM.Model.Event
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import qualified Blockchain.Stream.Action as Action
 import Control.DeepSeq
 import Control.Lens.Setter (set)
+import Control.Monad.IO.Class (MonadIO)
+import Data.Maybe (catMaybes)
 import qualified Data.Map as M
+import Data.List (foldl')
 import Data.Time.Clock
 import GHC.Generics
+import SolidVM.Model.TypedArg (valueToTypedArg)
 import Text.Format
 
 data TxRunResult = TxRunResult
@@ -177,3 +183,50 @@ getDeltasFromResults = foldr go mempty
           Right ExecResults{..} ->
             let vd' = toDelta erNewValidators erRemovedValidators
              in (vd' <> v)
+
+-- | Stake updates published during a block; a later transaction's update for
+-- the same validator wins.
+getStakeDeltasFromResults :: [TxRunResult] -> StakeDelta
+getStakeDeltasFromResults = foldl' go M.empty
+  where go acc trr = case trrResult trr of
+          Left _ -> acc
+          Right ExecResults{..} -> M.union erStakeUpdates acc
+
+-- | Convert a 'TxRunResult' to its canonical 'Receipt' for inclusion in the
+-- receipts trie (Phase 0 spec §6.2). Mirrors the gas/status accounting in
+-- 'BlockChain.outputTransactionResult':
+--
+--   * Pre-execution failure (Left) and execution exception both consume the
+--     full transaction gas limit and produce 'ReceiptFailure'.
+--   * Successful execution produces 'ReceiptSuccess' and gas used =
+--     gasLimit - remaining.
+--
+-- Each emitted SolidVM 'Event' becomes a 'ReceiptLog' whose args are the
+-- canonical 'TypedArg' values. Aggregates (arrays, structs, tuples) are
+-- resolved by reading the underlying IORef'd 'Variable's — that's why
+-- this lives in MonadIO. Args whose Value still can't be canonicalized
+-- (mappings, function refs, …) are dropped; see the comment on
+-- 'valueToTypedArg' in SolidVM.Model.TypedArg.
+txRunResultToReceipt :: MonadIO m => TxRunResult -> m Receipt
+txRunResultToReceipt trr = do
+  let txGasLim = TD.gasLimit (otBaseTx (trrTransaction trr))
+      (status, gasUsed, events) = case trrResult trr of
+        Left _ -> (ReceiptFailure, txGasLim, [])
+        Right er -> case erException er of
+          Just _ -> (ReceiptFailure, txGasLim, erEvents er)
+          Nothing -> (ReceiptSuccess, txGasLim - erRemainingTxGas er, erEvents er)
+  logs <- traverse eventToReceiptLog events
+  pure Receipt
+    { receiptStatus = status,
+      receiptGasUsed = gasUsed,
+      receiptLogs = logs
+    }
+
+eventToReceiptLog :: MonadIO m => Event -> m ReceiptLog
+eventToReceiptLog ev = do
+  args <- traverse (\(_, val, _, _) -> valueToTypedArg val) (evArgs ev)
+  pure ReceiptLog
+    { rlogContractAddress = evContractAddress ev,
+      rlogEventName = evName ev,
+      rlogArgs = catMaybes args
+    }

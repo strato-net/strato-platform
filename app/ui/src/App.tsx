@@ -12,6 +12,7 @@ import {
 } from "@rainbow-me/rainbowkit";
 import { createConfig, http } from "wagmi";
 import "@rainbow-me/rainbowkit/styles.css";
+import { robinhood, robinhoodTestnet } from "@/lib/bridge/constants";
 import { UserProvider } from "@/context/UserContext";
 import { UserTokensProvider } from "@/context/UserTokensContext";
 import { OracleProvider } from "@/context/OracleContext";
@@ -33,6 +34,7 @@ import StratoStats from "./pages/StratoStats";
 import Explore from "./pages/Explore";
 import Rewards from "./pages/Rewards";
 import Claim from "./pages/Claim";
+import ProductLanding from "./pages/ProductLanding";
 import CommunityRewardsOnePager from "./pages/CommunityRewardsOnePager";
 import PriceTracking from "./pages/PriceTracking";
 import Earn from "./pages/Earn";
@@ -165,8 +167,8 @@ const App = () => {
       const networkName = (window as { ENV?: { NETWORK_NAME?: string } }).ENV?.NETWORK_NAME || "";
       const isProduction = networkName === "upquark";
       const baseChains = isProduction
-        ? [mainnet, polygon, base, linea]
-        : [sepolia, baseSepolia, lineaSepolia];
+        ? [mainnet, polygon, base, linea, robinhood]
+        : [sepolia, baseSepolia, lineaSepolia, robinhoodTestnet];
       const proxiedChainIds: Set<number> = new Set(baseChains.filter(c => c.id !== polygon.id).map(c => c.id));
       const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(
@@ -506,6 +508,13 @@ const App = () => {
                                                   }
                                                 />
       
+                                                {/* Product landing pages — public, no app chrome */}
+                                                <Route path="/defi/usdst-vault" element={<ProductLanding slug="usdst-vault" />} />
+                                                <Route path="/defi/gold-vault" element={<ProductLanding slug="gold-vault" />} />
+                                                <Route path="/defi/liquidity" element={<ProductLanding slug="liquidity" />} />
+                                                <Route path="/defi/borrow" element={<ProductLanding slug="borrow" />} />
+                                                <Route path="/defi/staking" element={<ProductLanding slug="staking" />} />
+
                                                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                                                 <Route path="*" element={<NotFound />} />
                                               </Routes>

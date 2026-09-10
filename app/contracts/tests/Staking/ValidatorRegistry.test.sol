@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Pinned to the V1 (18.4) ValidatorRegistry, which is what BaseCodeCollection
+// currently ships. The V2 contract is parked outside the collection until the
+// validator fleet is upgraded past the staking fork.
+//
+// Tests for the V2 contract live in ValidatorRegistryV2.test.sol and are not run by
+// Jenkins yet — the "Contract tests" stage skips *V2.test.sol.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import "../../concrete/Staking/ValidatorRegistry.sol";
 import "../Util.sol";
 

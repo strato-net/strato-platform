@@ -13,7 +13,10 @@ library:
   dependencies:
     - aeson
     - aeson-casing
+    - base16-bytestring
     - binary
+    - ethereum-rlp
+    - merkle-patricia-db
     - blockapps-data
     - blockapps-datadefs
     - blockDB

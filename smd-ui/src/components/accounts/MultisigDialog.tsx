@@ -1021,6 +1021,13 @@ function ProposeIssueForm({
   const [manualArgs, setManualArgs] = useState<string[]>([""]);
   const [busy, setBusy] = useState(false);
 
+  // A stale dry-run is misleading once the proposal inputs change; clear the
+  // panel on any edit.
+  const proposalSimReset = proposalSim.reset;
+  useEffect(() => {
+    proposalSimReset();
+  }, [proposalSimReset, target, manualMode, selectedFunc, manualFunc, abiArgs, abiArgAddrs, manualArgs]);
+
   const isAddr = isAddressLike(target);
   const searchQ = isAddr ? strip0x(target) : target.trim().length >= 2 ? target.trim() : "";
   const { data: groups } = useContractGroups(searchQ);

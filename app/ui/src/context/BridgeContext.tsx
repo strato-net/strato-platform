@@ -53,10 +53,10 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   // ========== NETWORK & TOKEN FUNCTIONS ==========
   const fetchTokensForChain = useCallback(
-    async (chainId: string) => {
+    async (chainId: string, forceRefresh = false) => {
       try {
         const cached = tokenCacheRef.current.get(chainId);
-        if (cached) {
+        if (cached && !forceRefresh) {
           setBridgeableTokens(cached);
           if (cached.length > 0 && !selectedToken) setSelectedToken(cached[0]);
           return;
@@ -68,7 +68,11 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         tokenCacheRef.current.set(chainId, tokens);
         setBridgeableTokens(tokens);
 
-        if (tokens.length > 0 && !selectedToken) {
+        if (forceRefresh) {
+          setSelectedToken((current) =>
+            tokens.find((token) => token.id === current?.id) || current
+          );
+        } else if (tokens.length > 0 && !selectedToken) {
           setSelectedToken(tokens[0]);
         }
       } catch (e) {
@@ -341,12 +345,15 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
           params,
           options as any
         );
+        if (params.routeType === "native") {
+          await fetchTokensForChain(params.externalChainId, true);
+        }
         return { success: true, data };
       } finally {
         setLoading(false);
       }
     },
-    [],
+    [fetchTokensForChain],
   );
 
   // ========== TRANSACTION FUNCTIONS ==========

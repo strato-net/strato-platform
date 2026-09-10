@@ -8,7 +8,13 @@ import { ModeToggle } from './mode-toggle';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
 
-const Navbar = () => {
+interface NavbarProps {
+  /** "landing" renders the mockup treatment: solid bg, hairline border, filled navy CTA. */
+  variant?: "default" | "landing";
+}
+
+const Navbar = ({ variant = "default" }: NavbarProps) => {
+  const isLanding = variant === "landing";
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { isLoggedIn, logout, loading } = useUser();
   const { isTestnet } = useNetwork();
@@ -32,7 +38,13 @@ const Navbar = () => {
   );
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md shadow-sm">
+    <nav
+      className={
+        isLanding
+          ? "fixed top-0 left-0 right-0 z-50 border-b border-border bg-white dark:bg-background"
+          : "fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md shadow-sm"
+      }
+    >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-3">
@@ -67,7 +79,9 @@ const Navbar = () => {
                   ? 'opacity-75 cursor-not-allowed text-muted-foreground border border-border'
                   : isLoggedIn 
                     ? 'text-red-600 dark:text-red-400 border border-red-300 dark:border-red-400 hover:bg-red-50 dark:hover:bg-red-400/10' 
-                    : 'text-strato-blue dark:text-strato-lightblue border border-strato-blue/30 dark:border-strato-lightblue/50 hover:bg-strato-blue/5 dark:hover:bg-strato-lightblue/10'
+                    : isLanding
+                      ? 'bg-strato-blue text-white hover:bg-strato-blue/90 dark:bg-strato-lightblue dark:hover:bg-strato-lightblue/90'
+                      : 'text-strato-blue dark:text-strato-lightblue border border-strato-blue/30 dark:border-strato-lightblue/50 hover:bg-strato-blue/5 dark:hover:bg-strato-lightblue/10'
               }`}
             >
               {loading ? <Spinner /> : isLoggedIn ? 'Log Out' : 'Connect Wallet'}
@@ -115,7 +129,9 @@ const Navbar = () => {
                     ? 'opacity-75 cursor-not-allowed text-muted-foreground border border-border'
                     : isLoggedIn 
                       ? 'text-red-600 dark:text-red-400 border border-red-300 dark:border-red-400 hover:bg-red-50 dark:hover:bg-red-400/10' 
-                      : 'text-strato-blue dark:text-strato-lightblue border border-strato-blue dark:border-strato-lightblue hover:bg-strato-blue/5 dark:hover:bg-strato-lightblue/10'
+                      : isLanding
+                        ? 'bg-strato-blue text-white hover:bg-strato-blue/90 dark:bg-strato-lightblue dark:hover:bg-strato-lightblue/90'
+                        : 'text-strato-blue dark:text-strato-lightblue border border-strato-blue dark:border-strato-lightblue hover:bg-strato-blue/5 dark:hover:bg-strato-lightblue/10'
                 }`}
               >
                 {loading ? <Spinner /> : isLoggedIn ? 'Log Out' : 'Connect Wallet'}

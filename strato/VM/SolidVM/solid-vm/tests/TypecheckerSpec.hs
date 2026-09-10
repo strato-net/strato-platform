@@ -61,6 +61,28 @@ contract A {
 |]
 
     length anns `shouldBe` 0
+  it "typechecks an inherited modifier in the contract that declares it" $ do
+    anns <-
+      liftIO $
+        runTypechecker
+          [r|
+contract Base {
+  uint private secret = 7;
+  bool private locked;
+  modifier guard() {
+    require(!locked, "locked");
+    locked = true;
+    _;
+    locked = false;
+  }
+  function peek() internal view returns (uint) { return secret; }
+}
+contract Child is Base {
+  function go() public guard returns (uint) { return peek(); }
+}
+|]
+
+    anns `shouldBe` []
   it "can detect type errors in state variable declarations" $ do
     anns <-
       liftIO $

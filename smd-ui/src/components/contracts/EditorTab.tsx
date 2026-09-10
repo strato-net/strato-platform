@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import "@/lib/monaco";
+import { parseArgText } from "@/lib/args";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { Plus, FolderInput, Download, X, FilePlus2 } from "lucide-react";
@@ -96,6 +97,13 @@ export function EditorTab() {
   const [argValues, setArgValues] = useState<Record<string, string>>({});
   const [deploying, setDeploying] = useState(false);
   const [deployedAddress, setDeployedAddress] = useState<string>("");
+
+  // A stale dry-run is misleading once the deploy inputs change (or the dialog
+  // is reopened); clear the panel on any edit.
+  const simReset = sim.reset;
+  useEffect(() => {
+    simReset();
+  }, [simReset, selectedContract, argValues, walletUsername, compiledSource, createOpen]);
 
   const activeFile = files[active] ?? files[0];
   const contractNames = xabi?.src ? Object.keys(xabi.src) : [];
@@ -202,11 +210,9 @@ export function EditorTab() {
     for (const a of argDefs) {
       const raw = argValues[a.name];
       if (raw === undefined || raw === "") continue;
-      try {
-        args[a.name] = JSON.parse(raw);
-      } catch {
-        args[a.name] = raw;
-      }
+      // Bigint-safe parse: integers past 2^53 stay exact strings rather than
+      // rounded doubles; the node parses them against the declared ctor type.
+      args[a.name] = parseArgText(raw);
     }
     const metadata: Record<string, string> = { VM: "SolidVM" };
     if (contractNames.length) metadata.nohistory = contractNames.join(",");

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Vote, Database, ChevronDown, ArrowRightLeft, Vault } from 'lucide-react';
+import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Vote, Database, ChevronDown, ArrowRightLeft, Vault, Layers } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import CreateTokenForm from '@/components/admin/CreateTokenForm';
 import CreatePoolForm from '@/components/admin/CreatePoolForm';
@@ -17,6 +17,7 @@ import VoteTab from '@/components/admin/VoteTab';
 import BridgeTransactionsPage from '@/components/dashboard/BridgeTransactionsPage';
 import VaultAdminTab from '@/components/admin/VaultAdminTab';
 import YieldVaultAdminTab from '@/components/admin/YieldVaultAdminTab';
+import StakingAdminTab from '@/components/admin/StakingAdminTab';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -136,6 +137,11 @@ const Admin = () => {
                 <span className="hidden sm:inline">Vault</span>
                 <span className="sm:hidden">Vault</span>
               </TabsTrigger>
+              <TabsTrigger value="staking" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
+                <Layers className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Staking</span>
+                <span className="sm:hidden">Stake</span>
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -203,6 +209,19 @@ const Admin = () => {
           </TabsContent>
           <TabsContent value="bridge" className="space-y-6">
             <BridgeTransactionsPage isAdmin={true} />
+          </TabsContent>
+          <TabsContent value="staking" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Validators & Staking</CardTitle>
+                <CardDescription>
+                  Validator set, eligibility and fee parameters, governance wiring, operator management.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <StakingAdminTab />
+              </CardContent>
+            </Card>
           </TabsContent>
           <TabsContent value="vault" className="space-y-6">
             <Card>

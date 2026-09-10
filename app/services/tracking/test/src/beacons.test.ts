@@ -72,6 +72,58 @@ describe("anonymous beacons", () => {
     assert.equal(String(rows[0].link_id), link.id);
   });
 
+  it("stores a PostHog session-to-wallet join without a tracking-link session", async () => {
+    const external = randomAddress();
+    const posthogSessionId = "019c0000-0000-7000-8000-000000000001";
+    const body = {
+      externalWalletAddress: external,
+      connector: "MetaMask",
+      posthogSessionId,
+      posthogDistinctId: "anonymous-browser-1",
+    };
+
+    assert.equal(
+      (await api("/tracking-api/wallet-connected", { method: "POST", body })).status,
+      204
+    );
+    assert.equal(
+      (await api("/tracking-api/wallet-connected", { method: "POST", body })).status,
+      204
+    );
+
+    const { rows } = await sql(
+      "SELECT * FROM posthog_wallet_connections WHERE posthog_session_id = $1",
+      [posthogSessionId]
+    );
+    assert.equal(rows.length, 1, "duplicate PostHog connection should be deduped");
+    assert.equal(rows[0].external_wallet_address, cirrusAddress(external));
+    assert.equal(rows[0].strato_address, "");
+    assert.equal(rows[0].connector, "MetaMask");
+    assert.equal(rows[0].posthog_distinct_id, "anonymous-browser-1");
+  });
+
+  it("does not store malformed PostHog session identifiers", async () => {
+    const external = randomAddress();
+    assert.equal(
+      (
+        await api("/tracking-api/wallet-connected", {
+          method: "POST",
+          body: {
+            externalWalletAddress: external,
+            posthogSessionId: "not-a-session",
+            posthogDistinctId: "anonymous-browser-2",
+          },
+        })
+      ).status,
+      204
+    );
+    const { rows } = await sql(
+      "SELECT 1 FROM posthog_wallet_connections WHERE external_wallet_address = $1",
+      [cirrusAddress(external)]
+    );
+    assert.equal(rows.length, 0);
+  });
+
   it("ignores invalid addresses and sessions without a cookie", async () => {
     const link = await createLink();
     const { cookie, sessionId } = await openLink(link.slug);

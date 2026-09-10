@@ -49,7 +49,7 @@ main = do
       putStrLn "No BestSequencedBlock found in Redis, bootstrapping from genesis.json..."
       genesisInfo <- GI.getGenesisInfo
       let genesisBlock = genesisInfoToBlock genesisInfo
-          bsb = BestSequencedBlock (blockHash genesisBlock) 0 (GI.validators genesisInfo)
+          bsb = BestSequencedBlock (blockHash genesisBlock) 0 (GI.validators genesisInfo) [] 0
       bootstrapSequencer genesisBlock
       _ <- Redis.runRedis conn $ putBestSequencedBlockInfo bsb
       putStrLn $ "Bootstrapped BestSequencedBlock from genesis.json: " ++ format bsb
@@ -76,9 +76,20 @@ main = do
 
     putStrLn $ "ACTUAL validators list: " ++ show validators
 
-    let ckpt = def {checkpointValidators = validators, checkpointView=View 0 $ fromIntegral $ bestSequencedBlockNumber bestSequencedBlock}
+    -- Rounds persist across heights: resume at the best block's round so that a
+    -- restarted validator agrees with its peers on the current proposer.
+    let lastRound = bestSequencedBlockRound bestSequencedBlock
+        ckpt = Checkpoint
+          { checkpointView = View (fromIntegral lastRound) $ fromIntegral $ bestSequencedBlockNumber bestSequencedBlock
+          , checkpointValidators = validators
+          , checkpointParentHash = Just $ bestSequencedBlockHash bestSequencedBlock
+          , checkpointStakes = bestSequencedBlockStakes bestSequencedBlock
+          , checkpointLastRound = lastRound
+          }
+        activation = Conf.stakingActivationBlock (networkConfig ethConf)
+    putStrLn $ "strato-sequencer stakingActivationBlock: " ++ show activation
 
-    return $ newContext (Conf.network (networkConfig ethConf)) ckpt Nothing flags_validatorBehavior
+    return $ newContext (Conf.network (networkConfig ethConf)) (Conf.networkID (networkConfig ethConf)) ckpt Nothing flags_validatorBehavior activation
 
   cht <- atomically newTMChan
 

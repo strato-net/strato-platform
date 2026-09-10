@@ -3,7 +3,7 @@ import {
   Pool, SwapHistoryEntry, SetPoolRatesParams, SwapToken, SwapContextType,
   PoolV3, PoolV3Position, PoolV3AmountsPreview,
   PoolV3MintParams, PoolV3IncreaseParams, PoolV3BurnParams, PoolV3CollectParams,
-  PoolV3LiquidityDistribution, PoolV3CreateParams,
+  PoolV3LiquidityDistribution, PoolV3CreateParams, PoolV3FeeTier,
 } from '@/interface';
 import {api} from '@/lib/axios';
 
@@ -416,6 +416,16 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const fetchV3FeeTiers = useCallback(async (): Promise<PoolV3FeeTier[]> => {
+    try {
+      const { data } = await api.get<PoolV3FeeTier[]>('/poolv3/fee-tiers');
+      return data || [];
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to fetch V3 fee tiers');
+      return [];
+    }
+  }, []);
+
   const getV3PoolByAddress = useCallback(async (address: string): Promise<PoolV3 | null> => {
     try {
       const { data } = await api.get<PoolV3>(`/poolv3/pools/${address}`);
@@ -603,6 +613,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         // V3 (concentrated liquidity)
         createV3Pool,
         fetchV3Pools,
+        fetchV3FeeTiers,
         getV3PoolByAddress,
         getV3LiquidityDistribution,
         fetchV3Positions,

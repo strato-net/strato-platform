@@ -66,6 +66,14 @@ class (RLPSerializable h, HasIstanbulExtra h) => BlockHeaderLike h where
   blockHeaderSignatures :: h -> [Signature]
   blockHeaderVersion :: h -> Int
 
+  -- Version 3 (stake-weighted proposer selection); defaults for older shapes.
+  blockHeaderRound :: h -> Integer
+  blockHeaderRound _ = 0
+  blockHeaderStakes :: h -> [(Validator, Integer)]
+  blockHeaderStakes _ = []
+  blockHeaderStakeUpdates :: h -> [(Validator, Integer)]
+  blockHeaderStakeUpdates _ = []
+
   morphBlockHeader :: (BlockHeaderLike h2) => h2 -> h
   {-# MINIMAL
     blockHeaderBlockNumber,

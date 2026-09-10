@@ -30,6 +30,7 @@ module Control.Monad.Composable.Streaming.Kafka (
   -- Producing
   produceItems,
   produceItemsAsJSON,
+  produceToTopics,
   -- Consuming
   consume,
   consumeBroadcast,
@@ -186,6 +187,27 @@ produceItems topicName events = do
     case mErr of
       Just err -> error $ "Kafka produce error: " ++ show err
       Nothing -> return ()
+  liftIO $ KP.flushProducer producer
+  return [ProduceResponse]
+
+-- | Produce already-encoded payloads to several topics, flushing once.
+--
+-- 'produceItems' flushes per call, so a caller writing two topics per unit of
+-- work blocks on two flushes. Enqueueing everything first and flushing once
+-- lets librdkafka batch the lot.
+--
+-- Callers encode their own payloads because the topics generally carry
+-- different types.
+produceToTopics :: HasStreaming m => [(TopicName, [B.ByteString])] -> m [ProduceResponse]
+produceToTopics groups = do
+  env <- getStreamEnv
+  let producer = seProducer env
+  forM_ groups $ \(topicName, raws) ->
+    forM_ raws $ \raw -> do
+      mErr <- liftIO $ KP.produceMessage producer (mkRecord topicName (Just raw))
+      case mErr of
+        Just err -> error $ "Kafka produce error: " ++ show err
+        Nothing -> return ()
   liftIO $ KP.flushProducer producer
   return [ProduceResponse]
 

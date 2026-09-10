@@ -30,17 +30,19 @@ import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Class (blockHash)
+import Blockchain.Strato.Model.Class (blockHash, blockHeaderVersion)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.ProposerSelection
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Control.Lens as L
-import Control.Monad (unless)
+import Control.Monad (unless, when)
 import Control.Monad.Composable.Vault
 import Control.Monad.Except
 import Data.Either.Extra
 import Data.List
+import qualified Data.Map.Strict as M
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Set (Set)
 import qualified Data.Set as S
@@ -76,11 +78,13 @@ authenticate (IMsg (MsgAuth cm sig) tm) = do
 authenticate _ = return True
 
 replayHistoricBlock :: (MonadLogger m, MonadError String m) =>
-                       Set Validator -> Word256 -> Block -> m (Word256, Validator)
-replayHistoricBlock realValidators seqNo blk = do
+                       Set Validator -> M.Map Validator Integer -> Maybe Integer -> Integer -> Integer -> Word256 -> Block -> m (Word256, Validator)
+replayHistoricBlock realValidators realStakes activation chainId' lastRound' seqNo blk = do
   IstanbulExtra {..} <- liftEither $ maybeToEither "no istanbul metadata" $ evalIstanbulExtra id blk
-  let mProp = verifyProposerSeal blk =<< _proposedSig
-      blockNo = fromIntegral . number . blockBlockData $ blk
+  let hdr = blockBlockData blk
+      mProp = verifyProposerSeal blk =<< _proposedSig
+      blockNo = fromIntegral . number $ hdr
+      stakingActive = maybe True (number hdr >=) activation
 
   signers <- sequence $ map (verifyCommitmentSeal (blockHash blk)) _commitment
 
@@ -114,11 +118,38 @@ replayHistoricBlock realValidators seqNo blk = do
                ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
                ++ "\nblock validator list: " ++ show (map format $ S.toList expectedValidatorList)
 
-  unless (3 * S.size signerRes > 2 * S.size realValidators) $
+  -- Stake-weighted once staking is active (the stakes in force for this block are
+  -- the ones we hold and the header must carry, checked below), headcount before.
+  let weights = voteWeights stakingActive realValidators realStakes
+  unless (hasSupermajority weights signerRes) $
     blockstanbulError $
-      printf "not enough commit seals (have %d out of %d)" (S.size signerRes) (S.size realValidators)
+      printf "not enough commit seals (have %d out of %d, weight %d out of %d)"
+        (S.size signerRes) (S.size realValidators) (weightOf weights signerRes) (sum (M.elems weights))
       ++ ": signerRes = " ++ show signerRes
       ++ ", realValidators = " ++ show realValidators
+
+  when stakingActive $ do
+    unless (blockHeaderVersion hdr == 3) $
+      blockstanbulError $
+        printf "block #%d has header version %d, expected 3 (staking active)" blockNo (blockHeaderVersion hdr)
+
+    let blockStakes = M.fromList $ getBlockStakes hdr
+    unless (blockStakes == realStakes) $
+      blockstanbulError $
+        "real stake weights don't match the block's stake weights for block #" ++ show blockNo
+        ++ "\nreal stakes: " ++ show (M.toList realStakes)
+        ++ "\nblock stakes: " ++ show (M.toList blockStakes)
+
+    unless (getBlockRound hdr >= lastRound') $
+      blockstanbulError $
+        printf "block #%d has round %d, behind its parent's round %d" blockNo (getBlockRound hdr) lastRound'
+
+    let expectedProposer =
+          selectProposer chainId' (number hdr) realValidators realStakes lastRound' (getBlockRound hdr)
+    unless (propValidator == expectedProposer) $
+      blockstanbulError $
+        "proposer " ++ format propValidator ++ " of block #" ++ show blockNo
+        ++ " is not the proposer selected for round " ++ show (getBlockRound hdr) ++ ": " ++ format expectedProposer
 
   return (fromIntegral $ seqNo + 1, propValidator)
 

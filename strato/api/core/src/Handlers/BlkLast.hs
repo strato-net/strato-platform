@@ -71,6 +71,9 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => GetLastBlocks (SQLM m) where
     ss <- fmap (buildList commitmentSignatureRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
       E.where_ $ v E.^. CommitmentSignatureRefBlockDataRefId `E.in_` E.valList blockIds
       pure v
+    stakes <- fmap (buildList blockStakeRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
+      E.where_ $ v E.^. BlockStakeRefBlockDataRefId `E.in_` E.valList blockIds
+      pure v
     txs <- fmap (buildList' (blockTransactionBlockDataRefId . fst) ((: []) . rawTX2TX . snd) . map (E.entityVal *** E.entityVal)) . sqlQuery $
       E.select $ E.from $ \(btx `E.InnerJoin` rawTX) -> do
         E.on (rawTX E.^. RawTransactionId E.==. btx E.^. BlockTransactionTransaction)
@@ -78,7 +81,7 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => GetLastBlocks (SQLM m) where
         E.orderBy [E.asc (btx E.^. BlockTransactionId)]
         return (btx, rawTX)
 
-    return $ map (\(k,v) -> blockDataRefToBlock v (get' k vs) (get' k  vd) (get' k  ps) (get' k  ss) (get' k txs)) blks
+    return $ map (\(k,v) -> blockDataRefToBlock v (get' k vs) (get' k  vd) (get' k  ps) (get' k  ss) (get' k stakes) (get' k txs)) blks
 
 getBlkLast :: (Monad m, GetLastBlocks m) => Integer -> m [Block']
 getBlkLast n = do

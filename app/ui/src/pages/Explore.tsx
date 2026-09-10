@@ -255,7 +255,7 @@ const Explore = () => {
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="Explore" />
         <main className="p-4 md:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="space-y-6">
             <div>
               <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Tokens</h2>
               <p className="text-sm text-muted-foreground mt-1">

@@ -4,13 +4,20 @@
 
 local _M = {}
 
+local resty_random = require "resty.random"
+local resty_sha256 = require "resty.sha256"
+local str = require "resty.string"
+
+local CSRF_TOKEN_TTL = 1800
+-- How long the previous session's token stays valid after a session rotation,
+-- so requests already in flight with pre-rotation cookies still validate
+local ROTATION_GRACE_TTL = 60
+
 function _M.init(csrf_tokens_dict)
     _M.csrf_tokens = csrf_tokens_dict
 end
 
 function _M.generate_csrf_token()
-    local resty_random = require "resty.random"
-    local str = require "resty.string"
     local random_bytes = resty_random.bytes(32)
     if not random_bytes then
         ngx.log(ngx.ERR, "CSRF: Failed to generate random bytes")
@@ -41,15 +48,32 @@ function _M.validate_csrf_token(header_token, cookie_token, session_id)
         return false
     end
     
-    -- Refresh token TTL on successful validation
-    _M.csrf_tokens:set(session_id, stored_token, 1800)
-    
+    -- Refresh token TTL on successful validation, but never resurrect an
+    -- entry that is winding down under the rotation grace period
+    local remaining = _M.csrf_tokens:ttl(session_id)
+    if remaining and remaining > ROTATION_GRACE_TTL then
+        _M.csrf_tokens:set(session_id, stored_token, CSRF_TOKEN_TTL)
+    end
+
     return true
 end
 
--- Session ID = encrypted session cookie value (unique and stable per user)
+-- Dict keys must be sha256(session cookie), never the raw cookie: encrypted
+-- session cookies run 4-7KB each, so raw-cookie keys exhaust the 10M
+-- csrf_tokens zone within days of uptime ("no memory" on every store, which
+-- 403s every browser POST). Hashing keeps entries at a fixed ~100 bytes.
+function _M.hash_session_id(session_cookie)
+    if not session_cookie then
+        return nil
+    end
+    local sha256 = resty_sha256:new()
+    sha256:update(session_cookie)
+    return str.to_hex(sha256:final())
+end
+
+-- Session ID = sha256 of the encrypted session cookie value (unique and stable per user)
 function _M.get_session_id()
-    return ngx.var.cookie_strato_session
+    return _M.hash_session_id(ngx.var.cookie_strato_session)
 end
 
 -- Whitelist known API clients; validate Sec-Fetch headers for modern browsers
@@ -82,20 +106,31 @@ function _M.is_browser_request()
 end
 
 function _M.regenerate_token_for_new_session(new_session_id, old_session_id)
+    -- Callers pass raw cookie values (from ngx.ctx set in openid.lua)
+    new_session_id = _M.hash_session_id(new_session_id)
+    old_session_id = _M.hash_session_id(old_session_id)
+
     if not new_session_id then
         return nil
     end
-    
+
     if old_session_id and old_session_id ~= new_session_id then
-        _M.csrf_tokens:delete(old_session_id)
+        -- Keep the old session's token alive briefly instead of deleting it:
+        -- a request sent with pre-rotation cookies while another request
+        -- rotated the session would otherwise 403 (private issue #88).
+        -- Logout still deletes immediately (nginx.tpl.conf /auth/logout).
+        local old_token = _M.csrf_tokens:get(old_session_id)
+        if old_token then
+            _M.csrf_tokens:set(old_session_id, old_token, ROTATION_GRACE_TTL)
+        end
     end
-    
+
     local new_token = _M.generate_csrf_token()
     if not new_token then
         return nil
     end
-    
-    local success, err = _M.csrf_tokens:set(new_session_id, new_token, 1800)
+
+    local success, err = _M.csrf_tokens:set(new_session_id, new_token, CSRF_TOKEN_TTL)
     if not success then
         ngx.log(ngx.ERR, "CSRF: Failed to store token during rotation: ", err)
         return nil
@@ -119,7 +154,7 @@ function _M.ensure_csrf_token_for_session(session_id, context)
             return false
         end
         
-        local success, err = _M.csrf_tokens:add(session_id, new_token, 1800)
+        local success, err = _M.csrf_tokens:add(session_id, new_token, CSRF_TOKEN_TTL)
         if success then
             ngx.header["Set-Cookie"] = _M.build_csrf_cookie(new_token)
             return true
@@ -129,13 +164,27 @@ function _M.ensure_csrf_token_for_session(session_id, context)
                 ngx.header["Set-Cookie"] = _M.build_csrf_cookie(existing_token)
                 return true
             end
+        else
+            ngx.log(ngx.ERR, "CSRF: Failed to store token (", context, "): ", err)
         end
         return false
     else
-        -- Token exists, refresh its TTL to extend session
-        _M.csrf_tokens:set(session_id, existing_token, 1800)
-        
+        -- Token exists, refresh its TTL to extend the session, but never
+        -- resurrect an entry that is winding down under the rotation grace
+        -- period
+        local remaining = _M.csrf_tokens:ttl(session_id)
+        if remaining and remaining > ROTATION_GRACE_TTL then
+            _M.csrf_tokens:set(session_id, existing_token, CSRF_TOKEN_TTL)
+        end
+
         if not cookie_token then
+            ngx.header["Set-Cookie"] = _M.build_csrf_cookie(existing_token)
+            return true
+        elseif cookie_token ~= existing_token then
+            -- Browser holds a stale or crossed CSRF cookie (e.g. two
+            -- concurrent responses both rotated the session and their
+            -- Set-Cookie headers landed out of order). Resync so the next
+            -- state-changing request validates.
             ngx.header["Set-Cookie"] = _M.build_csrf_cookie(existing_token)
             return true
         end

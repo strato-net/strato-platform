@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { parseJsonExact } from "@/lib/args";
 import { env } from "@/lib/env";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { strip0x, ZERO_ADDRESS, type UserWallet } from "@/services/userWallets";
@@ -306,7 +307,10 @@ function normalizeArgs(raw: unknown): string[] {
     const s = raw.trim();
     if (s.startsWith("[")) {
       try {
-        const parsed = JSON.parse(s);
+        // Bigint-safe parse: a plain JSON.parse would round integers past
+        // 2^53 through a double, so re-cast votes would carry corrupted args
+        // (in scientific notation, no less) and miss the original issueId.
+        const parsed = parseJsonExact(s);
         if (Array.isArray(parsed)) return parsed.map((x) => String(x));
       } catch {
         /* fall through */

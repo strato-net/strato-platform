@@ -15,6 +15,8 @@ import {
   executeParallelQueries,
   parseBridgeRouteMappings,
   parseNativeBridgeAssets,
+  parseNativeLockedBalances,
+  parseNativeTokenBridgeConfigs,
   QUERY_CONFIGS 
 } from "../helpers/bridge.helper";
 import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction } from "@strato/shared-types";
@@ -25,7 +27,27 @@ import { getSaveUsdstActionState, SaveUsdstActionState } from "./saveUsdst.servi
 import { getConfigs as getMetalForgeConfigs, Config as MetalForgeConfig } from "./metalForge.service";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 
-const { MercataBridge, StratoNativeBridge, Token, mercataBridge, DECIMALS, USDST } = constants;
+const {
+  MercataBridge,
+  StratoNativeBridge,
+  StratoNativeCustodyVault,
+  SaveUSDSTVault,
+  Token,
+  mercataBridge,
+  DECIMALS,
+  USDST,
+} = constants;
+
+const normalizeAddress = (value?: string): string =>
+  (value || "").toLowerCase().replace(/^0x/, "");
+
+export const getBridgeTransferContractName = (
+  address: string,
+  saveUsdstVault = constants.saveUsdstVault
+): string =>
+  normalizeAddress(address) === normalizeAddress(saveUsdstVault)
+    ? extractContractName(SaveUSDSTVault)
+    : extractContractName(Token);
 
 const stripPagingParams = (
   params: Record<string, string | undefined>
@@ -147,6 +169,38 @@ export const requestWithdrawal = async (
   );
 };
 
+export const validateNativeWithdrawalRoute = (
+  nativeRoute: BridgeToken | undefined,
+  stratoTokenAmount: string
+): void => {
+  if (!nativeRoute || !nativeRoute.enabled) {
+    throw new Error("Native bridge route is unavailable");
+  }
+  if (nativeRoute.withdrawalsPaused) {
+    throw new Error("Native bridge withdrawals are paused");
+  }
+  if (nativeRoute.withdrawalsDisabled) {
+    throw new Error("Native token withdrawals are disabled");
+  }
+
+  const requestedAmount = BigInt(stratoTokenAmount);
+  const maxPerWithdrawal = BigInt(nativeRoute.maxPerWithdrawal || "0");
+  if (maxPerWithdrawal > 0n && requestedAmount > maxPerWithdrawal) {
+    throw new Error("Native withdrawal exceeds the per-withdrawal cap");
+  }
+
+  const maxOutstandingWithdrawal = BigInt(nativeRoute.maxOutstandingWithdrawal || "0");
+  const remainingOutstandingWithdrawal = BigInt(
+    nativeRoute.remainingOutstandingWithdrawal || "0"
+  );
+  if (
+    maxOutstandingWithdrawal > 0n
+    && requestedAmount > remainingOutstandingWithdrawal
+  ) {
+    throw new Error("Native withdrawal exceeds the remaining aggregate capacity");
+  }
+};
+
 export const requestNativeWithdrawal = async (
   accessToken: string,
   {
@@ -164,10 +218,18 @@ export const requestNativeWithdrawal = async (
     throw new Error("STRATO_NATIVE_CUSTODY_VAULT is not configured");
   }
 
+  const nativeRoute = (await getBridgeableTokens(accessToken, externalChainId)).find(
+    (token) =>
+      token.routeType === "native"
+      && token.stratoToken.toLowerCase().replace(/^0x/, "")
+        === stratoToken.toLowerCase().replace(/^0x/, "")
+  );
+  validateNativeWithdrawalRoute(nativeRoute, stratoTokenAmount);
+
   const tx = await buildFunctionTx(
     [
       {
-        contractName: extractContractName(Token),
+        contractName: getBridgeTransferContractName(stratoToken),
         contractAddress: stratoToken,
         method: "approve",
         args: {
@@ -280,7 +342,13 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
   };
   if (chainId) nativeParams["key2"] = `eq.${chainId}`;
 
-  const [standardResponse, nativeResponse, nativeBridgeResponse] = await Promise.all([
+  const [
+    standardResponse,
+    nativeResponse,
+    nativeBridgeResponse,
+    nativeTokenConfigResponse,
+    nativeLockedBalanceResponse,
+  ] = await Promise.all([
     cirrus.get(accessToken, "/mapping", { params: standardParams }),
     constants.stratoNativeBridge
       ? cirrus.get(accessToken, `/${StratoNativeBridge}-assets`, { params: nativeParams })
@@ -294,6 +362,22 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
           }
         })
       : Promise.resolve({ data: [] }),
+    constants.stratoNativeBridge
+      ? cirrus.get(accessToken, `/${StratoNativeBridge}-tokenBridgeConfigs`, {
+          params: {
+            address: `eq.${constants.stratoNativeBridge}`,
+            select: "key,value",
+          }
+        })
+      : Promise.resolve({ data: [] }),
+    constants.stratoNativeCustodyVault
+      ? cirrus.get(accessToken, `/${StratoNativeCustodyVault}-lockedBalance`, {
+          params: {
+            address: `eq.${constants.stratoNativeCustodyVault}`,
+            select: "key,lockedBalance:value::text",
+          }
+        })
+      : Promise.resolve({ data: [] }),
   ]);
 
   const standardRoutes = Array.isArray(standardResponse.data)
@@ -302,11 +386,17 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
   const nativeBridgeState = Array.isArray(nativeBridgeResponse.data)
     ? nativeBridgeResponse.data[0]
     : undefined;
+  const nativeTokenConfigs = Array.isArray(nativeTokenConfigResponse.data)
+    ? parseNativeTokenBridgeConfigs(nativeTokenConfigResponse.data as NativeBridgeAssetRow[])
+    : new Map();
+  const nativeLockedBalances = Array.isArray(nativeLockedBalanceResponse.data)
+    ? parseNativeLockedBalances(nativeLockedBalanceResponse.data as NativeBridgeAssetRow[])
+    : new Map();
   const nativeRoutes = Array.isArray(nativeResponse.data)
     ? parseNativeBridgeAssets(nativeResponse.data as NativeBridgeAssetRow[], {
         depositsPaused: nativeBridgeState?.depositsPaused === true,
         withdrawalsPaused: nativeBridgeState?.withdrawalsPaused === true,
-      })
+      }, nativeTokenConfigs, nativeLockedBalances)
     : [];
   const routes = [...standardRoutes, ...nativeRoutes];
   if (!routes.length) return [];
@@ -353,17 +443,36 @@ export const getWithdrawalSummary = async (
   userAddress: string
 ): Promise<WithdrawalSummaryResponse> => {
   const routes = await getBridgeableTokens(accessToken);
-  const stratoTokens = [...new Set(routes.map((route) => route.stratoToken).filter(Boolean))];
+  const stratoTokens = [...new Set(routes.map((route) => normalizeAddress(route.stratoToken)).filter(Boolean))];
   const thirtyDaysAgoUTC = toUTCTime(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+  const saveUsdstVaultAddress = normalizeAddress(constants.saveUsdstVault);
 
   const nativeWithdrawalsTable = `/${StratoNativeBridge}-withdrawals`;
-  const [balances, prices, pending, completed, nativePending, nativeCompleted] = await Promise.all([
+  const [
+    balances,
+    saveUsdstBalances,
+    prices,
+    pending,
+    completed,
+    nativePending,
+    nativeCompleted,
+  ] = await Promise.all([
     stratoTokens.length > 0
       ? cirrus.get(accessToken, `/${Token}-_balances`, {
           params: {
             select: "address,balance:value::text",
             key: `eq.${userAddress}`,
             address: `in.(${stratoTokens.join(",")})`
+          }
+        })
+      : Promise.resolve({ data: [] }),
+    saveUsdstVaultAddress
+      && stratoTokens.some((token) => normalizeAddress(token) === saveUsdstVaultAddress)
+      ? cirrus.get(accessToken, `/${SaveUSDSTVault}-_balances`, {
+          params: {
+            select: "address,balance:value::text",
+            key: `eq.${userAddress}`,
+            address: `eq.${saveUsdstVaultAddress}`,
           }
         })
       : Promise.resolve({ data: [] }),
@@ -409,11 +518,11 @@ export const getWithdrawalSummary = async (
   ]);
 
   let availableUSD = 0n;
-  for (const b of balances.data || []) {
+  for (const b of [...(balances.data || []), ...(saveUsdstBalances.data || [])]) {
     const balance = BigInt(b.balance || "0");
     const price = BigInt(prices.get(b.address) || "0");
     if (balance > 0n && price > 0n) {
-      availableUSD += (balance * price) / DECIMALS / DECIMALS;
+      availableUSD += (balance * price) / DECIMALS;
     }
   }
 

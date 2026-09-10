@@ -26,8 +26,8 @@ defineFlag "k:kafkaclientid" defaultKafkaClientId' "KafkaClientId (for runKafkaC
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag
   "blockstanbul_round_period_s"
-  (10 :: Int)
-  "Maximum seconds that one validator will remain the proposer"
+  (3600 :: Int)
+  "Seconds without progress before a forced PBFT round change (overridden by ethconf roundPeriodS)"
 defineFlag "validatorBehavior" (True :: Bool) "Whether to disable validator behavior if enabled"
 
 defineFlag "seq_debug_mode" (True :: Bool) "Whether to run sequencer debug mode"

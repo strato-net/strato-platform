@@ -33,6 +33,7 @@ import {
   PoolV3BurnParams,
   PoolV3CollectParams,
   PoolV3CreateParams,
+  PoolV3FeeTier,
   TransactionResponse,
   SwapHistoryEntry,
   PoolV3LiquidityDistribution,
@@ -43,6 +44,7 @@ const {
   PoolV3Ticks,
   PoolV3Positions,
   PoolV3SwapEvent,
+  PoolV3FactoryFeeTiers,
   PositionManagerV3Positions,
   PositionManagerV3Owners,
 } = POOL_V3_CONTRACTS;
@@ -319,6 +321,23 @@ export const getPools = async (accessToken: string): Promise<PoolV3[]> => {
   const rawPools = await fetchRawPools(accessToken);
   const pools = await attachPrices(accessToken, rawPools);
   return pools.sort((a, b) => b.totalLiquidityUSD - a.totalLiquidityUSD);
+};
+
+/** Fee tiers currently enabled on the configured factory (tickSpacing 0 = disabled tier) */
+export const getFeeTiers = async (accessToken: string): Promise<PoolV3FeeTier[]> => {
+  if (!config.poolV3Factory) return [];
+  const { data } = await cirrus.get(accessToken, `/${PoolV3FactoryFeeTiers}`, {
+    params: {
+      address: `eq.${normalizeAddress(config.poolV3Factory)}`,
+      select: "key,value",
+      value: "gt.0",
+      order: "key.asc",
+    },
+  });
+  return ((data as { key: number; value: number }[]) ?? []).map((row) => ({
+    fee: Number(row.key),
+    tickSpacing: Number(row.value),
+  }));
 };
 
 export const getPoolByAddress = async (accessToken: string, poolAddress: string): Promise<PoolV3 | null> => {

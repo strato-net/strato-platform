@@ -91,3 +91,50 @@ blockFragmentationBytesMetric =
     . vector "process"
     . gauge
     $ Info "strato_rts_gcdetails_block_fragmentation_bytes" "STRATO RTS GC block fragmentation bytes"
+
+-- Cumulative RTS totals (monotonic counters, exported as gauges holding the
+-- running total). Unlike the per-GC gcdetails above, these make productivity
+-- (mutator time / total time) observable: rate(strato_rts_gc_cpu_ns) /
+-- rate(strato_rts_cpu_ns) is the GC fraction.
+
+gcCpuNsMetric :: Vector Text Gauge
+gcCpuNsMetric =
+  unsafeRegister
+    . vector "process"
+    . gauge
+    $ Info "strato_rts_gc_cpu_ns" "STRATO RTS cumulative CPU time spent in GC (ns)"
+
+gcElapsedNsMetric :: Vector Text Gauge
+gcElapsedNsMetric =
+  unsafeRegister
+    . vector "process"
+    . gauge
+    $ Info "strato_rts_gc_elapsed_ns" "STRATO RTS cumulative wall-clock time spent in GC (ns)"
+
+cpuNsMetric :: Vector Text Gauge
+cpuNsMetric =
+  unsafeRegister
+    . vector "process"
+    . gauge
+    $ Info "strato_rts_cpu_ns" "STRATO RTS cumulative process CPU time (ns)"
+
+elapsedNsMetric :: Vector Text Gauge
+elapsedNsMetric =
+  unsafeRegister
+    . vector "process"
+    . gauge
+    $ Info "strato_rts_elapsed_ns" "STRATO RTS cumulative process wall-clock time (ns)"
+
+gcsMetric :: Vector Text Gauge
+gcsMetric =
+  unsafeRegister
+    . vector "process"
+    . gauge
+    $ Info "strato_rts_gcs" "STRATO RTS cumulative number of GCs"
+
+majorGcsMetric :: Vector Text Gauge
+majorGcsMetric =
+  unsafeRegister
+    . vector "process"
+    . gauge
+    $ Info "strato_rts_major_gcs" "STRATO RTS cumulative number of major GCs"

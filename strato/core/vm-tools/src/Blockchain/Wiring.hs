@@ -37,26 +37,30 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
+import Blockchain.Data.RLP (rlpEncode, rlpSerialize)
 import Blockchain.Stream.VMEvent (VMEvent(..), produceVMEvents)
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.Util (nibbleString2ByteString)
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext
 import Control.DeepSeq
 import Control.Lens hiding (Context (..))
-import Control.Monad (join, void)
+import Control.Monad (join, void, when)
+import Data.Foldable (for_)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
 import Control.Monad.Composable.Streaming (HasStreaming)
 import Control.Monad.IO.Class
-import Control.Monad.Reader (ReaderT)
+import Control.Monad.Reader (ReaderT, ask)
 import qualified Data.ByteString as B
 import Data.Default
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
@@ -159,11 +163,16 @@ vmBlockHashRootKey = "block_hash_root"
 
 instance HasContext m => Mod.Modifiable BlockHashRoot m where
   get _ = do
-    db <- getStateDB
-    BlockHashRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBlockHashRootKey
+    pendingRef <- view mpPendingBlockHashRoot <$> accessEnv
+    pending <- liftIO $ readIORef pendingRef
+    case pending of
+      Just sr -> pure . BlockHashRoot $ MP.StateRoot sr
+      Nothing -> do
+        db <- getStateDB
+        BlockHashRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBlockHashRootKey
   put _ (BlockHashRoot (MP.StateRoot sr)) = do
-    db <- getStateDB
-    DB.put db def vmBlockHashRootKey sr
+    pendingRef <- view mpPendingBlockHashRoot <$> accessEnv
+    liftIO $ writeIORef pendingRef (Just sr)
 
 instance HasContext m => Mod.Modifiable CurrentBlockHash m where
   get _ = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock
@@ -176,16 +185,83 @@ instance HasContext m => HasMemAddressStateDB m where
   putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
 
 instance MonadUnliftIO m => (MP.StateRoot `A.Alters` MP.NodeData) (ReaderT Context m) where
-  lookup _ = MP.genericLookupDB $ getStateDB
-  insert _ = MP.genericInsertDB $ getStateDB
-  delete _ = MP.genericDeleteDB $ getStateDB
+  lookup _ sr@(MP.StateRoot key) = do
+    pendingRef <- view mpPendingNodes <$> ask
+    pending <- liftIO $ readIORef pendingRef
+    cacheRef <- view mpNodeCache <$> ask
+    cache <- liftIO $ readIORef cacheRef
+    case HM.lookup key pending of
+      Just nd -> pure (Just nd)
+      Nothing -> case HM.lookup key cache of
+        Just nd -> pure (Just nd)
+        Nothing -> do
+          mnd <- MP.genericLookupDB getStateDB sr
+          liftIO $ for_ mnd $ \nd -> modifyIORef' cacheRef (HM.insert key nd)
+          pure mnd
+  insert _ (MP.StateRoot key) nd = do
+    cacheRef <- view mpNodeCache <$> ask
+    cache <- liftIO $ readIORef cacheRef
+    case HM.lookup key cache of
+      Just cached
+        | cached == nd -> pure ()
+        | otherwise -> error "MP node hash collision: cached node differs"
+      Nothing -> do
+        pendingRef <- view mpPendingNodes <$> ask
+        pending <- liftIO $ readIORef pendingRef
+        case HM.lookup key pending of
+          Just staged
+            | staged == nd -> pure ()
+            | otherwise -> error "MP node hash collision: pending node differs"
+          Nothing -> liftIO $ modifyIORef' pendingRef (HM.insert key nd)
+  delete _ sr@(MP.StateRoot key) = do
+    cacheRef <- view mpNodeCache <$> ask
+    liftIO $ modifyIORef' cacheRef (HM.delete key)
+    pendingRef <- view mpPendingNodes <$> ask
+    liftIO $ modifyIORef' pendingRef (HM.delete key)
+    MP.genericDeleteDB getStateDB sr
 
-instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (Address `A.Alters` AddressState) m where
+instance HasContext m => HasPendingMPNodes m where
+  flushPendingMPNodes = do
+    ctx <- accessEnv
+    count <- liftIO $ atomicModifyIORef' (ctx ^. mpFlushCount) $ \n -> let n' = n + 1 in (n', n')
+    when (count >= ctx ^. mpFlushInterval) flushPendingMPNodesNow
+  finalizePendingMPNodes = flushPendingMPNodesNow
+  clearPendingMPNodes = do
+    ctx <- accessEnv
+    liftIO $ do
+      writeIORef (ctx ^. mpPendingNodes) HM.empty
+      writeIORef (ctx ^. mpPendingBlockHashRoot) Nothing
+      writeIORef (ctx ^. mpFlushCount) 0
+
+flushPendingMPNodesNow :: HasContext m => m ()
+flushPendingMPNodesNow = do
+    pendingRef <- view mpPendingNodes <$> accessEnv
+    pending <- liftIO $ readIORef pendingRef
+    rootRef <- view mpPendingBlockHashRoot <$> accessEnv
+    pendingRoot <- liftIO $ readIORef rootRef
+    db <- getStateDB
+    DB.write db def
+      ( [ DB.Put key (rlpSerialize $ rlpEncode node)
+        | (key, node) <- HM.toList pending
+        ]
+          ++ maybe [] (pure . DB.Put vmBlockHashRootKey) pendingRoot
+      )
+    cacheRef <- view mpNodeCache <$> accessEnv
+    liftIO $ do
+      modifyIORef' cacheRef $ \cache ->
+        HM.union pending $ if HM.size cache > 200000 then HM.empty else cache
+      writeIORef pendingRef HM.empty
+      writeIORef rootRef Nothing
+    countRef <- view mpFlushCount <$> accessEnv
+    liftIO $ writeIORef countRef 0
+
+
+instance (MonadUnliftIO m, MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (Address `A.Alters` AddressState) m where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (Maybe Word256 `A.Alters` MP.StateRoot) m where
+instance (MonadUnliftIO m, MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (Maybe Word256 `A.Alters` MP.StateRoot) m where
   lookup _ chainId = do
     mBH <- gets $ view $ memDBs . currentBlock
     fmap join . for mBH $ \(CurrentBlockHash bh) -> do
@@ -199,7 +275,6 @@ instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) 
       Nothing -> pure ()
       Just (CurrentBlockHash bh) -> do
         modify $ memDBs . stateRoots %~ M.insert (bh, chainId) sr
-        putChainStateRoot chainId bh sr
   delete _ chainId = do
     mBH <- gets $ view $ memDBs . currentBlock
     case mBH of
@@ -213,10 +288,31 @@ instance HasContext m => (Keccak256 `A.Alters` DBCode) m where
   insert _ = genericInsertCodeDB $ getCodeDB
   delete _ = genericDeleteCodeDB $ getCodeDB
 
-instance HasContext m => (N.NibbleString `A.Alters` N.NibbleString) m where
-  lookup _ = genericLookupHashDB $ getHashDB
-  insert _ = genericInsertHashDB $ getHashDB
-  delete _ = genericDeleteHashDB $ getHashDB
+instance (MonadUnliftIO m, HasContext m) => (N.NibbleString `A.Alters` N.NibbleString) m where
+  lookup _ k = do
+    cacheRef <- view hashCache <$> accessEnv
+    cache <- liftIO $ readIORef cacheRef
+    case HM.lookup (nibbleString2ByteString k) cache of
+      Just v -> pure (Just v)
+      Nothing -> do
+        mv <- genericLookupHashDB getHashDB k
+        liftIO $ for_ mv $ \v -> modifyIORef' cacheRef (HM.insert (nibbleString2ByteString k) v)
+        pure mv
+  insert _ k v = do
+    cacheRef <- view hashCache <$> accessEnv
+    let key = nibbleString2ByteString k
+    cache <- liftIO $ readIORef cacheRef
+    case HM.lookup key cache of
+      Just cached
+        | cached == v -> pure ()
+        | otherwise -> error "hash reverse-index collision: cached value differs"
+      Nothing -> do
+        genericInsertHashDB getHashDB k v
+        liftIO $ modifyIORef' cacheRef (HM.insert key v)
+  delete _ k = do
+    cacheRef <- view hashCache <$> accessEnv
+    liftIO $ modifyIORef' cacheRef (HM.delete (nibbleString2ByteString k))
+    genericDeleteHashDB getHashDB k
 
 instance (HasContext m) => HasMemRawStorageDB m where
   getMemRawStorageTxDB = gets $ view $ memDBs . storageTxMap
@@ -224,7 +320,7 @@ instance (HasContext m) => HasMemRawStorageDB m where
   getMemRawStorageBlockDB = gets $ view $ memDBs . storageBlockMap
   putMemRawStorageBlockMap theMap = modify $ memDBs . storageBlockMap .~ theMap
 
-instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (RawStorageKey `A.Alters` RawStorageValue) m where
+instance (MonadUnliftIO m, MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (RawStorageKey `A.Alters` RawStorageValue) m where
   lookup _ = genericLookupRawStorageDB
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB

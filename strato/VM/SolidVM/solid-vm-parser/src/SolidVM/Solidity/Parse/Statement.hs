@@ -241,7 +241,44 @@ variableDefinitionStatement = do
   VariableDefinition vardefs <$> optionMaybe (reservedOp "=" >> expression)
 
 expression :: SolidityParser Expression
-expression =
+expression = do
+  legacy <- getLegacyOperatorPrecedence
+  if legacy then legacyExpression else solidityExpression
+
+-- | Solidity's operator precedence, tightest first. Notable orderings that the
+-- legacy table below got wrong: relational operators bind tighter than
+-- equality, @&&@ tighter than @||@, both tighter than the ternary, and
+-- assignment is the loosest of all (so @a = b || c@ assigns @b || c@).
+-- @**@ and the assignment operators associate to the right.
+solidityExpression :: SolidityParser Expression
+solidityExpression =
+  buildExpressionParser
+    [ [postfix $ choice [functionCall, memberAccess, arrayIndex]],
+      [Postfix (PlusPlus <$> position (reservedOp "++"))],
+      [Postfix (MinusMinus <$> position (reservedOp "--"))],
+      [prefix "!", prefix "~", prefix "delete", prefix "++", prefix "--", prefix "+", prefix "-"],
+      [binaryR "**"],
+      [binary "*", binary "/", binary "%"],
+      [binary "+", binary "-"],
+      [binary "<<", binary ">>", binary ">>>"],
+      [binary "&"],
+      [binary "^"],
+      [binary "|"],
+      [binary "<", binary ">", binary "<=", binary ">="],
+      [binary "==", binary "!="],
+      [binary "&&"],
+      [binary "||"],
+      [ternary],
+      [binaryR "=", binaryR "|=", binaryR "^=", binaryR "&=", binaryR "<<=", binaryR ">>=", binaryR ">>>=", binaryR "+=", binaryR "-=", binaryR "*=", binaryR "/=", binaryR "%="]
+    ]
+    (tuple <|> array <|> primaryExpression)
+
+-- | The operator table SolidVM shipped with before the operator-precedence
+-- fork. Kept verbatim so blocks produced under it still replay identically:
+-- assignment binds tighter than @&&@ and @||@, which is why
+-- @flag = flag || cond@ only ever stored @flag@.
+legacyExpression :: SolidityParser Expression
+legacyExpression =
   buildExpressionParser
     [ [postfix $ choice [functionCall, memberAccess, arrayIndex]],
       [Postfix (PlusPlus <$> position (reservedOp "++"))],
@@ -256,22 +293,25 @@ expression =
       [binary "|"],
       [binary "==", binary "!="],
       [binary "<", binary ">", binary "<=", binary ">="],
-      [ Postfix
-          ( do
-              ~(a, (e1, e2)) <- withPosition $ do
-                reservedOp "?"
-                e1 <- expression
-                reservedOp ":"
-                e2 <- expression
-                pure (e1, e2)
-              pure (\e -> Ternary (extractExpression e <> a) e e1 e2)
-          )
-      ],
+      [ternary],
       [binary "=", binary "|=", binary "^=", binary "&=", binary "<<=", binary ">>=", binary ">>>=", binary "+=", binary "-=", binary "*=", binary "/=", binary "%="],
       [binary "&&"],
       [binary "||"]
     ]
     (tuple <|> array <|> primaryExpression)
+
+ternary :: Operator String ParserState Identity Expression
+ternary =
+  Postfix
+    ( do
+        ~(a, (e1, e2)) <- withPosition $ do
+          reservedOp "?"
+          e1 <- expression
+          reservedOp ":"
+          e2 <- expression
+          pure (e1, e2)
+        pure (\e -> Ternary (extractExpression e <> a) e e1 e2)
+    )
 
 functionCall :: SolidityParser (Expression -> Expression)
 functionCall = do
@@ -301,6 +341,9 @@ arrayIndex = do
 
 binary :: String -> Operator String u Identity Expression
 binary x = Infix (uncurry Binary <$> withPosition (x <$ reservedOp x)) AssocLeft
+
+binaryR :: String -> Operator String u Identity Expression
+binaryR x = Infix (uncurry Binary <$> withPosition (x <$ reservedOp x)) AssocRight
 
 prefix :: String -> Operator String u Identity Expression
 prefix x = Prefix (uncurry Unitary <$> withPosition (x <$ reservedOp x))
@@ -506,6 +549,56 @@ accountLiteral = do
   void $ char '>'
   pure acct
 
+-- | Explicit type-cast literal forms for transaction args: string("…"),
+-- address("hex"), uint(5), int(-5), bool(true), decimal("1.5"), bytes("00ff").
+-- A plain quoted literal's type depends on its content ("123" parses as the
+-- address 0x123), so a marshaler that knows the intended type emits the cast
+-- form instead; string("123") is always the three-character string. Plain
+-- literals keep their existing inference, so old-format args are unaffected.
+castLiteral :: SolidityParser Expression
+castLiteral =
+  asum
+    [ cast "string" StringLiteral stringLiteral,
+      cast "address" AddressLiteral addressContent,
+      cast "uint" (\a n -> NumberLiteral a n Nothing) integer,
+      cast "int" (\a n -> NumberLiteral a n Nothing) integer,
+      cast "bool" BoolLiteral boolContent,
+      cast "decimal" (\a d -> DecimalLiteral a (WrappedDecimal d)) decimalContent,
+      cast "bytes" HexaLiteral bytesContent
+    ]
+  where
+    cast name f p = try $ do
+      ~(a, v) <- withPosition $ reserved name >> parens p
+      pure $ f a v
+    addressContent = do
+      s <- stringLiteral <|> lexeme rawHex
+      case readMaybe s of
+        Just addr -> pure addr
+        Nothing -> fail $ "address(...): could not parse address from " ++ show s
+    rawHex :: SolidityParser String
+    rawHex = (++) <$> option "" (try $ string "0x") <*> many1 hexDigit
+    boolContent = (False <$ reserved "false") <|> (True <$ reserved "true")
+    decimalContent =
+      asum
+        [ try $ do
+            num <- lexeme integer
+            period <- string "."
+            fraction <- many1 digit
+            skipMany space
+            pure (read (show num ++ period ++ fraction) :: Decimal),
+          do
+            s <- stringLiteral
+            case readMaybe s of
+              Just d -> pure d
+              Nothing -> fail $ "decimal(...): could not parse decimal from " ++ show s,
+          fromInteger <$> integer
+        ]
+    bytesContent = do
+      s <- stringLiteral
+      when (not (all (`elem` ("0123456789abcdefABCDEF" :: String)) s) || odd (Prelude.length s)) $
+        fail "bytes(...): expected an even-length hex string"
+      pure s
+
 literal :: SolidityParser Expression
 literal =
   asum
@@ -523,6 +616,7 @@ literal =
         ~(a, (n, u)) <- withPosition $ (,) <$> integer <*> optionMaybe numberUnit
         pure $ NumberLiteral a n u,
       myHexParser,
+      castLiteral,
       do
         (a, str) <- withPosition stringLiteral
         pure $ case readMaybe str of

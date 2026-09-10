@@ -35,6 +35,7 @@ module Control.Monad.Composable.Streaming.RabbitMQ (
   -- Producing
   produceItems,
   produceItemsAsJSON,
+  produceToTopics,
   -- Consuming
   consume,
   consumeBroadcast,
@@ -59,6 +60,8 @@ import Control.Monad.Composable.Base
 import Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import Data.Binary
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import Data.IORef
 import Data.Int (Int64)
 import Data.String (IsString)
@@ -137,6 +140,27 @@ produceItems topicName events = do
           AMQP.newMsg { AMQP.msgBody = encode e
                       , AMQP.msgDeliveryMode = Just AMQP.Persistent
                       }) events
+  return [ProduceResponse]
+
+-- | Publish already-encoded payloads to several exchanges in one call.
+--
+-- This exists so callers can stay backend-agnostic: on the Kafka backend the
+-- equivalent collapses N synchronous acks=all round trips into one, which is
+-- the whole point of the entry point. AMQP publishes are already fire-and-
+-- forget on the open channel, so this is just a loop -- it is here for
+-- interface parity, not for a speedup.
+--
+-- Callers encode their own payloads because the topics generally carry
+-- different types.
+produceToTopics :: HasStreaming m => [(TopicName, [B.ByteString])] -> m [ProduceResponse]
+produceToTopics groups = do
+  env <- getStreamEnv
+  let chan = seChannel env
+      publish exchange raw = AMQP.publishMsg chan exchange ""
+        AMQP.newMsg { AMQP.msgBody = BL.fromStrict raw
+                    , AMQP.msgDeliveryMode = Just AMQP.Persistent
+                    }
+  liftIO $ mapM_ (\(topicName, raws) -> mapM_ (publish $ unTopicName topicName) raws) groups
   return [ProduceResponse]
 
 produceItemsAsJSON :: (JSON.ToJSON a, HasStreaming m) => TopicName -> [a] -> m [ProduceResponse]

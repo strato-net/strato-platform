@@ -31,7 +31,8 @@ import           Data.IORef
 import           Data.Set.Ordered (empty)
 import           Instrumentation
 import           Blockchain.Sequencer.Kafka (seqP2pEventsTopicName, unseqEventsTopicName)
-import           Control.Monad.Composable.Streaming (createTopicAndWait)
+import           Control.Monad.Composable.Streaming (createStreamEnv, createTopicAndWait)
+import           Control.Concurrent.MVar (newMVar)
 
 main :: IO ()
 main = runLoggingT initP2P
@@ -53,10 +54,20 @@ initP2P = labelTheThread "initP2P" $ do
   wireMessagesRef <- liftIO $ newIORef empty
   cfg <- initConfig wireMessagesRef
   let vaultUrl' = vaultUrl . urlConfig $ ethConf
+      streamAddr = let k = streamingConfig ethConf in (streamingHost k, streamingPort k)
       runner f = runLoggingT $ runVaultM vaultUrl' $ do
         c' <- initContext
         ctx <- liftIO $ newIORef c'
-        let cfg' = cfg { configContext = ctx }
+        -- Every peer connection gets its own producer. A single process-wide
+        -- StreamEnv behind one MVar serialized every ToUnseq produce
+        -- (blockstanbul gossip, txs and blocks) across all peers, so the whole
+        -- p2p -> sequencer path ran one produce at a time node-wide (~68ms
+        -- each) and BlockBodies starved behind the gossip firehose during
+        -- sync. The MVar stays, to keep milena's non-atomic KafkaState
+        -- read-modify-write safe within a single connection.
+        env <- createStreamEnv "strato-p2p" streamAddr
+        envVar <- liftIO $ newMVar env
+        let cfg' = cfg { configContext = ctx, configStreamEnv = envVar }
         runContextM cfg' . f $ seqEventNotificationSource
   liftIO $
     race_

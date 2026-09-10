@@ -1684,11 +1684,16 @@ prune_consumed_kafka_history() {
 
   info "Pruning consumed kafka topic history before archiving (only history behind committed consumer offsets is deleted)..."
   docker rm -f "$KAFKA_PRUNE_CONTAINER" >/dev/null 2>&1 || true
+  # The broker service is named "kafka" in older compose files and "streaming"
+  # in newer ones; detect which one this node's compose file defines.
+  local kafka_service
+  kafka_service="$(cd "$node_dir" && docker compose config --services 2>/dev/null | grep -xE 'kafka|streaming' | head -1)"
+  kafka_service="${kafka_service:-kafka}"
   if ! (cd "$node_dir" && docker compose -p strato run -d --rm --no-deps \
         --name "$KAFKA_PRUNE_CONTAINER" \
         -e KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS=5000 \
         -e KAFKA_LOG_SEGMENT_DELETE_DELAY_MS=1000 \
-        kafka >/dev/null 2>&1); then
+        "$kafka_service" >/dev/null 2>&1); then
     warn "could not start the kafka broker for history pruning"
     kafka_prune_teardown "$node_dir"
     return 1

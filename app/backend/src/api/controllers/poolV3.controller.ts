@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
   getPools,
+  getFeeTiers,
   getPoolByAddress,
   getPositions,
   getPositionNFTItem,
@@ -32,6 +33,16 @@ class PoolV3Controller {
       const { accessToken } = req;
       const pools = await getPools(accessToken);
       res.status(RestStatus.OK).json(pools);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async feeTiers(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const tiers = await getFeeTiers(accessToken);
+      res.status(RestStatus.OK).json(tiers);
     } catch (error) {
       next(error);
     }

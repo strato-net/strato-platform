@@ -17,7 +17,7 @@ where
 
 import Blockchain.Data.AddressInfo
 import Blockchain.Data.CodeInfo
-import Blockchain.Strato.Model.Event
+import SolidVM.Model.Event
 import Blockchain.Strato.Model.Address
 import Blockchain.Database.MerklePatricia
 import Blockchain.Strato.Model.Keccak256
@@ -52,7 +52,7 @@ data GenesisInfo = GenesisInfo
     delegatecalls :: M.Map Address (S.Seq Delegatecall),
     validators :: [Validator]
   }
-  deriving (Show, Read, Eq, Generic)
+  deriving (Show, Eq, Generic)
 
 instance Format GenesisInfo where
   format GenesisInfo{..} =

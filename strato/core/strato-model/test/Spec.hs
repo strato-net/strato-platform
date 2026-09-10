@@ -12,7 +12,9 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.ProposerSelection
 import Blockchain.Strato.Model.Secp256k1 as SEC
+import Blockchain.Strato.Model.Validator
 import Control.Monad
 import qualified Data.Aeson as Ae
 import Data.Aeson.QQ
@@ -20,7 +22,9 @@ import Data.Binary
 import qualified Data.Bits as Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
+import qualified Data.Map.Strict as M
 import Data.Maybe
+import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Word ()
 import Database.Persist.Sql
@@ -37,6 +41,52 @@ main = hspec spec
 
 spec :: Spec
 spec = do
+  describe "selectProposer" $ do
+    let vals = S.fromList . map Validator
+        run chainId height vs stakes start rnd = selectProposer chainId height (vals vs) (M.fromList $ map (\(a, w) -> (Validator a, w)) stakes) start rnd
+
+    it "is deterministic and picks a member of the validator set" $
+      property $ \(chainId :: Integer) (height :: Integer) (NonEmpty vs) (start :: NonNegative Integer) (skip :: NonNegative Integer) -> do
+        let vs' = map (Address . fromIntegral) (vs :: [Word])
+            rnd = getNonNegative start + getNonNegative skip
+            picked = run chainId (abs height) vs' [] (getNonNegative start) rnd
+        picked `shouldBe` run chainId (abs height) vs' [] (getNonNegative start) rnd
+        picked `shouldSatisfy` (`S.member` vals vs')
+
+    it "never picks a validator with zero stake while others have stake" $
+      property $ \(chainId :: Integer) (height :: Integer) (start :: NonNegative Integer) ->
+        run chainId (abs height) [1, 2, 3] [(2, 10), (3, 5)] (getNonNegative start) (getNonNegative start) `shouldSatisfy` (/= Validator 1)
+
+    it "picks in proportion to stake" $ do
+      let picks = [run 1 i [1, 2] [(1, 3), (2, 1)] 0 0 | i <- [1 .. 4000 :: Integer]]
+          share1 = fromIntegral (length $ filter (== Validator 1) picks) / (4000 :: Double)
+      share1 `shouldSatisfy` (\x -> x > 0.7 && x < 0.8)
+
+    it "falls back to uniform selection when nobody has stake" $ do
+      let picks = [run 1 i [1, 2, 3, 4] [] 0 0 | i <- [1 .. 4000 :: Integer]]
+      forM_ [1, 2, 3, 4] $ \a ->
+        let share = fromIntegral (length $ filter (== Validator a) picks) / (4000 :: Double)
+         in share `shouldSatisfy` (\x -> x > 0.2 && x < 0.3)
+
+    it "rotates the leader every height" $ do
+      let picks = S.fromList [run 1 i [1, 2, 3, 4] [] 5 5 | i <- [1 .. 50 :: Integer]]
+      S.size picks `shouldBe` 4
+
+    it "moves to a different validator on each round change of a height" $
+      property $ \(chainId :: Integer) (height :: Integer) (start :: NonNegative Integer) -> do
+        let vs = [1, 2, 3]
+            st = getNonNegative start
+            picks = [run chainId (abs height) vs [(1, 100), (2, 1), (3, 1)] st r | r <- [st, st + 1, st + 2]]
+        S.fromList picks `shouldBe` vals vs
+        run chainId (abs height) vs [(1, 100), (2, 1), (3, 1)] st (st + 3) `shouldSatisfy` (`S.member` vals vs)
+
+    it "only looks back at most n-1 rounds, so large rounds are cheap" $
+      run 1 1 [1, 2, 3] [(1, 1)] 0 (10 ^ (30 :: Int)) `shouldSatisfy` (`S.member` vals [1, 2, 3])
+
+    it "always picks the only validator" $
+      property $ \(chainId :: Integer) (height :: Integer) (rnd :: NonNegative Integer) ->
+        run chainId (abs height) [7] [] 0 (getNonNegative rnd) `shouldBe` Validator 7
+
   describe "fastSerialize" $ do
     it "works on 0" $ word256ToBytes 0 `shouldBe` B.replicate 32 0
     it "works on ff" $ word256ToBytes 0xff `shouldBe` (B.replicate 31 0 <> B.replicate 1 0xff)

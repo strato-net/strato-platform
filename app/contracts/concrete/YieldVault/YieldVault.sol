@@ -2,6 +2,7 @@ import "../../abstract/ERC4626/ERC4626.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/utils/Pausable.sol";
+import "../Lending/PriceOracle.sol";
 
 /// @title YieldVault
 /// @notice ERC-4626 vault with:
@@ -54,6 +55,12 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
     bool public accrualInitialized;
     uint256 public accrualBaseAssets;
 
+    // --- Permissionless protocol-fee sweep (appended; do not reorder above) ---
+    address public feeCollector;                            // 0 => DEFAULT_FEE_COLLECTOR (0x100d)
+    address public priceOracle;                             // 0 => DEFAULT_PRICE_ORACLE (0x1002)
+    uint256 public sweepBuffer;                             // asset (wad) retained above principal
+    mapping(address => address) public strategyYieldToken; // strategy => yield token
+
     event VaultInitialized(address indexed asset, string name, string symbol);
     event AccrualInitialized(uint256 perSecondSavingsRate, uint256 lastAccrual);
     event Accrued(address indexed distributor, uint256 targetAmount, uint256 creditedAmount);
@@ -82,6 +89,18 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         bool fullyProcessed
     );
     event WithdrawalClaimed(address indexed owner, address indexed receiver, uint256 assets);
+    event FeeCollectorUpdated(address indexed oldFeeCollector, address indexed newFeeCollector);
+    event PriceOracleUpdated(address indexed oldOracle, address indexed newOracle);
+    event SweepBufferUpdated(uint256 oldBuffer, uint256 newBuffer);
+    event StrategyYieldTokenUpdated(address indexed strategy, address indexed yieldToken);
+    event StrategySurplusSwept(
+        address indexed strategy,
+        address indexed yieldToken,
+        address indexed feeCollector,
+        uint256 amount,
+        uint256 holdings,
+        uint256 rate
+    );
 
     constructor(address initialOwner)
         Ownable(initialOwner)
@@ -580,6 +599,111 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         deployedAssets -= loss;
         _checkpointAccrualBase();
         emit StrategyLossReported(strategy, loss, strategyDebt[strategy], deployedAssets);
+    }
+
+    // ---------------------------------------------------------------------
+    // Protocol-fee sweep (permissionless)
+    // ---------------------------------------------------------------------
+
+    function setFeeCollector(address newFeeCollector) external onlyOwner {
+        _requireInitialized();
+        require(newFeeCollector != address(this), "YieldVault: feeCollector=vault");
+        address old = feeCollector;
+        feeCollector = newFeeCollector;
+        emit FeeCollectorUpdated(old, newFeeCollector);
+    }
+
+    function setPriceOracle(address newOracle) external onlyOwner {
+        _requireInitialized();
+        address old = priceOracle;
+        priceOracle = newOracle;
+        emit PriceOracleUpdated(old, newOracle);
+    }
+
+    function setSweepBuffer(uint256 newBuffer) external onlyOwner {
+        _requireInitialized();
+        uint256 old = sweepBuffer;
+        sweepBuffer = newBuffer;
+        emit SweepBufferUpdated(old, newBuffer);
+    }
+
+    function setStrategyYieldToken(address strategy, address yieldToken) external onlyOwner {
+        _requireInitialized();
+        require(strategy != address(0), "YieldVault: strategy=0");
+        strategyYieldToken[strategy] = yieldToken;
+        emit StrategyYieldTokenUpdated(strategy, yieldToken);
+    }
+
+    /// @notice Yield-token amount a sweep would move: holdings valued above
+    ///         principal + buffer, expressed back in yield-token units.
+    function strategySurplus(address strategy)
+        public
+        view
+        returns (uint256 amount, uint256 holdings, uint256 rate)
+    {
+        address yieldToken = strategyYieldToken[strategy];
+        require(yieldToken != address(0), "YieldVault: yield token unset");
+
+        PriceOracle oracle = PriceOracle(_priceOracle());
+        holdings = IERC20(yieldToken).balanceOf(strategy);
+        rate = oracle.exchangeRates(yieldToken);
+        require(rate > 0, "YieldVault: no exchange rate");
+
+        uint256 reserve = strategyDebt[strategy] + sweepBuffer;
+
+        // (1) Intended amount from the smooth redemption rate (peg assumed).
+        uint256 valueInAsset = _mulDiv(holdings, rate, 1e18, false); // yieldToken -> asset, round down
+        if (valueInAsset <= reserve) return (0, holdings, rate);
+        amount = _mulDiv(valueInAsset - reserve, 1e18, rate, false); // asset -> yieldToken, round down
+
+        // (2) Market floor: after the sweep, holdings valued at the market
+        //     yieldToken/asset ratio must still cover reserve. Caps, never raises.
+        uint256 pYield = oracle.getAssetPrice(yieldToken); // USD (1e8); reverts if unavailable
+        uint256 pAsset = oracle.getAssetPrice(asset());    // USD (1e8); reverts if unavailable
+        uint256 minRetain = _mulDiv(reserve, pAsset, pYield, true); // reserve asset -> yieldToken at market, round up
+        uint256 maxByMarket = holdings > minRetain ? holdings - minRetain : 0;
+        if (amount > maxByMarket) amount = maxByMarket;
+
+        return (amount, holdings, rate);
+    }
+
+    /// @notice Permissionless. Sweeps the strategy's surplus to the fee
+    ///         collector.
+    function sweepStrategySurplus(address strategy)
+        external
+        whenNotPaused
+        nonReentrant
+        returns (uint256 amount)
+    {
+        _requireInitialized();
+        require(approvedStrategies[strategy], "YieldVault: strategy not approved");
+
+        address yieldToken = strategyYieldToken[strategy];
+        uint256 holdings;
+        uint256 rate;
+        (amount, holdings, rate) = strategySurplus(strategy);
+        if (amount == 0) return 0;
+
+        address collector = _feeCollector();
+        require(
+            IERC20(yieldToken).transferFrom(strategy, collector, amount),
+            "YieldVault: sweep failed"
+        );
+
+        emit StrategySurplusSwept(strategy, yieldToken, collector, amount, holdings, rate);
+        return amount;
+    }
+
+    function _feeCollector() internal view returns (address) {
+        return feeCollector == address(0)
+            ? address(0x000000000000000000000000000000000000100d)
+            : feeCollector;
+    }
+
+    function _priceOracle() internal view returns (address) {
+        return priceOracle == address(0)
+            ? address(0x0000000000000000000000000000000000001002)
+            : priceOracle;
     }
 
     function pause() external onlyOwner {

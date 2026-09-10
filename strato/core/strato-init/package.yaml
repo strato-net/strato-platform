@@ -27,6 +27,7 @@ library:
     - Blockchain.Init.BuildMetadata.TH
     - Blockchain.Init.Monad
     - Blockchain.Init.Options
+    - Blockchain.Init.RtsFlags
   dependencies:
   - aeson
   - blockapps-data
@@ -65,6 +66,16 @@ library:
   - unix
   - unliftio
   - yaml
+
+tests:
+  strato-init-test:
+    source-dirs: test/
+    main: Main.hs
+    other-modules: []
+    dependencies:
+      - hspec
+      - strato-init
+    ghc-options: -Wall -threaded
 
 executables:
 

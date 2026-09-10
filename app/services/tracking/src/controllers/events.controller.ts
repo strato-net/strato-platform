@@ -4,6 +4,7 @@ import {
   findSessionByRecentIp,
   isValidSessionId,
   markEngaged,
+  recordPostHogWalletConnection,
   recordWalletConnection,
 } from "../services/sessionService";
 import { normalizeAddress } from "../utils/addresses";
@@ -75,8 +76,25 @@ export const walletConnected = async (req: Request, res: Response): Promise<void
   }
   const connector =
     typeof req.body?.connector === "string" ? req.body.connector.slice(0, 64) : null;
+  const rawPosthogSessionId = firstString(req.body?.posthogSessionId);
+  const posthogSessionId = isValidSessionId(rawPosthogSessionId)
+    ? rawPosthogSessionId
+    : null;
+  const rawPosthogDistinctId = firstString(req.body?.posthogDistinctId);
+  const posthogDistinctId = rawPosthogDistinctId
+    ? rawPosthogDistinctId.slice(0, 200)
+    : null;
 
   try {
+    if (posthogSessionId) {
+      await recordPostHogWalletConnection(
+        posthogSessionId,
+        posthogDistinctId,
+        externalWalletAddress,
+        stratoAddress,
+        connector
+      );
+    }
     let session = sessionFromRequest(req);
     if (!session) {
       // No session id at all: fall back to this visitor's own recent open

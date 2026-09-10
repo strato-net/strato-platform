@@ -11,3 +11,6 @@ secrets.json
 /deploy/deployment-logs
 /scripts/token-transfer/transfer-logs
 r.log
+# Per-run state of the proxy upgrade scripts (implementation addresses, in-flight vote issues)
+/deploy/upgrade-*.state.*.json
+/deploy/sweep-withdrawal.state.*.json

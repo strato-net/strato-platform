@@ -142,6 +142,17 @@ generateDockerComposeAllDocker = do
         , command = Just ["exec docker-entrypoint.sh redis-server --appendonly yes >> /logs/redis.log 2>&1"]
         , volumes = Just ["./logs:/logs", "redisdata:/data"]
         , restart = Just "unless-stopped"
+        -- See the matching comment in DockerCompose.hs: an exit-code probe is
+        -- useless here because `redis-cli ping` exits 0 while the server is
+        -- still answering "-LOADING". Match on the reply so dependents that
+        -- wait for service_healthy actually wait for a usable Redis.
+        , healthcheck = Just Healthcheck
+            { test = ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+            , interval = Just "2s"
+            , timeout = Just "2s"
+            , retries = Just 10
+            , start_period = Just "180s"
+            }
         , logging = noLogging
         }
 
@@ -152,7 +163,7 @@ generateDockerComposeAllDocker = do
         , depends_on = Just $ DependsOnMap $ Map.fromList
             [ ("kafka", DependsOnCondition { condition = "service_started" })
             , ("postgres", DependsOnCondition { condition = "service_started" })
-            , ("redis", DependsOnCondition { condition = "service_started" })
+            , ("redis", DependsOnCondition { condition = "service_healthy" })
             ]
         , environment = Just $ Map.fromList
             [ ("addBootnodes", "${addBootnodes:-}")

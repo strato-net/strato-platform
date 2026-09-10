@@ -12,6 +12,7 @@
 module Executable.EthereumVM2
   ( handleVmTasks,
     writeBlockSummary,
+    processBlocks,
   )
 where
 
@@ -27,6 +28,7 @@ import Blockchain.DB.BlockSummaryDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
+import Blockchain.Data.ProposalFacts
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Event hiding (selfAddress)
 import Blockchain.TraceReplay (runJsonRpcCommandTraced)
@@ -38,7 +40,7 @@ import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.Model.MicroTime
 import Blockchain.VMContext
 import Blockchain.VMMetrics
-import Blockchain.EthConf (ethConf, quarryConfig)
+import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
 import qualified Blockchain.EthConf.Model as Conf
 import Conduit hiding (Flush)
 import Control.Arrow ((&&&), (***))
@@ -118,14 +120,30 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
                               parentHash = bSumParentHash summ,
                               stateRoot = bSumStateRoot summ
                             }
+                            -- NOTE: Do NOT override `parentHash` either - block.prevProposer /
+                            -- block.prevIntendedProposer resolve the *parent's* BlockSummary
+                            -- through this field. Pointing it at the grandparent makes any
+                            -- transaction that reads them produce a different state root here
+                            -- than the proposer and the authoritative replay computed, so the
+                            -- proposal is rejected and the round changes forever.
+                            BlockHeaderV3 {} -> bHeader {
+                              stateRoot = bSumStateRoot summ
+                            }
             proposer <- either error pure $ recoverProposer bHeader
-            res <- Bagger.runFromStateRoot
+            -- Verification always replays the whole block in one run, so it
+            -- always has the block's first transaction to attach the rewards
+            -- to; any leftover means the block has no transactions at all, and
+            -- then the miner drops them too. Nothing to carry here.
+            (_, res) <- Bagger.runFromStateRoot
               --account
               mineTransactions
               (bSumGasLimit summ)
               bHeader'
               otxs
               proposer
+              -- Replays the whole block from the parent state root, so this run
+              -- is the one that pays its rewards.
+              True
             case res of
               Right (sr, trrs, _) -> do
                 $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot we got: " <> format sr
@@ -232,9 +250,11 @@ outputTransactions :: [(Timestamp, OutputTx)] -> [VmOutEvent]
 outputTransactions = map $ OutIndexEvent . uncurry IndexTransaction
 
 writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
-writeBlockSummary block =
+writeBlockSummary block = do
   let sha = outputBlockHash block
       header = obBlockData block
       txCnt = fromIntegral $ length (obReceiptTransactions block)
-   in putBSum sha (blockHeaderToBSum header txCnt)
+  -- the parent's facts carry the round this height started at (none for genesis / legacy parents)
+  parentFacts <- maybe noProposalFacts bSumProposalFacts <$> A.lookup (A.Proxy @BlockSummary) (parentHash header)
+  putBSum sha (blockHeaderToBSum (Conf.networkID (networkConfig ethConf)) parentFacts header txCnt)
 

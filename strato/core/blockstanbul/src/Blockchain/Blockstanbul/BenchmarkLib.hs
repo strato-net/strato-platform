@@ -51,7 +51,7 @@ benchChainMember :: Address
 benchChainMember = 0x0
 
 benchContext :: BlockstanbulContext
-benchContext = newContext "" (Checkpoint (View 200 40) [benchValidator]) Nothing True
+benchContext = newContext "" 0 (Checkpoint (View 200 40) [benchValidator] Nothing [] 0) Nothing True Nothing
     where benchValidator = Validator benchChainMember
 
 makeBlock :: Int -> Int -> Block

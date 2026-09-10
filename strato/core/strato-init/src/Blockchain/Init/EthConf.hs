@@ -181,6 +181,29 @@ genEthConf = do
         , gasLimit = flags_gasLimit
         , blockPeriodMs = flags_blockstanbul_block_period_ms
         , roundPeriodS = flags_blockstanbul_round_period_s
+        , stakingActivationBlock =
+            if flags_stakingActivationBlock < 0
+              then defaultStakingActivationBlock flags_network
+              else Just flags_stakingActivationBlock
+        -- These two must be re-derived from flags_network. 'def' hardcodes
+        -- upquark's values, and ToJSON writes every field, so leaving them
+        -- alone bakes upquark's staking proxy into a helium node's
+        -- ethconf.yaml. FromJSON's per-network fallback can never fire after
+        -- that, because the key is present. The node then watches an address
+        -- that emits nothing on its network, derives no stake updates, and
+        -- dies with StakeMismatch on the first block whose header carries one.
+        , stakingContractAddress = defaultStakingContractAddress flags_network
+        -- An explicit --stakingActivationBlock has to carry the stake-event
+        -- source with it. The per-network default resolves to Nothing for a
+        -- network name this build has never heard of, and Nothing here means
+        -- "never switch to governance"; combined with stakingContractAddress
+        -- also being Nothing for a new network, stakeEventSourceAt would yield
+        -- no source at any height. Staking would activate at the requested
+        -- block with nothing publishing weights.
+        , stakingEventsFromGovernanceBlock =
+            if flags_stakingActivationBlock < 0
+              then defaultStakingEventsFromGovernanceBlock flags_network
+              else Just flags_stakingActivationBlock
         }
     }
 
@@ -193,5 +216,6 @@ deriveFileServerUrl "" "upquark" = "https://fileserver.mercata.blockapps.net/hig
 deriveFileServerUrl "" "mercata" = "https://fileserver.mercata.blockapps.net/highway"
 deriveFileServerUrl "" "uranium" = "https://fileserver.mercata.blockapps.net/highway"
 deriveFileServerUrl "" "lithium" = "https://fileserver.mercata.blockapps.net/highway"
+deriveFileServerUrl "" "beryllium" = "https://fileserver.mercata.blockapps.net/highway"
 deriveFileServerUrl "" _ = ""  -- Unknown networks get empty string
 deriveFileServerUrl url _ = url  -- Explicit URL takes precedence

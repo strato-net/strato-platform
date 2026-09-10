@@ -1,31 +1,76 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
-import { Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, Search } from 'lucide-react';
 import { absoluteLinkUrl, formatUsd, LinkSummary, listLinks, setLinkActive } from '../api';
 import CreateLinkModal from '../components/CreateLinkModal';
 import DailySnapshotPanel from '../components/DailySnapshotPanel';
 import EditLinkModal from '../components/EditLinkModal';
-import { Button, CopyButton, Skeleton, Switch, tdClass, thClass } from '../components/primitives';
+import {
+  Button,
+  CopyButton,
+  inputClass,
+  Skeleton,
+  SortDirection,
+  SortHeader,
+  Switch,
+  tdClass,
+  thClass,
+} from '../components/primitives';
+
+type SortKey =
+  | 'label'
+  | 'source'
+  | 'fullSource'
+  | 'creator'
+  | 'opens'
+  | 'wallets'
+  | 'bridgedWallets'
+  | 'bridgeValueUsd'
+  | 'activatedWallets'
+  | 'lastActivityAt'
+  | 'active';
 
 // Fixed-width columns (table-fixed + colgroup); overflowing text truncates
-// with the full value in the title tooltip.
-const COLUMNS: { label: string; width: number; align?: 'right' }[] = [
-  { label: 'Link', width: 170 },
-  { label: 'Source', width: 110 },
-  { label: 'Full source', width: 150 },
-  { label: 'Creator', width: 120 },
-  { label: 'Opens', width: 70, align: 'right' },
-  { label: 'Wallets', width: 80, align: 'right' },
-  { label: 'Bridged', width: 80, align: 'right' },
-  { label: 'Bridge value', width: 105, align: 'right' },
-  { label: 'Activated', width: 90, align: 'right' },
-  { label: 'Last activity', width: 120 },
-  { label: 'Active', width: 60 },
+// with the full value in the title tooltip. Every data column is sortable.
+const COLUMNS: { label: string; width: number; align?: 'right'; sort?: SortKey }[] = [
+  { label: 'Link', width: 170, sort: 'label' },
+  { label: 'Source', width: 110, sort: 'source' },
+  { label: 'Full source', width: 150, sort: 'fullSource' },
+  { label: 'Creator', width: 120, sort: 'creator' },
+  { label: 'Opens', width: 70, align: 'right', sort: 'opens' },
+  { label: 'Wallets', width: 80, align: 'right', sort: 'wallets' },
+  { label: 'Bridged', width: 80, align: 'right', sort: 'bridgedWallets' },
+  { label: 'Bridge value', width: 105, align: 'right', sort: 'bridgeValueUsd' },
+  { label: 'Activated', width: 90, align: 'right', sort: 'activatedWallets' },
+  { label: 'Last activity', width: 120, sort: 'lastActivityAt' },
+  { label: 'Active', width: 60, sort: 'active' },
   { label: '', width: 44 },
 ];
 const TABLE_MIN_WIDTH = COLUMNS.reduce((sum, col) => sum + col.width, 0);
+
+// Comparable value per sortable column; null (missing value, blank text) always
+// sinks to the bottom, whichever direction is active.
+const SORT_VALUES: Record<SortKey, (link: LinkSummary) => string | number | null> = {
+  label: (link) => link.label.trim().toLowerCase() || null,
+  source: (link) => link.source.trim().toLowerCase() || null,
+  fullSource: (link) => link.fullSource.trim().toLowerCase() || null,
+  creator: (link) => link.creator.trim().toLowerCase() || null,
+  opens: (link) => link.opens,
+  wallets: (link) => link.wallets,
+  bridgedWallets: (link) => link.bridgedWallets,
+  bridgeValueUsd: (link) => link.bridgeValueUsd,
+  activatedWallets: (link) => link.activatedWallets,
+  lastActivityAt: (link) => (link.lastActivityAt ? Date.parse(link.lastActivityAt) : null),
+  active: (link) => (link.active ? 1 : 0),
+};
+
+// Free-text search runs over everything the row shows plus the shareable URL.
+const searchHaystack = (link: LinkSummary) =>
+  [link.slug, link.url, link.label, link.source, link.fullSource, link.creator]
+    .join(' ')
+    .toLowerCase();
 
 const truncatedTdClass = `${tdClass} truncate`;
 
@@ -34,6 +79,9 @@ const LinksPage = () => {
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<LinkSummary | null>(null);
+  const [search, setSearch] = useState('');
+  // null = the server's own order (newest first)
+  const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
 
   const links = useQuery({
     queryKey: ['links'],
@@ -47,6 +95,35 @@ const LinksPage = () => {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['links'] }),
   });
 
+  // The endpoint returns the full list, so filtering and sorting stay client-side.
+  const visibleLinks = useMemo(() => {
+    const all = links.data ?? [];
+    const needle = search.trim().toLowerCase();
+    const filtered = needle ? all.filter((link) => searchHaystack(link).includes(needle)) : all;
+    if (!sort) return filtered;
+    const valueOf = SORT_VALUES[sort.key];
+    const factor = sort.direction === 'asc' ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const left = valueOf(a);
+      const right = valueOf(b);
+      if (left === null || right === null) {
+        if (left === right) return 0;
+        return left === null ? 1 : -1;
+      }
+      if (typeof left === 'string' && typeof right === 'string') {
+        return factor * left.localeCompare(right);
+      }
+      return factor * (Number(left) - Number(right));
+    });
+  }, [links.data, search, sort]);
+
+  // asc → desc → back to the server order
+  const toggleSort = (key: SortKey) =>
+    setSort((current) => {
+      if (current?.key !== key) return { key, direction: 'asc' };
+      return current.direction === 'asc' ? { key, direction: 'desc' } : null;
+    });
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -59,7 +136,32 @@ const LinksPage = () => {
 
       <DailySnapshotPanel />
 
-      <h2 className="pt-2 text-sm font-semibold">All links</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+        <h2 className="text-sm font-semibold">All links</h2>
+        {links.data && links.data.length > 0 && (
+          <div className="flex items-center gap-3">
+            {search.trim() && (
+              <span className="text-xs text-muted-foreground">
+                {visibleLinks.length} of {links.data.length}
+              </span>
+            )}
+            <div className="relative w-64 max-w-full">
+              <Search
+                size={14}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search links…"
+                aria-label="Search tracking links"
+                className={`${inputClass} pl-8`}
+              />
+            </div>
+          </div>
+        )}
+      </div>
 
       {links.isPending ? (
         <div className="space-y-2">
@@ -78,6 +180,13 @@ const LinksPage = () => {
         <div className="rounded-lg border border-border p-8 text-center text-sm text-muted-foreground">
           No tracking links yet — create your first one.
         </div>
+      ) : visibleLinks.length === 0 ? (
+        <div className="rounded-lg border border-border p-8 text-center text-sm text-muted-foreground">
+          No links match “{search.trim()}”.{' '}
+          <button className="underline" onClick={() => setSearch('')}>
+            Clear search
+          </button>
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full table-fixed" style={{ minWidth: TABLE_MIN_WIDTH }}>
@@ -88,18 +197,26 @@ const LinksPage = () => {
             </colgroup>
             <thead className="border-b border-border">
               <tr>
-                {COLUMNS.map((col) => (
-                  <th
-                    key={col.label}
-                    className={`${thClass} ${col.align === 'right' ? 'text-right' : ''}`}
-                  >
-                    {col.label}
-                  </th>
-                ))}
+                {COLUMNS.map(({ label, align, sort: key }) =>
+                  key ? (
+                    <SortHeader
+                      key={label}
+                      label={label}
+                      align={align}
+                      active={sort?.key === key}
+                      direction={sort?.key === key ? sort.direction : 'asc'}
+                      onClick={() => toggleSort(key)}
+                    />
+                  ) : (
+                    <th key={label} className={`${thClass} ${align === 'right' ? 'text-right' : ''}`}>
+                      {label}
+                    </th>
+                  )
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {links.data.map((link) => (
+              {visibleLinks.map((link) => (
                 <tr
                   key={link.id}
                   onClick={() => navigate(`/links/${link.id}`)}

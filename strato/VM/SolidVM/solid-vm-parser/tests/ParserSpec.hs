@@ -3,6 +3,7 @@
 
 module ParserSpec where
 
+import qualified Blockchain.Strato.Model.Address as Addr
 import Control.Monad
 import Data.Either (isLeft)
 import Data.Source.Annotation as SA
@@ -105,6 +106,81 @@ spec = do
             ]
       forM_ fcases $ \(input, want) -> do
         assertEqual input (Right want) (parseExpr input)
+
+  describe "Operator precedence" $ do
+    let parseExpr = fmap (fmap (const ())) . runParser expression initialParserState ""
+        legacyState = initialParserState {legacyOperatorPrecedence = True}
+        parseLegacy = fmap (fmap (const ())) . runParser expression legacyState ""
+        v = Variable ()
+        bin = Binary ()
+        cases =
+          [ -- assignment is the loosest operator: the whole `b || c` is assigned
+            ("a = b || c", bin "=" (v "a") (bin "||" (v "b") (v "c"))),
+            ("a = b && c", bin "=" (v "a") (bin "&&" (v "b") (v "c"))),
+            ("a |= b || c", bin "|=" (v "a") (bin "||" (v "b") (v "c"))),
+            ("a = c ? x : y", bin "=" (v "a") (Ternary () (v "c") (v "x") (v "y"))),
+            -- ternary is looser than || and &&
+            ("a || b ? x : y", Ternary () (bin "||" (v "a") (v "b")) (v "x") (v "y")),
+            ("a && b ? x : y", Ternary () (bin "&&" (v "a") (v "b")) (v "x") (v "y")),
+            -- && binds tighter than ||
+            ("a && b || c", bin "||" (bin "&&" (v "a") (v "b")) (v "c")),
+            ("a || b && c", bin "||" (v "a") (bin "&&" (v "b") (v "c"))),
+            -- relational binds tighter than equality
+            ("a < b == c", bin "==" (bin "<" (v "a") (v "b")) (v "c")),
+            ("a == b < c", bin "==" (v "a") (bin "<" (v "b") (v "c"))),
+            -- ** and assignment associate to the right
+            ("a ** b ** c", bin "**" (v "a") (bin "**" (v "b") (v "c"))),
+            ("a = b = c", bin "=" (v "a") (bin "=" (v "b") (v "c"))),
+            -- unchanged neighbours
+            ("!a || b", bin "||" (Unitary () "!" (v "a")) (v "b")),
+            ("a + b * c", bin "+" (v "a") (bin "*" (v "b") (v "c")))
+          ]
+    forM_ cases $ \(input, want) -> do
+      it ("parses " ++ input ++ " with Solidity precedence") $ parseExpr input `shouldBe` Right want
+
+    -- The pre-fork table, kept for replaying old blocks: assignment bound
+    -- tighter than && / ||, and the ternary tighter than both.
+    let legacyCases =
+          [ ("a = b || c", bin "||" (bin "=" (v "a") (v "b")) (v "c")),
+            ("a = b && c", bin "&&" (bin "=" (v "a") (v "b")) (v "c")),
+            ("a || b ? x : y", bin "||" (v "a") (Ternary () (v "b") (v "x") (v "y"))),
+            ("a < b == c", bin "<" (v "a") (bin "==" (v "b") (v "c"))),
+            ("a ** b ** c", bin "**" (bin "**" (v "a") (v "b")) (v "c"))
+          ]
+    forM_ legacyCases $ \(input, want) -> do
+      it ("parses " ++ input ++ " with the legacy table") $ parseLegacy input `shouldBe` Right want
+
+  describe "Arg literal parsing (parseArg)" $ do
+    let parseA = fmap (fmap (const ())) . runParser parseArg initialParserState ""
+        cases =
+          [ ("42", NumberLiteral () 42 Nothing),
+            ([r|"hello"|], StringLiteral () "hello"),
+            -- Legacy inference: a quoted string that reads as an address is an address
+            ([r|"123"|], AddressLiteral () (Addr.Address 0x123)),
+            ([r|"00000000000000000000000000000000deadbeef"|], AddressLiteral () (Addr.Address 0xdeadbeef)),
+            -- Explicit casts pin the type regardless of content shape
+            ([r|string("123")|], StringLiteral () "123"),
+            ([r|string("00000000000000000000000000000000deadbeef")|], StringLiteral () "00000000000000000000000000000000deadbeef"),
+            ([r|string("hello")|], StringLiteral () "hello"),
+            ([r|address("123")|], AddressLiteral () (Addr.Address 0x123)),
+            ([r|address("00000000000000000000000000000000deadbeef")|], AddressLiteral () (Addr.Address 0xdeadbeef)),
+            ("address(0xdeadbeef)", AddressLiteral () (Addr.Address 0xdeadbeef)),
+            ("uint(5)", NumberLiteral () 5 Nothing),
+            ("int(-5)", NumberLiteral () (-5) Nothing),
+            ("bool(true)", BoolLiteral () True),
+            ("bool(false)", BoolLiteral () False),
+            ("decimal(1.5)", DecimalLiteral () (WrappedDecimal 1.5)),
+            ([r|decimal("1.5")|], DecimalLiteral () (WrappedDecimal 1.5)),
+            ([r|bytes("00ff")|], HexaLiteral () "00ff"),
+            -- Casts nest inside array literals
+            ([r|[string("123"),uint(7)]|], ArrayExpression () [StringLiteral () "123", NumberLiteral () 7 Nothing])
+          ]
+    forM_ cases $ \(input, want) -> do
+      it ("can parse " ++ show input) $ parseA input `shouldBe` Right want
+    it "rejects an unterminated cast" $
+      parseA [r|string("123"|] `shouldSatisfy` isLeft
+    it "rejects odd-length bytes content" $
+      parseA [r|bytes("0ff")|] `shouldSatisfy` isLeft
 
   {-
   ------------------------------------------------------------------------------------------------------------------------------------------------

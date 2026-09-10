@@ -35,6 +35,11 @@ export type BridgeAssetInfo = {
   enabled: boolean;
   depositsPaused?: boolean;
   withdrawalsPaused?: boolean;
+  depositsDisabled?: boolean;
+  withdrawalsDisabled?: boolean;
+  maxOutstandingWithdrawal?: string;
+  outstandingWithdrawal?: string;
+  remainingOutstandingWithdrawal?: string;
 };
 
 export type BridgeableAssetRoute = {
@@ -49,6 +54,13 @@ export type NativeBridgeAssetRow = {
   key?: string;
   key2?: string | number;
   value?: unknown;
+  lockedBalance?: unknown;
+};
+
+export type NativeTokenBridgeConfig = {
+  depositsDisabled: boolean;
+  withdrawalsDisabled: boolean;
+  maxOutstandingWithdrawal: string;
 };
 
 // ============================================================================
@@ -155,7 +167,15 @@ async function fetchTokenSymbols(accessToken: string, addresses: Set<string>): P
   const { data } = await cirrus.get(accessToken, `/${constants.Token}`, {
     params: { select: "address,_symbol,_name", address: `in.(${[...addresses].join(",")})` }
   });
-  return new Map((data || []).map((t: any) => [stripHex(t.address), { name: t._name || "-", symbol: t._symbol || "-" }]));
+  const symbols = new Map<string, { name: string; symbol: string }>(
+    (data || []).map((t: any) => [stripHex(t.address), { name: t._name || "-", symbol: t._symbol || "-" }])
+  );
+  const missingAddresses = new Set([...addresses].filter((address) => !symbols.has(stripHex(address))));
+  if (missingAddresses.size) {
+    const storageSymbols = await fetchStorageTokenSymbols(accessToken, missingAddresses);
+    for (const [address, metadata] of storageSymbols) symbols.set(address, metadata);
+  }
+  return symbols;
 }
 
 async function fetchStorageTokenSymbols(accessToken: string, addresses: Set<string>): Promise<Map<string, { name: string; symbol: string }>> {
@@ -399,7 +419,9 @@ export function parseBridgeRouteMappings(mappings: BridgeMappingRow[]): Bridgeab
 
 export function parseNativeBridgeAssets(
   rows: NativeBridgeAssetRow[],
-  pauseState: { depositsPaused?: boolean; withdrawalsPaused?: boolean } = {}
+  pauseState: { depositsPaused?: boolean; withdrawalsPaused?: boolean } = {},
+  tokenConfigs: Map<string, NativeTokenBridgeConfig> = new Map(),
+  lockedBalances: Map<string, string> = new Map()
 ): BridgeableAssetRoute[] {
   const routes: BridgeableAssetRoute[] = [];
 
@@ -413,6 +435,14 @@ export function parseNativeBridgeAssets(
       ? normalizeBridgeAddress(raw.representationToken)
       : "";
     if (!representationToken) continue;
+    const tokenKey = stratoToken.toLowerCase().replace(/^0x/, "");
+    const tokenConfig = tokenConfigs.get(tokenKey);
+    const maxOutstandingWithdrawal = tokenConfig?.maxOutstandingWithdrawal ?? "0";
+    const outstandingWithdrawal = lockedBalances.get(tokenKey) ?? "0";
+    const maxOutstanding = BigInt(maxOutstandingWithdrawal);
+    const outstanding = BigInt(outstandingWithdrawal);
+    const remainingOutstandingWithdrawal =
+      maxOutstanding > outstanding ? String(maxOutstanding - outstanding) : "0";
 
     const asset: BridgeAssetInfo = {
       routeType: "native",
@@ -431,6 +461,11 @@ export function parseNativeBridgeAssets(
       enabled: isMappingTrue(raw.enabled),
       depositsPaused: pauseState.depositsPaused,
       withdrawalsPaused: pauseState.withdrawalsPaused,
+      depositsDisabled: tokenConfig?.depositsDisabled ?? false,
+      withdrawalsDisabled: tokenConfig?.withdrawalsDisabled ?? false,
+      maxOutstandingWithdrawal,
+      outstandingWithdrawal,
+      remainingOutstandingWithdrawal,
     };
 
     routes.push({
@@ -443,6 +478,41 @@ export function parseNativeBridgeAssets(
   }
 
   return routes;
+}
+
+export function parseNativeTokenBridgeConfigs(
+  rows: NativeBridgeAssetRow[]
+): Map<string, NativeTokenBridgeConfig> {
+  const configs = new Map<string, NativeTokenBridgeConfig>();
+
+  for (const row of rows) {
+    if (typeof row.key !== "string" || !row.value || typeof row.value !== "object") continue;
+    const raw = row.value as Record<string, unknown>;
+    configs.set(row.key.toLowerCase().replace(/^0x/, ""), {
+      depositsDisabled: isMappingTrue(raw.depositsDisabled),
+      withdrawalsDisabled: isMappingTrue(raw.withdrawalsDisabled),
+      maxOutstandingWithdrawal:
+        raw.maxOutstandingWithdrawal != null ? String(raw.maxOutstandingWithdrawal) : "0",
+    });
+  }
+
+  return configs;
+}
+
+export function parseNativeLockedBalances(
+  rows: NativeBridgeAssetRow[]
+): Map<string, string> {
+  const balances = new Map<string, string>();
+
+  for (const row of rows) {
+    if (typeof row.key !== "string") continue;
+    balances.set(
+      row.key.toLowerCase().replace(/^0x/, ""),
+      row.lockedBalance != null ? String(row.lockedBalance) : "0"
+    );
+  }
+
+  return balances;
 }
 
 export { QUERY_CONFIGS };

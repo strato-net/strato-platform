@@ -142,12 +142,21 @@ generateDockerCompose = do
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh redis-server --appendonly yes >> /logs/redis.log 2>&1"]
         , restart = Just "unless-stopped"
+        -- `redis-cli ping` exits 0 even when the server answers
+        -- "-LOADING Redis is loading the dataset in memory", so an exit-code
+        -- probe reports healthy as soon as Redis accepts connections -- while
+        -- it is still reading its dump back in. `docker compose up --wait`
+        -- then returns early and convoke starts the host processes against a
+        -- Redis that rejects every command. Match on the reply instead.
         , healthcheck = Just Healthcheck
-            { test = ["CMD", "redis-cli", "ping"]
+            { test = ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
             , interval = Just "2s"
             , timeout = Just "2s"
             , retries = Just 10
-            , start_period = Nothing
+            -- Loading a multi-GB dump takes much longer than
+            -- retries * interval; probes that fail inside start_period do not
+            -- count against the retry budget, and `--wait` keeps waiting.
+            , start_period = Just "180s"
             }
         , logging = noLogging
         , volumes = Just ["./logs:/logs", "./redis:/data"]

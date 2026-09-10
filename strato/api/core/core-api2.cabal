@@ -18,6 +18,7 @@ library
       Handlers.Metadata
       Handlers.Peers
       Handlers.QueuedTransactions
+      Handlers.Receipts
       Handlers.Stats
       Handlers.Storage
       Handlers.Transaction
@@ -35,6 +36,7 @@ library
       aeson
     , aeson-casing
     , base
+    , base16-bytestring
     , binary
     , blockDB
     , blockapps-data
@@ -48,10 +50,12 @@ library
     , directory
     , esqueleto
     , ethereum-discovery
+    , ethereum-rlp
     , filepath
     , format
     , http-types
     , lens
+    , merkle-patricia-db
     , monad-alter
     , mtl
     , openapi3

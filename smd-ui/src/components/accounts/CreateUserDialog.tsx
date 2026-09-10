@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { UserPlus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -28,6 +28,13 @@ export function CreateUserDialog({ disabled }: { disabled?: boolean }) {
   const { submit, canSubmit } = useSubmitTransaction();
   const sim = useSimulation();
   const queryClient = useQueryClient();
+
+  // A stale dry-run is misleading once the username changes (or the dialog is
+  // reopened); clear the panel on any edit.
+  const simReset = sim.reset;
+  useEffect(() => {
+    simReset();
+  }, [simReset, username, open]);
 
   // createUser uses msg.sender as the new wallet's owner, so this is a plain
   // function call signed by the connected account — no wallet wrapping needed.

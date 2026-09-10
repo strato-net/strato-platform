@@ -11,6 +11,7 @@ build-type:     Simple
 executable convoke
   main-is: Main.hs
   other-modules:
+      Log
       WaitAnyOrInterrupt
       Paths_convoke
   hs-source-dirs:
@@ -23,5 +24,6 @@ executable convoke
     , filepath
     , process
     , shellwords
+    , time
     , unix
   default-language: Haskell2010
