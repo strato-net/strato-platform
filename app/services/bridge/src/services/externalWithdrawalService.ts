@@ -12,6 +12,8 @@ import { OperationType } from "@safe-global/types-kit";
 import axios from "axios";
 import {
   config,
+  VERIFIER_REQUEST_TIMEOUT_MS,
+  EXTERNAL_BRIDGE_LOG_BLOCK_RANGE,
   getExternalBridgeExecutorKmsConfig,
   getExternalBridgeVerifierApiTokens,
   getExternalBridgeVerifierUrls,
@@ -233,6 +235,8 @@ export const signWithdrawalAuthorization = async (
         `${url}/v1/sign-withdrawal`,
         authorization,
         {
+          timeout: VERIFIER_REQUEST_TIMEOUT_MS,
+          signal: AbortSignal.timeout(VERIFIER_REQUEST_TIMEOUT_MS),
           headers: {
             Authorization: `Bearer ${signerApiTokens[index]}`,
           },
@@ -394,7 +398,7 @@ export const getReservationId = (
     ),
   );
 
-const getEventTransactionHash = async (
+export const getEventTransactionHash = async (
   provider: JsonRpcProvider,
   vaultAddress: string,
   eventName:
@@ -402,22 +406,46 @@ const getEventTransactionHash = async (
     | "WithdrawalReleased"
     | "WithdrawalCancelled",
   reservationId: string,
+  notBefore: string,
 ): Promise<string> => {
-  const logs = await provider.getLogs({
-    address: vaultAddress,
-    topics: vaultInterface.encodeFilterTopics(eventName, [reservationId]),
-    fromBlock: 0,
-    toBlock: "latest",
-  });
-  const transactionHash = logs.at(-1)?.transactionHash;
-  if (!transactionHash) {
-    throw new Error(`${eventName} event not found for ${reservationId}`);
+  const latest = await provider.getBlock("latest");
+  if (!latest) throw new Error("Latest block unavailable for withdrawal recovery");
+  let lower = 0;
+  let upper = latest.number;
+  while (lower < upper) {
+    const middle = Math.floor((lower + upper) / 2);
+    const block = await provider.getBlock(middle);
+    if (!block) throw new Error(`Block ${middle} unavailable for withdrawal recovery`);
+    if (BigInt(block.timestamp) < BigInt(notBefore)) lower = middle + 1;
+    else upper = middle;
   }
-  return transactionHash;
+  let toBlock = latest.number;
+  let range = EXTERNAL_BRIDGE_LOG_BLOCK_RANGE;
+  while (toBlock >= lower) {
+    const fromBlock = Math.max(lower, toBlock - range + 1);
+    let logs;
+    try {
+      logs = await provider.getLogs({
+        address: vaultAddress,
+        topics: vaultInterface.encodeFilterTopics(eventName, [reservationId]),
+        fromBlock,
+        toBlock,
+      });
+    } catch (error) {
+      if (range === 1) throw error;
+      range = Math.max(1, Math.floor(range / 2));
+      continue;
+    }
+    const transactionHash = logs.at(-1)?.transactionHash;
+    if (transactionHash) return transactionHash;
+    toBlock = fromBlock - 1;
+  }
+  throw new Error(`${eventName} event not found for ${reservationId}`);
 };
 
 export const getReservationState = async (
   authorization: WithdrawalAuthorization,
+  includeReservationTxHash = true,
 ): Promise<{
   reservationId: string;
   status: number;
@@ -448,13 +476,14 @@ export const getReservationState = async (
     status,
     latestTimestamp: BigInt(latestBlock.timestamp),
     reservationTxHash:
-      status === 0
+      status === 0 || !includeReservationTxHash
         ? undefined
         : await getEventTransactionHash(
             provider,
             authorization.destinationVault,
             "WithdrawalReserved",
             reservationId,
+            authorization.notBefore,
           ),
   };
 };
@@ -517,6 +546,7 @@ export const reserveWithdrawal = async (
       authorization.destinationVault,
       "WithdrawalReserved",
       reservationId,
+      authorization.notBefore,
     ),
   };
 };
@@ -546,6 +576,7 @@ export const releaseWithdrawal = async (
     authorization.destinationVault,
     "WithdrawalReleased",
     reservationId,
+    authorization.notBefore,
   );
 };
 
@@ -574,5 +605,6 @@ export const cancelExpiredWithdrawal = async (
     authorization.destinationVault,
     "WithdrawalCancelled",
     reservationId,
+    authorization.notBefore,
   );
 };

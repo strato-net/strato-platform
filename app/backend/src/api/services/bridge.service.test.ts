@@ -268,3 +268,43 @@ test("getDepositRouterMajor tries the fallback RPC when the primary returns a JS
   assert.equal(major, 3);
   assert.deepEqual(calls, [upstream, fallback]);
 });
+
+test("keeps pending and completed withdrawal totals separate across bridge types", async () => {
+  const bridge = await import("./bridge.service");
+  const oracle = await import("../helpers/oracle.helper");
+  const { cirrus } = await import("../../utils/appApiHelper");
+  const token = "9".repeat(40);
+  const wad = constants.DECIMALS;
+  const originalRoutes = bridge.getBridgeableTokens;
+  const originalPrices = oracle.getCompletePriceMap;
+  const originalGet = cirrus.get;
+  const originalNativeBridge = Object.getOwnPropertyDescriptor(constants, "stratoNativeBridge")!;
+  (bridge as any).getBridgeableTokens = async () => [];
+  (oracle as any).getCompletePriceMap = async () => new Map([[token, wad.toString()]]);
+  Object.defineProperty(constants, "stratoNativeBridge", { configurable: true, get: () => "8".repeat(40) });
+  (cirrus as any).get = async (_accessToken: string, path: string, { params }: any) => {
+    let amount: bigint;
+    if (path === `/${constants.ExternalAssetBridge}-withdrawals`) {
+      amount = params["value->>status"] === "eq.4" ? 200n : 100n;
+    } else if (path === `/${constants.MercataBridge}-withdrawals`) {
+      amount = params["value->>bridgeStatus"] === "eq.3" ? 20n : 10n;
+    } else {
+      assert.equal(path, `/${constants.StratoNativeBridge}-withdrawals`);
+      amount = params["value->>bridgeStatus"] === "eq.3" ? 2n : 1n;
+    }
+    const completed = params["value->>status"] === "eq.4" || params["value->>bridgeStatus"] === "eq.3";
+    assert.equal(typeof params.block_timestamp === "string", completed);
+    return { data: [{ stratoToken: token, stratoTokenAmount: (amount * wad).toString() }] };
+  };
+  try {
+    const summary = await bridge.getWithdrawalSummary("token", "user");
+    assert.equal(summary.pendingWithdrawals, (111n * wad).toString());
+    assert.equal(summary.totalWithdrawn30d, (222n * wad).toString());
+    assert.equal(summary.availableToWithdraw, "0");
+  } finally {
+    (bridge as any).getBridgeableTokens = originalRoutes;
+    (oracle as any).getCompletePriceMap = originalPrices;
+    cirrus.get = originalGet;
+    Object.defineProperty(constants, "stratoNativeBridge", originalNativeBridge);
+  }
+});

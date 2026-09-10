@@ -1,3 +1,4 @@
+import { reconcileRecordedDepositReviews } from "../services/depositRecoveryService";
 import {
   config,
   DEPOSIT_EVENT_SIGNATURES,
@@ -146,6 +147,7 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
   const depositRouters = chainInfo.depositRouters?.length
     ? chainInfo.depositRouters
     : [chainInfo.depositRouter];
+  await reconcileRecordedDepositReviews(externalChainId);
   const reviewRetryMs = getReviewRecordRetryMs();
   const reviewedDeposits =
     await depositStateService.listReviews(externalChainId);

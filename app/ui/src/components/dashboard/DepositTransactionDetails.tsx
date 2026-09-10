@@ -187,6 +187,13 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
               Initiated
             </span>
           );
+        } else if (statusNum === ExternalBridgeStatus.PENDING_REVIEW) {
+          return (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+              <Clock className="h-3 w-3 mr-1" />
+              Pending Review
+            </span>
+          );
         } else if (statusNum === ExternalBridgeStatus.COMPLETED) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">

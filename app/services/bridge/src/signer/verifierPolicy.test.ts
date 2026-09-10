@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { runInNewContext } from "node:vm";
+import ts from "typescript";
+import { getAddress, TypedDataEncoder } from "ethers";
 import {
   evaluateDepositPolicy,
   evaluateWithdrawalPolicy,
@@ -50,6 +55,57 @@ const deposit = {
   minFinalOut: "0",
 } satisfies DepositSettlementAttestation;
 
+// Load the actual route check without starting the verifier or initializing KMS.
+const signerSource = ts.createSourceFile(
+  "index.ts",
+  readFileSync(resolve(__dirname, "../../src/signer/index.ts"), "utf8"),
+  ts.ScriptTarget.Latest,
+  true,
+);
+const routeCheck = signerSource.statements.find(
+  (statement) => ts.isVariableStatement(statement) &&
+    statement.declarationList.declarations.some(
+      (declaration) => declaration.name.getText(signerSource) === "validateSourceDepositRoute",
+    ),
+);
+assert.ok(routeCheck);
+const routeCheckCode = ts.transpileModule(routeCheck.getText(signerSource), {
+  compilerOptions: { target: ts.ScriptTarget.ES2020 },
+}).outputText;
+
+test("validates structured Cirrus deposit routes and AUTO_ROUTE permissions", async () => {
+  let route: unknown = { depositsEnabled: true, withdrawalsEnabled: false, externalDecimals: 18 };
+  let autoRoute = false;
+  const validate = runInNewContext(`${routeCheckCode}\nvalidateSourceDepositRoute`, {
+    sourceBridge: policy.sourceBridge,
+    normalize: (value: string) => value.replace(/^0x/, "").toLowerCase(),
+    stratoGet: async (path: string, params: Record<string, string>) => {
+      assert.equal(params.address, `eq.${policy.sourceBridge}`);
+      assert.equal(params.key, `eq.${externalToken.slice(2)}`);
+      assert.equal(params.key2, `eq.${deposit.externalChainId}`);
+      assert.equal(params.key3, `eq.${stratoToken}`);
+      assert.equal(params.select, "value");
+      if (path.endsWith("-routes")) {
+        assert.equal(params["value->>depositsEnabled"], "eq.true");
+        assert.equal(params.value, undefined);
+        return { data: route === undefined ? [] : [{ value: route }] };
+      }
+      assert.equal(path, "/cirrus/search/BlockApps-ExternalAssetBridge-depositActionConfigs");
+      assert.equal(params["value->>depositsEnabled"], undefined);
+      return { data: [{ value: { autoRoute } }] };
+    },
+  }) as (input: DepositSettlementAttestation) => Promise<void>;
+
+  await validate(deposit);
+  for (route of [undefined, false, true, {}, { depositsEnabled: false }, { depositsEnabled: "true" }]) {
+    await assert.rejects(validate(deposit), /Deposit route is not enabled/);
+  }
+  route = { depositsEnabled: true };
+  await assert.rejects(validate({ ...deposit, action: "4" }), /AUTO_ROUTE is not enabled/);
+  autoRoute = true;
+  await validate({ ...deposit, action: "4" });
+});
+
 test("requires local review above the automatic deposit limit", () => {
   assert.equal(evaluateDepositPolicy(policy, deposit).decision, "approve");
   assert.equal(
@@ -79,4 +135,68 @@ test("requires local review above the automatic withdrawal limit", () => {
       .decision,
     "manual_review",
   );
+});
+
+test("validates historical releases independently of current authorization eligibility", async () => {
+  const names = ["AUTHORIZATION_TYPES", "domain", "validateDestinationIdentity", "validateDestination", "validateReleasedDestination"];
+  const code = names.map((name) => {
+    const statement = signerSource.statements.find((node) =>
+      ts.isVariableStatement(node) && node.declarationList.declarations.some(
+        (declaration) => declaration.name.getText(signerSource) === name,
+      ),
+    );
+    assert.ok(statement, name);
+    return statement.getText(signerSource);
+  }).join("\n");
+  const authorization = {
+    sourceChainId: "9001", sourceBridge: `0x${policy.sourceBridge}`, sourceWithdrawalId: "7",
+    destinationChainId: policy.destinationChainId, destinationVault: policy.destinationVault,
+    token: externalToken, recipient: deposit.externalSender, amount: "100",
+    notBefore: "1000", deadline: "1100", signerSetVersion: "1",
+  };
+  const reservationId = `0x${"a".repeat(64)}`;
+  let timestamp = 1101;
+  let version = 1n;
+  let enabled = true;
+  const reservation = { status: 2n, authorizationDigest: "" };
+  const checks = runInNewContext(ts.transpileModule(code, {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText + "\n({ validateDestination, validateReleasedDestination, digest: (a) => TypedDataEncoder.hash(domain(a), AUTHORIZATION_TYPES, a) })", {
+    destinationChainId: BigInt(policy.destinationChainId), destinationVault: policy.destinationVault,
+    authorizationSignerAddress: "signer", getAddress, TypedDataEncoder,
+    normalize: (value: string) => value.replace(/^0x/, "").toLowerCase(),
+    provider: { getBlock: async () => ({ timestamp }) },
+    vault: {
+      getReservationId: async () => reservationId,
+      reservations: async () => reservation,
+      maxAuthorizationValiditySeconds: async () => 1800n,
+      signerSetVersion: async () => version,
+      attestationSigners: async () => enabled,
+    },
+  });
+  reservation.authorizationDigest = checks.digest(authorization);
+  await checks.validateReleasedDestination(authorization, reservationId);
+  await assert.rejects(checks.validateDestination(authorization), /timing or signer set/);
+  timestamp = 1050;
+  version = 2n;
+  await checks.validateReleasedDestination(authorization, reservationId);
+  await assert.rejects(checks.validateDestination(authorization), /timing or signer set/);
+  enabled = false;
+  await checks.validateReleasedDestination(authorization, reservationId);
+  await assert.rejects(checks.validateDestination(authorization), /signer is not enabled/);
+  for (const mismatch of [{ destinationChainId: "1" }, { destinationVault: externalToken }]) {
+    await assert.rejects(checks.validateReleasedDestination(
+      { ...authorization, ...mismatch }, reservationId,
+    ), /Destination mismatch/);
+  }
+  await assert.rejects(checks.validateReleasedDestination(
+    authorization, `0x${"b".repeat(64)}`,
+  ), /does not match authorization/);
+  await assert.rejects(checks.validateReleasedDestination(
+    { ...authorization, amount: "101" }, reservationId,
+  ), /does not match authorization/);
+  for (const status of [0n, 1n, 3n]) {
+    reservation.status = status;
+    await assert.rejects(checks.validateReleasedDestination(authorization, reservationId), /does not match authorization/);
+  }
 });

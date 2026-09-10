@@ -19,7 +19,7 @@ export function useCompositeRouteQuote({
   slippageBps: number;
 }) {
   const debouncedAmount = useDebouncedValue(amountWei, 350);
-  return useQuery({
+  const query = useQuery({
     queryKey: [
       "trade",
       "bridge-route",
@@ -58,4 +58,11 @@ export function useCompositeRouteQuote({
     refetchInterval: 10_000,
     retry: 1,
   });
+
+  return {
+    ...query,
+    data: amountWei === debouncedAmount && !query.isPlaceholderData
+      ? query.data
+      : undefined,
+  };
 }

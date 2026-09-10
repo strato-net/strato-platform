@@ -3,6 +3,7 @@ import {
   ActionDepositArgs,
   DepositArgs,
   NonEmptyArray,
+  RecordedDepositReview,
 } from "../types";
 import { normalizeAddress } from "../utils/utils";
 
@@ -185,3 +186,49 @@ export const buildActionDepositBatchArgs = (
   actionTokens: depositArgs.map((deposit) => deposit.actionToken),
   minFinalOuts: depositArgs.map((deposit) => deposit.minFinalOut),
 });
+
+export const recoverDepositObservation = (
+  review: RecordedDepositReview,
+  receipt: any,
+): DepositArgs | ActionDepositArgs => {
+  if (!receipt || receipt.__rpcDisagreement || BigInt(receipt.status || 0) !== 1n ||
+      String(receipt.transactionHash || "").toLowerCase().replace(/^0x/, "") !== review.externalTxHash.toLowerCase().replace(/^0x/, "")) {
+    throw new Error("Review receipt is missing, failed, or inconsistent");
+  }
+  const logs = (receipt.logs || []).filter((log: RawDepositLog) =>
+    normalizeAddress(log.address) === normalizeAddress(review.depositRouter) &&
+    ["DepositRouted", "DepositRoutedWithAction"].some((name) =>
+      log.topics?.[0]?.toLowerCase() === depositEvents.getEvent(name)!.topicHash.toLowerCase(),
+    ),
+  ).map((log: RawDepositLog) => ({
+    ...log, transactionHash: receipt.transactionHash,
+    blockHash: receipt.blockHash, blockNumber: receipt.blockNumber,
+  }));
+  const classified = classifyDepositLogs(logs, Number(review.externalChainId));
+  const matches = [...classified.standardDeposits, ...classified.actionDeposits]
+    .filter((deposit) => deposit.depositId === review.depositId);
+  if (classified.quarantinedLogs.length || matches.length !== 1) {
+    throw new Error("Review receipt does not contain a unique deposit identity");
+  }
+  const deposit = matches[0];
+  if (!matchesRecordedDepositReview(deposit, review)) {
+    throw new Error("Review receipt fields, amount or action do not match STRATO");
+  }
+  return deposit;
+};
+
+export const matchesRecordedDepositReview = (
+  deposit: DepositArgs | ActionDepositArgs,
+  review: RecordedDepositReview,
+): boolean => {
+  const action = deposit as Partial<ActionDepositArgs>;
+  return String(deposit.externalChainId) === String(review.externalChainId) &&
+    deposit.depositId === review.depositId &&
+    deposit.externalTxHash.toLowerCase().replace(/^0x/, "") === review.externalTxHash.toLowerCase().replace(/^0x/, "") &&
+    (["depositRouter", "externalSender", "externalToken", "stratoRecipient", "targetStratoToken"] as const)
+      .every((field) => normalizeAddress(deposit[field]) === normalizeAddress(review[field])) &&
+    BigInt(deposit.externalTokenAmount) === BigInt(review.externalTokenAmount) &&
+    (action.action || "0") === review.action &&
+    normalizeAddress(action.actionToken || "0".repeat(40)) === normalizeAddress(review.actionToken) &&
+    BigInt(action.minFinalOut || "0") === BigInt(review.minFinalOut);
+};

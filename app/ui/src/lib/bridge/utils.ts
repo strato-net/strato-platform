@@ -209,7 +209,7 @@ export const BRIDGE_STATUS_OPTIONS = [
 ];
 
 export const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter(({ value }) =>
-  [0, ExternalBridgeStatus.INITIATED, ExternalBridgeStatus.COMPLETED, ExternalBridgeStatus.ABORTED].includes(value)
+  [0, ExternalBridgeStatus.INITIATED, ExternalBridgeStatus.PENDING_REVIEW, ExternalBridgeStatus.COMPLETED, ExternalBridgeStatus.ABORTED].includes(value)
 );
 
 /**

@@ -51,7 +51,7 @@ const deposit = {
   minFinalOut: "90",
 };
 
-test("requires two independent verifier services before settlement", async () => {
+test("settles with two verifiers when the third stalls until the deadline", async () => {
   const cirrusService = await import("./cirrusService");
   let threshold = 2;
   (cirrusService as any).getSettlementVerifierConfig = async () => ({
@@ -67,10 +67,22 @@ test("requires two independent verifier services before settlement", async () =>
   process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS =
     "token-one,token-two,token-three";
   const originalPost = axios.post;
+  const originalTimeout = AbortSignal.timeout;
+  AbortSignal.timeout = (milliseconds) => {
+    assert.equal(milliseconds, 60_000);
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(new Error("verifier deadline exceeded")), 10);
+    return controller.signal;
+  };
   const requests: any[] = [];
-  (axios as any).post = async (url: string, payload: unknown) => {
+  (axios as any).post = async (url: string, payload: unknown, options: any) => {
     requests.push({ url, payload });
-    if (url.startsWith("https://three")) throw new Error("unavailable");
+    assert.equal(options.timeout, 60_000);
+    if (url.startsWith("https://three")) {
+      return new Promise((_, reject) => {
+        options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+      });
+    }
     return { data: { transactionHash: url } };
   };
   try {
@@ -100,6 +112,7 @@ test("requires two independent verifier services before settlement", async () =>
     );
   } finally {
     axios.post = originalPost;
+    AbortSignal.timeout = originalTimeout;
   }
 });
 

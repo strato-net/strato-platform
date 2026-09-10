@@ -10,6 +10,8 @@ const {
   writeOutput,
 } = require("./configure-external-bridge");
 const {
+  requiredRoutePermissions,
+  validateRoutePermissions,
   compareInitialization,
   compareRoutes,
   compareActions,
@@ -166,9 +168,9 @@ test("keeps action enablement in a separate plan", () => {
   const actions = buildPlan(settings, "actions");
   assert.deepEqual(
     routes.map((call) => call.args._func),
-    ["setChain", "setRoute", "setRouteRebaseRequired"],
+    ["addWhitelist", "addWhitelist", "setChain", "setRoute", "setRouteRebaseRequired"],
   );
-  assert.equal(routes[2].args._args[3].value, false);
+  assert.equal(routes[4].args._args[3].value, false);
   assert.deepEqual(
     actions.map((call) => call.args._func),
     ["setDepositAction"],
@@ -303,6 +305,11 @@ test("loads verification state from Cirrus", async () => {
   });
   let actionsEnabled = false;
   const fetchImpl = async (url) => {
+    if (url.includes("AdminRegistry-whitelist")) {
+      return response(["mint", "burn"].map((func) => ({
+        key: "9".repeat(40), key2: func, key3: settings.bridge.address, value: true,
+      })));
+    }
     if (url.includes("ExternalAssetBridge-settlementVerifiers")) {
       return response([
         { key: "a".repeat(40) },
@@ -420,4 +427,51 @@ test("loads verification state from Cirrus", async () => {
     ).status,
     "PASSED",
   );
+});
+
+
+test("grants only required token permissions before enabling routes, without duplicates", () => {
+  const input = structuredClone(settings);
+  input.chains.push(structuredClone(input.chains[0]));
+  const plan = buildPlan(input, "routes");
+  const grants = plan.filter((call) => call.args._func === "addWhitelist");
+  assert.equal(grants.length, 2);
+  for (const [index, func] of ["mint", "burn"].entries()) {
+    assert.deepEqual(plan[index], {
+      contract: settings.adminRegistry, method: "castVoteOnIssue",
+      args: {
+        _target: settings.adminRegistry, _func: "addWhitelist",
+        _args: [
+          { type: "address", value: "9".repeat(40) },
+          { type: "string", value: func },
+          { type: "address", value: settings.bridge.address },
+        ],
+      },
+    });
+  }
+  for (const chain of input.chains) chain.routes[0].withdrawalsEnabled = false;
+  assert.deepEqual(requiredRoutePermissions(input), [{ token: "9".repeat(40), func: "mint" }]);
+  for (const chain of input.chains) chain.routes[0].depositsEnabled = false;
+  assert.deepEqual(requiredRoutePermissions(input), []);
+});
+
+test("rejects missing, revoked, or wrong-caller token permissions", async () => {
+  let rows = [];
+  const check = () => validateRoutePermissions(settings, "https://strato.example", "token", async (url) => {
+    const params = new URL(url).searchParams;
+    assert.equal(params.get("address"), `eq.${settings.adminRegistry}`);
+    assert.equal(params.get("key3"), `eq.${settings.bridge.address}`);
+    assert.equal(params.get("key2"), "in.(mint,burn)");
+    return { ok: true, json: async () => rows };
+  });
+  assert.equal((await check()).length, 2);
+  rows = ["mint", "burn"].map((func) => ({
+    key: "9".repeat(40), key2: func, key3: settings.bridge.address, value: true,
+  }));
+  assert.deepEqual(await check(), []);
+  rows[0].value = false;
+  assert.match((await check())[0], /Missing bridge mint permission/);
+  rows[0].value = true;
+  rows[0].key3 = ADDRESS;
+  assert.match((await check())[0], /Missing bridge mint permission/);
 });

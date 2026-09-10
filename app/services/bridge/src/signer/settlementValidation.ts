@@ -1,3 +1,5 @@
+import { verifyEthTransactionCustody } from "../utils/custodyValidation";
+import { normalizeAddress } from "../utils/utils";
 import { Interface, JsonRpcProvider, ZeroAddress, getAddress } from "ethers";
 
 export interface DepositSettlementAttestation {
@@ -148,30 +150,19 @@ export const validateDepositSettlement = async (
     return;
   }
 
-  const transaction = await provider.getTransaction(request.externalTxHash);
-  if (
-    !transaction ||
-    normalize(transaction.to || "") !== normalize(request.depositRouter) ||
-    normalize(transaction.from) !== normalize(request.externalSender) ||
-    transaction.value !== BigInt(request.externalTokenAmount)
-  ) {
-    throw new Error("ETH deposit transaction does not match settlement");
-  }
-  const traces = await provider.send("trace_transaction", [
-    request.externalTxHash,
-  ]);
-  const custodyMovements = (Array.isArray(traces) ? traces : []).filter(
-    (trace: any) =>
-      trace.type === "call" &&
-      normalize(trace.action?.from || "") ===
-        normalize(request.depositRouter) &&
-      normalize(trace.action?.to || "") === normalize(custodyAddress) &&
-      BigInt(trace.action?.value || 0) ===
-        BigInt(request.externalTokenAmount),
+  const traces = await provider.send("trace_transaction", [request.externalTxHash]);
+  if (!Array.isArray(traces)) throw new Error("ETH custody traces are unavailable");
+  const custodyError = verifyEthTransactionCustody(
+    deposits.filter((deposit) => deposit.token === normalize(ZeroAddress)).map((deposit) => ({
+      depositId: deposit.depositId.toString(),
+      depositRouter: normalizeAddress(deposit.router),
+      externalSender: normalizeAddress(deposit.sender),
+      observedExternalTokenAmount: deposit.amount.toString(),
+    })),
+    traces,
+    custodyAddress,
   );
-  if (custodyMovements.length !== 1) {
-    throw new Error("ETH custody transfer is not unique");
-  }
+  if (custodyError) throw custodyError;
 };
 
 export const validateWithdrawalRelease = async (
@@ -181,11 +172,7 @@ export const validateWithdrawalRelease = async (
   confirmations: number,
 ): Promise<void> => {
   const receipt = await provider.getTransactionReceipt(request.externalTxHash);
-  if (
-    !receipt ||
-    receipt.status !== 1 ||
-    normalize(receipt.to || "") !== normalize(vaultAddress)
-  ) {
+  if (!receipt || receipt.status !== 1) {
     throw new Error("Withdrawal release receipt is missing or failed");
   }
   const latestBlock = await provider.getBlockNumber();

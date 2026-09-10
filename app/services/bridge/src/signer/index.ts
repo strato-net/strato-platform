@@ -53,6 +53,8 @@ const AUTHORIZATION_TYPES = {
 };
 
 const VAULT_ABI = [
+  "function getReservationId(uint256 sourceChainId,address sourceBridge,uint256 sourceWithdrawalId) pure returns (bytes32)",
+  "function reservations(bytes32) view returns (uint8 status,address token,address recipient,uint256 amount,uint256 deadline,bytes32 authorizationDigest)",
   "function attestationSigners(address) view returns (bool)",
   "function maxAuthorizationValiditySeconds() view returns (uint256)",
   "function signerSetVersion() view returns (uint256)",
@@ -379,7 +381,7 @@ const validateSourceDepositRoute = async (
   const [routeResponse, actionResponse] = await Promise.all([
     stratoGet("/cirrus/search/BlockApps-ExternalAssetBridge-routes", {
       ...filters,
-      value: "eq.true",
+      "value->>depositsEnabled": "eq.true",
     }),
     Number(deposit.action) === 4
       ? stratoGet(
@@ -388,7 +390,7 @@ const validateSourceDepositRoute = async (
         )
       : Promise.resolve(undefined),
   ]);
-  if (!routeResponse.data?.length) {
+  if (routeResponse.data?.[0]?.value?.depositsEnabled !== true) {
     throw new Error("Deposit route is not enabled by the source bridge");
   }
   if (
@@ -415,15 +417,21 @@ const isDepositPendingReview = async (
   return Number(response.data?.[0]?.value?.status) === 2;
 };
 
-const validateDestination = async (
+const validateDestinationIdentity = (
   authorization: WithdrawalAuthorization,
-): Promise<void> => {
+): void => {
   if (
     BigInt(authorization.destinationChainId) !== destinationChainId ||
     getAddress(authorization.destinationVault) !== destinationVault
   ) {
     throw new Error("Destination mismatch");
   }
+};
+
+const validateDestination = async (
+  authorization: WithdrawalAuthorization,
+): Promise<void> => {
+  validateDestinationIdentity(authorization);
   const [latestBlock, validity, signerSetVersion, enabled] = await Promise.all([
     provider.getBlock("latest"),
     vault.maxAuthorizationValiditySeconds(),
@@ -443,6 +451,30 @@ const validateDestination = async (
     BigInt(authorization.signerSetVersion) !== BigInt(signerSetVersion.toString())
   ) {
     throw new Error("Authorization timing or signer set is invalid");
+  }
+};
+
+const validateReleasedDestination = async (
+  authorization: WithdrawalAuthorization,
+  reservationId: string,
+): Promise<void> => {
+  validateDestinationIdentity(authorization);
+  const [expectedId, reservation] = await Promise.all([
+    vault.getReservationId(
+      authorization.sourceChainId,
+      authorization.sourceBridge,
+      authorization.sourceWithdrawalId,
+    ),
+    vault.reservations(reservationId),
+  ]);
+  if (
+    normalize(reservationId) !== normalize(expectedId) ||
+    Number(reservation.status) !== 2 ||
+    normalize(reservation.authorizationDigest) !== normalize(
+      TypedDataEncoder.hash(domain(authorization), AUTHORIZATION_TYPES, authorization),
+    )
+  ) {
+    throw new Error("Released reservation does not match authorization");
   }
 };
 
@@ -698,7 +730,7 @@ app.post("/v1/attest-release", async (req, res) => {
     const externalTxHash = String(req.body.externalTxHash || "");
     await Promise.all([
       validateSourceWithdrawal(authorization),
-      validateDestination(authorization),
+      validateReleasedDestination(authorization, reservationId),
       validateWithdrawalRelease(
         provider,
         {

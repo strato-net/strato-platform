@@ -565,9 +565,9 @@ export const getWithdrawalSummary = async (
     balances,
     prices,
     pending,
-    completed,
     legacyPending,
     legacyCompleted,
+    completed,
     nativePending,
     nativeCompleted,
   ] = await Promise.all([

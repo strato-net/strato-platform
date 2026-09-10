@@ -13,6 +13,8 @@ const config = require("./config");
 const auth = require("./auth");
 const { rest, util } = require("blockapps-rest");
 const {
+  requiredRoutePermissions,
+  validateRoutePermissions,
   validateActiveRouteTokens,
   verifyConfiguration,
 } = require("./external-bridge-verification");
@@ -301,6 +303,13 @@ function buildPlan(settings, step) {
   }
 
   if (step === "routes") {
+    requiredRoutePermissions(settings).forEach(({ token, func }) =>
+      add(adminRegistry, "addWhitelist", [
+        parameter("address", token),
+        parameter("string", func),
+        parameter("address", bridge.address),
+      ]),
+    );
     chains.forEach((chain) => {
       add(bridge.address, "setChain", [
         parameter("string", chain.chainName),
@@ -489,10 +498,16 @@ async function main() {
         );
       }
     }
+    let permissionsVerified = args.step !== "routes";
     for (let index = 0; index < selectedPlan.calls.length; index += 1) {
       const call = selectedPlan.calls[index];
       const callNumber = selectedPlan.firstCall + index;
       try {
+        if (!permissionsVerified && call.args._func !== "addWhitelist") {
+          const errors = await validateRoutePermissions(settings, process.env.NODE_URL, token);
+          if (errors.length) throw new Error(errors.join("; "));
+          permissionsVerified = true;
+        }
         output.results.push({
           callNumber,
           target: call.args._target,

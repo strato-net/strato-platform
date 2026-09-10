@@ -122,6 +122,14 @@ Expired reservations are cancelled on the destination vault and recorded on STRA
 - `TRANSACTION_APPROVER_EMAILS` - Comma-separated list of emails for transaction alerts
 - `SENDGRID_API_KEY` - SendGrid API key for sending emails
 
+### Deposit cache recovery
+
+`data/pendingExternalDeposits.json` is a single-writer cache. Writes use atomic replacement. Pending deposits and reviews not yet recorded on STRATO hold the scan cursor before their external block, so their events can be replayed after cache loss. Retry grace periods restart when observations are reconstructed.
+
+Each chain poll reconciles STRATO pending reviews through Cirrus. Missing observations are reconstructed from external receipts and checked against the recorded identity, amounts, recipient and action. Recovered records remain in review; they are never automatically approved. Manual confirmation can perform the same reconstruction and still requires current STRATO review status, custody verification and verifier attestations. Unavailable or inconsistent receipts are retried without approving the deposit.
+
+This does not recover old unrecorded reviews if an earlier service version already advanced the cursor beyond them. Preserve existing cache files during rollout; those cases need an explicit historical replay. A corrupt committed JSON file still fails closed and must be preserved for investigation before recovery. No additional database is required.
+
 ### Dynamic Configuration
 
 The service automatically:

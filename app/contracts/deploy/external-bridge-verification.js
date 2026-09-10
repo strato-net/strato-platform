@@ -20,6 +20,39 @@ const routeKey = (externalToken, chainId, stratoToken) =>
     normalizeAddress(stratoToken),
   ].join(":");
 
+function requiredRoutePermissions(settings) {
+  const permissions = new Map();
+  for (const chain of settings.chains) {
+    for (const route of chain.routes) {
+      for (const [func, enabled] of [["mint", route.depositsEnabled], ["burn", route.withdrawalsEnabled]]) {
+        if (!enabled) continue;
+        const token = normalizeAddress(route.stratoToken);
+        permissions.set(`${token}:${func}`, { token, func });
+      }
+    }
+  }
+  return [...permissions.values()];
+}
+
+async function validateRoutePermissions(settings, nodeUrl, token, fetchImpl = fetch) {
+  const required = requiredRoutePermissions(settings);
+  if (!required.length) return [];
+  const rows = await cirrusSearch(nodeUrl, token, "BlockApps-AdminRegistry-whitelist", {
+    address: `eq.${normalizeAddress(settings.adminRegistry)}`,
+    key: `in.(${[...new Set(required.map(({ token }) => token))].join(",")})`,
+    key2: "in.(mint,burn)",
+    key3: `eq.${normalizeAddress(settings.bridge.address)}`,
+    value: "eq.true",
+    select: "key,key2,key3,value",
+    limit: required.length * 2,
+  }, fetchImpl);
+  const granted = new Set(rows.filter((row) =>
+    parseBool(row.value) && normalizeAddress(row.key3) === normalizeAddress(settings.bridge.address),
+  ).map((row) => `${normalizeAddress(row.key)}:${row.key2}`));
+  return required.filter(({ token, func }) => !granted.has(`${token}:${func}`))
+    .map(({ token, func }) => `Missing bridge ${func} permission for STRATO token ${token}`);
+}
+
 function compareInitialization(settings, state) {
   const errors = [];
   const compareAddress = (label, actual, expected) => {
@@ -490,6 +523,7 @@ async function verifyConfiguration(settings, step, options) {
   } else {
     state = await fetchRouteState(...args);
     errors = compareRoutes(settings, state);
+    errors.push(...await validateRoutePermissions(...args));
   }
   return {
     step,
@@ -499,6 +533,8 @@ async function verifyConfiguration(settings, step, options) {
 }
 
 module.exports = {
+  requiredRoutePermissions,
+  validateRoutePermissions,
   compareInitialization,
   compareRoutes,
   compareActions,

@@ -1,7 +1,9 @@
 import { cirrus } from "../utils/api";
 import { config } from "../config";
+import { logInfo } from "../utils/logger";
 import {
   ChainInfo,
+  RecordedDepositReview,
   WithdrawalInfo,
   NativeWithdrawalInfo,
   NonEmptyArray,
@@ -176,7 +178,14 @@ export const getExternalWithdrawalsByStatus = async (
   ]);
 
   if (!Array.isArray(data) || data.length === 0) return [];
-  const withdrawalIds = data.map((item) => item.key);
+  const eligible = data.filter((item) => {
+    const chainId = Number(item.value.externalChainId);
+    if (enabledChains.get(chainId)?.vault) return true;
+    logInfo("ExternalWithdrawal", `Skipping withdrawal ${item.key}: chain ${chainId} is disabled or has no vault`);
+    return false;
+  });
+  if (!eligible.length) return [];
+  const withdrawalIds = eligible.map((item) => item.key);
   const [authorizationData, reviewData] = await Promise.all([
     cirrus.get(
       `/${EXTERNAL_ASSET_BRIDGE_URL}-withdrawalAuthorizations`,
@@ -212,12 +221,9 @@ export const getExternalWithdrawalsByStatus = async (
     ]),
   );
 
-  return data.map((item) => {
+  return eligible.map((item) => {
     const externalChainId = Number(item.value.externalChainId);
-    const vault = enabledChains.get(externalChainId)?.vault;
-    if (!vault) {
-      throw new Error(`Vault not found for chain ${externalChainId}`);
-    }
+    const vault = enabledChains.get(externalChainId)!.vault!;
     return {
       ...item.value,
       bridgeStatus: item.value.status,
@@ -609,5 +615,52 @@ export const getSafeTxHashFromEvents = async (
       result[withdrawalId] = custodyTxHash;
   }
 
+  return result;
+};
+
+export const getRecordedDepositReviews = async (
+  externalChainId: number,
+  identity?: { depositRouter: string; depositId: string },
+): Promise<RecordedDepositReview[]> => {
+  const result: RecordedDepositReview[] = [];
+  const limit = 200;
+  for (let offset = 0; ; offset += limit) {
+    const rows = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-deposits`, {
+      params: {
+        address: `eq.${externalAssetBridgeAddress}`,
+        key: `eq.${externalChainId}`,
+        ...(identity ? { key2: `eq.${toCirrusAddress(identity.depositRouter)}`, key3: `eq.${identity.depositId}` } : {}),
+        "value->>status": "eq.2",
+        select: "key2,key3,value",
+        order: "key2.asc,key3.asc",
+        limit,
+        offset,
+      },
+    });
+    if (!Array.isArray(rows)) throw new Error("Deposit review response is invalid");
+    if (!rows.length) break;
+    const intents = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-depositActions`, {
+      params: {
+        address: `eq.${externalAssetBridgeAddress}`, key: `eq.${externalChainId}`,
+        or: `(${rows.map((row) => `and(key2.eq.${row.key2},key3.eq.${row.key3})`).join(",")})`,
+        select: "key2,key3,value", limit,
+      },
+    });
+    if (!Array.isArray(intents)) throw new Error("Deposit action response is invalid");
+    const actions = new Map(intents.map((row) => [`${row.key2}:${row.key3}`, row.value]));
+    for (const row of rows) {
+      const action = actions.get(`${row.key2}:${row.key3}`);
+      result.push({
+        externalChainId, depositRouter: row.key2, depositId: String(row.key3),
+        externalTxHash: row.value.externalTxHash, externalSender: row.value.externalSender,
+        externalToken: row.value.externalToken, externalTokenAmount: String(row.value.externalTokenAmount),
+        stratoRecipient: row.value.stratoRecipient, targetStratoToken: row.value.stratoToken,
+        action: String(action?.action || "0"),
+        actionToken: action?.actionToken || "0000000000000000000000000000000000000000",
+        minFinalOut: String(action?.minFinalOut || "0"),
+      });
+    }
+    if (rows.length < limit || identity) break;
+  }
   return result;
 };

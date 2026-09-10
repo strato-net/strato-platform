@@ -1,5 +1,6 @@
 import { mkdirSync, promises as fs } from "fs";
 import path from "path";
+import { randomUUID } from "crypto";
 import { ActionDepositArgs, DepositArgs } from "../types";
 
 export type DetectedDeposit = DepositArgs | ActionDepositArgs;
@@ -97,7 +98,7 @@ export const clampCursorToPending = (
 
 let writeQueue: Promise<void> = Promise.resolve();
 
-const readState = async (): Promise<DepositState> => {
+const loadState = async (): Promise<DepositState> => {
   try {
     return JSON.parse(await fs.readFile(STATE_PATH, "utf8"));
   } catch (error: any) {
@@ -106,14 +107,40 @@ const readState = async (): Promise<DepositState> => {
   }
 };
 
+const readState = (): Promise<DepositState> => writeQueue.then(loadState);
+
+const persistState = async (state: DepositState): Promise<void> => {
+  const temporaryPath = `${STATE_PATH}.${randomUUID()}.tmp`;
+  try {
+    const file = await fs.open(temporaryPath, "wx", 0o600);
+    try {
+      await file.writeFile(JSON.stringify(state, null, 2));
+      await file.sync();
+    } finally {
+      await file.close();
+    }
+    await fs.rename(temporaryPath, STATE_PATH);
+    const directory = await fs.open(DATA_DIR, "r");
+    try {
+      await directory.sync();
+    } finally {
+      await directory.close();
+    }
+  } finally {
+    await fs.unlink(temporaryPath).catch((error) => {
+      if (error.code !== "ENOENT") throw error;
+    });
+  }
+};
+
 const updateState = async <T>(
   update: (state: DepositState) => T,
 ): Promise<T> => {
   let result!: T;
   const write = writeQueue.then(async () => {
-    const state = await readState();
+    const state = await loadState();
     result = update(state);
-    await fs.writeFile(STATE_PATH, JSON.stringify(state, null, 2));
+    await persistState(state);
   });
   writeQueue = write.then(() => undefined, () => undefined);
   await write;
@@ -267,6 +294,19 @@ export const depositStateService = {
       }
     }),
 
+  restoreRecordedReview: (deposit: DetectedDeposit) =>
+    updateState((state) => {
+      const existing = state[identity(deposit)];
+      state[identity(deposit)] = {
+        ...existing,
+        deposit,
+        status: "review",
+        reviewReason: existing?.reviewReason || "Recovered pending review from STRATO",
+        reviewRecordedOnchain: true,
+      };
+      return state[identity(deposit)];
+    }),
+
   markForReview: (deposit: DepositArgs, reviewReason: string) =>
     updateState((state) => {
       const pending = state[identity(deposit)];
@@ -292,8 +332,8 @@ export const depositStateService = {
   ): Promise<number | undefined> => {
     const blocks = Object.values(await readState())
       .filter(
-        ({ deposit, status }) =>
-          status === "pending" &&
+        ({ deposit, status, reviewRecordedOnchain }) =>
+          (status === "pending" || (status === "review" && !reviewRecordedOnchain)) &&
           Number(deposit.externalChainId) === externalChainId,
       )
       .map(({ deposit }) => deposit.externalBlockNumber);

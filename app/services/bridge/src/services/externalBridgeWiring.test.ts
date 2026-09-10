@@ -136,6 +136,8 @@ test("confirms reviewed deposits through the bridge operator", async () => {
   const rpcService = await import("./rpcService");
   const verificationService = await import("./verificationService");
   const { depositStateService } = await import("./depositStateService");
+  const recovery = await import("./depositRecoveryService");
+  const originalRecover = recovery.recoverReviewedDeposit;
   const originalGetEnabledChains = cirrusService.getEnabledChains;
   const originalGetCurrentBlockNumber = rpcService.getCurrentBlockNumber;
   const originalVerifyDetectedDepositsBatch =
@@ -198,6 +200,16 @@ test("confirms reviewed deposits through the bridge operator", async () => {
       attestationProof: "0x",
     },
   });
+  let recovered = false;
+  (depositStateService as any).getByIdentity = async () => undefined;
+  (recovery as any).recoverReviewedDeposit = async (chainId: number, router: string, id: string) => {
+    assert.deepEqual([chainId, router, id], [1, "router", "7"]);
+    recovered = true;
+    return { deposit, status: "review", reviewRecordedOnchain: true };
+  };
+  assert.equal(await confirmReviewedDeposit(1, "router", "7"), "confirm-hash");
+  assert.equal(recovered, true);
+  (recovery as any).recoverReviewedDeposit = originalRecover;
   (cirrusService as any).getEnabledChains = originalGetEnabledChains;
   (rpcService as any).getCurrentBlockNumber = originalGetCurrentBlockNumber;
   (verificationService as any).verifyDetectedDepositsBatch =
@@ -694,7 +706,7 @@ test("restores ready withdrawal authorization state from Cirrus", async () => {
   assert.equal(withdrawals[0].reviewProposalHash, "0xbbbb");
 });
 
-test("collects threshold signatures from independent signer services", async () => {
+test("collects valid signatures when one signer stalls until the deadline", async () => {
   const { Wallet } = await import("ethers");
   const axios = (await import("axios")).default;
   const signerOne = new Wallet(`0x${"31".repeat(32)}`);
@@ -733,8 +745,20 @@ test("collects threshold signatures from independent signer services", async () 
     ],
   };
   const originalPost = axios.post;
-  (axios as any).post = async (url: string) => {
-    if (url.includes("three")) throw new Error("verifier unavailable");
+  const originalTimeout = AbortSignal.timeout;
+  AbortSignal.timeout = (milliseconds) => {
+    assert.equal(milliseconds, 60_000);
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(new Error("verifier deadline exceeded")), 10);
+    return controller.signal;
+  };
+  (axios as any).post = async (url: string, _payload: unknown, options: any) => {
+    assert.equal(options.timeout, 60_000);
+    if (url.includes("three")) {
+      return new Promise((_, reject) => {
+        options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+      });
+    }
     const signer = url.includes("one") ? signerOne : signerTwo;
     return {
       data: {
@@ -761,6 +785,7 @@ test("collects threshold signatures from independent signer services", async () 
     assert.equal(signatures.length, 2);
   } finally {
     axios.post = originalPost;
+    AbortSignal.timeout = originalTimeout;
   }
 });
 
@@ -835,4 +860,94 @@ test("requires HTTPS for every external verifier service", async () => {
     ]).join("\n"),
     /must use HTTPS.*Invalid external bridge verifier URL/s,
   );
+});
+
+test("isolates disabled-chain withdrawals and resumes them when re-enabled", async () => {
+  const { cirrus } = await import("../utils/api");
+  const { getExternalWithdrawalsByStatus } = await import("./cirrusService");
+  const originalGet = cirrus.get;
+  let disabledChainEnabled = false;
+  let noEnabledChains = false;
+  let enrichmentCalls = 0;
+  (cirrus as any).get = async (url: string, { params }: any) => {
+    if (url.includes("-withdrawals?")) {
+      return [1, 2].map((chainId) => ({
+        key: String(chainId),
+        value: { externalChainId: chainId, status: params["value->>status"].slice(3) },
+      }));
+    }
+    if (url.endsWith("-chains")) {
+      assert.equal(params["value->>enabled"], "eq.true");
+      return noEnabledChains ? [] : [1, ...(disabledChainEnabled ? [2] : [])].map((chainId) => ({
+        key: String(chainId), value: { enabled: true, vault: `vault-${chainId}` },
+      }));
+    }
+    if (url.endsWith("-depositRouters")) return [];
+    assert.ok(url.endsWith("-withdrawalAuthorizations") || url.endsWith("-withdrawalManualReviews"));
+    enrichmentCalls++;
+    assert.equal(params.key, disabledChainEnabled ? "in.(1,2)" : "in.(1)");
+    return [];
+  };
+  try {
+    for (const status of ["1", "2", "3"]) {
+      const withdrawals = await getExternalWithdrawalsByStatus(status);
+      assert.deepEqual(withdrawals.map((row) => [row.withdrawalId, row.vault, row.bridgeStatus]), [
+        ["1", "vault-1", status],
+      ]);
+    }
+    disabledChainEnabled = true;
+    const resumed = await getExternalWithdrawalsByStatus("3");
+    assert.deepEqual(resumed.map((row) => [row.withdrawalId, row.vault]), [
+      ["1", "vault-1"], ["2", "vault-2"],
+    ]);
+    noEnabledChains = true;
+    const before = enrichmentCalls;
+    assert.deepEqual(await getExternalWithdrawalsByStatus("3"), []);
+    assert.equal(enrichmentCalls, before);
+  } finally {
+    cirrus.get = originalGet;
+  }
+});
+
+test("recovers withdrawal events in bounded ranges from the authorization time", async () => {
+  const { getEventTransactionHash } = await import("./externalWithdrawalService");
+  const { Interface } = await import("ethers");
+  const vault = `0x${"1".repeat(40)}`;
+  const reservationId = `0x${"2".repeat(64)}`;
+  const iface = new Interface([
+    "event WithdrawalReserved(bytes32 indexed reservationId,bytes32 indexed authorizationDigest,uint256 indexed sourceWithdrawalId,address token,address recipient,uint256 amount,uint256 deadline)",
+    "event WithdrawalReleased(bytes32 indexed reservationId,address indexed token,address indexed recipient,uint256 amount)",
+    "event WithdrawalCancelled(bytes32 indexed reservationId)",
+  ]);
+  for (const eventName of ["WithdrawalReserved", "WithdrawalReleased", "WithdrawalCancelled"] as const) {
+    const successfulRanges: Array<[number, number]> = [];
+    let rejectedRanges = 0;
+    const provider = {
+      getBlock: async (number: number | string) => {
+        const block = number === "latest" ? 5000 : Number(number);
+        return { number: block, timestamp: block * 12 };
+      },
+      getLogs: async (filter: any) => {
+        assert.equal(filter.address, vault);
+        assert.deepEqual(filter.topics, iface.encodeFilterTopics(eventName, [reservationId]));
+        assert.equal(typeof filter.toBlock, "number");
+        assert.ok(filter.fromBlock >= 1000);
+        if (filter.toBlock - filter.fromBlock + 1 > 200) {
+          rejectedRanges++;
+          throw new Error("RPC block range limit exceeded");
+        }
+        successfulRanges.push([filter.fromBlock, filter.toBlock]);
+        return filter.fromBlock === 1000 ? [{ transactionHash: "recovered-hash" }] : [];
+      },
+    } as any;
+    assert.equal(await getEventTransactionHash(provider, vault, eventName, reservationId, "12000"), "recovered-hash");
+    assert.ok(rejectedRanges > 0);
+    assert.equal(successfulRanges[0][1], 5000);
+    assert.equal(successfulRanges.at(-1)![0], 1000);
+    for (let index = 1; index < successfulRanges.length; index++) {
+      assert.equal(successfulRanges[index][1], successfulRanges[index - 1][0] - 1);
+    }
+    provider.getLogs = async () => [];
+    await assert.rejects(getEventTransactionHash(provider, vault, eventName, reservationId, "12000"), /event not found/);
+  }
 });

@@ -1,5 +1,6 @@
 import axios from "axios";
 import {
+  VERIFIER_REQUEST_TIMEOUT_MS,
   getExternalBridgeVerifierApiTokens,
   getExternalBridgeVerifierUrls,
 } from "../config";
@@ -40,6 +41,8 @@ const requestAllVerifiers = async (
   const results = await Promise.allSettled(
     urls.map((url, index) =>
       axios.post(`${url}${path}`, payload, {
+        timeout: VERIFIER_REQUEST_TIMEOUT_MS,
+        signal: AbortSignal.timeout(VERIFIER_REQUEST_TIMEOUT_MS),
         headers: signerHeaders(apiTokens[index]),
       }),
     ),

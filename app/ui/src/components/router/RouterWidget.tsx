@@ -200,7 +200,7 @@ const RouterWidget = ({
   }, [sourceMode, quote, userRewards, tokens]);
 
   const handleTrade = async () => {
-    if (!quote || !tokenOut || amountWei === "0") return;
+    if (!quote || quoteLoading || pending || !tokenOut || amountWei === "0") return;
     try {
       if (sourceMode === "external") {
         if (!isAppAuthenticated) {

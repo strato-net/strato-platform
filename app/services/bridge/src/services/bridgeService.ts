@@ -1,3 +1,4 @@
+import { recoverReviewedDeposit } from "./depositRecoveryService";
 import {
   config,
   getChainRpcUrl,
@@ -363,13 +364,13 @@ export const confirmReviewedDeposit = async (
   depositRouter: string,
   depositId: string,
 ): Promise<string> => {
-  const pending = await depositStateService.getByIdentity(
+  let pending = await depositStateService.getByIdentity(
     externalChainId,
     depositRouter,
     depositId,
   );
   if (!pending || pending.status !== "review") {
-    throw new Error("Reviewed deposit observation is unavailable");
+    pending = await recoverReviewedDeposit(externalChainId, depositRouter, depositId);
   }
   const onchainStatus = await getDepositStatusByIdentity(
     externalChainId,
@@ -669,7 +670,7 @@ export const processExternalWithdrawal = async (
     }
   }
 
-  let reservationState = await getReservationState(authorization);
+  let reservationState = await getReservationState(authorization, !withdrawal.reservationId);
   const authorizationExpired =
     reservationState.latestTimestamp > BigInt(authorization.deadline);
   let reservationId = withdrawal.reservationId;

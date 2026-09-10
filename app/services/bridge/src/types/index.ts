@@ -261,3 +261,13 @@ export interface BridgeInfo {
   withdrawalCounter: number;
   withdrawalsPaused: boolean;
 }
+
+export type EthCustodyDeposit = Pick<DepositArgs,
+  "depositId" | "depositRouter" | "externalSender" | "observedExternalTokenAmount"
+>;
+
+export type RecordedDepositReview = Pick<ActionDepositArgs,
+  "externalChainId" | "depositRouter" | "depositId" | "externalTxHash" |
+  "externalSender" | "externalToken" | "externalTokenAmount" | "stratoRecipient" |
+  "targetStratoToken" | "action" | "actionToken" | "minFinalOut"
+>;

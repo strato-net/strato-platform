@@ -4,6 +4,8 @@ import { id } from "ethers";
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 export const STRATO_DECIMALS = 18;
 export const WAD = 10n ** 18n;
+export const VERIFIER_REQUEST_TIMEOUT_MS = 60_000;
+export const EXTERNAL_BRIDGE_LOG_BLOCK_RANGE = 1_000;
 
 export const ERC20_ABI = [
   "function transfer(address to, uint256 amount) public returns (bool)",
