@@ -64,6 +64,7 @@ HASH_PROMETHEUS := $(call dir_hash,prometheus-packager)
 HASH_SMD := $(call dir_hash,smd-ui)
 HASH_BRIDGE := $(call dir_hash,app/services/bridge)
 HASH_BRIDGE_NGINX := $(call dir_hash,app/services/bridge/nginx)
+HASH_HISTORY := $(call dir_hash,app/services/history)
 HASH_TRACKING := $(call dir_hash,app/services/tracking)
 HASH_TRACKING_NGINX := $(call dir_hash,app/services/tracking/nginx)
 HASH_TRACKING_UI := $(call dir_hash,app/services/tracking/ui)
@@ -106,7 +107,7 @@ HASH_SUBS = -e 's|<HASH_STRATO>|$(HASH_STRATO)|g' \
             -e 's|<HASH_TRACKING_NGINX>|$(HASH_TRACKING_NGINX)|g' \
             -e 's|<HASH_TRACKING_UI>|$(HASH_TRACKING_UI)|g'
 
-.PHONY: postgrest nginx apex app-backend app-ui app-nginx prometheus smd bridge bridge-nginx tracking tracking-nginx tracking-ui local-auth
+.PHONY: postgrest nginx apex app-backend app-ui app-nginx prometheus smd bridge bridge-nginx tracking tracking-nginx tracking-ui history local-auth
 
 postgrest:
 	@if $(call image_missing,$(REPO_URL)postgrest:$(VERSION)-$(HASH_POSTGREST)); then \
@@ -196,6 +197,17 @@ bridge-nginx:
 		docker tag $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) $(REPO_AWS_ECR_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX); \
 	else \
 		echo "bridge-nginx up to date"; \
+	fi
+
+# The app history service (phase 7): its own Postgres, fed by the bus and a
+# Cirrus poller, serving chart series under /history-api.
+history:
+	@if $(call image_missing,$(REPO_URL)history:$(VERSION)-$(HASH_HISTORY)); then \
+		echo "Building history ($(VERSION)-$(HASH_HISTORY))..."; \
+		docker build -t $(REPO_URL)history:$(VERSION)-$(HASH_HISTORY) ./app/services/history && \
+		docker tag $(REPO_URL)history:$(VERSION)-$(HASH_HISTORY) $(REPO_AWS_ECR_URL)history:$(VERSION)-$(HASH_HISTORY); \
+	else \
+		echo "history up to date"; \
 	fi
 
 tracking:

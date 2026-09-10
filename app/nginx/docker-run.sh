@@ -53,6 +53,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   else
     sed -i 's/[[:space:]]*#TEMPLATE_MARK_SESSION_SECRET//g' /tmp/nginx.conf
   fi
+  sed -i "s|__HISTORY_HOST__|${HISTORY_HOST:-}|g" /tmp/nginx.conf
   sed -i "s/__EDGE_REDIS_HOST__/$EDGE_REDIS_HOST/g" /tmp/nginx.conf
   sed -i "s/__EDGE_REDIS_PORT__/$EDGE_REDIS_PORT/g" /tmp/nginx.conf
   sed -i "s|__SESSION_SECRET__|$SESSION_SECRET|g" /tmp/nginx.conf

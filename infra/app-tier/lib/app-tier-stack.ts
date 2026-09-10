@@ -23,6 +23,9 @@ export interface AppTierStackProps extends StackProps {
 export class AppTierStack extends Stack {
   readonly loadBalancer: elbv2.ApplicationLoadBalancer;
   readonly albUsesHttps: boolean;
+  /** The ALB's one listener; other stacks add path rules to it. */
+  readonly listener: elbv2.ApplicationListener;
+  readonly cluster: ecs.Cluster;
 
   constructor(scope: Construct, id: string, props: AppTierStackProps) {
     super(scope, id, props);
@@ -62,6 +65,7 @@ export class AppTierStack extends Stack {
 
     // --- ECS ---
     const cluster = new ecs.Cluster(this, "Cluster", { vpc, clusterName: name, containerInsightsV2: ecs.ContainerInsights.ENABLED });
+    this.cluster = cluster;
     const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/strato/app/${config.envName}`, retention: logs.RetentionDays.ONE_MONTH });
 
     const task = new ecs.FargateTaskDefinition(this, "Task", {
@@ -155,6 +159,7 @@ export class AppTierStack extends Stack {
           sslPolicy: elbv2.SslPolicy.RECOMMENDED_TLS,
         })
       : this.loadBalancer.addListener("Http", { port: 80 });
+    this.listener = listener;
 
     listener.addTargets("Nginx", {
       port: 80,

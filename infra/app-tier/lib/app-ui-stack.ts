@@ -49,6 +49,16 @@ export class AppUiStack extends Stack {
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
     };
 
+    // Chart series from the history service are anonymous and carry their own
+    // Cache-Control per resolution, so CloudFront caches them by URL and query.
+    const historyBehavior: cloudfront.BehaviorOptions = {
+      origin: albOrigin,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+      cachePolicy: cloudfront.CachePolicy.USE_ORIGIN_CACHE_CONTROL_HEADERS_QUERY_STRINGS,
+      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+    };
+
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       comment: `strato app ${config.envName}`,
       defaultRootObject: "index.html",
@@ -57,7 +67,10 @@ export class AppUiStack extends Stack {
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
       },
-      additionalBehaviors: Object.fromEntries(API_PATHS.map((p) => [p, apiBehavior])),
+      additionalBehaviors: {
+        ...Object.fromEntries(API_PATHS.map((p) => [p, apiBehavior])),
+        ...(config.history ? { "/history-api/*": historyBehavior } : {}),
+      },
       // Client-side routes: the bucket has no such objects, the SPA does.
       errorResponses: [
         { httpStatus: 403, responseHttpStatus: 200, responsePagePath: "/index.html", ttl: Duration.seconds(0) },

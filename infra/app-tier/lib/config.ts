@@ -43,6 +43,20 @@ export interface AppTierConfig {
   /** Deploy app/ui/dist to the bucket (requires `npm run build` in app/ui first). */
   deployUi: boolean;
   desiredCount: number;
+  /**
+   * The app history service (phase 7). Present when `historyImage` is given:
+   * its own Aurora Serverless cluster and a Fargate service under
+   * /history-api on the app ALB. `busBootstrap` is host:port of the message
+   * bus; `busSecretName` a Secrets Manager JSON {username, password} SCRAM
+   * credential (the data-plane bus stack's AmazonMSK_ app secret).
+   */
+  history?: {
+    image: string;
+    desiredCount: number;
+    busBootstrap?: string;
+    busSecurity: string;
+    busSecretName?: string;
+  };
 }
 
 function present(v: unknown): boolean {
@@ -87,5 +101,14 @@ export function loadConfig(app: App): AppTierConfig {
     backendEnvironment: ctx<Record<string, string>>(app, "backendEnvironment", {}),
     deployUi: String(ctx(app, "deployUi", "false")) === "true",
     desiredCount: Number(ctx(app, "desiredCount", "2")),
+    history: optional(app, "historyImage")
+      ? {
+          image: ctx(app, "historyImage"),
+          desiredCount: Number(ctx(app, "historyDesiredCount", "1")),
+          busBootstrap: optional(app, "busBootstrap"),
+          busSecurity: ctx(app, "busSecurity", "sasl_ssl"),
+          busSecretName: optional(app, "busSecretName"),
+        }
+      : undefined,
   };
 }
