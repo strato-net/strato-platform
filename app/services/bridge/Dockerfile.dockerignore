@@ -1,0 +1,40 @@
+# Dockerfile-specific ignore file (BuildKit picks up <Dockerfile>.dockerignore
+# next to the Dockerfile). Paths are relative to the build context, which is
+# ./app (see the Makefile `bridge` target), not this directory.
+
+# Dependencies
+**/node_modules
+**/npm-debug.log*
+
+# Environment and secrets
+**/.env*
+
+# Build outputs (since we build inside Docker)
+**/dist
+
+# Logs
+**/*.log
+**/logs
+
+# Git
+**/.git
+**/.gitignore
+
+# Common IDE/OS files
+**/.vscode
+**/.idea
+**/.DS_Store
+
+# Documentation and tests
+**/*.md
+**/*.test.*
+**/*.spec.*
+**/*.puml
+
+# Bridge runtime state
+services/bridge/data
+services/bridge/bridge-error.flag
+services/bridge/lastProcessedBlocks.json
+
+# Ignore the nginx path from the bridge build
+services/bridge/nginx

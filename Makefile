@@ -61,7 +61,7 @@ HASH_APP_BACKEND := $(call dir_hash,app/backend)
 HASH_APP_UI := $(call dir_hash,app/ui)
 HASH_PROMETHEUS := $(call dir_hash,prometheus-packager)
 HASH_SMD := $(call dir_hash,smd-ui)
-HASH_BRIDGE := $(call dir_hash,app/services/bridge)
+HASH_BRIDGE := $(call dir_hash,app/services/bridge app/packages/shared-types)
 HASH_BRIDGE_NGINX := $(call dir_hash,app/services/bridge/nginx)
 HASH_TRACKING := $(call dir_hash,app/services/tracking)
 HASH_TRACKING_NGINX := $(call dir_hash,app/services/tracking/nginx)
@@ -167,7 +167,7 @@ smd:
 bridge:
 	@if $(call image_missing,$(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE)); then \
 		echo "Building bridge ($(VERSION)-$(HASH_BRIDGE))..."; \
-		docker build -t $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) ./app/services/bridge && \
+		docker build -t $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) -f ./app/services/bridge/Dockerfile ./app && \
 		docker tag $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) $(REPO_AWS_ECR_URL)bridge:$(VERSION)-$(HASH_BRIDGE); \
 	else \
 		echo "bridge up to date"; \
@@ -259,7 +259,7 @@ app-ui-force:
 
 bridge-force:
 	@echo Now building bridge...
-	docker build -t ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ./app/services/bridge
+	docker build -t ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} -f ./app/services/bridge/Dockerfile ./app
 	docker tag ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ${REPO_AWS_ECR_URL}bridge:${VERSION}-${HASH_BRIDGE}
 
 bridge-nginx-force:
