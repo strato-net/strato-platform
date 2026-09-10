@@ -20,7 +20,7 @@ module.exports = {
       gasPrice: "auto",
     },
     mainnet: {
-      url: process.env.MAINNET_RPC_URL,
+      url: process.env.MAINNET_RPC_URL || "https://eth.merkle.io",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       gasPrice: "auto",
     },
