@@ -607,6 +607,14 @@
           "targetAssetAddress": "d7fe8f62a5efbd8dd0f59ac94b13e022818178fc",
           "comment": "Robinhood NVDA bridge token on Helium"
         },
+        "WHYPE": {
+          "targetAssetAddress": "f9fb3d66c60dbd6eb5a7d125ed4c96f095994ed9",
+          "comment": "Wrapped HYPE (HyperEVM) on Helium"
+        },
+        "KHYPE": {
+          "targetAssetAddress": "d885844fd502040326e59d3cd9273bfd3cb78748",
+          "comment": "Kinetiq Staked HYPE on Helium"
+        },
         "SPYX": {
           "targetAssetAddress": "00000000000000000000000000000000deadbeef",
           "submit": false,
@@ -803,7 +811,9 @@
             "USDC",
             "USDT",
             "TSLAX",
-            "WEETH"
+            "WEETH",
+            "WHYPE",
+            "KHYPE"
           ]
         },
         "CoinMarketCap": {
@@ -823,7 +833,9 @@
             "RETH",
             "USDC",
             "USDT",
-            "WEETH"
+            "WEETH",
+            "WHYPE",
+            "KHYPE"
           ]
         },
         "Metals.dev": {
@@ -873,7 +885,9 @@
             "SPY",
             "SPYX",
             "NVDA",
-            "WEETH"
+            "WEETH",
+            "WHYPE",
+            "KHYPE"
           ],
           "symbolMapping": {
             "ETH": "ethereum",
@@ -890,7 +904,9 @@
             "SPY": "spdr-s-p-500-etf-trust-robinhood-tokenized-stock",
             "SPYX": "sp500-xstock",
             "NVDA": "nvidia-robinhood-tokenized-stock",
-            "WEETH": "wrapped-eeth"
+            "WEETH": "wrapped-eeth",
+            "WHYPE": "wrapped-hype",
+            "KHYPE": "kinetic-staked-hype"
           }
         },
         "CoinAPI": {
@@ -911,7 +927,8 @@
             "SPY",
             "SPYX",
             "NVDA",
-            "WEETH"
+            "WEETH",
+            "KHYPE"
           ]
         },
         "DefiLlama": {
@@ -933,7 +950,9 @@
             "SPY",
             "SPYX",
             "NVDA",
-            "WEETH"
+            "WEETH",
+            "WHYPE",
+            "KHYPE"
           ],
           "symbolMapping": {
             "ETH": "coingecko:ethereum",
@@ -950,7 +969,9 @@
             "SPY": "coingecko:spdr-s-p-500-etf-trust-robinhood-tokenized-stock",
             "SPYX": "coingecko:sp500-xstock",
             "NVDA": "coingecko:nvidia-robinhood-tokenized-stock",
-            "WEETH": "coingecko:wrapped-eeth"
+            "WEETH": "coingecko:wrapped-eeth",
+            "WHYPE": "hyperliquid:0x5555555555555555555555555555555555555555",
+            "KHYPE": "hyperliquid:0xfd739d4e423301ce9385c1fb8850539d657c296d"
           }
         },
         "DexScreener": {
