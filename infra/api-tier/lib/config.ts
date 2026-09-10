@@ -36,6 +36,9 @@ export interface ApiTierConfig {
   nodeIpAddresses: string[];
   apiTierWeight: number;
   desiredCount: number;
+  /** Observability (optional): SSM parameter holding the ADOT sidecar config and the IAM policy it needs, both outputs of the observability app. */
+  otelConfigParameterName?: string;
+  otelSidecarPolicyArn?: string;
 }
 
 function present(v: unknown): boolean {
@@ -85,5 +88,7 @@ export function loadConfig(app: App): ApiTierConfig {
     nodeIpAddresses: String(ctx(app, "nodeIpAddresses", "")).split(",").map((s) => s.trim()).filter(Boolean),
     apiTierWeight: Number(ctx(app, "apiTierWeight", "0")),
     desiredCount: Number(ctx(app, "desiredCount", "2")),
+    otelConfigParameterName: optional(app, "otelConfigParameterName"),
+    otelSidecarPolicyArn: optional(app, "otelSidecarPolicyArn"),
   };
 }

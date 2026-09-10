@@ -2,11 +2,13 @@ import { CfnOutput, Duration, Stack, StackProps } from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as ecr from "aws-cdk-lib/aws-ecr";
 import * as ecs from "aws-cdk-lib/aws-ecs";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as elasticache from "aws-cdk-lib/aws-elasticache";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 import { AppTierConfig } from "./config";
 
@@ -130,6 +132,28 @@ export class AppTierStack extends Stack {
       },
     });
     nginx.addContainerDependencies({ container: backend, condition: ecs.ContainerDependencyCondition.HEALTHY });
+
+    // Observability sidecar (optional): the ADOT collector scrapes this task's
+    // containers over localhost, forwards traces to X-Ray and remote-writes
+    // metrics to Managed Prometheus. Config and policy come from the
+    // observability app's outputs.
+    if (config.otelConfigParameterName) {
+      const otelConfig = ssm.StringParameter.fromStringParameterAttributes(this, "OtelConfigParam", {
+        parameterName: config.otelConfigParameterName,
+        forceDynamicReference: true,
+      });
+      task.addContainer("otel-collector", {
+        image: ecs.ContainerImage.fromRegistry("public.ecr.aws/aws-observability/aws-otel-collector:v0.43.0"),
+        logging: ecs.LogDrivers.awsLogs({ logGroup, streamPrefix: "otel" }),
+        essential: false,
+        portMappings: [{ containerPort: 4317 }, { containerPort: 4318 }],
+        secrets: { AOT_CONFIG_CONTENT: ecs.Secret.fromSsmParameter(otelConfig) },
+        memoryReservationMiB: 256,
+      });
+      if (config.otelSidecarPolicyArn) {
+        task.taskRole.addManagedPolicy(iam.ManagedPolicy.fromManagedPolicyArn(this, "OtelSidecarPolicy", config.otelSidecarPolicyArn));
+      }
+    }
 
     const taskSg = new ec2.SecurityGroup(this, "TaskSg", { vpc, description: `${name} tasks` });
     redisSg.addIngressRule(taskSg, ec2.Port.tcp(6379), "nginx sessions and CSRF tokens");

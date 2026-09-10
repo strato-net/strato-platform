@@ -1,0 +1,7 @@
+{
+  "app": "npx tsx bin/observability.ts",
+  "context": {
+    "@aws-cdk/core:newStyleStackSynthesis": true,
+    "@aws-cdk/core:defaultCrossStackReferences": "strong"
+  }
+}

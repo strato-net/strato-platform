@@ -27,6 +27,7 @@ import Blockchain.Data.BlockDB (putBlocksSql)
 import Blockchain.Data.IndexerProgress (getIndexerProgress, setIndexerProgressSql)
 import Blockchain.Data.WriterLease (LostWriterLease (..), fenceWriterLeaseSql, holdsWriterLease)
 import qualified Blockchain.Data.BlockHeader as BH
+import Blockchain.ChainMetrics (setBestBlockTimestamp)
 import Blockchain.Data.ReceiptRef (putReceiptRefsSql)
 import Blockchain.DB.MemAddressStateDB (AddressStateModification(..))
 import Blockchain.DB.SQLDB
@@ -48,7 +49,7 @@ import Data.Foldable (for_)
 import Data.Maybe (isJust, isNothing)
 import Data.Text (Text)
 import Data.Time.Clock (getCurrentTime)
-import UnliftIO (liftIO, throwIO)
+import UnliftIO (MonadIO, liftIO, throwIO)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
@@ -246,6 +247,7 @@ kafkaClientIds = ("strato-api-indexer", "strato-api-indexer")
 -- | P2P indexing: writes blocks to Redis for P2P sync
 indexP2P ::
   ( MonadLogger m,
+    MonadIO m,
     (Keccak256 `A.Alters` P2P OutputBlock) m,
     Mod.Modifiable (P2P BestBlock) m
   ) =>
@@ -260,4 +262,8 @@ indexP2P idxEvents = do
       $logInfoS "p2pIndexer" . T.pack $
         "Updating RedisBestBlock as (" ++ format sha ++ ", " ++ show num ++ ")"
       Mod.put (Mod.Proxy @(P2P BestBlock)) . P2P $ BestBlock sha num
+      -- Block age for the chain-health gauges: the header of the block that
+      -- just became best is in this batch.
+      for_ [b | RanBlock b _ <- idxEvents, blockHash b == sha] $
+        setBestBlockTimestamp . BH.timestamp . obBlockData
     _ -> return ()

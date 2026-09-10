@@ -76,6 +76,8 @@ executable strato-indexer
     , text
     , time
     , unliftio
+    , wai-middleware-prometheus
+    , warp
   default-language: Haskell2010
 
 executable strato-promote

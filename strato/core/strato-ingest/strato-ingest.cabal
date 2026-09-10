@@ -25,10 +25,13 @@ executable strato-ingest
     , hflags
     , process
     , process-monitor
+    , prometheus-client
     , seqevents
     , strato-conf
     , streaming
     , streaming-kafka-hw
     , text
     , unliftio
+    , wai-middleware-prometheus
+    , warp
   default-language: Haskell2010

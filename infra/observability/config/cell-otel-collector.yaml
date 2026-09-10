@@ -1,0 +1,64 @@
+# ADOT collector on a core cell: scrapes every node process on localhost and
+# remote-writes to Managed Prometheus with SigV4 from the instance role.
+# Installed from SSM /strato/__ENV__/observability/otel-collector-cell.
+extensions:
+  sigv4auth:
+    region: __REGION__
+    service: aps
+
+receivers:
+  prometheus:
+    config:
+      global:
+        scrape_interval: 15s
+        external_labels:
+          env: __ENV__
+      scrape_configs:
+        - job_name: strato-sequencer
+          static_configs: [{ targets: ["localhost:8050"] }]
+        - job_name: vm-runner
+          static_configs: [{ targets: ["localhost:8009"] }]
+        - job_name: strato-p2p
+          static_configs: [{ targets: ["localhost:10248"] }]
+        - job_name: slipstream
+          static_configs: [{ targets: ["localhost:10777"] }]
+        - job_name: strato-indexer
+          static_configs: [{ targets: ["localhost:10779"] }]
+        - job_name: ethereum-discover
+          static_configs: [{ targets: ["localhost:10780"] }]
+        - job_name: strato-ingest
+          static_configs: [{ targets: ["localhost:10781"] }]
+        # Present only on a monolith or a cell that still runs the API.
+        - job_name: core-api
+          static_configs: [{ targets: ["localhost:3000"] }]
+        - job_name: nginx
+          static_configs: [{ targets: ["localhost:8081"] }]
+
+processors:
+  batch:
+    timeout: 10s
+  resourcedetection:
+    detectors: [ec2]
+    ec2:
+      tags: [^Name$, ^strato:cell$]
+  resource:
+    attributes:
+      - key: env
+        value: __ENV__
+        action: upsert
+
+exporters:
+  prometheusremotewrite:
+    endpoint: __REMOTE_WRITE_URL__
+    auth:
+      authenticator: sigv4auth
+    resource_to_telemetry_conversion:
+      enabled: true
+
+service:
+  extensions: [sigv4auth]
+  pipelines:
+    metrics:
+      receivers: [prometheus]
+      processors: [resourcedetection, resource, batch]
+      exporters: [prometheusremotewrite]

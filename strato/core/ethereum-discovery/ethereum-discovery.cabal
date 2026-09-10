@@ -98,6 +98,8 @@ executable ethereum-discover
     , text
     , unliftio
     , vault-monad
+    , wai-middleware-prometheus
+    , warp
   default-language: Haskell2010
 
 executable strato-network-monitor

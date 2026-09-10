@@ -27,15 +27,29 @@ import qualified Control.Monad.Composable.Streaming.Kafka as Bus
 import Control.Monad.Composable.Streaming.Bus (BusSettings (..), createBusEnv)
 import Data.String (fromString)
 import qualified Data.Text as T
+import Control.Concurrent (forkIO)
+import Control.Monad (void)
 import HFlags
 import Instrumentation
+import Network.Wai.Handler.Warp (run)
+import Network.Wai.Middleware.Prometheus (metricsApp)
+import Prometheus
 import System.Process (readProcess)
 import UnliftIO (liftIO)
+
+{-# NOINLINE forwardedCounter #-}
+forwardedCounter :: Counter
+forwardedCounter = unsafeRegister . counter $ Info "strato_ingest_forwarded_total" "Transactions forwarded from the bus into this core's broker"
+
+{-# NOINLINE droppedCounter #-}
+droppedCounter :: Counter
+droppedCounter = unsafeRegister . counter $ Info "strato_ingest_dropped_total" "Non-transaction events dropped from the bus ingest topic"
 
 main :: IO ()
 main = do
   blockappsInit "strato-ingest"
   runInstrumentation "strato-ingest"
+  _ <- forkIO $ run 10781 metricsApp
   _ <- $initHFlags "strato-ingest: forward bus transactions into this core"
   bus <- case busConfig ethConf of
     Nothing -> error "strato-ingest: ethconf.yaml has no busConfig; this core has no message bus to read"
@@ -56,12 +70,15 @@ main = do
         let txs = [e | e@IETx {} <- events]
             dropped = length events - length txs
         if dropped > 0
-          then $logWarnS "strato-ingest" . T.pack $ "dropping " ++ show dropped ++ " non-transaction event(s) from the bus"
+          then do
+            liftIO . void $ addCounter droppedCounter (fromIntegral dropped)
+            $logWarnS "strato-ingest" . T.pack $ "dropping " ++ show dropped ++ " non-transaction event(s) from the bus"
           else pure ()
         if null txs
           then pure ()
           else do
             _ <- liftIO . runStreamMPooled "strato-ingest" $ writeIngestTx txs
+            liftIO . void $ addCounter forwardedCounter (fromIntegral $ length txs)
             $logInfoS "strato-ingest" . T.pack $ "forwarded " ++ show (length txs) ++ " transaction(s)"
 
 busSettings :: BusConf -> BusSettings

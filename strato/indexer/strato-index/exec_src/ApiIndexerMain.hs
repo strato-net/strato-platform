@@ -17,6 +17,8 @@ import qualified Data.Text as T
 import Data.Time.Clock (getCurrentTime)
 import HFlags
 import Instrumentation
+import Network.Wai.Handler.Warp (run)
+import Network.Wai.Middleware.Prometheus (metricsApp)
 import UnliftIO.Async (concurrently_)
 
 import Wiring ()
@@ -32,6 +34,9 @@ main = do
   runInstrumentation "strato-indexer"
   _ <- $initHFlags "Strato Indexer"
   cell <- T.pack <$> currentCellId
+  -- Chain-health gauges (Blockchain.ChainMetrics) and RTS stats, scraped by
+  -- the node's Prometheus and the cell's collector.
+  _ <- forkIO $ run 10779 metricsApp
 
   runLoggingT $ do
     bootstrapIndexer

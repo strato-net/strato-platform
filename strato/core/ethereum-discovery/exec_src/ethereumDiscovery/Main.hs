@@ -18,6 +18,9 @@ import Executable.EthDiscoverySetup (setup)
 import Executable.EthereumDiscovery
 import Executable.Options ()
 import HFlags
+import Control.Concurrent (forkIO)
+import Network.Wai.Handler.Warp (run)
+import Network.Wai.Middleware.Prometheus (metricsApp)
 import Instrumentation
 import qualified Network.Socket as S
 import qualified Text.Colors as CL
@@ -36,6 +39,9 @@ main = do
         Nothing -> []
         Just params -> map webAddress params
   putStrLn $ "ethereum-discover: Using bootnodes: " ++ show bootnodes
+
+  -- Peer counts (disc_num_peers) and RTS stats for the collectors.
+  _ <- forkIO $ run 10780 metricsApp
 
   putStrLn "ethereum-discover: Running peer database setup..."
   runStdoutLoggingT $ setup bootnodes

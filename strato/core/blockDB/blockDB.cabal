@@ -11,6 +11,7 @@ build-type:     Simple
 library
   exposed-modules:
       Blockchain.BlockDB
+      Blockchain.ChainMetrics
       Blockchain.Data.NodeStatus
       Blockchain.DB.Witnessable
       Blockchain.Model.JsonBlock
@@ -44,6 +45,7 @@ library
     , mtl
     , openapi3
     , persistent
+    , prometheus-client
     , random
     , raw-strings-qq
     , sql-monad

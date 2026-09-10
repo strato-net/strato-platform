@@ -43,6 +43,9 @@ export interface AppTierConfig {
   /** Deploy app/ui/dist to the bucket (requires `npm run build` in app/ui first). */
   deployUi: boolean;
   desiredCount: number;
+  /** Observability (optional): SSM parameter holding the ADOT sidecar config and the IAM policy it needs, both outputs of the observability app. */
+  otelConfigParameterName?: string;
+  otelSidecarPolicyArn?: string;
   /**
    * The app history service (phase 7). Present when `historyImage` is given:
    * its own Aurora Serverless cluster and a Fargate service under
@@ -101,6 +104,8 @@ export function loadConfig(app: App): AppTierConfig {
     backendEnvironment: ctx<Record<string, string>>(app, "backendEnvironment", {}),
     deployUi: String(ctx(app, "deployUi", "false")) === "true",
     desiredCount: Number(ctx(app, "desiredCount", "2")),
+    otelConfigParameterName: optional(app, "otelConfigParameterName"),
+    otelSidecarPolicyArn: optional(app, "otelSidecarPolicyArn"),
     history: optional(app, "historyImage")
       ? {
           image: ctx(app, "historyImage"),

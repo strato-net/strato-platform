@@ -20,8 +20,11 @@ where
 
 import BlockApps.Logging
 import Blockchain.DB.SQLDB
+import Blockchain.ChainMetrics
+import Blockchain.Data.IndexerProgress (getIndexerProgress)
 import Blockchain.Data.NodeStatus
 import Blockchain.Data.WriterLease (holdsWriterLease)
+import Blockchain.Model.SyncState (BestBlock (..), BestSequencedBlock (..))
 import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
 import Blockchain.SyncDB
   ( getBestBlockInfo,
@@ -58,6 +61,11 @@ nodeStatusMirrorLoop cell = go Map.empty
   where
     go written = do
       holds <- try $ holdsWriterLease cell
+      -- Every cell exports its own chain gauges, writer or not.
+      exported <- try $ exportChainMetrics (either (const False) id holds)
+      case exported of
+        Left (e :: SomeException) -> $logWarnS "nodeStatusMirror" . T.pack $ "chain metrics export failed: " ++ show e
+        Right () -> pure ()
       result <- case holds of
         Right True -> try $ mirrorNodeStatusOnce written
         Right False -> pure $ Right Map.empty
@@ -96,3 +104,22 @@ mirrorNodeStatusOnce written = do
   unless (null changed) $
     sqlQuery $ mapM_ (uncurry setNodeStatusEncodedSql) changed
   pure $ foldr (uncurry Map.insert) written changed
+
+-- | The chain-health gauges strato-indexer serves on its metrics port, from
+-- the same Redis scalars the mirror reads plus the progress row and lease.
+exportChainMetrics :: HasSQLDB m => Bool -> m ()
+exportChainMetrics leaseHeld = do
+  (best, world, sequenced, cirrus) <-
+    runStratoRedisIO $
+      (,,,)
+        <$> getBestBlockInfo
+        <*> getWorldBestBlockInfo
+        <*> getBestSequencedBlockInfo
+        <*> getCirrusBestBlockNumber
+  mapM_ (setBestBlock . bestBlockNumber) best
+  mapM_ (setWorldBestBlock . bestBlockNumber) world
+  mapM_ (setBestSequencedBlock . bestSequencedBlockNumber) sequenced
+  mapM_ setCirrusTip cirrus
+  progress <- getIndexerProgress
+  mapM_ setIndexerProgress progress
+  setWriterLeaseHeld leaseHeld

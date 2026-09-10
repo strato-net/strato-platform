@@ -56,6 +56,8 @@ executables:
       - text
       - time
       - unliftio
+      - wai-middleware-prometheus
+      - warp
     other-modules:
       - Wiring
   strato-promote:
