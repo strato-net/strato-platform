@@ -16,8 +16,9 @@ import Blockchain.Init.DockerCompose
 import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
 import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
+import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_password, flags_pghost, flags_sslDir)
+import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_password, flags_pghost, flags_regenerate, flags_sslDir)
 import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
@@ -40,7 +41,7 @@ import qualified Data.ByteString as BS
 import Data.Char (toLower)
 import Turtle (chmod, roo)
 import UnliftIO.Directory
-import System.Posix.Files (setFileMode, ownerModes, groupModes, otherModes)
+import System.Posix.Files (setFileMode, ownerModes, groupModes, otherModes, ownerReadMode, ownerWriteMode, groupReadMode, otherReadMode)
 import Data.Bits ((.|.))
 
 -- | Create a GenesisInfo from network name. Does NOT write to file.
@@ -170,12 +171,26 @@ mkFilesAndGenesis nodeDir hasFlags network = do
 
   -- Check if node already exists
   nodeExists <- doesFileExist (".ethereumH" </> "ethconf.yaml")
-  when nodeExists $ do
+  let regenerate = nodeExists && flags_regenerate
+  when (nodeExists && not flags_regenerate) $ do
     when hasFlags $ liftIO $
-      putStrLn $ "\ESC[1;33mWarning: Node already exists at " ++ nodeDir ++ ". Flags are ignored. To recreate, stop the node and remove the directory first.\ESC[0m"
+      putStrLn $ "\ESC[1;33mWarning: Node already exists at " ++ nodeDir ++ ". Flags are ignored. To recreate, stop the node and remove the directory first; to re-point an existing node (e.g. at a managed Postgres), pass --regenerate with the original flags plus the changes.\ESC[0m"
     liftIO $ putStrLn $ "Node already exists at " ++ nodeDir ++ ", skipping setup."
-  
-  unless nodeExists $ do
+
+  -- --regenerate keeps everything stateful (LevelDB, genesis, secrets) and
+  -- rewrites only what setup derives from flags. The network identity is the
+  -- one thing a forgotten flag would silently change, so it is checked.
+  when regenerate $ do
+    existing <- liftIO $ YAML.decodeFileThrow (".ethereumH" </> "ethconf.yaml")
+    let oldNet = EC.networkConfig (existing :: EC.EthConf)
+        oldId = (EC.network oldNet, EC.networkID oldNet, EC.chainId oldNet)
+        newId = flagsNetworkIdentity
+    when (oldId /= newId) $
+      liftIO $ error $ "--regenerate would change the network identity from " ++ show oldId
+        ++ " to " ++ show newId ++ "; pass the original --network"
+    liftIO $ putStrLn $ "Re-generating configuration for existing directory: " ++ nodeDir
+
+  unless (nodeExists && not flags_regenerate) $ do
     let role = currentRole
     liftIO $ putStrLn $ "Setting up STRATO " ++ roleName role ++ ": " ++ nodeDir
     liftIO $ putStrLn $ "  Network: " ++ network
@@ -238,8 +253,13 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     -- An API directory talks to a core's Postgres, so it must be given that
     -- core's password rather than invent one.
     let pgPasswordFile = "secrets" </> "postgres_password"
-    pgPasswordExists <- doesFileExist pgPasswordFile
+    pgPasswordExists' <- doesFileExist pgPasswordFile
+    -- An explicit --password replaces the stored one when re-generating
+    -- (the point of re-pointing a node at another Postgres).
+    let pgPasswordExists = pgPasswordExists' && not (regenerate && not (null flags_password))
     unless pgPasswordExists $ liftIO $ do
+      -- The stored file is read-only; make it writable before replacing it.
+      when pgPasswordExists' $ setFileMode pgPasswordFile ownerModes
       envPassword <- lookupEnv "postgres_password"
       password <- case (flags_password, envPassword) of
         (pw, _) | not (null pw) -> return pw
@@ -324,6 +344,9 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     ethconf <- liftIO $ genEthConf role
 
     let dir = ".ethereumH"
+    -- Writable for the rewrite, then back to the world-readable, read-only
+    -- mode the containers mounting it expect.
+    when regenerate $ liftIO $ setFileMode (dir </> "ethconf.yaml") (ownerReadMode .|. ownerWriteMode .|. groupReadMode .|. otherReadMode)
     liftIO $ YAML.encodeFile (dir </> "ethconf.yaml") ethconf
     liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
     liftIO $ putStrLn "  ✓ Generated ethconf.yaml"
@@ -351,6 +374,8 @@ mkFilesAndGenesis nodeDir hasFlags network = do
 
     if not (roleRunsCore role)
       then liftIO $ putStrLn "  ✓ API role: no genesis state needed"
+      else if regenerate
+      then liftIO $ putStrLn "  ✓ Existing chain state kept"
       else if genesisExists
       then do
         liftIO $ putStrLn "  ✓ Using provided genesis.json"

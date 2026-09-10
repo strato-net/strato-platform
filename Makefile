@@ -335,6 +335,7 @@ build_common: generate-version-file
 	@install -m 755 bin/strato-patch-app $(HOME)/.local/bin/
 	@install -m 755 bin/strato-user-add $(HOME)/.local/bin/
 	@install -m 755 bin/strato-snapshot $(HOME)/.local/bin/
+	@install -m 755 bin/strato-pg-migrate $(HOME)/.local/bin/
 	@install -m 755 bin/strato-logrotate $(HOME)/.local/bin/
 	@mkdir -p $(HOME)/.local/share/strato
 	@install -m 644 strato/tools/airlock/data/english.txt $(HOME)/.local/share/strato/bip39-english.txt
@@ -564,6 +565,7 @@ uninstall:
 	@rm -f $(HOME)/.local/bin/strato-ps
 	@rm -f $(HOME)/.local/bin/strato-patch-app
 	@rm -f $(HOME)/.local/bin/strato-user-add
+	@rm -f $(HOME)/.local/bin/strato-pg-migrate
 	@rm -f $(HOME)/.local/bin/strato-snapshot
 	@rm -f $(HOME)/.local/bin/strato-logrotate
 	@rm -f $(HOME)/.local/bin/strato-setup

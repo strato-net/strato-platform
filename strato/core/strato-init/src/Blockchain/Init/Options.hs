@@ -11,7 +11,9 @@ parseBootnodeString s | not $ elem '[' s = [s]
 parseBootnodeString s = read s
 
 defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
-defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname"
+defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname. Anything other than localhost is an external cluster (e.g. the Aurora writer endpoint): no postgres container is generated and --password must carry its password"
+defineFlag "pgReaderHost" ("" :: String) "Read-only Postgres endpoint (e.g. the Aurora reader endpoint) for PostgREST; defaults to --pghost"
+defineFlag "regenerate" (False :: Bool) "Re-generate ethconf.yaml, docker-compose.yml and commands.txt for an EXISTING directory from the flags given (state, secrets and genesis are kept). Pass the same flags as the original setup plus the changes; the network identity must not change"
 defineFlag "p:password" ("" :: String) "Postgres password"
 defineFlag "K:kafkahost" ("localhost" :: String) "Streaming broker hostname"
 defineFlag "z:lazyblocks" (False :: Bool) "Don't mine empty blocks"

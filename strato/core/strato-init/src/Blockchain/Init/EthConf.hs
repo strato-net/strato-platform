@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Blockchain.Init.EthConf (genEthConf, preferIPv4Loopback) where
+module Blockchain.Init.EthConf (genEthConf, preferIPv4Loopback, runtimeConfig, flagsNetworkIdentity) where
 
 import Blockchain.EthConf
 import Blockchain.Init.Options hiding (flags_localAuth)
@@ -125,6 +125,11 @@ waitOnVault env request = do
       threadDelay 5000000
       waitOnVault env request
     Right val -> return val
+
+-- | The network identity the current flags describe, exactly as 'genEthConf'
+-- writes it: (network name, network id, chain id).
+flagsNetworkIdentity :: (String, Integer, Integer)
+flagsNetworkIdentity = (flags_network, computeNetworkID, computeChainId flags_network)
 
 genEthConf :: Role -> IO EthConf
 genEthConf role = do

@@ -9,7 +9,7 @@ import Blockchain.EthConf.Model (apiConfig, apiPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Role
-import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_jsonrpc, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
+import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_jsonrpc, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
@@ -30,6 +30,17 @@ generateDockerCompose role = do
   -- app-backend and app-ui ride along only with a full node that has not
   -- moved its app tier out.
   let bundledApp = role == RoleNode && flags_bundledApp
+      -- A remote --pghost (a managed cluster) replaces the postgres container:
+      -- containers reach it by that name instead of the service name.
+      externalPostgres = flags_pghost `notElem` ["localhost", "127.0.0.1"]
+      pgWriterHost = if externalPostgres then flags_pghost else "postgres"
+      pgReaderHost
+        | externalPostgres = if null flags_pgReaderHost then flags_pghost else flags_pgReaderHost
+        | otherwise = "postgres"
+      -- depends_on entries for the local postgres container only
+      withPostgres :: [String] -> [String]
+      withPostgres svcs = [svc | svc <- svcs, externalPostgres `implies` (svc /= "postgres")]
+      implies a b = not a || b
   uid <- show <$> getEffectiveUserID
   gid <- show <$> getEffectiveGroupID
   
@@ -52,7 +63,7 @@ generateDockerCompose role = do
   let appBackend = def
         { image = "app-backend:" ++ stratoVersionTag ++ "-" ++ hashAppBackend
         , user = Just userGid
-        , depends_on = Just $ DependsOnList ["postgres", "postgrest"]
+        , depends_on = Just $ DependsOnList (withPostgres ["postgres", "postgrest"])
         , init = Just True
         , extra_hosts = hostGateway
         , volumes = Just
@@ -86,7 +97,7 @@ generateDockerCompose role = do
             , ("BA_PASSWORD", "${BA_PASSWORD:-}")
             , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT:-}")
             , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY:-}")
-            , ("postgres_host", "postgres")
+            , ("postgres_host", pgReaderHost)
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
             ]
@@ -127,10 +138,10 @@ generateDockerCompose role = do
   let apex = def
         { image = "apex:" ++ stratoVersionTag ++ "-" ++ hashApex
         , user = Just userGid
-        , depends_on = Just $ DependsOnList ["postgres", "prometheus"]
+        , depends_on = Just $ DependsOnList (withPostgres ["postgres", "prometheus"])
         , extra_hosts = hostGateway
         , environment = Just $ Map.fromList
-            [ ("postgres_host", "postgres")
+            [ ("postgres_host", pgWriterHost)
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
             ]
@@ -196,10 +207,10 @@ generateDockerCompose role = do
   let postgrest = def
         { image = "postgrest:" ++ stratoVersionTag ++ "-" ++ hashPostgrest
         , user = Just userGid
-        , depends_on = Just $ DependsOnList ["postgres"]
+        , depends_on = Just $ DependsOnList (withPostgres ["postgres"])
         , environment = Just $ Map.fromList
             [ ("PG_ENV_POSTGRES_DB", "cirrus")
-            , ("PG_ENV_POSTGRES_HOST", "postgres")
+            , ("PG_ENV_POSTGRES_HOST", pgReaderHost)
             , ("PG_ENV_POSTGRES_USER", "postgres")
             , ("PG_PORT_5432_TCP_PORT", "5432")
             , ("POSTGREST_LOG_LEVEL", "error")
@@ -362,11 +373,11 @@ generateDockerCompose role = do
 
   let localAuth = def
         { image = "local-auth:" ++ stratoVersionTag ++ "-" ++ hashLocalAuth
-        , depends_on = Just $ DependsOnList ["postgres"]
+        , depends_on = Just $ DependsOnList (withPostgres ["postgres"])
         , extra_hosts = hostGateway
         , environment = Just $ Map.fromList
-            [ ("DSN", "postgres://postgres@postgres:5432/kratos?sslmode=disable")
-            , ("HYDRA_DSN", "postgres://postgres@postgres:5432/hydra?sslmode=disable")
+            [ ("DSN", "postgres://postgres@" ++ pgWriterHost ++ ":5432/kratos?sslmode=disable")
+            , ("HYDRA_DSN", "postgres://postgres@" ++ pgWriterHost ++ ":5432/hydra?sslmode=disable")
             ]
         , healthcheck = Just Healthcheck
             { test = ["CMD", "curl", "-f", "http://localhost:4444/.well-known/openid-configuration"]
@@ -425,6 +436,7 @@ generateDockerCompose role = do
         | (name, svc) <- allServices
         , roleHasService role name
         , bundledApp || name `notElem` ["app-backend", "app-ui"]
+        , not (externalPostgres && name == "postgres")
         ]
 
   let composeFile = ComposeFile
