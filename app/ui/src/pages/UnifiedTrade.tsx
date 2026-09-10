@@ -15,7 +15,7 @@ const UnifiedTrade = () => {
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
-      <DashboardHeader />
+      <DashboardHeader title="Unified Trade" />
       <div className="flex">
         <DashboardSidebar />
         <main className="flex-1 p-4 md:p-6">

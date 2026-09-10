@@ -38,6 +38,7 @@ import {
   roundByMagnitude,
 } from "@/services/rewardsService";
 import { findBestEarnApyInfo } from "@/utils/earnUtils";
+import { capture } from "@/lib/analytics";
 
 const formatTokenAmount = (value: string, maxFractionDigits: number = 4): string => {
   try {
@@ -536,6 +537,8 @@ const EarnSave = () => {
 
   const handleActionRequest = (mode: Exclude<ActionMode, null>) => {
     if (!isLoggedIn) {
+      // Demand blocked by the auth wall: a signed-out visitor who tried to act.
+      capture("login_wall_hit", { surface: "earn_save", mode });
       toast({
         title: "Sign in required",
         description: "Connect your account to deposit or redeem saveUSDST.",

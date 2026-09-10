@@ -87,6 +87,7 @@ library ExternalBridgeTypes {
         uint256 notBefore;
         uint256 deadline;
         uint256 signerSetVersion;
+        address destinationVault;
     }
 
     struct WithdrawalManualReview {

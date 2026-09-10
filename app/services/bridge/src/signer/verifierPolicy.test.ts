@@ -200,3 +200,75 @@ test("validates historical releases independently of current authorization eligi
     await assert.rejects(checks.validateReleasedDestination(authorization, reservationId), /does not match authorization/);
   }
 });
+
+const loadSignerChecks = (names: string[], context: Record<string, unknown>) => {
+  const code = names.map((name) => {
+    const node = signerSource.statements.find((statement) => ts.isVariableStatement(statement) &&
+      statement.declarationList.declarations.some((declaration) => declaration.name.getText(signerSource) === name));
+    assert.ok(node, name);
+    return node.getText(signerSource);
+  }).join("\n");
+  return runInNewContext(ts.transpileModule(code, {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText + `\n({${names.join(",")}})`, context);
+};
+
+test("pins actual RPC identities without truncating STRATO network IDs", async () => {
+  let externalId = "0x1";
+  let networkID: string | undefined = "123456789012345678901234";
+  const { validateRpcIdentity } = loadSignerChecks(["validateRpcIdentity"], {
+    destinationChainId: 1n, sourceChainId: BigInt(networkID),
+    provider: { send: async (method: string) => { assert.equal(method, "eth_chainId"); return externalId; } },
+    stratoGet: async (path: string) => {
+      assert.equal(path, "/strato-api/eth/v1.2/metadata");
+      return { data: { networkID } };
+    },
+  });
+  await validateRpcIdentity();
+  externalId = "0x2";
+  await assert.rejects(validateRpcIdentity(), /External RPC chain ID mismatch/);
+  externalId = "0x1";
+  networkID = "123456789012345678901235";
+  await assert.rejects(validateRpcIdentity(), /STRATO RPC network ID mismatch/);
+  networkID = undefined;
+  await assert.rejects(validateRpcIdentity(), /STRATO RPC network ID mismatch/);
+});
+
+test("refund attestations reject paid, reserved, unconfirmed, or mismatched vault state", async () => {
+  const authorization = {
+    sourceChainId: "9001", sourceBridge: `0x${policy.sourceBridge}`, sourceWithdrawalId: "7",
+    destinationChainId: policy.destinationChainId, destinationVault: policy.destinationVault,
+    token: externalToken, recipient: deposit.externalSender, amount: "100",
+    notBefore: "1000", deadline: "1100", signerSetVersion: "1",
+  };
+  let confirmedTimestamp = 1101;
+  let status = 0;
+  let digest = "";
+  const checks = loadSignerChecks(["AUTHORIZATION_TYPES", "domain", "validateDestinationIdentity", "validateRefundDestination"], {
+    destinationChainId: BigInt(policy.destinationChainId), destinationVault: policy.destinationVault,
+    verifierConfirmations: 5, getAddress, TypedDataEncoder,
+    normalize: (value: string) => value.replace(/^0x/, "").toLowerCase(),
+    provider: { getBlock: async (tag: string | number) => tag === "latest"
+      ? { number: 20, timestamp: 1200 } : { number: 15, timestamp: confirmedTimestamp } },
+    vault: {
+      getReservationId: async () => "reservation",
+      reservations: async (_id: string, options: { blockTag: number }) => {
+        assert.equal(options.blockTag, 15);
+        return { status, authorizationDigest: digest };
+      },
+    },
+  });
+  await checks.validateRefundDestination(authorization);
+  confirmedTimestamp = 1100;
+  await assert.rejects(checks.validateRefundDestination(authorization), /has not expired/);
+  confirmedTimestamp = 1101;
+  for (status of [1, 2]) {
+    await assert.rejects(checks.validateRefundDestination(authorization), /not refundable/);
+  }
+  status = 3;
+  digest = `0x${"0".repeat(64)}`;
+  await assert.rejects(checks.validateRefundDestination(authorization), /not refundable/);
+  digest = TypedDataEncoder.hash(checks.domain(authorization), checks.AUTHORIZATION_TYPES, authorization);
+  await checks.validateRefundDestination(authorization);
+  await assert.rejects(checks.validateRefundDestination({ ...authorization, amount: "101" }), /not refundable/);
+});

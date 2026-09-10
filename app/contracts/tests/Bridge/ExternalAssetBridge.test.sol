@@ -19,6 +19,22 @@ contract ExternalBridgeUser {
     }
 }
 
+contract RefundTestBridge is ExternalAssetBridge {
+    using ExternalBridgeTypes for *;
+    constructor(address initialOwner) ExternalAssetBridge(initialOwner) {}
+
+    function seedRefund(address token, address recipient, address destinationVault) public {
+        withdrawals[1].status = Status.CANCELLED;
+        withdrawals[1].stratoToken = token;
+        withdrawals[1].stratoSender = recipient;
+        withdrawals[1].stratoTokenAmount = 100;
+        withdrawals[1].externalChainId = 1;
+        withdrawals[1].authorizationDeadline = 1;
+        withdrawalAuthorizations[1].deadline = 1;
+        withdrawalAuthorizations[1].destinationVault = destinationVault;
+    }
+}
+
 contract Describe_ExternalAssetBridge is Authorizable {
     using ExternalBridgeTypes for *;
     using RouterTypes for *;
@@ -1490,12 +1506,13 @@ contract Describe_ExternalAssetBridge is Authorizable {
         (
             uint256 authorizationNotBefore,
             uint256 authorizationDeadline,
-            uint256 signerSetVersion
+            uint256 signerSetVersion,
+            address authorizationVault
         ) = bridge.withdrawalAuthorizations(withdrawalId);
         require(
             authorizationNotBefore == block.timestamp &&
                 authorizationDeadline == deadline &&
-                signerSetVersion == 1,
+                signerSetVersion == 1 && authorizationVault == externalVault,
             "Withdrawal authorization should be persisted"
         );
         relayer.do(
@@ -1563,6 +1580,30 @@ contract Describe_ExternalAssetBridge is Authorizable {
             refundReverted,
             "Completed withdrawal should never be refundable"
         );
+    }
+
+    function it_requires_refund_attestations_even_after_operator_cancellation() {
+        fastForward(2);
+        RefundTestBridge refundBridge = new RefundTestBridge(address(this));
+        refundBridge.seedRefund(address(stratoToken), address(user), externalVault);
+        refundBridge.setSettlementVerifier(address(verifierOne), true);
+        refundBridge.setSettlementVerifier(address(verifierTwo), true);
+        refundBridge.setSettlementVerifierThreshold(2);
+        stratoToken.mint(address(refundBridge), 100);
+        bool rejected = false;
+        try { refundBridge.refundWithdrawal(1); } catch { rejected = true; }
+        require(rejected, "Refund without proof must fail");
+        verifierOne.do(address(refundBridge), "attestWithdrawalRefund", 1);
+        rejected = false;
+        try { refundBridge.refundWithdrawal(1); } catch { rejected = true; }
+        require(rejected, "One verifier must not authorize refund");
+        verifierTwo.do(address(refundBridge), "attestWithdrawalRefund", 1);
+        uint256 beforeBalance = stratoToken.balanceOf(address(user));
+        refundBridge.refundWithdrawal(1);
+        require(stratoToken.balanceOf(address(user)) == beforeBalance + 100, "Attested refund must return escrow");
+        rejected = false;
+        try { refundBridge.refundWithdrawal(1); } catch { rejected = true; }
+        require(rejected, "Refund must not replay");
     }
 
     function it_applies_rebase_factor_to_external_withdrawal_amount() {

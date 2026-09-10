@@ -52,7 +52,7 @@ import Blockchain.SyncDB
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Validator
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import ClassyPrelude (atomically)
+import ClassyPrelude (atomically, deepseq)
 import Conduit
 import Control.Concurrent.AlarmClock
 import Control.Concurrent.STM.TMChan
@@ -184,7 +184,7 @@ instance Monad m => (Keccak256 `A.Alters` ()) (StateT SequencerContext m) where
 
 instance Monad m => HasBlockstanbulContext (StateT SequencerContext m) where
   getBlockstanbulContext = use blockstanbulContext
-  putBlockstanbulContext = modify' . (.~) blockstanbulContext
+  putBlockstanbulContext c = c `deepseq` modify' (blockstanbulContext .~ c)
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT SequencerConfig m) where
   get _ =

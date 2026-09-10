@@ -201,7 +201,7 @@ processTheMessages messages = do
 
   fkeys <- mapOutput Right . fmap concat . forM creates $ \(cc, cr, ch) -> do
     $logInfoS "processTheMessages" $ "CodeCollection Added"
-    yield $ InsertTable codeTableName [("code_hash", SqlText), ("creator", SqlText)] [[Just . SimpleValue . ValueString . T.pack $ keccak256ToHex ch, Just . SimpleValue $ ValueString cr]] Nothing
+    yield $ InsertTable codeTableName [("code_hash", SqlText), ("creator", SqlText)] [[Just . SimpleValue . ValueString . T.pack $ keccak256ToHex ch, Just . SimpleValue $ ValueString cr]] $ Just DoNothing
     multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
     fmap concat . forM (Map.toList $ cc ^. contracts) $ \(_, c) -> do

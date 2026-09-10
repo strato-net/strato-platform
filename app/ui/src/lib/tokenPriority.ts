@@ -69,7 +69,7 @@ export const EARNING_ASSET_SYMBOL_ORDER: string[] = [
   // Yield Vaults
   "CarryETH", "CarryWBTC", "YieldUSDC","saveUSDST",
   // Wrapped tokens
-  "ETH", "WBTC",
+  "ETH", "WBTC", "SPY", "NVDA",
   // Stable coins
   "USDC", "USDT",
   // Staking tokens

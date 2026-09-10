@@ -249,14 +249,31 @@ def replaceServerPortsDocker() {
 }
 
 /**
- * Wait for the local node to report isSynced=true, failing fast if the node's
- * host processes die while we wait.
+ * Wait for the local node to report isSynced=true AND for Cirrus to catch up
+ * to the node tip, failing fast if the node's host processes die while we wait.
  *
  * Every caller deploys with strato-up, so the node's services run under convoke
  * on the host and strato-ps can see them. A from-genesis sync runs for hours,
  * and if convoke dies mid-sync (vm-runner crash, OOM, unclean shutdown) the
  * metadata endpoint simply goes quiet -- without the strato-ps check the poll
- * burns its full ~4h timeout before reporting a generic "failed to sync".
+ * burns its full ~5h timeout before reporting a generic "failed to sync".
+ *
+ * isSynced=true only covers the p2p/VM pipeline (node best block vs world best
+ * block in Redis). Cirrus is populated by slipstream from a separate Kafka
+ * topic (vmevents) and can still be tens of thousands of blocks behind at the
+ * moment isSynced flips true, so a second wait covers that layer. That check
+ * mirrors the one strato-snapshot create runs for
+ * scripts/create-and-publish-snapshot.sh: the node tip comes from apex /status
+ * (lastBlock.number, reachable as apex:3009 from the nginx container), the
+ * Cirrus tip from max(storage.block_number) in the cirrus DB (no HTTP endpoint
+ * serves it), and Cirrus counts as caught up when it is within 5 blocks of the
+ * node tip. Unreadable tips are treated as "keep waiting": on a healthy node
+ * both become readable, and a dead node is caught by the strato-ps check.
+ *
+ * The whole wait runs as ONE sh step. The previous version issued a separate sh
+ * step per 2s poll, and on a multi-hour sync the thousands of resulting steps
+ * made the Jenkins build page barely usable. The script prints progress only
+ * on state changes and once every ~5 minutes to keep the console log small.
  *
  * @param nodeDir  Node directory to pass to strato-ps. Default: empty, which
  *                 lets strato-ps fall back to ~/.strato/default-node (written
@@ -264,58 +281,114 @@ def replaceServerPortsDocker() {
  */
 def waitLocalNodeIsSynced(String nodeDir = '') {
   echo "Waiting for local node to be in-sync and healthy..."
-  for (int i = 0; i < 9000; i++) {
-    if (sh(returnStatus: true, script: "sudo docker exec strato-nginx-1 curl 172.17.0.1:3000/eth/v1.2/metadata | grep \\\"isSynced\\\":true") == 0) {
-      return true
-    }
-    // strato-ps shells out to docker compose and strato-barometer, so it costs
-    // far more than the metadata poll: check every ~30s, not every 2s. Skipping
-    // i=0 also gives convoke a grace period to write .strato.pid, since some
-    // callers land here immediately after strato-up returns.
-    if (i > 0 && i % 15 == 0) {
-      assertStratoIsRunning(nodeDir)
-    }
-    sleep 2
-  }
-  error ("STRATO node failed to sync after within the expected time window of ~5hrs. Check the strato logs in artifacts for more details.")
-}
+  def rc
+  withEnv(["STRATO_NODE_DIR=${nodeDir}"]) {
+    rc = sh(returnStatus: true, script: '''#!/bin/bash -l
+      # Exit codes (mapped to error messages by the Groovy caller):
+      #   0  node synced and Cirrus caught up
+      #   70 node never reported isSynced=true within the window
+      #   71 node synced but Cirrus never caught up within the window
+      #   72 strato-ps no longer reports STRATO as running
+      SYNC_MAX_POLLS=9000        # ~5h at 2s
+      CIRRUS_MAX_POLLS=1800      # ~5h at 10s
+      ALLOWED_LAG=5
+      PROGRESS_EVERY_SECS=300
 
-/**
- * Fail the build if strato-ps no longer reports the node's host processes as up.
- * Healthy output contains the two-line block:
- *
- *   Convoke:
- *     Running (PID 12345)
- *
- * The trailing detail after "Running" is required, since that is what tells a
- * live convoke apart from "  Not running".
- *
- * Matching happens in shell rather than via a Groovy regex on purpose: a
- * java.util.regex.Matcher left on the CPS stack across a pipeline step is not
- * serializable and fails the build.
- *
- * @param nodeDir  Node directory to pass to strato-ps (see above).
- */
-def assertStratoIsRunning(String nodeDir = '') {
-  // Two attempts: strato-ps talks to the docker daemon, which can briefly time
-  // out under the IO load of a sync, and a single blip is not a dead node.
-  for (int attempt = 0; attempt < 2; attempt++) {
-    if (attempt > 0) {
-      sleep 5
-    }
-    def healthy = sh(returnStatus: true, script: """#!/bin/bash -le
-      strato-ps ${nodeDir} 2>&1 | grep -A1 -x 'Convoke:' | tail -n +2 | grep -Eq '^  Running.+'
-    """) == 0
-    if (healthy) {
-      return
-    }
+      metadata() {
+        sudo docker exec strato-nginx-1 curl -fsS 172.17.0.1:3000/eth/v1.2/metadata 2>/dev/null
+      }
+
+      # strato-ps shells out to docker compose and strato-barometer, so it costs
+      # far more than the metadata poll: callers invoke it every ~30s, not every
+      # poll. Two attempts: strato-ps talks to the docker daemon, which can
+      # briefly time out under the IO load of a sync, and one blip is not a dead
+      # node. Healthy output contains the two-line block:
+      #   Convoke:
+      #     Running (PID 12345)
+      # The trailing detail after "Running" is required, since that is what
+      # tells a live convoke apart from "  Not running".
+      assert_strato_running() {
+        local attempt
+        for attempt in 1 2; do
+          if strato-ps $STRATO_NODE_DIR 2>&1 | grep -A1 -x 'Convoke:' | tail -n +2 | grep -Eq '^  Running.+'; then
+            return 0
+          fi
+          sleep 5
+        done
+        echo "=== strato-ps $STRATO_NODE_DIR (unhealthy) ==="
+        strato-ps $STRATO_NODE_DIR 2>&1 || true
+        docker ps -a || true
+        exit 72
+      }
+
+      # --- Phase 1: wait for isSynced=true -------------------------------------
+      last_progress=$SECONDS
+      for (( i = 0; i < SYNC_MAX_POLLS; i++ )); do
+        meta=$(metadata)
+        if grep -q '"isSynced":true' <<<"$meta"; then
+          echo "Node is in-sync (nodeBestBlock=$(jq -r '.nodeBestBlock // "?"' <<<"$meta" 2>/dev/null)) after ${SECONDS}s"
+          break
+        fi
+        if (( SECONDS - last_progress >= PROGRESS_EVERY_SECS )); then
+          echo "[$(date -u +%H:%M:%S)] still syncing: nodeBestBlock=$(jq -r '.nodeBestBlock // "?"' <<<"$meta" 2>/dev/null) worldBestBlock=$(jq -r '.worldBestBlock // "?"' <<<"$meta" 2>/dev/null)"
+          last_progress=$SECONDS
+        fi
+        # Skipping i=0 gives convoke a grace period to write .strato.pid, since
+        # some callers land here immediately after strato-up returns.
+        if (( i > 0 && i % 15 == 0 )); then
+          assert_strato_running
+        fi
+        sleep 2
+      done
+      if (( i >= SYNC_MAX_POLLS )); then
+        exit 70
+      fi
+
+      # --- Phase 2: wait for Cirrus to catch up to the node tip -----------------
+      echo "Waiting for Cirrus to catch up to the node tip..."
+      last_progress=$SECONDS
+      last_kind=""
+      for (( i = 0; i < CIRRUS_MAX_POLLS; i++ )); do
+        node_tip=$(sudo docker exec strato-nginx-1 curl -fsS apex:3009/status 2>/dev/null | jq -r '.lastBlock.number // empty' 2>/dev/null)
+        cirrus_tip=$(sudo docker exec strato-postgres-1 psql -U postgres -d cirrus -tAc \\
+          "select coalesce(max(block_number::numeric), 0)::bigint from storage where block_number ~ '^[0-9]+$';" 2>/dev/null | tr -d '[:space:]')
+        if ! [[ "$node_tip" =~ ^[0-9]+$ && "$cirrus_tip" =~ ^[0-9]+$ ]]; then
+          kind="unreadable"
+          status="Cirrus sync check: tips not readable yet (node_tip='$node_tip', cirrus_tip='$cirrus_tip')"
+        elif (( cirrus_tip + ALLOWED_LAG < node_tip )); then
+          kind="behind"
+          status="Cirrus tip ($cirrus_tip) is behind node tip ($node_tip) by more than $ALLOWED_LAG block(s); waiting"
+        else
+          echo "Cirrus tip ($cirrus_tip) has caught up to node tip ($node_tip) after ${SECONDS}s"
+          exit 0
+        fi
+        # Log on the first poll, whenever the kind of wait changes, or every ~5 min.
+        if [[ "$kind" != "$last_kind" ]] || (( SECONDS - last_progress >= PROGRESS_EVERY_SECS )); then
+          echo "[$(date -u +%H:%M:%S)] $status"
+          last_progress=$SECONDS
+        fi
+        last_kind=$kind
+        # Same ~30s strato-ps cadence as the isSynced poll.
+        if (( i > 0 && i % 3 == 0 )); then
+          assert_strato_running
+        fi
+        sleep 10
+      done
+      exit 71
+    ''')
   }
-  sh(returnStatus: true, script: """#!/bin/bash -le
-    echo '=== strato-ps ${nodeDir} (unhealthy) ==='
-    strato-ps ${nodeDir} 2>&1 || true
-    docker ps -a || true
-  """)
-  error("strato-ps no longer reports STRATO as running; the node's host processes died before the sync completed.")
+  switch (rc) {
+    case 0:
+      return true
+    case 70:
+      error("STRATO node failed to sync within the expected time window of ~5hrs. Check the strato logs in artifacts for more details.")
+    case 71:
+      error("Cirrus failed to catch up to the node tip within ~5hrs after the node synced. Slipstream is stuck or too slow; check the slipstream logs in artifacts for more details.")
+    case 72:
+      error("strato-ps no longer reports STRATO as running; the node's host processes died before the sync completed.")
+    default:
+      error("waitLocalNodeIsSynced: sync wait script exited unexpectedly with status ${rc}.")
+  }
 }
 
 /**

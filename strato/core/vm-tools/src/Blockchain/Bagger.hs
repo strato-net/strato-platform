@@ -41,6 +41,8 @@ import Blockchain.VMMetrics
 import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Data.ExecResults (ExecResults, erEvents, erLogs)
+import Blockchain.Data.LogsBloom (bloomFromItems, emptyLogsBloom)
+import SolidVM.Model.Event (evContractAddress, evTopics)
 import Blockchain.Forks (isBlockRewardReceiptForkActive, isReceiptsRootForkActive)
 import qualified Blockchain.Verification as V
 import Blockchain.Data.Receipt (Receipt)
@@ -342,7 +344,7 @@ makeNewBlock mineTransactions mSelfAddress = do
           let lastHead = B.bestBlockHeader cache
           let promoted = take ((fromInteger (Conf.maxTxsPerBlock (quarryConfig ethConf))) - lastExecLen) $ B.promotedTransactions cache
           let time = B.startTimestamp cache
-          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] [] time mempty M.empty
+          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] [] emptyLogsBloom time mempty M.empty
           let remGas = B.remainingGas cache
           $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
           -- Only the first incremental run of a block pays its rewards; the
@@ -654,7 +656,22 @@ buildFromMiningCache = do
   let txs = (trrTransaction <$> B.lastExecutedTxs cache) ++ (DL.toList $ B.privateHashes cache)
   let time = B.startTimestamp cache
   receipts <- traverse txRunResultToReceipt (B.lastExecutedTxs cache)
-  let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs receipts time vDelt sDelt
+  -- Real Ethereum logsBloom over every log in the block: OR the contract address
+  -- and topics of each emitted event (topics computed at emit time, carried on the
+  -- Event). Mirrors 'txRunResultToReceipt' event selection so the header bloom
+  -- matches the logs the JSON-RPC layer serves.
+  let blockEvents =
+        [ ev
+        | trr <- B.lastExecutedTxs cache,
+          ev <- either (const []) erEvents (trrResult trr)
+        ]
+  let blockBloom =
+        bloomFromItems
+          [ item
+          | ev <- blockEvents,
+            item <- addressToByteString (evContractAddress ev) : evTopics ev
+          ]
+  let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs receipts blockBloom time vDelt sDelt
   recordMaxBlockNumber "bagger_build" . number $ nextBlockData
   rewardedBlockData <- buildRewardedBlockHeader nextBlockData
   cacheRunResults rewardedBlockData (B.lastExecutedStateRoot cache, B.remainingGas cache, B.lastExecutedTxs cache)
@@ -672,11 +689,12 @@ buildNextBlockHeader ::
   StateRoot ->
   [OutputTx] ->
   [Receipt] ->
+  BS.ByteString ->
   UTCTime ->
   ValidatorDelta ->
   StakeDelta ->
   BlockHeader
-buildNextBlockHeader parentHeader parentHash stateRoot txs receipts time vd sd =
+buildNextBlockHeader parentHeader parentHash stateRoot txs receipts bloom time vd sd =
   let parentNum = number parentHeader
       blockNum = parentNum + 1
       (newV, remV) = fromDelta vd
@@ -686,7 +704,6 @@ buildNextBlockHeader parentHeader parentHash stateRoot txs receipts time vd sd =
       receiptsForRoot = if isReceiptsRootForkActive blockNum then receipts else []
       rcptRoot = V.receiptsVerificationValue receiptsForRoot
       txRoot = V.transactionsVerificationValue (otBaseTx <$> txs)
-      bloom = "0000000000000000000000000000000000000000000000000000000000000000"
       extra = txsLen2ExtraData (length txs)
    in if Conf.stakingActiveAt (networkConfig ethConf) (parentNum + 1)
         then BlockHeaderV3

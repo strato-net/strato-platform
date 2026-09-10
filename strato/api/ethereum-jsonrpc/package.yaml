@@ -9,6 +9,9 @@ executables:
   ethereum-jsonrpc:
     source-dirs:      src
     main:             Main.hs
+    # -threaded: required for +RTS -N (and the right choice for a Warp server
+    # anyway); -rtsopts: allows GC-tuning flags (-A etc.) from commands.txt.
+    ghc-options:      -threaded -rtsopts
     dependencies:
       - base
       - aeson

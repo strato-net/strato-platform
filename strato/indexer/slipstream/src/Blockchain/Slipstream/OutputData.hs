@@ -75,7 +75,6 @@ import           SolidVM.Model.Storable
 import qualified SolidVM.Model.Type              as SVMType
 import qualified SolidVM.Model.Value             as SVMValue
 import           Text.Printf
-import           Text.ShortDescription
 import qualified Data.Text.Encoding as TE
 
 newtype First b a = First {unFirst :: (a, b)}
@@ -945,25 +944,26 @@ insertCollectionTableQuery rows =
 insertEventArrayTableQuery :: [ProcessedCollectionRow] -> [SlipstreamQuery]
 insertEventArrayTableQuery [] = []
 insertEventArrayTableQuery ms =
-  concat $
-    let ms' = mapMaybe (\m -> (\k -> (m, k, collectionDataValue m)) <$> listToMaybe (collectionDataKeys m)) ms
-     in flip map ms' $ \case
-          (x,k,v) ->
-            let tableName = eventArrayTableName
-                keySt = baseEventCollectionColumns ++ [("key", SqlJsonb), ("value", SqlJsonb)]
-                baseVals =
-                  [ ValueAddress . address,
-                    ValueString . T.pack . keccak256ToHex . blockHash,
-                    ValueString . T.pack . keccak256ToHex . transactionHash,
-                    ValueString . tshow . blockTimestamp,
-                    ValueInt False Nothing . blockNumber,
-                    const $ ValueString "",
-                    ValueInt False Nothing . fromIntegral . maybe 0 snd . eventInfo,
-                    ValueString . collection_name,
-                    ValueString . collection_type
-                  ]
-                vals = map (Just . SimpleValue . ($ x)) baseVals ++ [Just k, Just v]
-             in [InsertTable tableName keySt [vals] $ Just DoNothing]
+  case mapMaybe prepareRow ms of
+    [] -> []
+    rows -> [InsertTable eventArrayTableName columns rows $ Just DoNothing]
+  where
+    columns = baseEventCollectionColumns ++ [("key", SqlJsonb), ("value", SqlJsonb)]
+
+    prepareRow m = do
+      key <- listToMaybe $ collectionDataKeys m
+      let baseVals =
+            [ ValueAddress . address,
+              ValueString . T.pack . keccak256ToHex . blockHash,
+              ValueString . T.pack . keccak256ToHex . transactionHash,
+              ValueString . tshow . blockTimestamp,
+              ValueInt False Nothing . blockNumber,
+              const $ ValueString "",
+              ValueInt False Nothing . fromIntegral . maybe 0 snd . eventInfo,
+              ValueString . collection_name,
+              ValueString . collection_type
+            ]
+      pure $ map (Just . SimpleValue . ($ m)) baseVals ++ [Just key, Just $ collectionDataValue m]
 
 -- Creates tables for all event declarations, stores table name in
 -- globals{createdEvents}
@@ -1060,58 +1060,46 @@ getArraysFromEvents evArgs = do
                             (map (SimpleValue . ValueString . T.pack) elements))
 
 pipeInsertGlobalEventTable :: OutputM m => [AggregateEvent] -> ConduitM () SlipstreamQuery m ()
+pipeInsertGlobalEventTable [] = pure ()
 pipeInsertGlobalEventTable aggregatedEvents = do
-  queries <- lift (mapM insertGlobalEventTable aggregatedEvents)
-  yieldMany queries
-
-insertGlobalEventTable :: OutputM m => AggregateEvent -> m SlipstreamQuery
-insertGlobalEventTable agEv = do
-  let query = insertGlobalEventTableQuery agEv
-  $logInfoS "insertGlobalEventTable/query" . T.pack $ shortDescription agEv
-  return query
+  $logInfoS "insertGlobalEventTable/query" . T.pack $
+    "inserting " ++ show (length aggregatedEvents) ++ " events"
+  yield $ insertGlobalEventTableQuery aggregatedEvents
 
 -- | Generates an INSERT SQL statement for the global 'events' table.
 --
--- This function creates a SQL INSERT statement that adds a single event record
+-- This function creates a SQL INSERT statement that adds a batch of event records
 -- to the centralized 'events' table. Unlike event-specific tables that are
 -- created dynamically per contract/event type, this global table has a fixed
 -- schema and stores all events in a normalized format.
 --
--- Event arguments are converted to a JSON object and stored in the 'attributes'
+-- Event arguments are converted to JSON objects and stored in the 'attributes'
 -- column, where each argument name becomes a key and its value becomes the
 -- corresponding JSON value.
-insertGlobalEventTableQuery :: AggregateEvent -> SlipstreamQuery
-insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
-  let eventName = T.pack $ Action.evName ev
-      address = Action.evContractAddress ev
-      blockHash = T.pack . keccak256ToHex $ eventBlockHash agEv
-      txHash = T.pack . keccak256ToHex $ Action.evTxHash ev
-      blockTimestamp = tshow $ eventBlockTimestamp agEv
-      blockNumber = eventBlockNumber agEv
-      transactionSender = Action.evTxSender ev
-      eventIdx = eventIndex agEv
+insertGlobalEventTableQuery :: [AggregateEvent] -> SlipstreamQuery
+insertGlobalEventTableQuery aggregatedEvents =
+  InsertTable globalEventTableName columns (eventValues <$> aggregatedEvents) (Just DoNothing)
+  where
+    columns =
+      baseEventColumns ++
+      [ ("event_name", SqlText)
+      , ("attributes", SqlJsonb)
+      ]
 
-      attributesMap = ValueMapping $
-        Map.fromList [(ValueString $ T.pack name, SimpleValue . ValueString $ T.pack valStr) | (name, _, valStr, _) <- Action.evArgs ev]
-
-      columns =
-        baseEventColumns ++
-        [ ("event_name", SqlText)
-        , ("attributes", SqlJsonb)
-        ]
-
-      values = Just <$>
-        [ SimpleValue $ ValueAddress address
-        , SimpleValue $ ValueString blockHash
-        , SimpleValue $ ValueString txHash
-        , SimpleValue $ ValueString blockTimestamp
-        , SimpleValue $ ValueInt False Nothing blockNumber
-        , SimpleValue $ ValueAddress transactionSender
-        , SimpleValue . ValueInt False Nothing $ fromIntegral eventIdx
-        , SimpleValue $ ValueString eventName
-        , attributesMap
-        ]
-  in InsertTable globalEventTableName columns [values] Nothing
+    eventValues agEv@AggregateEvent {eventEvent = ev} =
+      let attributesMap = ValueMapping $
+            Map.fromList [(ValueString $ T.pack name, SimpleValue . ValueString $ T.pack valStr) | (name, _, valStr, _) <- Action.evArgs ev]
+       in Just <$>
+            [ SimpleValue . ValueAddress $ Action.evContractAddress ev
+            , SimpleValue . ValueString . T.pack . keccak256ToHex $ eventBlockHash agEv
+            , SimpleValue . ValueString . T.pack . keccak256ToHex $ Action.evTxHash ev
+            , SimpleValue . ValueString . tshow $ eventBlockTimestamp agEv
+            , SimpleValue . ValueInt False Nothing $ eventBlockNumber agEv
+            , SimpleValue . ValueAddress $ Action.evTxSender ev
+            , SimpleValue . ValueInt False Nothing . fromIntegral $ eventIndex agEv
+            , SimpleValue . ValueString . T.pack $ Action.evName ev
+            , attributesMap
+            ]
 
 ------------------
 
@@ -1144,8 +1132,8 @@ solidityValueToText (SolidityValueAsString x) = escapeQuestionMarks . escapeQuot
 solidityValueToText (SolidityBool x) = tshow x
 solidityValueToText (SolidityNum x) = tshow x
 solidityValueToText (SolidityBytes x) = escapeQuestionMarks . escapeQuotes $ tshow x
-solidityValueToText (SolidityArray x) = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
-solidityValueToText x@(SolidityObject _) = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
+solidityValueToText (SolidityArray x) = escapeQuestionMarks . escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
+solidityValueToText x@(SolidityObject _) = escapeQuestionMarks . escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
 
 valueToSQLText' :: Bool -> Value -> Maybe Text
 valueToSQLText' _ (SimpleValue (ValueBool x)) = Just $ if x then "true" else "false"

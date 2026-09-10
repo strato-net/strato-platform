@@ -1,4 +1,6 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -18,10 +20,12 @@ import Blockchain.Strato.Model.ProposerSelection
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Conduit
+import Control.DeepSeq (NFData)
 import Control.Lens hiding (view)
 import Control.Monad
 import Control.Monad.Composable.Vault
 import Control.Monad.State.Class
+import GHC.Generics (Generic)
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Set as S
@@ -91,6 +95,7 @@ data BlockstanbulContext = BlockstanbulContext
     _isValidator :: Bool,
     _network :: String
   }
+  deriving (Generic, NFData)
 
 makeLenses ''BlockstanbulContext
 

@@ -2090,4 +2090,184 @@ contract Describe_MercataBridge is Authorizable {
         require(action == 0, "Abort should delete action intent");
     }
 
+    // ============ INCIDENT RESPONSE: CANCEL AND SWEEP ============
+
+    function _requestSweepTestWithdrawal(uint256 amount) internal returns (uint256) {
+        Token(address(testToken)).mint(address(user1), amount);
+        user1.do(address(testToken), "approve", address(bridge), amount);
+        return user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0xEEEE), address(0x5555), address(testToken), amount);
+    }
+
+    function it_bridge_owner_can_cancel_and_sweep_initiated_withdrawal() {
+        uint256 amount = 1000e18;
+        address triage = address(0x7A1A6E);
+        uint256 withdrawalId = _requestSweepTestWithdrawal(amount);
+        uint256 bridgeBefore = testToken.balanceOf(address(bridge));
+        require(bridgeBefore >= amount, "escrow should be in the bridge");
+
+        bridge.cancelAndSweepWithdrawal(withdrawalId, triage);
+
+        (BridgeStatus status,,,,,,,,,,,) = bridge.withdrawals(withdrawalId);
+        require(status == BridgeStatus.SWEPT, "status should be SWEPT");
+        require(testToken.balanceOf(triage) == amount, "triage wallet should hold the escrow");
+        require(testToken.balanceOf(address(bridge)) == bridgeBefore - amount, "bridge should have released the escrow");
+        require(testToken.balanceOf(address(user1)) == 0, "sender must not be refunded");
+        require(bridge.withdrawalSweptTo(withdrawalId) == triage, "triage wallet should be recorded");
+
+        // The withdrawal is terminal: relayer and user paths are closed.
+        bool reverted = false;
+        try { relayer.do(address(bridge), "confirmWithdrawal", withdrawalId, "deadbeef"); } catch { reverted = true; }
+        require(reverted, "confirm after sweep must revert");
+        reverted = false;
+        try { relayer.do(address(bridge), "finaliseWithdrawal", withdrawalId); } catch { reverted = true; }
+        require(reverted, "finalise after sweep must revert");
+        reverted = false;
+        try { relayer.do(address(bridge), "abortWithdrawal", withdrawalId); } catch { reverted = true; }
+        require(reverted, "abort after sweep must revert");
+        reverted = false;
+        try { bridge.cancelAndSweepWithdrawal(withdrawalId, triage); } catch { reverted = true; }
+        require(reverted, "second sweep must revert");
+        require(testToken.balanceOf(triage) == amount, "no double payout");
+    }
+
+    function it_bridge_owner_can_cancel_and_sweep_pending_review_withdrawal() {
+        uint256 amount = 1000e18;
+        address triage = address(0x7A1A6E);
+        uint256 withdrawalId = _requestSweepTestWithdrawal(amount);
+        relayer.do(address(bridge), "confirmWithdrawal", withdrawalId, "deadbeef");
+
+        bridge.cancelAndSweepWithdrawal(withdrawalId, triage);
+
+        (BridgeStatus status,,,,,,,,,,,) = bridge.withdrawals(withdrawalId);
+        require(status == BridgeStatus.SWEPT, "status should be SWEPT");
+        require(testToken.balanceOf(triage) == amount, "triage wallet should hold the escrow");
+
+        bool reverted = false;
+        try { relayer.do(address(bridge), "finaliseWithdrawal", withdrawalId); } catch { reverted = true; }
+        require(reverted, "finalise after sweep must revert");
+    }
+
+    function it_bridge_cancel_and_sweep_reverts_for_completed_aborted_and_unknown() {
+        address triage = address(0x7A1A6E);
+
+        uint256 completedId = _requestSweepTestWithdrawal(1000e18);
+        relayer.do(address(bridge), "confirmWithdrawal", completedId, "deadbeef");
+        relayer.do(address(bridge), "finaliseWithdrawal", completedId);
+        bool reverted = false;
+        try { bridge.cancelAndSweepWithdrawal(completedId, triage); } catch { reverted = true; }
+        require(reverted, "completed withdrawal must not be sweepable");
+
+        uint256 abortedId = _requestSweepTestWithdrawal(1000e18);
+        relayer.do(address(bridge), "abortWithdrawal", abortedId);
+        reverted = false;
+        try { bridge.cancelAndSweepWithdrawal(abortedId, triage); } catch { reverted = true; }
+        require(reverted, "aborted withdrawal must not be sweepable");
+
+        reverted = false;
+        try { bridge.cancelAndSweepWithdrawal(999999, triage); } catch { reverted = true; }
+        require(reverted, "unknown withdrawal must not be sweepable");
+
+        reverted = false;
+        try { bridge.cancelAndSweepWithdrawal(0, triage); } catch { reverted = true; }
+        require(reverted, "id 0 must revert");
+
+        require(testToken.balanceOf(triage) == 0, "nothing may have been swept");
+    }
+
+    function it_bridge_cancel_and_sweep_reverts_for_relayer_and_user() {
+        uint256 amount = 1000e18;
+        address triage = address(0x7A1A6E);
+        uint256 withdrawalId = _requestSweepTestWithdrawal(amount);
+
+        bool reverted = false;
+        try { relayer.do(address(bridge), "cancelAndSweepWithdrawal", withdrawalId, triage); } catch { reverted = true; }
+        require(reverted, "relayer must not be able to sweep");
+
+        reverted = false;
+        try { user1.do(address(bridge), "cancelAndSweepWithdrawal", withdrawalId, address(user1)); } catch { reverted = true; }
+        require(reverted, "sender must not be able to sweep");
+
+        reverted = false;
+        try { user2.do(address(bridge), "cancelAndSweepWithdrawalBatch", [withdrawalId], address(user2)); } catch { reverted = true; }
+        require(reverted, "third party must not be able to sweep");
+
+        (BridgeStatus status,,,,,,,,,,,) = bridge.withdrawals(withdrawalId);
+        require(status == BridgeStatus.INITIATED, "withdrawal must be untouched");
+        require(testToken.balanceOf(address(bridge)) == amount, "escrow must still be in the bridge");
+        require(testToken.balanceOf(triage) == 0 && testToken.balanceOf(address(user2)) == 0, "nothing moved");
+    }
+
+    function it_bridge_cancel_and_sweep_rejects_zero_and_self_triage() {
+        uint256 withdrawalId = _requestSweepTestWithdrawal(1000e18);
+        bool reverted = false;
+        try { bridge.cancelAndSweepWithdrawal(withdrawalId, address(0)); } catch { reverted = true; }
+        require(reverted, "zero triage wallet must revert");
+        reverted = false;
+        try { bridge.cancelAndSweepWithdrawal(withdrawalId, address(bridge)); } catch { reverted = true; }
+        require(reverted, "bridge itself as triage wallet must revert");
+        (BridgeStatus status,,,,,,,,,,,) = bridge.withdrawals(withdrawalId);
+        require(status == BridgeStatus.INITIATED, "withdrawal must be untouched");
+    }
+
+    function it_bridge_cancel_and_sweep_works_while_withdrawals_paused() {
+        uint256 amount = 1000e18;
+        address triage = address(0x7A1A6E);
+        uint256 withdrawalId = _requestSweepTestWithdrawal(amount);
+
+        bridge.setPause(false, true);
+        require(bridge.withdrawalsPaused(), "withdrawals should be paused");
+
+        // the relayer is locked out by the circuit breaker...
+        bool reverted = false;
+        try { relayer.do(address(bridge), "confirmWithdrawal", withdrawalId, "deadbeef"); } catch { reverted = true; }
+        require(reverted, "confirm must be blocked by the pause");
+
+        // ...but governance can still capture the escrow
+        bridge.cancelAndSweepWithdrawal(withdrawalId, triage);
+        (BridgeStatus status,,,,,,,,,,,) = bridge.withdrawals(withdrawalId);
+        require(status == BridgeStatus.SWEPT, "status should be SWEPT");
+        require(testToken.balanceOf(triage) == amount, "triage wallet should hold the escrow");
+    }
+
+    function it_bridge_can_cancel_and_sweep_batch() {
+        address triage = address(0x7A1A6E);
+        uint256 id1 = _requestSweepTestWithdrawal(1000e18);
+        uint256 id2 = _requestSweepTestWithdrawal(2000e18);
+
+        bridge.cancelAndSweepWithdrawalBatch([id1, id2], triage);
+
+        (BridgeStatus s1,,,,,,,,,,,) = bridge.withdrawals(id1);
+        (BridgeStatus s2,,,,,,,,,,,) = bridge.withdrawals(id2);
+        require(s1 == BridgeStatus.SWEPT && s2 == BridgeStatus.SWEPT, "both should be SWEPT");
+        require(testToken.balanceOf(triage) == 3000e18, "triage wallet should hold both escrows");
+        require(bridge.withdrawalSweptTo(id1) == triage && bridge.withdrawalSweptTo(id2) == triage, "both recorded");
+
+        // one bad id fails the whole batch
+        uint256 id3 = _requestSweepTestWithdrawal(500e18);
+        bool reverted = false;
+        try { bridge.cancelAndSweepWithdrawalBatch([id3, id1], triage); } catch { reverted = true; }
+        require(reverted, "a batch containing an already-swept id must revert");
+        (BridgeStatus s3,,,,,,,,,,,) = bridge.withdrawals(id3);
+        require(s3 == BridgeStatus.INITIATED, "the good id in a failed batch must be untouched");
+        require(testToken.balanceOf(triage) == 3000e18, "no partial sweep");
+
+        reverted = false;
+        try { bridge.cancelAndSweepWithdrawalBatch([], triage); } catch { reverted = true; }
+        require(reverted, "empty batch must revert");
+    }
+
+    function it_bridge_can_cancel_and_sweep_usdst_withdrawal() {
+        uint256 amount = 750e18;
+        address triage = address(0x7A1A6E);
+        Token(address(usdstToken)).mint(address(user1), amount);
+        user1.do(address(usdstToken), "approve", address(bridge), amount);
+        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0xEEEE), address(0x6666), address(usdstToken), amount);
+
+        bridge.cancelAndSweepWithdrawal(withdrawalId, triage);
+
+        (BridgeStatus status,,,,,,,,,,,) = bridge.withdrawals(withdrawalId);
+        require(status == BridgeStatus.SWEPT, "status should be SWEPT");
+        require(usdstToken.balanceOf(triage) == amount, "triage wallet should hold the USDST escrow");
+        require(usdstToken.balanceOf(address(user1)) == 0, "sender must not be refunded");
+    }
 }

@@ -1230,6 +1230,7 @@ contract record ExternalAssetBridge is Ownable {
         authorization.notBefore = authorizationNotBefore;
         authorization.deadline = authorizationDeadline;
         authorization.signerSetVersion = signerSetVersion;
+        authorization.destinationVault = chains[withdrawal.externalChainId].vault;
         withdrawal.timestamp = block.timestamp;
         emit WithdrawalReady(
             withdrawalId,
@@ -1434,6 +1435,34 @@ contract record ExternalAssetBridge is Ownable {
         );
     }
 
+    function attestWithdrawalRefund(uint256 withdrawalId) external {
+        WithdrawalInfo withdrawal = withdrawals[withdrawalId];
+        require(
+            withdrawal.status == Status.READY || withdrawal.status == Status.CANCELLED,
+            "EAB: not refundable"
+        );
+        require(block.timestamp > withdrawal.authorizationDeadline, "EAB: authorization active");
+        _recordSettlementAttestation(getWithdrawalRefundDigest(withdrawalId));
+    }
+
+    function getWithdrawalRefundDigest(uint256 withdrawalId) public view returns (bytes32) {
+        WithdrawalInfo withdrawal = withdrawals[withdrawalId];
+        WithdrawalAuthorizationInfo authorization = withdrawalAuthorizations[withdrawalId];
+        bytes32 withdrawalHash = keccak256(abi.encode(
+            withdrawalId, withdrawal.externalChainId, withdrawal.externalToken,
+            withdrawal.externalTokenAmount, withdrawal.externalRecipient,
+            withdrawal.stratoSender, withdrawal.stratoToken, withdrawal.stratoTokenAmount
+        ));
+        return keccak256(abi.encode(
+            keccak256("EAB_WITHDRAWAL_REFUND_V1"), block.chainid, address(this),
+            settlementVerifierSetVersion, withdrawalHash, withdrawal.status,
+            authorization.notBefore, authorization.deadline, authorization.signerSetVersion,
+            authorization.destinationVault,
+            withdrawal.reservationId.length == 0 ? keccak256("") : keccak256(bytes(withdrawal.reservationId)),
+            withdrawal.cancellationTxHash.length == 0 ? keccak256("") : keccak256(bytes(withdrawal.cancellationTxHash))
+        ));
+    }
+
     function refundWithdrawal(uint256 withdrawalId) external onlyOwner {
         WithdrawalInfo withdrawal = withdrawals[
             withdrawalId
@@ -1448,6 +1477,12 @@ contract record ExternalAssetBridge is Ownable {
             cancelled || readyWithoutReservation,
             "EAB: not refundable"
         );
+
+        require(
+            withdrawalAuthorizations[withdrawalId].destinationVault != address(0),
+            "EAB: missing destination vault"
+        );
+        _requireSettlementAttestations(getWithdrawalRefundDigest(withdrawalId), bytes(""));
 
         _refundFunds(
             withdrawal.stratoToken,

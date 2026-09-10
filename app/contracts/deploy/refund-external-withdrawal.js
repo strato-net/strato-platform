@@ -8,12 +8,13 @@
  *     [--admin-registry <address>] \
  *     [--execute]
  *
- * Without --execute, this script only prints the planned governance call.
+ * Without --execute, this script verifies confirmed non-payment evidence and prints the planned governance call.
  */
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
 const { rest, util } = require('blockapps-rest');
+const { Contract, JsonRpcProvider } = require('ethers');
 
 const DEFAULT_ADMIN_REGISTRY = '000000000000000000000000000000000000100c';
 
@@ -80,6 +81,95 @@ async function callAndWait(tokenObj, registry, args) {
   return final;
 }
 
+async function prepareRefund(bridgeAddress, withdrawalId, token, options = {}) {
+  const nodeUrl = (options.nodeUrl || process.env.NODE_URL || '').replace(/\/$/, '');
+  const fetchImpl = options.fetchImpl || fetch;
+  const read = async (pathname, params = {}) => {
+    const response = await fetchImpl(`${nodeUrl}${pathname}?${new URLSearchParams(params)}`, {
+      headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(60000),
+    });
+    if (!response.ok) throw new Error(`Refund evidence query failed: ${response.status}`);
+    return response.json();
+  };
+  const identity = { address: `eq.${bridgeAddress}`, key: `eq.${withdrawalId}`, select: 'value', limit: '1' };
+  const [withdrawals, authorizations, metadata, bridges] = await Promise.all([
+    read('/cirrus/search/BlockApps-ExternalAssetBridge-withdrawals', identity),
+    read('/cirrus/search/BlockApps-ExternalAssetBridge-withdrawalAuthorizations', identity),
+    read('/strato-api/eth/v1.2/metadata'),
+    read('/cirrus/search/BlockApps-ExternalAssetBridge', { address: `eq.${bridgeAddress}`, select: 'settlementVerifierThreshold', limit: '1' }),
+  ]);
+  const expectedSourceChainId = options.sourceChainId || process.env.SOURCE_CHAIN_ID;
+  if (!expectedSourceChainId || metadata.networkID == null || BigInt(metadata.networkID) !== BigInt(expectedSourceChainId)) {
+    throw new Error('SOURCE_CHAIN_ID must match STRATO metadata');
+  }
+  const threshold = Number(bridges?.[0]?.settlementVerifierThreshold);
+  if (!Number.isSafeInteger(threshold) || threshold < 2) throw new Error('Invalid refund verifier threshold');
+  const withdrawal = withdrawals?.[0]?.value;
+  const stored = authorizations?.[0]?.value;
+  if (!withdrawal || !stored?.destinationVault ||
+      !(Number(withdrawal.status) === 5 || (Number(withdrawal.status) === 3 && !withdrawal.reservationId))) {
+    throw new Error('Withdrawal is not eligible for an attested refund');
+  }
+  const authorization = {
+    sourceChainId: String(expectedSourceChainId), sourceBridge: `0x${bridgeAddress}`,
+    sourceWithdrawalId: withdrawalId, destinationChainId: String(withdrawal.externalChainId),
+    destinationVault: `0x${normalizeAddress(stored.destinationVault, 'destinationVault')}`,
+    token: `0x${normalizeAddress(withdrawal.externalToken, 'externalToken')}`,
+    recipient: `0x${normalizeAddress(withdrawal.externalRecipient, 'externalRecipient')}`,
+    amount: String(withdrawal.externalTokenAmount), notBefore: String(stored.notBefore),
+    deadline: String(stored.deadline), signerSetVersion: String(stored.signerSetVersion),
+  };
+  if (String(withdrawal.authorizationDeadline) !== authorization.deadline) throw new Error('Source authorization deadline mismatch');
+  const confirmations = Number(options.confirmations ?? process.env[`CHAIN_${authorization.destinationChainId}_DEPOSIT_CONFIRMATIONS`]);
+  if (!Number.isSafeInteger(confirmations) || confirmations <= 0) throw new Error('Positive external confirmation count is required');
+  const rpcUrl = process.env[`CHAIN_${authorization.destinationChainId}_RPC_URL`];
+  if (!options.provider && !rpcUrl) throw new Error('External RPC URL is required');
+  const provider = options.provider || new JsonRpcProvider(rpcUrl);
+  try {
+    if (BigInt(await provider.send('eth_chainId', [])) !== BigInt(authorization.destinationChainId)) throw new Error('External RPC chain ID mismatch');
+    const latest = await provider.getBlock('latest');
+    if (!latest || latest.number < confirmations) throw new Error('Confirmed external state is unavailable');
+    const blockTag = latest.number - confirmations;
+    const block = await provider.getBlock(blockTag);
+    if (!block || BigInt(block.timestamp) <= BigInt(authorization.deadline)) throw new Error('Authorization has not expired in confirmed external state');
+    const vault = options.vault || new Contract(authorization.destinationVault, [
+      'function getReservationId(uint256,address,uint256) pure returns (bytes32)',
+      'function reservations(bytes32) view returns (uint8 status,address token,address recipient,uint256 amount,uint256 deadline,bytes32 authorizationDigest)',
+      'function authorizationDigest((uint256 sourceChainId,address sourceBridge,uint256 sourceWithdrawalId,uint256 destinationChainId,address destinationVault,address token,address recipient,uint256 amount,uint256 notBefore,uint256 deadline,uint256 signerSetVersion)) view returns (bytes32)',
+    ], provider);
+    const reservationId = await vault.getReservationId(authorization.sourceChainId, authorization.sourceBridge, withdrawalId);
+    const reservation = await vault.reservations(reservationId, { blockTag });
+    const status = Number(reservation.status);
+    if (status !== 0 && status !== 3) throw new Error('External reservation is reserved or already released');
+    if (status === 3 && reservation.authorizationDigest.toLowerCase() !== (await vault.authorizationDigest(authorization, { blockTag })).toLowerCase()) {
+      throw new Error('Cancelled reservation authorization mismatch');
+    }
+    return { authorization, threshold, reservationId, externalBlockNumber: blockTag, externalBlockHash: block.hash, reservationStatus: status };
+  } finally {
+    if (!options.provider) provider.destroy();
+  }
+}
+
+async function collectRefundAttestations(evidence) {
+  const chainId = evidence.authorization.destinationChainId;
+  const urls = (process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS`] || '').split(',').map((v) => v.trim()).filter(Boolean);
+  const tokens = (process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS`] || '').split(',').map((v) => v.trim()).filter(Boolean);
+  if (!urls.length || urls.length !== tokens.length || urls.some((url) => new URL(url).protocol !== 'https:')) {
+    throw new Error('HTTPS verifier URLs and matching API tokens are required');
+  }
+  const results = await Promise.allSettled(urls.map(async (url, index) => {
+    const response = await fetch(`${url.replace(/\/$/, '')}/v1/attest-refund`, {
+      method: 'POST', headers: { Authorization: `Bearer ${tokens[index]}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ authorization: evidence.authorization }), signal: AbortSignal.timeout(60000),
+    });
+    if (!response.ok) throw new Error(`Refund verifier rejected evidence: ${response.status}`);
+    return response.json();
+  }));
+  const accepted = new Set(results.filter((result) => result.status === 'fulfilled' && result.value.transactionHash)
+    .map((result) => String(result.value.settlementAttestor || '').toLowerCase()).filter(Boolean));
+  if (accepted.size < evidence.threshold) throw new Error('Refund verifier quorum was not reached; no governance vote submitted');
+}
+
 async function main() {
   const args = parseArgs();
   const bridgeAddress = normalizeAddress(
@@ -100,16 +190,6 @@ async function main() {
     _args: [{ type: 'uint256', value: withdrawalId }],
   };
 
-  console.log(JSON.stringify({
-    contract: adminRegistry,
-    method: 'castVoteOnIssue',
-    args: voteArgs,
-  }, null, 2));
-  if (!args.execute) {
-    console.log('Dry run only. Re-run with --execute to submit this vote.');
-    return;
-  }
-
   const required = [
     'GLOBAL_ADMIN_NAME',
     'GLOBAL_ADMIN_PASSWORD',
@@ -127,6 +207,13 @@ async function main() {
     process.env.GLOBAL_ADMIN_NAME,
     process.env.GLOBAL_ADMIN_PASSWORD
   );
+  const evidence = await prepareRefund(bridgeAddress, withdrawalId, token);
+  console.log(JSON.stringify({ evidence, contract: adminRegistry, method: 'castVoteOnIssue', args: voteArgs }, null, 2));
+  if (!args.execute) {
+    console.log('Evidence verified. Dry run only; no attestations or governance votes submitted.');
+    return;
+  }
+  await collectRefundAttestations(evidence);
   const result = await callAndWait({ token }, adminRegistry, voteArgs);
   console.log(`Refund vote submitted successfully (${result.hash})`);
 }
@@ -139,3 +226,4 @@ if (require.main === module) {
 }
 
 module.exports = main;
+module.exports.prepareRefund = prepareRefund;

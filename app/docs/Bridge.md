@@ -2,13 +2,15 @@
 
 Purpose: Cross-system token bridging into and out of STRATO.
 
+Deployment scope: this is a fresh ExternalAssetBridge deployment with new proxies and no legacy deposits, withdrawals, or custody balances to migrate. Legacy cutover/drain procedures are not part of this rollout. Existing deployments, if present on the same network, remain independent.
+
 Key contracts:
 - `ExternalAssetBridge`: STRATO coordinator for non-native assets.
 - `ExternalBridgeVault`: Route-local custody and threshold-authorized releases on each external chain.
 - `DepositRouter`: Emits uniquely numbered external deposits and transfers assets to the route vault.
 - `TokenRouter`: Executes validated, bounded STRATO routes after bridge settlement.
 - `StratoNativeBridge`: Unchanged native-asset bridge.
-- `MercataBridge`: Legacy non-native history only while existing activity drains.
+- `MercataBridge`: Independent legacy history and operations, outside this fresh deployment.
 
 Non-native bridge-in:
 1. The service detects every router event independently, keyed by `(externalChainId, depositRouter, depositId)`.
@@ -23,6 +25,7 @@ Non-native bridge-in:
 
 Activity history enriches the canonical completion with `AutoRouted` or `DepositActionFallback` final-token data and labels it `Deposit & Trade` or `Deposit (Fallback)`. Direct STRATO routes are recorded from `TokenRouter.RouteExecuted`; Unified Trade displays those recent routes alongside pending and completed bridge deposits. Its STRATO source catalog includes every graph node with an outgoing route, including PSM-only assets, and reserves both STRATO call fees from maximum transferable USDST. Rewards continue to consume only `DepositCompleted` and its bridged source amount; action outcomes are presentation metadata and do not create a second reward.
 
+
 External action intent is not separately signed by the external wallet; it is emitted by DepositRouter in the externally signed transaction. Each settlement verifier independently binds the deposit identity, STRATO recipient, source route, action, destination token and `minFinalOut` to that canonical event. Route steps are selected by the bridge operator but must execute through TokenRouter's approved dependencies and satisfy the attested destination token and absolute `minFinalOut`. Arbitrary relayers cannot select route steps or force fallback. Contract route allowlists, on-chain rebase accounting, replay protection and source-token fallback remain the execution bounds.
 
 Non-native bridge-out:
@@ -30,7 +33,7 @@ Non-native bridge-out:
 2. Routine withdrawals receive short-lived authorization from independent KMS/HSM signers.
 3. The unprivileged executor reserves and releases route-local vault liquidity.
 4. Independent verifier services confirm the exact vault `WithdrawalReleased` event. Any relayer may finalize after two STRATO attestations, and only then is escrow burned.
-5. Large withdrawals additionally require Safe review. Expired reservations can be cancelled and refunded through governance.
+5. Large withdrawals additionally require Safe review. Expired reservations can be cancelled. Governance refunds additionally require the configured STRATO verifier threshold to attest confirmed external non-payment: no reservation after authorization expiry, or a matching cancelled reservation. A recorded operator cancellation alone cannot authorize a refund. The destination vault is captured in each authorization so later chain configuration changes cannot redirect recovery.
 
 Operational controls:
 - Deposit and withdrawal pause controls are independent.
@@ -41,6 +44,7 @@ Operational controls:
 - The service never mutates the observed external amount for rebasing. Missing factors fail only the affected settlement or review-record attempt; the remaining chain batch continues.
 - TokenRouter-originated Forge and vault events are excluded from user activity and rewards attribution. The canonical ExternalAssetBridge completion attributes the deposit to its recipient without double counting.
 - DepositRouter 3.2 or newer is required for native ETH `AUTO_ROUTE`.
+
 
 Follow-up TODO:
 - Deploy three isolated verifier instances per external chain with distinct RPC providers and STRATO identities. Complete production key isolation, scoped credentials, rotation, monitoring and incident-recovery procedures for verifier, executor and governance authorities.
@@ -135,7 +139,7 @@ The script checks the network and Permit2 bytecode, initializes the router direc
 cp app/ethereum/externalBridgeVault.config.example.json /secure/path/external-bridge-vault.helium-sepolia.json
 ```
 
-Set `sourceChainId` to `"114784819836269"`, `sourceBridge` to `<EXTERNAL_ASSET_BRIDGE_PROXY>`, and use the new vault/router proxies from step 3. Configure signer threshold and per-token policy values in raw external units. Keep every `migrateAmount` at `"0"` until smoke tests pass.
+Set `sourceChainId` to `"114784819836269"`, `sourceBridge` to `<EXTERNAL_ASSET_BRIDGE_PROXY>`, and use the new vault/router proxies from step 3. Configure signer threshold and per-token policy values in raw external units. Keep every `migrateAmount` at `"0"`; this fresh deployment must not sweep legacy custody.
 
 5. Generate and review all external Safe operations as JSON:
 
@@ -201,7 +205,7 @@ npm --prefix app/contracts run configure:external-bridge -- --config /secure/pat
 
 8. Configure and start the backend, bridge service, signers, and rewards poller. Preserve `BRIDGE_ADDRESS=0000000000000000000000000000000000001008` while adding `EXTERNAL_ASSET_BRIDGE_ADDRESS=<EXTERNAL_ASSET_BRIDGE_PROXY>` and `TOKEN_ROUTER=<TOKEN_ROUTER_PROXY>`. The bridge operator OAuth account must resolve to the address configured in `ExternalAssetBridge.initialize`. Use independent signer keys/RPCs and ensure the configured signer count satisfies the vault threshold.
 
-9. Test in this order: route quote, plain deposit, deterministic route fallback, successful deposit-and-route, routine withdrawal, large withdrawal requiring both threshold signatures and Safe approval, pause/unpause, RPC disagreement, missing receipt, reorg replacement, and expired authorization. Confirm the legacy bridge still processes its own in-flight operations.
+9. Test in this order: route quote, plain deposit, deterministic route fallback, successful deposit-and-route, routine withdrawal, large withdrawal requiring both threshold signatures and Safe approval, pause/unpause, RPC disagreement, missing receipt, reorg replacement, and expired authorization. Confirm no legacy balances or in-flight operations are assigned to the new bridge.
 
 10. Enable action 4 only for routes with verified quotes:
 
@@ -215,19 +219,17 @@ Review the generated JSON, then have each required admin submit it:
 npm --prefix app/contracts run configure:external-bridge -- --config /secure/path/external-bridge.helium.json --step actions --execute
 ```
 
-11. Migrate test liquidity only after acceptance:
-
-```bash
-npm --prefix app/ethereum run external:vault:ops -- --config /secure/path/external-bridge-vault.helium-sepolia.json --chains 11155111 --step liquidity
-```
-
-Review the Safe JSON for token, amount, source Safe, destination vault, and remaining legacy liquidity, then propose:
-
-```bash
-npm --prefix app/ethereum run external:vault:ops -- --config /secure/path/external-bridge-vault.helium-sepolia.json --chains 11155111 --step liquidity --apply
-```
+11. Fund the new vault from an explicitly approved test treasury after acceptance. Keep legacy-custody migration disabled (`migrateAmount = "0"`). Verify the vault balance and route limits before accepting new deposits or withdrawals.
 
 Rollback is route-local: disable action 4, disable EAB deposits for the affected route or chain, keep withdrawals available where safe, and leave the legacy bridge/router untouched. Do not move new-vault liquidity back until pending new-bridge withdrawals are reconciled.
 
 Keep pool, Forge, and vault reward activities registered against their existing source contracts. The poller correlates their TokenRouter-owned events with `RouteExecuted` and attributes direct routes to the caller; ExternalAssetBridge callers remain excluded because their canonical reward is `DepositCompleted`.
 
+
+Legacy MercataBridge incident operations remain available independently: owner-governed `cancelAndSweepWithdrawal` and its batch variant move INITIATED/PENDING_REVIEW escrow to a triage wallet and mark it SWEPT. Never whitelist these operations for the relayer; reject any associated external Safe proposal before sweeping pending-review escrow. These operations do not apply to ExternalAssetBridge.
+
+### Refund evidence and RPC identity
+
+Verifier startup reads the external RPC's actual `eth_chainId` and STRATO metadata `networkID` and requires exact matches to `DESTINATION_CHAIN_ID` and `SOURCE_CHAIN_ID`. Network IDs are compared as integers without conversion to JavaScript Number. Each `/v1/attest-refund` request repeats the identity checks and reads the original vault at a block with `VERIFIER_CONFIRMATIONS` confirmations. Current expiry and signer-set checks are not used to invalidate historical release evidence.
+
+`npm --prefix app/contracts run refund:external-withdrawal -- --bridge-address <bridge> --withdrawal-id <id>` now performs read-only evidence checks even without `--execute`. Supply STRATO OAuth settings, `NODE_URL`, `SOURCE_CHAIN_ID`, `CHAIN_<id>_RPC_URL`, and a positive `CHAIN_<id>_DEPOSIT_CONFIRMATIONS`. The output includes the original authorization, vault, reservation state and confirmed block. With `--execute`, also supply the chain's HTTPS verifier URLs and API tokens; the tool first collects refund attestations, then submits the governance vote. The contract independently enforces the configured attestation threshold at execution. A reserved or released vault reservation is never acceptable refund evidence.

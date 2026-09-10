@@ -25,6 +25,7 @@ executable ethereum-jsonrpc
       Paths_ethereum_jsonrpc
   hs-source-dirs:
       src
+  ghc-options: -threaded -rtsopts
   build-depends:
       aeson
     , base

@@ -223,7 +223,7 @@ export const getExternalWithdrawalsByStatus = async (
 
   return eligible.map((item) => {
     const externalChainId = Number(item.value.externalChainId);
-    const vault = enabledChains.get(externalChainId)!.vault!;
+    const vault = authorizations.get(String(item.key))?.destinationVault || enabledChains.get(externalChainId)!.vault!;
     return {
       ...item.value,
       bridgeStatus: item.value.status,

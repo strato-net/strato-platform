@@ -28,6 +28,12 @@ takeRtsSample name = do
   withLabel slopBytesMetric               name (flip setGauge . fromIntegral . gcdetails_slop_bytes                $ gc rts)
   withLabel copiedBytesMetric             name (flip setGauge . fromIntegral . gcdetails_copied_bytes              $ gc rts)
   withLabel blockFragmentationBytesMetric name (flip setGauge . fromIntegral . gcdetails_block_fragmentation_bytes $ gc rts)
+  withLabel gcCpuNsMetric                 name (flip setGauge . fromIntegral $ gc_cpu_ns     rts)
+  withLabel gcElapsedNsMetric             name (flip setGauge . fromIntegral $ gc_elapsed_ns rts)
+  withLabel cpuNsMetric                   name (flip setGauge . fromIntegral $ cpu_ns        rts)
+  withLabel elapsedNsMetric               name (flip setGauge . fromIntegral $ elapsed_ns    rts)
+  withLabel gcsMetric                     name (flip setGauge . fromIntegral $ gcs           rts)
+  withLabel majorGcsMetric                name (flip setGauge . fromIntegral $ major_gcs     rts)
 
 runInstrumentation :: Text -> IO ()
 runInstrumentation name = do

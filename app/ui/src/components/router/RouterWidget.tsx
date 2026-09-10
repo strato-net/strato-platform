@@ -63,6 +63,7 @@ const RouterWidget = ({
               balance: "0",
               price: "0",
               poolBalance: "0",
+              routableSource: false,
               images: route.stratoTokenImage
                 ? [{ value: route.stratoTokenImage }]
                 : [],
@@ -354,8 +355,7 @@ const RouterWidget = ({
             <span>
               Available:{" "}
               {formatAmount(
-                formatUnits(maxSpendableWei, tokenIn.customDecimals),
-                6
+                formatUnits(maxSpendableWei, tokenIn.customDecimals)
               )}{" "}
               {tokenIn._symbol}
             </span>
@@ -451,8 +451,7 @@ const RouterWidget = ({
             If the STRATO route is unavailable or cannot meet your minimum,
             you will receive{" "}
             {formatAmount(
-              formatUnits(compositeQuote.data.bridge.bridgedAmount, 18),
-              6
+              formatUnits(compositeQuote.data.bridge.bridgedAmount, 18)
             )}{" "}
             {externalRoute.stratoTokenSymbol} instead.
           </p>

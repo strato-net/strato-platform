@@ -107,7 +107,7 @@ Verifier deployments use `docker-compose.bridge-signer.tpl.yml`. Deploy one isol
 For native ETH deposits, each verifier calls `trace_transaction` to prove the DepositRouter-to-vault custody movement. At least two of the three configured signer RPCs must support this method for settlement, and all three should support it to preserve one-verifier fault tolerance. Verify trace support with a real DepositRouter ETH transaction before enabling the route.
 
 Routine non-native withdrawals are marked ready on STRATO, reserved in the route-local vault, released externally, and only then finalized and burned on STRATO. Large withdrawals require an executed Safe approval over their stable review digest before receiving a fresh release authorization.
-Expired reservations are cancelled on the destination vault and recorded on STRATO; governance can then refund the escrowed representation with `npm run refund:external-withdrawal` from `app/contracts`.
+Expired reservations are cancelled on the original destination vault and recorded on STRATO. Refunds additionally require threshold verifier attestations of confirmed external non-payment; an operator cancellation record alone is insufficient. `npm run refund:external-withdrawal` from `app/contracts` verifies evidence in dry-run mode, and collects `/v1/attest-refund` attestations before submitting a governance vote in execute mode. Configure `SOURCE_CHAIN_ID`, the external RPC URL and positive confirmation count for the refund tool, plus HTTPS verifier URLs/API tokens when executing. Verifier startup checks actual external and STRATO RPC network identities; mismatches fail closed.
 
 #### Optional
 - `CHAIN_${chainId}_WS_RPC_URL` - WebSocket RPC used for immediate deposit detection

@@ -310,6 +310,8 @@ const normalize = (value: string): string => value.replace(/^0x/, "").toLowerCas
 
 const validateSourceWithdrawal = async (
   authorization: WithdrawalAuthorization,
+  allowedStatuses = [3],
+  requireEnabledChain = true,
 ): Promise<void> => {
   if (normalize(authorization.sourceBridge) !== normalize(sourceBridge)) {
     throw new Error("Source bridge mismatch");
@@ -326,7 +328,7 @@ const validateSourceWithdrawal = async (
     },
   );
   const withdrawal = response.data?.[0]?.value;
-  if (!withdrawal || Number(withdrawal.status) !== 3) {
+  if (!withdrawal || !allowedStatuses.includes(Number(withdrawal.status))) {
     throw new Error("Source withdrawal is not ready");
   }
   if (
@@ -347,7 +349,8 @@ const validateSourceWithdrawal = async (
     },
   );
   const sourceAuthorization = authorizationResponse.data?.[0]?.value;
-  if (!matchesSourceWithdrawalAuthorization(sourceAuthorization, authorization)) {
+  if (!matchesSourceWithdrawalAuthorization(sourceAuthorization, authorization) ||
+      normalize(sourceAuthorization?.destinationVault || "") !== normalize(authorization.destinationVault)) {
     throw new Error("Source withdrawal authorization does not match request");
   }
 
@@ -361,8 +364,8 @@ const validateSourceWithdrawal = async (
   );
   const chain = chainResponse.data?.[0]?.value;
   if (
-    !chain?.enabled ||
-    normalize(chain.vault) !== normalize(authorization.destinationVault)
+    requireEnabledChain && (!chain?.enabled ||
+    normalize(chain.vault) !== normalize(authorization.destinationVault))
   ) {
     throw new Error("Destination vault is not enabled by the source bridge");
   }
@@ -729,7 +732,7 @@ app.post("/v1/attest-release", async (req, res) => {
     const reservationId = String(req.body.reservationId || "");
     const externalTxHash = String(req.body.externalTxHash || "");
     await Promise.all([
-      validateSourceWithdrawal(authorization),
+      validateSourceWithdrawal(authorization, [3], false),
       validateReleasedDestination(authorization, reservationId),
       validateWithdrawalRelease(
         provider,
@@ -760,8 +763,56 @@ app.post("/v1/attest-release", async (req, res) => {
   }
 });
 
+const validateRpcIdentity = async (): Promise<void> => {
+  const [externalChain, metadata] = await Promise.all([
+    provider.send("eth_chainId", []),
+    stratoGet("/strato-api/eth/v1.2/metadata", {}),
+  ]);
+  if (BigInt(externalChain) !== destinationChainId) throw new Error("External RPC chain ID mismatch");
+  const networkId = metadata.data?.networkID;
+  if (networkId == null || BigInt(networkId) !== sourceChainId) throw new Error("STRATO RPC network ID mismatch");
+};
+
+const validateRefundDestination = async (authorization: WithdrawalAuthorization): Promise<void> => {
+  validateDestinationIdentity(authorization);
+  const latest = await provider.getBlock("latest");
+  if (!latest || latest.number < verifierConfirmations) throw new Error("Finalized vault state is unavailable");
+  const blockTag = latest.number - verifierConfirmations;
+  const block = await provider.getBlock(blockTag);
+  if (!block || BigInt(block.timestamp) <= BigInt(authorization.deadline)) {
+    throw new Error("Authorization has not expired in confirmed vault state");
+  }
+  const reservationId = await vault.getReservationId(
+    authorization.sourceChainId, authorization.sourceBridge, authorization.sourceWithdrawalId,
+  );
+  const reservation = await vault.reservations(reservationId, { blockTag });
+  const status = Number(reservation.status);
+  if (status === 0) return;
+  if (status !== 3 || normalize(reservation.authorizationDigest) !== normalize(
+    TypedDataEncoder.hash(domain(authorization), AUTHORIZATION_TYPES, authorization),
+  )) throw new Error("Vault reservation is not refundable");
+};
+
+app.post("/v1/attest-refund", async (req, res) => {
+  try {
+    const authorization = req.body.authorization as WithdrawalAuthorization;
+    await validateRpcIdentity();
+    await Promise.all([
+      validateSourceWithdrawal(authorization, [3, 5], false),
+      validateRefundDestination(authorization),
+    ]);
+    const transactionHash = await submitStratoAttestation("attestWithdrawalRefund", {
+      withdrawalId: authorization.sourceWithdrawalId,
+    });
+    res.json({ settlementAttestor: settlementAttestorAddress, transactionHash });
+  } catch (error) {
+    res.status(422).json({ error: (error as Error).message });
+  }
+});
+
 const start = async () => {
   try {
+    await validateRpcIdentity();
     [settlementAttestorAddress] = await Promise.all([
       validateSettlementVerifier(),
       validateAwsKmsAddress(kmsConfig),
