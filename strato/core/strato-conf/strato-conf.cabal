@@ -24,10 +24,13 @@ library
       aeson
     , base
     , bytestring
+    , containers
     , data-default
     , hedis
     , postgresql-simple
+    , resource-pool
     , strato-model
     , streaming
+    , unliftio-core
     , yaml
   default-language: Haskell2010

@@ -5,7 +5,7 @@ const axios = require("axios");
 const config = require("../config/app.config");
 
 const utils = require("../lib/utils");
-const redisBlockDB = require("../lib/redis-block-db");
+const nodeStatusDB = require("../lib/node-status-db");
 
 
 const API_VERSION = "2.0";
@@ -34,10 +34,10 @@ module.exports = {
           ],
           raw: true,
         }),
-        // Source `lastBlock.number` from the same place as `strato-barometer syncstats`
-        // (used by `bin/strato-ps`): the BestBlock entry in Redis. Falls back to
-        // BlockDataRef.number if Redis is unavailable.
-        redisBlockDB.getBestBlockNumber().catch((err) => {
+        // Source `lastBlock.number` from the node_status table, which the core
+        // mirrors from the same Redis entry `strato-barometer syncstats` reads.
+        // Falls back to BlockDataRef.number if the row is unavailable.
+        nodeStatusDB.getBestBlockNumber().catch((err) => {
           winston.warn(`Falling back to BlockDataRef for lastBlock.number: ${err.message}`);
           return null;
         }),
@@ -52,10 +52,10 @@ module.exports = {
           winston.warn(`Unable to fetch active peers count: ${err.message}`);
           return null;
         }),
-        // Current validator list, sourced from the same place as the
-        // /eth/v1.2/metadata endpoint: the BestSequencedBlock entry in Redis.
-        // Falls back to null so /status remains usable.
-        redisBlockDB.getValidators().catch((err) => {
+        // Current validator list, from the same node_status row the
+        // /eth/v1.2/metadata endpoint reads. Falls back to null so /status
+        // remains usable.
+        nodeStatusDB.getValidators().catch((err) => {
           winston.warn(`Unable to fetch validators: ${err.message}`);
           return null;
         }),
@@ -158,10 +158,10 @@ module.exports = {
           attributes: ["number", "hash", "parent_hash", "nonce"],
           raw: true,
         }),
-        // Source `lastBlock.number` from the same place as `strato-barometer syncstats`
-        // (used by `bin/strato-ps`): the BestBlock entry in Redis. Falls back to
-        // BlockDataRef.number if Redis is unavailable.
-        redisBlockDB.getBestBlockNumber().catch((err) => {
+        // Source `lastBlock.number` from the node_status table, which the core
+        // mirrors from the same Redis entry `strato-barometer syncstats` reads.
+        // Falls back to BlockDataRef.number if the row is unavailable.
+        nodeStatusDB.getBestBlockNumber().catch((err) => {
           winston.warn(`Falling back to BlockDataRef for lastBlock.number: ${err.message}`);
           return null;
         }),

@@ -47,6 +47,9 @@ data EthConf = EthConf
   { sqlConfig :: SqlConf,
     cirrusConfig :: SqlConf,
     redisBlockDBConfig :: RedisBlockDBConf,
+    -- | The edge tier's Redis (nonce counters, CSRF tokens, sessions),
+    -- shared by every API instance and separate from the core's block DB.
+    edgeRedisConfig :: RedisBlockDBConf,
     streamingConfig :: StreamingConf,
     levelDBConfig :: LevelDBConf,
     quarryConfig :: QuarryConf,
@@ -71,6 +74,7 @@ instance FromJSON EthConf where
     <$> v .: "sqlConfig"
     <*> v .: "cirrusConfig"
     <*> v .: "redisBlockDBConfig"
+    <*> v .:? "edgeRedisConfig" .!= defaultEdgeRedisConf
     <*> (v .:? "streamingConfig" .!= def <|> v .: "kafkaConfig")
     <*> v .:? "levelDBConfig" .!= def
     <*> v .:? "quarryConfig" .!= def
@@ -440,11 +444,20 @@ instance Default NetworkConf where
     , stakingEventsFromGovernanceBlock = defaultStakingEventsFromGovernanceBlock "upquark"
     }
 
+-- | Used when ethconf.yaml has no @edgeRedisConfig@ key, i.e. a node
+-- directory set up before the edge Redis existed. Such a node has no
+-- edge-redis container, so fall back to the core's Redis on a separate
+-- database number: functionally what the old in-process cache gave a single
+-- instance. strato-setup writes an explicit @edgeRedisConfig@ for new nodes.
+defaultEdgeRedisConf :: RedisBlockDBConf
+defaultEdgeRedisConf = def { redisDBNumber = 1 }
+
 instance Default EthConf where
   def = EthConf
     { sqlConfig = def
     , cirrusConfig = def { database = "cirrus" }
     , redisBlockDBConfig = def
+    , edgeRedisConfig = defaultEdgeRedisConf
     , streamingConfig = def
     , levelDBConfig = def
     , quarryConfig = def

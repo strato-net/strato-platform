@@ -39,6 +39,7 @@ import Bloc.API.Transaction
 import Bloc.API.Users
 import Bloc.API.Utils
 import Bloc.Database.Queries (getContractDetailsForContract, getContractWithCodeCollectionByAddress, withCodeCollectionCache)
+import Bloc.NonceStore (reserveNonces)
 import qualified SolidVM.Model.CodeCollection as CC
 import Bloc.Monad
 import Bloc.Server.TransactionResult
@@ -87,13 +88,8 @@ import Control.Lens hiding (from, ix)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Extra
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.State.Lazy (gets)
-import qualified Data.Cache as Cache
-import qualified Data.Cache.Internal as Cache
 import Data.Foldable
-import Data.Hashable hiding (hash)
 import Data.Int (Int32)
 import Data.List (sortOn, stripPrefix)
 import Text.Read (readMaybe)
@@ -101,9 +97,7 @@ import qualified Data.Map as M
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
-import Data.Semigroup (Max (..))
 import Data.Set (isSubsetOf)
-import qualified Data.Set as S
 import Data.Source.Map
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -119,7 +113,6 @@ import SolidVM.Model.CodeCollection.Function
 import SolidVM.Model.SolidString (labelToString, SolidString)
 import SolidVM.Model.CodeCollection.VarDef (FieldType(..))
 import qualified SolidVM.Model.Value as SMV
-import System.Clock
 import Text.Format
 
 import UnliftIO
@@ -1281,37 +1274,23 @@ getAccountTxParams ::
   m TxParams
 getAccountTxParams cacheNonce addr mTxParams = do
   let params = fromMaybe emptyTxParams mTxParams
-      cacheKey = addr
-  nonceCache <- fmap globalNonceCounter getBlocEnv
-  now <- liftIO $ getTime Monotonic
-  mCachedNonce <- case cacheNonce of
-    Do CacheNonce -> atomically $ cacheLookup nonceCache now cacheKey
-    Don't CacheNonce -> pure Nothing
-  theNonce <- case mCachedNonce of
-    Just n -> pure n
-    Nothing -> getAccountNonce addr
-  liftIO . atomically $ do
-    now' <- Cache.nowSTM
-    mmNonce <- cacheLookup nonceCache now' cacheKey
-    let mNonce = case cacheNonce of
-          Do CacheNonce -> mmNonce
-          Don't CacheNonce -> Nothing
-        sNonce = Just theNonce
-        maxNonce = liftA2 max mNonce sNonce
-        newNonce = fromMaybe 0 $ txparamsNonce params <|> maxNonce <|> mNonce <|> sNonce
-        expTime = (now' +) <$> Cache.defaultExpiration nonceCache
-    Cache.insertSTM cacheKey (newNonce + 1) nonceCache expTime
-    pure params {txparamsNonce = Just newNonce}
+  sqlNonce <- getAccountNonce addr
+  env <- getBlocEnv
+  let reserve = reserveNonces (nonceStore env) (nonceTtlSeconds env) addr (useStoredNonce cacheNonce) sqlNonce
+  theNonce <- case txparamsNonce params of
+    -- An explicit nonce is used as given and becomes the floor for the next
+    -- reservation, exactly as the in-process cache used to record it.
+    Just explicit -> explicit <$ reserve [explicit] 0
+    Nothing -> do
+      assigned <- reserve [] 1
+      case assigned of
+        [n] -> pure n
+        _ -> throwIO $ ServerError "nonce store returned no nonce"
+  pure params {txparamsNonce = Just theNonce}
 
-cacheLookup ::
-  (Hashable k) =>
-  Cache.Cache k v ->
-  TimeSpec ->
-  k ->
-  STM (Maybe v)
-cacheLookup c t k = do
-  Cache.purgeExpiredSTM c t
-  Cache.lookupSTM True k c t
+useStoredNonce :: Should CacheNonce -> Bool
+useStoredNonce (Do CacheNonce) = True
+useStoredNonce (Don't CacheNonce) = False
 
 genNonces :: forall a m.
   ( MonadIO m
@@ -1326,51 +1305,25 @@ genNonces :: forall a m.
   [a] ->
   m [a]
 genNonces cacheNonce fromAddr l items = do
-  let cacheKey :: Address
-      cacheKey = fromAddr
-      viewNonce :: a -> Maybe Nonce
+  let viewNonce :: a -> Maybe Nonce
       viewNonce = txparamsNonce <=< view l
-
-  nonceCache <- fmap globalNonceCounter getBlocEnv
-  now <- liftIO $ getTime Monotonic
-  cachedItem <- case cacheNonce of
-                  Do CacheNonce -> atomically $ cacheLookup nonceCache now cacheKey
-                  Don't CacheNonce -> pure $ Nothing
-
-  (sNonce :: Maybe Nonce) <-
-    case cachedItem of
-      Nothing -> fmap Just $ getAccountNonce fromAddr
-      Just val -> return $ Just val
-
-  liftIO . atomically $ do
-      let noncesInUse = S.fromList $ mapMaybe (viewNonce) items
-      now' <- Cache.nowSTM
-      nonce <-
-        if S.size noncesInUse == length items
-          then
-            pure . Nonce . error $
-              "internal error: unused nonce when already specified " ++ show items
-          else do
-            mmNonce <- cacheLookup nonceCache now' fromAddr
-            let mNonce = case cacheNonce of
-                  Do CacheNonce -> mmNonce
-                  Don't CacheNonce -> Nothing
-            pure . fromMaybe 0 $ liftA2 max mNonce sNonce <|> mNonce <|> sNonce
-      let txs = runIdentity . forStateT nonce items $ \a -> do
-            let params' = fromMaybe emptyTxParams (a ^. l)
-            newNonce <- case txparamsNonce params' of
-              Just v -> return v
-              Nothing -> do
-                whileM $ do
-                  inUse <- gets (`S.member` noncesInUse)
-                  when inUse $ id += 1
-                  return inUse
-                id <<+= 1
-            return $ (l .~ Just params' {txparamsNonce = Just newNonce}) a
-          newCachedNonce = 1 + getMax (foldMap (Max . fromMaybe 0 . viewNonce) txs)
-          expTime = (now' +) <$> Cache.defaultExpiration nonceCache
-      Cache.insertSTM fromAddr newCachedNonce nonceCache expTime
-      pure txs
+      inUse = mapMaybe viewNonce items
+      missing = length $ filter (isNothing . viewNonce) items
+  sqlNonce <- getAccountNonce fromAddr
+  env <- getBlocEnv
+  -- One atomic reservation for the whole batch: items with an explicit nonce
+  -- keep it, the rest receive the next free nonces in order, and the shared
+  -- counter ends one past the highest nonce in the batch.
+  assigned <- reserveNonces (nonceStore env) (nonceTtlSeconds env) fromAddr (useStoredNonce cacheNonce) sqlNonce inUse missing
+  let setNonce a n =
+        let params' = fromMaybe emptyTxParams (a ^. l)
+         in (l .~ Just params' {txparamsNonce = Just n}) a
+      fill (a : as) ns = case (viewNonce a, ns) of
+        (Just _, _) -> a : fill as ns
+        (Nothing, n : ns') -> setNonce a n : fill as ns'
+        (Nothing, []) -> error $ "internal error: ran out of reserved nonces for " ++ show items
+      fill [] _ = []
+  pure $ fill items assigned
 
 getAccountNonce ::
   ( MonadIO m

@@ -33,6 +33,8 @@ import Control.Monad.Composable.SQL
 -- import Data.String  -- UNUSED: was for solidvmevents
 import Blockchain.Slipstream.PostgresqlTypedShim
 import Data.Either (partitionEithers)
+import Data.Foldable (for_)
+import qualified Data.Text as T
 import Prelude hiding (lookup)
 
 getAndProcessMessages ::
@@ -47,14 +49,19 @@ getAndProcessMessages conn = do
 
   consume "slipstream" "vmevents" $ \messages -> timeSlipstreamPhase "batch" $ do
     recordKafkaMessages messages
+    let mTip = cirrusTip messages
+    -- The progress upsert is appended as the batch's final query, so it
+    -- lands in the last chunk and commits in the same transaction as the
+    -- batch's final Cirrus writes: the marker never claims a block whose
+    -- rows are still uncommitted.
     (_emittedEvents, ()) <- runConduit $
-      (processTheMessages messages `fuseUpstream` dedupC) `fuseBoth`
+      ((processTheMessages messages <* for_ mTip (yield . Right . cirrusProgressQuery)) `fuseUpstream` dedupC) `fuseBoth`
         sinkSlipstreamOutputChunks slipstreamOutputChunkSize (writeOutputChunk conn)
     recordProcessedKafkaMessages messages
     -- _ <- produceSolidVmEvents _emittedEvents  -- UNUSED: no consumer for solidvmevents
     -- Publish the high-water mark only after the conduit above has committed
     -- the batch's rows, so it never claims blocks Cirrus hasn't indexed yet.
-    publishCirrusHighWaterMark messages
+    for_ mTip publishCirrusHighWaterMark
     return ()
 
 writeOutputChunk ::
@@ -95,16 +102,33 @@ sinkSlipstreamOutputChunks chunkSize writeChunk = go
 slipstreamOutputChunkSize :: Int
 slipstreamOutputChunkSize = 256
 
--- | Record the highest block number this batch covered in Redis, where
--- strato-api folds it into the metadata isSynced flag. vm-runner emits exactly
--- one NewAction per executed block (empty blocks included, see
--- sendNewActionMessage), so the max NewAction block number is the exact Cirrus
--- tip; batches with no NewAction carry no block information to record.
-publishCirrusHighWaterMark :: MonadIO m => [VMEvent] -> m ()
-publishCirrusHighWaterMark messages =
+-- | The highest block number a batch covers. vm-runner emits exactly one
+-- NewAction per executed block (empty blocks included, see
+-- sendNewActionMessage), so the max NewAction block number is the exact
+-- Cirrus tip; batches with no NewAction carry no block information.
+cirrusTip :: [VMEvent] -> Maybe Integer
+cirrusTip messages =
   case [A._blockNumber a | NewAction a <- messages] of
-    [] -> pure ()
-    blockNumbers -> runStratoRedisIO . updateCirrusBestBlockNumber $ maximum blockNumbers
+    [] -> Nothing
+    blockNumbers -> Just $ maximum blockNumbers
+
+-- | Durable progress marker: upsert into @cirrus_progress@ (the
+-- @CirrusProgress@ entity in CirrusTables.txt). Never moves backwards, so a
+-- replayed batch cannot regress it.
+cirrusProgressQuery :: Integer -> SlipstreamQuery
+cirrusProgressQuery n =
+  RawSQL $
+    T.concat
+      [ "INSERT INTO cirrus_progress (name, block_number) VALUES ('slipstream', ",
+        T.pack (show n),
+        ") ON CONFLICT (name) DO UPDATE SET block_number = GREATEST(cirrus_progress.block_number, EXCLUDED.block_number)"
+      ]
+
+-- | Record the Cirrus tip in Redis, where strato-api folds it into the
+-- metadata isSynced flag. The Postgres row written by 'cirrusProgressQuery'
+-- is the durable copy; this one is node-local.
+publishCirrusHighWaterMark :: MonadIO m => Integer -> m ()
+publishCirrusHighWaterMark = runStratoRedisIO . updateCirrusBestBlockNumber
 
 ------ solidvmevents indexer code here ------
 -- UNUSED: no consumer for solidvmevents topic

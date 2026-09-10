@@ -284,7 +284,7 @@ EOF
     ${postgres_password:+-e postgres_password="${postgres_password}"} \
     "${STRATO_IMAGE}" \
     /node/nodedata --dockerMode=allDocker --network="${network}" --vaultUrl="${VAULT_URL}" --repoUrl="${REPO_URL:-}" \
-    --pghost=postgres --kafkahost=kafka --redisHost=redis --httpPort="${HTTP_PORT}" \
+    --pghost=postgres --kafkahost=kafka --redisHost=redis --edgeRedisHost=edge-redis --edgeRedisPort=6379 --httpPort="${HTTP_PORT}" \
     ${stakingActivationBlock:+--stakingActivationBlock="${stakingActivationBlock}"}
 
   # Fix ownership for non-root containers

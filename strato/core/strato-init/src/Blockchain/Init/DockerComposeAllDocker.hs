@@ -31,6 +31,7 @@ generateDockerComposeAllDocker = do
         , ("prometheusdata", VolumeConfig { volume_driver = Just "local" })
         , ("kafkadata", VolumeConfig { volume_driver = Just "local" })
         , ("redisdata", VolumeConfig { volume_driver = Just "local" })
+        , ("edgeredisdata", VolumeConfig { volume_driver = Just "local" })
         , ("zookeeperdata", VolumeConfig { volume_driver = Just "local" })
         ]
 
@@ -114,14 +115,12 @@ generateDockerComposeAllDocker = do
   let apex = def
         { image = "${APEX_IMAGE:-" ++ repoUrl ++ "apex:" ++ stratoVersion ++ "-" ++ hashApex ++ "}"
         , build = Just "."
-        , depends_on = Just $ DependsOnList ["postgres", "prometheus", "redis", "strato"]
+        , depends_on = Just $ DependsOnList ["postgres", "prometheus", "strato"]
         , environment = Just $ Map.fromList
             [ ("ADMIN_EMAIL", "${ADMIN_EMAIL:-}")
             , ("postgres_host", "postgres")
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
-            , ("redis_host", "redis")
-            , ("redis_port", "6379")
             , ("PROMETHEUS_HOST", "${PROMETHEUS_HOST:-prometheus:9090}")
             , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY:-}")
             , ("STRATO_HOSTNAME", "${STRATO_HOSTNAME:-strato}")
@@ -208,6 +207,8 @@ generateDockerComposeAllDocker = do
             , ("redisBDBNumber", "${redisBDBNumber:-}")
             , ("redisHost", "redis")
             , ("redisPort", "6379")
+            , ("edgeRedisHost", "edge-redis")
+            , ("edgeRedisPort", "6379")
             , ("seqMaxEventsPerIter", "${seqMaxEventsPerIter:-}")
             , ("seqMaxUsPerIter", "${seqMaxUsPerIter:-}")
             , ("seqRTSOPTs", "${seqRTSOPTs:-}")
@@ -268,12 +269,32 @@ generateDockerComposeAllDocker = do
         , logging = noLogging
         }
 
+  -- The edge tier's Redis: nonce counters (strato-api), CSRF tokens and
+  -- sessions (nginx). Kept apart from the core's block DB.
+  let edgeRedis = def
+        { image = "redis:7-alpine"
+        , entrypoint = Just ["/bin/sh", "-c"]
+        , command = Just ["exec docker-entrypoint.sh redis-server --appendonly yes >> /logs/edge-redis.log 2>&1"]
+        , volumes = Just ["./logs:/logs", "edgeredisdata:/data"]
+        , restart = Just "unless-stopped"
+        , healthcheck = Just Healthcheck
+            { test = ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+            , interval = Just "2s"
+            , timeout = Just "2s"
+            , retries = Just 10
+            , start_period = Just "30s"
+            }
+        , logging = noLogging
+        }
+
   let nginx = def
         { image = "${NGINX_IMAGE:-" ++ repoUrl ++ "nginx:" ++ stratoVersion ++ "-" ++ hashNginx ++ "}"
         , build = Just "."
-        , depends_on = Just $ DependsOnList ["apex", "docs", "postgrest", "prometheus", "smd", "strato", "app-backend", "app-ui"]
+        , depends_on = Just $ DependsOnList ["apex", "docs", "postgrest", "prometheus", "smd", "strato", "app-backend", "app-ui", "edge-redis"]
         , environment = Just $ Map.fromList
             [ ("APEX_HOST", "${APEX_HOST:-}")
+            , ("EDGE_REDIS_HOST", "${EDGE_REDIS_HOST:-edge-redis}")
+            , ("EDGE_REDIS_PORT", "${EDGE_REDIS_PORT:-6379}")
             , ("blockTime", "${blockTime:-}")
             , ("DOCS_HOST", "${DOCS_HOST:-}")
             , ("NGINX_TRUST_PROXY_CIDRS", "${NGINX_TRUST_PROXY_CIDRS:-}")
@@ -382,6 +403,7 @@ generateDockerComposeAllDocker = do
             , ("smd", smd)
             , ("apex", apex)
             , ("redis", redis)
+            , ("edge-redis", edgeRedis)
             , ("strato", strato)
             , ("postgrest", postgrest)
             , ("postgres", postgres)

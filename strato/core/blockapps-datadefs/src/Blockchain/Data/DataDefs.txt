@@ -182,3 +182,16 @@ ReceiptRef
     receiptBytes BS.ByteString
     UniqueReceiptRefBlockTx blockHash txIndex
     deriving Eq Generic Show
+
+IndexerProgress
+    name Text
+    blockNumber Integer sqltype=numeric(1000,0)
+    UniqueIndexerProgressName name
+    deriving Eq Show Generic
+
+NodeStatus
+    name Text
+    value Text
+    updatedAt UTCTime
+    UniqueNodeStatusName name
+    deriving Eq Show Generic

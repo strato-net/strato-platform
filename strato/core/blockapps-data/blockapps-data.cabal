@@ -25,6 +25,7 @@ library
       Blockchain.Data.Enode
       Blockchain.Data.EventDB
       Blockchain.Data.Extra
+      Blockchain.Data.IndexerProgress
       Blockchain.Data.Log
       Blockchain.Data.LogDB
       Blockchain.Data.LogsBloom

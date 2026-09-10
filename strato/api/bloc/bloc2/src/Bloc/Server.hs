@@ -17,9 +17,8 @@ import Bloc.Server.Transaction
 import Bloc.Server.TransactionResult
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Model.SyncState (BestBlock, WorldBestBlock)
+import Blockchain.Model.SyncState (WorldBestBlock)
 import Blockchain.Strato.Model.Address
-import Blockchain.SyncDB
 import Control.Lens (over, (&), (.~), (?~))
 import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Modify as Mod
@@ -32,8 +31,6 @@ import Servant.OpenApi
 type MonadBlocAPI m =
   ( MonadCoreAPI m,
     HasBlocEnv m,
-    Mod.Accessible (Maybe SyncStatus) m,
-    Mod.Accessible (Maybe BestBlock) m,
     Mod.Accessible (Maybe WorldBestBlock) m,
     Selectable Address AddressState m,
     HasCodeDB m

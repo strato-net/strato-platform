@@ -32,7 +32,7 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction (Transaction, rawTX2TX, transactionHash)
-import Blockchain.EthConf (runStreamMConfigured)
+import Blockchain.EthConf (runStreamMPooled)
 import Blockchain.Model.JsonBlock
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event (IngestEvent (IETx), Timestamp)
@@ -219,7 +219,7 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable TxsFilterParams [RawT
 instance {-# OVERLAPPING #-} (LoggingT IO) `Mod.Outputs` [IngestEvent] where
   output txs = do
     $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " tx(s) to unseqevents"
-    resps <- liftIO $ runStreamMConfigured "strato-api" $ writeUnseqEvents txs
+    resps <- liftIO $ runStreamMPooled "strato-api" $ writeUnseqEvents txs
     $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
 
 postTransactionC :: (MonadIO m, MonadLogger m) => Maybe Int -> RawTransaction' -> ConduitT a IngestEvent m Keccak256

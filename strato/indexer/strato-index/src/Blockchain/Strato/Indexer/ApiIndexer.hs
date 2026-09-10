@@ -20,7 +20,9 @@ import BlockApps.Logging
 import Blockchain.Data.AddressStateDB (AddressState(..))
 import Blockchain.Data.AddressStateRef (updateSQLBalanceAndNonce)
 import Blockchain.Data.DataDefs (ReceiptRef (..))
-import Blockchain.Data.ReceiptRef (putReceiptRefs)
+import Blockchain.Data.BlockDB (putBlocksSql)
+import Blockchain.Data.IndexerProgress (setIndexerProgressSql)
+import Blockchain.Data.ReceiptRef (putReceiptRefsSql)
 import Blockchain.DB.MemAddressStateDB (AddressStateModification(..))
 import Blockchain.DB.SQLDB
 import Blockchain.Model.SyncState
@@ -32,9 +34,11 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff (StateDiff)
-import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
+import Blockchain.Strato.StateDiff.Database (commitSqlDiffsSql)
 import Control.Arrow ((&&&))
 import Control.Monad
+import Data.Foldable (for_)
+import Data.Maybe (isJust)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
@@ -47,7 +51,6 @@ indexerMainLoop :: ( MonadLogger m,
                      HasStreaming m,
                      HasSQLDB m,
                      (Keccak256 `A.Alters` API OutputTx) m,
-                     (Keccak256 `A.Alters` API OutputBlock) m,
                      (Keccak256 `A.Alters` P2P OutputBlock) m,
                      Mod.Modifiable (P2P BestBlock) m
                    ) =>
@@ -61,8 +64,7 @@ indexerMainLoop =
 apiIndexerMainLoop :: ( MonadLogger m,
                         HasStreaming m,
                         HasSQLDB m,
-                        (Keccak256 `A.Alters` API OutputTx) m,
-                        (Keccak256 `A.Alters` API OutputBlock) m
+                        (Keccak256 `A.Alters` API OutputTx) m
                       ) =>
                       m ()
 apiIndexerMainLoop =
@@ -73,30 +75,41 @@ apiIndexerMainLoop =
 indexAPI ::
   ( MonadLogger m,
     HasSQLDB m,
-    (Keccak256 `A.Alters` API OutputTx) m,
-    (Keccak256 `A.Alters` API OutputBlock) m
+    (Keccak256 `A.Alters` API OutputTx) m
   ) =>
   [IndexEvent] ->
   m ()
 indexAPI idxEvents = do
   let (txs, blocks, receiptRefs, stateDiffs, asmUpdates) = filterHelper idxEvents
       insertCount = length blocks
+      -- vm-runner yields NewBestBlock only after a batch's RanBlocks and
+      -- their state diffs (BlockChain.addBlocks), so the highest one in this
+      -- batch bounds the blocks whose index events are all in hand.
+      mProgress = case [n | NewBestBlock (_, n) <- idxEvents] of
+        [] -> Nothing
+        ns -> Just $ maximum ns
 
   A.insertMany (A.Proxy @(API OutputTx)) . M.fromList $ (otHash &&& API) <$> txs
 
   $logInfoS "apiIndexer" . T.pack $ show insertCount ++ " of them are blocks"
-  when (insertCount > 0) $ do
+  when (insertCount > 0) $
     $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
-    A.insertMany (A.Proxy @(API OutputBlock)) . M.fromList $ (blockHash &&& API) <$> blocks
-
-  when (not $ null receiptRefs) $ do
-    $logInfoS "apiIndexer" . T.pack $
-      "Processing " ++ show (length receiptRefs) ++ " receipt rows"
-    putReceiptRefs receiptRefs
-
-  when (not $ null stateDiffs) $ do
+  when (not $ null receiptRefs) $
+    $logInfoS "apiIndexer" . T.pack $ "Processing " ++ show (length receiptRefs) ++ " receipt rows"
+  when (not $ null stateDiffs) $
     $logInfoS "apiIndexer" . T.pack $ "Processing " ++ show (length stateDiffs) ++ " state diffs"
-    mapM_ commitSqlDiffs stateDiffs
+
+  -- One transaction per batch: blocks, receipts, state diffs and the progress
+  -- marker commit together, so indexer_progress never names a block whose
+  -- rows are missing and a crash mid-batch leaves nothing half-applied. Every
+  -- write inside is idempotent, so the at-least-once redelivery after a crash
+  -- (offsets commit only after this handler returns) is safe.
+  when (not (null blocks) || not (null receiptRefs) || not (null stateDiffs) || isJust mProgress) $
+    sqlQuery $ do
+      unless (null blocks) . void $ putBlocksSql (outputBlockToBlockRetainPayloads <$> blocks) False
+      putReceiptRefsSql receiptRefs
+      mapM_ commitSqlDiffsSql stateDiffs
+      for_ mProgress setIndexerProgressSql
 
   when (not $ null asmUpdates) $ do
     $logInfoS "apiIndexer" . T.pack $ "Processing " ++ show (length asmUpdates) ++ " address state updates"

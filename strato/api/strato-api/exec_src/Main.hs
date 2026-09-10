@@ -21,18 +21,19 @@ import Bloc.Server
 import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.DB.CodeDB
+import Blockchain.DB.SQLDB (SQLDB, CirrusDB)
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef
 import Blockchain.Data.DataDefs
 import Blockchain.EthConf
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Model.JsonBlock
-import Blockchain.Model.SyncState (BestBlock, WorldBestBlock(..))
+import Blockchain.Data.NodeStatus (CirrusTip, getNodeBestBlock, getNodeBestSequencedBlock, getNodeCirrusTip, getNodeSyncStatus, getNodeWorldBestBlock)
+import Blockchain.Model.SyncState (BestBlock, BestSequencedBlock, WorldBestBlock)
 import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.RedisBlockDB
-import Blockchain.SyncDB
+import Blockchain.SyncDB (SyncStatus (..))
 import Control.Lens.Operators
 import Control.Monad.Change.Alter
 import Control.Monad.Change.Modify
@@ -45,8 +46,8 @@ import Core.API
 import Data.Aeson ()
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
-import qualified Data.Cache as Cache
 import qualified Data.HashMap.Strict.InsOrd as H
+import qualified Database.Redis as Redis
 import Data.Map (fromList, traverseWithKey)
 import Data.Maybe (listToMaybe)
 import Data.Source.Map
@@ -71,7 +72,6 @@ import Servant
 import Servant.Multipart
 import Servant.OpenApi
 import Servant.Swagger.UI
-import System.Clock
 import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
@@ -112,14 +112,22 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState 
 instance {-# OVERLAPPING #-} Selectable Address AddressState m => Selectable Address AddressState (ReaderT a m) where
   select p = lift . select p
 
-instance {-# OVERLAPPING #-} Accessible (Maybe SyncStatus) IO where
-  access _ = fmap SyncStatus <$> runStratoRedisIO getSyncStatus
+-- The sync scalars come from the node_status table (mirrored from the core's
+-- Redis by strato-indexer), so the API needs no Redis connection at all.
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Accessible (Maybe SyncStatus) (SQLM m) where
+  access _ = fmap SyncStatus <$> getNodeSyncStatus
 
-instance {-# OVERLAPPING #-} Accessible (Maybe BestBlock) IO where
-  access _ = runStratoRedisIO getBestBlockInfo
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Accessible (Maybe BestBlock) (SQLM m) where
+  access _ = getNodeBestBlock
 
-instance {-# OVERLAPPING #-} Accessible (Maybe WorldBestBlock) IO where
-  access _ = fmap WorldBestBlock <$> runStratoRedisIO getWorldBestBlockInfo
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Accessible (Maybe WorldBestBlock) (SQLM m) where
+  access _ = getNodeWorldBestBlock
+
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Accessible (Maybe BestSequencedBlock) (SQLM m) where
+  access _ = getNodeBestSequencedBlock
+
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Accessible (Maybe CirrusTip) (SQLM m) where
+  access _ = getNodeCirrusTip
 
 type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
 
@@ -128,16 +136,21 @@ fullServer = coreApiServer :<|> bloc
 
 ----------------
 
-hoistCoreServer :: BlocEnv -> UrlMap -> Servant.Server FullAPI
-hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErrors fullServer
+-- | The eth and cirrus pools are created once in 'main' and shared by every
+-- request. Until 2026-09 each request built (and tore down) its own
+-- 20-connection pool per database, which Postgres tolerated over loopback
+-- but which multiplies into thousands of connections once several API
+-- instances sit in front of a managed cluster.
+hoistCoreServer :: SQLDB -> CirrusDB -> BlocEnv -> UrlMap -> Servant.Server FullAPI
+hoistCoreServer sqlDb cirrusDb blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErrors fullServer
   where
     convertErrors :: ReaderT UrlMap (ReaderT BlocEnv (CirrusM (SQLM (LoggingT IO)))) a -> Handler a
     convertErrors x = Handler $ do
       y <- liftIO
         . try
         . runLoggingT
-        . runSQLM
-        . runCirrusM
+        . runSQLMWith sqlDb
+        . runCirrusMWith cirrusDb
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
         $ x `catch` handleRuntimeError `catch` handleApiError
@@ -184,17 +197,25 @@ main = do
   runInstrumentation "strato-api"
 
   let stateFetchLimit' = 100
+      -- Seconds a reserved nonce counter stays valid in the edge Redis; long
+      -- enough to cover a transaction's trip to the indexer under load.
       nonceCounterTimeout = 10
 
-  nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
+  -- The edge Redis (nonces here; CSRF tokens and sessions in nginx) is
+  -- shared by every API instance. hedis opens sockets lazily, so an
+  -- unreachable Redis surfaces on the first signed transaction, not here.
+  nonceStore' <- Redis.connect edgeRedisConnectInfo
   simCounter <- newTVarIO 0
+  sqlDb <- runLoggingT $ createSQLDB sqlPoolSize
+  cirrusDb <- runLoggingT $ createCirrusDB sqlPoolSize
 
   let env =
         BlocEnv
           { Bloc.Monad.txSizeLimit = Conf.txSizeLimit (networkConfig ethConf),
             Bloc.Monad.gasLimit = Conf.gasLimit (networkConfig ethConf),
             Bloc.Monad.stateFetchLimit = stateFetchLimit',
-            Bloc.Monad.globalNonceCounter = nonceCache,
+            Bloc.Monad.nonceStore = nonceStore',
+            Bloc.Monad.nonceTtlSeconds = nonceCounterTimeout,
             Bloc.Monad.vmJsonRpcUrl = Conf.vmJsonRpcUrl (Conf.vmConfig ethConf),
             Bloc.Monad.simInFlight = simCounter,
             Bloc.Monad.simMaxConcurrent = Conf.simMaxConcurrent (Conf.vmConfig ethConf)
@@ -203,10 +224,16 @@ main = do
       bindPort = Conf.apiPort (Conf.apiConfig ethConf)
   putStrLn $ "Starting strato-api on " ++ bindHost' ++ ":" ++ show bindPort
   let settings = setPort bindPort $ setHost (fromString bindHost') defaultSettings
-  runSettings settings $ app env theDoc urlMap
+  runSettings settings $ app sqlDb cirrusDb env theDoc urlMap
 
-app :: BlocEnv -> OpenApi -> UrlMap -> Application
-app blocEnv theDoc urlMap =
+-- | Connections per database for the whole process. Twenty matches the
+-- per-request pool size this replaced; -N4 workers rarely hold more than a
+-- handful at once.
+sqlPoolSize :: Int
+sqlPoolSize = 20
+
+app :: SQLDB -> CirrusDB -> BlocEnv -> OpenApi -> UrlMap -> Application
+app sqlDb cirrusDb blocEnv theDoc urlMap =
   prometheus def {prometheusInstrumentApp = False} $
     instrumentApp "core-api" $
       logStdoutDev $
@@ -215,7 +242,7 @@ app blocEnv theDoc urlMap =
         $
           addPathsTo404 $
             serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "openapi-ui" "openapi.json")) $
-              hoistCoreServer blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
+              hoistCoreServer sqlDb cirrusDb blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
 
 addPathsTo404 :: Middleware
 addPathsTo404 baseApp req respond' =

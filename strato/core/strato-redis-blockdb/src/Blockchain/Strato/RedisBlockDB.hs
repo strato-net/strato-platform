@@ -26,6 +26,7 @@ import Control.Monad.Change.Modify hiding (get)
 import Control.Monad.Trans
 import qualified Data.ByteString.Char8 as S8
 import Database.Redis
+import System.IO.Unsafe (unsafePerformIO)
 
 newtype RedisConnection = RedisConnection {unRedisConnection :: Connection}
 
@@ -49,9 +50,19 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "validators" -> Validators
   wut -> error $ "unknown namespace: " ++ show wut
 
+-- | The process-wide Redis connection pool. hedis' 'Connection' is itself a
+-- pool (50 sockets, 30s idle) whose sockets are opened lazily on first use,
+-- so building it once at startup costs nothing until Redis is actually
+-- reached, and a Redis that is still loading fails the first command (which
+-- callers already retry) instead of failing here. Previously every
+-- 'runStratoRedisIO' called 'checkedConnect', opening and pinging a new
+-- socket per call: invisible over loopback, but strato-api's /metadata and
+-- every bloc transaction do it, and the API tier is moving off the core host.
+{-# NOINLINE stratoRedisConnection #-}
+stratoRedisConnection :: Connection
+stratoRedisConnection = unsafePerformIO $ connect lookupRedisBlockDBConfig
+
 -- TODO: Use an effect system (IO eww... 😒)
 runStratoRedisIO :: MonadIO m => Redis a -> m a
-runStratoRedisIO r = liftIO $ do
-  conn <- checkedConnect lookupRedisBlockDBConfig
-  runRedis conn r
+runStratoRedisIO r = liftIO $ runRedis stratoRedisConnection r
 

@@ -21,6 +21,9 @@ library:
     - data-default
     - hedis
     - streaming
+    - containers
+    - resource-pool
+    - unliftio-core
     - postgresql-simple
     - strato-model
     - yaml

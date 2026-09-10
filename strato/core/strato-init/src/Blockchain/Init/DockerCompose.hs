@@ -116,14 +116,12 @@ generateDockerCompose = do
   let apex = def
         { image = "apex:" ++ stratoVersionTag ++ "-" ++ hashApex
         , user = Just userGid
-        , depends_on = Just $ DependsOnList ["postgres", "prometheus", "redis"]
+        , depends_on = Just $ DependsOnList ["postgres", "prometheus"]
         , extra_hosts = hostGateway
         , environment = Just $ Map.fromList
             [ ("postgres_host", "postgres")
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
-            , ("redis_host", "redis")
-            , ("redis_port", "6379")
             ]
         , volumes = Just
             [ "./logs:/logs"
@@ -161,6 +159,27 @@ generateDockerCompose = do
         , logging = noLogging
         , volumes = Just ["./logs:/logs", "./redis:/data"]
         , ports = Just ["127.0.0.1:6379:6379"]
+        }
+
+  -- The edge tier's Redis: nonce counters (strato-api), CSRF tokens and
+  -- sessions (nginx). Separate from the core's block DB so the core's Redis
+  -- stays internal; on a split deployment this is the API tier's ElastiCache.
+  let edgeRedis = def
+        { image = "redis:7-alpine"
+        , user = Just userGid
+        , entrypoint = Just ["/bin/sh", "-c"]
+        , command = Just ["exec docker-entrypoint.sh redis-server --appendonly yes >> /logs/edge-redis.log 2>&1"]
+        , restart = Just "unless-stopped"
+        , healthcheck = Just Healthcheck
+            { test = ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+            , interval = Just "2s"
+            , timeout = Just "2s"
+            , retries = Just 10
+            , start_period = Just "30s"
+            }
+        , logging = noLogging
+        , volumes = Just ["./logs:/logs", "./edge-redis:/data"]
+        , ports = Just ["127.0.0.1:6380:6379"]
         }
 
   let postgrest = def
@@ -225,10 +244,11 @@ generateDockerCompose = do
                 , ("smd", DependsOnCondition "service_started")
                 , ("app-backend", DependsOnCondition "service_started")
                 , ("app-ui", DependsOnCondition "service_started")
+                , ("edge-redis", DependsOnCondition "service_healthy")
                 , ("local-auth", DependsOnCondition "service_healthy")
                 ]
               else DependsOnList
-                ["apex", "docs", "postgrest", "prometheus", "smd", "app-backend", "app-ui"]
+                ["apex", "docs", "postgrest", "prometheus", "smd", "app-backend", "app-ui", "edge-redis"]
         
         , environment = Just $ Map.fromList $
             [ ("STRATO_PORT_API", stratoApiPort)
@@ -238,6 +258,8 @@ generateDockerCompose = do
             , ("RPC_PORT", rpcPort)
             , ("TRACKING_ENABLED", "true")
             , ("TRACKING_URL", "https://go.strato.nexus")
+            , ("EDGE_REDIS_HOST", "edge-redis")
+            , ("EDGE_REDIS_PORT", "6379")
             , ("ssl", if ssl then "true" else "false")
             ]
             ++ if flags_localAuth
@@ -249,6 +271,7 @@ generateDockerCompose = do
             [ "./logs:/logs"
             , "./secrets/ssl:/etc/ssl/strato:ro"
             , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
+            , "./secrets/session_secret:/run/secrets/session_secret:ro"
             , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
@@ -363,6 +386,7 @@ generateDockerCompose = do
             , ("smd", smd)
             , ("apex", apex)
             , ("redis", redis)
+            , ("edge-redis", edgeRedis)
             , ("postgrest", postgrest)
             , ("postgres", postgres)
             , ("nginx", nginx)

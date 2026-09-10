@@ -29,12 +29,10 @@ module Bloc.Monad
 where
 
 import BlockApps.Logging
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Nonce
 import Control.Monad.Change.Modify hiding (modify)
 import Control.Monad.Composable.Vault
 import Control.Monad.Reader
-import Data.Cache
+import qualified Database.Redis as Redis
 import Data.Text (Text)
 import GHC.Stack
 import SQLM
@@ -54,7 +52,10 @@ data BlocEnv = BlocEnv
   { stateFetchLimit :: Integer,
     txSizeLimit :: Int,
     gasLimit :: Integer,
-    globalNonceCounter :: Cache Address Nonce,
+    -- | Edge Redis holding the per-address nonce counters shared by every
+    -- API instance (see "Bloc.NonceStore"), and how long a counter lives.
+    nonceStore :: Redis.Connection,
+    nonceTtlSeconds :: Int,
     -- | Base URL of the node's ethereum-jsonrpc service, used for sandboxed
     -- transaction simulation (same container). From ethconf.yaml vmConfig.
     vmJsonRpcUrl :: String,

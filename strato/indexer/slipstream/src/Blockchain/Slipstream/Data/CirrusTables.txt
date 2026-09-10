@@ -20,3 +20,9 @@ Code
     creator Text
     Primary code_hash creator
     deriving Eq Ord Read Show
+
+CirrusProgress
+    name Text
+    blockNumber Integer sqltype=numeric(1000,0)
+    UniqueCirrusProgressName name
+    deriving Eq Ord Show

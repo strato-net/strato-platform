@@ -27,6 +27,8 @@ defineCustomFlag
 defineFlag "R:redisHost" ("localhost" :: String) "Redis BlockDB hostname"
 defineFlag "redisPort" (6379 :: Int) "Redis BlockDB port"
 defineFlag "redisDBNumber" (0 :: Integer) "Redis database number"
+defineFlag "edgeRedisHost" ("localhost" :: String) "Edge Redis hostname (nonce counters, CSRF tokens, sessions; shared by API instances)"
+defineFlag "edgeRedisPort" (6380 :: Int) "Edge Redis port"
 
 defineFlag "minPeers" (10 :: Int) "Threshold for discovery to stop querying for more peers"
 

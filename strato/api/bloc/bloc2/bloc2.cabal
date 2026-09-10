@@ -16,6 +16,7 @@ library
   exposed-modules:
       Bloc.Database.Queries
       Bloc.Monad
+      Bloc.NonceStore
       Bloc.Server
       Bloc.Server.Contracts
       Bloc.Server.JsonRpc
@@ -53,6 +54,7 @@ library
     , extra
     , format
     , hashable
+    , hedis
     , http-client
     , insert-ordered-containers
     , labeled-error

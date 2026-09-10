@@ -43,6 +43,7 @@ library:
   - openapi3
   - time
   - text
+  - unliftio
 
 tests:
   blockdb-test:

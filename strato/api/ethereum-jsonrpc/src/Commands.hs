@@ -18,7 +18,7 @@ import Blockchain.Data.LogsBloom (emptyLogsBloom)
 import TransactionReceipt (TransactionReceipt, EthHex(..), mkTransactionReceipt, transactionIndex)
 import Strato.Version (stratoVersion)
 import Blockchain.CommunicationConduit (ethVersion)
-import Blockchain.EthConf (runStreamMConfigured, ethConf)
+import Blockchain.EthConf (runStreamMPooled, ethConf)
 import qualified Blockchain.EthConf.Model as EthConf
 import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID, contractsConfig, nativeTokenAddress)
 import Blockchain.Data.Block (Block, blockBlockData, blockReceiptTransactions)
@@ -306,7 +306,7 @@ debugCallTimeout = 120000000
 callVM' :: Int -> JsonRpcCommand -> IO JsonRpcResponse
 callVM' waitMicros c = do
   putStrLn $ "callVM: " ++ show (jrcId c)
-  result <- timeout waitMicros $ runStreamMConfigured "ethereum-jsonrpc" $
+  result <- timeout waitMicros $ runStreamMPooled "ethereum-jsonrpc" $
     consumeFromLatest "jsonrpcresponse"
       (void $ writeSeqVmTasks [VmJsonRpcCommand c])
       (\responses ->

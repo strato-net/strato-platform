@@ -27,6 +27,7 @@ executables:
     - core-api2
     - ethereum-discovery
     - format
+    - hedis
     - http-types
     - insert-ordered-containers
     - lens

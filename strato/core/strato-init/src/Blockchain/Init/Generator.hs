@@ -184,7 +184,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
 
     -- Create node directories first (needed before genEthConf reads postgres_password)
     liftIO $ mapM_ (createDirectoryIfMissing True)
-      (["postgres", "redis", "prometheus", "logs", "secrets", ".ethereumH"] ++ brokerVolumeDirs)
+      (["postgres", "redis", "edge-redis", "prometheus", "logs", "secrets", ".ethereumH"] ++ brokerVolumeDirs)
 
     -- Make logs directory world-writable for containers running as non-root users (e.g. prometheus)
     liftIO $ setFileMode "logs" (ownerModes .|. groupModes .|. otherModes)
@@ -227,6 +227,17 @@ mkFilesAndGenesis nodeDir hasFlags network = do
       putStrLn $ "  Creating postgres password file: " ++ pgPasswordFile
       writeFile pgPasswordFile password
       void $ chmod roo pgPasswordFile
+
+    -- Session secret for nginx's encrypted session cookies. Every API-tier
+    -- nginx must share it, or a cookie minted by one instance fails to
+    -- decrypt on another; on a split deployment it comes from Secrets Manager.
+    let sessionSecretFile = "secrets" </> "session_secret"
+    sessionSecretExists <- doesFileExist sessionSecretFile
+    unless sessionSecretExists $ liftIO $ do
+      secret <- generatePassword 64
+      putStrLn $ "  Creating session secret file: " ++ sessionSecretFile
+      writeFile sessionSecretFile secret
+      void $ chmod roo sessionSecretFile
 
     when flags_localAuth $ liftIO setupLocalAuthSecrets
 

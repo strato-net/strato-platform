@@ -59,6 +59,10 @@ runtimeConfig = def
       , redisPort = flags_redisPort
       , redisDBNumber = flags_redisDBNumber
       }
+  , edgeRedisConfig = def
+      { redisHost = preferIPv4Loopback flags_edgeRedisHost
+      , redisPort = flags_edgeRedisPort
+      }
   , streamingConfig = def
       { streamingHost = bcHost brokerConfig
       , streamingPort = bcPort brokerConfig

@@ -36,6 +36,16 @@ RPC_PORT=${RPC_PORT:-8545}
 # connector signs transactions client-side and submits via eth_sendRawTransaction
 # over /rpc, so deployments that expose the SMD wallet must set JSONRPC_ENABLED=true.
 JSONRPC_ENABLED=${JSONRPC_ENABLED:-false}
+# Edge Redis for CSRF tokens and sessions, shared by every nginx instance in
+# front of the API tier. Empty EDGE_REDIS_HOST keeps both in this instance's
+# memory (fine for a single node, wrong behind a load balancer).
+EDGE_REDIS_HOST=${EDGE_REDIS_HOST:-}
+EDGE_REDIS_PORT=${EDGE_REDIS_PORT:-6379}
+# Session cookie secret: from the mounted secret file unless given directly.
+if [[ -z "${SESSION_SECRET:-}" && -f /run/secrets/session_secret ]]; then
+    SESSION_SECRET=$(tr -d '[:space:]' < /run/secrets/session_secret)
+fi
+SESSION_SECRET=${SESSION_SECRET:-}
 
 # Read config from ethconf.yaml (single source of truth)
 NODE_URL=$(yq '.urlConfig.nodeUrl' /config/ethconf.yaml)
@@ -172,6 +182,19 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i 's/<BLOC_TIMEOUT>/'"$BLOC_TIMEOUT"'/g' /tmp/nginx.conf
 
   # Replacing HOST NAME PLACEHOLDERS
+  if [[ -z "$EDGE_REDIS_HOST" ]]; then
+    sed -i '/#TEMPLATE_MARK_EDGE_REDIS/d' /tmp/nginx.conf
+  else
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_EDGE_REDIS//g' /tmp/nginx.conf
+  fi
+  if [[ -z "$SESSION_SECRET" ]]; then
+    sed -i '/#TEMPLATE_MARK_SESSION_SECRET/d' /tmp/nginx.conf
+  else
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_SESSION_SECRET//g' /tmp/nginx.conf
+  fi
+  sed -i "s/__EDGE_REDIS_HOST__/$EDGE_REDIS_HOST/g" /tmp/nginx.conf
+  sed -i "s/__EDGE_REDIS_PORT__/$EDGE_REDIS_PORT/g" /tmp/nginx.conf
+  sed -i "s|__SESSION_SECRET__|$SESSION_SECRET|g" /tmp/nginx.conf
   sed -i "s/__APEX_HOST__/$APEX_HOST/g" /tmp/nginx.conf
   sed -i "s|__TRACKING_URL__|$TRACKING_URL|g" /tmp/nginx.conf
   sed -i "s/__DOCS_HOST__/$DOCS_HOST/g" /tmp/nginx.conf
