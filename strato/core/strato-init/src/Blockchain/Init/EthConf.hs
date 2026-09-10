@@ -5,6 +5,7 @@ module Blockchain.Init.EthConf (genEthConf, preferIPv4Loopback) where
 
 import Blockchain.EthConf
 import Blockchain.Init.Options hiding (flags_localAuth)
+import Blockchain.Init.Role
 import Control.Monad.Composable.Streaming.DockerConfig (brokerConfig, bcHost, bcPort)
 import qualified Blockchain.Init.Options as Opts
 import Blockchain.Strato.Model.Address
@@ -20,9 +21,12 @@ import System.Info (os)
 import System.Process (readProcess)
 import Text.ShortDescription
 
--- | Address strato-api binds its socket to
+-- | Address strato-api binds its socket to: @--apiIPAddress@ when given,
+-- otherwise the docker bridge on Linux (so the nginx container reaches the
+-- host process) and loopback elsewhere.
 getApiListenAddress :: String
 getApiListenAddress
+  | not (null flags_apiIPAddress) = flags_apiIPAddress
   | os == "linux" = "172.17.0.1"
   | otherwise = "127.0.0.1"
 
@@ -122,8 +126,8 @@ waitOnVault env request = do
       waitOnVault env request
     Right val -> return val
 
-genEthConf :: IO EthConf
-genEthConf = do
+genEthConf :: Role -> IO EthConf
+genEthConf role = do
   pgPass <- filter (/= '\n') <$> readFile "secrets/postgres_password"
 
   localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
@@ -133,15 +137,32 @@ genEthConf = do
         ++ localHostname
         ++ if ssl then "" else ":" ++ show flags_httpPort
 
-  -- For local auth mode, skip vault during setup (vault-wrapper starts later)
+  -- For local auth mode, skip vault during setup (vault-wrapper starts later).
+  -- An API-only directory has no node identity: it signs nothing.
   if Opts.flags_localAuth
     then putStrLn $ "  ✓ Local auth mode (hostname: " ++ localHostname ++ "): node key will be provisioned during first admin setup"
-    else do
-      (pub, _addr) <- getNodeKey
-      putStrLn $ "  ✓ Node key: " ++ shortDescription pub
+    else if not (roleRunsCore role)
+      then putStrLn "  ✓ API role: no node key needed"
+      else do
+        (pub, _addr) <- getNodeKey
+        putStrLn $ "  ✓ Node key: " ++ shortDescription pub
+
+  -- On an API-only host both listeners face only the nginx container, so
+  -- the JSON-RPC server binds where strato-api does instead of everywhere,
+  -- and bloc's simulation calls follow it there.
+  let apiConf = apiConfig runtimeConfig
+      roleApiConfig
+        | role == RoleApi = apiConf { rpcListenAddress = getApiListenAddress }
+        | otherwise = apiConf
+      roleVmConfig
+        | role == RoleApi =
+            (vmConfig runtimeConfig) { vmJsonRpcUrl = "http://" ++ getApiListenAddress ++ ":" ++ show (rpcPort apiConf) }
+        | otherwise = vmConfig runtimeConfig
 
   return runtimeConfig
-    { sqlConfig = (sqlConfig runtimeConfig)
+    { apiConfig = roleApiConfig
+    , vmConfig = roleVmConfig
+    , sqlConfig = (sqlConfig runtimeConfig)
         { user = flags_pguser
         , host = preferIPv4Loopback flags_pghost
         , password = pgPass

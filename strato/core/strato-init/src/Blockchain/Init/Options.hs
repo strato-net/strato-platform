@@ -32,7 +32,7 @@ defineFlag "edgeRedisPort" (6380 :: Int) "Edge Redis port"
 
 defineFlag "minPeers" (10 :: Int) "Threshold for discovery to stop querying for more peers"
 
-defineFlag "apiIPAddress" "" "The address containers use to reach strato-api on the host (auto-detected if empty)"
+defineFlag "apiIPAddress" "" "Address strato-api binds to, which is also how the nginx container reaches it (default: the docker bridge 172.17.0.1 on Linux, 127.0.0.1 elsewhere)"
 
 defineFlag "httpPort" (8081 :: Int) "The external HTTP port for nginx"
 defineFlag "nodeHost" ("localhost" :: String) "The external hostname for the node"
@@ -54,6 +54,7 @@ defineFlag "localAuth" (False :: Bool) "Use local auth (Kratos/Hydra) instead of
 defineFlag "sslDir" ("" :: String) "Path to directory containing server.pem and server.key (enables SSL)"
 
 defineFlag "dockerMode" ("local" :: String) "Docker compose mode: 'local' for local dev, 'allDocker' for full containerized deployment"
+defineFlag "role" ("node" :: String) "What this directory runs: 'node' (everything, the default), 'core' (consensus, VM, indexers and their Postgres/Redis/broker), or 'api' (strato-api, ethereum-jsonrpc, PostgREST and the nginx sidecar; point --pghost and --kafkahost at a core and pass its Postgres password with --password)"
 
 defineFlag "repoUrl" ("" :: String) "Docker registry URL prefix for images (e.g., 'registry.example.com/org/')"
 

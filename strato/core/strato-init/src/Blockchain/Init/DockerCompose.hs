@@ -8,6 +8,7 @@ import Blockchain.EthConf (ethConf)
 import Blockchain.EthConf.Model (apiConfig, apiPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
+import Blockchain.Init.Role
 import Blockchain.Init.Options (flags_jsonrpc, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
@@ -17,8 +18,15 @@ import qualified Data.Yaml as Yaml
 import System.Posix.User (getEffectiveUserID, getEffectiveGroupID)
 import System.Process (readProcess)
 
-generateDockerCompose :: IO ()
-generateDockerCompose = do
+-- | Which of the node's containers a role runs. A core keeps the stores the
+-- chain processes write; an API tier keeps what fronts strato-api.
+roleHasService :: Role -> String -> Bool
+roleHasService RoleNode _ = True
+roleHasService RoleCore name = name `elem` ["postgres", "redis", "streaming", "prometheus"]
+roleHasService RoleApi name = name `elem` ["nginx", "postgrest", "edge-redis", "docs"]
+
+generateDockerCompose :: Role -> IO ()
+generateDockerCompose role = do
   uid <- show <$> getEffectiveUserID
   gid <- show <$> getEffectiveGroupID
   
@@ -398,9 +406,25 @@ generateDockerCompose = do
         then ("local-auth", localAuth) : baseServices
         else baseServices
 
+      -- An API-only nginx has no SMD, apex or Prometheus behind it; their
+      -- locations get an unreachable upstream and answer 502.
+      apiOnlyNginx = nginx
+        { depends_on = Just $ DependsOnList ["docs", "postgrest", "edge-redis"]
+        , environment = Map.union (Map.fromList
+            [ ("APEX_HOST", "127.0.0.1:1")
+            , ("SMD_HOST", "127.0.0.1:1")
+            , ("PROMETHEUS_HOST", "127.0.0.1:1")
+            ]) <$> environment nginx
+        }
+      roleServices =
+        [ (name, if role == RoleApi && name == "nginx" then apiOnlyNginx else svc)
+        | (name, svc) <- allServices
+        , roleHasService role name
+        ]
+
   let composeFile = ComposeFile
         { namedVolumes = Nothing
-        , services = Map.fromList allServices
+        , services = Map.fromList roleServices
         }
 
   Yaml.encodeFile "docker-compose.yml" composeFile

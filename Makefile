@@ -461,7 +461,7 @@ vault-nginx:
 	BASIL_DOCKER_TAG=${REPO_URL}vault-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
 docker-compose:
-	@echo Generating vault, highway, bridge compose files...
+	@echo Generating vault, highway, bridge, tracking, api compose files...
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.ecr.yml
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
@@ -470,6 +470,8 @@ docker-compose:
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.ecr.yml
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.tracking.tpl.yml > docker-compose.tracking.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.tracking.tpl.yml > docker-compose.tracking.push.ecr.yml
+	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.api.tpl.yml > docker-compose.api.push.yml
+	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.api.tpl.yml > docker-compose.api.push.ecr.yml
 
 	awk '/build: ./{getline} 1' docker-compose.vault.push.yml > docker-compose.vault.yml
 	awk '/build: ./{getline} 1' docker-compose.vault.push.ecr.yml > docker-compose.vault.ecr.yml
@@ -479,6 +481,8 @@ docker-compose:
 	awk '/build: ./{getline} 1' docker-compose.bridge.push.ecr.yml > docker-compose.bridge.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.tracking.push.yml > docker-compose.tracking.yml
 	awk '/build: ./{getline} 1' docker-compose.tracking.push.ecr.yml > docker-compose.tracking.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.api.push.yml > docker-compose.api.yml
+	awk '/build: ./{getline} 1' docker-compose.api.push.ecr.yml > docker-compose.api.ecr.yml
 
 docker-build:
 	cp -fr strato/extraFiles/* ${STRATODIR}

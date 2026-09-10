@@ -50,6 +50,11 @@ SESSION_SECRET=${SESSION_SECRET:-}
 # Read config from ethconf.yaml (single source of truth)
 NODE_URL=$(yq '.urlConfig.nodeUrl' /config/ethconf.yaml)
 STRATO_HOSTNAME=$(echo "$NODE_URL" | sed 's|https\?://\([^:/]*\).*|\1|')
+# As a sidecar in the API tier (docker-compose.api.yml) nginx proxies to the
+# strato-api container next to it, not to the host named by nodeUrl.
+if [[ -n "${API_UPSTREAM_HOST:-}" ]]; then
+  STRATO_HOSTNAME=$API_UPSTREAM_HOST
+fi
 STRATO_PORT_API=$(yq '.apiConfig.apiPort' /config/ethconf.yaml)
 HTTP_PORT=$(yq '.networkConfig.httpPort' /config/ethconf.yaml)
 VAULT_URL=$(yq '.urlConfig.vaultUrl' /config/ethconf.yaml | xargs)

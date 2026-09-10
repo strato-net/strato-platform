@@ -94,12 +94,20 @@ instance ToJSON EthConf where
 data ApiConfig = ApiConfig
   { apiPort :: Int
   , apiListenAddress :: String
+    -- | Bind address of ethereum-jsonrpc, in Warp's notation: an IP, "*"
+    -- (every interface, IPv4 and IPv6), "*4" or "*6". Kept separate from
+    -- 'apiListenAddress' because bloc reaches the JSON-RPC server on
+    -- localhost while nginx reaches strato-api on the docker bridge.
+  , rpcListenAddress :: String
+  , rpcPort :: Int
   } deriving (Show, Eq, Generic, ToJSON)
 
 instance FromJSON ApiConfig where
   parseJSON = withObject "ApiConfig" $ \v -> ApiConfig
     <$> v .:? "apiPort" .!= 3000
     <*> v .:? "apiListenAddress" .!= "127.0.0.1"
+    <*> v .:? "rpcListenAddress" .!= "*"
+    <*> v .:? "rpcPort" .!= 8545
 
 data DiscoveryConf = DiscoveryConf
   { discoveryPort :: Int,
@@ -397,6 +405,8 @@ instance Default ApiConfig where
   def = ApiConfig
     { apiPort = 3000
     , apiListenAddress = "127.0.0.1"
+    , rpcListenAddress = "*"
+    , rpcPort = 8545
     }
 
 instance Default DebugConfig where

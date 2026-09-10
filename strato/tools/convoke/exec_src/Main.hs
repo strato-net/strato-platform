@@ -19,7 +19,9 @@ import Control.Concurrent.Async
 import Control.Exception
 import Control.Monad
 import Text.Read (readMaybe)
+import Data.List (partition)
 import Data.Maybe (catMaybes)
+import Data.Time (NominalDiffTime, UTCTime, diffUTCTime, getCurrentTime)
 import qualified ShellWords as Sh
 import System.FilePath ((</>))
 import Log
@@ -35,17 +37,32 @@ pidFile = "pids.txt"
 logsDir :: FilePath
 logsDir = "logs"
 
--- Parse a shell-style command line into (cmd, args)
-parseLine :: String -> Maybe (FilePath, [String])
+-- | One line of commands.txt. A leading "@restart" marks a process convoke
+-- restarts by itself when it exits; any other process exiting takes the
+-- whole directory down (the consensus processes share state a lone restart
+-- cannot recover, so strato-setup marks only indexers, API servers and the
+-- helpers as restartable).
+data Spec = Spec FilePath [String] Bool  -- command, arguments, restartable
+
+specRestart :: Spec -> Bool
+specRestart (Spec _ _ r) = r
+
+restartMarker :: String
+restartMarker = "@restart"
+
+-- Parse a shell-style command line
+parseLine :: String -> Maybe Spec
 parseLine line =
   case Sh.parse line of
     Left _ -> Nothing
     Right [] -> Nothing
-    Right (cmd:args) -> Just (cmd, args)
+    Right (marker:cmd:args) | marker == restartMarker -> Just (Spec cmd args True)
+    Right [marker] | marker == restartMarker -> Nothing
+    Right (cmd:args) -> Just (Spec cmd args False)
 
 -- Launch a command and track its PID
-launchCommand :: (FilePath, [String]) -> IO (Async (ExitCode, ProcessID, FilePath))
-launchCommand (cmd, args) = do
+launchCommand :: Spec -> IO (Async (ExitCode, ProcessID, FilePath))
+launchCommand (Spec cmd args _) = do
   let logFile = logsDir </> cmd
   createDirectoryIfMissing True logsDir
   -- Append so logs survive restarts (like the docker service logs, which use
@@ -183,6 +200,47 @@ dockerComposeDown = do
   _ <- waitForProcess ph
   say "Docker containers stopped."
 
+data Child = Child
+  { childAsync :: Async (ExitCode, ProcessID, FilePath)
+  , childSpec :: Spec
+  , childStarted :: UTCTime
+  , childRestarts :: Int  -- consecutive quick exits, drives the backoff
+  }
+
+-- | A child that stayed up this long before exiting is treated as a fresh
+-- failure, not the next round of a crash loop.
+stableRunSeconds :: NominalDiffTime
+stableRunSeconds = 300
+
+maxRestartDelaySeconds :: Int
+maxRestartDelaySeconds = 60
+
+-- | Wait for children to exit. A restartable child is relaunched after an
+-- exponential backoff (1s, 2s, 4s ... capped) and supervision continues; any
+-- other exit stops everything, as it always has.
+supervise :: [Child] -> IO ()
+supervise [] = say "No processes left to supervise."
+supervise children = do
+  (finished, (exitCode, pid, cmd)) <- waitAny (map childAsync children)
+  let (exited, rest) = partition ((== finished) . childAsync) children
+  case exited of
+    [child] | specRestart (childSpec child) -> do
+      now <- getCurrentTime
+      let quick = diffUTCTime now (childStarted child) < stableRunSeconds
+          restarts = if quick then childRestarts child + 1 else 1
+          delaySeconds = min maxRestartDelaySeconds (2 ^ (min 6 (restarts - 1)) :: Int)
+      say $ "Process " ++ cmd ++ " (PID " ++ show pid ++ ") exited with: " ++ show exitCode
+        ++ "; restarting in " ++ show delaySeconds ++ "s (attempt " ++ show restarts ++ ")"
+      tailFile 20 (logsDir </> cmd)
+      threadDelay (delaySeconds * 1000 * 1000)
+      a <- launchCommand (childSpec child)
+      started <- getCurrentTime
+      supervise (rest ++ [Child a (childSpec child) started restarts])
+    _ -> do
+      say $ "ERROR: Process " ++ cmd ++ " (PID " ++ show pid ++ ") exited with: " ++ show exitCode
+      killAllProcesses
+      tailFile 20 (logsDir </> cmd)
+
 -- | Children inherit convoke's open-file limit, and the usual soft default of
 -- 1024 is too low: ethereum-jsonrpc opens a fresh Kafka connection per callVM
 -- request and only closes it ~10s after use, so a load test exhausts
@@ -223,16 +281,16 @@ main = do
 
   raiseOpenFileLimit
   say $ "Launching " ++ show (length commandList) ++ " processes..."
-  asyncs <- sequence $ map launchCommand commandList
+  running <- forM commandList $ \spec -> do
+    a <- launchCommand spec
+    started <- getCurrentTime
+    return (Child a spec started 0)
 
-  result <- waitAnyOrInterrupt asyncs
+  result <- withInterrupts $ supervise running
   case result of
-    Just (_, (exitCode, pid, cmd)) -> do
-      say $ "ERROR: Process " ++ cmd ++ " (PID " ++ show pid ++ ") exited with: " ++ show exitCode
-      killAllProcesses
-      tailFile 20 (logsDir </> cmd)
+    Just () -> return ()
     Nothing -> do
-      say "Interrupted by Ctrl-C"
+      say "Interrupted; stopping all processes"
       killAllProcesses
 
   -- Stop docker compose on shutdown (unless --no-docker)

@@ -17,7 +17,8 @@ import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
 import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_pghost, flags_sslDir)
+import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_password, flags_pghost, flags_sslDir)
+import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
@@ -79,8 +80,14 @@ createGenesisInfo network =
     "beryllium" -> HELIUM.berylliumGenesisBlock
     _ -> HELIUM.genesisBlock
 
-createCommandsFile :: IO ()
-createCommandsFile = do
+-- | Processes convoke may restart on their own when they exit. Everything
+-- else takes the whole directory down, as before: p2p, the sequencer and
+-- vm-runner share consensus state that a lone restart cannot recover.
+restartable :: String -> String
+restartable = ("@restart " ++)
+
+createCommandsFile :: Role -> IO ()
+createCommandsFile role = do
   localAuthCommands <- if flags_localAuth
     then do
       pgPassword <- filter (/= '\n') <$> readFile "secrets/postgres_password"
@@ -88,51 +95,52 @@ createCommandsFile = do
       -- pinning that genEthConf applies to the other local processes: postgres
       -- publishes on 127.0.0.1 only, but "localhost" resolves to ::1 first on
       -- macOS. See preferIPv4Loopback.
-      return ["blockapps-vault-wrapper-server --pghost " ++ preferIPv4Loopback flags_pghost ++ " --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
+      return [restartable $ "blockapps-vault-wrapper-server --pghost " ++ preferIPv4Loopback flags_pghost ++ " --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
     else return []
 
-  -- The sequencer and vm-runner carry multi-GB heaps during catch-up, so
-  -- their RTS flags are sized to this machine (or container limit) instead of
-  -- being hard-coded. Sizing happens here, once, at setup time: resizing a
-  -- node means re-running strato-setup or editing commands.txt.
-  resources <- detectMachineResources
-  (sequencerRts, seqNote) <- rtsWithOverride "STRATO_SEQUENCER_RTS" $
-    sequencerRtsFlags (mrCores resources) (mrMemMB resources)
-  (vmRunnerRts, vmNote) <- rtsWithOverride "STRATO_VMRUNNER_RTS" $
-    vmRunnerRtsFlags (mrCores resources) (mrMemMB resources)
-  let sizingReport =
-        [ "RTS sizing: " ++ describeMachineResources resources ]
-        ++ seqNote ++ vmNote ++
-        [ "strato-sequencer: " ++ sequencerRts
-        , "vm-runner: " ++ vmRunnerRts
-        ]
-  mapM_ (putStrLn . ("  " ++)) sizingReport
-  -- Persist the decision where support can find it later: setup's terminal
-  -- output is gone by the time anyone asks why a node runs with these flags.
-  writeFile ("logs" </> "rts-sizing.log") (unlines sizingReport)
-  when (mrMemMB resources <= smallestRamTierMB) $
-    putStrLn $ "\ESC[1;33mWarning: " ++ show (mrMemMB resources) ++ " MB RAM is not enough "
-      ++ "for from-genesis sync (vm-runner live data alone is ~3.5GB). "
-      ++ "Restore this node from a snapshot instead (strato-up --snapshot).\ESC[0m"
+  coreCommands <- if not (roleRunsCore role) then return [] else do
+    -- The sequencer and vm-runner carry multi-GB heaps during catch-up, so
+    -- their RTS flags are sized to this machine (or container limit) instead of
+    -- being hard-coded. Sizing happens here, once, at setup time: resizing a
+    -- node means re-running strato-setup or editing commands.txt.
+    resources <- detectMachineResources
+    (sequencerRts, seqNote) <- rtsWithOverride "STRATO_SEQUENCER_RTS" $
+      sequencerRtsFlags (mrCores resources) (mrMemMB resources)
+    (vmRunnerRts, vmNote) <- rtsWithOverride "STRATO_VMRUNNER_RTS" $
+      vmRunnerRtsFlags (mrCores resources) (mrMemMB resources)
+    let sizingReport =
+          [ "RTS sizing: " ++ describeMachineResources resources ]
+          ++ seqNote ++ vmNote ++
+          [ "strato-sequencer: " ++ sequencerRts
+          , "vm-runner: " ++ vmRunnerRts
+          ]
+    mapM_ (putStrLn . ("  " ++)) sizingReport
+    -- Persist the decision where support can find it later: setup's terminal
+    -- output is gone by the time anyone asks why a node runs with these flags.
+    writeFile ("logs" </> "rts-sizing.log") (unlines sizingReport)
+    when (mrMemMB resources <= smallestRamTierMB) $
+      putStrLn $ "\ESC[1;33mWarning: " ++ show (mrMemMB resources) ++ " MB RAM is not enough "
+        ++ "for from-genesis sync (vm-runner live data alone is ~3.5GB). "
+        ++ "Restore this node from a snapshot instead (strato-up --snapshot).\ESC[0m"
+    return
+      [ restartable "ethereum-discover +RTS -T -RTS"
+      , "strato-p2p +RTS -T -RTS"
+      , "strato-sequencer " ++ sequencerRts
+      , "vm-runner " ++ vmRunnerRts
+      , restartable "strato-indexer"
+      , restartable "slipstream +RTS -T -RTS"
+      , restartable "strato-network-monitor"
+      ]
 
-  let baseCommands =
-        [ "ethereum-discover +RTS -T -RTS"
-        , "strato-p2p +RTS -T -RTS"
-        , "strato-sequencer " ++ sequencerRts
-        , "vm-runner " ++ vmRunnerRts
-        , "strato-indexer"
-        , "slipstream +RTS -T -RTS"
-        , "strato-api +RTS -T -N -maxN4 -RTS"
-        , "strato-network-monitor"
-        , "strato-logrotate"
-        ]
+  let apiCommands
+        | roleRunsApi role =
+            restartable "strato-api +RTS -T -N -maxN4 -RTS"
+              : [restartable "ethereum-jsonrpc +RTS -T -N -maxN4 -RTS" | flags_jsonrpc]
+        | otherwise = []
 
-      jsonrpcCommands =
-        if flags_jsonrpc
-          then ["ethereum-jsonrpc +RTS -T -N -maxN4 -RTS"]
-          else []
+      commonCommands = [restartable "strato-logrotate"]
 
-  writeFile "commands.txt" $ unlines (localAuthCommands ++ baseCommands ++ jsonrpcCommands)
+  writeFile "commands.txt" $ unlines (localAuthCommands ++ coreCommands ++ apiCommands ++ commonCommands)
 
 -- | The computed RTS flags for a process, unless its escape-hatch env var is
 -- set, in which case the env var's value is used verbatim (wrapped in
@@ -168,8 +176,13 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     liftIO $ putStrLn $ "Node already exists at " ++ nodeDir ++ ", skipping setup."
   
   unless nodeExists $ do
-    liftIO $ putStrLn $ "Setting up STRATO node: " ++ nodeDir
+    let role = currentRole
+    liftIO $ putStrLn $ "Setting up STRATO " ++ roleName role ++ ": " ++ nodeDir
     liftIO $ putStrLn $ "  Network: " ++ network
+    when (role /= RoleNode && flags_localAuth) $
+      liftIO $ error "--localAuth is only supported with --role=node"
+    when (role /= RoleNode && flags_dockerMode == "allDocker") $
+      liftIO $ error "--dockerMode=allDocker is only supported with --role=node; use docker-compose.api.yml for a containerized API tier"
 
     -- Validate SSL directory contents before doing any setup
     when (not $ null flags_sslDir) $ do
@@ -183,8 +196,12 @@ mkFilesAndGenesis nodeDir hasFlags network = do
         liftIO $ error $ "SSL key not found: " ++ keyPath
 
     -- Create node directories first (needed before genEthConf reads postgres_password)
-    liftIO $ mapM_ (createDirectoryIfMissing True)
-      (["postgres", "redis", "edge-redis", "prometheus", "logs", "secrets", ".ethereumH"] ++ brokerVolumeDirs)
+    let coreDirs = ["postgres", "redis", "prometheus"] ++ brokerVolumeDirs
+        apiDirs = ["edge-redis"]
+    liftIO $ mapM_ (createDirectoryIfMissing True) $
+      ["logs", "secrets", ".ethereumH"]
+        ++ (if roleRunsCore role then coreDirs else [])
+        ++ (if roleRunsApi role then apiDirs else [])
 
     -- Make logs directory world-writable for containers running as non-root users (e.g. prometheus)
     liftIO $ setFileMode "logs" (ownerModes .|. groupModes .|. otherModes)
@@ -207,7 +224,8 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     -- NOT need this; in particular its config dir (redpanda/config) should not
     -- be made world-writable. If that backend ever becomes the default, give it
     -- a narrower treatment instead of relaxing every broker dir here.
-    liftIO $ mapM_ (\d -> setFileMode d (ownerModes .|. groupModes .|. otherModes)) brokerVolumeDirs
+    when (roleRunsCore role) $
+      liftIO $ mapM_ (\d -> setFileMode d (ownerModes .|. groupModes .|. otherModes)) brokerVolumeDirs
 
     -- Copy SSL cert and key into the node's secrets/ssl/ directory
     when (not $ null flags_sslDir) $ liftIO $ do
@@ -216,14 +234,18 @@ mkFilesAndGenesis nodeDir hasFlags network = do
       copyFile (flags_sslDir </> "server.key") ("secrets" </> "ssl" </> "server.key")
       putStrLn "  ✓ SSL certificate and key installed"
 
-    -- Set postgres password: use env var if provided, otherwise generate random
+    -- Set postgres password: --password, else the env var, else a random one.
+    -- An API directory talks to a core's Postgres, so it must be given that
+    -- core's password rather than invent one.
     let pgPasswordFile = "secrets" </> "postgres_password"
     pgPasswordExists <- doesFileExist pgPasswordFile
     unless pgPasswordExists $ liftIO $ do
       envPassword <- lookupEnv "postgres_password"
-      password <- case envPassword of
-        Just pw | not (null pw) -> return pw
-        _ -> generatePassword 32
+      password <- case (flags_password, envPassword) of
+        (pw, _) | not (null pw) -> return pw
+        (_, Just pw) | not (null pw) -> return pw
+        _ | role == RoleApi -> error "--role=api needs the core's Postgres password: pass --password or set postgres_password"
+          | otherwise -> generatePassword 32
       putStrLn $ "  Creating postgres password file: " ++ pgPasswordFile
       writeFile pgPasswordFile password
       void $ chmod roo pgPasswordFile
@@ -233,8 +255,11 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     -- decrypt on another; on a split deployment it comes from Secrets Manager.
     let sessionSecretFile = "secrets" </> "session_secret"
     sessionSecretExists <- doesFileExist sessionSecretFile
-    unless sessionSecretExists $ liftIO $ do
-      secret <- generatePassword 64
+    unless (sessionSecretExists || not (roleRunsApi role)) $ liftIO $ do
+      envSecret <- lookupEnv "session_secret"
+      secret <- case envSecret of
+        Just sec | not (null sec) -> return sec
+        _ -> generatePassword 64
       putStrLn $ "  Creating session secret file: " ++ sessionSecretFile
       writeFile sessionSecretFile secret
       void $ chmod roo sessionSecretFile
@@ -296,7 +321,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
             else
               error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first."
 
-    ethconf <- liftIO genEthConf
+    ethconf <- liftIO $ genEthConf role
 
     let dir = ".ethereumH"
     liftIO $ YAML.encodeFile (dir </> "ethconf.yaml") ethconf
@@ -314,9 +339,9 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     -- Generate docker-compose.yml
     liftIO $ case flags_dockerMode of
       "allDocker" -> generateDockerComposeAllDocker
-      _ -> generateDockerCompose
+      _ -> generateDockerCompose role
 
-    liftIO createCommandsFile
+    liftIO $ createCommandsFile role
     liftIO $ putStrLn "  ✓ Generated commands.txt"
 
     -- Custom genesis support: when genesis.json is pre-placed (e.g. useCustomGenesis=true in
@@ -324,7 +349,9 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     -- DO NOT REMOVE this branch — without it, custom genesis nodes crash with "Missing StateRoot".
     genesisExists <- doesFileExist "genesis.json"
 
-    if genesisExists
+    if not (roleRunsCore role)
+      then liftIO $ putStrLn "  ✓ API role: no genesis state needed"
+      else if genesisExists
       then do
         liftIO $ putStrLn "  ✓ Using provided genesis.json"
         content <- liftIO $ BS.readFile "genesis.json"
@@ -340,7 +367,10 @@ mkFilesAndGenesis nodeDir hasFlags network = do
           populateMPTAndWriteGenesis genesisInfo
         liftIO $ putStrLn "  ✓ Created genesis.json"
 
-    liftIO $ putStrLn "Node ready"
+    liftIO $ putStrLn $ case role of
+      RoleNode -> "Node ready"
+      RoleCore -> "Core ready"
+      RoleApi -> "API tier ready"
 
 -- We have to normalize the information held in GenesisInfo, unfortunalely we have some characters that done encode and decode back from JSON the same
 -- If we don't do this, the stateroot created from the raw data won't match that if created from the data read from genesis.json
