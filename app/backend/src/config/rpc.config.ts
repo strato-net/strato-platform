@@ -8,6 +8,7 @@ const lineaChainId = "59144";
 const lineaSepoliaChainId = "59141";
 const robinhoodChainId = "4663";
 const robinhoodTestnetChainId = "46630";
+const hyperEvmChainId = "999";
 
 const fallbackRpcUpstreams: RpcMapping = {
   [mainnetChainId]: process.env.RPC_URL_MAINNET_FALLBACK || "https://eth.merkle.io",
@@ -21,6 +22,8 @@ const fallbackRpcUpstreams: RpcMapping = {
   [robinhoodTestnetChainId]:
     process.env.RPC_URL_ROBINHOOD_TESTNET_FALLBACK ||
     "https://rpc.testnet.chain.robinhood.com",
+  [hyperEvmChainId]:
+    process.env.RPC_URL_HYPEREVM_FALLBACK || "https://rpc.hyperliquid.xyz/evm",
 };
 
 const rpcUpstreams: RpcMapping = {
@@ -33,6 +36,7 @@ const rpcUpstreams: RpcMapping = {
   [robinhoodChainId]: process.env.RPC_URL_ROBINHOOD || fallbackRpcUpstreams[robinhoodChainId],
   [robinhoodTestnetChainId]:
     process.env.RPC_URL_ROBINHOOD_TESTNET || fallbackRpcUpstreams[robinhoodTestnetChainId],
+  [hyperEvmChainId]: process.env.RPC_URL_HYPEREVM || fallbackRpcUpstreams[hyperEvmChainId],
 };
 
 export function getRpcUpstream(chainId: string): { upstream: string | undefined; fallback: string | undefined } {

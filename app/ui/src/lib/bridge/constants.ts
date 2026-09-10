@@ -215,6 +215,7 @@ export const SUPPORTED_CHAINS = {
   AVALANCHE: 43114,
   ROBINHOOD: 4663,
   ROBINHOOD_TESTNET: 46630,
+  HYPEREVM: 999,
 } as const;
 
 /** Robinhood Chain mainnet — not in viem/chains; used by wagmi + resolveViemChain */
@@ -245,6 +246,22 @@ export const robinhoodTestnet = defineChain({
     default: {
       name: "Explorer",
       url: "https://explorer.testnet.chain.robinhood.com",
+    },
+  },
+});
+
+/** HyperEVM — not in viem/chains; used by wagmi + resolveViemChain */
+export const hyperEvm = defineChain({
+  id: SUPPORTED_CHAINS.HYPEREVM,
+  name: "HyperEVM",
+  nativeCurrency: { name: "HYPE", symbol: "HYPE", decimals: 18 },
+  rpcUrls: {
+    default: { http: ["https://rpc.hyperliquid.xyz/evm"] },
+  },
+  blockExplorers: {
+    default: {
+      name: "Explorer",
+      url: "https://hyperevmscan.io",
     },
   },
 });
@@ -295,6 +312,7 @@ async function loadBuiltInChain(id: number): Promise<Chain | null> {
       case SUPPORTED_CHAINS.AVALANCHE:          return chains.avalanche;
       case SUPPORTED_CHAINS.ROBINHOOD:           return robinhood;
       case SUPPORTED_CHAINS.ROBINHOOD_TESTNET:  return robinhoodTestnet;
+      case SUPPORTED_CHAINS.HYPEREVM:           return hyperEvm;
       default:                                  return null;
     }
   } catch {
