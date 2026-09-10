@@ -45,6 +45,10 @@ redisConnection r =
 
 data EthConf = EthConf
   { sqlConfig :: SqlConf,
+    -- | Optional read endpoint for the eth database (a replica); the API
+    -- tier reads it and keeps 'sqlConfig' for writes and the few reads that
+    -- must see the latest commit.
+    sqlReaderConfig :: Maybe SqlConf,
     cirrusConfig :: SqlConf,
     redisBlockDBConfig :: RedisBlockDBConf,
     -- | The edge tier's Redis (nonce counters, CSRF tokens, sessions),
@@ -72,6 +76,7 @@ kafkaConfig = streamingConfig
 instance FromJSON EthConf where
   parseJSON = withObject "EthConf" $ \v -> EthConf
     <$> v .: "sqlConfig"
+    <*> v .:? "sqlReaderConfig"
     <*> v .: "cirrusConfig"
     <*> v .: "redisBlockDBConfig"
     <*> v .:? "edgeRedisConfig" .!= defaultEdgeRedisConf
@@ -465,6 +470,7 @@ defaultEdgeRedisConf = def { redisDBNumber = 1 }
 instance Default EthConf where
   def = EthConf
     { sqlConfig = def
+    , sqlReaderConfig = Nothing
     , cirrusConfig = def { database = "cirrus" }
     , redisBlockDBConfig = def
     , edgeRedisConfig = defaultEdgeRedisConf

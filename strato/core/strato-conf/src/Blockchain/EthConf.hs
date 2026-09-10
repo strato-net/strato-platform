@@ -6,6 +6,7 @@ module Blockchain.EthConf
   (
     ethConf,
     connStr,
+    readerConnStr,
     lookupRedisBlockDBConfig,
     edgeRedisConnectInfo,
     cirrusConnStr,
@@ -57,6 +58,11 @@ connStr = postgreSQLConnectionString . sqlConfig $ ethConf
 
 cirrusConnStr :: B.ByteString
 cirrusConnStr = postgreSQLConnectionString . cirrusConfig $ ethConf
+
+-- | The eth database's read endpoint (a replica), or the writer when none is
+-- configured.
+readerConnStr :: B.ByteString
+readerConnStr = maybe connStr postgreSQLConnectionString (sqlReaderConfig ethConf)
 
 -- | Run against a fresh stream environment (and so a fresh broker
 -- connection) each time. Right for a long-lived consumer loop that calls it

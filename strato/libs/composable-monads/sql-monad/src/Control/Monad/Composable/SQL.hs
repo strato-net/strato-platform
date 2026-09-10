@@ -24,7 +24,7 @@ type HasCirrus m = HasCirrusDB m
 -- should hold a pool created once with 'createSQLDB' and use 'runSQLMWith'.
 runSQLM :: (MonadUnliftIO m, MonadLoggerIO m) => SQLM m a -> m a
 runSQLM f =
-  PSQL.withPostgresqlPool connStr 20 (\ppool -> runReaderT f $ SQLDB ppool)
+  PSQL.withPostgresqlPool connStr 20 (\ppool -> runReaderT f $ sqlDB ppool)
 
 runCirrusM :: (MonadUnliftIO m, MonadLoggerIO m) => CirrusM m a -> m a
 runCirrusM f =
@@ -34,7 +34,9 @@ runCirrusM f =
 -- Connections are opened lazily, so creating these before Postgres is
 -- reachable is harmless.
 createSQLDB :: (MonadUnliftIO m, MonadLoggerIO m) => Int -> m SQLDB
-createSQLDB n = SQLDB <$> PSQL.createPostgresqlPool connStr n
+createSQLDB n
+  | readerConnStr == connStr = sqlDB <$> PSQL.createPostgresqlPool connStr n
+  | otherwise = SQLDB <$> PSQL.createPostgresqlPool readerConnStr n <*> PSQL.createPostgresqlPool connStr n
 
 createCirrusDB :: (MonadUnliftIO m, MonadLoggerIO m) => Int -> m CirrusDB
 createCirrusDB n = CirrusDB <$> PSQL.createPostgresqlPool cirrusConnStr n

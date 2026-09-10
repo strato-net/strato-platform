@@ -164,23 +164,32 @@ genEthConf role = do
             (vmConfig runtimeConfig) { vmJsonRpcUrl = "http://" ++ getApiListenAddress ++ ":" ++ show (rpcPort apiConf) }
         | otherwise = vmConfig runtimeConfig
 
-  return runtimeConfig
-    { apiConfig = roleApiConfig
-    , vmConfig = roleVmConfig
-    , sqlConfig = (sqlConfig runtimeConfig)
+  -- An API-only directory reads through the replica endpoint when one is
+  -- given; its writes (and consistency-sensitive reads) stay on --pghost.
+  let readerHost = if null flags_pgReaderHost || role /= RoleApi then Nothing else Just flags_pgReaderHost
+      writerSql = (sqlConfig runtimeConfig)
         { user = flags_pguser
         , host = preferIPv4Loopback flags_pghost
         , password = pgPass
         }
+
+  return runtimeConfig
+    { apiConfig = roleApiConfig
+    , vmConfig = roleVmConfig
+    , sqlConfig = writerSql
+    , sqlReaderConfig = (\h -> writerSql { host = h }) <$> readerHost
     , cirrusConfig = (cirrusConfig runtimeConfig)
         { user = flags_pguser
-        , host = preferIPv4Loopback flags_pghost
+        , host = maybe (preferIPv4Loopback flags_pghost) id readerHost
         , password = pgPass
         }
     , streamingConfig = (streamingConfig runtimeConfig)
         { streamingHost = if flags_kafkahost == "localhost"
                           then bcHost brokerConfig
                           else flags_kafkahost 
+        , streamingPort = if flags_kafkahost == "localhost"
+                          then bcPort brokerConfig
+                          else flags_kafkaport
         }
     , levelDBConfig = def
         { cacheSize = flags_ldbCacheSize

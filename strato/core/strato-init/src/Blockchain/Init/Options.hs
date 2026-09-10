@@ -16,6 +16,8 @@ defineFlag "pgReaderHost" ("" :: String) "Read-only Postgres endpoint (e.g. the 
 defineFlag "regenerate" (False :: Bool) "Re-generate ethconf.yaml, docker-compose.yml and commands.txt for an EXISTING directory from the flags given (state, secrets and genesis are kept). Pass the same flags as the original setup plus the changes; the network identity must not change"
 defineFlag "p:password" ("" :: String) "Postgres password"
 defineFlag "K:kafkahost" ("localhost" :: String) "Streaming broker hostname"
+defineFlag "kafkaport" (9092 :: Int) "Streaming broker port (9094 for a core's VPC-facing listener, see --kafkaExternalHost)"
+defineFlag "kafkaExternalHost" ("" :: String) "Private hostname or IP at which other hosts (the API tier) reach this node's broker; adds a second, VPC-facing listener on port 9094. Keep it private: the listener is plaintext, so restrict it with a security group"
 defineFlag "z:lazyblocks" (False :: Bool) "Don't mine empty blocks"
 defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If set to false, the peer will not be able to initiate a connection to the network by itself (this option is useful if you want to set up a peer to itself be a bootnode in a private network)"
 defineCustomFlag

@@ -16,6 +16,7 @@ import Bloc.Server.Simulate
 import Bloc.Server.Transaction
 import Bloc.Server.TransactionResult
 import Blockchain.DB.CodeDB
+import Blockchain.DB.SQLDB (HasSQLDB)
 import Blockchain.Data.AddressStateDB
 import Blockchain.Model.SyncState (WorldBestBlock)
 import Blockchain.Strato.Model.Address
@@ -31,6 +32,7 @@ import Servant.OpenApi
 type MonadBlocAPI m =
   ( MonadCoreAPI m,
     HasBlocEnv m,
+    HasSQLDB m,
     Mod.Accessible (Maybe WorldBestBlock) m,
     Selectable Address AddressState m,
     HasCodeDB m

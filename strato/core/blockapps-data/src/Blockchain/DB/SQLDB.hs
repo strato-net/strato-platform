@@ -8,6 +8,9 @@
 module Blockchain.DB.SQLDB
   ( HasSQLDB,
     SQLDB (..),
+    sqlDB,
+    unSQLDB,
+    sqlQueryWriter,
     HasCirrusDB,
     CirrusDB (..),
     sqlQuery,
@@ -34,10 +37,26 @@ import qualified Database.Persist.Postgresql as PSQL
 import qualified Database.Persist.Sql as SQL
 import System.IO.Unsafe (unsafePerformIO)
 
-newtype SQLDB = SQLDB {unSQLDB :: SQL.ConnectionPool}
+-- | The eth database. Reads go to 'sqlReaderPool' and writes (and the few
+-- reads that must see the latest commit, such as the API's resolve poll) to
+-- 'sqlWriterPool'. Every process but the API tier builds one with 'sqlDB',
+-- where both are the same pool; the API tier points the reader at a
+-- replica endpoint.
+data SQLDB = SQLDB
+  { sqlReaderPool :: SQL.ConnectionPool,
+    sqlWriterPool :: SQL.ConnectionPool
+  }
+
+-- | One pool serving reads and writes alike.
+sqlDB :: SQL.ConnectionPool -> SQLDB
+sqlDB p = SQLDB p p
+
+-- | The reader pool; the historical accessor.
+unSQLDB :: SQLDB -> SQL.ConnectionPool
+unSQLDB = sqlReaderPool
 
 instance NFData SQLDB where
-  rnf (SQLDB db) = db `seq` ()
+  rnf (SQLDB r w) = r `seq` w `seq` ()
 
 type HasSQLDB m = (MonadIO m, MonadUnliftIO m, AccessibleEnv SQLDB m)
 
@@ -49,13 +68,18 @@ instance NFData CirrusDB where
 type HasCirrusDB m = (MonadIO m, MonadUnliftIO m, AccessibleEnv CirrusDB m)
 
 sqlQuery :: HasSQLDB m => SQL.SqlPersistT (ResourceT m) a -> m a
-sqlQuery q = runResourceT . SQL.runSqlPool q . unSQLDB =<< accessEnv
+sqlQuery q = runResourceT . SQL.runSqlPool q . sqlReaderPool =<< accessEnv
+
+-- | Run against the writer: for writes, and for reads that must not lag
+-- behind the indexer (a replica may be a few hundred milliseconds behind).
+sqlQueryWriter :: HasSQLDB m => SQL.SqlPersistT (ResourceT m) a -> m a
+sqlQueryWriter q = runResourceT . SQL.runSqlPool q . sqlWriterPool =<< accessEnv
 
 cirrusQuery :: HasCirrusDB m => SQL.SqlPersistT (ResourceT m) a -> m a
 cirrusQuery q = runResourceT . SQL.runSqlPool q . unCirrusDB =<< accessEnv
 
 sqlQueryNoTransaction :: HasSQLDB m => SQL.SqlPersistT (ResourceT m) a -> m a
-sqlQueryNoTransaction q = runResourceT . flip (SQL.runSqlPoolNoTransaction q) Nothing . unSQLDB =<< accessEnv
+sqlQueryNoTransaction q = runResourceT . flip (SQL.runSqlPoolNoTransaction q) Nothing . sqlWriterPool =<< accessEnv
 
 runSqlPool :: MonadUnliftIO m => SQL.SqlPersistT (ResourceT m) a -> SQLDB -> m a
 runSqlPool q = runResourceT . SQL.runSqlPool q . unSQLDB
@@ -72,7 +96,7 @@ createPostgresqlPool ::
   PSQL.ConnectionString ->
   Int ->
   m SQLDB
-createPostgresqlPool cString n = SQLDB <$> PSQL.createPostgresqlPool cString n
+createPostgresqlPool cString n = sqlDB <$> PSQL.createPostgresqlPool cString n
 
 globalSQLPool :: IORef SQLDB
 globalSQLPool = unsafePerformIO $ do

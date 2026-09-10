@@ -9,7 +9,7 @@ import Blockchain.EthConf.Model (apiConfig, apiPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Role
-import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_jsonrpc, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
+import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_jsonrpc, flags_kafkaExternalHost, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
@@ -337,10 +337,23 @@ generateDockerCompose role = do
       applyKafkaRetention env
         | Map.member "KAFKA_LOG_DIRS" env = Map.union kafkaRetentionEnv env
         | otherwise = env
+      -- A second, VPC-facing listener so the API tier can produce to this
+      -- node's broker (transactions, VM calls) until the message bus exists.
+      -- The node's own processes keep using the localhost listener.
+      externalListener = not (null flags_kafkaExternalHost)
+      kafkaExternalEnv = Map.fromList
+        [ ("KAFKA_LISTENERS", "INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9093")
+        , ("KAFKA_ADVERTISED_LISTENERS", "INTERNAL://localhost:9092,EXTERNAL://" ++ flags_kafkaExternalHost ++ ":9094")
+        , ("KAFKA_LISTENER_SECURITY_PROTOCOL_MAP", "CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT")
+        , ("KAFKA_INTER_BROKER_LISTENER_NAME", "INTERNAL")
+        ]
+      applyKafkaExternal env
+        | externalListener && Map.member "KAFKA_LOG_DIRS" env = Map.union kafkaExternalEnv env
+        | otherwise = env
       streaming = def
         { image = bcImage bc
         , user = if bcNeedsUserGid bc then Just userGid else Nothing
-        , environment = applyKafkaRetention <$> bcEnvironment bc
+        , environment = applyKafkaExternal . applyKafkaRetention <$> bcEnvironment bc
         , entrypoint = bcEntrypoint bc
         , command = bcCommand bc
         , restart = Just "unless-stopped"
@@ -353,7 +366,8 @@ generateDockerCompose role = do
             }
         , volumes = Just (bcVolumes bc)
         , logging = noLogging
-        , ports = Just ["127.0.0.1:" ++ show (bcPort bc) ++ ":" ++ show (bcPort bc)]
+        , ports = Just $ ["127.0.0.1:" ++ show (bcPort bc) ++ ":" ++ show (bcPort bc)]
+            ++ ["9094:9094" | externalListener]
         }
 
   let prometheus = def

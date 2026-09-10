@@ -8,7 +8,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Handlers.TransactionResult
-  ( GetTransactionResult,
+  ( getTransactionResultsFromWriter,
+    GetTransactionResult,
     PostBatchTransactionResult,
     API,
     getTransactionResultClient,
@@ -27,6 +28,7 @@ import Control.Monad.Composable.SQL
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Database.Esqueleto.Legacy as E
+import Database.Persist.Postgresql (SqlPersistT)
 import SQLM (ApiError(MissingParameterError))
 import Servant
 import Servant.Client
@@ -56,18 +58,30 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Keccak256 [Transactio
         E.where_ matchHash
         return txr
   selectMany _ [] = throwIO $ MissingParameterError "missing parameter: hashes"
-  selectMany _ hashes = do
-    txrs <- sqlQuery . E.select . E.from $ \txr -> do
-      let matchHashes = (txr E.^. TransactionResultTransactionHash) `E.in_` E.valList hashes
-      E.where_ matchHashes
-      return txr
-    let mmUpsert k v m = case M.lookup k m of
-          Nothing -> M.insert k [v] m
-          Just vs -> M.insert k (v : vs) m
-        theFold m v = mmUpsert (transactionResultTransactionHash v) v m
-        baseMap = foldl (\m k -> M.insert k [] m) M.empty hashes
-        grouped = foldl theFold baseMap (E.entityVal <$> txrs)
-    return grouped
+  selectMany _ hashes = groupByHash hashes . map E.entityVal <$> sqlQuery (resultsByHashes hashes)
+
+resultsByHashes :: MonadIO m => [Keccak256] -> SqlPersistT m [E.Entity TransactionResult]
+resultsByHashes hashes = E.select . E.from $ \txr -> do
+  let matchHashes = (txr E.^. TransactionResultTransactionHash) `E.in_` E.valList hashes
+  E.where_ matchHashes
+  return txr
+
+groupByHash :: [Keccak256] -> [TransactionResult] -> M.Map Keccak256 [TransactionResult]
+groupByHash hashes txrs =
+  let mmUpsert k v m = case M.lookup k m of
+        Nothing -> M.insert k [v] m
+        Just vs -> M.insert k (v : vs) m
+      theFold m v = mmUpsert (transactionResultTransactionHash v) v m
+      baseMap = foldl (\m k -> M.insert k [] m) M.empty hashes
+   in foldl theFold baseMap txrs
+
+-- | The same lookup against the writer, for callers that poll for a result
+-- that was committed moments ago: on an API instance reading a replica the
+-- reader endpoint can lag by a few hundred milliseconds, which bloc's
+-- resolve poll would otherwise spend part of its 10-second budget on.
+getTransactionResultsFromWriter :: HasSQLDB m => [Keccak256] -> m (M.Map Keccak256 [TransactionResult])
+getTransactionResultsFromWriter [] = pure M.empty
+getTransactionResultsFromWriter hashes = groupByHash hashes . map E.entityVal <$> sqlQueryWriter (resultsByHashes hashes)
 
 getTransactionResult :: Selectable Keccak256 [TransactionResult] m => Keccak256 -> m [TransactionResult]
 getTransactionResult txHash = fromMaybe [] <$> select (Proxy @[TransactionResult]) txHash

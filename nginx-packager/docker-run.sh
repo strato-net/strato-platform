@@ -2,6 +2,13 @@
 
 set -e
 
+# The OAuth credentials file may arrive as one environment value (how ECS
+# hands over a Secrets Manager secret); make it a file first.
+if [[ -n "${OAUTH_CREDENTIALS_YAML:-}" && ! -f /run/secrets/oauth_credentials.yaml ]]; then
+    mkdir -p /run/secrets
+    printf '%s\n' "$OAUTH_CREDENTIALS_YAML" > /run/secrets/oauth_credentials.yaml
+fi
+
 # Load OAuth from file if env vars not set
 if [[ -f /run/secrets/oauth_credentials.yaml ]]; then
     OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-$(grep "discoveryUrl:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)}
@@ -53,21 +60,30 @@ if [[ -z "${SESSION_SECRET:-}" && -f /run/secrets/session_secret ]]; then
 fi
 SESSION_SECRET=${SESSION_SECRET:-}
 
+# The node config can arrive as a base64 environment value instead of a
+# mounted file (ECS has no bind mounts): ETHCONF_BASE64 is decoded to a
+# private copy and used from there.
+ETHCONF_FILE=${ETHCONF_FILE:-/config/ethconf.yaml}
+if [[ -n "${ETHCONF_BASE64:-}" ]]; then
+  ETHCONF_FILE=/tmp/ethconf.yaml
+  echo "$ETHCONF_BASE64" | base64 -d > "$ETHCONF_FILE"
+fi
+
 # Read config from ethconf.yaml (single source of truth)
-NODE_URL=$(yq '.urlConfig.nodeUrl' /config/ethconf.yaml)
+NODE_URL=$(yq '.urlConfig.nodeUrl' "$ETHCONF_FILE")
 STRATO_HOSTNAME=$(echo "$NODE_URL" | sed 's|https\?://\([^:/]*\).*|\1|')
 # As a sidecar in the API tier (docker-compose.api.yml) nginx proxies to the
 # strato-api container next to it, not to the host named by nodeUrl.
 if [[ -n "${API_UPSTREAM_HOST:-}" ]]; then
   STRATO_HOSTNAME=$API_UPSTREAM_HOST
 fi
-STRATO_PORT_API=$(yq '.apiConfig.apiPort' /config/ethconf.yaml)
-HTTP_PORT=$(yq '.networkConfig.httpPort' /config/ethconf.yaml)
-VAULT_URL=$(yq '.urlConfig.vaultUrl' /config/ethconf.yaml | xargs)
+STRATO_PORT_API=$(yq '.apiConfig.apiPort' $ETHCONF_FILE)
+HTTP_PORT=$(yq '.networkConfig.httpPort' $ETHCONF_FILE)
+VAULT_URL=$(yq '.urlConfig.vaultUrl' $ETHCONF_FILE | xargs)
 INTERNAL_VAULT_URL=${INTERNAL_VAULT_URL:-http://${STRATO_HOSTNAME}:8093}
 
 if [[ -z "${VAULT_URL}" || "${VAULT_URL}" == "null" ]]; then
-  echo "urlConfig.vaultUrl is required in /config/ethconf.yaml"
+  echo "urlConfig.vaultUrl is required in $ETHCONF_FILE"
   exit 7
 fi
 
